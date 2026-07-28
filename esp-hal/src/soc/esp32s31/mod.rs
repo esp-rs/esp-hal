@@ -67,10 +67,10 @@ pub(crate) fn pre_init() {
     // being disabled later, so perform the same enable/reset sequence as
     // ESP-IDF's S31 systimer LL before `Instant` starts using the counter.
     let systimer = crate::peripherals::HP_SYS_CLKRST::regs().systimer_ctrl0();
-    systimer.modify(|_, w| w.systimer_apb_clk_en().set_bit());
-    systimer.modify(|_, w| w.systimer_rst_en().set_bit());
-    systimer.modify(|_, w| w.systimer_rst_en().clear_bit());
-    systimer.modify(|_, w| w.systimer_clk_en().set_bit());
+    systimer.modify(|_, w| w.apb_clk_en().set_bit());
+    systimer.modify(|_, w| w.rst_en().set_bit());
+    systimer.modify(|_, w| w.rst_en().clear_bit());
+    systimer.modify(|_, w| w.clk_en().set_bit());
 }
 
 /// Opens LP/HP peripheral PMS regions for all security modes.

@@ -25,12 +25,12 @@ impl SpiInstance {
             SpiInstance::Spi2 => {
                 HP_SYS_CLKRST::regs()
                     .gpspi2_ctrl0()
-                    .modify(|_, w| unsafe { w.gpspi2_clk_src_sel().bits(source) });
+                    .modify(|_, w| unsafe { w.clk_src_sel().bits(source) });
             }
             SpiInstance::Spi3 => {
                 HP_SYS_CLKRST::regs()
                     .gpspi3_ctrl0()
-                    .modify(|_, w| unsafe { w.gpspi3_clk_src_sel().bits(source) });
+                    .modify(|_, w| unsafe { w.clk_src_sel().bits(source) });
             }
         }
     }

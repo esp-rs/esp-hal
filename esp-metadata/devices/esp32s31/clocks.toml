@@ -86,34 +86,49 @@ system_clocks = { clock_tree = [
 ] }
 
 peripheral_clocks = { templates = [
-    { name = "clk_en_template",         value = "{{default_clk_en_template}}" },
-    { name = "rst_template",            value = "{{default_rst_template}}" },
-    { name = "default_clk_en_template", value = "let _ = enable;" },
-    { name = "default_rst_template",    value = "let _ = reset;" },
-    { name = "sys_apb_clk_template",    value = "{{control}}::regs().{{sys_reg}}().modify(|_, w| w.{{sys_field}}_clk_en().bit(enable).{{apb_field}}_clk_en().bit(enable));" },
-    { name = "apb_clk_template",        value = "{{control}}::regs().{{apb_reg}}().modify(|_, w| w.reg_{{apb_field}}().bit(enable));" },
-    { name = "rst_template_inner",      value = "{{control}}::regs().{{rst_reg}}().modify(|_, w| w.reg_{{rst_field}}().bit(reset));" },
-    { name = "control",                 value = "crate::peripherals::HP_SYS_CLKRST" },
+    { name = "clk_en_template",       value = "{{default_clk_template}}" },
+    { name = "rst_template",          value = "{{default_rst_template}}" },
+
+    { name = "base",                  value = "crate::peripherals::HP_SYS_CLKRST::regs()" },
+    { name = "ctrl_reg",              value = "{{peripheral}}_ctrl0()" },
+
+    # Clock
+    { name = "default_clk_template",  value = "{{base}}.{{ctrl_reg}}.modify(|_, w| w {{clk_en}});" },
+    { name = "crypto_clk",            value = ".crypto_{{peripheral}}_clk_en().bit(enable)" },
+    { name = "clk_en",                value = "{{sys_clk}} {{apb_clk}}" },
+    
+    { name = "sys_clk",               value = ".sys_clk_en().bit(enable)" },
+    { name = "apb_clk",               value = ".apb_clk_en().bit(enable)" },
+    { name = "peri_clk",              value = ".clk_en().bit(enable)" },
+
+    # Reset
+    { name = "default_rst_template",  value = "{{base}}.{{ctrl_reg}}.modify(|_, w| w {{rst_en}});" },
+    { name = "rst_en",                value = ".rst_en().bit(reset)" },
+    { name = "crypto_rst",            value = ".crypto_{{peripheral}}_rst_en().bit(reset)" },
+
+    { name = "no_rst",                value = "let _ = reset;" },
+    { name = "uart_rst",              value = ".core_rst_en().bit(reset).apb_rst_en().bit(reset)" },
 ], peripheral_clocks = [
-    # UARTs: each has its own ctrl0 register
-    { name = "Uart0", template_params = { default_clk_en_template = "{{control}}::regs().uart_ctrl0(0).modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().uart_ctrl0(0).modify(|_, w| w.core_rst_en().bit(reset).apb_rst_en().bit(reset));" }, keep_enabled = true },
-    { name = "Uart1", template_params = { default_clk_en_template = "{{control}}::regs().uart_ctrl0(1).modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().uart_ctrl0(1).modify(|_, w| w.core_rst_en().bit(reset).apb_rst_en().bit(reset));" } },
-    { name = "Uart2", template_params = { default_clk_en_template = "{{control}}::regs().uart_ctrl0(2).modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().uart_ctrl0(2).modify(|_, w| w.core_rst_en().bit(reset).apb_rst_en().bit(reset));" } },
-    { name = "Uart3", template_params = { default_clk_en_template = "{{control}}::regs().uart_ctrl0(3).modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().uart_ctrl0(3).modify(|_, w| w.core_rst_en().bit(reset).apb_rst_en().bit(reset));" } },
-    { name = "Spi2", template_params = { default_clk_en_template = "{{control}}::regs().gpspi2_ctrl0().modify(|_, w| w.gpspi2_sys_clk_en().bit(enable).gpspi2_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().gpspi2_ctrl0().modify(|_, w| w.gpspi2_rst_en().bit(reset));" } },
-    { name = "Spi3", template_params = { default_clk_en_template = "{{control}}::regs().gpspi3_ctrl0().modify(|_, w| w.gpspi3_sys_clk_en().bit(enable).gpspi3_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().gpspi3_ctrl0().modify(|_, w| w.gpspi3_rst_en().bit(reset));" } },
-    { name = "AxiGdma", template_params = { default_clk_en_template = "{{control}}::regs().axi_pdma_ctrl0().modify(|_, w| w.axi_pdma_sys_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().axi_pdma_ctrl0().modify(|_, w| w.axi_pdma_rst_en().bit(reset));" } },
-    { name = "I2c0", template_params = { default_clk_en_template = "{{control}}::regs().i2c_ctrl0(0).modify(|_, w| w.apb_clk_en().bit(enable).clk_en().bit(enable));", default_rst_template = "{{control}}::regs().i2c_ctrl0(0).modify(|_, w| w.rst_en().bit(reset));" } },
-    { name = "I2c1", template_params = { default_clk_en_template = "{{control}}::regs().i2c_ctrl0(1).modify(|_, w| w.apb_clk_en().bit(enable).clk_en().bit(enable));", default_rst_template = "{{control}}::regs().i2c_ctrl0(1).modify(|_, w| w.rst_en().bit(reset));" } },
+    { name = "Uart0", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(0)" }, keep_enabled = true },
+    { name = "Uart1", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(1)" } },
+    { name = "Uart2", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(2)" } },
+    { name = "Uart3", template_params = { rst_en = "{{uart_rst}}", ctrl_reg = "uart_ctrl0(3)" } },
+
+    { name = "Spi2", template_params = { peripheral = "gpspi2" } },
+    { name = "Spi3", template_params = { peripheral = "gpspi3" } },
+    { name = "I2c0", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}", ctrl_reg = "i2c_ctrl0(0)" } },
+    { name = "I2c1", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}", ctrl_reg = "i2c_ctrl0(1)" } },
+    # DMA engines
+    { name = "AxiGdma", template_params = { peripheral = "axi_pdma", clk_en = "{{sys_clk}}" } },
     # USB
-    { name = "UsbHs",  template_params = { clk_en_template = "{{sys_apb_clk_template}}", sys_reg = "usb_otghs_ctrl0", sys_field = "usb_otghs_sys", apb_field = "usb_otghs_apb" } },
+    { name = "UsbHs", template_params = { peripheral = "usb_otghs", rst_template = "{{no_rst}}" } },
     # Crypto - there is a crypto_clk_en bit as well, luckily it starts as 1
-    { name = "Aes", template_params = { clk_en_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_aes_clk_en().bit(enable));", rst_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_aes_rst_en().bit(reset));" } }, # TODO
-    { name = "Ecc", template_params = { clk_en_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_ecc_clk_en().bit(enable));", rst_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_ecc_rst_en().bit(reset));" } }, # TODO
-    { name = "Sha", template_params = { clk_en_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_sha_clk_en().bit(enable));", rst_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_sha_rst_en().bit(reset));" } }, # TODO
-    { name = "Rsa", template_params = { clk_en_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_rsa_clk_en().bit(enable));", rst_template = "{{control}}::regs().crypto_ctrl0().modify(|_, w| w.crypto_rsa_rst_en().bit(reset));" } }, # TODO
+    { name = "Aes", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
+    { name = "Ecc", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
+    { name = "Sha", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
+    { name = "Rsa", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     # Timers
-    { name = "Systimer", template_params = { default_clk_en_template = "{{control}}::regs().systimer_ctrl0().modify(|_, w| w.systimer_apb_clk_en().bit(enable).systimer_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().systimer_ctrl0().modify(|_, w| w.systimer_rst_en().bit(reset));" }, keep_enabled = true },
-    { name = "Timg0", template_params = { default_clk_en_template = "{{control}}::regs().timergrp0_ctrl0().modify(|_, w| w.timergrp0_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().timergrp0_ctrl0().modify(|_, w| w.timergrp0_rst_en().bit(reset));" }, keep_enabled = true },
-    { name = "Timg1", template_params = { default_clk_en_template = "{{control}}::regs().timergrp1_ctrl0().modify(|_, w| w.timergrp1_apb_clk_en().bit(enable));", default_rst_template = "{{control}}::regs().timergrp1_ctrl0().modify(|_, w| w.timergrp1_rst_en().bit(reset));" } },
+    { name = "Systimer", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}" }, keep_enabled = true },
+    { name = "Timg0", template_params = { peripheral = "timergrp0", clk_en = "{{apb_clk}}" }, keep_enabled = true },
+    { name = "Timg1", template_params = { peripheral = "timergrp1", clk_en = "{{apb_clk}}" } },
 ] }
