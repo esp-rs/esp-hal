@@ -3,7 +3,8 @@ mod tests {
     use esp_hal::{
         Blocking,
         dma::{DmaError, Mem2Mem},
-        dma_buffers, dma_descriptors,
+        dma_buffers,
+        dma_descriptors,
     };
     const DATA_SIZE: usize = 1024 * 10;
 
