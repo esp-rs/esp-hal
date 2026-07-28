@@ -231,3 +231,65 @@ engines = [
         ]
     },
 ]
+
+[device.ecc]
+support_status = "not_supported"
+working_modes = [
+    { id = 0, mode = "affine_point_multiplication" },
+    { id = 2, mode = "affine_point_verification" },
+    { id = 3, mode = "affine_point_verification_and_multiplication" },
+    { id = 4, mode = "jacobian_point_multiplication" },
+    { id = 5, mode = "affine_point_addition" },
+    { id = 6, mode = "jacobian_point_verification" },
+    { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" },
+    { id = 8, mode = "modular_addition" },
+    { id = 9, mode = "modular_subtraction" },
+    { id = 10, mode = "modular_multiplication" },
+    { id = 11, mode = "modular_division" }
+]
+curves = [
+    { id = 0, curve = 192 },
+    { id = 1, curve = 256 },
+    { id = 2, curve = 384 },
+    # TODO: SM2 = 3
+]
+separate_jacobian_point_memory = true
+has_memory_clock_gate = true
+supports_enhanced_security = true
+
+[device.aes]
+support_status = "not_supported"
+has_split_text_registers = true
+endianness_configurable = false
+dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128", "GCM"]
+key_length = { options = [
+    { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
+    { bits = 256, encrypt_mode = 2, decrypt_mode = 6 },
+] }
+
+[device.rsa]
+support_status = "not_supported"
+version = 3 # TODO verify
+size_increment = 32
+memory_size_bytes = 512
+
+[device.sha]
+support_status = "not_supported"
+algo = {
+    sha1 = 0,
+    sha224 = 1,
+    sha256 = 2,
+    sha384 = 3,
+    sha512 = 4,
+    sha512_224 = 5,
+    sha512_256 = 6,
+    sha512_t = 7,
+    # TODO: sm3 = 14
+}
+
+[device.hmac]
+support_status = "not_supported"
+[device.ds]
+support_status = "not_supported"
+[device.ecdsa]
+support_status = "not_supported"
