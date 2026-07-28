@@ -606,7 +606,7 @@ impl Info {
             // TODO: this block should only prepare the new clock config, and it should
             // be applied only after validating the resulting baud rate.
             cfg_select! {
-                any(uart_has_sclk_divider, soc_has_pcr, esp32p4) => {
+                any(uart_has_sclk_divider, soc_has_pcr, esp32p4, esp32s31) => {
                     const MAX_DIV: u32 = property!("clock_tree.uart.baud_rate_generator.integral").1;
                     let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
                     debug!("SCLK: {} divider: {}", clk, clk_div);
@@ -891,7 +891,7 @@ impl<'t> UartClockGuard<'t> {
             // Apply default SCLK configuration
             let sclk_config = ClockConfig::new(
                 Default::default(),
-                #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))]
+                #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4, esp32s31))]
                 0,
             );
             clock.configure_function_clock(clocks, sclk_config);
