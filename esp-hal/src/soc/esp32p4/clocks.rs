@@ -17,6 +17,8 @@
     reason = "CPU frequency variant names follow the chip-spec MHz convention"
 )]
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
 
 use crate::{
@@ -120,7 +122,15 @@ impl ClockConfig {
     }
 
     pub(crate) fn configure(self, clocks: &mut ClockTree) {
+        // The CPU, memory, system, and APB dividers share one update signal.
+        // Write the complete configuration before latching it; applying each
+        // change separately can temporarily overclock the buses.
+        DIVIDER_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
         self.apply(clocks);
+        DIVIDER_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
+
+        update_divider();
+        ets_update_cpu_frequency_rom(Rate::from_hz(cpu_clk_frequency()).as_mhz());
     }
 }
 
@@ -308,11 +318,18 @@ fn configure_cpu_clk_impl(
     // Trigger divider update
     update_divider();
 
-    let cpu_freq = Rate::from_hz(cpu_clk_frequency());
-    ets_update_cpu_frequency_rom(cpu_freq.as_mhz());
+    if !DIVIDER_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        ets_update_cpu_frequency_rom(Rate::from_hz(cpu_clk_frequency()).as_mhz());
+    }
 }
 
+static DIVIDER_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);
+
 fn update_divider() {
+    if DIVIDER_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        return;
+    }
+
     HP_SYS_CLKRST::regs()
         .root_clk_ctrl0()
         .modify(|_, w| w.soc_clk_div_update().set_bit());
