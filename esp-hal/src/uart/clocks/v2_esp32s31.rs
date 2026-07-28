@@ -44,35 +44,36 @@ impl UartInstance {
     }
 
     pub(crate) fn enable_mem_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        if en {
-            // UART1-3 memories are powered down after reset. Hand control back to
-            // the PMU and request the memory to remain powered while active.
-            let regs = HP_SYS::regs();
-            let register = match self {
-                UartInstance::Uart0 => None,
-                UartInstance::Uart1 => Some(regs.uart1_mem_lp_ctrl()),
-                UartInstance::Uart2 => Some(regs.uart2_mem_lp_ctrl()),
-                UartInstance::Uart3 => Some(regs.uart3_mem_lp_ctrl()),
-            };
-            if let Some(register) = register {
-                register.modify(|_, w| unsafe {
-                    w.mem_lp_mode()
-                        .bits(2)
-                        .mem_lp_en()
-                        .clear_bit()
-                        .mem_force_ctrl()
-                        .clear_bit()
-                });
-            }
-        }
-
-        let regs = match self {
+        let uart = match self {
             UartInstance::Uart0 => crate::peripherals::UART0::regs(),
             UartInstance::Uart1 => crate::peripherals::UART1::regs(),
             UartInstance::Uart2 => crate::peripherals::UART2::regs(),
             UartInstance::Uart3 => crate::peripherals::UART3::regs(),
         };
-        regs.conf0().modify(|_, w| w.mem_clk_en().bit(en));
+        uart.conf0().modify(|_, w| w.mem_clk_en().bit(en));
+
+        // UART0 has a different reset state from UART1-3, so its PAC register
+        // has a different type even though the fields have the same layout.
+        macro_rules! set_memory_power {
+            ($register:expr) => {
+                $register.modify(|_, w| unsafe {
+                    w.mem_lp_mode()
+                        .bits(2)
+                        .mem_lp_en()
+                        .bit(!en)
+                        .mem_force_ctrl()
+                        .set_bit()
+                })
+            };
+        }
+
+        let regs = HP_SYS::regs();
+        match self {
+            UartInstance::Uart0 => set_memory_power!(regs.uart0_mem_lp_ctrl()),
+            UartInstance::Uart1 => set_memory_power!(regs.uart1_mem_lp_ctrl()),
+            UartInstance::Uart2 => set_memory_power!(regs.uart2_mem_lp_ctrl()),
+            UartInstance::Uart3 => set_memory_power!(regs.uart3_mem_lp_ctrl()),
+        };
     }
 
     pub(crate) fn configure_mem_clock_impl(
