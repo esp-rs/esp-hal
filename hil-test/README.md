@@ -98,7 +98,7 @@ Our self-hosted runners have the following setup:
     - `GPIO9` and `GPIO10` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S31 (`esp32s31-jtag`):
-  - Devkit: `ESP32-S31-DevKitC-1` connected via UART (`UART` port).
+  - Devkit: `ESP32-S31_QFN80_Test_Board` connected via UART (`USB-UART` port).
     - `GPIO6` and `GPIO7` are I2C pins.
     - `GPIO2` and `GPIO3` are connected.
   - Probe: `ESP-Prog` connected with the [following connections][connection_s31]
