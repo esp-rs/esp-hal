@@ -127,6 +127,18 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("rng.apb_cycle_wait_num") => {
+        16
+    };
+    ("rng.apb_cycle_wait_num", str) => {
+        stringify!(16)
+    };
+    ("rng.trng_supported") => {
+        false
+    };
+    ("rng.is_lp_sys") => {
+        false
+    };
     ("rom.has_crc_le") => {
         true
     };
