@@ -3552,6 +3552,18 @@ macro_rules! memory_range {
     (size as str, "DRAM2_UNINIT") => {
         "66416"
     };
+    ("IROM") => {
+        0x42000000..0x42400000
+    };
+    (size as str, "IROM") => {
+        "4194304"
+    };
+    ("DROM") => {
+        0x3C000000..0x3C400000
+    };
+    (size as str, "DROM") => {
+        "4194304"
+    };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
 ///

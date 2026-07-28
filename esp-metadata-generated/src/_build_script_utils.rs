@@ -426,6 +426,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"1\"",
                     "spi_master_fifo_size=\"64\"",
                     "spi_master_bit_order_is_bool",
@@ -661,6 +663,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"1\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=spi_master_bit_order_is_bool",
@@ -683,6 +687,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x3FFE7E30..0x40000000,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x400D0000..0x40400000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x3F400000..0x3F800000,
                             },
                         ),
                     ],
@@ -1002,6 +1018,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"3\"",
                     "spi_master_fifo_size=\"64\"",
                     "spi_master_has_app_interrupts",
@@ -1183,6 +1201,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=spi_master_has_app_interrupts",
@@ -1207,6 +1227,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x3FCCE800..0x3FCDEB70,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x42400000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x3C000000..0x3C400000,
                             },
                         ),
                     ],
@@ -1531,6 +1563,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"3\"",
                     "spi_master_fifo_size=\"64\"",
                     "spi_master_bit_order_is_bool",
@@ -1775,6 +1809,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=spi_master_bit_order_is_bool",
@@ -1801,6 +1837,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x3FCCE400..0x3FCDE710,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x42800000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x3C000000..0x3C800000,
                             },
                         ),
                     ],
@@ -2171,6 +2219,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"3\"",
                     "spi_master_fifo_size=\"64\"",
                     "spi_master_has_app_interrupts",
@@ -2461,6 +2511,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=spi_master_has_app_interrupts",
@@ -2491,6 +2543,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x4084E5A0..0x4085E5A0,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x44000000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x44000000,
                             },
                         ),
                     ],
@@ -2906,6 +2970,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"3\"",
                     "spi_master_fifo_size=\"64\"",
                     "spi_master_has_app_interrupts",
@@ -3210,6 +3276,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=spi_master_has_app_interrupts",
@@ -3237,6 +3305,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x4086E610..0x4087E610,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x43000000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x43000000,
                             },
                         ),
                     ],
@@ -3582,6 +3662,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"3\"",
                     "spi_master_fifo_size=\"64\"",
                     "spi_master_has_app_interrupts",
@@ -3810,6 +3892,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=spi_master_has_app_interrupts",
@@ -3839,6 +3923,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x4083EA70..0x4084EA70,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x44000000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x44000000,
                             },
                         ),
                     ],
@@ -4231,6 +4327,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"3\"",
                     "spi_master_fifo_size=\"64\"",
                     "spi_master_has_app_interrupts",
@@ -4506,6 +4604,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=spi_master_has_app_interrupts",
@@ -4531,6 +4631,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x4083EFD0..0x4084FEE0,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x43000000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x43000000,
                             },
                         ),
                     ],
@@ -4880,6 +4992,8 @@ impl Chip {
                     "soc_has_clock_node_mipi_dsi_phy_cfg_clk",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"3\"",
                     "spi_master_fifo_size=\"64\"",
                     "timergroup_timg_has_timer1",
@@ -5145,6 +5259,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_mipi_dsi_phy_cfg_clk",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
@@ -5167,6 +5283,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x4FF00000..0x4FF40000,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x40000000..0x44000000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x40000000..0x44000000,
                             },
                         ),
                     ],
@@ -5630,6 +5758,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"2\"",
                     "spi_master_fifo_size=\"72\"",
                     "spi_master_bit_order_is_bool",
@@ -5876,6 +6006,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"2\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"72\"",
                     "cargo:rustc-cfg=spi_master_bit_order_is_bool",
@@ -5901,6 +6033,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x3FFDE000..0x40000000,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x40080000..0x40800000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x3F000000..0x3F400000,
                             },
                         ),
                     ],
@@ -6363,6 +6507,8 @@ impl Chip {
                     "soc_has_clock_node_spi_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "spi_master_version=\"3\"",
                     "spi_master_fifo_size=\"64\"",
                     "spi_master_has_octal",
@@ -6658,6 +6804,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_spi_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=spi_master_version=\"3\"",
                     "cargo:rustc-cfg=spi_master_fifo_size=\"64\"",
                     "cargo:rustc-cfg=spi_master_has_octal",
@@ -6685,6 +6833,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x3FCDB700..0x3FCED710,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x42000000..0x44000000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x3C000000..0x3E000000,
                             },
                         ),
                     ],
@@ -6984,6 +7144,8 @@ impl Chip {
                     "soc_has_clock_node_i2c_function_clock",
                     "has_dram_region",
                     "has_dram2_uninit_region",
+                    "has_irom_region",
+                    "has_drom_region",
                     "timergroup_timg_has_divcnt_rst",
                     "timergroup_rc_fast_calibration_divider",
                     "timergroup_rc_fast_calibration_is_set",
@@ -7098,6 +7260,8 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_clock_node_i2c_function_clock",
                     "cargo:rustc-cfg=has_dram_region",
                     "cargo:rustc-cfg=has_dram2_uninit_region",
+                    "cargo:rustc-cfg=has_irom_region",
+                    "cargo:rustc-cfg=has_drom_region",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_divider",
                     "cargo:rustc-cfg=timergroup_rc_fast_calibration_is_set",
@@ -7115,6 +7279,18 @@ impl Chip {
                             "dram2_uninit",
                             MemoryRegion {
                                 address_range: 0x2F07AFC0..0x2F07CFB0,
+                            },
+                        ),
+                        (
+                            "irom",
+                            MemoryRegion {
+                                address_range: 0x40000000..0x50000000,
+                            },
+                        ),
+                        (
+                            "drom",
+                            MemoryRegion {
+                                address_range: 0x40000000..0x50000000,
                             },
                         ),
                     ],
@@ -7564,6 +7740,8 @@ impl Chip {
             "soc_has_clock_node_spi_function_clock",
             "has_dram_region",
             "has_dram2_uninit_region",
+            "has_irom_region",
+            "has_drom_region",
             "spi_master_bit_order_is_bool",
             "timergroup_timg_has_timer1",
             "timergroup_rc_fast_calibration_is_set",

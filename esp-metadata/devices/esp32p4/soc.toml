@@ -49,6 +49,8 @@ has_swd_watchdog = true
 memory_map = { ranges = [
     { name = "dram", start = 0x4FF4_0000, end = 0x4FFC_0000 },
     { name = "dram2_uninit", start = 0x4FF0_0000, end = 0x4FF4_0000 },
+    { name = "irom", start = 0x4000_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x4000_0000, end = 0x4400_0000 },
 ] }
 
 peripherals = [
