@@ -13,6 +13,10 @@ cores  = 1
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 256
+
 [device.rom]
 has_crc_le  = true
 has_md5_bsd = true

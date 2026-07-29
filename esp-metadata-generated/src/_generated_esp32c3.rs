@@ -271,6 +271,18 @@ macro_rules! property {
     ("lp_io.version") => {
         "v3"
     };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        128
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(128)
+    };
     ("phy.combo_module") => {
         true
     };

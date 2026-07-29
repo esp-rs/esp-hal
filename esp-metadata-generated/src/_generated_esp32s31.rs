@@ -184,6 +184,18 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        1024
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(1024)
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };

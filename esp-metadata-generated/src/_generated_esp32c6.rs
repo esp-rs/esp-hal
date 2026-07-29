@@ -298,6 +298,18 @@ macro_rules! property {
     ("lp_uart.ram_size", str) => {
         stringify!(32)
     };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        256
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(256)
+    };
     ("parl_io.version") => {
         1
     };
