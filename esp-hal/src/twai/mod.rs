@@ -1767,15 +1767,11 @@ mod asynch {
     }
 
     pub(super) fn handle_interrupt(register_block: &RegisterBlock, async_state: &TwaiAsyncState) {
-        let intr_status = register_block.int_raw().read();
-
+        let int_raw = register_block.int_raw().read();
         let int_ena_reg = register_block.int_ena();
-        let tx_int_status = intr_status.tx_int_st();
-        let rx_int_status = intr_status.rx_int_st();
+        let int_ena = int_ena_reg.read();
 
-        let intr_enable = int_ena_reg.read();
-
-        if rx_int_status.bit_is_set() {
+        if int_raw.rx_int_st().bit_is_set() {
             let status_reg = register_block.status();
             let status = status_reg.read();
 
@@ -1784,7 +1780,7 @@ mod asynch {
             if status.bus_off_st().bit_is_set() {
                 let _ = rx_queue.try_send(Err(EspTwaiError::BusOff));
                 // Abort transmissions and wake senders if we are in bus-off state.
-                if !status.tx_buf_st().bit_is_set() {
+                if status.tx_buf_st().bit_is_clear() {
                     register_block.cmd().write(|w| w.abort_tx().set_bit());
                     async_state.tx_waker.wake();
                 }
@@ -1813,11 +1809,11 @@ mod asynch {
             }
         }
 
-        if tx_int_status.bit_is_set() {
+        if int_raw.tx_int_st().bit_is_set() {
             async_state.tx_waker.wake();
         }
 
-        if intr_status.bits() & 0b10110100 > 0 {
+        if int_raw.bits() & 0b10110100 > 0 {
             // We might want to use the error code to gather statistics in the
             // future.
             let _ = register_block.err_code_cap().read();
@@ -1826,7 +1822,7 @@ mod asynch {
 
         // Clear interrupt request bits
         unsafe {
-            int_ena_reg.modify(|_, w| w.bits(intr_enable.bits() & (!intr_status.bits() | 1)));
+            int_ena_reg.modify(|_, w| w.bits(int_ena.bits() & (!int_raw.bits() | 1)));
         }
     }
 }
