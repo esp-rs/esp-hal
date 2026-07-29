@@ -60,7 +60,7 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     let dma_channel = cfg_select! {
-        any(feature = "esp32", feature = "esp32s2") => peripherals.DMA_I2S0,
+        i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,
         _ => peripherals.DMA_CH0,
     };
 

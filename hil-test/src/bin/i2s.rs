@@ -12,9 +12,6 @@
 macro_rules! i2s_test_dma_channel {
     ($peripherals:ident, I2S0) => {
         cfg_select! {
-            esp32s2 => {
-                $peripherals.DMA_I2S0
-            }
             i2s_dma_engine = "I2S_DMA" => {
                 $peripherals.DMA_I2S0.into()
             }
