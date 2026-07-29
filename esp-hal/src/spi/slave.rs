@@ -1,6 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
-        cfg(any(esp32, esp32s2)) => "DMA_SPI2",
+        cfg(spi_slave_dma_engine = "SPI_DMA") => "DMA_SPI2",
         _ => "DMA_CH0",
     },
 ))]
@@ -513,7 +513,7 @@ pub mod dma {
         }
 
         fn reset_dma_before_usr_cmd(&self) {
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(spi_slave_dma_engine = "SPI_DMA"))]
             self.regs().dma_conf().modify(|_, w| {
                 w.rx_afifo_rst().set_bit();
                 w.buf_afifo_rst().set_bit();
@@ -523,7 +523,7 @@ pub mod dma {
 
         fn enable_dma(&self) {
             cfg_select! {
-                any(esp32, esp32s2) => {
+                spi_slave_dma_engine = "SPI_DMA" => {
                     use crate::RegisterToggle;
                     self.regs().dma_conf().toggle(|w, bit| {
                         w.in_rst().bit(bit);
@@ -547,7 +547,7 @@ pub mod dma {
         fn clear_dma_interrupts(&self) {
             self.regs().dma_int_clr().write(|w| {
                 cfg_select! {
-                    any(esp32, esp32s2) => {
+                    spi_slave_dma_engine = "SPI_DMA" => {
                         w.inlink_dscr_empty().clear_bit_by_one();
                         w.outlink_dscr_error().clear_bit_by_one();
                         w.inlink_dscr_error().clear_bit_by_one();
