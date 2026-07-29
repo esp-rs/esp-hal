@@ -1806,7 +1806,10 @@ mod asynch {
                     // Current frame is complete
                     read_frame(register_block)
                 };
-                let _ = rx_queue.try_send(msg);
+                // Rx queue is full? Stop consumming Rx frames
+                if rx_queue.try_send(msg).is_err() {
+                    break;
+                }
             }
         }
 
