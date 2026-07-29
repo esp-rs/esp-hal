@@ -103,10 +103,7 @@ fn configure_tx(i2s: &Info, config: &super::PdmTxConfig) -> Result<(), PdmError>
                 .modify(|_, w| w.i2s_mclk_sel().clear_bit());
         }
         i2s_clock_configured_by_hp_sys_clkrst => {
-            // TODO: I2S0 hard-coded here
-            crate::peripherals::HP_SYS_CLKRST::regs()
-                .peri_clk_ctrl14()
-                .modify(|_, w| w.i2s0_mst_clk_sel().set_bit());
+            // MCLK mux is configured in `hp_sys_clkrst::set_tx_clock` via `Info::peripheral`.
         }
         _ => {
             i2s.regs().rx_clkm_conf().modify(|_, w| w.mclk_sel().clear_bit());
@@ -197,10 +194,7 @@ fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError>
                 .modify(|_, w| w.i2s_mclk_sel().set_bit());
         }
         i2s_clock_configured_by_hp_sys_clkrst => {
-            // TODO: I2S0 hard-coded here
-            crate::peripherals::HP_SYS_CLKRST::regs()
-                .peri_clk_ctrl14()
-                .modify(|_, w| w.i2s0_mst_clk_sel().clear_bit());
+            // MCLK mux is configured in `hp_sys_clkrst::set_rx_clock` via `Info::peripheral`.
         }
         _ => {
             i2s.regs().rx_clkm_conf().modify(|_, w| w.mclk_sel().set_bit());

@@ -323,6 +323,8 @@ instances = [
         ws_rx = "I2S1_I_WS",
         dout = ["I2S1_O_SD"],
         din = ["I2S1_I_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
     },
     {
         name = "i2s2",
@@ -334,6 +336,8 @@ instances = [
         ws_rx = "I2S2_I_WS",
         dout = ["I2S2_O_SD"],
         din = ["I2S2_I_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
     },
 ]
 

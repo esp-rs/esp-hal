@@ -123,10 +123,13 @@
     any(i2s_supports_pdm_tx, i2s_supports_pdm_rx),
     doc = r"## PDM mode
 
-PDM (pulse-density modulation) is supported on **I2S0 only** on chips where the
-hardware provides PDM filters. Use [`I2s::new_pdm`] with [`PdmConfig`]. PDM uses a
-single clock pin (`with_clk` on [`I2s::i2s_tx`] / [`I2s::i2s_rx`]) instead of
-separate BCLK and WS lines. Only simplex operation (TX *or* RX) is supported.
+PDM (pulse-density modulation) is supported on I2S instances where the hardware
+provides PDM (see per-instance metadata). Use [`I2s::new_pdm`] with [`PdmConfig`].
+Hardware PCM-to-PDM / PDM-to-PCM conversion is only available on instances that
+support it (typically I2S0); other instances require [`PdmDataFormat::Raw`].
+PDM uses a single clock pin (`with_clk` on [`I2s::i2s_tx`] / [`I2s::i2s_rx`])
+instead of separate BCLK and WS lines. Only simplex operation (TX *or* RX) is
+supported.
 
 ```rust, no_run
 # {before_snippet}
@@ -243,7 +246,7 @@ impl<'d> I2s<'d, crate::Blocking> {
         Self::new_internal(i2s, channel.into(), Config::Tdm(config))
     }
 
-    /// Construct a new I2S instance in PDM mode (I2S0 only).
+    /// Construct a new I2S instance in PDM mode.
     #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
     pub fn new_pdm<I: Instance + PdmInstance + 'd>(
         i2s: I,
@@ -803,7 +806,7 @@ impl Channels {
 pub(crate) enum Config {
     /// Time-division multiplexed (TDM) configuration.
     Tdm(TdmConfig),
-    /// Pulse-density modulation (PDM) configuration (I2S0 only).
+    /// Pulse-density modulation (PDM) configuration.
     #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
     Pdm(PdmConfig),
 }

@@ -4105,11 +4105,11 @@ macro_rules! for_each_i2s {
         _for_each_inner_i2s!((I2S0, I2s0, __NO_MCLK, I2S0O_BCK, I2S0O_WS, I2S0I_BCK,
         I2S0I_WS, [I2S0O_DATA_23], [I2S0I_DATA_15], true, true, true, true));
         _for_each_inner_i2s!((I2S1, I2s1, __NO_MCLK, I2S1O_BCK, I2S1O_WS, I2S1I_BCK,
-        I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], false, false, false, false));
+        I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], true, false, false, false));
         _for_each_inner_i2s!((names(I2S0), (I2S1))); _for_each_inner_i2s!((all(I2S0,
         I2s0, __NO_MCLK, I2S0O_BCK, I2S0O_WS, I2S0I_BCK, I2S0I_WS, [I2S0O_DATA_23],
         [I2S0I_DATA_15], true, true, true, true), (I2S1, I2s1, __NO_MCLK, I2S1O_BCK,
-        I2S1O_WS, I2S1I_BCK, I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], false, false,
+        I2S1O_WS, I2S1I_BCK, I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], true, false,
         false, false)));
     };
 }

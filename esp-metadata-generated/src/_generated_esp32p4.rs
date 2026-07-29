@@ -4858,16 +4858,16 @@ macro_rules! for_each_i2s {
         I2S0_O_BCK, I2S0_O_WS, I2S0_I_BCK, I2S0_I_WS, [I2S0_O_SD, I2S0_O_SD1],
         [I2S0_I_SD, I2S0_I_SD1, I2S0_I_SD2, I2S0_I_SD3], true, true, true, true));
         _for_each_inner_i2s!((I2S1, I2s1, I2S1_MCLK, I2S1_O_BCK, I2S1_O_WS, I2S1_I_BCK,
-        I2S1_I_WS, [I2S1_O_SD], [I2S1_I_SD], false, false, false, false));
+        I2S1_I_WS, [I2S1_O_SD], [I2S1_I_SD], true, true, false, false));
         _for_each_inner_i2s!((I2S2, I2s2, I2S2_MCLK, I2S2_O_BCK, I2S2_O_WS, I2S2_I_BCK,
-        I2S2_I_WS, [I2S2_O_SD], [I2S2_I_SD], false, false, false, false));
+        I2S2_I_WS, [I2S2_O_SD], [I2S2_I_SD], true, true, false, false));
         _for_each_inner_i2s!((names(I2S0), (I2S1), (I2S2)));
         _for_each_inner_i2s!((all(I2S0, I2s0, I2S0_MCLK, I2S0_O_BCK, I2S0_O_WS,
         I2S0_I_BCK, I2S0_I_WS, [I2S0_O_SD, I2S0_O_SD1], [I2S0_I_SD, I2S0_I_SD1,
         I2S0_I_SD2, I2S0_I_SD3], true, true, true, true), (I2S1, I2s1, I2S1_MCLK,
-        I2S1_O_BCK, I2S1_O_WS, I2S1_I_BCK, I2S1_I_WS, [I2S1_O_SD], [I2S1_I_SD], false,
-        false, false, false), (I2S2, I2s2, I2S2_MCLK, I2S2_O_BCK, I2S2_O_WS, I2S2_I_BCK,
-        I2S2_I_WS, [I2S2_O_SD], [I2S2_I_SD], false, false, false, false)));
+        I2S1_O_BCK, I2S1_O_WS, I2S1_I_BCK, I2S1_I_WS, [I2S1_O_SD], [I2S1_I_SD], true,
+        true, false, false), (I2S2, I2s2, I2S2_MCLK, I2S2_O_BCK, I2S2_O_WS, I2S2_I_BCK,
+        I2S2_I_WS, [I2S2_O_SD], [I2S2_I_SD], true, true, false, false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.
