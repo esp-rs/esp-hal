@@ -1776,7 +1776,8 @@ mod asynch {
         let intr_enable = int_ena_reg.read();
 
         if rx_int_status.bit_is_set() {
-            let status = register_block.status().read();
+            let status_reg = register_block.status();
+            let status = status_reg.read();
 
             let rx_queue = &async_state.rx_queue;
 
@@ -1789,10 +1790,21 @@ mod asynch {
                 }
             }
 
-            if status.miss_st().bit_is_set() {
-                release_receive_fifo(register_block);
-                let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
-            } else {
+            // Consumme all pending frames in the Rx FIFO
+            while register_block
+                .rx_message_cnt()
+                .read()
+                .rx_message_counter()
+                .bits()
+                > 0
+            {
+                if status_reg.read().miss_st().bit_is_set() {
+                    // Current frame is incomplete (Rx FIFO has overrun)
+                    release_receive_fifo(register_block);
+                    let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
+                    continue;
+                }
+                // Current frame is complete
                 match read_frame(register_block) {
                     Ok(frame) => {
                         let _ = rx_queue.try_send(Ok(frame));
