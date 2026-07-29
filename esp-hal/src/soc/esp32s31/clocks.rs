@@ -400,29 +400,6 @@ fn configure_timg_calibration_clock_impl(
         });
 }
 
-impl I2cInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do here
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old: Option<I2cFunctionClockConfig>,
-        new: I2cFunctionClockConfig,
-    ) {
-        HP_SYS_CLKRST::regs()
-            .i2c_ctrl0(self as usize)
-            .modify(|_, w| unsafe {
-                w.clk_src_sel()
-                    .bit(matches!(new.sclk(), I2cFunctionClockSclk::RcFast));
-                w.clk_div_num().bits(new.div_num() as u8);
-                w.clk_div_numerator().bits(0);
-                w.clk_div_denominator().bits(0)
-            });
-    }
-}
-
 impl TimgInstance {
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
         // TODO: Control the selected timer's function-clock gate.

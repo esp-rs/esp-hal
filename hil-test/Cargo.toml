@@ -233,7 +233,7 @@ esp32s3 = [
 ]
 esp32s31 = [
     "esp-hal/esp32s31",
-    # "esp-alloc?/esp32s31",
+    "esp-alloc?/esp32s31",
     # "esp-radio?/esp32s31",
     "esp-storage?/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",

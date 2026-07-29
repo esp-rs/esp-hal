@@ -81,6 +81,7 @@ macro_rules! i2c_pins {
             any(esp32s2, esp32s3) => ($peripherals.GPIO3, $peripherals.GPIO2),
             esp32 => ($peripherals.GPIO32, $peripherals.GPIO33),
             any(esp32c6, esp32c61) => ($peripherals.GPIO6, $peripherals.GPIO7),
+            esp32s31 => ($peripherals.GPIO7, $peripherals.GPIO6),
             esp32h2 => ($peripherals.GPIO12, $peripherals.GPIO22),
             esp32c2 => ($peripherals.GPIO18, $peripherals.GPIO9),
             any(esp32c5, esp32p4) => ($peripherals.GPIO2, $peripherals.GPIO3),
