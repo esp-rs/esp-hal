@@ -1775,10 +1775,6 @@ mod asynch {
 
         let intr_enable = int_ena_reg.read();
 
-        if tx_int_status.bit_is_set() {
-            async_state.tx_waker.wake();
-        }
-
         if rx_int_status.bit_is_set() {
             let status = register_block.status().read();
 
@@ -1804,6 +1800,10 @@ mod asynch {
                     Err(e) => warn!("Error reading frame: {:?}", e),
                 }
             }
+        }
+
+        if tx_int_status.bit_is_set() {
+            async_state.tx_waker.wake();
         }
 
         if intr_status.bits() & 0b10110100 > 0 {
