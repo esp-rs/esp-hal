@@ -11,6 +11,7 @@ use crate::{
     Async,
     Blocking,
     asynch::AtomicWaker,
+    clock::dividers::FractionalDivider,
     handler,
     interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
@@ -206,6 +207,18 @@ pub(crate) struct ClockDivider {
     pub div_a: u32,
 }
 
+impl ClockDivider {
+    fn new(divider: FractionalDivider) -> Self {
+        Self {
+            div_num: divider.integer,
+            div_b: divider.numerator,
+            // An integral divider has no denominator, but the clock tree only accepts
+            // denominators of 1 or more.
+            div_a: divider.denominator.max(1),
+        }
+    }
+}
+
 /// Clock configuration errors.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -218,121 +231,50 @@ pub(crate) fn calculate_clkm(
     desired_frequency: u32,
     source_frequencies: &[u32],
 ) -> Result<(usize, ClockDivider), ClockError> {
-    let mut result_freq = 0;
+    let mut result_error = 0;
     let mut result = None;
 
     for (i, &source_frequency) in source_frequencies.iter().enumerate() {
-        let div = calculate_closest_divider(source_frequency, desired_frequency);
-        if let Some(div) = div {
-            let freq = calculate_output_frequency(source_frequency, &div);
-            if result.is_none() || freq > result_freq {
-                result = Some((i, div));
-                result_freq = freq;
-            }
+        let Some(divider) = calculate_closest_divider(source_frequency, desired_frequency) else {
+            continue;
+        };
+
+        // A divider may land either side of the desired frequency, so pick the source that gets
+        // closest to it.
+        let error = divider
+            .output_frequency(source_frequency)
+            .abs_diff(desired_frequency);
+        if result.is_none() || error < result_error {
+            result = Some((i, divider));
+            result_error = error;
         }
     }
 
-    result.ok_or(ClockError::FrequencyTooLow)
-}
+    let (index, divider) = result.ok_or(ClockError::FrequencyTooLow)?;
 
-fn calculate_output_frequency(source_frequency: u32, divider: &ClockDivider) -> u32 {
-    // OUTPUT = SOURCE / (N + B/A)
-    // OUTPUT = SOURCE / ((NA + B)/A)
-    // OUTPUT = (SOURCE * A) / (NA + B)
-
-    // u64 is required to fit the numbers from this arithmetic.
-    let source = source_frequency as u64;
-    let n = divider.div_num as u64;
-    let a = divider.div_a as u64;
-    let b = divider.div_b as u64;
-
-    ((source * a) / (n * a + b)) as u32
+    Ok((index, ClockDivider::new(divider)))
 }
 
 fn calculate_closest_divider(
     source_frequency: u32,
     desired_frequency: u32,
-) -> Option<ClockDivider> {
-    let div_num = source_frequency / desired_frequency;
+) -> Option<FractionalDivider> {
     // For current chips, LCD and CAM have the same divider range.
     let (min_divider, max_divider) = property!("clock_tree.lcd_cam.lcd_clock.div_num");
-    let (_, max_denom) = property!("clock_tree.lcd_cam.lcd_clock.div_a");
-    if div_num < min_divider {
+    let (_, max_denominator) = property!("clock_tree.lcd_cam.lcd_clock.div_a");
+
+    if source_frequency / desired_frequency < min_divider {
         // Source clock isn't fast enough to reach the desired frequency.
         // Return max output.
-        return Some(ClockDivider {
-            div_num: min_divider,
-            div_b: 0,
-            div_a: 1,
+        return Some(FractionalDivider {
+            integer: min_divider,
+            numerator: 0,
+            denominator: 0,
         });
     }
-    if div_num > max_divider {
-        // Source is too fast to divide to the desired frequency. Return None.
-        return None;
-    }
 
-    let div_fraction = {
-        let div_remainder = source_frequency % desired_frequency;
-        let gcd = hcf(div_remainder, desired_frequency);
-        Fraction {
-            numerator: div_remainder / gcd,
-            denominator: desired_frequency / gcd,
-        }
-    };
+    let divider = FractionalDivider::new(source_frequency, desired_frequency, max_denominator);
 
-    let divider = if div_fraction.numerator == 0 {
-        ClockDivider {
-            div_num,
-            div_b: 0,
-            div_a: 1,
-        }
-    } else {
-        let target = div_fraction;
-        let closest = farey_sequence(max_denom).find(|curr| {
-            // https://en.wikipedia.org/wiki/Fraction#Adding_unlike_quantities
-
-            let new_curr_num = curr.numerator * target.denominator;
-            let new_target_num = target.numerator * curr.denominator;
-            new_curr_num >= new_target_num
-        });
-
-        let closest = unwrap!(closest, "The fraction must be between 0 and 1");
-
-        ClockDivider {
-            div_num,
-            div_b: closest.numerator,
-            div_a: closest.denominator,
-        }
-    };
-    Some(divider)
-}
-
-// https://en.wikipedia.org/wiki/Euclidean_algorithm
-const fn hcf(a: u32, b: u32) -> u32 {
-    if b != 0 { hcf(b, a % b) } else { a }
-}
-
-struct Fraction {
-    pub numerator: u32,
-    pub denominator: u32,
-}
-
-// https://en.wikipedia.org/wiki/Farey_sequence#Next_term
-fn farey_sequence(denominator: u32) -> impl Iterator<Item = Fraction> {
-    let mut a = 0;
-    let mut b = 1;
-    let mut c = 1;
-    let mut d = denominator;
-    core::iter::from_fn(move || {
-        if a > denominator {
-            return None;
-        }
-        let next = Fraction {
-            numerator: a,
-            denominator: b,
-        };
-        let k = (denominator + b) / d;
-        (a, b, c, d) = (c, d, k * c - a, k * d - b);
-        Some(next)
-    })
+    // Source is too fast to divide down to the desired frequency.
+    (divider.integer <= max_divider).then_some(divider)
 }

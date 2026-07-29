@@ -53,6 +53,8 @@ use clocks::RtcSlowClkConfig;
 use clocks::TimgFunctionClockConfig;
 use portable_atomic::AtomicU32;
 
+pub(crate) mod dividers;
+
 /// # Low-level clock control
 ///
 /// <section class="warning">

@@ -159,6 +159,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+    clock::dividers::FractionalDivider,
     dma::{
         Channel,
         ChannelRx,
@@ -1812,8 +1813,6 @@ pub(crate) mod private {
         pub fn new(sample_rate: Rate, channels: u8, data_bits: u8) -> I2sClockDividers {
             // this loosely corresponds to `i2s_std_calculate_clock` and
             // `i2s_ll_tx_set_mclk` in esp-idf
-            //
-            // main difference is we are using fixed-point arithmetic here
 
             // If data_bits is a power of two, use 256 as the mclk_multiple
             // If data_bits is 24, use 192 (24 * 8) as the mclk_multiple
@@ -1824,51 +1823,18 @@ pub(crate) mod private {
 
             let bclk = rate * channels as u32 * data_bits as u32;
             let mclk = rate * mclk_multiple;
-            let bclk_divider = mclk / bclk;
-            let mut mclk_divider = sclk / mclk;
 
-            let mut ma: u32;
-            let mut mb: u32;
-            let mut denominator: u32 = 0;
-            let mut numerator: u32 = 0;
+            I2sClockDividers::from_frequencies(sclk, mclk, mclk / bclk)
+        }
 
-            let freq_diff = sclk.abs_diff(mclk * mclk_divider);
-
-            if freq_diff != 0 {
-                let decimal = freq_diff as u64 * 10000 / mclk as u64;
-
-                // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
-                // 126.0
-                if decimal > 1250000 / 126 {
-                    mclk_divider += 1;
-                } else {
-                    let mut min: u32 = !0;
-
-                    for a in 2..=I2S_LL_MCLK_DIVIDER_MAX {
-                        let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
-                        ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
-                        mb = (mclk as u64 * (b / 10000)) as u32;
-
-                        if ma == mb {
-                            denominator = a as u32;
-                            numerator = (b / 10000) as u32;
-                            break;
-                        }
-
-                        if mb.abs_diff(ma) < min {
-                            denominator = a as u32;
-                            numerator = (b / 10000) as u32;
-                            min = mb.abs_diff(ma);
-                        }
-                    }
-                }
-            }
+        pub(crate) fn from_frequencies(sclk: u32, mclk: u32, bclk_divider: u32) -> Self {
+            let divider = FractionalDivider::new(sclk, mclk, I2S_LL_MCLK_DIVIDER_MAX as u32);
 
             I2sClockDividers {
-                mclk_divider,
+                mclk_divider: divider.integer,
                 bclk_divider,
-                denominator,
-                numerator,
+                denominator: divider.denominator,
+                numerator: divider.numerator,
             }
         }
     }
