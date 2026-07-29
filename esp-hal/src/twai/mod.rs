@@ -1798,19 +1798,15 @@ mod asynch {
                 .bits()
                 > 0
             {
-                if status_reg.read().miss_st().bit_is_set() {
+                let msg = if status_reg.read().miss_st().bit_is_set() {
                     // Current frame is incomplete (Rx FIFO has overrun)
                     release_receive_fifo(register_block);
-                    let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
-                    continue;
-                }
-                // Current frame is complete
-                match read_frame(register_block) {
-                    Ok(frame) => {
-                        let _ = rx_queue.try_send(Ok(frame));
-                    }
-                    Err(e) => warn!("Error reading frame: {:?}", e),
-                }
+                    Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun))
+                } else {
+                    // Current frame is complete
+                    read_frame(register_block)
+                };
+                let _ = rx_queue.try_send(msg);
             }
         }
 
