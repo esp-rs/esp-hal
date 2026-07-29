@@ -62,14 +62,20 @@ struct RsaGuard {
 impl RsaGuard {
     fn new() -> Self {
         let _guard = GenericPeripheralGuard::new();
-        #[cfg(not(rsa_version = "1"))]
-        crate::peripherals::SYSTEM::regs()
-            .rsa_pd_ctrl()
-            .modify(|_, w| {
-                w.rsa_mem_force_pd().clear_bit();
-                w.rsa_mem_force_pu().set_bit();
-                w.rsa_mem_pd().clear_bit()
-            });
+        cfg_select! {
+            rsa_version = "1" => {}
+            esp32s31 => {}
+            _ => {
+                crate::peripherals::SYSTEM::regs()
+                    .rsa_pd_ctrl()
+                    .modify(|_, w| {
+                        w.rsa_mem_force_pd().clear_bit();
+                        w.rsa_mem_force_pu().set_bit();
+                        w.rsa_mem_pd().clear_bit()
+                    });
+            }
+        }
+
         Self { _guard }
     }
 }
@@ -83,14 +89,20 @@ impl Drop for RsaGuard {
             // To prevent this, we disable interrupts manually before stopping the peripheral.
             crate::peripherals::RSA::steal().disable_peri_interrupt_on_all_cores();
         }
-        #[cfg(not(rsa_version = "1"))]
-        crate::peripherals::SYSTEM::regs()
-            .rsa_pd_ctrl()
-            .modify(|_, w| {
-                w.rsa_mem_force_pd().clear_bit();
-                w.rsa_mem_force_pu().clear_bit();
-                w.rsa_mem_pd().set_bit()
-            });
+
+        cfg_select! {
+            rsa_version = "1" => {}
+            esp32s31 => {}
+            _ => {
+                crate::peripherals::SYSTEM::regs()
+                    .rsa_pd_ctrl()
+                    .modify(|_, w| {
+                        w.rsa_mem_force_pd().clear_bit();
+                        w.rsa_mem_force_pu().clear_bit();
+                        w.rsa_mem_pd().set_bit()
+                    });
+            }
+        }
     }
 }
 

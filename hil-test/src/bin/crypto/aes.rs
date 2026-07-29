@@ -428,8 +428,8 @@ mod tests {
         let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
         let dma_channel = cfg_select! {
-            esp32s2 => peripherals.DMA_CRYPTO,
-            esp32p4 => peripherals.DMA_AXI_CH0,
+            aes_dma_engine = "CRYPTO_DMA" => peripherals.DMA_CRYPTO,
+            aes_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
             _ => peripherals.DMA_CH0,
         };
 
@@ -604,8 +604,8 @@ mod work_queue_dma_tests {
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
         let dma = cfg_select! {
-            esp32s2 => p.DMA_CRYPTO,
-            esp32p4 => p.DMA_AXI_CH0,
+            aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
+            aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
             _ => p.DMA_CH0,
         };
 
