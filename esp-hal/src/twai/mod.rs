@@ -1794,8 +1794,8 @@ mod asynch {
             }
 
             if status.miss_st().bit_is_set() {
-                let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
                 release_receive_fifo(register_block);
+                let _ = rx_queue.try_send(Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)));
             } else {
                 match read_frame(register_block) {
                     Ok(frame) => {
