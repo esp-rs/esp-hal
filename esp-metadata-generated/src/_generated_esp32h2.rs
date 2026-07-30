@@ -379,9 +379,6 @@ macro_rules! property {
     ("sdm.channel_count", str) => {
         stringify!(4)
     };
-    ("sdm.default_clock_source") => {
-        "pll_f48m"
-    };
     ("sleep.light_sleep") => {
         true
     };

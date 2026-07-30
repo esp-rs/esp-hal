@@ -228,8 +228,6 @@ algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 
 [device.sdm]
 support_status = "partial"
 channel_count = 8
-clock_sources = ["apb"]
-default_clock_source = "apb"
 
 [device.spi_master]
 version = 3

@@ -331,9 +331,6 @@ macro_rules! property {
     ("sdm.channel_count", str) => {
         stringify!(8)
     };
-    ("sdm.default_clock_source") => {
-        "pll_f80m"
-    };
     ("sleep.light_sleep") => {
         true
     };
@@ -4200,6 +4197,8 @@ macro_rules! implement_peripheral_clocks {
             Emac,
             /// GPIO_SD peripheral clock signal
             GpioSd,
+            /// GPIO_SD peripheral clock signal
+            GpioSd,
             /// HMAC peripheral clock signal
             Hmac,
             /// I2C0 peripheral clock signal
@@ -4292,6 +4291,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Ecdsa,
                 Self::Emac,
                 Self::GpioSd,
+                Self::GpioSd,
                 Self::Hmac,
                 Self::I2c0,
                 Self::I2c1,
@@ -4371,6 +4371,14 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.emac_sys_clk_en().bit(enable));
+                }
+                Peripheral::GpioSd => {
+                    crate::peripherals::GPIO_SD::regs()
+                        .clock_gate()
+                        .modify(|_, w| w.clk_en().bit(enable));
+                    crate::peripherals::GPIO_SD::regs()
+                        .sigmadelta_misc()
+                        .modify(|_, w| w.function_clk_en().bit(enable));
                 }
                 Peripheral::GpioSd => {
                     crate::peripherals::GPIO_SD::regs()
@@ -4626,6 +4634,9 @@ macro_rules! implement_peripheral_clocks {
                         .modify(|_, w| w.rst_en_ecdsa().bit(reset));
                 }
                 Peripheral::Emac => {
+                    let _ = reset;
+                }
+                Peripheral::GpioSd => {
                     let _ = reset;
                 }
                 Peripheral::GpioSd => {

@@ -703,11 +703,6 @@ driver_configs![
         properties: {
             /// Number of sigma-delta channels.
             channel_count: SdmChannels,
-            /// Supported source clocks for the shared SDM/IO_MUX clock.
-            #[serde(default)]
-            clock_sources: Vec<String>,
-            /// Default source clock for the shared SDM/IO_MUX clock.
-            default_clock_source: String,
         }
     },
     SleepProperties {

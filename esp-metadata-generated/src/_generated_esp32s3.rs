@@ -388,9 +388,6 @@ macro_rules! property {
     ("sdm.channel_count", str) => {
         stringify!(8)
     };
-    ("sdm.default_clock_source") => {
-        "apb"
-    };
     ("sleep.light_sleep") => {
         true
     };
