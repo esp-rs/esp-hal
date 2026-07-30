@@ -53,10 +53,10 @@ mod low_level;
 pub trait LowPowerPin<const PIN: u8>: RtcPin {}
 
 for_each_lp_function! {
-    (($_signal:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
+    (($_signal:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
     };
-    (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
+    (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
     };
 }
@@ -77,35 +77,61 @@ pub(crate) fn connect_open_drain_signals(
     low_level::pulldown_enable(lp_pin, false);
     low_level::output_enable(lp_pin, true);
 
-    route_input(lp_pin, input);
+    route_input(lp_pin, input, true);
     route_output(lp_pin, output);
 }
 
-/// Configures an LP pin as an input and routes an LP peripheral's input signal to it through the
-/// LP GPIO matrix.
+/// Configures an LP pin as an input and routes an LP peripheral's input signal to it.
 #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
 pub(crate) fn connect_input_signal(pin: &(impl RtcPin + InputPin), input: LpInputSignal) {
-    let lp_pin = low_level::init_pin(pin, true);
-    low_level::input_enable(lp_pin, true);
+    let mux_af = pin
+        .lp_input_signals()
+        .iter()
+        .find(|(_, signal)| *signal == input)
+        .map(|(af, _)| *af);
 
-    route_input(lp_pin, input);
+    let lp_pin = match mux_af {
+        Some(af) => {
+            let lp_pin = pin.rtc_number();
+            low_level::set_pad_function(lp_pin, true, true, af);
+            lp_pin
+        }
+        None => low_level::init_pin(pin, true),
+    };
+
+    low_level::input_enable(lp_pin, true);
+    route_input(lp_pin, input, mux_af.is_none());
 }
 
-/// Configures an LP pin as an output and routes an LP peripheral's output signal to it through the
-/// LP GPIO matrix.
+/// Configures an LP pin as an output and routes an LP peripheral's output signal to it.
 #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
 pub(crate) fn connect_output_signal(pin: &(impl RtcPin + OutputPin), output: LpOutputSignal) {
-    let lp_pin = low_level::init_pin(pin, false);
+    let mux_af = pin
+        .lp_output_signals()
+        .iter()
+        .find(|(_, signal)| *signal == output)
+        .map(|(af, _)| *af);
 
-    route_output(lp_pin, output);
+    match mux_af {
+        Some(af) => {
+            let lp_pin = pin.rtc_number();
+            low_level::set_pad_function(lp_pin, false, true, af);
+        }
+        None => {
+            let lp_pin = low_level::init_pin(pin, false);
+            route_output(lp_pin, output);
+        }
+    }
 }
 
+/// Points an LP peripheral's input signal at `lp_pin`, either through the LP GPIO matrix or, when
+/// the pad's own LP IO MUX function feeds the peripheral, straight from the pad.
 #[cfg(lp_io_has_gpio_matrix)]
-fn route_input(lp_pin: u8, input: LpInputSignal) {
+fn route_input(lp_pin: u8, input: LpInputSignal, use_gpio_matrix: bool) {
     crate::peripherals::LP_GPIO::regs()
         .func_in_sel_cfg(input as usize)
         .write(|w| unsafe {
-            w.sig_in_sel().set_bit();
+            w.sig_in_sel().bit(use_gpio_matrix);
             w.in_inv_sel().clear_bit();
             w.in_sel().bits(lp_pin)
         });

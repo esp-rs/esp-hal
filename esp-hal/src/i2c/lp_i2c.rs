@@ -24,7 +24,7 @@ pub trait Scl: RtcPin + OutputPin + InputPin {
 // expose them on the pads whose LP IO MUX has an LP I2C function.
 #[cfg(lp_io_has_gpio_matrix)]
 for_each_lp_function! {
-    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal) => {
+    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
         impl Sda for crate::peripherals::$gpio<'_> {
             fn connect_sda(&self) {
                 crate::gpio::lp_io::connect_open_drain_signals(

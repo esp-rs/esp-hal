@@ -58,7 +58,7 @@ macro_rules! hold_field {
 // Generates one big match statement because the pin registers have different types.
 for_each_lp_function!(
     (RTC_GPIOn $(
-        (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:literal)
+        (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt)
     ),*) => {
         macro_rules! with_pin_reg {
             ($pin:expr, |$reg:ident| $code:expr) => {{
@@ -77,7 +77,7 @@ for_each_lp_function!(
 );
 
 for_each_lp_function! {
-    (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:literal) => {
+    (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl RtcPin for crate::peripherals::$gpio<'_> {
             fn rtc_number(&self) -> u8 {
