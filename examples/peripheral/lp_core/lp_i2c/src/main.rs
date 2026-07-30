@@ -16,7 +16,6 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::lp_io::LowPowerOutputOpenDrain,
     i2c::lp_i2c::LpI2c,
     load_lp_code,
     lp_core::{LpCore, LpCoreWakeupSource},
@@ -47,8 +46,8 @@ fn main() -> ! {
     // configure LP I2C
     let i2c = LpI2c::new(
         peripherals.LP_I2C0,
-        LowPowerOutputOpenDrain::new(peripherals.GPIO6),
-        LowPowerOutputOpenDrain::new(peripherals.GPIO7),
+        peripherals.GPIO6,
+        peripherals.GPIO7,
         Rate::from_khz(100),
     );
 

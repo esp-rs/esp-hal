@@ -13,7 +13,7 @@ cfg_select! {
 }
 
 for_each_lp_function! {
-    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident) => {
+    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl RtcPin for crate::peripherals::$gpio<'_> {
             fn rtc_number(&self) -> u8 {

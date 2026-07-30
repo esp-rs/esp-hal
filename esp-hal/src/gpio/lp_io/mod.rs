@@ -51,10 +51,10 @@ mod low_level;
 pub trait LowPowerPin<const PIN: u8>: RtcPin {}
 
 for_each_lp_function! {
-    (($_signal:ident, RTC_GPIOn, $pin:literal), $gpio:ident) => {
+    (($_signal:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
     };
-    (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident) => {
+    (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
     };
 }

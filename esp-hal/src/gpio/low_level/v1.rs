@@ -48,7 +48,7 @@ fn errata36(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
     use crate::gpio::{Pin, RtcPinWithResistors};
 
     for_each_lp_function! {
-        (RTC_GPIOn $( (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) ),* ) => {
+        (RTC_GPIOn $( (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:literal) ),* ) => {
             const RTC_IO_PINS: &[u8] = &[ $( $crate::peripherals::$gpio::NUMBER ),* ];
         };
     };
