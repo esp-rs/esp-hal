@@ -12,7 +12,6 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
-use clap::Parser;
 use esp_metadata::{Chip, Config, TokenStream};
 use strum::IntoEnumIterator;
 
@@ -21,31 +20,36 @@ use strum::IntoEnumIterator;
 /// regeneration cannot resolve a version mismatch.
 const CACHE_VERSION: u32 = 1;
 
-#[derive(Debug, Parser)]
-enum Cli {
-    /// Re-generate `esp-metadata-generated`, the tables in the esp-hal README, and the
-    /// metadata cache read by the devtool.
-    Generate(GenerateArgs),
-}
+const USAGE: &str = "\
+Usage: cargo update-metadata [--check]
 
-#[derive(Debug, clap::Args)]
-struct GenerateArgs {
-    /// Run in 'check' mode; exits with 0 if the generated code is up to date, 1 otherwise.
-    #[arg(long)]
-    check: bool,
-}
+Re-generates `esp-metadata-generated`, the tables in the esp-hal README, and
+the metadata cache read by the devtool.
+
+    --check    Exit with 1 if the generated code is not up to date.
+";
 
 fn main() -> Result<()> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
+    let mut check = false;
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "generate" => {}
+            "--check" => check = true,
+            _ => {
+                eprint!("{USAGE}");
+                bail!("Unrecognized argument: {arg}");
+            }
+        }
+    }
 
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .to_path_buf();
 
-    match Cli::parse() {
-        Cli::Generate(args) => generate(&workspace, args.check),
-    }
+    generate(&workspace, check)
 }
 
 fn generate(workspace: &Path, check: bool) -> Result<()> {

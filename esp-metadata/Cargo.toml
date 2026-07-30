@@ -19,7 +19,6 @@ clippy-configs = [] # don't waste time on this
 
 [dependencies]
 anyhow       = "1.0"
-clap         = { version = "4.5", features = ["derive"] }
 convert_case = "0.8"
 env_logger   = { version = "0.11.5", default-features = false, features = ["auto-color", "humantime"] }
 prettyplease = "0.2.34"
