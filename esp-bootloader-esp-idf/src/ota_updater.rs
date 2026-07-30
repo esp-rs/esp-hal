@@ -61,7 +61,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         })
     }
 
-    /// Returns an [`Ota`] for accessing the OTA-data partition.
+    /// Returns a [`crate::ota::Ota`] for accessing the OTA-data partition.
     ///
     /// # Errors
     /// [Error::Invalid] if no OTA data partition was found.

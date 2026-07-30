@@ -53,9 +53,13 @@ impl MockFlash<'_> {
 }
 
 impl FlashAccess for MockFlash<'_> {
+    #[cfg(feature = "embedded-storage")]
     const READ_SIZE: usize = WORD_SIZE as usize;
+    #[cfg(feature = "embedded-storage")]
     const WRITE_SIZE: usize = WORD_SIZE as usize;
+    #[cfg(feature = "embedded-storage")]
     const ERASE_SIZE: usize = SECTOR_SIZE as usize;
+    #[cfg(feature = "embedded-storage")]
     const SECTOR_SIZE: u32 = SECTOR_SIZE;
 
     fn flash_read(&mut self, offset: u32, mut bytes: &mut [u8]) -> Result<(), Error> {
@@ -145,10 +149,12 @@ impl FlashAccess for MockFlash<'_> {
         self.flash_write(offset, bytes)
     }
 
+    #[cfg(feature = "embedded-storage")]
     fn flash_read_nor(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
         self.flash_read(offset, bytes)
     }
 
+    #[cfg(feature = "embedded-storage")]
     fn flash_write_nor(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
         self.flash_write(offset, bytes)
     }

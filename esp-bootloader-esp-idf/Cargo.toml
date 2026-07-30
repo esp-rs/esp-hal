@@ -67,7 +67,7 @@ defmt = ["dep:defmt"]
 # Replace ROM functions with pure Rust implementations, needed for tests.
 std = ["dep:crc", "dep:md-5"]
 
-## Implement traits from `embedded-storage` for [`FlashRegion`].
+## Implement traits from `embedded-storage` for [`crate::partitions::FlashRegion`].
 embedded-storage = ["dep:embedded-storage"]
 
 #! ### Chip selection

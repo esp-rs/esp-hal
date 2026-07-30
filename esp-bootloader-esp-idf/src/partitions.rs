@@ -15,6 +15,7 @@ const PARTITION_TABLE_OFFSET: u32 =
 
 const RAW_ENTRY_LEN: usize = 32;
 const ENTRY_MAGIC: u16 = 0x50aa;
+#[cfg(feature = "validation")]
 const MD5_MAGIC: u16 = 0xebeb;
 
 const OTA_SUBTYPE_OFFSET: u8 = 0x10;
@@ -205,12 +206,12 @@ pub enum Error {
         expected_size: usize,
         expected_type: PartitionType,
     },
-    /// Invalid tate
+    /// Invalid state
     InvalidState,
     /// The given argument is invalid.
     InvalidArgument,
-    /// The operation is not supported for this partition (e.g. wrong [`FlashRegion::as_nor_flash`]
-    /// accessor for an encrypted partition).
+    /// The operation is not supported for this partition (e.g. `as_nor_flash` on an encrypted
+    /// partition).
     NotSupported,
 }
 
