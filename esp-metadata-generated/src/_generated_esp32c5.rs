@@ -5269,9 +5269,9 @@ macro_rules! for_each_lp_function {
         _for_each_inner_lp_function!((LP_UART_CTSN, GPIO3, 0));
         _for_each_inner_lp_function!((LP_GPIO3, GPIO3, 1));
         _for_each_inner_lp_function!((LP_I2C_SCL, GPIO3, 3));
-        _for_each_inner_lp_function!((LP_UART_RXD_PAD, GPIO4, 0));
+        _for_each_inner_lp_function!((LP_UART_RXD, GPIO4, 0));
         _for_each_inner_lp_function!((LP_GPIO4, GPIO4, 1));
-        _for_each_inner_lp_function!((LP_UART_TXD_PAD, GPIO5, 0));
+        _for_each_inner_lp_function!((LP_UART_TXD, GPIO5, 0));
         _for_each_inner_lp_function!((LP_GPIO5, GPIO5, 1));
         _for_each_inner_lp_function!((LP_GPIO6, GPIO6, 1));
         _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0, 1));
@@ -5284,13 +5284,12 @@ macro_rules! for_each_lp_function {
         _for_each_inner_lp_function!((all(LP_UART_DTRN, GPIO0, 0), (LP_GPIO0, GPIO0, 1),
         (LP_UART_DSRN, GPIO1, 0), (LP_GPIO1, GPIO1, 1), (LP_UART_RTSN, GPIO2, 0),
         (LP_GPIO2, GPIO2, 1), (LP_I2C_SDA, GPIO2, 3), (LP_UART_CTSN, GPIO3, 0),
-        (LP_GPIO3, GPIO3, 1), (LP_I2C_SCL, GPIO3, 3), (LP_UART_RXD_PAD, GPIO4, 0),
-        (LP_GPIO4, GPIO4, 1), (LP_UART_TXD_PAD, GPIO5, 0), (LP_GPIO5, GPIO5, 1),
-        (LP_GPIO6, GPIO6, 1))); _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0,
-        LP_GPIOn, 0), GPIO0, 1), ((LP_GPIO1, LP_GPIOn, 1), GPIO1, 1), ((LP_GPIO2,
-        LP_GPIOn, 2), GPIO2, 1), ((LP_GPIO3, LP_GPIOn, 3), GPIO3, 1), ((LP_GPIO4,
-        LP_GPIOn, 4), GPIO4, 1), ((LP_GPIO5, LP_GPIOn, 5), GPIO5, 1), ((LP_GPIO6,
-        LP_GPIOn, 6), GPIO6, 1)));
+        (LP_GPIO3, GPIO3, 1), (LP_I2C_SCL, GPIO3, 3), (LP_UART_RXD, GPIO4, 0), (LP_GPIO4,
+        GPIO4, 1), (LP_UART_TXD, GPIO5, 0), (LP_GPIO5, GPIO5, 1), (LP_GPIO6, GPIO6, 1)));
+        _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0, LP_GPIOn, 0), GPIO0, 1),
+        ((LP_GPIO1, LP_GPIOn, 1), GPIO1, 1), ((LP_GPIO2, LP_GPIOn, 2), GPIO2, 1),
+        ((LP_GPIO3, LP_GPIOn, 3), GPIO3, 1), ((LP_GPIO4, LP_GPIOn, 4), GPIO4, 1),
+        ((LP_GPIO5, LP_GPIOn, 5), GPIO5, 1), ((LP_GPIO6, LP_GPIOn, 6), GPIO6, 1)));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
