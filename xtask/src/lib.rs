@@ -938,7 +938,7 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                     .subcommand("test")
                     .arg("--lib")
                     .arg("--tests")
-                    .features(&vec!["std".into()])
+                    .features(&vec!["std".into(), "embedded-storage".into()])
                     .arg("--")
                     .arg("--test-threads=1")
                     .build(),

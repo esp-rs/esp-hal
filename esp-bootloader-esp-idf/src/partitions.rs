@@ -19,6 +19,9 @@ const MD5_MAGIC: u16 = 0xebeb;
 
 const OTA_SUBTYPE_OFFSET: u8 = 0x10;
 
+use crate::flash::FlashAccess;
+pub use crate::flash::FlashStorage;
+
 /// Represents a single partition entry.
 #[derive(Clone, Copy)]
 pub struct PartitionEntry<'a> {
@@ -133,11 +136,8 @@ impl<'a> PartitionEntry<'a> {
     }
 
     /// Provides a "view" into the partition allowing to read/write the
-    /// partition contents using the given [`esp_storage::FlashStorage`].
-    pub fn as_flash_region<'d>(
-        self,
-        flash: &'a mut esp_storage::FlashStorage<'d>,
-    ) -> FlashRegion<'a, 'd> {
+    /// partition contents using the given [`FlashStorage`].
+    pub fn as_flash_region<'d>(self, flash: &'a mut FlashStorage<'d>) -> FlashRegion<'a, 'd> {
         FlashRegion { raw: self, flash }
     }
 }
@@ -580,10 +580,16 @@ impl TryFrom<u8> for PartitionTablePartitionSubType {
 
 /// Read the partition table.
 ///
-/// Pass a [`esp_storage::FlashStorage`] which can read from the whole flash
-/// and provide storage to read the partition table into.
+/// Pass [`FlashStorage`] and a buffer to read the partition table into.
 pub fn read_partition_table<'a, 'd>(
-    flash: &mut esp_storage::FlashStorage<'d>,
+    flash: &mut FlashStorage<'d>,
+    storage: &'a mut [u8],
+) -> Result<PartitionTable<'a>, Error> {
+    read_partition_table_impl(flash, storage)
+}
+
+fn read_partition_table_impl<'a, F: FlashAccess>(
+    flash: &mut F,
     storage: &'a mut [u8],
 ) -> Result<PartitionTable<'a>, Error> {
     #[cfg(feature = "std")]
@@ -593,13 +599,9 @@ pub fn read_partition_table<'a, 'd>(
     let enabled = esp_storage::flash_encryption();
 
     if enabled {
-        flash
-            .read_encrypted(PARTITION_TABLE_OFFSET, storage)
-            .map_err(|_e| Error::StorageError)?;
+        flash.flash_read_encrypted(PARTITION_TABLE_OFFSET, storage)?;
     } else {
-        flash
-            .read(PARTITION_TABLE_OFFSET, storage)
-            .map_err(|_e| Error::StorageError)?;
+        flash.flash_read(PARTITION_TABLE_OFFSET, storage)?;
     }
 
     PartitionTable::new(storage)
@@ -613,10 +615,10 @@ pub fn read_partition_table<'a, 'd>(
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, 'd> {
     pub(crate) raw: PartitionEntry<'a>,
-    pub(crate) flash: &'a mut esp_storage::FlashStorage<'d>,
+    pub(crate) flash: &'a mut FlashStorage<'d>,
 }
 
-impl FlashRegion<'_, '_> {
+impl<'a, 'd> FlashRegion<'a, 'd> {
     /// Returns the size of the partition in bytes.
     pub fn partition_size(&self) -> usize {
         self.raw.len() as _
@@ -639,13 +641,9 @@ impl FlashRegion<'_, '_> {
         }
 
         if self.raw.is_effectively_encrypted() {
-            self.flash
-                .read_encrypted(address, bytes)
-                .map_err(|_e| Error::StorageError)
+            self.flash.flash_read_encrypted(address, bytes)
         } else {
-            self.flash
-                .read(address, bytes)
-                .map_err(|_e| Error::StorageError)
+            self.flash.flash_read(address, bytes)
         }
     }
 
@@ -662,13 +660,9 @@ impl FlashRegion<'_, '_> {
         }
 
         if self.raw.is_effectively_encrypted() {
-            self.flash
-                .write_encrypted(address, bytes)
-                .map_err(|_e| Error::StorageError)
+            self.flash.flash_write_encrypted(address, bytes)
         } else {
-            self.flash
-                .write(address, bytes)
-                .map_err(|_e| Error::StorageError)
+            self.flash.flash_write(address, bytes)
         }
     }
 
@@ -696,9 +690,7 @@ impl FlashRegion<'_, '_> {
             return Err(Error::OutOfBounds);
         }
 
-        self.flash
-            .erase(address_from, address_to)
-            .map_err(|_e| Error::StorageError)
+        self.flash.flash_erase(address_from, address_to)
     }
 }
 
@@ -711,7 +703,7 @@ pub struct NorFlashRegion<'r, 'a, 'd> {
 #[cfg(feature = "embedded-storage")]
 /// [`NorFlash`] view of an encrypted [`FlashRegion`].
 ///
-/// Write size is 4096 bytes ([`esp_storage::FlashStorage::SECTOR_SIZE`]): the ROM encrypts
+/// Write size is one flash sector ([`esp_storage::FlashStorage::SECTOR_SIZE`]): the ROM encrypts
 /// whole sectors.
 pub struct EncryptedNorFlashRegion<'r, 'a, 'd> {
     region: &'r mut FlashRegion<'a, 'd>,
@@ -734,6 +726,12 @@ mod embedded_storage_traits {
     };
 
     use super::*;
+
+    const NOR_READ_SIZE: usize = <FlashStorage<'static> as FlashAccess>::READ_SIZE;
+    const NOR_WRITE_SIZE: usize = <FlashStorage<'static> as FlashAccess>::WRITE_SIZE;
+    const NOR_ERASE_SIZE: usize = <FlashStorage<'static> as FlashAccess>::ERASE_SIZE;
+    const ENCRYPTED_WRITE_SIZE: usize =
+        <FlashStorage<'static> as FlashAccess>::SECTOR_SIZE as usize;
 
     impl<'a, 'd> FlashRegion<'a, 'd> {
         /// Returns a [`NorFlashRegion`] for [`NorFlash`] access.
@@ -804,7 +802,7 @@ mod embedded_storage_traits {
     }
 
     impl ReadNorFlash for NorFlashRegion<'_, '_, '_> {
-        const READ_SIZE: usize = esp_storage::FlashStorage::READ_SIZE;
+        const READ_SIZE: usize = NOR_READ_SIZE;
 
         fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
             let address = offset + self.region.raw.offset();
@@ -813,10 +811,7 @@ mod embedded_storage_traits {
                 return Err(Error::OutOfBounds);
             }
 
-            self.region
-                .flash
-                .read_nor(address, bytes)
-                .map_err(|_e| Error::StorageError)
+            self.region.flash.flash_read_nor(address, bytes)
         }
 
         fn capacity(&self) -> usize {
@@ -825,8 +820,8 @@ mod embedded_storage_traits {
     }
 
     impl NorFlash for NorFlashRegion<'_, '_, '_> {
-        const WRITE_SIZE: usize = esp_storage::FlashStorage::WRITE_SIZE;
-        const ERASE_SIZE: usize = esp_storage::FlashStorage::ERASE_SIZE;
+        const WRITE_SIZE: usize = NOR_WRITE_SIZE;
+        const ERASE_SIZE: usize = NOR_ERASE_SIZE;
 
         fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
             self.region.erase(from, to)
@@ -843,10 +838,7 @@ mod embedded_storage_traits {
                 return Err(Error::OutOfBounds);
             }
 
-            self.region
-                .flash
-                .write_nor(address, bytes)
-                .map_err(|_e| Error::StorageError)
+            self.region.flash.flash_write_nor(address, bytes)
         }
     }
 
@@ -857,7 +849,7 @@ mod embedded_storage_traits {
     }
 
     impl ReadNorFlash for EncryptedNorFlashRegion<'_, '_, '_> {
-        const READ_SIZE: usize = esp_storage::FlashStorage::READ_SIZE;
+        const READ_SIZE: usize = NOR_READ_SIZE;
 
         fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
             let address = offset + self.region.raw.offset();
@@ -866,10 +858,7 @@ mod embedded_storage_traits {
                 return Err(Error::OutOfBounds);
             }
 
-            self.region
-                .flash
-                .read_encrypted(address, bytes)
-                .map_err(|_e| Error::StorageError)
+            self.region.flash.flash_read_encrypted(address, bytes)
         }
 
         fn capacity(&self) -> usize {
@@ -878,8 +867,8 @@ mod embedded_storage_traits {
     }
 
     impl NorFlash for EncryptedNorFlashRegion<'_, '_, '_> {
-        const WRITE_SIZE: usize = esp_storage::FlashStorage::SECTOR_SIZE as usize;
-        const ERASE_SIZE: usize = esp_storage::FlashStorage::ERASE_SIZE;
+        const WRITE_SIZE: usize = ENCRYPTED_WRITE_SIZE;
+        const ERASE_SIZE: usize = NOR_ERASE_SIZE;
 
         fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
             self.region.erase(from, to)
@@ -896,10 +885,7 @@ mod embedded_storage_traits {
                 return Err(Error::OutOfBounds);
             }
 
-            self.region
-                .flash
-                .write_encrypted(address, bytes)
-                .map_err(|_e| Error::StorageError)
+            self.region.flash.flash_write_encrypted(address, bytes)
         }
     }
 }
@@ -1079,12 +1065,10 @@ mod tests {
 
 #[cfg(test)]
 mod storage_tests {
-    use esp_storage::{Flash, FlashStorage};
-
     use super::*;
 
     fn test_flash() -> FlashStorage<'static> {
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         let mut data = [23u8; 0x10000];
         data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN]
             .copy_from_slice(include_bytes!("../testdata/single_factory_no_ota.bin"));
@@ -1142,12 +1126,11 @@ mod storage_tests {
 #[cfg(all(test, feature = "embedded-storage"))]
 mod nor_flash_tests {
     use embedded_storage::nor_flash::{MultiwriteNorFlash, NorFlash, ReadNorFlash};
-    use esp_storage::{Flash, FlashStorage};
 
     use super::*;
 
     fn test_flash() -> FlashStorage<'static> {
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         let mut data = [23u8; 0x10000];
         data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN]
             .copy_from_slice(include_bytes!("../testdata/single_factory_no_ota.bin"));
@@ -1185,19 +1168,19 @@ mod nor_flash_tests {
     fn nor_flash_write_sizes() {
         assert_eq!(
             <NorFlashRegion<'static, 'static, 'static> as NorFlash>::WRITE_SIZE,
-            esp_storage::FlashStorage::WRITE_SIZE
+            <FlashStorage<'static> as FlashAccess>::WRITE_SIZE
         );
         assert_eq!(
             <EncryptedNorFlashRegion<'static, 'static, 'static> as NorFlash>::WRITE_SIZE,
-            esp_storage::FlashStorage::SECTOR_SIZE as usize
+            <FlashStorage<'static> as FlashAccess>::SECTOR_SIZE as usize
         );
         assert_eq!(
             <NorFlashRegion<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
-            esp_storage::FlashStorage::READ_SIZE
+            <FlashStorage<'static> as FlashAccess>::READ_SIZE
         );
         assert_eq!(
             <EncryptedNorFlashRegion<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
-            esp_storage::FlashStorage::READ_SIZE
+            <FlashStorage<'static> as FlashAccess>::READ_SIZE
         );
     }
 }
