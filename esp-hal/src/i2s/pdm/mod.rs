@@ -19,7 +19,7 @@ use crate::{i2s::master::Info, time::Rate};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PdmError {
-    /// PDM is not supported on this I2S peripheral instance (I2S1).
+    /// PDM is not supported on this I2S peripheral instance.
     UnsupportedInstance,
     /// PCM format requested but hardware PCM2PDM/PDM2PCM is unavailable.
     PcmFormatUnsupported,
@@ -40,10 +40,12 @@ impl core::error::Error for PdmError {}
 impl core::fmt::Display for PdmError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::UnsupportedInstance => write!(f, "PDM mode is only supported on I2S0"),
+            Self::UnsupportedInstance => {
+                write!(f, "PDM mode is not supported on this I2S instance")
+            }
             Self::PcmFormatUnsupported => write!(
                 f,
-                "PCM PDM format is not supported on this chip; use raw PDM format"
+                "PCM PDM format is not supported on this I2S instance; use raw PDM format"
             ),
             Self::InvalidClock => write!(f, "PDM clock configuration is out of supported range"),
             Self::InvalidSlotMask => {
@@ -60,14 +62,21 @@ impl core::fmt::Display for PdmError {
     }
 }
 
-/// A peripheral singleton that supports PDM mode (I2S0 only).
+/// A peripheral singleton that supports PDM mode.
 pub trait PdmInstance: Instance {}
 
 for_each_i2s! {
     (
         $instance:ident, $sys:ident, $mclk:ident,
         $bclk:ident, $ws:ident, $bclk_rx:ident, $ws_rx:ident,
-        $dout:tt, $din:tt, true, true, $pcm2pdm:literal, $pdm2pcm:literal
+        $dout:tt, $din:tt, true, $pdm_rx:literal, $pcm2pdm:literal, $pdm2pcm:literal
+    ) => {
+        impl PdmInstance for crate::peripherals::$instance<'_> {}
+    };
+    (
+        $instance:ident, $sys:ident, $mclk:ident,
+        $bclk:ident, $ws:ident, $bclk_rx:ident, $ws_rx:ident,
+        $dout:tt, $din:tt, false, true, $pcm2pdm:literal, $pdm2pcm:literal
     ) => {
         impl PdmInstance for crate::peripherals::$instance<'_> {}
     };
@@ -293,10 +302,10 @@ impl PdmTxSlotConfig {
         cfg
     }
 
-    #[cfg(not(i2s_supports_pcm2pdm))]
     fn raw_default(mode: PdmSlotMode) -> Self {
         let mut cfg = Self::codec_pcm_default(mode);
         cfg.data_format = PdmDataFormat::Raw;
+        cfg.hp_en = false;
         cfg
     }
 }
@@ -385,6 +394,14 @@ impl PdmTxConfig {
         Self {
             clock: PdmTxClockConfig::codec_default(sample_rate),
             slot: default_tx_slot(mode),
+        }
+    }
+
+    /// Raw PDM TX defaults (no hardware PCM conversion).
+    pub fn new_raw_default(sample_rate: Rate, mode: PdmSlotMode) -> Self {
+        Self {
+            clock: PdmTxClockConfig::codec_default(sample_rate),
+            slot: PdmTxSlotConfig::raw_default(mode),
         }
     }
 
@@ -507,6 +524,12 @@ impl PdmConfig {
         }
         if self.tx.is_some() && self.rx.is_some() {
             return Err(PdmError::DuplexUnsupported);
+        }
+        if self.tx.is_some() && !info.pdm_tx {
+            return Err(PdmError::UnsupportedInstance);
+        }
+        if self.rx.is_some() && !info.pdm_rx {
+            return Err(PdmError::UnsupportedInstance);
         }
         if let Some(tx) = &self.tx {
             tx.validate(info)?;

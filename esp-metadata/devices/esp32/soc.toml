@@ -330,6 +330,7 @@ instances = [
         ws_rx = "I2S1I_WS",
         dout = ["I2S1O_DATA_23"],
         din = ["I2S1I_DATA_15"],
+        pdm_tx = true,
     },
 ]
 
