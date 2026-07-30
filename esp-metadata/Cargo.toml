@@ -35,3 +35,6 @@ quote        = "1"
 indexmap     = { version = "2", features = ["serde"] }
 log          = "0.4.22"
 walkdir      = "2.5.0"
+
+[profile.dev]
+debug = 0 # unnecessary for general use
