@@ -733,10 +733,14 @@ driver_configs![
             deep_sleep: bool,
             #[serde(default)]
             wakeup_sources: WakeupSources,
-            // esp-hal implements CPU/TOP power-down retention (software CPU retention +
-            // regDMA TOP retention) for light sleep on this chip.
             #[serde(default)]
             pd_retention: bool,
+            #[serde(default)]
+            regdma_sw_trigger: bool,
+            // Whether the chip's TOP-domain retention program includes a step that
+            // polls a register, as opposed to only reading and writing them.
+            #[serde(default)]
+            regdma_wait_ops: bool,
         }
     },
     SocProperties {
@@ -752,6 +756,8 @@ driver_configs![
             multi_core_enabled: bool,
             #[serde(default)]
             cpu_csr_prv_mode: Option<u32>,
+            #[serde(default)]
+            cpu_csr_set: Option<CpuCsrSet>,
             #[serde(default)]
             internal_memory_cached: bool,
             #[serde(default)]

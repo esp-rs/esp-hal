@@ -66,6 +66,24 @@ impl super::GenericProperty for SocConfig {
     }
 }
 
+/// The set of CSRs a RISC-V core implements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CpuCsrSet {
+    /// The RV32IMAC core.
+    EspRiscv,
+}
+
+impl super::GenericProperty for CpuCsrSet {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let set = match self {
+            Self::EspRiscv => "esp_riscv",
+        };
+
+        Some(vec![format!("cpu_csr_set=\"{set}\"")])
+    }
+}
+
 /// Memory region.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

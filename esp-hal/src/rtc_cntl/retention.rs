@@ -5,10 +5,6 @@
 //! list of [`RegdmaLink`] nodes on PAU entry link 0. Arming builds the core set
 //! into a caller-owned [`SystemRetentionMemory`], chains any opt-in peripheral
 //! entries and programs the link.
-//!
-//! All logic here is chip-agnostic; the only per-chip input is register data
-//! (the `OPS` program and the base addresses), which lives in the `chip`
-//! submodule - one data file per chip. Adding a chip is a new data file.
 
 // References (ESP-IDF `v5.4`): `soc/regdma.h`, `hal/<chip>/pau_ll.h`,
 // `hal/<chip>/pau_hal.c`, `esp_hw_support/port/pau_regdma.c`.
@@ -30,42 +26,231 @@ use crate::{
     },
 };
 
-// Per-chip register data (base addresses, region sizes, the SYS_PERIPH program
-// and the CPU-domain device-register bases). Selected by target; consumed only
-// by the chip-agnostic logic here and (via the re-export below) `cpu_retention`.
+/// Runtime absolute address (as `u32`) of a named PAC register.
+macro_rules! reg_addr {
+    ($peri:ident, $($path:tt)+) => {
+        (unsafe { &*crate::pac::$peri::PTR }.$($path)+.as_ptr()) as u32
+    };
+}
+
+/// Runtime base address (as `u32`) of a PAC peripheral.
+macro_rules! peri_base {
+    ($peri:ident) => {
+        crate::pac::$peri::ptr() as u32
+    };
+}
+
+/// `const` byte offset of a named PAC register within its peripheral.
+macro_rules! reg_off {
+    ($peri:ident, $($path:tt)+) => {{
+        let block = core::mem::MaybeUninit::<
+            <crate::pac::$peri as core::ops::Deref>::Target,
+        >::uninit();
+        let base = block.as_ptr();
+        let reg = unsafe { (*base).$($path)+ };
+
+        (unsafe { (reg as *const _ as *const u8).offset_from(base as *const u8) }) as u32
+    }};
+}
+
+macro_rules! reg {
+    ($peri:ident, $($path:tt)+) => {
+        || reg_addr!($peri, $($path)+)
+    };
+}
+
+/// `const` width of a named PAC register in 32-bit words: `2` for the 64-bit
+/// CLINT counters, `1` for everything else.
+macro_rules! reg_words {
+    ($peri:ident, $($path:tt)+) => {{
+        let block = core::mem::MaybeUninit::<
+            <crate::pac::$peri as core::ops::Deref>::Target,
+        >::uninit();
+        let base = block.as_ptr();
+        let reg = unsafe { (*base).$($path)+ };
+        (core::mem::size_of_val(reg) / 4) as u32
+    }};
+}
+
+/// `const` count of registers spanning `[from] ..= [to]` (inclusive).
+macro_rules! span {
+    ($peri:ident, [$($from:tt)+] ..= [$($to:tt)+]) => {
+        (reg_off!($peri, $($to)+) - reg_off!($peri, $($from)+)) / 4
+            + reg_words!($peri, $($to)+)
+    };
+}
+
+// ---------------------------------------------------------------------------
+// `SysOp` builders. Each retention step is one self-describing line whose
+// address(es) and register count are both derived from the named register(s).
+// ---------------------------------------------------------------------------
+
+/// A `Continuous` op. Two forms:
+/// - `continuous!(PCR, [uart(0).conf()] ..= [sram_power_conf()])` - back up the inclusive register
+///   span; `count` is derived from it.
+/// - `continuous!(GPIO, [func_out_sel_cfg(0)], 35)` - named start, explicit count (used where the
+///   end register isn't modelled in the PAC).
+macro_rules! continuous {
+    ($peri:ident, [$($from:tt)+] ..= [$($to:tt)+]) => {
+        SysOp::Continuous {
+            addr: || reg_addr!($peri, $($from)+),
+            count: span!($peri, [$($from)+] ..= [$($to)+]),
+        }
+    };
+    ($peri:ident, [$($from:tt)+], $count:expr) => {
+        SysOp::Continuous {
+            addr: || reg_addr!($peri, $($from)+),
+            count: $count,
+        }
+    };
+}
+
+/// A `ContinuousSplit` op: back up `[backup]`, restore into `[restore]`.
+macro_rules! continuous_split {
+    ($peri:ident, [$($backup:tt)+] => [$($restore:tt)+], $count:expr) => {
+        SysOp::ContinuousSplit {
+            backup: || reg_addr!($peri, $($backup)+),
+            restore: || reg_addr!($peri, $($restore)+),
+            count: $count,
+        }
+    };
+}
+
+/// A restore-only masked `Write`.
+macro_rules! write_reg {
+    ($peri:ident, [$($path:tt)+], $value:expr, $mask:expr) => {
+        SysOp::Write {
+            addr: || reg_addr!($peri, $($path)+),
+            value: $value,
+            mask: $mask,
+        }
+    };
+}
+
+/// A restore-only `Wait` until `(reg & mask) == value`.
+#[cfg(sleep_regdma_wait_ops)]
+macro_rules! wait_reg {
+    ($peri:ident, [$($path:tt)+], $value:expr, $mask:expr) => {
+        SysOp::Wait {
+            addr: || reg_addr!($peri, $($path)+),
+            value: $value,
+            mask: $mask,
+        }
+    };
+}
+
+/// The shared console-UART sequence for the given UART peripheral.
+macro_rules! uart_seq {
+    ($peri:ident) => {
+        SysOp::Uart {
+            base: || peri_base!($peri),
+        }
+    };
+}
+
+/// The shared SysTimer sequence for the given SysTimer peripheral.
+macro_rules! systimer_seq {
+    ($peri:ident) => {
+        SysOp::Systimer {
+            base: || peri_base!($peri),
+        }
+    };
+}
+
+// ---------------------------------------------------------------------------
+// `PeriphOp` builders. Opt-in peripheral (UART/I2C/SPI) retention chains are
+// per-chip, per-peripheral `&[PeriphOp]` lists.
+// ---------------------------------------------------------------------------
+
+/// Back up/restore a run of config registers. Two forms:
+/// - `periph_continuous!(UART0, [hwfc_conf()] ..= [tout_conf()])`
+/// - `periph_continuous!(UART0, [int_ena()])`
+macro_rules! periph_continuous {
+    ($peri:ident, [$($from:tt)+] ..= [$($to:tt)+]) => {
+        PeriphOp::Continuous {
+            off: reg_off!($peri, $($from)+),
+            count: span!($peri, [$($from)+] ..= [$($to)+]),
+        }
+    };
+    ($peri:ident, [$($reg:tt)+]) => {
+        PeriphOp::Continuous {
+            off: reg_off!($peri, $($reg)+),
+            count: 1,
+        }
+    };
+}
+
+/// A restore-only masked write to a named config register.
+macro_rules! periph_write {
+    ($peri:ident, [$($reg:tt)+], $value:expr, $mask:expr) => {
+        PeriphOp::Write {
+            off: reg_off!($peri, $($reg)+),
+            value: $value,
+            mask: $mask,
+        }
+    };
+}
+
+/// A restore-only poll of a named config register until `(reg & mask) == value`.
+macro_rules! periph_wait {
+    ($peri:ident, [$($reg:tt)+], $value:expr, $mask:expr) => {
+        PeriphOp::Wait {
+            off: reg_off!($peri, $($reg)+),
+            value: $value,
+            mask: $mask,
+        }
+    };
+}
+
+// ---------------------------------------------------------------------------
+// CPU-domain register regions, copied word by word by `cpu_retention` because
+// regDMA cannot reach them while the CPU domain is off.
+// ---------------------------------------------------------------------------
+
+/// A contiguous run of `words` 32-bit registers starting at `start`.
+///
+/// `start` is resolved from the PAC at runtime (see [`reg!`]); `words` stays
+/// `const` so the retention store can be sized at compile time.
+pub(crate) struct Region {
+    pub(crate) start: fn() -> u32,
+    pub(crate) words: usize,
+}
+
+/// Total 32-bit words covered by a set of [`Region`]s, to size their store.
+pub(crate) const fn total_words(regions: &[Region]) -> usize {
+    let mut words = 0;
+    let mut i = 0;
+    while i < regions.len() {
+        words += regions[i].words;
+        i += 1;
+    }
+    words
+}
+
+/// A [`Region`] over named registers. Two forms:
+/// - `region!(INTPRI, [cpu_int_enable()] ..= [rnd_eco_low()])`
+/// - `region!(PLIC_MX, [mxint_conf()])`
+macro_rules! region {
+    ($peri:ident, [$($from:tt)+] ..= [$($to:tt)+]) => {
+        Region {
+            start: reg!($peri, $($from)+),
+            words: span!($peri, [$($from)+] ..= [$($to)+]) as usize,
+        }
+    };
+    ($peri:ident, [$($reg:tt)+]) => {
+        Region {
+            start: reg!($peri, $($reg)+),
+            words: reg_words!($peri, $($reg)+) as usize,
+        }
+    };
+}
+
 #[cfg_attr(esp32c6, path = "retention/esp32c6.rs")]
 #[cfg_attr(esp32h2, path = "retention/esp32h2.rs")]
 mod chip;
 
-// The CPU-domain device-register bases live in the same per-chip data module;
-// re-export them so `cpu_retention` can read them while `chip` stays private.
-pub(crate) use chip::{
-    CACHE_BASE,
-    CLINT_MINT_BASE,
-    CLINT_UINT_BASE,
-    INTPRI_BASE,
-    PLIC_MX_BASE,
-    PLIC_UX_BASE,
-};
-// Per-chip opt-in peripheral config-register retention data (register
-// offsets/masks/maps/counts). The sequence builders below are chip-agnostic;
-// only this register-layout data is device-specific.
-use chip::{
-    I2C_CONF_UPGATE,
-    I2C_CTR_OFF,
-    I2C_FSM_RST,
-    I2C_REGS_MAP,
-    I2C_RETENTION_REGS_CNT,
-    I2C_SCL_LOW_PERIOD_OFF,
-    SPI_CMD_OFF,
-    SPI_REGS_MAP,
-    SPI_RETENTION_REGS_CNT,
-    UART_INT_ENA_OFF,
-    UART_REG_UPDATE,
-    UART_REG_UPDATE_OFF,
-    UART_REGS_MAP,
-    UART_RETENTION_REGS_CNT,
-};
+pub(crate) use chip::{CACHE_REGIONS, CLINT_REGIONS, INTPRI_REGIONS, PLIC_REGIONS};
+use chip::{I2C_OPS, SPI_OPS, UART_OPS};
 
 // Bit layout of `regdma_link_head_t` (see ESP-IDF `regdma.h`):
 // https://github.com/espressif/esp-idf/blob/v5.4/components/soc/include/soc/regdma.h#L114-L123
@@ -81,20 +266,15 @@ const HEAD_EOF_BIT: u32 = 1 << 31; // end of link
 enum LinkMode {
     /// Back up/restore a run of consecutive registers via a RAM buffer.
     Continuous = 0,
-    /// Like [`Continuous`](Self::Continuous), but a 4-word bitmap selects which
-    /// registers in the window to transfer (skipping interspersed read-only
-    /// status/FIFO registers).
-    AddrMap    = 1,
     /// Unconditionally write a masked value to a register.
     Write      = 2,
     /// Poll a register until `(reg & mask) == value`.
     Wait       = 3,
 }
 
-/// A single regDMA linked-list node (matches the PAU `head` + body layout).
+/// A single regDMA linked-list node.
 ///
 /// - CONTINUOUS: `w0 = backup addr`, `w1 = restore addr`, `w2 = RAM buffer`.
-/// - ADDR_MAP: as CONTINUOUS, plus `map` selecting which registers to transfer.
 /// - WRITE/WAIT: `w0 = target addr`, `w1 = value`, `w2 = mask`.
 #[repr(C, align(4))]
 #[derive(Clone, Copy, Debug)]
@@ -107,8 +287,6 @@ pub(crate) struct RegdmaLink {
     w0: u32,
     w1: u32,
     w2: u32,
-    /// ADDR_MAP register-selection bitmap; unread for other modes.
-    map: [u32; 4],
 }
 
 impl RegdmaLink {
@@ -118,7 +296,6 @@ impl RegdmaLink {
         w0: 0,
         w1: 0,
         w2: 0,
-        map: [0; 4],
     };
 
     fn head(mode: LinkMode, len: u32, skip_b: bool, skip_r: bool) -> u32 {
@@ -138,7 +315,7 @@ impl RegdmaLink {
     }
 
     /// A CONTINUOUS node with distinct backup/restore registers sharing one RAM
-    /// buffer (e.g. the SysTimer value vs. load registers).
+    /// buffer.
     fn continuous_split(backup: u32, restore: u32, storage: u32, len: u32) -> Self {
         Self {
             head: Self::head(LinkMode::Continuous, len, false, false),
@@ -146,20 +323,6 @@ impl RegdmaLink {
             w0: backup,
             w1: restore,
             w2: storage,
-            map: [0; 4],
-        }
-    }
-
-    /// An ADDR_MAP node: back up/restore the `count` registers selected by `map`
-    /// (bit `i` = register at `reg + i * 4`) from `reg` into `storage`.
-    fn addr_map(reg: u32, storage: u32, count: u32, map: [u32; 4]) -> Self {
-        Self {
-            head: Self::head(LinkMode::AddrMap, count, false, false),
-            next: 0,
-            w0: reg,
-            w1: reg,
-            w2: storage,
-            map,
         }
     }
 
@@ -172,7 +335,6 @@ impl RegdmaLink {
             w0: target,
             w1: value,
             w2: mask,
-            map: [0; 4],
         }
     }
 
@@ -184,7 +346,6 @@ impl RegdmaLink {
             w0: target,
             w1: value,
             w2: mask,
-            map: [0; 4],
         }
     }
 
@@ -193,80 +354,67 @@ impl RegdmaLink {
     }
 }
 
-// Console UART config-register retention, shared by the always-on console and
-// the opt-in `UartRetentionMemory`. The register data lives in `chip`.
-/// One ADDR_MAP + a restore-only WRITE+WAIT pulsing `UART_REG_UPDATE`.
-const UART_NODE_COUNT: usize = 3;
-
-/// Build the UART retention sequence for `base` into `nodes`, backing the
-/// registers up into `storage`. The WRITE+WAIT pulse the update bit on restore
-/// to latch the shadow (`_SYNC`) registers.
-fn build_uart_seq(base: u32, nodes: &mut [RegdmaLink], storage: u32) {
-    nodes[0] = RegdmaLink::addr_map(
-        base + UART_INT_ENA_OFF,
-        storage,
-        UART_RETENTION_REGS_CNT,
-        UART_REGS_MAP,
-    );
-    nodes[1] = RegdmaLink::write(
-        base + UART_REG_UPDATE_OFF,
-        UART_REG_UPDATE,
-        UART_REG_UPDATE,
-        true,
-        false,
-    );
-    nodes[2] = RegdmaLink::wait(base + UART_REG_UPDATE_OFF, 0, UART_REG_UPDATE, true, false);
-}
-
-// I2C config-register retention. Config registers are shadowed, so restore
-// pulses the FSM reset then requests a config update and waits for it to latch.
-// The register data lives in `chip`.
-/// One ADDR_MAP + a restore-only WRITE*3/WAIT pulsing `FSM_RST` then `CONF_UPGATE`.
-const I2C_NODE_COUNT: usize = 5;
-
-/// Build the I2C retention sequence for `base` into `nodes`, backing the
-/// registers up into `storage`.
-fn build_i2c_seq(base: u32, nodes: &mut [RegdmaLink], storage: u32) {
-    let ctr = base + I2C_CTR_OFF;
-    nodes[0] = RegdmaLink::addr_map(
-        base + I2C_SCL_LOW_PERIOD_OFF,
-        storage,
-        I2C_RETENTION_REGS_CNT,
-        I2C_REGS_MAP,
-    );
-    // Restore-only: pulse FSM reset, request config update, wait for it to latch.
-    nodes[1] = RegdmaLink::write(ctr, I2C_FSM_RST, I2C_FSM_RST, true, false);
-    nodes[2] = RegdmaLink::write(ctr, 0, I2C_FSM_RST, true, false);
-    nodes[3] = RegdmaLink::write(ctr, I2C_CONF_UPGATE, I2C_CONF_UPGATE, true, false);
-    nodes[4] = RegdmaLink::wait(ctr, 0, I2C_CONF_UPGATE, true, false);
-}
-
-// GPSPI2 config-register retention. The register data lives in `chip`.
-/// A single ADDR_MAP over the config registers.
-const SPI_NODE_COUNT: usize = 1;
-
-/// Build the SPI retention sequence for `base` into `nodes`, backing the
-/// registers up into `storage`.
+/// One step of an opt-in peripheral's config-register retention chain.
 ///
-/// The config registers are only reachable while the SPI function clock runs.
-/// `Spi::with_retention_memory` holds that clock for the retention lifetime, so
-/// they stay accessible at both backup and restore.
-// `spi2_regs_retention`)
-fn build_spi_seq(base: u32, nodes: &mut [RegdmaLink], storage: u32) {
-    nodes[0] = RegdmaLink::addr_map(
-        base + SPI_CMD_OFF,
-        storage,
-        SPI_RETENTION_REGS_CNT,
-        SPI_REGS_MAP,
-    );
+/// Unlike [`SysOp`] (whose peripherals are fixed, so it carries absolute
+/// addresses) these apply to whichever instance the caller registers.
+#[derive(Clone, Copy)]
+enum PeriphOp {
+    /// Back up/restore `count` consecutive registers at `base + off`.
+    Continuous { off: u32, count: u32 },
+    /// Restore-only masked write of `value` to `base + off`.
+    Write { off: u32, value: u32, mask: u32 },
+    /// Restore-only poll of `base + off` until `(reg & mask) == value`.
+    Wait { off: u32, value: u32, mask: u32 },
 }
+
+/// PAU nodes an opt-in peripheral op list expands to (one per op).
+const fn periph_nodes(ops: &[PeriphOp]) -> usize {
+    ops.len()
+}
+
+/// RAM buffer words an opt-in peripheral op list needs (its backed-up registers).
+const fn periph_words(ops: &[PeriphOp]) -> usize {
+    let mut w = 0;
+    let mut i = 0;
+    while i < ops.len() {
+        if let PeriphOp::Continuous { count, .. } = ops[i] {
+            w += count as usize;
+        }
+        i += 1;
+    }
+    w
+}
+
+/// Build a peripheral's retention sequence for `base` into `nodes`, drawing its
+/// CONTINUOUS RAM from `storage`. Fills exactly [`periph_nodes`] nodes and
+/// consumes [`periph_words`] words.
+fn build_periph_seq(base: u32, ops: &[PeriphOp], nodes: &mut [RegdmaLink], storage: *mut u32) {
+    let mut word = 0;
+    for (node, op) in nodes.iter_mut().zip(ops) {
+        *node = match *op {
+            PeriphOp::Continuous { off, count } => {
+                let mem = unsafe { storage.add(word) } as u32;
+                word += count as usize;
+                RegdmaLink::continuous(base + off, mem, count)
+            }
+            PeriphOp::Write { off, value, mask } => {
+                RegdmaLink::write(base + off, value, mask, true, false)
+            }
+            PeriphOp::Wait { off, value, mask } => {
+                RegdmaLink::wait(base + off, value, mask, true, false)
+            }
+        };
+    }
+}
+
+/// Console UART config-register retention, shared by the always-on console and
+/// the opt-in `UartRetentionMemory`.
+const UART_NODE_COUNT: usize = periph_nodes(chip::UART_OPS);
+/// RAM buffer words the UART chain backs up (see [`chip::UART_OPS`]).
+const UART_WORDS: usize = periph_words(chip::UART_OPS);
 
 /// A node in the intrusive registry of opt-in peripheral retention sequences.
-///
-/// One lives inside each peripheral's caller-owned retention memory, so any
-/// number of peripherals can register without a fixed table or allocation. The
-/// pointers are only dereferenced in [`arm_link`] (under [`REGISTRY`], on the
-/// single HP core), pointing at borrow-frozen memory until deregistered.
 pub(crate) struct RetentionNode {
     next: Option<NonNull<RetentionNode>>,
     head: *mut RegdmaLink,
@@ -299,8 +447,6 @@ impl defmt::Format for RetentionNode {
 /// Head of the intrusive list of registered peripheral retention sequences.
 struct Registry(Option<NonNull<RetentionNode>>);
 
-// SAFETY: the pointers are only followed under the `REGISTRY` lock, and while
-// armed they point at borrow-frozen caller memory on the single HP core.
 unsafe impl Send for Registry {}
 
 static REGISTRY: NonReentrantMutex<Registry> = NonReentrantMutex::new(Registry(None));
@@ -322,8 +468,7 @@ fn deregister_node(node: &mut RetentionNode) {
     let target = NonNull::from(&mut *node);
     REGISTRY.with(|registry| {
         let mut link: *mut Option<NonNull<RetentionNode>> = &mut registry.0;
-        // SAFETY: every pointer in the list points at a live, registered node;
-        // the walk only follows `next` links until it reaches `target`.
+
         unsafe {
             while let Some(current) = *link {
                 if current == target {
@@ -358,8 +503,6 @@ fn arm_link(core: &mut [RegdmaLink]) -> u32 {
     REGISTRY.with(|registry| {
         let mut current = registry.0;
         while let Some(node) = current {
-            // SAFETY: a registered node points at a live, borrow-frozen
-            // caller-owned array of `len` nodes, distinct from every other.
             let (seg_head, seg_len, next) = unsafe {
                 let node = node.as_ref();
                 (node.head, node.len, node.next)
@@ -381,10 +524,10 @@ fn arm_link(core: &mut [RegdmaLink]) -> u32 {
     head
 }
 
-/// Generate a per-peripheral caller-owned regDMA backing store, sized to its
-/// `nodes` and register `buf`. `$build` is its sequence builder.
+/// Generate a per-peripheral caller-owned regDMA backing store, sized from and
+/// built by the chip's `$ops` op chain.
 macro_rules! peripheral_retention_memory {
-    ($name:ident, $nodes:expr, $words:expr, $build:path, $doc:expr) => {
+    ($name:ident, $ops:expr, $doc:expr) => {
         #[doc = $doc]
         #[instability::unstable]
         #[derive(Debug)]
@@ -392,8 +535,8 @@ macro_rules! peripheral_retention_memory {
         #[repr(C, align(4))]
         pub struct $name {
             node: RetentionNode,
-            nodes: [RegdmaLink; $nodes],
-            buf: [u32; $words],
+            nodes: [RegdmaLink; periph_nodes($ops)],
+            buf: [u32; periph_words($ops)],
         }
 
         #[instability::unstable]
@@ -409,16 +552,16 @@ macro_rules! peripheral_retention_memory {
             pub const fn new() -> Self {
                 Self {
                     node: RetentionNode::new(),
-                    nodes: [RegdmaLink::EMPTY; $nodes],
-                    buf: [0; $words],
+                    nodes: [RegdmaLink::EMPTY; periph_nodes($ops)],
+                    buf: [0; periph_words($ops)],
                 }
             }
         }
 
         impl RetentionMemory for $name {
             fn register(&mut self, base: u32) -> NonNull<RetentionNode> {
-                let storage = self.buf.as_mut_ptr() as u32;
-                $build(base, &mut self.nodes, storage);
+                let storage = self.buf.as_mut_ptr();
+                build_periph_seq(base, $ops, &mut self.nodes, storage);
                 register_node(&mut self.node, &mut self.nodes)
             }
         }
@@ -427,9 +570,7 @@ macro_rules! peripheral_retention_memory {
 
 peripheral_retention_memory!(
     UartRetentionMemory,
-    UART_NODE_COUNT,
-    UART_RETENTION_REGS_CNT as usize,
-    build_uart_seq,
+    UART_OPS,
     "Caller-owned store retaining one UART's config registers across a `TOP` \
 power-down, passed to \
 [`Uart::with_retention_memory`](crate::uart::Uart::with_retention_memory). The \
@@ -438,9 +579,7 @@ console/log UART is retained automatically."
 
 peripheral_retention_memory!(
     I2cRetentionMemory,
-    I2C_NODE_COUNT,
-    I2C_RETENTION_REGS_CNT as usize,
-    build_i2c_seq,
+    I2C_OPS,
     "Caller-owned store retaining one I2C's config registers across a `TOP` \
 power-down, passed to \
 [`I2c::with_retention_memory`](crate::i2c::master::I2c::with_retention_memory). \
@@ -449,9 +588,7 @@ See [`UartRetentionMemory`]."
 
 peripheral_retention_memory!(
     SpiRetentionMemory,
-    SPI_NODE_COUNT,
-    SPI_RETENTION_REGS_CNT as usize,
-    build_spi_seq,
+    SPI_OPS,
     "Caller-owned store retaining one SPI's config registers across a `TOP` \
 power-down, passed to \
 [`Spi::with_retention_memory`](crate::spi::master::Spi::with_retention_memory). \
@@ -459,21 +596,18 @@ See [`UartRetentionMemory`]."
 );
 
 /// Caller-owned retention memory that can be registered for TOP-domain
-/// retention. Implemented by the generated `*RetentionMemory` types.
+/// retention.
 pub(crate) trait RetentionMemory {
     /// Build the retention sequence for `base` and register it, returning its
     /// registry node.
     fn register(&mut self, base: u32) -> NonNull<RetentionNode>;
 }
 
-/// A `TOP`-domain driver's power state, stored in the driver: either active,
-/// holding a [`PowerDomainLock`] that keeps `TOP` powered (without preventing
-/// sleep), or retained, with the lock dropped and regDMA saving/restoring its
-/// config across a `TOP` power-down from `'d`-borrowed memory.
+/// A `TOP`-domain driver's power state, stored in the driver.
 pub(crate) enum PowerManagement<'d, M: RetentionMemory> {
     /// Active, not retained: the held lock keeps `TOP` powered.
     PowerDomainLock { _lock: PowerDomainLock },
-    /// Retained: `node` points into the caller-owned memory borrowed for `'d`.
+    /// Retained: `node` points into the caller-owned memory.
     Retain {
         node: NonNull<RetentionNode>,
         _mem: PhantomData<&'d mut M>,
@@ -502,17 +636,11 @@ impl<'d, M: RetentionMemory> PowerManagement<'d, M> {
 impl<M: RetentionMemory> Drop for PowerManagement<'_, M> {
     fn drop(&mut self) {
         if let Self::Retain { node, .. } = self {
-            // SAFETY: the node lives in caller memory borrowed for `'d`, which
-            // outlives `self`, so it is still valid to unlink here.
             unsafe { deregister_node(node.as_mut()) };
         }
     }
 }
 
-// SAFETY: the only thread-unsafe state a `Retain` holds is the raw node/link
-// pointers, and those are only ever dereferenced on the single HP core under the
-// `REGISTRY` mutex (see `arm_link`/`deregister_node`); the owner never follows
-// them otherwise.
 unsafe impl<M: RetentionMemory> Send for PowerManagement<'_, M> {}
 unsafe impl<M: RetentionMemory> Sync for PowerManagement<'_, M> {}
 
@@ -536,39 +664,43 @@ impl<M: RetentionMemory> defmt::Format for PowerManagement<'_, M> {
 }
 
 /// One step of a chip's TOP-domain retention program (`chip::OPS`), expanded
-/// into PAU regDMA nodes by [`sys_periph::build_link`]. `Write`/`Wait` are
-/// restore-only (they re-apply state the backup can't capture, e.g. unlocking
-/// TEE/APM or pulsing a clock-update bit).
-// A given chip may not use every variant (only the H2 needs `Wait`).
-#[allow(dead_code)]
+/// into PAU regDMA nodes by [`sys_periph::build_link`].
 #[derive(Clone, Copy)]
 enum SysOp {
-    /// Back up/restore `count` consecutive registers starting at `base`.
-    Continuous { base: u32, count: u32 },
-    /// Back up `count` words from `backup`, restore them to `restore` (e.g.
-    /// GPIO output-enable via the W1TS register).
+    /// Back up/restore `count` consecutive registers starting at `addr`.
+    Continuous { addr: fn() -> u32, count: u32 },
+    /// Back up `count` consecutive registers starting at `backup`, restore into
+    /// `restore`.
     ContinuousSplit {
-        backup: u32,
-        restore: u32,
+        backup: fn() -> u32,
+        restore: fn() -> u32,
         count: u32,
     },
     /// Restore-only masked write of `value` to `addr`.
-    Write { addr: u32, value: u32, mask: u32 },
+    Write {
+        addr: fn() -> u32,
+        value: u32,
+        mask: u32,
+    },
     /// Restore-only poll of `addr` until `(reg & mask) == value`.
-    Wait { addr: u32, value: u32, mask: u32 },
-    /// The shared console-UART config sequence for the UART based at `base`.
-    Uart { base: u32 },
-    /// The shared SysTimer save/restore sequence based at `base`.
-    Systimer { base: u32 },
+    #[cfg(sleep_regdma_wait_ops)]
+    Wait {
+        addr: fn() -> u32,
+        value: u32,
+        mask: u32,
+    },
+    /// The shared console-UART config sequence.
+    Uart { base: fn() -> u32 },
+    /// The shared SysTimer save/restore sequence.
+    Systimer { base: fn() -> u32 },
 }
 
 /// PAU nodes emitted for one [`SysOp`].
 const fn op_nodes(op: &SysOp) -> usize {
     match op {
-        SysOp::Continuous { .. }
-        | SysOp::ContinuousSplit { .. }
-        | SysOp::Write { .. }
-        | SysOp::Wait { .. } => 1,
+        SysOp::Continuous { .. } | SysOp::ContinuousSplit { .. } | SysOp::Write { .. } => 1,
+        #[cfg(sleep_regdma_wait_ops)]
+        SysOp::Wait { .. } => 1,
         SysOp::Uart { .. } => UART_NODE_COUNT,
         SysOp::Systimer { .. } => SYSTIMER_NODE_COUNT,
     }
@@ -578,9 +710,11 @@ const fn op_nodes(op: &SysOp) -> usize {
 const fn op_words(op: &SysOp) -> usize {
     match op {
         SysOp::Continuous { count, .. } | SysOp::ContinuousSplit { count, .. } => *count as usize,
-        SysOp::Uart { .. } => UART_RETENTION_REGS_CNT as usize,
+        SysOp::Uart { .. } => UART_WORDS,
         SysOp::Systimer { .. } => SYSTIMER_CONT_WORDS,
-        SysOp::Write { .. } | SysOp::Wait { .. } => 0,
+        SysOp::Write { .. } => 0,
+        #[cfg(sleep_regdma_wait_ops)]
+        SysOp::Wait { .. } => 0,
     }
 }
 
@@ -606,47 +740,39 @@ const fn ops_buf_words(ops: &[SysOp]) -> usize {
     w
 }
 
-// SysTimer register offsets and bit masks (shared; only the base differs per
-// chip). Offsets/masks from ESP-IDF v5.4 `systimer_reg.h`; the save/restore
-// sequence mirrors `systimer_regs_retention[]`.
-const ST_UNIT_UPDATE: u32 = 1 << 30;
-const ST_UNIT_VALUE_VALID: u32 = 1 << 29;
+const ST_UNIT_OP_UPDATE: u32 = 1 << 30;
+const ST_UNIT_OP_VALUE_VALID: u32 = 1 << 29;
 const ST_UNIT_LOAD: u32 = 1 << 0;
 const ST_COMP_LOAD: u32 = 1 << 0;
-const ST_TARGET_PERIOD_MODE: u32 = 1 << 30;
-/// TARGET0_HI ..= TARGET2_CONF, i.e. all three targets' hi/lo/conf.
-const ST_TARGETS_LEN: u32 = 9;
-/// One node per SysTimer step of `build_systimer_seq`.
-const SYSTIMER_NODE_COUNT: usize = 19;
-/// SysTimer CONTINUOUS words: unit0/1 value (2+2), targets (9), conf, int_ena.
+const ST_TARGET_CONF_PERIOD_MODE: u32 = 1 << 30;
+const ST_TARGETS_LEN: u32 = span!(SYSTIMER, [trgt(0).hi()]..=[target_conf(2)]);
+// Nodes `build_systimer_seq` emits: four per counter unit (latch, poll, read,
+// load), the target values, one load per comparator, a clear and set to re-arm
+// period mode on target0/1 plus a clear on target2, then `conf` and `int_ena`.
+const SYSTIMER_NODE_COUNT: usize = 2 * 4 + 1 + 3 + 2 * 2 + 1 + 1 + 1;
+// SysTimer CONTINUOUS words: unit0/1 value (2+2), the targets, conf, int_ena.
 const SYSTIMER_CONT_WORDS: usize = 2 + 2 + ST_TARGETS_LEN as usize + 1 + 1;
 
 /// Build the SysTimer retention sequence for the timer at `base` into `nodes`,
-/// drawing its RAM from `buf_base` starting at word `start_word`. Fills exactly
-/// [`SYSTIMER_NODE_COUNT`] nodes and consumes [`SYSTIMER_CONT_WORDS`] words.
-///
-/// Backup latches each unit's counter (UPDATE + wait for VALUE_VALID) and reads
-/// it; restore loads it back and triggers a load. The value is read from
-/// VALUE_HI/LO but restored into LOAD_HI/LO, hence the split backup/restore
-/// addresses.
+/// drawing its RAM from `buf_base`.
 fn build_systimer_seq(base: u32, nodes: &mut [RegdmaLink], buf_base: *mut u32, start_word: usize) {
-    let st_conf = base;
-    let st_unit0_op = base + 0x04;
-    let st_unit1_op = base + 0x08;
-    let st_unit0_load_hi = base + 0x0C;
-    let st_unit1_load_hi = base + 0x14;
-    let st_target0_hi = base + 0x1C;
-    let st_target0_conf = base + 0x34;
-    let st_target1_conf = base + 0x38;
-    let st_target2_conf = base + 0x3C;
-    let st_unit0_value_hi = base + 0x40;
-    let st_unit1_value_hi = base + 0x48;
-    let st_comp0_load = base + 0x50;
-    let st_comp1_load = base + 0x54;
-    let st_comp2_load = base + 0x58;
-    let st_unit0_load = base + 0x5C;
-    let st_unit1_load = base + 0x60;
-    let st_int_ena = base + 0x64;
+    let st_conf = base + reg_off!(SYSTIMER, conf());
+    let st_unit0_op = base + reg_off!(SYSTIMER, unit_op(0));
+    let st_unit1_op = base + reg_off!(SYSTIMER, unit_op(1));
+    let st_unit0_load_hi = base + reg_off!(SYSTIMER, unitload(0).hi());
+    let st_unit1_load_hi = base + reg_off!(SYSTIMER, unitload(1).hi());
+    let st_target0_hi = base + reg_off!(SYSTIMER, trgt(0).hi());
+    let st_target0_conf = base + reg_off!(SYSTIMER, target_conf(0));
+    let st_target1_conf = base + reg_off!(SYSTIMER, target_conf(1));
+    let st_target2_conf = base + reg_off!(SYSTIMER, target_conf(2));
+    let st_unit0_value_hi = base + reg_off!(SYSTIMER, unit_value(0).hi());
+    let st_unit1_value_hi = base + reg_off!(SYSTIMER, unit_value(1).hi());
+    let st_comp0_load = base + reg_off!(SYSTIMER, comp_load(0));
+    let st_comp1_load = base + reg_off!(SYSTIMER, comp_load(1));
+    let st_comp2_load = base + reg_off!(SYSTIMER, comp_load(2));
+    let st_unit0_load = base + reg_off!(SYSTIMER, unit_load(0));
+    let st_unit1_load = base + reg_off!(SYSTIMER, unit_load(1));
+    let st_int_ena = base + reg_off!(SYSTIMER, int_ena());
 
     let mut word = start_word;
     let mut alloc = |len: u32| -> u32 {
@@ -672,9 +798,15 @@ fn build_systimer_seq(base: u32, nodes: &mut [RegdmaLink], buf_base: *mut u32, s
             st_unit1_load,
         ),
     ] {
-        nodes[node] = RegdmaLink::write(op, ST_UNIT_UPDATE, ST_UNIT_UPDATE, false, true);
+        nodes[node] = RegdmaLink::write(op, ST_UNIT_OP_UPDATE, ST_UNIT_OP_UPDATE, false, true);
         node += 1;
-        nodes[node] = RegdmaLink::wait(op, ST_UNIT_VALUE_VALID, ST_UNIT_VALUE_VALID, false, true);
+        nodes[node] = RegdmaLink::wait(
+            op,
+            ST_UNIT_OP_VALUE_VALID,
+            ST_UNIT_OP_VALUE_VALID,
+            false,
+            true,
+        );
         node += 1;
         let mem = alloc(2);
         nodes[node] = RegdmaLink::continuous_split(value_hi, load_hi, mem, 2);
@@ -693,18 +825,18 @@ fn build_systimer_seq(base: u32, nodes: &mut [RegdmaLink], buf_base: *mut u32, s
     }
     // Re-arm period mode: clear+set for target0/1, clear for target2.
     for target in [st_target0_conf, st_target1_conf] {
-        nodes[node] = RegdmaLink::write(target, 0, ST_TARGET_PERIOD_MODE, true, false);
+        nodes[node] = RegdmaLink::write(target, 0, ST_TARGET_CONF_PERIOD_MODE, true, false);
         node += 1;
         nodes[node] = RegdmaLink::write(
             target,
-            ST_TARGET_PERIOD_MODE,
-            ST_TARGET_PERIOD_MODE,
+            ST_TARGET_CONF_PERIOD_MODE,
+            ST_TARGET_CONF_PERIOD_MODE,
             true,
             false,
         );
         node += 1;
     }
-    nodes[node] = RegdmaLink::write(st_target2_conf, 0, ST_TARGET_PERIOD_MODE, true, false);
+    nodes[node] = RegdmaLink::write(st_target2_conf, 0, ST_TARGET_CONF_PERIOD_MODE, true, false);
     node += 1;
 
     // Work-enable and interrupt-enable state.
@@ -719,13 +851,7 @@ fn build_systimer_seq(base: u32, nodes: &mut [RegdmaLink], buf_base: *mut u32, s
     debug_assert!(word - start_word == SYSTIMER_CONT_WORDS);
 }
 
-/// Caller-owned backing store for the TOP-domain system-peripheral register set
-/// (PCR, interrupt matrix, HP system, TEE/APM, IO MUX, GPIO matrix, flash SPI
-/// mem, console UART and SysTimer - see the chip's `OPS` retention program).
-///
-/// The core state regDMA must retain for the `TOP` domain to power down at all;
-/// the caller opts in via [`RtcSleepConfig::with_top_power_down`]. Individual
-/// peripherals opt into retaining their own config via `with_retention_memory`.
+/// Caller-owned backing store for the TOP-domain system-peripheral register set.
 ///
 /// [`RtcSleepConfig::with_top_power_down`]: crate::rtc_cntl::sleep::RtcSleepConfig::with_top_power_down
 #[instability::unstable]
@@ -757,8 +883,8 @@ impl SystemRetentionMemory {
 
 /// Enable the regDMA bus clock and release its reset (`pau_ll_enable_bus_clock`),
 /// and bound the WAIT polling so a never-satisfied condition can't hang the
-/// engine (`pau_hal_set_regdma_wait_timeout`, ESP-IDF `PAU_REGDMA_LINK_WAIT_*`).
-// `#[ram]`: also called from the wake path (see `restore_top_retention`).
+/// engine.
+// `pau_hal_set_regdma_wait_timeout`, ESP-IDF `PAU_REGDMA_LINK_WAIT_*`
 #[ram]
 fn regdma_clock_and_timeout() {
     PCR::regs().regdma_conf().modify(|_, w| {
@@ -772,9 +898,7 @@ fn regdma_clock_and_timeout() {
 }
 
 /// Software-trigger a regDMA transfer of system link 0 and wait for it. `backup`
-/// copies registers into RAM, else restores RAM back into registers. Used on
-/// [`chip::SW_TRIGGER_REGDMA`] chips whose PAU powers off with `TOP`, so the PMU
-/// can't drive the transfer.
+/// copies registers into RAM, else restores RAM back into registers.
 // Mirrors ESP-IDF `pau_hal_start_regdma_system_link`.
 // `#[ram]`: the restore runs on wake before the flash SPI controller is back.
 #[ram]
@@ -803,11 +927,6 @@ fn sw_trigger_system_link(backup: bool) {
 /// sleep: program PAU entry link 0 and start the backup. Must be called after
 /// the PMU power config (which resets the backup-enable bits) and before the
 /// sleep request; rebuilds the chain from the live registry each time.
-///
-/// Where the PAU survives the `TOP` power-down the PMU drives backup/restore in
-/// hardware. On [`chip::SW_TRIGGER_REGDMA`] chips the PAU powers off with `TOP`,
-/// so the hardware backup is disabled and the backup is triggered in software
-/// here, with [`restore_top_retention`] doing the restore on wake.
 fn enable_top_retention(mem: &mut SystemRetentionMemory) {
     regdma_clock_and_timeout();
 
@@ -818,7 +937,7 @@ fn enable_top_retention(mem: &mut SystemRetentionMemory) {
         .write(|w| unsafe { w.bits(head) });
 
     let pmu = PMU::regs();
-    if chip::SW_TRIGGER_REGDMA {
+    if cfg!(sleep_regdma_sw_trigger) {
         // The PAU powers off with TOP: the PMU can't run the backup on the
         // active->sleep transition, so disable it and back up in software now.
         pmu.hp_sleep_backup()
@@ -836,7 +955,7 @@ fn enable_top_retention(mem: &mut SystemRetentionMemory) {
     }
 }
 
-/// Restore the TOP-domain peripherals on wake for [`chip::SW_TRIGGER_REGDMA`]
+/// Restore the TOP-domain peripherals on wake for `sleep_regdma_sw_trigger`
 /// chips, whose PAU lost its own configuration with the `TOP` power-down.
 ///
 /// Re-enables the regDMA bus clock, re-programs entry link 0 (the linked list in
@@ -846,7 +965,7 @@ fn enable_top_retention(mem: &mut SystemRetentionMemory) {
 // `#[ram]`: runs on the wake path before the flash SPI controller is restored.
 #[ram]
 pub(crate) fn restore_top_retention(mem: &mut SystemRetentionMemory) {
-    if !chip::SW_TRIGGER_REGDMA {
+    if !cfg!(sleep_regdma_sw_trigger) {
         return;
     }
     regdma_clock_and_timeout();
@@ -888,9 +1007,6 @@ pub(crate) fn disable_timg0_flashboot_wdt() {
 /// `RtcSleepConfig`. Holds the caller's opt-in choices and retention memory plus
 /// the chip-agnostic resolve/enter logic; a chip only maps the resolved decision
 /// onto its own `PowerDownFlags`.
-///
-/// Raw pointers (not borrows) keep the embedding `RtcSleepConfig` `Copy`; the
-/// setters take `&'static mut`.
 #[derive(Clone, Copy)]
 pub(crate) struct SleepRetention {
     cpu_power_down: bool,
@@ -936,9 +1052,7 @@ impl SleepRetention {
     }
 
     /// Resolve which domains may actually power down for a light sleep, given the
-    /// opt-in choices, caller memory and active power-domain locks. Returns
-    /// `(cpu_pd, top_pd)`; `top_pd` implies `cpu_pd`, and a domain only powers
-    /// down with its retention memory and no lock (else it clock-gates).
+    /// opt-in choices, caller memory and active power-domain locks.
     pub(crate) fn resolve(&self) -> (bool, bool) {
         let have_cpu = !self.cpu_mem.is_null();
         let have_sys = !self.top_mem.is_null();
@@ -980,8 +1094,8 @@ impl SleepRetention {
     }
 }
 
-/// Chip-agnostic interpreter that expands a chip's `OPS` program into PAU regDMA
-/// nodes (in retention-priority order, system clock first).
+// Chip-agnostic interpreter that expands a chip's `OPS` program into PAU regDMA
+// nodes (in retention-priority order, system clock first).
 // Mirrors ESP-IDF's `SLEEP_RETENTION_MODULE_SYS_PERIPH` + `..._CLOCK_SYSTEM`
 // (`soc/<chip>/system_retention_periph.c`, `.../sleep_clock.c`).
 mod sys_periph {
@@ -991,9 +1105,10 @@ mod sys_periph {
         SYSTIMER_NODE_COUNT,
         SysOp,
         UART_NODE_COUNT,
-        UART_RETENTION_REGS_CNT,
+        UART_OPS,
+        UART_WORDS,
+        build_periph_seq,
         build_systimer_seq,
-        build_uart_seq,
         chip,
     };
 
@@ -1026,9 +1141,9 @@ mod sys_periph {
 
         for op in chip::OPS {
             match *op {
-                SysOp::Continuous { base, count } => {
+                SysOp::Continuous { addr, count } => {
                     let mem = unsafe { buf_base.add(word) } as u32;
-                    nodes[node] = RegdmaLink::continuous(base, mem, count);
+                    nodes[node] = RegdmaLink::continuous(addr(), mem, count);
                     word += count as usize;
                     node += 1;
                 }
@@ -1038,27 +1153,33 @@ mod sys_periph {
                     count,
                 } => {
                     let mem = unsafe { buf_base.add(word) } as u32;
-                    nodes[node] = RegdmaLink::continuous_split(backup, restore, mem, count);
+                    nodes[node] = RegdmaLink::continuous_split(backup(), restore(), mem, count);
                     word += count as usize;
                     node += 1;
                 }
                 SysOp::Write { addr, value, mask } => {
-                    nodes[node] = RegdmaLink::write(addr, value, mask, true, false);
+                    nodes[node] = RegdmaLink::write(addr(), value, mask, true, false);
                     node += 1;
                 }
+                #[cfg(sleep_regdma_wait_ops)]
                 SysOp::Wait { addr, value, mask } => {
-                    nodes[node] = RegdmaLink::wait(addr, value, mask, true, false);
+                    nodes[node] = RegdmaLink::wait(addr(), value, mask, true, false);
                     node += 1;
                 }
                 SysOp::Uart { base } => {
-                    let mem = unsafe { buf_base.add(word) } as u32;
-                    build_uart_seq(base, &mut nodes[node..node + UART_NODE_COUNT], mem);
-                    word += UART_RETENTION_REGS_CNT as usize;
+                    let mem = unsafe { buf_base.add(word) };
+                    build_periph_seq(
+                        base(),
+                        UART_OPS,
+                        &mut nodes[node..node + UART_NODE_COUNT],
+                        mem,
+                    );
+                    word += UART_WORDS;
                     node += UART_NODE_COUNT;
                 }
                 SysOp::Systimer { base } => {
                     build_systimer_seq(
-                        base,
+                        base(),
                         &mut nodes[node..node + SYSTIMER_NODE_COUNT],
                         buf_base,
                         word,

@@ -1,17 +1,4 @@
 //! CPU power-down retention during light sleep (RISC-V PMU chips).
-//!
-//! When `pd_cpu` powers down, the CPU loses all state and regDMA can't reach the
-//! register file/CSRs, so they are saved/restored in software in three parts:
-//! critical registers (GP + machine CSRs) in assembly via a setjmp/longjmp-style
-//! trick, non-critical CSRs via `csrr`/`csrw`, and CPU-domain device registers
-//! (`INTPRI`, `PLIC`/`CLINT`, cache). Backing RAM ([`CpuRetentionMemory`]) is
-//! caller-owned, opt-in via
-//! [`RtcSleepConfig::with_cpu_power_down`](crate::rtc_cntl::sleep::RtcSleepConfig::with_cpu_power_down).
-//!
-//! The logic is chip-agnostic - only the device-register base addresses are
-//! per-chip data (from the `retention::chip` module). Everything runs from IRAM
-//! (`.rwtext`): the ROM wakes with the flash cache lost, so no `#[ram]` function
-//! may call flash-resident code until the cache config is restored.
 
 // Mirrors ESP-IDF `v5.4` `esp_sleep_cpu_retention()` (`sleep_cpu.c`,
 // `sleep_cpu_asm.S`, `rvsleep-frames.h`).
@@ -20,17 +7,19 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 use procmacros::ram;
 
-use crate::peripherals::{LP_AON, PMU};
 /// Second buffer required by
 /// [`RtcSleepConfig::with_top_power_down`](crate::rtc_cntl::sleep::RtcSleepConfig::with_top_power_down).
 #[instability::unstable]
 pub use crate::rtc_cntl::retention::SystemRetentionMemory;
+use crate::{
+    peripherals::{LP_AON, PMU},
+    soc::csr,
+};
 
 /// Incremented only when the CPU domain actually lost and regained power.
 static CPU_POWERDOWN_WAKES: AtomicU32 = AtomicU32::new(0);
 
 /// How many times the CPU power domain was actually powered down and restored.
-/// Diagnostic: rises across light sleeps only if the CPU genuinely lost power.
 #[instability::unstable]
 pub fn cpu_power_down_wake_count() -> u32 {
     CPU_POWERDOWN_WAKES.load(Ordering::Relaxed)
@@ -253,38 +242,19 @@ rv_core_critical_regs_restore:
 // Non-critical CSRs (RvCoreNonCriticalSleepFrame)
 // ---------------------------------------------------------------------------
 
-/// Read a CSR by numeric address (must be a compile-time constant).
-#[inline(always)]
-unsafe fn read_csr<const CSR: u32>() -> u32 {
-    let value: u32;
-    unsafe {
-        core::arch::asm!("csrr {0}, {1}", out(reg) value, const CSR, options(nostack));
-    }
-    value
-}
-
-/// Write a CSR by numeric address (must be a compile-time constant).
-#[inline(always)]
-unsafe fn write_csr<const CSR: u32>(value: u32) {
-    unsafe {
-        core::arch::asm!("csrw {1}, {0}", in(reg) value, const CSR, options(nostack));
-    }
-}
-
 /// Generate the slot count and save/restore routines for the non-critical CSRs
-/// from one list. `$name` is documentation only; CSRs are addressed by number
-/// so custom Espressif CSRs need no assembler support.
+/// from one list of names.
 // CSR list order matches ESP-IDF `sleep_cpu.c`.
 macro_rules! noncritical_csrs {
-    ($($name:ident = $csr:literal),+ $(,)?) => {
+    ($($name:ident),+ $(,)?) => {
         /// Non-critical CSR slot count; sizes the `noncritical` field.
-        const NONCRITICAL_WORDS: usize = [$($csr),+].len();
+        const NONCRITICAL_WORDS: usize = [$(stringify!($name)),+].len();
 
         #[ram]
         fn save_noncritical(buf: *mut u32) {
             let mut i = 0usize;
             $(
-                unsafe { buf.add(i).write(read_csr::<$csr>()); }
+                unsafe { buf.add(i).write(csr::$name::read() as u32); }
                 i += 1;
             )+
             let _ = i;
@@ -294,7 +264,7 @@ macro_rules! noncritical_csrs {
         fn restore_noncritical(buf: *const u32) {
             let mut i = 0usize;
             $(
-                unsafe { write_csr::<$csr>(buf.add(i).read()); }
+                unsafe { csr::$name::write(buf.add(i).read() as usize); }
                 i += 1;
             )+
             let _ = i;
@@ -303,144 +273,60 @@ macro_rules! noncritical_csrs {
 }
 
 noncritical_csrs! {
-    mscratch = 0x340,
-    mideleg  = 0x303,
-    misa     = 0x301,
-    tselect  = 0x7A0,
-    tdata1   = 0x7A1,
-    tdata2   = 0x7A2,
-    tcontrol = 0x7A5,
-    pmpaddr0 = 0x3B0, pmpaddr1 = 0x3B1, pmpaddr2 = 0x3B2, pmpaddr3 = 0x3B3,
-    pmpaddr4 = 0x3B4, pmpaddr5 = 0x3B5, pmpaddr6 = 0x3B6, pmpaddr7 = 0x3B7,
-    pmpaddr8 = 0x3B8, pmpaddr9 = 0x3B9, pmpaddr10 = 0x3BA, pmpaddr11 = 0x3BB,
-    pmpaddr12 = 0x3BC, pmpaddr13 = 0x3BD, pmpaddr14 = 0x3BE, pmpaddr15 = 0x3BF,
-    pmpcfg0 = 0x3A0, pmpcfg1 = 0x3A1, pmpcfg2 = 0x3A2, pmpcfg3 = 0x3A3,
-    pmaaddr0 = 0xBD0, pmaaddr1 = 0xBD1, pmaaddr2 = 0xBD2, pmaaddr3 = 0xBD3,
-    pmaaddr4 = 0xBD4, pmaaddr5 = 0xBD5, pmaaddr6 = 0xBD6, pmaaddr7 = 0xBD7,
-    pmaaddr8 = 0xBD8, pmaaddr9 = 0xBD9, pmaaddr10 = 0xBDA, pmaaddr11 = 0xBDB,
-    pmaaddr12 = 0xBDC, pmaaddr13 = 0xBDD, pmaaddr14 = 0xBDE, pmaaddr15 = 0xBDF,
-    pmacfg0 = 0xBC0, pmacfg1 = 0xBC1, pmacfg2 = 0xBC2, pmacfg3 = 0xBC3,
-    pmacfg4 = 0xBC4, pmacfg5 = 0xBC5, pmacfg6 = 0xBC6, pmacfg7 = 0xBC7,
-    pmacfg8 = 0xBC8, pmacfg9 = 0xBC9, pmacfg10 = 0xBCA, pmacfg11 = 0xBCB,
-    pmacfg12 = 0xBCC, pmacfg13 = 0xBCD, pmacfg14 = 0xBCE, pmacfg15 = 0xBCF,
-    utvec   = 0x005,
-    ustatus = 0x000,
-    uepc    = 0x041,
-    ucause  = 0x042,
-    mpcer   = 0x7E0,
-    mpcmr   = 0x7E1,
-    mpccr   = 0x7E2,
-    cpu_testbus_ctrl = 0x7E3,
-    upcer   = 0x800,
-    upcmr   = 0x801,
-    upccr   = 0x802,
-    ugpio_oen = 0x803,
-    ugpio_in  = 0x804,
-    ugpio_out = 0x805,
+    mscratch,
+    mideleg,
+    misa,
+    tselect,
+    tdata1,
+    tdata2,
+    tcontrol,
+    pmpaddr0, pmpaddr1, pmpaddr2, pmpaddr3,
+    pmpaddr4, pmpaddr5, pmpaddr6, pmpaddr7,
+    pmpaddr8, pmpaddr9, pmpaddr10, pmpaddr11,
+    pmpaddr12, pmpaddr13, pmpaddr14, pmpaddr15,
+    pmpcfg0, pmpcfg1, pmpcfg2, pmpcfg3,
+    pmaaddr0, pmaaddr1, pmaaddr2, pmaaddr3,
+    pmaaddr4, pmaaddr5, pmaaddr6, pmaaddr7,
+    pmaaddr8, pmaaddr9, pmaaddr10, pmaaddr11,
+    pmaaddr12, pmaaddr13, pmaaddr14, pmaaddr15,
+    pmacfg0, pmacfg1, pmacfg2, pmacfg3,
+    pmacfg4, pmacfg5, pmacfg6, pmacfg7,
+    pmacfg8, pmacfg9, pmacfg10, pmacfg11,
+    pmacfg12, pmacfg13, pmacfg14, pmacfg15,
+    utvec,
+    ustatus,
+    uepc,
+    ucause,
+    mpcer,
+    mpcmr,
+    mpccr,
+    cpu_testbus_ctrl,
+    upcer,
+    upcmr,
+    upccr,
+    ugpio_oen,
+    ugpio_in,
+    ugpio_out,
 }
 
 // ---------------------------------------------------------------------------
 // CPU-domain device registers (INTPRI / cache / PLIC / CLINT)
 // ---------------------------------------------------------------------------
 
-/// A contiguous run of `words` 32-bit registers starting at `start`.
-struct Region {
-    start: u32,
-    words: usize,
-}
-
-/// Total 32-bit words covered by a set of [`Region`]s, to size their store.
-const fn total_words(regions: &[Region]) -> usize {
-    let mut words = 0;
-    let mut i = 0;
-    while i < regions.len() {
-        words += regions[i].words;
-        i += 1;
-    }
-    words
-}
-
-// Per-chip base addresses (the region layout below is chip-agnostic).
 use crate::rtc_cntl::retention::{
-    CACHE_BASE,
-    CLINT_MINT_BASE,
-    CLINT_UINT_BASE,
-    INTPRI_BASE,
-    PLIC_MX_BASE,
-    PLIC_UX_BASE,
+    CACHE_REGIONS,
+    CLINT_REGIONS,
+    INTPRI_REGIONS,
+    PLIC_REGIONS,
+    Region,
+    total_words,
 };
-
-// Interrupt matrix priority registers (`INTPRI`).
-const INTPRI_REGIONS: [Region; 2] = [
-    // INTPRI_CORE0_CPU_INT_ENABLE_REG ..= INTPRI_RND_ECO_LOW_REG
-    Region {
-        start: INTPRI_BASE,
-        words: 45,
-    },
-    // INTPRI_RND_ECO_HIGH_REG
-    Region {
-        start: INTPRI_BASE + 0x3FC,
-        words: 1,
-    },
-];
-
-// L1 cache control (`EXTMEM`/`CACHE`).
-const CACHE_REGIONS: [Region; 2] = [
-    // *_L1_CACHE_CTRL_REG
-    Region {
-        start: CACHE_BASE + 0x4,
-        words: 1,
-    },
-    // *_L1_CACHE_WRAP_AROUND_CTRL_REG
-    Region {
-        start: CACHE_BASE + 0x20,
-        words: 1,
-    },
-];
-
-// PLIC machine/user interrupt controllers.
-const PLIC_REGIONS: [Region; 4] = [
-    // PLIC_MXINT_ENABLE_REG ..= PLIC_MXINT_CLAIM_REG
-    Region {
-        start: PLIC_MX_BASE,
-        words: 38,
-    },
-    // PLIC_MXINT_CONF_REG
-    Region {
-        start: PLIC_MX_BASE + 0x3FC,
-        words: 1,
-    },
-    // PLIC_UXINT_ENABLE_REG ..= PLIC_UXINT_CLAIM_REG
-    Region {
-        start: PLIC_UX_BASE,
-        words: 38,
-    },
-    // PLIC_UXINT_CONF_REG
-    Region {
-        start: PLIC_UX_BASE + 0x3FC,
-        words: 1,
-    },
-];
-
-// CLINT machine/user timers.
-const CLINT_REGIONS: [Region; 2] = [
-    // CLINT_MINT_SIP_REG ..= CLINT_MINT_MTIMECMP_H_REG
-    Region {
-        start: CLINT_MINT_BASE,
-        words: 6,
-    },
-    // CLINT_UINT_SIP_REG ..= CLINT_UINT_UTIMECMP_H_REG
-    Region {
-        start: CLINT_UINT_BASE,
-        words: 6,
-    },
-];
 
 #[ram]
 fn save_device_regs(regions: &[Region], buf: *mut u32) {
     let mut out = buf;
     for region in regions {
-        let mut addr = region.start as *const u32;
+        let mut addr = (region.start)() as *const u32;
         for _ in 0..region.words {
             unsafe {
                 out.write(addr.read_volatile());
@@ -455,7 +341,7 @@ fn save_device_regs(regions: &[Region], buf: *mut u32) {
 fn restore_device_regs(regions: &[Region], buf: *const u32) {
     let mut src = buf;
     for region in regions {
-        let mut addr = region.start as *mut u32;
+        let mut addr = (region.start)() as *mut u32;
         for _ in 0..region.words {
             unsafe {
                 addr.write_volatile(src.read());
@@ -470,7 +356,7 @@ fn restore_device_regs(regions: &[Region], buf: *const u32) {
 // Caller-owned retention storage
 // ---------------------------------------------------------------------------
 
-/// Backing storage (~1 KiB) for CPU power-down register retention.
+/// Backing storage for CPU power-down register retention.
 ///
 /// Caller-owned, opted into via [`RtcSleepConfig::with_cpu_power_down`] (or
 /// [`RtcSleepConfig::with_top_power_down`], which also powers the CPU down).
@@ -520,7 +406,8 @@ impl Default for CpuRetentionMemory {
 // ---------------------------------------------------------------------------
 
 /// Read `mstatus` and clear its global machine-interrupt-enable bit (`MIE`),
-/// returning the previous value. Mirrors `RV_READ_MSTATUS_AND_DISABLE_INTR()`.
+/// returning the previous value.
+// Mirrors `RV_READ_MSTATUS_AND_DISABLE_INTR()`.
 #[inline(always)]
 unsafe fn save_mstatus_and_disable_int() -> u32 {
     let mstatus: u32;

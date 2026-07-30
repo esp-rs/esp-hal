@@ -1,160 +1,113 @@
 //! ESP32-H2 register data for TOP-domain regDMA retention and CPU-domain
 //! software retention.
-//!
-//! Pure data consumed by the chip-agnostic logic in `retention` and
-//! `cpu_retention`. Region sizes note the sizing end register
-//! (`count = ((end - base) / 4) + 1`).
 
 // References (ESP-IDF `v5.4`): `soc/esp32h2/system_retention_periph.c`,
 // `esp_hw_support/.../esp32h2/sleep_clock.c`, `.../esp32h2/sleep_cpu.c`.
 
-use super::SysOp::{self, Continuous, ContinuousSplit, Systimer, Uart, Wait, Write};
+use super::{PeriphOp, Region, SysOp};
 
 /// The TOP-domain SYS_PERIPH retention program, in retention-priority order
 /// (system clock first). Interpreted by `retention::sys_periph::build_link`.
 pub(super) const OPS: &[SysOp] = &[
-    // PRI_0: system clock/reset (PCR). The H2 must also pulse the bus-clock
-    // update bit on restore for the new clock config to take effect.
-    Continuous {
-        base: 0x6009_6000,
-        count: 85,
-    }, // PCR ..= PCR_PWDET_SAR_CLK_CONF_REG (+0x150)
-    Continuous {
-        base: 0x6009_6FF0,
-        count: 1,
-    }, // PCR_RESET_EVENT_BYPASS_REG
-    Write {
-        addr: 0x6009_6148,
-        value: 0x1,
-        mask: 0x1,
-    }, // PCR_BUS_CLK_UPDATE (BUS_CLOCK_UPDATE)
-    Wait {
-        addr: 0x6009_6148,
-        value: 0,
-        mask: 0x1,
-    }, // wait for it to self-clear
-    // PRI_2: unlock TEE/APM (clear TEE_M4_MODE_CTRL) before restoring them.
-    Write {
-        addr: 0x6009_8010,
-        value: 0,
-        mask: 0xFFFF_FFFF,
-    }, // TEE_M4_MODE_CTRL_REG
+    // PRI_0: system clock/reset. The bus-clock update bit has to be pulsed on
+    // restore for the restored clock config to take effect.
+    continuous!(PCR, [uart(0).conf()]..=[pwdet_sar_clk_conf()]),
+    continuous!(PCR, [reset_event_bypass()], 1),
+    write_reg!(PCR, [bus_clk_update()], 0x1, 0x1),
+    wait_reg!(PCR, [bus_clk_update()], 0, 0x1), // wait for it to self-clear
+    // PRI_2: unlock TEE/APM before restoring them.
+    write_reg!(TEE, [m_mode_ctrl(4)], 0, 0xFFFF_FFFF),
     // PRI_4/5: TEE/APM, interrupt matrix, HP system.
-    Continuous {
-        base: 0x6009_9000,
-        count: 68,
-    }, // HP_APM ..= HP_APM_CLOCK_GATE_REG (+0x10c)
-    Continuous {
-        base: 0x6009_8000,
-        count: 33,
-    }, // TEE ..= TEE_CLOCK_GATE_REG (+0x80)
-    Continuous {
-        base: 0x6001_0000,
-        count: 69,
-    }, // INTMTX ..= INTMTX_CORE0_CLOCK_GATE_REG (+0x110)
-    Continuous {
-        base: 0x6009_5000,
-        count: 12,
-    }, // HP_SYSTEM ..= HP_SYSTEM_MEM_TEST_CONF_REG (+0x2c)
+    continuous!(HP_APM, [region_filter_en()]..=[clock_gate()]),
+    continuous!(TEE, [m_mode_ctrl(0)]..=[clock_gate()]),
+    continuous!(INTERRUPT_CORE0, [core_0_intr_map(0)]..=[clock_gate()]),
+    continuous!(
+        HP_SYS,
+        [external_device_encrypt_decrypt_control()]..=[mem_test_conf()]
+    ),
     // PRI_5: console UART0.
-    Uart { base: 0x6000_0000 },
-    // PRI_6: IO MUX + GPIO matrix (fewer pins than the C6).
-    Continuous {
-        base: 0x6009_0000,
-        count: 29,
-    }, // IO_MUX ..= IO_MUX_GPIO27_REG (+0x70)
-    Continuous {
-        base: 0x6009_1554,
-        count: 32,
-    }, // GPIO_FUNC0_OUT_SEL ..= GPIO_FUNC31_OUT_SEL
-    Continuous {
-        base: 0x6009_114C,
-        count: 127,
-    }, // GPIO_STATUS_NEXT ..= GPIO_FUNC124_IN_SEL
-    Continuous {
-        base: 0x6009_1000,
-        count: 61,
-    }, // GPIO ..= GPIO_PIN31_REG (+0xf0)
-    ContinuousSplit {
-        backup: 0x6009_1020,
-        restore: 0x6009_1024,
-        count: 1,
-    }, // GPIO_ENABLE_REG .. GPIO_ENABLE_W1TS_REG
-    // PRI_6: Flash SPI mem (SPIMEM1 then SPIMEM0), identical layout to the C6.
-    // MMU content/index registers are intentionally excluded (see ESP-IDF note).
-    Continuous {
-        base: 0x6000_3000,
-        count: 55,
-    }, // SPIMEM1 ..= SPI_MEM_SPI_SMEM_DDR (+0xd8)
-    Continuous {
-        base: 0x6000_3100,
-        count: 41,
-    }, // SPIMEM1 FMEM_PMS0_ATTR ..= SMEM_AC (+0x1a0)
-    Continuous {
-        base: 0x6000_3200,
-        count: 1,
-    }, // SPIMEM1 CLOCK_GATE
-    Continuous {
-        base: 0x6000_3384,
-        count: 31,
-    }, // SPIMEM1 MMU_POWER_CTRL ..= DATE (+0x3fc)
-    Continuous {
-        base: 0x6000_2000,
-        count: 55,
-    }, // SPIMEM0 ..= SPI_MEM_SPI_SMEM_DDR
-    Continuous {
-        base: 0x6000_2100,
-        count: 41,
-    }, // SPIMEM0 FMEM_PMS0_ATTR ..= SMEM_AC
-    Continuous {
-        base: 0x6000_2200,
-        count: 1,
-    }, // SPIMEM0 CLOCK_GATE
-    Continuous {
-        base: 0x6000_2384,
-        count: 31,
-    }, // SPIMEM0 MMU_POWER_CTRL ..= DATE
-    // PRI_6: SysTimer (base differs from the C6).
-    Systimer { base: 0x6000_B000 },
+    uart_seq!(UART0),
+    // PRI_6: IO MUX + GPIO matrix.
+    continuous!(IO_MUX, [pin_ctrl()]..=[gpio(27)]),
+    continuous!(GPIO, [func_out_sel_cfg(0)], 32),
+    continuous!(GPIO, [status_next()]..=[func_in_sel_cfg(124)]),
+    continuous!(GPIO, [bt_select()]..=[pin(31)]),
+    continuous_split!(GPIO, [enable()] => [enable_w1ts()], 1),
+    // PRI_6: flash SPI mem, SPIMEM1 (SPI1) before SPIMEM0 (SPI0). The MMU
+    // content/index registers are intentionally excluded,
+    // which is why each controller's last window starts at MMU_POWER_CTRL.
+    continuous!(SPI1, [cmd()]..=[spi_smem_ddr()]),
+    continuous!(SPI1, [spi_fmem_pms_attr(0)]..=[spi_smem_ac()]),
+    continuous!(SPI1, [clock_gate()], 1),
+    continuous!(SPI1, [mmu_power_ctrl()]..=[date()]),
+    continuous!(SPI0, [cmd()]..=[spi_smem_ddr()]),
+    continuous!(SPI0, [spi_fmem_pms_attr(0)]..=[spi_smem_ac()]),
+    continuous!(SPI0, [clock_gate()], 1),
+    continuous!(SPI0, [mmu_power_ctrl()]..=[date()]),
+    // PRI_6: SysTimer.
+    systimer_seq!(SYSTIMER),
 ];
 
-// ESP32-H2 use software to trigger REGDMA to restore instead of PMU, because regdma has power bug.
-pub(super) const SW_TRIGGER_REGDMA: bool = true;
-
-// Opt-in peripheral config-register retention data (offsets/masks/maps/counts),
-// consumed by the chip-agnostic sequence builders in `retention`.
-//
 // UART: ESP-IDF v5.4 `uart_periph.c` `UART_SLEEP_RETENTION_ENTRIES`, `uart_reg.h`.
-pub(super) const UART_INT_ENA_OFF: u32 = 0x0C; // UART_INT_ENA_REG: ADDR_MAP window base
-pub(super) const UART_REG_UPDATE_OFF: u32 = 0x98; // UART_REG_UPDATE_REG
-pub(super) const UART_REG_UPDATE: u32 = 1 << 0;
-/// Registers retained (set bits in [`UART_REGS_MAP`]).
-pub(super) const UART_RETENTION_REGS_CNT: u32 = 21;
-/// `uart_regs_map[4]`: config registers in the INT_ENA..ID window.
-pub(super) const UART_REGS_MAP: [u32; 4] = [0x007f_ff6d, 0x0000_0010, 0, 0];
+pub(super) const UART_OPS: &[PeriphOp] = &[
+    periph_continuous!(UART0, [int_ena()]),
+    periph_continuous!(UART0, [clkdiv()]..=[rx_filt()]),
+    periph_continuous!(UART0, [conf0()]..=[conf1()]),
+    periph_continuous!(UART0, [hwfc_conf()]..=[tout_conf()]),
+    periph_continuous!(UART0, [id()]),
+    // Restore-only: pulse REG_UPDATE to latch the shadow (`_SYNC`) registers.
+    periph_write!(UART0, [reg_update()], 1 << 0, 1 << 0),
+    periph_wait!(UART0, [reg_update()], 0, 1 << 0),
+];
 
 // I2C: ESP-IDF v5.4 `i2c_periph.c` `i2c0_regs_retention`, `i2c_reg.h`.
-pub(super) const I2C_SCL_LOW_PERIOD_OFF: u32 = 0x00; // I2C_SCL_LOW_PERIOD_REG: ADDR_MAP window base
-pub(super) const I2C_CTR_OFF: u32 = 0x04; // I2C_CTR_REG
-pub(super) const I2C_FSM_RST: u32 = 1 << 10; // I2C_FSM_RST (value == mask)
-pub(super) const I2C_CONF_UPGATE: u32 = 1 << 11; // I2C_CONF_UPGATE (value == mask)
-/// Registers retained (set bits in [`I2C_REGS_MAP`]).
-pub(super) const I2C_RETENTION_REGS_CNT: u32 = 18;
-/// `i2c0_regs_map[4]`: config registers in the `SCL_LOW_PERIOD..SCL_STRETCH_CONF` window.
-pub(super) const I2C_REGS_MAP: [u32; 4] = [0xc03f_345b, 0x3, 0, 0];
+pub(super) const I2C_OPS: &[PeriphOp] = &[
+    periph_continuous!(I2C0, [scl_low_period()]..=[ctr()]),
+    periph_continuous!(I2C0, [to()]..=[slave_addr()]),
+    periph_continuous!(I2C0, [fifo_conf()]),
+    periph_continuous!(I2C0, [int_ena()]),
+    periph_continuous!(I2C0, [sda_hold()]..=[sda_sample()]),
+    periph_continuous!(I2C0, [scl_start_hold()]..=[clk_conf()]),
+    periph_continuous!(I2C0, [scl_st_time_out()]..=[scl_stretch_conf()]),
+    // Restore-only: pulse FSM reset, request a config update, wait for it to latch.
+    periph_write!(I2C0, [ctr()], 1 << 10, 1 << 10), // I2C_FSM_RST
+    periph_write!(I2C0, [ctr()], 0, 1 << 10),
+    periph_write!(I2C0, [ctr()], 1 << 11, 1 << 11), // I2C_CONF_UPGATE
+    periph_wait!(I2C0, [ctr()], 0, 1 << 11),
+];
 
-// GPSPI2: ESP-IDF v5.4 `spi_periph.c` `spi2_regs_retention`, `spi_reg.h`.
-pub(super) const SPI_CMD_OFF: u32 = 0x00; // SPI_CMD_REG: ADDR_MAP window base
-/// Registers retained (set bits in [`SPI_REGS_MAP`]).
-pub(super) const SPI_RETENTION_REGS_CNT: u32 = 12;
-/// `spi_regs_map[4]`: config registers in the `CMD..SLAVE` window.
-pub(super) const SPI_REGS_MAP: [u32; 4] = [0x0000_31ff, 0x0100_0000, 0, 0];
+// GPSPI2: ESP-IDF v5.4 `spi_periph.c` `spi2_regs_retention`, `spi_reg.h`. The
+// config registers are only reachable while the SPI function clock runs;
+// `Spi::with_retention_memory` holds that clock across the retention lifetime.
+pub(super) const SPI_OPS: &[PeriphOp] = &[
+    periph_continuous!(SPI2, [cmd()]..=[misc()]),
+    periph_continuous!(SPI2, [dma_conf()]..=[dma_int_ena()]),
+    periph_continuous!(SPI2, [slave()]),
+];
 
-// CPU-domain device-register bases lost when `pd_cpu` powers down (consumed by
-// `cpu_retention`). Identical to the C6 (same RISC-V core/cache/PLIC/CLINT).
-pub(crate) const INTPRI_BASE: u32 = 0x600C_5000; // interrupt priority (INTPRI)
-pub(crate) const CACHE_BASE: u32 = 0x600C_8000; // L1 cache control (CACHE)
-pub(crate) const PLIC_MX_BASE: u32 = 0x2000_1000; // PLIC machine interrupts
-pub(crate) const PLIC_UX_BASE: u32 = 0x2000_1400; // PLIC user interrupts
-pub(crate) const CLINT_MINT_BASE: u32 = 0x2000_1800; // CLINT machine timer
-pub(crate) const CLINT_UINT_BASE: u32 = 0x2000_1C00; // CLINT user timer
+// Interrupt matrix priorities.
+pub(crate) const INTPRI_REGIONS: [Region; 2] = [
+    region!(INTPRI, [cpu_int_enable()]..=[rnd_eco_low()]),
+    region!(INTPRI, [rnd_eco_high()]),
+];
+
+// L1 cache control.
+pub(crate) const CACHE_REGIONS: [Region; 2] = [
+    region!(CACHE, [l1_cache_ctrl()]),
+    region!(CACHE, [l1_cache_wrap_around_ctrl()]),
+];
+
+// PLIC machine/user interrupt controllers.
+pub(crate) const PLIC_REGIONS: [Region; 4] = [
+    region!(PLIC_MX, [mxint_enable()]..=[mxint_claim()]),
+    region!(PLIC_MX, [mxint_conf()]),
+    region!(PLIC_UX, [uxint_enable()]..=[uxint_claim()]),
+    region!(PLIC_UX, [uxint_conf()]),
+];
+
+// CLINT machine/user timers. The comparators are 64-bit, which `span!` accounts
+// for.
+pub(crate) const CLINT_REGIONS: [Region; 2] = [
+    region!(CLINT, [msip()]..=[mtimecmp()]),
+    region!(CLINT, [usip()]..=[utimecmp()]),
+];

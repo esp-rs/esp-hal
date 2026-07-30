@@ -570,16 +570,13 @@ impl RtcSleepConfig {
             // Light sleep: the digital domain (CPU, RAM, peripherals) stays
             // powered and only clock-gated by default, so execution resumes in
             // place. Power down the analog clock sources nothing needs while the
-            // core is clock-gated to cut power. Unlike the C5/C6 family, H2's
-            // light-sleep analog config does not lower the HP voltage, so this
-            // saves the oscillator current but not regulator power.
+            // core is clock-gated to cut power.
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
 
             // A domain only powers down with the caller's retention storage and
-            // no active lock (else clock-gating); pd_top implies pd_cpu. Shares
-            // the chip-agnostic regDMA/CPU-retention path with the C6.
+            // no active lock (else clock-gating); pd_top implies pd_cpu.
             let (cpu_pd, top_pd) = self.retention.resolve();
             self.pd_flags.set_pd_top(top_pd);
             self.pd_flags.set_pd_cpu(cpu_pd);

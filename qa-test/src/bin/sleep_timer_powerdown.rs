@@ -20,7 +20,7 @@
 //! GPIO5 is high while awake, low while asleep, to bracket each sleep on a
 //! current meter / logic analyzer.
 
-//% CHIP_FILTER: esp32c6 || esp32h2
+//% CHIP_FILTER: sleep_pd_retention
 
 #![no_std]
 #![no_main]
@@ -53,14 +53,11 @@ macro_rules! mk_static {
     }};
 }
 
-/// Sleep duration per round (ms), wide enough to average on a current meter.
-const EVENT_MS: u64 = 1000;
-/// Awake window between sleeps (ms), to separate the plateaus on a trace.
+const SLEEP_MS: u64 = 1000;
 const AWAKE_MS: u32 = 200;
-/// Rounds per mode.
 const ROUNDS: u32 = 3;
 
-/// Sleep once for `EVENT_MS` and report the time slept (from the RTC) and the
+/// Sleep once for `SLEEP_MS` and report the time slept (from the RTC) and the
 /// CPU power-down count. `marker` is driven low for the sleep window.
 fn sleep_round(
     rtc: &mut Rtc<'_>,
@@ -71,7 +68,7 @@ fn sleep_round(
     label: &str,
     round: u32,
 ) {
-    let timer = TimerWakeupSource::new(Duration::from_millis(EVENT_MS));
+    let timer = TimerWakeupSource::new(Duration::from_millis(SLEEP_MS));
 
     let rtc_before = rtc.time_since_power_up().as_micros();
     marker.set_low();
@@ -119,7 +116,6 @@ fn main() -> ! {
     // Stamp a recognizable sentinel into the TOP register so its fate is obvious
     // in the log; the exact value doesn't matter, only whether it survives.
     const SENTINEL: u32 = 0x155;
-    // SAFETY: driver alive, register writable and readable.
     let scl_configured = unsafe {
         (I2C0_SCL_LOW_PERIOD as *mut u32).write_volatile(SENTINEL);
         I2C0_SCL_LOW_PERIOD.read_volatile()
@@ -128,7 +124,7 @@ fn main() -> ! {
     marker.set_low();
     lpwr.sleep(
         &clock_gated,
-        &[&TimerWakeupSource::new(Duration::from_millis(EVENT_MS))],
+        &[&TimerWakeupSource::new(Duration::from_millis(SLEEP_MS))],
     );
     marker.set_high();
     // Read while the driver is still alive (TOP stayed powered, so it survives).
@@ -143,7 +139,7 @@ fn main() -> ! {
     marker.set_low();
     lpwr.sleep(
         &top_pd,
-        &[&TimerWakeupSource::new(Duration::from_millis(EVENT_MS))],
+        &[&TimerWakeupSource::new(Duration::from_millis(SLEEP_MS))],
     );
     marker.set_high();
     let downs_after_nc = cpu_power_down_wake_count();
@@ -155,7 +151,7 @@ fn main() -> ! {
     SYSTEM::regs()
         .i2c0_conf()
         .modify(|_, w| w.i2c0_clk_en().set_bit());
-    // SAFETY: register readable now the clock is on; reads its reset value (0)
+    // register readable now the clock is on; reads its reset value (0)
     // because TOP lost power and reset it.
     let scl_after_top_pd = unsafe { I2C0_SCL_LOW_PERIOD.read_volatile() };
 
@@ -215,29 +211,24 @@ fn main() -> ! {
 
     // Retain UART1: drops the lock so its registers are saved/restored around the
     // power-down. Kept alive for the proof.
-    let _uart1 =
-        uart1.with_retention_memory(mk_static!(UartRetentionMemory, UartRetentionMemory::new()));
-    // SAFETY: driver alive, register readable.
+    let mut uart1_retention = UartRetentionMemory::new();
+    let _uart1 = uart1.with_retention_memory(&mut uart1_retention);
     let clkdiv_before = unsafe { UART1_CLKDIV.read_volatile() };
 
     // Re-acquire I2C0 (the negative control dropped it) and retain it too.
-    // SAFETY: the earlier I2C0 driver was dropped, so no other instance is live.
     let i2c0 = I2c::new(
         unsafe { esp_hal::peripherals::I2C0::steal() },
         I2cConfig::default(),
     )
     .unwrap();
-    let _i2c0 =
-        i2c0.with_retention_memory(mk_static!(I2cRetentionMemory, I2cRetentionMemory::new()));
-    // SAFETY: driver alive, register readable.
+    let mut i2c0_retention = I2cRetentionMemory::new();
+    let _i2c0 = i2c0.with_retention_memory(&mut i2c0_retention);
     let i2c_scl_before = unsafe { I2C0_SCL_LOW_PERIOD.read_volatile() };
 
-    // ...and SPI2, whose CLOCK register holds the divider from `Spi::new`.
     const SPI2_CLOCK: *const u32 = 0x6008_100C as *const u32;
     let spi2 = Spi::new(peripherals.SPI2, SpiConfig::default()).unwrap();
-    let _spi2 =
-        spi2.with_retention_memory(mk_static!(SpiRetentionMemory, SpiRetentionMemory::new()));
-    // SAFETY: driver alive, register readable.
+    let mut spi2_retention = SpiRetentionMemory::new();
+    let _spi2 = spi2.with_retention_memory(&mut spi2_retention);
     let spi_clock_before = unsafe { SPI2_CLOCK.read_volatile() };
 
     // Same timer wakeup, increasingly aggressive power policies.
@@ -274,7 +265,6 @@ fn main() -> ! {
         }
     );
 
-    // Same check for I2C0's timing register.
     let i2c_scl_after = unsafe { I2C0_SCL_LOW_PERIOD.read_volatile() };
     println!(
         "I2C0 SCL_LOW_PERIOD: before = {:#x}, after top-powerdown = {:#x} -> {}",
@@ -287,7 +277,6 @@ fn main() -> ! {
         }
     );
 
-    // ...and for SPI2's clock register.
     let spi_clock_after = unsafe { SPI2_CLOCK.read_volatile() };
     println!(
         "SPI2 CLOCK: before = {:#x}, after top-powerdown = {:#x} -> {}",

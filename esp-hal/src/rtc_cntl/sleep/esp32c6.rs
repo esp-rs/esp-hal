@@ -568,8 +568,8 @@ impl SleepTimeConfig {
 pub struct RtcSleepConfig {
     /// Deep Sleep flag
     pub deep: bool,
-    /// Power Down flags. On the C6 `apply()` sets the `pd_cpu`/`pd_top` bits, so
-    /// a domain can't power off without the caller's retention storage.
+    /// Power Down flags. `apply()` sets the `pd_cpu`/`pd_top` bits, so a domain
+    /// can't power off without the caller's retention storage.
     pub(crate) pd_flags: PowerDownFlags,
     /// Light-sleep CPU/TOP power-down retention (opt-in choices + caller memory).
     retention: crate::rtc_cntl::retention::SleepRetention,
