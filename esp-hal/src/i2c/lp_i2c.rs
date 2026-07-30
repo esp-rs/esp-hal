@@ -2,7 +2,7 @@
 
 use crate::{
     gpio::{InputPin, OutputPin, RtcPin},
-    peripherals::{LP_AON, LP_I2C0, LP_IO, LP_PERI, LPWR},
+    peripherals::{LP_I2C0, LP_PERI, LPWR},
     time::Rate,
 };
 
@@ -11,27 +11,55 @@ const LP_I2C_FILTER_CYC_NUM_DEF: u8 = 7;
 /// Trait representing the LP_I2C SDA pin.
 pub trait Sda: RtcPin + OutputPin + InputPin {
     #[doc(hidden)]
-    fn lp_function(&self) -> u8;
+    fn connect_sda(&self);
 }
 
 /// Trait representing the LP_I2C SCL pin.
 pub trait Scl: RtcPin + OutputPin + InputPin {
     #[doc(hidden)]
-    fn lp_function(&self) -> u8;
+    fn connect_scl(&self);
 }
 
+// Chips with an LP GPIO matrix can route the LP I2C signals to any LP pin, chips without one only
+// expose them on the pads whose LP IO MUX has an LP I2C function.
+#[cfg(lp_io_has_gpio_matrix)]
+for_each_lp_function! {
+    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal) => {
+        impl Sda for crate::peripherals::$gpio<'_> {
+            fn connect_sda(&self) {
+                crate::gpio::lp_io::connect_open_drain_signals(
+                    self,
+                    crate::gpio::lp_io::LpInputSignal::LP_I2C_SDA,
+                    crate::gpio::lp_io::LpOutputSignal::LP_I2C_SDA,
+                );
+            }
+        }
+
+        impl Scl for crate::peripherals::$gpio<'_> {
+            fn connect_scl(&self) {
+                crate::gpio::lp_io::connect_open_drain_signals(
+                    self,
+                    crate::gpio::lp_io::LpInputSignal::LP_I2C_SCL,
+                    crate::gpio::lp_io::LpOutputSignal::LP_I2C_SCL,
+                );
+            }
+        }
+    };
+}
+
+#[cfg(not(lp_io_has_gpio_matrix))]
 for_each_lp_function! {
     (LP_I2C_SDA, $gpio:ident, $af:literal) => {
         impl Sda for crate::peripherals::$gpio<'_> {
-            fn lp_function(&self) -> u8 {
-                $af
+            fn connect_sda(&self) {
+                configure_pad(self.rtc_number(), $af);
             }
         }
     };
     (LP_I2C_SCL, $gpio:ident, $af:literal) => {
         impl Scl for crate::peripherals::$gpio<'_> {
-            fn lp_function(&self) -> u8 {
-                $af
+            fn connect_scl(&self) {
+                configure_pad(self.rtc_number(), $af);
             }
         }
     };
@@ -111,42 +139,50 @@ pub struct LpI2c {
     i2c: LP_I2C0<'static>,
 }
 
-impl LpI2c {
-    fn lp_i2c_configure_io(ionum: usize, pullup_en: bool) {
-        let lp_io = LP_IO::regs();
-        let lp_aon = LP_AON::regs();
-        unsafe {
-            // Set the IO pin to high to avoid them from toggling from Low to
-            // High state during initialization. This can register a spurious
-            // I2C start condition.
-            lp_io
-                .out_data_w1ts()
-                .write(|w| w.out_data_w1ts().bits(1 << ionum));
+/// Configures an LP pad as an open-drain output with its pull-up enabled, then selects the pad's
+/// LP I2C function.
+#[cfg(not(lp_io_has_gpio_matrix))]
+fn configure_pad(lp_pin: u8, function: u8) {
+    use crate::peripherals::{LP_AON, LP_IO};
 
-            lp_aon
-                .gpio_mux()
-                .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << ionum)));
+    let ionum = lp_pin as usize;
+    let lp_io = LP_IO::regs();
+    let lp_aon = LP_AON::regs();
+    unsafe {
+        // Set the IO pin to high to avoid them from toggling from Low to
+        // High state during initialization. This can register a spurious
+        // I2C start condition.
+        lp_io
+            .out_data_w1ts()
+            .write(|w| w.out_data_w1ts().bits(1 << ionum));
 
-            // Set output mode to Open Drain
-            lp_io.pin(ionum).modify(|_, w| w.pad_driver().set_bit());
+        lp_aon
+            .gpio_mux()
+            .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << ionum)));
 
-            // Enable output (writing to write-1-to-set register, then internally the
-            // `GPIO_OUT_REG` will be set)
-            lp_io
-                .out_enable_w1ts()
-                .write(|w| w.enable_w1ts().bits(1 << ionum));
+        // Set output mode to Open Drain
+        lp_io.pin(ionum).modify(|_, w| w.pad_driver().set_bit());
 
-            lp_io.gpio(ionum).modify(|_, w| {
-                // Enable input
-                w.fun_ie().set_bit();
-                // Disable the internal weak pull-down
-                w.fun_wpd().clear_bit();
-                // Configure the internal weak pull-up
-                w.fun_wpu().bit(pullup_en)
-            });
-        }
+        // Enable output (writing to write-1-to-set register, then internally the
+        // `GPIO_OUT_REG` will be set)
+        lp_io
+            .out_enable_w1ts()
+            .write(|w| w.enable_w1ts().bits(1 << ionum));
+
+        lp_io.gpio(ionum).modify(|_, w| {
+            // Enable input
+            w.fun_ie().set_bit();
+            // Disable the internal weak pull-down
+            w.fun_wpd().clear_bit();
+            // Enable the internal weak pull-up
+            w.fun_wpu().set_bit();
+            // Select the LP I2C function
+            w.mcu_sel().bits(function)
+        });
     }
+}
 
+impl LpI2c {
     /// Creates a new instance of the `LpI2c` peripheral.
     pub fn new(
         i2c: LP_I2C0<'static>,
@@ -157,25 +193,10 @@ impl LpI2c {
         let me = Self { i2c };
 
         // Configure LP I2C GPIOs
-
-        let sda_pin = sda.rtc_number() as usize;
-        let scl_pin = scl.rtc_number() as usize;
-
-        // Initialize IO Pins
         // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
         // initialization is important to avoid any spurious I2C start conditions on the bus.
-        Self::lp_i2c_configure_io(scl_pin, true);
-        Self::lp_i2c_configure_io(sda_pin, true);
-        unsafe {
-            let lp_io = LP_IO::regs();
-            // Select LP I2C function for the SDA and SCL pins
-            lp_io
-                .gpio(scl_pin)
-                .modify(|_, w| w.mcu_sel().bits(scl.lp_function()));
-            lp_io
-                .gpio(sda_pin)
-                .modify(|_, w| w.mcu_sel().bits(sda.lp_function()));
-        }
+        scl.connect_scl();
+        sda.connect_sda();
 
         // Initialize LP I2C HAL */
         me.i2c
