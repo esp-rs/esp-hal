@@ -24,7 +24,7 @@ use crate::{
 
 /// Path of the metadata cache shared with the devtool.
 pub fn cache_path(workspace: &Path) -> PathBuf {
-    workspace.join("target").join("esp-metadata-cache.json")
+    workspace.join("target").join("esp-metadata-cache.toml")
 }
 
 /// Hash of everything the generated metadata is derived from.

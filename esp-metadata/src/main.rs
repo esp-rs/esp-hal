@@ -223,6 +223,8 @@ struct ChipCache {
     pretty_name: String,
     arch: String,
     target: String,
+    // TOML has no null: an absent LP target is an absent key.
+    #[serde(skip_serializing_if = "Option::is_none")]
     lp_target: Option<String>,
     has_lp_core: bool,
     symbols: Vec<String>,
@@ -311,8 +313,8 @@ fn dump_cache(workspace: &Path) -> Result<PathBuf> {
 
     // Written via a temporary file: a devtool invocation may be reading the
     // cache while another one refreshes it.
-    let tmp = path.with_extension("json.tmp");
-    write_file(&tmp, serde_json::to_vec_pretty(&cache)?)?;
+    let tmp = path.with_extension("toml.tmp");
+    write_file(&tmp, toml::to_string_pretty(&cache)?)?;
     std::fs::rename(&tmp, &path).with_context(|| format!("Failed to write {}", path.display()))?;
 
     log::debug!("Wrote {}", path.display());

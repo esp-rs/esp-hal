@@ -171,7 +171,7 @@ fn cache() -> &'static Cache {
 
 fn load() -> Result<Cache> {
     let workspace = workspace_root()?;
-    let path = workspace.join("target").join("esp-metadata-cache.json");
+    let path = workspace.join("target").join("esp-metadata-cache.toml");
 
     let mut hash = input_hash(&workspace)?;
 
@@ -229,17 +229,18 @@ fn probe(path: &Path) -> Option<(u32, String)> {
         hash: String,
     }
 
-    let contents = std::fs::read(path).ok()?;
-    let probe: Probe = serde_json::from_slice(&contents).ok()?;
+    let contents = std::fs::read_to_string(path).ok()?;
+    let probe: Probe = toml_edit::de::from_str(&contents).ok()?;
 
     Some((probe.version, probe.hash))
 }
 
 fn read_cache(path: &Path) -> Result<Cache> {
-    let contents = std::fs::read(path)
+    let contents = std::fs::read_to_string(path)
         .with_context(|| format!("`esp-metadata` did not write {}", path.display()))?;
 
-    serde_json::from_slice(&contents).with_context(|| format!("Failed to parse {}", path.display()))
+    toml_edit::de::from_str(&contents)
+        .with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 fn refresh(workspace: &Path) -> Result<()> {
