@@ -13,7 +13,6 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use esp_metadata::{Chip, Config, TokenStream};
-use strum::IntoEnumIterator;
 
 /// Bump when the cache layout changes. Devtools that expect a different
 /// version refuse to use the cache instead of regenerating it, because
