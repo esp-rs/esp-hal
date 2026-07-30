@@ -1,6 +1,3 @@
-# Last matching pattern wins — fallback first, areas below.
-* @esp-rs/espressif
-
 # ─── Area: CI & release automation ───
 /.github/                       @MabezDev @SergioGasquez @JurajSadel
 
@@ -40,7 +37,7 @@
 # Area: bus & interface drivers (owners vary per driver — deep domain knowledge)
 /esp-hal/src/spi/               @bugadani @playfulFence @bjoernQ @MabezDev
 /esp-hal/src/i2c/               @playfulFence @bugadani @SergioGasquez
-/esp-hal/src/uart/              @playfulFence @SergioGasquez @MabezDev@
+/esp-hal/src/uart/              @playfulFence @SergioGasquez @MabezDev
 /esp-hal/src/i2s/               @bjoernQ @playfulFence
 /esp-hal/src/twai/              @JurajSadel @bugadani @bjoernQ
 /esp-hal/src/usb/               @bugadani @JurajSadel @SergioGasquez
