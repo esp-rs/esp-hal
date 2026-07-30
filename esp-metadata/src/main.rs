@@ -53,6 +53,21 @@ fn main() -> Result<()> {
 }
 
 fn generate(workspace: &Path, check: bool) -> Result<()> {
+    // Generated code is only useful once formatted, so without rustfmt we
+    // refresh the cache alone. This keeps the devtool usable in environments
+    // that only build (CI jobs, for example), where regenerating would
+    // otherwise fail every command that reads chip metadata.
+    if !rustfmt_available() {
+        if check {
+            bail!("Checking the generated code needs `cargo +nightly fmt`, which is not available");
+        }
+
+        log::debug!("`cargo +nightly fmt` is not available, only refreshing the metadata cache");
+        dump_cache(workspace)?;
+
+        return Ok(());
+    }
+
     log::info!("Updating esp-metadata-generated and README tables...");
 
     update_readme_tables(workspace)?;
@@ -103,6 +118,13 @@ fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
     source.push_str(&prettyplease::unparse(&syntax_tree));
 
     write_file(out_path, source)
+}
+
+fn rustfmt_available() -> bool {
+    Command::new("cargo")
+        .args(["+nightly", "fmt", "--version"])
+        .output()
+        .is_ok_and(|output| output.status.success())
 }
 
 fn format_generated_crate(workspace: &Path) -> Result<()> {
