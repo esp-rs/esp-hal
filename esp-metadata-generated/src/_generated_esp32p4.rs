@@ -256,6 +256,9 @@ macro_rules! property {
     ("lp_io.version") => {
         "esp32p4"
     };
+    ("lp_io.has_gpio_matrix") => {
+        true
+    };
     ("mmu.page_size") => {
         65536
     };
@@ -927,6 +930,55 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
+    };
+}
+/// Defines the `LpInputSignal` and `LpOutputSignal` enums.
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_lp_io_signals {
+    () => {
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum LpInputSignal {
+            LP_I2C_SCL   = 0,
+            LP_I2C_SDA   = 1,
+            LP_UART_RXD  = 2,
+            LP_UART_CTSN = 3,
+            LP_UART_DSRN = 4,
+            LP_SPI_CK    = 5,
+            LP_SPI_CS    = 6,
+            LP_SPI_D     = 7,
+            LP_SPI_Q     = 8,
+            LP_I2S_I_BCK = 9,
+            LP_I2S_I_SD  = 10,
+            LP_I2S_I_WS  = 11,
+            LP_I2S_O_BCK = 12,
+            LP_I2S_O_WS  = 13,
+        }
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum LpOutputSignal {
+            LP_I2C_SCL   = 0,
+            LP_I2C_SDA   = 1,
+            LP_UART_TXD  = 2,
+            LP_UART_RTSN = 3,
+            LP_UART_DTRN = 4,
+            LP_SPI_CK    = 5,
+            LP_SPI_CS    = 6,
+            LP_SPI_D     = 7,
+            LP_SPI_Q     = 8,
+            LP_I2S_I_BCK = 9,
+            LP_I2S_O_SD  = 10,
+            LP_I2S_I_WS  = 11,
+            LP_I2S_O_BCK = 12,
+            LP_I2S_O_WS  = 13,
+        }
     };
 }
 #[macro_export]

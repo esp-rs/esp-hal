@@ -63,6 +63,8 @@ peripherals = [
     { name = "IO_MUX" },
     { name = "LP_AON_CLK_RST", pac = "LP_AON_CLKRST" },
     { name = "LP_APM" },
+    { name = "LP_GPIO" },
+    { name = "LP_IO_MUX" },
     { name = "LP_PERI", pac = "LP_PERICLKRST" },
     { name = "LP_SYS" },
     { name = "LP_TEE" },

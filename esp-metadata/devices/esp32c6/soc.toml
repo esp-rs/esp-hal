@@ -185,10 +185,6 @@ curves = [
 zero_extend_writes = true
 has_memory_clock_gate = true
 
-[device.lp_io]
-support_status = "partial"
-version = "v4"
-
 [device.gpio]
 support_status = "supported"
 # {include gpio.toml}

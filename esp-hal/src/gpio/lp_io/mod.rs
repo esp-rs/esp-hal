@@ -35,6 +35,8 @@ use core::marker::PhantomData;
 
 use super::{InputPin, OutputPin, RtcPin};
 
+define_lp_io_signals!();
+
 #[cfg_attr(lp_io_version = "esp32", path = "low_level/esp32.rs")]
 #[cfg_attr(lp_io_version = "v2", path = "low_level/v2.rs")]
 #[cfg_attr(lp_io_version = "v3", path = "low_level/v3.rs")]

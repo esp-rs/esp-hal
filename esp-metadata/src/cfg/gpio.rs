@@ -749,7 +749,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     }
 }
 
-fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
+pub(super) fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
     if signals.is_empty() {
         // If there are no signals, we don't need to generate an enum.
         return quote! {};

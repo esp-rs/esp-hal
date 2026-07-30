@@ -155,10 +155,6 @@ engines = [
     }
 ]
 
-[device.lp_io]
-support_status = "partial"
-version = "esp32"
-
 [device.gpio]
 support_status = "supported"
 # {include gpio.toml}

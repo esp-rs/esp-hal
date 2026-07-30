@@ -468,3 +468,39 @@ pins = [
     { pin = 53, functions = {                                    3 = "EMAC_RXD1",     4 = "DBG_FLASH_CK"   }, analog = { 1 = "ADC2_CH4" } },
     { pin = 54, functions = {                                    3 = "EMAC_RXER",     4 = "DBG_FLASH_D"    }, analog = { 1 = "ADC2_CH5" } },
 ]
+
+[device.lp_io]
+support_status = "partial"
+version = "esp32p4"
+lp_input_signals = [
+    { name = "LP_I2C_SCL",   id = 0 },
+    { name = "LP_I2C_SDA",   id = 1 },
+    { name = "LP_UART_RXD",  id = 2 },
+    { name = "LP_UART_CTSN", id = 3 },
+    { name = "LP_UART_DSRN", id = 4 },
+    { name = "LP_SPI_CK",    id = 5 },
+    { name = "LP_SPI_CS",    id = 6 },
+    { name = "LP_SPI_D",     id = 7 },
+    { name = "LP_SPI_Q",     id = 8 },
+    { name = "LP_I2S_I_BCK", id = 9 },
+    { name = "LP_I2S_I_SD",  id = 10 },
+    { name = "LP_I2S_I_WS",  id = 11 },
+    { name = "LP_I2S_O_BCK", id = 12 },
+    { name = "LP_I2S_O_WS",  id = 13 },
+]
+lp_output_signals = [
+    { name = "LP_I2C_SCL",   id = 0 },
+    { name = "LP_I2C_SDA",   id = 1 },
+    { name = "LP_UART_TXD",  id = 2 },
+    { name = "LP_UART_RTSN", id = 3 },
+    { name = "LP_UART_DTRN", id = 4 },
+    { name = "LP_SPI_CK",    id = 5 },
+    { name = "LP_SPI_CS",    id = 6 },
+    { name = "LP_SPI_D",     id = 7 },
+    { name = "LP_SPI_Q",     id = 8 },
+    { name = "LP_I2S_I_BCK", id = 9 },
+    { name = "LP_I2S_O_SD",  id = 10 },
+    { name = "LP_I2S_I_WS",  id = 11 },
+    { name = "LP_I2S_O_BCK", id = 12 },
+    { name = "LP_I2S_O_WS",  id = 13 },
+]
