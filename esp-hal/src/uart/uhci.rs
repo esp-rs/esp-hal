@@ -1,4 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
+//! UHCI wrapper around UART
+//!
 //! ## Usage
 //! ```rust, no_run
 //! #![no_std]
