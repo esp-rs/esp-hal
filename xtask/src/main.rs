@@ -15,7 +15,6 @@ use xtask::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder, CargoCommandBatcher},
     commands::*,
-    update_metadata,
 };
 
 // ----------------------------------------------------------------------------
@@ -52,8 +51,6 @@ enum Cli {
     ///
     /// Reads the body from stdin by default. Pass `--pr` to fetch from GitHub.
     CheckPrChangelog(CheckPrChangelogArgs),
-    /// Re-generate metadata and tables in the esp-hal README.
-    UpdateMetadata(UpdateMetadataArgs),
     /// Run host-tests in the workspace with `cargo test`
     HostTests(HostTestsArgs),
     /// Check global symbols in the compiled `.rlib` of the specified packages for the specified
@@ -170,7 +167,6 @@ fn main() -> Result<()> {
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
         Cli::CheckPrChangelog(args) => check_pr_changelog(&workspace, args.pr),
-        Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
         Cli::HostTests(args) => host_tests(&workspace, args),
         Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),
         #[cfg(feature = "report")]

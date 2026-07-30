@@ -14,24 +14,25 @@ forever-unstable = true
 changelog-exempt = true
 check-configs = [
     { features = [] },
-    { features = ["clap"] },
 ]
 clippy-configs = [] # don't waste time on this
 
 [dependencies]
 anyhow       = "1.0"
-clap         = { version = "4.5", features = ["derive"], optional = true }
+clap         = { version = "4.5", features = ["derive"] }
 convert_case = "0.8"
+env_logger   = { version = "0.11.5", default-features = false, features = ["auto-color", "humantime"] }
+prettyplease = "0.2.34"
 toml         = { version = "1.1", features = ["preserve_order"] }
 serde        = { version = "1.0", default-features = false, features = ["derive", "std"] }
+serde_json   = "1.0"
+sha2         = "0.10"
 somni-parser = "0.3"
 somni-expr   = "0.3"
 strum        = { version = "0.27", features = ["derive"] }
+syn          = { version = "2", default-features = false, features = ["full", "parsing"] }
 proc-macro2  = "1"
 quote        = "1"
 indexmap     = { version = "2", features = ["serde"] }
 log          = "0.4.22"
-
-[features]
-default = []
-clap = ["dep:clap"]
+walkdir      = "2.5.0"

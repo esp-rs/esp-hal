@@ -167,21 +167,6 @@ pub struct LintPackagesArgs {
     pub toolchain: Option<String>,
 }
 
-/// Arguments for the `update-metadata` subcommand.
-#[cfg_attr(
-    feature = "mcp",
-    xtask_mcp_macros::mcp_tool(
-        description = "Re-generate metadata and tables in the esp-hal README",
-        command = "update-metadata"
-    )
-)]
-#[derive(Debug, Args)]
-pub struct UpdateMetadataArgs {
-    /// Run in 'check' mode; exits with 0 if formatted correctly, 1 otherwise
-    #[arg(long)]
-    pub check: bool,
-}
-
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 

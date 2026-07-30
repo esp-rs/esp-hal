@@ -363,7 +363,7 @@ jobs:
       - run: cargo xtask fmt-packages --check
 
       # Check metadata generation for all packages:
-      - run: cargo xtask update-metadata --check
+      - run: cargo update-metadata --check
 
       # Enforce esp-rom-sys dependency requirement policy:
       - run: cargo xrel-check check-rom-sys-policy

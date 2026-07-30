@@ -2,7 +2,11 @@
 mod cfg;
 
 use core::str::FromStr;
-use std::{fmt::Write, path::Path, sync::OnceLock};
+use std::{
+    fmt::Write,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
 use anyhow::{Context, Result, bail, ensure};
 use cfg::PeriConfig;
@@ -18,6 +22,46 @@ use crate::{
     cfg::{SupportItem, Value},
     support_status::SupportStatusLevel,
 };
+
+/// Path of the metadata cache shared with the devtool.
+pub fn cache_path(workspace: &Path) -> PathBuf {
+    workspace.join("target").join("esp-metadata-cache.json")
+}
+
+/// Hash of everything the generated metadata is derived from.
+///
+/// Covers the device descriptions as well as the code deriving symbols from
+/// them, so that changing either invalidates the cache. Contents are hashed
+/// rather than modification times, which `git checkout` shuffles.
+///
+/// The devtool reimplements this to validate the cache; keep both in sync.
+pub fn input_hash(workspace: &Path) -> Result<String> {
+    use sha2::Digest;
+
+    let root = workspace.join("esp-metadata");
+    let mut files = vec![];
+    for entry in walkdir::WalkDir::new(&root)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_entry(|e| e.file_name() != "target")
+    {
+        let path = entry?.into_path();
+        if path.is_file() {
+            files.push(path);
+        }
+    }
+
+    let mut hasher = sha2::Sha256::new();
+    for file in files {
+        let relative = file.strip_prefix(&root).unwrap();
+        hasher.update(relative.to_string_lossy().replace('\\', "/").as_bytes());
+        hasher.update(
+            std::fs::read(&file).with_context(|| format!("Failed to read {}", file.display()))?,
+        );
+    }
+
+    Ok(format!("{:x}", hasher.finalize()))
+}
 
 fn load_device_config(relative_path: &str) -> Config {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -130,7 +174,7 @@ pub enum Cores {
     strum::EnumString,
     strum::AsRefStr,
 )]
-#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[derive(clap::ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
 pub enum Chip {
