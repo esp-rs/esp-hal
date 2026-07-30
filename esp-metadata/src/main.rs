@@ -5,7 +5,7 @@
 //! metadata cache consumed by the devtool.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     path::{Path, PathBuf},
     process::Command,
     time::Duration,
@@ -23,10 +23,9 @@ const CACHE_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
 enum Cli {
-    /// Re-generate `esp-metadata-generated` and the tables in the esp-hal README.
+    /// Re-generate `esp-metadata-generated`, the tables in the esp-hal README, and the
+    /// metadata cache read by the devtool.
     Generate(GenerateArgs),
-    /// Write the metadata cache read by the devtool.
-    DumpCache,
 }
 
 #[derive(Debug, clap::Args)]
@@ -46,7 +45,6 @@ fn main() -> Result<()> {
 
     match Cli::parse() {
         Cli::Generate(args) => generate(&workspace, args.check),
-        Cli::DumpCache => dump_cache(&workspace).map(|_| ()),
     }
 }
 
@@ -110,7 +108,10 @@ fn format_generated_crate(workspace: &Path) -> Result<()> {
         String::from("+nightly"),
         String::from("fmt"),
         String::from("--"),
-        format!("--config-path={}", package_path.join("rustfmt.toml").display()),
+        format!(
+            "--config-path={}",
+            package_path.join("rustfmt.toml").display()
+        ),
     ];
     for entry in walkdir::WalkDir::new(package_path.join("src")) {
         let path = entry?.into_path();
@@ -120,14 +121,19 @@ fn format_generated_crate(workspace: &Path) -> Result<()> {
     }
 
     retry_on_failure("Formatting esp-metadata-generated", || {
-        let status = Command::new("cargo")
+        let output = Command::new("cargo")
             .args(&args)
             .current_dir(&package_path)
-            .status()
+            .output()
             .context("Failed to run `cargo fmt`")?;
-        if !status.success() {
-            bail!("`cargo fmt` failed with {status}");
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // rustfmt reports files it could not write without failing itself,
+        // which would leave the generated code unformatted.
+        if !output.status.success() || stderr.contains("Error writing files") {
+            bail!("`cargo fmt` failed: {stderr}");
         }
+
         Ok(())
     })
 }
@@ -180,35 +186,95 @@ fn update_readme_tables(workspace: &Path) -> Result<()> {
 struct Cache {
     version: u32,
     hash: String,
+    /// Every valueless symbol defined by any chip.
+    symbols: Vec<String>,
+    /// Every symbol with a value defined by any chip.
+    kv_symbols: Vec<String>,
     chips: BTreeMap<String, ChipCache>,
 }
 
 #[derive(serde::Serialize)]
 struct ChipCache {
+    pretty_name: String,
+    arch: String,
     target: String,
+    lp_target: Option<String>,
+    has_lp_core: bool,
     symbols: Vec<String>,
+    kv_values: BTreeMap<String, String>,
+}
+
+/// Symbols are used as variables in chip filter expressions, so those that
+/// cannot be spelled as an identifier are dropped.
+fn symbol_to_ident(symbol: &str) -> Option<String> {
+    symbol
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+        .then_some(symbol.replace('.', "_"))
+}
+
+/// Splits a chip's symbols into valueless ones and `key="value"` ones.
+fn split_symbols(config: &Config) -> (Vec<String>, BTreeMap<String, String>) {
+    let mut symbols = vec![];
+    let mut kv_values = BTreeMap::new();
+
+    for symbol in config.all() {
+        match symbol.split_once('=') {
+            Some((key, value)) => {
+                if let Some(key) = symbol_to_ident(key.trim()) {
+                    kv_values.insert(key, value.trim().trim_matches('"').to_string());
+                }
+            }
+            None => symbols.extend(symbol_to_ident(symbol)),
+        }
+    }
+
+    (symbols, kv_values)
 }
 
 /// Write the devtool's metadata cache.
 ///
 /// The cache deliberately only contains data the devtool queries, in a layout
 /// that doesn't change when the shape of the metadata does: adding or renaming
-/// a property only ever changes the contents of `symbols`.
+/// a property only ever changes which symbols are listed. Symbols are stored in
+/// the form the devtool evaluates them in, so it doesn't need to know how they
+/// are spelled in the metadata.
 fn dump_cache(workspace: &Path) -> Result<PathBuf> {
     let mut chips = BTreeMap::new();
     for chip in Chip::iter() {
+        let config = Config::for_chip(&chip);
+        let (symbols, kv_values) = split_symbols(config);
         chips.insert(
             chip.to_string(),
             ChipCache {
+                pretty_name: chip.pretty_name().to_string(),
+                arch: config.arch().to_string(),
                 target: chip.target(),
-                symbols: Config::for_chip(&chip).all().to_vec(),
+                lp_target: chip.lp_target().ok().map(str::to_string),
+                has_lp_core: chip.has_lp_core(),
+                symbols,
+                kv_values,
             },
         );
     }
 
+    // A symbol that has a value on any chip is treated as having one
+    // everywhere, so that it is never seeded as both a boolean and a string.
+    let kv_symbols = chips
+        .values()
+        .flat_map(|chip| chip.kv_values.keys().cloned())
+        .collect::<BTreeSet<_>>();
+    let symbols = chips
+        .values()
+        .flat_map(|chip| chip.symbols.iter().cloned())
+        .filter(|symbol| !kv_symbols.contains(symbol))
+        .collect::<BTreeSet<_>>();
+
     let cache = Cache {
         version: CACHE_VERSION,
         hash: esp_metadata::input_hash(workspace)?,
+        symbols: symbols.into_iter().collect(),
+        kv_symbols: kv_symbols.into_iter().collect(),
         chips,
     };
 
@@ -222,8 +288,7 @@ fn dump_cache(workspace: &Path) -> Result<PathBuf> {
     // cache while another one refreshes it.
     let tmp = path.with_extension("json.tmp");
     write_file(&tmp, serde_json::to_vec_pretty(&cache)?)?;
-    std::fs::rename(&tmp, &path)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
+    std::fs::rename(&tmp, &path).with_context(|| format!("Failed to write {}", path.display()))?;
 
     log::debug!("Wrote {}", path.display());
 

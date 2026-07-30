@@ -30,9 +30,9 @@ All automation goes through `cargo xtask`. Use `--packages` and `--chips` to sco
 | Validate metadata | `cargo update-metadata --check` | Fast |
 | Validate changelog | `cargo xtask check-changelog` | Fast |
 | Build an example | `cargo xtask run example [name] --chip <chip>` | |
-| Build docs | `cargo xtask build documentation --chips <list>` | Slow â€” scope to affected chips |
+| Build docs | `cargo xtask build documentation --chips <list>` | Slow — scope to affected chips |
 | HIL tests (needs hardware) | `cargo xtask run tests <chip> [--test name]` | Requires connected device |
-| Full CI check for one chip | `cargo xtask ci <chip>` | **Very slow** â€” use only as final check before opening a PR |
+| Full CI check for one chip | `cargo xtask ci <chip>` | **Very slow** — use only as final check before opening a PR |
 
 **Prefer targeted commands** (`lint-packages --chips X --packages Y`, `run example ... --chip X`) during development. Only run `ci` as a final validation pass.
 
@@ -61,7 +61,7 @@ Named configs build the same file with different settings:
 - **Applications** (examples, tests) may enable `unstable` freely.
 - Mark new unstable APIs with `#[instability::unstable]`.
 - `unstable_module!` macro: makes a module `pub` when `unstable` is enabled, `pub(crate)` otherwise.
-- Features prefixed with `__` (e.g. `__bluetooth`) are private â€” never enable directly.
+- Features prefixed with `__` (e.g. `__bluetooth`) are private — never enable directly.
 
 ## esp-config
 
@@ -97,8 +97,8 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 
 ## Changelog & migration
 
-- Changelog entries go in the **PR description**, not in `CHANGELOG.md` (those files are generated at release time â€” never edit them directly).
-- Use a `# Changelog` section with H2 crate headings (e.g. `## esp-hal`). Each entry starts with a kind prefix: `Added`, `Changed`, `Fixed`, or `Removed` â€” e.g. `- Added: Support for the Foo peripheral.` Do not include a PR number.
+- Changelog entries go in the **PR description**, not in `CHANGELOG.md` (those files are generated at release time — never edit them directly).
+- Use a `# Changelog` section with H2 crate headings (e.g. `## esp-hal`). Each entry starts with a kind prefix: `Added`, `Changed`, `Fixed`, or `Removed` — e.g. `- Added: Support for the Foo peripheral.` Do not include a PR number.
 - If a touched crate needs no user-visible entry, add `- No changelog necessary.` as the sole item in its section.
 - Breaking changes: add a `# Migration guide` section with an H2 `## crate/area` heading (e.g. `## esp-hal/SPI driver`) and an H3 `### Title` per change, followed by migration steps.
 - Breaking changes to stable API require a `breaking-change-<crate-name>` PR label.
@@ -107,16 +107,16 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 ## PR checklist
 
 1. `cargo xtask fmt-packages`
-2. `cargo xtask lint-packages --chips <affected>` â€” fix all warnings
-3. `cargo update-metadata --check` â€” if metadata changed
-4. `cargo xtask check-pr-changelog` â€” add changelog entries to the PR description if API changed
+2. `cargo xtask lint-packages --chips <affected>` — fix all warnings
+3. `cargo update-metadata --check` — if metadata changed
+4. `cargo xtask check-pr-changelog` — add changelog entries to the PR description if API changed
 5. Build affected examples/tests for relevant chips
-6. `cargo xtask host-tests` â€” if host-side code changed; when adding `#[test]` to a package for the first time, register it in `run_host_tests` (`xtask/src/lib.rs`)
+6. `cargo xtask host-tests` — if host-side code changed; when adding `#[test]` to a package for the first time, register it in `run_host_tests` (`xtask/src/lib.rs`)
 
 ## Key references
 
-- `documentation/DEVELOPER-GUIDELINES.md` â€” full API design rules
-- `documentation/CONTRIBUTING.md` â€” contribution workflow
-- `xtask/README.md` â€” metadata annotations and xtask usage
-- `.github/workflows/ci.yml` â€” CI steps and MSRV
-- `esp-metadata/devices/*.toml` â€” per-chip peripheral definitions
+- `documentation/DEVELOPER-GUIDELINES.md` — full API design rules
+- `documentation/CONTRIBUTING.md` — contribution workflow
+- `xtask/README.md` — metadata annotations and xtask usage
+- `.github/workflows/ci.yml` — CI steps and MSRV
+- `esp-metadata/devices/*.toml` — per-chip peripheral definitions

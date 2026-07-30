@@ -5,7 +5,6 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
-use esp_metadata::Chip;
 use inquire::Select;
 use serde::Serialize;
 use strum::IntoEnumIterator;
@@ -15,6 +14,7 @@ use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
     firmware,
+    metadata::Chip,
 };
 mod build;
 mod check_changelog;

@@ -6,7 +6,6 @@ use std::{
 
 use anyhow::{Context as _, Result, ensure};
 use clap::ValueEnum;
-use esp_metadata::Config;
 use serde::{Deserialize, Serialize};
 use somni_expr::somni_struct;
 use somni_template::{Env, Iter, SomniStruct, Syntax, Template, TemplateTypes};
@@ -16,6 +15,7 @@ use crate::{
     Chip,
     Package,
     cargo::{CargoArgsBuilder, CargoCommandBatcher},
+    metadata::Config,
     windows_safe_path,
 };
 
@@ -293,7 +293,7 @@ fn cargo_doc_without_pre_processing(
         features.push(chip.to_string());
         package.doc_config_rules(Config::for_chip(chip))
     } else {
-        package.doc_config_rules(&Config::empty())
+        package.doc_config_rules(&Config::default())
     };
     if let Some(doc_config) = &doc_config {
         features.extend(doc_config.features.clone());
@@ -401,10 +401,7 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
     let mut engine = somni_expr::Context::new();
     engine.add_function("has", move |cond: &str| -> bool {
         if let Some(chip_cfg) = chip_cfg {
-            chip_cfg
-                .all()
-                .iter()
-                .any(|symbol| cond == symbol.replace('.', "_"))
+            chip_cfg.symbols.iter().any(|symbol| cond == symbol)
         } else {
             false
         }

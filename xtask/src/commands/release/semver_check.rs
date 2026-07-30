@@ -1,10 +1,9 @@
 use std::path::Path;
 
 use clap::{Args, Subcommand};
-use esp_metadata::Chip;
 use strum::IntoEnumIterator;
 
-use crate::Package;
+use crate::{Package, metadata::Chip};
 
 /// Commands for performing semver checks on the public API of packages.
 #[derive(Debug, Subcommand)]
@@ -73,10 +72,10 @@ pub mod checker {
 
     use anyhow::Context;
     use cargo_semver_checks::ReleaseType;
-    use esp_metadata::Chip;
 
     use crate::{
         Package,
+        metadata::Chip,
         semver_check::{build_doc_json, minimum_update},
     };
 

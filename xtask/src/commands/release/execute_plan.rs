@@ -2,7 +2,6 @@ use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
-use esp_metadata::Chip;
 use strum::IntoEnumIterator;
 use toml_edit::{Item, Value};
 
@@ -15,6 +14,7 @@ use crate::{
         update_package,
     },
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
+    metadata::Chip,
 };
 
 /// Arguments for executing the release plan.

@@ -7,7 +7,6 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser};
 use esp_devtool as xtask;
-use esp_metadata::{Chip, Config};
 use object::{Object, ObjectSymbol, SymbolKind, read::archive::ArchiveFile};
 use rustc_demangle::try_demangle;
 use strum::IntoEnumIterator;
@@ -15,6 +14,7 @@ use xtask::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder, CargoCommandBatcher},
     commands::*,
+    metadata::{Chip, Config},
 };
 
 // ----------------------------------------------------------------------------
@@ -259,7 +259,7 @@ fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
 
             for mut check_config in package.check_config_rules(device) {
                 if package.has_chip_features() {
-                    check_config.features.push(device.name());
+                    check_config.features.push(device.name.clone());
                 }
 
                 commands.push(build_check_package_command(
@@ -360,7 +360,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
             for mut check_config in package.lint_config_rules(device) {
                 if package.has_chip_features() {
-                    check_config.features.push(device.name());
+                    check_config.features.push(device.name.clone());
                 }
 
                 lint_package(

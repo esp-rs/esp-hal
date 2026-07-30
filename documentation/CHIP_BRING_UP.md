@@ -2,9 +2,9 @@
 
 This guide aims to reach a chip bring-up state where basic examples build and flash successfully (even if they do nothing) and watchdogs reboot the chip.
 
-In general, comparison and existing knowledge are key to obtaining all required data. As a first step, determine which already supported chip is most similar to the one being added. In the case of the `ESP32-C5`, the closest references were `ESP32-C6` and/or `ESP32-H2`. Even if no clearly similar chip exists â€” simply choose one as a reference and work based on that.
+In general, comparison and existing knowledge are key to obtaining all required data. As a first step, determine which already supported chip is most similar to the one being added. In the case of the `ESP32-C5`, the closest references were `ESP32-C6` and/or `ESP32-H2`. Even if no clearly similar chip exists — simply choose one as a reference and work based on that.
 
-We prefer to trust `ESP-IDF` first and `TRM` second. The reason is simple: `TRM`, unfortunately, might sometimes contain inaccuracies, while `ESP-IDF` code is proven to work â€” operability is our main priority. As a side task, you may look for inconsistencies in the TRM and report them via GitHub issues (if you are an external contributor) or in the `Documentation` channel (if you are a team member).
+We prefer to trust `ESP-IDF` first and `TRM` second. The reason is simple: `TRM`, unfortunately, might sometimes contain inaccuracies, while `ESP-IDF` code is proven to work — operability is our main priority. As a side task, you may look for inconsistencies in the TRM and report them via GitHub issues (if you are an external contributor) or in the `Documentation` channel (if you are a team member).
 
 ## `espflash` And Test Tooling
 
@@ -47,7 +47,7 @@ First, determine the source of truth for memory mappings. For example, using `es
 RAM : ORIGIN = 0x40800000 , LENGTH = 0x6E610
 ```
 
-In `ESP-IDF` (preferably `master` or the `latest` release), search for `6E610` â€” it is unique enough to find relevant matches. The search will lead to:
+In `ESP-IDF` (preferably `master` or the `latest` release), search for `6E610` — it is unique enough to find relevant matches. The search will lead to:
 
 - `components/bootloader/subproject/main/ld/esp32c6/bootloader.ld.in`
 - `components/esp_system/ld/esp32c6/memory.ld.in`
@@ -128,9 +128,9 @@ For `<chip>.x`, refer to similar chips (`c6`, `h2`, `c2`) and copy as needed, ad
 
 --- 
 
-If you want to see the fully expanded linker scripts, build an example `ESP-IDF` project (`hello-world` is enough) for the same chip, then search inside the projectâ€™s build/ directory for *.ld.
+If you want to see the fully expanded linker scripts, build an example `ESP-IDF` project (`hello-world` is enough) for the same chip, then search inside the project’s build/ directory for *.ld.
 
-Those *.ld files are the complete, final linker scripts produced by the build system and passed to the linker. Use them as the â€œground truthâ€, and compare them to the corresponding *.ld.in template inputs to verify your #defines, memory regions, and section placement match what ESP-IDF ends up generating.
+Those *.ld files are the complete, final linker scripts produced by the build system and passed to the linker. Use them as the “ground truth”, and compare them to the corresponding *.ld.in template inputs to verify your #defines, memory regions, and section placement match what ESP-IDF ends up generating.
 
 ### esp-rom-sys
 
@@ -302,4 +302,4 @@ Implementing further peripheral support boils down to a relatively simple loop o
   Sometimes this process does indeed cause dozens or even hundreds of errors, but it is worth checking again to see if most of them can be corrected with a couple of `cfg`-gates.
 
 - **Code has been successfully flashed, but the chip keeps rebooting**
-  Make sure you have disabled `WDT`s or are not using `RTC RAM` on a chip that **does not** support this feature â€” this applies both not enabling the â€œesp-riscv-rt/rtc-ramâ€ feature for the given chip and to the absence of `RTC-RAM`-related sections in the linker script.
+  Make sure you have disabled `WDT`s or are not using `RTC RAM` on a chip that **does not** support this feature — this applies both not enabling the “esp-riscv-rt/rtc-ram” feature for the given chip and to the absence of `RTC-RAM`-related sections in the linker script.

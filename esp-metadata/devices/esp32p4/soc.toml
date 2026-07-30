@@ -239,7 +239,7 @@ engines = [
             { name = "DMA_AXI_CH2", mem2mem = true, mem2mem_id = 8, interrupt_in = "AXI_PDMA_IN_CH2", interrupt_out = "AXI_PDMA_OUT_CH2" },
         ]
     },
-    # DW-GDMA / VDMA: used for MIPI-DSI video streaming (mem â†’ DSI bridge FIFO).
+    # DW-GDMA / VDMA: used for MIPI-DSI video streaming (mem → DSI bridge FIFO).
     # All 4 channels share the single DMA interrupt; interrupt binding is managed
     # by the MIPI-DSI driver directly rather than through the standard DMA traits.
     {

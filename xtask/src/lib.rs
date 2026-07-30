@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
-use esp_metadata::{Chip, Config};
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use pretty_yaml::{config::FormatOptions, format_text};
 use serde::{Deserialize, Serialize};
@@ -17,6 +16,7 @@ use walkdir::WalkDir;
 use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
     firmware::Metadata,
+    metadata::{Chip, Config},
 };
 
 pub mod cargo;
@@ -25,6 +25,7 @@ pub mod commands;
 pub mod documentation;
 pub mod firmware;
 pub mod git;
+pub mod metadata;
 pub mod pr_changelog;
 
 /// GitHub repository used for all `gh` CLI calls.
@@ -1161,84 +1162,23 @@ pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
     Ok(packages)
 }
 
-struct ScriptContext {
-    all_symbols: Vec<String>,
-    all_kv_symbols: Vec<String>,
-}
+struct ScriptContext;
 
 struct ChipFilterEval<'a> {
-    all_symbols: &'a [String],
-    all_kv_symbols: &'a [String],
-    chip_symbols: Vec<String>,
-    chip_kv_values: Vec<(String, String)>,
+    config: &'a Config,
 }
 
 impl ScriptContext {
-    fn symbol_to_ident(s: &str) -> Option<String> {
-        s.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
-            .then_some(s.replace(".", "_"))
-    }
-
     pub fn new() -> Self {
-        let all_symbols = Chip::list_of_possible_symbols()
-            .iter()
-            .filter_map(|(sym, values)| {
-                if values.is_none() {
-                    Self::symbol_to_ident(sym)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        let all_kv_symbols = Chip::list_of_possible_symbols()
-            .iter()
-            .filter_map(|(sym, values)| {
-                if values.is_some() {
-                    Self::symbol_to_ident(sym)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        Self {
-            all_symbols,
-            all_kv_symbols,
-        }
+        Self
     }
 
     pub fn for_chip(&self, chip: Chip) -> ChipFilterEval<'_> {
-        self.for_config(&Config::for_chip(&chip))
+        self.for_config(Config::for_chip(&chip))
     }
 
-    pub fn for_config(&self, config: &Config) -> ChipFilterEval<'_> {
-        let chip_symbols = config
-            .all()
-            .iter()
-            .filter_map(|s| Self::symbol_to_ident(s))
-            .collect::<Vec<_>>();
-        let chip_kv_values = config
-            .all()
-            .iter()
-            .filter_map(|sym| {
-                if sym.contains('"') {
-                    let (k, v) = sym.split_once('=')?;
-                    let k = Self::symbol_to_ident(k.trim())?;
-                    let v = v.trim().trim_matches('"');
-                    Some((k.to_string(), v.to_string()))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        ChipFilterEval {
-            all_symbols: &self.all_symbols,
-            all_kv_symbols: &self.all_kv_symbols,
-            chip_symbols,
-            chip_kv_values,
-        }
+    pub fn for_config<'a>(&self, config: &'a Config) -> ChipFilterEval<'a> {
+        ChipFilterEval { config }
     }
 }
 
@@ -1247,19 +1187,19 @@ impl ChipFilterEval<'_> {
         let mut ctx = somni_expr::Context::new();
 
         // All known symbols are initially false
-        for sym in self.all_symbols.iter() {
+        for sym in Chip::all_symbols() {
             ctx.add_variable(sym, false);
         }
-        for sym in self.all_kv_symbols.iter() {
+        for sym in Chip::all_kv_symbols() {
             // empty string is not a valid value, chips that don't define the symbol won't match
             ctx.add_variable(sym, "");
         }
 
         // All defined symbols for this chip are true
-        for sym in self.chip_symbols.iter() {
+        for sym in &self.config.symbols {
             ctx.add_variable(sym, true);
         }
-        for (k, v) in self.chip_kv_values.iter() {
+        for (k, v) in &self.config.kv_values {
             ctx.add_variable(k, v.as_str());
         }
 
