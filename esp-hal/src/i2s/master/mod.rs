@@ -157,7 +157,15 @@ mod low_level;
 pub use low_level::Info;
 
 #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-pub use super::pdm::{PdmConfig, PdmError, PdmInstance, PdmRxConfig, PdmSlotMode, PdmTxConfig};
+pub use super::pdm::{
+    PdmConfig,
+    PdmDataFormat,
+    PdmError,
+    PdmInstance,
+    PdmRxConfig,
+    PdmSlotMode,
+    PdmTxConfig,
+};
 use crate::{
     Async,
     Blocking,
