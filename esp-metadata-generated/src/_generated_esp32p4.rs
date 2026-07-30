@@ -6029,35 +6029,55 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0, 0));
-        _for_each_inner_lp_function!((LP_GPIO1, GPIO1, 0));
-        _for_each_inner_lp_function!((LP_GPIO2, GPIO2, 0));
-        _for_each_inner_lp_function!((LP_GPIO3, GPIO3, 0));
-        _for_each_inner_lp_function!((LP_GPIO4, GPIO4, 0));
-        _for_each_inner_lp_function!((LP_GPIO5, GPIO5, 0));
-        _for_each_inner_lp_function!((LP_GPIO12, GPIO12, 0));
-        _for_each_inner_lp_function!((LP_GPIO13, GPIO13, 0));
-        _for_each_inner_lp_function!((LP_GPIO14, GPIO14, 0));
-        _for_each_inner_lp_function!((LP_GPIO15, GPIO15, 0));
-        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0, 0));
-        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1, 0));
-        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2, 0));
-        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3, 0));
-        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4, 0));
-        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5, 0));
-        _for_each_inner_lp_function!(((LP_GPIO12, LP_GPIOn, 12), GPIO12, 0));
-        _for_each_inner_lp_function!(((LP_GPIO13, LP_GPIOn, 13), GPIO13, 0));
-        _for_each_inner_lp_function!(((LP_GPIO14, LP_GPIOn, 14), GPIO14, 0));
-        _for_each_inner_lp_function!(((LP_GPIO15, LP_GPIOn, 15), GPIO15, 0));
-        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0, 0), (LP_GPIO1, GPIO1, 0),
-        (LP_GPIO2, GPIO2, 0), (LP_GPIO3, GPIO3, 0), (LP_GPIO4, GPIO4, 0), (LP_GPIO5,
-        GPIO5, 0), (LP_GPIO12, GPIO12, 0), (LP_GPIO13, GPIO13, 0), (LP_GPIO14, GPIO14,
-        0), (LP_GPIO15, GPIO15, 0))); _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0,
-        LP_GPIOn, 0), GPIO0, 0), ((LP_GPIO1, LP_GPIOn, 1), GPIO1, 0), ((LP_GPIO2,
-        LP_GPIOn, 2), GPIO2, 0), ((LP_GPIO3, LP_GPIOn, 3), GPIO3, 0), ((LP_GPIO4,
-        LP_GPIOn, 4), GPIO4, 0), ((LP_GPIO5, LP_GPIOn, 5), GPIO5, 0), ((LP_GPIO12,
-        LP_GPIOn, 12), GPIO12, 0), ((LP_GPIO13, LP_GPIOn, 13), GPIO13, 0), ((LP_GPIO14,
-        LP_GPIOn, 14), GPIO14, 0), ((LP_GPIO15, LP_GPIOn, 15), GPIO15, 0)));
+        => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0, 1));
+        _for_each_inner_lp_function!((LP_GPIO1, GPIO1, 1));
+        _for_each_inner_lp_function!((LP_GPIO2, GPIO2, 1));
+        _for_each_inner_lp_function!((LP_GPIO3, GPIO3, 1));
+        _for_each_inner_lp_function!((LP_GPIO4, GPIO4, 1));
+        _for_each_inner_lp_function!((LP_GPIO5, GPIO5, 1));
+        _for_each_inner_lp_function!((LP_GPIO6, GPIO6, 1));
+        _for_each_inner_lp_function!((LP_GPIO7, GPIO7, 1));
+        _for_each_inner_lp_function!((LP_GPIO8, GPIO8, 1));
+        _for_each_inner_lp_function!((LP_GPIO9, GPIO9, 1));
+        _for_each_inner_lp_function!((LP_GPIO10, GPIO10, 1));
+        _for_each_inner_lp_function!((LP_GPIO11, GPIO11, 1));
+        _for_each_inner_lp_function!((LP_GPIO12, GPIO12, 1));
+        _for_each_inner_lp_function!((LP_GPIO13, GPIO13, 1));
+        _for_each_inner_lp_function!((LP_UART_TXD, GPIO14, 0));
+        _for_each_inner_lp_function!((LP_GPIO14, GPIO14, 1));
+        _for_each_inner_lp_function!((LP_UART_RXD, GPIO15, 0));
+        _for_each_inner_lp_function!((LP_GPIO15, GPIO15, 1));
+        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0, 1));
+        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1, 1));
+        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2, 1));
+        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3, 1));
+        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4, 1));
+        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5, 1));
+        _for_each_inner_lp_function!(((LP_GPIO6, LP_GPIOn, 6), GPIO6, 1));
+        _for_each_inner_lp_function!(((LP_GPIO7, LP_GPIOn, 7), GPIO7, 1));
+        _for_each_inner_lp_function!(((LP_GPIO8, LP_GPIOn, 8), GPIO8, 1));
+        _for_each_inner_lp_function!(((LP_GPIO9, LP_GPIOn, 9), GPIO9, 1));
+        _for_each_inner_lp_function!(((LP_GPIO10, LP_GPIOn, 10), GPIO10, 1));
+        _for_each_inner_lp_function!(((LP_GPIO11, LP_GPIOn, 11), GPIO11, 1));
+        _for_each_inner_lp_function!(((LP_GPIO12, LP_GPIOn, 12), GPIO12, 1));
+        _for_each_inner_lp_function!(((LP_GPIO13, LP_GPIOn, 13), GPIO13, 1));
+        _for_each_inner_lp_function!(((LP_GPIO14, LP_GPIOn, 14), GPIO14, 1));
+        _for_each_inner_lp_function!(((LP_GPIO15, LP_GPIOn, 15), GPIO15, 1));
+        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0, 1), (LP_GPIO1, GPIO1, 1),
+        (LP_GPIO2, GPIO2, 1), (LP_GPIO3, GPIO3, 1), (LP_GPIO4, GPIO4, 1), (LP_GPIO5,
+        GPIO5, 1), (LP_GPIO6, GPIO6, 1), (LP_GPIO7, GPIO7, 1), (LP_GPIO8, GPIO8, 1),
+        (LP_GPIO9, GPIO9, 1), (LP_GPIO10, GPIO10, 1), (LP_GPIO11, GPIO11, 1), (LP_GPIO12,
+        GPIO12, 1), (LP_GPIO13, GPIO13, 1), (LP_UART_TXD, GPIO14, 0), (LP_GPIO14, GPIO14,
+        1), (LP_UART_RXD, GPIO15, 0), (LP_GPIO15, GPIO15, 1)));
+        _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0, LP_GPIOn, 0), GPIO0, 1),
+        ((LP_GPIO1, LP_GPIOn, 1), GPIO1, 1), ((LP_GPIO2, LP_GPIOn, 2), GPIO2, 1),
+        ((LP_GPIO3, LP_GPIOn, 3), GPIO3, 1), ((LP_GPIO4, LP_GPIOn, 4), GPIO4, 1),
+        ((LP_GPIO5, LP_GPIOn, 5), GPIO5, 1), ((LP_GPIO6, LP_GPIOn, 6), GPIO6, 1),
+        ((LP_GPIO7, LP_GPIOn, 7), GPIO7, 1), ((LP_GPIO8, LP_GPIOn, 8), GPIO8, 1),
+        ((LP_GPIO9, LP_GPIOn, 9), GPIO9, 1), ((LP_GPIO10, LP_GPIOn, 10), GPIO10, 1),
+        ((LP_GPIO11, LP_GPIOn, 11), GPIO11, 1), ((LP_GPIO12, LP_GPIOn, 12), GPIO12, 1),
+        ((LP_GPIO13, LP_GPIOn, 13), GPIO13, 1), ((LP_GPIO14, LP_GPIOn, 14), GPIO14, 1),
+        ((LP_GPIO15, LP_GPIOn, 15), GPIO15, 1)));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
