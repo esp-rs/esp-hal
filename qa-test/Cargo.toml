@@ -5,6 +5,9 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 publish = false
 
+[build-dependencies]
+esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
+
 [dependencies]
 embassy-executor = "0.10.0"
 embassy-time = "0.5.0"

@@ -490,6 +490,9 @@ impl Default for Config {
 
 impl Config {
     /// Set the frequency of the SPI bus clock.
+    ///
+    /// The closest available frequency that does not exceed `frequency` is used,
+    /// so the bus never runs faster than requested.
     pub fn with_frequency(mut self, frequency: Rate) -> Self {
         self.frequency = frequency;
         self.reg = self.recalculate();
@@ -520,58 +523,90 @@ impl Config {
         // In HW, n, h and l fields range from 1 to 64, pre ranges from 1 to 8K.
         // The value written to register is one lower than the used value.
 
-        if self.frequency > ((source_freq / 4) * 3) {
-            // Using source frequency directly will give us the best result here.
+        if self.frequency >= source_freq {
+            // Bypass the divider, which is exactly the source frequency.
             // Set the SPI_CLK_EQU_SYSCLK bit.
-            Ok(1 << 31)
-        } else {
-            // For best duty cycle resolution, we want n to be as close to 32 as
-            // possible, but we also need a pre/n combo that gets us as close as
-            // possible to the intended frequency. To do this, we bruteforce n and
-            // calculate the best pre to go along with that. If there's a choice
-            // between pre/n combos that give the same result, use the one with the
-            // higher n.
+            return Ok(1 << 31);
+        }
 
-            let mut best_n: u32 = 2;
-            let mut best_pre: u32 = 0;
-            let mut best_err: u32 = u32::MAX;
+        let (n, pre) = Self::divider_pair(source_freq.as_hz(), self.frequency.as_hz());
 
-            let target_freq_hz = self.frequency.as_hz();
-            let source_freq_hz = source_freq.as_hz();
+        // In master mode, L == N
+        let l = n;
 
-            // Start at n = 2. We need to be able to set h/l so we have at least
-            // one high and one low pulse.
+        // In master mode, this field must be floor((SPI_CLKCNT_N + 1)/2 - 1)
+        let h = (n / 2).max(1);
 
-            for n in 2..=64 {
-                let pre = (source_freq_hz / n).div_ceil(target_freq_hz).clamp(1, 16);
+        Ok((l - 1) // SPI_CLKCNT_L
+            | ((h - 1) << 6) // SPI_CLKCNT_H
+            | ((n - 1) << 12) // SPI_CLKCNT_N
+            | ((pre - 1) << 18)) // SPI_CLKDIV_PRE
+    }
 
-                let errval = (source_freq_hz / (pre * n)).abs_diff(target_freq_hz);
-                if errval <= best_err {
-                    best_err = errval;
-                    best_n = n;
-                    best_pre = pre;
+    /// Finds the `(n, pre)` pair producing the highest bus frequency that does
+    /// not exceed `target_freq_hz`, where `n` is `SPI_CLKCNT_N + 1` and `pre` is
+    /// `SPI_CLKDIV_PRE + 1`.
+    ///
+    /// The peripheral divides the source clock by `pre * n`, so this is the
+    /// smallest divider that does not overshoot. `n` also determines the duty
+    /// cycle resolution, so out of pairs forming that divider we want the one
+    /// with the largest `n`.
+    ///
+    /// Out-of-range frequencies (see [`Config::validate`]) yield the slowest pair
+    /// available rather than an error.
+    fn divider_pair(source_freq_hz: u32, target_freq_hz: u32) -> (u32, u32) {
+        // A zero target is rejected by `validate`, but must not divide by zero
+        // here.
+        if target_freq_hz == 0 {
+            return (64, 16);
+        }
 
-                    if errval == 0 {
-                        break;
-                    }
+        // Any smaller divider would run the bus faster than requested. `n` starts
+        // at 2 so that h/l can describe at least one high and one low pulse.
+        let min_divider = source_freq_hz.div_ceil(target_freq_hz).max(2);
+
+        // A `pre` of 1 offers every divider up to 64, so if the smallest usable
+        // divider is in that range we can form it directly, with the largest `n`
+        // that produces it.
+        if min_divider <= 64 {
+            return (min_divider, 1);
+        }
+
+        // `n` maxes out at 64, so a smaller `pre` cannot bring the source clock
+        // down to the target. As `n` shrinks when `pre` grows, walking `pre`
+        // upwards visits the candidates in order of decreasing duty cycle
+        // resolution, which lets us keep the first of several that share a
+        // divider.
+        //
+        // The seed is the slowest pair, which also answers requests below the
+        // supported range.
+        let mut best = (64, 16);
+        let mut best_divider = 64 * 16;
+
+        // A `for` loop over a range would leave a divide-by-zero check on `pre`
+        // in the generated code, as the lower bound is not visible through the
+        // range iterator on all targets.
+        let mut pre = min_divider.div_ceil(64);
+        while pre <= 16 {
+            // The smallest `n` that keeps `pre * n` from overshooting. The lower
+            // bound on `pre` keeps this at or below 64.
+            let n = min_divider.div_ceil(pre);
+            let divider = pre * n;
+
+            if divider < best_divider {
+                best = (n, pre);
+                best_divider = divider;
+
+                // Nothing can beat hitting the smallest usable divider exactly.
+                if divider == min_divider {
+                    break;
                 }
             }
 
-            // n = SPI_CLKCNT_N + 1
-            let n = best_n;
-            // pre = SPI_CLKDIV_PRE + 1
-            let pre = best_pre;
-            // In master mode, L == N
-            let l = n;
-
-            // In master mode, this field must be floor((SPI_CLKCNT_N + 1)/2 - 1)
-            let h = (n / 2).max(1);
-
-            Ok((l - 1) // SPI_CLKCNT_L
-                | ((h - 1) << 6) // SPI_CLKCNT_H
-                | ((n - 1) << 12) // SPI_CLKCNT_N
-                | ((pre - 1) << 18)) // SPI_CLKDIV_PRE
+            pre += 1;
         }
+
+        best
     }
 
     fn raw_clock_reg_value(&self) -> Result<u32, ConfigError> {

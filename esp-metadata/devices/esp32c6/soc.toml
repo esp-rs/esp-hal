@@ -13,6 +13,10 @@ cores  = 1
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-c6_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 256
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -28,6 +32,8 @@ has_swd_watchdog = true
 memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4088_0000 },
     { name = "dram2_uninit", start = 0x4086_E610, end = 0x4087_E610 },
+    { name = "irom", start = 0x4200_0000, end = 0x4300_0000 },
+    { name = "drom", start = 0x4200_0000, end = 0x4300_0000 },
 ] }
 
 peripherals = [
@@ -312,7 +318,7 @@ ram_size = 32
 support_status = { status = "not_supported", issue = 884 }
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = true

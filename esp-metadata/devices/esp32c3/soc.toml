@@ -13,6 +13,10 @@ cores  = 1
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 128
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -27,6 +31,8 @@ has_swd_watchdog = true
 memory_map = { ranges = [
     { name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 },
     { name = "dram2_uninit", start = 0x3FCCE400, end = 0x3FCD_E710 },
+    { name = "irom", start = 0x4200_0000, end = 0x4280_0000 },
+    { name = "drom", start = 0x3C00_0000, end = 0x3C80_0000 },
 ] }
 
 peripherals = [
@@ -256,7 +262,7 @@ support_status = "partial"
 support_status = { status = "not_supported", issue = 884 }
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 

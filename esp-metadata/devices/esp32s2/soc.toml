@@ -13,6 +13,10 @@ cores  = 1
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 256
+
 [device.rom]
 has_crc_le  = true
 has_md5_bsd = true
@@ -21,6 +25,8 @@ has_md5_bsd = true
 memory_map = { ranges = [
     { name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 },
     { name = "dram2_uninit", start = 0x3FFD_E000, end = 0x4000_0000 },
+    { name = "irom", start = 0x4008_0000, end = 0x4080_0000 },
+    { name = "drom", start = 0x3F00_0000, end = 0x3F40_0000 },
 ] }
 has_swd_watchdog = true
 
@@ -306,7 +312,7 @@ support_status = { status = "not_supported", issue = 1905 }
 support_status = { status = "not_supported", issue = 884 }
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 

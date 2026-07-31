@@ -133,7 +133,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
         ) -> i32;
     }
 
-    const MMU_PAGE_SIZE: u32 = 0x10000;
+    const MMU_PAGE_SIZE: u32 = property!("mmu.page_size");
 
     fn mmu_entry_is_valid(entry_id: usize) -> bool {
         !MMU_TABLE::regs().entry(entry_id).read().invalid().bit()

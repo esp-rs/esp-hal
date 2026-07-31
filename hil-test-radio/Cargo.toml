@@ -107,6 +107,16 @@ esp32c6 = [
     "esp-metadata-generated/esp32c6",
     "esp-rtos?/esp32c6",
 ]
+esp32s3 = [
+    "embedded-test/xtensa-semihosting",
+    "esp-hal/esp32s3",
+    "esp-alloc?/esp32s3",
+    "esp-radio?/esp32s3",
+    "esp-storage?/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-metadata-generated/esp32s3",
+    "esp-rtos?/esp32s3",
+]
 
 # https://doc.rust-lang.org/cargo/reference/profiles.html#test
 # Test and bench profiles inherit from dev and release respectively.
@@ -120,9 +130,10 @@ overflow-checks  = true
 
 [profile.release]
 codegen-units    = 1
-debug            = 2
 debug-assertions = true
 incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
+# We rarely debug HIL binaries, so let's shrink the .ELF size
+debug            = 0

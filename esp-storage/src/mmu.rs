@@ -206,12 +206,7 @@ fn invalidate_cache(_vaddr: u32, _size: u32) {
 }
 
 #[cfg(not(esp32s2))]
-const FLASH_VADDR_BASE: u32 = cfg_select! {
-    any(esp32c5, esp32c6, esp32c61, esp32h2) => 0x4200_0000,
-    any(esp32p4, esp32s31) => 0x4000_0000,
-    any(esp32c3, esp32c2, esp32s3) => 0x3C00_0000,
-    _ => 0x3F40_0000,
-};
+const FLASH_VADDR_BASE: u32 = memory_range!("DROM").start as u32;
 
 fn entry_id_to_vaddr(entry_id: u32) -> *const u8 {
     cfg_select! {
@@ -341,12 +336,7 @@ mod indexed {
     }
 
     pub(super) fn entry_count() -> u32 {
-        cfg_select! {
-            esp32s31 => 1024,
-            any(esp32c5, esp32c61, esp32p4) => 512,
-            any(esp32c6, esp32h2) => 256,
-            _ => 0,
-        }
+        property!("mmu.entry_num")
     }
 
     pub(super) fn entry_is_valid(entry_id: u32) -> bool {
@@ -367,10 +357,8 @@ mod table {
         unsafe { &*pac::MMU_TABLE::ptr() }
     }
 
-    const PAGE_SIZE: u32 = 0x10000;
-
     pub(super) fn mmu_page_size() -> u32 {
-        PAGE_SIZE
+        property!("mmu.page_size")
     }
 
     pub(super) fn flash_page_number(page_paddr: u32) -> u32 {

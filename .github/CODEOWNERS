@@ -1,0 +1,85 @@
+# ─── Area: CI & release automation ───
+/.github/                       @MabezDev @SergioGasquez @JurajSadel
+
+# ─── Area: metadata & codegen ───
+/esp-metadata/                  @bugadani @playfulFence
+/esp-metadata-generated/        @bugadani @playfulFence
+/esp-hal-procmacros/            @bugadani @playfulFence
+
+# ─── Area: runtime & arch support ───
+/esp-rtos/                      @bugadani @playfulFence @MabezDev
+/esp-riscv-rt/                  @bjoernQ @bugadani @MabezDev
+/xtensa-lx/                     @bugadani @bjoernQ
+/xtensa-lx-rt/                  @bugadani @bjoernQ @MabezDev
+/esp-lp-hal/                    @playfulFence @SergioGasquez
+
+# ─── Area: boot & flash ───
+/esp-bootloader-esp-idf/        @bjoernQ @SergioGasquez
+/esp-storage/                   @bjoernQ @SergioGasquez
+/esp-rom-sys/                   @bjoernQ @SergioGasquez
+
+# ─── esp-hal ───
+/esp-hal/                       @bugadani @playfulFence @MabezDev  # crate fallback
+
+# Area: core & system (SoC, clocks, interrupts, DMA, timers, power)
+/esp-hal/src/soc/               @bugadani @bjoernQ
+/esp-hal/src/peripherals/       @bugadani @bjoernQ @MabezDev
+/esp-hal/src/clock/             @bugadani @bjoernQ
+/esp-hal/src/system/            @bugadani @bjoernQ
+/esp-hal/src/system.rs          @bugadani @bjoernQ
+/esp-hal/src/interrupt/         @bugadani @bjoernQ @MabezDev
+/esp-hal/src/rtc_cntl/          @bugadani @bjoernQ
+/esp-hal/src/dma/               @bugadani @bjoernQ
+/esp-hal/src/timer/             @bugadani @bjoernQ
+/esp-hal/src/psram/             @bugadani @bjoernQ
+/esp-hal/src/efuse/             @bugadani @bjoernQ
+
+# Area: bus & interface drivers (owners vary per driver — deep domain knowledge)
+/esp-hal/src/spi/               @bugadani @playfulFence @bjoernQ @MabezDev
+/esp-hal/src/i2c/               @playfulFence @bugadani @SergioGasquez
+/esp-hal/src/uart/              @playfulFence @SergioGasquez @MabezDev
+/esp-hal/src/i2s/               @bjoernQ @playfulFence
+/esp-hal/src/twai/              @JurajSadel @bugadani @bjoernQ
+/esp-hal/src/usb/               @bugadani @JurajSadel @SergioGasquez
+/esp-hal/src/sdmmc/             @bugadani @JurajSadel @playfulFence @MabezDev
+/esp-hal/src/ethernet/          @bugadani @playfulFence @JurajSadel
+/esp-hal/src/parl_io.rs         @bugadani @playfulFence @bjoernQ
+/esp-hal/src/lcd_cam/           @bugadani @bjoernQ @playfulFence
+/esp-hal/src/mipi_dsi/          @bugadani @JurajSadel @bjoernQ
+
+# Area: GPIO, PWM & analog
+/esp-hal/src/gpio/              @playfulFence @bugadani
+/esp-hal/src/ledc/              @JurajSadel @playfulFence
+/esp-hal/src/mcpwm/             @JurajSadel @playfulFence
+/esp-hal/src/pcnt/              @JurajSadel @playfulFence
+/esp-hal/src/rmt/               @JurajSadel @playfulFence
+/esp-hal/src/rmt.rs             @JurajSadel @playfulFence
+/esp-hal/src/touch.rs           @JurajSadel @playfulFence
+/esp-hal/src/analog/            @JurajSadel @playfulFence
+/esp-hal/src/tsens.rs           @JurajSadel @playfulFence
+
+# Area: crypto & security
+/esp-hal/src/aes/               @bugadani @JurajSadel
+/esp-hal/src/sha.rs             @bugadani @JurajSadel
+/esp-hal/src/rsa/               @bugadani @JurajSadel
+/esp-hal/src/ecc.rs             @bugadani @JurajSadel
+/esp-hal/src/hmac.rs            @bugadani @JurajSadel
+/esp-hal/src/rng/               @JurajSadel @playfulFence
+
+# ─── esp-radio (+ radio support crates) ───
+/esp-radio/                     @bjoernQ @JurajSadel @MabezDev       # crate fallback: compat/glue layer
+/esp-phy/                       @bjoernQ @JurajSadel 
+/esp-radio-rtos-driver/         @bugadani @bjoernQ
+
+# Area: Wi-Fi
+/esp-radio/src/wifi/            @JurajSadel @bjoernQ @MabezDev
+/esp-radio/src/esp_now/         @JurajSadel @bjoernQ
+
+# Area: Bluetooth
+/esp-radio/src/ble/             @bjoernQ @JurajSadel @SergioGasquez
+
+# Area: 802.15.4
+/esp-radio/src/ieee802154/      @bjoernQ @playfulFence
+
+# Area: PACs
+/esp-pacs/                      @playfulFence @bugadani

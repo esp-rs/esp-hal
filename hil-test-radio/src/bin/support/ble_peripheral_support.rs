@@ -1,4 +1,4 @@
-//% CHIP_FILTER(has_wifi_ble): esp32c6
+//% CHIP_FILTER(has_wifi_ble): esp32c6 || esp32s3
 //% SUPPORT-FIRMWARE: true
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(has_wifi_ble): esp-radio/ble esp-radio esp-radio-unstable

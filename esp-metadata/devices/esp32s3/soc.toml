@@ -13,6 +13,10 @@ cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 384
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -25,6 +29,8 @@ has_swd_watchdog = true
 memory_map = { ranges = [
     { name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 },
     { name = "dram2_uninit", start = 0x3FCD_B700, end = 0x3FCE_D710 },
+    { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x3C00_0000, end = 0x3E00_0000 },
 ] }
 
 peripherals = [
@@ -48,7 +54,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
-    { name = "LCD_CAM" },
+    { name = "LCD_CAM", clock_group = "LCD_CAM" },
     { name = "LEDC" },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_TIMER", pac = "RTC_CNTL" },
@@ -223,7 +229,16 @@ memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
-algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
+algo = {
+    sha1 = 0,
+    sha224 = 1,
+    sha256 = 2,
+    sha384 = 3,
+    sha512 = 4,
+    sha512_224 = 5,
+    sha512_256 = 6,
+    sha512_t = 7,
+}
 
 [device.sdm]
 support_status = "partial"
@@ -302,7 +317,7 @@ support_status = { status = "not_supported", issue = 1905 }
 support_status = { status = "not_supported", issue = 884 }
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
@@ -363,6 +378,8 @@ instances = [
         ws_rx = "I2S1I_WS",
         dout = ["I2S1O_SD"],
         din = ["I2S1I_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
     },
 ]
 

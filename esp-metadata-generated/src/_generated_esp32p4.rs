@@ -256,6 +256,18 @@ macro_rules! property {
     ("lp_io.version") => {
         "esp32p4"
     };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        512
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(512)
+    };
     ("psram.octal_spi") => {
         false
     };
@@ -358,6 +370,11 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(63)
     };
+    ("clock_tree.cpu_root_clk") => {
+        [crate ::soc::clocks::CpuRootClkConfig::Xtal, crate
+        ::soc::clocks::CpuRootClkConfig::Cpll, crate
+        ::soc::clocks::CpuRootClkConfig::RcFast]
+    };
     ("clock_tree.cpu_clk.divisor") => {
         (0, 255)
     };
@@ -370,6 +387,28 @@ macro_rules! property {
     ("clock_tree.apb_clk.divisor") => {
         (0, 255)
     };
+    ("clock_tree.lp_fast_clk") => {
+        [crate ::soc::clocks::LpFastClkConfig::RcFast, crate
+        ::soc::clocks::LpFastClkConfig::XtalD2]
+    };
+    ("clock_tree.lp_slow_clk") => {
+        [crate ::soc::clocks::LpSlowClkConfig::RcSlow, crate
+        ::soc::clocks::LpSlowClkConfig::Xtal32k, crate
+        ::soc::clocks::LpSlowClkConfig::OscSlow]
+    };
+    ("clock_tree.timg_calibration_clock") => {
+        [crate ::soc::clocks::TimgCalibrationClockConfig::MpllClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::SpllClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::CpllClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::RcFastDivClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::Xtal32kClk]
+    };
+    ("clock_tree.uart.function_clock.sclk") => {
+        [crate ::soc::clocks::UartFunctionClockSclk::Xtal, crate
+        ::soc::clocks::UartFunctionClockSclk::PllF80m, crate
+        ::soc::clocks::UartFunctionClockSclk::RcFast]
+    };
     ("clock_tree.uart.function_clock.div_num") => {
         (0, 255)
     };
@@ -379,14 +418,49 @@ macro_rules! property {
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 4095)
     };
+    ("clock_tree.timg.function_clock") => {
+        [crate ::soc::clocks::TimgFunctionClockConfig::XtalClk, crate
+        ::soc::clocks::TimgFunctionClockConfig::RcFastClk, crate
+        ::soc::clocks::TimgFunctionClockConfig::PllF80m]
+    };
+    ("clock_tree.timg.wdt_clock") => {
+        [crate ::soc::clocks::TimgWdtClockConfig::XtalClk, crate
+        ::soc::clocks::TimgWdtClockConfig::PllF80m, crate
+        ::soc::clocks::TimgWdtClockConfig::RcFastClk]
+    };
+    ("clock_tree.i2c.function_clock.sclk") => {
+        [crate ::soc::clocks::I2cFunctionClockSclk::Xtal, crate
+        ::soc::clocks::I2cFunctionClockSclk::RcFast]
+    };
     ("clock_tree.i2c.function_clock.div_num") => {
         (0, 255)
+    };
+    ("clock_tree.spi.function_clock") => {
+        [crate ::soc::clocks::SpiFunctionClockConfig::Xtal, crate
+        ::soc::clocks::SpiFunctionClockConfig::RcFast, crate
+        ::soc::clocks::SpiFunctionClockConfig::Spll]
+    };
+    ("clock_tree.mipi_dsi.dpi_clk.sclk") => {
+        [crate ::soc::clocks::MipiDsiDpiClkSclk::Xtal, crate
+        ::soc::clocks::MipiDsiDpiClkSclk::PllF240m, crate
+        ::soc::clocks::MipiDsiDpiClkSclk::PllF160m]
     };
     ("clock_tree.mipi_dsi.dpi_clk.div_num") => {
         (0, 255)
     };
+    ("clock_tree.mipi_dsi.phy_pll_refclk.sclk") => {
+        [crate ::soc::clocks::MipiDsiPhyPllRefclkSclk::Xtal, crate
+        ::soc::clocks::MipiDsiPhyPllRefclkSclk::Cpll, crate
+        ::soc::clocks::MipiDsiPhyPllRefclkSclk::Spll, crate
+        ::soc::clocks::MipiDsiPhyPllRefclkSclk::Mpll]
+    };
     ("clock_tree.mipi_dsi.phy_pll_refclk.div_num") => {
         (0, 255)
+    };
+    ("clock_tree.mipi_dsi.phy_cfg_clk") => {
+        [crate ::soc::clocks::MipiDsiPhyCfgClkConfig::PllF20m, crate
+        ::soc::clocks::MipiDsiPhyCfgClkConfig::RcFast, crate
+        ::soc::clocks::MipiDsiPhyCfgClkConfig::PllF25m]
     };
     ("spi_master.version") => {
         3
@@ -4940,6 +5014,18 @@ macro_rules! memory_range {
     (size as str, "DRAM2_UNINIT") => {
         "262144"
     };
+    ("IROM") => {
+        0x40000000..0x44000000
+    };
+    (size as str, "IROM") => {
+        "67108864"
+    };
+    ("DROM") => {
+        0x40000000..0x44000000
+    };
+    (size as str, "DROM") => {
+        "67108864"
+    };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
 ///
@@ -5004,16 +5090,16 @@ macro_rules! for_each_i2s {
         I2S0_O_BCK, I2S0_O_WS, I2S0_I_BCK, I2S0_I_WS, [I2S0_O_SD, I2S0_O_SD1],
         [I2S0_I_SD, I2S0_I_SD1, I2S0_I_SD2, I2S0_I_SD3], true, true, true, true));
         _for_each_inner_i2s!((I2S1, I2s1, I2S1_MCLK, I2S1_O_BCK, I2S1_O_WS, I2S1_I_BCK,
-        I2S1_I_WS, [I2S1_O_SD], [I2S1_I_SD], false, false, false, false));
+        I2S1_I_WS, [I2S1_O_SD], [I2S1_I_SD], true, true, false, false));
         _for_each_inner_i2s!((I2S2, I2s2, I2S2_MCLK, I2S2_O_BCK, I2S2_O_WS, I2S2_I_BCK,
-        I2S2_I_WS, [I2S2_O_SD], [I2S2_I_SD], false, false, false, false));
+        I2S2_I_WS, [I2S2_O_SD], [I2S2_I_SD], true, true, false, false));
         _for_each_inner_i2s!((names(I2S0), (I2S1), (I2S2)));
         _for_each_inner_i2s!((all(I2S0, I2s0, I2S0_MCLK, I2S0_O_BCK, I2S0_O_WS,
         I2S0_I_BCK, I2S0_I_WS, [I2S0_O_SD, I2S0_O_SD1], [I2S0_I_SD, I2S0_I_SD1,
         I2S0_I_SD2, I2S0_I_SD3], true, true, true, true), (I2S1, I2s1, I2S1_MCLK,
-        I2S1_O_BCK, I2S1_O_WS, I2S1_I_BCK, I2S1_I_WS, [I2S1_O_SD], [I2S1_I_SD], false,
-        false, false, false), (I2S2, I2s2, I2S2_MCLK, I2S2_O_BCK, I2S2_O_WS, I2S2_I_BCK,
-        I2S2_I_WS, [I2S2_O_SD], [I2S2_I_SD], false, false, false, false)));
+        I2S1_O_BCK, I2S1_O_WS, I2S1_I_BCK, I2S1_I_WS, [I2S1_O_SD], [I2S1_I_SD], true,
+        true, false, false), (I2S2, I2s2, I2S2_MCLK, I2S2_O_BCK, I2S2_O_WS, I2S2_I_BCK,
+        I2S2_I_WS, [I2S2_O_SD], [I2S2_I_SD], true, true, false, false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.

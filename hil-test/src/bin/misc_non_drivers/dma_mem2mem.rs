@@ -20,6 +20,7 @@ mod tests {
             esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),
             any(esp32c3, esp32s3) => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
             esp32p4 => Mem2Mem::new(peripherals.DMA_CH1),
+            esp32s31 => Mem2Mem::new(peripherals.DMA_AXI_CH1),
             _ => Mem2Mem::new(peripherals.DMA_CH0),
         };
 

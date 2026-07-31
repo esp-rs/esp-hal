@@ -5,9 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>esp-rs Documentation and Resources</title>
+  <title>{{ package }} Documentation</title>
 
-  <link rel="icon" href="/projects/rust/esp-rs.svg" />
+  <link rel="icon" href="../../esp-rs.svg" />
   <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400;1,600&display=swap"
     rel="stylesheet" />
@@ -20,25 +20,23 @@
       margin: 0;
       padding: 40px 20px;
       display: flex;
+      height: 100vh;
+      width: 100vw;
       justify-content: center;
       box-sizing: border-box;
     }
 
     .logo {
       text-align: center;
-      margin-bottom: 42px;
-      font-size: 0.8em;
-      font-weight: 100;
+      margin-bottom: 50px;
+      font-size: 2em;
+      font-weight: 500;
     }
 
     .logo img {
       width: 100px;
       height: auto;
-      margin-bottom: 12px;
-    }
-
-    .logo h2 {
-      margin-top: 0.5rem;
+      margin-bottom: 20px;
     }
 
     .content {
@@ -65,7 +63,7 @@
 
     .crate-name {
       color: #d6991d;
-      width: 220px;
+      width: 120px;
     }
 
     /* Ensure the link color does not change after being clicked */
@@ -83,27 +81,6 @@
       width: 120px;
     }
 
-    .resource {
-      display: flex;
-      align-items: center;
-      padding: 10px;
-      border-bottom: 2px solid #454444;
-    }
-
-    .resource-name {
-      color: #d6991d;
-      width: 400px;
-    }
-
-    /* Ensure the link color does not change after being clicked */
-    .resource-name a:link,
-    .resource-name a:visited,
-    .resource-name a:hover,
-    .resource-name a:active,
-    .resource-name a:focus {
-      color: #d6991d;
-    }
-
     @media screen and (min-height: 650px) {
       body {
         align-items: center;
@@ -115,29 +92,22 @@
 <body>
   <div class="content">
     <div class="logo">
-      <img src="esp-rs.svg" alt="esp-rs logo" />
-      <h2>esp-rs Documentation and Resources</h2>
-      Bare-metal (no_std) hardware abstraction layer for Espressif devices.
+      <img src="../../esp-rs.svg" alt="esp-rs logo" />
+      <div>{{ package }} Documentation</div>
     </div>
 
-    <h2>Resources</h2>
-
-    <div class="resource"><span class="resource-name"><a href="https://docs.espressif.com/projects/rust/book/">The Rust on ESP Book</a></span></div>
-    <div class="resource"><span class="resource-name"><a href="https://docs.espressif.com/projects/rust/no_std-training/">Embedded Rust (no_std) on Espressif Training</a></span></div>
-
-
-    <h2>Package Documentation</h2>
-
-    {%- for meta in metadata %}
+    <h2>{{ package }}</h2>
+{% for meta in metadata %}
     <div class="crate">
       <span class="crate-name">
-        <a href="{{ meta.url }}">{{ meta.name }}</a>
+        <a href="{{ meta.chip }}/{{ meta.package }}/index.html">
+          {{ meta.chip_pretty }}
+        </a>
       </span>
-      <span class="crate-description">Documentation for <code>{{ meta.name }}</code> crate</span>
+      <span class="crate-description">{{ meta.name }} (targeting {{ meta.chip_pretty }})</span>
       <span class="crate-version">{{ meta.version }}</span>
     </div>
-    {%- endfor %}
-
+{% endfor %}
   </div>
 </body>
 

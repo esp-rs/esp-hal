@@ -7,21 +7,106 @@
 //! For more information on these modes, please refer to the documentation in
 //! their respective modules.
 
+use core::marker::PhantomData;
+
 use super::GenericPeripheralGuard;
-use crate::{peripherals::LCD_CAM, system};
+use crate::{
+    Async,
+    Blocking,
+    DriverMode,
+    clock::ll::{ClockTree, LcdCamInstance, LcdCamLcdClockConfig},
+    lcd_cam::{ClockError, calculate_clkm},
+    peripherals::LCD_CAM,
+    system,
+    time::Rate,
+};
 
 pub mod dpi;
 pub mod i8080;
 
-/// Represents an LCD interface.
-pub struct Lcd<'d, Dm: crate::DriverMode> {
+pub(super) struct Inner<'d> {
     /// The `LCD_CAM` peripheral reference for managing the LCD functionality.
-    pub(crate) lcd_cam: LCD_CAM<'d>,
+    pub lcd_cam: LCD_CAM<'d>,
+
+    pub _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
+
+    pub clock_requested: bool,
+}
+
+impl<'a> Drop for Inner<'a> {
+    fn drop(&mut self) {
+        if self.clock_requested {
+            ClockTree::with(|clocks| LcdCamInstance::LcdCam.release_lcd_clock(clocks));
+        }
+    }
+}
+
+/// Represents an LCD interface.
+pub struct Lcd<'d, Dm: DriverMode> {
+    pub(super) inner: Inner<'d>,
 
     /// A marker for the mode of operation (blocking or asynchronous).
-    pub(crate) _mode: core::marker::PhantomData<Dm>,
+    pub(super) _mode: PhantomData<Dm>,
+}
 
-    pub(super) _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
+struct ClockConfig {
+    /// Specifies the clock mode, including polarity and phase settings.
+    pub clock_mode: ClockMode,
+
+    /// The frequency of the pixel clock.
+    pub frequency: Rate,
+}
+
+impl<'d, Dm: DriverMode> Lcd<'d, Dm> {
+    fn regs(&self) -> &crate::pac::lcd_cam::RegisterBlock {
+        self.inner.lcd_cam.register_block()
+    }
+
+    fn configure_clocks(&mut self, config: &ClockConfig) -> Result<(), ClockError> {
+        let sources = property!("clock_tree.lcd_cam.lcd_clock.sclk");
+        let (i, divider) = calculate_clkm(
+            config.frequency.as_hz(),
+            &sources.map(LcdCamInstance::lcd_clock_source_frequency),
+        )?;
+        let clock_config =
+            LcdCamLcdClockConfig::new(sources[i], divider.div_num, divider.div_a, divider.div_b);
+
+        self.regs().lcd_clock().write(|w| unsafe {
+            // Force enable the clock for all configuration registers.
+            w.clk_en().set_bit();
+            w.lcd_clk_equ_sysclk().clear_bit();
+            w.lcd_clkcnt_n().bits(2 - 1); // Must not be 0.
+            w.lcd_ck_idle_edge()
+                .bit(config.clock_mode.polarity == Polarity::IdleHigh);
+            w.lcd_ck_out_edge()
+                .bit(config.clock_mode.phase == Phase::ShiftHigh)
+        });
+        ClockTree::with(|clocks| {
+            LcdCamInstance::LcdCam.configure_lcd_clock(clocks, clock_config);
+            if !self.inner.clock_requested {
+                LcdCamInstance::LcdCam.request_lcd_clock(clocks);
+                self.inner.clock_requested = true;
+            }
+        });
+
+        Ok(())
+    }
+
+    pub(super) fn into_async(self) -> Lcd<'d, Async> {
+        Lcd {
+            inner: self.inner,
+            _mode: PhantomData,
+        }
+    }
+}
+
+impl<'d> Lcd<'d, Async> {
+    pub(super) fn into_blocking(self) -> Lcd<'d, Blocking> {
+        Lcd {
+            inner: self.inner,
+            _mode: PhantomData,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

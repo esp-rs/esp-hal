@@ -13,6 +13,10 @@ cores  = 1
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-c61_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 512
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -30,6 +34,8 @@ memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4085_0000 },
     # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c61/bootloader.ld#L32
     { name = "dram2_uninit", start = 0x4083_EA70, end = 0x4084_EA70 },
+    { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x4200_0000, end = 0x4400_0000 },
 ] }
 
 peripherals = [
@@ -213,7 +219,7 @@ wakeup_sources = {
 }
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5981 }
 trng_supported = false  # TODO
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = true

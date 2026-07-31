@@ -4,7 +4,7 @@
 //! (`wifi`, future `ble`, and `esp_radio` for mixed/coex tests), so domains
 //! stay independent instead of everything being folded into a single binary.
 
-//% CHIP_FILTER(has_wifi_ble): esp32c6
+//% CHIP_FILTER(has_wifi_ble): esp32c6 || esp32s3
 //% HARNESS-FIRMWARE(has_wifi_ble): wifi_ap_support
 
 //% FEATURES: unstable esp-alloc embassy

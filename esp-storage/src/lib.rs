@@ -25,6 +25,9 @@
 #![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![cfg_attr(not(all(test, feature = "emulation")), no_std)]
 
+#[macro_use]
+extern crate esp_metadata_generated;
+
 #[cfg_attr(not(feature = "emulation"), path = "hardware.rs")]
 #[cfg_attr(feature = "emulation", path = "stub.rs")]
 mod chip_specific;

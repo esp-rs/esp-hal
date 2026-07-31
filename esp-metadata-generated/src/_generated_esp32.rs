@@ -253,6 +253,18 @@ macro_rules! property {
     ("lp_io.version") => {
         "esp32"
     };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        256
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(256)
+    };
     ("phy.combo_module") => {
         true
     };
@@ -388,8 +400,28 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(0)
     };
+    ("clock_tree.cpu_pll_div_in") => {
+        [crate ::soc::clocks::CpuPllDivInConfig::Pll, crate
+        ::soc::clocks::CpuPllDivInConfig::Apll]
+    };
+    ("clock_tree.cpu_pll_div.divisor") => {
+        [2, 4]
+    };
+    ("clock_tree.syscon_pre_div_in") => {
+        [crate ::soc::clocks::SysconPreDivInConfig::Xtal, crate
+        ::soc::clocks::SysconPreDivInConfig::RcFast]
+    };
     ("clock_tree.syscon_pre_div.divisor") => {
         (0, 1023)
+    };
+    ("clock_tree.cpu_clk") => {
+        [crate ::soc::clocks::CpuClkConfig::Xtal, crate
+        ::soc::clocks::CpuClkConfig::RcFast, crate ::soc::clocks::CpuClkConfig::Apll,
+        crate ::soc::clocks::CpuClkConfig::Pll]
+    };
+    ("clock_tree.apb_clk") => {
+        [crate ::soc::clocks::ApbClkConfig::Pll80m, crate
+        ::soc::clocks::ApbClkConfig::CpuDiv2, crate ::soc::clocks::ApbClkConfig::Cpu]
     };
     ("clock_tree.ref_tick_pll.divisor") => {
         (0, 255)
@@ -403,11 +435,41 @@ macro_rules! property {
     ("clock_tree.ref_tick_fosc.divisor") => {
         (0, 255)
     };
+    ("clock_tree.ref_tick") => {
+        [crate ::soc::clocks::RefTickConfig::Pll, crate
+        ::soc::clocks::RefTickConfig::Apll, crate ::soc::clocks::RefTickConfig::Xtal,
+        crate ::soc::clocks::RefTickConfig::Fosc]
+    };
+    ("clock_tree.rtc_slow_clk") => {
+        [crate ::soc::clocks::RtcSlowClkConfig::Xtal32k, crate
+        ::soc::clocks::RtcSlowClkConfig::RcSlow, crate
+        ::soc::clocks::RtcSlowClkConfig::RcFast]
+    };
+    ("clock_tree.rtc_fast_clk") => {
+        [crate ::soc::clocks::RtcFastClkConfig::Xtal, crate
+        ::soc::clocks::RtcFastClkConfig::Rc]
+    };
+    ("clock_tree.timg_calibration_clock") => {
+        [crate ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::RcFastDivClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::Xtal32kClk]
+    };
+    ("clock_tree.i2c.function_clock.sclk") => {
+        [crate ::soc::clocks::I2cFunctionClockSclk::Apb]
+    };
+    ("clock_tree.uart.function_clock.sclk") => {
+        [crate ::soc::clocks::UartFunctionClockSclk::Apb, crate
+        ::soc::clocks::UartFunctionClockSclk::RefTick]
+    };
     ("clock_tree.uart.baud_rate_generator.fractional") => {
         (0, 15)
     };
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 1048575)
+    };
+    ("clock_tree.rmt.sclk") => {
+        [crate ::soc::clocks::RmtSclkConfig::RefTick, crate
+        ::soc::clocks::RmtSclkConfig::ApbClk]
     };
     ("spi_master.version") => {
         1
@@ -4092,6 +4154,18 @@ macro_rules! memory_range {
     (size as str, "DRAM2_UNINIT") => {
         "98768"
     };
+    ("IROM") => {
+        0x400D0000..0x40400000
+    };
+    (size as str, "IROM") => {
+        "3342336"
+    };
+    ("DROM") => {
+        0x3F400000..0x3F800000
+    };
+    (size as str, "DROM") => {
+        "4194304"
+    };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
 ///
@@ -4155,11 +4229,11 @@ macro_rules! for_each_i2s {
         _for_each_inner_i2s!((I2S0, I2s0, __NO_MCLK, I2S0O_BCK, I2S0O_WS, I2S0I_BCK,
         I2S0I_WS, [I2S0O_DATA_23], [I2S0I_DATA_15], true, true, true, true));
         _for_each_inner_i2s!((I2S1, I2s1, __NO_MCLK, I2S1O_BCK, I2S1O_WS, I2S1I_BCK,
-        I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], false, false, false, false));
+        I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], true, false, false, false));
         _for_each_inner_i2s!((names(I2S0), (I2S1))); _for_each_inner_i2s!((all(I2S0,
         I2s0, __NO_MCLK, I2S0O_BCK, I2S0O_WS, I2S0I_BCK, I2S0I_WS, [I2S0O_DATA_23],
         [I2S0I_DATA_15], true, true, true, true), (I2S1, I2s1, __NO_MCLK, I2S1O_BCK,
-        I2S1O_WS, I2S1I_BCK, I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], false, false,
+        I2S1O_WS, I2S1I_BCK, I2S1I_WS, [I2S1O_DATA_23], [I2S1I_DATA_15], true, false,
         false, false)));
     };
 }

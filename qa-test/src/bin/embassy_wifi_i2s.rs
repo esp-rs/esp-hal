@@ -144,10 +144,10 @@ async fn main(spawner: Spawner) {
     esp_rtos::CurrentThreadHandle::get().set_priority(30);
 
     // I2S config (TDM Philips, 32-bit data per channel, stereo)
-    #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-    let dma_channel = peripherals.DMA_I2S0;
-    #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
-    let dma_channel = peripherals.DMA_CH0;
+    let dma_channel = cfg_select! {
+        i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,
+        _ => peripherals.DMA_CH0,
+    };
     let buffer = esp_hal::dma_rx_stream_buffer!(I2S_BUFFER_SIZE, 2048);
 
     let i2s_cfg = TdmConfig::new_tdm_philips()

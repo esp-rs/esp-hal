@@ -8,6 +8,8 @@
     reason = "Clock-tree types come from generated macro code"
 )]
 
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
 
 use crate::{
@@ -103,11 +105,25 @@ impl ClockConfig {
     }
 
     pub(crate) fn configure(self, clocks: &mut ClockTree) {
+        // CPU_ROOT_CLK and the CPU, memory, AHB, and APB dividers share one
+        // update signal. Write the complete configuration before latching it;
+        // applying each change separately can temporarily overclock the buses.
+        BUS_CLOCK_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
         self.apply(clocks);
+        BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
+
+        update_bus_clocks();
+        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
     }
 }
 
+static BUS_CLOCK_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);
+
 fn update_bus_clocks() {
+    if BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        return;
+    }
+
     HP_SYS_CLKRST::regs()
         .root_clk_ctrl0()
         .modify(|_, w| w.soc_clk_div_update().set_bit());
@@ -148,19 +164,19 @@ fn configure_bbpll_clk_impl(
     // The S31 BBPLL is fixed at 480 MHz. Program its documented divider taps.
     HP_SYS_CLKRST::regs()
         .ref_20m_ctrl0()
-        .modify(|_, w| unsafe { w.ref_20m_clk_div_num().bits(23) });
+        .modify(|_, w| unsafe { w.clk_div_num().bits(23) });
     HP_SYS_CLKRST::regs()
         .ref_80m_ctrl0()
-        .modify(|_, w| unsafe { w.ref_80m_clk_div_num().bits(5) });
+        .modify(|_, w| unsafe { w.clk_div_num().bits(5) });
     HP_SYS_CLKRST::regs()
         .ref_120m_ctrl0()
-        .modify(|_, w| unsafe { w.ref_120m_clk_div_num().bits(3) });
+        .modify(|_, w| unsafe { w.clk_div_num().bits(3) });
     HP_SYS_CLKRST::regs()
         .ref_160m_ctrl0()
-        .modify(|_, w| unsafe { w.ref_160m_clk_div_num().bits(2) });
+        .modify(|_, w| unsafe { w.clk_div_num().bits(2) });
     HP_SYS_CLKRST::regs()
         .ref_240m_ctrl0()
-        .modify(|_, w| unsafe { w.ref_240m_clk_div_num().bits(1) });
+        .modify(|_, w| unsafe { w.clk_div_num().bits(1) });
 }
 
 fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -246,20 +262,20 @@ fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
 }
 
 macro_rules! pll_gate {
-    ($name:ident, $register:ident, $field:ident) => {
+    ($name:ident, $register:ident) => {
         fn $name(_clocks: &mut ClockTree, en: bool) {
             HP_SYS_CLKRST::regs()
                 .$register()
-                .modify(|_, w| w.$field().bit(en));
+                .modify(|_, w| w.clk_en().bit(en));
         }
     };
 }
 
-pll_gate!(enable_pll_f20m_impl, ref_20m_ctrl0, ref_20m_clk_en);
-pll_gate!(enable_pll_f80m_impl, ref_80m_ctrl0, ref_80m_clk_en);
-pll_gate!(enable_pll_f120m_impl, ref_120m_ctrl0, ref_120m_clk_en);
-pll_gate!(enable_pll_f160m_impl, ref_160m_ctrl0, ref_160m_clk_en);
-pll_gate!(enable_pll_f240m_impl, ref_240m_ctrl0, ref_240m_clk_en);
+pll_gate!(enable_pll_f20m_impl, ref_20m_ctrl0);
+pll_gate!(enable_pll_f80m_impl, ref_80m_ctrl0);
+pll_gate!(enable_pll_f120m_impl, ref_120m_ctrl0);
+pll_gate!(enable_pll_f160m_impl, ref_160m_ctrl0);
+pll_gate!(enable_pll_f240m_impl, ref_240m_ctrl0);
 
 fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do here
@@ -299,13 +315,16 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, n
             w.cpu_clk_div_numerator().bits(0);
             w.cpu_clk_div_denominator().bits(0)
         });
-    update_bus_clocks();
-    // MEM_CLK is a separate CPU branch and is limited to 160 MHz.
+    // MEM_CLK is a separate CPU branch and is limited to 160 MHz. Both
+    // dividers must be latched together when raising the CPU frequency.
     HP_SYS_CLKRST::regs()
         .mem_freq_ctrl0()
         .modify(|_, w| w.mem_clk_div_num().bit(cpu_clk_frequency() > 160_000_000));
     update_bus_clocks();
-    ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+
+    if !BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+    }
 }
 
 fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -379,7 +398,7 @@ fn configure_lp_slow_clk_impl(
 fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, en: bool) {
     HP_SYS_CLKRST::regs()
         .timergrp0_tgrt_ctrl0()
-        .modify(|_, w| w.timergrp0_tgrt_clk_en().bit(en));
+        .modify(|_, w| w.clk_en().bit(en));
 }
 
 fn configure_timg_calibration_clock_impl(
@@ -395,44 +414,9 @@ fn configure_timg_calibration_clock_impl(
     HP_SYS_CLKRST::regs()
         .timergrp0_tgrt_ctrl0()
         .modify(|_, w| unsafe {
-            w.timergrp0_tgrt_clk_src_sel().bits(source);
-            w.timergrp0_tgrt_clk_div_num().bits(divider - 1)
+            w.clk_src_sel().bits(source);
+            w.clk_div_num().bits(divider - 1)
         });
-}
-
-impl I2cInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do here
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old: Option<I2cFunctionClockConfig>,
-        new: I2cFunctionClockConfig,
-    ) {
-        HP_SYS_CLKRST::regs().i2c0_ctrl0().modify(|_, w| unsafe {
-            w.i2c0_clk_src_sel()
-                .bit(matches!(new.sclk(), I2cFunctionClockSclk::RcFast));
-            w.i2c0_clk_div_num().bits(new.div_num() as u8);
-            w.i2c0_clk_div_numerator().bits(0);
-            w.i2c0_clk_div_denominator().bits(0)
-        });
-    }
-}
-
-impl SpiInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do here
-    }
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old: Option<SpiFunctionClockConfig>,
-        _new: SpiFunctionClockConfig,
-    ) {
-        // TODO: Configure the GPSPI source and divider when SPI support is enabled.
-    }
 }
 
 impl TimgInstance {
@@ -458,80 +442,5 @@ impl TimgInstance {
         _new: TimgWdtClockConfig,
     ) {
         // TODO: Configure the selected timer group's watchdog-clock source.
-    }
-}
-
-impl UartInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let regs = HP_SYS_CLKRST::regs();
-        match self {
-            UartInstance::Uart0 => regs.uart0_ctrl0().modify(|_, w| w.uart0_clk_en().bit(en)),
-            UartInstance::Uart1 => regs.uart1_ctrl0().modify(|_, w| w.uart1_clk_en().bit(en)),
-            UartInstance::Uart2 => regs.uart2_ctrl0().modify(|_, w| w.uart2_clk_en().bit(en)),
-            UartInstance::Uart3 => regs.uart3_ctrl0().modify(|_, w| w.uart3_clk_en().bit(en)),
-        };
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old: Option<UartFunctionClockConfig>,
-        new: UartFunctionClockConfig,
-    ) {
-        let source = match new.sclk() {
-            UartFunctionClockSclk::Xtal => 0,
-            UartFunctionClockSclk::RcFast => 1,
-            UartFunctionClockSclk::PllF80m => 2,
-        };
-        let divider = new.div_num() as u8;
-        let regs = HP_SYS_CLKRST::regs();
-        match self {
-            UartInstance::Uart0 => regs.uart0_ctrl0().modify(|_, w| unsafe {
-                w.uart0_clk_src_sel().bits(source);
-                w.uart0_sclk_div_num().bits(divider);
-                w.uart0_sclk_div_numerator().bits(0);
-                w.uart0_sclk_div_denominator().bits(0)
-            }),
-            UartInstance::Uart1 => regs.uart1_ctrl0().modify(|_, w| unsafe {
-                w.uart1_clk_src_sel().bits(source);
-                w.uart1_sclk_div_num().bits(divider);
-                w.uart1_sclk_div_numerator().bits(0);
-                w.uart1_sclk_div_denominator().bits(0)
-            }),
-            UartInstance::Uart2 => regs.uart2_ctrl0().modify(|_, w| unsafe {
-                w.uart2_clk_src_sel().bits(source);
-                w.uart2_sclk_div_num().bits(divider);
-                w.uart2_sclk_div_numerator().bits(0);
-                w.uart2_sclk_div_denominator().bits(0)
-            }),
-            UartInstance::Uart3 => regs.uart3_ctrl0().modify(|_, w| unsafe {
-                w.uart3_clk_src_sel().bits(source);
-                w.uart3_sclk_div_num().bits(divider);
-                w.uart3_sclk_div_numerator().bits(0);
-                w.uart3_sclk_div_denominator().bits(0)
-            }),
-        };
-    }
-
-    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // The baud-rate generator is enabled by the UART function clock.
-    }
-
-    fn configure_baud_rate_generator_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old: Option<UartBaudRateGeneratorConfig>,
-        new: UartBaudRateGeneratorConfig,
-    ) {
-        let regs = match self {
-            UartInstance::Uart0 => crate::peripherals::UART0::regs(),
-            UartInstance::Uart1 => crate::peripherals::UART1::regs(),
-            UartInstance::Uart2 => crate::peripherals::UART2::regs(),
-            UartInstance::Uart3 => crate::peripherals::UART3::regs(),
-        };
-        regs.clkdiv().write(|w| unsafe {
-            w.clkdiv().bits(new.integral() as u16);
-            w.frag().bits(new.fractional() as u8)
-        });
     }
 }

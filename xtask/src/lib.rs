@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use anyhow::{Context, Result, anyhow};
@@ -1016,6 +1017,39 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     }
 }
 
+/// How many times an operation that writes source files is attempted before
+/// giving up.
+const WRITE_ATTEMPTS: usize = 5;
+
+/// Runs `operation`, retrying up to [`WRITE_ATTEMPTS`] times.
+///
+/// Writing files can transiently fail if another process (an editor, a virus
+/// scanner, ...) holds a lock on them, so give the lock a chance to disappear
+/// before propagating the error.
+fn retry_on_failure<T>(what: &str, mut operation: impl FnMut() -> Result<T>) -> Result<T> {
+    for attempt in 1..=WRITE_ATTEMPTS {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error) if attempt < WRITE_ATTEMPTS => {
+                log::warn!("{what} failed (attempt {attempt}/{WRITE_ATTEMPTS}), retrying...");
+                log::debug!("{error:?}");
+                std::thread::sleep(Duration::from_millis(200 * attempt as u64));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    unreachable!()
+}
+
+/// Write `contents` to `path`, retrying if the file is temporarily locked.
+fn write_file(path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
+    let contents = contents.as_ref();
+    retry_on_failure(&format!("Writing {}", path.display()), || {
+        fs::write(path, contents).with_context(|| format!("Failed to write {}", path.display()))
+    })
+}
+
 /// Format a package directory in the workspace using `cargo fmt`.
 pub fn format_package_path(
     workspace: &Path,
@@ -1061,7 +1095,13 @@ pub fn format_package_path(
 
     log::debug!("{cargo_args:#?}");
 
-    cargo::run(&cargo_args, &package_path)
+    if check {
+        return cargo::run(&cargo_args, &package_path);
+    }
+
+    retry_on_failure(&format!("Formatting {}", package_path.display()), || {
+        cargo::run(&cargo_args, &package_path)
+    })
 }
 
 /// Recursively format all `.yml` files in the `.github/` directory.
@@ -1083,7 +1123,7 @@ pub fn format_yml<P: AsRef<Path>>(check: bool, path: P) -> Result<()> {
                 }
 
                 log::info!("Fixing format: {:?}", path);
-                fs::write(path, formatted)?;
+                write_file(path, formatted)?;
             }
 
             Ok(())
@@ -1156,7 +1196,7 @@ fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
     );
     source.push_str(&prettyplease::unparse(&syntax_tree));
 
-    std::fs::write(out_path, source)?;
+    write_file(out_path, source)?;
 
     Ok(())
 }
@@ -1201,7 +1241,7 @@ fn update_readme_tables(workspace: &Path) -> Result<()> {
         }
     }
 
-    std::fs::write(workspace.join("esp-hal").join("README.md"), output)?;
+    write_file(&workspace.join("esp-hal").join("README.md"), output)?;
 
     Ok(())
 }

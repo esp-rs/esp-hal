@@ -13,6 +13,10 @@ cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_datasheet_en.pdf"
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 512
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -49,6 +53,8 @@ has_swd_watchdog = true
 memory_map = { ranges = [
     { name = "dram", start = 0x4FF4_0000, end = 0x4FFC_0000 },
     { name = "dram2_uninit", start = 0x4FF0_0000, end = 0x4FF4_0000 },
+    { name = "irom", start = 0x4000_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x4000_0000, end = 0x4400_0000 },
 ] }
 
 peripherals = [
@@ -318,6 +324,8 @@ instances = [
         ws_rx = "I2S1_I_WS",
         dout = ["I2S1_O_SD"],
         din = ["I2S1_I_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
     },
     {
         name = "i2s2",
@@ -329,6 +337,8 @@ instances = [
         ws_rx = "I2S2_I_WS",
         dout = ["I2S2_O_SD"],
         din = ["I2S2_I_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
     },
 ]
 
@@ -352,7 +362,7 @@ support_status = "not_supported"  # LCD path of LCD_CAM block
 # left out until those are mapped from P4 TRM. README row stays blank.
 
 [device.rng]
-support_status = "partial"  # TRNG
+support_status = { status = "partial", issue = 5982 }
 trng_supported = false  # TODO
 apb_cycle_wait_num = 16  # placeholder
 is_lp_sys = true
@@ -440,7 +450,16 @@ key_length = { options = [
 
 [device.sha]
 support_status = "partial"
-algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
+algo = {
+    sha1 = 0,
+    sha224 = 1,
+    sha256 = 2,
+    sha384 = 3,
+    sha512 = 4,
+    sha512_224 = 5,
+    sha512_256 = 6,
+    sha512_t = 7,
+}
 
 [device.psram]
 extmem_origin = 0x4800_0000

@@ -235,6 +235,18 @@ macro_rules! property {
     ("lp_io.version") => {
         "v3"
     };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        64
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(64)
+    };
     ("phy.combo_module") => {
         true
     };
@@ -289,11 +301,67 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(31)
     };
+    ("clock_tree.system_pre_div_in") => {
+        [crate ::soc::clocks::SystemPreDivInConfig::Xtal, crate
+        ::soc::clocks::SystemPreDivInConfig::RcFast]
+    };
     ("clock_tree.system_pre_div.divisor") => {
         (0, 1023)
     };
+    ("clock_tree.cpu_pll_div.divisor") => {
+        [4, 6]
+    };
+    ("clock_tree.cpu_clk") => {
+        [crate ::soc::clocks::CpuClkConfig::Xtal, crate
+        ::soc::clocks::CpuClkConfig::RcFast, crate ::soc::clocks::CpuClkConfig::Pll]
+    };
+    ("clock_tree.apb_clk") => {
+        [crate ::soc::clocks::ApbClkConfig::Pll40m, crate
+        ::soc::clocks::ApbClkConfig::Cpu]
+    };
+    ("clock_tree.crypto_clk") => {
+        [crate ::soc::clocks::CryptoClkConfig::Pll80m, crate
+        ::soc::clocks::CryptoClkConfig::Cpu]
+    };
+    ("clock_tree.mspi_clk") => {
+        [crate ::soc::clocks::MspiClkConfig::CpuDiv2, crate
+        ::soc::clocks::MspiClkConfig::Cpu]
+    };
     ("clock_tree.rc_fast_clk_div_n.divisor") => {
         (0, 3)
+    };
+    ("clock_tree.rtc_slow_clk") => {
+        [crate ::soc::clocks::RtcSlowClkConfig::OscSlow, crate
+        ::soc::clocks::RtcSlowClkConfig::RcSlow, crate
+        ::soc::clocks::RtcSlowClkConfig::RcFast]
+    };
+    ("clock_tree.rtc_fast_clk") => {
+        [crate ::soc::clocks::RtcFastClkConfig::Xtal, crate
+        ::soc::clocks::RtcFastClkConfig::Rc]
+    };
+    ("clock_tree.low_power_clk") => {
+        [crate ::soc::clocks::LowPowerClkConfig::Xtal, crate
+        ::soc::clocks::LowPowerClkConfig::RcFast, crate
+        ::soc::clocks::LowPowerClkConfig::OscSlow, crate
+        ::soc::clocks::LowPowerClkConfig::RtcSlow]
+    };
+    ("clock_tree.timg_calibration_clock") => {
+        [crate ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::RcFastDivClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::Osc32kClk]
+    };
+    ("clock_tree.timg.function_clock") => {
+        [crate ::soc::clocks::TimgFunctionClockConfig::XtalClk, crate
+        ::soc::clocks::TimgFunctionClockConfig::Pll40m]
+    };
+    ("clock_tree.timg.wdt_clock") => {
+        [crate ::soc::clocks::TimgWdtClockConfig::Pll40m, crate
+        ::soc::clocks::TimgWdtClockConfig::XtalClk]
+    };
+    ("clock_tree.uart.function_clock.sclk") => {
+        [crate ::soc::clocks::UartFunctionClockSclk::PllF40m, crate
+        ::soc::clocks::UartFunctionClockSclk::RcFast, crate
+        ::soc::clocks::UartFunctionClockSclk::Xtal]
     };
     ("clock_tree.uart.function_clock.div_num") => {
         (0, 255)
@@ -304,8 +372,16 @@ macro_rules! property {
     ("clock_tree.uart.baud_rate_generator.integral") => {
         (0, 4095)
     };
+    ("clock_tree.i2c.function_clock.sclk") => {
+        [crate ::soc::clocks::I2cFunctionClockSclk::Xtal, crate
+        ::soc::clocks::I2cFunctionClockSclk::RcFast]
+    };
     ("clock_tree.i2c.function_clock.div_num") => {
         (0, 255)
+    };
+    ("clock_tree.spi.function_clock") => {
+        [crate ::soc::clocks::SpiFunctionClockConfig::Xtal, crate
+        ::soc::clocks::SpiFunctionClockConfig::Pll40m]
     };
     ("spi_master.version") => {
         3
@@ -3487,6 +3563,18 @@ macro_rules! memory_range {
     };
     (size as str, "DRAM2_UNINIT") => {
         "66416"
+    };
+    ("IROM") => {
+        0x42000000..0x42400000
+    };
+    (size as str, "IROM") => {
+        "4194304"
+    };
+    ("DROM") => {
+        0x3C000000..0x3C400000
+    };
+    (size as str, "DROM") => {
+        "4194304"
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.

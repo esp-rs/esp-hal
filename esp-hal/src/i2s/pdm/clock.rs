@@ -1,11 +1,7 @@
 //! PDM clock calculations.
 
 use super::{PdmDownsampleRate, PdmError, PdmRxClockConfig, PdmTxClockConfig};
-use crate::{
-    i2s::master::{I2S_LL_MCLK_DIVIDER_MAX, private::I2sClockDividers},
-    soc,
-    time::Rate,
-};
+use crate::{i2s::master::private::I2sClockDividers, soc, time::Rate};
 
 pub(crate) const PDM_BCK_FACTOR: u32 = 64;
 pub(crate) const PDM_TX_BCLK_DIV_MIN: u32 = 8;
@@ -20,75 +16,19 @@ pub(crate) struct PdmRxClockResult {
     pub dividers: I2sClockDividers,
 }
 
-fn gcd(mut a: u32, mut b: u32) -> u32 {
-    while b != 0 {
-        (a, b) = (b, a % b);
-    }
-    a
-}
-
 fn calculate_mclk_dividers(sclk: u32, mclk: u32) -> Result<I2sClockDividers, PdmError> {
     // Require `sclk > mclk * 1.99` — use integer math to avoid soft-float.
     if (sclk as u64) * 100 <= (mclk as u64) * 199 {
         return Err(PdmError::InvalidClock);
     }
 
-    let mut mclk_divider = sclk / mclk;
-    if mclk_divider >= 256 {
+    let dividers = I2sClockDividers::from_frequencies(sclk, mclk, 0);
+
+    if dividers.mclk_divider >= 256 {
         return Err(PdmError::InvalidClock);
     }
 
-    let freq_diff = sclk.abs_diff(mclk * mclk_divider);
-    let mut denominator = 0u32;
-    let mut numerator = 0u32;
-
-    if freq_diff != 0 {
-        let decimal = freq_diff as u64 * 10000 / mclk as u64;
-        if decimal > 1250000 / 126 {
-            mclk_divider += 1;
-            if mclk_divider >= 256 {
-                return Err(PdmError::InvalidClock);
-            }
-        } else {
-            let max_fract = I2S_LL_MCLK_DIVIDER_MAX as u32;
-            let common = gcd(freq_diff, mclk);
-            let exact_num = freq_diff / common;
-            let exact_den = mclk / common;
-            if (2..=max_fract).contains(&exact_den) {
-                numerator = exact_num;
-                denominator = exact_den;
-            } else {
-                let mut min = u32::MAX;
-                for a in 2..=max_fract {
-                    // Best rational approximation of `freq_diff / mclk` with denominator `a`.
-                    let b = ((freq_diff as u64 * a as u64) + mclk as u64 / 2) / mclk as u64;
-                    if b == 0 || b >= a as u64 {
-                        continue;
-                    }
-                    let ma = freq_diff as u64 * a as u64;
-                    let mb = mclk as u64 * b;
-                    if ma == mb {
-                        denominator = a;
-                        numerator = b as u32;
-                        break;
-                    }
-                    let err = ma.abs_diff(mb);
-                    if err < min as u64 {
-                        denominator = a;
-                        numerator = b as u32;
-                        min = err as u32;
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(I2sClockDividers {
-        mclk_divider,
-        bclk_divider: 0,
-        denominator,
-        numerator,
-    })
+    Ok(dividers)
 }
 
 pub(crate) fn calculate_tx_clock(

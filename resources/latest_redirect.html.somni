@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <title>Redirecting...</title>
 <script>
-{#-
+/*
   nginx sends users here as …/latest/?path=<decoded remainder>. We merge `path` onto `base`
   (../<semver>/…) only when it looks like a rustdoc-relative path.
--#}
+*/
 (function () {
   var base = "{{ base }}";
   var pathFromQuery = new URLSearchParams(location.search).get("path");

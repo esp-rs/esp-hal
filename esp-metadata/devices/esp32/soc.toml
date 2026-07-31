@@ -13,6 +13,10 @@ cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
 
+[device.mmu]
+page_size = 0x10000
+entry_num = 256
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -24,6 +28,8 @@ multi_core_enabled = true
 memory_map = { ranges = [
     { name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 },
     { name = "dram2_uninit", start = 0x3FFE_7E30, end = 0x4000_0000 },
+    { name = "irom", start = 0x400D_0000, end = 0x4040_0000 },
+    { name = "drom", start = 0x3F40_0000, end = 0x3F80_0000 },
 ] }
 
 peripherals = [
@@ -271,7 +277,7 @@ support_status = "not_supported"
 support_status = "partial"
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
@@ -325,6 +331,7 @@ instances = [
         ws_rx = "I2S1I_WS",
         dout = ["I2S1O_DATA_23"],
         din = ["I2S1I_DATA_15"],
+        pdm_tx = true,
     },
 ]
 

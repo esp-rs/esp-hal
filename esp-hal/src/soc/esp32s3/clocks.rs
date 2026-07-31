@@ -17,7 +17,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LPWR, RMT, SYSTEM, TIMG0, TIMG1},
+    peripherals::{I2C_ANA_MST, LCD_CAM, LPWR, RMT, SYSTEM, TIMG0, TIMG1},
     soc::regi2c,
     time::Rate,
 };
@@ -769,6 +769,60 @@ fn configure_timg_calibration_clock_impl(
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
+}
+
+impl LcdCamInstance {
+    // LCD_CAM_LCD_CLOCK
+
+    fn enable_lcd_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // The selector doubles as the clock gate, so gating is handled by
+        // `configure_lcd_clock_impl`.
+    }
+
+    fn configure_lcd_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamLcdClockConfig>,
+        new_config: LcdCamLcdClockConfig,
+    ) {
+        LCD_CAM::regs().lcd_clock().modify(|_, w| unsafe {
+            // The divider is 8 bits wide, the maximum divisor of 256 is encoded as 0.
+            w.lcd_clkm_div_num().bits(new_config.div_num() as u8);
+            w.lcd_clkm_div_a().bits(new_config.div_a() as u8);
+            w.lcd_clkm_div_b().bits(new_config.div_b() as u8);
+            w.lcd_clk_sel().bits(match new_config.sclk() {
+                LcdCamLcdClockSclk::XtalClk => 1,
+                LcdCamLcdClockSclk::PllD2 => 2,
+                LcdCamLcdClockSclk::Pll160m => 3,
+            })
+        });
+    }
+
+    // LCD_CAM_CAM_CLOCK
+
+    fn enable_cam_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // The selector doubles as the clock gate, so gating is handled by
+        // `configure_cam_clock_impl`.
+    }
+
+    fn configure_cam_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamCamClockConfig>,
+        new_config: LcdCamCamClockConfig,
+    ) {
+        LCD_CAM::regs().cam_ctrl().modify(|_, w| unsafe {
+            // The divider is 8 bits wide, the maximum divisor of 256 is encoded as 0.
+            w.cam_clkm_div_num().bits(new_config.div_num() as u8);
+            w.cam_clkm_div_a().bits(new_config.div_a() as u8);
+            w.cam_clkm_div_b().bits(new_config.div_b() as u8);
+            w.cam_clk_sel().bits(match new_config.sclk() {
+                LcdCamCamClockSclk::XtalClk => 1,
+                LcdCamCamClockSclk::PllD2 => 2,
+                LcdCamCamClockSclk::Pll160m => 3,
+            })
+        });
+    }
 }
 
 impl McpwmInstance {

@@ -560,6 +560,17 @@ driver_configs![
         name: "MCPWM",
         properties: {}
     },
+    MmuProperties {
+        driver: mmu,
+        name: "MMU",
+        hide_from_peri_table: true,
+        properties: {
+            /// MMU page size in bytes.
+            page_size: u32,
+            /// Total number of MMU table entries.
+            entry_num: u32,
+        }
+    },
     MipiDsiProperties {
         driver: mipi_dsi,
         name: "MIPI-DSI",
