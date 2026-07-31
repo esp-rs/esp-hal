@@ -475,6 +475,11 @@ macro_rules! property {
         [crate ::soc::clocks::MspiFastClkConfig::Hs, crate
         ::soc::clocks::MspiFastClkConfig::Ls]
     };
+    ("clock_tree.iomux_function_clock") => {
+        [crate ::soc::clocks::IomuxFunctionClockConfig::PllF80m, crate
+        ::soc::clocks::IomuxFunctionClockConfig::RcFastClk, crate
+        ::soc::clocks::IomuxFunctionClockConfig::XtalClk]
+    };
     ("clock_tree.ledc_sclk") => {
         [crate ::soc::clocks::LedcSclkConfig::PllF80m, crate
         ::soc::clocks::LedcSclkConfig::RcFastClk, crate

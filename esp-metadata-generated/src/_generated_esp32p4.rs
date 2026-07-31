@@ -370,6 +370,10 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(63)
     };
+    ("clock_tree.iomux_function_clock") => {
+        [crate ::soc::clocks::IomuxFunctionClockConfig::XtalClk, crate
+        ::soc::clocks::IomuxFunctionClockConfig::PllF80m]
+    };
     ("clock_tree.cpu_root_clk") => {
         [crate ::soc::clocks::CpuRootClkConfig::Xtal, crate
         ::soc::clocks::CpuRootClkConfig::Cpll, crate

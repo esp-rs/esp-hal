@@ -424,6 +424,10 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(31)
     };
+    ("clock_tree.iomux_function_clock") => {
+        [crate ::soc::clocks::IomuxFunctionClockConfig::XtalClk, crate
+        ::soc::clocks::IomuxFunctionClockConfig::PllF48m]
+    };
     ("clock_tree.hp_root_clk") => {
         [crate ::soc::clocks::HpRootClkConfig::Pll96, crate
         ::soc::clocks::HpRootClkConfig::Pll64, crate

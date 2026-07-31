@@ -457,6 +457,11 @@ macro_rules! property {
         ::soc::clocks::CryptoClkConfig::Fosc, crate
         ::soc::clocks::CryptoClkConfig::PllF480m]
     };
+    ("clock_tree.iomux_function_clock") => {
+        [crate ::soc::clocks::IomuxFunctionClockConfig::XtalClk, crate
+        ::soc::clocks::IomuxFunctionClockConfig::RcFastClk, crate
+        ::soc::clocks::IomuxFunctionClockConfig::PllF80m]
+    };
     ("clock_tree.timg_calibration_clock") => {
         [crate ::soc::clocks::TimgCalibrationClockConfig::OscSlowClk, crate
         ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
