@@ -95,10 +95,8 @@ impl FlashAccess for MockFlash<'_> {
             let len = bytes.len().min((Self::SECTOR_SIZE - data_offset) as usize);
 
             Self::with_flash(|flash| {
-                let sector = aligned_offset as usize;
-                let sector_end = sector + Self::SECTOR_SIZE as usize;
-                flash[sector..sector_end].fill(ERASE_BYTE);
-                flash[sector + data_offset as usize..][..len].copy_from_slice(&bytes[..len]);
+                flash[aligned_offset as usize + data_offset as usize..][..len]
+                    .copy_from_slice(&bytes[..len]);
             });
 
             aligned_offset += Self::SECTOR_SIZE;
