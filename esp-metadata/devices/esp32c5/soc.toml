@@ -48,7 +48,7 @@ peripherals = [
     { name = "EFUSE", hidden = true },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "GPIO" },
-    { name = "GPIO_SD", pac = "GPIO_EXT" },
+    { name = "GPIO_SD", pac = "GPIO_EXT", clock_group = "SDM" },
     # { name = "HINF" },
     { name = "HMAC" },
     { name = "HP_APM" },

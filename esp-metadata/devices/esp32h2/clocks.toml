@@ -61,6 +61,9 @@ system_clocks = { clock_tree = [
         ], div_num = "0 .. 0x100" } },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
     ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
+    ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", wake_locking = true, variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK", default = true },
@@ -135,7 +138,7 @@ peripheral_clocks = { templates = [
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Rmt" },
     { name = "Ledc" },
-    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable)); crate::peripherals::GPIO_SD::regs().sigmadelta_misc().modify(|_, w| w.function_clk_en().bit(enable));", rst_template = "let _ = reset;" } },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Systimer", keep_enabled = true },

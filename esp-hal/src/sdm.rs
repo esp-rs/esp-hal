@@ -33,7 +33,7 @@
 use core::{fmt, marker::PhantomData};
 
 #[cfg(soc_has_clock_node_iomux_function_clock)]
-use crate::soc::clocks::{self, ClockTree, IomuxFunctionClockConfig};
+use crate::soc::clocks::{self, IomuxFunctionClockConfig};
 use crate::{
     gpio::{
         OutputConfig,
@@ -42,6 +42,7 @@ use crate::{
         interconnect::{OutputSignal as GpioOutputSignal, PeripheralOutput},
     },
     peripherals::GPIO_SD,
+    soc::clocks::{ClockTree, SdmInstance},
     system::{GenericPeripheralGuard, Peripheral},
     time::Rate,
 };
@@ -352,43 +353,41 @@ fn connect_pin<'d>(channel: usize, pin: impl PeripheralOutput<'d>) -> PinGuard {
 
 #[derive(Debug)]
 struct SdmClockGuard {
+    // Fields are dropped in declaration order. Release the function clock
+    // while the GPIO_SD register clock is still available.
+    _function_clock: SdmFunctionClockGuard,
     _peripheral: GenericPeripheralGuard<{ Peripheral::GpioSd as u8 }>,
-    _iomux: IomuxClockGuard,
 }
 
 impl SdmClockGuard {
     fn new() -> Self {
-        let iomux = IomuxClockGuard::new();
+        let peripheral = GenericPeripheralGuard::new();
+        let function_clock = SdmFunctionClockGuard::new();
         Self {
-            _peripheral: GenericPeripheralGuard::new(),
-            _iomux: iomux,
+            _function_clock: function_clock,
+            _peripheral: peripheral,
         }
     }
 }
 
 #[derive(Debug)]
-struct IomuxClockGuard;
+struct SdmFunctionClockGuard;
 
-impl IomuxClockGuard {
+impl SdmFunctionClockGuard {
     fn new() -> Self {
-        #[cfg(soc_has_clock_node_iomux_function_clock)]
-        ClockTree::with(clocks::request_iomux_function_clock);
+        ClockTree::with(|clocks| SdmInstance::GpioSd.request_function_clock(clocks));
         Self
     }
 }
 
-impl Drop for IomuxClockGuard {
+impl Drop for SdmFunctionClockGuard {
     fn drop(&mut self) {
-        #[cfg(soc_has_clock_node_iomux_function_clock)]
-        ClockTree::with(clocks::release_iomux_function_clock);
+        ClockTree::with(|clocks| SdmInstance::GpioSd.release_function_clock(clocks));
     }
 }
 
 fn prescaler_from_frequency(frequency: Rate) -> Result<u16, Error> {
-    #[cfg(soc_has_clock_node_iomux_function_clock)]
-    let source_frequency = clocks::iomux_function_clock_frequency();
-    #[cfg(not(soc_has_clock_node_iomux_function_clock))]
-    let source_frequency = crate::soc::clocks::apb_clk_frequency();
+    let source_frequency = SdmInstance::GpioSd.function_clock_frequency();
     let requested_frequency = frequency.as_hz();
 
     if requested_frequency == 0 || requested_frequency > source_frequency {

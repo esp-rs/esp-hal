@@ -1405,6 +1405,22 @@ macro_rules! for_each_wakeup_source {
 ///     todo!()
 /// }
 ///
+/// impl SdmInstance {
+///     // SDM_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<SdmFunctionClockConfig>,
+///         _new_config: SdmFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl I2cInstance {
 ///     // I2C_FUNCTION_CLOCK
 ///
@@ -1549,6 +1565,11 @@ macro_rules! for_each_wakeup_source {
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum SdmInstance {
+            GpioSd = 0,
+        }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum I2cInstance {
@@ -1746,6 +1767,18 @@ macro_rules! define_clock_tree_types {
             RcFastDivClk,
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
+        }
+        /// Configures the `GPIO_SD_FUNCTION_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = IOMUX_FUNCTION_CLOCK`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct SdmFunctionClockConfig {}
+        impl SdmFunctionClockConfig {
+            /// Creates a new configuration for the FUNCTION_CLOCK clock node.
+            pub const fn new() -> Self {
+                Self {}
+            }
         }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1954,6 +1987,7 @@ macro_rules! define_clock_tree_types {
             crypto_clk: Option<CryptoClkConfig>,
             iomux_function_clock: Option<IomuxFunctionClockConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
+            sdm_function_clock: [Option<SdmFunctionClockConfig>; 1],
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 1],
             parl_io_rx_clock: [Option<ParlIoRxClockConfig>; 1],
             parl_io_tx_clock: [Option<ParlIoTxClockConfig>; 1],
@@ -1982,8 +2016,8 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
             crypto_clk_refcount: u32,
-            iomux_function_clock_refcount: u32,
             timg_calibration_clock_refcount: u32,
+            sdm_function_clock_refcount: [u32; 1],
             i2c_function_clock_refcount: [u32; 1],
             parl_io_rx_clock_refcount: [u32; 1],
             parl_io_tx_clock_refcount: [u32; 1],
@@ -2038,6 +2072,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the TIMG_CALIBRATION_CLOCK clock tree node
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
                 self.timg_calibration_clock
+            }
+            /// Returns the current configuration of the GPIO_SD_FUNCTION_CLOCK clock tree node
+            pub fn gpio_sd_function_clock(&self) -> Option<SdmFunctionClockConfig> {
+                self.sdm_function_clock[SdmInstance::GpioSd as usize]
             }
             /// Returns the current configuration of the I2C0_FUNCTION_CLOCK clock tree node
             pub fn i2c0_function_clock(&self) -> Option<I2cFunctionClockConfig> {
@@ -2104,6 +2142,7 @@ macro_rules! define_clock_tree_types {
                 crypto_clk: None,
                 iomux_function_clock: None,
                 timg_calibration_clock: None,
+                sdm_function_clock: [None; 1],
                 i2c_function_clock: [None; 1],
                 parl_io_rx_clock: [None; 1],
                 parl_io_tx_clock: [None; 1],
@@ -2132,8 +2171,8 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
                 crypto_clk_refcount: 0,
-                iomux_function_clock_refcount: 0,
                 timg_calibration_clock_refcount: 0,
+                sdm_function_clock_refcount: [0; 1],
                 i2c_function_clock_refcount: [0; 1],
                 parl_io_rx_clock_refcount: [0; 1],
                 parl_io_tx_clock_refcount: [0; 1],
@@ -2884,22 +2923,18 @@ macro_rules! define_clock_tree_types {
         ) {
             let old_selector = clocks.iomux_function_clock.replace(new_selector);
             refresh_iomux_function_clock_downstream(clocks);
-            if clocks.iomux_function_clock_refcount > 0 {
-                match new_selector {
-                    IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+            match new_selector {
+                IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+            }
+            configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
+            if let Some(old_selector) = old_selector {
+                match old_selector {
+                    IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                    IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                    IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
                 }
-                configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                        IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                        IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
-                    }
-                }
-            } else {
-                configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
             }
         }
         pub fn iomux_function_clock_config(
@@ -2909,26 +2944,22 @@ macro_rules! define_clock_tree_types {
         }
         pub fn request_iomux_function_clock(clocks: &mut ClockTree) {
             trace!("Requesting IOMUX_FUNCTION_CLOCK");
-            if increment_reference_count(&mut clocks.iomux_function_clock_refcount) {
-                trace!("Enabling IOMUX_FUNCTION_CLOCK");
-                match unwrap!(clocks.iomux_function_clock) {
-                    IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                    IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                    IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
-                }
-                enable_iomux_function_clock_impl(clocks, true);
+            trace!("Enabling IOMUX_FUNCTION_CLOCK");
+            match unwrap!(clocks.iomux_function_clock) {
+                IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
+                IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
+                IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
             }
+            enable_iomux_function_clock_impl(clocks, true);
         }
         pub fn release_iomux_function_clock(clocks: &mut ClockTree) {
             trace!("Releasing IOMUX_FUNCTION_CLOCK");
-            if decrement_reference_count(&mut clocks.iomux_function_clock_refcount) {
-                trace!("Disabling IOMUX_FUNCTION_CLOCK");
-                enable_iomux_function_clock_impl(clocks, false);
-                match unwrap!(clocks.iomux_function_clock) {
-                    IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                    IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                    IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
-                }
+            trace!("Disabling IOMUX_FUNCTION_CLOCK");
+            enable_iomux_function_clock_impl(clocks, false);
+            match unwrap!(clocks.iomux_function_clock) {
+                IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
+                IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
+                IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
             }
         }
         #[allow(unused_variables)]
@@ -3032,6 +3063,54 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::RcSlowClk => rc_slow_clk_frequency(),
                 TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(),
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
+            }
+        }
+        impl SdmInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                config: SdmFunctionClockConfig,
+            ) {
+                let old_config = clocks.sdm_function_clock[self as usize].replace(config);
+                refresh_sdm_function_clock_downstream(clocks, self);
+                self.configure_function_clock_impl(clocks, old_config, config);
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<SdmFunctionClockConfig> {
+                clocks.sdm_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.sdm_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    request_iomux_function_clock(clocks);
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.sdm_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    release_iomux_function_clock(clocks);
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                clocks: &mut ClockTree,
+                config: SdmFunctionClockConfig,
+            ) -> u32 {
+                iomux_function_clock_frequency()
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                iomux_function_clock_frequency()
+            }
+            pub fn function_clock_source_frequency() -> u32 {
+                iomux_function_clock_frequency()
             }
         }
         impl I2cInstance {
@@ -3876,6 +3955,9 @@ macro_rules! define_clock_tree_types {
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+            for child_instance in [SdmInstance::GpioSd] {
+                refresh_sdm_function_clock_downstream(clocks, child_instance);
+            }
         }
         fn refresh_timg_calibration_clock_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.timg_calibration_clock {
@@ -3885,6 +3967,7 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
+        fn refresh_sdm_function_clock_downstream(clocks: &mut ClockTree, instance: SdmInstance) {}
         fn refresh_i2c_function_clock_downstream(clocks: &mut ClockTree, instance: I2cInstance) {
             if let Some(config) = clocks.i2c_function_clock[instance as usize] {
                 I2C_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
@@ -4074,9 +4157,6 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::GPIO_SD::regs()
                         .clock_gate()
                         .modify(|_, w| w.clk_en().bit(enable));
-                    crate::peripherals::GPIO_SD::regs()
-                        .sigmadelta_misc()
-                        .modify(|_, w| w.sigmadelta_clk_en().bit(enable));
                 }
                 Peripheral::I2cExt0 => {
                     crate::peripherals::SYSTEM::regs()

@@ -55,7 +55,7 @@ peripherals = [
     # Minimal set for esp-hal compilation
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
-    { name = "GPIO_SD" },
+    { name = "GPIO_SD", clock_group = "SDM" },
     { name = "SYSTEM", pac = "HP_SYS" },
     { name = "HP_SYS" },
     { name = "HP_SYS_CLKRST" },

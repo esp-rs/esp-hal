@@ -39,7 +39,7 @@ peripherals = [
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
-    { name = "GPIO_SD" },
+    { name = "GPIO_SD", clock_group = "SDM" },
     { name = "HMAC" },
     { name = "HP_APM" },
     { name = "HP_SYS" },

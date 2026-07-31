@@ -681,6 +681,24 @@ impl TimgInstance {
     }
 }
 
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.function_clk_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<SdmFunctionClockConfig>,
+        _new_config: SdmFunctionClockConfig,
+    ) {
+        // Nothing to do.
+    }
+}
 impl RmtInstance {
     // RMT_SCLK
 
