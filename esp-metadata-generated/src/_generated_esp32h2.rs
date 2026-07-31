@@ -286,6 +286,9 @@ macro_rules! property {
     ("lp_io.version") => {
         "esp32h2"
     };
+    ("lp_io.has_gpio_matrix") => {
+        false
+    };
     ("mmu.page_size") => {
         65536
     };
@@ -941,6 +944,14 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
     };
+}
+/// Defines the `LpInputSignal` and `LpOutputSignal` enums.
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_lp_io_signals {
+    () => {};
 }
 /// This macro can be used to generate code for each channel of the RMT peripheral.
 ///

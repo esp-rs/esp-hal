@@ -35,6 +35,8 @@ use core::marker::PhantomData;
 
 use super::{InputPin, OutputPin, RtcPin};
 
+define_lp_io_signals!();
+
 #[cfg_attr(lp_io_version = "esp32", path = "low_level/esp32.rs")]
 #[cfg_attr(lp_io_version = "v2", path = "low_level/v2.rs")]
 #[cfg_attr(lp_io_version = "v3", path = "low_level/v3.rs")]
@@ -57,6 +59,43 @@ for_each_lp_function! {
     (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
     };
+}
+
+/// Configures an LP pin as an open-drain output with its pull-up enabled, and routes an LP
+/// peripheral's signal pair to it through the LP GPIO matrix.
+#[cfg(lp_io_has_gpio_matrix)]
+#[cfg_attr(not(soc_has_lp_i2c0), expect(dead_code))]
+pub(crate) fn connect_open_drain_signals(
+    pin: &(impl RtcPin + InputPin + OutputPin),
+    input: LpInputSignal,
+    output: LpOutputSignal,
+) {
+    use crate::peripherals::LP_GPIO;
+
+    let lp_pin = low_level::init_pin(pin, true);
+    low_level::set_open_drain_output(pin.number(), true);
+    low_level::input_enable(lp_pin, true);
+    low_level::pullup_enable(lp_pin, true);
+    low_level::pulldown_enable(lp_pin, false);
+    low_level::output_enable(lp_pin, true);
+
+    LP_GPIO::regs()
+        .func_in_sel_cfg(input as usize)
+        .write(|w| unsafe {
+            w.sig_in_sel().set_bit();
+            w.in_inv_sel().clear_bit();
+            w.in_sel().bits(lp_pin)
+        });
+
+    LP_GPIO::regs()
+        .func_out_sel_cfg(lp_pin as usize)
+        .write(|w| unsafe {
+            w.out_sel().bits(output as _);
+            w.out_inv_sel().clear_bit();
+            // Let the peripheral drive the output enable signal.
+            w.oe_sel().clear_bit();
+            w.oe_inv_sel().clear_bit()
+        });
 }
 
 /// A GPIO output pin configured for low-power operation.
