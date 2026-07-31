@@ -356,12 +356,12 @@ impl TryFrom<usize> for AlternateFunction {
     }
 }
 
-/// Trait implemented by RTC pins
+/// Trait implemented by low-power pins
 #[instability::unstable]
 #[cfg(lp_io_driver_supported)]
-pub trait RtcPin: Pin {
-    /// RTC number of the pin
-    fn rtc_number(&self) -> u8;
+pub trait LpPin: Pin {
+    /// LP number of the pin
+    fn lp_number(&self) -> u8;
 
     /// Enables or disables the input path in the low-power domain, selects whether the pad belongs
     /// to the low-power domain (`mux` is `true`) or to the digital GPIO peripheral, and selects the
@@ -370,11 +370,11 @@ pub trait RtcPin: Pin {
     /// `func` has no effect while the pad belongs to the digital GPIO peripheral.
     #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
     #[doc(hidden)]
-    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction);
+    fn lp_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction);
 
     /// Enable or disable PAD_HOLD
     #[doc(hidden)]
-    fn rtcio_pad_hold(&self, enable: bool);
+    fn lp_pad_hold(&self, enable: bool);
 
     /// # Safety
     ///
@@ -395,17 +395,18 @@ pub trait RtcPin: Pin {
     fn lp_output_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpOutputSignal)];
 }
 
-/// Trait implemented by RTC pins which support internal pull-up / pull-down
+/// Trait implemented by low-power pins which support internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
 #[cfg(lp_io_driver_supported)]
-pub trait RtcPinWithResistors: RtcPin {
+pub trait LpPinWithResistors: LpPin {
     /// Enable/disable the internal pull-up resistor
     #[doc(hidden)]
-    fn rtcio_pullup(&self, enable: bool);
+    fn lp_pullup(&self, enable: bool);
+
     /// Enable/disable the internal pull-down resistor
     #[doc(hidden)]
-    fn rtcio_pulldown(&self, enable: bool);
+    fn lp_pulldown(&self, enable: bool);
 }
 
 /// Common trait implemented by pins
@@ -1680,12 +1681,7 @@ impl<'lt> AnyPin<'lt> {
         for_each_lp_function! {
             (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
-                    RtcPin::rtc_set_config(self, false, false, lp_io::LpFunction::$af);
-                }
-            };
-            (($_signal:ident, RTC_GPIOn, $_lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
-                if self.number() == crate::peripherals::$gpio::NUMBER {
-                    RtcPin::rtc_set_config(self, false, false, lp_io::LpFunction::$af);
+                    LpPin::lp_set_config(self, false, false, lp_io::LpFunction::$af);
                 }
             };
         }
@@ -2177,7 +2173,7 @@ fn pin_does_not_support_function(pin: u8, function: &str) {
 }
 
 #[cfg(lp_io_driver_supported)]
-macro_rules! for_each_rtcio_pin {
+macro_rules! for_each_lp_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
             #[allow(unused_mut)]
@@ -2188,11 +2184,8 @@ macro_rules! for_each_rtcio_pin {
 
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
-            };
             (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
+                for_each_lp_pin!(@impl $ident, $target, $gpio, $code)
             };
         }
         unreachable!();
@@ -2200,7 +2193,7 @@ macro_rules! for_each_rtcio_pin {
 }
 
 #[cfg(lp_io_driver_supported)]
-macro_rules! for_each_rtcio_output_pin {
+macro_rules! for_each_lp_output_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
             for_each_gpio! {
@@ -2220,11 +2213,8 @@ macro_rules! for_each_rtcio_output_pin {
 
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "RTC_IO output")
-            };
             (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "LP_IO output")
+                for_each_lp_output_pin!(@impl $ident, $target, $gpio, $code, "LP_IO output")
             };
         }
         unreachable!();
@@ -2232,60 +2222,60 @@ macro_rules! for_each_rtcio_output_pin {
 }
 
 #[cfg(lp_io_driver_supported)]
-impl RtcPin for AnyPin<'_> {
-    fn rtc_number(&self) -> u8 {
-        for_each_rtcio_pin! {
-            (self, target) => { RtcPin::rtc_number(&target) };
+impl LpPin for AnyPin<'_> {
+    fn lp_number(&self) -> u8 {
+        for_each_lp_pin! {
+            (self, target) => { LpPin::lp_number(&target) };
         }
     }
 
     // Keep device cfg aligned with init_gpio!
     #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
-    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction) {
-        for_each_rtcio_pin! {
-            (self, target) => { RtcPin::rtc_set_config(&target, input_enable, mux, func) };
+    fn lp_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction) {
+        for_each_lp_pin! {
+            (self, target) => { LpPin::lp_set_config(&target, input_enable, mux, func) };
         }
     }
 
-    fn rtcio_pad_hold(&self, enable: bool) {
-        for_each_rtcio_pin! {
-            (self, target) => { RtcPin::rtcio_pad_hold(&target, enable) };
+    fn lp_pad_hold(&self, enable: bool) {
+        for_each_lp_pin! {
+            (self, target) => { LpPin::lp_pad_hold(&target, enable) };
         }
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
-        for_each_rtcio_pin! {
-            (self, target) => { unsafe { RtcPin::apply_wakeup(&target, wakeup, level) } };
+        for_each_lp_pin! {
+            (self, target) => { unsafe { LpPin::apply_wakeup(&target, wakeup, level) } };
         }
     }
 
     #[cfg(lp_io_has_gpio_matrix)]
     fn lp_input_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpInputSignal)] {
-        for_each_rtcio_pin! {
-            (self, target) => { RtcPin::lp_input_signals(&target) };
+        for_each_lp_pin! {
+            (self, target) => { LpPin::lp_input_signals(&target) };
         }
     }
 
     #[cfg(lp_io_has_gpio_matrix)]
     fn lp_output_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpOutputSignal)] {
-        for_each_rtcio_pin! {
-            (self, target) => { RtcPin::lp_output_signals(&target) };
+        for_each_lp_pin! {
+            (self, target) => { LpPin::lp_output_signals(&target) };
         }
     }
 }
 
 #[cfg(lp_io_driver_supported)]
-impl RtcPinWithResistors for AnyPin<'_> {
-    fn rtcio_pullup(&self, enable: bool) {
-        for_each_rtcio_output_pin! {
-            (self, target) => { RtcPinWithResistors::rtcio_pullup(&target, enable) };
+impl LpPinWithResistors for AnyPin<'_> {
+    fn lp_pullup(&self, enable: bool) {
+        for_each_lp_output_pin! {
+            (self, target) => { LpPinWithResistors::lp_pullup(&target, enable) };
         }
     }
 
-    fn rtcio_pulldown(&self, enable: bool) {
-        for_each_rtcio_output_pin! {
-            (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
+    fn lp_pulldown(&self, enable: bool) {
+        for_each_lp_output_pin! {
+            (self, target) => { LpPinWithResistors::lp_pulldown(&target, enable) };
         }
     }
 }

@@ -571,7 +571,7 @@ mod tests {
 
     #[cfg(esp32)]
     #[test]
-    fn can_configure_rtcio_pins_as_input() {
+    fn can_configure_lp_io_pins_as_input() {
         let pin = unsafe { esp_hal::peripherals::GPIO37::steal() };
 
         _ = Input::new(pin, InputConfig::default().with_pull(Pull::Down));
@@ -859,17 +859,12 @@ mod tests {
         let jtag_pins = cfg_select!(
             esp32 => [13, 14, 15, 16],
             any(esp32c2, esp32c3) => [4, 5],
-            // S2 JTAG pins are not RTC_IO pins, rest use USB Serial/JTAG
+            // S2 JTAG pins are not LP IO pins, rest use USB Serial/JTAG
             _ => [],
         );
 
         esp_metadata_generated::for_each_lp_function! {
-            (($_rtc:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                if !jtag_pins.contains(&$pin) {
-                    esp_hal::gpio::lp_io::LowPowerInput::new(peripherals.$gpio);
-                }
-            };
-            (($_rtc:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
+            (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if !jtag_pins.contains(&$pin) {
                     esp_hal::gpio::lp_io::LowPowerInput::new(peripherals.$gpio);
                 }

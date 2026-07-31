@@ -1,19 +1,19 @@
 //! Low-power UART
 
 use crate::{
-    gpio::{InputPin, OutputPin, RtcPin, lp_io::LpFunction},
+    gpio::{InputPin, LpPin, OutputPin, lp_io::LpFunction},
     peripherals::{LP_CLKRST, LP_UART, LPWR},
     uart::{DataBits, Parity, StopBits},
 };
 
 /// Trait representing the LP_UART TX pin.
-pub trait Tx: RtcPin + OutputPin {
+pub trait Tx: LpPin + OutputPin {
     #[doc(hidden)]
     fn connect_tx(&self);
 }
 
 /// Trait representing the LP_UART RX pin.
-pub trait Rx: RtcPin + InputPin {
+pub trait Rx: LpPin + InputPin {
     #[doc(hidden)]
     fn connect_rx(&self);
 }
@@ -50,14 +50,14 @@ for_each_lp_function! {
             fn connect_tx(&self) {
                 // The output enable is left to the peripheral: selecting a function other than
                 // LP GPIO takes the pad's direction out of the LP GPIO peripheral's hands.
-                self.rtc_set_config(false, true, LpFunction::$af);
+                self.lp_set_config(false, true, LpFunction::$af);
             }
         }
     };
     (LP_UART_RXD, $gpio:ident, $af:ident) => {
         impl Rx for crate::peripherals::$gpio<'_> {
             fn connect_rx(&self) {
-                self.rtc_set_config(true, true, LpFunction::$af);
+                self.lp_set_config(true, true, LpFunction::$af);
             }
         }
     };

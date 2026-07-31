@@ -138,8 +138,8 @@ pub(crate) struct PinConfig {
     #[serde(default)]
     pub analog: AnalogMap,
 
-    /// Available LP/RTC IO functions for this pin.
-    #[serde(default, alias = "rtc")]
+    /// Available LP IO functions for this pin.
+    #[serde(default)]
     pub lp: LowPowerMap,
 
     /// Lists cases where the GPIO needs special attention.
@@ -264,7 +264,7 @@ impl AnalogMap {
     }
 }
 
-/// Available RTC/LP functions for a given GPIO pin.
+/// Available LP functions for a given GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct LowPowerMap {
@@ -710,7 +710,7 @@ pub(crate) fn generate_gpios(
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_analog
 
-        /// This macro can be used to generate code for each LP/RTC function of each GPIO.
+        /// This macro can be used to generate code for each LP function of each GPIO.
         ///
         /// For an explanation on the general syntax, as well as usage of individual/repeated
         /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
@@ -726,7 +726,7 @@ pub(crate) fn generate_gpios(
         /// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this is `ADCn_CHm`.
         /// - `$number`: the numbers extracted from `$signal`.
         /// - `$gpio`: the name of the GPIO.
-        /// - `$af`: the LP/RTC IO MUX function, as an identifier (i.e. for function 0 this is `_0`).
+        /// - `$af`: the LP IO MUX function, as an identifier (i.e. for function 0 this is `_0`).
         ///   This is the name of an `LpFunction` variant, and its number is the value to write to
         ///   the pad's function select field.
         /// - `$lp_input_af`: the LP IO MUX function for an LP peripheral input on this pad.
@@ -735,8 +735,8 @@ pub(crate) fn generate_gpios(
         /// - `$lp_output_signal`: the LP peripheral output signal name.
         ///
         /// Example data:
-        /// - `(RTC_GPIO15, GPIO12, _0)`
-        /// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, _0, () ())`
+        /// - `(LP_GPIO15, GPIO12, _0)`
+        /// - `((LP_GPIO15, LP_GPIOn, 15), GPIO12, _0, () ())`
         /// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, _1, () (_0 => LP_UART_TXD))`
         /// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, _3, () ())`
         ///
@@ -786,8 +786,8 @@ pub(crate) fn generate_gpios(
 
         /// Defines the `LpFunction` enum.
         ///
-        /// The enum only contains the LP/RTC IO MUX functions that the chip implements. It is
-        /// empty on chips without an LP/RTC IO peripheral.
+        /// The enum only contains the LP IO MUX functions that the chip implements. It is
+        /// empty on chips without an LP IO peripheral.
         ///
         /// This macro is intended to be called in esp-hal only.
         #[macro_export]
@@ -821,9 +821,9 @@ pub(crate) fn generate_gpios(
     }
 }
 
-/// Renders the `LpFunction` enum, which lists the LP/RTC IO MUX functions of the chip.
+/// Renders the `LpFunction` enum, which lists the LP IO MUX functions of the chip.
 ///
-/// Unlike the digital IO MUX, LP/RTC pads usually implement only a few functions, so the enum
+/// Unlike the digital IO MUX, LP pads usually implement only a few functions, so the enum
 /// contains a variant for the used function numbers only.
 fn render_lp_functions(gpio: &super::GpioProperties) -> TokenStream {
     let mut functions = BTreeMap::new();
@@ -841,22 +841,16 @@ fn render_lp_functions(gpio: &super::GpioProperties) -> TokenStream {
         return quote! {};
     }
 
-    // The function that connects a pad to the LP/RTC GPIO peripheral. The pad list names it
-    // `LP_GPIOn` or `RTC_GPIOn`, depending on the peripheral.
     let gpio_function = functions
         .iter()
-        .find(|(_, signals)| {
-            signals
-                .iter()
-                .any(|signal| signal.starts_with("LP_GPIO") || signal.starts_with("RTC_GPIO"))
-        })
+        .find(|(_, signals)| signals.iter().any(|signal| signal.starts_with("LP_GPIO")))
         .map(|(af, _)| format_ident!("_{af}"))
-        .expect("No LP/RTC GPIO function found in the pad list");
+        .expect("No LP_GPIO function found in the pad list");
 
     let variants = functions.keys().map(|af| {
         let variant = format_ident!("_{af}");
         let value = number(*af);
-        let doc = format!("LP/RTC IO MUX function {af}.");
+        let doc = format!("LP IO MUX function {af}.");
         quote! {
             #[doc = #doc]
             #variant = #value,
@@ -864,7 +858,7 @@ fn render_lp_functions(gpio: &super::GpioProperties) -> TokenStream {
     });
 
     quote! {
-        /// LP/RTC IO MUX function of a pad.
+        /// LP IO MUX function of a pad.
         ///
         /// This is the low-power counterpart of `AlternateFunction`: it selects which function
         /// drives a pad while the pad belongs to the low-power domain.
@@ -876,7 +870,7 @@ fn render_lp_functions(gpio: &super::GpioProperties) -> TokenStream {
         }
 
         impl LpFunction {
-            /// The function that connects the pad to the LP/RTC GPIO peripheral.
+            /// The function that connects the pad to the LP GPIO peripheral.
             pub const LP_GPIO: Self = Self::#gpio_function;
         }
     }

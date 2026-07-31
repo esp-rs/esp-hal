@@ -1,7 +1,7 @@
 use crate::{
     gpio::{
-        RtcPin,
-        RtcPinWithResistors,
+        LpPin,
+        LpPinWithResistors,
         lp_io::{LpFunction, LpInputSignal, LpOutputSignal},
     },
     peripherals::{LP_GPIO, LP_IO_MUX},
@@ -9,8 +9,8 @@ use crate::{
 
 for_each_lp_function! {
     (($lp_pin_name:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident, $_af:ident, ($( $lp_in_af:ident => $lp_in_signal:ident )*) ($( $lp_out_af:ident => $lp_out_signal:ident )*)) => {
-        impl RtcPin for crate::peripherals::$gpio<'_> {
-            fn rtc_number(&self) -> u8 {
+        impl LpPin for crate::peripherals::$gpio<'_> {
+            fn lp_number(&self) -> u8 {
                 $lp_pin
             }
 
@@ -21,11 +21,11 @@ for_each_lp_function! {
                 });
             }
 
-            fn rtcio_pad_hold(&self, enable: bool) {
+            fn lp_pad_hold(&self, enable: bool) {
                 pad_hold_enable($lp_pin, enable);
             }
 
-            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: LpFunction) {
+            fn lp_set_config(&self, input_enable: bool, mux: bool, func: LpFunction) {
                 if mux {
                     LP_GPIO::regs()
                         .clk_en()
@@ -49,21 +49,21 @@ for_each_lp_function! {
             }
         }
 
-        impl RtcPinWithResistors for crate::peripherals::$gpio<'_> {
-            fn rtcio_pullup(&self, enable: bool) {
+        impl LpPinWithResistors for crate::peripherals::$gpio<'_> {
+            fn lp_pullup(&self, enable: bool) {
                 pullup_enable($lp_pin, enable);
             }
 
-            fn rtcio_pulldown(&self, enable: bool) {
+            fn lp_pulldown(&self, enable: bool) {
                 pulldown_enable($lp_pin, enable);
             }
         }
     };
 }
 
-pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
+pub(super) fn init_pin(pin: &impl LpPin, input_enable: bool) -> u8 {
     let lp_pin = pin.number();
-    pin.rtc_set_config(input_enable, true, LpFunction::LP_GPIO);
+    pin.lp_set_config(input_enable, true, LpFunction::LP_GPIO);
     lp_pin
 }
 

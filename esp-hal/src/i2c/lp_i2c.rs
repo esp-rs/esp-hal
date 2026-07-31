@@ -1,7 +1,7 @@
 //! Low-power I2C driver
 
 use crate::{
-    gpio::{InputPin, OutputPin, RtcPin, lp_io::LpFunction},
+    gpio::{InputPin, LpPin, OutputPin, lp_io::LpFunction},
     peripherals::{LP_I2C0, LP_PERI, LPWR},
     time::Rate,
 };
@@ -9,13 +9,13 @@ use crate::{
 const LP_I2C_FILTER_CYC_NUM_DEF: u8 = 7;
 
 /// Trait representing the LP_I2C SDA pin.
-pub trait Sda: RtcPin + OutputPin + InputPin {
+pub trait Sda: LpPin + OutputPin + InputPin {
     #[doc(hidden)]
     fn connect_sda(&self);
 }
 
 /// Trait representing the LP_I2C SCL pin.
-pub trait Scl: RtcPin + OutputPin + InputPin {
+pub trait Scl: LpPin + OutputPin + InputPin {
     #[doc(hidden)]
     fn connect_scl(&self);
 }
@@ -142,10 +142,10 @@ pub struct LpI2c {
 /// Configures an LP pad as an open-drain output with its pull-up enabled, then selects the pad's
 /// LP I2C function.
 #[cfg(not(lp_io_has_gpio_matrix))]
-fn configure_pad(pin: &impl RtcPin, function: LpFunction) {
+fn configure_pad(pin: &impl LpPin, function: LpFunction) {
     use crate::peripherals::LP_IO;
 
-    let ionum = pin.rtc_number() as usize;
+    let ionum = pin.lp_number() as usize;
     let lp_io = LP_IO::regs();
     unsafe {
         // Set the IO pin to high to avoid them from toggling from Low to
@@ -172,7 +172,7 @@ fn configure_pad(pin: &impl RtcPin, function: LpFunction) {
         });
     }
 
-    pin.rtc_set_config(true, true, function);
+    pin.lp_set_config(true, true, function);
 }
 
 impl LpI2c {

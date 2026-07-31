@@ -1,17 +1,17 @@
 use crate::{
-    gpio::{AlternateFunction, RtcPin, RtcPinWithResistors, lp_io::LpFunction},
+    gpio::{AlternateFunction, LpPin, LpPinWithResistors, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LP_AON},
 };
 
 for_each_lp_function! {
     (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl RtcPin for crate::peripherals::$gpio<'_> {
-            fn rtc_number(&self) -> u8 {
+        impl LpPin for crate::peripherals::$gpio<'_> {
+            fn lp_number(&self) -> u8 {
                 $pin
             }
 
-            fn rtcio_pad_hold(&self, enable: bool) {
+            fn lp_pad_hold(&self, enable: bool) {
                 let mask = 1 << lp_pin_to_gpio($pin);
                 LP_AON::regs()
                     .gpio_hold0()
@@ -27,7 +27,7 @@ for_each_lp_function! {
 
             // The LP core reaches the pad through the digital IO MUX, so there is no low-power
             // function to select.
-            fn rtc_set_config(&self, input_enable: bool, _mux: bool, _func: LpFunction) {
+            fn lp_set_config(&self, input_enable: bool, _mux: bool, _func: LpFunction) {
                 IO_MUX::regs().gpio(lp_pin_to_gpio($pin) as usize)
                     .modify(|_, w| unsafe {
                         w.slp_sel().bit(false);
@@ -38,20 +38,20 @@ for_each_lp_function! {
         }
 
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl RtcPinWithResistors for crate::peripherals::$gpio<'_> {
-            fn rtcio_pullup(&self, enable: bool) {
+        impl LpPinWithResistors for crate::peripherals::$gpio<'_> {
+            fn lp_pullup(&self, enable: bool) {
                 pullup_enable($pin, enable);
             }
 
-            fn rtcio_pulldown(&self, enable: bool) {
+            fn lp_pulldown(&self, enable: bool) {
                 pulldown_enable($pin, enable);
             }
         }
     };
 }
 
-pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
-    let lp_pin = pin.rtc_number();
+pub(super) fn init_pin(pin: &impl LpPin, input_enable: bool) -> u8 {
+    let lp_pin = pin.lp_number();
     input_enable_fn(lp_pin, input_enable);
     lp_pin
 }

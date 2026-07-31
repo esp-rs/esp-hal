@@ -45,16 +45,16 @@ pub(crate) fn set_interrupt_priority(priority: Priority) {
 }
 
 fn errata36(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
-    use crate::gpio::{Pin, RtcPinWithResistors};
+    use crate::gpio::{LpPinWithResistors, Pin};
 
     for_each_lp_function! {
-        (RTC_GPIOn $( (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),* ) => {
-            const RTC_IO_PINS: &[u8] = &[ $( $crate::peripherals::$gpio::NUMBER ),* ];
+        (LP_GPIOn $( (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),* ) => {
+            const LP_IO_PINS: &[u8] = &[ $( $crate::peripherals::$gpio::NUMBER ),* ];
         };
     };
 
-    if RTC_IO_PINS.contains(&pin.number()) && pin.is_output() {
-        pin.rtcio_pullup(pull_up);
-        pin.rtcio_pulldown(pull_down);
+    if LP_IO_PINS.contains(&pin.number()) && pin.is_output() {
+        pin.lp_pullup(pull_up);
+        pin.lp_pulldown(pull_down);
     }
 }

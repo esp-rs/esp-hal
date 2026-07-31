@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{Level, RtcPin, lp_io::LpFunction},
+    gpio::{Level, LpPin, lp_io::LpFunction},
     peripherals::LP_AON,
     rtc_cntl::{
         Rtc,
@@ -21,14 +21,14 @@ impl Ext1WakeupSource<'_, '_> {
     }
 
     pub(in crate::rtc_cntl::sleep) fn wake_io_reset() {
-        fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
-            let pin_number = pin.rtc_number();
+        fn uninit_pin(pin: impl LpPin, wakeup_pins: u8) {
+            let pin_number = pin.lp_number();
 
             if wakeup_pins & (1 << pin_number) != 0 {
-                pin.rtcio_pad_hold(false);
+                pin.lp_pad_hold(false);
                 cfg_select! {
                     esp32h2 => pin.degrade().init_gpio(),
-                    _ => pin.rtc_set_config(false, false, LpFunction::LP_GPIO),
+                    _ => pin.lp_set_config(false, false, LpFunction::LP_GPIO),
                 }
             }
         }
@@ -55,7 +55,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut pin_mask = 0u8;
         let mut level_mask = 0u8;
         for (pin, level) in pins.iter_mut() {
-            let pin_number = pin.rtc_number();
+            let pin_number = pin.lp_number();
 
             pin_mask |= 1 << pin_number;
             level_mask |= match level {
@@ -63,8 +63,8 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
                 Level::Low => 0,
             };
 
-            pin.rtc_set_config(true, !cfg!(esp32h2), LpFunction::LP_GPIO);
-            pin.rtcio_pad_hold(true);
+            pin.lp_set_config(true, !cfg!(esp32h2), LpFunction::LP_GPIO);
+            pin.lp_pad_hold(true);
         }
 
         LP_AON::regs()
@@ -85,9 +85,9 @@ impl Drop for Ext1WakeupSource<'_, '_> {
         let mut pins = self.pins.borrow_mut();
         for (pin, _level) in pins.iter_mut() {
             if cfg!(esp32h2) {
-                pin.rtcio_pad_hold(false);
+                pin.lp_pad_hold(false);
             }
-            pin.rtc_set_config(true, false, LpFunction::LP_GPIO);
+            pin.lp_set_config(true, false, LpFunction::LP_GPIO);
         }
     }
 }

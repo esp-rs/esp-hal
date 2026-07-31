@@ -81,13 +81,13 @@ impl<P: RtcIoWakeupPinType> WakeSource for Ext0WakeupSource<P> {
         // set pin to RTC function
         self.pin
             .borrow_mut()
-            .rtc_set_config(true, true, LpFunction::LP_GPIO);
+            .lp_set_config(true, true, LpFunction::LP_GPIO);
 
         unsafe {
             // set pin register field
             RTC_IO::regs()
                 .ext_wakeup0()
-                .modify(|_, w| w.sel().bits(self.pin.borrow().rtc_number()));
+                .modify(|_, w| w.sel().bits(self.pin.borrow().lp_number()));
             // set level register field
             LPWR::regs()
                 .ext_wakeup_conf()
@@ -103,6 +103,6 @@ impl<P: RtcIoWakeupPinType> Drop for Ext0WakeupSource<P> {
         // to IO_MUX)
         self.pin
             .borrow_mut()
-            .rtc_set_config(true, false, LpFunction::LP_GPIO);
+            .lp_set_config(true, false, LpFunction::LP_GPIO);
     }
 }

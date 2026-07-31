@@ -5235,7 +5235,7 @@ macro_rules! for_each_analog_function {
         GPIO9)));
     };
 }
-/// This macro can be used to generate code for each LP/RTC function of each GPIO.
+/// This macro can be used to generate code for each LP function of each GPIO.
 ///
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
@@ -5257,8 +5257,8 @@ macro_rules! for_each_analog_function {
 ///   is `ADCn_CHm`.
 /// - `$number`: the numbers extracted from `$signal`.
 /// - `$gpio`: the name of the GPIO.
-/// - `$af`: the LP/RTC IO MUX function, as an identifier (i.e. for function 0 this is `_0`). This
-///   is the name of an `LpFunction` variant, and its number is the value to write to the pad's
+/// - `$af`: the LP IO MUX function, as an identifier (i.e. for function 0 this is `_0`). This is
+///   the name of an `LpFunction` variant, and its number is the value to write to the pad's
 ///   function select field.
 /// - `$lp_input_af`: the LP IO MUX function for an LP peripheral input on this pad.
 /// - `$lp_input_signal`: the LP peripheral input signal name.
@@ -5266,8 +5266,8 @@ macro_rules! for_each_analog_function {
 /// - `$lp_output_signal`: the LP peripheral output signal name.
 ///
 /// Example data:
-/// - `(RTC_GPIO15, GPIO12, _0)`
-/// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, _0, () ())`
+/// - `(LP_GPIO15, GPIO12, _0)`
+/// - `((LP_GPIO15, LP_GPIOn, 15), GPIO12, _0, () ())`
 /// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, _1, () (_0 => LP_UART_TXD))`
 /// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, _3, () ())`
 ///
@@ -5566,15 +5566,15 @@ macro_rules! define_io_mux_signals {
 }
 /// Defines the `LpFunction` enum.
 ///
-/// The enum only contains the LP/RTC IO MUX functions that the chip implements. It is
-/// empty on chips without an LP/RTC IO peripheral.
+/// The enum only contains the LP IO MUX functions that the chip implements. It is
+/// empty on chips without an LP IO peripheral.
 ///
 /// This macro is intended to be called in esp-hal only.
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! define_lp_functions {
     () => {
-        /// LP/RTC IO MUX function of a pad.
+        /// LP IO MUX function of a pad.
         ///
         /// This is the low-power counterpart of `AlternateFunction`: it selects which function
         /// drives a pad while the pad belongs to the low-power domain.
@@ -5582,15 +5582,15 @@ macro_rules! define_lp_functions {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
         pub enum LpFunction {
-            /// LP/RTC IO MUX function 0.
+            /// LP IO MUX function 0.
             _0 = 0,
-            /// LP/RTC IO MUX function 1.
+            /// LP IO MUX function 1.
             _1 = 1,
-            /// LP/RTC IO MUX function 3.
+            /// LP IO MUX function 3.
             _3 = 3,
         }
         impl LpFunction {
-            /// The function that connects the pad to the LP/RTC GPIO peripheral.
+            /// The function that connects the pad to the LP GPIO peripheral.
             pub const LP_GPIO: Self = Self::_1;
         }
     };

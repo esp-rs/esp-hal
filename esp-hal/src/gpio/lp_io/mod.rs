@@ -11,8 +11,8 @@
 //! # Overview
 //!
 //! The hardware provides GPIO pins with low-power capabilities and analog
-//! functions. Depending on the device, these pins are controlled by an RTC IO
-//! or LP IO peripheral.
+//! functions. These pins are controlled by the LP IO peripheral, which some
+//! devices call RTC IO.
 //!
 //! ## Configuration
 //!
@@ -33,7 +33,7 @@
 
 use core::marker::PhantomData;
 
-use super::{InputPin, OutputPin, RtcPin};
+use super::{InputPin, LpPin, OutputPin};
 
 define_lp_io_signals!();
 define_lp_functions!();
@@ -46,17 +46,14 @@ define_lp_functions!();
 #[cfg_attr(lp_io_version = "v4", path = "low_level/v4.rs")]
 mod low_level;
 
-// FIXME: RtcPin is necessary only as long as the sleep API takes &dyn RtcPin(WithResistors).
+// FIXME: LpPin is necessary only as long as the sleep API takes &dyn LpPin(WithResistors).
 // After that has been resolved, we can simplify this hierarchy to only have LowPowerPin.
 
 /// Trait implemented by pins with a known low-power pin number.
 #[doc(hidden)]
-pub trait LowPowerPin<const PIN: u8>: RtcPin {}
+pub trait LowPowerPin<const PIN: u8>: LpPin {}
 
 for_each_lp_function! {
-    (($_signal:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-        impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
-    };
     (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
     };
@@ -67,7 +64,7 @@ for_each_lp_function! {
 #[cfg(lp_io_has_gpio_matrix)]
 #[cfg_attr(not(soc_has_lp_i2c0), expect(dead_code))]
 pub(crate) fn connect_open_drain_signals(
-    pin: &(impl RtcPin + InputPin + OutputPin),
+    pin: &(impl LpPin + InputPin + OutputPin),
     input: LpInputSignal,
     output: LpOutputSignal,
 ) {
@@ -84,7 +81,7 @@ pub(crate) fn connect_open_drain_signals(
 
 /// Configures an LP pin as an input and routes an LP peripheral's input signal to it.
 #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
-pub(crate) fn connect_input_signal(pin: &(impl RtcPin + InputPin), input: LpInputSignal) {
+pub(crate) fn connect_input_signal(pin: &(impl LpPin + InputPin), input: LpInputSignal) {
     let mux_af = pin
         .lp_input_signals()
         .iter()
@@ -93,8 +90,8 @@ pub(crate) fn connect_input_signal(pin: &(impl RtcPin + InputPin), input: LpInpu
 
     let lp_pin = match mux_af {
         Some(af) => {
-            let lp_pin = pin.rtc_number();
-            pin.rtc_set_config(true, true, af);
+            let lp_pin = pin.lp_number();
+            pin.lp_set_config(true, true, af);
             lp_pin
         }
         None => low_level::init_pin(pin, true),
@@ -106,7 +103,7 @@ pub(crate) fn connect_input_signal(pin: &(impl RtcPin + InputPin), input: LpInpu
 
 /// Configures an LP pin as an output and routes an LP peripheral's output signal to it.
 #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
-pub(crate) fn connect_output_signal(pin: &(impl RtcPin + OutputPin), output: LpOutputSignal) {
+pub(crate) fn connect_output_signal(pin: &(impl LpPin + OutputPin), output: LpOutputSignal) {
     let mux_af = pin
         .lp_output_signals()
         .iter()
@@ -115,7 +112,7 @@ pub(crate) fn connect_output_signal(pin: &(impl RtcPin + OutputPin), output: LpO
 
     match mux_af {
         Some(af) => {
-            pin.rtc_set_config(false, true, af);
+            pin.lp_set_config(false, true, af);
         }
         None => {
             let lp_pin = low_level::init_pin(pin, false);

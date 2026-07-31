@@ -4220,7 +4220,7 @@ macro_rules! for_each_analog_function {
         ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO4)));
     };
 }
-/// This macro can be used to generate code for each LP/RTC function of each GPIO.
+/// This macro can be used to generate code for each LP function of each GPIO.
 ///
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
@@ -4242,8 +4242,8 @@ macro_rules! for_each_analog_function {
 ///   is `ADCn_CHm`.
 /// - `$number`: the numbers extracted from `$signal`.
 /// - `$gpio`: the name of the GPIO.
-/// - `$af`: the LP/RTC IO MUX function, as an identifier (i.e. for function 0 this is `_0`). This
-///   is the name of an `LpFunction` variant, and its number is the value to write to the pad's
+/// - `$af`: the LP IO MUX function, as an identifier (i.e. for function 0 this is `_0`). This is
+///   the name of an `LpFunction` variant, and its number is the value to write to the pad's
 ///   function select field.
 /// - `$lp_input_af`: the LP IO MUX function for an LP peripheral input on this pad.
 /// - `$lp_input_signal`: the LP peripheral input signal name.
@@ -4251,8 +4251,8 @@ macro_rules! for_each_analog_function {
 /// - `$lp_output_signal`: the LP peripheral output signal name.
 ///
 /// Example data:
-/// - `(RTC_GPIO15, GPIO12, _0)`
-/// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, _0, () ())`
+/// - `(LP_GPIO15, GPIO12, _0)`
+/// - `((LP_GPIO15, LP_GPIOn, 15), GPIO12, _0, () ())`
 /// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, _1, () (_0 => LP_UART_TXD))`
 /// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, _3, () ())`
 ///
@@ -4262,25 +4262,25 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_lp_function!((RTC_GPIO0, GPIO0, _0));
-        _for_each_inner_lp_function!((RTC_GPIO1, GPIO1, _0));
-        _for_each_inner_lp_function!((RTC_GPIO2, GPIO2, _0));
-        _for_each_inner_lp_function!((RTC_GPIO3, GPIO3, _0));
-        _for_each_inner_lp_function!((RTC_GPIO4, GPIO4, _0));
-        _for_each_inner_lp_function!((RTC_GPIO5, GPIO5, _0));
-        _for_each_inner_lp_function!(((RTC_GPIO0, RTC_GPIOn, 0), GPIO0, _0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO1, RTC_GPIOn, 1), GPIO1, _0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO2, RTC_GPIOn, 2), GPIO2, _0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO3, RTC_GPIOn, 3), GPIO3, _0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO4, RTC_GPIOn, 4), GPIO4, _0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO5, RTC_GPIOn, 5), GPIO5, _0, () ()));
-        _for_each_inner_lp_function!((all(RTC_GPIO0, GPIO0, _0), (RTC_GPIO1, GPIO1, _0),
-        (RTC_GPIO2, GPIO2, _0), (RTC_GPIO3, GPIO3, _0), (RTC_GPIO4, GPIO4, _0),
-        (RTC_GPIO5, GPIO5, _0))); _for_each_inner_lp_function!((RTC_GPIOn((RTC_GPIO0,
-        RTC_GPIOn, 0), GPIO0, _0, () ()), ((RTC_GPIO1, RTC_GPIOn, 1), GPIO1, _0, () ()),
-        ((RTC_GPIO2, RTC_GPIOn, 2), GPIO2, _0, () ()), ((RTC_GPIO3, RTC_GPIOn, 3), GPIO3,
-        _0, () ()), ((RTC_GPIO4, RTC_GPIOn, 4), GPIO4, _0, () ()), ((RTC_GPIO5,
-        RTC_GPIOn, 5), GPIO5, _0, () ())));
+        => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0, _0));
+        _for_each_inner_lp_function!((LP_GPIO1, GPIO1, _0));
+        _for_each_inner_lp_function!((LP_GPIO2, GPIO2, _0));
+        _for_each_inner_lp_function!((LP_GPIO3, GPIO3, _0));
+        _for_each_inner_lp_function!((LP_GPIO4, GPIO4, _0));
+        _for_each_inner_lp_function!((LP_GPIO5, GPIO5, _0));
+        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0, _0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1, _0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2, _0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3, _0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4, _0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5, _0, () ()));
+        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0, _0), (LP_GPIO1, GPIO1, _0),
+        (LP_GPIO2, GPIO2, _0), (LP_GPIO3, GPIO3, _0), (LP_GPIO4, GPIO4, _0), (LP_GPIO5,
+        GPIO5, _0))); _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0, LP_GPIOn, 0),
+        GPIO0, _0, () ()), ((LP_GPIO1, LP_GPIOn, 1), GPIO1, _0, () ()), ((LP_GPIO2,
+        LP_GPIOn, 2), GPIO2, _0, () ()), ((LP_GPIO3, LP_GPIOn, 3), GPIO3, _0, () ()),
+        ((LP_GPIO4, LP_GPIOn, 4), GPIO4, _0, () ()), ((LP_GPIO5, LP_GPIOn, 5), GPIO5, _0,
+        () ())));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
@@ -4471,15 +4471,15 @@ macro_rules! define_io_mux_signals {
 }
 /// Defines the `LpFunction` enum.
 ///
-/// The enum only contains the LP/RTC IO MUX functions that the chip implements. It is
-/// empty on chips without an LP/RTC IO peripheral.
+/// The enum only contains the LP IO MUX functions that the chip implements. It is
+/// empty on chips without an LP IO peripheral.
 ///
 /// This macro is intended to be called in esp-hal only.
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! define_lp_functions {
     () => {
-        /// LP/RTC IO MUX function of a pad.
+        /// LP IO MUX function of a pad.
         ///
         /// This is the low-power counterpart of `AlternateFunction`: it selects which function
         /// drives a pad while the pad belongs to the low-power domain.
@@ -4487,11 +4487,11 @@ macro_rules! define_lp_functions {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
         pub enum LpFunction {
-            /// LP/RTC IO MUX function 0.
+            /// LP IO MUX function 0.
             _0 = 0,
         }
         impl LpFunction {
-            /// The function that connects the pad to the LP/RTC GPIO peripheral.
+            /// The function that connects the pad to the LP GPIO peripheral.
             pub const LP_GPIO: Self = Self::_0;
         }
     };
