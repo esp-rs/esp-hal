@@ -74,11 +74,13 @@ for_each_lp_function! {
     };
 }
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(super) fn init_pin(pin: &impl LpPin, input_enable: bool) -> u8 {
     pin.lp_set_config(input_enable, true, LpFunction::LP_GPIO);
     pin.number()
 }
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(super) fn output_enable(pin: u8, enable: bool) {
     if enable {
         LP_GPIO::regs()
@@ -91,6 +93,7 @@ pub(super) fn output_enable(pin: u8, enable: bool) {
     }
 }
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(super) fn input_enable(pin: u8, enable: bool) {
     LP_IO_MUX::regs()
         .gpio(pin as usize)
@@ -109,6 +112,7 @@ pub(super) fn pulldown_enable(pin: u8, enable: bool) {
         .modify(|_, w| w.fun_wpd().bit(enable));
 }
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(super) fn set_open_drain_output(pin: u8, enable: bool) {
     LP_GPIO::regs()
         .pin(pin as usize)

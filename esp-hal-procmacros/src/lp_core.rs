@@ -326,8 +326,7 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
     let imports = quote! {
         use #hal_crate::lp_core::LpCore;
         use #hal_crate::lp_core::LpCoreWakeupSource;
-        use #hal_crate::gpio::lp_io::LowPowerOutput;
-        use #hal_crate::gpio::*;
+        use #hal_crate::gpio::lp_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain};
         use #hal_crate::uart::lp_uart::LpUart;
         use #hal_crate::i2c::lp_i2c::LpI2c;
     };
@@ -335,7 +334,7 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
     let imports = quote! {
         use #hal_crate::lp_core::UlpCore as LpCore;
         use #hal_crate::lp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
-        use #hal_crate::gpio::*;
+        use #hal_crate::gpio::lp_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain};
     };
 
     #[cfg(feature = "has-lp-core")]
@@ -463,8 +462,7 @@ mod tests {
                 {
                     use crate::lp_core::LpCore;
                     use crate::lp_core::LpCoreWakeupSource;
-                    use crate::gpio::lp_io::LowPowerOutput;
-                    use crate::gpio::*;
+                    use crate::gpio::lp_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain};
                     use crate::uart::lp_uart::LpUart;
                     use crate::i2c::lp_i2c::LpI2c;
 

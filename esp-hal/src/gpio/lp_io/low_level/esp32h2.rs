@@ -70,9 +70,10 @@ for_each_lp_function! {
     };
 }
 
-pub(super) fn init_pin(pin: &impl LpPin, input_enable: bool) -> u8 {
+#[expect(dead_code)]
+pub(super) fn init_pin(pin: &impl LpPin, enable_input: bool) -> u8 {
     let lp_pin = pin.lp_number();
-    input_enable_fn(lp_pin, input_enable);
+    input_enable(lp_pin, enable_input);
     lp_pin
 }
 
@@ -80,6 +81,7 @@ fn lp_pin_to_gpio(pin: u8) -> u8 {
     pin + 7
 }
 
+#[expect(dead_code)]
 pub(super) fn output_enable(pin: u8, enable: bool) {
     let gpio = lp_pin_to_gpio(pin);
     if enable {
@@ -94,10 +96,6 @@ pub(super) fn output_enable(pin: u8, enable: bool) {
 }
 
 pub(super) fn input_enable(pin: u8, enable: bool) {
-    input_enable_fn(pin, enable);
-}
-
-fn input_enable_fn(pin: u8, enable: bool) {
     IO_MUX::regs()
         .gpio(lp_pin_to_gpio(pin) as usize)
         .modify(|_, w| w.fun_ie().bit(enable));
@@ -115,6 +113,7 @@ pub(super) fn pulldown_enable(pin: u8, enable: bool) {
         .modify(|_, w| w.fun_wpd().bit(enable));
 }
 
+#[expect(dead_code)]
 pub(super) fn set_open_drain_output(pin: u8, enable: bool) {
     GPIO::regs()
         .pin(pin as usize)

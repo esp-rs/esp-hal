@@ -866,7 +866,10 @@ mod tests {
         esp_metadata_generated::for_each_lp_function! {
             (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if !jtag_pins.contains(&$pin) {
-                    esp_hal::gpio::lp_io::LowPowerInput::new(peripherals.$gpio);
+                    esp_hal::gpio::Input::new(
+                        peripherals.$gpio,
+                        esp_hal::gpio::InputConfig::default(),
+                    );
                 }
             };
         }
