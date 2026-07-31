@@ -330,7 +330,7 @@ pub enum AlternateFunction {
 }
 
 impl AlternateFunction {
-    const GPIO: Self = match Self::const_try_from(property!("gpio.gpio_function")) {
+    pub(crate) const GPIO: Self = match Self::const_try_from(property!("gpio.gpio_function")) {
         Ok(func) => func,
         Err(_) => ::core::panic!("Invalid GPIO function"),
     };
@@ -356,20 +356,6 @@ impl TryFrom<usize> for AlternateFunction {
     }
 }
 
-/// RTC function
-#[instability::unstable]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum RtcFunction {
-    /// RTC mode.
-    Rtc     = 0,
-    /// Digital mode.
-    Digital = 1,
-    /// RTC_I2C mode.
-    #[cfg(soc_has_rtc_i2c)]
-    I2c     = 3,
-}
-
 /// Trait implemented by RTC pins
 #[instability::unstable]
 #[cfg(lp_io_driver_supported)]
@@ -377,10 +363,14 @@ pub trait RtcPin: Pin {
     /// RTC number of the pin
     fn rtc_number(&self) -> u8;
 
-    /// Configure the pin
+    /// Enables or disables the input path in the low-power domain, selects whether the pad belongs
+    /// to the low-power domain (`mux` is `true`) or to the digital GPIO peripheral, and selects the
+    /// pad's low-power function.
+    ///
+    /// `func` has no effect while the pad belongs to the digital GPIO peripheral.
     #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
     #[doc(hidden)]
-    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction);
+    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction);
 
     /// Enable or disable PAD_HOLD
     #[doc(hidden)]
@@ -394,15 +384,15 @@ pub trait RtcPin: Pin {
     #[doc(hidden)]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
 
-    /// LP IO MUX alternate functions on this pad that carry LP peripheral input signals.
+    /// LP IO MUX functions on this pad that carry LP peripheral input signals.
     #[cfg(lp_io_has_gpio_matrix)]
     #[doc(hidden)]
-    fn lp_input_signals(&self) -> &'static [(u8, crate::gpio::lp_io::LpInputSignal)];
+    fn lp_input_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpInputSignal)];
 
-    /// LP IO MUX alternate functions on this pad that carry LP peripheral output signals.
+    /// LP IO MUX functions on this pad that carry LP peripheral output signals.
     #[cfg(lp_io_has_gpio_matrix)]
     #[doc(hidden)]
-    fn lp_output_signals(&self) -> &'static [(u8, crate::gpio::lp_io::LpOutputSignal)];
+    fn lp_output_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpOutputSignal)];
 }
 
 /// Trait implemented by RTC pins which support internal pull-up / pull-down
@@ -611,23 +601,23 @@ for_each_analog_function! {
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
         #[instability::unstable]
         impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
-            #[cfg(riscv)]
             fn set_analog(&self, _: private::Internal) {
-                io_mux_reg(self.number()).modify(|_, w| unsafe {
-                    w.mcu_sel().bits(1);
-                    w.fun_ie().clear_bit();
-                    w.fun_wpu().clear_bit();
-                    w.fun_wpd().clear_bit()
-                });
+                cfg_select! {
+                    xtensa => { self.set_analog_impl(); }
+                    riscv => {
+                        // Just configure as a floating GPIO.
+                        io_mux_reg(self.number()).modify(|_, w| unsafe {
+                            w.mcu_sel().bits(AlternateFunction::GPIO as u8);
+                            w.fun_ie().clear_bit();
+                            w.fun_wpu().clear_bit();
+                            w.fun_wpd().clear_bit()
+                        });
 
-                GPIO::regs()
-                    .enable_w1tc()
-                    .write(|w| unsafe { w.bits(1 << self.number()) });
-            }
-
-            #[cfg(not(riscv))]
-            fn set_analog(&self, _: private::Internal) {
-                self.set_analog_impl();
+                        GPIO::regs()
+                            .enable_w1tc()
+                            .write(|w| unsafe { w.bits(1 << self.number()) });
+                    }
+                }
             }
         }
     };
@@ -1688,14 +1678,14 @@ impl<'lt> AnyPin<'lt> {
 
         #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
         for_each_lp_function! {
-            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
-                    RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
+                    RtcPin::rtc_set_config(self, false, false, lp_io::LpFunction::$af);
                 }
             };
-            (($_signal:ident, RTC_GPIOn, $_lp_pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+            (($_signal:ident, RTC_GPIOn, $_lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
-                    RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
+                    RtcPin::rtc_set_config(self, false, false, lp_io::LpFunction::$af);
                 }
             };
         }
@@ -2198,10 +2188,10 @@ macro_rules! for_each_rtcio_pin {
 
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
                 for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
             };
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
                 for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
             };
         }
@@ -2230,10 +2220,10 @@ macro_rules! for_each_rtcio_output_pin {
 
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
                 for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "RTC_IO output")
             };
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
                 for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "LP_IO output")
             };
         }
@@ -2251,7 +2241,7 @@ impl RtcPin for AnyPin<'_> {
 
     // Keep device cfg aligned with init_gpio!
     #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
-    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
+    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction) {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtc_set_config(&target, input_enable, mux, func) };
         }
@@ -2271,14 +2261,14 @@ impl RtcPin for AnyPin<'_> {
     }
 
     #[cfg(lp_io_has_gpio_matrix)]
-    fn lp_input_signals(&self) -> &'static [(u8, crate::gpio::lp_io::LpInputSignal)] {
+    fn lp_input_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpInputSignal)] {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::lp_input_signals(&target) };
         }
     }
 
     #[cfg(lp_io_has_gpio_matrix)]
-    fn lp_output_signals(&self) -> &'static [(u8, crate::gpio::lp_io::LpOutputSignal)] {
+    fn lp_output_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpOutputSignal)] {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::lp_output_signals(&target) };
         }

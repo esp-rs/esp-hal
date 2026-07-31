@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 
 use crate::{
-    gpio::{Level, RtcFunction},
+    gpio::{Level, lp_io::LpFunction},
     peripherals::{LPWR, RTC_IO},
     rtc_cntl::{
         Rtc,
@@ -81,7 +81,7 @@ impl<P: RtcIoWakeupPinType> WakeSource for Ext0WakeupSource<P> {
         // set pin to RTC function
         self.pin
             .borrow_mut()
-            .rtc_set_config(true, true, RtcFunction::Rtc);
+            .rtc_set_config(true, true, LpFunction::LP_GPIO);
 
         unsafe {
             // set pin register field
@@ -103,6 +103,6 @@ impl<P: RtcIoWakeupPinType> Drop for Ext0WakeupSource<P> {
         // to IO_MUX)
         self.pin
             .borrow_mut()
-            .rtc_set_config(true, false, RtcFunction::Rtc);
+            .rtc_set_config(true, false, LpFunction::LP_GPIO);
     }
 }

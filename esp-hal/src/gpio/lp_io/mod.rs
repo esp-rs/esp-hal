@@ -36,6 +36,7 @@ use core::marker::PhantomData;
 use super::{InputPin, OutputPin, RtcPin};
 
 define_lp_io_signals!();
+define_lp_functions!();
 
 #[cfg_attr(lp_io_version = "esp32", path = "low_level/esp32.rs")]
 #[cfg_attr(lp_io_version = "v2", path = "low_level/v2.rs")]
@@ -53,10 +54,10 @@ mod low_level;
 pub trait LowPowerPin<const PIN: u8>: RtcPin {}
 
 for_each_lp_function! {
-    (($_signal:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_signal:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
     };
-    (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
     };
 }
@@ -93,7 +94,7 @@ pub(crate) fn connect_input_signal(pin: &(impl RtcPin + InputPin), input: LpInpu
     let lp_pin = match mux_af {
         Some(af) => {
             let lp_pin = pin.rtc_number();
-            low_level::set_pad_function(lp_pin, true, true, af);
+            pin.rtc_set_config(true, true, af);
             lp_pin
         }
         None => low_level::init_pin(pin, true),
@@ -114,8 +115,7 @@ pub(crate) fn connect_output_signal(pin: &(impl RtcPin + OutputPin), output: LpO
 
     match mux_af {
         Some(af) => {
-            let lp_pin = pin.rtc_number();
-            low_level::set_pad_function(lp_pin, false, true, af);
+            pin.rtc_set_config(false, true, af);
         }
         None => {
             let lp_pin = low_level::init_pin(pin, false);

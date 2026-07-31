@@ -6055,10 +6055,10 @@ macro_rules! for_each_analog_function {
 ///
 /// This macro has two options for its "Individual matcher" case:
 ///
-/// - `all`: `($signal:ident, $gpio:ident, $af:literal)` - simple case where you only need
-///   identifiers, and maybe the function number.
-/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:literal, ($(
-///   $lp_input_af:literal => $lp_input_signal:ident )*) ($( $lp_output_af:literal =>
+/// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need
+///   identifiers, and maybe the function.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:ident, ($(
+///   $lp_input_af:ident => $lp_input_signal:ident )*) ($( $lp_output_af:ident =>
 ///   $lp_output_signal:ident )*))` - expanded signal case, where you need the number(s) of a
 ///   signal, or the general group to which the signal belongs. Every expanded branch ends with the
 ///   pad's LP input and output function groups (empty on chips without an LP GPIO matrix).
@@ -6070,19 +6070,19 @@ macro_rules! for_each_analog_function {
 ///   is `ADCn_CHm`.
 /// - `$number`: the numbers extracted from `$signal`.
 /// - `$gpio`: the name of the GPIO.
-/// - `$af`: the function number, as listed in the LP/RTC IO MUX pad list. On chips with an LP IO
-///   peripheral this is the value to write to the pin's `MCU_SEL` field to select the function. On
-///   chips with an RTC IO peripheral the numbering is not necessarily register-accurate.
-/// - `$lp_input_af`: the LP IO MUX function number for an LP peripheral input on this pad.
+/// - `$af`: the LP/RTC IO MUX function, as an identifier (i.e. for function 0 this is `_0`). This
+///   is the name of an `LpFunction` variant, and its number is the value to write to the pad's
+///   function select field.
+/// - `$lp_input_af`: the LP IO MUX function for an LP peripheral input on this pad.
 /// - `$lp_input_signal`: the LP peripheral input signal name.
-/// - `$lp_output_af`: the LP IO MUX function number for an LP peripheral output on this pad.
+/// - `$lp_output_af`: the LP IO MUX function for an LP peripheral output on this pad.
 /// - `$lp_output_signal`: the LP peripheral output signal name.
 ///
 /// Example data:
-/// - `(RTC_GPIO15, GPIO12, 0)`
-/// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, 0, () ())`
-/// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, 1, () (0 => LP_UART_TXD))`
-/// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, 1, () ())`
+/// - `(RTC_GPIO15, GPIO12, _0)`
+/// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, _0, () ())`
+/// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, _1, () (_0 => LP_UART_TXD))`
+/// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, _3, () ())`
 ///
 /// The expanded syntax is only available when the signal has at least one numbered component.
 #[macro_export]
@@ -6090,85 +6090,86 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_lp_function!((RTC_GPIO0, GPIO0, 0));
-        _for_each_inner_lp_function!((SAR_I2C_SCL_0, GPIO0, 1));
-        _for_each_inner_lp_function!((RTC_GPIO1, GPIO1, 0));
-        _for_each_inner_lp_function!((SAR_I2C_SDA_0, GPIO1, 1));
-        _for_each_inner_lp_function!((RTC_GPIO2, GPIO2, 0));
-        _for_each_inner_lp_function!((SAR_I2C_SCL_1, GPIO2, 1));
-        _for_each_inner_lp_function!((RTC_GPIO3, GPIO3, 0));
-        _for_each_inner_lp_function!((SAR_I2C_SDA_1, GPIO3, 1));
-        _for_each_inner_lp_function!((RTC_GPIO4, GPIO4, 0));
-        _for_each_inner_lp_function!((RTC_GPIO5, GPIO5, 0));
-        _for_each_inner_lp_function!((RTC_GPIO6, GPIO6, 0));
-        _for_each_inner_lp_function!((RTC_GPIO7, GPIO7, 0));
-        _for_each_inner_lp_function!((RTC_GPIO8, GPIO8, 0));
-        _for_each_inner_lp_function!((RTC_GPIO9, GPIO9, 0));
-        _for_each_inner_lp_function!((RTC_GPIO10, GPIO10, 0));
-        _for_each_inner_lp_function!((RTC_GPIO11, GPIO11, 0));
-        _for_each_inner_lp_function!((RTC_GPIO12, GPIO12, 0));
-        _for_each_inner_lp_function!((RTC_GPIO13, GPIO13, 0));
-        _for_each_inner_lp_function!((RTC_GPIO14, GPIO14, 0));
-        _for_each_inner_lp_function!((RTC_GPIO15, GPIO15, 0));
-        _for_each_inner_lp_function!((RTC_GPIO16, GPIO16, 0));
-        _for_each_inner_lp_function!((RTC_GPIO17, GPIO17, 0));
-        _for_each_inner_lp_function!((RTC_GPIO18, GPIO18, 0));
-        _for_each_inner_lp_function!((RTC_GPIO19, GPIO19, 0));
-        _for_each_inner_lp_function!((RTC_GPIO20, GPIO20, 0));
-        _for_each_inner_lp_function!((RTC_GPIO21, GPIO21, 0));
-        _for_each_inner_lp_function!(((RTC_GPIO0, RTC_GPIOn, 0), GPIO0, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO1, RTC_GPIOn, 1), GPIO1, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO2, RTC_GPIOn, 2), GPIO2, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO3, RTC_GPIOn, 3), GPIO3, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO4, RTC_GPIOn, 4), GPIO4, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO5, RTC_GPIOn, 5), GPIO5, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO6, RTC_GPIOn, 6), GPIO6, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO7, RTC_GPIOn, 7), GPIO7, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO8, RTC_GPIOn, 8), GPIO8, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO9, RTC_GPIOn, 9), GPIO9, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO10, RTC_GPIOn, 10), GPIO10, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO11, RTC_GPIOn, 11), GPIO11, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO12, RTC_GPIOn, 12), GPIO12, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO13, RTC_GPIOn, 13), GPIO13, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO14, RTC_GPIOn, 14), GPIO14, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO15, RTC_GPIOn, 15), GPIO15, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO16, RTC_GPIOn, 16), GPIO16, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO17, RTC_GPIOn, 17), GPIO17, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO18, RTC_GPIOn, 18), GPIO18, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO19, RTC_GPIOn, 19), GPIO19, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO20, RTC_GPIOn, 20), GPIO20, 0, () ()));
-        _for_each_inner_lp_function!(((RTC_GPIO21, RTC_GPIOn, 21), GPIO21, 0, () ()));
-        _for_each_inner_lp_function!(((SAR_I2C_SCL_0, SAR_I2C_SCL_n, 0), GPIO0, 1, ()
-        ())); _for_each_inner_lp_function!(((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, 1,
+        => {} } _for_each_inner_lp_function!((RTC_GPIO0, GPIO0, _0));
+        _for_each_inner_lp_function!((SAR_I2C_SCL_0, GPIO0, _3));
+        _for_each_inner_lp_function!((RTC_GPIO1, GPIO1, _0));
+        _for_each_inner_lp_function!((SAR_I2C_SDA_0, GPIO1, _3));
+        _for_each_inner_lp_function!((RTC_GPIO2, GPIO2, _0));
+        _for_each_inner_lp_function!((SAR_I2C_SCL_1, GPIO2, _3));
+        _for_each_inner_lp_function!((RTC_GPIO3, GPIO3, _0));
+        _for_each_inner_lp_function!((SAR_I2C_SDA_1, GPIO3, _3));
+        _for_each_inner_lp_function!((RTC_GPIO4, GPIO4, _0));
+        _for_each_inner_lp_function!((RTC_GPIO5, GPIO5, _0));
+        _for_each_inner_lp_function!((RTC_GPIO6, GPIO6, _0));
+        _for_each_inner_lp_function!((RTC_GPIO7, GPIO7, _0));
+        _for_each_inner_lp_function!((RTC_GPIO8, GPIO8, _0));
+        _for_each_inner_lp_function!((RTC_GPIO9, GPIO9, _0));
+        _for_each_inner_lp_function!((RTC_GPIO10, GPIO10, _0));
+        _for_each_inner_lp_function!((RTC_GPIO11, GPIO11, _0));
+        _for_each_inner_lp_function!((RTC_GPIO12, GPIO12, _0));
+        _for_each_inner_lp_function!((RTC_GPIO13, GPIO13, _0));
+        _for_each_inner_lp_function!((RTC_GPIO14, GPIO14, _0));
+        _for_each_inner_lp_function!((RTC_GPIO15, GPIO15, _0));
+        _for_each_inner_lp_function!((RTC_GPIO16, GPIO16, _0));
+        _for_each_inner_lp_function!((RTC_GPIO17, GPIO17, _0));
+        _for_each_inner_lp_function!((RTC_GPIO18, GPIO18, _0));
+        _for_each_inner_lp_function!((RTC_GPIO19, GPIO19, _0));
+        _for_each_inner_lp_function!((RTC_GPIO20, GPIO20, _0));
+        _for_each_inner_lp_function!((RTC_GPIO21, GPIO21, _0));
+        _for_each_inner_lp_function!(((RTC_GPIO0, RTC_GPIOn, 0), GPIO0, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO1, RTC_GPIOn, 1), GPIO1, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO2, RTC_GPIOn, 2), GPIO2, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO3, RTC_GPIOn, 3), GPIO3, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO4, RTC_GPIOn, 4), GPIO4, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO5, RTC_GPIOn, 5), GPIO5, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO6, RTC_GPIOn, 6), GPIO6, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO7, RTC_GPIOn, 7), GPIO7, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO8, RTC_GPIOn, 8), GPIO8, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO9, RTC_GPIOn, 9), GPIO9, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO10, RTC_GPIOn, 10), GPIO10, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO11, RTC_GPIOn, 11), GPIO11, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO12, RTC_GPIOn, 12), GPIO12, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO13, RTC_GPIOn, 13), GPIO13, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO14, RTC_GPIOn, 14), GPIO14, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO15, RTC_GPIOn, 15), GPIO15, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO16, RTC_GPIOn, 16), GPIO16, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO17, RTC_GPIOn, 17), GPIO17, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO18, RTC_GPIOn, 18), GPIO18, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO19, RTC_GPIOn, 19), GPIO19, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO20, RTC_GPIOn, 20), GPIO20, _0, () ()));
+        _for_each_inner_lp_function!(((RTC_GPIO21, RTC_GPIOn, 21), GPIO21, _0, () ()));
+        _for_each_inner_lp_function!(((SAR_I2C_SCL_0, SAR_I2C_SCL_n, 0), GPIO0, _3, ()
+        ())); _for_each_inner_lp_function!(((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, _3,
         () ())); _for_each_inner_lp_function!(((SAR_I2C_SDA_0, SAR_I2C_SDA_n, 0), GPIO1,
-        1, () ())); _for_each_inner_lp_function!(((SAR_I2C_SDA_1, SAR_I2C_SDA_n, 1),
-        GPIO3, 1, () ())); _for_each_inner_lp_function!((all(RTC_GPIO0, GPIO0, 0),
-        (SAR_I2C_SCL_0, GPIO0, 1), (RTC_GPIO1, GPIO1, 0), (SAR_I2C_SDA_0, GPIO1, 1),
-        (RTC_GPIO2, GPIO2, 0), (SAR_I2C_SCL_1, GPIO2, 1), (RTC_GPIO3, GPIO3, 0),
-        (SAR_I2C_SDA_1, GPIO3, 1), (RTC_GPIO4, GPIO4, 0), (RTC_GPIO5, GPIO5, 0),
-        (RTC_GPIO6, GPIO6, 0), (RTC_GPIO7, GPIO7, 0), (RTC_GPIO8, GPIO8, 0), (RTC_GPIO9,
-        GPIO9, 0), (RTC_GPIO10, GPIO10, 0), (RTC_GPIO11, GPIO11, 0), (RTC_GPIO12, GPIO12,
-        0), (RTC_GPIO13, GPIO13, 0), (RTC_GPIO14, GPIO14, 0), (RTC_GPIO15, GPIO15, 0),
-        (RTC_GPIO16, GPIO16, 0), (RTC_GPIO17, GPIO17, 0), (RTC_GPIO18, GPIO18, 0),
-        (RTC_GPIO19, GPIO19, 0), (RTC_GPIO20, GPIO20, 0), (RTC_GPIO21, GPIO21, 0)));
-        _for_each_inner_lp_function!((RTC_GPIOn((RTC_GPIO0, RTC_GPIOn, 0), GPIO0, 0, ()
-        ()), ((RTC_GPIO1, RTC_GPIOn, 1), GPIO1, 0, () ()), ((RTC_GPIO2, RTC_GPIOn, 2),
-        GPIO2, 0, () ()), ((RTC_GPIO3, RTC_GPIOn, 3), GPIO3, 0, () ()), ((RTC_GPIO4,
-        RTC_GPIOn, 4), GPIO4, 0, () ()), ((RTC_GPIO5, RTC_GPIOn, 5), GPIO5, 0, () ()),
-        ((RTC_GPIO6, RTC_GPIOn, 6), GPIO6, 0, () ()), ((RTC_GPIO7, RTC_GPIOn, 7), GPIO7,
-        0, () ()), ((RTC_GPIO8, RTC_GPIOn, 8), GPIO8, 0, () ()), ((RTC_GPIO9, RTC_GPIOn,
-        9), GPIO9, 0, () ()), ((RTC_GPIO10, RTC_GPIOn, 10), GPIO10, 0, () ()),
-        ((RTC_GPIO11, RTC_GPIOn, 11), GPIO11, 0, () ()), ((RTC_GPIO12, RTC_GPIOn, 12),
-        GPIO12, 0, () ()), ((RTC_GPIO13, RTC_GPIOn, 13), GPIO13, 0, () ()), ((RTC_GPIO14,
-        RTC_GPIOn, 14), GPIO14, 0, () ()), ((RTC_GPIO15, RTC_GPIOn, 15), GPIO15, 0, ()
-        ()), ((RTC_GPIO16, RTC_GPIOn, 16), GPIO16, 0, () ()), ((RTC_GPIO17, RTC_GPIOn,
-        17), GPIO17, 0, () ()), ((RTC_GPIO18, RTC_GPIOn, 18), GPIO18, 0, () ()),
-        ((RTC_GPIO19, RTC_GPIOn, 19), GPIO19, 0, () ()), ((RTC_GPIO20, RTC_GPIOn, 20),
-        GPIO20, 0, () ()), ((RTC_GPIO21, RTC_GPIOn, 21), GPIO21, 0, () ())));
+        _3, () ())); _for_each_inner_lp_function!(((SAR_I2C_SDA_1, SAR_I2C_SDA_n, 1),
+        GPIO3, _3, () ())); _for_each_inner_lp_function!((all(RTC_GPIO0, GPIO0, _0),
+        (SAR_I2C_SCL_0, GPIO0, _3), (RTC_GPIO1, GPIO1, _0), (SAR_I2C_SDA_0, GPIO1, _3),
+        (RTC_GPIO2, GPIO2, _0), (SAR_I2C_SCL_1, GPIO2, _3), (RTC_GPIO3, GPIO3, _0),
+        (SAR_I2C_SDA_1, GPIO3, _3), (RTC_GPIO4, GPIO4, _0), (RTC_GPIO5, GPIO5, _0),
+        (RTC_GPIO6, GPIO6, _0), (RTC_GPIO7, GPIO7, _0), (RTC_GPIO8, GPIO8, _0),
+        (RTC_GPIO9, GPIO9, _0), (RTC_GPIO10, GPIO10, _0), (RTC_GPIO11, GPIO11, _0),
+        (RTC_GPIO12, GPIO12, _0), (RTC_GPIO13, GPIO13, _0), (RTC_GPIO14, GPIO14, _0),
+        (RTC_GPIO15, GPIO15, _0), (RTC_GPIO16, GPIO16, _0), (RTC_GPIO17, GPIO17, _0),
+        (RTC_GPIO18, GPIO18, _0), (RTC_GPIO19, GPIO19, _0), (RTC_GPIO20, GPIO20, _0),
+        (RTC_GPIO21, GPIO21, _0))); _for_each_inner_lp_function!((RTC_GPIOn((RTC_GPIO0,
+        RTC_GPIOn, 0), GPIO0, _0, () ()), ((RTC_GPIO1, RTC_GPIOn, 1), GPIO1, _0, () ()),
+        ((RTC_GPIO2, RTC_GPIOn, 2), GPIO2, _0, () ()), ((RTC_GPIO3, RTC_GPIOn, 3), GPIO3,
+        _0, () ()), ((RTC_GPIO4, RTC_GPIOn, 4), GPIO4, _0, () ()), ((RTC_GPIO5,
+        RTC_GPIOn, 5), GPIO5, _0, () ()), ((RTC_GPIO6, RTC_GPIOn, 6), GPIO6, _0, () ()),
+        ((RTC_GPIO7, RTC_GPIOn, 7), GPIO7, _0, () ()), ((RTC_GPIO8, RTC_GPIOn, 8), GPIO8,
+        _0, () ()), ((RTC_GPIO9, RTC_GPIOn, 9), GPIO9, _0, () ()), ((RTC_GPIO10,
+        RTC_GPIOn, 10), GPIO10, _0, () ()), ((RTC_GPIO11, RTC_GPIOn, 11), GPIO11, _0, ()
+        ()), ((RTC_GPIO12, RTC_GPIOn, 12), GPIO12, _0, () ()), ((RTC_GPIO13, RTC_GPIOn,
+        13), GPIO13, _0, () ()), ((RTC_GPIO14, RTC_GPIOn, 14), GPIO14, _0, () ()),
+        ((RTC_GPIO15, RTC_GPIOn, 15), GPIO15, _0, () ()), ((RTC_GPIO16, RTC_GPIOn, 16),
+        GPIO16, _0, () ()), ((RTC_GPIO17, RTC_GPIOn, 17), GPIO17, _0, () ()),
+        ((RTC_GPIO18, RTC_GPIOn, 18), GPIO18, _0, () ()), ((RTC_GPIO19, RTC_GPIOn, 19),
+        GPIO19, _0, () ()), ((RTC_GPIO20, RTC_GPIOn, 20), GPIO20, _0, () ()),
+        ((RTC_GPIO21, RTC_GPIOn, 21), GPIO21, _0, () ())));
         _for_each_inner_lp_function!((SAR_I2C_SCL_n((SAR_I2C_SCL_0, SAR_I2C_SCL_n, 0),
-        GPIO0, 1, () ()), ((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, 1, () ())));
+        GPIO0, _3, () ()), ((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, _3, () ())));
         _for_each_inner_lp_function!((SAR_I2C_SDA_n((SAR_I2C_SDA_0, SAR_I2C_SDA_n, 0),
-        GPIO1, 1, () ()), ((SAR_I2C_SDA_1, SAR_I2C_SDA_n, 1), GPIO3, 1, () ())));
+        GPIO1, _3, () ()), ((SAR_I2C_SDA_1, SAR_I2C_SDA_n, 1), GPIO3, _3, () ())));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
@@ -6721,6 +6722,35 @@ macro_rules! define_io_mux_signals {
             SUBSPICLK_P_DIFF,
             SUBSPICLK_N_DIFF,
             MTDO,
+        }
+    };
+}
+/// Defines the `LpFunction` enum.
+///
+/// The enum only contains the LP/RTC IO MUX functions that the chip implements. It is
+/// empty on chips without an LP/RTC IO peripheral.
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_lp_functions {
+    () => {
+        /// LP/RTC IO MUX function of a pad.
+        ///
+        /// This is the low-power counterpart of `AlternateFunction`: it selects which function
+        /// drives a pad while the pad belongs to the low-power domain.
+        #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum LpFunction {
+            /// LP/RTC IO MUX function 0.
+            _0 = 0,
+            /// LP/RTC IO MUX function 3.
+            _3 = 3,
+        }
+        impl LpFunction {
+            /// The function that connects the pad to the LP/RTC GPIO peripheral.
+            pub const LP_GPIO: Self = Self::_0;
         }
     };
 }

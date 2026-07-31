@@ -1,10 +1,10 @@
 use crate::{
-    gpio::{RtcFunction, RtcPin, RtcPinWithResistors},
+    gpio::{AlternateFunction, RtcPin, RtcPinWithResistors, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LP_AON},
 };
 
 for_each_lp_function! {
-    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl RtcPin for crate::peripherals::$gpio<'_> {
             fn rtc_number(&self) -> u8 {
@@ -25,11 +25,13 @@ for_each_lp_function! {
                     });
             }
 
-            fn rtc_set_config(&self, input_enable: bool, _mux: bool, _func: RtcFunction) {
+            // The LP core reaches the pad through the digital IO MUX, so there is no low-power
+            // function to select.
+            fn rtc_set_config(&self, input_enable: bool, _mux: bool, _func: LpFunction) {
                 IO_MUX::regs().gpio(lp_pin_to_gpio($pin) as usize)
                     .modify(|_, w| unsafe {
                         w.slp_sel().bit(false);
-                        w.mcu_sel().bits(1);
+                        w.mcu_sel().bits(AlternateFunction::GPIO as u8);
                         w.fun_ie().bit(input_enable)
                     });
             }

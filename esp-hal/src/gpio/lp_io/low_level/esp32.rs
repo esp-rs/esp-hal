@@ -1,4 +1,7 @@
-use crate::peripherals::{GPIO, LPWR, RTC_IO};
+use crate::{
+    gpio::lp_io::LpFunction,
+    peripherals::{GPIO, LPWR, RTC_IO},
+};
 
 macro_rules! rtcio_analog {
     ($pin_peri:ident, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident) => {
@@ -13,7 +16,7 @@ macro_rules! rtcio_analog {
                     &self,
                     input_enable: bool,
                     mux: bool,
-                    func: crate::gpio::RtcFunction,
+                    func: LpFunction,
                 ) {
                     RTC_IO::regs()
                         .$pin_reg
@@ -60,7 +63,7 @@ macro_rules! rtcio_analog {
                     RTC_IO::regs().$pin_reg.modify(|_, w| {
                         w.[<$prefix fun_ie>]().clear_bit();
                         w.[<$prefix mux_sel>]().set_bit();
-                        unsafe { w.[<$prefix fun_sel>]().bits(0) };
+                        unsafe { w.[<$prefix fun_sel>]().bits(LpFunction::LP_GPIO as u8) };
 
                         // Only output pins have PU/PD resistors.
                         for_each_gpio! {
@@ -167,7 +170,7 @@ macro_rules! set_pull_field {
 }
 
 pub(super) fn init_pin(pin: &impl crate::gpio::RtcPin, input_enable: bool) -> u8 {
-    pin.rtc_set_config(input_enable, true, crate::gpio::RtcFunction::Rtc);
+    pin.rtc_set_config(input_enable, true, LpFunction::LP_GPIO);
     pin.rtc_number()
 }
 

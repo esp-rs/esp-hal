@@ -4,10 +4,10 @@ gpio_function = 1
 constant_0_input = 0x3c
 constant_1_input = 0x38
 pins = [
-    { pin =  0,                                                                                                                rtc = { 0 = "RTC_GPIO0", 1 = "SAR_I2C_SCL_0" }, limitations = ["strapping"] },
-    { pin =  1,                                                                analog = { 0 = "TOUCH1",     1 = "ADC1_CH0"  }, rtc = { 0 = "RTC_GPIO1", 1 = "SAR_I2C_SDA_0" } },
-    { pin =  2,                                                                analog = { 0 = "TOUCH2",     1 = "ADC1_CH1"  }, rtc = { 0 = "RTC_GPIO2", 1 = "SAR_I2C_SCL_1" } },
-    { pin =  3,                                                                analog = { 0 = "TOUCH3",     1 = "ADC1_CH2"  }, rtc = { 0 = "RTC_GPIO3", 1 = "SAR_I2C_SDA_1" }, limitations = ["strapping"] },
+    { pin =  0,                                                                                                                rtc = { 0 = "RTC_GPIO0", 3 = "SAR_I2C_SCL_0" }, limitations = ["strapping"] },
+    { pin =  1,                                                                analog = { 0 = "TOUCH1",     1 = "ADC1_CH0"  }, rtc = { 0 = "RTC_GPIO1", 3 = "SAR_I2C_SDA_0" } },
+    { pin =  2,                                                                analog = { 0 = "TOUCH2",     1 = "ADC1_CH1"  }, rtc = { 0 = "RTC_GPIO2", 3 = "SAR_I2C_SCL_1" } },
+    { pin =  3,                                                                analog = { 0 = "TOUCH3",     1 = "ADC1_CH2"  }, rtc = { 0 = "RTC_GPIO3", 3 = "SAR_I2C_SDA_1" }, limitations = ["strapping"] },
     { pin =  4,                                                                analog = { 0 = "TOUCH4",     1 = "ADC1_CH3"  }, rtc = { 0 = "RTC_GPIO4" } },
     { pin =  5,                                                                analog = { 0 = "TOUCH5",     1 = "ADC1_CH4"  }, rtc = { 0 = "RTC_GPIO5" } },
     { pin =  6,                                                                analog = { 0 = "TOUCH6",     1 = "ADC1_CH5"  }, rtc = { 0 = "RTC_GPIO6" } },

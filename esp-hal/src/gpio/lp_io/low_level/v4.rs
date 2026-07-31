@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{RtcFunction, RtcPin, RtcPinWithResistors},
+    gpio::{RtcPin, RtcPinWithResistors, lp_io::LpFunction},
     peripherals::LP_AON,
 };
 
@@ -13,7 +13,7 @@ cfg_select! {
 }
 
 for_each_lp_function! {
-    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl RtcPin for crate::peripherals::$gpio<'_> {
             fn rtc_number(&self) -> u8 {
@@ -40,7 +40,7 @@ for_each_lp_function! {
                     });
             }
 
-            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
+            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: LpFunction) {
                 let mask = 1 << $pin;
                 LP_AON::regs()
                     .gpio_mux()
@@ -75,7 +75,7 @@ for_each_lp_function! {
 }
 
 pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
-    pin.rtc_set_config(input_enable, true, RtcFunction::Rtc);
+    pin.rtc_set_config(input_enable, true, LpFunction::LP_GPIO);
     pin.number()
 }
 

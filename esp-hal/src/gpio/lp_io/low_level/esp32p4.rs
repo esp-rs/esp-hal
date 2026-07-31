@@ -1,15 +1,14 @@
 use crate::{
     gpio::{
-        RtcFunction,
         RtcPin,
         RtcPinWithResistors,
-        lp_io::{LpInputSignal, LpOutputSignal},
+        lp_io::{LpFunction, LpInputSignal, LpOutputSignal},
     },
     peripherals::{LP_GPIO, LP_IO_MUX},
 };
 
 for_each_lp_function! {
-    (($lp_pin_name:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident, $_af:literal, ($( $lp_in_af:literal => $lp_in_signal:ident )*) ($( $lp_out_af:literal => $lp_out_signal:ident )*)) => {
+    (($lp_pin_name:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident, $_af:ident, ($( $lp_in_af:ident => $lp_in_signal:ident )*) ($( $lp_out_af:ident => $lp_out_signal:ident )*)) => {
         impl RtcPin for crate::peripherals::$gpio<'_> {
             fn rtc_number(&self) -> u8 {
                 $lp_pin
@@ -26,25 +25,27 @@ for_each_lp_function! {
                 pad_hold_enable($lp_pin, enable);
             }
 
-            fn rtc_set_config(
-                &self,
-                input_enable: bool,
-                mux: bool,
-                func: RtcFunction,
-            ) {
-                let func_num = match func {
-                    RtcFunction::Rtc => 1,
-                    RtcFunction::Digital => 0,
-                };
-                set_pad_function($lp_pin, input_enable, mux, func_num);
+            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: LpFunction) {
+                if mux {
+                    LP_GPIO::regs()
+                        .clk_en()
+                        .modify(|_, w| w.reg_clk_en().set_bit());
+                    while LP_GPIO::regs().clk_en().read().reg_clk_en().bit_is_clear() {}
+                }
+
+                LP_IO_MUX::regs().pad($lp_pin).modify(|_, w| unsafe {
+                    w.mux_sel().bit(mux);
+                    w.fun_ie().bit(input_enable);
+                    w.fun_sel().bits(func as u8)
+                });
             }
 
-            fn lp_input_signals(&self) -> &'static [(u8, LpInputSignal)] {
-                &[$( ($lp_in_af, LpInputSignal::$lp_in_signal) ),*]
+            fn lp_input_signals(&self) -> &'static [(LpFunction, LpInputSignal)] {
+                &[$( (LpFunction::$lp_in_af, LpInputSignal::$lp_in_signal) ),*]
             }
 
-            fn lp_output_signals(&self) -> &'static [(u8, LpOutputSignal)] {
-                &[$( ($lp_out_af, LpOutputSignal::$lp_out_signal) ),*]
+            fn lp_output_signals(&self) -> &'static [(LpFunction, LpOutputSignal)] {
+                &[$( (LpFunction::$lp_out_af, LpOutputSignal::$lp_out_signal) ),*]
             }
         }
 
@@ -60,24 +61,9 @@ for_each_lp_function! {
     };
 }
 
-pub(super) fn set_pad_function(pin: u8, input_enable: bool, mux: bool, func: u8) {
-    if mux {
-        LP_GPIO::regs()
-            .clk_en()
-            .modify(|_, w| w.reg_clk_en().set_bit());
-        while LP_GPIO::regs().clk_en().read().reg_clk_en().bit_is_clear() {}
-    }
-
-    LP_IO_MUX::regs().pad(pin as usize).modify(|_, w| unsafe {
-        w.mux_sel().bit(mux);
-        w.fun_ie().bit(input_enable);
-        w.fun_sel().bits(func)
-    });
-}
-
 pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
     let lp_pin = pin.number();
-    pin.rtc_set_config(input_enable, true, RtcFunction::Rtc);
+    pin.rtc_set_config(input_enable, true, LpFunction::LP_GPIO);
     lp_pin
 }
 

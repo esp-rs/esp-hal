@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{RtcFunction, RtcPin, RtcPinWithResistors},
+    gpio::{RtcPin, RtcPinWithResistors, lp_io::LpFunction},
     peripherals::{GPIO, LPWR, RTC_IO, SENS},
 };
 
@@ -58,7 +58,7 @@ macro_rules! hold_field {
 // Generates one big match statement because the pin registers have different types.
 for_each_lp_function!(
     (RTC_GPIOn $(
-        (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt)
+        (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt)
     ),*) => {
         macro_rules! with_pin_reg {
             ($pin:expr, |$reg:ident| $code:expr) => {{
@@ -77,14 +77,14 @@ for_each_lp_function!(
 );
 
 for_each_lp_function! {
-    (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl RtcPin for crate::peripherals::$gpio<'_> {
             fn rtc_number(&self) -> u8 {
                 $n
             }
 
-            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
+            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: LpFunction) {
                 enable_iomux_clk_gate();
                 pin_reg!($gpio).modify(|_, w| unsafe {
                     w.fun_ie().bit(input_enable);
@@ -128,7 +128,7 @@ for_each_analog_function! {
                 pin_reg!($gpio).modify(|_, w| {
                     w.fun_ie().clear_bit();
                     w.mux_sel().set_bit();
-                    unsafe { w.fun_sel().bits(0) };
+                    unsafe { w.fun_sel().bits(LpFunction::LP_GPIO as u8) };
                     w.rue().bit(false);
                     w.rde().bit(false)
                 });
@@ -138,7 +138,7 @@ for_each_analog_function! {
 }
 
 pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
-    pin.rtc_set_config(input_enable, true, RtcFunction::Rtc);
+    pin.rtc_set_config(input_enable, true, LpFunction::LP_GPIO);
     pin.rtc_number()
 }
 

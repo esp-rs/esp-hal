@@ -74,7 +74,7 @@
 //! ```
 
 use crate::{
-    gpio::{InputPin, OutputPin, RtcFunction, RtcPin},
+    gpio::{InputPin, OutputPin, RtcPin, lp_io::LpFunction},
     peripherals::{GPIO, RTC_I2C, RTC_IO, SENS},
     time::Duration,
 };
@@ -83,26 +83,38 @@ use crate::{
 pub trait Sda: RtcPin + OutputPin + InputPin {
     #[doc(hidden)]
     fn selector(&self) -> u8;
+    #[doc(hidden)]
+    fn rtc_i2c_function(&self) -> LpFunction;
 }
 
 /// Trait representing the RTC_I2C SCL pin.
 pub trait Scl: RtcPin + OutputPin + InputPin {
     #[doc(hidden)]
     fn selector(&self) -> u8;
+    #[doc(hidden)]
+    fn rtc_i2c_function(&self) -> LpFunction;
 }
 
 for_each_lp_function! {
-    (($_func:ident, SAR_I2C_SCL_n, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_func:ident, SAR_I2C_SCL_n, $n:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl Scl for crate::peripherals::$gpio<'_> {
             fn selector(&self) -> u8 {
                 $n
             }
+
+            fn rtc_i2c_function(&self) -> LpFunction {
+                LpFunction::$af
+            }
         }
     };
-    (($_func:ident, SAR_I2C_SDA_n, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_func:ident, SAR_I2C_SDA_n, $n:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl Sda for crate::peripherals::$gpio<'_> {
             fn selector(&self) -> u8 {
                 $n
+            }
+
+            fn rtc_i2c_function(&self) -> LpFunction {
+                LpFunction::$af
             }
         }
     };
@@ -166,21 +178,21 @@ impl<'d> I2c<'d> {
         i2c.register_block().ctrl().reset();
         SENS::regs().sar_i2c_ctrl().reset();
 
-        fn bind_pin(pin: &impl RtcPin) {
+        fn bind_pin(pin: &impl RtcPin, function: LpFunction) {
             GPIO::regs()
                 .pin(pin.number() as usize)
                 .modify(|_, w| w.pad_driver().bit(true));
             RTC_IO::regs()
                 .touch_pad(pin.number() as usize)
-                .modify(|_, w| w.fun_ie().bit(true).rue().bit(true).rde().bit(false));
+                .modify(|_, w| w.rue().bit(true).rde().bit(false));
             RTC_IO::regs()
                 .rtc_gpio_enable_w1ts()
                 .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << pin.number()) });
-            pin.rtc_set_config(true, true, RtcFunction::I2c);
+            pin.rtc_set_config(true, true, function);
         }
 
-        bind_pin(&sda);
-        bind_pin(&scl);
+        bind_pin(&sda, sda.rtc_i2c_function());
+        bind_pin(&scl, scl.rtc_i2c_function());
 
         RTC_IO::regs().sar_i2c_io().write(|w| unsafe {
             w.sar_i2c_sda_sel().bits(sda.selector());
