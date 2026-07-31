@@ -472,32 +472,6 @@ impl EspTwaiFrame {
             self_reception: true,
         })
     }
-
-    /// Make a new frame from an id, pointer to the TWAI_DATA_x_REG registers,
-    /// and the length of the data payload (dlc).
-    ///
-    /// # Safety
-    /// This is unsafe because it directly accesses peripheral registers.
-    unsafe fn new_from_data_registers(
-        id: impl Into<Id>,
-        registers: *const u32,
-        dlc: usize,
-    ) -> Self {
-        let mut data: [u8; 8] = [0; 8];
-
-        // Copy the data from the memory mapped peripheral into actual memory.
-        unsafe {
-            copy_from_data_register(&mut data[..dlc], registers);
-        }
-
-        Self {
-            id: id.into(),
-            data,
-            dlc,
-            is_remote: false,
-            self_reception: false,
-        }
-    }
 }
 
 #[instability::unstable]
@@ -533,6 +507,82 @@ impl embedded_can::Frame for EspTwaiFrame {
             true => &[],
             false => &self.data[0..self.dlc],
         }
+    }
+}
+
+/// A RAM buffer for a TWAI frame.
+///
+/// Mirror image of the 13 TWAI_DATA_x_REG registers.
+#[derive(Debug)]
+pub struct RawFrame {
+    bytes: [u8; 13],
+}
+
+impl RawFrame {
+    /// Make a new [`RawFrame`] from TWAI_DATA_x_REG registers
+    pub(super) fn new_from_registers(register_block: &RegisterBlock) -> Self {
+        let mut bytes: [u8; 13] = [0; 13];
+        // SAFETY: Safe because it is a constant-size, read-only access to the 13 data registers
+        unsafe {
+            copy_from_data_register(&mut bytes, register_block.data(0).as_ptr());
+        }
+        Self { bytes }
+    }
+}
+
+impl TryFrom<RawFrame> for EspTwaiFrame {
+    type Error = EspTwaiError;
+
+    /// Attempt to build a new [EspTwaiFrame] by parsing and validating a [RawFrame].
+    ///
+    /// Returns a [EspTwaiError] if it does not contain a valid TWAI frame.
+    #[inline(always)]
+    fn try_from(raw_frame: RawFrame) -> Result<Self, EspTwaiError> {
+        let bytes = raw_frame.bytes;
+
+        let frame_info = bytes[0];
+        let is_standard_format = frame_info & (0b1 << 7) == 0;
+        let is_data_frame = frame_info & (0b1 << 6) == 0;
+        let self_reception = frame_info & (0b1 << 4) != 0;
+        let dlc = frame_info & 0b1111;
+        if dlc > 8 {
+            // Max data length: 8 bytes
+            return Err(EspTwaiError::NonCompliantDlc(dlc));
+        }
+        let dlc = dlc as usize;
+
+        // Frame Identifier: 2 or 4 bytes long
+        let (id, data_start) = match is_standard_format {
+            true => {
+                // Standard Format: 11-bit Identifier, 2 bytes long
+                let raw_id: u16 = ((bytes[1] as u16) << 3) | ((bytes[2] as u16) >> 5);
+                let id = Id::from(StandardId::new(raw_id).unwrap());
+                (id, 3)
+            }
+            false => {
+                // Extended Format: 29-bit Identifier, 4 bytes long
+                let raw_id: u32 = ((bytes[1] as u32) << 21)
+                    | ((bytes[2] as u32) << 13)
+                    | ((bytes[3] as u32) << 5)
+                    | ((bytes[4] as u32) >> 3);
+                let id = Id::from(ExtendedId::new(raw_id).unwrap());
+                (id, 5)
+            }
+        };
+
+        // Frame Data: `dlc` bytes long
+        let mut frame = match is_data_frame {
+            true => {
+                let data_end = data_start + dlc;
+                EspTwaiFrame::new(id, &bytes[data_start..data_end]).unwrap()
+            }
+            false => EspTwaiFrame::new_remote(id, dlc).unwrap(),
+        };
+
+        // Set Self Reception bit
+        frame.self_reception = self_reception;
+
+        Ok(frame)
     }
 }
 
@@ -1199,7 +1249,9 @@ where
             )));
         }
 
-        Ok(read_frame(self.regs())?)
+        let raw_frame = RawFrame::new_from_registers(self.regs());
+        release_receive_fifo(self.regs());
+        Ok(raw_frame.try_into()?)
     }
 }
 
@@ -1352,65 +1404,6 @@ pub trait PrivateInstance: crate::private::Sealed {
     }
     /// Returns a reference to the asynchronous state for this TWAI instance.
     fn async_state(&self) -> &asynch::TwaiAsyncState;
-}
-
-/// Read a frame from the peripheral.
-fn read_frame(register_block: &RegisterBlock) -> Result<EspTwaiFrame, EspTwaiError> {
-    // Read the frame information and extract the frame id format and dlc.
-    let data_0 = register_block.data(0).read().tx_byte().bits();
-
-    let is_standard_format = data_0 & (0b1 << 7) == 0;
-    let is_data_frame = data_0 & (0b1 << 6) == 0;
-    let self_reception = data_0 & (0b1 << 4) != 0;
-    let dlc = data_0 & 0b1111;
-
-    if dlc > 8 {
-        // Release the packet we read from the FIFO, allowing the peripheral to prepare
-        // the next packet.
-        release_receive_fifo(register_block);
-
-        return Err(EspTwaiError::NonCompliantDlc(dlc));
-    }
-    let dlc = dlc as usize;
-
-    // Read the payload from the packet and construct a frame.
-    let (id, data_ptr) = if is_standard_format {
-        // Frame uses standard 11 bit id.
-        let data_1 = register_block.data(1).read().tx_byte().bits();
-        let data_2 = register_block.data(2).read().tx_byte().bits();
-
-        let raw_id: u16 = ((data_1 as u16) << 3) | ((data_2 as u16) >> 5);
-
-        let id = Id::from(StandardId::new(raw_id).unwrap());
-        (id, register_block.data(3).as_ptr())
-    } else {
-        // Frame uses extended 29 bit id.
-        let data_1 = register_block.data(1).read().tx_byte().bits();
-        let data_2 = register_block.data(2).read().tx_byte().bits();
-        let data_3 = register_block.data(3).read().tx_byte().bits();
-        let data_4 = register_block.data(4).read().tx_byte().bits();
-
-        let raw_id: u32 = ((data_1 as u32) << 21)
-            | ((data_2 as u32) << 13)
-            | ((data_3 as u32) << 5)
-            | ((data_4 as u32) >> 3);
-
-        let id = Id::from(ExtendedId::new(raw_id).unwrap());
-        (id, register_block.data(5).as_ptr())
-    };
-
-    let mut frame = if is_data_frame {
-        unsafe { EspTwaiFrame::new_from_data_registers(id, data_ptr, dlc) }
-    } else {
-        EspTwaiFrame::new_remote(id, dlc).unwrap()
-    };
-    frame.self_reception = self_reception;
-
-    // Release the packet we read from the FIFO, allowing the peripheral to prepare
-    // the next packet.
-    release_receive_fifo(register_block);
-
-    Ok(frame)
 }
 
 /// Release the message in the buffer. This will decrement the received
@@ -1632,7 +1625,7 @@ mod asynch {
     pub struct TwaiAsyncState {
         pub tx_waker: AtomicWaker,
         pub err_waker: AtomicWaker,
-        pub rx_queue: Channel<RawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
+        pub rx_queue: Channel<RawMutex, Result<RawFrame, EspTwaiError>, 32>,
     }
 
     impl Default for TwaiAsyncState {
@@ -1750,6 +1743,11 @@ mod asynch {
                 self.twai.listen(EnumSet::all());
 
                 if let Poll::Ready(result) = self.twai.async_state().rx_queue.poll_receive(cx) {
+                    // Convert `RawFrame` to `EspTwaiFrame`
+                    let result = match result {
+                        Ok(raw_frame) => raw_frame.try_into(),
+                        Err(e) => Err(e),
+                    };
                     return Poll::Ready(result);
                 }
 
@@ -1800,7 +1798,9 @@ mod asynch {
                     Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun))
                 } else {
                     // Current frame is complete
-                    read_frame(register_block)
+                    let raw_frame = RawFrame::new_from_registers(register_block);
+                    release_receive_fifo(register_block);
+                    Ok(raw_frame)
                 };
                 // Rx queue is full? Stop consuming Rx frames
                 if rx_queue.try_send(msg).is_err() {
