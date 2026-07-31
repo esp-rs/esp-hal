@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{AlternateFunction, LpPin, LpPinWithResistors, lp_io::LpFunction},
+    gpio::{AlternateFunction, LpPin, LpPinWithResistors, WakeEvent, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
@@ -12,7 +12,7 @@ for_each_lp_function! {
                     $pin
                 }
 
-                unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
+                fn apply_wakeup(&self, wakeup: bool, level: WakeEvent) {
                     let gpio_wakeup = cfg_select! {
                         esp32c2 => LPWR::regs().cntl_gpio_wakeup(),
                         esp32c3 => LPWR::regs().gpio_wakeup(),
@@ -20,7 +20,7 @@ for_each_lp_function! {
 
                     gpio_wakeup.modify(|_, w| unsafe {
                         w.[<gpio_pin $pin _wakeup_enable>]().bit(wakeup);
-                        w.[<gpio_pin $pin _int_type>]().bits(level)
+                        w.[<gpio_pin $pin _int_type>]().bits(level as u8)
                     });
                 }
 

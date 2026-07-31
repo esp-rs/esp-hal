@@ -375,13 +375,9 @@ pub trait LpPin: Pin {
     #[doc(hidden)]
     fn lp_pad_hold(&self, enable: bool);
 
-    /// # Safety
-    ///
-    /// The `level` argument needs to be a valid setting for the
-    /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
-    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
+    /// Enables or disables waking up the chip when the pad reaches `level`.
     #[doc(hidden)]
-    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
+    fn apply_wakeup(&self, wakeup: bool, level: WakeEvent);
 
     /// LP IO MUX functions on this pad that carry LP peripheral input signals.
     #[cfg(lp_io_has_gpio_matrix)]
@@ -2240,10 +2236,9 @@ impl LpPin for AnyPin<'_> {
         }
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
-    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
+    fn apply_wakeup(&self, wakeup: bool, level: WakeEvent) {
         for_each_lp_pin! {
-            (self, target) => { unsafe { LpPin::apply_wakeup(&target, wakeup, level) } };
+            (self, target) => { LpPin::apply_wakeup(&target, wakeup, level) };
         }
     }
 

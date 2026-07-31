@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{LpPin, LpPinWithResistors, lp_io::LpFunction},
+    gpio::{LpPin, LpPinWithResistors, WakeEvent, lp_io::LpFunction},
     peripherals::LP_AON,
 };
 
@@ -20,9 +20,9 @@ for_each_lp_function! {
                 $pin
             }
 
-            unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
+            fn apply_wakeup(&self, wakeup: bool, level: WakeEvent) {
                 LP_GPIO::regs().pin($pin).modify(|_, w| unsafe {
-                    w.wakeup_enable().bit(wakeup).int_type().bits(level)
+                    w.wakeup_enable().bit(wakeup).int_type().bits(level as u8)
                 });
             }
 

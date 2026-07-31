@@ -1,12 +1,10 @@
 use super::RtcioWakeupSource;
 use crate::{
-    gpio::{AlternateFunction, Level, LpPinWithResistors},
+    gpio::{AlternateFunction, Level, LpPinWithResistors, WakeEvent},
     peripherals::{GPIO, IO_MUX, LPWR},
     rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource},
 };
 
-const GPIO_INTR_LOW_LEVEL: u8 = 4;
-const GPIO_INTR_HIGH_LEVEL: u8 = 5;
 const SIG_GPIO_OUT_IDX: u32 = 128;
 const GPIO_NUM_MAX: usize = 22;
 
@@ -17,20 +15,18 @@ impl RtcioWakeupSource<'_, '_> {
             Level::High => {
                 pin.lp_pullup(false);
                 pin.lp_pulldown(true);
-                GPIO_INTR_HIGH_LEVEL
+                WakeEvent::HighLevel
             }
             Level::Low => {
                 pin.lp_pullup(true);
                 pin.lp_pulldown(false);
-                GPIO_INTR_LOW_LEVEL
+                WakeEvent::LowLevel
             }
         };
         pin.lp_pad_hold(true);
 
         // apply_wakeup does the same as idf's esp_deep_sleep_enable_gpio_wakeup
-        unsafe {
-            pin.apply_wakeup(true, level);
-        }
+        pin.apply_wakeup(true, level);
     }
 }
 
