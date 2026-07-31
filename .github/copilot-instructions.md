@@ -27,7 +27,7 @@ All automation goes through `cargo xtask`. Use `--packages` and `--chips` to sco
 | Format (required before PR) | `cargo xtask fmt-packages` | Fast |
 | Lint | `cargo xtask lint-packages [--chips X --packages Y]` | Always scope with `--chips`/`--packages` |
 | Host-side unit tests | `cargo xtask host-tests` | Fast, runs on host |
-| Validate metadata | `cargo xtask update-metadata --check` | Fast |
+| Validate metadata | `cargo update-metadata --check` | Fast |
 | Validate changelog | `cargo xtask check-changelog` | Fast |
 | Build an example | `cargo xtask run example [name] --chip <chip>` | |
 | Build docs | `cargo xtask build documentation --chips <list>` | Slow — scope to affected chips |
@@ -108,7 +108,7 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 
 1. `cargo xtask fmt-packages`
 2. `cargo xtask lint-packages --chips <affected>` — fix all warnings
-3. `cargo xtask update-metadata --check` — if metadata changed
+3. `cargo update-metadata --check` — if metadata changed
 4. `cargo xtask check-pr-changelog` — add changelog entries to the PR description if API changed
 5. Build affected examples/tests for relevant chips
 6. `cargo xtask host-tests` — if host-side code changed; when adding `#[test]` to a package for the first time, register it in `run_host_tests` (`xtask/src/lib.rs`)

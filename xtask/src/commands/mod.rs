@@ -5,7 +5,6 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
-use esp_metadata::Chip;
 use inquire::Select;
 use serde::Serialize;
 use strum::IntoEnumIterator;
@@ -15,6 +14,7 @@ use crate::{
     Package,
     cargo::{CargoAction, CargoCommandBatcher},
     firmware,
+    metadata::Chip,
 };
 mod build;
 mod check_changelog;
@@ -165,21 +165,6 @@ pub struct LintPackagesArgs {
     /// The toolchain used to run the lints
     #[arg(long)]
     pub toolchain: Option<String>,
-}
-
-/// Arguments for the `update-metadata` subcommand.
-#[cfg_attr(
-    feature = "mcp",
-    xtask_mcp_macros::mcp_tool(
-        description = "Re-generate metadata and tables in the esp-hal README",
-        command = "update-metadata"
-    )
-)]
-#[derive(Debug, Args)]
-pub struct UpdateMetadataArgs {
-    /// Run in 'check' mode; exits with 0 if formatted correctly, 1 otherwise
-    #[arg(long)]
-    pub check: bool,
 }
 
 // ----------------------------------------------------------------------------

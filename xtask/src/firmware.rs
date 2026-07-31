@@ -6,11 +6,10 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
-use esp_metadata::Chip;
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
 
-use crate::{ScriptContext, windows_safe_path};
+use crate::{ScriptContext, metadata::Chip, windows_safe_path};
 
 /// A single, configured example (or test).
 #[derive(Debug, Clone)]

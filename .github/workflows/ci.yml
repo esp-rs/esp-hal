@@ -363,7 +363,7 @@ jobs:
       - run: cargo xtask fmt-packages --check
 
       # Check metadata generation for all packages:
-      - run: cargo xtask update-metadata --check
+      - run: cargo update-metadata --check
 
       # Enforce esp-rom-sys dependency requirement policy:
       - run: cargo xrel-check check-rom-sys-policy
@@ -554,7 +554,7 @@ jobs:
           path: |
             target/armv7-unknown-linux-gnueabihf/release/esp-devtool
             target/aarch64-unknown-linux-gnu/release/esp-devtool
-          key: xtask-hil-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'esp-metadata/**', 'xtask-mcp-macros/**') }}
+          key: xtask-hil-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'xtask-mcp-macros/**') }}
 
       - name: Install cross-compilation targets
         if: steps.xtask-cache.outputs.cache-hit != 'true'
