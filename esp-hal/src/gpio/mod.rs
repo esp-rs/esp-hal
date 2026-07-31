@@ -368,7 +368,6 @@ pub trait LpPin: Pin {
     /// pad's low-power function.
     ///
     /// `func` has no effect while the pad belongs to the digital GPIO peripheral.
-    #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
     #[doc(hidden)]
     fn lp_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction);
 
@@ -1677,7 +1676,7 @@ impl<'lt> AnyPin<'lt> {
         self.set_output_enable(false);
         self.disable_usb_pads();
 
-        #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
+        #[cfg(lp_io_driver_supported)]
         for_each_lp_function! {
             (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
@@ -2229,8 +2228,6 @@ impl LpPin for AnyPin<'_> {
         }
     }
 
-    // Keep device cfg aligned with init_gpio!
-    #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
     fn lp_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction) {
         for_each_lp_pin! {
             (self, target) => { LpPin::lp_set_config(&target, input_enable, mux, func) };

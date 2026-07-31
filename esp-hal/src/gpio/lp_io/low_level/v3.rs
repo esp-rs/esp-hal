@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{LpPin, LpPinWithResistors},
+    gpio::{AlternateFunction, LpPin, LpPinWithResistors, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
@@ -28,6 +28,17 @@ for_each_lp_function! {
                     LPWR::regs()
                         .pad_hold()
                         .modify(|_, w| w.[<gpio_pin $pin _hold>]().bit(enable));
+                }
+
+                // The low-power domain reaches the pad through the digital IO MUX, so there is
+                // no low-power function to select.
+                fn lp_set_config(&self, input_enable: bool, _mux: bool, _func: LpFunction) {
+                    IO_MUX::regs().gpio($pin)
+                        .modify(|_, w| unsafe {
+                            w.slp_sel().bit(false);
+                            w.mcu_sel().bits(AlternateFunction::GPIO as u8);
+                            w.fun_ie().bit(input_enable)
+                        });
                 }
             }
 
