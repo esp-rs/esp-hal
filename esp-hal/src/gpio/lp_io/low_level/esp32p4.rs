@@ -4,7 +4,7 @@ use crate::{
 };
 
 for_each_lp_function! {
-    (($lp_pin_name:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident) => {
+    (($lp_pin_name:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident, $_af:literal) => {
         impl RtcPin for crate::peripherals::$gpio<'_> {
             fn rtc_number(&self) -> u8 {
                 $lp_pin

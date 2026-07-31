@@ -863,12 +863,12 @@ mod tests {
         );
 
         esp_metadata_generated::for_each_lp_function! {
-            (($_rtc:ident, RTC_GPIOn, $pin:literal), $gpio:ident) => {
+            (($_rtc:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
                 if !jtag_pins.contains(&$pin) {
                     esp_hal::gpio::lp_io::LowPowerInput::new(peripherals.$gpio);
                 }
             };
-            (($_rtc:ident, LP_GPIOn, $pin:literal), $gpio:ident) => {
+            (($_rtc:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
                 if !jtag_pins.contains(&$pin) {
                     esp_hal::gpio::lp_io::LowPowerInput::new(peripherals.$gpio);
                 }

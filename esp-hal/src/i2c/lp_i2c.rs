@@ -1,12 +1,41 @@
 //! Low-power I2C driver
 
 use crate::{
-    gpio::lp_io::LowPowerOutputOpenDrain,
+    gpio::{InputPin, OutputPin, RtcPin},
     peripherals::{LP_AON, LP_I2C0, LP_IO, LP_PERI, LPWR},
     time::Rate,
 };
 
 const LP_I2C_FILTER_CYC_NUM_DEF: u8 = 7;
+
+/// Trait representing the LP_I2C SDA pin.
+pub trait Sda: RtcPin + OutputPin + InputPin {
+    #[doc(hidden)]
+    fn lp_function(&self) -> u8;
+}
+
+/// Trait representing the LP_I2C SCL pin.
+pub trait Scl: RtcPin + OutputPin + InputPin {
+    #[doc(hidden)]
+    fn lp_function(&self) -> u8;
+}
+
+for_each_lp_function! {
+    (LP_I2C_SDA, $gpio:ident, $af:literal) => {
+        impl Sda for crate::peripherals::$gpio<'_> {
+            fn lp_function(&self) -> u8 {
+                $af
+            }
+        }
+    };
+    (LP_I2C_SCL, $gpio:ident, $af:literal) => {
+        impl Scl for crate::peripherals::$gpio<'_> {
+            fn lp_function(&self) -> u8 {
+                $af
+            }
+        }
+    };
+}
 
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -121,25 +150,31 @@ impl LpI2c {
     /// Creates a new instance of the `LpI2c` peripheral.
     pub fn new(
         i2c: LP_I2C0<'static>,
-        _sda: LowPowerOutputOpenDrain<'_, 6>,
-        _scl: LowPowerOutputOpenDrain<'_, 7>,
+        sda: impl Sda + 'static,
+        scl: impl Scl + 'static,
         frequency: Rate,
     ) -> Self {
         let me = Self { i2c };
 
         // Configure LP I2C GPIOs
 
+        let sda_pin = sda.rtc_number() as usize;
+        let scl_pin = scl.rtc_number() as usize;
+
         // Initialize IO Pins
-        // NOTE: We always initialize the SCL pin (GPIO7) first, then the
-        // SDA (GPIO6) pin. This order of initialization is important to
-        // avoid any spurious I2C start conditions on the bus.
-        Self::lp_i2c_configure_io(7, true);
-        Self::lp_i2c_configure_io(6, true);
+        // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
+        // initialization is important to avoid any spurious I2C start conditions on the bus.
+        Self::lp_i2c_configure_io(scl_pin, true);
+        Self::lp_i2c_configure_io(sda_pin, true);
         unsafe {
             let lp_io = LP_IO::regs();
             // Select LP I2C function for the SDA and SCL pins
-            lp_io.gpio(7).modify(|_, w| w.mcu_sel().bits(1));
-            lp_io.gpio(6).modify(|_, w| w.mcu_sel().bits(1));
+            lp_io
+                .gpio(scl_pin)
+                .modify(|_, w| w.mcu_sel().bits(scl.lp_function()));
+            lp_io
+                .gpio(sda_pin)
+                .modify(|_, w| w.mcu_sel().bits(sda.lp_function()));
         }
 
         // Initialize LP I2C HAL */
