@@ -61,7 +61,7 @@ for_each_sdm_channel!(
                 _instance: GPIO_SD<'d>,
                 $(
                     #[doc = concat!("Channel ", stringify!($ch), " creator.")]
-                    pub [<channel $ch>]: ChannelCreator,
+                    pub [<channel $ch>]: ChannelCreator<'d>,
                 )*
             }
 
@@ -271,13 +271,19 @@ impl ChannelConfigBuilder {
 /// mutably borrows the creator for the lifetime of the active [`Channel`],
 /// which prevents accidentally connecting the same channel twice.
 #[derive(Debug)]
-pub struct ChannelCreator {
+pub struct ChannelCreator<'d> {
     channel: usize,
+    // Conceptually retains the main driver even when this creator is moved out
+    // of it, preventing SDM from being reinitialized while the creator exists.
+    _sdm: PhantomData<Sdm<'d>>,
 }
 
-impl ChannelCreator {
+impl ChannelCreator<'_> {
     const fn new(channel: usize) -> Self {
-        Self { channel }
+        Self {
+            channel,
+            _sdm: PhantomData,
+        }
     }
 
     /// Configures this channel and connects it to an output pin.
@@ -305,7 +311,7 @@ impl ChannelCreator {
 #[derive(Debug)]
 pub struct Channel<'a> {
     channel: usize,
-    _creator: PhantomData<&'a mut ChannelCreator>,
+    _creator: PhantomData<&'a mut ChannelCreator<'a>>,
     _pin_guard: PinGuard,
     _clock_guard: SdmClockGuard,
 }
