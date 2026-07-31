@@ -4,7 +4,7 @@
 //! - SDM output => first common test pin
 //! - RMT RX     => second common test pin
 
-//% CHIPS: esp32 esp32c3 esp32c5 esp32c6 esp32h2 esp32s2 esp32s3
+//% CHIP_FILTER: sdm_driver_supported && rmt_driver_supported
 //% FEATURES: unstable
 
 #![no_std]
