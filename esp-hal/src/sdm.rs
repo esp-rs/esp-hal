@@ -246,6 +246,9 @@ impl ChannelConfigBuilder {
     }
 
     /// Sets the requested output frequency.
+    ///
+    /// Selects the prescaler that produces the closest output frequency using
+    /// the currently configured SDM clock source.
     pub fn with_frequency(mut self, frequency: Rate) -> Result<ChannelConfig, Error> {
         self.config.raw_prescaler = raw_prescaler(prescaler_from_frequency(frequency)?);
         Ok(self.config)
@@ -393,20 +396,34 @@ impl Drop for SdmFunctionClockGuard {
 }
 
 fn prescaler_from_frequency(frequency: Rate) -> Result<u16, Error> {
-    let source_frequency = SdmInstance::GpioSd.function_clock_frequency();
-    let requested_frequency = frequency.as_hz();
+    let source_frequency = SdmInstance::GpioSd.function_clock_frequency() as u64;
+    let requested_frequency = frequency.as_hz() as u64;
 
-    if requested_frequency == 0 || requested_frequency > source_frequency {
+    if requested_frequency == 0
+        || requested_frequency > source_frequency
+        || requested_frequency * 256 < source_frequency
+    {
         return Err(Error::UnreachableTargetFrequency);
     }
 
-    let prescaler =
-        (source_frequency as u64 + requested_frequency as u64 / 2) / requested_frequency as u64;
-    if prescaler == 0 || prescaler > 256 {
-        return Err(Error::UnreachableTargetFrequency);
+    // The closest output must be produced by one of the two integers around
+    // the ideal prescaler.
+    let lower = source_frequency / requested_frequency;
+    let upper = lower + 1;
+    if upper > 256 {
+        return Ok(lower as u16);
     }
 
-    Ok(prescaler as u16)
+    // Compare |source / prescaler - requested| without truncating either
+    // resulting frequency.
+    let lower_error = (source_frequency - requested_frequency * lower) * upper;
+    let upper_error = (requested_frequency * upper - source_frequency) * lower;
+
+    Ok(if lower_error <= upper_error {
+        lower as u16
+    } else {
+        upper as u16
+    })
 }
 
 fn check_prescaler(prescaler: u16) -> Result<(), Error> {
