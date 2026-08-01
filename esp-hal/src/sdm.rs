@@ -47,6 +47,7 @@ the selected target are listed by
 The source can be selected as part of the global clock configuration before initializing the HAL:
 
 ```rust, no_run
+# {before_snippet}
 use esp_hal::{
     Config,
     clock::{ClockConfig, ll::IomuxFunctionClockConfig},
@@ -57,11 +58,13 @@ let clock_config = ClockConfig {
     ..ClockConfig::default()
 };
 let peripherals = esp_hal::init(Config::default().with_cpu_clock(clock_config));
+# {after_snippet}
 ```
 
 The low-level clock-tree API can also change the source at runtime:
 
 ```rust, no_run
+# {before_snippet}
 use esp_hal::clock::ll::{
     ClockTree,
     IomuxFunctionClockConfig,
@@ -71,6 +74,7 @@ use esp_hal::clock::ll::{
 ClockTree::with(|clocks| {
     configure_iomux_function_clock(clocks, IomuxFunctionClockConfig::XtalClk);
 });
+# {after_snippet}
 ```
 
 Changing this global source affects every active consumer of `IOMUX_FUNCTION_CLOCK`. Existing peripheral dividers are not automatically recalculated.
