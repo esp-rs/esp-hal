@@ -162,8 +162,8 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnreachableTargetFrequency => f.write_str("unreachable target frequency"),
-            Self::PrescalerOutOfRange => f.write_str("prescaler out of range"),
+            Self::UnreachableTargetFrequency => f.write_str("Unreachable target frequency"),
+            Self::PrescalerOutOfRange => f.write_str("Prescaler out of range"),
         }
     }
 }
