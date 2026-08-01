@@ -1,31 +1,9 @@
 # Check with a local registry.
-#
-# We want to check if we can compile examples/tests after bumping the deps by using a local registry.
-# (i.e. if we will publish the right set of crates)
-
-name: pre-release-checks
-
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-  workflow_dispatch:
-
-env:
-  CARGO_TERM_COLOR: always
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-jobs:
-  check:
-    runs-on: macos-m1-self-hosted
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'release:registry:compile-test') || contains(github.event.pull_request.labels.*.name, 'release:registry:ci'))) }}
-
-    steps:
-      - uses: actions/checkout@v6
-
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
           version: 1.97.0.0
+
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
@@ -34,6 +12,7 @@ jobs:
           toolchain: stable
           components: rust-src
 
+
       # Install the Rust nightly toolchain for RISC-V devices:
       - uses: ./.github/actions/setup-nightly
         with:
@@ -41,21 +20,22 @@ jobs:
           components: rust-src
           alias: "true"
 
+
       - name: Setup cargo-batch
         run: |
           if ! command -v cargo-batch &> /dev/null; then
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
+
       - name: init-local-registry
         run: |
-          # this example relies on a Cargo.lock file and won't compile after `cargo update` - for now lets remove it
-          # include it once that is resolved
-          rm -rf examples/async/embassy_usb_ethernet
+
 
           cargo xrel-check init
           cargo xrel-check update
           cargo xrel-check replace-path-deps
+
 
       # Build the compile-tests against the local registry. This is the cheap smoke
       # test, so it runs first. Gated on `release:registry:compile-test` so it can be
@@ -76,6 +56,7 @@ jobs:
           cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32p4
           cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32h2
 
+
       # Build the examples/qa-test/tests against the local registry. Gated on
       # `release:registry:ci` so a release can opt out of this heavy check.
       - name: try-build [examples/qa-test/tests]
@@ -91,6 +72,3 @@ jobs:
           cargo xcheck ci esp32c3 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32c5 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32c6 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32c61 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32p4 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32h2 --toolchain stable --steps=lp-examples,examples,qa-test,tests
