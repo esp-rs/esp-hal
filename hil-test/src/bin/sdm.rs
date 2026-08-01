@@ -16,7 +16,7 @@ use esp_hal::{
     gpio::{AnyPin, Level, Output, OutputConfig, interconnect::PeripheralInput},
     peripherals::{GPIO_SD, RMT},
     rmt::{CHANNEL_RAM_SIZE, Channel, PulseCode, Rmt, Rx, RxChannelConfig, RxChannelCreator},
-    sdm::{Sdm, SdmConfig},
+    sdm::Sdm,
     time::Rate,
 };
 use hil_test as _;
@@ -219,7 +219,7 @@ fn expected_ratio_per_mille(duty: u8) -> u32 {
 }
 
 fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
-    let mut sdm = Sdm::new(ctx.gpio_sd.reborrow(), SdmConfig::default());
+    let mut sdm = Sdm::new(ctx.gpio_sd.reborrow());
     let config = sdm
         .channel_config()
         .with_frequency(SDM_FREQUENCY)

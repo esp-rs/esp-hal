@@ -12,14 +12,12 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::{
-//!     sdm::{Sdm, SdmConfig},
-//!     time::Rate,
-//! };
+//! use esp_hal::{sdm::Sdm, time::Rate};
 //!
-//! let mut sdm = Sdm::new(peripherals.GPIO_SD, SdmConfig::default());
+//! let mut sdm = Sdm::new(peripherals.GPIO_SD);
 //! let config = sdm
 //!     .channel_config()
+//!     // Select the prescaler that produces the closest available frequency.
 //!     .with_frequency(Rate::from_khz(500))?
 //!     .with_duty(128);
 //! let mut channel = sdm.channel0.connect(peripherals.GPIO2, config);
@@ -29,11 +27,60 @@
 //!
 //! # {after_snippet}
 //! ```
+//!
+//! ## Clock source
+#![cfg_attr(
+    not(soc_has_clock_node_iomux_function_clock),
+    doc = r#"
+The SDM function clock is derived from the APB clock.
+"#
+)]
+#![cfg_attr(
+    soc_has_clock_node_iomux_function_clock,
+    doc = r#"
+The SDM function clock is derived from the global `IOMUX_FUNCTION_CLOCK`. Its
+source is shared by every consumer of that clock and is therefore configured
+globally instead of through [`Sdm`]. The available sources and the default for
+the selected target are listed by
+[`IomuxFunctionClockConfig`](crate::clock::ll::IomuxFunctionClockConfig).
+
+The source can be selected as part of the global clock configuration before initializing the HAL:
+
+```rust, no_run
+use esp_hal::{
+    Config,
+    clock::{ClockConfig, ll::IomuxFunctionClockConfig},
+};
+
+let clock_config = ClockConfig {
+    iomux_function_clock: Some(IomuxFunctionClockConfig::XtalClk),
+    ..ClockConfig::default()
+};
+let peripherals = esp_hal::init(Config::default().with_cpu_clock(clock_config));
+```
+
+The low-level clock-tree API can also change the source at runtime:
+
+```rust, no_run
+use esp_hal::clock::ll::{
+    ClockTree,
+    IomuxFunctionClockConfig,
+    configure_iomux_function_clock,
+};
+
+ClockTree::with(|clocks| {
+    configure_iomux_function_clock(clocks, IomuxFunctionClockConfig::XtalClk);
+});
+```
+
+Changing this global source affects every active consumer of `IOMUX_FUNCTION_CLOCK`. Existing peripheral dividers are not automatically recalculated.
+"#
+)]
+//! Each channel's prescaler divides this function clock to produce its output
+//! frequency.
 
 use core::{fmt, marker::PhantomData};
 
-#[cfg(soc_has_clock_node_iomux_function_clock)]
-use crate::soc::clocks::{self, IomuxFunctionClockConfig};
 use crate::{
     gpio::{
         OutputConfig,
@@ -67,20 +114,7 @@ for_each_sdm_channel!(
 
             impl<'d> Sdm<'d> {
                 /// Creates a new sigma-delta peripheral driver.
-                ///
-                /// The SDM clock source is shared by all SDM channels through the IO_MUX
-                /// clock, so it is selected here instead of being configurable per channel.
-                pub fn new(instance: GPIO_SD<'d>, config: SdmConfig) -> Self {
-                    #[cfg(soc_has_clock_node_iomux_function_clock)]
-                    ClockTree::with(|clocks| {
-                        clocks::configure_iomux_function_clock(
-                            clocks,
-                            config.clock_source.into(),
-                        );
-                    });
-                    #[cfg(not(soc_has_clock_node_iomux_function_clock))]
-                    let _ = config;
-
+                pub fn new(instance: GPIO_SD<'d>) -> Self {
                     Self {
                         _instance: instance,
                         $(
@@ -91,10 +125,9 @@ for_each_sdm_channel!(
 
                 /// Creates a channel configuration builder.
                 pub const fn channel_config(&self) -> ChannelConfigBuilder {
-                    // this ensures that channels can be configured only after that SDM
-                    // have been initialized with a selected clock source. Since
-                    // `with_frequency` requires a clock source to calculate the prescaler,
-                    // it is important that the SDM is initialized first.
+                    // This ensures that channel configs can only be created after SDM has
+                    // been initialized. `with_frequency` relies on the function clock that
+                    // was configured during system initialization.
                     ChannelConfigBuilder::new()
                 }
             }
@@ -114,60 +147,6 @@ for_each_sdm_channel!(
         }
     };
 );
-
-/// Sigma-delta peripheral configuration.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct SdmConfig {
-    /// Clock source used by the shared SDM/IO_MUX clock.
-    clock_source: ClockSource,
-}
-
-/// Source clock for the shared SDM/IO_MUX clock.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub enum ClockSource {
-    /// APB clock.
-    #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
-    #[default]
-    Apb,
-    /// XTAL clock.
-    #[cfg(any(esp32c5, esp32c6, esp32h2, esp32p4))]
-    Xtal,
-    /// Fixed 80 MHz PLL clock.
-    #[cfg(any(esp32c5, esp32c6, esp32p4))]
-    #[cfg_attr(any(esp32c5, esp32c6, esp32p4), default)]
-    PllF80m,
-    /// Fixed 48 MHz PLL clock.
-    #[cfg(esp32h2)]
-    #[cfg_attr(esp32h2, default)]
-    PllF48m,
-}
-
-#[cfg(any(esp32c5, esp32c6, esp32p4))]
-// C5/C6 hardware also routes RC_FAST (called FOSC in some register descriptions) through the
-// IO MUX. ESP-IDF does not expose it as an SDM clock source, so neither do we. It should be
-// usable in principle, but has not been included in the supported SDM API.
-impl From<ClockSource> for IomuxFunctionClockConfig {
-    fn from(source: ClockSource) -> Self {
-        match source {
-            ClockSource::Xtal => Self::XtalClk,
-            ClockSource::PllF80m => Self::PllF80m,
-        }
-    }
-}
-
-#[cfg(esp32h2)]
-impl From<ClockSource> for IomuxFunctionClockConfig {
-    fn from(source: ClockSource) -> Self {
-        match source {
-            ClockSource::Xtal => Self::XtalClk,
-            ClockSource::PllF48m => Self::PllF48m,
-        }
-    }
-}
 
 /// Sigma-delta configuration or runtime error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
