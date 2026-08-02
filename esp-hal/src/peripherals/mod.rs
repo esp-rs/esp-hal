@@ -158,7 +158,7 @@ macro_rules! create_peripheral {
             #[doc = r"Return a reference to the register block"]
             #[inline(always)]
             #[instability::unstable]
-            pub const fn regs<'a>() -> &'a <pac::$base as core::ops::Deref>::Target {
+            pub fn regs<'a>() -> &'a <pac::$base as core::ops::Deref>::Target {
                 unsafe { &*Self::PTR }
             }
 
