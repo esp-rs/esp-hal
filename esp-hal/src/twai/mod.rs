@@ -122,6 +122,7 @@
 
 use core::marker::PhantomData;
 
+use embedded_can::Frame;
 use enumset::{EnumSet, EnumSetType};
 use procmacros::handler;
 
@@ -626,6 +627,12 @@ impl RawFrame {
         &self.bytes[data_start..data_end]
     }
 
+    /// Returns a slice reference to the relevant frame bytes.
+    fn as_slice(&self) -> &[u8] {
+        let len = self.data_offset() + self.data_length();
+        &self.bytes[0..len]
+    }
+
     /// Make a new [`RawFrame`] from TWAI_DATA_x_REG registers.
     pub(super) fn new_from_registers(register_block: &RegisterBlock) -> Self {
         let mut bytes: [u8; 13] = [0; 13];
@@ -634,6 +641,39 @@ impl RawFrame {
             copy_from_data_register(&mut bytes, register_block.data(0).as_ptr());
         }
         Self { bytes }
+    }
+
+    /// Make a new [`RawFrame`] from a [`EspTwaiFrame`].
+    pub(super) fn new_from_frame(frame: &EspTwaiFrame) -> Self {
+        let mut bytes = [0u8; 13];
+
+        // Frame Info
+        let ff = (frame.is_extended() as u8) << 7;
+        let rtr = (frame.is_remote as u8) << 6;
+        let sr = (frame.self_reception as u8) << 4;
+        let dlc = (frame.dlc as u8) & 0b1111;
+        bytes[0] = ff | rtr | sr | dlc;
+        // Id
+        let data_start: usize = match frame.id {
+            Id::Standard(id) => {
+                let id = id.as_raw();
+                bytes[1] = (id >> 3) as u8;
+                bytes[2] = (id << 5) as u8;
+                3
+            }
+            Id::Extended(id) => {
+                let id = id.as_raw();
+                bytes[1] = (id >> 21) as u8;
+                bytes[2] = (id >> 13) as u8;
+                bytes[3] = (id >> 5) as u8;
+                bytes[4] = (id << 3) as u8;
+                5
+            }
+        };
+        // Data
+        bytes[data_start..].copy_from_slice(frame.data());
+
+        RawFrame { bytes }
     }
 }
 
@@ -1491,73 +1531,19 @@ fn release_receive_fifo(register_block: &RegisterBlock) {
 
 /// Write a frame to the peripheral.
 fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
-    // Assemble the frame information into the data_0 byte.
-    let frame_format: u8 = matches!(frame.id, Id::Extended(_)) as u8;
-    let self_reception: u8 = frame.self_reception as u8;
-    let rtr_bit: u8 = frame.is_remote as u8;
-    let dlc_bits: u8 = frame.dlc as u8 & 0b1111;
-
-    let data_0: u8 = (frame_format << 7) | (rtr_bit << 6) | (self_reception << 4) | dlc_bits;
-
-    register_block
-        .data(0)
-        .write(|w| unsafe { w.tx_byte().bits(data_0) });
-
-    // Assemble the identifier information of the packet and return where the data
-    // buffer starts.
-    let data_ptr = match frame.id {
-        Id::Standard(id) => {
-            let id = id.as_raw();
-
-            register_block
-                .data(1)
-                .write(|w| unsafe { w.tx_byte().bits((id >> 3) as u8) });
-
-            register_block
-                .data(2)
-                .write(|w| unsafe { w.tx_byte().bits((id << 5) as u8) });
-
-            register_block.data(3).as_ptr()
-        }
-        Id::Extended(id) => {
-            let id = id.as_raw();
-
-            register_block
-                .data(1)
-                .write(|w| unsafe { w.tx_byte().bits((id >> 21) as u8) });
-            register_block
-                .data(2)
-                .write(|w| unsafe { w.tx_byte().bits((id >> 13) as u8) });
-            register_block
-                .data(3)
-                .write(|w| unsafe { w.tx_byte().bits((id >> 5) as u8) });
-            register_block
-                .data(4)
-                .write(|w| unsafe { w.tx_byte().bits((id << 3) as u8) });
-
-            register_block.data(5).as_ptr()
-        }
-    };
-
-    // Store the data portion of the packet into the transmit buffer.
+    let raw = RawFrame::new_from_frame(frame);
+    // SAFETY: safe because there are 13 data registers and the slice is 13 bytes long max
     unsafe {
-        copy_to_data_register(
-            data_ptr,
-            match frame.is_remote {
-                true => &[], // RTR frame, so no data is included.
-                false => &frame.data[0..frame.dlc],
-            },
-        )
+        copy_to_data_register(register_block.data(0).as_ptr(), raw.as_slice());
     }
 
     // Trigger the appropriate transmission request based on self_reception flag
-    if frame.self_reception {
-        register_block.cmd().write(|w| w.self_rx_req().set_bit());
-    } else {
+    match raw.is_self_reception() {
         // Set the transmit request command, this will lock the transmit buffer until
         // the transmission is complete or aborted.
-        register_block.cmd().write(|w| w.tx_req().set_bit());
-    }
+        false => register_block.cmd().write(|w| w.tx_req().set_bit()),
+        true => register_block.cmd().write(|w| w.self_rx_req().set_bit()),
+    };
 }
 
 impl PrivateInstance for crate::peripherals::TWAI0<'_> {
