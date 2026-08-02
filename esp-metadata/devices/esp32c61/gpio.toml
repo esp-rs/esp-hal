@@ -132,3 +132,7 @@ output_signals = [
     { name = "SDIO_TOHOST_INT",       id = 124 },
     { name = "GPIO",                  id = 256 },
 ]
+
+[device.lp_io]
+support_status = "partial"
+version = "v4"

@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-metadata` to
+# If you modify a driver support status, run `cargo update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -179,10 +179,6 @@ zero_extend_writes = true
 separate_jacobian_point_memory = true
 has_memory_clock_gate = true
 supports_enhanced_security = true # only after revision 1.2
-
-[device.lp_io]
-support_status = "partial"
-version = "esp32h2"
 
 [device.gpio]
 support_status = "supported"

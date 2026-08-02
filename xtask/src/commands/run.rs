@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::{Context as _, Result, bail};
 use clap::{Args, Subcommand};
-use esp_metadata::Chip;
 use serde::Deserialize;
 
 use super::{DocTestArgs, ExamplesArgs, TestsArgs};
@@ -15,6 +14,7 @@ use crate::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::{self, Metadata},
+    metadata::Chip,
     radio_hil_runner::run_radio_test_elf,
 };
 
@@ -86,7 +86,7 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
     }
 
     // Packages that have doc features are documented. We run doc-tests for these, and only these.
-    let Some(mut doc_config) = package.doc_config_rules(&esp_metadata::Config::for_chip(&chip))
+    let Some(mut doc_config) = package.doc_config_rules(&crate::metadata::Config::for_chip(&chip))
     else {
         log::info!("Skipping undocumented package {package}.");
         return Ok(true);

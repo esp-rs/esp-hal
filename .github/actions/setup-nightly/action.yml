@@ -19,12 +19,10 @@ runs:
   using: composite
   steps:
     # Single source of truth for the nightly version used across all workflows.
-    # Pin: nightly-2026-07-20 regressed docsrs cfg_attr+proc-macro (doc_replace) on
-    # file modules, introduced by rust-lang/rust#158046. Set to `nightly` to unpin
-    # when a fixed nightly ships.
+    # Set to a specific version to work around a compiler issue.
     - id: version
       shell: bash
-      run: echo "nightly=nightly-2026-07-19" >> "$GITHUB_OUTPUT"
+      run: echo "nightly=nightly" >> "$GITHUB_OUTPUT"
 
     - uses: dtolnay/rust-toolchain@v1
       with:

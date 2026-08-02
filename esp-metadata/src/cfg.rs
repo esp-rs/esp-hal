@@ -5,6 +5,7 @@ pub(crate) mod gpio;
 pub(crate) mod i2c_master;
 pub(crate) mod i2s;
 pub(crate) mod interrupt;
+pub(crate) mod lp_io;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
 pub(crate) mod sdm;
@@ -24,6 +25,7 @@ pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
 pub(crate) use i2s::*;
 pub(crate) use interrupt::*;
+pub(crate) use lp_io::*;
 pub(crate) use rmt::*;
 pub(crate) use sdm::*;
 pub(crate) use sdmmc::*;
@@ -546,6 +548,9 @@ driver_configs![
         properties: {
             /// Low-level implementation selected for the chip's RTC/LP IO block.
             version: String,
+
+            #[serde(flatten)]
+            signals: LpIoSignals,
         }
     },
     LpUartProperties {

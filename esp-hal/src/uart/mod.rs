@@ -2245,10 +2245,39 @@ impl From<TxError> for IoError {
 #[instability::unstable]
 pub mod lp_uart {
     use crate::{
-        gpio::lp_io::{LowPowerInput, LowPowerOutput},
+        gpio::{InputPin, OutputPin, RtcPin},
         peripherals::{LP_AON, LP_CLKRST, LP_IO, LP_UART, LPWR},
         uart::{DataBits, Parity, StopBits},
     };
+
+    /// Trait representing the LP_UART TX pin.
+    pub trait Tx: RtcPin + OutputPin {
+        #[doc(hidden)]
+        fn lp_function(&self) -> u8;
+    }
+
+    /// Trait representing the LP_UART RX pin.
+    pub trait Rx: RtcPin + InputPin {
+        #[doc(hidden)]
+        fn lp_function(&self) -> u8;
+    }
+
+    for_each_lp_function! {
+        (LP_UART_TXD, $gpio:ident, $af:literal) => {
+            impl Tx for crate::peripherals::$gpio<'_> {
+                fn lp_function(&self) -> u8 {
+                    $af
+                }
+            }
+        };
+        (LP_UART_RXD, $gpio:ident, $af:literal) => {
+            impl Rx for crate::peripherals::$gpio<'_> {
+                fn lp_function(&self) -> u8 {
+                    $af
+                }
+            }
+        };
+    }
 
     /// LP-UART Configuration
     #[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
@@ -2306,20 +2335,22 @@ pub mod lp_uart {
         pub fn new(
             uart: LP_UART<'static>,
             config: Config,
-            _tx: LowPowerOutput<'_, 5>,
-            _rx: LowPowerInput<'_, 4>,
+            tx: impl Tx + 'static,
+            rx: impl Rx + 'static,
         ) -> Self {
-            // FIXME: use GPIO APIs to configure pins
-            LP_AON::regs()
-                .gpio_mux()
-                .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | (1 << 4) | (1 << 5)) });
+            let tx_pin = tx.rtc_number() as usize;
+            let rx_pin = rx.rtc_number() as usize;
+
+            LP_AON::regs().gpio_mux().modify(|r, w| unsafe {
+                w.sel().bits(r.sel().bits() | (1 << tx_pin) | (1 << rx_pin))
+            });
 
             LP_IO::regs()
-                .gpio(4)
-                .modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+                .gpio(rx_pin)
+                .modify(|_, w| unsafe { w.mcu_sel().bits(rx.lp_function()) });
             LP_IO::regs()
-                .gpio(5)
-                .modify(|_, w| unsafe { w.mcu_sel().bits(1) });
+                .gpio(tx_pin)
+                .modify(|_, w| unsafe { w.mcu_sel().bits(tx.lp_function()) });
 
             let mut me = Self { uart };
             let uart = me.uart.register_block();

@@ -2,7 +2,6 @@ use std::path::Path;
 
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use esp_metadata::Chip;
 use strum::IntoEnumIterator as _;
 
 use super::{ExamplesArgs, TestsArgs};
@@ -11,6 +10,7 @@ use crate::{
     cargo::{self, CargoAction, CargoArgsBuilder, CargoCommandBatcher},
     commands::move_artifacts,
     firmware::Metadata,
+    metadata::Chip,
 };
 
 // ----------------------------------------------------------------------------

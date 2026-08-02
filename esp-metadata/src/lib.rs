@@ -2,14 +2,17 @@
 mod cfg;
 
 use core::str::FromStr;
-use std::{fmt::Write, path::Path, sync::OnceLock};
+use std::{
+    fmt::Write,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
 use anyhow::{Context, Result, bail, ensure};
 use cfg::PeriConfig;
 use indexmap::IndexMap;
 pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use strum::IntoEnumIterator;
 
 mod include;
 mod support_status;
@@ -18,6 +21,46 @@ use crate::{
     cfg::{SupportItem, Value},
     support_status::SupportStatusLevel,
 };
+
+/// Path of the metadata cache shared with the devtool.
+pub fn cache_path(workspace: &Path) -> PathBuf {
+    workspace.join("target").join("esp-metadata-cache.toml")
+}
+
+/// Hash of everything the generated metadata is derived from.
+///
+/// Covers the device descriptions as well as the code deriving symbols from
+/// them, so that changing either invalidates the cache. Contents are hashed
+/// rather than modification times, which `git checkout` shuffles.
+///
+/// The devtool reimplements this to validate the cache; keep both in sync.
+pub fn input_hash(workspace: &Path) -> Result<String> {
+    use sha2::Digest;
+
+    let root = workspace.join("esp-metadata");
+    let mut files = vec![];
+    for entry in walkdir::WalkDir::new(&root)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_entry(|e| e.file_name() != "target")
+    {
+        let path = entry?.into_path();
+        if path.is_file() {
+            files.push(path);
+        }
+    }
+
+    let mut hasher = sha2::Sha256::new();
+    for file in files {
+        let relative = file.strip_prefix(&root).unwrap();
+        hasher.update(relative.to_string_lossy().replace('\\', "/").as_bytes());
+        hasher.update(
+            std::fs::read(&file).with_context(|| format!("Failed to read {}", file.display()))?,
+        );
+    }
+
+    Ok(format!("{:x}", hasher.finalize()))
+}
 
 fn load_device_config(relative_path: &str) -> Config {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
@@ -61,101 +104,146 @@ macro_rules! cached_device_config {
     }};
 }
 
-/// Supported device architectures.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    serde::Deserialize,
-    serde::Serialize,
-    strum::Display,
-    strum::EnumIter,
-    strum::EnumString,
-    strum::AsRefStr,
-)]
-#[serde(rename_all = "lowercase")]
-#[strum(serialize_all = "lowercase")]
-pub enum Arch {
-    /// RISC-V architecture
-    RiscV,
-    /// Xtensa architecture
-    Xtensa,
+/// Defines an enum together with the string each variant maps to, and the
+/// conversions between the two.
+macro_rules! string_enum {
+    (
+        $(#[$meta:meta])*
+        pub enum $name:ident {
+            $($(#[$variant_meta:meta])* $variant:ident = $string:literal),* $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        pub enum $name {
+            $($(#[$variant_meta])* $variant,)*
+        }
+
+        impl $name {
+            /// All variants, in declaration order.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),*];
+
+            /// Returns an iterator over all variants.
+            pub fn iter() -> impl Iterator<Item = Self> {
+                Self::ALL.iter().copied()
+            }
+
+            /// Returns the string representation of this variant.
+            pub fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $string,)*
+                }
+            }
+        }
+
+        impl AsRef<str> for $name {
+            fn as_ref(&self) -> &str {
+                self.as_str()
+            }
+        }
+
+        impl core::fmt::Display for $name {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str(self.as_str())
+            }
+        }
+
+        impl std::str::FromStr for $name {
+            type Err = anyhow::Error;
+
+            fn from_str(s: &str) -> Result<Self> {
+                match s {
+                    $($string => Ok(Self::$variant),)*
+                    _ => bail!("Unknown {}: '{s}'", stringify!($name)),
+                }
+            }
+        }
+    };
 }
 
-/// Device core count.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    serde::Deserialize,
-    serde::Serialize,
-    strum::Display,
-    strum::EnumIter,
-    strum::EnumString,
-    strum::AsRefStr,
-)]
-pub enum Cores {
-    /// Single CPU core
-    #[serde(rename = "single_core")]
-    #[strum(serialize = "single_core")]
-    Single,
-    /// Two or more CPU cores
-    #[serde(rename = "multi_core")]
-    #[strum(serialize = "multi_core")]
-    Multi,
+string_enum! {
+    /// Supported device architectures.
+    #[derive(
+        Debug,
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        serde::Deserialize,
+        serde::Serialize,
+    )]
+    #[serde(rename_all = "lowercase")]
+    pub enum Arch {
+        /// RISC-V architecture
+        RiscV = "riscv",
+        /// Xtensa architecture
+        Xtensa = "xtensa",
+    }
 }
 
-/// Supported devices.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Deserialize,
-    serde::Serialize,
-    strum::Display,
-    strum::EnumIter,
-    strum::EnumString,
-    strum::AsRefStr,
-)]
-#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-#[serde(rename_all = "kebab-case")]
-#[strum(serialize_all = "kebab-case")]
-pub enum Chip {
-    /// ESP32
-    Esp32,
-    /// ESP32-C2, ESP8684
-    Esp32c2,
-    /// ESP32-C3, ESP8685
-    Esp32c3,
-    /// ESP32-C5
-    Esp32c5,
-    /// ESP32-C6
-    Esp32c6,
-    /// ESP32-C61
-    Esp32c61,
-    /// ESP32-H2
-    Esp32h2,
-    /// ESP32-P4 (chip revision v3.x / eco5 only)
-    Esp32p4,
-    /// ESP32-S2
-    Esp32s2,
-    /// ESP32-S3
-    Esp32s3,
-    /// ESP32-S31
-    Esp32s31,
+string_enum! {
+    /// Device core count.
+    #[derive(
+        Debug,
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        serde::Deserialize,
+        serde::Serialize,
+    )]
+    pub enum Cores {
+        /// Single CPU core
+        #[serde(rename = "single_core")]
+        Single = "single_core",
+        /// Two or more CPU cores
+        #[serde(rename = "multi_core")]
+        Multi = "multi_core",
+    }
+}
+
+string_enum! {
+    /// Supported devices.
+    #[derive(
+        Debug,
+        Clone,
+        Copy,
+        PartialEq,
+        Eq,
+        PartialOrd,
+        Ord,
+        Hash,
+        serde::Deserialize,
+        serde::Serialize,
+    )]
+    #[serde(rename_all = "kebab-case")]
+    pub enum Chip {
+        /// ESP32
+        Esp32 = "esp32",
+        /// ESP32-C2, ESP8684
+        Esp32c2 = "esp32c2",
+        /// ESP32-C3, ESP8685
+        Esp32c3 = "esp32c3",
+        /// ESP32-C5
+        Esp32c5 = "esp32c5",
+        /// ESP32-C6
+        Esp32c6 = "esp32c6",
+        /// ESP32-C61
+        Esp32c61 = "esp32c61",
+        /// ESP32-H2
+        Esp32h2 = "esp32h2",
+        /// ESP32-P4 (chip revision v3.x / eco5 only)
+        Esp32p4 = "esp32p4",
+        /// ESP32-S2
+        Esp32s2 = "esp32s2",
+        /// ESP32-S3
+        Esp32s3 = "esp32s3",
+        /// ESP32-S31
+        Esp32s31 = "esp32s31",
+    }
 }
 
 impl Chip {

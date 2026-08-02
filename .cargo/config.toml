@@ -1,5 +1,6 @@
 [alias]
 xtask    = "run --package esp-devtool --"
+update-metadata = "run --quiet --manifest-path ./esp-metadata/Cargo.toml -- generate"
 xclean   = "xtask clean"
 xdoc     = "run --package esp-devtool --features=deploy-docs,preview-docs --"
 xfmt     = "xtask fmt-packages"

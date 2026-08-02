@@ -1678,12 +1678,12 @@ impl<'lt> AnyPin<'lt> {
 
         #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
         for_each_lp_function! {
-            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident) => {
+            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident, $_af:literal) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
                     RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
                 }
             };
-            (($_signal:ident, RTC_GPIOn, $_lp_pin:literal), $gpio:ident) => {
+            (($_signal:ident, RTC_GPIOn, $_lp_pin:literal), $gpio:ident, $_af:literal) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
                     RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
                 }
@@ -2188,10 +2188,10 @@ macro_rules! for_each_rtcio_pin {
 
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
+            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:literal) => {
                 for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
             };
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
+            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:literal) => {
                 for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
             };
         }
@@ -2220,10 +2220,10 @@ macro_rules! for_each_rtcio_output_pin {
 
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
+            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident, $_af:literal) => {
                 for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "RTC_IO output")
             };
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
+            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:literal) => {
                 for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "LP_IO output")
             };
         }

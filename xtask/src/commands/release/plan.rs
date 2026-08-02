@@ -3,7 +3,6 @@ use std::{collections::HashMap, io::Write, path::Path, process::Command};
 use anyhow::{Context, Result, bail, ensure};
 use cargo_semver_checks::ReleaseType;
 use clap::Args;
-use esp_metadata::Chip;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, Value};
@@ -19,6 +18,7 @@ use crate::{
         release::changelog_preview,
     },
     git::{BackportInfo, current_branch, parse_backport_branch},
+    metadata::Chip,
 };
 
 /// Arguments for generating a release plan.

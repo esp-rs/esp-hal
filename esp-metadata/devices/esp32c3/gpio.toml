@@ -158,3 +158,7 @@ output_signals = [
 
     { name = "MTDO" },
 ]
+
+[device.lp_io]
+support_status = "partial"
+version = "v3"

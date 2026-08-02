@@ -514,8 +514,15 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             for af in 0..LowPowerMap::COUNT {
                 if let Some(signal) = pin.lp.get(af) {
                     let signal_name = TokenStream::from_str(signal).unwrap();
-                    lp_functions.push(quote! { #signal_name, #pin_peri });
-                    create_matchers_for_signal(&mut expanded_lp_functions, &pin_peri, signal, None);
+                    let af_number = number(af);
+                    let af_tokens = quote! { #af_number };
+                    lp_functions.push(quote! { #signal_name, #pin_peri, #af_number });
+                    create_matchers_for_signal(
+                        &mut expanded_lp_functions,
+                        &pin_peri,
+                        signal,
+                        Some(&af_tokens),
+                    );
                 }
             }
 
@@ -657,8 +664,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         ///
         /// This macro has two options for its "Individual matcher" case:
         ///
-        /// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+        /// - `all`: `($signal:ident, $gpio:ident, $af:literal)` - simple case where you only need identifiers, and maybe the function number.
+        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:literal)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
         ///
         /// Macro fragments:
         ///
@@ -666,10 +673,14 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         /// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this is `ADCn_CHm`.
         /// - `$number`: the numbers extracted from `$signal`.
         /// - `$gpio`: the name of the GPIO.
+        /// - `$af`: the function number, as listed in the LP/RTC IO MUX pad list. On chips with an
+        ///   LP IO peripheral this is the value to write to the pin's `MCU_SEL` field to select the
+        ///   function. On chips with an RTC IO peripheral the numbering is not necessarily
+        ///   register-accurate.
         ///
         /// Example data:
-        /// - `(RTC_GPIO15, GPIO12)`
-        /// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12)`
+        /// - `(RTC_GPIO15, GPIO12, 0)`
+        /// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, 0)`
         ///
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_lp
@@ -738,7 +749,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     }
 }
 
-fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
+pub(super) fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
     if signals.is_empty() {
         // If there are no signals, we don't need to generate an enum.
         return quote! {};
