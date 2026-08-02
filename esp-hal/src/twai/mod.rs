@@ -1319,7 +1319,7 @@ where
             return nb::Result::Err(nb::Error::Other(EspTwaiError::BusOff));
         }
         // Check that the peripheral is not already transmitting a packet.
-        if !status.tx_buf_st().bit_is_set() {
+        if status.tx_buf_st().bit_is_clear() {
             return nb::Result::Err(nb::Error::WouldBlock);
         }
 
@@ -1354,7 +1354,7 @@ where
         }
 
         // Check that we actually have packets to receive.
-        if !status.rx_buf_st().bit_is_set() {
+        if status.rx_buf_st().bit_is_clear() {
             return nb::Result::Err(nb::Error::WouldBlock);
         }
 
@@ -1761,7 +1761,7 @@ mod asynch {
             }
 
             // Check that the peripheral is not currently transmitting a packet.
-            if !status.tx_buf_st().bit_is_set() {
+            if status.tx_buf_st().bit_is_clear() {
                 return Poll::Pending;
             }
 
