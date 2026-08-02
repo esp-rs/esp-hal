@@ -519,7 +519,114 @@ pub struct RawFrame {
 }
 
 impl RawFrame {
-    /// Make a new [`RawFrame`] from TWAI_DATA_x_REG registers
+    /// Frame Information: specifies a frame's type, format, data length, etc.
+    ///
+    /// | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
+    /// |--------|-------|-------|-------|-------|-------|-------|-------|-------|
+    /// |  0x0   |  FF   |  RTR  |  ---  |  SR   | DLC.3 | DLC.2 | DLC.1 | DLC.0 |
+    #[inline(always)]
+    fn info(&self) -> u8 {
+        self.bytes[0]
+    }
+
+    /// Frame Format (FF): specifies whether content is Extended Frame Format (EFF) or Standard
+    /// Frame Format (SFF).
+    ///
+    /// This method is private: interested clients should deduce the frame format from
+    /// [`Self::id()`].
+    #[inline(always)]
+    fn is_extended_format(&self) -> bool {
+        self.info() & (0b1 << 7) != 0
+    }
+
+    /// Remote Transmission Request (RTR): specifies whether content is a data frame or a remote
+    /// request frame (on-demand polling).
+    ///
+    /// Note: Remote request frames do not have a data payload, no matter their DLC.
+    pub fn is_remote_request(&self) -> bool {
+        self.info() & (0b1 << 6) != 0
+    }
+
+    /// Self Reception (SR): indicates whether content was sent by us (using the TWAI_SELF_RX_SEQ
+    /// command) or received from the bus.
+    pub fn is_self_reception(&self) -> bool {
+        self.info() & (0b1 << 4) != 0
+    }
+
+    /// Data Length Code (DLC): specifies the number of data bytes for a data frame, or the number
+    /// of data bytes requested by a remote frame.
+    ///
+    /// Note: although no frame can have a payload longer than 8, the DLC can be greater than 8 in
+    /// rare cases (payload length then is still 8).
+    pub fn data_length_code(&self) -> usize {
+        (self.info() & 0b1111) as usize
+    }
+
+    /// Length of the data payload: 0 for a RTR frame, 8 if DLC > 8.
+    pub fn data_length(&self) -> usize {
+        match self.is_remote_request() {
+            true => 0,
+            false => core::cmp::min(self.data_length_code(), 8),
+        }
+    }
+
+    /// Frame Identifier: 11-bit long for a SFF frame, 29-bit long for an EFF frame.
+    #[inline]
+    pub fn id(&self) -> Id {
+        let bytes = self.bytes;
+        match self.is_extended_format() {
+            false => {
+                // Standard Format: 11-bit Identifier, 2 bytes long
+                //
+                // | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
+                // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
+                // |  0x1   | ID.10 | ID.9  | ID.8  | ID.7  | ID.6  | ID.5  | ID.4  | ID.3  |
+                // |  0x2   | ID.2  | ID.1  | ID.0  |  ---  |  ---  |  ---  |  ---  |  ---  |
+                let raw_id: u16 = ((bytes[1] as u16) << 3) | ((bytes[2] as u16) >> 5);
+                // SAFETY: safe because raw_id is 11 bits long (it cannot exceed StandardId::MAX).
+                unsafe { StandardId::new_unchecked(raw_id).into() }
+            }
+            true => {
+                // Extended Format: 29-bit Identifier, 4 bytes long
+                //
+                // | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
+                // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
+                // |  0x1   | ID.28 | ID.27 | ID.26 | ID.25 | ID.24 | ID.23 | ID.22 | ID.21 |
+                // |  0x2   | ID.20 | ID.19 | ID.18 | ID.17 | ID.16 | ID.15 | ID.14 | ID.13 |
+                // |  0x3   | ID.12 | ID.11 | ID.10 | ID.9  | ID.8  | ID.7  | ID.6  | ID.5  |
+                // |  0x4   | ID.4  | ID.3  | ID.2  | ID.1  | ID.0  |  ---  |  ---  |  ---  |
+                let raw_id: u32 = ((bytes[1] as u32) << 21)
+                    | ((bytes[2] as u32) << 13)
+                    | ((bytes[3] as u32) << 5)
+                    | ((bytes[4] as u32) >> 3);
+                // SAFETY: safe because raw_id is 29 bits long (it cannot exceed ExtendedId::MAX)
+                unsafe { ExtendedId::new_unchecked(raw_id).into() }
+            }
+        }
+    }
+
+    /// Offset at which frame data starts: 0x3 for a SFF, 0x5 for an EFF.
+    #[inline(always)]
+    fn data_offset(&self) -> usize {
+        match self.is_extended_format() {
+            false => 0x3,
+            true => 0x5,
+        }
+    }
+
+    /// Frame Data: data payload, 0 to 8 bytes long.
+    ///
+    /// Returns a reference to a slice:
+    /// * empty in case of a Remote Transmission Request
+    /// * 8 bytes long in case DLC > 8
+    #[inline]
+    pub fn data(&self) -> &[u8] {
+        let data_start = self.data_offset();
+        let data_end = data_start + self.data_length();
+        &self.bytes[data_start..data_end]
+    }
+
+    /// Make a new [`RawFrame`] from TWAI_DATA_x_REG registers.
     pub(super) fn new_from_registers(register_block: &RegisterBlock) -> Self {
         let mut bytes: [u8; 13] = [0; 13];
         // SAFETY: Safe because it is a constant-size, read-only access to the 13 data registers
@@ -537,52 +644,21 @@ impl TryFrom<RawFrame> for EspTwaiFrame {
     ///
     /// Returns a [EspTwaiError] if it does not contain a valid TWAI frame.
     #[inline(always)]
-    fn try_from(raw_frame: RawFrame) -> Result<Self, EspTwaiError> {
-        let bytes = raw_frame.bytes;
-
-        let frame_info = bytes[0];
-        let is_extended_format = frame_info & (0b1 << 7) != 0;
-        let is_remote_request = frame_info & (0b1 << 6) != 0;
-        let is_self_reception = frame_info & (0b1 << 4) != 0;
-        let dlc = frame_info & 0b1111;
+    fn try_from(raw: RawFrame) -> Result<Self, EspTwaiError> {
+        let dlc = raw.data_length_code();
         if dlc > 8 {
-            // Max data length: 8 bytes
-            return Err(EspTwaiError::NonCompliantDlc(dlc));
+            return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
         }
-        let dlc = dlc as usize;
-
-        // Frame Identifier: 2 or 4 bytes long
-        let (id, data_start) = match is_extended_format {
-            false => {
-                // Standard Format: 11-bit Identifier, 2 bytes long
-                let raw_id: u16 = ((bytes[1] as u16) << 3) | ((bytes[2] as u16) >> 5);
-                let id = Id::from(StandardId::new(raw_id).unwrap());
-                (id, 3)
-            }
-            true => {
-                // Extended Format: 29-bit Identifier, 4 bytes long
-                let raw_id: u32 = ((bytes[1] as u32) << 21)
-                    | ((bytes[2] as u32) << 13)
-                    | ((bytes[3] as u32) << 5)
-                    | ((bytes[4] as u32) >> 3);
-                let id = Id::from(ExtendedId::new(raw_id).unwrap());
-                (id, 5)
-            }
-        };
-
-        // Frame Data: `dlc` bytes long
-        let mut frame = match is_remote_request {
-            false => {
-                let data_end = data_start + dlc;
-                EspTwaiFrame::new(id, &bytes[data_start..data_end]).unwrap()
-            }
-            true => EspTwaiFrame::new_remote(id, dlc).unwrap(),
-        };
-
-        // Set Self Reception bit
-        frame.self_reception = is_self_reception;
-
-        Ok(frame)
+        let payload = raw.data();
+        let mut data: [u8; 8] = [0; 8];
+        data[..payload.len()].copy_from_slice(payload);
+        Ok(EspTwaiFrame {
+            id: raw.id(),
+            dlc,
+            data,
+            is_remote: raw.is_remote_request(),
+            self_reception: raw.is_self_reception(),
+        })
     }
 }
 
