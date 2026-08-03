@@ -73,8 +73,8 @@ pub(crate) struct CpuState {
     idle: bool,
 
     // This context will be filled out by the first context switch.
-    // We allocate the main task statically, because there is always a main task. If deleted, we
-    // simply don't deallocate this.
+    // We allocate the main task statically, because there is always a main task.
+    // Cannot be deleted.
     pub(crate) main_task: Task,
 }
 
@@ -367,10 +367,27 @@ impl SchedulerState {
         });
     }
 
+    /// Returns whether `task` is the main task of any CPU.
+    #[cfg(feature = "esp-radio")]
+    fn is_main_task(&self, task: TaskPtr) -> bool {
+        self.per_cpu
+            .iter()
+            .any(|per_cpu| core::ptr::eq(task.as_ptr(), &raw const per_cpu.main_task))
+    }
+
     #[cfg(feature = "esp-radio")]
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: Option<TaskPtr>) -> bool {
         let current_task = SCHEDULER.current_task();
         let task_to_delete = task_to_delete.unwrap_or(current_task);
+
+        // Every CPU must keep its main task. The idle context has no stack of its own and runs on
+        // the main task's stack, so a CPU without a main task has nothing to fall back to.
+        assert!(
+            !self.is_main_task(task_to_delete),
+            "The main task must not be deleted: {:?}",
+            task_to_delete
+        );
+
         let is_current = task_to_delete == current_task;
 
         self.remove_from_all_queues(task_to_delete);
