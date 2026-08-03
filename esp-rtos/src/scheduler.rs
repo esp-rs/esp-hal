@@ -401,6 +401,16 @@ impl SchedulerState {
             .any(|per_cpu| core::ptr::eq(task.as_ptr(), &raw const per_cpu.main_task))
     }
 
+    /// Returns the CPU that runs `task`, if that CPU is not the current one.
+    #[cfg(all(multi_core, feature = "esp-radio"))]
+    fn other_cpu_running(&self, task: TaskPtr) -> Option<Cpu> {
+        let current_cpu = Cpu::current();
+        Cpu::all().find(|cpu| {
+            *cpu != current_cpu
+                && core::ptr::eq(self.per_cpu[*cpu as usize].current_task, task.as_ptr())
+        })
+    }
+
     #[cfg(feature = "esp-radio")]
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: Option<TaskPtr>) -> bool {
         let current_task = SCHEDULER.current_task();
@@ -419,19 +429,41 @@ impl SchedulerState {
         self.remove_from_all_queues(task_to_delete);
 
         if is_current {
-            if task_to_delete.state() != TaskState::Deleted {
-                self.per_cpu[Cpu::current() as usize]
-                    .to_delete
-                    .push(task_to_delete);
-                task_to_delete.set_state(TaskState::Deleted);
-            }
+            self.mark_for_deletion(Cpu::current(), task_to_delete);
 
             crate::task::write_thread_pointer(core::ptr::null_mut());
         } else {
-            self.delete_task(task_to_delete);
+            cfg_select! {
+                multi_core => {
+                    // Another CPU may run this task. We must not free it, because that CPU still
+                    // uses its stack, and because the allocator could hand the same address to a
+                    // new task while that CPU still holds the address as its current task. Let the
+                    // other CPU switch away from the task first, and delete the task there.
+                    if let Some(cpu) = self.other_cpu_running(task_to_delete) {
+                        self.mark_for_deletion(cpu, task_to_delete);
+                        task::schedule_other_core();
+                    } else {
+                        self.delete_task(task_to_delete);
+                    }
+                }
+                _ => {
+                    // On a single CPU, a task that is not the current task does not run, so its
+                    // stack is not in use.
+                    self.delete_task(task_to_delete);
+                }
+            }
         }
 
         is_current
+    }
+
+    /// Marks `task` deleted, and queues it to be deleted by a scheduler run on `cpu`.
+    #[cfg(feature = "esp-radio")]
+    fn mark_for_deletion(&mut self, cpu: Cpu, task: TaskPtr) {
+        if task.state() != TaskState::Deleted {
+            self.per_cpu[cpu as usize].to_delete.push(task);
+            task.set_state(TaskState::Deleted);
+        }
     }
 
     pub(crate) fn sleep_task_until(&mut self, task: TaskPtr, at: Instant) -> bool {
