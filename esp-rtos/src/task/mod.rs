@@ -540,7 +540,6 @@ impl Task {
     /// Returns the address range of the task's stack, as `(bottom, top)`.
     ///
     /// The stack grows down from `top`, so `bottom` itself is not a valid stack pointer.
-    #[cfg(stack_pointer_range_check)]
     fn stack_range(&self) -> (usize, usize) {
         let bottom = self.stack.cast::<MaybeUninit<u32>>();
         let top = bottom.wrapping_add(self.stack.len());
@@ -548,8 +547,7 @@ impl Task {
     }
 
     /// Returns whether `sp` points into this task's stack.
-    #[cfg(stack_pointer_range_check)]
-    fn owns_stack_pointer(&self, sp: usize) -> bool {
+    pub(crate) fn owns_stack_pointer(&self, sp: usize) -> bool {
         let (bottom, top) = self.stack_range();
         sp > bottom && sp <= top
     }

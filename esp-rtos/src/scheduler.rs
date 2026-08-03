@@ -202,14 +202,35 @@ impl SchedulerState {
         task_ptr
     }
 
+    /// Deletes the tasks marked for deletion on `cpu`, except the one that owns `current_sp`.
+    ///
+    /// A task that deletes itself keeps running on its own stack until the scheduler switches away
+    /// from it. Freeing that stack here would hand it back to the allocator while this CPU still
+    /// writes to it, and the other core could hand it out again. Such a task stays in the list, and
+    /// a later scheduler run deletes it, once this CPU runs on a different stack.
+    ///
+    /// Only the task the CPU currently runs on can be deferred, so the list holds at most one task
+    /// after this function returns.
     #[cold]
     #[inline(never)]
-    fn delete_marked_tasks(&mut self, cpu: Cpu) {
+    fn delete_marked_tasks(&mut self, cpu: Cpu, current_sp: usize) {
+        let mut in_use = None;
+
         while let Some(task_ptr) = self.per_cpu[cpu as usize].to_delete.pop() {
             assert!(task_ptr.state() == TaskState::Deleted);
 
+            if unsafe { task_ptr.as_ref() }.owns_stack_pointer(current_sp) {
+                trace!("delete_marked_tasks {:?} is still in use", task_ptr);
+                in_use = Some(task_ptr);
+                continue;
+            }
+
             trace!("delete_marked_tasks {:?}", task_ptr);
             self.delete_task(task_ptr);
+        }
+
+        if let Some(task_ptr) = in_use {
+            self.per_cpu[cpu as usize].to_delete.push(task_ptr);
         }
     }
 
@@ -220,10 +241,6 @@ impl SchedulerState {
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
 
-        if !self.per_cpu[cpu as usize].to_delete.is_empty() {
-            self.delete_marked_tasks(cpu);
-        }
-
         let current_sp: u32;
         cfg_select! {
             xtensa => unsafe {
@@ -232,6 +249,10 @@ impl SchedulerState {
             _ => unsafe {
                 core::arch::asm!("mv {0}, sp", out(reg) current_sp);
             },
+        }
+
+        if !self.per_cpu[cpu as usize].to_delete.is_empty() {
+            self.delete_marked_tasks(cpu, current_sp as usize);
         }
 
         let current_task = NonNull::new(read_thread_pointer());
