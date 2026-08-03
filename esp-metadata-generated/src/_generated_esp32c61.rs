@@ -155,10 +155,10 @@ macro_rules! property {
         stringify!(256)
     };
     ("i2c_master.version") => {
-        3
+        4
     };
     ("i2c_master.version", str) => {
-        stringify!(3)
+        stringify!(4)
     };
     ("i2c_master.has_fsm_timeouts") => {
         true

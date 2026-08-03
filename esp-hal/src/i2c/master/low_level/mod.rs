@@ -3,7 +3,10 @@ use crate::{rtc_cntl::WakeLock, soc::clocks::ClockTree};
 
 #[cfg_attr(i2c_master_version = "1", path = "v1.rs")]
 #[cfg_attr(i2c_master_version = "2", path = "v2.rs")]
-#[cfg_attr(i2c_master_version = "3", path = "v3.rs")]
+#[cfg_attr(
+    any(i2c_master_version = "3", i2c_master_version = "4"),
+    path = "v3.rs"
+)]
 mod version;
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]

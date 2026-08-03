@@ -716,7 +716,7 @@ impl<'d> I2c<'d, Blocking> {
             let clock = i2c.info().clock_instance;
             let config = I2cFunctionClockConfig::new(
                 Default::default(),
-                #[cfg(i2c_master_version = "3")]
+                #[cfg(any(i2c_master_version = "3", i2c_master_version = "4"))]
                 0,
             );
             clock.configure_function_clock(clocks, config);
