@@ -92,14 +92,14 @@ pub trait Scl: RtcPin + OutputPin + InputPin {
 }
 
 for_each_lp_function! {
-    (($_func:ident, SAR_I2C_SCL_n, $n:literal), $gpio:ident, $_af:literal) => {
+    (($_func:ident, SAR_I2C_SCL_n, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
         impl Scl for crate::peripherals::$gpio<'_> {
             fn selector(&self) -> u8 {
                 $n
             }
         }
     };
-    (($_func:ident, SAR_I2C_SDA_n, $n:literal), $gpio:ident, $_af:literal) => {
+    (($_func:ident, SAR_I2C_SDA_n, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
         impl Sda for crate::peripherals::$gpio<'_> {
             fn selector(&self) -> u8 {
                 $n

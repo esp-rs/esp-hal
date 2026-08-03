@@ -18,11 +18,11 @@ pub trait Rx: RtcPin + InputPin {
     fn connect_rx(&self);
 }
 
-// Chips with an LP GPIO matrix can route the LP UART signals to any LP pin, chips without one only
-// expose them on the pads whose LP IO MUX has an LP UART function.
+// Chips with an LP GPIO matrix can route the LP UART signals to any LP pin. When a pad's LP IO MUX
+// has an LP UART function, use that; otherwise route through the matrix.
 #[cfg(lp_io_has_gpio_matrix)]
 for_each_lp_function! {
-    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal) => {
+    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
         impl Tx for crate::peripherals::$gpio<'_> {
             fn connect_tx(&self) {
                 crate::gpio::lp_io::connect_output_signal(

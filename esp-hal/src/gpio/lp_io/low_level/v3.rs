@@ -4,7 +4,7 @@ use crate::{
 };
 
 for_each_lp_function! {
-    (($_rtc:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
+    (($_rtc:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
         paste::paste! {
             #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
             impl RtcPin for crate::peripherals::$gpio<'_> {

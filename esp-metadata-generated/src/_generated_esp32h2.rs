@@ -4918,10 +4918,11 @@ macro_rules! for_each_analog_function {
 ///
 /// - `all`: `($signal:ident, $gpio:ident, $af:literal)` - simple case where you only need
 ///   identifiers, and maybe the function number.
-/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:literal)` -
-///   expanded signal case, where you need the number(s) of a signal, or the general group to which
-///   the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like
-///   `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+/// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:literal, ($(
+///   $lp_input_af:literal => $lp_input_signal:ident )*) ($( $lp_output_af:literal =>
+///   $lp_output_signal:ident )*))` - expanded signal case, where you need the number(s) of a
+///   signal, or the general group to which the signal belongs. Every expanded branch ends with the
+///   pad's LP input and output function groups (empty on chips without an LP GPIO matrix).
 ///
 /// Macro fragments:
 ///
@@ -4933,10 +4934,16 @@ macro_rules! for_each_analog_function {
 /// - `$af`: the function number, as listed in the LP/RTC IO MUX pad list. On chips with an LP IO
 ///   peripheral this is the value to write to the pin's `MCU_SEL` field to select the function. On
 ///   chips with an RTC IO peripheral the numbering is not necessarily register-accurate.
+/// - `$lp_input_af`: the LP IO MUX function number for an LP peripheral input on this pad.
+/// - `$lp_input_signal`: the LP peripheral input signal name.
+/// - `$lp_output_af`: the LP IO MUX function number for an LP peripheral output on this pad.
+/// - `$lp_output_signal`: the LP peripheral output signal name.
 ///
 /// Example data:
 /// - `(RTC_GPIO15, GPIO12, 0)`
-/// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, 0)`
+/// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, 0, () ())`
+/// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, 1, () (0 => LP_UART_TXD))`
+/// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, 1, () ())`
 ///
 /// The expanded syntax is only available when the signal has at least one numbered component.
 #[macro_export]
@@ -4952,22 +4959,22 @@ macro_rules! for_each_lp_function {
         _for_each_inner_lp_function!((LP_GPIO5, GPIO12, 0));
         _for_each_inner_lp_function!((LP_GPIO6, GPIO13, 0));
         _for_each_inner_lp_function!((LP_GPIO7, GPIO14, 0));
-        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO7, 0));
-        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO8, 0));
-        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO9, 0));
-        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO10, 0));
-        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO11, 0));
-        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO12, 0));
-        _for_each_inner_lp_function!(((LP_GPIO6, LP_GPIOn, 6), GPIO13, 0));
-        _for_each_inner_lp_function!(((LP_GPIO7, LP_GPIOn, 7), GPIO14, 0));
+        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO7, 0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO8, 0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO9, 0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO10, 0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO11, 0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO12, 0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO6, LP_GPIOn, 6), GPIO13, 0, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO7, LP_GPIOn, 7), GPIO14, 0, () ()));
         _for_each_inner_lp_function!((all(LP_GPIO0, GPIO7, 0), (LP_GPIO1, GPIO8, 0),
         (LP_GPIO2, GPIO9, 0), (LP_GPIO3, GPIO10, 0), (LP_GPIO4, GPIO11, 0), (LP_GPIO5,
         GPIO12, 0), (LP_GPIO6, GPIO13, 0), (LP_GPIO7, GPIO14, 0)));
-        _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0, LP_GPIOn, 0), GPIO7, 0),
-        ((LP_GPIO1, LP_GPIOn, 1), GPIO8, 0), ((LP_GPIO2, LP_GPIOn, 2), GPIO9, 0),
-        ((LP_GPIO3, LP_GPIOn, 3), GPIO10, 0), ((LP_GPIO4, LP_GPIOn, 4), GPIO11, 0),
-        ((LP_GPIO5, LP_GPIOn, 5), GPIO12, 0), ((LP_GPIO6, LP_GPIOn, 6), GPIO13, 0),
-        ((LP_GPIO7, LP_GPIOn, 7), GPIO14, 0)));
+        _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0, LP_GPIOn, 0), GPIO7, 0, () ()),
+        ((LP_GPIO1, LP_GPIOn, 1), GPIO8, 0, () ()), ((LP_GPIO2, LP_GPIOn, 2), GPIO9, 0,
+        () ()), ((LP_GPIO3, LP_GPIOn, 3), GPIO10, 0, () ()), ((LP_GPIO4, LP_GPIOn, 4),
+        GPIO11, 0, () ()), ((LP_GPIO5, LP_GPIOn, 5), GPIO12, 0, () ()), ((LP_GPIO6,
+        LP_GPIOn, 6), GPIO13, 0, () ()), ((LP_GPIO7, LP_GPIOn, 7), GPIO14, 0, () ())));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.

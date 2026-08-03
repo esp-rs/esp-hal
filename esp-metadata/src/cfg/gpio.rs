@@ -1,7 +1,7 @@
 //! This module contains configuration used in [device.gpio], as well as
 //! functions that generate code for esp-hal.
 
-use std::str::FromStr;
+use std::{collections::HashSet, str::FromStr};
 
 use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
@@ -342,7 +342,27 @@ impl super::GpioProperties {
     }
 }
 
-pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
+pub(crate) fn generate_gpios(
+    gpio: &super::GpioProperties,
+    lp_io: Option<&super::LpIoSignals>,
+) -> TokenStream {
+    let lp_output_signals: HashSet<&str> = lp_io
+        .map(|io| {
+            io.lp_output_signals
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect()
+        })
+        .unwrap_or_default();
+    let lp_input_signals: HashSet<&str> = lp_io
+        .map(|io| {
+            io.lp_input_signals
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect()
+        })
+        .unwrap_or_default();
+
     let pin_numbers = gpio
         .pins_and_signals
         .pins
@@ -432,6 +452,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                 pin_peri: &Ident,
                 signal: &str,
                 af: Option<&TokenStream>,
+                lp_groups: Option<&TokenStream>,
             ) {
                 // Split "NAMEnumber" format fragments into the NAME and the number. The function
                 // returns `None` if the input string is not in this format. The NAME part can be
@@ -491,7 +512,11 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                         .entry(pattern_name)
                         .or_default()
                         .push(if let Some(af) = af {
-                            quote! { #full_signal, #pin_peri, #af }
+                            if let Some(groups) = lp_groups {
+                                quote! { #full_signal, #pin_peri, #af, #groups }
+                            } else {
+                                quote! { #full_signal, #pin_peri, #af }
+                            }
                         } else {
                             quote! { #full_signal, #pin_peri }
                         });
@@ -507,21 +532,43 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                         &pin_peri,
                         signal,
                         None,
+                        None,
                     );
                 }
             }
 
+            let mut lp_pin_input_afs = vec![];
+            let mut lp_pin_output_afs = vec![];
+
             for af in 0..LowPowerMap::COUNT {
                 if let Some(signal) = pin.lp.get(af) {
                     let signal_name = TokenStream::from_str(signal).unwrap();
+                    let signal_ident = format_ident!("{signal}");
+                    let af_number = number(af);
+                    lp_functions.push(quote! { #signal_name, #pin_peri, #af_number });
+                    if lp_output_signals.contains(signal) {
+                        lp_pin_output_afs.push(quote! { #af_number => #signal_ident });
+                    }
+                    if lp_input_signals.contains(signal) {
+                        lp_pin_input_afs.push(quote! { #af_number => #signal_ident });
+                    }
+                }
+            }
+
+            let lp_groups = quote! {
+                ( #(#lp_pin_input_afs)* ) ( #(#lp_pin_output_afs)* )
+            };
+
+            for af in 0..LowPowerMap::COUNT {
+                if let Some(signal) = pin.lp.get(af) {
                     let af_number = number(af);
                     let af_tokens = quote! { #af_number };
-                    lp_functions.push(quote! { #signal_name, #pin_peri, #af_number });
                     create_matchers_for_signal(
                         &mut expanded_lp_functions,
                         &pin_peri,
                         signal,
                         Some(&af_tokens),
+                        Some(&lp_groups),
                     );
                 }
             }
@@ -537,6 +584,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                         &pin_peri,
                         signal,
                         Some(&af_tokens),
+                        None,
                     );
                 }
             }
@@ -665,7 +713,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         /// This macro has two options for its "Individual matcher" case:
         ///
         /// - `all`: `($signal:ident, $gpio:ident, $af:literal)` - simple case where you only need identifiers, and maybe the function number.
-        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:literal)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:literal, ($( $lp_input_af:literal => $lp_input_signal:ident )*) ($( $lp_output_af:literal => $lp_output_signal:ident )*))` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. Every expanded branch ends with the pad's LP input and output function groups (empty on chips without an LP GPIO matrix).
         ///
         /// Macro fragments:
         ///
@@ -677,10 +725,16 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         ///   LP IO peripheral this is the value to write to the pin's `MCU_SEL` field to select the
         ///   function. On chips with an RTC IO peripheral the numbering is not necessarily
         ///   register-accurate.
+        /// - `$lp_input_af`: the LP IO MUX function number for an LP peripheral input on this pad.
+        /// - `$lp_input_signal`: the LP peripheral input signal name.
+        /// - `$lp_output_af`: the LP IO MUX function number for an LP peripheral output on this pad.
+        /// - `$lp_output_signal`: the LP peripheral output signal name.
         ///
         /// Example data:
         /// - `(RTC_GPIO15, GPIO12, 0)`
-        /// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, 0)`
+        /// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, 0, () ())`
+        /// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, 1, () (0 => LP_UART_TXD))`
+        /// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, 1, () ())`
         ///
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_lp

@@ -26,7 +26,7 @@ impl Ext1WakeupSource<'_, '_> {
 
         let wakeup_pins = Self::wakeup_pins();
         for_each_lp_function! {
-            (($_lp:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal) => {
+            (($_lp:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
                 uninit_pin(unsafe { $crate::peripherals::$gpio::steal() }, wakeup_pins);
             };
         }
