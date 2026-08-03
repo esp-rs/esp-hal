@@ -537,6 +537,21 @@ impl Task {
         }
     }
 
+    /// Returns the address range of the task's stack, as `(bottom, top)`.
+    ///
+    /// The stack grows down from `top`, so `bottom` itself is not a valid stack pointer.
+    fn stack_range(&self) -> (usize, usize) {
+        let bottom = self.stack.cast::<MaybeUninit<u32>>();
+        let top = bottom.wrapping_add(self.stack.len());
+        (bottom as usize, top as usize)
+    }
+
+    /// Returns whether `sp` points into this task's stack.
+    pub(crate) fn owns_stack_pointer(&self, sp: usize) -> bool {
+        let (bottom, top) = self.stack_range();
+        sp > bottom && sp <= top
+    }
+
     pub(crate) fn ensure_no_stack_overflow(&self, _sp: usize) {
         #[cfg(sw_task_overflow_detection)]
         assert_eq!(
@@ -549,20 +564,14 @@ impl Task {
         );
 
         #[cfg(stack_pointer_range_check)]
-        {
-            let len = self.stack.len();
-            let data_ptr = self.stack.cast::<MaybeUninit<u32>>();
-            let stack_bottom = data_ptr as usize;
-            let stack_top = data_ptr.wrapping_add(len) as usize;
-            assert!(
-                _sp > stack_bottom && _sp <= stack_top,
-                "Stack overflow detected in {:?}. Stack pointer: {:x}, Task stack range: {:x} ..= {:x}",
-                self as *const Task,
-                _sp,
-                stack_bottom,
-                stack_top
-            );
-        }
+        assert!(
+            self.owns_stack_pointer(_sp),
+            "Stack overflow detected in {:?}. Stack pointer: {:x}, Task stack range: {:x} ..= {:x}",
+            self as *const Task,
+            _sp,
+            self.stack_range().0,
+            self.stack_range().1
+        );
     }
 
     pub(crate) fn set_up_stack_watchpoint(&self) {
