@@ -524,14 +524,10 @@ impl SchedulerState {
             let task = unsafe { task.as_ref() };
             let in_queue = task.in_run_or_wait_queue;
 
-            cfg_select! {
-                feature = "esp-radio" => {
-                    let in_waitqueue = task.current_wait_queue.is_some();
-                }
-                _ => {
-                    let in_waitqueue = false;
-                }
-            }
+            let in_waitqueue = cfg_select! {
+                feature = "esp-radio" => task.current_wait_queue.is_some(),
+                _ => false,
+            };
 
             in_queue && !in_waitqueue
         };

@@ -506,13 +506,14 @@ mod interrupt_spi_dma {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-        let (dma_channel1, dma_channel2) = cfg_select! {
-            spi_master_dma_engine = "SPI_DMA" => (peripherals.DMA_SPI2, peripherals.DMA_SPI3),
-            spi_master_dma_engine = "AXI_GDMA" => {
-                (peripherals.DMA_AXI_CH0, peripherals.DMA_AXI_CH1)
-            }
-            _ => (peripherals.DMA_CH0, peripherals.DMA_CH1),
-        };
+        let (dma_channel1, dma_channel2) =
+            cfg_select! {
+                spi_master_dma_engine = "SPI_DMA" => (peripherals.DMA_SPI2, peripherals.DMA_SPI3),
+                spi_master_dma_engine = "AXI_GDMA" => {
+                    (peripherals.DMA_AXI_CH0, peripherals.DMA_AXI_CH1)
+                }
+                _ => (peripherals.DMA_CH0, peripherals.DMA_CH1),
+            };
 
         let dma_rx_buf = dma_rx_buffer!(1024).unwrap();
         let dma_tx_buf = dma_tx_buffer!(1024).unwrap();
