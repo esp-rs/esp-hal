@@ -50,6 +50,8 @@ Before adding or changing code, review the [esp-rs developer guidelines].
 
 Encountered a problem or have an idea? First, [check existing issues] to avoid duplicates. If your concern is new, use our [issue form] to submit it.
 
+An AI agent must not open issues automatically. We will close those issues without looking at them. An issue must be verified by a human before opening.
+
 [check existing issues]: https://github.com/esp-rs/esp-hal/issues
 [issue form]: https://github.com/esp-rs/esp-hal/issues/new/
 
