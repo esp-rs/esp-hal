@@ -413,12 +413,8 @@ impl ContextExt for CpuContext {
 
     fn sp(&self) -> u32 {
         cfg_select! {
-            xtensa => {
-                self.A1
-            }
-            _ => {
-                self.sp as u32
-            }
+            xtensa => self.A1,
+            _ => self.sp as u32,
         }
     }
 
@@ -718,9 +714,7 @@ pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
                         schedule_other_core()
                     }
                 }
-                _ => {
-                    yield_task()
-                }
+                _ => yield_task(),
             }
         }
     }

@@ -244,12 +244,12 @@ pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     // Just using IEEE802.15.4 doesn't need the current time. If we don't use `preempt::now`, users
     // will not need to have a scheduler in their firmware.
     cfg_select! {
-        any(feature = "wifi", feature = "ble") => {
-            crate::preempt::now() as i64
-        }
+        any(feature = "wifi", feature = "ble") => crate::preempt::now() as i64,
         _ => {
             // In this case we don't have a scheduler, we can return esp-hal's timestamp.
-            esp_hal::time::Instant::now().duration_since_epoch().as_micros() as i64
+            esp_hal::time::Instant::now()
+                .duration_since_epoch()
+                .as_micros() as i64
         }
     }
 }
@@ -328,7 +328,8 @@ pub(crate) fn enable_wifi_power_domain() {
             soc_has_apb_ctrl => {
                 let syscon = regs!(APB_CTRL);
             }
-            _ => { // S2
+            _ => {
+                // S2
                 let syscon = regs!(SYSCON);
             }
         }

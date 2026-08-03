@@ -1436,9 +1436,7 @@ pub unsafe extern "C" fn coex_status_get() -> u32 {
             const COEX_STATUS_GET_WIFI_BITMAP: u8 = 1;
             unsafe { crate::sys::include::coex_status_get(COEX_STATUS_GET_WIFI_BITMAP) }
         }
-        _ => {
-            0
-        }
+        _ => 0,
     }
 }
 
@@ -1456,17 +1454,13 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
     trace!("coex_schm_register_cb_wrapper {} {:?}", arg1, cb);
 
     cfg_select! {
-        feature = "coex" => {
-            unsafe {
-                crate::sys::include::coex_schm_register_callback(
-                    arg1 as u32,
-                    unwrap!(cb) as *mut c_void,
-                )
-            }
-        }
-        _ => {
-            0
-        }
+        feature = "coex" => unsafe {
+            crate::sys::include::coex_schm_register_callback(
+                arg1 as u32,
+                unwrap!(cb) as *mut c_void,
+            )
+        },
+        _ => 0,
     }
 }
 

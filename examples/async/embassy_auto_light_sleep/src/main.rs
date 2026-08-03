@@ -51,10 +51,10 @@ cfg_select! {
         use peripherals::GPIO0 as BOOT_GPIO;
     }
     feature = "esp32c5" => {
-       use peripherals::GPIO28 as BOOT_GPIO;
+        use peripherals::GPIO28 as BOOT_GPIO;
     }
     feature = "esp32p4" => {
-       use peripherals::GPIO35 as BOOT_GPIO;
+        use peripherals::GPIO35 as BOOT_GPIO;
     }
     // esp32c3, esp32c6, esp32c61, esp32h2
     _ => {

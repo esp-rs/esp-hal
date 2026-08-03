@@ -475,23 +475,19 @@ impl EspHeapInner {
         }
 
         cfg_select! {
-            feature = "internal-heap-stats" => {
-                HeapStats {
-                    region_stats,
-                    size: free + used,
-                    current_usage: used,
-                    max_usage: self.internal_heap_stats.max_usage,
-                    total_allocated: self.internal_heap_stats.total_allocated,
-                    total_freed: self.internal_heap_stats.total_freed,
-                }
-            }
-            _ => {
-                HeapStats {
-                    region_stats,
-                    size: free + used,
-                    current_usage: used,
-                }
-            }
+            feature = "internal-heap-stats" => HeapStats {
+                region_stats,
+                size: free + used,
+                current_usage: used,
+                max_usage: self.internal_heap_stats.max_usage,
+                total_allocated: self.internal_heap_stats.total_allocated,
+                total_freed: self.internal_heap_stats.total_freed,
+            },
+            _ => HeapStats {
+                region_stats,
+                size: free + used,
+                current_usage: used,
+            },
         }
     }
 

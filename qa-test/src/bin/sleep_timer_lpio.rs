@@ -38,7 +38,12 @@ fn main() -> ! {
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
     cfg_select! {
-        any(feature = "esp32c5", feature = "esp32c6", feature = "esp32c61", feature = "esp32p4") => {
+        any(
+            feature = "esp32c5",
+            feature = "esp32c6",
+            feature = "esp32c61",
+            feature = "esp32p4"
+        ) => {
             let mut pin_low = peripherals.GPIO2;
             let mut pin_high = peripherals.GPIO3;
         }

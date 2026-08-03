@@ -631,9 +631,15 @@ impl ShaAlgorithmKind {
             esp32 => {
                 match self {
                     ShaAlgorithmKind::Sha1 => regs.sha1_start().write(|w| w.sha1_start().set_bit()),
-                    ShaAlgorithmKind::Sha256 => regs.sha256_start().write(|w| w.sha256_start().set_bit()),
-                    ShaAlgorithmKind::Sha384 => regs.sha384_start().write(|w| w.sha384_start().set_bit()),
-                    ShaAlgorithmKind::Sha512 => regs.sha512_start().write(|w| w.sha512_start().set_bit()),
+                    ShaAlgorithmKind::Sha256 => {
+                        regs.sha256_start().write(|w| w.sha256_start().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha384 => {
+                        regs.sha384_start().write(|w| w.sha384_start().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha512 => {
+                        regs.sha512_start().write(|w| w.sha512_start().set_bit())
+                    }
                 };
             }
             _ => {
@@ -647,10 +653,18 @@ impl ShaAlgorithmKind {
         cfg_select! {
             esp32 => {
                 match self {
-                    ShaAlgorithmKind::Sha1 => regs.sha1_continue().write(|w| w.sha1_continue().set_bit()),
-                    ShaAlgorithmKind::Sha256 => regs.sha256_continue().write(|w| w.sha256_continue().set_bit()),
-                    ShaAlgorithmKind::Sha384 => regs.sha384_continue().write(|w| w.sha384_continue().set_bit()),
-                    ShaAlgorithmKind::Sha512 => regs.sha512_continue().write(|w| w.sha512_continue().set_bit()),
+                    ShaAlgorithmKind::Sha1 => {
+                        regs.sha1_continue().write(|w| w.sha1_continue().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha256 => regs
+                        .sha256_continue()
+                        .write(|w| w.sha256_continue().set_bit()),
+                    ShaAlgorithmKind::Sha384 => regs
+                        .sha384_continue()
+                        .write(|w| w.sha384_continue().set_bit()),
+                    ShaAlgorithmKind::Sha512 => regs
+                        .sha512_continue()
+                        .write(|w| w.sha512_continue().set_bit()),
                 };
             }
             _ => {
@@ -668,9 +682,15 @@ impl ShaAlgorithmKind {
                 let regs = _sha.register_block();
                 match self {
                     ShaAlgorithmKind::Sha1 => regs.sha1_load().write(|w| w.sha1_load().set_bit()),
-                    ShaAlgorithmKind::Sha256 => regs.sha256_load().write(|w| w.sha256_load().set_bit()),
-                    ShaAlgorithmKind::Sha384 => regs.sha384_load().write(|w| w.sha384_load().set_bit()),
-                    ShaAlgorithmKind::Sha512 => regs.sha512_load().write(|w| w.sha512_load().set_bit()),
+                    ShaAlgorithmKind::Sha256 => {
+                        regs.sha256_load().write(|w| w.sha256_load().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha384 => {
+                        regs.sha384_load().write(|w| w.sha384_load().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha512 => {
+                        regs.sha512_load().write(|w| w.sha512_load().set_bit())
+                    }
                 };
 
                 true
@@ -737,24 +757,16 @@ for_each_sha_algorithm! {
 fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();
     cfg_select! {
-        esp32 => {
-            sha.text(index).as_ptr()
-        }
-        _ => {
-            sha.h_mem(index).as_ptr()
-        }
+        esp32 => sha.text(index).as_ptr(),
+        _ => sha.h_mem(index).as_ptr(),
     }
 }
 
 fn m_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();
     cfg_select! {
-        esp32 => {
-            sha.text(index).as_ptr()
-        }
-        _ => {
-            sha.m_mem(index).as_ptr()
-        }
+        esp32 => sha.text(index).as_ptr(),
+        _ => sha.m_mem(index).as_ptr(),
     }
 }
 

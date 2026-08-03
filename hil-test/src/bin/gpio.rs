@@ -14,8 +14,11 @@ use hil_test as _;
 cfg_select! {
     feature = "unstable" => {
         use core::cell::RefCell;
+
         use critical_section::Mutex;
         use embassy_time::{Duration, Timer};
+        #[cfg(multi_core)]
+        use esp_hal::system::Stack;
         use esp_hal::{
             // OutputOpenDrain is here because will be unused otherwise
             delay::Delay,
@@ -23,8 +26,6 @@ cfg_select! {
             handler,
             timer::timg::TimerGroup,
         };
-        #[cfg(multi_core)]
-        use esp_hal::system::Stack;
         #[cfg(multi_core)]
         use hil_test::mk_static;
         use portable_atomic::{AtomicUsize, Ordering};
