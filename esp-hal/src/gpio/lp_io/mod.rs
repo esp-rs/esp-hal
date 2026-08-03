@@ -70,8 +70,6 @@ pub(crate) fn connect_open_drain_signals(
     input: LpInputSignal,
     output: LpOutputSignal,
 ) {
-    use crate::peripherals::LP_GPIO;
-
     let lp_pin = low_level::init_pin(pin, true);
     low_level::set_open_drain_output(pin.number(), true);
     low_level::input_enable(lp_pin, true);
@@ -79,15 +77,43 @@ pub(crate) fn connect_open_drain_signals(
     low_level::pulldown_enable(lp_pin, false);
     low_level::output_enable(lp_pin, true);
 
-    LP_GPIO::regs()
+    route_input(lp_pin, input);
+    route_output(lp_pin, output);
+}
+
+/// Configures an LP pin as an input and routes an LP peripheral's input signal to it through the
+/// LP GPIO matrix.
+#[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
+pub(crate) fn connect_input_signal(pin: &(impl RtcPin + InputPin), input: LpInputSignal) {
+    let lp_pin = low_level::init_pin(pin, true);
+    low_level::input_enable(lp_pin, true);
+
+    route_input(lp_pin, input);
+}
+
+/// Configures an LP pin as an output and routes an LP peripheral's output signal to it through the
+/// LP GPIO matrix.
+#[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
+pub(crate) fn connect_output_signal(pin: &(impl RtcPin + OutputPin), output: LpOutputSignal) {
+    let lp_pin = low_level::init_pin(pin, false);
+
+    route_output(lp_pin, output);
+}
+
+#[cfg(lp_io_has_gpio_matrix)]
+fn route_input(lp_pin: u8, input: LpInputSignal) {
+    crate::peripherals::LP_GPIO::regs()
         .func_in_sel_cfg(input as usize)
         .write(|w| unsafe {
             w.sig_in_sel().set_bit();
             w.in_inv_sel().clear_bit();
             w.in_sel().bits(lp_pin)
         });
+}
 
-    LP_GPIO::regs()
+#[cfg(lp_io_has_gpio_matrix)]
+fn route_output(lp_pin: u8, output: LpOutputSignal) {
+    crate::peripherals::LP_GPIO::regs()
         .func_out_sel_cfg(lp_pin as usize)
         .write(|w| unsafe {
             w.out_sel().bits(output as _);
