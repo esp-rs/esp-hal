@@ -473,14 +473,14 @@ jobs:
         run: |
           ALL_CHIPS='[
             {"soc":"esp32",   "rust-target":"xtensa-esp32-none-elf",        "runner":"esp32-jtag",    "host":"aarch64"},
-            {"soc":"esp32s2", "rust-target":"xtensa-esp32s2-none-elf",      "runner":"esp32s2-jtag",  "host":"armv7"},
-            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-usb",   "host":"armv7"},
+            {"soc":"esp32s2", "rust-target":"xtensa-esp32s2-none-elf",      "runner":"esp32s2-jtag",  "host":"aarch64"},
+            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-usb",   "host":"aarch64"},
             {"soc":"esp32c2", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c2-jtag",  "host":"aarch64"},
-            {"soc":"esp32c3", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c3-usb",   "host":"armv7"},
+            {"soc":"esp32c3", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c3-usb",   "host":"aarch64"},
             {"soc":"esp32c5", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c5-usb",   "host":"aarch64"},
-            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-usb",   "host":"armv7"},
+            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-usb",   "host":"aarch64"},
             {"soc":"esp32c61","rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c61-usb",  "host":"aarch64"},
-            {"soc":"esp32h2", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32h2-usb",   "host":"armv7"},
+            {"soc":"esp32h2", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32h2-usb",   "host":"aarch64"},
             {"soc":"esp32p4", "rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32p4",       "host":"aarch64"},
             {"soc":"esp32s31","rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32s31-jtag", "host":"aarch64"}
           ]'
@@ -547,23 +547,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # xtask runs on the HIL runners as a host tool.
-      # Cache the cross-compiled binaries, they rarely change so this
-      # avoids the expensive cross build.
-      - name: Cache xtask binaries
+      # xtask runs on the AArch64 HIL runners as a host tool.
+      # Cache the cross-compiled binary, it rarely changes so this avoids the
+      # expensive cross build.
+      - name: Cache xtask binary
         id: xtask-cache
         uses: actions/cache@v4
         with:
-          path: |
-            target/armv7-unknown-linux-gnueabihf/release/esp-devtool
-            target/aarch64-unknown-linux-gnu/release/esp-devtool
-          key: xtask-hil-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'xtask-mcp-macros/**') }}
+          path: target/aarch64-unknown-linux-gnu/release/esp-devtool
+          key: xtask-hil-aarch64-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'xtask-mcp-macros/**') }}
 
-      - name: Install cross-compilation targets
+      - name: Install cross-compilation target
         if: steps.xtask-cache.outputs.cache-hit != 'true'
-        run: |
-          rustup target add aarch64-unknown-linux-gnu
-          rustup target add armv7-unknown-linux-gnueabihf
+        run: rustup target add aarch64-unknown-linux-gnu
 
       - uses: taiki-e/install-action@v2
         if: steps.xtask-cache.outputs.cache-hit != 'true'
@@ -575,14 +571,7 @@ jobs:
 
       - name: Build xtask for HIL runners
         if: steps.xtask-cache.outputs.cache-hit != 'true'
-        run: |
-          cross build --release --target armv7-unknown-linux-gnueabihf -p esp-devtool
-          cross build --release --target aarch64-unknown-linux-gnu -p esp-devtool
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: xtask-armv7
-          path: target/armv7-unknown-linux-gnueabihf/release/esp-devtool
+        run: cross build --release --target aarch64-unknown-linux-gnu -p esp-devtool
 
       - uses: actions/upload-artifact@v6
         with:
