@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{RtcFunction, RtcPin, RtcPinWithResistors},
+    gpio::{LpPin, LpPinWithResistors, lp_io::LpFunction},
     peripherals::{GPIO, LPWR, RTC_IO, SENS},
 };
 
@@ -57,8 +57,8 @@ macro_rules! hold_field {
 
 // Generates one big match statement because the pin registers have different types.
 for_each_lp_function!(
-    (RTC_GPIOn $(
-        (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt)
+    (LP_GPIOn $(
+        (($_lp:ident, LP_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt)
     ),*) => {
         macro_rules! with_pin_reg {
             ($pin:expr, |$reg:ident| $code:expr) => {{
@@ -77,14 +77,14 @@ for_each_lp_function!(
 );
 
 for_each_lp_function! {
-    (($_rtc:ident, RTC_GPIOn, $n:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_lp:ident, LP_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl RtcPin for crate::peripherals::$gpio<'_> {
-            fn rtc_number(&self) -> u8 {
+        impl LpPin for crate::peripherals::$gpio<'_> {
+            fn lp_number(&self) -> u8 {
                 $n
             }
 
-            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
+            fn lp_set_config(&self, input_enable: bool, mux: bool, func: LpFunction) {
                 enable_iomux_clk_gate();
                 pin_reg!($gpio).modify(|_, w| unsafe {
                     w.fun_ie().bit(input_enable);
@@ -93,7 +93,7 @@ for_each_lp_function! {
                 });
             }
 
-            fn rtcio_pad_hold(&self, enable: bool) {
+            fn lp_pad_hold(&self, enable: bool) {
                 LPWR::regs()
                     .pad_hold()
                     .modify(|_, w| hold_field!(w, $gpio).bit(enable));
@@ -101,12 +101,12 @@ for_each_lp_function! {
         }
 
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl RtcPinWithResistors for crate::peripherals::$gpio<'_> {
-            fn rtcio_pullup(&self, enable: bool) {
+        impl LpPinWithResistors for crate::peripherals::$gpio<'_> {
+            fn lp_pullup(&self, enable: bool) {
                 pullup_enable($n, enable);
             }
 
-            fn rtcio_pulldown(&self, enable: bool) {
+            fn lp_pulldown(&self, enable: bool) {
                 pulldown_enable($n, enable);
             }
         }
@@ -118,17 +118,17 @@ for_each_analog_function! {
         impl crate::peripherals::$gpio<'_> {
             #[cfg(feature = "unstable")]
             pub(crate) fn set_analog_impl(&self) {
-                use crate::gpio::RtcPin;
+                use crate::gpio::LpPin;
 
                 enable_iomux_clk_gate();
 
-                output_enable(self.rtc_number(), false);
-                set_open_drain_output(self.rtc_number(), false);
+                output_enable(self.lp_number(), false);
+                set_open_drain_output(self.lp_number(), false);
 
                 pin_reg!($gpio).modify(|_, w| {
                     w.fun_ie().clear_bit();
                     w.mux_sel().set_bit();
-                    unsafe { w.fun_sel().bits(0) };
+                    unsafe { w.fun_sel().bits(LpFunction::LP_GPIO as u8) };
                     w.rue().bit(false);
                     w.rde().bit(false)
                 });
@@ -137,9 +137,9 @@ for_each_analog_function! {
     };
 }
 
-pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
-    pin.rtc_set_config(input_enable, true, RtcFunction::Rtc);
-    pin.rtc_number()
+pub(super) fn init_pin(pin: &impl LpPin, input_enable: bool) -> u8 {
+    pin.lp_set_config(input_enable, true, LpFunction::LP_GPIO);
+    pin.lp_number()
 }
 
 pub(super) fn output_enable(pin: u8, enable: bool) {

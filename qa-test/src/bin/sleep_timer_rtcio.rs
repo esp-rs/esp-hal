@@ -54,7 +54,7 @@ fn main() -> ! {
             let mut pin3 = peripherals.GPIO3;
             let _pin2_input = Input::new(pin2.reborrow(), config);
 
-            let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, Level)] =
+            let wakeup_pins: &mut [(&mut dyn gpio::LpPinWithResistors, Level)] =
                 &mut [(&mut pin2, Level::Low), (&mut pin3, Level::High)];
         }
         any(feature = "esp32s2", feature = "esp32s3") => {
@@ -62,7 +62,7 @@ fn main() -> ! {
             let mut pin18 = peripherals.GPIO18;
             let _pin17_input = Input::new(pin17.reborrow(), config);
 
-            let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, Level)] =
+            let wakeup_pins: &mut [(&mut dyn gpio::LpPin, Level)] =
                 &mut [(&mut pin17, Level::Low), (&mut pin18, Level::High)];
         }
         _ => {}

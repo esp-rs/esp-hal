@@ -1,7 +1,10 @@
 //! This module contains configuration used in [device.gpio], as well as
 //! functions that generate code for esp-hal.
 
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::{BTreeMap, HashSet},
+    str::FromStr,
+};
 
 use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
@@ -135,8 +138,8 @@ pub(crate) struct PinConfig {
     #[serde(default)]
     pub analog: AnalogMap,
 
-    /// Available LP/RTC IO functions for this pin.
-    #[serde(default, alias = "rtc")]
+    /// Available LP IO functions for this pin.
+    #[serde(default)]
     pub lp: LowPowerMap,
 
     /// Lists cases where the GPIO needs special attention.
@@ -261,7 +264,7 @@ impl AnalogMap {
     }
 }
 
-/// Available RTC/LP functions for a given GPIO pin.
+/// Available LP functions for a given GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct LowPowerMap {
@@ -544,13 +547,13 @@ pub(crate) fn generate_gpios(
                 if let Some(signal) = pin.lp.get(af) {
                     let signal_name = TokenStream::from_str(signal).unwrap();
                     let signal_ident = format_ident!("{signal}");
-                    let af_number = number(af);
-                    lp_functions.push(quote! { #signal_name, #pin_peri, #af_number });
+                    let af_variant = format_ident!("_{af}");
+                    lp_functions.push(quote! { #signal_name, #pin_peri, #af_variant });
                     if lp_output_signals.contains(signal) {
-                        lp_pin_output_afs.push(quote! { #af_number => #signal_ident });
+                        lp_pin_output_afs.push(quote! { #af_variant => #signal_ident });
                     }
                     if lp_input_signals.contains(signal) {
-                        lp_pin_input_afs.push(quote! { #af_number => #signal_ident });
+                        lp_pin_input_afs.push(quote! { #af_variant => #signal_ident });
                     }
                 }
             }
@@ -561,8 +564,8 @@ pub(crate) fn generate_gpios(
 
             for af in 0..LowPowerMap::COUNT {
                 if let Some(signal) = pin.lp.get(af) {
-                    let af_number = number(af);
-                    let af_tokens = quote! { #af_number };
+                    let af_variant = format_ident!("_{af}");
+                    let af_tokens = quote! { #af_variant };
                     create_matchers_for_signal(
                         &mut expanded_lp_functions,
                         &pin_peri,
@@ -658,6 +661,8 @@ pub(crate) fn generate_gpios(
     let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
     let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
+    let lp_functions_enum = render_lp_functions(gpio);
+
     quote! {
         /// This macro can be used to generate code for each `GPIOn` instance.
         ///
@@ -705,15 +710,15 @@ pub(crate) fn generate_gpios(
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_analog
 
-        /// This macro can be used to generate code for each LP/RTC function of each GPIO.
+        /// This macro can be used to generate code for each LP function of each GPIO.
         ///
         /// For an explanation on the general syntax, as well as usage of individual/repeated
         /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
         ///
         /// This macro has two options for its "Individual matcher" case:
         ///
-        /// - `all`: `($signal:ident, $gpio:ident, $af:literal)` - simple case where you only need identifiers, and maybe the function number.
-        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:literal, ($( $lp_input_af:literal => $lp_input_signal:ident )*) ($( $lp_output_af:literal => $lp_output_signal:ident )*))` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. Every expanded branch ends with the pad's LP input and output function groups (empty on chips without an LP GPIO matrix).
+        /// - `all`: `($signal:ident, $gpio:ident, $af:ident)` - simple case where you only need identifiers, and maybe the function.
+        /// - group: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident, $af:ident, ($( $lp_input_af:ident => $lp_input_signal:ident )*) ($( $lp_output_af:ident => $lp_output_signal:ident )*))` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. Every expanded branch ends with the pad's LP input and output function groups (empty on chips without an LP GPIO matrix).
         ///
         /// Macro fragments:
         ///
@@ -721,20 +726,19 @@ pub(crate) fn generate_gpios(
         /// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this is `ADCn_CHm`.
         /// - `$number`: the numbers extracted from `$signal`.
         /// - `$gpio`: the name of the GPIO.
-        /// - `$af`: the function number, as listed in the LP/RTC IO MUX pad list. On chips with an
-        ///   LP IO peripheral this is the value to write to the pin's `MCU_SEL` field to select the
-        ///   function. On chips with an RTC IO peripheral the numbering is not necessarily
-        ///   register-accurate.
-        /// - `$lp_input_af`: the LP IO MUX function number for an LP peripheral input on this pad.
+        /// - `$af`: the LP IO MUX function, as an identifier (i.e. for function 0 this is `_0`).
+        ///   This is the name of an `LpFunction` variant, and its number is the value to write to
+        ///   the pad's function select field.
+        /// - `$lp_input_af`: the LP IO MUX function for an LP peripheral input on this pad.
         /// - `$lp_input_signal`: the LP peripheral input signal name.
-        /// - `$lp_output_af`: the LP IO MUX function number for an LP peripheral output on this pad.
+        /// - `$lp_output_af`: the LP IO MUX function for an LP peripheral output on this pad.
         /// - `$lp_output_signal`: the LP peripheral output signal name.
         ///
         /// Example data:
-        /// - `(RTC_GPIO15, GPIO12, 0)`
-        /// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12, 0, () ())`
-        /// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, 1, () (0 => LP_UART_TXD))`
-        /// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, 1, () ())`
+        /// - `(LP_GPIO15, GPIO12, _0)`
+        /// - `((LP_GPIO15, LP_GPIOn, 15), GPIO12, _0, () ())`
+        /// - `((LP_GPIO14, LP_GPIOn, 14), GPIO14, _1, () (_0 => LP_UART_TXD))`
+        /// - `((SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1), GPIO2, _3, () ())`
         ///
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_lp
@@ -780,6 +784,20 @@ pub(crate) fn generate_gpios(
             };
         }
 
+        /// Defines the `LpFunction` enum.
+        ///
+        /// The enum only contains the LP IO MUX functions that the chip implements. It is
+        /// empty on chips without an LP IO peripheral.
+        ///
+        /// This macro is intended to be called in esp-hal only.
+        #[macro_export]
+        #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+        macro_rules! define_lp_functions {
+            () => {
+                #lp_functions_enum
+            };
+        }
+
         /// Defines and implements the `io_mux_reg` function.
         ///
         /// The generated function has the following signature:
@@ -799,6 +817,61 @@ pub(crate) fn generate_gpios(
             () => {
                 #io_mux_accessor
             };
+        }
+    }
+}
+
+/// Renders the `LpFunction` enum, which lists the LP IO MUX functions of the chip.
+///
+/// Unlike the digital IO MUX, LP pads usually implement only a few functions, so the enum
+/// contains a variant for the used function numbers only.
+fn render_lp_functions(gpio: &super::GpioProperties) -> TokenStream {
+    let mut functions = BTreeMap::new();
+
+    for pin in gpio.pins_and_signals.pins.iter() {
+        for af in 0..LowPowerMap::COUNT {
+            let Some(signal) = pin.lp.get(af) else {
+                continue;
+            };
+            functions.entry(af).or_insert_with(Vec::new).push(signal);
+        }
+    }
+
+    if functions.is_empty() {
+        return quote! {};
+    }
+
+    let gpio_function = functions
+        .iter()
+        .find(|(_, signals)| signals.iter().any(|signal| signal.starts_with("LP_GPIO")))
+        .map(|(af, _)| format_ident!("_{af}"))
+        .expect("No LP_GPIO function found in the pad list");
+
+    let variants = functions.keys().map(|af| {
+        let variant = format_ident!("_{af}");
+        let value = number(*af);
+        let doc = format!("LP IO MUX function {af}.");
+        quote! {
+            #[doc = #doc]
+            #variant = #value,
+        }
+    });
+
+    quote! {
+        /// LP IO MUX function of a pad.
+        ///
+        /// This is the low-power counterpart of `AlternateFunction`: it selects which function
+        /// drives a pad while the pad belongs to the low-power domain.
+        #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum LpFunction {
+            #(#variants)*
+        }
+
+        impl LpFunction {
+            /// The function that connects the pad to the LP GPIO peripheral.
+            pub const LP_GPIO: Self = Self::#gpio_function;
         }
     }
 }

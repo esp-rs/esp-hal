@@ -1,19 +1,19 @@
 //! Low-power UART
 
 use crate::{
-    gpio::{InputPin, OutputPin, RtcPin},
+    gpio::{InputPin, LpPin, OutputPin, lp_io::LpFunction},
     peripherals::{LP_CLKRST, LP_UART, LPWR},
     uart::{DataBits, Parity, StopBits},
 };
 
 /// Trait representing the LP_UART TX pin.
-pub trait Tx: RtcPin + OutputPin {
+pub trait Tx: LpPin + OutputPin {
     #[doc(hidden)]
     fn connect_tx(&self);
 }
 
 /// Trait representing the LP_UART RX pin.
-pub trait Rx: RtcPin + InputPin {
+pub trait Rx: LpPin + InputPin {
     #[doc(hidden)]
     fn connect_rx(&self);
 }
@@ -22,7 +22,7 @@ pub trait Rx: RtcPin + InputPin {
 // has an LP UART function, use that; otherwise route through the matrix.
 #[cfg(lp_io_has_gpio_matrix)]
 for_each_lp_function! {
-    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl Tx for crate::peripherals::$gpio<'_> {
             fn connect_tx(&self) {
                 crate::gpio::lp_io::connect_output_signal(
@@ -45,40 +45,22 @@ for_each_lp_function! {
 
 #[cfg(not(lp_io_has_gpio_matrix))]
 for_each_lp_function! {
-    (LP_UART_TXD, $gpio:ident, $af:literal) => {
+    (LP_UART_TXD, $gpio:ident, $af:ident) => {
         impl Tx for crate::peripherals::$gpio<'_> {
             fn connect_tx(&self) {
-                configure_pad(self.rtc_number(), $af, false);
+                // The output enable is left to the peripheral: selecting a function other than
+                // LP GPIO takes the pad's direction out of the LP GPIO peripheral's hands.
+                self.lp_set_config(false, true, LpFunction::$af);
             }
         }
     };
-    (LP_UART_RXD, $gpio:ident, $af:literal) => {
+    (LP_UART_RXD, $gpio:ident, $af:ident) => {
         impl Rx for crate::peripherals::$gpio<'_> {
             fn connect_rx(&self) {
-                configure_pad(self.rtc_number(), $af, true);
+                self.lp_set_config(true, true, LpFunction::$af);
             }
         }
     };
-}
-
-/// Hands an LP pad over to the LP domain and selects its LP UART function in the LP IO MUX.
-///
-/// The output enable is left to the peripheral: selecting a function other than LP GPIO takes the
-/// pad's direction out of the LP GPIO peripheral's hands.
-#[cfg(not(lp_io_has_gpio_matrix))]
-fn configure_pad(lp_pin: u8, function: u8, input_enable: bool) {
-    use crate::peripherals::{LP_AON, LP_IO};
-
-    let ionum = lp_pin as usize;
-
-    LP_AON::regs()
-        .gpio_mux()
-        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() | (1 << ionum)) });
-
-    LP_IO::regs().gpio(ionum).modify(|_, w| unsafe {
-        w.fun_ie().bit(input_enable);
-        w.mcu_sel().bits(function)
-    });
 }
 
 /// LP-UART Configuration

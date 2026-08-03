@@ -1,7 +1,7 @@
 //! Low-power I2C driver
 
 use crate::{
-    gpio::{InputPin, OutputPin, RtcPin},
+    gpio::{InputPin, LpPin, OutputPin, lp_io::LpFunction},
     peripherals::{LP_I2C0, LP_PERI, LPWR},
     time::Rate,
 };
@@ -9,13 +9,13 @@ use crate::{
 const LP_I2C_FILTER_CYC_NUM_DEF: u8 = 7;
 
 /// Trait representing the LP_I2C SDA pin.
-pub trait Sda: RtcPin + OutputPin + InputPin {
+pub trait Sda: LpPin + OutputPin + InputPin {
     #[doc(hidden)]
     fn connect_sda(&self);
 }
 
 /// Trait representing the LP_I2C SCL pin.
-pub trait Scl: RtcPin + OutputPin + InputPin {
+pub trait Scl: LpPin + OutputPin + InputPin {
     #[doc(hidden)]
     fn connect_scl(&self);
 }
@@ -24,7 +24,7 @@ pub trait Scl: RtcPin + OutputPin + InputPin {
 // expose them on the pads whose LP IO MUX has an LP I2C function.
 #[cfg(lp_io_has_gpio_matrix)]
 for_each_lp_function! {
-    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl Sda for crate::peripherals::$gpio<'_> {
             fn connect_sda(&self) {
                 crate::gpio::lp_io::connect_open_drain_signals(
@@ -49,17 +49,17 @@ for_each_lp_function! {
 
 #[cfg(not(lp_io_has_gpio_matrix))]
 for_each_lp_function! {
-    (LP_I2C_SDA, $gpio:ident, $af:literal) => {
+    (LP_I2C_SDA, $gpio:ident, $af:ident) => {
         impl Sda for crate::peripherals::$gpio<'_> {
             fn connect_sda(&self) {
-                configure_pad(self.rtc_number(), $af);
+                configure_pad(self, LpFunction::$af);
             }
         }
     };
-    (LP_I2C_SCL, $gpio:ident, $af:literal) => {
+    (LP_I2C_SCL, $gpio:ident, $af:ident) => {
         impl Scl for crate::peripherals::$gpio<'_> {
             fn connect_scl(&self) {
-                configure_pad(self.rtc_number(), $af);
+                configure_pad(self, LpFunction::$af);
             }
         }
     };
@@ -142,12 +142,11 @@ pub struct LpI2c {
 /// Configures an LP pad as an open-drain output with its pull-up enabled, then selects the pad's
 /// LP I2C function.
 #[cfg(not(lp_io_has_gpio_matrix))]
-fn configure_pad(lp_pin: u8, function: u8) {
-    use crate::peripherals::{LP_AON, LP_IO};
+fn configure_pad(pin: &impl LpPin, function: LpFunction) {
+    use crate::peripherals::LP_IO;
 
-    let ionum = lp_pin as usize;
+    let ionum = pin.lp_number() as usize;
     let lp_io = LP_IO::regs();
-    let lp_aon = LP_AON::regs();
     unsafe {
         // Set the IO pin to high to avoid them from toggling from Low to
         // High state during initialization. This can register a spurious
@@ -155,10 +154,6 @@ fn configure_pad(lp_pin: u8, function: u8) {
         lp_io
             .out_data_w1ts()
             .write(|w| w.out_data_w1ts().bits(1 << ionum));
-
-        lp_aon
-            .gpio_mux()
-            .modify(|r, w| w.sel().bits(r.sel().bits() | (1 << ionum)));
 
         // Set output mode to Open Drain
         lp_io.pin(ionum).modify(|_, w| w.pad_driver().set_bit());
@@ -170,16 +165,14 @@ fn configure_pad(lp_pin: u8, function: u8) {
             .write(|w| w.enable_w1ts().bits(1 << ionum));
 
         lp_io.gpio(ionum).modify(|_, w| {
-            // Enable input
-            w.fun_ie().set_bit();
             // Disable the internal weak pull-down
             w.fun_wpd().clear_bit();
             // Enable the internal weak pull-up
-            w.fun_wpu().set_bit();
-            // Select the LP I2C function
-            w.mcu_sel().bits(function)
+            w.fun_wpu().set_bit()
         });
     }
+
+    pin.lp_set_config(true, true, function);
 }
 
 impl LpI2c {

@@ -1,14 +1,14 @@
 use crate::{
-    gpio::{RtcPin, RtcPinWithResistors},
+    gpio::{LpPin, LpPinWithResistors},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
 for_each_lp_function! {
-    (($_rtc:ident, RTC_GPIOn, $pin:literal), $gpio:ident, $_af:literal, $_lp_in:tt $_lp_out:tt) => {
+    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         paste::paste! {
             #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-            impl RtcPin for crate::peripherals::$gpio<'_> {
-                fn rtc_number(&self) -> u8 {
+            impl LpPin for crate::peripherals::$gpio<'_> {
+                fn lp_number(&self) -> u8 {
                     $pin
                 }
 
@@ -24,7 +24,7 @@ for_each_lp_function! {
                     });
                 }
 
-                fn rtcio_pad_hold(&self, enable: bool) {
+                fn lp_pad_hold(&self, enable: bool) {
                     LPWR::regs()
                         .pad_hold()
                         .modify(|_, w| w.[<gpio_pin $pin _hold>]().bit(enable));
@@ -32,12 +32,12 @@ for_each_lp_function! {
             }
 
             #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-            impl RtcPinWithResistors for crate::peripherals::$gpio<'_> {
-                fn rtcio_pullup(&self, enable: bool) {
+            impl LpPinWithResistors for crate::peripherals::$gpio<'_> {
+                fn lp_pullup(&self, enable: bool) {
                     pullup_enable($pin, enable)
                 }
 
-                fn rtcio_pulldown(&self, enable: bool) {
+                fn lp_pulldown(&self, enable: bool) {
                     pulldown_enable($pin, enable)
                 }
             }
@@ -45,7 +45,7 @@ for_each_lp_function! {
     };
 }
 
-pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
+pub(super) fn init_pin(pin: &impl LpPin, input_enable: bool) -> u8 {
     let pin = pin.number();
     input_enable_fn(pin, input_enable);
     pin

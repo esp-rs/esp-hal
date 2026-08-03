@@ -109,19 +109,19 @@ macro_rules! touch {
         impl $crate::gpio::TouchPin for $crate::peripherals::$pin_peri<'_> {
             fn set_touch(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::{GPIO, RTC_IO, SENS};
-                use $crate::gpio::RtcPin;
+                use $crate::gpio::LpPin;
 
                 let gpio = GPIO::regs();
                 let rtcio = RTC_IO::regs();
                 let sens = SENS::regs();
 
                 // Pad to normal mode (not open-drain)
-                gpio.pin(self.rtc_number() as usize).write(|w| w.pad_driver().clear_bit());
+                gpio.pin(self.lp_number() as usize).write(|w| w.pad_driver().clear_bit());
 
                 // clear output
                 rtcio
                     .enable_w1tc()
-                    .write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
+                    .write(|w| unsafe { w.enable_w1tc().bits(1 << self.lp_number()) });
 
                 touch_thres_reg!(sens, $touch_num).write(|w| unsafe {
                     touch_out_th_field!(w, $touch_num).bits(

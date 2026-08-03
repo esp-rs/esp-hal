@@ -1,6 +1,6 @@
 use super::RtcioWakeupSource;
 use crate::{
-    gpio::{Level, RtcFunction, RtcPinWithResistors},
+    gpio::{AlternateFunction, Level, LpPinWithResistors},
     peripherals::{GPIO, IO_MUX, LPWR},
     rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource},
 };
@@ -11,21 +11,21 @@ const SIG_GPIO_OUT_IDX: u32 = 128;
 const GPIO_NUM_MAX: usize = 22;
 
 impl RtcioWakeupSource<'_, '_> {
-    fn apply_pin(&self, pin: &mut dyn RtcPinWithResistors, level: Level) {
+    fn apply_pin(&self, pin: &mut dyn LpPinWithResistors, level: Level) {
         // The pullup/pulldown part is like in gpio_deep_sleep_wakeup_prepare
         let level = match level {
             Level::High => {
-                pin.rtcio_pullup(false);
-                pin.rtcio_pulldown(true);
+                pin.lp_pullup(false);
+                pin.lp_pulldown(true);
                 GPIO_INTR_HIGH_LEVEL
             }
             Level::Low => {
-                pin.rtcio_pullup(true);
-                pin.rtcio_pulldown(false);
+                pin.lp_pullup(true);
+                pin.lp_pulldown(false);
                 GPIO_INTR_LOW_LEVEL
             }
         };
-        pin.rtcio_pad_hold(true);
+        pin.lp_pad_hold(true);
 
         // apply_wakeup does the same as idf's esp_deep_sleep_enable_gpio_wakeup
         unsafe {
@@ -67,7 +67,7 @@ fn isolate_digital_gpio() {
             // make pad work as gpio (otherwise, deep_sleep bottom current will rise)
             io_mux
                 .gpio(pin_num)
-                .modify(|_, w| unsafe { w.mcu_sel().bits(RtcFunction::Digital as u8) });
+                .modify(|_, w| unsafe { w.mcu_sel().bits(AlternateFunction::GPIO as u8) });
         }
     }
 }
