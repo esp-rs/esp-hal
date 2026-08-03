@@ -65,6 +65,13 @@ pub(crate) struct CpuState {
     /// Pointer to the task that is scheduled for deletion.
     pub(crate) to_delete: TaskList<TaskDeleteListElement>,
 
+    /// Set while the CPU executes the idle context.
+    ///
+    /// The idle context has no `Task`, so the thread pointer is null while it runs. A task that
+    /// has deleted itself also has a null thread pointer, so the flag is needed to tell the two
+    /// apart.
+    idle: bool,
+
     // This context will be filled out by the first context switch.
     // We allocate the main task statically, because there is always a main task. If deleted, we
     // simply don't deallocate this.
@@ -77,6 +84,7 @@ impl CpuState {
             initialized: false,
             idle_context: CpuContext::new(),
             to_delete: TaskList::new(),
+            idle: false,
 
             #[cfg(multi_core)]
             current_task: core::ptr::null_mut(),
@@ -227,19 +235,34 @@ impl SchedulerState {
         }
 
         let current_task = NonNull::new(read_thread_pointer());
-        if let Some(current_task) = current_task {
+
+        // The idle task has no Task structure, and it has no stack of its own - it runs on the
+        // main task's stack. Check the main task in that case, so that a deep idle hook cannot
+        // overflow the main stack unnoticed. Before the main task is set up, there is no stack
+        // guard to check. A task that deleted itself also has no thread pointer, but it still runs
+        // on its own stack, which is about to be freed - there is nothing to check for it.
+        let stack_owner = match current_task {
+            Some(current_task) => Some(current_task),
+            None if self.per_cpu[current_cpu].idle => {
+                Some(NonNull::from(&self.per_cpu[current_cpu].main_task))
+            }
+            None => None,
+        };
+        if let Some(stack_owner) = stack_owner {
             unsafe {
-                current_task
+                stack_owner
                     .as_ref()
                     .ensure_no_stack_overflow(current_sp as usize)
             };
+        }
 
-            if current_task.state() == TaskState::Ready {
-                // Current task is still ready, mark it as such.
-                debug!("re-queueing current task: {:?}", current_task);
-                self.run_queue.mark_task_ready(&self.per_cpu, current_task);
-            }
-        };
+        if let Some(current_task) = current_task
+            && current_task.state() == TaskState::Ready
+        {
+            // Current task is still ready, mark it as such.
+            debug!("re-queueing current task: {:?}", current_task);
+            self.run_queue.mark_task_ready(&self.per_cpu, current_task);
+        }
 
         let mut arm_next_timeslice_tick = false;
         let next_task = self.run_queue.pop();
@@ -310,6 +333,8 @@ impl SchedulerState {
 
                 &raw mut self.per_cpu[current_cpu].idle_context
             };
+
+            self.per_cpu[current_cpu].idle = next_task.is_none();
 
             task_switch(current_context, next_context);
 
@@ -454,7 +479,8 @@ impl SchedulerState {
     #[cfg(all(multi_core, sleep_light_sleep))]
     pub(crate) fn cpu_idle(&self, cpu: Cpu) -> bool {
         let per_cpu = &self.per_cpu[cpu as usize];
-        !per_cpu.initialized || per_cpu.current_task.is_null()
+        // A CPU that never started the scheduler has no work to do, so it counts as idle.
+        !per_cpu.initialized || per_cpu.idle
     }
 }
 

@@ -412,7 +412,7 @@ pub fn start_with_idle_hook(
         let stack_bottom = (&raw const _stack_end_cpu0).cast::<MaybeUninit<u32>>();
         let stack_slice = core::ptr::slice_from_raw_parts_mut(
             stack_bottom.cast_mut(),
-            stack_top as usize - stack_bottom as usize,
+            (stack_top as usize - stack_bottom as usize) / 4,
         );
 
         task::allocate_main_task(
@@ -482,7 +482,7 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
     let stack_ptrs = SecondCoreStack {
         stack: core::ptr::slice_from_raw_parts_mut(
             stack.bottom().cast::<MaybeUninit<u32>>(),
-            STACK_SIZE,
+            STACK_SIZE / 4,
         ),
     };
 
