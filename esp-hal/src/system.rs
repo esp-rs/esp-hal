@@ -276,15 +276,11 @@ impl Cpu {
     #[instability::unstable]
     pub fn other() -> impl Iterator<Item = Self> {
         cfg_select! {
-            multi_core => {
-                match Self::current() {
-                    Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
-                    Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
-                }
-            }
-            _ => {
-                [].into_iter()
-            }
+            multi_core => match Self::current() {
+                Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+            },
+            _ => [].into_iter(),
         }
     }
 
@@ -292,12 +288,8 @@ impl Cpu {
     #[inline(always)]
     pub fn all() -> impl Iterator<Item = Self> {
         cfg_select! {
-            multi_core => {
-                [Cpu::ProCpu, Cpu::AppCpu].into_iter()
-            }
-            _ => {
-                [Cpu::ProCpu].into_iter()
-            }
+            multi_core => [Cpu::ProCpu, Cpu::AppCpu].into_iter(),
+            _ => [Cpu::ProCpu].into_iter(),
         }
     }
 }
@@ -313,15 +305,9 @@ impl Cpu {
 pub(crate) fn raw_core() -> usize {
     // This method must never return UNUSED_THREAD_ID_VALUE
     cfg_select! {
-        all(multi_core, riscv) => {
-            riscv::register::mhartid::read()
-        }
-        all(multi_core, xtensa) => {
-            (xtensa_lx::get_processor_id() & 0x2000) as usize
-        }
-        _ => {
-            0
-        }
+        all(multi_core, riscv) => riscv::register::mhartid::read(),
+        all(multi_core, xtensa) => (xtensa_lx::get_processor_id() & 0x2000) as usize,
+        _ => 0,
     }
 }
 

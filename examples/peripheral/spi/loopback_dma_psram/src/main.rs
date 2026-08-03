@@ -62,7 +62,8 @@ macro_rules! dma_alloc_tx_buffer {
 
 const DMA_BUFFER_SIZE: usize = 8192;
 const DMA_ALIGNMENT: ExternalBurstConfig = cfg_select! {
-    // ExternalBurstConfig::Size64 is not available on ESP32-S2.
+    // ExternalBurstConfig::Size64 is not available on
+    // ESP32-S2.
     feature = "esp32s2" => ExternalBurstConfig::Size32,
     _ => ExternalBurstConfig::Size64,
 };
@@ -75,10 +76,11 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    let (sclk, mosi, cs) = cfg_select! {
-        feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
-        _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
-    };
+    let (sclk, mosi, cs) =
+        cfg_select! {
+            feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
+            _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
+        };
     let miso = unsafe { mosi.clone_unchecked() };
 
     let dma_channel = cfg_select! {

@@ -47,12 +47,8 @@ static mut ITERATION: u32 = 0;
 
 fn load_iteration() -> u32 {
     cfg_select! {
-        feature = "esp32c2" => {
-            esp_hal::peripherals::LPWR::regs().store6().read().bits()
-        },
-        feature = "esp32c61" => {
-            esp_hal::peripherals::LP_AON::regs().store6().read().bits()
-        },
+        feature = "esp32c2" => esp_hal::peripherals::LPWR::regs().store6().read().bits(),
+        feature = "esp32c61" => esp_hal::peripherals::LP_AON::regs().store6().read().bits(),
         _ => unsafe { ITERATION },
     }
 }
@@ -62,12 +58,12 @@ fn store_iteration(value: u32) {
             esp_hal::peripherals::LPWR::regs()
                 .store6()
                 .write(|w| unsafe { w.bits(value) });
-        },
+        }
         feature = "esp32c61" => {
             esp_hal::peripherals::LP_AON::regs()
                 .store6()
                 .write(|w| unsafe { w.bits(value) });
-        },
+        }
         _ => unsafe { ITERATION = value },
     }
 }
@@ -102,11 +98,11 @@ fn init_heap() {
         feature = "esp32" => {
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
             esp_alloc::heap_allocator!(size: 24 * 1024);
-        },
+        }
         _ => {
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 64 * 1024);
-        },
+        }
     }
 }
 

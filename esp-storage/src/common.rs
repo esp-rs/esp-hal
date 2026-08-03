@@ -94,7 +94,7 @@ impl<'d> FlashStorage<'d> {
             unlocked: false,
             multi_core_strategy: cfg_select!(
                 multi_core => MultiCoreStrategy::Error,
-                _ => MultiCoreStrategy::Ignore
+                _ => MultiCoreStrategy::Ignore,
             ),
             _flash: flash,
         }

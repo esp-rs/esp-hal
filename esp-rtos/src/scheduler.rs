@@ -218,12 +218,12 @@ impl SchedulerState {
 
         let current_sp: u32;
         cfg_select! {
-            xtensa => {
-                unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
-            }
-            _ => {
-                unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
-            }
+            xtensa => unsafe {
+                core::arch::asm!("mov {0}, sp", out(reg) current_sp);
+            },
+            _ => unsafe {
+                core::arch::asm!("mv {0}, sp", out(reg) current_sp);
+            },
         }
 
         let current_task = NonNull::new(read_thread_pointer());

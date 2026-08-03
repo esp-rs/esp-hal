@@ -38,11 +38,11 @@ fn init_heap() {
             use esp_hal::ram;
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 36 * 1024);
-        },
+        }
         any(esp32c5, esp32h2) => {
             esp_alloc::heap_allocator!(size: 72 * 1024);
-        },
-        _ => {},
+        }
+        _ => {}
     }
 }
 

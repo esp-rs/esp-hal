@@ -93,9 +93,7 @@ async fn main(_spawner: Spawner) {
         any(feature = "esp32", feature = "esp32s3", feature = "esp32p4") => {
             PdmRxConfig::new_pcm_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
         }
-        _ => {
-            PdmRxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono)
-        }
+        _ => PdmRxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono),
     };
     let pdm_cfg = PdmConfig::rx_only(rx_cfg);
 

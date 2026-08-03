@@ -106,7 +106,9 @@ fn configure_tx(i2s: &Info, config: &super::PdmTxConfig) -> Result<(), PdmError>
             // MCLK mux is configured in `hp_sys_clkrst::set_tx_clock` via `Info::peripheral`.
         }
         _ => {
-            i2s.regs().rx_clkm_conf().modify(|_, w| w.mclk_sel().clear_bit());
+            i2s.regs()
+                .rx_clkm_conf()
+                .modify(|_, w| w.mclk_sel().clear_bit());
         }
     }
 
@@ -197,7 +199,9 @@ fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError>
             // MCLK mux is configured in `hp_sys_clkrst::set_rx_clock` via `Info::peripheral`.
         }
         _ => {
-            i2s.regs().rx_clkm_conf().modify(|_, w| w.mclk_sel().set_bit());
+            i2s.regs()
+                .rx_clkm_conf()
+                .modify(|_, w| w.mclk_sel().set_bit());
         }
     }
 

@@ -1926,12 +1926,8 @@ mod private {
 
         pub fn tx_valid_pin_signal() -> OutputSignal {
             cfg_select! {
-                esp32c5 => {
-                    OutputSignal::PARL_TX_CS
-                }
-                _ => {
-                    OutputSignal::PARL_TX_DATA7
-                }
+                esp32c5 => OutputSignal::PARL_TX_CS,
+                _ => OutputSignal::PARL_TX_DATA7,
             }
         }
 

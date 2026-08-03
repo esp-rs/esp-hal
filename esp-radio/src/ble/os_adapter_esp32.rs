@@ -521,9 +521,7 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
             const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
             unsafe { coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, callback) }
         }
-        _ => {
-            0
-        }
+        _ => 0,
     }
 }
 
@@ -541,9 +539,7 @@ pub(crate) unsafe extern "C" fn coex_wifi_channel_get(
             }
             unsafe { coex_wifi_channel_get(_primary, _secondary) }
         }
-        _ => {
-            -1
-        }
+        _ => -1,
     }
 }
 

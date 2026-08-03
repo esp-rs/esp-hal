@@ -619,34 +619,22 @@ impl Info {
 
     fn qx_mem(&self) -> *mut u32 {
         cfg_select! {
-            ecc_separate_jacobian_point_memory => {
-                self.regs.qx_mem(0).as_ptr()
-            }
-            _ => {
-                self.regs.px_mem(0).as_ptr()
-            }
+            ecc_separate_jacobian_point_memory => self.regs.qx_mem(0).as_ptr(),
+            _ => self.regs.px_mem(0).as_ptr(),
         }
     }
 
     fn qy_mem(&self) -> *mut u32 {
         cfg_select! {
-            ecc_separate_jacobian_point_memory => {
-                self.regs.qy_mem(0).as_ptr()
-            }
-            _ => {
-                self.regs.py_mem(0).as_ptr()
-            }
+            ecc_separate_jacobian_point_memory => self.regs.qy_mem(0).as_ptr(),
+            _ => self.regs.py_mem(0).as_ptr(),
         }
     }
 
     fn qz_mem(&self) -> *mut u32 {
         cfg_select! {
-            ecc_separate_jacobian_point_memory => {
-                self.regs.qz_mem(0).as_ptr()
-            }
-            _ => {
-                self.regs.k_mem(0).as_ptr()
-            }
+            ecc_separate_jacobian_point_memory => self.regs.qz_mem(0).as_ptr(),
+            _ => self.regs.k_mem(0).as_ptr(),
         }
     }
 
