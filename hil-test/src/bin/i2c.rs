@@ -390,7 +390,9 @@ mod tests {
         use esp_hal::i2c::master::ClockSource;
 
         let configs = cfg_select! {
-            i2c_master_version = "3" => [ClockSource::Xtal, ClockSource::RcFast],
+            any(i2c_master_version = "3", i2c_master_version = "4") => {
+                [ClockSource::Xtal, ClockSource::RcFast]
+            }
             _ => [ClockSource::Apb, ClockSource::RefTick],
         };
 
