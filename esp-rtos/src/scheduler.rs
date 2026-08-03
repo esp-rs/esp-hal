@@ -257,6 +257,11 @@ impl SchedulerState {
 
         let current_task = NonNull::new(read_thread_pointer());
 
+        // A task that deleted itself has no thread pointer, but it keeps running on its own stack.
+        // We have to switch away from it, even if there is nothing else to run, so that we do not
+        // return to a task that no longer exists.
+        let deleted_self = current_task.is_none() && !self.per_cpu[current_cpu].idle;
+
         // The idle task has no Task structure, and it has no stack of its own - it runs on the
         // main task's stack. Check the main task in that case, so that a deep idle hook cannot
         // overflow the main stack unnoticed. Before the main task is set up, there is no stack
@@ -287,7 +292,7 @@ impl SchedulerState {
 
         let mut arm_next_timeslice_tick = false;
         let next_task = self.run_queue.pop();
-        if next_task != current_task {
+        if next_task != current_task || deleted_self {
             debug!("Switching task {:?} -> {:?}", current_task, next_task);
 
             // If the current task is deleted, we can skip saving its context. We signal this by

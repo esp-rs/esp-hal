@@ -292,6 +292,37 @@ mod tests {
     }
 
     #[test]
+    fn task_can_delete_itself_when_nothing_else_is_ready() {
+        // The task deletes itself while the main task sleeps. The run queue is empty at that point,
+        // so the scheduler has to switch from the deleted task to the idle context.
+        extern "C" fn self_deleting_task(_context: *mut c_void) {
+            // Wait for the main task to go to sleep, so that this task is the last ready one.
+            CurrentThreadHandle::get().delay(Duration::from_millis(10));
+
+            info!("Task: deleting itself");
+            unsafe { preempt::schedule_task_deletion(None) };
+
+            unreachable!("A deleted task must not run again");
+        }
+
+        unsafe {
+            preempt::task_create(
+                "self_deleting_task",
+                self_deleting_task,
+                core::ptr::null_mut(),
+                3,
+                None,
+                4096,
+            )
+        };
+
+        // Sleeping takes the main task out of the run queue.
+        CurrentThreadHandle::get().delay(Duration::from_millis(50));
+
+        info!("Main: done");
+    }
+
+    #[test]
     fn interrupt_handler_is_not_preempted_by_context_switch(mut ctx: Context) {
         // In this test, we start a thread, and make it wait for a signal. We then trigger a
         // low-priority interrupt, which sets the signal and exits the test. The test must not time
