@@ -235,7 +235,7 @@ jobs:
       # expensive cross build.
       - name: Cache xtask binary
         id: xtask-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: target/aarch64-unknown-linux-gnu/release/esp-devtool
           key: xtask-hil-aarch64-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'xtask-mcp-macros/**') }}
