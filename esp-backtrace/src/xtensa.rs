@@ -20,15 +20,15 @@ fn sp() -> u32 {
         asm!(
             "mov {0}, a1", // current stack pointer
             // Spill registers, otherwise `sp - 12` will not contain the previous stack pointer
-            "add a12,a12,a12",
+            "and a12,a12,a12",
             "rotw 3",
-            "add a12,a12,a12",
+            "and a12,a12,a12",
             "rotw 3",
-            "add a12,a12,a12",
+            "and a12,a12,a12",
             "rotw 3",
-            "add a12,a12,a12",
+            "and a12,a12,a12",
             "rotw 3",
-            "add a12,a12,a12",
+            "and a12,a12,a12",
             "rotw 4",
             out(reg) sp
         );
