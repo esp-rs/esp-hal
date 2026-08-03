@@ -140,6 +140,7 @@ pub mod sleep;
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]
 pub(crate) mod rtc;
 
+<<<<<<< HEAD
 cfg_if::cfg_if! {
     if #[cfg(soc_has_lp_wdt)] {
         use crate::peripherals::LP_WDT;
@@ -150,6 +151,17 @@ cfg_if::cfg_if! {
         use crate::peripherals::LPWR as LP_WDT;
         use crate::peripherals::LPWR as LP_TIMER;
         use crate::peripherals::LPWR as LP_AON;
+=======
+cfg_select! {
+    esp32s31 => {
+        use crate::peripherals::{LP_SYS as LP_AON, LP_WDT};
+    }
+    soc_has_lp_wdt => {
+        use crate::peripherals::{LP_AON, LP_WDT};
+    }
+    _ => {
+        use crate::peripherals::{LPWR, LPWR as LP_WDT, LPWR as LP_AON};
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 
@@ -222,10 +234,33 @@ impl<'d> Rtc<'d> {
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
 
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 rtc_cntl.time_update().write(|w| w.time_update().set_bit());
                 while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
+=======
+        // Load counter value
+        cfg_select! {
+            any(esp32, esp32s2, esp32s3, esp32c2, esp32c3) => {
+                // Keep update high for at least one RTC slowclk period, assumes 150k RTC_SLOWCLK
+                // Without this, this function may return a stale value
+                const UPDATE_COUNT: usize = if cfg!(esp32) { 20 } else { 10 };
+                for _ in 0..UPDATE_COUNT {
+                    rtc.time_update().write(|w| w.time_update().set_bit());
+                    crate::rom::ets_delay_us(1);
+                }
+            }
+            _ => {
+                rtc.update().write(|w| w.main_timer_update().set_bit());
+            }
+        }
+
+        // Read counter value
+        cfg_select! {
+            esp32 => {
+                while rtc.time_update().read().time_valid().bit_is_clear() {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                     // Might take 1 RTC slowclk period, don't flood RTC bus
                     crate::rom::ets_delay_us(1);
                 }
@@ -265,6 +300,15 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
+<<<<<<< HEAD
+=======
+        let (low_reg, high_reg) =
+            cfg_select! {
+                esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+                esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+                _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+            };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
         // In terms of registers, STORE2 and STORE3 are used on all current chips
         // (esp32, esp32p4, esp32h2, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61,
@@ -293,7 +337,16 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
+<<<<<<< HEAD
         let rtc_cntl = LP_AON::regs();
+=======
+        let (low_reg, high_reg) =
+            cfg_select! {
+                esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+                esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+                _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+            };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
         // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
         rtc_cntl
@@ -414,9 +467,24 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
+<<<<<<< HEAD
         LP_AON::regs()
             .store4()
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
+=======
+        let reg = cfg_select! {
+            esp32s31 => LP_AON::regs().lp_store(4),
+            esp32p4 => LP_AON::regs().lp_store4(),
+            _ => LP_AON::regs().store4(),
+        };
+        let disable_mask = cfg_select! {
+            any(esp32p4, esp32s31) => {
+                Self::RTC_DISABLE_ROM_LOG | (Self::RTC_DISABLE_ROM_LOG << 16)
+            }
+            _ => Self::RTC_DISABLE_ROM_LOG,
+        };
+        reg.modify(|r, w| unsafe { w.bits(r.bits() | disable_mask) });
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 
     /// Register an interrupt handler for the RTC.
@@ -702,7 +770,19 @@ pub fn wakeup_cause() -> SleepSource {
         }
     }
 
+<<<<<<< HEAD
     let wakeup_cause = WakeupReason::from_bits_retain(wakeup_cause_bits);
+=======
+    /// Returns `true` if at least one wake lock is currently held.
+    #[instability::unstable]
+    pub fn is_active() -> bool {
+        cfg_select! {
+            sleep_light_sleep => wake_lock_count().load(portable_atomic::Ordering::Acquire) != 0,
+            _ => true,
+        }
+    }
+}
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
     if wakeup_cause.contains(WakeupReason::TimerTrigEn) {
         return SleepSource::Timer;

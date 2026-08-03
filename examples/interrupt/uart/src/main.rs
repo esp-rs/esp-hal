@@ -39,6 +39,7 @@ static SERIAL: Mutex<RefCell<Option<Uart<Blocking>>>> = Mutex::new(RefCell::new(
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
             let (tx_pin, rx_pin) = (peripherals.GPIO1, peripherals.GPIO3);
@@ -54,6 +55,22 @@ fn main() -> ! {
             let (tx_pin, rx_pin) = (peripherals.GPIO43, peripherals.GPIO44);
         }
     }
+=======
+    let (tx_pin, rx_pin) = cfg_select! {
+        feature = "esp32" => (peripherals.GPIO1, peripherals.GPIO3),
+        feature = "esp32c2" => (peripherals.GPIO20, peripherals.GPIO19),
+        feature = "esp32c3" => (peripherals.GPIO21, peripherals.GPIO20),
+        feature = "esp32c5" => (peripherals.GPIO10, peripherals.GPIO9),
+        feature = "esp32c6" => (peripherals.GPIO16, peripherals.GPIO17),
+        feature = "esp32c61" => (peripherals.GPIO3, peripherals.GPIO2),
+        feature = "esp32h2" => (peripherals.GPIO24, peripherals.GPIO23),
+        feature = "esp32p4" => (peripherals.GPIO6, peripherals.GPIO5),
+        feature = "esp32s31" => (peripherals.GPIO3, peripherals.GPIO2),
+        any(feature = "esp32s2", feature = "esp32s3") => {
+            (peripherals.GPIO43, peripherals.GPIO44)
+        }
+    };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
     let uart_config = UartConfig::default()
         .with_baudrate(19200)

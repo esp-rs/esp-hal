@@ -1433,9 +1433,14 @@ pub unsafe extern "C" fn coex_status_get() -> u32 {
         if #[cfg(feature = "coex")] {
             const COEX_STATUS_GET_WIFI_BITMAP: u8 = 1;
             unsafe { crate::sys::include::coex_status_get(COEX_STATUS_GET_WIFI_BITMAP) }
+<<<<<<< HEAD
         } else {
             0
         }
+=======
+        }
+        _ => 0,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 
@@ -1452,6 +1457,7 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
 ) -> c_int {
     trace!("coex_schm_register_cb_wrapper {} {:?}", arg1, cb);
 
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(feature = "coex")] {
             unsafe {
@@ -1463,6 +1469,16 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
         } else {
             0
         }
+=======
+    cfg_select! {
+        feature = "coex" => unsafe {
+            crate::sys::include::coex_schm_register_callback(
+                arg1 as u32,
+                unwrap!(cb) as *mut c_void,
+            )
+        },
+        _ => 0,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 

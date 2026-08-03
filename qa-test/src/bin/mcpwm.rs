@@ -25,6 +25,7 @@ fn main() -> ! {
     let peripherals: Peripherals = esp_hal::init(esp_hal::Config::default());
     let pin = peripherals.GPIO0;
 
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32h2")] {
             let clock_cfg =
@@ -34,6 +35,14 @@ fn main() -> ! {
                 PeripheralClockConfig::with_frequency(Rate::from_mhz(32)).unwrap();
         }
     }
+=======
+    let clock_cfg = cfg_select! {
+        feature = "esp32h2" => {
+            PeripheralClockConfig::with_frequency(Rate::from_mhz(40)).unwrap()
+        }
+        _ => PeripheralClockConfig::with_frequency(Rate::from_mhz(32)).unwrap(),
+    };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
     let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
     mcpwm.operator0.set_timer(&mcpwm.timer0);

@@ -235,12 +235,22 @@ impl SchedulerState {
         let current_cpu = cpu as usize;
 
         let current_sp: u32;
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(xtensa)] {
                 unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
             } else {
                 unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
             }
+=======
+        cfg_select! {
+            xtensa => unsafe {
+                core::arch::asm!("mov {0}, sp", out(reg) current_sp);
+            },
+            _ => unsafe {
+                core::arch::asm!("mv {0}, sp", out(reg) current_sp);
+            },
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
 
         let current_task = NonNull::new(read_thread_pointer());

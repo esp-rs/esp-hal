@@ -108,11 +108,32 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
 
     /// Trigger this software-interrupt
     pub fn raise(&self) {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(soc_has_intpri)] {
                 let regs = crate::peripherals::INTPRI::regs();
             } else {
                 let regs = crate::peripherals::SYSTEM::regs();
+=======
+        let regs = cfg_select! {
+            soc_has_intpri => crate::peripherals::INTPRI::regs(),
+            _ => crate::peripherals::SYSTEM::regs(),
+        };
+        let reg = regs.cpu_intr_from_cpu(NUM as usize);
+
+        cfg_select! {
+            xtensa => {
+                reg.write(|w| w.cpu_intr().set_bit());
+                // Read back to ensure the write is completed.
+                _ = reg.read();
+            }
+            _ => {
+                crate::interrupt::free(|| {
+                    reg.write(|w| w.cpu_intr().set_bit());
+                    // Wait for the interrupt to actually take effect.
+                    while !self.is_pending() {}
+                });
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             }
         }
         let reg;

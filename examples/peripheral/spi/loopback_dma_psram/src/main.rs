@@ -48,8 +48,17 @@ macro_rules! dma_alloc_buffer {
 }
 
 const DMA_BUFFER_SIZE: usize = 8192;
+<<<<<<< HEAD
 const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
 const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
+=======
+const DMA_ALIGNMENT: ExternalBurstConfig = cfg_select! {
+    // ExternalBurstConfig::Size64 is not available on
+    // ESP32-S2.
+    feature = "esp32s2" => ExternalBurstConfig::Size32,
+    _ => ExternalBurstConfig::Size64,
+};
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
 #[main]
 fn main() -> ! {
@@ -59,8 +68,16 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
+<<<<<<< HEAD
     let sclk = peripherals.GPIO42;
     let mosi = peripherals.GPIO48;
+=======
+    let (sclk, mosi, cs) =
+        cfg_select! {
+            feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
+            _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
+        };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     let miso = unsafe { mosi.clone_unchecked() };
     let cs = peripherals.GPIO38;
 

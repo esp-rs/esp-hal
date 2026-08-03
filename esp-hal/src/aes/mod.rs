@@ -201,12 +201,18 @@ impl<'d> Aes<'d> {
     }
 
     fn is_idle(&mut self) -> bool {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 self.regs().idle().read().idle().bit_is_set()
             } else {
                 self.regs().state().read().state().bits() == 0
             }
+=======
+        cfg_select! {
+            esp32 => self.regs().idle().read().idle().bit_is_set(),
+            _ => self.regs().state().read().state().bits() == 0,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 

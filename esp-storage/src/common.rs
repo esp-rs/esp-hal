@@ -112,8 +112,15 @@ impl<'d> FlashStorage<'d> {
         let mut storage = Self {
             capacity: 0,
             unlocked: false,
+<<<<<<< HEAD
             #[cfg(multi_core)]
             multi_core_strategy: MultiCoreStrategy::Error,
+=======
+            multi_core_strategy: cfg_select!(
+                multi_core => MultiCoreStrategy::Error,
+                _ => MultiCoreStrategy::Ignore,
+            ),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             _flash: flash,
         };
 

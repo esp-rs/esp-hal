@@ -190,12 +190,22 @@ pub unsafe fn init_syscall_table() {
             unsafe extern "C" {
                 static mut syscall_table_ptr_pro: *const chip_specific::syscall_stub_table;
             }
+<<<<<<< HEAD
             unsafe { syscall_table_ptr_pro = &raw const SYSCALL_TABLE; }
         } else {
+=======
+            unsafe {
+                syscall_table_ptr_pro = &raw const SYSCALL_TABLE;
+            }
+        }
+        _ => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             unsafe extern "C" {
                 static mut syscall_table_ptr: *const chip_specific::syscall_stub_table;
             }
-            unsafe { syscall_table_ptr = &raw const SYSCALL_TABLE; }
+            unsafe {
+                syscall_table_ptr = &raw const SYSCALL_TABLE;
+            }
         }
     };
 }

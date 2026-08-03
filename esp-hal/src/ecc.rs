@@ -617,32 +617,50 @@ impl Info {
     }
 
     fn qx_mem(&self) -> *mut u32 {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(ecc_separate_jacobian_point_memory)] {
                 self.regs.qx_mem(0).as_ptr()
             } else {
                 self.regs.px_mem(0).as_ptr()
             }
+=======
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => self.regs.qx_mem(0).as_ptr(),
+            _ => self.regs.px_mem(0).as_ptr(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 
     fn qy_mem(&self) -> *mut u32 {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(ecc_separate_jacobian_point_memory)] {
                 self.regs.qy_mem(0).as_ptr()
             } else {
                 self.regs.py_mem(0).as_ptr()
             }
+=======
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => self.regs.qy_mem(0).as_ptr(),
+            _ => self.regs.py_mem(0).as_ptr(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 
     fn qz_mem(&self) -> *mut u32 {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(ecc_separate_jacobian_point_memory)] {
                 self.regs.qz_mem(0).as_ptr()
             } else {
                 self.regs.k_mem(0).as_ptr()
             }
+=======
+        cfg_select! {
+            ecc_separate_jacobian_point_memory => self.regs.qz_mem(0).as_ptr(),
+            _ => self.regs.k_mem(0).as_ptr(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 

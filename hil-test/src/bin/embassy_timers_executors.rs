@@ -505,6 +505,7 @@ mod interrupt_spi_dma {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
                 let dma_channel1 = peripherals.DMA_SPI2;
@@ -514,6 +515,16 @@ mod interrupt_spi_dma {
                 let dma_channel2 = peripherals.DMA_CH1;
             }
         }
+=======
+        let (dma_channel1, dma_channel2) =
+            cfg_select! {
+                spi_master_dma_engine = "SPI_DMA" => (peripherals.DMA_SPI2, peripherals.DMA_SPI3),
+                spi_master_dma_engine = "AXI_GDMA" => {
+                    (peripherals.DMA_AXI_CH0, peripherals.DMA_AXI_CH1)
+                }
+                _ => (peripherals.DMA_CH0, peripherals.DMA_CH1),
+            };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(1024);
         let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();

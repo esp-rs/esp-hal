@@ -1927,12 +1927,18 @@ mod private {
         }
 
         pub fn tx_valid_pin_signal() -> OutputSignal {
+<<<<<<< HEAD
             cfg_if::cfg_if! {
                 if #[cfg(esp32c5)] {
                     OutputSignal::PARL_TX_CS
                 } else {
                     OutputSignal::PARL_TX_DATA7
                 }
+=======
+            cfg_select! {
+                esp32c5 => OutputSignal::PARL_TX_CS,
+                _ => OutputSignal::PARL_TX_DATA7,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             }
         }
 

@@ -410,12 +410,18 @@ impl ContextExt for CpuContext {
     }
 
     fn sp(&self) -> u32 {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(xtensa)] {
                 self.A1
             } else {
                 self.sp as u32
             }
+=======
+        cfg_select! {
+            xtensa => self.A1,
+            _ => self.sp as u32,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 
@@ -713,9 +719,14 @@ pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
                     } else {
                         schedule_other_core()
                     }
+<<<<<<< HEAD
                 } else {
                     yield_task()
                 }
+=======
+                }
+                _ => yield_task(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             }
         }
     }

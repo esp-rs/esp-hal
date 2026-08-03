@@ -136,12 +136,23 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
 
 impl TxRegisterAccess for AnySpiDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
+<<<<<<< HEAD:esp-hal/src/dma/pdma/spi.rs
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0
             } else {
                 self.regs().dma_outstatus().read().dma_outfifo_empty().bit_is_set()
             }
+=======
+        cfg_select! {
+            esp32 => self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0,
+            _ => self
+                .regs()
+                .dma_outstatus()
+                .read()
+                .dma_outfifo_empty()
+                .bit_is_set(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022)):esp-hal/src/dma/engine/spi.rs
         }
     }
 

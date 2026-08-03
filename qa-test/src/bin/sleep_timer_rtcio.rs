@@ -56,19 +56,31 @@ fn main() -> ! {
             let mut pin3 = peripherals.GPIO3;
             let _pin2_input = Input::new(pin2.reborrow(), config);
 
+<<<<<<< HEAD
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
                 (&mut pin2, WakeupLevel::Low),
                 (&mut pin3, WakeupLevel::High),
             ];
         } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
+=======
+            let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, Level)] =
+                &mut [(&mut pin2, Level::Low), (&mut pin3, Level::High)];
+        }
+        any(feature = "esp32s2", feature = "esp32s3") => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             let mut pin17 = peripherals.GPIO17;
             let mut pin18 = peripherals.GPIO18;
             let _pin17_input = Input::new(pin17.reborrow(), config);
 
+<<<<<<< HEAD
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut [
                 (&mut pin17, WakeupLevel::Low),
                 (&mut pin18, WakeupLevel::High),
             ];
+=======
+            let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, Level)] =
+                &mut [(&mut pin17, Level::Low), (&mut pin18, Level::High)];
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 

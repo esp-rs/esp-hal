@@ -14,8 +14,11 @@ use hil_test as _;
 cfg_if::cfg_if! {
     if #[cfg(feature = "unstable")] {
         use core::cell::RefCell;
+
         use critical_section::Mutex;
         use embassy_time::{Duration, Timer};
+        #[cfg(multi_core)]
+        use esp_hal::system::Stack;
         use esp_hal::{
             // OutputOpenDrain is here because will be unused otherwise
             delay::Delay,
@@ -23,6 +26,11 @@ cfg_if::cfg_if! {
             handler,
             timer::timg::TimerGroup,
         };
+<<<<<<< HEAD
+=======
+        #[cfg(multi_core)]
+        use hil_test::mk_static;
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         use portable_atomic::{AtomicUsize, Ordering};
 
         static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));

@@ -269,6 +269,7 @@ impl Cpu {
     #[inline(always)]
     #[instability::unstable]
     pub fn other() -> impl Iterator<Item = Self> {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 match Self::current() {
@@ -278,18 +279,32 @@ impl Cpu {
             } else {
                 [].into_iter()
             }
+=======
+        cfg_select! {
+            multi_core => match Self::current() {
+                Cpu::ProCpu => [Cpu::AppCpu].into_iter(),
+                Cpu::AppCpu => [Cpu::ProCpu].into_iter(),
+            },
+            _ => [].into_iter(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 
     /// Returns an iterator over all cores.
     #[inline(always)]
     pub fn all() -> impl Iterator<Item = Self> {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(multi_core)] {
                 [Cpu::ProCpu, Cpu::AppCpu].into_iter()
             } else {
                 [Cpu::ProCpu].into_iter()
             }
+=======
+        cfg_select! {
+            multi_core => [Cpu::ProCpu, Cpu::AppCpu].into_iter(),
+            _ => [Cpu::ProCpu].into_iter(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 }
@@ -304,6 +319,7 @@ impl Cpu {
 #[inline(always)]
 pub(crate) fn raw_core() -> usize {
     // This method must never return UNUSED_THREAD_ID_VALUE
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(all(multi_core, riscv))] {
             riscv::register::mhartid::read()
@@ -312,6 +328,12 @@ pub(crate) fn raw_core() -> usize {
         } else {
             0
         }
+=======
+    cfg_select! {
+        all(multi_core, riscv) => riscv::register::mhartid::read(),
+        all(multi_core, xtensa) => (xtensa_lx::get_processor_id() & 0x2000) as usize,
+        _ => 0,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 

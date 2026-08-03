@@ -100,12 +100,28 @@ impl RegisterAccess for AnyGdmaTxChannel<'_> {
 
 impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
+<<<<<<< HEAD:esp-hal/src/dma/gdma/ahb_v1.rs
         cfg_if::cfg_if! {
             if #[cfg(esp32s3)] {
                  self.ch().outfifo_status().read().outfifo_empty_l3().bit_is_set()
             } else {
                  self.ch().outfifo_status().read().outfifo_empty().bit_is_set()
             }
+=======
+        cfg_select! {
+            esp32s3 => self
+                .ch()
+                .outfifo_status()
+                .read()
+                .outfifo_empty_l3()
+                .bit_is_set(),
+            _ => self
+                .ch()
+                .outfifo_status()
+                .read()
+                .outfifo_empty()
+                .bit_is_set(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022)):esp-hal/src/dma/engine/gdma/ahb_v1.rs
         }
     }
 
@@ -230,12 +246,22 @@ impl InterruptAccess<DmaTxInterrupt> for AnyGdmaTxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
+<<<<<<< HEAD:esp-hal/src/dma/gdma/ahb_v1.rs
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
                 TX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
             } else {
                 true
             }
+=======
+        cfg_select! {
+            any(esp32c2, esp32c3) => self
+                .0
+                .state
+                .tx_is_async
+                .load(portable_atomic::Ordering::Acquire),
+            _ => true,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022)):esp-hal/src/dma/engine/gdma/ahb_v1.rs
         }
     }
 
@@ -465,12 +491,22 @@ impl InterruptAccess<DmaRxInterrupt> for AnyGdmaRxChannel<'_> {
     }
 
     fn is_async(&self) -> bool {
+<<<<<<< HEAD:esp-hal/src/dma/gdma/ahb_v1.rs
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c2, esp32c3))] {
                 RX_IS_ASYNC[self.channel as usize].load(portable_atomic::Ordering::Acquire)
             } else {
                 true
             }
+=======
+        cfg_select! {
+            any(esp32c2, esp32c3) => self
+                .0
+                .state
+                .rx_is_async
+                .load(portable_atomic::Ordering::Acquire),
+            _ => true,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022)):esp-hal/src/dma/engine/gdma/ahb_v1.rs
         }
     }
 

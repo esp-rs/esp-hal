@@ -60,6 +60,7 @@ async fn main(spawner: Spawner) {
         .with_clk_divider(255)
         .with_idle_threshold(10000);
 
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
             let channel = rmt.channel0.configure_rx(&rx_config).unwrap();
@@ -69,6 +70,15 @@ async fn main(spawner: Spawner) {
             let channel = rmt.channel2.configure_rx(&rx_config).unwrap();
         }
     }
+=======
+    let channel = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2") => {
+            rmt.channel0.configure_rx(&rx_config).unwrap()
+        }
+        feature = "esp32s3" => rmt.channel7.configure_rx(&rx_config).unwrap(),
+        _ => rmt.channel2.configure_rx(&rx_config).unwrap(),
+    };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
     let mut channel = channel.with_pin(peripherals.GPIO4);
 

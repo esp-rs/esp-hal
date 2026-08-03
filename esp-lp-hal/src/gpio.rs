@@ -103,6 +103,7 @@ impl<const PIN: u8> Flex<PIN> {
 
     /// Get the current pin input level.
     pub fn level(&self) -> Level {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(esp32c6)] {
                 ((unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0).into()
@@ -111,6 +112,14 @@ impl<const PIN: u8> Flex<PIN> {
             } else if #[cfg(esp32s3)] {
                 ((unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0).into()
             }
+=======
+        cfg_select! {
+            esp32c6 => ((unsafe { &*LpIo::PTR }.in_().read().bits() >> PIN) & 0x1 != 0).into(),
+            esp32s2 => ((unsafe { &*LpIo::PTR }.in_().read().gpio_in_next().bits() >> PIN) & 0x1 != 0)
+                .into(),
+            esp32s3 => ((unsafe { &*LpIo::PTR }.in_().read().next().bits() >> PIN) & 0x1 != 0).into(),
+            _ => {}
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 
@@ -131,6 +140,7 @@ impl<const PIN: u8> Flex<PIN> {
 
     /// What level output is set to
     pub fn output_level(&self) -> Level {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(esp32c6)] {
                 ((unsafe { &*LpIo::PTR }.out().read().bits() >> PIN) & 0x1 != 0).into()
@@ -139,6 +149,15 @@ impl<const PIN: u8> Flex<PIN> {
             } else if #[cfg(esp32s3)] {
                 ((unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0).into()
             }
+=======
+        cfg_select! {
+            esp32c6 => ((unsafe { &*LpIo::PTR }.out().read().bits() >> PIN) & 0x1 != 0).into(),
+            esp32s2 => ((unsafe { &*LpIo::PTR }.out().read().gpio_out_data().bits() >> PIN) & 0x1
+                != 0)
+                .into(),
+            esp32s3 => ((unsafe { &*LpIo::PTR }.out().read().data().bits() >> PIN) & 0x1 != 0).into(),
+            _ => {}
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 

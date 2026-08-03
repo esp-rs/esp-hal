@@ -35,10 +35,19 @@ fn main() -> ! {
     // configure GPIO 1 as LP output pin
     let lp_pin = LowPowerOutput::new(peripherals.GPIO1);
 
+<<<<<<< HEAD
     #[cfg(feature = "esp32c6")]
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     let mut lp_core = UlpCore::new(peripherals.ULP_RISCV_CORE);
+=======
+    let mut lp_core = cfg_select! {
+        any(feature = "esp32s2", feature = "esp32s3") => {
+            UlpCore::new(peripherals.ULP_RISCV_CORE)
+        }
+        _ => LpCore::new(peripherals.LP_CORE),
+    };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
     #[cfg(not(feature = "esp32s2"))]
     {
@@ -57,10 +66,19 @@ fn main() -> ! {
     );
 
     // start LP core
+<<<<<<< HEAD
     #[cfg(feature = "esp32c6")]
     lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, lp_pin);
     #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
     lp_core_code.run(&mut lp_core, UlpCoreWakeupSource::HpCpu, lp_pin);
+=======
+    let wakeup_source =
+        cfg_select! {
+            any(feature = "esp32s2", feature = "esp32s3") => UlpCoreWakeupSource::HpCpu,
+            _ => LpCoreWakeupSource::HpCpu,
+        };
+    lp_core_code.run(&mut lp_core, wakeup_source, lp_pin);
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
     println!("lp core run");
 

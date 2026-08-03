@@ -11,10 +11,16 @@ fn tee_enabled() -> bool {
 
 #[inline]
 fn current_cpu_cycles() -> usize {
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(xtensa)] {
             xtensa_lx::timer::get_cycle_count() as usize
         } else if #[cfg(soc_cpu_has_csr_pc)] {
+=======
+    cfg_select! {
+        xtensa => xtensa_lx::timer::get_cycle_count() as usize,
+        soc_cpu_has_csr_pc => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             const PRV_M: usize = 3;
             macro_rules! read_csr_fn {
                 ($fnname:ident, $csr:expr) => {
@@ -49,9 +55,14 @@ fn current_cpu_cycles() -> usize {
             } else {
                 read_pccr_user()
             }
+<<<<<<< HEAD
         } else {
             riscv::register::mcycle::read()
         }
+=======
+        }
+        _ => riscv::register::mcycle::read(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 
@@ -64,7 +75,15 @@ fn read_one(wait_cycles: usize) -> u32 {
             if now.wrapping_sub(*last_wait_start) >= wait_cycles {
                 *last_wait_start = now;
 
+<<<<<<< HEAD
                 Some(RNG::regs().data().read().bits())
+=======
+                cfg_select! {
+                    rng_is_lp_sys => Some(RNG::regs().rng_data().read().bits()),
+                    esp32s31 => Some(RNG::regs().crc_sync_data().read().bits()),
+                    _ => Some(RNG::regs().data().read().bits()),
+                }
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             } else {
                 None
             }

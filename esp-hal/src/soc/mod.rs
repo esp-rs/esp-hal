@@ -262,12 +262,22 @@ pub(crate) fn ensure_stack_pointer_in_range() {
         static _stack_start_cpu0: u32;
     }
     let current_sp: usize;
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(xtensa)] {
             unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
         } else {
             unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
         }
+=======
+    cfg_select! {
+        xtensa => unsafe {
+            core::arch::asm!("mov {0}, sp", out(reg) current_sp);
+        },
+        _ => unsafe {
+            core::arch::asm!("mv {0}, sp", out(reg) current_sp);
+        },
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
     let stack_bottom = (&raw const _stack_end_cpu0) as usize;
     let stack_top = (&raw const _stack_start_cpu0) as usize;

@@ -27,6 +27,7 @@ fn main() -> ! {
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DATA_SIZE);
 
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32s2")] {
             let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
@@ -36,6 +37,17 @@ fn main() -> ! {
             let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
         }
     }
+=======
+    let mem2mem = cfg_select! {
+        any(feature = "esp32c3", feature = "esp32s3") => {
+            Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2)
+        }
+        feature = "esp32s2" => Mem2Mem::new(peripherals.DMA_COPY),
+        feature = "esp32p4" => Mem2Mem::new(peripherals.DMA_AXI_CH0),
+        feature = "esp32s31" => Mem2Mem::new(peripherals.DMA_AXI_CH0),
+        _ => Mem2Mem::new(peripherals.DMA_CH0),
+    };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
     let mut mem2mem = mem2mem
         .with_descriptors(rx_descriptors, tx_descriptors, BurstConfig::default())

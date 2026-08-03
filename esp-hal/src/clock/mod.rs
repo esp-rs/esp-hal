@@ -93,6 +93,7 @@ impl CpuClock {
     /// # {after_snippet}
     /// ```
     pub const fn max() -> Self {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(esp32c2)] {
                 Self::_120MHz
@@ -103,6 +104,15 @@ impl CpuClock {
             } else {
                 Self::_240MHz
             }
+=======
+        cfg_select! {
+            esp32c2 => Self::_120MHz,
+            any(esp32c3, esp32c6, esp32c61) => Self::_160MHz,
+            esp32h2 => Self::_96MHz,
+            esp32p4 => Self::_400MHz,
+            esp32s31 => Self::_320MHz,
+            _ => Self::_240MHz,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 }
@@ -351,9 +361,16 @@ impl Clocks {
             .modify(|_, w| w.rtc_cali_start().clear_bit());
 
         // Make sure we measure the crystal.
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(soc_has_clock_node_timg_function_clock)] {
                 let current_function_clock = clocks::TimgInstance::Timg0.function_clock_config(clocks);
+=======
+        cfg_select! {
+            soc_has_clock_node_timg_function_clock => {
+                let current_function_clock =
+                    clocks::TimgInstance::Timg0.function_clock_config(clocks);
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                 clocks::TimgInstance::Timg0.configure_function_clock(clocks, function_clock);
                 clocks::TimgInstance::Timg0.request_function_clock(clocks);
             }

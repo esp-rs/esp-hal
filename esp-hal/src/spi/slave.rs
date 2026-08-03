@@ -542,11 +542,21 @@ pub mod dma {
                         w.ahbm_fifo_rst().bit(bit);
                         w.ahbm_rst().bit(bit)
                     });
+<<<<<<< HEAD
 
                     #[cfg(esp32s2)]
                     reg_block
                         .dma_conf()
                         .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
+=======
+                }
+                _ => {
+                    self.regs().dma_conf().modify(|_, w| {
+                        w.dma_tx_ena().set_bit();
+                        w.dma_rx_ena().set_bit();
+                        w.rx_eof_en().clear_bit()
+                    });
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                 }
                 set_rst_bit(self.regs(), true);
                 set_rst_bit(self.regs(), false);
@@ -556,6 +566,7 @@ pub mod dma {
         fn clear_dma_interrupts(&self) {
             #[cfg(dma_kind = "gdma")]
             self.regs().dma_int_clr().write(|w| {
+<<<<<<< HEAD
                 w.dma_infifo_full_err().clear_bit_by_one();
                 w.dma_outfifo_empty_err().clear_bit_by_one();
                 w.trans_done().clear_bit_by_one();
@@ -574,6 +585,28 @@ pub mod dma {
                 w.out_done().clear_bit_by_one();
                 w.out_eof().clear_bit_by_one();
                 w.out_total_eof().clear_bit_by_one()
+=======
+                cfg_select! {
+                    spi_slave_dma_engine = "SPI_DMA" => {
+                        w.inlink_dscr_empty().clear_bit_by_one();
+                        w.outlink_dscr_error().clear_bit_by_one();
+                        w.inlink_dscr_error().clear_bit_by_one();
+                        w.in_done().clear_bit_by_one();
+                        w.in_err_eof().clear_bit_by_one();
+                        w.in_suc_eof().clear_bit_by_one();
+                        w.out_done().clear_bit_by_one();
+                        w.out_eof().clear_bit_by_one();
+                        w.out_total_eof().clear_bit_by_one()
+                    }
+                    _ => {
+                        w.dma_infifo_full_err().clear_bit_by_one();
+                        w.dma_outfifo_empty_err().clear_bit_by_one();
+                        w.trans_done().clear_bit_by_one();
+                        w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                        w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+                    }
+                }
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             });
         }
     }
@@ -776,6 +809,7 @@ impl Info {
 
     #[cfg(spi_slave_supports_dma)]
     fn is_bus_busy(&self) -> bool {
+<<<<<<< HEAD
         #[cfg(dma_kind = "pdma")]
         {
             self.regs().slave().read().trans_done().bit_is_clear()
@@ -784,11 +818,19 @@ impl Info {
         {
             self.regs().dma_int_raw().read().trans_done().bit_is_clear()
         }
+=======
+        let reg = cfg_select! {
+            any(esp32, esp32s2) => self.regs().slave(),
+            _ => self.regs().dma_int_raw(),
+        };
+        reg.read().trans_done().bit_is_clear()
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 
     // Clear the transaction-done interrupt flag so flush() can work properly.
     #[cfg(spi_slave_supports_dma)]
     fn setup_for_flush(&self) {
+<<<<<<< HEAD
         #[cfg(dma_kind = "pdma")]
         self.regs()
             .slave()
@@ -797,6 +839,20 @@ impl Info {
         self.regs()
             .dma_int_clr()
             .write(|w| w.trans_done().clear_bit_by_one());
+=======
+        cfg_select! {
+            any(esp32, esp32s2) => {
+                self.regs()
+                    .slave()
+                    .modify(|_, w| w.trans_done().clear_bit());
+            }
+            _ => {
+                self.regs()
+                    .dma_int_clr()
+                    .write(|w| w.trans_done().clear_bit_by_one());
+            }
+        }
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 
@@ -814,7 +870,7 @@ for_each_spi_slave! {
             #[inline(always)]
             fn info(&self) -> &'static Info {
                 static INFO: Info = Info {
-                    register_block: crate::peripherals::$peri::regs(),
+                    register_block: crate::peripherals::$peri::ptr(),
                     peripheral: crate::system::Peripheral::$sys,
                     sclk: InputSignal::$sclk,
                     mosi: InputSignal::$mosi,

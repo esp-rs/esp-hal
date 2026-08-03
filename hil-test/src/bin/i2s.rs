@@ -10,7 +10,50 @@
 #![no_std]
 #![no_main]
 
+<<<<<<< HEAD
 #[cfg(not(esp32))] // FIXME
+=======
+macro_rules! i2s_test_dma_channel {
+    ($peripherals:ident, I2S0) => {
+        cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => $peripherals.DMA_I2S0.into(),
+            _ => $peripherals.DMA_CH0.into(),
+        }
+    };
+    ($peripherals:ident, I2S1) => {
+        cfg_select! {
+            i2s_dma_engine = "I2S_DMA" => $peripherals.DMA_I2S1.into(),
+            _ => $peripherals.DMA_CH0.into(),
+        }
+    };
+    ($peripherals:ident, I2S2) => {
+        $peripherals.DMA_CH0.into()
+    };
+}
+
+macro_rules! i2s_instance_resources {
+    ($i2s:ident) => {{
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+        let i2s: esp_hal::i2s::AnyI2s<'static> = peripherals.$i2s.into();
+        let dma_channel = i2s_test_dma_channel!(peripherals, $i2s);
+
+        #[cfg(not(esp32c5))]
+        let (_, dout) = hil_test::common_test_pins!(peripherals);
+
+        // there are some random pulses counted on ESP32-C5 in our HIL setup
+        // with the common test pin, so just use a fixed GPIO pin which is not used for anything
+        // else in this test on that chip in the hope it will fix it
+        #[cfg(esp32c5)]
+        let dout = peripherals.GPIO6;
+
+        let dout = dout.degrade();
+        (i2s, dma_channel, dout)
+    }};
+}
+
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use esp_hal::{

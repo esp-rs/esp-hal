@@ -123,6 +123,7 @@ mod multi_core {
     #[inline]
     fn thread_id() -> usize {
         // This method must never return UNUSED_THREAD_ID_VALUE
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(all(multi_core, riscv))] {
                 riscv::register::mhartid::read()
@@ -131,6 +132,12 @@ mod multi_core {
             } else {
                 0
             }
+=======
+        cfg_select! {
+            all(multi_core, riscv) => riscv::register::mhartid::read(),
+            all(multi_core, xtensa) => (xtensa_lx::get_processor_id() & 0x2000) as usize,
+            _ => 0,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 

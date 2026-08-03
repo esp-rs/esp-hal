@@ -51,6 +51,7 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     }
 }
 
+<<<<<<< HEAD
 /// Get the size of a cache line in the DCache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
@@ -60,6 +61,30 @@ pub unsafe fn cache_get_dcache_line_size() -> u32 {
     }
     unsafe { Cache_Get_DCache_Line_Size() }
 }
+=======
+// Byte values (not ROM enum indices) to let DMA alignment code use these directly. The ROM calls in
+// configure_cpu_caches will convert to the expected enum index.
+pub(crate) const CONFIG_INSTRUCTION_CACHE_LINE_SIZE: usize = cfg_select! {
+    instruction_cache_line_size_16b => 16,
+    instruction_cache_line_size_32b => 32,
+};
+
+pub(crate) const CONFIG_DATA_CACHE_LINE_SIZE: usize = cfg_select! {
+    data_cache_line_size_16b => 16,
+    data_cache_line_size_32b => 32,
+};
+
+pub(crate) const CONFIG_INSTRUCTION_CACHE_SIZE: usize = cfg_select! {
+    instruction_cache_size_8kb => 0,
+    instruction_cache_size_16kb => 1,
+};
+pub(crate) const CONFIG_DATA_CACHE_SIZE: usize =
+    cfg_select! {
+        data_cache_size_0kb => 0, // doesn't matter according to esp-idf
+        data_cache_size_8kb => 0,
+        data_cache_size_16kb => 1,
+    };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
 #[crate::ram]
 pub(crate) unsafe fn configure_cpu_caches() {

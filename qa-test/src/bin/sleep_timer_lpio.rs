@@ -41,6 +41,16 @@ fn main() -> ! {
         if #[cfg(feature = "esp32c6")] {
             use esp_hal::gpio::{Input, InputConfig, Pull};
 
+<<<<<<< HEAD
+=======
+    cfg_select! {
+        any(
+            feature = "esp32c5",
+            feature = "esp32c6",
+            feature = "esp32c61",
+            feature = "esp32p4"
+        ) => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             let mut pin_low = peripherals.GPIO2;
             let mut pin_high = peripherals.GPIO3;
             let input = Input::new(

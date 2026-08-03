@@ -263,7 +263,8 @@ impl RunQueue {
                     Cpu::ProCpu => Cpu::AppCpu,
                 };
 
-                // Look iteratively through priority levels - this will ensure we can find a task even if all high priority tasks are pinned to the other CPU.
+                // Look iteratively through priority levels - this will ensure we can find a task
+                // even if all high priority tasks are pinned to the other CPU.
                 let mut priority_level = self.ready_priority;
 
                 let mut current_prio = current_prio;
@@ -282,8 +283,13 @@ impl RunQueue {
 
                     break;
                 }
+<<<<<<< HEAD
 
             } else {
+=======
+            }
+            _ => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                 let popped = self.ready_tasks[current_prio].pop();
             }
         }

@@ -138,6 +138,7 @@ impl<'a> WifiCsiInfo<'_> {
     /// [`SecondaryChannel`] on which this packet is received.
     #[instability::unstable]
     pub fn secondary_channel(&self) -> SecondaryChannel {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(wifi_mac_version = "1")] {
                 SecondaryChannel::from_raw(unsafe {
@@ -147,7 +148,13 @@ impl<'a> WifiCsiInfo<'_> {
                 SecondaryChannel::from_raw(unsafe {
                     (*self.inner).rx_ctrl.second()
                 })
+=======
+        cfg_select! {
+            wifi_mac_version = "1" => {
+                SecondaryChannel::from_raw(unsafe { (*self.inner).rx_ctrl.secondary_channel() })
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             }
+            _ => SecondaryChannel::from_raw(unsafe { (*self.inner).rx_ctrl.second() }),
         }
     }
 

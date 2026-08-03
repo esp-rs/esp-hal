@@ -34,14 +34,48 @@ const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
 impl RawLock for SingleCoreInterruptLock {
     #[inline]
     unsafe fn enter(&self) -> RestoreState {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(riscv)] {
+=======
+        cfg_select! {
+            esp32p4 => {
+                // TODO: any with zcmp
+                // ESP32-P4 (v3.2/ECO7 etc.) Zcmp hardware bug workaround (IDF-14279 / DIG-661):
+                // Clearing mstatus.mie alone does not fully mask CLIC interrupts -- an
+                // interrupt can still fire mid-instruction on cm.push (and possibly on
+                // other multi-cycle sequences). Fix: raise mintthresh (CSR 0x347) to 0xFF
+                // while mie is cleared, then restore the previous mintthresh on exit.
+                // Ref: esp-idf commit c27c33a83 "fix(riscv): implement a workaround for
+                // Zcmp hardware bug".
+                let old_mintthresh: u32;
+                unsafe {
+                    core::arch::asm!(
+                        "li   t0, 0xff",
+                        "csrrw {0}, 0x347, t0",
+                        out(reg) old_mintthresh,
+                        out("t0") _,
+                    );
+                }
                 let mut mstatus = 0u32;
-                unsafe { core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus); }
+                unsafe {
+                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                }
+                let mie_bit = mstatus & 0b1000;
+                let token = mie_bit | ((old_mintthresh & 0xff) << 8);
+            }
+            riscv => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
+                let mut mstatus = 0u32;
+                unsafe {
+                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                }
                 let token = mstatus & 0b1000;
             } else if #[cfg(xtensa)] {
                 let token: u32;
-                unsafe { core::arch::asm!("rsil {0}, 5", out(reg) token); }
+                unsafe {
+                    core::arch::asm!("rsil {0}, 5", out(reg) token);
+                }
                 #[cfg(debug_assertions)]
                 let token = token & !RESERVED_MASK;
             } else {
@@ -75,7 +109,8 @@ impl RawLock for SingleCoreInterruptLock {
                 #[cfg(debug_assertions)]
                 if token & RESERVED_MASK != 0 {
                     // We could do this transformation in fmt.rs automatically, but experiments
-                    // show this is only worth it in terms of binary size for code inlined into many places.
+                    // show this is only worth it in terms of binary size for code inlined into many
+                    // places.
                     #[cold]
                     #[inline(never)]
                     fn __assert_failed() {

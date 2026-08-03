@@ -47,11 +47,19 @@ pub use self::riscv::*;
 pub use self::xtensa::*;
 use crate::{peripherals::Interrupt, system::Cpu};
 
+<<<<<<< HEAD
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         use crate::peripherals::DPORT as INTERRUPT_CORE0;
         use crate::peripherals::DPORT as INTERRUPT_CORE1;
     } else {
+=======
+cfg_select! {
+    esp32 => {
+        use crate::peripherals::{DPORT as INTERRUPT_CORE0, DPORT as INTERRUPT_CORE1};
+    }
+    _ => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         use crate::peripherals::INTERRUPT_CORE0;
         #[cfg(esp32s3)]
         use crate::peripherals::INTERRUPT_CORE1;
@@ -192,6 +200,87 @@ pub struct InterruptStatus {
 }
 
 impl InterruptStatus {
+<<<<<<< HEAD
+=======
+    /// Get status of a particular peripheral interrupt
+    #[instability::unstable]
+    #[inline]
+    pub fn is_pending(interrupt: Interrupt) -> bool {
+        let word = (interrupt as usize) / 32;
+        let bit = (interrupt as usize) % 32;
+        let mut status_word = 0;
+        for cpu in Cpu::all() {
+            status_word |= Self::interrupt_status_word(cpu, word);
+        }
+        (status_word & (1 << bit)) != 0
+    }
+
+    #[inline]
+    fn interrupt_status_word(cpu: Cpu, word: usize) -> u32 {
+        match cpu {
+            Cpu::ProCpu => {
+                cfg_select! {
+                    esp32s31 => {
+                        if word == 5 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE0::regs().core_0_intr_status5().read().bits()
+                                & 0x1ff;
+                        }
+                        INTERRUPT_CORE0::regs()
+                            .core_0_intr_status(word)
+                            .read()
+                            .bits()
+                    }
+                    esp32p4 => {
+                        if word == 4 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
+                        }
+                        INTERRUPT_CORE0::regs()
+                            .core_0_intr_status(word)
+                            .read()
+                            .bits()
+                    }
+                    _ => INTERRUPT_CORE0::regs()
+                        .core_0_intr_status(word)
+                        .read()
+                        .bits(),
+                }
+            }
+            #[cfg(multi_core)]
+            Cpu::AppCpu => {
+                cfg_select! {
+                    esp32s31 => {
+                        if word == 5 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE1::regs().core_1_intr_status5().read().bits()
+                                & 0x1ff;
+                        }
+                        INTERRUPT_CORE1::regs()
+                            .core_1_intr_status(word)
+                            .read()
+                            .bits()
+                    }
+                    esp32p4 => {
+                        if word == 4 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
+                        }
+                        INTERRUPT_CORE1::regs()
+                            .core_1_intr_status(word)
+                            .read()
+                            .bits()
+                    }
+                    _ => INTERRUPT_CORE1::regs()
+                        .core_1_intr_status(word)
+                        .read()
+                        .bits(),
+                }
+            }
+        }
+    }
+
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     /// Get status of peripheral interrupts
     #[instability::unstable]
     pub fn current() -> InterruptStatus {
@@ -266,11 +355,34 @@ impl Iterator for InterruptStatusIterator {
 // Peripheral interrupt API.
 
 fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(xtensa)] {
             &pac::__INTERRUPTS[interrupt as usize]
         } else {
             &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]
+=======
+    unsafe extern "Rust" {
+        #[cfg(xtensa)]
+        static __INTERRUPTS: pac::Vector;
+        #[cfg(riscv)]
+        static __EXTERNAL_INTERRUPTS: pac::Vector;
+    }
+
+    // SAFETY: Interrupt numbers are guaranteed to be valid and in range because we use the
+    // Interrupt enum, which is generated from the list of valid peripheral interrupts in the PAC.
+    unsafe {
+        cfg_select! {
+            xtensa => (&__INTERRUPTS as *const pac::Vector)
+                .add(interrupt as usize)
+                .as_ref_unchecked(),
+            riscv => (&__EXTERNAL_INTERRUPTS as *const pac::Vector)
+                .add(interrupt as usize)
+                .as_ref_unchecked(),
+            _ => {
+                compile_error!("Unsupported architecture");
+            }
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 }

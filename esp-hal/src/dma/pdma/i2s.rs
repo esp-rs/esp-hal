@@ -127,12 +127,18 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
 
 impl TxRegisterAccess for AnyI2sDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
+<<<<<<< HEAD:esp-hal/src/dma/pdma/i2s.rs
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 self.regs().lc_state0().read().bits() & 0x80000000 != 0
             } else {
                 self.regs().lc_state0().read().out_empty().bit_is_set()
             }
+=======
+        cfg_select! {
+            esp32 => self.regs().lc_state0().read().bits() & 0x80000000 != 0,
+            _ => self.regs().lc_state0().read().out_empty().bit_is_set(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022)):esp-hal/src/dma/engine/i2s.rs
         }
     }
 

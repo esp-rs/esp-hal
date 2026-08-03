@@ -665,7 +665,14 @@ impl<'a, 'd> RsaFuture<'a, 'd> {
     }
 
     fn is_done(&self) -> bool {
+<<<<<<< HEAD
         SIGNALED.load(Ordering::Acquire)
+=======
+        cfg_select! {
+            rsa_version = "1" => SIGNALED.load(Ordering::Acquire),
+            _ => self.driver.is_idle(),
+        }
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 

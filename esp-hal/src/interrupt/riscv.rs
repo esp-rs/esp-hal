@@ -406,6 +406,7 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
 }
 
 fn cpu_wait_mode_on() -> bool {
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(soc_has_pcr)] {
             crate::peripherals::PCR::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
@@ -416,6 +417,24 @@ fn cpu_wait_mode_on() -> bool {
                 .cpu_wait_mode_force_on()
                 .bit_is_set()
         }
+=======
+    cfg_select! {
+        soc_has_pcr => crate::peripherals::PCR::regs()
+            .cpu_waiti_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
+        soc_has_hp_sys => crate::peripherals::HP_SYS::regs()
+            .cpu_waiti_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
+        _ => crate::peripherals::SYSTEM::regs()
+            .cpu_per_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 
@@ -570,10 +589,19 @@ pub(crate) mod rt {
             if #[cfg(interrupt_controller = "clic")] {
                 let prio = cpu_int::current_runlevel();
                 let mcause = riscv::register::mcause::read();
+<<<<<<< HEAD
             } else {
                 // Change the current runlevel so that interrupt handlers can access the correct runlevel.
+=======
+            }
+            _ => {
+                // Change the current runlevel so that interrupt handlers can access the correct
+                // runlevel.
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                 let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
-                let level = unsafe { change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio))) };
+                let level = unsafe {
+                    change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio)))
+                };
                 let prio = prio as u8;
             }
         }
@@ -606,10 +634,16 @@ pub(crate) mod rt {
                 // since it contains the former CPU priority. When executing `mret`,
                 // the hardware will restore the former threshold, from `mcause` to
                 // `mintstatus` CSR
+<<<<<<< HEAD
                 unsafe {
                     core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
                 }
             } else {
+=======
+                unsafe { core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits()) }
+            }
+            _ => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                 unsafe { change_current_runlevel(level) };
             }
         }

@@ -422,6 +422,7 @@ impl Timer<'_> {
     }
 
     fn source_frequency(&self) -> Rate {
+<<<<<<< HEAD
         let hz = clocks::ClockTree::with(|clocks| {
             cfg_if::cfg_if! {
                 if #[cfg(soc_has_clock_node_timg_function_clock)] {
@@ -436,6 +437,17 @@ impl Timer<'_> {
                 } else {
                     crate::soc::clocks::apb_clk_frequency(clocks)
                 }
+=======
+        cfg_select! {
+            soc_has_clock_node_timg_function_clock => {
+                let timg = match self.timer_group() {
+                    0 => crate::soc::clocks::TimgInstance::Timg0,
+                    #[cfg(soc_has_timg1)]
+                    1 => crate::soc::clocks::TimgInstance::Timg1,
+                    _ => unreachable!(),
+                };
+                let hz = timg.function_clock_frequency();
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
             }
         });
         Rate::from_hz(hz)
@@ -520,10 +532,16 @@ impl Timer<'_> {
                 // On ESP32 and S2, the `int_ena` register is ineffective - interrupts fire even
                 // without int_ena enabling them. We use level interrupts so that we have a status
                 // bit available.
+<<<<<<< HEAD
                 self.t()
                     .config()
                     .modify(|_, w| w.level_int_en().bit(state));
             } else if #[cfg(timergroup_timg_has_timer1)] {
+=======
+                self.t().config().modify(|_, w| w.level_int_en().bit(state));
+            }
+            timergroup_timg_has_timer1 => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                 INT_ENA_LOCK[self.timer_group() as usize].lock(|| {
                     self.register_block()
                         .int_ena()

@@ -637,9 +637,15 @@ impl ShaAlgorithmKind {
             if #[cfg(esp32)] {
                 match self {
                     ShaAlgorithmKind::Sha1 => regs.sha1_start().write(|w| w.sha1_start().set_bit()),
-                    ShaAlgorithmKind::Sha256 => regs.sha256_start().write(|w| w.sha256_start().set_bit()),
-                    ShaAlgorithmKind::Sha384 => regs.sha384_start().write(|w| w.sha384_start().set_bit()),
-                    ShaAlgorithmKind::Sha512 => regs.sha512_start().write(|w| w.sha512_start().set_bit()),
+                    ShaAlgorithmKind::Sha256 => {
+                        regs.sha256_start().write(|w| w.sha256_start().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha384 => {
+                        regs.sha384_start().write(|w| w.sha384_start().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha512 => {
+                        regs.sha512_start().write(|w| w.sha512_start().set_bit())
+                    }
                 };
             } else {
                 regs.start().write(|w| w.start().set_bit());
@@ -652,10 +658,18 @@ impl ShaAlgorithmKind {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 match self {
-                    ShaAlgorithmKind::Sha1 => regs.sha1_continue().write(|w| w.sha1_continue().set_bit()),
-                    ShaAlgorithmKind::Sha256 => regs.sha256_continue().write(|w| w.sha256_continue().set_bit()),
-                    ShaAlgorithmKind::Sha384 => regs.sha384_continue().write(|w| w.sha384_continue().set_bit()),
-                    ShaAlgorithmKind::Sha512 => regs.sha512_continue().write(|w| w.sha512_continue().set_bit()),
+                    ShaAlgorithmKind::Sha1 => {
+                        regs.sha1_continue().write(|w| w.sha1_continue().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha256 => regs
+                        .sha256_continue()
+                        .write(|w| w.sha256_continue().set_bit()),
+                    ShaAlgorithmKind::Sha384 => regs
+                        .sha384_continue()
+                        .write(|w| w.sha384_continue().set_bit()),
+                    ShaAlgorithmKind::Sha512 => regs
+                        .sha512_continue()
+                        .write(|w| w.sha512_continue().set_bit()),
                 };
             } else {
                 regs.continue_().write(|w| w.continue_().set_bit());
@@ -672,9 +686,15 @@ impl ShaAlgorithmKind {
                 let regs = _sha.register_block();
                 match self {
                     ShaAlgorithmKind::Sha1 => regs.sha1_load().write(|w| w.sha1_load().set_bit()),
-                    ShaAlgorithmKind::Sha256 => regs.sha256_load().write(|w| w.sha256_load().set_bit()),
-                    ShaAlgorithmKind::Sha384 => regs.sha384_load().write(|w| w.sha384_load().set_bit()),
-                    ShaAlgorithmKind::Sha512 => regs.sha512_load().write(|w| w.sha512_load().set_bit()),
+                    ShaAlgorithmKind::Sha256 => {
+                        regs.sha256_load().write(|w| w.sha256_load().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha384 => {
+                        regs.sha384_load().write(|w| w.sha384_load().set_bit())
+                    }
+                    ShaAlgorithmKind::Sha512 => {
+                        regs.sha512_load().write(|w| w.sha512_load().set_bit())
+                    }
                 };
 
                 true
@@ -738,23 +758,35 @@ for_each_sha_algorithm! {
 
 fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             sha.text(index).as_ptr()
         } else {
             sha.h_mem(index).as_ptr()
         }
+=======
+    cfg_select! {
+        esp32 => sha.text(index).as_ptr(),
+        _ => sha.h_mem(index).as_ptr(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 
 fn m_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(esp32)] {
             sha.text(index).as_ptr()
         } else {
             sha.m_mem(index).as_ptr()
         }
+=======
+    cfg_select! {
+        esp32 => sha.text(index).as_ptr(),
+        _ => sha.m_mem(index).as_ptr(),
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 

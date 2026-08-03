@@ -318,17 +318,26 @@ impl<'a> PartitionTable<'a> {
         // Read entry 0 from MMU to know which partition is mapped
         //
         // See <https://github.com/espressif/esp-idf/blob/758939caecb16e5542b3adfba0bc85025517db45/components/hal/mmu_hal.c#L124>
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32")] {
                 let paddr = unsafe {
                     ((0x3FF10000 as *const u32).read_volatile() & 0xff) << 16
                 };
             } else if #[cfg(feature = "esp32s2")] {
+=======
+        cfg_select! {
+            feature = "esp32" => {
+                let paddr = unsafe { ((0x3FF10000 as *const u32).read_volatile() & 0xff) << 16 };
+            }
+            feature = "esp32s2" => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                 let paddr = unsafe {
                     (((0x61801000 + 128 * 4) as *const u32).read_volatile() & 0xff) << 16
                 };
             } else if #[cfg(feature = "esp32s3")] {
                 // Revisit this once we support XiP from PSRAM for ESP32-S3
+<<<<<<< HEAD
                 let paddr = unsafe {
                     ((0x600C5000 as *const u32).read_volatile() & 0xff) << 16
                 };
@@ -337,6 +346,35 @@ impl<'a> PartitionTable<'a> {
                     ((0x600c5000 as *const u32).read_volatile() & 0xff) << 16
                 };
             } else if #[cfg(any(feature = "esp32c5", feature = "esp32c6", feature = "esp32c61", feature = "esp32h2"))] {
+=======
+                let paddr = unsafe { ((0x600C5000 as *const u32).read_volatile() & 0xff) << 16 };
+            }
+            any(feature = "esp32c2", feature = "esp32c3") => {
+                let paddr = unsafe { ((0x600c5000 as *const u32).read_volatile() & 0xff) << 16 };
+            }
+            feature = "esp32p4" => {
+                // DR_REG_FLASH_SPI0_BASE : 0x5008C000 = DR_REG_HPPERIPH0_BASE + 0x8C000
+                // TODO: verify MSPI register for partition physical address read
+                let paddr = unsafe {
+                    ((0x5008C000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_C_MMU_ITEM_INDEX_REG
+                    (((0x5008C000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
+                };
+            }
+            feature = "esp32s31" => {
+                // Read MMU entry 0, which maps the beginning of the flash
+                // virtual-address range.
+                let paddr = unsafe {
+                    ((0x20500000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_C_MMU_ITEM_INDEX_REG
+                    (((0x20500000 + 0x37c) as *const u32).read_volatile() & 0x7ff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
+                };
+            }
+            any(
+                feature = "esp32c5",
+                feature = "esp32c6",
+                feature = "esp32c61",
+                feature = "esp32h2"
+            ) => {
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
                 let paddr = unsafe {
                     ((0x60002000 + 0x380) as *mut u32).write_volatile(0);
                     (((0x60002000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16

@@ -178,6 +178,7 @@ coex_fns! {
 extern "C" fn coex_schm_register_btdm_callback(_callback: *mut c_void) -> i32 {
     trace!("coex_schm_register_btdm_callback");
 
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(feature = "coex")] {
             unsafe {
@@ -187,6 +188,14 @@ extern "C" fn coex_schm_register_btdm_callback(_callback: *mut c_void) -> i32 {
         } else {
             0
         }
+=======
+    cfg_select! {
+        feature = "coex" => unsafe {
+            const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
+            coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, _callback)
+        },
+        _ => 0,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 

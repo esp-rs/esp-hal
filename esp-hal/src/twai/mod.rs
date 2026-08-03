@@ -1498,22 +1498,34 @@ impl PrivateInstance for crate::peripherals::TWAI0<'_> {
     }
 
     fn input_signal(&self) -> InputSignal {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
                 InputSignal::TWAI_RX
             } else {
                 InputSignal::TWAI0_RX
             }
+=======
+        cfg_select! {
+            any(esp32, esp32c3, esp32s2, esp32s3) => InputSignal::TWAI_RX,
+            _ => InputSignal::TWAI0_RX,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 
     fn output_signal(&self) -> OutputSignal {
+<<<<<<< HEAD
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
                 OutputSignal::TWAI_TX
             } else {
                 OutputSignal::TWAI0_TX
             }
+=======
+        cfg_select! {
+            any(esp32, esp32c3, esp32s2, esp32s3) => OutputSignal::TWAI_TX,
+            _ => OutputSignal::TWAI0_TX,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         }
     }
 

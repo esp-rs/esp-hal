@@ -163,6 +163,7 @@ impl<'d> SpiDma<'d, Blocking> {
         static mut RX_DESCRIPTORS: [[DmaDescriptor; 1]; SPI_NUM] =
             [[DmaDescriptor::EMPTY]; SPI_NUM];
 
+<<<<<<< HEAD
         let empty_rx_buffer = unwrap!(DmaRxBuf::new(unsafe { &mut RX_DESCRIPTORS[id] }, &mut []));
 
         cfg_if::cfg_if! {
@@ -174,6 +175,19 @@ impl<'d> SpiDma<'d, Blocking> {
                 let empty_tx_buffer = unwrap!(DmaTxBuf::new(unsafe { &mut TX_DESCRIPTORS[id] }, &mut []));
             }
         }
+=======
+        let tx_buffer = cfg_select! {
+            all(spi_master_version = "1", spi_address_workaround) => unsafe {
+                (&mut *state.default_tx_buffer.get()).get_mut().unsize()
+            },
+            _ => unsafe { DmaAlignedMut::new_unchecked(&mut [][..]) },
+        };
+
+        let rx_buffer = unwrap!(DmaRxBuf::new(rx_descriptors, unsafe {
+            DmaAlignedMut::new_unchecked(&mut [])
+        }));
+        let tx_buffer = unwrap!(DmaTxBuf::new(tx_descriptors, tx_buffer));
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
         // The buffers must be set up when creating the driver.
         unsafe { (&mut *state.empty_tx_buffer.get()).write(empty_tx_buffer) };
@@ -1359,6 +1373,7 @@ impl DmaDriver {
     }
 
     fn enable_dma(&self) {
+<<<<<<< HEAD
         #[cfg(dma_kind = "gdma")]
         // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
         self.regs().dma_conf().modify(|_, w| {
@@ -1368,11 +1383,25 @@ impl DmaDriver {
 
         #[cfg(dma_kind = "pdma")]
         self.reset_dma();
+=======
+        cfg_select! {
+            any(spi_master_version = "1", spi_master_version = "2") => {
+                self.reset_dma();
+            }
+            _ => {
+                self.regs().dma_conf().modify(|_, w| {
+                    w.dma_tx_ena().set_bit();
+                    w.dma_rx_ena().set_bit()
+                });
+            }
+        }
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 
     fn reset_dma(&self) {
         #[cfg(dma_kind = "pdma")]
         self.regs().dma_conf().toggle(|w, bit| {
+<<<<<<< HEAD
             w.out_rst().bit(bit);
             w.in_rst().bit(bit);
             w.ahbm_fifo_rst().bit(bit);
@@ -1384,6 +1413,21 @@ impl DmaDriver {
             w.rx_afifo_rst().bit(bit);
             w.buf_afifo_rst().bit(bit);
             w.dma_afifo_rst().bit(bit)
+=======
+            cfg_select! {
+                any(spi_master_version = "1", spi_master_version = "2") => {
+                    w.out_rst().bit(bit);
+                    w.in_rst().bit(bit);
+                    w.ahbm_fifo_rst().bit(bit);
+                    w.ahbm_rst().bit(bit)
+                }
+                _ => {
+                    w.rx_afifo_rst().bit(bit);
+                    w.buf_afifo_rst().bit(bit);
+                    w.dma_afifo_rst().bit(bit)
+                }
+            }
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         });
 
         self.clear_dma_interrupts();
@@ -1392,6 +1436,7 @@ impl DmaDriver {
     #[cfg(dma_kind = "gdma")]
     fn clear_dma_interrupts(&self) {
         self.regs().dma_int_clr().write(|w| {
+<<<<<<< HEAD
             w.dma_infifo_full_err().clear_bit_by_one();
             w.dma_outfifo_empty_err().clear_bit_by_one();
             w.trans_done().clear_bit_by_one();
@@ -1412,6 +1457,28 @@ impl DmaDriver {
             w.out_done().clear_bit_by_one();
             w.out_eof().clear_bit_by_one();
             w.out_total_eof().clear_bit_by_one()
+=======
+            cfg_select! {
+                any(spi_master_version = "1", spi_master_version = "2") => {
+                    w.inlink_dscr_empty().clear_bit_by_one();
+                    w.outlink_dscr_error().clear_bit_by_one();
+                    w.inlink_dscr_error().clear_bit_by_one();
+                    w.in_done().clear_bit_by_one();
+                    w.in_err_eof().clear_bit_by_one();
+                    w.in_suc_eof().clear_bit_by_one();
+                    w.out_done().clear_bit_by_one();
+                    w.out_eof().clear_bit_by_one();
+                    w.out_total_eof().clear_bit_by_one()
+                }
+                _ => {
+                    w.dma_infifo_full_err().clear_bit_by_one();
+                    w.dma_outfifo_empty_err().clear_bit_by_one();
+                    w.trans_done().clear_bit_by_one();
+                    w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                    w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+                }
+            }
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
         });
     }
 }

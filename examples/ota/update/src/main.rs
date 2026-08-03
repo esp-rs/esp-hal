@@ -88,6 +88,7 @@ fn main() -> ! {
         }
     }
 
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
             let button = peripherals.GPIO0;
@@ -97,6 +98,16 @@ fn main() -> ! {
             let button = peripherals.GPIO9;
         }
     }
+=======
+    let button =
+        cfg_select! {
+            any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
+            feature = "esp32c5" => peripherals.GPIO28,
+            feature = "esp32p4" => peripherals.GPIO35,
+            feature = "esp32s31" => peripherals.GPIO61,
+            _ => peripherals.GPIO9,
+        };
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
 
     let boot_button = Input::new(button, InputConfig::default().with_pull(Pull::Up));
 

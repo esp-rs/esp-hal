@@ -540,12 +540,18 @@ pub(super) fn acquire_async_adc() {
 }
 
 pub(super) fn release_async_adc() -> bool {
+<<<<<<< HEAD
     cfg_if::cfg_if! {
         if #[cfg(all(adc_adc1, adc_adc2))] {
             ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
         } else {
             true
         }
+=======
+    cfg_select! {
+        all(adc_adc1, adc_adc2) => ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1,
+        _ => true,
+>>>>>>> cc277b29c (fix(spi): take register block pointer via `ptr()` instead of `regs()` (#6022))
     }
 }
 
