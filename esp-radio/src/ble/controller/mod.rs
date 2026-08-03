@@ -1,5 +1,5 @@
 //! BLE controller
-use core::task::Poll;
+use core::{future::Future, task::Poll};
 
 use bt_hci::{
     ControllerToHostPacket,
@@ -7,8 +7,8 @@ use bt_hci::{
     FromHciBytesError,
     HostToControllerPacket,
     WriteHci,
-    transport::{Transport, WithIndicator},
 };
+use bt_hci_transport::{PacketKind, PacketToController, PacketToHost};
 use docsplay::Display;
 use esp_phy::PhyInitGuard;
 
@@ -184,8 +184,8 @@ pub(crate) fn hci_read_data_available() {
 }
 
 impl embedded_io_async_06::Read for BleConnector<'_> {
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
-        self.read_async(buf).await
+    fn read(&mut self, buf: &mut [u8]) -> impl Future<Output = Result<usize, BleConnectorError>> {
+        self.read_async(buf)
     }
 }
 
@@ -202,8 +202,8 @@ impl embedded_io_async_06::Write for BleConnector<'_> {
 }
 
 impl embedded_io_async_07::Read for BleConnector<'_> {
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
-        self.read_async(buf).await
+    fn read(&mut self, buf: &mut [u8]) -> impl Future<Output = Result<usize, BleConnectorError>> {
+        self.read_async(buf)
     }
 }
 
@@ -245,9 +245,40 @@ impl core::future::Future for HciReadyEventFuture {
     }
 }
 
-fn parse_hci(data: &[u8]) -> Result<Option<ControllerToHostPacket<'_>>, BleConnectorError> {
+/// The largest HCI packet, including the packet type indicator byte.
+const MAX_HCI_PACKET_LEN: usize = 259;
+
+/// The HCI output of the BLE controller.
+///
+/// The transport implementations use this zero-sized writer to serialize packets directly into the
+/// controller.
+struct HciWriter;
+
+impl embedded_io_07::ErrorType for HciWriter {
+    type Error = BleConnectorError;
+}
+
+impl embedded_io_async_07::Write for HciWriter {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        send_hci(buf);
+        Ok(buf.len())
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        // nothing to do
+        Ok(())
+    }
+}
+
+impl<E: embedded_io_07::Error> From<bt_hci_transport::ReadHciError<E>> for BleConnectorError {
+    fn from(_e: bt_hci_transport::ReadHciError<E>) -> Self {
+        BleConnectorError::Unknown
+    }
+}
+
+fn parse_hci(data: &[u8]) -> Result<ControllerToHostPacket<'_>, BleConnectorError> {
     match ControllerToHostPacket::from_hci_bytes_complete(data) {
-        Ok(p) => Ok(Some(p)),
+        Ok(p) => Ok(p),
         Err(e) => {
             warn!("[hci] error parsing packet: {:?}", e);
             Err(BleConnectorError::Unknown)
@@ -255,34 +286,53 @@ fn parse_hci(data: &[u8]) -> Result<Option<ControllerToHostPacket<'_>>, BleConne
     }
 }
 
-impl Transport for BleConnector<'_> {
+/// Waits for a packet from the controller, then reads it into `rx`.
+///
+/// Returns the length of the packet.
+async fn next_packet(rx: &mut [u8]) -> usize {
+    if !have_hci_read_data() {
+        HciReadyEventFuture.await;
+    }
+
+    read_next(rx)
+}
+
+impl bt_hci::transport::Transport for BleConnector<'_> {
     /// Read a complete HCI packet into the rx buffer
     async fn read<'a>(&self, rx: &'a mut [u8]) -> Result<ControllerToHostPacket<'a>, Self::Error> {
-        loop {
-            if !have_hci_read_data() {
-                HciReadyEventFuture.await;
-            }
+        // Workaround for borrow checker.
+        // Safety: we only return a reference to x once, if parsing is successful.
+        let rx = unsafe { &mut *core::ptr::slice_from_raw_parts_mut(rx.as_mut_ptr(), rx.len()) };
 
-            // Workaround for borrow checker.
-            // Safety: we only return a reference to x once, if parsing is successful.
-            let rx =
-                unsafe { &mut *core::ptr::slice_from_raw_parts_mut(rx.as_mut_ptr(), rx.len()) };
-
-            let len = crate::ble::read_next(rx);
-            if let Some(packet) = parse_hci(&rx[..len])? {
-                return Ok(packet);
-            }
-        }
+        let len = next_packet(rx).await;
+        parse_hci(&rx[..len])
     }
 
     /// Write a complete HCI packet from the tx buffer
     async fn write<T: HostToControllerPacket>(&self, val: &T) -> Result<(), Self::Error> {
-        let mut buf: [u8; 259] = [0; 259];
-        let w = WithIndicator::new(val);
-        let len = w.size();
-        w.write_hci(&mut buf[..])
-            .map_err(|_| BleConnectorError::Unknown)?;
-        send_hci(&buf[..len]);
-        Ok(())
+        bt_hci::transport::WithIndicator::new(val)
+            .write_hci_async(HciWriter)
+            .await
+    }
+}
+
+impl bt_hci_transport::Transport for BleConnector<'_> {
+    /// Read a complete HCI packet into the rx buffer
+    async fn read<'a, P: PacketToHost<'a>>(&self, rx: &'a mut [u8]) -> Result<P, Self::Error> {
+        // `P::read_hci` deserializes from a reader into `rx`, so the packet must be read into a
+        // buffer other than `rx`.
+        let mut packet = [0; MAX_HCI_PACKET_LEN];
+        let len = next_packet(&mut packet).await;
+
+        let mut reader = &packet[..len];
+        let kind = PacketKind::read(&mut reader)?;
+        Ok(P::read_hci(kind, &mut reader, rx)?)
+    }
+
+    /// Write a complete HCI packet from the tx buffer
+    async fn write<P: PacketToController>(&self, tx: &P) -> Result<(), Self::Error> {
+        bt_hci_transport::WithIndicator::new(tx)
+            .write_hci_async(HciWriter)
+            .await
     }
 }
