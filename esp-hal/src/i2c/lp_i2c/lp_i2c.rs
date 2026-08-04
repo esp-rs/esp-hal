@@ -2,7 +2,7 @@
 use crate::gpio::{LpPin, lp_io::LpFunction};
 use crate::{
     i2c::lp_i2c::{LpI2c, Scl, Sda},
-    peripherals::{LP_I2C0, LP_PERI, LPWR},
+    peripherals::{LP_PERI, LPWR},
     time::Rate,
 };
 
@@ -132,51 +132,35 @@ fn configure_pad(pin: &impl LpPin, function: LpFunction) {
 }
 
 impl<'d> LpI2c<'d> {
-    /// Creates a new instance of the `LpI2c` peripheral.
-    pub fn new(
-        i2c: LP_I2C0<'d>,
-        config: Config,
-        sda: impl Sda + 'd,
-        scl: impl Scl + 'd,
-    ) -> Result<Self, ConfigError> {
-        let me = Self {
-            i2c,
-            sda: sda.number(),
-            scl: scl.number(),
-        };
-
-        // Configure LP I2C GPIOs
-        // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
-        // initialization is important to avoid any spurious I2C start conditions on the bus.
-        scl.connect_scl();
-        sda.connect_sda();
-
+    pub(super) fn init(&mut self) {
         // Initialize LP I2C HAL */
-        me.i2c
+        self.i2c
             .register_block()
             .clk_conf()
             .modify(|_, w| w.sclk_active().set_bit());
 
-        let lp_peri = LP_PERI::regs();
         // Enable LP I2C controller clock
-        lp_peri
+        LP_PERI::regs()
             .clk_en()
             .modify(|_, w| w.lp_ext_i2c_ck_en().set_bit());
 
-        lp_peri
+        LP_PERI::regs()
             .reset_en()
             .modify(|_, w| w.lp_ext_i2c_reset_en().set_bit());
-        lp_peri
+        LP_PERI::regs()
             .reset_en()
             .modify(|_, w| w.lp_ext_i2c_reset_en().clear_bit());
+    }
 
+    /// Applies the given configuration to the `LpI2c` peripheral.
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         // Set LP I2C source clock
         LPWR::regs()
             .lpperi()
             .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
 
         // Initialize LP I2C Master mode
-        me.i2c.register_block().ctr().modify(|_, w| unsafe {
+        self.i2c.register_block().ctr().modify(|_, w| unsafe {
             // Clear register
             w.bits(0);
             // Use open drain output for SDA and SCL
@@ -187,17 +171,17 @@ impl<'d> LpI2c<'d> {
         });
 
         // First, reset the fifo buffers
-        me.i2c
+        self.i2c
             .register_block()
             .fifo_conf()
             .modify(|_, w| w.nonfifo_en().clear_bit());
 
-        me.i2c.register_block().ctr().modify(|_, w| {
+        self.i2c.register_block().ctr().modify(|_, w| {
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit()
         });
 
-        me.reset_fifo();
+        self.reset_fifo();
 
         // Set LP I2C source clock
         LPWR::regs()
@@ -208,7 +192,7 @@ impl<'d> LpI2c<'d> {
         // call
 
         let source_clk = 16_000_000;
-        let bus_freq = frequency.as_hz();
+        let bus_freq = config.frequency.as_hz();
 
         let clkm_div: u32 = source_clk / (bus_freq * 1024) + 1;
         let sclk_freq: u32 = source_clk / clkm_div;
@@ -258,52 +242,52 @@ impl<'d> LpI2c<'d> {
 
         // Write data to registers
         unsafe {
-            me.i2c.register_block().clk_conf().modify(|_, w| {
+            self.i2c.register_block().clk_conf().modify(|_, w| {
                 w.sclk_sel().clear_bit();
                 w.sclk_div_num().bits((clkm_div - 1) as u8)
             });
 
             // scl period
-            me.i2c
+            self.i2c
                 .register_block()
                 .scl_low_period()
                 .write(|w| w.scl_low_period().bits(scl_low_period as u16));
 
-            me.i2c.register_block().scl_high_period().write(|w| {
+            self.i2c.register_block().scl_high_period().write(|w| {
                 w.scl_high_period().bits(scl_high_period as u16);
                 w.scl_wait_high_period().bits(scl_wait_high_period as u8)
             });
             // sda sample
-            me.i2c
+            self.i2c
                 .register_block()
                 .sda_hold()
                 .write(|w| w.time().bits(sda_hold_time as u16));
-            me.i2c
+            self.i2c
                 .register_block()
                 .sda_sample()
                 .write(|w| w.time().bits(sda_sample_time as u16));
 
             // setup
-            me.i2c
+            self.i2c
                 .register_block()
                 .scl_rstart_setup()
                 .write(|w| w.time().bits(scl_rstart_setup_time as u16));
-            me.i2c
+            self.i2c
                 .register_block()
                 .scl_stop_setup()
                 .write(|w| w.time().bits(scl_stop_setup_time as u16));
 
             // hold
-            me.i2c
+            self.i2c
                 .register_block()
                 .scl_start_hold()
                 .write(|w| w.time().bits(scl_start_hold_time as u16));
-            me.i2c
+            self.i2c
                 .register_block()
                 .scl_stop_hold()
                 .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
-            me.i2c.register_block().to().write(|w| {
+            self.i2c.register_block().to().write(|w| {
                 w.time_out_en().bit(time_out_en);
                 w.time_out_value().bits(time_out_value.try_into().unwrap())
             });
@@ -312,34 +296,34 @@ impl<'d> LpI2c<'d> {
         // Enable SDA and SCL filtering. This configuration matches the HP I2C filter
         // config
 
-        me.i2c
+        self.i2c
             .register_block()
             .filter_cfg()
             .modify(|_, w| unsafe { w.sda_filter_thres().bits(LP_I2C_FILTER_CYC_NUM_DEF) });
-        me.i2c
+        self.i2c
             .register_block()
             .filter_cfg()
             .modify(|_, w| unsafe { w.scl_filter_thres().bits(LP_I2C_FILTER_CYC_NUM_DEF) });
 
-        me.i2c
+        self.i2c
             .register_block()
             .filter_cfg()
             .modify(|_, w| w.sda_filter_en().set_bit());
-        me.i2c
+        self.i2c
             .register_block()
             .filter_cfg()
             .modify(|_, w| w.scl_filter_en().set_bit());
 
         // Configure the I2C master to send a NACK when the Rx FIFO count is full
-        me.i2c
+        self.i2c
             .register_block()
             .ctr()
             .modify(|_, w| w.rx_full_ack_level().set_bit());
 
         // Synchronize the config register values to the LP I2C peripheral clock
-        me.lp_i2c_update();
+        self.lp_i2c_update();
 
-        Ok(me)
+        Ok(())
     }
 
     /// Update I2C configuration
@@ -372,6 +356,10 @@ impl<'d> LpI2c<'d> {
             .fifo_conf()
             .modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
+
+    pub(crate) fn disable(&mut self) {
+        // TODO
+    }
 }
 
 /// I2C-specific configuration errors
@@ -380,16 +368,19 @@ impl<'d> LpI2c<'d> {
 #[non_exhaustive]
 pub enum ConfigError {}
 
-/// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {}
-
 /// I2C driver configuration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, procmacros::BuilderLite)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
     frequency: Rate,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            frequency: Rate::from_khz(100),
+        }
+    }
 }

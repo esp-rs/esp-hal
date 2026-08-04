@@ -75,7 +75,7 @@
 use crate::{
     gpio::{LpPin, lp_io::LpFunction},
     i2c::lp_i2c::{LpI2c, Scl, Sda},
-    peripherals::{GPIO, LP_I2C0, RTC_IO, SENS},
+    peripherals::{GPIO, RTC_IO, SENS},
     time::Duration,
 };
 
@@ -118,51 +118,21 @@ for_each_lp_function! {
 }
 
 impl<'d> LpI2c<'d> {
-    #[procmacros::doc_replace]
-    /// Create a new I2C (RTC) instance.
-    ///
-    /// ## Errors
-    ///
-    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if bus frequency or timeout
-    /// passed in config is invalid.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
-    /// let i2c = LpI2c::new(
-    ///     peripherals.LP_I2C0,
-    ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
-    /// )?;
-    /// # {after_snippet}
-    /// ```
-    pub fn new(
-        i2c: LP_I2C0<'d>,
-        config: Config,
-        sda: impl Sda + 'd,
-        scl: impl Scl + 'd,
-    ) -> Result<Self, ConfigError> {
+    pub(super) fn init(&mut self) {
         // Clear any stale config registers
-        i2c.register_block().ctrl().reset();
+        self.i2c.register_block().ctrl().reset();
         SENS::regs().sar_i2c_ctrl().reset();
-
-        // Configure RTC I2C GPIOs
-        // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
-        // initialization is important to avoid any spurious I2C start conditions on the bus.
-        scl.connect_scl();
-        sda.connect_sda();
 
         // Reset RTC I2C
         SENS::regs()
             .sar_peri_reset_conf()
             .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
-        i2c.register_block()
+        self.i2c
+            .register_block()
             .ctrl()
             .modify(|_, w| w.i2c_reset().set_bit());
-        i2c.register_block()
+        self.i2c
+            .register_block()
             .ctrl()
             .modify(|_, w| w.i2c_reset().clear_bit());
         SENS::regs()
@@ -170,7 +140,7 @@ impl<'d> LpI2c<'d> {
             .modify(|_, w| w.sar_rtc_i2c_reset().clear_bit());
 
         // Enable internal open-drain for SDA and SCL
-        i2c.register_block().ctrl().modify(|_, w| {
+        self.i2c.register_block().ctrl().modify(|_, w| {
             w.sda_force_out().clear_bit();
             w.scl_force_out().clear_bit()
         });
@@ -181,20 +151,14 @@ impl<'d> LpI2c<'d> {
             .modify(|_, w| w.rtc_i2c_clk_en().set_bit());
 
         // Configure the RTC I2C controller into master mode.
-        i2c.register_block()
+        self.i2c
+            .register_block()
             .ctrl()
             .modify(|_, w| w.ms_mode().set_bit());
-        i2c.register_block()
+        self.i2c
+            .register_block()
             .ctrl()
             .modify(|_, w| w.i2c_ctrl_clk_gate_en().set_bit());
-
-        let mut this = Self {
-            i2c,
-            sda: sda.number(),
-            scl: scl.number(),
-        };
-        this.apply_config(&config)?;
-        Ok(this)
     }
 
     #[procmacros::doc_replace]
@@ -202,8 +166,8 @@ impl<'d> LpI2c<'d> {
     ///
     /// ## Errors
     ///
-    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if bus frequency or timeout
-    /// passed in config is invalid.
+    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if the provided config is
+    /// invalid.
     ///
     /// ## Example
     ///
@@ -549,10 +513,8 @@ impl<'d> LpI2c<'d> {
             .cmd(idx)
             .write(|w| unsafe { w.command().bits(cmd) });
     }
-}
 
-impl Drop for LpI2c<'_> {
-    fn drop(&mut self) {
+    pub(super) fn disable(&mut self) {
         fn release_pin(pin: u8) {
             GPIO::regs().pin(pin as usize).reset();
 

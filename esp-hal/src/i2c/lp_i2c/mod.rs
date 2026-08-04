@@ -72,6 +72,61 @@ for_each_lp_function! {
 /// ```
 pub struct LpI2c<'d> {
     i2c: LP_I2C0<'d>,
+    #[allow(unused)]
     sda: u8,
+    #[allow(unused)]
     scl: u8,
+}
+
+impl<'d> LpI2c<'d> {
+    /// Creates a new instance of the `LpI2c` peripheral.
+    ///
+    /// ## Errors
+    ///
+    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if the provided config is
+    /// invalid.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+    /// let i2c = LpI2c::new(
+    ///     peripherals.LP_I2C0,
+    ///     Config::default(),
+    ///     peripherals.GPIO1,
+    ///     peripherals.GPIO2,
+    /// )?;
+    /// # {after_snippet}
+    /// ```
+    pub fn new(
+        i2c: LP_I2C0<'d>,
+        config: Config,
+        sda: impl Sda + 'd,
+        scl: impl Scl + 'd,
+    ) -> Result<Self, ConfigError> {
+        let mut me = Self {
+            i2c,
+            sda: sda.number(),
+            scl: scl.number(),
+        };
+
+        me.init();
+
+        // Configure LP I2C GPIOs
+        // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
+        // initialization is important to avoid any spurious I2C start conditions on the bus.
+        scl.connect_scl();
+        sda.connect_sda();
+
+        me.apply_config(&config)?;
+
+        Ok(me)
+    }
+}
+
+impl Drop for LpI2c<'_> {
+    fn drop(&mut self) {
+        self.disable();
+    }
 }
