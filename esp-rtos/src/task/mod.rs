@@ -606,13 +606,6 @@ pub(super) fn allocate_main_task(
     let cpu = Cpu::current();
     let current_cpu = cpu as usize;
 
-    debug_assert!(
-        !scheduler.per_cpu[current_cpu].initialized,
-        "Tried to allocate main task multiple times"
-    );
-
-    scheduler.per_cpu[current_cpu].initialized = true;
-
     // Reset main task properties. The rest should be cleared when the task is deleted.
     scheduler.per_cpu[current_cpu].main_task.priority = Priority::ZERO;
     scheduler.per_cpu[current_cpu].main_task.state = TaskState::Ready;
@@ -657,7 +650,7 @@ pub(super) fn allocate_main_task(
     scheduler.set_current_task(cpu, Some(main_task_ptr));
     scheduler
         .run_queue
-        .mark_task_ready(&scheduler.per_cpu, main_task_ptr);
+        .mark_task_ready(&scheduler.per_cpu, scheduler.active_cores, main_task_ptr);
 }
 
 /// A handle to the current thread.

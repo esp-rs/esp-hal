@@ -10,6 +10,7 @@ use crate::{
     SCHEDULER,
     TICK_RATE,
     TimeBase,
+    run_queue::RunSchedulerOn,
     task::{self, TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
 };
 
@@ -258,6 +259,7 @@ extern "C" fn timer_tick_handler() {
         let mut scheduler = global_state.scheduler();
         let scheduler = &mut *scheduler;
 
+        let active_cores = scheduler.active_cores;
         let time_driver = unwrap!(scheduler.time_driver.as_mut());
 
         time_driver.timer.clear_interrupt();
@@ -276,9 +278,10 @@ extern "C" fn timer_tick_handler() {
 
             debug!("Task {:?} is ready", ready_task);
 
-            let run_scheduler = scheduler
-                .run_queue
-                .mark_task_ready(&scheduler.per_cpu, ready_task);
+            let run_scheduler =
+                scheduler
+                    .run_queue
+                    .mark_task_ready(&scheduler.per_cpu, active_cores, ready_task);
             task::trigger_scheduler(run_scheduler);
         });
 
@@ -292,13 +295,14 @@ extern "C" fn timer_tick_handler() {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_end(TraceEvents::ProcessTimerQueue as u32);
 
-        if now >= time_driver.timer_queue.time_slice_target[0] {
-            crate::task::yield_task();
-        }
-
-        #[cfg(multi_core)]
-        if now >= time_driver.timer_queue.time_slice_target[1] {
-            crate::task::schedule_other_core();
+        // This handler can run on any CPU that runs the scheduler, so we must trigger the
+        // scheduler on the CPU whose time slice ran out, not on a fixed one.
+        for cpu in Cpu::all() {
+            if active_cores.contains(cpu)
+                && now >= time_driver.timer_queue.time_slice_target[cpu as usize]
+            {
+                task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
+            }
         }
 
         // Re-arm the timer. This should be relatively cheap, and ensures that the timer will keep

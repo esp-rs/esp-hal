@@ -39,6 +39,38 @@ use crate::{
     timer::TimeDriver,
 };
 
+/// The set of CPUs that run the scheduler.
+///
+/// The start functions of the scheduler decide this set, and it does not change afterwards.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ActiveCores {
+    /// The scheduler runs on one CPU only. The other CPUs, if any, run bare-metal code.
+    Single(Cpu),
+
+    /// The scheduler runs on every CPU.
+    #[cfg(multi_core)]
+    All,
+}
+
+impl ActiveCores {
+    /// Returns whether `cpu` runs the scheduler.
+    #[inline]
+    pub(crate) fn contains(self, cpu: Cpu) -> bool {
+        match self {
+            Self::Single(single) => single == cpu,
+            #[cfg(multi_core)]
+            Self::All => true,
+        }
+    }
+
+    /// Returns whether the scheduler runs on every CPU.
+    #[cfg(multi_core)]
+    #[inline]
+    pub(crate) fn is_smp(self) -> bool {
+        matches!(self, Self::All)
+    }
+}
+
 pub(crate) struct SchedulerState {
     /// A list of all allocated tasks
     pub(crate) all_tasks: TaskList<TaskAllocListElement>,
@@ -49,10 +81,16 @@ pub(crate) struct SchedulerState {
     pub(crate) time_driver: Option<TimeDriver>,
 
     pub(crate) per_cpu: [CpuState; Cpu::COUNT],
+
+    /// The CPUs that run the scheduler.
+    ///
+    /// The start functions set this once, together with `time_driver`. Until then it names the
+    /// boot core, because a thread-mode executor can be created before the main task starts the
+    /// scheduler. Use `time_driver.is_some()` to tell the two cases apart.
+    pub(crate) active_cores: ActiveCores,
 }
 
 pub(crate) struct CpuState {
-    pub(crate) initialized: bool,
     idle_context: CpuContext,
 
     /// A pointer to the current task.
@@ -81,7 +119,6 @@ pub(crate) struct CpuState {
 impl CpuState {
     const fn new() -> Self {
         Self {
-            initialized: false,
             idle_context: CpuContext::new(),
             to_delete: TaskList::new(),
             idle: false,
@@ -131,6 +168,8 @@ impl SchedulerState {
             time_driver: None,
 
             per_cpu: [const { CpuState::new() }; Cpu::COUNT],
+
+            active_cores: ActiveCores::Single(Cpu::ProCpu),
         }
     }
 
@@ -154,6 +193,7 @@ impl SchedulerState {
             "The scheduler has already been started"
         );
         self.time_driver = Some(time_driver);
+        self.active_cores = ActiveCores::Single(Cpu::current());
         for cpu in 0..Cpu::COUNT {
             task::set_idle_hook_entry(&mut self.per_cpu[cpu].idle_context, idle_hook);
         }
@@ -171,8 +211,9 @@ impl SchedulerState {
     ) -> TaskPtr {
         if let Some(cpu) = pinned_to {
             assert!(
-                self.per_cpu[cpu as usize].initialized,
-                "Cannot create task on uninitialized CPU"
+                self.active_cores.contains(cpu),
+                "Cannot create a task on {:?}, because the scheduler does not run on it",
+                cpu
             );
         }
 
@@ -194,7 +235,9 @@ impl SchedulerState {
         rtos_trace::trace::task_new(task_ptr.rtos_trace_id());
 
         self.all_tasks.push(task_ptr);
-        let run_scheduler = self.run_queue.mark_task_ready(&self.per_cpu, task_ptr);
+        let run_scheduler =
+            self.run_queue
+                .mark_task_ready(&self.per_cpu, self.active_cores, task_ptr);
         task::trigger_scheduler(run_scheduler);
 
         debug!("Task '{}' created: {:?}", name, task_ptr);
@@ -287,7 +330,8 @@ impl SchedulerState {
         {
             // Current task is still ready, mark it as such.
             debug!("re-queueing current task: {:?}", current_task);
-            self.run_queue.mark_task_ready(&self.per_cpu, current_task);
+            self.run_queue
+                .mark_task_ready(&self.per_cpu, self.active_cores, current_task);
         }
 
         let mut arm_next_timeslice_tick = false;
@@ -306,8 +350,11 @@ impl SchedulerState {
                 // while it might try to restore a partially saved context.
                 #[cfg(multi_core)]
                 let current_ref = unsafe { current.as_ref() };
+                // The other core can only pick up the task we switch away from if it runs the
+                // scheduler, too.
                 #[cfg(multi_core)]
-                if current_ref.pinned_to.is_none()
+                if self.active_cores.is_smp()
+                    && current_ref.pinned_to.is_none()
                     && current_ref.priority
                         >= Self::priority_of_core(&self.per_cpu, 1 - current_cpu)
                 {
@@ -476,7 +523,9 @@ impl SchedulerState {
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);
 
-        let run_scheduler = self.run_queue.mark_task_ready(&self.per_cpu, task);
+        let run_scheduler = self
+            .run_queue
+            .mark_task_ready(&self.per_cpu, self.active_cores, task);
         task::trigger_scheduler(run_scheduler);
     }
 
@@ -549,9 +598,15 @@ impl SchedulerState {
 
     #[cfg(all(multi_core, sleep_light_sleep))]
     pub(crate) fn cpu_idle(&self, cpu: Cpu) -> bool {
-        let per_cpu = &self.per_cpu[cpu as usize];
-        // A CPU that never started the scheduler has no work to do, so it counts as idle.
-        !per_cpu.initialized || per_cpu.idle
+        if self.active_cores.contains(cpu) {
+            return self.per_cpu[cpu as usize].idle;
+        }
+
+        // The boot core is outside the set only if the scheduler runs on the second core alone. In
+        // that case the boot core runs bare-metal code that must keep running, so it is never idle.
+        // A second core that the scheduler does not run on may be parked, which counts as idle. If
+        // it runs bare-metal code instead, the user must take a `WakeLock`.
+        cpu != Cpu::ProCpu
     }
 }
 
