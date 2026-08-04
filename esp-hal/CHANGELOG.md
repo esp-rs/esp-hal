@@ -12,8 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The peripheral support table now marks SDIO host, SDIO slave and ULP (FSM) as not supported on the chips where they are not implemented (#5597)
-
 
 ### Fixed
 
