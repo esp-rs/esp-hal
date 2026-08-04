@@ -198,6 +198,10 @@ has_pd_en = true
 [device.i2c_slave]
 support_status = { status = "not_supported", issue = 1909 }
 
+[device.lp_i2c_master]
+support_status = "partial"
+version = "rtc_i2c"
+
 [device.interrupts]
 support_status = "partial"
 status_registers = 4

@@ -200,6 +200,10 @@ i2c0_data_register_ahb_address = 0x6001301c
 [device.i2c_slave]
 support_status = { status = "not_supported", issue = 1909 }
 
+[device.lp_i2c_master]
+support_status = "not_supported"
+version = "rtc_i2c"
+
 [device.interrupts]
 support_status = "partial"
 status_registers = 3

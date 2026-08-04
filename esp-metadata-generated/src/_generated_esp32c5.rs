@@ -271,6 +271,9 @@ macro_rules! property {
     ("interrupts.disabled_interrupt") => {
         0
     };
+    ("lp_i2c_master.version") => {
+        "lp_i2c"
+    };
     ("lp_i2c_master.fifo_size") => {
         16
     };

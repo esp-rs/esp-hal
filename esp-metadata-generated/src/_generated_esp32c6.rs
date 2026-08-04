@@ -283,6 +283,9 @@ macro_rules! property {
     ("ledc.channel_count", str) => {
         stringify!(6)
     };
+    ("lp_i2c_master.version") => {
+        "lp_i2c"
+    };
     ("lp_i2c_master.fifo_size") => {
         16
     };

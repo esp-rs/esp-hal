@@ -345,9 +345,12 @@ instances = [
 version = 2
 channel_count = 8
 support_status = "not_supported"
+
 [device.lp_i2c_master]
 support_status = "not_supported"
-fifo_size = 32  # placeholder until LP I2C driver lands; from c6 reference
+version = "lp_i2c"
+fifo_size = 16
+
 [device.lp_uart]
 support_status = "not_supported"
 ram_size = 32  # placeholder; LP UART RAM size on P4 needs verification
