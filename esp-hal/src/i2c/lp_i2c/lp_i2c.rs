@@ -95,11 +95,6 @@ enum Command {
 // Configure LP_EXT_I2C_CK_EN high to enable the clock source of I2C_SCLK.
 // Adjust the timing registers accordingly when the clock frequency changes.
 
-/// Represents a Low-Power I2C peripheral.
-pub struct LpI2c {
-    i2c: LP_I2C0<'static>,
-}
-
 /// Configures an LP pad as an open-drain output with its pull-up enabled, then selects the pad's
 /// LP I2C function.
 #[cfg(not(lp_io_has_gpio_matrix))]
@@ -136,15 +131,19 @@ fn configure_pad(pin: &impl LpPin, function: LpFunction) {
     pin.lp_set_config(true, true, function);
 }
 
-impl LpI2c {
+impl<'d> LpI2c<'d> {
     /// Creates a new instance of the `LpI2c` peripheral.
     pub fn new(
-        i2c: LP_I2C0<'static>,
-        sda: impl Sda + 'static,
-        scl: impl Scl + 'static,
-        frequency: Rate,
-    ) -> Self {
-        let me = Self { i2c };
+        i2c: LP_I2C0<'d>,
+        config: Config,
+        sda: impl Sda + 'd,
+        scl: impl Scl + 'd,
+    ) -> Result<Self, ConfigError> {
+        let me = Self {
+            i2c,
+            sda: sda.number(),
+            scl: scl.number(),
+        };
 
         // Configure LP I2C GPIOs
         // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
@@ -340,7 +339,7 @@ impl LpI2c {
         // Synchronize the config register values to the LP I2C peripheral clock
         me.lp_i2c_update();
 
-        me
+        Ok(me)
     }
 
     /// Update I2C configuration
@@ -373,4 +372,24 @@ impl LpI2c {
             .fifo_conf()
             .modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
+}
+
+/// I2C-specific configuration errors
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConfigError {}
+
+/// I2C-specific transmission errors
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Error {}
+
+/// I2C driver configuration
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct Config {
+    /// The I2C clock frequency.
+    frequency: Rate,
 }

@@ -46,3 +46,29 @@ for_each_lp_function! {
         }
     };
 }
+
+#[procmacros::doc_replace]
+/// Low-power I2C driver
+///
+/// ## Example
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::i2c::lp_i2c::{Config, I2c};
+/// # const DEVICE_ADDR: u8 = 0x77;
+/// let mut i2c = I2c::new(
+///     peripherals.RTC_I2C,
+///     Config::default(),
+///     peripherals.GPIO1,
+///     peripherals.GPIO2,
+/// )?;
+///
+/// let mut data = [0u8; 22];
+/// i2c.read(DEVICE_ADDR, 0xaa, &mut data)?;
+/// # {after_snippet}
+/// ```
+pub struct I2c<'d> {
+    i2c: RTC_I2C<'d>,
+    sda: u8,
+    scl: u8,
+}
