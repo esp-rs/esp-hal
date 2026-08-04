@@ -277,9 +277,7 @@ impl<'d> SpiDma<'d, Blocking> {
             all(spi_master_version = "1", spi_address_workaround) => unsafe {
                 (&mut *state.default_tx_buffer.get()).get_mut().unsize()
             },
-            _ => unsafe {
-                DmaAlignedMut::new_unchecked(&mut [][..])
-            }
+            _ => unsafe { DmaAlignedMut::new_unchecked(&mut [][..]) },
         };
 
         let rx_buffer = unwrap!(DmaRxBuf::new(rx_descriptors, unsafe {
@@ -1923,7 +1921,7 @@ impl DmaDriver {
         cfg_select! {
             any(spi_master_version = "1", spi_master_version = "2") => {
                 self.reset_dma();
-            },
+            }
             _ => {
                 self.regs().dma_conf().modify(|_, w| {
                     w.dma_tx_ena().set_bit();
@@ -1941,7 +1939,7 @@ impl DmaDriver {
                     w.in_rst().bit(bit);
                     w.ahbm_fifo_rst().bit(bit);
                     w.ahbm_rst().bit(bit)
-                },
+                }
                 _ => {
                     w.rx_afifo_rst().bit(bit);
                     w.buf_afifo_rst().bit(bit);
@@ -1966,7 +1964,7 @@ impl DmaDriver {
                     w.out_done().clear_bit_by_one();
                     w.out_eof().clear_bit_by_one();
                     w.out_total_eof().clear_bit_by_one()
-                },
+                }
                 _ => {
                     w.dma_infifo_full_err().clear_bit_by_one();
                     w.dma_outfifo_empty_err().clear_bit_by_one();

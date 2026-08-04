@@ -49,7 +49,7 @@ async fn main(_spawner: Spawner) {
         esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
 
-    let mut rtc = Rtc::new(peripherals.RTC_TIMER);
+    let rtc = Rtc::new(peripherals.RTC_TIMER);
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
     let boot_count = unsafe { BOOT_COUNT };

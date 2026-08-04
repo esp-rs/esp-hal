@@ -120,7 +120,7 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
                 reg.write(|w| w.cpu_intr().set_bit());
                 // Read back to ensure the write is completed.
                 _ = reg.read();
-            },
+            }
             _ => {
                 crate::interrupt::free(|| {
                     reg.write(|w| w.cpu_intr().set_bit());

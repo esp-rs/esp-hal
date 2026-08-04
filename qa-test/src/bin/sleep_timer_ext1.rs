@@ -11,7 +11,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Input, InputConfig, Level, Pull, RtcPin},
+    gpio::{Input, InputConfig, Level, LpPin, Pull},
     main,
     rtc_cntl::{
         SocResetReason,
@@ -49,7 +49,7 @@ fn main() -> ! {
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
     core::mem::drop(input);
-    let mut wakeup_pins: [&mut dyn RtcPin; 2] = [&mut pin_4, &mut pin_2];
+    let mut wakeup_pins: [&mut dyn LpPin; 2] = [&mut pin_4, &mut pin_2];
     let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, Level::High);
     println!("sleeping!");
     delay.delay_millis(100);

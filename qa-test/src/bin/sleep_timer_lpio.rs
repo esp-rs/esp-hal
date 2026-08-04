@@ -16,7 +16,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    gpio::{Level, RtcPinWithResistors},
+    gpio::{Level, LpPinWithResistors},
     main,
     rtc_cntl::{
         SocResetReason,
@@ -38,7 +38,12 @@ fn main() -> ! {
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
     cfg_select! {
-        any(feature = "esp32c5", feature = "esp32c6", feature = "esp32c61", feature = "esp32p4") => {
+        any(
+            feature = "esp32c5",
+            feature = "esp32c6",
+            feature = "esp32c61",
+            feature = "esp32p4"
+        ) => {
             let mut pin_low = peripherals.GPIO2;
             let mut pin_high = peripherals.GPIO3;
         }
@@ -58,7 +63,7 @@ fn main() -> ! {
     let delay = Delay::new();
     let timer = TimerWakeupSource::new(Duration::from_secs(10));
 
-    let wakeup_pins: &mut [(&mut dyn RtcPinWithResistors, Level)] =
+    let wakeup_pins: &mut [(&mut dyn LpPinWithResistors, Level)] =
         &mut [(&mut pin_low, Level::Low), (&mut pin_high, Level::High)];
 
     let rtcio = Ext1WakeupSource::new(wakeup_pins);

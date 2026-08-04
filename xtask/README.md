@@ -8,19 +8,23 @@ Automation using [cargo-xtask](https://github.com/matklad/cargo-xtask).
 Usage: esp-devtool <COMMAND>
 
 Commands:
-  build                      Build-related subcommands
-  run                        Run-related subcommands
-  release                    Release-related subcommands
-  ci                         Perform (parts of) the checks done in CI
-  fmt-packages               Format all packages in the workspace with rustfmt
-  clean                      Run cargo clean
-  lint-packages              Lint all packages in the workspace with clippy
-  semver-check               Semver Checks
-  check-changelog            Check the changelog for packages
-  update-chip-support-table  Re-generate the chip support table in the esp-hal README
-  host-tests                 Run host tests for packages with registered instructions (see below)
-  check-global-symbols       Check global symbols in the compiled `.rlib`
-  help                       Print this message or the help of the given subcommand(s)
+  build                 Build-related subcommands
+  run                   Run-related subcommands
+  release               Release-related subcommands
+  ci                    Perform (parts of) the checks done in CI
+  fmt-packages          Format all packages in the workspace with rustfmt
+  clean                 Run cargo clean
+  check-packages        Check all packages in the workspace with cargo check
+  lint-packages         Lint all packages in the workspace with clippy
+  semver-check          Semver Checks
+  check-changelog       Check the changelog for packages
+  check-pr-changelog    Validate the changelog format of a PR description
+  host-tests            Run host-tests in the workspace with `cargo test`
+  check-global-symbols  Check global symbols in the compiled `.rlib` of the specified packages for the specified chips
+  generate-report       Generate reports from CI data
+  rel-check             Tasks for checking compile tests with a local registry
+  mcp                   Start the MCP server (stdio transport, for use with Claude Code)
+  help                  Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help

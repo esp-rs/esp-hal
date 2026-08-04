@@ -113,6 +113,8 @@ pub use crypto::Crc32 as Crc32ForTesting;
 #[cfg(feature = "std")]
 pub(crate) use non_rom as crypto;
 
+mod flash;
+
 pub mod partitions;
 
 pub mod ota;

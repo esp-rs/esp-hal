@@ -1,5 +1,6 @@
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
+    use embassy_time::{Duration, Timer};
     use esp_hal::{
         clock::CpuClock,
         interrupt::software::SoftwareInterruptControl,
@@ -53,10 +54,23 @@ mod tests {
 
         for _ in 0..10 {
             let _ = controller.scan_async(&scan_config).await.unwrap();
+
+            // The Wi-Fi driver runs in its own task. Memory that the driver holds while we read
+            // the free heap makes the heap look smaller than it is. The driver free's this memory
+            // soon, but it does not free leaked memory, so wait for the heap to recover.
+            let mut free = esp_alloc::HEAP.free();
+            for _ in 0..20 {
+                if free >= min_free {
+                    break;
+                }
+                Timer::after(Duration::from_millis(10)).await;
+                free = esp_alloc::HEAP.free();
+            }
+
             assert!(
-                esp_alloc::HEAP.free() >= min_free,
+                free >= min_free,
                 "current free: {}, min free: {}",
-                esp_alloc::HEAP.free(),
+                free,
                 min_free
             );
         }

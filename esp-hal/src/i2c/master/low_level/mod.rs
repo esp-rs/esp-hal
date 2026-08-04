@@ -1913,9 +1913,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
                 AcknowledgeCheckFailedReason::Data
             }
         }
-        _ => {
-            AcknowledgeCheckFailedReason::Unknown
-        }
+        _ => AcknowledgeCheckFailedReason::Unknown,
     }
 }
 

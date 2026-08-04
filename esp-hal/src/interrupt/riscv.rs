@@ -418,19 +418,21 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
 
 fn cpu_wait_mode_on() -> bool {
     cfg_select! {
-        soc_has_pcr => {
-            crate::peripherals::PCR::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
-        }
-        soc_has_hp_sys => {
-            crate::peripherals::HP_SYS::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
-        }
-        _ => {
-            crate::peripherals::SYSTEM::regs()
-                .cpu_per_conf()
-                .read()
-                .cpu_wait_mode_force_on()
-                .bit_is_set()
-        }
+        soc_has_pcr => crate::peripherals::PCR::regs()
+            .cpu_waiti_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
+        soc_has_hp_sys => crate::peripherals::HP_SYS::regs()
+            .cpu_waiti_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
+        _ => crate::peripherals::SYSTEM::regs()
+            .cpu_per_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
     }
 }
 
@@ -604,9 +606,12 @@ pub(crate) mod rt {
                 let mcause = riscv::register::mcause::read();
             }
             _ => {
-                // Change the current runlevel so that interrupt handlers can access the correct runlevel.
+                // Change the current runlevel so that interrupt handlers can access the correct
+                // runlevel.
                 let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
-                let level = unsafe { change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio))) };
+                let level = unsafe {
+                    change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio)))
+                };
                 let prio = prio as u8;
             }
         }
@@ -639,9 +644,7 @@ pub(crate) mod rt {
                 // since it contains the former CPU priority. When executing `mret`,
                 // the hardware will restore the former threshold, from `mcause` to
                 // `mintstatus` CSR
-                unsafe {
-                    core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
-                }
+                unsafe { core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits()) }
             }
             _ => {
                 unsafe { change_current_runlevel(level) };

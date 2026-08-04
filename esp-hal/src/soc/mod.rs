@@ -273,12 +273,12 @@ pub(crate) fn ensure_stack_pointer_in_range() {
     }
     let current_sp: usize;
     cfg_select! {
-        xtensa => {
-            unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
-        }
-        _ => {
-            unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
-        }
+        xtensa => unsafe {
+            core::arch::asm!("mov {0}, sp", out(reg) current_sp);
+        },
+        _ => unsafe {
+            core::arch::asm!("mv {0}, sp", out(reg) current_sp);
+        },
     }
     let stack_bottom = (&raw const _stack_end_cpu0) as usize;
     let stack_top = (&raw const _stack_start_cpu0) as usize;

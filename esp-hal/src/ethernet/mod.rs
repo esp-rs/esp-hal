@@ -232,17 +232,17 @@ cfg_select! {
     }
     _ => {
         emac_pin!(MiiTxClk, "MII TX clock pin");
-        emac_pin!(MiiTxEn,  "MII TX enable pin");
-        emac_pin!(MiiTxd0,  "MII TXD0 pin");
-        emac_pin!(MiiTxd1,  "MII TXD1 pin");
-        emac_pin!(MiiTxd2,  "MII TXD2 pin");
-        emac_pin!(MiiTxd3,  "MII TXD3 pin");
+        emac_pin!(MiiTxEn, "MII TX enable pin");
+        emac_pin!(MiiTxd0, "MII TXD0 pin");
+        emac_pin!(MiiTxd1, "MII TXD1 pin");
+        emac_pin!(MiiTxd2, "MII TXD2 pin");
+        emac_pin!(MiiTxd3, "MII TXD3 pin");
         emac_pin!(MiiRxClk, "MII RX clock pin");
-        emac_pin!(MiiRxDv,  "MII RX data valid pin");
-        emac_pin!(MiiRxd0,  "MII RXD0 pin");
-        emac_pin!(MiiRxd1,  "MII RXD1 pin");
-        emac_pin!(MiiRxd2,  "MII RXD2 pin");
-        emac_pin!(MiiRxd3,  "MII RXD3 pin");
+        emac_pin!(MiiRxDv, "MII RX data valid pin");
+        emac_pin!(MiiRxd0, "MII RXD0 pin");
+        emac_pin!(MiiRxd1, "MII RXD1 pin");
+        emac_pin!(MiiRxd2, "MII RXD2 pin");
+        emac_pin!(MiiRxd3, "MII RXD3 pin");
 
         for_each_iomux_function! {
             (EMAC_TX_CLK, $gpio:ident, $af:ident) => {

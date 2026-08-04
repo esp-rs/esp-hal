@@ -429,7 +429,7 @@ impl Timer<'_> {
                     0 => crate::soc::clocks::TimgInstance::Timg0,
                     #[cfg(soc_has_timg1)]
                     1 => crate::soc::clocks::TimgInstance::Timg1,
-                    _ => unreachable!()
+                    _ => unreachable!(),
                 };
                 let hz = timg.function_clock_frequency();
             }
@@ -519,9 +519,7 @@ impl Timer<'_> {
                 // On ESP32 and S2, the `int_ena` register is ineffective - interrupts fire even
                 // without int_ena enabling them. We use level interrupts so that we have a status
                 // bit available.
-                self.t()
-                    .config()
-                    .modify(|_, w| w.level_int_en().bit(state));
+                self.t().config().modify(|_, w| w.level_int_en().bit(state));
             }
             timergroup_timg_has_timer1 => {
                 INT_ENA_LOCK[self.timer_group() as usize].lock(|| {

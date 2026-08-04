@@ -42,7 +42,7 @@ impl UartInstance {
                 UartFunctionClockSclk::PllF48m => 1,
                 UartFunctionClockSclk::RcFast => 2,
                 UartFunctionClockSclk::Xtal => 3,
-            }
+            },
         };
 
         PCR::regs()

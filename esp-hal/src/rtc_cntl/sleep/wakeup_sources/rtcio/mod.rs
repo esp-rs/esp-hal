@@ -12,8 +12,8 @@ use crate::{gpio::Level, rtc_cntl::sleep::RtcIoWakeupPinType};
         cfg(any(esp32s2, esp32s3)) => "GPIO18"
     },
     "rtc_pin_trait" => {
-        cfg(any(esp32c3, esp32c2)) => "gpio::RtcPinWithResistors",
-        cfg(any(esp32s2, esp32s3)) => "gpio::RtcPin"
+        cfg(any(esp32c3, esp32c2)) => "gpio::LpPinWithResistors",
+        cfg(any(esp32s2, esp32s3)) => "gpio::LpPin"
     },
 )]
 /// RTC_IO wakeup source

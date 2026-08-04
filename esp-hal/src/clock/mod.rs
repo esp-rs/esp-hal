@@ -112,24 +112,12 @@ impl CpuClock {
     /// ```
     pub const fn max() -> Self {
         cfg_select! {
-            esp32c2 => {
-                Self::_120MHz
-            }
-            any(esp32c3, esp32c6, esp32c61) => {
-                Self::_160MHz
-            }
-            esp32h2 => {
-                Self::_96MHz
-            }
-            esp32p4 => {
-                Self::_400MHz
-            }
-            esp32s31 => {
-                Self::_320MHz
-            }
-            _ => {
-                Self::_240MHz
-            }
+            esp32c2 => Self::_120MHz,
+            any(esp32c3, esp32c6, esp32c61) => Self::_160MHz,
+            esp32h2 => Self::_96MHz,
+            esp32p4 => Self::_400MHz,
+            esp32s31 => Self::_320MHz,
+            _ => Self::_240MHz,
         }
     }
 }
@@ -335,7 +323,8 @@ impl RtcClock {
         // Make sure we measure the crystal.
         cfg_select! {
             soc_has_clock_node_timg_function_clock => {
-                let current_function_clock = clocks::TimgInstance::Timg0.function_clock_config(clocks);
+                let current_function_clock =
+                    clocks::TimgInstance::Timg0.function_clock_config(clocks);
                 clocks::TimgInstance::Timg0.configure_function_clock(clocks, function_clock);
                 clocks::TimgInstance::Timg0.request_function_clock(clocks);
             }

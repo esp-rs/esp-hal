@@ -3,20 +3,14 @@
 /// Checks if a debugger is connected.
 pub fn debugger_connected() -> bool {
     cfg_select! {
-        xtensa => {
-            xtensa_lx::is_debugger_attached()
-        }
-        all(riscv, soc_has_assist_debug) => {
-            crate::peripherals::ASSIST_DEBUG::regs()
-                .cpu(0)
-                .debug_mode()
-                .read()
-                .debug_module_active()
-                .bit_is_set()
-        }
-        _ => {
-            false
-        }
+        xtensa => xtensa_lx::is_debugger_attached(),
+        all(riscv, soc_has_assist_debug) => crate::peripherals::ASSIST_DEBUG::regs()
+            .cpu(0)
+            .debug_mode()
+            .read()
+            .debug_module_active()
+            .bit_is_set(),
+        _ => false,
     }
 }
 
@@ -50,9 +44,9 @@ pub unsafe fn set_stack_watchpoint(addr: usize) {
                     );
                 }
             }
-            _ => {
-                unsafe { set_watchpoint(0, addr, 4); }
-            }
+            _ => unsafe {
+                set_watchpoint(0, addr, 4);
+            },
         }
     }
 }
