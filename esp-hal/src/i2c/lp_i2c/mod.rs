@@ -1,4 +1,84 @@
-//! Low-power I2C driver
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "sda" => {
+        cfg(esp32s3) => "GPIO1",
+        _ => "GPIO6"
+    },
+    "scl" => {
+        cfg(esp32s3) => "GPIO2",
+        _ => "GPIO7"
+    }
+))]
+//! # Low-power I2C driver
+//!
+//! ## Overview
+//!
+//! This is the host driver for the LP_I2C peripheral, which is primarily meant to be driven by
+//! the ULP.
+//!
+//! The driver always sends a slave sub-register address along with the device address. This makes
+//! it incompatible with I2C devices or sensors that do not expose sub-registers, and it also means
+//! an `embedded_hal::i2c::I2c` implementation cannot be provided.
+//!
+//! ## Configuration
+//!
+//! The driver can be configured using the [`Config`] struct. To create a
+//! configuration, you can use the [`Config::default()`] method, and then modify
+//! the individual settings as needed, by calling `with_*` methods on the
+//! [`Config`] struct.
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! use esp_hal::i2c::lp_i2c::Config;
+//!
+//! let config = Config::default();
+//! # {after_snippet}
+//! ```
+//!
+//! You will then need to pass the configuration to [`LpI2c::new`], and you can
+//! also change the configuration later by calling [`LpI2c::apply_config`].
+//!
+//! You will also need to specify the SDA and SCL pins when you create the
+//! driver instance.
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+//! #
+//! # let config = Config::default();
+//! #
+//! let mut i2c = LpI2c::new(
+//!     peripherals.LP_I2C0,
+//!     config,
+//!     peripherals.__sda__,
+//!     peripherals.__scl__,
+//! )?;
+//!
+//! // You can change the configuration later:
+//! i2c.apply_config(&Config::default())?;
+//! # {after_snippet}
+//! ```
+//!
+//! ## Usage
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! # use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+//! # let mut i2c = LpI2c::new(
+//! #     peripherals.LP_I2C0,
+//! #     Config::default(),
+//! #     peripherals.__sda__,
+//! #     peripherals.__scl__,
+//! # )?;
+//! // The device address does not contain the `R/W` bit!
+//! const DEVICE_ADDR: u8 = 0x77;
+//! const DEVICE_REG: u8 = 0x01;
+//! let write_buffer = [0xAA];
+//! let mut read_buffer = [0u8; 22];
+//!
+//! i2c.write(DEVICE_ADDR, DEVICE_REG, &write_buffer)?;
+//! i2c.read(DEVICE_ADDR, DEVICE_REG, &mut read_buffer)?;
+//! # {after_snippet}
+//! ```
 
 use crate::{
     gpio::{InputPin, LpPin, OutputPin},
@@ -50,7 +130,30 @@ for_each_lp_function! {
     };
 }
 
-#[procmacros::doc_replace]
+/// I2C-specific transmission errors
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Error {
+    /// The transmission size exceeded the limit.
+    TransactionSizeLimitExceeded,
+    /// The acknowledgment check failed.
+    AckCheckFailed,
+    /// A timeout occurred during transmission.
+    TimeOut,
+    /// The arbitration for the bus was lost.
+    ArbitrationLost,
+}
+
+#[procmacros::doc_replace(
+    "sda" => {
+        cfg(esp32s3) => "GPIO1",
+        _ => "GPIO6"
+    },
+    "scl" => {
+        cfg(esp32s3) => "GPIO2",
+        _ => "GPIO7"
+    }
+)]
 /// Low-power I2C driver
 ///
 /// ## Example
@@ -62,8 +165,8 @@ for_each_lp_function! {
 /// let mut i2c = LpI2c::new(
 ///     peripherals.LP_I2C0,
 ///     Config::default(),
-///     peripherals.GPIO1,
-///     peripherals.GPIO2,
+///     peripherals.__sda__,
+///     peripherals.__scl__,
 /// )?;
 ///
 /// let mut data = [0u8; 22];
@@ -77,6 +180,16 @@ pub struct LpI2c<'d> {
 }
 
 impl<'d> LpI2c<'d> {
+    #[procmacros::doc_replace(
+        "sda" => {
+            cfg(esp32s3) => "GPIO1",
+            _ => "GPIO6"
+        },
+        "scl" => {
+            cfg(esp32s3) => "GPIO2",
+            _ => "GPIO7"
+        }
+    )]
     /// Creates a new instance of the `LpI2c` peripheral.
     ///
     /// ## Errors
@@ -92,8 +205,8 @@ impl<'d> LpI2c<'d> {
     /// let i2c = LpI2c::new(
     ///     peripherals.LP_I2C0,
     ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
+    ///     peripherals.__sda__,
+    ///     peripherals.__scl__,
     /// )?;
     /// # {after_snippet}
     /// ```
@@ -120,6 +233,124 @@ impl<'d> LpI2c<'d> {
         me.apply_config(&config)?;
 
         Ok(me)
+    }
+
+    #[procmacros::doc_replace(
+        "sda" => {
+            cfg(esp32s3) => "GPIO1",
+            _ => "GPIO6"
+        },
+        "scl" => {
+            cfg(esp32s3) => "GPIO2",
+            _ => "GPIO7"
+        }
+    )]
+    /// Applies a new configuration.
+    ///
+    /// ## Errors
+    ///
+    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if the provided config is
+    /// invalid.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+    /// let mut i2c = LpI2c::new(
+    ///     peripherals.LP_I2C0,
+    ///     Config::default(),
+    ///     peripherals.__sda__,
+    ///     peripherals.__scl__,
+    /// )?;
+    ///
+    /// i2c.apply_config(&Config::default())?;
+    /// # {after_snippet}
+    /// ```
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.configure(config)
+    }
+
+    #[procmacros::doc_replace(
+        "sda" => {
+            cfg(esp32s3) => "GPIO1",
+            _ => "GPIO6"
+        },
+        "scl" => {
+            cfg(esp32s3) => "GPIO2",
+            _ => "GPIO7"
+        }
+    )]
+    /// Writes `data` to the `register` of the slave with the given `address`.
+    ///
+    /// The transfer consists of a single write transaction that sends the device address, the
+    /// register address, then `data`.
+    ///
+    /// ## Errors
+    ///
+    /// [`Error::TransactionSizeLimitExceeded`] is returned if `data` is longer than the driver
+    /// can transfer in a single transaction.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+    /// const DEVICE_ADDR: u8 = 0x77;
+    /// let mut i2c = LpI2c::new(
+    ///     peripherals.LP_I2C0,
+    ///     Config::default(),
+    ///     peripherals.__sda__,
+    ///     peripherals.__scl__,
+    /// )?;
+    ///
+    /// i2c.write(DEVICE_ADDR, 2, &[0xaa])?;
+    /// # {after_snippet}
+    /// ```
+    pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
+        self.write_bytes(address, register, data)
+    }
+
+    #[procmacros::doc_replace(
+        "sda" => {
+            cfg(esp32s3) => "GPIO1",
+            _ => "GPIO6"
+        },
+        "scl" => {
+            cfg(esp32s3) => "GPIO2",
+            _ => "GPIO7"
+        }
+    )]
+    /// Reads enough bytes from the `register` of the slave with the given `address` to fill
+    /// `data`.
+    ///
+    /// The transfer writes the device address and the register address, then repeats the start
+    /// condition to read `data` back.
+    ///
+    /// ## Errors
+    ///
+    /// [`Error::TransactionSizeLimitExceeded`] is returned if `data` is longer than the driver
+    /// can transfer in a single transaction.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+    /// const DEVICE_ADDR: u8 = 0x77;
+    /// let mut i2c = LpI2c::new(
+    ///     peripherals.LP_I2C0,
+    ///     Config::default(),
+    ///     peripherals.__sda__,
+    ///     peripherals.__scl__,
+    /// )?;
+    ///
+    /// let mut data = [0u8; 22];
+    /// i2c.read(DEVICE_ADDR, 7, &mut data)?;
+    /// # {after_snippet}
+    /// ```
+    pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
+        self.read_bytes(address, register, data)
     }
 }
 

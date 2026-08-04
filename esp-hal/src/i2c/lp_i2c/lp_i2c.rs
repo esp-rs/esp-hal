@@ -1,12 +1,23 @@
+//! LP_I2C implementation of the low-power I2C driver.
+//!
+//! This peripheral is a FIFO-based I2C master that executes a list of commands.
+
 #[cfg(not(lp_io_has_gpio_matrix))]
 use crate::gpio::{LpPin, lp_io::LpFunction};
 use crate::{
-    i2c::lp_i2c::{LpI2c, Scl, Sda},
+    i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
+    pac::lp_i2c0::RegisterBlock,
     peripherals::{LP_PERI, LPWR},
     time::Rate,
 };
 
 const LP_I2C_FILTER_CYC_NUM_DEF: u8 = 7;
+
+/// Depth of the TX and RX FIFOs, in bytes.
+const FIFO_SIZE: usize = property!("lp_i2c_master.fifo_size");
+
+/// Number of command slots in the command list.
+const COMMAND_SLOTS: usize = 8;
 
 #[cfg(not(lp_io_has_gpio_matrix))]
 for_each_lp_function! {
@@ -26,41 +37,18 @@ for_each_lp_function! {
     };
 }
 
-/// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    /// The transmission exceeded the FIFO size.
-    ExceedingFifo,
-    /// The acknowledgment check failed.
-    AckCheckFailed,
-    /// A timeout occurred during transmission.
-    TimeOut,
-    /// The arbitration for the bus was lost.
-    ArbitrationLost,
-    /// The execution of the I2C command was incomplete.
-    ExecIncomplete,
-    /// The number of commands issued exceeded the limit.
-    CommandNrExceeded,
-    /// The response received from the I2C device was invalid.
-    InvalidResponse,
-}
-
-#[allow(unused)]
 enum OperationType {
     Write = 0,
     Read  = 1,
 }
 
-#[allow(unused)]
 #[derive(Eq, PartialEq, Copy, Clone)]
 enum Ack {
     Ack,
     Nack,
 }
 
-#[derive(PartialEq)]
-#[allow(unused)]
+#[derive(Clone, Copy)]
 enum Command {
     Start,
     Stop,
@@ -83,6 +71,58 @@ enum Command {
         /// while the minimum is 1.
         length: u8,
     },
+}
+
+impl From<Command> for u16 {
+    fn from(c: Command) -> u16 {
+        let opcode: u16 = match c {
+            Command::Start => 6,
+            Command::Write { .. } => 1,
+            Command::Stop => 2,
+            Command::Read { .. } => 3,
+            Command::End => 4,
+        };
+
+        let length = match c {
+            Command::Start | Command::Stop | Command::End => 0,
+            Command::Write { length: l, .. } | Command::Read { length: l, .. } => l,
+        };
+
+        let ack_exp = match c {
+            Command::Start | Command::Stop | Command::End | Command::Read { .. } => Ack::Nack,
+            Command::Write { ack_exp: exp, .. } => exp,
+        };
+
+        let ack_check_en = match c {
+            Command::Start | Command::Stop | Command::End | Command::Read { .. } => false,
+            Command::Write {
+                ack_check_en: en, ..
+            } => en,
+        };
+
+        let ack_value = match c {
+            Command::Start | Command::Stop | Command::End | Command::Write { .. } => Ack::Nack,
+            Command::Read { ack_value: ack, .. } => ack,
+        };
+
+        let mut cmd: u16 = length.into();
+
+        if ack_check_en {
+            cmd |= 1 << 8;
+        }
+
+        if ack_exp == Ack::Nack {
+            cmd |= 1 << 9;
+        }
+
+        if ack_value == Ack::Nack {
+            cmd |= 1 << 10;
+        }
+
+        cmd |= opcode << 11;
+
+        cmd
+    }
 }
 
 // https://github.com/espressif/esp-idf/blob/master/components/ulp/lp_core/lp_core_i2c.c#L122
@@ -131,7 +171,49 @@ fn configure_pad(pin: &impl LpPin, function: LpFunction) {
     pin.lp_set_config(true, true, function);
 }
 
+/// Returns the SDA and SCL pads to the state they were in before [`configure_pad`] claimed them.
+#[cfg(not(lp_io_has_gpio_matrix))]
+fn release_pads(sda: u8, scl: u8) {
+    use crate::peripherals::{LP_AON, LP_IO};
+
+    for pin in [sda, scl] {
+        let ionum = pin as usize;
+        let lp_io = LP_IO::regs();
+
+        // Stop driving the pad, and drop the pull-up the driver added.
+        unsafe {
+            lp_io
+                .out_enable_w1tc()
+                .write(|w| w.enable_w1tc().bits(1 << pin));
+        }
+        lp_io.pin(ionum).modify(|_, w| w.pad_driver().clear_bit());
+        lp_io.gpio(ionum).modify(|_, w| {
+            w.fun_wpu().clear_bit();
+            w.fun_ie().clear_bit();
+            unsafe { w.mcu_sel().bits(LpFunction::LP_GPIO as u8) }
+        });
+
+        // Hand the pad back to the digital IO MUX.
+        LP_AON::regs()
+            .gpio_mux()
+            .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() & !(1 << pin)) });
+    }
+}
+
+/// Takes the SDA and SCL signals off the pads they were routed to.
+#[cfg(lp_io_has_gpio_matrix)]
+fn release_pads(sda: u8, scl: u8) {
+    use crate::gpio::lp_io::{LpInputSignal, disconnect_open_drain_signals};
+
+    disconnect_open_drain_signals(sda, LpInputSignal::LP_I2C_SDA);
+    disconnect_open_drain_signals(scl, LpInputSignal::LP_I2C_SCL);
+}
+
 impl<'d> LpI2c<'d> {
+    fn regs(&self) -> &RegisterBlock {
+        self.i2c.register_block()
+    }
+
     pub(super) fn init(&mut self) {
         // Initialize LP I2C HAL */
         self.i2c
@@ -152,8 +234,7 @@ impl<'d> LpI2c<'d> {
             .modify(|_, w| w.lp_ext_i2c_reset_en().clear_bit());
     }
 
-    /// Applies the given configuration to the `LpI2c` peripheral.
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+    pub(super) fn configure(&mut self, config: &Config) -> Result<(), ConfigError> {
         // Set LP I2C source clock
         LPWR::regs()
             .lpperi()
@@ -326,6 +407,230 @@ impl<'d> LpI2c<'d> {
         Ok(())
     }
 
+    pub(super) fn write_bytes(
+        &mut self,
+        address: u8,
+        register: u8,
+        data: &[u8],
+    ) -> Result<(), Error> {
+        self.start_transaction();
+
+        let mut slot = 0;
+        self.write_cmd(&mut slot, Command::Start);
+
+        self.write_fifo((address << 1) | OperationType::Write as u8);
+        self.write_cmd(
+            &mut slot,
+            Command::Write {
+                ack_exp: Ack::Ack,
+                ack_check_en: true,
+                length: 1,
+            },
+        );
+
+        // The register address is sent as the first payload byte.
+        let payload_len = data.len() + 1;
+        let payload = |index: usize| {
+            if index == 0 {
+                register
+            } else {
+                data[index - 1]
+            }
+        };
+
+        // The device address takes up one FIFO slot in the first chunk.
+        let mut fifo_free = FIFO_SIZE - 1;
+        let mut sent = 0;
+
+        while sent < payload_len {
+            let chunk = (payload_len - sent).min(fifo_free);
+            for index in sent..sent + chunk {
+                self.write_fifo(payload(index));
+            }
+            sent += chunk;
+
+            self.write_cmd(
+                &mut slot,
+                Command::Write {
+                    ack_exp: Ack::Ack,
+                    ack_check_en: true,
+                    length: chunk as u8,
+                },
+            );
+            // The peripheral pauses on End, so the FIFO and the command list can be refilled
+            // without releasing the bus.
+            self.write_cmd(
+                &mut slot,
+                if sent == payload_len {
+                    Command::Stop
+                } else {
+                    Command::End
+                },
+            );
+
+            self.execute()?;
+
+            slot = 0;
+            fifo_free = FIFO_SIZE;
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn read_bytes(
+        &mut self,
+        address: u8,
+        register: u8,
+        data: &mut [u8],
+    ) -> Result<(), Error> {
+        if data.is_empty() {
+            return Ok(());
+        }
+
+        self.start_transaction();
+
+        let mut slot = 0;
+
+        // Select the register to read from...
+        self.write_cmd(&mut slot, Command::Start);
+        self.write_fifo((address << 1) | OperationType::Write as u8);
+        self.write_fifo(register);
+        self.write_cmd(
+            &mut slot,
+            Command::Write {
+                ack_exp: Ack::Ack,
+                ack_check_en: true,
+                length: 2,
+            },
+        );
+
+        // ... then turn the bus around with a repeated start.
+        self.write_cmd(&mut slot, Command::Start);
+        self.write_fifo((address << 1) | OperationType::Read as u8);
+        self.write_cmd(
+            &mut slot,
+            Command::Write {
+                ack_exp: Ack::Ack,
+                ack_check_en: true,
+                length: 1,
+            },
+        );
+
+        let mut received = 0;
+
+        while received < data.len() {
+            let chunk = (data.len() - received).min(FIFO_SIZE);
+
+            if received + chunk == data.len() {
+                // The slave stops sending after the last byte is NACKed.
+                if chunk > 1 {
+                    self.write_cmd(
+                        &mut slot,
+                        Command::Read {
+                            ack_value: Ack::Ack,
+                            length: (chunk - 1) as u8,
+                        },
+                    );
+                }
+                self.write_cmd(
+                    &mut slot,
+                    Command::Read {
+                        ack_value: Ack::Nack,
+                        length: 1,
+                    },
+                );
+                self.write_cmd(&mut slot, Command::Stop);
+            } else {
+                self.write_cmd(
+                    &mut slot,
+                    Command::Read {
+                        ack_value: Ack::Ack,
+                        length: chunk as u8,
+                    },
+                );
+                self.write_cmd(&mut slot, Command::End);
+            }
+
+            self.execute()?;
+
+            for byte in data[received..received + chunk].iter_mut() {
+                *byte = self.read_fifo();
+            }
+            received += chunk;
+
+            slot = 0;
+        }
+
+        Ok(())
+    }
+
+    /// Resets the peripheral so that it can start a new transaction.
+    fn start_transaction(&self) {
+        // A previous transfer may have been interrupted, leaving the bus occupied.
+        if self.regs().sr().read().bus_busy().bit_is_set() {
+            self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
+        }
+
+        self.reset_fifo();
+        self.clear_interrupts();
+    }
+
+    /// Runs the command list and waits for the peripheral to stop.
+    fn execute(&self) -> Result<(), Error> {
+        self.lp_i2c_update();
+        self.regs().ctr().modify(|_, w| w.trans_start().set_bit());
+
+        let result = loop {
+            let interrupts = self.regs().int_raw().read();
+
+            if interrupts.nack().bit_is_set() {
+                break Err(Error::AckCheckFailed);
+            } else if interrupts.arbitration_lost().bit_is_set() {
+                break Err(Error::ArbitrationLost);
+            } else if interrupts.time_out().bit_is_set() {
+                break Err(Error::TimeOut);
+            } else if interrupts.trans_complete().bit_is_set()
+                || interrupts.end_detect().bit_is_set()
+            {
+                break Ok(());
+            }
+        };
+
+        self.clear_interrupts();
+
+        result
+    }
+
+    fn clear_interrupts(&self) {
+        self.regs().int_clr().write(|w| {
+            w.nack().clear_bit_by_one();
+            w.arbitration_lost().clear_bit_by_one();
+            w.time_out().clear_bit_by_one();
+            w.trans_complete().clear_bit_by_one();
+            w.end_detect().clear_bit_by_one()
+        });
+    }
+
+    fn write_cmd(&self, slot: &mut usize, command: Command) {
+        debug_assert!(*slot < COMMAND_SLOTS);
+
+        self.regs()
+            .comd(*slot)
+            .write(|w| unsafe { w.command().bits(command.into()) });
+
+        *slot += 1;
+    }
+
+    fn write_fifo(&self, data: u8) {
+        self.regs()
+            .data()
+            .write(|w| unsafe { w.fifo_rdata().bits(data) });
+    }
+
+    fn read_fifo(&self) -> u8 {
+        self.regs().data().read().fifo_rdata().bits()
+    }
+
     /// Update I2C configuration
     fn lp_i2c_update(&self) {
         self.i2c
@@ -357,21 +662,20 @@ impl<'d> LpI2c<'d> {
             .modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
 
-    pub(crate) fn disable(&mut self) {
-        fn release_pin(_pin: u8) {
-            // TODO
-        }
-
-        LP_PERI::regs()
-            .clk_en()
-            .modify(|_, w| w.lp_ext_i2c_ck_en().set_bit());
-
+    pub(super) fn disable(&mut self) {
+        // Reset the peripheral so that it stops driving the bus, then take away its clocks.
         LP_PERI::regs()
             .reset_en()
             .modify(|_, w| w.lp_ext_i2c_reset_en().set_bit());
+        LP_PERI::regs()
+            .reset_en()
+            .modify(|_, w| w.lp_ext_i2c_reset_en().clear_bit());
 
-        release_pin(self.scl);
-        release_pin(self.sda);
+        LP_PERI::regs()
+            .clk_en()
+            .modify(|_, w| w.lp_ext_i2c_ck_en().clear_bit());
+
+        release_pads(self.sda, self.scl);
     }
 }
 

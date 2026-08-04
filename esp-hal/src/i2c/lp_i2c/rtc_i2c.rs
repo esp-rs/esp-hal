@@ -1,80 +1,11 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
-//! # LP I2C driver
+//! RTC_I2C implementation of the low-power I2C driver.
 //!
-//! ## Overview
-//!
-//! This is the host driver for the LP_I2C peripheral which is primarily for the ULP.
-//!
-//! The LP I2C peripheral always expects a slave sub-register address to be provided when reading
-//! or writing.
-//! This could make the RTC I2C peripheral incompatible with certain I2C devices or sensors which
-//! do not need any sub-register to be programmed.
-//! It also means a `embedded_hal::i2c::I2c` implementation cannot be provided.
-//!
-//! ## Configuration
-//!
-//! The driver can be configured using the [`Config`] struct. To create a
-//! configuration, you can use the [`Config::default()`] method, and then modify
-//! the individual settings as needed, by calling `with_*` methods on the
-//! [`Config`] struct.
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! use esp_hal::{i2c::lp_i2c::Config, time::Duration};
-//!
-//! let config = Config::default().with_timeout(Duration::from_micros(100));
-//! # {after_snippet}
-//! ```
-//!
-//! You will then need to pass the configuration to [`I2c::new`], and you can
-//! also change the configuration later by calling [`I2c::apply_config`].
-//!
-//! You will also need to specify the SDA and SCL pins when you create the
-//! driver instance.
-//! ```rust, no_run
-//! # {before_snippet}
-//! use esp_hal::i2c::lp_i2c::{Config, LpI2c};
-//! # use esp_hal::time::Duration;
-//! #
-//! # let config = Config::default();
-//! #
-//! // You need to configure the driver during initialization:
-//! let mut i2c = LpI2c::new(
-//!     peripherals.LP_I2C0,
-//!     config,
-//!     peripherals.GPIO3,
-//!     peripherals.GPIO2,
-//! )?;
-//!
-//! // You can change the configuration later:
-//! let new_config = config.with_timeout(Duration::from_micros(150));
-//! i2c.apply_config(&new_config)?;
-//! # {after_snippet}
-//! ```
-//!
-//! ## Usage
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! # use esp_hal::i2c::lp_i2c::{LpI2c, Config};
-//! # let config = Config::default();
-//! # let mut i2c = LpI2c::new(peripherals.LP_I2C0, config, peripherals.GPIO3, peripherals.GPIO2)?;
-//! #
-//! // `u8` is automatically converted to `I2cAddress::SevenBit`. The device
-//! // address does not contain the `R/W` bit!
-//! const DEVICE_ADDR: u8 = 0x77;
-//! const DEVICE_REG: u8 = 0x01;
-//! let write_buffer = [0xAA];
-//! let mut read_buffer = [0u8; 22];
-//!
-//! i2c.write(DEVICE_ADDR, DEVICE_REG, &write_buffer)?;
-//! i2c.read(DEVICE_ADDR, DEVICE_REG, &mut read_buffer)?;
-//! # {after_snippet}
-//! ```
+//! This peripheral transfers through a single data register and always needs a slave sub-register
+//! address.
 
 use crate::{
     gpio::{LpPin, lp_io::LpFunction},
-    i2c::lp_i2c::{LpI2c, Scl, Sda},
+    i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
     peripherals::{GPIO, RTC_IO, SENS},
     time::Duration,
 };
@@ -161,33 +92,7 @@ impl<'d> LpI2c<'d> {
             .modify(|_, w| w.i2c_ctrl_clk_gate_en().set_bit());
     }
 
-    #[procmacros::doc_replace]
-    /// Applies a new configuration.
-    ///
-    /// ## Errors
-    ///
-    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if the provided config is
-    /// invalid.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::{
-    ///     i2c::lp_i2c::{Config, LpI2c},
-    ///     time::Duration,
-    /// };
-    /// let mut i2c = LpI2c::new(
-    ///     peripherals.LP_I2C0,
-    ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
-    /// )?;
-    ///
-    /// i2c.apply_config(&Config::default().with_timeout(Duration::from_micros(100)))?;
-    /// # {after_snippet}
-    /// ```
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+    pub(super) fn configure(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.i2c
             .register_block()
             .scl_low()
@@ -219,26 +124,12 @@ impl<'d> LpI2c<'d> {
         Ok(())
     }
 
-    #[procmacros::doc_replace]
-    /// Writes bytes to slave with given `address` and `register`.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
-    /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = LpI2c::new(
-    ///     peripherals.LP_I2C0,
-    ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
-    /// )?;
-    ///
-    /// i2c.write(DEVICE_ADDR, 2, &[0xaa])?;
-    /// # {after_snippet}
-    /// ```
-    pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
+    pub(super) fn write_bytes(
+        &mut self,
+        address: u8,
+        register: u8,
+        data: &[u8],
+    ) -> Result<(), Error> {
         let sens = unsafe { crate::pac::SENS::steal() };
 
         if data.len() > u8::MAX as usize - 2 {
@@ -320,27 +211,12 @@ impl<'d> LpI2c<'d> {
         result
     }
 
-    #[procmacros::doc_replace]
-    /// Reads bytes from slave with given `address` and `register`.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
-    /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = LpI2c::new(
-    ///     peripherals.LP_I2C0,
-    ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
-    /// )?;
-    ///
-    /// let mut data = [0u8; 22];
-    /// i2c.read(DEVICE_ADDR, 7, &mut data)?;
-    /// # {after_snippet}
-    /// ```
-    pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
+    pub(super) fn read_bytes(
+        &mut self,
+        address: u8,
+        register: u8,
+        data: &mut [u8],
+    ) -> Result<(), Error> {
         let sens = unsafe { crate::pac::SENS::steal() };
 
         if data.len() > u8::MAX as usize {
@@ -544,20 +420,6 @@ impl<'d> LpI2c<'d> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {}
-
-/// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    /// The transmission size exceeded the limit.
-    TransactionSizeLimitExceeded,
-    /// The acknowledgment check failed.
-    AckCheckFailed,
-    /// A timeout occurred during transmission.
-    TimeOut,
-    /// The arbitration for the bus was lost.
-    ArbitrationLost,
-}
 
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, procmacros::BuilderLite)]
