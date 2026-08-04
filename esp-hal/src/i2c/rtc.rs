@@ -82,39 +82,48 @@ use crate::{
 /// Trait representing the RTC_I2C SDA pin.
 pub trait Sda: LpPin + OutputPin + InputPin {
     #[doc(hidden)]
-    fn selector(&self) -> u8;
-    #[doc(hidden)]
-    fn rtc_i2c_function(&self) -> LpFunction;
+    fn connect_sda(&self);
 }
 
 /// Trait representing the RTC_I2C SCL pin.
 pub trait Scl: LpPin + OutputPin + InputPin {
     #[doc(hidden)]
-    fn selector(&self) -> u8;
-    #[doc(hidden)]
-    fn rtc_i2c_function(&self) -> LpFunction;
+    fn connect_scl(&self);
+}
+
+fn bind_pin(pin: &impl LpPin, function: LpFunction) {
+    GPIO::regs()
+        .pin(pin.number() as usize)
+        .modify(|_, w| w.pad_driver().bit(true));
+    RTC_IO::regs()
+        .touch_pad(pin.number() as usize)
+        .modify(|_, w| w.rue().bit(true).rde().bit(false));
+    RTC_IO::regs()
+        .rtc_gpio_enable_w1ts()
+        .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << pin.number()) });
+    pin.lp_set_config(true, true, function);
 }
 
 for_each_lp_function! {
     (($_func:ident, SAR_I2C_SCL_n, $n:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl Scl for crate::peripherals::$gpio<'_> {
-            fn selector(&self) -> u8 {
-                $n
-            }
-
-            fn rtc_i2c_function(&self) -> LpFunction {
-                LpFunction::$af
+            fn connect_scl(&self) {
+                bind_pin(self, LpFunction::$af);
+                // sar_i2c_io holds both selector fields; update only this one.
+                RTC_IO::regs().sar_i2c_io().modify(|_, w| unsafe {
+                    w.sar_i2c_scl_sel().bits($n)
+                });
             }
         }
     };
     (($_func:ident, SAR_I2C_SDA_n, $n:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl Sda for crate::peripherals::$gpio<'_> {
-            fn selector(&self) -> u8 {
-                $n
-            }
-
-            fn rtc_i2c_function(&self) -> LpFunction {
-                LpFunction::$af
+            fn connect_sda(&self) {
+                bind_pin(self, LpFunction::$af);
+                // sar_i2c_io holds both selector fields; update only this one.
+                RTC_IO::regs().sar_i2c_io().modify(|_, w| unsafe {
+                    w.sar_i2c_sda_sel().bits($n)
+                });
             }
         }
     };
@@ -178,26 +187,11 @@ impl<'d> I2c<'d> {
         i2c.register_block().ctrl().reset();
         SENS::regs().sar_i2c_ctrl().reset();
 
-        fn bind_pin(pin: &impl LpPin, function: LpFunction) {
-            GPIO::regs()
-                .pin(pin.number() as usize)
-                .modify(|_, w| w.pad_driver().bit(true));
-            RTC_IO::regs()
-                .touch_pad(pin.number() as usize)
-                .modify(|_, w| w.rue().bit(true).rde().bit(false));
-            RTC_IO::regs()
-                .rtc_gpio_enable_w1ts()
-                .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << pin.number()) });
-            pin.lp_set_config(true, true, function);
-        }
-
-        bind_pin(&sda, sda.rtc_i2c_function());
-        bind_pin(&scl, scl.rtc_i2c_function());
-
-        RTC_IO::regs().sar_i2c_io().write(|w| unsafe {
-            w.sar_i2c_sda_sel().bits(sda.selector());
-            w.sar_i2c_scl_sel().bits(scl.selector())
-        });
+        // Configure RTC I2C GPIOs
+        // NOTE: We always initialize the SCL pin first, then the SDA pin. This order of
+        // initialization is important to avoid any spurious I2C start conditions on the bus.
+        scl.connect_scl();
+        sda.connect_sda();
 
         // Reset RTC I2C
         SENS::regs()
