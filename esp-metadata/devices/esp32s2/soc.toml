@@ -294,8 +294,11 @@ version = 1
 [device.uhci]
 support_status = "not_supported"
 
-[device.rgb_display] # via SPI and I2S
+[device.rgb_display] # via I2S
 support_status = "not_supported"
+
+[device.spi_lcd] # the LCD mode of GP-SPI2
+support_status = { status = "not_supported", issue = 5374 }
 
 [device.camera] # via I2S
 support_status = "not_supported"
