@@ -29,7 +29,22 @@ impl FlashStorage<'_> {
 
     /// Read bytes from flash using NOR flash semantics.
     ///
-    /// Offset and length must be aligned to [`Self::READ_SIZE`].
+    /// `offset` and `bytes.len()` must be aligned to [`Self::READ_SIZE`].
+    ///
+    /// # Note
+    ///
+    /// If `bytes` is not word-aligned (4-byte), this function allocates a
+    /// [`Self::SECTOR_SIZE`]-byte buffer on the stack and copies through it.
+    /// See the
+    /// [crate-level documentation](crate#buffer-alignment-and-stack-usage).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::NotAligned`] if `offset` or `bytes.len()` is
+    /// not aligned to [`Self::READ_SIZE`].
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the read would extend past
+    /// the end of the flash.
     pub fn read_nor(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), FlashStorageError> {
         const RS: u32 = FlashStorage::READ_SIZE as u32;
         self.check_alignment::<{ RS }>(offset, bytes.len())?;
@@ -119,8 +134,28 @@ impl FlashStorage<'_> {
 
     /// Write bytes to flash using NOR flash semantics.
     ///
-    /// The target region must be erased beforehand. Offset and length must be
-    /// aligned to [`Self::WRITE_SIZE`].
+    /// NOR flash can only change bits from 1 to 0. Setting a bit from 0 to 1
+    /// requires erasing the containing sector first (see [`Self::erase`]). Each
+    /// byte is updated by ANDing it with the data being written; if the target
+    /// still contains 0 bits where you need 1s, the stored value will not match
+    /// what you passed in even though the operation succeeds.
+    ///
+    /// `offset` and `bytes.len()` must be aligned to [`Self::WRITE_SIZE`].
+    ///
+    /// # Note
+    ///
+    /// If `bytes` is not word-aligned (4-byte), this function allocates a
+    /// [`Self::SECTOR_SIZE`]-byte buffer on the stack and copies through it.
+    /// See the
+    /// [crate-level documentation](crate#buffer-alignment-and-stack-usage).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::NotAligned`] if `offset` or `bytes.len()` is
+    /// not aligned to [`Self::WRITE_SIZE`].
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the write would extend past
+    /// the end of the flash.
     pub fn write_nor(&mut self, offset: u32, bytes: &[u8]) -> Result<(), FlashStorageError> {
         const WS: u32 = FlashStorage::WORD_SIZE;
         self.check_alignment::<{ WS }>(offset, bytes.len())?;
@@ -157,7 +192,17 @@ impl FlashStorage<'_> {
 
     /// Erase flash from `from` up to but not including `to`.
     ///
-    /// Both addresses must be aligned to [`Self::ERASE_SIZE`].
+    /// Erased bytes are set to `0xFF`. Both addresses must be aligned to
+    /// [`Self::ERASE_SIZE`], and `to - from` must be a multiple of
+    /// [`Self::ERASE_SIZE`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::NotAligned`] if `from` or `to - from` is
+    /// not aligned to [`Self::ERASE_SIZE`].
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the range would extend past
+    /// the end of the flash.
     pub fn erase(&mut self, from: u32, to: u32) -> Result<(), FlashStorageError> {
         let len = (to - from) as _;
         const SZ: u32 = FlashStorage::SECTOR_SIZE;

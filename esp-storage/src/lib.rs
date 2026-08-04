@@ -9,7 +9,7 @@
 //! [`FlashStorage::write_encrypted`].
 //!
 //! The `embedded-storage` feature flag only implements traits from [`embedded_storage`]
-//! and always assume to access non-encrypted flash.
+//! and always assumes access to non-encrypted flash.
 //!
 //! If you need to use this struct where traits from [`embedded_storage_async`] are needed, you can
 //! use [`embassy_embedded_hal::adapter::BlockingAsync`] or
@@ -19,6 +19,21 @@
 //! [`embedded_storage_async`]: https://docs.rs/embedded-storage-async/latest/embedded_storage_async/
 //! [`embassy_embedded_hal::adapter::BlockingAsync`]: https://docs.rs/embassy-embedded-hal/latest/embassy_embedded_hal/adapter/struct.BlockingAsync.html
 //! [`embassy_embedded_hal::adapter::YieldingAsync`]: https://docs.rs/embassy-embedded-hal/latest/embassy_embedded_hal/adapter/struct.YieldingAsync.html
+//!
+//! ## Buffer alignment and stack usage
+//!
+//! The ESP flash ROM read/write path requires word-aligned (4-byte) buffers.
+//! Several methods accept any `&[u8]` / `&mut [u8]` and, when needed, copy
+//! through a temporary sector-sized buffer on the stack. That cost is not
+//! visible from the slice type and can surprise users in stack-constrained
+//! contexts (for example Embassy tasks with small stacks).
+//!
+//! [`FlashStorage::read_nor`] and [`FlashStorage::write_nor`] only allocate
+//! this fallback when the caller's slice pointer is not word-aligned. Each
+//! fallback is [`FlashStorage::SECTOR_SIZE`] bytes.
+//!
+//! [`FlashStorage::read`], [`FlashStorage::write`], and the encrypted variants
+//! always allocate a sector buffer on the stack for each call.
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
