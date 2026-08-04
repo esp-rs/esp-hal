@@ -358,7 +358,20 @@ impl<'d> LpI2c<'d> {
     }
 
     pub(crate) fn disable(&mut self) {
-        // TODO
+        fn release_pin(_pin: u8) {
+            // TODO
+        }
+
+        LP_PERI::regs()
+            .clk_en()
+            .modify(|_, w| w.lp_ext_i2c_ck_en().set_bit());
+
+        LP_PERI::regs()
+            .reset_en()
+            .modify(|_, w| w.lp_ext_i2c_reset_en().set_bit());
+
+        release_pin(self.scl);
+        release_pin(self.sda);
     }
 }
 

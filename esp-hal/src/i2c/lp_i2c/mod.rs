@@ -72,9 +72,7 @@ for_each_lp_function! {
 /// ```
 pub struct LpI2c<'d> {
     i2c: LP_I2C0<'d>,
-    #[allow(unused)]
     sda: u8,
-    #[allow(unused)]
     scl: u8,
 }
 
