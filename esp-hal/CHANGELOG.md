@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- ESP32: the SHA accelerator is no longer powered down while it is in use (#5592)
+- ESP32: SHA no longer tries to use the hardware accelerator when it is held by another SHA operation (#5592)
+- ESP32: RSA now correctly disables its interrupts before disabling the accelerator (#5592)
 
 ### Removed
 
