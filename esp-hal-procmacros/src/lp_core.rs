@@ -516,8 +516,9 @@ mod tests {
                             &self,
                             lp_core: &mut LpCore,
                             wakeup_source: LpCoreWakeupSource,
-                            _: LowPowerOutput<1>
+                            arg_0: LowPowerOutput<1>
                         ) {
+                            core::mem::forget(arg_0);
                             lp_core.run(wakeup_source);
                         }
                     }
