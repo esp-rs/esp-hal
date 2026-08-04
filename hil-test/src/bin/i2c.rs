@@ -477,7 +477,7 @@ mod tests {
     #[cfg(esp32s3)]
     fn test_read_cali_with_rtc_i2c() {
         use esp_hal::{
-            i2c::lp_i2c::{Config, I2c, Timing},
+            i2c::lp_i2c::{Config, LpI2c, Timing},
             time::Duration,
         };
 
@@ -488,7 +488,7 @@ mod tests {
         let config = Config::default()
             .with_timing(Timing::standard_mode())
             .with_timeout(Duration::from_micros(100));
-        let mut i2c = I2c::new(peripherals.RTC_I2C, config, sda, scl).unwrap();
+        let mut i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
 
         let mut data = [0; 22];
 

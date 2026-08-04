@@ -1,11 +1,11 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
-//! # RTC I2C driver
+//! # LP I2C driver
 //!
 //! ## Overview
 //!
-//! This is the host driver for the RTC_I2C peripheral which is primarily for the ULP.
+//! This is the host driver for the LP_I2C peripheral which is primarily for the ULP.
 //!
-//! The RTC I2C peripheral always expects a slave sub-register address to be provided when reading
+//! The LP I2C peripheral always expects a slave sub-register address to be provided when reading
 //! or writing.
 //! This could make the RTC I2C peripheral incompatible with certain I2C devices or sensors which
 //! do not need any sub-register to be programmed.
@@ -33,14 +33,14 @@
 //! driver instance.
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::i2c::lp_i2c::{Config, I2c};
+//! use esp_hal::i2c::lp_i2c::{Config, LpI2c};
 //! # use esp_hal::time::Duration;
 //! #
 //! # let config = Config::default();
 //! #
 //! // You need to configure the driver during initialization:
-//! let mut i2c = I2c::new(
-//!     peripherals.RTC_I2C,
+//! let mut i2c = LpI2c::new(
+//!     peripherals.LP_I2C0,
 //!     config,
 //!     peripherals.GPIO3,
 //!     peripherals.GPIO2,
@@ -56,9 +56,9 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::i2c::lp_i2c::{I2c, Config};
+//! # use esp_hal::i2c::lp_i2c::{LpI2c, Config};
 //! # let config = Config::default();
-//! # let mut i2c = I2c::new(peripherals.RTC_I2C, config, peripherals.GPIO3, peripherals.GPIO2)?;
+//! # let mut i2c = LpI2c::new(peripherals.LP_I2C0, config, peripherals.GPIO3, peripherals.GPIO2)?;
 //! #
 //! // `u8` is automatically converted to `I2cAddress::SevenBit`. The device
 //! // address does not contain the `R/W` bit!
@@ -74,8 +74,8 @@
 
 use crate::{
     gpio::{LpPin, lp_io::LpFunction},
-    i2c::lp_i2c::{Scl, Sda},
-    peripherals::{GPIO, RTC_I2C, RTC_IO, SENS},
+    i2c::lp_i2c::{LpI2c, Scl, Sda},
+    peripherals::{GPIO, LP_I2C0, RTC_IO, SENS},
     time::Duration,
 };
 
@@ -117,7 +117,7 @@ for_each_lp_function! {
     };
 }
 
-impl<'d> I2c<'d> {
+impl<'d> LpI2c<'d> {
     #[procmacros::doc_replace]
     /// Create a new I2C (RTC) instance.
     ///
@@ -130,9 +130,9 @@ impl<'d> I2c<'d> {
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::i2c::lp_i2c::{Config, I2c};
-    /// let i2c = I2c::new(
-    ///     peripherals.RTC_I2C,
+    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
+    /// let i2c = LpI2c::new(
+    ///     peripherals.LP_I2C0,
     ///     Config::default(),
     ///     peripherals.GPIO1,
     ///     peripherals.GPIO2,
@@ -140,7 +140,7 @@ impl<'d> I2c<'d> {
     /// # {after_snippet}
     /// ```
     pub fn new(
-        i2c: RTC_I2C<'d>,
+        i2c: LP_I2C0<'d>,
         config: Config,
         sda: impl Sda + 'd,
         scl: impl Scl + 'd,
@@ -210,11 +210,11 @@ impl<'d> I2c<'d> {
     /// ```rust, no_run
     /// # {before_snippet}
     /// use esp_hal::{
-    ///     i2c::lp_i2c::{Config, I2c},
+    ///     i2c::lp_i2c::{Config, LpI2c},
     ///     time::Duration,
     /// };
-    /// let mut i2c = I2c::new(
-    ///     peripherals.RTC_I2C,
+    /// let mut i2c = LpI2c::new(
+    ///     peripherals.LP_I2C0,
     ///     Config::default(),
     ///     peripherals.GPIO1,
     ///     peripherals.GPIO2,
@@ -262,10 +262,10 @@ impl<'d> I2c<'d> {
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::i2c::lp_i2c::{Config, I2c};
+    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
     /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = I2c::new(
-    ///     peripherals.RTC_I2C,
+    /// let mut i2c = LpI2c::new(
+    ///     peripherals.LP_I2C0,
     ///     Config::default(),
     ///     peripherals.GPIO1,
     ///     peripherals.GPIO2,
@@ -363,10 +363,10 @@ impl<'d> I2c<'d> {
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::i2c::lp_i2c::{Config, I2c};
+    /// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
     /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = I2c::new(
-    ///     peripherals.RTC_I2C,
+    /// let mut i2c = LpI2c::new(
+    ///     peripherals.LP_I2C0,
     ///     Config::default(),
     ///     peripherals.GPIO1,
     ///     peripherals.GPIO2,
@@ -559,7 +559,7 @@ impl<'d> I2c<'d> {
     }
 }
 
-impl Drop for I2c<'_> {
+impl Drop for LpI2c<'_> {
     fn drop(&mut self) {
         fn release_pin(pin: u8) {
             GPIO::regs().pin(pin as usize).reset();

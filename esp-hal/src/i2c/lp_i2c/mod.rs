@@ -1,6 +1,9 @@
 //! Low-power I2C driver
 
-use crate::gpio::{InputPin, LpPin, OutputPin};
+use crate::{
+    gpio::{InputPin, LpPin, OutputPin},
+    peripherals::LP_I2C0,
+};
 
 #[cfg_attr(lp_i2c_master_version = "lp_i2c", path = "lp_i2c.rs")]
 #[cfg_attr(lp_i2c_master_version = "rtc_i2c", path = "rtc_i2c.rs")]
@@ -54,10 +57,10 @@ for_each_lp_function! {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// use esp_hal::i2c::lp_i2c::{Config, I2c};
+/// use esp_hal::i2c::lp_i2c::{Config, LpI2c};
 /// # const DEVICE_ADDR: u8 = 0x77;
-/// let mut i2c = I2c::new(
-///     peripherals.RTC_I2C,
+/// let mut i2c = LpI2c::new(
+///     peripherals.LP_I2C0,
 ///     Config::default(),
 ///     peripherals.GPIO1,
 ///     peripherals.GPIO2,
@@ -67,8 +70,8 @@ for_each_lp_function! {
 /// i2c.read(DEVICE_ADDR, 0xaa, &mut data)?;
 /// # {after_snippet}
 /// ```
-pub struct I2c<'d> {
-    i2c: RTC_I2C<'d>,
+pub struct LpI2c<'d> {
+    i2c: LP_I2C0<'d>,
     sda: u8,
     scl: u8,
 }

@@ -1,7 +1,7 @@
 #[cfg(not(lp_io_has_gpio_matrix))]
 use crate::gpio::{LpPin, lp_io::LpFunction};
 use crate::{
-    i2c::lp_i2c::{Scl, Sda},
+    i2c::lp_i2c::{LpI2c, Scl, Sda},
     peripherals::{LP_I2C0, LP_PERI, LPWR},
     time::Rate,
 };
