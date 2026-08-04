@@ -175,6 +175,7 @@ pub enum Error {
 /// ```
 pub struct LpI2c<'d> {
     i2c: LP_I2C0<'d>,
+    /// LP pin numbers, kept so that the pads can be released when the driver is dropped.
     sda: u8,
     scl: u8,
 }
@@ -218,8 +219,8 @@ impl<'d> LpI2c<'d> {
     ) -> Result<Self, ConfigError> {
         let mut me = Self {
             i2c,
-            sda: sda.number(),
-            scl: scl.number(),
+            sda: sda.lp_number(),
+            scl: scl.lp_number(),
         };
 
         me.init();
@@ -357,5 +358,8 @@ impl<'d> LpI2c<'d> {
 impl Drop for LpI2c<'_> {
     fn drop(&mut self) {
         self.disable();
+
+        crate::gpio::lp_io::reset_pin(self.sda);
+        crate::gpio::lp_io::reset_pin(self.scl);
     }
 }

@@ -79,25 +79,12 @@ pub(crate) fn connect_open_drain_signals(
     route_output(lp_pin, output);
 }
 
-/// Releases an LP pin from an LP peripheral's signal pair, undoing
-/// [`connect_open_drain_signals`].
-#[cfg(lp_io_has_gpio_matrix)]
-#[cfg_attr(not(soc_has_lp_i2c0), expect(dead_code))]
-pub(crate) fn disconnect_open_drain_signals(lp_pin: u8, input: LpInputSignal) {
-    // Take the signal pair off the LP GPIO matrix, so that neither the peripheral follows the
-    // pad, nor the pad the peripheral.
-    crate::peripherals::LP_GPIO::regs()
-        .func_in_sel_cfg(input as usize)
-        .reset();
-    crate::peripherals::LP_GPIO::regs()
-        .func_out_sel_cfg(lp_pin as usize)
-        .reset();
-
-    low_level::output_enable(lp_pin, false);
-    low_level::input_enable(lp_pin, false);
-    low_level::pullup_enable(lp_pin, false);
-    low_level::set_open_drain_output(lp_pin, false);
-}
+/// Returns an LP pin to its reset state, handing the pad back to the digital IO MUX.
+///
+/// A pin in this state no longer drives, senses or pulls anything, so any LP peripheral signal
+/// still routed to it through the LP GPIO matrix cannot reach the pad.
+#[cfg(lp_i2c_master_driver_supported)]
+pub(crate) use low_level::reset_pin;
 
 /// Configures an LP pin as an input and routes an LP peripheral's input signal to it.
 #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]

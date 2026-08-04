@@ -171,44 +171,6 @@ fn configure_pad(pin: &impl LpPin, function: LpFunction) {
     pin.lp_set_config(true, true, function);
 }
 
-/// Returns the SDA and SCL pads to the state they were in before [`configure_pad`] claimed them.
-#[cfg(not(lp_io_has_gpio_matrix))]
-fn release_pads(sda: u8, scl: u8) {
-    use crate::peripherals::{LP_AON, LP_IO};
-
-    for pin in [sda, scl] {
-        let ionum = pin as usize;
-        let lp_io = LP_IO::regs();
-
-        // Stop driving the pad, and drop the pull-up the driver added.
-        unsafe {
-            lp_io
-                .out_enable_w1tc()
-                .write(|w| w.enable_w1tc().bits(1 << pin));
-        }
-        lp_io.pin(ionum).modify(|_, w| w.pad_driver().clear_bit());
-        lp_io.gpio(ionum).modify(|_, w| {
-            w.fun_wpu().clear_bit();
-            w.fun_ie().clear_bit();
-            unsafe { w.mcu_sel().bits(LpFunction::LP_GPIO as u8) }
-        });
-
-        // Hand the pad back to the digital IO MUX.
-        LP_AON::regs()
-            .gpio_mux()
-            .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() & !(1 << pin)) });
-    }
-}
-
-/// Takes the SDA and SCL signals off the pads they were routed to.
-#[cfg(lp_io_has_gpio_matrix)]
-fn release_pads(sda: u8, scl: u8) {
-    use crate::gpio::lp_io::{LpInputSignal, disconnect_open_drain_signals};
-
-    disconnect_open_drain_signals(sda, LpInputSignal::LP_I2C_SDA);
-    disconnect_open_drain_signals(scl, LpInputSignal::LP_I2C_SCL);
-}
-
 impl<'d> LpI2c<'d> {
     fn regs(&self) -> &RegisterBlock {
         self.i2c.register_block()
@@ -674,8 +636,6 @@ impl<'d> LpI2c<'d> {
         LP_PERI::regs()
             .clk_en()
             .modify(|_, w| w.lp_ext_i2c_ck_en().clear_bit());
-
-        release_pads(self.sda, self.scl);
     }
 }
 

@@ -391,16 +391,6 @@ impl<'d> LpI2c<'d> {
     }
 
     pub(super) fn disable(&mut self) {
-        fn release_pin(pin: u8) {
-            GPIO::regs().pin(pin as usize).reset();
-
-            RTC_IO::regs()
-                .enable_w1tc()
-                .write(|w| unsafe { w.enable_w1tc().bits(1 << pin) });
-
-            RTC_IO::regs().touch_pad(pin as usize).reset();
-        }
-
         // Reset and disable RTC I2C clock
         SENS::regs()
             .sar_peri_reset_conf()
@@ -409,9 +399,6 @@ impl<'d> LpI2c<'d> {
         SENS::regs()
             .sar_peri_clk_gate_conf()
             .modify(|_, w| w.rtc_i2c_clk_en().clear_bit());
-
-        release_pin(self.scl);
-        release_pin(self.sda);
     }
 }
 

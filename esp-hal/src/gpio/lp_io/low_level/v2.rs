@@ -179,6 +179,17 @@ pub(super) fn set_open_drain_output(pin: u8, enable: bool) {
         .modify(|_, w| w.pad_driver().bit(enable));
 }
 
+#[cfg(lp_i2c_master_driver_supported)]
+pub(crate) fn reset_pin(pin: u8) {
+    output_enable(pin, false);
+    set_open_drain_output(pin, false);
+
+    // Resistors, input enable, the pad's LP function and whether it is muxed to the LP IO at all
+    // are all held in this register.
+    enable_iomux_clk_gate();
+    with_pin_reg!(pin, |reg| reg.reset());
+}
+
 fn enable_iomux_clk_gate() {
     cfg_select! {
         esp32s2 => {
