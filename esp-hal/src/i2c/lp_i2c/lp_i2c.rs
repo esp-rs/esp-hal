@@ -1,51 +1,12 @@
-//! Low-power I2C driver
-
+#[cfg(not(lp_io_has_gpio_matrix))]
+use crate::gpio::{LpPin, lp_io::LpFunction};
 use crate::{
-    gpio::{InputPin, LpPin, OutputPin, lp_io::LpFunction},
+    i2c::lp_i2c::{Scl, Sda},
     peripherals::{LP_I2C0, LP_PERI, LPWR},
     time::Rate,
 };
 
 const LP_I2C_FILTER_CYC_NUM_DEF: u8 = 7;
-
-/// Trait representing the LP_I2C SDA pin.
-pub trait Sda: LpPin + OutputPin + InputPin {
-    #[doc(hidden)]
-    fn connect_sda(&self);
-}
-
-/// Trait representing the LP_I2C SCL pin.
-pub trait Scl: LpPin + OutputPin + InputPin {
-    #[doc(hidden)]
-    fn connect_scl(&self);
-}
-
-// Chips with an LP GPIO matrix can route the LP I2C signals to any LP pin, chips without one only
-// expose them on the pads whose LP IO MUX has an LP I2C function.
-#[cfg(lp_io_has_gpio_matrix)]
-for_each_lp_function! {
-    (($_signal:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-        impl Sda for crate::peripherals::$gpio<'_> {
-            fn connect_sda(&self) {
-                crate::gpio::lp_io::connect_open_drain_signals(
-                    self,
-                    crate::gpio::lp_io::LpInputSignal::LP_I2C_SDA,
-                    crate::gpio::lp_io::LpOutputSignal::LP_I2C_SDA,
-                );
-            }
-        }
-
-        impl Scl for crate::peripherals::$gpio<'_> {
-            fn connect_scl(&self) {
-                crate::gpio::lp_io::connect_open_drain_signals(
-                    self,
-                    crate::gpio::lp_io::LpInputSignal::LP_I2C_SCL,
-                    crate::gpio::lp_io::LpOutputSignal::LP_I2C_SCL,
-                );
-            }
-        }
-    };
-}
 
 #[cfg(not(lp_io_has_gpio_matrix))]
 for_each_lp_function! {

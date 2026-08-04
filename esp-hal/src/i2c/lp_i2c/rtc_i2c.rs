@@ -20,7 +20,7 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::{i2c::rtc::Config, time::Duration};
+//! use esp_hal::{i2c::lp_i2c::Config, time::Duration};
 //!
 //! let config = Config::default().with_timeout(Duration::from_micros(100));
 //! # {after_snippet}
@@ -33,8 +33,7 @@
 //! driver instance.
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::i2c::rtc::I2c;
-//! # use esp_hal::i2c::rtc::Config;
+//! use esp_hal::i2c::lp_i2c::{Config, I2c};
 //! # use esp_hal::time::Duration;
 //! #
 //! # let config = Config::default();
@@ -57,7 +56,7 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::i2c::rtc::{I2c, Config};
+//! # use esp_hal::i2c::lp_i2c::{I2c, Config};
 //! # let config = Config::default();
 //! # let mut i2c = I2c::new(peripherals.RTC_I2C, config, peripherals.GPIO3, peripherals.GPIO2)?;
 //! #
@@ -74,22 +73,11 @@
 //! ```
 
 use crate::{
-    gpio::{InputPin, LpPin, OutputPin, lp_io::LpFunction},
+    gpio::{LpPin, lp_io::LpFunction},
+    i2c::lp_i2c::{Scl, Sda},
     peripherals::{GPIO, RTC_I2C, RTC_IO, SENS},
     time::Duration,
 };
-
-/// Trait representing the RTC_I2C SDA pin.
-pub trait Sda: LpPin + OutputPin + InputPin {
-    #[doc(hidden)]
-    fn connect_sda(&self);
-}
-
-/// Trait representing the RTC_I2C SCL pin.
-pub trait Scl: LpPin + OutputPin + InputPin {
-    #[doc(hidden)]
-    fn connect_scl(&self);
-}
 
 fn bind_pin(pin: &impl LpPin, function: LpFunction) {
     GPIO::regs()
@@ -136,7 +124,7 @@ for_each_lp_function! {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// use esp_hal::i2c::rtc::{Config, I2c};
+/// use esp_hal::i2c::lp_i2c::{Config, I2c};
 /// # const DEVICE_ADDR: u8 = 0x77;
 /// let mut i2c = I2c::new(
 ///     peripherals.RTC_I2C,
@@ -161,14 +149,14 @@ impl<'d> I2c<'d> {
     ///
     /// ## Errors
     ///
-    /// A [`crate::i2c::rtc::ConfigError`] variant will be returned if bus frequency or timeout
+    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::i2c::rtc::{Config, I2c};
+    /// use esp_hal::i2c::lp_i2c::{Config, I2c};
     /// let i2c = I2c::new(
     ///     peripherals.RTC_I2C,
     ///     Config::default(),
@@ -240,7 +228,7 @@ impl<'d> I2c<'d> {
     ///
     /// ## Errors
     ///
-    /// A [`crate::i2c::rtc::ConfigError`] variant will be returned if bus frequency or timeout
+    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
     ///
     /// ## Example
@@ -248,7 +236,7 @@ impl<'d> I2c<'d> {
     /// ```rust, no_run
     /// # {before_snippet}
     /// use esp_hal::{
-    ///     i2c::rtc::{Config, I2c},
+    ///     i2c::lp_i2c::{Config, I2c},
     ///     time::Duration,
     /// };
     /// let mut i2c = I2c::new(
@@ -300,7 +288,7 @@ impl<'d> I2c<'d> {
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::i2c::rtc::{Config, I2c};
+    /// use esp_hal::i2c::lp_i2c::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
     /// let mut i2c = I2c::new(
     ///     peripherals.RTC_I2C,
@@ -401,7 +389,7 @@ impl<'d> I2c<'d> {
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::i2c::rtc::{Config, I2c};
+    /// use esp_hal::i2c::lp_i2c::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
     /// let mut i2c = I2c::new(
     ///     peripherals.RTC_I2C,

@@ -477,7 +477,7 @@ mod tests {
     #[cfg(esp32s3)]
     fn test_read_cali_with_rtc_i2c() {
         use esp_hal::{
-            i2c::rtc::{Config, I2c, Timing},
+            i2c::lp_i2c::{Config, I2c, Timing},
             time::Duration,
         };
 

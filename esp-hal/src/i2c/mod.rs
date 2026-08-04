@@ -15,11 +15,8 @@ crate::unstable_driver! {
     #[cfg(i2c_slave_driver_supported)]
     pub mod slave;
 
-    #[cfg(lp_i2c_master_version = "lp_i2c")]
+    #[cfg(lp_i2c_master_driver_supported)]
     pub mod lp_i2c;
-
-    #[cfg(lp_i2c_master_version = "rtc_i2c")]
-    pub mod rtc;
 }
 
 #[cfg_attr(i2c_master_version = "1", path = "clocks/v1.rs")]
