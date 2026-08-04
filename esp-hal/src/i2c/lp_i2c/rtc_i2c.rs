@@ -475,10 +475,8 @@ impl<'d> LpI2c<'d> {
 
         // Stop transmission.
         sens.sar_i2c_ctrl().modify(|_, w| {
-            w.sar_i2c_start_force()
-                .clear_bit()
-                .sar_i2c_start()
-                .clear_bit()
+            w.sar_i2c_start_force().clear_bit();
+            w.sar_i2c_start().clear_bit()
         });
 
         result
@@ -486,18 +484,12 @@ impl<'d> LpI2c<'d> {
 
     fn clear_interrupts(&self) {
         self.i2c.register_block().int_clr().write(|w| {
-            w.trans_complete()
-                .clear_bit_by_one()
-                .tx_data()
-                .clear_bit_by_one()
-                .rx_data()
-                .clear_bit_by_one()
-                .ack_err()
-                .clear_bit_by_one()
-                .time_out()
-                .clear_bit_by_one()
-                .arbitration_lost()
-                .clear_bit_by_one()
+            w.trans_complete().clear_bit_by_one();
+            w.tx_data().clear_bit_by_one();
+            w.rx_data().clear_bit_by_one();
+            w.ack_err().clear_bit_by_one();
+            w.time_out().clear_bit_by_one();
+            w.arbitration_lost().clear_bit_by_one()
         });
     }
 
