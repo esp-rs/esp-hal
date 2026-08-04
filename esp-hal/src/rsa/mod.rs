@@ -25,8 +25,8 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::InterruptHandler,
     pac,
-    peripherals::{Interrupt, RSA},
-    system::{Cpu, GenericPeripheralGuard, Peripheral as PeripheralEnable},
+    peripherals::RSA,
+    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
     trm_markdown_link,
     work_queue::{self, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
@@ -35,9 +35,7 @@ use crate::{
 pub struct Rsa<'d, Dm: DriverMode> {
     rsa: RSA<'d>,
     phantom: PhantomData<Dm>,
-    #[cfg(not(esp32))]
-    _memory_guard: RsaMemoryPowerGuard,
-    _guard: GenericPeripheralGuard<{ PeripheralEnable::Rsa as u8 }>,
+    _guard: RsaGuard,
 }
 
 // There are two distinct peripheral versions: ESP32, and all else. There is a naming split in the
@@ -50,12 +48,14 @@ pub struct Rsa<'d, Dm: DriverMode> {
 /// bits, or 16 words.
 const WORDS_PER_INCREMENT: u32 = property!("rsa.size_increment") / 32;
 
-#[cfg(not(esp32))]
-struct RsaMemoryPowerGuard;
+struct RsaGuard {
+    _guard: GenericPeripheralGuard<{ PeripheralEnable::Rsa as u8 }>,
+}
 
-#[cfg(not(esp32))]
-impl RsaMemoryPowerGuard {
+impl RsaGuard {
     fn new() -> Self {
+        let _guard = GenericPeripheralGuard::new();
+        #[cfg(not(esp32))]
         crate::peripherals::SYSTEM::regs()
             .rsa_pd_ctrl()
             .modify(|_, w| {
@@ -63,12 +63,11 @@ impl RsaMemoryPowerGuard {
                 w.rsa_mem_force_pu().set_bit();
                 w.rsa_mem_pd().clear_bit()
             });
-        Self
+        Self { _guard }
     }
 }
 
-#[cfg(not(esp32))]
-impl Drop for RsaMemoryPowerGuard {
+impl Drop for RsaGuard {
     fn drop(&mut self) {
         unsafe {
             // Stopping the peripheral's clock source pends an interrupt. Since the clocks
@@ -77,6 +76,7 @@ impl Drop for RsaMemoryPowerGuard {
             // To prevent this, we disable interrupts manually before stopping the peripheral.
             crate::peripherals::RSA::steal().disable_peri_interrupt_on_all_cores();
         }
+        #[cfg(not(esp32))]
         crate::peripherals::SYSTEM::regs()
             .rsa_pd_ctrl()
             .modify(|_, w| {
@@ -92,14 +92,10 @@ impl<'d> Rsa<'d, Blocking> {
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rsa: RSA<'d>) -> Self {
-        let guard = GenericPeripheralGuard::new();
-
         let this = Self {
             rsa,
             phantom: PhantomData,
-            #[cfg(not(esp32))]
-            _memory_guard: RsaMemoryPowerGuard::new(),
-            _guard: guard,
+            _guard: RsaGuard::new(),
         };
 
         while !this.ready() {}
@@ -115,8 +111,6 @@ impl<'d> Rsa<'d, Blocking> {
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
-            #[cfg(not(esp32))]
-            _memory_guard: self._memory_guard,
             _guard: self._guard,
         }
     }
@@ -155,12 +149,9 @@ impl<'d> Rsa<'d, Async> {
         self.internal_enable_disable_interrupt(false);
         self.rsa.disable_peri_interrupt_on_all_cores();
 
-        crate::interrupt::disable(Cpu::current(), Interrupt::RSA);
         Rsa {
             rsa: self.rsa,
             phantom: PhantomData,
-            #[cfg(not(esp32))]
-            _memory_guard: self._memory_guard,
             _guard: self._guard,
         }
     }
@@ -903,9 +894,7 @@ impl<'d> RsaBackend<'d> {
                 let driver = Rsa {
                     rsa: unsafe { self.peri.clone_unchecked() },
                     phantom: PhantomData,
-                    #[cfg(not(esp32))]
-                    _memory_guard: RsaMemoryPowerGuard::new(),
-                    _guard: GenericPeripheralGuard::new(),
+                    _guard: RsaGuard::new(),
                 };
                 self.state = RsaBackendState::Initializing(driver);
                 work_queue::Poll::Pending(true)

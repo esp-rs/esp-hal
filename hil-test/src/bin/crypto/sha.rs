@@ -462,6 +462,9 @@ mod tests {
     /// interleaving. This specifically tests the SHA backend implementation
     #[test]
     fn test_for_digest_rolling_context_interleaved(_ctx: Context) {
+        // Drop the Sha driver so that the backend can release resources when it needs to.
+        core::mem::drop(_ctx.sha);
+
         let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
         let _sha_driver = sha_backend.start();
 
