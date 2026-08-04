@@ -613,7 +613,7 @@ driver_configs![
     },
     RgbProperties {
         driver: rgb_display,
-        name: "RGB display", // LCD_CAM, ESP32 I2S, S2 SPI
+        name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
         properties: {}
     },
     RmtProperties {
@@ -750,6 +750,11 @@ driver_configs![
             #[serde(flatten)]
             config: SocConfig,
         }
+    },
+    SpiLcdProperties {
+        driver: spi_lcd,
+        name: "SPI LCD interface", // The LCD mode of the S2's GP-SPI2
+        properties: {}
     },
     SpiMasterProperties<SpiMasterInstanceConfig> {
         driver: spi_master,
