@@ -671,7 +671,9 @@ impl RawFrame {
             }
         };
         // Data
-        bytes[data_start..].copy_from_slice(frame.data());
+        let data = frame.data();
+        let data_end = data_start + data.len();
+        bytes[data_start..data_end].copy_from_slice(data);
 
         RawFrame { bytes }
     }
