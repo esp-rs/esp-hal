@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- SPI master: import `ram` explicitly so the driver builds with `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM` enabled (#5585)
 
 ### Removed
 
