@@ -607,7 +607,8 @@ impl Info {
             // be applied only after validating the resulting baud rate.
             cfg_select! {
                 any(uart_has_sclk_divider, soc_has_pcr, esp32p4, esp32s31) => {
-                    const MAX_DIV: u32 = property!("clock_tree.uart.baud_rate_generator.integral").1;
+                    const MAX_DIV: u32 =
+                        property!("clock_tree.uart.baud_rate_generator.integral").1;
                     let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
                     debug!("SCLK: {} divider: {}", clk, clk_div);
 

@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{RtcFunction, RtcPin, RtcPinWithResistors},
+    gpio::{LpPin, LpPinWithResistors, WakeEvent, lp_io::LpFunction},
     peripherals::LP_AON,
 };
 
@@ -13,20 +13,20 @@ cfg_select! {
 }
 
 for_each_lp_function! {
-    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:literal) => {
+    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl RtcPin for crate::peripherals::$gpio<'_> {
-            fn rtc_number(&self) -> u8 {
+        impl LpPin for crate::peripherals::$gpio<'_> {
+            fn lp_number(&self) -> u8 {
                 $pin
             }
 
-            unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
+            fn apply_wakeup(&self, wakeup: bool, level: WakeEvent) {
                 LP_GPIO::regs().pin($pin).modify(|_, w| unsafe {
-                    w.wakeup_enable().bit(wakeup).int_type().bits(level)
+                    w.wakeup_enable().bit(wakeup).int_type().bits(level as u8)
                 });
             }
 
-            fn rtcio_pad_hold(&self, enable: bool) {
+            fn lp_pad_hold(&self, enable: bool) {
                 let mask = 1 << $pin;
                 LP_AON::regs()
                     .gpio_hold0()
@@ -40,7 +40,7 @@ for_each_lp_function! {
                     });
             }
 
-            fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
+            fn lp_set_config(&self, input_enable: bool, mux: bool, func: LpFunction) {
                 let mask = 1 << $pin;
                 LP_AON::regs()
                     .gpio_mux()
@@ -62,20 +62,20 @@ for_each_lp_function! {
         }
 
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl RtcPinWithResistors for crate::peripherals::$gpio<'_> {
-            fn rtcio_pullup(&self, enable: bool) {
+        impl LpPinWithResistors for crate::peripherals::$gpio<'_> {
+            fn lp_pullup(&self, enable: bool) {
                 pullup_enable($pin, enable);
             }
 
-            fn rtcio_pulldown(&self, enable: bool) {
+            fn lp_pulldown(&self, enable: bool) {
                 pulldown_enable($pin, enable);
             }
         }
     };
 }
 
-pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
-    pin.rtc_set_config(input_enable, true, RtcFunction::Rtc);
+pub(super) fn init_pin(pin: &impl LpPin, input_enable: bool) -> u8 {
+    pin.lp_set_config(input_enable, true, LpFunction::LP_GPIO);
     pin.number()
 }
 

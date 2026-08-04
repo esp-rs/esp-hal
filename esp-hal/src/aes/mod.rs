@@ -203,12 +203,8 @@ impl<'d> Aes<'d> {
 
     fn is_idle(&mut self) -> bool {
         cfg_select! {
-            esp32 => {
-                self.regs().idle().read().idle().bit_is_set()
-            }
-            _ => {
-                self.regs().state().read().state().bits() == 0
-            }
+            esp32 => self.regs().idle().read().idle().bit_is_set(),
+            _ => self.regs().state().read().state().bits() == 0,
         }
     }
 

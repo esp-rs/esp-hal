@@ -79,7 +79,7 @@ pub(crate) fn map_flash_page(paddr: u32) -> Result<FlashMmapGuard, FlashStorageE
             let entry_id = s2::alloc_entry();
             s2::map_entry(entry_id, page_paddr)?;
             FlashMmapGuard::new(entry_id, page_size, true)
-        },
+        }
         _ => {
             let entry_id = find_free_entry().ok_or(FlashStorageError::NotSupported)?;
             write_flash_entry(entry_id, page_paddr);

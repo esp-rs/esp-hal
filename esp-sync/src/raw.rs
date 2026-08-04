@@ -35,7 +35,8 @@ impl RawLock for SingleCoreInterruptLock {
     #[inline]
     unsafe fn enter(&self) -> RestoreState {
         cfg_select! {
-            esp32p4 => { // TODO: any with zcmp
+            esp32p4 => {
+                // TODO: any with zcmp
                 // ESP32-P4 (v3.2/ECO7 etc.) Zcmp hardware bug workaround (IDF-14279 / DIG-661):
                 // Clearing mstatus.mie alone does not fully mask CLIC interrupts -- an
                 // interrupt can still fire mid-instruction on cm.push (and possibly on
@@ -53,18 +54,24 @@ impl RawLock for SingleCoreInterruptLock {
                     );
                 }
                 let mut mstatus = 0u32;
-                unsafe { core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus); }
+                unsafe {
+                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                }
                 let mie_bit = mstatus & 0b1000;
                 let token = mie_bit | ((old_mintthresh & 0xff) << 8);
             }
             riscv => {
                 let mut mstatus = 0u32;
-                unsafe { core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus); }
+                unsafe {
+                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                }
                 let token = mstatus & 0b1000;
             }
             xtensa => {
                 let token: u32;
-                unsafe { core::arch::asm!("rsil {0}, 5", out(reg) token); }
+                unsafe {
+                    core::arch::asm!("rsil {0}, 5", out(reg) token);
+                }
                 #[cfg(debug_assertions)]
                 let token = token & !RESERVED_MASK;
             }
@@ -122,7 +129,8 @@ impl RawLock for SingleCoreInterruptLock {
                 #[cfg(debug_assertions)]
                 if token & RESERVED_MASK != 0 {
                     // We could do this transformation in fmt.rs automatically, but experiments
-                    // show this is only worth it in terms of binary size for code inlined into many places.
+                    // show this is only worth it in terms of binary size for code inlined into many
+                    // places.
                     #[cold]
                     #[inline(never)]
                     fn __assert_failed() {

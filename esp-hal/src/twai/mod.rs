@@ -1553,23 +1553,15 @@ impl PrivateInstance for crate::peripherals::TWAI0<'_> {
 
     fn input_signal(&self) -> InputSignal {
         cfg_select! {
-            any(esp32, esp32c3, esp32s2, esp32s3) => {
-                InputSignal::TWAI_RX
-            }
-            _ => {
-                InputSignal::TWAI0_RX
-            }
+            any(esp32, esp32c3, esp32s2, esp32s3) => InputSignal::TWAI_RX,
+            _ => InputSignal::TWAI0_RX,
         }
     }
 
     fn output_signal(&self) -> OutputSignal {
         cfg_select! {
-            any(esp32, esp32c3, esp32s2, esp32s3) => {
-                OutputSignal::TWAI_TX
-            }
-            _ => {
-                OutputSignal::TWAI0_TX
-            }
+            any(esp32, esp32c3, esp32s2, esp32s3) => OutputSignal::TWAI_TX,
+            _ => OutputSignal::TWAI0_TX,
         }
     }
 

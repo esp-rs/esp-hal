@@ -533,7 +533,7 @@ pub mod dma {
                         w.dma_infifo_full_clr().bit(bit);
                         w.ahbm_rst().bit(bit)
                     });
-                },
+                }
                 _ => {
                     self.regs().dma_conf().modify(|_, w| {
                         w.dma_tx_ena().set_bit();
@@ -557,7 +557,7 @@ pub mod dma {
                         w.out_done().clear_bit_by_one();
                         w.out_eof().clear_bit_by_one();
                         w.out_total_eof().clear_bit_by_one()
-                    },
+                    }
                     _ => {
                         w.dma_infifo_full_err().clear_bit_by_one();
                         w.dma_outfifo_empty_err().clear_bit_by_one();
@@ -782,12 +782,8 @@ impl Info {
     #[cfg(spi_slave_supports_dma)]
     fn is_bus_busy(&self) -> bool {
         let reg = cfg_select! {
-            any(esp32, esp32s2) => {
-                self.regs().slave()
-            },
-            _ => {
-                self.regs().dma_int_raw()
-            }
+            any(esp32, esp32s2) => self.regs().slave(),
+            _ => self.regs().dma_int_raw(),
         };
         reg.read().trans_done().bit_is_clear()
     }
@@ -800,7 +796,7 @@ impl Info {
                 self.regs()
                     .slave()
                     .modify(|_, w| w.trans_done().clear_bit());
-            },
+            }
             _ => {
                 self.regs()
                     .dma_int_clr()
@@ -824,7 +820,7 @@ for_each_spi_slave! {
             #[inline(always)]
             fn info(&self) -> &'static Info {
                 static INFO: Info = Info {
-                    register_block: crate::peripherals::$peri::regs(),
+                    register_block: crate::peripherals::$peri::ptr(),
                     peripheral: crate::system::Peripheral::$sys,
                     sclk: InputSignal::$sclk,
                     mosi: InputSignal::$mosi,

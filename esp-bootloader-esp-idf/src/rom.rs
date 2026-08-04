@@ -1,4 +1,4 @@
-use esp_rom_sys::rom::md5;
+use esp_rom_sys::rom::crc;
 
 pub struct Crc32 {}
 
@@ -8,18 +8,20 @@ impl Crc32 {
     }
 
     pub fn crc(&self, data: &[u8]) -> u32 {
-        esp_rom_sys::rom::crc::crc32_le(u32::MAX, data)
+        crc::crc32_le(u32::MAX, data)
     }
 }
 
+#[cfg(feature = "validation")]
 pub struct Md5 {
-    context: md5::Context,
+    context: esp_rom_sys::rom::md5::Context,
 }
 
+#[cfg(feature = "validation")]
 impl Md5 {
     pub fn new() -> Self {
         Self {
-            context: md5::Context::new(),
+            context: esp_rom_sys::rom::md5::Context::new(),
         }
     }
 

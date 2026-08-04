@@ -66,11 +66,12 @@ pub(crate) const CONFIG_INSTRUCTION_CACHE_SIZE: usize = cfg_select! {
     instruction_cache_size_8kb => 0,
     instruction_cache_size_16kb => 1,
 };
-pub(crate) const CONFIG_DATA_CACHE_SIZE: usize = cfg_select! {
-    data_cache_size_0kb => 0, // doesn't matter according to esp-idf
-    data_cache_size_8kb => 0,
-    data_cache_size_16kb => 1,
-};
+pub(crate) const CONFIG_DATA_CACHE_SIZE: usize =
+    cfg_select! {
+        data_cache_size_0kb => 0, // doesn't matter according to esp-idf
+        data_cache_size_8kb => 0,
+        data_cache_size_16kb => 1,
+    };
 
 #[crate::ram]
 pub(crate) unsafe fn configure_cpu_caches() {

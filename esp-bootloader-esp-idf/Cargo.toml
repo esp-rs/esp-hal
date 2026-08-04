@@ -65,10 +65,10 @@ log-04 = ["dep:log-04"]
 defmt = ["dep:defmt"]
 
 # Replace ROM functions with pure Rust implementations, needed for tests.
-std = ["dep:crc", "dep:md-5", "esp-storage/emulation"]
+std = ["dep:crc", "dep:md-5"]
 
-## Implement traits from `embedded-storage` for [`FlashRegion`].
-embedded-storage = ["dep:embedded-storage", "esp-storage/embedded-storage"]
+## Implement traits from `embedded-storage` for [`crate::partitions::FlashRegion`].
+embedded-storage = ["dep:embedded-storage"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:

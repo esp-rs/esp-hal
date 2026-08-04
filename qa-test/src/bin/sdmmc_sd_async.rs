@@ -80,7 +80,9 @@ async fn main(_spawner: Spawner) {
     let slot_config = SlotConfig::default();
     cfg_select! {
         feature = "esp32s3" => {
-            let slot = controller.slot::<1>(slot_config.with_input_delay_phase(INPUT_DELAY_PHASE)).unwrap();
+            let slot = controller
+                .slot::<1>(slot_config.with_input_delay_phase(INPUT_DELAY_PHASE))
+                .unwrap();
             let slot = slot
                 .with_clk(peripherals.GPIO39)
                 .with_cmd(peripherals.GPIO38)
@@ -97,7 +99,9 @@ async fn main(_spawner: Spawner) {
                 .with_data3(peripherals.GPIO13);
         }
         feature = "esp32p4" => {
-            let slot = controller.slot::<0>(slot_config.with_input_delay_phase(INPUT_DELAY_PHASE)).unwrap();
+            let slot = controller
+                .slot::<0>(slot_config.with_input_delay_phase(INPUT_DELAY_PHASE))
+                .unwrap();
             let slot = slot
                 .with_clk(peripherals.GPIO43)
                 .with_cmd(peripherals.GPIO44)

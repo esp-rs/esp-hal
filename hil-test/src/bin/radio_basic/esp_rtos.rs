@@ -292,6 +292,37 @@ mod tests {
     }
 
     #[test]
+    fn task_can_delete_itself_when_nothing_else_is_ready() {
+        // The task deletes itself while the main task sleeps. The run queue is empty at that point,
+        // so the scheduler has to switch from the deleted task to the idle context.
+        extern "C" fn self_deleting_task(_context: *mut c_void) {
+            // Wait for the main task to go to sleep, so that this task is the last ready one.
+            CurrentThreadHandle::get().delay(Duration::from_millis(10));
+
+            info!("Task: deleting itself");
+            unsafe { preempt::schedule_task_deletion(None) };
+
+            unreachable!("A deleted task must not run again");
+        }
+
+        unsafe {
+            preempt::task_create(
+                "self_deleting_task",
+                self_deleting_task,
+                core::ptr::null_mut(),
+                3,
+                None,
+                4096,
+            )
+        };
+
+        // Sleeping takes the main task out of the run queue.
+        CurrentThreadHandle::get().delay(Duration::from_millis(50));
+
+        info!("Main: done");
+    }
+
+    #[test]
     fn interrupt_handler_is_not_preempted_by_context_switch(mut ctx: Context) {
         // In this test, we start a thread, and make it wait for a signal. We then trigger a
         // low-priority interrupt, which sets the signal and exits the test. The test must not time
@@ -461,6 +492,96 @@ mod tests {
         info!("Wait for tasks to finish");
         test_context.ready_semaphore.take(None);
         test_context.ready_semaphore.take(None);
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    fn deleting_a_task_on_another_core_keeps_other_tasks_alive(ctx: Context) {
+        // Core 0 deletes a task that is running on core 1. The task is freed while core 1 still
+        // holds it as its current task, so the allocator can hand the same address to a task
+        // created afterwards. Core 1 then acts on the new task instead of the deleted one.
+        struct TestContext {
+            victim_runs: SemaphoreHandle,
+            successor_alive: SemaphoreHandle,
+        }
+
+        let test_context = TestContext {
+            victim_runs: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+            successor_alive: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+        };
+
+        extern "C" fn victim(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+
+            context.victim_runs.give();
+
+            // Stay the current task of core 1, and keep entering the scheduler.
+            loop {
+                preempt::yield_task();
+            }
+        }
+
+        extern "C" fn successor(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+
+            // Report being alive, and sleep in between so that the main task can run.
+            loop {
+                context.successor_alive.give();
+                CurrentThreadHandle::get().delay(Duration::from_millis(10));
+            }
+        }
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            ctx.sw_int1,
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // The spinning tasks must not starve the main task, otherwise this test can only time out.
+        CurrentThreadHandle::get().set_priority(5);
+
+        let context_ptr = (&raw const test_context).cast::<c_void>().cast_mut();
+
+        // Both tasks use the same stack size, so that the successor can reuse the memory of the
+        // victim.
+        const STACK_SIZE: usize = 4096;
+
+        let victim_handle =
+            unsafe { preempt::task_create("victim", victim, context_ptr, 1, Some(1), STACK_SIZE) };
+
+        info!("Wait for the victim to run on core 1");
+        hil_test::assert!(test_context.victim_runs.take(Some(1_000_000)));
+
+        info!("Delete the victim from core 0");
+        unsafe { preempt::schedule_task_deletion(Some(victim_handle)) };
+
+        let successor_handle = unsafe {
+            preempt::task_create("successor", successor, context_ptr, 1, Some(0), STACK_SIZE)
+        };
+        info!(
+            "victim: {:?}, successor: {:?}",
+            victim_handle.as_ptr(),
+            successor_handle.as_ptr()
+        );
+
+        // The successor must keep running. If core 1 still treats the freed address as its current
+        // task, it corrupts or deletes the successor instead.
+        for round in 0..5 {
+            hil_test::assert!(
+                test_context.successor_alive.take(Some(500_000)),
+                "The task created after the deletion stopped running in round {}",
+                round
+            );
+        }
 
         unsafe {
             // Park the second core, we don't need it anymore

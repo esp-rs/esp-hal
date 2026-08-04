@@ -149,12 +149,8 @@ impl RegisterAccess for I2sDmaTxChannel<'_> {
 impl TxRegisterAccess for I2sDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
         cfg_select! {
-            esp32 => {
-                self.regs().lc_state0().read().bits() & 0x80000000 != 0
-            }
-            _ => {
-                self.regs().lc_state0().read().out_empty().bit_is_set()
-            }
+            esp32 => self.regs().lc_state0().read().bits() & 0x80000000 != 0,
+            _ => self.regs().lc_state0().read().out_empty().bit_is_set(),
         }
     }
 

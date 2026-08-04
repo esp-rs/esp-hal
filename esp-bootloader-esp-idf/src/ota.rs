@@ -385,10 +385,8 @@ impl<'a, 'd> Ota<'a, 'd> {
 
 #[cfg(test)]
 mod tests {
-    use esp_storage::{Flash, FlashStorage};
-
     use super::*;
-    use crate::partitions::PartitionEntry;
+    use crate::partitions::{FlashStorage, PartitionEntry};
 
     const PARTITION_RAW: [u8; 32] = [
         0xaa, 0x50, // MAGIC
@@ -449,7 +447,7 @@ mod tests {
     fn test_initial_state_and_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mock_region = ota_region(&mut flash, &mut binary);
@@ -488,7 +486,7 @@ mod tests {
     fn test_slot0_valid_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
         flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
         flash.write(0x1000, SLOT_INITIAL).unwrap();
@@ -519,7 +517,7 @@ mod tests {
     fn test_slot1_new_next_slot() {
         let mut binary = PARTITION_RAW;
 
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
         flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
         flash.write(0x1000, SLOT_COUNT_2_NEW).unwrap();
@@ -551,7 +549,7 @@ mod tests {
     fn test_multi_updates() {
         let mut binary = PARTITION_RAW;
 
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mock_region = ota_region(&mut flash, &mut binary);
@@ -609,7 +607,7 @@ mod tests {
     fn test_multi_updates_4_apps() {
         let mut binary = PARTITION_RAW;
 
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mock_region = ota_region(&mut flash, &mut binary);
@@ -686,7 +684,7 @@ mod tests {
     fn test_multi_updates_skip_parts() {
         let mut binary = PARTITION_RAW;
 
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mock_region = ota_region(&mut flash, &mut binary);
@@ -736,7 +734,7 @@ mod tests {
     #[test]
     fn test_read_erased_slot() {
         let mut binary = PARTITION_RAW;
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mut region = ota_region(&mut flash, &mut binary);
@@ -750,7 +748,7 @@ mod tests {
     #[test]
     fn test_read_valid_slot() {
         let mut binary = PARTITION_RAW;
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
         flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
 
@@ -763,7 +761,7 @@ mod tests {
     #[test]
     fn test_read_rejects_bad_crc() {
         let mut binary = PARTITION_RAW;
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mut slot = [0u8; 32];
@@ -781,7 +779,7 @@ mod tests {
     #[test]
     fn test_read_rejects_unknown_ota_state() {
         let mut binary = PARTITION_RAW;
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let ota_seq = 1u32;
@@ -802,7 +800,7 @@ mod tests {
     #[test]
     fn test_read_rejects_erased_seq_with_non_erased_state() {
         let mut binary = PARTITION_RAW;
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mut slot = [0xffu8; 32];
@@ -819,7 +817,7 @@ mod tests {
     #[test]
     fn test_one_corrupt_slot_fails_current_app_partition() {
         let mut binary = PARTITION_RAW;
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mut corrupt = [0u8; 32];
@@ -839,7 +837,7 @@ mod tests {
     #[test]
     fn test_reset_to_factory_after_corrupt_ota_data() {
         let mut binary = PARTITION_RAW;
-        let mut flash = FlashStorage::new(Flash::new());
+        let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
         let mut corrupt = [0u8; 32];

@@ -21,27 +21,25 @@ use hil_test as _;
 
 cfg_select! {
     feature = "unstable" => {
-        use esp_hal::peripherals::SPI2;
-        use esp_hal::spi::master::{Address, Command, DataMode};
-
+        #[cfg(all(spi_master_supports_dma, dma_can_access_psram))]
+        use allocator_api2::vec::Vec;
+        #[cfg(all(spi_master_supports_dma, pcnt_driver_supported))]
+        use esp_hal::Async;
+        #[cfg(pcnt_driver_supported)]
+        use esp_hal::pcnt::{Pcnt, channel::EdgeMode, unit::Unit};
         #[cfg(spi_master_supports_dma)]
         use esp_hal::{
-            gpio::{Level, NoPin},
             dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, aligned::DmaAlignedMut},
             dma_buffers,
             dma_rx_buffer,
             dma_tx_buffer,
+            gpio::{Level, NoPin},
             spi::master::SpiDma,
         };
-
-        #[cfg(all(spi_master_supports_dma, dma_can_access_psram))]
-        use allocator_api2::vec::Vec;
-
-        #[cfg(pcnt_driver_supported)]
-        use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
-
-        #[cfg(all(spi_master_supports_dma, pcnt_driver_supported))]
-        use esp_hal::Async;
+        use esp_hal::{
+            peripherals::SPI2,
+            spi::master::{Address, Command, DataMode},
+        };
     }
     _ => {}
 }
@@ -325,15 +323,9 @@ mod tests {
 
         #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
         let dma_channel = cfg_select! {
-            spi_master_dma_engine = "SPI_DMA" => {
-                peripherals.DMA_SPI2
-            },
-            spi_master_dma_engine = "AHB_GDMA" => {
-                peripherals.DMA_CH0
-            },
-            spi_master_dma_engine = "AXI_GDMA" => {
-                peripherals.DMA_AXI_CH0
-            },
+            spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
+            spi_master_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            spi_master_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
         };
 
         cfg_select! {
@@ -361,32 +353,28 @@ mod tests {
         .with_mosi(mosi);
 
         cfg_select! {
-            feature = "unstable" => {
-                Context {
-                    spi,
-                    rx_buffer,
-                    tx_buffer,
-                    miso_input,
-                    #[cfg(pcnt_driver_supported)]
-                    sclk_input,
-                    #[cfg(spi_master_supports_dma)]
-                    dma_channel,
-                    #[cfg(spi_master_supports_dma)]
-                    rx_descriptors,
-                    #[cfg(spi_master_supports_dma)]
-                    tx_descriptors,
-                    #[cfg(pcnt_driver_supported)]
-                    pcnt_unit: Pcnt::new(peripherals.PCNT).unit0,
-                }
-            }
-            _ => {
-                Context {
-                    spi,
-                    rx_buffer,
-                    tx_buffer,
-                    miso_input,
-                }
-            }
+            feature = "unstable" => Context {
+                spi,
+                rx_buffer,
+                tx_buffer,
+                miso_input,
+                #[cfg(pcnt_driver_supported)]
+                sclk_input,
+                #[cfg(spi_master_supports_dma)]
+                dma_channel,
+                #[cfg(spi_master_supports_dma)]
+                rx_descriptors,
+                #[cfg(spi_master_supports_dma)]
+                tx_descriptors,
+                #[cfg(pcnt_driver_supported)]
+                pcnt_unit: Pcnt::new(peripherals.PCNT).unit0,
+            },
+            _ => Context {
+                spi,
+                rx_buffer,
+                tx_buffer,
+                miso_input,
+            },
         }
     }
 
@@ -1667,15 +1655,9 @@ mod read {
 
         #[cfg(spi_master_supports_dma)]
         let dma_channel = cfg_select! {
-            spi_master_dma_engine = "SPI_DMA" => {
-                peripherals.DMA_SPI2
-            },
-            spi_master_dma_engine = "AHB_GDMA" => {
-                peripherals.DMA_CH0
-            },
-            spi_master_dma_engine = "AXI_GDMA" => {
-                peripherals.DMA_AXI_CH0
-            },
+            spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
+            spi_master_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            spi_master_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
         };
 
         let spi = Spi::new(
@@ -1955,15 +1937,9 @@ mod write {
 
         #[cfg(spi_master_supports_dma)]
         let dma_channel = cfg_select! {
-            spi_master_dma_engine = "SPI_DMA" => {
-                peripherals.DMA_SPI2
-            },
-            spi_master_dma_engine = "AHB_GDMA" => {
-                peripherals.DMA_CH0
-            },
-            spi_master_dma_engine = "AXI_GDMA" => {
-                peripherals.DMA_AXI_CH0
-            },
+            spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
+            spi_master_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            spi_master_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
         };
 
         let mut mosi = Flex::new(mosi);
@@ -2282,12 +2258,8 @@ mod spi_slave {
 
         #[cfg(spi_slave_supports_dma)]
         let dma_channel = cfg_select! {
-            spi_slave_dma_engine = "SPI_DMA" => {
-                peripherals.DMA_SPI2
-            },
-            spi_slave_dma_engine = "AHB_GDMA" => {
-                peripherals.DMA_CH0
-            },
+            spi_slave_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
+            spi_slave_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
         };
 
         let mut mosi_gpio = Flex::new(mosi_pin);
@@ -2401,7 +2373,8 @@ mod qspi_dma {
             const COMMAND_DATA_MODES: [DataMode; 1] = [DataMode::SingleTwoDataLines];
         }
         _ => {
-            const COMMAND_DATA_MODES: [DataMode; 2] = [DataMode::SingleTwoDataLines, DataMode::Quad];
+            const COMMAND_DATA_MODES: [DataMode; 2] =
+                [DataMode::SingleTwoDataLines, DataMode::Quad];
         }
     }
 
@@ -2728,15 +2701,9 @@ mod qspi_dma {
         let _ = Input::new(unconnected_pin.reborrow(), config);
 
         let dma_channel = cfg_select! {
-            spi_master_dma_engine = "SPI_DMA" => {
-                peripherals.DMA_SPI2
-            },
-            spi_master_dma_engine = "AHB_GDMA" => {
-                peripherals.DMA_CH0
-            },
-            spi_master_dma_engine = "AXI_GDMA" => {
-                peripherals.DMA_AXI_CH0
-            },
+            spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
+            spi_master_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            spi_master_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
         };
 
         let spi = Spi::new(

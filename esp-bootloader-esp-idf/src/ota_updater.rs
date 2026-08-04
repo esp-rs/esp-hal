@@ -2,7 +2,7 @@
 
 use crate::{
     ota::OtaImageState,
-    partitions::{AppPartitionSubType, Error, FlashRegion, PartitionTable},
+    partitions::{AppPartitionSubType, Error, FlashRegion, FlashStorage, PartitionTable},
 };
 
 /// This can be used as more convenient - yet less flexible, way to do OTA updates.
@@ -11,7 +11,7 @@ use crate::{
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OtaUpdater<'a, 'd> {
-    flash: &'a mut esp_storage::FlashStorage<'d>,
+    flash: &'a mut FlashStorage<'d>,
     pt: PartitionTable<'a>,
     ota_count: usize,
 }
@@ -22,7 +22,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
     /// # Errors
     /// [Error::Invalid] if no OTA data partition or less than two OTA app partition were found.
     pub fn new(
-        flash: &'a mut esp_storage::FlashStorage<'d>,
+        flash: &'a mut FlashStorage<'d>,
         buffer: &'a mut [u8; crate::partitions::PARTITION_TABLE_MAX_LEN],
     ) -> Result<Self, Error> {
         let pt = crate::partitions::read_partition_table(flash, buffer)?;
@@ -61,7 +61,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         })
     }
 
-    /// Returns an [`Ota`] for accessing the OTA-data partition.
+    /// Returns a [`crate::ota::Ota`] for accessing the OTA-data partition.
     ///
     /// # Errors
     /// [Error::Invalid] if no OTA data partition was found.
