@@ -75,7 +75,7 @@ peripherals = [
     { name = "LP_APM0" },
     { name = "LP_CLKRST" },
     { name = "LP_GPIO", pac = "LP_IO" },
-    # { name = "LP_I2C0" },
+    { name = "LP_I2C0" },
     { name = "LP_I2C_ANA_MST" },
     { name = "LP_IO_MUX" },
     { name = "LP_PERI", pac = "LPPERI" },
@@ -347,7 +347,7 @@ support_status = { status = "not_supported", issue = 5155 }
 ram_size = 32
 
 [device.lp_i2c_master]
-support_status = "partial"
+support_status = "not_supported"
 version = "lp_i2c"
 fifo_size = 16
 
