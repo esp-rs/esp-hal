@@ -71,7 +71,18 @@ impl<'d> Flash<'d> {
 ///
 /// This type can read and write any location on the SPI flash chip. For
 /// application data, it is recommended to reserve a dedicated
-#[doc = concat!("[partition](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-guides/partition-tables.html)")]
+#[cfg_attr(
+    not(feature = "emulation"),
+    doc = concat!(
+        "[partition](https://docs.espressif.com/projects/esp-idf/en/latest/",
+        esp_metadata_generated::chip!(),
+        "/api-guides/partition-tables.html)"
+    )
+)]
+#[cfg_attr(
+    feature = "emulation",
+    doc = "[partition](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/partition-tables.html)"
+)]
 /// instead of writing to arbitrary addresses. For partition-table helpers, see
 /// `esp-bootloader-esp-idf`.
 ///
