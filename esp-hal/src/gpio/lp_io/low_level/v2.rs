@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{LpPin, LpPinWithResistors, lp_io::LpFunction},
+    gpio::{LpPin, LpPinWithResistors, WakeEvent, lp_io::LpFunction},
     peripherals::{GPIO, LPWR, RTC_IO, SENS},
 };
 
@@ -90,6 +90,13 @@ for_each_lp_function! {
                     w.fun_ie().bit(input_enable);
                     w.mux_sel().bit(mux);
                     w.fun_sel().bits(func as u8)
+                });
+            }
+
+            fn apply_wakeup(&self, wakeup: bool, level: WakeEvent) {
+                RTC_IO::regs().pin($n).modify(|_, w| unsafe {
+                    w.wakeup_enable().bit(wakeup);
+                    w.int_type().bits(level as u8)
                 });
             }
 

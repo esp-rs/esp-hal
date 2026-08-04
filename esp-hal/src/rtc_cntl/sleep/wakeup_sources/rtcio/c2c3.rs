@@ -1,14 +1,9 @@
 use super::RtcioWakeupSource;
 use crate::{
-    gpio::{AlternateFunction, Level, LpPinWithResistors},
+    gpio::{AlternateFunction, Level, LpPinWithResistors, OutputSignal, WakeEvent},
     peripherals::{GPIO, IO_MUX, LPWR},
     rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource},
 };
-
-const GPIO_INTR_LOW_LEVEL: u8 = 4;
-const GPIO_INTR_HIGH_LEVEL: u8 = 5;
-const SIG_GPIO_OUT_IDX: u32 = 128;
-const GPIO_NUM_MAX: usize = 22;
 
 impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn LpPinWithResistors, level: Level) {
@@ -17,59 +12,55 @@ impl RtcioWakeupSource<'_, '_> {
             Level::High => {
                 pin.lp_pullup(false);
                 pin.lp_pulldown(true);
-                GPIO_INTR_HIGH_LEVEL
+                WakeEvent::HighLevel
             }
             Level::Low => {
                 pin.lp_pullup(true);
                 pin.lp_pulldown(false);
-                GPIO_INTR_LOW_LEVEL
+                WakeEvent::LowLevel
             }
         };
         pin.lp_pad_hold(true);
 
         // apply_wakeup does the same as idf's esp_deep_sleep_enable_gpio_wakeup
-        unsafe {
-            pin.apply_wakeup(true, level);
-        }
+        pin.apply_wakeup(true, level);
     }
 }
 
 fn isolate_digital_gpio() {
-    // like esp_sleep_isolate_digital_gpio
-    let rtc_cntl = LPWR::regs();
-    let io_mux = IO_MUX::regs();
-    let gpio = GPIO::regs();
-
-    let dig_iso = &rtc_cntl.dig_iso().read();
+    let dig_iso = LPWR::regs().dig_iso().read();
     let deep_sleep_hold_is_en =
         !dig_iso.dg_pad_force_unhold().bit() && dig_iso.dg_pad_autohold_en().bit();
     if !deep_sleep_hold_is_en {
         return;
     }
 
-    // TODO: assert that the task stack is not in external ram
-
-    for pin_num in 0..GPIO_NUM_MAX {
-        let pin_hold = rtc_cntl.dig_pad_hold().read().bits() & (1 << pin_num) != 0;
-        if !pin_hold {
-            // input disable, like gpio_ll_input_disable
-            io_mux.gpio(pin_num).modify(|_, w| w.fun_ie().clear_bit());
-            // output disable, like gpio_ll_output_disable
-            unsafe {
-                gpio.func_out_sel_cfg(pin_num)
-                    .modify(|_, w| w.bits(SIG_GPIO_OUT_IDX));
+    let pin_hold = LPWR::regs().dig_pad_hold().read().bits();
+    for_each_gpio! {
+        ($n:literal, $($rest:tt)*) => {
+            if pin_hold & (1 << $n) == 0 {
+                isolate_one_gpio($n);
             }
+        };
+    };
+}
 
-            // disable pull-up and pull-down
-            io_mux.gpio(pin_num).modify(|_, w| w.fun_wpu().clear_bit());
-            io_mux.gpio(pin_num).modify(|_, w| w.fun_wpd().clear_bit());
+fn isolate_one_gpio(pin_num: usize) {
+    // output disable, like gpio_ll_output_disable
+    GPIO::regs()
+        .func_out_sel_cfg(pin_num)
+        .modify(|_, w| unsafe { w.bits(OutputSignal::GPIO as u32) });
 
-            // make pad work as gpio (otherwise, deep_sleep bottom current will rise)
-            io_mux
-                .gpio(pin_num)
-                .modify(|_, w| unsafe { w.mcu_sel().bits(AlternateFunction::GPIO as u8) });
-        }
-    }
+    IO_MUX::regs().gpio(pin_num).modify(|_, w| unsafe {
+        // disable pull-up and pull-down
+        w.fun_wpu().clear_bit();
+        w.fun_wpd().clear_bit();
+
+        // input disable, like gpio_ll_input_disable
+        w.fun_ie().clear_bit();
+        // make pad work as gpio (otherwise, deep_sleep bottom current will rise)
+        w.mcu_sel().bits(AlternateFunction::GPIO as u8)
+    });
 }
 
 fn prepare_gpio_wakeup() {

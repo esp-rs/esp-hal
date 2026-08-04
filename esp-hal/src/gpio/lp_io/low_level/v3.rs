@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{LpPin, LpPinWithResistors},
+    gpio::{AlternateFunction, LpPin, LpPinWithResistors, WakeEvent, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
@@ -12,7 +12,7 @@ for_each_lp_function! {
                     $pin
                 }
 
-                unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
+                fn apply_wakeup(&self, wakeup: bool, level: WakeEvent) {
                     let gpio_wakeup = cfg_select! {
                         esp32c2 => LPWR::regs().cntl_gpio_wakeup(),
                         esp32c3 => LPWR::regs().gpio_wakeup(),
@@ -20,7 +20,7 @@ for_each_lp_function! {
 
                     gpio_wakeup.modify(|_, w| unsafe {
                         w.[<gpio_pin $pin _wakeup_enable>]().bit(wakeup);
-                        w.[<gpio_pin $pin _int_type>]().bits(level)
+                        w.[<gpio_pin $pin _int_type>]().bits(level as u8)
                     });
                 }
 
@@ -28,6 +28,17 @@ for_each_lp_function! {
                     LPWR::regs()
                         .pad_hold()
                         .modify(|_, w| w.[<gpio_pin $pin _hold>]().bit(enable));
+                }
+
+                // The low-power domain reaches the pad through the digital IO MUX, so there is
+                // no low-power function to select.
+                fn lp_set_config(&self, input_enable: bool, _mux: bool, _func: LpFunction) {
+                    IO_MUX::regs().gpio($pin)
+                        .modify(|_, w| unsafe {
+                            w.slp_sel().bit(false);
+                            w.mcu_sel().bits(AlternateFunction::GPIO as u8);
+                            w.fun_ie().bit(input_enable)
+                        });
                 }
             }
 
