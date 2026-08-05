@@ -434,7 +434,7 @@ pub enum AppPartitionSubType {
     /// Factory image
     Factory = 0,
     /// OTA slot 0
-    Ota0 = OTA_SUBTYPE_OFFSET,
+    Ota0    = OTA_SUBTYPE_OFFSET,
     /// OTA slot 1
     Ota1,
     /// OTA slot 2
@@ -498,7 +498,7 @@ pub enum DataPartitionSubType {
     /// Data partition which stores information about the currently selected OTA
     /// app slot. This partition should be 0x2000 bytes in size. Refer to
     /// the OTA documentation for more details.
-    Ota = 0,
+    Ota      = 0,
     /// Phy is for storing PHY initialization data. This allows PHY to be
     /// configured per-device, instead of in firmware.
     Phy,
@@ -514,9 +514,9 @@ pub enum DataPartitionSubType {
     /// but it is possible to explicitly mark them as undefined as well.
     Undefined,
     /// FAT Filesystem Support.
-    Fat = 0x81,
+    Fat      = 0x81,
     /// SPIFFS Filesystem.
-    Spiffs = 0x82,
+    Spiffs   = 0x82,
     ///  LittleFS filesystem.
     LittleFs = 0x83,
 }
@@ -538,7 +538,7 @@ pub enum BootloaderPartitionSubType {
     Primary = 0,
     /// It is a temporary bootloader partition used by the bootloader OTA update
     /// functionality for downloading a new image.
-    Ota = 1,
+    Ota     = 1,
 }
 
 impl TryFrom<u8> for BootloaderPartitionSubType {
@@ -558,7 +558,7 @@ pub enum PartitionTablePartitionSubType {
     Primary = 0,
     /// It is a temporary partition table partition used by the partition table
     /// OTA update functionality for downloading a new image.
-    Ota = 1,
+    Ota     = 1,
 }
 
 impl TryFrom<u8> for PartitionTablePartitionSubType {
@@ -703,9 +703,16 @@ pub struct EncryptedNorFlashRegion<'r, 'a, 'd> {
 #[cfg(feature = "embedded-storage")]
 mod embedded_storage_traits {
     use ::embedded_storage::{
-        ReadStorage, Region, Storage,
+        ReadStorage,
+        Region,
+        Storage,
         nor_flash::{
-            ErrorType, MultiwriteNorFlash, NorFlash, NorFlashError, NorFlashErrorKind, ReadNorFlash,
+            ErrorType,
+            MultiwriteNorFlash,
+            NorFlash,
+            NorFlashError,
+            NorFlashErrorKind,
+            ReadNorFlash,
         },
     };
 
