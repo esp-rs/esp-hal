@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v1.1.2] - 2026-08-05
+
 ## [v1.1.1] - 2026-05-07
 
 ### Fixed
@@ -1637,4 +1639,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.1.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0-rc.0
 [v1.1.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0-rc.0...esp-hal-v1.1.0
 [v1.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...esp-hal-v1.1.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.1...HEAD
+[v1.1.2]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.1...esp-hal-v1.1.2
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.2...HEAD
