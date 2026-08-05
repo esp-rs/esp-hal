@@ -73,6 +73,27 @@ impl WakeTriggers {
     pub(crate) fn as_u32(&self) -> u32 {
         self.0.as_u32()
     }
+
+    /// Returns the raw sleep-reject register bitmask.
+    ///
+    /// Rejection aborts a sleep request whose wakeup source is already asserted when the request is
+    /// made. Deep sleep cannot be rejected.
+    // TODO: OR in PMU_MODEM_WAKEUP_PROTECT (bit 16) once the radio can report that its state is not
+    // yet safe for sleep. It is not a wakeup-enable bit, so it cannot come from the source set.
+    // TODO: define for all chips - ESP32 is limited, rest have RTC_CNTL_SLP_REJECT_CONF_REG.
+    // Not every chip supports rejecting every wakeup source.
+    #[cfg(soc_has_pmu)]
+    pub(crate) fn reject_mask(&self, deep: bool) -> u32 {
+        if deep {
+            return 0;
+        }
+
+        // Every wake source can also reject a sleep request. esp32 is the exception, and it has no
+        // per-source reject mask at all.
+        let rejectable = EnumSet::<WakeupSource>::all().as_u32();
+
+        self.as_u32() & rejectable
+    }
 }
 
 /// Trait representing a wakeup source.

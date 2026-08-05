@@ -527,27 +527,8 @@ impl RtcSleepConfig {
     ///
     /// This function does not return if deep sleep is requested.
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
-        const PMU_EXT1_WAKEUP_EN: u32 = 1 << 1;
-        const PMU_GPIO_WAKEUP_EN: u32 = 1 << 2;
-        const PMU_LP_TIMER_WAKEUP_EN: u32 = 1 << 4;
-        const PMU_UART0_WAKEUP_EN: u32 = 1 << 6;
-        const PMU_UART1_WAKEUP_EN: u32 = 1 << 7;
-        const PMU_BLE_SOC_WAKEUP_EN: u32 = 1 << 10;
-
-        const RTC_SLEEP_REJECT_MASK: u32 = PMU_EXT1_WAKEUP_EN
-            | PMU_GPIO_WAKEUP_EN
-            | PMU_LP_TIMER_WAKEUP_EN
-            | PMU_UART0_WAKEUP_EN
-            | PMU_UART1_WAKEUP_EN
-            | PMU_BLE_SOC_WAKEUP_EN;
-
         let wakeup_mask = wakeup_triggers.as_u32();
-        let reject_mask = if self.deep {
-            0
-        } else {
-            let reject_mask = RTC_SLEEP_REJECT_MASK;
-            wakeup_mask & reject_mask
-        };
+        let reject_mask = wakeup_triggers.reject_mask(self.deep);
 
         let _restore_clock_config = ClockTree::with(|clocks| {
             let old_hp_root_clk = clocks.hp_root_clk();

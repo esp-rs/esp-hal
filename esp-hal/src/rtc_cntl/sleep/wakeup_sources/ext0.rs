@@ -72,12 +72,6 @@ impl<P: RtcIoWakeupPinType> WakeSource for Ext0WakeupSource<P> {
         sleep_config.set_rtc_peri_pd_en(false);
         triggers.insert(WakeupSource::Ext0);
 
-        // TODO: disable clock when not in use
-        #[cfg(esp32s2)]
-        crate::peripherals::SENS::regs()
-            .sar_io_mux_conf()
-            .modify(|_, w| w.iomux_clk_gate_en().set_bit());
-
         // set pin to RTC function
         self.pin
             .borrow_mut()
