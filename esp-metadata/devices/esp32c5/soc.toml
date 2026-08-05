@@ -407,7 +407,6 @@ wakeup_sources = {
     Sdio = 8,
     Bt = 10,
     LpCore = 11,
-    Usb = 14,
 }
 
 [device.etm]

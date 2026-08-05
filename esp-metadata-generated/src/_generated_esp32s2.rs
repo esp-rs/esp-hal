@@ -1025,10 +1025,9 @@ macro_rules! for_each_wakeup_source {
         _for_each_inner_wakeup_source!((Touch, 8));
         _for_each_inner_wakeup_source!((UlpRiscv, 11));
         _for_each_inner_wakeup_source!((UlpRiscvTrap, 13));
-        _for_each_inner_wakeup_source!((Usb, 15));
         _for_each_inner_wakeup_source!((all(Ext0, 0), (Ext1, 1), (Gpio, 2), (Timer, 3),
         (Wifi, 5), (Uart0, 6), (Uart1, 7), (Touch, 8), (UlpRiscv, 11), (UlpRiscvTrap,
-        13), (Usb, 15)));
+        13)));
     };
 }
 #[macro_export]
