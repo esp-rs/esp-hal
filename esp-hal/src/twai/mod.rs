@@ -122,7 +122,6 @@
 
 use core::marker::PhantomData;
 
-use embedded_can::Frame;
 use enumset::{EnumSet, EnumSetType};
 use procmacros::handler;
 
@@ -407,74 +406,6 @@ impl From<embedded_can::Id> for Id {
     }
 }
 
-/// A TWAI Frame.
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct EspTwaiFrame {
-    id: Id,
-    dlc: usize,
-    data: [u8; 8],
-    is_remote: bool,
-    self_reception: bool,
-}
-
-impl EspTwaiFrame {
-    /// Creates a new `EspTwaiFrame` with the specified ID and data payload.
-    pub fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
-        // TWAI frames cannot contain more than 8 bytes of data.
-        if data.len() > 8 {
-            return None;
-        }
-
-        let mut d: [u8; 8] = [0; 8];
-        d[..data.len()].copy_from_slice(data);
-
-        Some(EspTwaiFrame {
-            id: id.into(),
-            data: d,
-            dlc: data.len(),
-            is_remote: false,
-            self_reception: false,
-        })
-    }
-
-    /// Creates a new `EspTwaiFrame` for a transmission request with the
-    /// specified ID and data length (DLC).
-    pub fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
-        // TWAI frames cannot have more than 8 bytes.
-        if dlc > 8 {
-            return None;
-        }
-
-        Some(EspTwaiFrame {
-            id: id.into(),
-            data: [0; 8],
-            dlc,
-            is_remote: true,
-            self_reception: false,
-        })
-    }
-
-    /// Creates a new `EspTwaiFrame` ready for self-reception with the specified
-    /// ID and data payload.
-    pub fn new_self_reception(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
-        if data.len() > 8 {
-            return None;
-        }
-
-        let mut d: [u8; 8] = [0; 8];
-        d[..data.len()].copy_from_slice(data);
-
-        Some(EspTwaiFrame {
-            id: id.into(),
-            data: d,
-            dlc: data.len(),
-            is_remote: false,
-            self_reception: true,
-        })
-    }
-}
-
 #[instability::unstable]
 impl embedded_can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
@@ -486,40 +417,35 @@ impl embedded_can::Frame for EspTwaiFrame {
     }
 
     fn is_extended(&self) -> bool {
-        matches!(self.id, Id::Extended(_))
+        self.is_extended_format()
     }
 
     fn is_remote_frame(&self) -> bool {
-        self.is_remote
+        self.is_remote_request()
     }
 
     fn id(&self) -> embedded_can::Id {
-        self.id.into()
+        self.identifier().into()
     }
 
     fn dlc(&self) -> usize {
-        self.dlc
+        self.data_length_code()
     }
 
     fn data(&self) -> &[u8] {
-        // Remote frames do not contain data, yet have a value for the dlc so return
-        // an empty slice for remote frames.
-        match self.is_remote {
-            true => &[],
-            false => &self.data[0..self.dlc],
-        }
+        self.data()
     }
 }
 
 /// A RAM buffer for a TWAI frame.
 ///
 /// Mirror image of the 13 TWAI_DATA_x_REG registers.
-#[derive(Debug)]
-pub struct RawFrame {
+#[derive(Clone, Copy, Debug)]
+pub struct EspTwaiFrame {
     bytes: [u8; 13],
 }
 
-impl RawFrame {
+impl EspTwaiFrame {
     /// Frame Information: specifies a frame's type, format, data length, etc.
     ///
     /// | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
@@ -573,7 +499,7 @@ impl RawFrame {
 
     /// Frame Identifier: 11-bit long for a SFF frame, 29-bit long for an EFF frame.
     #[inline]
-    pub fn id(&self) -> Id {
+    pub fn identifier(&self) -> Id {
         let bytes = self.bytes;
         match self.is_extended_format() {
             false => {
@@ -633,7 +559,7 @@ impl RawFrame {
         &self.bytes[0..len]
     }
 
-    /// Make a new [`RawFrame`] from TWAI_DATA_x_REG registers.
+    /// Make a new [`EspTwaiFrame`] from TWAI_DATA_x_REG registers.
     pub(super) fn new_from_registers(register_block: &RegisterBlock) -> Self {
         let mut bytes: [u8; 13] = [0; 13];
         // SAFETY: Safe because it is a constant-size, read-only access to the 13 data registers
@@ -643,64 +569,77 @@ impl RawFrame {
         Self { bytes }
     }
 
-    /// Make a new [`RawFrame`] from a [`EspTwaiFrame`].
-    pub(super) fn new_from_frame(frame: &EspTwaiFrame) -> Self {
-        let mut bytes = [0u8; 13];
+    /// Make a new [`EspTwaiFrame`] from parameters.
+    fn new_from_parameters(
+        id: impl Into<Id>,
+        remote_request: bool,
+        self_reception: bool,
+        dlc: usize,
+        data: &[u8],
+    ) -> Result<Self, EspTwaiError> {
+        let data_len = data.len();
 
-        // Frame Info
-        let ff = (frame.is_extended() as u8) << 7;
-        let rtr = (frame.is_remote as u8) << 6;
-        let sr = (frame.self_reception as u8) << 4;
-        let dlc = (frame.dlc as u8) & 0b1111;
-        bytes[0] = ff | rtr | sr | dlc;
-        // Id
-        let data_start: usize = match frame.id {
-            Id::Standard(id) => {
-                let id = id.as_raw();
-                bytes[1] = (id >> 3) as u8;
-                bytes[2] = (id << 5) as u8;
-                3
-            }
-            Id::Extended(id) => {
-                let id = id.as_raw();
-                bytes[1] = (id >> 21) as u8;
-                bytes[2] = (id >> 13) as u8;
-                bytes[3] = (id >> 5) as u8;
-                bytes[4] = (id << 3) as u8;
-                5
-            }
-        };
-        // Data
-        let data = frame.data();
-        let data_end = data_start + data.len();
-        bytes[data_start..data_end].copy_from_slice(data);
-
-        RawFrame { bytes }
-    }
-}
-
-impl TryFrom<RawFrame> for EspTwaiFrame {
-    type Error = EspTwaiError;
-
-    /// Attempt to build a new [EspTwaiFrame] by parsing and validating a [RawFrame].
-    ///
-    /// Returns a [EspTwaiError] if it does not contain a valid TWAI frame.
-    #[inline(always)]
-    fn try_from(raw: RawFrame) -> Result<Self, EspTwaiError> {
-        let dlc = raw.data_length_code();
-        if dlc > 8 {
+        // Assert that:
+        // - Max data length is 8
+        // - remote request frames have no data payload
+        if data_len > 8 || (remote_request & (data_len > 0)) {
+            return Err(EspTwaiError::InvalidDataLength(data_len as u8));
+        }
+        // Assert that:
+        // - Max DLC is 15
+        // - Data length smaller than 8 must have equal DLC
+        // - Data length equal to 8 hmust ave DLC >= 8
+        if dlc > 15 || ((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8)) {
             return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
         }
-        let payload = raw.data();
-        let mut data: [u8; 8] = [0; 8];
-        data[..payload.len()].copy_from_slice(payload);
-        Ok(EspTwaiFrame {
-            id: raw.id(),
-            dlc,
-            data,
-            is_remote: raw.is_remote_request(),
-            self_reception: raw.is_self_reception(),
-        })
+
+        let mut bytes = [0u8; 13];
+
+        // Id
+        let (extended_format, data_start): (u8, usize) = match id.into() {
+            Id::Standard(id) => {
+                let raw = id.as_raw();
+                bytes[1] = (raw >> 3) as u8;
+                bytes[2] = (raw << 5) as u8;
+                (0, 3)
+            }
+            Id::Extended(id) => {
+                let raw = id.as_raw();
+                bytes[1] = (raw >> 21) as u8;
+                bytes[2] = (raw >> 13) as u8;
+                bytes[3] = (raw >> 5) as u8;
+                bytes[4] = (raw << 3) as u8;
+                (1, 5)
+            }
+        };
+        // Frame Info
+        let ff = extended_format << 7;
+        let rtr = (remote_request as u8) << 6;
+        let sr = (self_reception as u8) << 4;
+        let dlc = (dlc as u8) & 0b1111;
+        bytes[0] = ff | rtr | sr | dlc;
+        // Data
+        let data_end = data_start + data_len;
+        bytes[data_start..data_end].copy_from_slice(data);
+
+        Ok(Self { bytes })
+    }
+
+    /// Create a new `EspTwaiFrame` with the specified ID and data payload.
+    pub fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
+        Self::new_from_parameters(id.into(), false, false, data.len(), data).ok()
+    }
+
+    /// Create a new `EspTwaiFrame` for a transmission request with the
+    /// specified ID and data length (DLC).
+    pub fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
+        Self::new_from_parameters(id.into(), true, false, dlc, &[]).ok()
+    }
+
+    /// Create a new `EspTwaiFrame` ready for self-reception with the specified
+    /// ID and data payload.
+    pub fn new_self_reception(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
+        Self::new_from_parameters(id.into(), false, true, data.len(), data).ok()
     }
 }
 
@@ -1367,9 +1306,9 @@ where
             )));
         }
 
-        let raw_frame = RawFrame::new_from_registers(self.regs());
+        let frame = EspTwaiFrame::new_from_registers(self.regs());
         release_receive_fifo(self.regs());
-        Ok(raw_frame.try_into()?)
+        Ok(frame)
     }
 }
 
@@ -1401,6 +1340,8 @@ pub enum EspTwaiError {
     BusOff,
     /// The received frame contains an invalid DLC.
     NonCompliantDlc(u8),
+    /// Invalid data length.
+    InvalidDataLength(u8),
     /// Encapsulates errors defined by the embedded-hal crate.
     EmbeddedHAL(ErrorKind),
 }
@@ -1533,14 +1474,13 @@ fn release_receive_fifo(register_block: &RegisterBlock) {
 
 /// Write a frame to the peripheral.
 fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
-    let raw = RawFrame::new_from_frame(frame);
     // SAFETY: safe because there are 13 data registers and the slice is 13 bytes long max
     unsafe {
-        copy_to_data_register(register_block.data(0).as_ptr(), raw.as_slice());
+        copy_to_data_register(register_block.data(0).as_ptr(), frame.as_slice());
     }
 
     // Trigger the appropriate transmission request based on self_reception flag
-    match raw.is_self_reception() {
+    match frame.is_self_reception() {
         // Set the transmit request command, this will lock the transmit buffer until
         // the transmission is complete or aborted.
         false => register_block.cmd().write(|w| w.tx_req().set_bit()),
@@ -1681,7 +1621,7 @@ mod asynch {
     pub struct TwaiAsyncState {
         pub tx_waker: AtomicWaker,
         pub err_waker: AtomicWaker,
-        pub rx_queue: Channel<RawMutex, Result<RawFrame, EspTwaiError>, 32>,
+        pub rx_queue: Channel<RawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
     }
 
     impl Default for TwaiAsyncState {
@@ -1799,11 +1739,6 @@ mod asynch {
                 self.twai.listen(EnumSet::all());
 
                 if let Poll::Ready(result) = self.twai.async_state().rx_queue.poll_receive(cx) {
-                    // Convert `RawFrame` to `EspTwaiFrame`
-                    let result = match result {
-                        Ok(raw_frame) => raw_frame.try_into(),
-                        Err(e) => Err(e),
-                    };
                     return Poll::Ready(result);
                 }
 
@@ -1854,9 +1789,9 @@ mod asynch {
                     Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun))
                 } else {
                     // Current frame is complete
-                    let raw_frame = RawFrame::new_from_registers(register_block);
+                    let frame = EspTwaiFrame::new_from_registers(register_block);
                     release_receive_fifo(register_block);
-                    Ok(raw_frame)
+                    Ok(frame)
                 };
                 // Rx queue is full? Stop consuming Rx frames
                 if rx_queue.try_send(msg).is_err() {
