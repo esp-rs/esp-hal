@@ -334,7 +334,6 @@ wakeup_sources = {
     #UlpFsm = 9,
     UlpRiscv = 11,
     UlpRiscvTrap = 13,
-    Usb = 15,
 }
 
 # Other drivers which are partially supported but have no other configuration:
