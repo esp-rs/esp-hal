@@ -998,6 +998,9 @@ impl RtcSleepConfig {
             .lp_store8()
             .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
 
+        // The wakeup enable field is bits 30:0 here, unlike the other PMU chips where it is the
+        // whole register. Bit 31 is reserved and reads 0, so a whole-register write is correct and
+        // saves the read.
         PMU::regs()
             .slp_wakeup_cntl2()
             .write(|w| unsafe { w.bits(wakeup_mask) });

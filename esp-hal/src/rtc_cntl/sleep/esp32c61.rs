@@ -778,7 +778,6 @@ impl RtcSleepConfig {
         const PMU_BLE_SOC_WAKEUP_EN: u32 = 1 << 10;
         const PMU_LP_CORE_WAKEUP_EN: u32 = 1 << 11;
         const PMU_USB_WAKEUP_EN: u32 = 1 << 14;
-        const MODEM_REJECT: u32 = 1 << 16;
 
         const RTC_SLEEP_REJECT_MASK: u32 = PMU_EXT0_WAKEUP_EN
             | PMU_EXT1_WAKEUP_EN
@@ -796,9 +795,10 @@ impl RtcSleepConfig {
         let reject_mask = if self.deep {
             0
         } else {
-            // TODO: MODEM_REJECT if s_sleep_modem.wifi.phy_link != NULL
-            let reject_mask = RTC_SLEEP_REJECT_MASK | MODEM_REJECT;
-            wakeup_mask & reject_mask
+            // TODO: OR in PMU_MODEM_WAKEUP_PROTECT (bit 16) once the radio can report that its
+            // state is not yet safe for sleep. It is not a wakeup-enable bit, so it must be added
+            // after this mask, not to `RTC_SLEEP_REJECT_MASK`.
+            wakeup_mask & RTC_SLEEP_REJECT_MASK
         };
 
         let _restore_clock_config = ClockTree::with(|clocks| {
