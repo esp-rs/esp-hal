@@ -814,7 +814,7 @@ for_each_spi_slave! {
             #[inline(always)]
             fn info(&self) -> &'static Info {
                 static INFO: Info = Info {
-                    register_block: crate::peripherals::$peri::regs(),
+                    register_block: crate::peripherals::$peri::ptr(),
                     peripheral: crate::system::Peripheral::$sys,
                     sclk: InputSignal::$sclk,
                     mosi: InputSignal::$mosi,
