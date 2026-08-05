@@ -25,13 +25,13 @@ pub use crate::flash::FlashStorage;
 
 /// Represents a single partition entry.
 #[derive(Clone, Copy)]
-pub struct PartitionEntry<'a> {
-    pub(crate) binary: &'a [u8; RAW_ENTRY_LEN],
+pub struct PartitionEntry {
+    pub(crate) binary: [u8; RAW_ENTRY_LEN],
 }
 
-impl<'a> PartitionEntry<'a> {
-    fn new(binary: &'a [u8; RAW_ENTRY_LEN]) -> Self {
-        Self { binary }
+impl PartitionEntry {
+    fn new(binary: &[u8; RAW_ENTRY_LEN]) -> Self {
+        Self { binary: *binary }
     }
 
     /// The magic value of the entry.
@@ -65,12 +65,12 @@ impl<'a> PartitionEntry<'a> {
     }
 
     /// The label of the partition.
-    pub fn label(&self) -> &'a [u8] {
+    pub fn label(&self) -> &[u8] {
         &self.binary[12..][..16]
     }
 
     /// The label of the partition as `&str`.
-    pub fn label_as_str(&self) -> &'a str {
+    pub fn label_as_str(&self) -> &str {
         let array = self.label();
         let len = array
             .iter()
@@ -138,12 +138,12 @@ impl<'a> PartitionEntry<'a> {
 
     /// Provides a "view" into the partition allowing to read/write the
     /// partition contents using the given [`FlashStorage`].
-    pub fn as_flash_region<'d>(self, flash: &'a mut FlashStorage<'d>) -> FlashRegion<'a, 'd> {
+    pub fn as_flash_region<'a, 'd>(self, flash: &'a mut FlashStorage<'d>) -> FlashRegion<'a, 'd> {
         FlashRegion { raw: self, flash }
     }
 }
 
-impl core::fmt::Debug for PartitionEntry<'_> {
+impl core::fmt::Debug for PartitionEntry {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("PartitionEntry")
             .field("magic", &self.magic())
@@ -160,7 +160,7 @@ impl core::fmt::Debug for PartitionEntry<'_> {
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for PartitionEntry<'_> {
+impl defmt::Format for PartitionEntry {
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
             fmt,
@@ -250,26 +250,17 @@ impl<'a> PartitionTable<'a> {
 
         #[cfg(feature = "validation")]
         {
-            let (hash, index) = {
-                let mut i = 0;
-                loop {
-                    if let Ok(entry) = raw_table.get_partition(i) {
-                        if entry.magic() == MD5_MAGIC {
-                            break (&entry.binary[16..][..16], i);
-                        }
-
-                        i += 1;
-                        if i >= raw_table.entries {
-                            return Err(Error::Invalid);
-                        }
-                    }
-                }
-            };
+            let index = raw_table
+                .binary
+                .iter()
+                .position(|entry| u16::from_le_bytes([entry[0], entry[1]]) == MD5_MAGIC)
+                .ok_or(Error::Invalid)?;
+            let hash = &raw_table.binary[index][16..][..16];
 
             let mut hasher = crate::crypto::Md5::new();
 
-            for i in 0..index {
-                hasher.update(&raw_table.binary[i]);
+            for entry in &raw_table.binary[..index] {
+                hasher.update(entry);
             }
             let calculated_hash = hasher.finalize();
 
@@ -314,7 +305,7 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Get a partition entry.
-    pub fn get_partition(&self, index: usize) -> Result<PartitionEntry<'a>, Error> {
+    pub fn get_partition(&self, index: usize) -> Result<PartitionEntry, Error> {
         if index >= self.entries {
             return Err(Error::OutOfBounds);
         }
@@ -322,7 +313,7 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Get the first partition matching the given partition type.
-    pub fn find_partition(&self, pt: PartitionType) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn find_partition(&self, pt: PartitionType) -> Result<Option<PartitionEntry>, Error> {
         for i in 0..self.entries {
             let entry = self.get_partition(i)?;
             if entry.partition_type() == pt {
@@ -333,19 +324,19 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Returns an iterator over the partitions.
-    pub fn iter(&self) -> impl Iterator<Item = PartitionEntry<'a>> {
+    pub fn iter(&self) -> impl Iterator<Item = PartitionEntry> {
         (0..self.entries).filter_map(|i| self.get_partition(i).ok())
     }
 
     #[cfg(feature = "std")]
     /// Get the currently booted partition.
-    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn booted_partition(&self) -> Result<Option<PartitionEntry>, Error> {
         Err(Error::Invalid)
     }
 
     #[cfg(not(feature = "std"))]
     /// Get the currently booted partition.
-    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn booted_partition(&self) -> Result<Option<PartitionEntry>, Error> {
         // Read entry 0 from MMU to know which partition is mapped
         //
         // See <https://github.com/espressif/esp-idf/blob/758939caecb16e5542b3adfba0bc85025517db45/components/hal/mmu_hal.c#L124>
@@ -443,7 +434,7 @@ pub enum AppPartitionSubType {
     /// Factory image
     Factory = 0,
     /// OTA slot 0
-    Ota0    = OTA_SUBTYPE_OFFSET,
+    Ota0 = OTA_SUBTYPE_OFFSET,
     /// OTA slot 1
     Ota1,
     /// OTA slot 2
@@ -507,7 +498,7 @@ pub enum DataPartitionSubType {
     /// Data partition which stores information about the currently selected OTA
     /// app slot. This partition should be 0x2000 bytes in size. Refer to
     /// the OTA documentation for more details.
-    Ota      = 0,
+    Ota = 0,
     /// Phy is for storing PHY initialization data. This allows PHY to be
     /// configured per-device, instead of in firmware.
     Phy,
@@ -523,9 +514,9 @@ pub enum DataPartitionSubType {
     /// but it is possible to explicitly mark them as undefined as well.
     Undefined,
     /// FAT Filesystem Support.
-    Fat      = 0x81,
+    Fat = 0x81,
     /// SPIFFS Filesystem.
-    Spiffs   = 0x82,
+    Spiffs = 0x82,
     ///  LittleFS filesystem.
     LittleFs = 0x83,
 }
@@ -547,7 +538,7 @@ pub enum BootloaderPartitionSubType {
     Primary = 0,
     /// It is a temporary bootloader partition used by the bootloader OTA update
     /// functionality for downloading a new image.
-    Ota     = 1,
+    Ota = 1,
 }
 
 impl TryFrom<u8> for BootloaderPartitionSubType {
@@ -567,7 +558,7 @@ pub enum PartitionTablePartitionSubType {
     Primary = 0,
     /// It is a temporary partition table partition used by the partition table
     /// OTA update functionality for downloading a new image.
-    Ota     = 1,
+    Ota = 1,
 }
 
 impl TryFrom<u8> for PartitionTablePartitionSubType {
@@ -614,7 +605,7 @@ fn read_partition_table_impl<'a, F: FlashAccess>(
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, 'd> {
-    pub(crate) raw: PartitionEntry<'a>,
+    pub(crate) raw: PartitionEntry,
     pub(crate) flash: &'a mut FlashStorage<'d>,
 }
 
@@ -712,16 +703,9 @@ pub struct EncryptedNorFlashRegion<'r, 'a, 'd> {
 #[cfg(feature = "embedded-storage")]
 mod embedded_storage_traits {
     use ::embedded_storage::{
-        ReadStorage,
-        Region,
-        Storage,
+        ReadStorage, Region, Storage,
         nor_flash::{
-            ErrorType,
-            MultiwriteNorFlash,
-            NorFlash,
-            NorFlashError,
-            NorFlashErrorKind,
-            ReadNorFlash,
+            ErrorType, MultiwriteNorFlash, NorFlash, NorFlashError, NorFlashErrorKind, ReadNorFlash,
         },
     };
 
