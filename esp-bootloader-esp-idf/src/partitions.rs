@@ -682,14 +682,11 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
             return Err(Error::WriteProtected);
         }
 
-        let range = self.range();
-
-        if !range.contains(&address_from) {
+        if from > to {
             return Err(Error::OutOfBounds);
         }
 
-        // `to` is exclusive, so it may point one past the end of the partition.
-        if address_to > range.end || address_to < address_from {
+        if !self.in_range(address_from, (address_to - address_from) as usize) {
             return Err(Error::OutOfBounds);
         }
 
