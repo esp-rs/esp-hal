@@ -7,13 +7,13 @@ constant_0_input = 0xc0
 constant_1_input = 0x80
 # GPIO29 and GPIO41 are not bonded.
 pins = [
-    { pin =  0,                                                     lp = { 0 = "LP_GPIO0" } }, # analog = { 0 = "XTAL_32K_N" } },
-    { pin =  1,                                                     lp = { 0 = "LP_GPIO1" } }, # analog = { 0 = "XTAL_32K_P" } },
+    { pin =  0,                                                      lp = { 0 = "LP_GPIO0" } }, # analog = { 0 = "XTAL_32K_N" } },
+    { pin =  1,                                                      lp = { 0 = "LP_GPIO1" } }, # analog = { 0 = "XTAL_32K_P" } },
     { pin =  2, functions = {                    3 = "LCD_DATA19" }, lp = { 0 = "LP_GPIO2" } },
     { pin =  3, functions = {                    3 = "LCD_DATA20" }, lp = { 0 = "LP_GPIO3" } },
     { pin =  4, functions = {                    3 = "LCD_DATA21" }, lp = { 0 = "LP_GPIO4" } },
     { pin =  5, functions = {                    3 = "LCD_DATA22" }, lp = { 0 = "LP_GPIO5" } },
-    { pin =  6,                                                     lp = { 0 = "LP_GPIO6" } },
+    { pin =  6,                                                      lp = { 0 = "LP_GPIO6" } },
     { pin =  7, functions = {                    3 = "LCD_DATA23" }, lp = { 0 = "LP_GPIO7" } },
     { pin =  8, functions = {                   2 = "GMAC_PHY_TXD0", 3 = "LCD_DATA0"  } },
     { pin =  9, functions = { 0 = "FSPIHD",     2 = "GMAC_PHY_TXD1", 3 = "LCD_DATA1",  4 = "DBG_PSRAM_CK" } },

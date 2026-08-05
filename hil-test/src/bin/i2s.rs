@@ -12,22 +12,14 @@
 macro_rules! i2s_test_dma_channel {
     ($peripherals:ident, I2S0) => {
         cfg_select! {
-            i2s_dma_engine = "I2S_DMA" => {
-                $peripherals.DMA_I2S0.into()
-            }
-            _ => {
-                $peripherals.DMA_CH0.into()
-            }
+            i2s_dma_engine = "I2S_DMA" => $peripherals.DMA_I2S0.into(),
+            _ => $peripherals.DMA_CH0.into(),
         }
     };
     ($peripherals:ident, I2S1) => {
         cfg_select! {
-            i2s_dma_engine = "I2S_DMA" => {
-                $peripherals.DMA_I2S1.into()
-            }
-            _ => {
-                $peripherals.DMA_CH0.into()
-            }
+            i2s_dma_engine = "I2S_DMA" => $peripherals.DMA_I2S1.into(),
+            _ => $peripherals.DMA_CH0.into(),
         }
     };
     ($peripherals:ident, I2S2) => {

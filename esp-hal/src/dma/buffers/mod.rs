@@ -325,7 +325,10 @@ impl BurstConfig {
             dma_can_access_psram => {
                 let mut alignment = alignment;
                 if is_valid_psram_address(_buffer.as_ptr() as usize) {
-                    alignment = max(alignment, self.external_memory.min_psram_alignment(direction));
+                    alignment = max(
+                        alignment,
+                        self.external_memory.min_psram_alignment(direction),
+                    );
                 }
             }
             _ => {}
@@ -1997,15 +2000,13 @@ pub(crate) unsafe fn prepare_for_rx(
     let data_len = if data_in_psram {
         cfg_select! {
             dma_can_access_psram => {
-                // This could use a better API, but right now we'll have to build the descriptor list by
-                // hand.
-                let consumed_bytes = build_descriptor_list_for_psram(
-                    &mut descriptors,
-                    align_buffers,
-                    data,
-                );
+                // This could use a better API, but right now we'll have to build the descriptor
+                // list by hand.
+                let consumed_bytes =
+                    build_descriptor_list_for_psram(&mut descriptors, align_buffers, data);
 
-                // Invalidate data written by the DMA. As this likely affects more data than we touched, write back first.
+                // Invalidate data written by the DMA. As this likely affects more data than we
+                // touched, write back first.
                 unsafe {
                     crate::soc::cache_writeback_addr(data_addr as u32, consumed_bytes as u32);
                     crate::soc::cache_invalidate_addr(data_addr as u32, consumed_bytes as u32);

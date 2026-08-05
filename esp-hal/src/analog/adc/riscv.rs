@@ -567,12 +567,8 @@ pub(super) fn acquire_async_adc() {
 
 pub(super) fn release_async_adc() -> bool {
     cfg_select! {
-        all(adc_adc1, adc_adc2) => {
-            ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
-        }
-        _ => {
-            true
-        }
+        all(adc_adc1, adc_adc2) => ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1,
+        _ => true,
     }
 }
 

@@ -36,7 +36,9 @@ fn main() -> ! {
     let lp_pin = LowPowerOutput::new(peripherals.GPIO1);
 
     let mut lp_core = cfg_select! {
-        any(feature = "esp32s2", feature = "esp32s3") => UlpCore::new(peripherals.ULP_RISCV_CORE),
+        any(feature = "esp32s2", feature = "esp32s3") => {
+            UlpCore::new(peripherals.ULP_RISCV_CORE)
+        }
         _ => LpCore::new(peripherals.LP_CORE),
     };
 
@@ -57,10 +59,11 @@ fn main() -> ! {
     };
 
     // start LP core
-    let wakeup_source = cfg_select! {
-        any(feature = "esp32s2", feature = "esp32s3") => UlpCoreWakeupSource::HpCpu,
-        _ => LpCoreWakeupSource::HpCpu,
-    };
+    let wakeup_source =
+        cfg_select! {
+            any(feature = "esp32s2", feature = "esp32s3") => UlpCoreWakeupSource::HpCpu,
+            _ => LpCoreWakeupSource::HpCpu,
+        };
     lp_core_code.run(&mut lp_core, wakeup_source, lp_pin);
 
     println!("lp core run");

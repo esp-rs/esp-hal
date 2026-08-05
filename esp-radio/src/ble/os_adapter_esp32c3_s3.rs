@@ -179,15 +179,11 @@ extern "C" fn coex_schm_register_btdm_callback(_callback: *mut c_void) -> i32 {
     trace!("coex_schm_register_btdm_callback");
 
     cfg_select! {
-        feature = "coex" => {
-            unsafe {
-                const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
-                coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, _callback)
-            }
-        }
-        _ => {
-            0
-        }
+        feature = "coex" => unsafe {
+            const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
+            coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, _callback)
+        },
+        _ => 0,
     }
 }
 
@@ -302,7 +298,6 @@ pub enum TxPower {
     P20,
 }
 
-#[allow(dead_code)]
 impl TxPower {
     fn idx(self) -> esp_power_level_t {
         match self {
@@ -322,6 +317,7 @@ impl TxPower {
         }
     }
 
+    #[allow(dead_code)]
     fn dbm(self) -> i8 {
         match self {
             Self::N15 => -15,
@@ -537,7 +533,9 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         hci_tl_funcs: core::ptr::null_mut(),
         txant_dft: config.default_tx_antenna as u8,
         rxant_dft: config.default_rx_antenna as u8,
-        txpwr_dft: config.default_tx_power as u8,
+        // `txpwr_dft` expects an `esp_power_level_t` index, which is offset by 3
+        // from the plain `TxPower` discriminant (`ESP_PWR_LVL_N15` is 3, not 0).
+        txpwr_dft: config.default_tx_power.idx() as u8,
         cfg_mask: CFG_MASK,
 
         // Bluetooth mesh options, currently not supported

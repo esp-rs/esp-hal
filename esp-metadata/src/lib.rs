@@ -705,7 +705,10 @@ impl Config {
             return quote! {};
         };
 
-        cfg::generate_gpios(gpio)
+        cfg::generate_gpios(
+            gpio,
+            self.device.peri_config.lp_io.as_ref().map(|lp| &lp.signals),
+        )
     }
 
     fn generate_peripherals(&self) -> TokenStream {

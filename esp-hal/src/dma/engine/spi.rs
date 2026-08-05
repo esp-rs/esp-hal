@@ -161,12 +161,13 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
 impl TxRegisterAccess for SpiDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
         cfg_select! {
-            esp32 => {
-                self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0
-            }
-            _ => {
-                self.regs().dma_outstatus().read().dma_outfifo_empty().bit_is_set()
-            }
+            esp32 => self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0,
+            _ => self
+                .regs()
+                .dma_outstatus()
+                .read()
+                .dma_outfifo_empty()
+                .bit_is_set(),
         }
     }
 

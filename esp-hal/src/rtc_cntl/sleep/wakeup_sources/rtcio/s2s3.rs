@@ -1,23 +1,20 @@
 use super::RtcioWakeupSource;
 use crate::{
-    gpio::{Level, RtcFunction, RtcPin},
-    peripherals::RTC_IO,
+    gpio::{Level, LpPin, WakeEvent, lp_io::LpFunction},
     rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource},
 };
 
 impl RtcioWakeupSource<'_, '_> {
-    fn apply_pin(&self, pin: &mut dyn RtcPin, level: Level) {
-        pin.rtc_set_config(true, true, RtcFunction::Rtc);
+    fn apply_pin(&self, pin: &mut dyn LpPin, level: Level) {
+        pin.lp_set_config(true, true, LpFunction::LP_GPIO);
 
-        RTC_IO::regs()
-            .pin(pin.number() as usize)
-            .modify(|_, w| unsafe {
-                w.wakeup_enable().set_bit();
-                w.int_type().bits(match level {
-                    Level::Low => 4,
-                    Level::High => 5,
-                })
-            });
+        pin.apply_wakeup(
+            true,
+            match level {
+                Level::Low => WakeEvent::LowLevel,
+                Level::High => WakeEvent::HighLevel,
+            },
+        );
     }
 }
 
@@ -66,7 +63,7 @@ impl Drop for RtcioWakeupSource<'_, '_> {
         // to IO_MUX)
         let mut pins = self.pins.borrow_mut();
         for (pin, _level) in pins.iter_mut() {
-            pin.rtc_set_config(true, false, RtcFunction::Rtc);
+            pin.lp_set_config(true, false, LpFunction::LP_GPIO);
         }
     }
 }

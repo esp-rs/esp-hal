@@ -23,7 +23,7 @@ mod implementation;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, LowPower, TimerWakeupSource}, wakeup_cause, SocResetReason};
 /// # use esp_hal::system::Cpu;
-/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull, RtcPinWithResistors};
+/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull, LpPinWithResistors};
 /// # use esp_hal::time::Duration;
 /// #
 /// let delay = Delay::new();
@@ -41,7 +41,7 @@ mod implementation;
 ///
 /// core::mem::drop(pin_low_input);
 ///
-/// let wakeup_pins: &mut [(&mut dyn RtcPinWithResistors, Level)] =
+/// let wakeup_pins: &mut [(&mut dyn LpPinWithResistors, Level)] =
 /// &mut [
 ///     (&mut peripherals.__pin_low__, Level::Low),
 ///     (&mut peripherals.__pin_high__, Level::High),
@@ -80,7 +80,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, LowPower, TimerWakeupSource}, wakeup_cause, SocResetReason};
 /// # use esp_hal::system::Cpu;
-/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull, RtcPin};
+/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull, LpPin};
 /// # use esp_hal::time::Duration;
 ///
 /// let delay = Delay::new();
@@ -101,7 +101,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// // Drop the driver to access `pin_4`
 /// core::mem::drop(pin_4_driver);
 ///
-/// let mut wakeup_pins: [&mut dyn RtcPin; 2] = [&mut pin_4, &mut pin_2];
+/// let mut wakeup_pins: [&mut dyn LpPin; 2] = [&mut pin_4, &mut pin_2];
 ///
 /// let ext1 = Ext1WakeupSource::new(&mut wakeup_pins, Level::High);
 ///

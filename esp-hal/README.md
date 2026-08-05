@@ -111,6 +111,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | [⚒️][5973] [^1] |
 | SDM                       | [❌][2370] [^1] |          | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |           | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |           |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
+| SPI LCD interface         |       |          |          |          |          |           |          |          | [❌][5374] [^1] |          |           |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      | ❌        |
 | SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
@@ -151,6 +152,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5169]: https://github.com/esp-rs/esp-hal/issues/5169
 [5170]: https://github.com/esp-rs/esp-hal/issues/5170
 [5171]: https://github.com/esp-rs/esp-hal/issues/5171
+[5374]: https://github.com/esp-rs/esp-hal/issues/5374
 [5417]: https://github.com/esp-rs/esp-hal/issues/5417
 [5418]: https://github.com/esp-rs/esp-hal/issues/5418
 [5419]: https://github.com/esp-rs/esp-hal/issues/5419

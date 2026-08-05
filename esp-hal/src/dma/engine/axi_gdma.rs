@@ -559,7 +559,7 @@ fn init_axi_dma_racey() {
                 .write(|w| unsafe { w.access_extr_mem_start_addr().bits(0x4000_0000) });
             regs.extr_mem_end_addr()
                 .write(|w| unsafe { w.access_extr_mem_end_addr().bits(0x53FF_FFFF) });
-        },
+        }
         _ => {
             regs.intr_mem_start_addr()
                 .write(|w| unsafe { w.access_intr_mem_start_addr().bits(0x4FC0_0000) });

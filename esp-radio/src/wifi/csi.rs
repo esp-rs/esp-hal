@@ -140,15 +140,9 @@ impl<'a> WifiCsiInfo<'_> {
     pub fn secondary_channel(&self) -> SecondaryChannel {
         cfg_select! {
             wifi_mac_version = "1" => {
-                SecondaryChannel::from_raw(unsafe {
-                    (*self.inner).rx_ctrl.secondary_channel()
-                })
+                SecondaryChannel::from_raw(unsafe { (*self.inner).rx_ctrl.secondary_channel() })
             }
-            _ => {
-                SecondaryChannel::from_raw(unsafe {
-                    (*self.inner).rx_ctrl.second()
-                })
-            }
+            _ => SecondaryChannel::from_raw(unsafe { (*self.inner).rx_ctrl.second() }),
         }
     }
 
