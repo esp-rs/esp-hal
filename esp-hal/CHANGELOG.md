@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.1.2] - 2026-08-05
 
+### Fixed
+
+- timer: `OneShotTimer::into_blocking()` now returns `OneShotTimer<'d, Blocking>` (#5689)
+- SHA: ESP32 implementation no longer powers down the SHA accelerator while in use (#5607)
+- SHA: ESP32 no longer tries to use the hardware accelerator when it's held by another SHA operation. (#5607)
+- RSA: ESP32 now correctly disables its interrupts before disabling the RSA accelerator (#5607)
+- Add missing import when building SPI with `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM = "true"` (#5588)
+- SPI: the register block pointer is now taken via `ptr()`, fixing a const-evaluation build failure on recent nightly compilers (#6051)
+
 ## [v1.1.1] - 2026-05-07
 
 ### Fixed
