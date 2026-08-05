@@ -866,3 +866,161 @@ mod tests {
         }
     }
 }
+
+/// Tests for the configuration where the scheduler runs on the second core only, and the first core
+/// stays bare-metal.
+///
+/// The test functions run on the first core, so they must not use any esp-rtos API. They observe
+/// the second core through atomics instead.
+#[cfg(multi_core)]
+#[embedded_test::tests(default_timeout = 3)]
+mod second_core_only {
+    use core::ffi::c_void;
+
+    use esp_hal::{
+        clock::CpuClock,
+        interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
+        peripherals::CPU_CTRL,
+        system::Cpu,
+        time::Duration,
+        timer::timg::{Timer, TimerGroup},
+    };
+    use esp_radio_rtos_driver as preempt;
+    use esp_rtos::CurrentThreadHandle;
+    use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    struct Context {
+        cpu_control: CPU_CTRL<'static>,
+        sw_int1: SoftwareInterrupt<'static, 1>,
+        timer: Timer<'static>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        crate::init_heap();
+
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
+
+        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        let timg0 = TimerGroup::new(p.TIMG0);
+
+        Context {
+            cpu_control: p.CPU_CTRL,
+            sw_int1: sw_ints.software_interrupt1,
+            timer: timg0.timer0,
+        }
+    }
+
+    fn start_on_second_core(ctx: Context, func: impl FnOnce() + Send + 'static) {
+        esp_rtos::start_on_second_core_only(
+            ctx.cpu_control,
+            ctx.sw_int1,
+            ctx.timer,
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            func,
+        );
+    }
+
+    fn spawn(name: &str, task: extern "C" fn(*mut c_void), priority: u32) {
+        unsafe { preempt::task_create(name, task, core::ptr::null_mut(), priority, None, 4096) };
+    }
+
+    #[test]
+    fn task_runs_on_the_second_core(ctx: Context) {
+        static FINISHED: AtomicBool = AtomicBool::new(false);
+        static RAN_ON_SECOND_CORE: AtomicBool = AtomicBool::new(false);
+
+        extern "C" fn task(_: *mut c_void) {
+            RAN_ON_SECOND_CORE.store(Cpu::current() == Cpu::AppCpu, Ordering::SeqCst);
+            FINISHED.store(true, Ordering::SeqCst);
+        }
+
+        start_on_second_core(ctx, || spawn("task", task, 1));
+
+        while !FINISHED.load(Ordering::SeqCst) {}
+
+        hil_test::assert!(RAN_ON_SECOND_CORE.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn time_slicing_on_the_second_core(ctx: Context) {
+        // Two tasks of the same priority must both make progress. Each task counts up until the
+        // counter jumps, which means the other task ran in between.
+        static FINISHED: AtomicUsize = AtomicUsize::new(0);
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+        extern "C" fn task(_: *mut c_void) {
+            let mut expected_value = None;
+
+            loop {
+                let was = COUNTER.fetch_add(1, Ordering::SeqCst);
+
+                if let Some(expected) = expected_value {
+                    // Not the first iteration. Check that the counter matches the expected value.
+                    if was == expected {
+                        expected_value = Some(was + 1);
+                    } else {
+                        break;
+                    }
+                } else {
+                    // First iteration, just grab the initial value.
+                    expected_value = Some(was + 1);
+                }
+            }
+
+            FINISHED.fetch_add(1, Ordering::SeqCst);
+        }
+
+        start_on_second_core(ctx, || {
+            // The tasks run at the priority of the main thread, so that the main thread can create
+            // the second task.
+            spawn("task1", task, 0);
+            spawn("task2", task, 0);
+        });
+
+        while FINISHED.load(Ordering::SeqCst) < 2 {}
+    }
+
+    #[test]
+    fn the_first_core_keeps_running(ctx: Context) {
+        static FIRST_CORE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+        static FIRST_CORE_ADVANCED: AtomicBool = AtomicBool::new(false);
+        static FINISHED: AtomicBool = AtomicBool::new(false);
+
+        extern "C" fn observer(_: *mut c_void) {
+            let before = FIRST_CORE_COUNTER.load(Ordering::Relaxed);
+
+            // Sleeping proves that the scheduler of the second core works while the first core runs
+            // its own code.
+            CurrentThreadHandle::get().delay(Duration::from_millis(50));
+
+            let after = FIRST_CORE_COUNTER.load(Ordering::Relaxed);
+            FIRST_CORE_ADVANCED.store(after > before, Ordering::SeqCst);
+            FINISHED.store(true, Ordering::SeqCst);
+        }
+
+        start_on_second_core(ctx, || spawn("observer", observer, 1));
+
+        while !FINISHED.load(Ordering::SeqCst) {
+            FIRST_CORE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        }
+
+        hil_test::assert!(FIRST_CORE_ADVANCED.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    #[should_panic]
+    fn thread_mode_executor_on_the_first_core_panics(ctx: Context) {
+        use esp_rtos::embassy::Executor;
+        use static_cell::StaticCell;
+
+        start_on_second_core(ctx, || {});
+
+        static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+        EXECUTOR.init(Executor::new()).run(|_| {});
+    }
+}

@@ -178,7 +178,9 @@ pub trait Callbacks {
     multi_core,
     doc = r"
 
-If you want to start the executor on the second core, you will need to start the second core using [`crate::start_second_core`].
+If you want to start the executor on the second core, you will need to start the second core using
+[`crate::start_second_core`], or [`crate::start_on_second_core_only`] if the first core should stay
+bare-metal.
 If you are looking for a way to run code on the second core without the scheduler, use the [`InterruptExecutor`].
 "
 )]
@@ -270,11 +272,11 @@ impl Executor {
             ))
         };
 
+        // The main task may start the scheduler from inside this executor, so we cannot require the
+        // scheduler to run already. We can, however, refuse to run on a CPU that the scheduler
+        // never runs on.
         #[cfg(multi_core)]
-        if Cpu::current() != Cpu::ProCpu
-            && crate::SCHEDULER
-                .with(|scheduler| !scheduler.per_cpu[Cpu::current() as usize].initialized)
-        {
+        if crate::SCHEDULER.with(|scheduler| !scheduler.active_cores.contains(Cpu::current())) {
             panic!("Executor cannot be started: the scheduler is not running on the current CPU.");
         }
 
