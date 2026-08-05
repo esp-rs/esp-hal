@@ -206,7 +206,7 @@ impl<'a, 'd> Ota<'a, 'd> {
         }
 
         if flash.capacity() != 0x2000
-            || flash.raw.partition_type() != PartitionType::Data(DataPartitionSubType::Ota)
+            || flash.partition_type != PartitionType::Data(DataPartitionSubType::Ota)
         {
             return Err(Error::InvalidPartition {
                 expected_size: 0x2000,
@@ -427,10 +427,7 @@ mod tests {
         flash: &'a mut FlashStorage<'static>,
         binary: [u8; 32],
     ) -> FlashRegion<'a, 'static> {
-        FlashRegion {
-            raw: PartitionEntry { binary },
-            flash,
-        }
+        PartitionEntry { binary }.as_flash_region(flash)
     }
 
     fn init_ota_flash(flash: &mut FlashStorage<'static>) {
