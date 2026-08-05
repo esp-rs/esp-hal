@@ -2466,7 +2466,7 @@ for_each_spi_master! {
                 }
 
                 static INFO: Info = Info {
-                    register_block: crate::peripherals::$peri::regs(),
+                    register_block: crate::peripherals::$peri::ptr(),
                     peripheral: crate::system::Peripheral::$sys,
                     async_handler: irq_handler,
                     sclk: OutputSignal::$sclk,
