@@ -4,6 +4,10 @@
         cfg(any(esp32s2, esp32s3)) => "GPIO21",
         cfg(esp32h2) => "GPIO8",
         _ => "GPIO1"
+    },
+    "lp_num" => {
+        cfg(any(esp32s2, esp32s3)) => "21",
+        _ => "1"
     }
 ))]
 //! Low Power IO (LP_IO)
@@ -19,20 +23,45 @@
 //! Low-power pins bypass the regular IO MUX and GPIO matrix so they can be used
 //! by the ULP/LP core and low-power peripherals. They can remain operational
 //! during deep sleep and can be used as wake-up sources.
-//!
-//! ## Examples
-//!
-//! ### Configure a Low-Power Pin as Output
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! use esp_hal::gpio::lp_io::LowPowerOutput;
-//! let lp_pin = LowPowerOutput::new(peripherals.__lp_io__);
-//! # {after_snippet}
-//! ```
+#![cfg_attr(
+    ulp_riscv_driver_supported,
+    doc = "
 
+## Handing a pin to the low-power core
+
+[`LowPowerInput`], [`LowPowerOutput`], and [`LowPowerOutputOpenDrain`] are opaque tokens that
+represent a pad owned by the low-power domain. Obtain them by consuming a
+[`Input`](crate::gpio::Input) or [`Output`](crate::gpio::Output) driver with
+[`Input::into_lp`](crate::gpio::Input::into_lp), [`Output::into_lp`](crate::gpio::Output::into_lp),
+or [`Output::into_open_drain_lp`](crate::gpio::Output::into_open_drain_lp). The conversion muxes the
+pad into the low-power domain; afterwards the HP core can no longer drive it.
+
+The `PIN` parameter of the tokens is the low-power pin number, which is how low-power core firmware
+refers to the pin. The conversions verify at runtime that the pad they are given is that pin, and
+hand the driver back when it is not.
+
+The tokens can also be created straight from a pin with `LowPowerInput::new`,
+`LowPowerOutput::new`, and `LowPowerOutputOpenDrain::new`, which check the pin number at compile
+time but leave the pad's configuration up to the token.
+
+## Examples
+
+### Hand a pin to the LP core
+
+```rust, no_run
+# {before_snippet}
+use esp_hal::gpio::{Level, Output, OutputConfig};
+let pin = Output::new(peripherals.__lp_io__, Level::Low, OutputConfig::default());
+let lp_pin = pin.into_lp::<__lp_num__>().unwrap();
+# {after_snippet}
+```
+"
+)]
+
+#[cfg(ulp_riscv_driver_supported)]
 use core::marker::PhantomData;
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 use super::{InputPin, LpPin, OutputPin};
 
 define_lp_io_signals!();
@@ -46,13 +75,12 @@ define_lp_functions!();
 #[cfg_attr(lp_io_version = "v4", path = "low_level/v4.rs")]
 mod low_level;
 
-// FIXME: LpPin is necessary only as long as the sleep API takes &dyn LpPin(WithResistors).
-// After that has been resolved, we can simplify this hierarchy to only have LowPowerPin.
-
 /// Trait implemented by pins with a known low-power pin number.
+#[cfg(ulp_riscv_driver_supported)]
 #[doc(hidden)]
 pub trait LowPowerPin<const PIN: u8>: LpPin {}
 
+#[cfg(ulp_riscv_driver_supported)]
 for_each_lp_function! {
     (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl LowPowerPin<$pin> for crate::peripherals::$gpio<'_> {}
@@ -154,92 +182,197 @@ fn route_output(lp_pin: u8, output: LpOutputSignal) {
         });
 }
 
-/// A GPIO output pin configured for low-power operation.
-pub struct LowPowerOutput<'d, const PIN: u8> {
-    phantom: PhantomData<&'d mut ()>,
-}
+/// Tokens to hand out a pin to a low-power CPU.
+// FIXME: tokens should be 'static to be handed out.
+#[cfg(ulp_riscv_driver_supported)]
+mod ulp_tokens {
+    use super::*;
+    use crate::gpio::Pin;
 
-impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
-    /// Creates a new output pin for use by the low-power core.
+    // Needed because AnyPin::lp_number is infallible
+    fn lp_number(gpio: u8) -> Option<u8> {
+        for_each_lp_function! {
+            (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
+                if gpio == crate::peripherals::$gpio::NUMBER {
+                    return Some($pin);
+                }
+            };
+        }
+
+        None
+    }
+
+    impl<'d> crate::gpio::Input<'d> {
+        /// Hands the pin over to the low-power core.
+        ///
+        /// `PIN` is the low-power pin number, which is how low-power core firmware refers to the
+        /// pin.
+        ///
+        /// # Errors
+        ///
+        /// Returns the driver unchanged if the pad is not the low-power pin numbered `PIN`.
+        #[instability::unstable]
+        pub fn into_lp<const PIN: u8>(self) -> Result<LowPowerInput<'d, PIN>, Self> {
+            if lp_number(self.pin.pin.number()) != Some(PIN) {
+                return Err(self);
+            }
+
+            Ok(LowPowerInput::new_untyped(self.pin.pin))
+        }
+    }
+
+    impl<'d> crate::gpio::Output<'d> {
+        /// Hands the pin over to the low-power core.
+        ///
+        /// `PIN` is the low-power pin number, which is how low-power core firmware refers to the
+        /// pin.
+        ///
+        /// # Errors
+        ///
+        /// Returns the driver unchanged if the pad is not the low-power pin numbered `PIN`.
+        #[instability::unstable]
+        pub fn into_lp<const PIN: u8>(self) -> Result<LowPowerOutput<'d, PIN>, Self> {
+            if lp_number(self.pin.pin.number()) != Some(PIN) {
+                return Err(self);
+            }
+
+            Ok(LowPowerOutput::new_untyped(self.pin.pin))
+        }
+
+        /// Hands the pin over to the low-power core as an open-drain output.
+        ///
+        /// `PIN` is the low-power pin number, which is how low-power core firmware refers to the
+        /// pin. The pad's pull-up is enabled, regardless of the driver's configuration.
+        ///
+        /// # Errors
+        ///
+        /// Returns the driver unchanged if the pad is not the low-power pin numbered `PIN`.
+        #[instability::unstable]
+        pub fn into_open_drain_lp<const PIN: u8>(
+            self,
+        ) -> Result<LowPowerOutputOpenDrain<'d, PIN>, Self> {
+            if lp_number(self.pin.pin.number()) != Some(PIN) {
+                return Err(self);
+            }
+
+            Ok(LowPowerOutputOpenDrain::new_untyped(self.pin.pin))
+        }
+    }
+
+    /// A GPIO output pin configured for low-power operation.
     #[instability::unstable]
-    pub fn new<P>(pin: P) -> Self
-    where
-        P: LowPowerPin<PIN> + OutputPin + 'd,
-    {
-        let pin = low_level::init_pin(&pin, false);
-        low_level::output_enable(pin, true);
+    pub struct LowPowerOutput<'d, const PIN: u8> {
+        pub(super) phantom: PhantomData<&'d mut ()>,
+    }
 
-        Self {
-            phantom: PhantomData,
+    impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
+        /// Creates a new output pin for use by the low-power core.
+        #[instability::unstable]
+        pub fn new<P>(pin: P) -> Self
+        where
+            P: LowPowerPin<PIN> + OutputPin + 'd,
+        {
+            Self::new_untyped(pin)
+        }
+
+        pub(super) fn new_untyped<P>(pin: P) -> Self
+        where
+            P: LpPin + OutputPin + 'd,
+        {
+            let lp_pin = low_level::init_pin(&pin, false);
+            low_level::output_enable(lp_pin, true);
+
+            Self {
+                phantom: PhantomData,
+            }
+        }
+    }
+
+    /// A GPIO input pin configured for low-power operation.
+    #[instability::unstable]
+    pub struct LowPowerInput<'d, const PIN: u8> {
+        pub(super) phantom: PhantomData<&'d mut ()>,
+    }
+
+    impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
+        /// Creates a new input pin for use by the low-power core.
+        #[instability::unstable]
+        pub fn new<P>(pin: P) -> Self
+        where
+            P: LowPowerPin<PIN> + InputPin + 'd,
+        {
+            Self::new_untyped(pin)
+        }
+
+        pub(super) fn new_untyped<P>(pin: P) -> Self
+        where
+            P: LpPin + InputPin + 'd,
+        {
+            let lp_pin = low_level::init_pin(&pin, true);
+            low_level::input_enable(lp_pin, true);
+            low_level::pullup_enable(lp_pin, false);
+            low_level::pulldown_enable(lp_pin, false);
+
+            Self {
+                phantom: PhantomData,
+            }
+        }
+
+        /// Enables or disables the internal pull-up resistor.
+        pub fn pullup_enable(&self, enable: bool) {
+            low_level::pullup_enable(PIN, enable);
+        }
+
+        /// Enables or disables the internal pull-down resistor.
+        pub fn pulldown_enable(&self, enable: bool) {
+            low_level::pulldown_enable(PIN, enable);
+        }
+    }
+
+    /// A GPIO open-drain output pin configured for low-power operation.
+    #[instability::unstable]
+    pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
+        pub(super) phantom: PhantomData<&'d mut ()>,
+    }
+
+    impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
+        /// Creates a new open-drain output pin for use by the low-power core.
+        #[instability::unstable]
+        pub fn new<P>(pin: P) -> Self
+        where
+            P: LowPowerPin<PIN> + InputPin + OutputPin + 'd,
+        {
+            Self::new_untyped(pin)
+        }
+
+        pub(super) fn new_untyped<P>(pin: P) -> Self
+        where
+            P: LpPin + InputPin + OutputPin + 'd,
+        {
+            let gpio = pin.number();
+            let lp_pin = low_level::init_pin(&pin, true);
+            low_level::set_open_drain_output(gpio, true);
+            low_level::input_enable(lp_pin, true);
+            low_level::pullup_enable(lp_pin, true);
+            low_level::pulldown_enable(lp_pin, false);
+            low_level::output_enable(lp_pin, true);
+
+            Self {
+                phantom: PhantomData,
+            }
+        }
+
+        /// Enables or disables the internal pull-up resistor.
+        pub fn pullup_enable(&self, enable: bool) {
+            low_level::pullup_enable(PIN, enable);
+        }
+
+        /// Enables or disables the internal pull-down resistor.
+        pub fn pulldown_enable(&self, enable: bool) {
+            low_level::pulldown_enable(PIN, enable);
         }
     }
 }
 
-/// A GPIO input pin configured for low-power operation.
-pub struct LowPowerInput<'d, const PIN: u8> {
-    phantom: PhantomData<&'d mut ()>,
-}
-
-impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
-    /// Creates a new input pin for use by the low-power core.
-    #[instability::unstable]
-    pub fn new<P>(pin: P) -> Self
-    where
-        P: LowPowerPin<PIN> + InputPin + 'd,
-    {
-        let pin = low_level::init_pin(&pin, true);
-        low_level::input_enable(pin, true);
-        low_level::pullup_enable(pin, false);
-        low_level::pulldown_enable(pin, false);
-
-        Self {
-            phantom: PhantomData,
-        }
-    }
-
-    /// Enables or disables the internal pull-up resistor.
-    pub fn pullup_enable(&self, enable: bool) {
-        low_level::pullup_enable(PIN, enable);
-    }
-
-    /// Enables or disables the internal pull-down resistor.
-    pub fn pulldown_enable(&self, enable: bool) {
-        low_level::pulldown_enable(PIN, enable);
-    }
-}
-
-/// A GPIO open-drain output pin configured for low-power operation.
-pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
-    phantom: PhantomData<&'d mut ()>,
-}
-
-impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
-    /// Creates a new open-drain output pin for use by the low-power core.
-    #[instability::unstable]
-    pub fn new<P>(pin: P) -> Self
-    where
-        P: LowPowerPin<PIN> + InputPin + OutputPin + 'd,
-    {
-        let gpio = pin.number();
-        let pin = low_level::init_pin(&pin, true);
-        low_level::set_open_drain_output(gpio, true);
-        low_level::input_enable(pin, true);
-        low_level::pullup_enable(pin, true);
-        low_level::pulldown_enable(pin, false);
-        low_level::output_enable(pin, true);
-
-        Self {
-            phantom: PhantomData,
-        }
-    }
-
-    /// Enables or disables the internal pull-up resistor.
-    pub fn pullup_enable(&self, enable: bool) {
-        low_level::pullup_enable(PIN, enable);
-    }
-
-    /// Enables or disables the internal pull-down resistor.
-    pub fn pulldown_enable(&self, enable: bool) {
-        low_level::pulldown_enable(PIN, enable);
-    }
-}
+#[cfg(ulp_riscv_driver_supported)]
+pub use ulp_tokens::*;
