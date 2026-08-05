@@ -643,6 +643,22 @@ impl EspTwaiFrame {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for EspTwaiFrame {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        defmt::write!(
+            f,
+            "EspTwaiFrame {{ EFF: {0=7..8}, RTR: {0=6..7}, SR: {0=4..5}, DLC: {0=1..4}, ID: {1=u32} DATA: {2=[u8]} }}",
+            self.info(),
+            match self.identifier().into() {
+                Id::Standard(id) => id.as_raw() as u32,
+                Id::Extended(id) => id.as_raw(),
+            },
+            self.data()
+        );
+    }
+}
+
 /// The underlying timings for the TWAI peripheral.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
