@@ -765,39 +765,8 @@ impl RtcSleepConfig {
     ///
     /// This function does not return if deep sleep is requested.
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
-        const PMU_EXT0_WAKEUP_EN: u32 = 1 << 0;
-        const PMU_EXT1_WAKEUP_EN: u32 = 1 << 1;
-        const PMU_GPIO_WAKEUP_EN: u32 = 1 << 2;
-        const PMU_LP_TIMER_WAKEUP_EN: u32 = 1 << 4;
-        const PMU_WIFI_SOC_WAKEUP_EN: u32 = 1 << 5;
-        const PMU_UART0_WAKEUP_EN: u32 = 1 << 6;
-        const PMU_UART1_WAKEUP_EN: u32 = 1 << 7;
-        const PMU_SDIO_WAKEUP_EN: u32 = 1 << 8;
-        const PMU_BLE_SOC_WAKEUP_EN: u32 = 1 << 10;
-        const PMU_LP_CORE_WAKEUP_EN: u32 = 1 << 11;
-        const PMU_USB_WAKEUP_EN: u32 = 1 << 14;
-
-        const RTC_SLEEP_REJECT_MASK: u32 = PMU_EXT0_WAKEUP_EN
-            | PMU_EXT1_WAKEUP_EN
-            | PMU_GPIO_WAKEUP_EN
-            | PMU_LP_TIMER_WAKEUP_EN
-            | PMU_WIFI_SOC_WAKEUP_EN
-            | PMU_UART0_WAKEUP_EN
-            | PMU_UART1_WAKEUP_EN
-            | PMU_SDIO_WAKEUP_EN
-            | PMU_BLE_SOC_WAKEUP_EN
-            | PMU_LP_CORE_WAKEUP_EN
-            | PMU_USB_WAKEUP_EN;
-
         let wakeup_mask = wakeup_triggers.as_u32();
-        let reject_mask = if self.deep {
-            0
-        } else {
-            // TODO: OR in PMU_MODEM_WAKEUP_PROTECT (bit 16) once the radio can report that its
-            // state is not yet safe for sleep. It is not a wakeup-enable bit, so it must be added
-            // after this mask, not to `RTC_SLEEP_REJECT_MASK`.
-            wakeup_mask & RTC_SLEEP_REJECT_MASK
-        };
+        let reject_mask = wakeup_triggers.reject_mask(self.deep);
 
         let _restore_clock_config = ClockTree::with(|clocks| {
             let old_root = clocks.hp_root_clk();
