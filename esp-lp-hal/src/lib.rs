@@ -26,7 +26,7 @@ use core::arch::global_asm;
 
 pub mod delay;
 pub mod gpio;
-#[cfg(lp_i2c_master_driver_supported)]
+#[cfg(lp_i2c_master_version = "lp_i2c")]
 pub mod i2c;
 #[cfg(lp_uart_driver_supported)]
 pub mod uart;

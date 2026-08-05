@@ -1,6 +1,6 @@
 #[allow(unused)]
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -8,7 +8,6 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     #[cfg(not(test))]
     use proc_macro_crate::crate_name;
     use proc_macro2::{Ident, Span};
-    use quote::format_ident;
     use syn::{
         FnArg,
         GenericArgument,
@@ -321,6 +320,9 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
         })
         .filter(|v: &proc_macro2::TokenStream| !v.is_empty())
         .collect();
+    let arg_names = (0..args.len())
+        .map(|i| format_ident!("arg_{i}"))
+        .collect::<Vec<_>>();
 
     #[cfg(feature = "has-lp-core")]
     let imports = quote! {
@@ -364,8 +366,9 @@ pub fn load_lp_code(input: TokenStream, fs: impl Filesystem) -> TokenStream {
                     &self,
                     lp_core: &mut LpCore,
                     wakeup_source: LpCoreWakeupSource,
-                    #(_: #args),*
+                    #(#arg_names: #args),*
                 ) {
+                    #(core::mem::forget(#arg_names);)*
                     lp_core.run(wakeup_source);
                 }
             }
@@ -513,8 +516,9 @@ mod tests {
                             &self,
                             lp_core: &mut LpCore,
                             wakeup_source: LpCoreWakeupSource,
-                            _: LowPowerOutput<1>
+                            arg_0: LowPowerOutput<1>
                         ) {
+                            core::mem::forget(arg_0);
                             lp_core.run(wakeup_source);
                         }
                     }

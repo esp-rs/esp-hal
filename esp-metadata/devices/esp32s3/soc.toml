@@ -66,7 +66,7 @@ peripherals = [
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "RTC_CNTL" },
-    { name = "RTC_I2C" },
+    { name = "LP_I2C0", pac = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SDHOST" },
     { name = "SENS" },
@@ -197,6 +197,10 @@ has_pd_en = true
 
 [device.i2c_slave]
 support_status = { status = "not_supported", issue = 1909 }
+
+[device.lp_i2c_master]
+support_status = "partial"
+version = "rtc_i2c"
 
 [device.interrupts]
 support_status = "partial"

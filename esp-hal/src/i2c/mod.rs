@@ -11,20 +11,12 @@
 #[cfg(i2c_master_driver_supported)]
 pub mod master;
 
-#[cfg(i2c_slave_driver_supported)]
-crate::unstable_module! {
+crate::unstable_driver! {
+    #[cfg(i2c_slave_driver_supported)]
     pub mod slave;
-}
 
-#[cfg(soc_has_lp_i2c0)]
-crate::unstable_module! {
+    #[cfg(lp_i2c_master_driver_supported)]
     pub mod lp_i2c;
-}
-
-#[cfg(esp32s3)] // Only support ESP32-S3 for now.
-#[cfg(soc_has_rtc_i2c)]
-crate::unstable_module! {
-    pub mod rtc;
 }
 
 #[cfg_attr(i2c_master_version = "1", path = "clocks/v1.rs")]

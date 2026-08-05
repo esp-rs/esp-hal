@@ -114,3 +114,17 @@ pub(super) fn set_open_drain_output(pin: u8, enable: bool) {
         .pin(pin as usize)
         .modify(|_, w| w.pad_driver().bit(enable));
 }
+
+#[cfg(lp_i2c_master_driver_supported)]
+pub(crate) fn reset_pin(pin: u8) {
+    output_enable(pin, false);
+    set_open_drain_output(pin, false);
+
+    // Resistors, input enable and the pad's LP function all live in this register.
+    LP_IO_MUX::regs().gpio(pin as usize).reset();
+
+    // Hand the pad back to the digital IO MUX.
+    LP_AON::regs()
+        .gpio_mux()
+        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() & !(1 << pin)) });
+}
