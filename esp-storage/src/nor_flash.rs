@@ -202,8 +202,12 @@ impl FlashStorage<'_> {
     /// not aligned to [`Self::ERASE_SIZE`].
     ///
     /// Returns [`FlashStorageError::OutOfBounds`] if the range would extend past
-    /// the end of the flash.
+    /// the end of the flash, or if `to` is less than `from`.
     pub fn erase(&mut self, from: u32, to: u32) -> Result<(), FlashStorageError> {
+        if to < from {
+            return Err(FlashStorageError::OutOfBounds);
+        }
+
         let len = (to - from) as _;
         const SZ: u32 = FlashStorage::SECTOR_SIZE;
         self.check_alignment::<{ SZ }>(from, len)?;
@@ -476,6 +480,68 @@ mod tests {
         flash.read_nor(0, &mut read_data.data[..128]).unwrap();
 
         assert_eq!(&read_data.data[..128], &write_data.data[1..129]);
+    }
+
+    #[test]
+    fn erase_up_to_end_of_flash() {
+        let mut flash = FlashStorage::new(Flash::new());
+        flash.capacity = FLASH_SIZE as usize;
+        let mut read_data = TestBuffer::default();
+        let write_data = [0u8; SECTOR_SIZE as usize];
+
+        flash.erase(FLASH_SIZE - BLOCK_SIZE, FLASH_SIZE).unwrap();
+        flash
+            .write_nor(FLASH_SIZE - 2 * SECTOR_SIZE, &write_data)
+            .unwrap();
+        flash
+            .write_nor(FLASH_SIZE - SECTOR_SIZE, &write_data)
+            .unwrap();
+
+        // Erasing the last sector of the flash must be allowed
+        flash.erase(FLASH_SIZE - SECTOR_SIZE, FLASH_SIZE).unwrap();
+
+        flash
+            .read(
+                FLASH_SIZE - 2 * SECTOR_SIZE,
+                &mut read_data.data[..(2 * SECTOR_SIZE) as usize],
+            )
+            .unwrap();
+        assert!(
+            read_data.data[..SECTOR_SIZE as usize]
+                .iter()
+                .all(|v| *v == 0x0)
+        );
+        assert!(
+            read_data.data[SECTOR_SIZE as usize..(2 * SECTOR_SIZE) as usize]
+                .iter()
+                .all(|v| *v == 0xFF)
+        );
+
+        // Erasing the last block of the flash must be allowed
+        flash.erase(FLASH_SIZE - BLOCK_SIZE, FLASH_SIZE).unwrap();
+
+        flash
+            .read(
+                FLASH_SIZE - 2 * SECTOR_SIZE,
+                &mut read_data.data[..(2 * SECTOR_SIZE) as usize],
+            )
+            .unwrap();
+        assert!(
+            read_data.data[..(2 * SECTOR_SIZE) as usize]
+                .iter()
+                .all(|v| *v == 0xFF)
+        );
+    }
+
+    #[test]
+    fn erase_reversed_range_is_rejected() {
+        let mut flash = FlashStorage::new(Flash::new());
+        flash.capacity = FLASH_SIZE as usize;
+
+        assert_eq!(
+            flash.erase(SECTOR_SIZE, 0),
+            Err(FlashStorageError::OutOfBounds)
+        );
     }
 
     #[test]
