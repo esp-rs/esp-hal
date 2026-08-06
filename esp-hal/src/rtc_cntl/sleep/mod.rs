@@ -14,12 +14,6 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
-use enumset::EnumSet;
-
-#[cfg(any(
-    esp32, esp32s2, esp32s3, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4
-))]
-use crate::gpio::LpPin as RtcIoWakeupPinType;
 use crate::{
     peripherals::LPWR,
     rtc_cntl::{Rtc, WakeupSource},
@@ -41,55 +35,14 @@ mod pmu_common;
 mod sleep_impl;
 pub use sleep_impl::*;
 
-mod wakeup_sources;
-#[instability::unstable]
-pub use wakeup_sources::*;
+#[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
+mod ext1;
+
+#[cfg(sleep_has_wakeup_source_timer)]
+mod timer;
 
 mod wakeup;
 pub(crate) use wakeup::*;
-
-/// The set of wakeup sources configured to end a sleep.
-///
-/// This is a thin wrapper around a set of [`WakeupSource`]s. Wakeup source implementations enable
-/// the sources they need via [`WakeTriggers::insert`] from within [`WakeSource::apply`].
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct WakeTriggers(EnumSet<WakeupSource>);
-
-impl WakeTriggers {
-    /// Enables the given source as a wakeup trigger.
-    pub fn insert(&mut self, source: WakeupSource) {
-        self.0.insert(source);
-    }
-
-    /// Returns `true` if the given source is enabled as a wakeup trigger.
-    pub fn contains(&self, source: WakeupSource) -> bool {
-        self.0.contains(source)
-    }
-
-    /// Returns the raw wakeup-enable register bitmask.
-    pub(crate) fn as_u32(&self) -> u32 {
-        self.0.as_u32()
-    }
-
-    /// Returns the raw sleep-reject register bitmask.
-    ///
-    /// A source rejects a sleep request if the source is already asserted at the request. Without
-    /// the rejection, the chip sleeps through the event that the caller wants to wake on. A
-    /// chip cannot reject on every source that it can wake from, so the enabled sources pass
-    /// through the mask of the sources that the chip can reject on. Deep sleep cannot be
-    /// rejected.
-    // TODO: OR in PMU_MODEM_WAKEUP_PROTECT (bit 16) once the radio can report that its state is not
-    // yet safe for sleep. It is not a wakeup-enable bit, so it cannot come from the source set.
-    #[cfg(soc_has_pmu)]
-    pub(crate) fn reject_mask(&self, deep: bool) -> u32 {
-        if deep {
-            return 0;
-        }
-
-        self.as_u32() & property!("sleep.rejectable_mask")
-    }
-}
 
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
@@ -104,7 +57,7 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     if super::reset_reason(crate::system::Cpu::ProCpu) == Some(super::SocResetReason::CoreDeepSleep)
         && io_wake_enabled()
     {
-        RtcSleepConfig::wake_io_reset();
+        ext1::wake_io_reset();
     }
 
     RtcSleepConfig::base_settings(rtc);
@@ -112,13 +65,12 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
     set_mask(0);
 }
 
-/// Trait representing a wakeup source.
-pub trait WakeSource {
-    /// Configures the RTC and applies the wakeup triggers.
-    fn apply(&self, rtc: &Rtc<'_>, triggers: &mut WakeTriggers, sleep_config: &mut RtcSleepConfig);
-}
-
 /// Low-power management.
+///
+/// The wakeup sources that end a sleep are not passed to the sleep calls. Each driver enables the
+/// source it owns, and the hardware wakeup-enable mask keeps that intent until the driver clears
+/// it — across a light sleep, and across a deep-sleep wake. A sleep call reads the mask back and
+/// derives the rest from it.
 #[instability::unstable]
 pub struct LowPower<'d> {
     _inner: LPWR<'d>,
@@ -130,41 +82,110 @@ impl<'d> LowPower<'d> {
         Self { _inner: lpwr }
     }
 
-    /// Enter deep sleep and wake with the provided `wake_sources`.
+    /// Arms the sleep alarm for `deadline`, and enables the timer wakeup source.
     ///
-    /// In Deep-sleep mode, the CPUs, most of the RAM, and all digital
-    /// peripherals that are clocked from APB_CLK are powered off.
+    /// The deadline is absolute, so the time spent between arming it and sleeping does not shorten
+    /// the sleep. It is a standing request: the wake it causes does not disarm it, and a later call
+    /// replaces it. [`Self::clear_wakeup_deadline`] ends it.
     ///
-    /// You can use the [`#[esp_hal::ram(persistent)]`][procmacros::ram]
-    /// attribute to persist a variable though deep sleep.
+    /// A deadline in the past ends a light sleep immediately, and panics in [`Self::sleep_deep`].
+    #[cfg(sleep_has_wakeup_source_timer)]
+    pub fn set_wakeup_deadline(&mut self, deadline: crate::time::Instant) {
+        timer::set_deadline(deadline);
+    }
+
+    /// Disarms the sleep alarm, and disables the timer wakeup source.
+    #[cfg(sleep_has_wakeup_source_timer)]
+    pub fn clear_wakeup_deadline(&mut self) {
+        timer::clear_deadline();
+    }
+
+    /// Enters deep sleep, and does not return.
+    ///
+    /// In deep sleep the CPUs, most of the RAM, and all digital peripherals that are clocked from
+    /// APB_CLK are powered off. Waking resets the chip, so use the
+    /// [`#[esp_hal::ram(persistent)]`][procmacros::ram] attribute to carry a variable across.
+    ///
+    /// This call cannot be rejected, because it cannot return to report it — see
+    /// [`Self::sleep_deep_with_rejection`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if no wakeup source is enabled, because nothing could end the sleep, and if the
+    /// armed wakeup deadline is too near for the sleep transition to catch. Both would otherwise
+    /// leave a chip that never wakes and says nothing about why.
     #[cfg(sleep_deep_sleep)]
-    pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
-        let config = RtcSleepConfig::deep();
-        self.sleep(&config, wake_sources);
-        unreachable!();
-    }
-
-    /// Enter light sleep and wake with the provided `wake_sources`.
-    #[cfg(sleep_light_sleep)]
-    pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource]) {
-        let config = RtcSleepConfig::default();
-        self.sleep(&config, wake_sources);
-    }
-
-    /// Enter sleep with the provided `config` and wake with the provided
-    /// `wake_sources`.
-    #[cfg(sleep_driver_supported)]
-    #[crate::ram]
-    pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
-        let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
-
-        let mut config = *config;
-        let mut wakeup_triggers = WakeTriggers::default();
-        for wake_source in wake_sources {
-            wake_source.apply(&rtc, &mut wakeup_triggers, &mut config)
+    pub fn sleep_deep(&mut self, config: RtcSleepConfig) -> ! {
+        #[cfg(sleep_has_wakeup_source_timer)]
+        if enabled_sources().contains(WakeupSource::Timer) {
+            assert!(
+                !timer::deadline_missed(),
+                "the wakeup deadline is too near to be caught by the sleep transition"
+            );
         }
 
+        self.sleep(config, SleepKind::Deep, false);
+
+        unreachable!("deep sleep without rejection cannot return")
+    }
+
+    /// Enters deep sleep, and returns only if the hardware rejects the request.
+    ///
+    /// A sleep is rejected when one of its wakeup sources is already asserted, which would
+    /// otherwise mean sleeping through the event the caller wants to wake on. The return is the
+    /// whole message, so there is nothing to report beyond it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no wakeup source is enabled.
+    #[cfg(sleep_deep_sleep)]
+    pub fn sleep_deep_with_rejection(&mut self, config: RtcSleepConfig) {
+        self.sleep(config, SleepKind::Deep, true);
+    }
+
+    /// Enters light sleep, and returns when a wakeup source ends it.
+    ///
+    /// Light sleep keeps the digital domain's state, so execution continues where it left off.
+    ///
+    /// The call also returns at once, without sleeping, when no wakeup source is enabled, or when
+    /// the hardware rejects the request because a wakeup source is already asserted. Neither is
+    /// reported: a sleep that was refused, rejected, or merely very short are the same thing to the
+    /// caller.
+    #[cfg(sleep_light_sleep)]
+    pub fn sleep_light(&mut self, config: RtcSleepConfig) {
+        self.sleep(config, SleepKind::Light, true);
+    }
+
+    /// Derives the sleep from the wakeup-enable mask, and enters it.
+    #[cfg(sleep_driver_supported)]
+    #[crate::ram]
+    fn sleep(&mut self, config: RtcSleepConfig, kind: SleepKind, allow_reject: bool) {
+        let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
+
+        let mut config = config;
+        config.set_sleep_kind(kind);
+
+        // Hooks run before `apply`, so that a vote to keep a power domain alive reaches hardware,
+        // and before the mask is read for the last time, because a hook may enable a source of its
+        // own: GPIO allocates its pins across the paths here.
+        run_entry_hooks(kind, &mut config);
+
         config.apply();
+
+        // A sleep with no wakeup source would never end, and no counter wrap would save it.
+        let wakeup_mask = mask();
+        if wakeup_mask == 0 {
+            match kind {
+                // Refusing is the same outcome as a rejected sleep, which light sleep does not
+                // report either.
+                SleepKind::Light => return,
+                SleepKind::Deep => {
+                    panic!("no wakeup source is enabled, so nothing could end the sleep")
+                }
+            }
+        }
+
+        let reject_mask = if allow_reject { reject_mask() } else { 0 };
 
         sleep_uart_prepare();
 
@@ -176,7 +197,7 @@ impl<'d> LowPower<'d> {
         let before = rtc.time_since_boot_raw();
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
-        config.start_sleep(wakeup_triggers);
+        config.start_sleep(wakeup_mask, reject_mask);
 
         if config.is_deep_sleep() {
             // Because RTC is in a slower clock domain than the CPU, it
@@ -196,10 +217,12 @@ impl<'d> LowPower<'d> {
         unsafe { crate::time::implem::update_counter(before_ticks + slept_ticks) };
         sleep_uart_resume();
 
+        run_exit_hooks();
+
         // Unlike deep sleep, light sleep does not reset the chip, so `wakeup_cause` cannot rely on
         // the reset reason to tell whether a wakeup occurred.
         // https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/esp_hw_support/sleep_modes.c#L2158
-        if !config.deep_slp() {
+        if !config.is_deep_sleep() {
             super::LIGHT_SLEEP_WAKEUP.store(true, portable_atomic::Ordering::Relaxed);
         }
     }
