@@ -10,6 +10,9 @@
 //! paths — `ext0`, `ext1` and the per-pin low-power path — survive the peripheral's power-down, so
 //! they are what deep sleep, and a light sleep that powers the peripheral down, need. Only
 //! low-power pads have them, and a pin has to ask for them through [`WakeupConfig`].
+//!
+//! Because it owns the pad tables, this module also holds the deep-sleep pad isolation, which is a
+//! sleep-entry step rather than a wakeup source.
 
 use portable_atomic::{AtomicU64, Ordering};
 
@@ -262,11 +265,6 @@ fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'
     }
 
     prepare_gpio_wakeup();
-
-    #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
-    if kind == SleepKind::Deep && !armed.is_empty() {
-        isolate_digital_gpio();
-    }
 }
 
 /// esp32, esp32s2 and esp32s3, whose `ext1` has one level for the whole pad mask.
@@ -563,23 +561,46 @@ fn prepare_gpio_wakeup() {
 
 /// Cuts the pads that are not held loose from the digital peripheral, so that they do not raise
 /// the deep-sleep current through a powered-down output driver.
-#[cfg(all(sleep_pin_wakeup_version = "2", sleep_deep_sleep_needs_gpio_isolation))]
+///
+/// This is not a property of any wakeup source, so every deep sleep does it, the way ESP-IDF's
+/// `esp_sleep_isolate_digital_gpio` does. It is destructive — a pad that a peripheral was driving
+/// loses that function — which is why it runs at sleep entry, on the chips that cannot hold a
+/// single pad through a deep sleep, and after the wakeup sources have taken the holds they need.
+#[cfg(sleep_deep_sleep_needs_gpio_isolation)]
 #[crate::ram]
-fn isolate_digital_gpio() {
+pub(crate) fn isolate_pads_for_deep_sleep() {
     use crate::{
-        gpio::{AlternateFunction, OutputSignal},
-        peripherals::{IO_MUX, LPWR},
+        gpio::{AlternateFunction, OutputSignal, io_mux_reg},
+        peripherals::LPWR,
     };
 
+    // With the hold disabled, no pad keeps its level through the sleep anyway, and ESP-IDF skips
+    // the isolation for the same reason.
     let dig_iso = LPWR::regs().dig_iso().read();
     let hold_enabled = !dig_iso.dg_pad_force_unhold().bit() && dig_iso.dg_pad_autohold_en().bit();
     if !hold_enabled {
         return;
     }
 
-    let held = LPWR::regs().dig_pad_hold().read().bits();
+    let held = cfg_select! {
+        esp32 => crate::peripherals::RTC_IO::regs()
+            .dig_pad_hold()
+            .read()
+            .bits(),
+        _ => LPWR::regs().dig_pad_hold().read().bits(),
+    };
+
     for &gpio in PADS {
-        if held & (1 << gpio) != 0 {
+        // Only the pads the digital supply feeds leak here, and they are exactly the pads with no
+        // low-power number. The low-power pads have their own supply, which stays up, and a wake
+        // pad is always one of them.
+        if lp_number(gpio).is_some() {
+            continue;
+        }
+
+        // A pad the user holds keeps the level it was left at, which is the point of holding it,
+        // so isolating it would undo the request.
+        if held & digital_hold_mask(gpio) != 0 {
             continue;
         }
 
@@ -587,12 +608,37 @@ fn isolate_digital_gpio() {
             .func_out_sel_cfg(gpio as usize)
             .modify(|_, w| unsafe { w.bits(OutputSignal::GPIO as u32) });
 
-        IO_MUX::regs().gpio(gpio as usize).modify(|_, w| unsafe {
+        io_mux_reg(gpio).modify(|_, w| unsafe {
             w.fun_wpu().clear_bit();
             w.fun_wpd().clear_bit();
             w.fun_ie().clear_bit();
             // A pad left on a peripheral function raises the deep-sleep current.
             w.mcu_sel().bits(AlternateFunction::GPIO as u8)
         });
+    }
+}
+
+/// The bit that holds `gpio` in the digital pad-hold register.
+///
+/// The register covers the digital pads only, so the bit is not the pin number on every chip: the
+/// esp32s2 and esp32s3 registers start at the first digital pad, and the esp32 register packs the
+/// pads it has in an order of its own.
+#[cfg(sleep_deep_sleep_needs_gpio_isolation)]
+#[crate::ram]
+fn digital_hold_mask(gpio: u8) -> u32 {
+    cfg_select! {
+        esp32 => {
+            1 << match gpio {
+                1 => 1,
+                3 => 0,
+                5 => 8,
+                6..=11 => gpio - 4,
+                16..=19 | 21..=23 => gpio - 7,
+                // No other pad is fed by the digital supply, so none is reached here.
+                _ => return 0,
+            }
+        }
+        any(esp32s2, esp32s3) => 1 << (gpio - 21),
+        _ => 1 << gpio,
     }
 }

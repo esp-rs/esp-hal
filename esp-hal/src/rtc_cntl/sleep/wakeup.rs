@@ -32,6 +32,8 @@ pub(crate) enum SleepKind {
 pub(crate) enum SleepResource {
     /// The low-power peripherals, including the RTC IO pads.
     LpPeripherals,
+    /// The low-power memory, which holds a low-power core's program and data.
+    LpMemory,
     /// The high-performance peripherals, including the digital GPIO pads.
     HpPeripherals,
     /// The main crystal oscillator.
@@ -74,6 +76,14 @@ impl<'a> WrappedSleepConfig<'a> {
                     esp32h2 => {}
                     soc_has_pmu => _config.pd_flags.set_pd_lp_periph(false),
                     _ => _config.set_rtc_peri_pd_en(false),
+                }
+            }
+            SleepResource::LpMemory => {
+                cfg_select! {
+                    // The PMU chips retain the low-power memory through a sleep instead of keeping
+                    // it powered, so there is no power-down to prevent.
+                    any(esp32, esp32s2, esp32s3) => _config.set_rtc_slowmem_pd_en(false),
+                    _ => {}
                 }
             }
             SleepResource::HpPeripherals => {

@@ -77,7 +77,7 @@ use low_level::{gpio_intr_enable, is_int_enabled, set_int_enable};
 mod placeholder;
 
 #[cfg(sleep_driver_supported)]
-mod wakeup;
+pub(crate) mod wakeup;
 use core::fmt::Display;
 
 use esp_sync::RawMutex;

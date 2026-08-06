@@ -189,6 +189,13 @@ impl<'d> LowPower<'d> {
 
         sleep_uart_prepare();
 
+        // Last, because it takes the pads away from whatever was driving them: the wakeup sources
+        // have taken their holds by now, and nothing after this point needs a pad.
+        #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
+        if kind == SleepKind::Deep {
+            crate::gpio::wakeup::isolate_pads_for_deep_sleep();
+        }
+
         // Latch the systimer value *before* sleeping. The systimer keeps running during
         // the sleep enter/exit sequences, so we must not advance from the post-wake
         // value (that would count the enter/exit time twice). Instead we set an absolute
