@@ -44,6 +44,21 @@ Usage: esp-devtool build examples [OPTIONS] <EXAMPLE>
 [...]
 ```
 
+### Selecting examples
+
+`build examples` and `run example` take the example name as their first argument, and `all` in that
+position means every example of the package:
+
+```text
+cargo xtask build examples uart --chip esp32c6
+cargo xtask build examples all --chip esp32c6
+cargo xtask build examples all --chip esp32c6 --package qa-test
+```
+
+Omitting the name is not a shortcut for `all`. The command asks which example to act on, so a caller
+with no terminal — a script, a CI job, an agent — gets an error naming this argument instead of a
+build. `--chip` behaves the same way.
+
 > Tip: To avoid rebuilding the xtask, you can install it using `cargo install-xtask` from the repo root once, then call `esp-devtool <command>`.
 >
 > You will need to reinstall from time to time, for example when a new driver is added to `esp-metadata`.
