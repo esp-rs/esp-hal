@@ -13,7 +13,8 @@ use esp_alloc;
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
-    rtc_cntl::sleep::{LowPower, RtcSleepConfig, TimerWakeupSource},
+    rtc_cntl::sleep::{LowPower, RtcSleepConfig},
+    time::{Duration, Instant},
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -35,19 +36,17 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    // Sleep for one second
-    let sleep_config = RtcSleepConfig::default();
-
     let delay = esp_hal::delay::Delay::new();
     delay.delay_millis(100);
 
-    let timer = TimerWakeupSource::new(esp_hal::time::Duration::from_secs(1));
-
+    // Sleep for one second
     let mut lpwr = LowPower::new(peripherals.LPWR);
+    lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(1));
+
     esp_println::println!("Start sleep");
     delay.delay_millis(100);
 
-    lpwr.sleep(&sleep_config, &[&timer]);
+    lpwr.sleep_light(RtcSleepConfig::default());
     delay.delay_millis(100);
 
     esp_println::println!("Done sleeping");
