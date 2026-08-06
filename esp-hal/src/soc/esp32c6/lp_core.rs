@@ -19,7 +19,13 @@
 //!
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/lp_core/lp_blinky/src/main.rs
 
-use crate::peripherals::{LP_AON, LP_CORE, LP_PERI, LPWR, PMU};
+use crate::{
+    peripherals::{LP_AON, LP_CORE, LP_PERI, LPWR, PMU},
+    rtc_cntl::{
+        WakeupSource,
+        sleep::{SleepKind, SleepResource, WrappedSleepConfig},
+    },
+};
 
 /// Represents the possible wakeup sources for the LP (Low Power) core.
 #[derive(Debug, Clone, Copy)]
@@ -81,6 +87,26 @@ impl<'d> LpCore<'d> {
     pub fn run(&mut self, wakeup_src: LpCoreWakeupSource) {
         ulp_lp_core_run(wakeup_src);
     }
+
+    /// Lets the LP core wake the chip from sleep.
+    ///
+    /// The request stands until [`Self::disable_wakeup`] ends it: it survives a sleep, a
+    /// deep-sleep wake, and this driver's `Drop`. It does nothing while the chip is awake.
+    pub fn enable_wakeup(&mut self) {
+        WakeupSource::LpCore.enable_with_hooks(Some(keep_low_power_domain), None);
+    }
+
+    /// Stops the LP core from waking the chip.
+    pub fn disable_wakeup(&mut self) {
+        WakeupSource::LpCore.disable();
+    }
+}
+
+/// The LP core wakes the chip through the low-power peripherals, which also hold the timer it
+/// usually waits on, so a sleep that powers them down never sees the request.
+#[crate::ram]
+fn keep_low_power_domain(_kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
+    config.keep_alive(SleepResource::LpPeripherals);
 }
 
 fn ulp_lp_core_stop() {
@@ -127,6 +153,13 @@ fn ulp_lp_core_run(wakeup_src: LpCoreWakeupSource) {
     lp_peri
         .cpu()
         .modify(|_, w| w.lpcore_dbgm_unavaliable().clear_bit());
+
+    // Clear the wake requests a previous run left latched. They would reject the next light sleep
+    // without any of them being the event the caller waits for.
+    pmu.int_clr().write(|w| {
+        w.sw().clear_bit_by_one();
+        w.lp_cpu_exc().clear_bit_by_one()
+    });
 
     // wake up
     match wakeup_src {

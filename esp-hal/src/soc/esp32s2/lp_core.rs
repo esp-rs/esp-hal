@@ -41,7 +41,13 @@
 //! # }
 //! ```
 
-use crate::peripherals::LPWR;
+use crate::{
+    peripherals::LPWR,
+    rtc_cntl::{
+        WakeupSource,
+        sleep::{SleepKind, SleepResource, WrappedSleepConfig},
+    },
+};
 
 /// Enum representing the possible wakeup sources for the ULP core.
 #[derive(Debug, Clone, Copy)]
@@ -109,6 +115,64 @@ impl<'d> UlpCore<'d> {
     pub fn run(&mut self, wakeup_src: UlpCoreWakeupSource) {
         ulp_run(wakeup_src);
     }
+
+    /// Lets the ULP core wake the chip from sleep.
+    ///
+    /// The request stands until [`Self::disable_wakeup`] ends it: it survives a sleep, a
+    /// deep-sleep wake, and this driver's `Drop`. It does nothing while the chip is awake.
+    pub fn enable_wakeup(&mut self, config: WakeupConfig) {
+        enable_wakeup(config);
+    }
+
+    /// Stops the ULP core from waking the chip.
+    pub fn disable_wakeup(&mut self) {
+        WakeupSource::UlpRiscv.disable();
+        WakeupSource::UlpRiscvTrap.disable();
+    }
+}
+
+/// Configures what the ULP core wakes the chip on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct WakeupConfig {
+    /// Wakes the chip when the ULP core raises a software interrupt.
+    software_interrupt: bool,
+    /// Wakes the chip when the ULP core traps.
+    trap: bool,
+}
+
+impl Default for WakeupConfig {
+    fn default() -> Self {
+        Self {
+            software_interrupt: true,
+            trap: true,
+        }
+    }
+}
+
+fn enable_wakeup(config: WakeupConfig) {
+    for (source, enable) in [
+        (WakeupSource::UlpRiscv, config.software_interrupt),
+        (WakeupSource::UlpRiscvTrap, config.trap),
+    ] {
+        if enable {
+            source.enable_with_hooks(Some(keep_low_power_domain), None);
+        } else {
+            source.disable();
+        }
+    }
+}
+
+/// The ULP core runs from the low-power memory and reads its pads through the low-power
+/// peripherals, so a sleep that powers either down leaves it unable to raise the wake.
+#[crate::ram]
+fn keep_low_power_domain(_kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
+    config.keep_alive(SleepResource::LpMemory);
+    // ESP-IDF keeps the low-power peripherals on for `ext0` and GPIO wake only, but powering them
+    // down stops the ULP timer and the ULP's own GPIO from working.
+    // https://github.com/espressif/esp-idf/issues/10595
+    config.keep_alive(SleepResource::LpPeripherals);
 }
 
 #[allow(unused)] // TODO: remove cfg when implementation is corrected
