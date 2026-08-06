@@ -16,11 +16,11 @@ use esp_hal::{
     rtc_cntl::{
         SocResetReason,
         reset_reason,
-        sleep::{LowPower, TimerWakeupSource},
+        sleep::{LowPower, RtcSleepConfig},
         wakeup_cause,
     },
     system::Cpu,
-    time::Duration,
+    time::{Duration, Instant},
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -77,8 +77,10 @@ async fn main(_spawner: Spawner) -> ! {
 
     println!("Wifi configured and started!");
 
-    let timer = TimerWakeupSource::new(Duration::from_secs(5));
+    // The deadline is absolute, so the delay below does not shorten the sleep.
+    lpwr.set_wakeup_deadline(Instant::now() + Duration::from_secs(5));
+
     println!("sleeping!");
     delay.delay_millis(100);
-    lpwr.sleep_deep(&[&timer]);
+    lpwr.sleep_deep(RtcSleepConfig::deep());
 }

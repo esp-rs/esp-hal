@@ -27,10 +27,10 @@ macro_rules! lp_io_analog {
                         });
                 }
 
-                fn apply_wakeup(&self, wakeup: bool, level: crate::gpio::WakeEvent) {
+                fn apply_wakeup(&self, wakeup: bool, level: crate::gpio::Level) {
                     RTC_IO::regs().pin($lp_pin).modify(|_, w| unsafe {
                         w.wakeup_enable().bit(wakeup);
-                        w.int_type().bits(level as u8)
+                        w.int_type().bits(crate::gpio::lp_io::wake_trigger(level))
                     });
                 }
 

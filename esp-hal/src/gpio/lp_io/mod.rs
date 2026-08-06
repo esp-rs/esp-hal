@@ -75,6 +75,18 @@ define_lp_functions!();
 #[cfg_attr(lp_io_version = "v4", path = "low_level/v4.rs")]
 mod low_level;
 
+/// The trigger type a pad's low-power wakeup register needs to wake the chip at `level`.
+///
+/// The field takes the same values as the digital interrupt type.
+// esp32h2 has no per-pin wakeup register: its low-power path shares ext1's level mask.
+#[cfg(not(esp32h2))]
+pub(crate) const fn wake_trigger(level: super::Level) -> u8 {
+    match level {
+        super::Level::Low => super::Event::LowLevel as u8,
+        super::Level::High => super::Event::HighLevel as u8,
+    }
+}
+
 /// Trait implemented by pins with a known low-power pin number.
 #[cfg(ulp_riscv_driver_supported)]
 #[doc(hidden)]

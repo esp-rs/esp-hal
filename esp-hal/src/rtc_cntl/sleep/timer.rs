@@ -45,8 +45,7 @@ pub(crate) fn set_deadline(deadline: Instant) {
     DEADLINE.store(ticks, Ordering::Relaxed);
     arm(ticks);
 
-    // The entry hook is in RAM, as `enable_with_hooks` requires.
-    unsafe { WakeupSource::Timer.enable_with_hooks(Some(entry_hook), None) };
+    WakeupSource::Timer.enable_with_hooks(Some(entry_hook), None);
 }
 
 /// Disarms the alarm and disables the timer wakeup source.

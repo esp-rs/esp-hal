@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{AlternateFunction, LpPin, LpPinWithResistors, WakeEvent, lp_io::LpFunction},
+    gpio::{AlternateFunction, Level, LpPin, LpPinWithResistors, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LP_AON},
 };
 
@@ -11,7 +11,7 @@ for_each_lp_function! {
                 $pin
             }
 
-            fn apply_wakeup(&self, wakeup: bool, level: WakeEvent) {
+            fn apply_wakeup(&self, wakeup: bool, level: Level) {
                 let mask = 1 << $pin;
                 LP_AON::regs().ext_wakeup_cntl().modify(|r, w| unsafe {
                     let select = r.ext_wakeup_sel().bits();
@@ -23,7 +23,7 @@ for_each_lp_function! {
                     } else {
                         select & !mask
                     });
-                    w.ext_wakeup_lv().bits(if level == WakeEvent::HighLevel {
+                    w.ext_wakeup_lv().bits(if level == Level::High {
                         levels | mask
                     } else {
                         levels & !mask
