@@ -16,7 +16,7 @@ use super::{
     pib::*,
 };
 use crate::{
-    radio_clocks::{clocks_ll::enable_ieee802154, init_radio_clocks},
+    radio_clocks::{clocks_ll::enable_ieee802154, deinit_radio_clocks, init_radio_clocks},
     sys::include::{
         ieee802154_coex_event_t,
         ieee802154_coex_event_t_IEEE802154_IDLE,
@@ -104,9 +104,25 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
+/// Gates off the 802.15.4 modem clocks and undoes the radio clock
+/// initialization (`deinit_radio_clocks`) when dropped.
+///
+/// Must be dropped only after the PHY guards: PHY teardown still requires the
+/// modem clocks.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct RadioClockGuard;
+
+impl Drop for RadioClockGuard {
+    fn drop(&mut self) {
+        enable_ieee802154(false);
+        deinit_radio_clocks();
+    }
+}
+
 pub(crate) fn esp_ieee802154_enable(
     radio: IEEE802154<'_>,
-) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
+) -> (PhyClockGuard<'_>, PhyInitGuard<'_>, RadioClockGuard) {
     init_radio_clocks();
     let phy_clock_guard = esp_phy::enable_phy_clock();
     enable_ieee802154(true);
@@ -117,7 +133,7 @@ pub(crate) fn esp_ieee802154_enable(
     ieee802154_mac_init(radio);
 
     info!("date={:x}", mac_date());
-    (phy_clock_guard, phy_init_guard)
+    (phy_clock_guard, phy_init_guard, RadioClockGuard)
 }
 
 fn esp_btbb_enable() {

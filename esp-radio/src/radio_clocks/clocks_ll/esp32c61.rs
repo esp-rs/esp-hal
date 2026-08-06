@@ -40,6 +40,10 @@ pub(crate) fn init_clocks() {
     // done in esp-hal
 }
 
+pub(crate) fn deinit_clocks() {
+    // nothing to do, `init_clocks` is a no-op
+}
+
 pub(crate) fn ble_rtc_clk_init() {
     // nothing for this target (yet)
 }

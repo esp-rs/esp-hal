@@ -42,3 +42,10 @@ pub(crate) fn init_clocks() {
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | DPORT_WIFI_CLK_WIFI_EN) });
 }
+
+pub(crate) fn deinit_clocks() {
+    // Nothing to do: the Wi-Fi clock bits (`DPORT_WIFI_CLK_WIFI_EN_M`) are
+    // cleared by `enable_wifi(false)` when the Wi-Fi driver deinitializes,
+    // and `disable_wifi_power_domain` powers the modem power domain off.
+    // ESP-IDF has no global clock-register restore on deinit either.
+}
