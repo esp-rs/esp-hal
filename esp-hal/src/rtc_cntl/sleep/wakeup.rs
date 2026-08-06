@@ -26,7 +26,9 @@ pub(crate) enum SleepKind {
 /// The vocabulary is chip-agnostic. Asking for a resource that the target chip does not have, or
 /// that it cannot power down in the first place, does nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(not(sleep_driver_supported), expect(unused))]
+// Which resources are asked for varies per chip, and no wakeup source votes for the oscillators
+// yet.
+#[allow(dead_code, reason = "the vocabulary is chip-agnostic")]
 pub(crate) enum SleepResource {
     /// The low-power peripherals, including the RTC IO pads.
     LpPeripherals,
@@ -150,9 +152,10 @@ impl WakeupSource {
     ///
     /// The source stays enabled until [`Self::disable`] is called, including across sleeps and
     /// across a deep-sleep wake. Enabling a source is inert while the chip is awake.
+    // A chip whose only implemented sources need hooks has no caller for this.
+    #[allow(dead_code, reason = "not every chip has such a source yet")]
     pub(crate) fn enable(self) {
-        // Safe: a source with no hooks has nothing to place in RAM.
-        unsafe { self.enable_with_hooks(None, None) }
+        self.enable_with_hooks(None, None)
     }
 
     /// Enables this source and registers the hooks that run around a sleep.
@@ -161,11 +164,10 @@ impl WakeupSource {
     /// hooks of the first. Since a source belongs to one driver, that only happens when a driver
     /// re-registers its own hooks, which is what enabling an already enabled source does.
     ///
-    /// # Safety
-    ///
-    /// Both hooks must be resident in RAM, because they can run with the flash powered down. Place
-    /// them, and everything they call, in RAM with `#[crate::ram]`.
-    pub(crate) unsafe fn enable_with_hooks(
+    /// Both hooks run with the flash accessible: the entry hook before the sleep configuration
+    /// reaches hardware, the exit hook after the wake sequence has restored it. They run inside
+    /// sleep entry, though, so keep them short, and place what they call in RAM where that is easy.
+    pub(crate) fn enable_with_hooks(
         self,
         entry: Option<SleepEntryHook>,
         exit: Option<SleepExitHook>,
@@ -209,6 +211,7 @@ pub(crate) fn reject_mask() -> u32 {
 ///
 /// Read this before the mask is cleared at init: it decides whether the pads a previous run armed
 /// need releasing, the way ESP-IDF gates `esp_deep_sleep_wakeup_io_reset`.
+#[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
 pub(crate) fn io_wake_enabled() -> bool {
     let sources = enabled_sources();
 

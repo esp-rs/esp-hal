@@ -1059,9 +1059,8 @@ impl RtcSleepConfig {
             .imm_pad_hold_all()
             .write(|w| w.tie_low_pad_slp_sel().set_bit());
 
-        // TODO: this belongs in the GPIO driver's post-wake hook, which takes the pad hold at
-        // entry and is the only owner that knows which pads it holds.
-        super::ext1::wake_io_reset();
+        // The pads a sleep armed are released by the GPIO driver's post-wake hook, which is the
+        // only owner that knows which pads it prepared.
 
         // Re-enumerate USB-Serial-JTAG (only disabled for light sleep; in deep
         // sleep we never reach here).

@@ -1,5 +1,6 @@
 use crate::{
     gpio::{
+        Level,
         LpPin,
         lp_io::{LpFunction, LpInputSignal, LpOutputSignal},
     },

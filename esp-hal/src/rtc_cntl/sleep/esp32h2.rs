@@ -618,8 +618,7 @@ impl RtcSleepConfig {
 
     /// Cleans up after sleep
     pub(crate) fn finish_sleep(&self) {
-        // TODO: this belongs in the GPIO driver's post-wake hook, which takes the pad hold at
-        // entry and is the only owner that knows which pads it holds.
-        super::ext1::wake_io_reset();
+        // The pads a sleep armed are released by the GPIO driver's post-wake hook, which is the
+        // only owner that knows which pads it prepared.
     }
 }
