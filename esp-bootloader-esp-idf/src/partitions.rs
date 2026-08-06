@@ -148,6 +148,43 @@ impl PartitionEntry {
             flash,
         }
     }
+
+    /// Calculate the SHA-256 digest of this partition.
+    ///
+    /// - App / bootloader with appended hash: return that digest after verifying it
+    /// - App / bootloader without appended hash: hash the image (not the whole partition)
+    /// - Other types: hash the entire partition
+    pub fn sha256(&self, flash: &mut FlashStorage<'_>) -> Result<[u8; 32], Error> {
+        if self.is_empty() {
+            return Err(Error::InvalidArgument);
+        }
+
+        let address = self.offset();
+        let encrypted = self.is_effectively_encrypted();
+        let mut size = self.len();
+
+        if matches!(
+            self.partition_type(),
+            PartitionType::App(_) | PartitionType::Bootloader(_)
+        ) {
+            let data = get_image_metadata(flash, address, size, encrypted)?;
+            if data.hash_appended {
+                let calc = sha256_flash_contents(
+                    flash,
+                    address,
+                    data.image_len - PARTITION_HASH_LEN as u32,
+                    encrypted,
+                )?;
+                if calc != data.image_digest {
+                    return Err(Error::InvalidImage);
+                }
+                return Ok(data.image_digest);
+            }
+            size = data.image_len;
+        }
+
+        sha256_flash_contents(flash, address, size, encrypted)
+    }
 }
 
 impl core::fmt::Debug for PartitionEntry {
@@ -220,6 +257,8 @@ pub enum Error {
     /// The operation is not supported for this partition (e.g. `as_nor_flash` on an encrypted
     /// partition).
     NotSupported,
+    /// The partition does not contain a valid application or bootloader image.
+    InvalidImage,
 }
 
 impl core::error::Error for Error {}
@@ -603,6 +642,121 @@ fn read_partition_table_impl<'a, F: FlashAccess>(
     }
 
     PartitionTable::new(storage)
+}
+
+const PARTITION_HASH_LEN: usize = 32;
+const IMAGE_HEADER_MAGIC: u8 = 0xE9;
+const IMAGE_HEADER_LEN: u32 = 24;
+const IMAGE_MAX_SEGMENTS: u8 = 16;
+const IMAGE_MAX_FLASH_ADDR_SIZE: u32 = 16 * 1024 * 1024;
+
+/// Subset of ESP-IDF `esp_image_metadata_t` for partition SHA-256 convenience.
+struct ImageMetadata {
+    image_len: u32,
+    image_digest: [u8; PARTITION_HASH_LEN],
+    hash_appended: bool,
+}
+
+/// Parse an app/bootloader image on flash and return its length and optional
+/// appended SHA-256 digest.
+///
+/// Walks the image header and segment table, accounts for the checksum
+/// padding, and — if the image has a simple hash appended — reads that digest.
+/// Does not verify the checksum or load any segments.
+fn get_image_metadata<F: FlashAccess>(
+    flash: &mut F,
+    address: u32,
+    part_size: u32,
+    encrypted: bool,
+) -> Result<ImageMetadata, Error> {
+    if part_size == 0 || part_size > IMAGE_MAX_FLASH_ADDR_SIZE {
+        return Err(Error::InvalidArgument);
+    }
+
+    // process_image_header()
+    let mut hdr = [0u8; IMAGE_HEADER_LEN as usize];
+    flash_read(flash, address, &mut hdr, encrypted)?;
+    // `esp_image_get_metadata` skips header verify, but refuse obvious garbage.
+    if hdr[0] != IMAGE_HEADER_MAGIC || hdr[1] > IMAGE_MAX_SEGMENTS {
+        return Err(Error::InvalidImage);
+    }
+
+    let mut image_len = IMAGE_HEADER_LEN;
+
+    // process_segments()
+    for _ in 0..hdr[1] {
+        let mut seg = [0u8; 8];
+        flash_read(flash, address + image_len, &mut seg, encrypted)?;
+        // seg[0..4] - load address
+        let data_len = u32::from_le_bytes(unwrap!(seg[4..8].try_into()));
+        if data_len % 4 != 0 || data_len >= IMAGE_MAX_FLASH_ADDR_SIZE {
+            return Err(Error::InvalidImage);
+        }
+        image_len = image_len
+            .checked_add(8 + data_len)
+            .ok_or(Error::InvalidImage)?;
+    }
+
+    // process_checksum()
+    // add a byte for the checksum, pad to next full 16 byte block
+    image_len = (image_len + 1 + 15) & !15;
+
+    // process_appended_hash_and_sig()
+    let hash_appended = hdr[23] != 0;
+    let mut image_digest = [0u8; PARTITION_HASH_LEN];
+    if hash_appended {
+        flash_read(flash, address + image_len, &mut image_digest, encrypted)?;
+        image_len += PARTITION_HASH_LEN as u32;
+    }
+
+    if image_len > part_size {
+        return Err(Error::InvalidImage);
+    }
+
+    Ok(ImageMetadata {
+        image_len,
+        image_digest,
+        hash_appended,
+    })
+}
+
+fn flash_read<F: FlashAccess>(
+    flash: &mut F,
+    address: u32,
+    bytes: &mut [u8],
+    encrypted: bool,
+) -> Result<(), Error> {
+    if encrypted {
+        flash.flash_read_encrypted(address, bytes)
+    } else {
+        flash.flash_read(address, bytes)
+    }
+}
+
+/// Hash `len` bytes of flash starting at `flash_offset`.
+///
+/// Reads the region in fixed-size chunks so large partitions do not need to be
+/// loaded into memory at once.
+fn sha256_flash_contents<F: FlashAccess>(
+    flash: &mut F,
+    mut flash_offset: u32,
+    mut len: u32,
+    encrypted: bool,
+) -> Result<[u8; PARTITION_HASH_LEN], Error> {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    let mut chunk = [0u8; 4096];
+
+    while len > 0 {
+        let n = len.min(chunk.len() as u32) as usize;
+        flash_read(flash, flash_offset, &mut chunk[..n], encrypted)?;
+        hasher.update(&chunk[..n]);
+        flash_offset += n as u32;
+        len -= n as u32;
+    }
+
+    Ok(hasher.finalize().into())
 }
 
 /// A flash region is a "view" into the partition.
