@@ -1,7 +1,7 @@
-use super::WakeTriggers;
+use super::SleepKind;
 use crate::{
     peripherals::{BB, DPORT, I2S0, LPWR, NRX},
-    rtc_cntl::Rtc,
+    rtc_cntl::{Rtc, WakeupSource},
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
@@ -149,6 +149,10 @@ impl RtcSleepConfig {
 
     pub(crate) fn is_deep_sleep(&self) -> bool {
         self.deep_slp()
+    }
+
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.set_deep_slp(kind == SleepKind::Deep);
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -442,7 +446,7 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         LPWR::regs()
             .reset_state()
             .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
@@ -450,7 +454,15 @@ impl RtcSleepConfig {
         // set bits for what can wake us up
         LPWR::regs()
             .wakeup_state()
-            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.as_u32() as u16) });
+            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_mask as u16) });
+
+        // esp32 has no reject-source mask: GPIO and SDIO have a reject enable each, and nothing
+        // else can reject. The enables are armed by the reject bits `apply` wrote.
+        let rejects = enumset::EnumSet::<WakeupSource>::from_u32_truncated(reject_mask);
+        LPWR::regs().slp_reject_conf().modify(|_, w| {
+            w.gpio_reject_en().bit(rejects.contains(WakeupSource::Gpio));
+            w.sdio_reject_en().bit(rejects.contains(WakeupSource::Sdio))
+        });
 
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }

@@ -116,11 +116,13 @@ async fn main(_spawner: Spawner) {
 
     let delay = esp_hal::delay::Delay::new();
 
-    let timer = esp_hal::rtc_cntl::sleep::TimerWakeupSource::new(
-        esp_hal::time::Duration::from_millis(SLEEP_MS),
-    );
-
+    // Let the console drain before arming: the deadline is absolute, and 30 ms of it would
+    // otherwise be spent in the delay.
     delay.delay_millis(100);
 
-    lpwr.sleep(&config, &[&timer]);
+    lpwr.set_wakeup_deadline(
+        esp_hal::time::Instant::now() + esp_hal::time::Duration::from_millis(SLEEP_MS),
+    );
+
+    lpwr.sleep_deep(config);
 }

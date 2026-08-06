@@ -1,4 +1,4 @@
-use super::WakeTriggers;
+use super::SleepKind;
 use crate::{
     peripherals::{APB_CTRL, BB, EXTMEM, FE, FE2, LPWR, NRX, SPI0, SPI1, SYSTEM},
     rtc_cntl::Rtc,
@@ -325,6 +325,10 @@ impl RtcSleepConfig {
 
     pub(crate) fn is_deep_sleep(&self) -> bool {
         self.deep_slp()
+    }
+
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.set_deep_slp(kind == SleepKind::Deep);
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -668,12 +672,16 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         // set bits for what can wake us up
-        LPWR::regs().wakeup_state().modify(|_, w| unsafe {
-            w.wakeup_ena()
-                .bits((wakeup_triggers.as_u32() as u16).into())
-        });
+        LPWR::regs()
+            .wakeup_state()
+            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_mask) });
+
+        // set bits for what rejects the sleep, which is armed by the reject enables `apply` wrote
+        LPWR::regs()
+            .slp_reject_conf()
+            .modify(|_, w| unsafe { w.sleep_reject_ena().bits(reject_mask) });
 
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }

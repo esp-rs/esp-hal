@@ -194,6 +194,17 @@ pub(crate) fn enabled_sources() -> enumset::EnumSet<WakeupSource> {
     enumset::EnumSet::from_u32_truncated(mask())
 }
 
+/// Returns the sources that reject the sleep about to be requested.
+///
+/// A source rejects a sleep that is requested while the source is already asserted, which would
+/// otherwise sleep through the event the caller wants to wake on. The reject sources are the
+/// enabled wake sources, narrowed to those the chip can reject on: every one it can wake from,
+/// except on esp32, which has reject enables for GPIO and SDIO only.
+#[crate::ram]
+pub(crate) fn reject_mask() -> u32 {
+    mask() & property!("sleep.rejectable_mask")
+}
+
 /// Returns whether any wakeup source that configures pads is enabled.
 ///
 /// Read this before the mask is cleared at init: it decides whether the pads a previous run armed
