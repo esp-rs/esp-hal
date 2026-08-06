@@ -21,19 +21,9 @@ use esp_hal::{
 };
 use hil_test as _;
 
-cfg_select! {
-    esp32h2 => {
-        const RMT_FREQUENCY: Rate = Rate::from_mhz(32);
-        // default clock source for h2 is 32Mhz
-        const RMT_DIVIDER: u8 = 32;
-    }
-    _ => {
-        const RMT_FREQUENCY: Rate = Rate::from_mhz(80);
-        // default clock source for other models is 80Mhz
-        const RMT_DIVIDER: u8 = 80;
-    }
-    // make sure that all models uses 1 Mhz clock
-}
+// Configure a 1 MHz RMT clock on every supported chip.
+const RMT_DIVIDER: u8 = if cfg!(esp32h2) { 32 } else { 80 };
+const RMT_FREQUENCY: Rate = Rate::from_mhz(RMT_DIVIDER as u32);
 
 const SDM_FREQUENCY: Rate = Rate::from_khz(500);
 const SDM_WARM_UP_US: u32 = 1_000;
