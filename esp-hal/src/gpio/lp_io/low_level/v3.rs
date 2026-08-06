@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{AlternateFunction, LpPin, WakeEvent, lp_io::LpFunction},
+    gpio::{AlternateFunction, Level, LpPin, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
@@ -17,8 +17,8 @@ for_each_lp_function! {
     // functions dispatch on the low-power number.
     (LP_GPIOn $( (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),*) => {
         paste::paste! {
-            pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, event: WakeEvent) {
-                let trigger = event as u8;
+            pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: Level) {
+                let trigger = crate::gpio::lp_io::wake_trigger(level);
 
                 let gpio_wakeup = cfg_select! {
                     esp32c2 => LPWR::regs().cntl_gpio_wakeup(),

@@ -78,8 +78,12 @@ pub(crate) mod low_level;
 /// The trigger type a pad's low-power wakeup register needs to wake the chip at `level`.
 ///
 /// The field takes the same values as the digital interrupt type.
-// esp32h2 has no per-pin wakeup register: its low-power path shares ext1's level mask.
-#[cfg(not(esp32h2))]
+// Only the chips that arm the pads one by one have such a register. The others reach the pads
+// through ext1, which takes a mask.
+#[cfg(all(
+    sleep_pin_wakeup_version_is_set,
+    any(sleep_ext1_version = "1", not(sleep_ext1_version_is_set))
+))]
 pub(crate) const fn wake_trigger(level: super::Level) -> u8 {
     match level {
         super::Level::Low => super::Event::LowLevel as u8,

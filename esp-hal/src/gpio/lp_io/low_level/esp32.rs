@@ -158,12 +158,10 @@ macro_rules! set_pull_field {
     }};
 }
 
-// esp32 arms its pads through ext0 and ext1, not one by one.
-#[expect(dead_code)]
-pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, event: crate::gpio::WakeEvent) {
+pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: crate::gpio::Level) {
     RTC_IO::regs().pin(lp as usize).modify(|_, w| unsafe {
         w.wakeup_enable().bit(wakeup);
-        w.int_type().bits(event as u8)
+        w.int_type().bits(crate::gpio::lp_io::wake_trigger(level))
     });
 }
 
