@@ -75,16 +75,12 @@ pub(crate) fn input_enable(lp: u8, enable: bool) {
         .modify(|_, w| w.fun_ie().bit(enable));
 }
 
-// A pad of these chips only needs its resistors set while a low-power core drives it: sleep uses
-// ext1, which holds the pad instead.
-#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(crate) fn pullup_enable(lp: u8, enable: bool) {
     LP_IO_MUX::regs()
         .gpio(lp as usize)
         .modify(|_, w| w.fun_wpu().bit(enable));
 }
 
-#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
     LP_IO_MUX::regs()
         .gpio(lp as usize)
