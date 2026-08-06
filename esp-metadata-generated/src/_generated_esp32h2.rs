@@ -403,6 +403,9 @@ macro_rules! property {
     ("sleep.ext1_version", str) => {
         stringify!(2)
     };
+    ("sleep.deep_sleep_needs_gpio_isolation") => {
+        false
+    };
     ("soc.cpu_has_branch_predictor") => {
         false
     };

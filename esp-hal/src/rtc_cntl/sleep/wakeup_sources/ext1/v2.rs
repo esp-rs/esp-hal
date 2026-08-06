@@ -24,16 +24,16 @@ impl Ext1WakeupSource<'_, '_> {
             .bits()
     }
 
+    /// Releases the pad hold that a previous sleep took, so the pads follow their drivers again.
+    ///
+    /// This releases the hold and nothing else. Reassigning the pad function would steal a pad that
+    /// the application has since handed to an LP core, which owns its pads for as long as it runs.
     pub(in crate::rtc_cntl::sleep) fn wake_io_reset() {
         fn uninit_pin(pin: impl LpPin, wakeup_pins: u8) {
             let pin_number = pin.lp_number();
 
             if wakeup_pins & (1 << pin_number) != 0 {
                 low_level::pad_hold(pin_number, false);
-                cfg_select! {
-                    esp32h2 => pin.degrade().init_gpio(),
-                    _ => low_level::set_config(pin_number, false, false, LpFunction::LP_GPIO),
-                }
             }
         }
 
