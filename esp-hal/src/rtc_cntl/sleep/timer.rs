@@ -59,7 +59,6 @@ pub(crate) fn clear_deadline() {
 ///
 /// Only a deep sleep needs to ask: a light sleep that misses the alarm is rejected by hardware,
 /// because 007 makes the enabled sources the reject sources, and the alarm status latches.
-#[crate::ram]
 pub(crate) fn deadline_missed() -> bool {
     let deadline = DEADLINE.load(Ordering::Relaxed);
 

@@ -11,8 +11,22 @@
 //! they are what deep sleep, and a light sleep that powers the peripheral down, need. Only
 //! low-power pads have them, and a pin has to ask for them through [`WakeupConfig`].
 //!
+//! Which low-power paths a chip has, and how they divide the pins between them, is what the
+//! [`path`] module holds: this module collects the pins and votes for what they need powered.
+//!
 //! Because it owns the pad tables, this module also holds the deep-sleep pad isolation, which is a
 //! sleep-entry step rather than a wakeup source.
+//!
+//! Nothing here runs with the flash inaccessible: sleep entry calls the hooks before it hands the
+//! configuration to hardware, and calls the exit hook after the wake sequence has restored it. The
+//! code therefore stays in flash, where the compiler may inline it.
+
+// The low-power path is what the version decides, so each generation brings its own allocation.
+#[cfg_attr(sleep_ext1_version = "1", path = "ext1_v1.rs")]
+#[cfg_attr(sleep_ext1_version = "2", path = "ext1_v2.rs")]
+#[cfg_attr(sleep_ext1_version = "3", path = "ext1_v3.rs")]
+#[cfg_attr(not(sleep_ext1_version_is_set), path = "per_pin.rs")]
+mod path;
 
 use portable_atomic::{AtomicU64, Ordering};
 
@@ -67,34 +81,54 @@ static LOW_POWER_PADS: AtomicU64 = AtomicU64::new(0);
 /// back.
 static PREPARED_PADS: AtomicU64 = AtomicU64::new(0);
 
-for_each_lp_function! {
-    (LP_GPIOn $( (($_sig:ident, LP_GPIOn, $lp:literal), $gpio:ident, $_af:ident, $_in:tt $_out:tt) ),*) => {
-        /// The low-power pads: the digital pin number, and the number the low-power registers
-        /// index the pad by.
-        const LOW_POWER_PADS_TABLE: &[(u8, u8)] = &[
-            $( (crate::peripherals::$gpio::NUMBER, $lp) ),*
-        ];
-    };
-}
-
 for_each_gpio! {
     (all $( ($n:literal, $gpio:ident $_ins:tt $_outs:tt $_attrs:tt) ),*) => {
         /// Every pad, so that the digital path can be read back from hardware.
         const PADS: &[u8] = &[ $( $n ),* ];
+
+        /// One past the highest pin number, which is what the pad tables are indexed by.
+        const PAD_COUNT: usize = {
+            let mut highest = 0;
+            $( if $n > highest { highest = $n; } )*
+            highest + 1
+        };
     };
 }
 
-const MAX_ARMED: usize = LOW_POWER_PADS_TABLE.len();
+for_each_lp_function! {
+    (LP_GPIOn $( (($_sig:ident, LP_GPIOn, $lp:literal), $gpio:ident, $_af:ident, $_in:tt $_out:tt) ),*) => {
+        /// The number the low-power registers index each pad by, for the pads they reach.
+        ///
+        /// The two domains number the pads separately, and only some chips give a pad the same
+        /// number in both, so a low-power register takes the number from here and never the pin
+        /// number.
+        const LP_NUMBERS: [Option<u8>; PAD_COUNT] = {
+            let mut numbers = [None; PAD_COUNT];
+            $( numbers[crate::peripherals::$gpio::NUMBER as usize] = Some($lp); )*
+            numbers
+        };
+    };
+}
+
+/// Every pin can be armed at once, so the set of listening pins never outgrows this.
+const MAX_ARMED: usize = {
+    let mut count = 0;
+    let mut pad = 0;
+    while pad < PAD_COUNT {
+        if LP_NUMBERS[pad].is_some() {
+            count += 1;
+        }
+        pad += 1;
+    }
+    count
+};
 
 /// A listening pin, and the level that wakes the chip.
 #[derive(Debug, Clone, Copy)]
 struct Armed {
     /// The digital pin number.
-    // esp32c2 and esp32c3 keep the pad on the digital IO MUX, so nothing there needs this number.
-    #[cfg_attr(
-        not(any(sleep_ext1_version_is_set, sleep_pin_wakeup_version = "1")),
-        expect(dead_code)
-    )]
+    // esp32c2 and esp32c3 keep the pad on the digital IO MUX, so nothing in their path needs it.
+    #[cfg_attr(not(sleep_ext1_version_is_set), expect(dead_code))]
     gpio: u8,
     /// The number the low-power registers index the pad by.
     lp: u8,
@@ -140,19 +174,22 @@ pub(crate) fn enable() {
 fn disable() {
     WakeupSource::Gpio.disable();
 
-    // A stale `ext0` or `ext1` bit would outlive the hook that cleans it up, and the chip would
-    // carry a wakeup source nobody asked for.
-    #[cfg(sleep_has_wakeup_source_ext0)]
-    WakeupSource::Ext0.disable();
-    #[cfg(sleep_has_wakeup_source_ext1)]
-    WakeupSource::Ext1.disable();
+    // A stale bit of a path this chip has would outlive the hook that cleans it up, and the chip
+    // would carry a wakeup source nobody asked for.
+    path::disable();
 }
 
+/// The number the low-power registers index `gpio` by, or `None` if they do not reach the pad.
 fn lp_number(gpio: u8) -> Option<u8> {
-    LOW_POWER_PADS_TABLE
+    *LP_NUMBERS.get(gpio as usize)?
+}
+
+/// The pads a low-power path can reach, as the pin number and the low-power number.
+fn low_power_pads() -> impl Iterator<Item = (u8, u8)> {
+    LP_NUMBERS
         .iter()
-        .find(|(pad, _)| *pad == gpio)
-        .map(|(_, lp)| *lp)
+        .enumerate()
+        .filter_map(|(gpio, lp)| lp.map(|lp| (gpio as u8, lp)))
 }
 
 /// Assigns the listening pins to the hardware paths, and votes for what they need powered.
@@ -177,7 +214,7 @@ fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
         config.keep_alive(SleepResource::HpPeripherals);
     }
 
-    allocate(armed, kind, config);
+    path::allocate(armed, kind, config);
 }
 
 /// Gives the pads back to the digital GPIO peripheral after a light sleep.
@@ -185,7 +222,7 @@ fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
 fn exit_hook() {
     let prepared = PREPARED_PADS.swap(0, Ordering::Relaxed);
 
-    for &(gpio, lp) in LOW_POWER_PADS_TABLE {
+    for (gpio, lp) in low_power_pads() {
         if prepared & (1 << gpio) == 0 {
             continue;
         }
@@ -197,12 +234,11 @@ fn exit_hook() {
 
 /// Collects the listening pins that asked for a low-power path, and reports whether any pin at all
 /// is listening.
-#[crate::ram]
 fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
     let participants = LOW_POWER_PADS.load(Ordering::Relaxed);
 
     let mut count = 0;
-    for &(gpio, lp) in LOW_POWER_PADS_TABLE {
+    for (gpio, lp) in low_power_pads() {
         if participants & (1 << gpio) == 0 {
             continue;
         }
@@ -230,7 +266,6 @@ fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
 /// is what "wake when this changes" means. Sampling it races with the pin, benignly: a pin that
 /// changes before the sleep starts arms a level that is already asserted, so the sleep is rejected
 /// or ends at once.
-#[crate::ram]
 fn armed_level(gpio: u8) -> Option<Level> {
     let pin = GPIO::regs().pin(gpio as usize).read();
 
@@ -252,287 +287,12 @@ fn armed_level(gpio: u8) -> Option<Level> {
     )
 }
 
-/// Every chip whose `ext1` has per-pin levels: esp32c5, esp32c6, esp32c61, esp32h2 and esp32p4.
-///
-/// `ext1` covers every low-power pad at no cost in sleep current, so there is nothing to weigh: all
-/// pins go there, and the per-pin path stays unused until edge support arrives.
-#[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
-#[crate::ram]
-fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
-    arm_ext1(armed, kind);
-}
-
-/// esp32c2 and esp32c3, which have no `ext1` and no low-power peripheral domain to keep alive.
-///
-/// The per-pin path is the only low-power path, and it is free, so there is nothing to allocate.
-#[cfg(all(not(sleep_ext1_version_is_set), sleep_pin_wakeup_version_is_set))]
-#[crate::ram]
-fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
-    clear_per_pin();
-
-    for pin in armed {
-        arm_per_pin(pin, kind);
-    }
-
-    prepare_gpio_wakeup();
-}
-
-/// esp32, esp32s2 and esp32s3, whose `ext1` has one level for the whole pad mask.
-///
-/// `ext1` is the only low-power path that keeps the low-power peripheral domain powered down, so it
-/// takes the largest group of pins that share a level, and the rest pay for the domain: one pin on
-/// `ext0`, and any further pins on the per-pin path.
-#[cfg(sleep_ext1_version = "1")]
-#[crate::ram]
-fn allocate(armed: &[Armed], kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
-    clear_per_pin();
-
-    let shared = shared_level(armed);
-
-    // Every armed pin gets a path: `ext1` takes one level group, `ext0` one of the leftovers, and
-    // the per-pin path covers every low-power pad, so it takes the rest. A chip with a smaller
-    // per-pin path, or an edge-capable allocation with fewer slots, would break that.
-    let mut leftover = false;
-    let mut ext0_taken = false;
-    for pin in armed {
-        if Some(pin.level) == shared {
-            continue;
-        }
-
-        leftover = true;
-        if !ext0_taken {
-            arm_ext0(pin, kind);
-            ext0_taken = true;
-        } else {
-            arm_per_pin(pin, kind);
-        }
-    }
-
-    if !ext0_taken {
-        WakeupSource::Ext0.disable();
-    }
-
-    if leftover {
-        // `ext0` and the per-pin path read the pad through the low-power IO pads.
-        config.keep_alive(SleepResource::LpPeripherals);
-    }
-
-    match shared {
-        Some(level) => {
-            let group = |pin: &&Armed| pin.level == level;
-            arm_ext1_group(armed.iter().filter(group), level, kind);
-        }
-        None => disarm_ext1(),
-    }
-}
-
-/// Picks the level that `ext1` serves, or `None` if it cannot serve any pin.
-///
-/// The larger group wins, because every pin outside it costs the low-power peripheral domain. When
-/// the groups are the same size the lower pin number wins, so that two otherwise identical sleeps
-/// draw the same current.
-#[cfg(sleep_ext1_version = "1")]
-#[crate::ram]
-fn shared_level(armed: &[Armed]) -> Option<Level> {
-    fn group(armed: &[Armed], level: Level) -> (usize, u8) {
-        let mut count = 0;
-        let mut lowest = u8::MAX;
-        for pin in armed.iter().filter(|pin| pin.level == level) {
-            count += 1;
-            lowest = lowest.min(pin.gpio);
-        }
-        (count, lowest)
-    }
-
-    let high = group(armed, Level::High);
-    let mut low = group(armed, Level::Low);
-
-    // esp32's low condition is an AND across the selected pads rather than an OR, so a low group
-    // only means what the user asked for while it holds a single pad.
-    if cfg!(esp32) && low.0 > 1 {
-        low = (0, u8::MAX);
-    }
-
-    match (high.0, low.0) {
-        (0, 0) => None,
-        (_, 0) => Some(Level::High),
-        (0, _) => Some(Level::Low),
-        _ if high.0 > low.0 => Some(Level::High),
-        _ if low.0 > high.0 => Some(Level::Low),
-        _ if high.1 < low.1 => Some(Level::High),
-        _ => Some(Level::Low),
-    }
-}
-
-/// Arms the whole set on `ext1`, which has a level per pad here.
-#[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
-#[crate::ram]
-fn arm_ext1(armed: &[Armed], kind: SleepKind) {
-    if armed.is_empty() {
-        disarm_ext1();
-        return;
-    }
-
-    let mut pads = 0;
-    let mut levels = 0;
-    for pin in armed {
-        // esp32p4 selects the pads by digital pin number, the others by low-power number.
-        let bit = 1
-            << if cfg!(sleep_ext1_version = "3") {
-                pin.gpio
-            } else {
-                pin.lp
-            };
-
-        pads |= bit;
-        if pin.level == Level::High {
-            levels |= bit;
-        }
-
-        prepare_pad(pin, kind);
-    }
-
-    write_ext1(pads, levels);
-    WakeupSource::Ext1.enable();
-}
-
-/// Arms one level group on `ext1`, which has a single level for the whole pad mask here.
-#[cfg(sleep_ext1_version = "1")]
-#[crate::ram]
-fn arm_ext1_group<'a>(group: impl Iterator<Item = &'a Armed>, level: Level, kind: SleepKind) {
-    let mut pads = 0;
-    for pin in group {
-        pads |= 1 << pin.lp;
-        prepare_pad(pin, kind);
-    }
-
-    write_ext1(pads, level);
-    WakeupSource::Ext1.enable();
-}
-
-#[cfg(sleep_ext1_version_is_set)]
-#[crate::ram]
-fn disarm_ext1() {
-    cfg_select! {
-        sleep_ext1_version = "1" => write_ext1(0, Level::Low),
-        _ => write_ext1(0, 0),
-    }
-    WakeupSource::Ext1.disable();
-}
-
-#[cfg(sleep_ext1_version = "1")]
-#[crate::ram]
-fn write_ext1(pads: u32, level: Level) {
-    use crate::peripherals::LPWR;
-
-    LPWR::regs()
-        .ext_wakeup1()
-        .modify(|_, w| w.status_clr().set_bit());
-    LPWR::regs()
-        .ext_wakeup1()
-        .modify(|_, w| unsafe { w.sel().bits(pads) });
-    LPWR::regs()
-        .ext_wakeup_conf()
-        .modify(|_, w| w.ext_wakeup1_lv().bit(level == Level::High));
-}
-
-#[cfg(sleep_ext1_version = "2")]
-#[crate::ram]
-fn write_ext1(pads: u8, levels: u8) {
-    use crate::peripherals::LP_AON;
-
-    LP_AON::regs()
-        .ext_wakeup_cntl()
-        .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
-    LP_AON::regs().ext_wakeup_cntl().modify(|_, w| unsafe {
-        w.ext_wakeup_status_clr().clear_bit();
-        w.ext_wakeup_sel().bits(pads);
-        w.ext_wakeup_lv().bits(levels)
-    });
-}
-
-#[cfg(sleep_ext1_version = "3")]
-#[crate::ram]
-fn write_ext1(pads: u32, levels: u32) {
-    use crate::peripherals::PMU;
-
-    PMU::regs()
-        .ext_wakeup_cntl()
-        .modify(|_, w| w.ext_wakeup_status_clr().set_bit());
-    PMU::regs()
-        .ext_wakeup_cntl()
-        .modify(|_, w| w.ext_wakeup_status_clr().clear_bit());
-    PMU::regs()
-        .ext_wakeup_sel()
-        .write(|w| unsafe { w.ext_wakeup_sel().bits(pads) });
-    PMU::regs()
-        .ext_wakeup_lv()
-        .write(|w| unsafe { w.ext_wakeup_lv().bits(levels) });
-}
-
-/// Arms one pad on `ext0`, the oldest of the low-power paths, which takes a single pad at a level
-/// of its own.
-#[cfg(sleep_has_wakeup_source_ext0)]
-#[crate::ram]
-fn arm_ext0(pin: &Armed, kind: SleepKind) {
-    use crate::peripherals::{LPWR, RTC_IO};
-
-    prepare_pad(pin, kind);
-
-    RTC_IO::regs()
-        .ext_wakeup0()
-        .modify(|_, w| unsafe { w.sel().bits(pin.lp) });
-    LPWR::regs()
-        .ext_wakeup_conf()
-        .modify(|_, w| w.ext_wakeup0_lv().bit(pin.level == Level::High));
-
-    WakeupSource::Ext0.enable();
-}
-
-/// Disarms every pad's per-pin path, so that the pads this sleep did not choose cannot wake it.
-#[cfg(all(
-    sleep_pin_wakeup_version_is_set,
-    any(sleep_ext1_version = "1", not(sleep_ext1_version_is_set))
-))]
-#[crate::ram]
-fn clear_per_pin() {
-    for &(_, lp) in LOW_POWER_PADS_TABLE {
-        low_level::apply_wakeup(lp, false, Level::Low);
-    }
-}
-
-/// Arms one pad on the per-pin low-power path, which gives every low-power pad a level of its own.
-#[cfg(all(
-    sleep_pin_wakeup_version_is_set,
-    any(sleep_ext1_version = "1", not(sleep_ext1_version_is_set))
-))]
-#[crate::ram]
-fn arm_per_pin(pin: &Armed, kind: SleepKind) {
-    cfg_select! {
-        sleep_pin_wakeup_version = "2" => {
-            // esp32c2 and esp32c3 reach the pad through the digital IO MUX, so there is no
-            // low-power function to select. ESP-IDF drives the pad to its wake level with the
-            // pull resistors, so that a deep sleep, which isolates the pad, cannot lose it.
-            if kind == SleepKind::Deep {
-                low_level::pullup_enable(pin.lp, pin.level == Level::Low);
-                low_level::pulldown_enable(pin.lp, pin.level == Level::High);
-            }
-        }
-        _ => {
-            prepare_pad(pin, kind);
-        }
-    }
-
-    low_level::apply_wakeup(pin.lp, true, pin.level);
-}
-
 /// Gives the pad to the low-power IO MUX, which is what makes it readable while the
 /// high-performance GPIO peripheral is powered down.
 ///
 /// A deep sleep also holds the pad, because it powers down whatever drives it. A light sleep does
 /// not: nothing it powers down drives the pad, and the hold would freeze an output.
-#[cfg(any(sleep_ext1_version_is_set, sleep_pin_wakeup_version = "1"))]
-#[crate::ram]
+#[cfg(sleep_ext1_version_is_set)]
 fn prepare_pad(pin: &Armed, kind: SleepKind) {
     // The low-power IO MUX has pull resistors of its own, and the digital ones stop working the
     // moment the pad changes hands. Carry them over, or a pad that nothing drives floats away from
@@ -551,27 +311,6 @@ fn prepare_pad(pin: &Armed, kind: SleepKind) {
     PREPARED_PADS.fetch_or(1 << pin.gpio, Ordering::Relaxed);
 }
 
-/// Clocks the pad-scanning logic that the esp32c2 and esp32c3 per-pin path needs, and clears the
-/// status a previous wake left behind.
-#[cfg(sleep_pin_wakeup_version = "2")]
-#[crate::ram]
-fn prepare_gpio_wakeup() {
-    use crate::peripherals::LPWR;
-
-    let gpio_wakeup = cfg_select! {
-        esp32c2 => LPWR::regs().cntl_gpio_wakeup(),
-        esp32c3 => LPWR::regs().gpio_wakeup(),
-    };
-
-    gpio_wakeup.modify(|_, w| w.gpio_pin_clk_gate().set_bit());
-    LPWR::regs()
-        .ext_wakeup_conf()
-        .modify(|_, w| w.gpio_wakeup_filter().set_bit());
-
-    gpio_wakeup.modify(|_, w| w.gpio_wakeup_status_clr().set_bit());
-    gpio_wakeup.modify(|_, w| w.gpio_wakeup_status_clr().clear_bit());
-}
-
 /// Cuts the pads that are not held loose from the digital peripheral, so that they do not raise
 /// the deep-sleep current through a powered-down output driver.
 ///
@@ -580,7 +319,6 @@ fn prepare_gpio_wakeup() {
 /// loses that function — which is why it runs at sleep entry, on the chips that cannot hold a
 /// single pad through a deep sleep, and after the wakeup sources have taken the holds they need.
 #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
-#[crate::ram]
 pub(crate) fn isolate_pads_for_deep_sleep() {
     use crate::{
         gpio::{AlternateFunction, OutputSignal, io_mux_reg},
@@ -637,7 +375,6 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
 /// esp32s2 and esp32s3 registers start at the first digital pad, and the esp32 register packs the
 /// pads it has in an order of its own.
 #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
-#[crate::ram]
 fn digital_hold_mask(gpio: u8) -> u32 {
     cfg_select! {
         esp32 => {

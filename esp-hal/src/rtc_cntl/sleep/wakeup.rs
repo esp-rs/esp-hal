@@ -175,8 +175,9 @@ impl WakeupSource {
     /// re-registers its own hooks, which is what enabling an already enabled source does.
     ///
     /// Both hooks run with the flash accessible: the entry hook before the sleep configuration
-    /// reaches hardware, the exit hook after the wake sequence has restored it. They run inside
-    /// sleep entry, though, so keep them short, and place what they call in RAM where that is easy.
+    /// reaches hardware, the exit hook after the wake sequence has restored it. A hook and what it
+    /// calls therefore need no [`ram`][crate::ram] attribute. They do run inside sleep entry, so
+    /// keep them short.
     pub(crate) fn enable_with_hooks(
         self,
         entry: Option<SleepEntryHook>,
@@ -213,7 +214,6 @@ pub(crate) fn enabled_sources() -> enumset::EnumSet<WakeupSource> {
 /// enabled wake sources, narrowed to those the chip can reject on, which is not every source it
 /// can wake from: esp32 rejects on GPIO and SDIO only, and esp32c2, esp32c3, esp32s2 and esp32s3
 /// do not reject on a UART.
-#[crate::ram]
 pub(crate) fn reject_mask() -> u32 {
     mask() & property!("sleep.rejectable_mask")
 }
@@ -246,7 +246,6 @@ pub(crate) fn io_wake_enabled() -> bool {
 /// Hook selection uses the mask as it reads at entry. A hook may enable a source of its own — GPIO
 /// does, because it decides between the `ext0`, `ext1` and per-pin paths here — and the caller
 /// re-reads the mask afterwards rather than looking for a fixed point.
-#[crate::ram]
 pub(crate) fn run_entry_hooks(kind: SleepKind, config: &mut RtcSleepConfig) {
     let mut wrapped = WrappedSleepConfig::new(config);
 
@@ -259,7 +258,6 @@ pub(crate) fn run_entry_hooks(kind: SleepKind, config: &mut RtcSleepConfig) {
 }
 
 /// Runs every enabled source's post-wake hook. Light sleep only.
-#[crate::ram]
 pub(crate) fn run_exit_hooks() {
     for source in enabled_sources() {
         let hook = HOOKS.with(|hooks| hooks.exit[source as usize]);
