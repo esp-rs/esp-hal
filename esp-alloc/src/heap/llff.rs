@@ -30,7 +30,8 @@ impl LlffHeap {
     }
 
     pub(crate) unsafe fn try_deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> bool {
-        if self.heap.bottom() <= ptr.as_ptr() && self.heap.top() >= ptr.as_ptr() {
+        // `top()` is one past the last byte of the heap, so the bound is exclusive.
+        if self.heap.bottom() <= ptr.as_ptr() && self.heap.top() > ptr.as_ptr() {
             unsafe { self.heap.deallocate(ptr, layout) };
             true
         } else {
