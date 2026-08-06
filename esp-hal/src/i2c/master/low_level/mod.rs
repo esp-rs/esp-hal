@@ -518,15 +518,25 @@ impl Driver<'_> {
         self.regs().sr().read().bus_busy().bit_is_set()
     }
 
+    /// Returns whether either line is held low while no transaction is in progress.
+    fn line_held_low(&self) -> bool {
+        use crate::gpio::AnyPin;
+
+        let held_low =
+            |pin: Option<u8>| pin.is_some_and(|n| !unsafe { AnyPin::steal(n) }.is_input_high());
+
+        held_low(self.config.sda_pin.pin_number()) || held_low(self.config.scl_pin.pin_number())
+    }
+
     fn ensure_idle_blocking(&self) {
-        if self.bus_busy() {
+        if self.bus_busy() || self.line_held_low() {
             // If the bus is busy, we need to clear it.
             self.clear_bus_blocking(false);
         }
     }
 
     async fn ensure_idle(&self) {
-        if self.bus_busy() {
+        if self.bus_busy() || self.line_held_low() {
             // If the bus is busy, we need to clear it.
             self.clear_bus().await;
         }
