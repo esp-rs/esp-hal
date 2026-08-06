@@ -130,9 +130,9 @@ for_each_lp_function! {
         /// The two domains number the pads separately, and only some chips give a pad the same
         /// number in both, so a low-power register takes the number from here and never the pin
         /// number.
-        const LP_NUMBERS: [Option<u8>; PAD_COUNT] = {
-            let mut numbers = [None; PAD_COUNT];
-            $( numbers[crate::peripherals::$gpio::NUMBER as usize] = Some($lp); )*
+        const LP_NUMBERS: [u8; PAD_COUNT] = {
+            let mut numbers = [0xFF; PAD_COUNT];
+            $( numbers[crate::peripherals::$gpio::NUMBER as usize] = $lp; )*
             numbers
         };
     };
@@ -143,7 +143,7 @@ const MAX_ARMED: usize = {
     let mut count = 0;
     let mut pad = 0;
     while pad < PAD_COUNT {
-        if LP_NUMBERS[pad].is_some() {
+        if LP_NUMBERS[pad] != 0xFF {
             count += 1;
         }
         pad += 1;
@@ -207,7 +207,11 @@ fn disable() {
 
 /// The number the low-power registers index `gpio` by, or `None` if they do not reach the pad.
 fn lp_number(gpio: u8) -> Option<u8> {
-    *LP_NUMBERS.get(gpio as usize)?
+    if LP_NUMBERS[gpio as usize] == 0xFF {
+        None
+    } else {
+        Some(LP_NUMBERS[gpio as usize])
+    }
 }
 
 /// Assigns the listening pins to the hardware paths, and votes for what they need powered.

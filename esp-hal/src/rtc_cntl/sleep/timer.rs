@@ -4,8 +4,6 @@
 //! Arming it is a standing request, like every other wakeup source: it survives the wake it causes,
 //! and it ends only when the caller clears it.
 
-use portable_atomic::{AtomicU64, Ordering};
-
 use crate::{
     peripherals::RTC_TIMER,
     rtc_cntl::{
@@ -22,12 +20,6 @@ use crate::{
 /// round again.
 const ALARM_TO_SLEEP_TICKS: u64 = 16;
 
-/// The armed deadline, in LP timer ticks.
-///
-/// Kept beside the comparator because the comparator registers are write-only on some chips. Deep
-/// sleep resets the chip, and light sleep keeps RAM, so a value here always belongs to this run.
-static DEADLINE: AtomicU64 = AtomicU64::new(0);
-
 /// Arms the alarm for `deadline` and enables the timer wakeup source.
 pub(crate) fn set_deadline(deadline: Instant) {
     let now = Instant::now();
@@ -42,7 +34,6 @@ pub(crate) fn set_deadline(deadline: Instant) {
         crate::rtc_cntl::time_since_boot_raw().saturating_sub(behind)
     };
 
-    DEADLINE.store(ticks, Ordering::Relaxed);
     arm(ticks);
 
     WakeupSource::Timer.enable_with_hooks(Some(entry_hook), None);
@@ -52,28 +43,40 @@ pub(crate) fn set_deadline(deadline: Instant) {
 pub(crate) fn clear_deadline() {
     WakeupSource::Timer.disable();
     disarm();
-    DEADLINE.store(0, Ordering::Relaxed);
 }
 
 /// Returns whether the armed deadline is too near for the sleep transition to catch it.
 ///
 /// Only a deep sleep needs to ask: a light sleep that misses the alarm is rejected by hardware,
 /// because 007 makes the enabled sources the reject sources, and the alarm status latches.
+///
+/// The comparator holds the deadline, so nothing has to keep a copy of it. Its target is readable
+/// on every chip, even where the alarm enable beside it is not, and only a caller that found the
+/// timer source enabled asks, so the target it reads is always one this run armed.
 pub(crate) fn deadline_missed() -> bool {
-    let deadline = DEADLINE.load(Ordering::Relaxed);
+    let regs = RTC_TIMER::regs();
+
+    let (low, high) = cfg_select! {
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4) => (
+            regs.tar0_low().read().main_timer_tar_low0().bits(),
+            regs.tar0_high().read().main_timer_tar_high0().bits(),
+        ),
+        _ => (
+            regs.slp_timer0().read().slp_val_lo().bits(),
+            regs.slp_timer1().read().slp_val_hi().bits(),
+        ),
+    };
+    let deadline = (u64::from(high) << 32) | u64::from(low);
 
     deadline < crate::rtc_cntl::time_since_boot_raw() + ALARM_TO_SLEEP_TICKS
 }
 
 #[crate::ram]
 fn entry_hook(_kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
-    cfg_select! {
-        // The PMU chips run the comparator from the always-on domain, and ESP-IDF powers their
-        // low-power peripherals down with a timer wake armed.
-        soc_has_pmu => {
-            let _ = config;
-        }
-        _ => config.keep_alive(super::SleepResource::LpPeripherals),
+    // The PMU chips run the comparator from the always-on domain, and ESP-IDF powers their
+    // low-power peripherals down with a timer wake armed.
+    if !cfg!(soc_has_pmu) {
+        config.keep_alive(super::SleepResource::LpPeripherals);
     }
 }
 
