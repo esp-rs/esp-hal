@@ -145,7 +145,7 @@ fn arm_ext0(pin: &Armed, kind: SleepKind) {
 
 /// Disarms every pad's per-pin path, so that the pads this sleep did not choose cannot wake it.
 fn clear_per_pin() {
-    for &lp in LP_NUMBERS.iter().flatten() {
+    for &lp in LP_NUMBERS.iter().filter(|&n| n != 0xFF) {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
 }

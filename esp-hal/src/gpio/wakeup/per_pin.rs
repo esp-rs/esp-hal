@@ -16,7 +16,7 @@ pub(super) fn disable() {}
 
 pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
     // The pads this sleep did not choose must not wake it.
-    for &lp in LP_NUMBERS.iter().flatten() {
+    for &lp in LP_NUMBERS.iter().filter(|&n| n != 0xFF) {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
 
