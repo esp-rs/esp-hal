@@ -55,6 +55,18 @@ use crate::{
 /// [`listen`][crate::gpio::Input::listen] or by the `wait_for` family: **a pin that is not
 /// listening is not a wakeup source**, and a pin that listens wakes the chip from light sleep
 /// through the digital path without any configuration.
+///
+/// # Holding the pad at the level that does not wake the chip
+///
+/// A pad that is at its wake level when the sleep starts ends the sleep at once, so something has
+/// to hold it at the other level. That something is the pin's own configuration: sleep keeps the
+/// pull resistors the pin is configured with, and adds none of its own. A pin left with
+/// [`Pull::None`][crate::gpio::Pull::None] and no external resistor therefore floats through the
+/// sleep, and a floating pad wakes the chip immediately and every time.
+///
+/// So give a level-triggered wake pin a pull against the level it wakes on, or an external
+/// resistor. An external pull-up is the better choice for a pin that wakes the chip on a low
+/// level.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -65,10 +77,10 @@ pub struct WakeupConfig {
     /// This is what deep sleep needs, and what a light sleep that powers the peripheral down
     /// needs. Only low-power pads have such a path.
     ///
-    /// Sleep entry switches the pad to the low-power IO MUX, enables its low-power input, copies
-    /// the pin's pull resistors to it, and, for a deep sleep, holds the pad. A light sleep gives
-    /// the pad back to the digital GPIO peripheral when it ends; a deep sleep releases the hold
-    /// when the chip boots again.
+    /// Sleep entry gives the pad whatever the low-power path needs — the pin's pull resistors stay
+    /// in force either way — and, for a deep sleep, holds the pad, because deep sleep powers down
+    /// whatever drives it. A light sleep gives the pad back to the digital GPIO peripheral when it
+    /// ends; a deep sleep releases the hold when the chip boots again.
     low_power_path: bool,
 }
 
@@ -123,6 +135,9 @@ for_each_gpio! {
     };
 }
 
+/// Marks a pad the low-power registers do not reach, in [`LP_NUMBERS`].
+const NO_LP_NUMBER: u8 = u8::MAX;
+
 for_each_lp_function! {
     (LP_GPIOn $( (($_sig:ident, LP_GPIOn, $lp:literal), $gpio:ident, $_af:ident, $_in:tt $_out:tt) ),*) => {
         /// The number the low-power registers index each pad by, for the pads they reach.
@@ -131,7 +146,7 @@ for_each_lp_function! {
         /// number in both, so a low-power register takes the number from here and never the pin
         /// number.
         const LP_NUMBERS: [u8; PAD_COUNT] = {
-            let mut numbers = [0xFF; PAD_COUNT];
+            let mut numbers = [NO_LP_NUMBER; PAD_COUNT];
             $( numbers[crate::peripherals::$gpio::NUMBER as usize] = $lp; )*
             numbers
         };
@@ -143,7 +158,7 @@ const MAX_ARMED: usize = {
     let mut count = 0;
     let mut pad = 0;
     while pad < PAD_COUNT {
-        if LP_NUMBERS[pad] != 0xFF {
+        if LP_NUMBERS[pad] != NO_LP_NUMBER {
             count += 1;
         }
         pad += 1;
@@ -207,10 +222,9 @@ fn disable() {
 
 /// The number the low-power registers index `gpio` by, or `None` if they do not reach the pad.
 fn lp_number(gpio: u8) -> Option<u8> {
-    if LP_NUMBERS[gpio as usize] == 0xFF {
-        None
-    } else {
-        Some(LP_NUMBERS[gpio as usize])
+    match LP_NUMBERS[gpio as usize] {
+        NO_LP_NUMBER => None,
+        lp => Some(lp),
     }
 }
 

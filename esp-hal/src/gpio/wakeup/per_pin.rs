@@ -4,7 +4,7 @@
 //! costs no power domain, and it reaches the pad through the digital IO MUX, so there is nothing to
 //! allocate and no pad to hand over.
 
-use super::{Armed, LP_NUMBERS};
+use super::{Armed, LP_NUMBERS, NO_LP_NUMBER};
 use crate::{
     gpio::{Level, lp_io::low_level},
     peripherals::LPWR,
@@ -14,20 +14,15 @@ use crate::{
 /// These chips have no path of their own to clear: the pads share the GPIO wakeup source.
 pub(super) fn disable() {}
 
-pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
+pub(super) fn allocate(armed: &[Armed], _kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
     // The pads this sleep did not choose must not wake it.
-    for &lp in LP_NUMBERS.iter().filter(|&n| n != 0xFF) {
+    for &lp in LP_NUMBERS.iter().filter(|&&lp| lp != NO_LP_NUMBER) {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
 
     for pin in armed {
-        // ESP-IDF drives the pad to its wake level with the pull resistors, so that a deep sleep,
-        // which isolates the pad, cannot lose it.
-        if kind == SleepKind::Deep {
-            low_level::pullup_enable(pin.lp, pin.level == Level::Low);
-            low_level::pulldown_enable(pin.lp, pin.level == Level::High);
-        }
-
+        // The pull resistors are the pin's own configuration, which these chips keep in force
+        // because their low-power pull registers are the digital ones.
         low_level::apply_wakeup(pin.lp, true, pin.level);
     }
 

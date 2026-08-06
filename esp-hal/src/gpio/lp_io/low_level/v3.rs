@@ -87,18 +87,6 @@ pub(crate) fn input_enable(lp: u8, enable: bool) {
         .modify(|_, w| w.fun_ie().bit(enable));
 }
 
-pub(crate) fn pullup_enable(lp: u8, enable: bool) {
-    IO_MUX::regs()
-        .gpio(lp as usize)
-        .modify(|_, w| w.fun_wpu().bit(enable));
-}
-
-pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
-    IO_MUX::regs()
-        .gpio(lp as usize)
-        .modify(|_, w| w.fun_wpd().bit(enable));
-}
-
 #[expect(dead_code)]
 pub(crate) fn set_open_drain_output(lp: u8, enable: bool) {
     GPIO::regs()
