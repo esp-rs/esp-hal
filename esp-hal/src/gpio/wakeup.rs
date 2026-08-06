@@ -301,7 +301,7 @@ fn allocate(armed: &[Armed], kind: SleepKind, config: &mut WrappedSleepConfig<'_
 
         leftover = true;
         if !ext0_taken {
-            arm_ext0(pin);
+            arm_ext0(pin, kind);
             ext0_taken = true;
         } else {
             arm_per_pin(pin, kind);
@@ -474,10 +474,10 @@ fn write_ext1(pads: u32, levels: u32) {
 /// of its own.
 #[cfg(sleep_has_wakeup_source_ext0)]
 #[crate::ram]
-fn arm_ext0(pin: &Armed) {
+fn arm_ext0(pin: &Armed, kind: SleepKind) {
     use crate::peripherals::{LPWR, RTC_IO};
 
-    low_level::set_config(pin.lp, true, true, LpFunction::LP_GPIO);
+    prepare_pad(pin, kind);
 
     RTC_IO::regs()
         .ext_wakeup0()
@@ -510,14 +510,12 @@ fn clear_per_pin() {
 fn arm_per_pin(pin: &Armed, kind: SleepKind) {
     cfg_select! {
         sleep_pin_wakeup_version = "2" => {
-            {
-                // esp32c2 and esp32c3 reach the pad through the digital IO MUX, so there is no
-                // low-power function to select. ESP-IDF drives the pad to its wake level with the
-                // pull resistors, so that a deep sleep, which isolates the pad, cannot lose it.
-                if kind == SleepKind::Deep {
-                    low_level::pullup_enable(pin.lp, pin.level == Level::Low);
-                    low_level::pulldown_enable(pin.lp, pin.level == Level::High);
-                }
+            // esp32c2 and esp32c3 reach the pad through the digital IO MUX, so there is no
+            // low-power function to select. ESP-IDF drives the pad to its wake level with the
+            // pull resistors, so that a deep sleep, which isolates the pad, cannot lose it.
+            if kind == SleepKind::Deep {
+                low_level::pullup_enable(pin.lp, pin.level == Level::Low);
+                low_level::pulldown_enable(pin.lp, pin.level == Level::High);
             }
         }
         _ => {
