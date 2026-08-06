@@ -25,13 +25,13 @@ pub use crate::flash::FlashStorage;
 
 /// Represents a single partition entry.
 #[derive(Clone, Copy)]
-pub struct PartitionEntry<'a> {
-    pub(crate) binary: &'a [u8; RAW_ENTRY_LEN],
+pub struct PartitionEntry {
+    pub(crate) binary: [u8; RAW_ENTRY_LEN],
 }
 
-impl<'a> PartitionEntry<'a> {
-    fn new(binary: &'a [u8; RAW_ENTRY_LEN]) -> Self {
-        Self { binary }
+impl PartitionEntry {
+    fn new(binary: &[u8; RAW_ENTRY_LEN]) -> Self {
+        Self { binary: *binary }
     }
 
     /// The magic value of the entry.
@@ -65,12 +65,12 @@ impl<'a> PartitionEntry<'a> {
     }
 
     /// The label of the partition.
-    pub fn label(&self) -> &'a [u8] {
+    pub fn label(&self) -> &[u8] {
         &self.binary[12..][..16]
     }
 
     /// The label of the partition as `&str`.
-    pub fn label_as_str(&self) -> &'a str {
+    pub fn label_as_str(&self) -> &str {
         let array = self.label();
         let len = array
             .iter()
@@ -138,12 +138,19 @@ impl<'a> PartitionEntry<'a> {
 
     /// Provides a "view" into the partition allowing to read/write the
     /// partition contents using the given [`FlashStorage`].
-    pub fn as_flash_region<'d>(self, flash: &'a mut FlashStorage<'d>) -> FlashRegion<'a, 'd> {
-        FlashRegion { raw: self, flash }
+    pub fn as_flash_region<'a, 'd>(self, flash: &'a mut FlashStorage<'d>) -> FlashRegion<'a, 'd> {
+        FlashRegion {
+            offset: self.offset(),
+            len: self.len(),
+            partition_type: self.partition_type(),
+            read_only: self.is_read_only(),
+            encrypted: self.is_effectively_encrypted(),
+            flash,
+        }
     }
 }
 
-impl core::fmt::Debug for PartitionEntry<'_> {
+impl core::fmt::Debug for PartitionEntry {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("PartitionEntry")
             .field("magic", &self.magic())
@@ -160,7 +167,7 @@ impl core::fmt::Debug for PartitionEntry<'_> {
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for PartitionEntry<'_> {
+impl defmt::Format for PartitionEntry {
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
             fmt,
@@ -250,26 +257,17 @@ impl<'a> PartitionTable<'a> {
 
         #[cfg(feature = "validation")]
         {
-            let (hash, index) = {
-                let mut i = 0;
-                loop {
-                    if let Ok(entry) = raw_table.get_partition(i) {
-                        if entry.magic() == MD5_MAGIC {
-                            break (&entry.binary[16..][..16], i);
-                        }
-
-                        i += 1;
-                        if i >= raw_table.entries {
-                            return Err(Error::Invalid);
-                        }
-                    }
-                }
-            };
+            let index = raw_table
+                .binary
+                .iter()
+                .position(|entry| u16::from_le_bytes([entry[0], entry[1]]) == MD5_MAGIC)
+                .ok_or(Error::Invalid)?;
+            let hash = &raw_table.binary[index][16..][..16];
 
             let mut hasher = crate::crypto::Md5::new();
 
-            for i in 0..index {
-                hasher.update(&raw_table.binary[i]);
+            for entry in &raw_table.binary[..index] {
+                hasher.update(entry);
             }
             let calculated_hash = hasher.finalize();
 
@@ -314,7 +312,7 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Get a partition entry.
-    pub fn get_partition(&self, index: usize) -> Result<PartitionEntry<'a>, Error> {
+    pub fn get_partition(&self, index: usize) -> Result<PartitionEntry, Error> {
         if index >= self.entries {
             return Err(Error::OutOfBounds);
         }
@@ -322,7 +320,7 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Get the first partition matching the given partition type.
-    pub fn find_partition(&self, pt: PartitionType) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn find_partition(&self, pt: PartitionType) -> Result<Option<PartitionEntry>, Error> {
         for i in 0..self.entries {
             let entry = self.get_partition(i)?;
             if entry.partition_type() == pt {
@@ -333,19 +331,19 @@ impl<'a> PartitionTable<'a> {
     }
 
     /// Returns an iterator over the partitions.
-    pub fn iter(&self) -> impl Iterator<Item = PartitionEntry<'a>> {
+    pub fn iter(&self) -> impl Iterator<Item = PartitionEntry> {
         (0..self.entries).filter_map(|i| self.get_partition(i).ok())
     }
 
     #[cfg(feature = "std")]
     /// Get the currently booted partition.
-    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn booted_partition(&self) -> Result<Option<PartitionEntry>, Error> {
         Err(Error::Invalid)
     }
 
     #[cfg(not(feature = "std"))]
     /// Get the currently booted partition.
-    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+    pub fn booted_partition(&self) -> Result<Option<PartitionEntry>, Error> {
         // Read entry 0 from MMU to know which partition is mapped
         //
         // See <https://github.com/espressif/esp-idf/blob/758939caecb16e5542b3adfba0bc85025517db45/components/hal/mmu_hal.c#L124>
@@ -614,18 +612,24 @@ fn read_partition_table_impl<'a, F: FlashAccess>(
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashRegion<'a, 'd> {
-    pub(crate) raw: PartitionEntry<'a>,
+    pub(crate) offset: u32,
+    pub(crate) len: u32,
+    pub(crate) partition_type: PartitionType,
+    pub(crate) read_only: bool,
+    /// Whether the partition is effectively encrypted (see
+    /// `PartitionEntry::is_effectively_encrypted`).
+    pub(crate) encrypted: bool,
     pub(crate) flash: &'a mut FlashStorage<'d>,
 }
 
 impl<'a, 'd> FlashRegion<'a, 'd> {
     /// Returns the size of the partition in bytes.
     pub fn partition_size(&self) -> usize {
-        self.raw.len() as _
+        self.len as _
     }
 
     fn range(&self) -> core::ops::Range<u32> {
-        self.raw.offset()..self.raw.offset() + self.raw.len()
+        self.offset..self.offset + self.len
     }
 
     fn in_range(&self, start: u32, len: usize) -> bool {
@@ -634,13 +638,13 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
 
     /// Read bytes from the partition.
     pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
-        let address = offset + self.raw.offset();
+        let address = offset + self.offset;
 
         if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
-        if self.raw.is_effectively_encrypted() {
+        if self.encrypted {
             self.flash.flash_read_encrypted(address, bytes)
         } else {
             self.flash.flash_read(address, bytes)
@@ -649,9 +653,9 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
 
     /// Write bytes to the partition.
     pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
-        let address = offset + self.raw.offset();
+        let address = offset + self.offset;
 
-        if self.raw.is_read_only() {
+        if self.read_only {
             return Err(Error::WriteProtected);
         }
 
@@ -659,7 +663,7 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
             return Err(Error::OutOfBounds);
         }
 
-        if self.raw.is_effectively_encrypted() {
+        if self.encrypted {
             self.flash.flash_write_encrypted(address, bytes)
         } else {
             self.flash.flash_write(address, bytes)
@@ -675,10 +679,10 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
     ///
     /// Addresses are relative to the partition start.
     pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
-        let address_from = from + self.raw.offset();
-        let address_to = to + self.raw.offset();
+        let address_from = from + self.offset;
+        let address_to = to + self.offset;
 
-        if self.raw.is_read_only() {
+        if self.read_only {
             return Err(Error::WriteProtected);
         }
 
@@ -741,7 +745,7 @@ mod embedded_storage_traits {
         /// Returns [`Error::NotSupported`] if this partition is treated as encrypted (e.g. app
         /// partitions when flash encryption is enabled).
         pub fn as_nor_flash<'r>(&'r mut self) -> Result<NorFlashRegion<'r, 'a, 'd>, Error> {
-            if self.raw.is_effectively_encrypted() {
+            if self.encrypted {
                 return Err(Error::NotSupported);
             }
 
@@ -756,7 +760,7 @@ mod embedded_storage_traits {
         pub fn as_nor_flash_encrypted<'r>(
             &'r mut self,
         ) -> Result<EncryptedNorFlashRegion<'r, 'a, 'd>, Error> {
-            if !self.raw.is_effectively_encrypted() {
+            if !self.encrypted {
                 return Err(Error::NotSupported);
             }
 
@@ -805,7 +809,7 @@ mod embedded_storage_traits {
         const READ_SIZE: usize = NOR_READ_SIZE;
 
         fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
-            let address = offset + self.region.raw.offset();
+            let address = offset + self.region.offset;
 
             if !self.region.in_range(address, bytes.len()) {
                 return Err(Error::OutOfBounds);
@@ -828,9 +832,9 @@ mod embedded_storage_traits {
         }
 
         fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-            let address = offset + self.region.raw.offset();
+            let address = offset + self.region.offset;
 
-            if self.region.raw.is_read_only() {
+            if self.region.read_only {
                 return Err(Error::WriteProtected);
             }
 
@@ -852,7 +856,7 @@ mod embedded_storage_traits {
         const READ_SIZE: usize = NOR_READ_SIZE;
 
         fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
-            let address = offset + self.region.raw.offset();
+            let address = offset + self.region.offset;
 
             if !self.region.in_range(address, bytes.len()) {
                 return Err(Error::OutOfBounds);
@@ -875,9 +879,9 @@ mod embedded_storage_traits {
         }
 
         fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-            let address = offset + self.region.raw.offset();
+            let address = offset + self.region.offset;
 
-            if self.region.raw.is_read_only() {
+            if self.region.read_only {
                 return Err(Error::WriteProtected);
             }
 
@@ -1088,7 +1092,7 @@ mod storage_tests {
             .unwrap()
             .unwrap();
         let mut nvs_partition = nvs.as_flash_region(&mut storage);
-        assert_eq!(nvs_partition.raw.offset(), 36864);
+        assert_eq!(nvs_partition.offset, 36864);
 
         assert_eq!(nvs_partition.capacity(), 24576);
 
@@ -1114,7 +1118,7 @@ mod storage_tests {
             .unwrap()
             .unwrap();
         let mut nvs_partition = nvs.as_flash_region(&mut storage);
-        assert_eq!(nvs_partition.raw.offset(), 36864);
+        assert_eq!(nvs_partition.offset, 36864);
 
         assert_eq!(nvs_partition.capacity(), 24576);
 
