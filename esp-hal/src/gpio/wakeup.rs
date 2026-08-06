@@ -48,9 +48,10 @@ pub struct WakeupConfig {
     /// This is what deep sleep needs, and what a light sleep that powers the peripheral down
     /// needs. Only low-power pads have such a path.
     ///
-    /// Sleep entry switches the pad to the low-power IO MUX and enables its low-power input, and,
-    /// for a deep sleep, holds the pad. A light sleep gives the pad back to the digital GPIO
-    /// peripheral when it ends; a deep sleep releases the hold when the chip boots again.
+    /// Sleep entry switches the pad to the low-power IO MUX, enables its low-power input, copies
+    /// the pin's pull resistors to it, and, for a deep sleep, holds the pad. A light sleep gives
+    /// the pad back to the digital GPIO peripheral when it ends; a deep sleep releases the hold
+    /// when the chip boots again.
     low_power_path: bool,
 }
 
