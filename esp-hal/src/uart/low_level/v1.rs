@@ -168,6 +168,13 @@ pub(super) fn suspend(_info: &Info, _en: bool) {
 }
 
 #[cfg(sleep_driver_supported)]
+pub(super) fn set_wakeup_edge_threshold(info: &Info, threshold: u16) {
+    info.regs()
+        .sleep_conf()
+        .modify(|_, w| unsafe { w.active_threshold().bits(threshold) });
+}
+
+#[cfg(sleep_driver_supported)]
 pub(super) fn wait_for_suspended(info: &Info) {
     // Wait for FIFO to drain completely.
     while info.regs().status().read().txfifo_cnt().bits() > 0 {}
