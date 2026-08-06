@@ -682,11 +682,11 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
             return Err(Error::WriteProtected);
         }
 
-        if !self.range().contains(&address_from) {
+        if from > to {
             return Err(Error::OutOfBounds);
         }
 
-        if !self.range().contains(&address_to) {
+        if !self.in_range(address_from, (address_to - address_from) as usize) {
             return Err(Error::OutOfBounds);
         }
 
@@ -1121,6 +1121,55 @@ mod storage_tests {
         let mut buffer = [0u8; 24577];
         assert!(nvs_partition.read(0, &mut buffer) == Err(Error::OutOfBounds));
     }
+
+    #[test]
+    fn can_erase_up_to_partition_end() {
+        let mut storage = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nvs_partition = nvs.as_flash_region(&mut storage);
+
+        let capacity = nvs_partition.capacity() as u32;
+        assert_eq!(capacity, 24576);
+
+        nvs_partition.write(0, &[42u8; 24576]).unwrap();
+
+        nvs_partition.erase(capacity - 4096, capacity).unwrap();
+        let mut buffer = [0u8; 4096];
+        nvs_partition.read(capacity - 4096, &mut buffer).unwrap();
+        assert!(buffer.iter().all(|v| *v == 0xff));
+
+        nvs_partition.erase(0, capacity).unwrap();
+        let mut buffer = [0u8; 24576];
+        nvs_partition.read(0, &mut buffer).unwrap();
+        assert!(buffer.iter().all(|v| *v == 0xff));
+    }
+
+    #[test]
+    fn cannot_erase_out_of_bounds() {
+        let mut storage = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nvs_partition = nvs.as_flash_region(&mut storage);
+
+        let capacity = nvs_partition.capacity() as u32;
+
+        assert!(nvs_partition.erase(0, capacity + 4096) == Err(Error::OutOfBounds));
+        assert!(nvs_partition.erase(capacity, capacity + 4096) == Err(Error::OutOfBounds));
+        assert!(nvs_partition.erase(4096, 0) == Err(Error::OutOfBounds));
+    }
 }
 
 #[cfg(all(test, feature = "embedded-storage"))]
@@ -1182,5 +1231,29 @@ mod nor_flash_tests {
             <EncryptedNorFlashRegion<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
             <FlashStorage<'static> as FlashAccess>::READ_SIZE
         );
+    }
+
+    #[test]
+    fn nor_flash_erase_bounds() {
+        let mut storage = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nvs_partition = nvs.as_flash_region(&mut storage);
+        let capacity = nvs_partition.capacity() as u32;
+        let mut nor_flash = nvs_partition.as_nor_flash().unwrap();
+
+        nor_flash.erase(0, capacity).unwrap();
+        let mut buffer = [0u8; 4096];
+        nor_flash.read(capacity - 4096, &mut buffer).unwrap();
+        assert!(buffer.iter().all(|v| *v == 0xff));
+
+        assert!(nor_flash.erase(0, capacity + 4096) == Err(Error::OutOfBounds));
+        assert!(nor_flash.erase(4096, 0) == Err(Error::OutOfBounds));
     }
 }

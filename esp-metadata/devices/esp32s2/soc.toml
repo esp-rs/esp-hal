@@ -58,7 +58,7 @@ peripherals = [
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_TIMER", pac = "RTC_CNTL" },
-    { name = "RTC_I2C" },
+    { name = "LP_I2C0", pac = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SENS" },
     { name = "SHA", interrupts = { peri = "SHA" } },
@@ -200,6 +200,10 @@ i2c0_data_register_ahb_address = 0x6001301c
 [device.i2c_slave]
 support_status = { status = "not_supported", issue = 1909 }
 
+[device.lp_i2c_master]
+support_status = "not_supported"
+version = "rtc_i2c"
+
 [device.interrupts]
 support_status = "partial"
 status_registers = 3
@@ -295,8 +299,11 @@ version = 1
 [device.uhci]
 support_status = "not_supported"
 
-[device.rgb_display] # via SPI and I2S
+[device.rgb_display] # via I2S
 support_status = "not_supported"
+
+[device.spi_lcd] # the LCD mode of GP-SPI2
+support_status = { status = "not_supported", issue = 5374 }
 
 [device.camera] # via I2S
 support_status = "not_supported"
@@ -328,7 +335,6 @@ wakeup_sources = {
     #UlpFsm = 9,
     UlpRiscv = 11,
     UlpRiscvTrap = 13,
-    Usb = 15,
 }
 
 # Other drivers which are partially supported but have no other configuration:

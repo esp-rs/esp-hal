@@ -523,7 +523,6 @@ mod systimer {
 
 #[cfg(twai_driver_supported)]
 mod twai {
-    use embedded_can::Frame;
     use esp_hal::{
         Async,
         Blocking,

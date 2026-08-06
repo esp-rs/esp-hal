@@ -283,6 +283,9 @@ macro_rules! property {
     ("ledc.channel_count", str) => {
         stringify!(6)
     };
+    ("lp_i2c_master.version") => {
+        "lp_i2c"
+    };
     ("lp_i2c_master.fifo_size") => {
         16
     };
@@ -1264,10 +1267,8 @@ macro_rules! for_each_wakeup_source {
         _for_each_inner_wakeup_source!((Uart1, 7)); _for_each_inner_wakeup_source!((Sdio,
         8)); _for_each_inner_wakeup_source!((Bt, 10));
         _for_each_inner_wakeup_source!((LpCore, 11));
-        _for_each_inner_wakeup_source!((Usb, 14));
         _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (WifiBeacon, 3), (Timer,
-        4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Bt, 10), (LpCore, 11), (Usb,
-        14)));
+        4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Bt, 10), (LpCore, 11)));
     };
 }
 #[macro_export]

@@ -176,6 +176,7 @@ macro_rules! set_pull_field {
     }};
 }
 
+#[expect(dead_code)]
 pub(super) fn init_pin(pin: &impl crate::gpio::LpPin, input_enable: bool) -> u8 {
     pin.lp_set_config(input_enable, true, LpFunction::LP_GPIO);
     pin.lp_number()
@@ -193,6 +194,7 @@ pub(super) fn output_enable(pin: u8, enable: bool) {
     }
 }
 
+#[expect(dead_code)]
 pub(super) fn input_enable(pin: u8, enable: bool) {
     set_pad_field!(pin, fun_ie, enable);
 }

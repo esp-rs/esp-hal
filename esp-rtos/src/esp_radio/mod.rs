@@ -34,8 +34,8 @@ impl esp_radio_rtos_driver::SchedulerImplementation for Scheduler {
                 return false;
             }
 
-            let current_cpu = Cpu::current() as usize;
-            if !scheduler.per_cpu[current_cpu].initialized {
+            let current_cpu = Cpu::current();
+            if !scheduler.active_cores.contains(current_cpu) {
                 error!(
                     "Trying to initialize esp-radio on {:?} but esp-rtos is not running on this core",
                     current_cpu

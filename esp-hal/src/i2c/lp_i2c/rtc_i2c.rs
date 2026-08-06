@@ -1,212 +1,69 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
-//! # RTC I2C driver
+//! RTC_I2C implementation of the low-power I2C driver.
 //!
-//! ## Overview
-//!
-//! This is the host driver for the RTC_I2C peripheral which is primarily for the ULP.
-//!
-//! The RTC I2C peripheral always expects a slave sub-register address to be provided when reading
-//! or writing.
-//! This could make the RTC I2C peripheral incompatible with certain I2C devices or sensors which
-//! do not need any sub-register to be programmed.
-//! It also means a `embedded_hal::i2c::I2c` implementation cannot be provided.
-//!
-//! ## Configuration
-//!
-//! The driver can be configured using the [`Config`] struct. To create a
-//! configuration, you can use the [`Config::default()`] method, and then modify
-//! the individual settings as needed, by calling `with_*` methods on the
-//! [`Config`] struct.
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! use esp_hal::{i2c::rtc::Config, time::Duration};
-//!
-//! let config = Config::default().with_timeout(Duration::from_micros(100));
-//! # {after_snippet}
-//! ```
-//!
-//! You will then need to pass the configuration to [`I2c::new`], and you can
-//! also change the configuration later by calling [`I2c::apply_config`].
-//!
-//! You will also need to specify the SDA and SCL pins when you create the
-//! driver instance.
-//! ```rust, no_run
-//! # {before_snippet}
-//! use esp_hal::i2c::rtc::I2c;
-//! # use esp_hal::i2c::rtc::Config;
-//! # use esp_hal::time::Duration;
-//! #
-//! # let config = Config::default();
-//! #
-//! // You need to configure the driver during initialization:
-//! let mut i2c = I2c::new(
-//!     peripherals.RTC_I2C,
-//!     config,
-//!     peripherals.GPIO3,
-//!     peripherals.GPIO2,
-//! )?;
-//!
-//! // You can change the configuration later:
-//! let new_config = config.with_timeout(Duration::from_micros(150));
-//! i2c.apply_config(&new_config)?;
-//! # {after_snippet}
-//! ```
-//!
-//! ## Usage
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! # use esp_hal::i2c::rtc::{I2c, Config};
-//! # let config = Config::default();
-//! # let mut i2c = I2c::new(peripherals.RTC_I2C, config, peripherals.GPIO3, peripherals.GPIO2)?;
-//! #
-//! // `u8` is automatically converted to `I2cAddress::SevenBit`. The device
-//! // address does not contain the `R/W` bit!
-//! const DEVICE_ADDR: u8 = 0x77;
-//! const DEVICE_REG: u8 = 0x01;
-//! let write_buffer = [0xAA];
-//! let mut read_buffer = [0u8; 22];
-//!
-//! i2c.write(DEVICE_ADDR, DEVICE_REG, &write_buffer)?;
-//! i2c.read(DEVICE_ADDR, DEVICE_REG, &mut read_buffer)?;
-//! # {after_snippet}
-//! ```
+//! This peripheral transfers through a single data register and always needs a slave sub-register
+//! address.
 
 use crate::{
-    gpio::{InputPin, LpPin, OutputPin, lp_io::LpFunction},
-    peripherals::{GPIO, RTC_I2C, RTC_IO, SENS},
+    gpio::{LpPin, lp_io::LpFunction},
+    i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
+    peripherals::{GPIO, RTC_IO, SENS},
     time::Duration,
 };
 
-/// Trait representing the RTC_I2C SDA pin.
-pub trait Sda: LpPin + OutputPin + InputPin {
-    #[doc(hidden)]
-    fn selector(&self) -> u8;
-    #[doc(hidden)]
-    fn rtc_i2c_function(&self) -> LpFunction;
-}
-
-/// Trait representing the RTC_I2C SCL pin.
-pub trait Scl: LpPin + OutputPin + InputPin {
-    #[doc(hidden)]
-    fn selector(&self) -> u8;
-    #[doc(hidden)]
-    fn rtc_i2c_function(&self) -> LpFunction;
+fn bind_pin(pin: &impl LpPin, function: LpFunction) {
+    GPIO::regs()
+        .pin(pin.number() as usize)
+        .modify(|_, w| w.pad_driver().bit(true));
+    RTC_IO::regs()
+        .touch_pad(pin.number() as usize)
+        .modify(|_, w| w.rue().bit(true).rde().bit(false));
+    RTC_IO::regs()
+        .rtc_gpio_enable_w1ts()
+        .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << pin.number()) });
+    pin.lp_set_config(true, true, function);
 }
 
 for_each_lp_function! {
     (($_func:ident, SAR_I2C_SCL_n, $n:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl Scl for crate::peripherals::$gpio<'_> {
-            fn selector(&self) -> u8 {
-                $n
-            }
-
-            fn rtc_i2c_function(&self) -> LpFunction {
-                LpFunction::$af
+            fn connect_scl(&self) {
+                bind_pin(self, LpFunction::$af);
+                // sar_i2c_io holds both selector fields; update only this one.
+                RTC_IO::regs().sar_i2c_io().modify(|_, w| unsafe {
+                    w.sar_i2c_scl_sel().bits($n)
+                });
             }
         }
     };
     (($_func:ident, SAR_I2C_SDA_n, $n:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
         impl Sda for crate::peripherals::$gpio<'_> {
-            fn selector(&self) -> u8 {
-                $n
-            }
-
-            fn rtc_i2c_function(&self) -> LpFunction {
-                LpFunction::$af
+            fn connect_sda(&self) {
+                bind_pin(self, LpFunction::$af);
+                // sar_i2c_io holds both selector fields; update only this one.
+                RTC_IO::regs().sar_i2c_io().modify(|_, w| unsafe {
+                    w.sar_i2c_sda_sel().bits($n)
+                });
             }
         }
     };
 }
 
-#[procmacros::doc_replace]
-/// I2C (RTC) driver
-///
-/// ## Example
-///
-/// ```rust, no_run
-/// # {before_snippet}
-/// use esp_hal::i2c::rtc::{Config, I2c};
-/// # const DEVICE_ADDR: u8 = 0x77;
-/// let mut i2c = I2c::new(
-///     peripherals.RTC_I2C,
-///     Config::default(),
-///     peripherals.GPIO1,
-///     peripherals.GPIO2,
-/// )?;
-///
-/// let mut data = [0u8; 22];
-/// i2c.read(DEVICE_ADDR, 0xaa, &mut data)?;
-/// # {after_snippet}
-/// ```
-pub struct I2c<'d> {
-    i2c: RTC_I2C<'d>,
-    sda: u8,
-    scl: u8,
-}
-
-impl<'d> I2c<'d> {
-    #[procmacros::doc_replace]
-    /// Create a new I2C (RTC) instance.
-    ///
-    /// ## Errors
-    ///
-    /// A [`crate::i2c::rtc::ConfigError`] variant will be returned if bus frequency or timeout
-    /// passed in config is invalid.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::i2c::rtc::{Config, I2c};
-    /// let i2c = I2c::new(
-    ///     peripherals.RTC_I2C,
-    ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
-    /// )?;
-    /// # {after_snippet}
-    /// ```
-    pub fn new(
-        i2c: RTC_I2C<'d>,
-        config: Config,
-        sda: impl Sda + 'd,
-        scl: impl Scl + 'd,
-    ) -> Result<Self, ConfigError> {
+impl<'d> LpI2c<'d> {
+    pub(super) fn init(&mut self) {
         // Clear any stale config registers
-        i2c.register_block().ctrl().reset();
+        self.i2c.register_block().ctrl().reset();
         SENS::regs().sar_i2c_ctrl().reset();
-
-        fn bind_pin(pin: &impl LpPin, function: LpFunction) {
-            GPIO::regs()
-                .pin(pin.number() as usize)
-                .modify(|_, w| w.pad_driver().bit(true));
-            RTC_IO::regs()
-                .touch_pad(pin.number() as usize)
-                .modify(|_, w| w.rue().bit(true).rde().bit(false));
-            RTC_IO::regs()
-                .rtc_gpio_enable_w1ts()
-                .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << pin.number()) });
-            pin.lp_set_config(true, true, function);
-        }
-
-        bind_pin(&sda, sda.rtc_i2c_function());
-        bind_pin(&scl, scl.rtc_i2c_function());
-
-        RTC_IO::regs().sar_i2c_io().write(|w| unsafe {
-            w.sar_i2c_sda_sel().bits(sda.selector());
-            w.sar_i2c_scl_sel().bits(scl.selector())
-        });
 
         // Reset RTC I2C
         SENS::regs()
             .sar_peri_reset_conf()
             .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
-        i2c.register_block()
+        self.i2c
+            .register_block()
             .ctrl()
             .modify(|_, w| w.i2c_reset().set_bit());
-        i2c.register_block()
+        self.i2c
+            .register_block()
             .ctrl()
             .modify(|_, w| w.i2c_reset().clear_bit());
         SENS::regs()
@@ -214,7 +71,7 @@ impl<'d> I2c<'d> {
             .modify(|_, w| w.sar_rtc_i2c_reset().clear_bit());
 
         // Enable internal open-drain for SDA and SCL
-        i2c.register_block().ctrl().modify(|_, w| {
+        self.i2c.register_block().ctrl().modify(|_, w| {
             w.sda_force_out().clear_bit();
             w.scl_force_out().clear_bit()
         });
@@ -225,49 +82,17 @@ impl<'d> I2c<'d> {
             .modify(|_, w| w.rtc_i2c_clk_en().set_bit());
 
         // Configure the RTC I2C controller into master mode.
-        i2c.register_block()
+        self.i2c
+            .register_block()
             .ctrl()
             .modify(|_, w| w.ms_mode().set_bit());
-        i2c.register_block()
+        self.i2c
+            .register_block()
             .ctrl()
             .modify(|_, w| w.i2c_ctrl_clk_gate_en().set_bit());
-
-        let mut this = Self {
-            i2c,
-            sda: sda.number(),
-            scl: scl.number(),
-        };
-        this.apply_config(&config)?;
-        Ok(this)
     }
 
-    #[procmacros::doc_replace]
-    /// Applies a new configuration.
-    ///
-    /// ## Errors
-    ///
-    /// A [`crate::i2c::rtc::ConfigError`] variant will be returned if bus frequency or timeout
-    /// passed in config is invalid.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::{
-    ///     i2c::rtc::{Config, I2c},
-    ///     time::Duration,
-    /// };
-    /// let mut i2c = I2c::new(
-    ///     peripherals.RTC_I2C,
-    ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
-    /// )?;
-    ///
-    /// i2c.apply_config(&Config::default().with_timeout(Duration::from_micros(100)))?;
-    /// # {after_snippet}
-    /// ```
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+    pub(super) fn configure(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.i2c
             .register_block()
             .scl_low()
@@ -299,26 +124,12 @@ impl<'d> I2c<'d> {
         Ok(())
     }
 
-    #[procmacros::doc_replace]
-    /// Writes bytes to slave with given `address` and `register`.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::i2c::rtc::{Config, I2c};
-    /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = I2c::new(
-    ///     peripherals.RTC_I2C,
-    ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
-    /// )?;
-    ///
-    /// i2c.write(DEVICE_ADDR, 2, &[0xaa])?;
-    /// # {after_snippet}
-    /// ```
-    pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
+    pub(super) fn write_bytes(
+        &mut self,
+        address: u8,
+        register: u8,
+        data: &[u8],
+    ) -> Result<(), Error> {
         let sens = unsafe { crate::pac::SENS::steal() };
 
         if data.len() > u8::MAX as usize - 2 {
@@ -400,27 +211,12 @@ impl<'d> I2c<'d> {
         result
     }
 
-    #[procmacros::doc_replace]
-    /// Reads bytes from slave with given `address` and `register`.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::i2c::rtc::{Config, I2c};
-    /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = I2c::new(
-    ///     peripherals.RTC_I2C,
-    ///     Config::default(),
-    ///     peripherals.GPIO1,
-    ///     peripherals.GPIO2,
-    /// )?;
-    ///
-    /// let mut data = [0u8; 22];
-    /// i2c.read(DEVICE_ADDR, 7, &mut data)?;
-    /// # {after_snippet}
-    /// ```
-    pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
+    pub(super) fn read_bytes(
+        &mut self,
+        address: u8,
+        register: u8,
+        data: &mut [u8],
+    ) -> Result<(), Error> {
         let sens = unsafe { crate::pac::SENS::steal() };
 
         if data.len() > u8::MAX as usize {
@@ -519,10 +315,8 @@ impl<'d> I2c<'d> {
 
         // Stop transmission.
         sens.sar_i2c_ctrl().modify(|_, w| {
-            w.sar_i2c_start_force()
-                .clear_bit()
-                .sar_i2c_start()
-                .clear_bit()
+            w.sar_i2c_start_force().clear_bit();
+            w.sar_i2c_start().clear_bit()
         });
 
         result
@@ -530,18 +324,12 @@ impl<'d> I2c<'d> {
 
     fn clear_interrupts(&self) {
         self.i2c.register_block().int_clr().write(|w| {
-            w.trans_complete()
-                .clear_bit_by_one()
-                .tx_data()
-                .clear_bit_by_one()
-                .rx_data()
-                .clear_bit_by_one()
-                .ack_err()
-                .clear_bit_by_one()
-                .time_out()
-                .clear_bit_by_one()
-                .arbitration_lost()
-                .clear_bit_by_one()
+            w.trans_complete().clear_bit_by_one();
+            w.tx_data().clear_bit_by_one();
+            w.rx_data().clear_bit_by_one();
+            w.ack_err().clear_bit_by_one();
+            w.time_out().clear_bit_by_one();
+            w.arbitration_lost().clear_bit_by_one()
         });
     }
 
@@ -601,20 +389,8 @@ impl<'d> I2c<'d> {
             .cmd(idx)
             .write(|w| unsafe { w.command().bits(cmd) });
     }
-}
 
-impl Drop for I2c<'_> {
-    fn drop(&mut self) {
-        fn release_pin(pin: u8) {
-            GPIO::regs().pin(pin as usize).reset();
-
-            RTC_IO::regs()
-                .enable_w1tc()
-                .write(|w| unsafe { w.enable_w1tc().bits(1 << pin) });
-
-            RTC_IO::regs().touch_pad(pin as usize).reset();
-        }
-
+    pub(super) fn disable(&mut self) {
         // Reset and disable RTC I2C clock
         SENS::regs()
             .sar_peri_reset_conf()
@@ -623,9 +399,6 @@ impl Drop for I2c<'_> {
         SENS::regs()
             .sar_peri_clk_gate_conf()
             .modify(|_, w| w.rtc_i2c_clk_en().clear_bit());
-
-        release_pin(self.scl);
-        release_pin(self.sda);
     }
 }
 
@@ -634,20 +407,6 @@ impl Drop for I2c<'_> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {}
-
-/// I2C-specific transmission errors
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error {
-    /// The transmission size exceeded the limit.
-    TransactionSizeLimitExceeded,
-    /// The acknowledgment check failed.
-    AckCheckFailed,
-    /// A timeout occurred during transmission.
-    TimeOut,
-    /// The arbitration for the bus was lost.
-    ArbitrationLost,
-}
 
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, procmacros::BuilderLite)]

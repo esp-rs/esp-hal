@@ -216,6 +216,7 @@ has_pd_en = true
 
 [device.lp_i2c_master]
 support_status = "partial"
+version = "lp_i2c"
 fifo_size = 16
 
 [device.i2c_slave]
@@ -334,7 +335,6 @@ wakeup_sources = {
     Sdio = 8,
     Bt = 10,
     LpCore = 11,
-    Usb = 14,
 }
 
 [device.parl_io]

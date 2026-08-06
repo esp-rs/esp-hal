@@ -4,6 +4,17 @@ impl FlashStorage<'_> {
     /// Read bytes from flash.
     ///
     /// Unaligned offsets and lengths are supported.
+    ///
+    /// # Note
+    ///
+    /// This function always allocates a [`Self::SECTOR_SIZE`]-byte buffer on
+    /// the stack. See the
+    /// [crate-level documentation](crate#buffer-alignment-and-stack-usage).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the read would extend past
+    /// the end of the flash.
     pub fn read(&mut self, offset: u32, mut bytes: &mut [u8]) -> Result<(), FlashStorageError> {
         self.check_bounds(offset, bytes.len())?;
 
@@ -44,7 +55,20 @@ impl FlashStorage<'_> {
 
     /// Write bytes to flash.
     ///
-    /// Performs read-modify-write on affected sectors and erases before writing.
+    /// Performs read-modify-write on affected sectors and erases each sector
+    /// before writing. Unlike [`FlashStorage::write_nor`], alignment is not
+    /// required and erasure is handled automatically.
+    ///
+    /// # Note
+    ///
+    /// This function always allocates a [`Self::SECTOR_SIZE`]-byte buffer on
+    /// the stack. See the
+    /// [crate-level documentation](crate#buffer-alignment-and-stack-usage).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the write would extend past
+    /// the end of the flash.
     pub fn write(&mut self, offset: u32, mut bytes: &[u8]) -> Result<(), FlashStorageError> {
         self.check_bounds(offset, bytes.len())?;
 

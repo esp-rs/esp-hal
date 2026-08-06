@@ -57,6 +57,13 @@ esp_rtos::start_second_core(
 //! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
 //! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
 #![cfg_attr(
+    multi_core,
+    doc = r"
+The scheduler can also run on the second core alone, which keeps the first core free for bare-metal
+code. See [`start_on_second_core_only`] for that configuration and its restrictions.
+"
+)]
+#![cfg_attr(
     sleep_light_sleep,
     doc = r"
 ## Automatic Light Sleep (experimental)
@@ -187,6 +194,8 @@ use esp_hal::{
 #[cfg(feature = "embassy")]
 #[cfg_attr(docsrs, doc(cfg(feature = "embassy")))]
 pub use macros::main;
+#[cfg(multi_core)]
+use scheduler::ActiveCores;
 pub(crate) use scheduler::SCHEDULER;
 pub use task::CurrentThreadHandle;
 
@@ -333,6 +342,32 @@ impl TimerSource for Alarm<'static> {
     }
 }
 
+fn init_tracing() {
+    #[cfg(feature = "rtos-trace")]
+    {
+        rtos_trace::trace::name_marker(TraceEvents::YieldTask as u32, "yield task");
+        rtos_trace::trace::name_marker(TraceEvents::RunSchedule as u32, "run scheduler");
+        rtos_trace::trace::name_marker(TraceEvents::TimerTickHandler as u32, "timer tick handler");
+        rtos_trace::trace::name_marker(
+            TraceEvents::ProcessTimerQueue as u32,
+            "process timer queue",
+        );
+        rtos_trace::trace::name_marker(
+            TraceEvents::ProcessEmbassyTimerQueue as u32,
+            "process embassy timer queue",
+        );
+        rtos_trace::trace::start();
+    }
+}
+
+fn assert_thread_mode(function: &str) {
+    assert!(
+        esp_hal::interrupt::RunLevel::current().is_thread(),
+        "{} must not be called from an interrupt handler",
+        function
+    );
+}
+
 /// Starts the scheduler.
 ///
 /// The current context will be converted into the main task, and will be pinned to the first core.
@@ -370,32 +405,11 @@ pub fn start_with_idle_hook(
     int0: SoftwareInterrupt<'static, 0>,
     idle_hook: IdleFn,
 ) {
-    #[cfg(feature = "rtos-trace")]
-    {
-        rtos_trace::trace::name_marker(TraceEvents::YieldTask as u32, "yield task");
-        rtos_trace::trace::name_marker(TraceEvents::RunSchedule as u32, "run scheduler");
-        rtos_trace::trace::name_marker(TraceEvents::TimerTickHandler as u32, "timer tick handler");
-        rtos_trace::trace::name_marker(
-            TraceEvents::ProcessTimerQueue as u32,
-            "process timer queue",
-        );
-        rtos_trace::trace::name_marker(
-            TraceEvents::ProcessEmbassyTimerQueue as u32,
-            "process embassy timer queue",
-        );
-        rtos_trace::trace::start();
-    }
-
-    fn is_thread_mode() -> bool {
-        esp_hal::interrupt::RunLevel::current().is_thread()
-    }
+    init_tracing();
 
     trace!("Starting scheduler for the first core");
     assert_eq!(Cpu::current(), Cpu::ProCpu);
-    assert!(
-        is_thread_mode(),
-        "esp_rtos::start must not be called from an interrupt handler"
-    );
+    assert_thread_mode("esp_rtos::start");
 
     SCHEDULER.with(move |scheduler| {
         scheduler.setup(TimeDriver::new(timer.timer()), idle_hook);
@@ -451,6 +465,73 @@ pub fn start_second_core<const STACK_SIZE: usize>(
     start_second_core_with_stack_guard_offset::<STACK_SIZE>(cpu_control, int1, stack, None, func);
 }
 
+/// The stack of the second core, in a form that can be moved into the second core's main function.
+#[cfg(multi_core)]
+struct SecondCoreStack {
+    stack: *mut [MaybeUninit<u32>],
+}
+
+#[cfg(multi_core)]
+unsafe impl Send for SecondCoreStack {}
+
+#[cfg(multi_core)]
+impl SecondCoreStack {
+    fn new<const STACK_SIZE: usize>(stack: &mut Stack<STACK_SIZE>) -> Self {
+        Self {
+            stack: core::ptr::slice_from_raw_parts_mut(
+                stack.bottom().cast::<MaybeUninit<u32>>(),
+                STACK_SIZE / 4,
+            ),
+        }
+    }
+
+    /// Turns the current context of the second core into its main task.
+    ///
+    /// This takes `self` by value, so that a `move` closure captures the whole struct instead of
+    /// its `!Send` field only.
+    fn allocate_main_task(self, scheduler: &mut scheduler::SchedulerState, guard_offset: usize) {
+        // esp-hal may be configured to use a watchpoint. To work around that, we read the memory at
+        // the stack guard, and we'll use whatever we find as the main task's stack guard value,
+        // instead of writing our own stack guard value.
+        let stack_bottom = self.stack.cast::<u32>();
+        let stack_guard = unsafe { stack_bottom.byte_add(guard_offset) };
+
+        task::allocate_main_task(scheduler, self.stack, guard_offset, unsafe {
+            stack_guard.read()
+        });
+    }
+}
+
+#[cfg(multi_core)]
+fn default_stack_guard_offset() -> usize {
+    esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET")
+}
+
+/// Waits for the scheduler of the second core to start.
+#[cfg(multi_core)]
+fn wait_for_second_core_scheduler() {
+    let start = Instant::now();
+
+    while start.elapsed() < Duration::from_secs(1) {
+        if SCHEDULER.with(|s| s.active_cores.contains(Cpu::AppCpu)) {
+            return;
+        }
+        esp_hal::rom::ets_delay_us(1);
+    }
+
+    panic!(
+        "Second core scheduler failed to initialize. \
+        This can happen if its main function overflowed the stack."
+    );
+}
+
+#[cfg(multi_core)]
+fn suspend_main_task() {
+    loop {
+        SCHEDULER.sleep_until(Instant::EPOCH + Duration::MAX);
+    }
+}
+
 /// Starts the scheduler on the second CPU core.
 ///
 /// Note that the scheduler must be started first, before starting the second core.
@@ -475,21 +556,13 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
 ) {
     trace!("Starting scheduler for the second core");
 
-    struct SecondCoreStack {
-        stack: *mut [MaybeUninit<u32>],
+    match SCHEDULER.with(|scheduler| scheduler.active_cores) {
+        ActiveCores::Single(Cpu::ProCpu) => {}
+        _ => unreachable!(),
     }
-    unsafe impl Send for SecondCoreStack {}
-    let stack_ptrs = SecondCoreStack {
-        stack: core::ptr::slice_from_raw_parts_mut(
-            stack.bottom().cast::<MaybeUninit<u32>>(),
-            STACK_SIZE / 4,
-        ),
-    };
 
-    let stack_guard_offset = stack_guard_offset.unwrap_or(esp_config::esp_config_int!(
-        usize,
-        "ESP_HAL_CONFIG_STACK_GUARD_OFFSET"
-    ));
+    let stack_ptrs = SecondCoreStack::new(stack);
+    let stack_guard_offset = stack_guard_offset.unwrap_or_else(default_stack_guard_offset);
 
     let mut cpu_control = CpuControl::new(cpu_control);
     let guard = cpu_control
@@ -497,50 +570,141 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
             trace!("Second core running");
             SCHEDULER.with(move |scheduler| {
                 task::setup_smp(int1);
-                // Make sure the whole struct is captured, not just a !Send field.
-                let ptrs = stack_ptrs;
                 assert!(
                     scheduler.time_driver.is_some(),
                     "The scheduler must be started on the first core first."
                 );
 
-                // esp-hal may be configured to use a watchpoint. To work around that, we read the
-                // memory at the stack guard, and we'll use whatever we find as the main task's
-                // stack guard value, instead of writing our own stack guard value.
-                let stack_bottom = ptrs.stack.cast::<u32>();
-                let stack_guard = unsafe { stack_bottom.byte_add(stack_guard_offset) };
+                scheduler.active_cores = ActiveCores::All;
 
-                task::allocate_main_task(scheduler, ptrs.stack, stack_guard_offset, unsafe {
-                    stack_guard.read()
-                });
+                stack_ptrs.allocate_main_task(scheduler, stack_guard_offset);
                 task::yield_task();
                 trace!("Second core scheduler initialized");
             });
 
             func();
-
-            loop {
-                SCHEDULER.sleep_until(Instant::EPOCH + Duration::MAX);
-            }
+            suspend_main_task();
         })
         .unwrap();
 
-    // Spin until the second core scheduler is initialized
-    let start = Instant::now();
+    wait_for_second_core_scheduler();
 
-    while start.elapsed() < Duration::from_secs(1) {
-        if SCHEDULER.with(|s| s.per_cpu[1].initialized) {
-            break;
-        }
-        esp_hal::rom::ets_delay_us(1);
-    }
+    core::mem::forget(guard);
+}
 
-    if !SCHEDULER.with(|s| s.per_cpu[1].initialized) {
-        panic!(
-            "Second core scheduler failed to initialize. \
-            This can happen if its main function overflowed the stack."
-        );
-    }
+/// Starts the scheduler on the second CPU core only.
+///
+/// Use this function if you want to keep the first core free for bare-metal code, and run all
+/// RTOS-managed work on the second core. Call it from the first core. It returns on the first core,
+/// which then continues to run bare-metal code.
+///
+/// The scheduler does not run on the first core in this configuration. This function must not be
+/// combined with [`start`] or [`start_second_core`]; either combination panics.
+///
+/// The supplied stack and function become the main thread of the second core. The thread is pinned
+/// to the second core. For the list of accepted timer sources, see [`start_with_idle_hook`].
+///
+/// You can return from the second core's main thread function. This will cause the scheduler to
+/// enter the idle state, but the second core will continue to run interrupt handlers and other
+/// tasks.
+///
+/// ## Restrictions
+///
+/// - The first core must not call any `esp-rtos` API, not even to wake a task that runs on the
+///   second core. The scheduler protects its state with a lock that disables interrupts and spins,
+///   which would break the timing of the bare-metal code on the first core.
+/// - Automatic light sleep is not available, because this function takes no idle hook.
+/// - The Wi-Fi and Bluetooth LE drivers of `esp-radio` are not supported.
+/// - `#[esp_rtos::main]` on an `async fn` cannot be used, because it creates a thread-mode executor
+///   on the first core. Create the thread-mode executor (`embassy::Executor`) inside `func`
+///   instead.
+///
+/// ## Example
+///
+/// ```rust, no_run
+#[doc = esp_hal::before_snippet!()]
+/// # struct FakeHeap;
+/// # unsafe impl core::alloc::GlobalAlloc for FakeHeap {
+/// #     unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
+/// #         unimplemented!()
+/// #     }
+/// #     unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {
+/// #         unimplemented!()
+/// #     }
+/// # }
+/// # #[global_allocator]
+/// # static ALLOCATOR: FakeHeap = FakeHeap;
+/// use esp_hal::{
+///     interrupt::software::SoftwareInterruptControl,
+///     system::Stack,
+///     timer::timg::TimerGroup,
+/// };
+/// use static_cell::ConstStaticCell;
+///
+/// static STACK: ConstStaticCell<Stack<8192>> = ConstStaticCell::new(Stack::new());
+///
+/// let timg0 = TimerGroup::new(peripherals.TIMG0);
+/// let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+///
+/// esp_rtos::start_on_second_core_only(
+///     peripherals.CPU_CTRL,
+///     software_interrupt.software_interrupt1,
+///     timg0.timer0,
+///     STACK.take(),
+///     || {
+///         // The main thread of the second core.
+///     },
+/// );
+///
+/// // The first core continues here, and must not call any esp-rtos API.
+#[doc = esp_hal::after_snippet!()]
+/// ```
+#[cfg(multi_core)]
+pub fn start_on_second_core_only<const STACK_SIZE: usize>(
+    cpu_control: CPU_CTRL<'static>,
+    int1: SoftwareInterrupt<'static, 1>,
+    timer: impl TimerSource + Send,
+    stack: &'static mut Stack<STACK_SIZE>,
+    func: impl FnOnce() + Send + 'static,
+) {
+    init_tracing();
+
+    trace!("Starting scheduler for the second core only");
+    assert_eq!(Cpu::current(), Cpu::ProCpu);
+    assert_thread_mode("esp_rtos::start_on_second_core_only");
+    assert!(
+        SCHEDULER.with(|scheduler| scheduler.time_driver.is_none()),
+        "The scheduler has already been started. \
+        esp_rtos::start_on_second_core_only must not be combined with esp_rtos::start."
+    );
+
+    let stack_ptrs = SecondCoreStack::new(stack);
+    let stack_guard_offset = default_stack_guard_offset();
+
+    let mut cpu_control = CpuControl::new(cpu_control);
+    let guard = cpu_control
+        .start_app_core_with_stack_guard_offset(stack, Some(stack_guard_offset), move || {
+            trace!("Second core running");
+            SCHEDULER.with(move |scheduler| {
+                task::setup_multitasking(int1);
+
+                // The time driver must be created here, and not on the first core:
+                // `Timer::set_interrupt_handler` binds the timer interrupt to the core that calls
+                // it.
+                scheduler.setup(TimeDriver::new(timer.timer()), crate::task::idle_hook);
+                syscall::setup_syscalls();
+
+                stack_ptrs.allocate_main_task(scheduler, stack_guard_offset);
+                task::yield_task();
+                trace!("Second core scheduler initialized");
+            });
+
+            func();
+            suspend_main_task();
+        })
+        .unwrap();
+
+    wait_for_second_core_scheduler();
 
     core::mem::forget(guard);
 }

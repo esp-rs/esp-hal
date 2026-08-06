@@ -20,16 +20,6 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
     ) {
         triggers.insert(WakeupSource::Ext1);
 
-        cfg_select! {
-            esp32s2 => {
-                // TODO: disable clock when not in use
-                crate::peripherals::SENS::regs()
-                    .sar_io_mux_conf()
-                    .modify(|_, w| w.iomux_clk_gate_en().set_bit());
-            }
-            _ => {}
-        }
-
         let mut pins = self.pins.borrow_mut();
         let mut bits = 0u32;
         for pin in pins.iter_mut() {

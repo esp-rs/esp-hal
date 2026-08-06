@@ -539,7 +539,14 @@ driver_configs![
         driver: lp_i2c_master,
         name: "LP I2C master",
         properties: {
-            fifo_size: u32,
+            /// Low-level implementation selected for the chip's low-power I2C master.
+            ///
+            /// The `rtc_i2c*` variants describe the RTC_I2C peripheral, which transfers through a
+            /// single data register and always needs a slave sub-register address. The `lp_i2c`
+            /// variant describes the FIFO-based LP_I2C peripheral.
+            version: String,
+            /// Depth of the TX/RX FIFOs. Unset on peripherals that have no FIFO.
+            fifo_size: Option<u32>,
         }
     },
     LpIoProperties {
@@ -615,7 +622,7 @@ driver_configs![
     },
     RgbProperties {
         driver: rgb_display,
-        name: "RGB display", // LCD_CAM, ESP32 I2S, S2 SPI
+        name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
         properties: {}
     },
     RmtProperties {
@@ -755,6 +762,11 @@ driver_configs![
             #[serde(flatten)]
             config: SocConfig,
         }
+    },
+    SpiLcdProperties {
+        driver: spi_lcd,
+        name: "SPI LCD interface", // The LCD mode of the S2's GP-SPI2
+        properties: {}
     },
     SpiMasterProperties<SpiMasterInstanceConfig> {
         driver: spi_master,

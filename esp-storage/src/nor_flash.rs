@@ -29,7 +29,22 @@ impl FlashStorage<'_> {
 
     /// Read bytes from flash using NOR flash semantics.
     ///
-    /// Offset and length must be aligned to [`Self::READ_SIZE`].
+    /// `offset` and `bytes.len()` must be aligned to [`Self::READ_SIZE`].
+    ///
+    /// # Note
+    ///
+    /// If `bytes` is not word-aligned (4-byte), this function allocates a
+    /// [`Self::SECTOR_SIZE`]-byte buffer on the stack and copies through it.
+    /// See the
+    /// [crate-level documentation](crate#buffer-alignment-and-stack-usage).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::NotAligned`] if `offset` or `bytes.len()` is
+    /// not aligned to [`Self::READ_SIZE`].
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the read would extend past
+    /// the end of the flash.
     pub fn read_nor(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), FlashStorageError> {
         const RS: u32 = FlashStorage::READ_SIZE as u32;
         self.check_alignment::<{ RS }>(offset, bytes.len())?;
@@ -119,8 +134,28 @@ impl FlashStorage<'_> {
 
     /// Write bytes to flash using NOR flash semantics.
     ///
-    /// The target region must be erased beforehand. Offset and length must be
-    /// aligned to [`Self::WRITE_SIZE`].
+    /// NOR flash can only change bits from 1 to 0. Setting a bit from 0 to 1
+    /// requires erasing the containing sector first (see [`Self::erase`]). Each
+    /// byte is updated by ANDing it with the data being written; if the target
+    /// still contains 0 bits where you need 1s, the stored value will not match
+    /// what you passed in even though the operation succeeds.
+    ///
+    /// `offset` and `bytes.len()` must be aligned to [`Self::WRITE_SIZE`].
+    ///
+    /// # Note
+    ///
+    /// If `bytes` is not word-aligned (4-byte), this function allocates a
+    /// [`Self::SECTOR_SIZE`]-byte buffer on the stack and copies through it.
+    /// See the
+    /// [crate-level documentation](crate#buffer-alignment-and-stack-usage).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::NotAligned`] if `offset` or `bytes.len()` is
+    /// not aligned to [`Self::WRITE_SIZE`].
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the write would extend past
+    /// the end of the flash.
     pub fn write_nor(&mut self, offset: u32, bytes: &[u8]) -> Result<(), FlashStorageError> {
         const WS: u32 = FlashStorage::WORD_SIZE;
         self.check_alignment::<{ WS }>(offset, bytes.len())?;
@@ -157,8 +192,22 @@ impl FlashStorage<'_> {
 
     /// Erase flash from `from` up to but not including `to`.
     ///
-    /// Both addresses must be aligned to [`Self::ERASE_SIZE`].
+    /// Erased bytes are set to `0xFF`. Both addresses must be aligned to
+    /// [`Self::ERASE_SIZE`], and `to - from` must be a multiple of
+    /// [`Self::ERASE_SIZE`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::NotAligned`] if `from` or `to - from` is
+    /// not aligned to [`Self::ERASE_SIZE`].
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the range would extend past
+    /// the end of the flash, or if `to` is less than `from`.
     pub fn erase(&mut self, from: u32, to: u32) -> Result<(), FlashStorageError> {
+        if to < from {
+            return Err(FlashStorageError::OutOfBounds);
+        }
+
         let len = (to - from) as _;
         const SZ: u32 = FlashStorage::SECTOR_SIZE;
         self.check_alignment::<{ SZ }>(from, len)?;
@@ -431,6 +480,68 @@ mod tests {
         flash.read_nor(0, &mut read_data.data[..128]).unwrap();
 
         assert_eq!(&read_data.data[..128], &write_data.data[1..129]);
+    }
+
+    #[test]
+    fn erase_up_to_end_of_flash() {
+        let mut flash = FlashStorage::new(Flash::new());
+        flash.capacity = FLASH_SIZE as usize;
+        let mut read_data = TestBuffer::default();
+        let write_data = [0u8; SECTOR_SIZE as usize];
+
+        flash.erase(FLASH_SIZE - BLOCK_SIZE, FLASH_SIZE).unwrap();
+        flash
+            .write_nor(FLASH_SIZE - 2 * SECTOR_SIZE, &write_data)
+            .unwrap();
+        flash
+            .write_nor(FLASH_SIZE - SECTOR_SIZE, &write_data)
+            .unwrap();
+
+        // Erasing the last sector of the flash must be allowed
+        flash.erase(FLASH_SIZE - SECTOR_SIZE, FLASH_SIZE).unwrap();
+
+        flash
+            .read(
+                FLASH_SIZE - 2 * SECTOR_SIZE,
+                &mut read_data.data[..(2 * SECTOR_SIZE) as usize],
+            )
+            .unwrap();
+        assert!(
+            read_data.data[..SECTOR_SIZE as usize]
+                .iter()
+                .all(|v| *v == 0x0)
+        );
+        assert!(
+            read_data.data[SECTOR_SIZE as usize..(2 * SECTOR_SIZE) as usize]
+                .iter()
+                .all(|v| *v == 0xFF)
+        );
+
+        // Erasing the last block of the flash must be allowed
+        flash.erase(FLASH_SIZE - BLOCK_SIZE, FLASH_SIZE).unwrap();
+
+        flash
+            .read(
+                FLASH_SIZE - 2 * SECTOR_SIZE,
+                &mut read_data.data[..(2 * SECTOR_SIZE) as usize],
+            )
+            .unwrap();
+        assert!(
+            read_data.data[..(2 * SECTOR_SIZE) as usize]
+                .iter()
+                .all(|v| *v == 0xFF)
+        );
+    }
+
+    #[test]
+    fn erase_reversed_range_is_rejected() {
+        let mut flash = FlashStorage::new(Flash::new());
+        flash.capacity = FLASH_SIZE as usize;
+
+        assert_eq!(
+            flash.erase(SECTOR_SIZE, 0),
+            Err(FlashStorageError::OutOfBounds)
+        );
     }
 
     #[test]

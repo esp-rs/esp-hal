@@ -69,7 +69,6 @@ peripherals = [
     { name = "LP_CLKRST" },
     { name = "LPWR", pac = "LP_CLKRST" },
     { name = "LP_GPIO" },
-    # { name = "LP_I2C0" },
     { name = "LP_IO_MUX" },
     { name = "LP_PERI", pac = "LPPERI" },
     { name = "LP_TEE" },
@@ -211,7 +210,6 @@ wakeup_sources = {
     Sdio = 8,
     Bt = 10,
     LpCore = 11,
-    Usb = 14,
 }
 
 [device.rng]

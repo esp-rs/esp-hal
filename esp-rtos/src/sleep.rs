@@ -142,7 +142,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 multi_core => {
                     let mut cpu_control = CpuControl::new(unsafe { CPU_CTRL::steal() });
                     for cpu in Cpu::other() {
-                        if scheduler.per_cpu[cpu as usize].initialized {
+                        if scheduler.active_cores.contains(cpu) {
                             unsafe { cpu_control.park_core(cpu) };
                             // FIXME: this is insufficient when we power down the CPU - we will
                             // need to force the other core to be parked in a known place, saving
@@ -180,7 +180,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             // the system back to sleep immediately.
             #[cfg(multi_core)]
             for cpu in Cpu::other() {
-                if scheduler.per_cpu[cpu as usize].initialized {
+                if scheduler.active_cores.contains(cpu) {
                     cpu_control.unpark_core(cpu);
                     task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
                 }

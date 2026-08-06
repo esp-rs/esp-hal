@@ -474,21 +474,23 @@ mod tests {
     }
 
     #[test]
-    #[cfg(esp32s3)]
-    fn test_read_cali_with_rtc_i2c() {
-        use esp_hal::{
-            i2c::rtc::{Config, I2c, Timing},
-            time::Duration,
-        };
+    #[cfg(lp_i2c_master_driver_supported)]
+    fn test_read_cali_with_lp_i2c() {
+        use esp_hal::i2c::lp_i2c::{Config, LpI2c};
 
         let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
 
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
 
-        let config = Config::default()
-            .with_timing(Timing::standard_mode())
-            .with_timeout(Duration::from_micros(100));
-        let mut i2c = I2c::new(peripherals.RTC_I2C, config, sda, scl).unwrap();
+        // RTC_I2C has no usable default timing, it has to be spelled out.
+        let config = cfg_select! {
+            lp_i2c_master_version = "rtc_i2c" => Config::default()
+                .with_timing(esp_hal::i2c::lp_i2c::Timing::standard_mode())
+                .with_timeout(esp_hal::time::Duration::from_micros(100)),
+            _ => Config::default(),
+        };
+
+        let mut i2c = LpI2c::new(peripherals.LP_I2C0, config, sda, scl).unwrap();
 
         let mut data = [0; 22];
 

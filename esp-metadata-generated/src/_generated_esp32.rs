@@ -4602,8 +4602,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "LPWR peripheral singleton"]
         LPWR <= RTC_CNTL() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "RTC_TIMER peripheral singleton"] RTC_TIMER <= RTC_CNTL() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "RTC_I2C peripheral singleton"]
-        RTC_I2C <= RTC_I2C() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_I2C0 peripheral singleton"]
+        LP_I2C0 <= RTC_I2C() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "RTC_IO peripheral singleton"] RTC_IO <= RTC_IO() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SDHOST peripheral singleton"]
         SDHOST <= SDHOST() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -4704,7 +4704,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((RSA(unstable)));
         _for_each_inner_peripheral!((LPWR(unstable)));
         _for_each_inner_peripheral!((RTC_TIMER(unstable)));
-        _for_each_inner_peripheral!((RTC_I2C(unstable)));
+        _for_each_inner_peripheral!((LP_I2C0(unstable)));
         _for_each_inner_peripheral!((RTC_IO(unstable)));
         _for_each_inner_peripheral!((SDHOST(unstable)));
         _for_each_inner_peripheral!((SENS(unstable)));
@@ -4943,8 +4943,8 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR <= RTC_CNTL()
         (unstable)), (@ peri_type #[doc = "RTC_TIMER peripheral singleton"] RTC_TIMER <=
-        RTC_CNTL() (unstable)), (@ peri_type #[doc = "RTC_I2C peripheral singleton"]
-        RTC_I2C <= RTC_I2C() (unstable)), (@ peri_type #[doc =
+        RTC_CNTL() (unstable)), (@ peri_type #[doc = "LP_I2C0 peripheral singleton"]
+        LP_I2C0 <= RTC_I2C() (unstable)), (@ peri_type #[doc =
         "RTC_IO peripheral singleton"] RTC_IO <= RTC_IO() (unstable)), (@ peri_type #[doc
         = "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)), (@ peri_type
         #[doc = "SENS peripheral singleton"] SENS <= SENS() (unstable)), (@ peri_type
@@ -4999,7 +4999,7 @@ macro_rules! for_each_peripheral {
         (I2S1(unstable)), (IO_MUX(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
         (MCPWM1(unstable)), (NRX(unstable)), (PCNT(unstable)), (RMT(unstable)),
         (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)), (RTC_TIMER(unstable)),
-        (RTC_I2C(unstable)), (RTC_IO(unstable)), (SDHOST(unstable)), (SENS(unstable)),
+        (LP_I2C0(unstable)), (RTC_IO(unstable)), (SDHOST(unstable)), (SENS(unstable)),
         (SHA(unstable)), (SLC(unstable)), (SLCHOST(unstable)), (SPI0(unstable)),
         (SPI1(unstable)), (SPI2), (SPI3), (TIMG0(unstable)), (TIMG1(unstable)),
         (TWAI0(unstable)), (UART0), (UART1), (UART2), (UHCI0(unstable)),

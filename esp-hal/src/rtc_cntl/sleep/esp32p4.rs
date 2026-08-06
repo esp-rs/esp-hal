@@ -912,28 +912,8 @@ impl RtcSleepConfig {
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
         // ESP32-P4 PMU wakeup-source bitmap (esp-idf `pmu_bit_defs.h`).
-        const PMU_SDIO_WAKEUP_EN: u32 = 1 << 0;
-        const PMU_GPIO_WAKEUP_EN: u32 = 1 << 2;
-        const PMU_USB_WAKEUP_EN: u32 = 1 << 3;
-        const PMU_UART1_WAKEUP_EN: u32 = 1 << 7;
-        const PMU_UART0_WAKEUP_EN: u32 = 1 << 8;
-        const PMU_EXT1_WAKEUP_EN: u32 = 1 << 12;
-        const PMU_LP_TIMER_WAKEUP_EN: u32 = 1 << 13;
-
-        const RTC_SLEEP_REJECT_MASK: u32 = PMU_EXT1_WAKEUP_EN
-            | PMU_GPIO_WAKEUP_EN
-            | PMU_LP_TIMER_WAKEUP_EN
-            | PMU_UART0_WAKEUP_EN
-            | PMU_UART1_WAKEUP_EN
-            | PMU_SDIO_WAKEUP_EN
-            | PMU_USB_WAKEUP_EN;
-
         let wakeup_mask = wakeup_triggers.as_u32();
-        let reject_mask = if self.deep {
-            0
-        } else {
-            wakeup_mask & RTC_SLEEP_REJECT_MASK
-        };
+        let reject_mask = wakeup_triggers.reject_mask(self.deep);
 
         // Switch the CPU root clock to XTAL for the duration of sleep.
         let _restore_clock_config = ClockTree::with(|clocks| {
@@ -998,6 +978,9 @@ impl RtcSleepConfig {
             .lp_store8()
             .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
 
+        // The wakeup enable field is bits 30:0 here, unlike the other PMU chips where it is the
+        // whole register. Bit 31 is reserved and reads 0, so a whole-register write is correct and
+        // saves the read.
         PMU::regs()
             .slp_wakeup_cntl2()
             .write(|w| unsafe { w.bits(wakeup_mask) });

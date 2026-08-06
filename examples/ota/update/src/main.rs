@@ -10,11 +10,11 @@
 //!
 //! ```ignore,bash
 //! cargo xtask build examples gpio --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt examples/target/ota_image
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt target/ota_image
 //! cargo xtask build examples update --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
 //! cargo xtask build examples update --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
 //! espflash erase-flash
 //! cargo xtask run example update --chip=esp32
 //! ```
@@ -44,7 +44,7 @@ use esp_storage::FlashStorage;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-static OTA_IMAGE: &[u8] = include_bytes!("../../../target/ota_image");
+static OTA_IMAGE: &[u8] = include_bytes!("../../../../target/ota_image");
 
 #[main]
 fn main() -> ! {

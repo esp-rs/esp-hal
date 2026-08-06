@@ -74,11 +74,13 @@ for_each_lp_function! {
     };
 }
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(super) fn init_pin(pin: &impl LpPin, input_enable: bool) -> u8 {
     pin.lp_set_config(input_enable, true, LpFunction::LP_GPIO);
     pin.number()
 }
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(super) fn output_enable(pin: u8, enable: bool) {
     if enable {
         LP_GPIO::regs()
@@ -91,6 +93,7 @@ pub(super) fn output_enable(pin: u8, enable: bool) {
     }
 }
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(super) fn input_enable(pin: u8, enable: bool) {
     LP_IO_MUX::regs()
         .gpio(pin as usize)
@@ -109,8 +112,23 @@ pub(super) fn pulldown_enable(pin: u8, enable: bool) {
         .modify(|_, w| w.fun_wpd().bit(enable));
 }
 
+#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(super) fn set_open_drain_output(pin: u8, enable: bool) {
     LP_GPIO::regs()
         .pin(pin as usize)
         .modify(|_, w| w.pad_driver().bit(enable));
+}
+
+#[cfg(lp_i2c_master_driver_supported)]
+pub(crate) fn reset_pin(pin: u8) {
+    output_enable(pin, false);
+    set_open_drain_output(pin, false);
+
+    // Resistors, input enable and the pad's LP function all live in this register.
+    LP_IO_MUX::regs().gpio(pin as usize).reset();
+
+    // Hand the pad back to the digital IO MUX.
+    LP_AON::regs()
+        .gpio_mux()
+        .modify(|r, w| unsafe { w.sel().bits(r.sel().bits() & !(1 << pin)) });
 }

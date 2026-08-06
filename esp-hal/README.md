@@ -92,7 +92,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | IOMUX                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       |
 | Key Manager               |       |          |          | [❌][5171] [^1] |          |           |          |          |          |          |           |
 | LEDC                      | ⚒️   | ⚒️      | ⚒️      | [❌][5161] [^1] | ⚒️      | [❌][5418] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
-| LP I2C master             |       |          |          | ⚒️      | ⚒️      |           |          | ❌       |          |          |           |
+| LP I2C master             | ❌    |          |          | ❌       | ⚒️      |           |          | ❌       | ❌       | ⚒️      | ❌        |
 | LP IO                     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
 | LP UART                   |       |          |          | [❌][5155] [^1] | ⚒️      |           |          | ❌       |          |          |           |
 | MCPWM                     | ⚒️   |          |          | [❌][5154] [^1] | ⚒️      |           | ⚒️      | ❌       |          | ⚒️      |           |
@@ -111,6 +111,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | [⚒️][5973] [^1] |
 | SDM                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      |           |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
+| SPI LCD interface         |       |          |          |          |          |           |          |          | [❌][5374] [^1] |          |           |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      | ❌        |
 | SYSTIMER                  |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
@@ -150,6 +151,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5169]: https://github.com/esp-rs/esp-hal/issues/5169
 [5170]: https://github.com/esp-rs/esp-hal/issues/5170
 [5171]: https://github.com/esp-rs/esp-hal/issues/5171
+[5374]: https://github.com/esp-rs/esp-hal/issues/5374
 [5417]: https://github.com/esp-rs/esp-hal/issues/5417
 [5418]: https://github.com/esp-rs/esp-hal/issues/5418
 [5419]: https://github.com/esp-rs/esp-hal/issues/5419
