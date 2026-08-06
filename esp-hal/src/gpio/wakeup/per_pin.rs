@@ -14,15 +14,18 @@ use crate::{
 /// These chips have no path of their own to clear: the pads share the GPIO wakeup source.
 pub(super) fn disable() {}
 
-pub(super) fn allocate(armed: &[Armed], _kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
+pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
     // The pads this sleep did not choose must not wake it.
     for &lp in LP_NUMBERS.iter().filter(|&&lp| lp != NO_LP_NUMBER) {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
 
     for pin in armed {
-        // The pull resistors are the pin's own configuration, which these chips keep in force
-        // because their low-power pull registers are the digital ones.
+        // A deep sleep powers the digital IO MUX down, and the pull resistors live there, so the
+        // pad has to keep its own state through the sleep or it floats to whatever level it likes.
+        // The wake resets the chip, which releases the hold, so nothing has to release it here.
+        low_level::pad_hold(pin.lp, kind == SleepKind::Deep);
+
         low_level::apply_wakeup(pin.lp, true, pin.level);
     }
 
