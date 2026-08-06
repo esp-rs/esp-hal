@@ -6,7 +6,7 @@
 //! the domain: one pin on `ext0`, which takes a single pad at a level of its own, and any further
 //! pins on the per-pin path, which gives every low-power pad a level of its own.
 
-use super::{Armed, low_power_pads, prepare_pad};
+use super::{Armed, LP_NUMBERS, prepare_pad};
 use crate::{
     gpio::{Level, lp_io::low_level},
     peripherals::{LPWR, RTC_IO},
@@ -145,7 +145,7 @@ fn arm_ext0(pin: &Armed, kind: SleepKind) {
 
 /// Disarms every pad's per-pin path, so that the pads this sleep did not choose cannot wake it.
 fn clear_per_pin() {
-    for (_, lp) in low_power_pads() {
+    for &lp in LP_NUMBERS.iter().flatten() {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
 }

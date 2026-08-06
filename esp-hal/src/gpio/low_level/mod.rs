@@ -3,7 +3,7 @@
 #[cfg_attr(gpio_version = "3", path = "v3.rs")]
 mod version;
 
-use portable_atomic::AtomicU32;
+use portable_atomic::{AtomicU32, Ordering};
 use strum::EnumCount;
 pub(crate) use version::{
     enable_interrupt,
@@ -41,11 +41,29 @@ impl PadMask {
 }
 
 impl GpioBank {
+    /// Every bank, so that a caller can walk the pins one word at a time.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) const ALL: [Self; Self::COUNT] = cfg_select! {
+        gpio_has_bank_1 => [Self::_0, Self::_1],
+        _ => [Self::_0],
+    };
+
     /// The pins of this bank that an async wait owns.
     ///
     /// The interrupt handler clears a pin's bit to signal that its wait is over, so the bit is
     /// what tells the future it has completed.
     pub(crate) fn async_operations(self) -> &'static AtomicU32 {
+        static FLAGS: PadMask = PadMask::new();
+
+        FLAGS.word(self)
+    }
+
+    /// The pins of this bank that are listening for an interrupt.
+    ///
+    /// The same bits also say which pins may end a light sleep, because the interrupt enable and
+    /// the pad's wakeup enable are written together. Reading them from here saves sleep entry a
+    /// register read per pin.
+    pub(crate) fn listening(self) -> &'static AtomicU32 {
         static FLAGS: PadMask = PadMask::new();
 
         FLAGS.word(self)
@@ -173,13 +191,23 @@ pub(crate) fn set_int_enable(
     int_type: u8,
     wake_up_from_light_sleep: bool,
 ) {
-    GPIO::regs().pin(gpio_num as usize).modify(|_, w| unsafe {
-        if let Some(int_ena) = int_ena {
-            w.int_ena().bits(int_ena);
-        }
+    let mut listening = false;
+    GPIO::regs().pin(gpio_num as usize).modify(|r, w| unsafe {
+        let enabled = int_ena.unwrap_or_else(|| r.int_ena().bits());
+        listening = enabled != 0;
+
+        w.int_ena().bits(enabled);
         w.int_type().bits(int_type);
         w.wakeup_enable().bit(wake_up_from_light_sleep)
     });
+
+    let bank = bank(gpio_num);
+    let pin = 1 << (gpio_num - bank.offset());
+    if listening {
+        bank.listening().fetch_or(pin, Ordering::Relaxed);
+    } else {
+        bank.listening().fetch_and(!pin, Ordering::Relaxed);
+    }
 }
 
 pub(crate) fn is_int_enabled(gpio_num: u8) -> bool {

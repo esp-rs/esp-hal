@@ -175,9 +175,9 @@ impl WakeupSource {
     /// re-registers its own hooks, which is what enabling an already enabled source does.
     ///
     /// Both hooks run with the flash accessible: the entry hook before the sleep configuration
-    /// reaches hardware, the exit hook after the wake sequence has restored it. A hook and what it
-    /// calls therefore need no [`ram`][crate::ram] attribute. They do run inside sleep entry, so
-    /// keep them short.
+    /// reaches hardware, the exit hook after the wake sequence has restored it. They do run inside
+    /// sleep entry, so keep them short, and give them the [`ram`][crate::ram] attribute to keep the
+    /// flash out of the sleep path.
     pub(crate) fn enable_with_hooks(
         self,
         entry: Option<SleepEntryHook>,

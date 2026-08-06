@@ -875,6 +875,7 @@ impl Info {
 
 /// The RX line is watched by the UART peripheral itself, which therefore has to stay powered.
 #[cfg(sleep_driver_supported)]
+#[crate::ram]
 fn keep_peripherals_powered(
     kind: crate::rtc_cntl::sleep::SleepKind,
     config: &mut crate::rtc_cntl::sleep::WrappedSleepConfig<'_>,

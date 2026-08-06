@@ -28,15 +28,18 @@
 #[cfg_attr(not(sleep_ext1_version_is_set), path = "per_pin.rs")]
 mod path;
 
-use portable_atomic::{AtomicU64, Ordering};
+use portable_atomic::{AtomicU32, Ordering};
+use strum::EnumCount;
 
 use crate::{
     gpio::{
         AnyPin,
         Event,
+        GpioBank,
         Level,
         Pin,
         WakeConfigError,
+        low_level::bank,
         lp_io::{LpFunction, low_level},
     },
     peripherals::GPIO,
@@ -69,21 +72,46 @@ pub struct WakeupConfig {
     low_power_path: bool,
 }
 
+/// A set of pads, held in the words the GPIO peripheral groups its pins into.
+struct PadMask([AtomicU32; GpioBank::COUNT]);
+
+impl PadMask {
+    const fn new() -> Self {
+        Self([const { AtomicU32::new(0) }; GpioBank::COUNT])
+    }
+
+    fn word(&self, bank: GpioBank) -> &AtomicU32 {
+        &self.0[bank as usize]
+    }
+
+    fn set(&self, gpio: u8, member: bool) {
+        let bank = bank(gpio);
+        let pin = 1 << (gpio - bank.offset());
+
+        if member {
+            self.word(bank).fetch_or(pin, Ordering::Relaxed);
+        } else {
+            self.word(bank).fetch_and(!pin, Ordering::Relaxed);
+        }
+    }
+}
+
 /// The pads that may wake the chip through a low-power path.
 ///
 /// The digital path is recorded in hardware, in the pad's own wakeup-enable bit, but no low-power
 /// register means "may wake" without also arming a level, and esp32h2 has no per-pin low-power
 /// register at all. This record is therefore software. It does not have to survive a deep sleep,
 /// because that wake resets the chip, and a program starts with no wakeup sources.
-static LOW_POWER_PADS: AtomicU64 = AtomicU64::new(0);
+static LOW_POWER_PADS: PadMask = PadMask::new();
 
 /// The pads that sleep entry gave to the low-power IO MUX, and that a light sleep has to give
 /// back.
-static PREPARED_PADS: AtomicU64 = AtomicU64::new(0);
+static PREPARED_PADS: PadMask = PadMask::new();
 
 for_each_gpio! {
     (all $( ($n:literal, $gpio:ident $_ins:tt $_outs:tt $_attrs:tt) ),*) => {
-        /// Every pad, so that the digital path can be read back from hardware.
+        /// Every pad, so that deep-sleep isolation can walk them.
+        #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
         const PADS: &[u8] = &[ $( $n ),* ];
 
         /// One past the highest pin number, which is what the pad tables are indexed by.
@@ -145,17 +173,15 @@ impl Armed {
 
 /// Applies a pin's wakeup configuration.
 pub(crate) fn apply_config(pin: &AnyPin<'_>, config: &WakeupConfig) -> Result<(), WakeConfigError> {
-    let pad = 1 << pin.number();
-
     if config.low_power_path {
         if lp_number(pin.number()).is_none() {
             return Err(WakeConfigError::NoLowPowerPath);
         }
 
-        LOW_POWER_PADS.fetch_or(pad, Ordering::Relaxed);
+        LOW_POWER_PADS.set(pin.number(), true);
         enable();
     } else {
-        LOW_POWER_PADS.fetch_and(!pad, Ordering::Relaxed);
+        LOW_POWER_PADS.set(pin.number(), false);
     }
 
     Ok(())
@@ -182,14 +208,6 @@ fn disable() {
 /// The number the low-power registers index `gpio` by, or `None` if they do not reach the pad.
 fn lp_number(gpio: u8) -> Option<u8> {
     *LP_NUMBERS.get(gpio as usize)?
-}
-
-/// The pads a low-power path can reach, as the pin number and the low-power number.
-fn low_power_pads() -> impl Iterator<Item = (u8, u8)> {
-    LP_NUMBERS
-        .iter()
-        .enumerate()
-        .filter_map(|(gpio, lp)| lp.map(|lp| (gpio as u8, lp)))
 }
 
 /// Assigns the listening pins to the hardware paths, and votes for what they need powered.
@@ -220,46 +238,56 @@ fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
 /// Gives the pads back to the digital GPIO peripheral after a light sleep.
 #[crate::ram]
 fn exit_hook() {
-    let prepared = PREPARED_PADS.swap(0, Ordering::Relaxed);
+    for bank in GpioBank::ALL {
+        let mut prepared = PREPARED_PADS.word(bank).swap(0, Ordering::Relaxed);
 
-    for (gpio, lp) in low_power_pads() {
-        if prepared & (1 << gpio) == 0 {
-            continue;
+        while prepared != 0 {
+            let pin = prepared.trailing_zeros();
+            prepared &= !(1 << pin);
+
+            let Some(lp) = lp_number(bank.offset() + pin as u8) else {
+                continue;
+            };
+
+            low_level::pad_hold(lp, false);
+            low_level::set_config(lp, true, false, LpFunction::LP_GPIO);
         }
-
-        low_level::pad_hold(lp, false);
-        low_level::set_config(lp, true, false, LpFunction::LP_GPIO);
     }
 }
 
 /// Collects the listening pins that asked for a low-power path, and reports whether any pin at all
 /// is listening.
+///
+/// A pin that listens also ends a light sleep, so the listening record answers both questions, and
+/// neither one needs a walk over the pads.
 fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
-    let participants = LOW_POWER_PADS.load(Ordering::Relaxed);
-
     let mut count = 0;
-    for (gpio, lp) in low_power_pads() {
-        if participants & (1 << gpio) == 0 {
-            continue;
-        }
-        if let Some(level) = armed_level(gpio) {
-            buffer[count] = Armed { gpio, lp, level };
-            count += 1;
+    let mut digital = false;
+
+    for bank in GpioBank::ALL {
+        let listening = bank.listening().load(Ordering::Relaxed);
+        digital |= listening != 0;
+
+        let mut participants = listening & LOW_POWER_PADS.word(bank).load(Ordering::Relaxed);
+        while participants != 0 {
+            let pin = participants.trailing_zeros();
+            participants &= !(1 << pin);
+
+            // Only a pad the low-power registers reach enters the mask, so the number is there.
+            let gpio = bank.offset() + pin as u8;
+            let Some(lp) = lp_number(gpio) else { continue };
+
+            if let Some(level) = armed_level(gpio) {
+                buffer[count] = Armed { gpio, lp, level };
+                count += 1;
+            }
         }
     }
-
-    let digital = PADS.iter().any(|&gpio| {
-        GPIO::regs()
-            .pin(gpio as usize)
-            .read()
-            .wakeup_enable()
-            .bit_is_set()
-    });
 
     (&buffer[..count], digital)
 }
 
-/// Returns the level that wakes the chip through this pad, or `None` if the pin is not listening.
+/// Returns the level that wakes the chip through this pad, or `None` if its trigger names none.
 ///
 /// An edge trigger becomes the level the edge ends on, so that the user's intent survives on the
 /// chips whose wake paths are level-only. `AnyEdge` ends on the level the pin is not at now, which
@@ -267,13 +295,7 @@ fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
 /// changes before the sleep starts arms a level that is already asserted, so the sleep is rejected
 /// or ends at once.
 fn armed_level(gpio: u8) -> Option<Level> {
-    let pin = GPIO::regs().pin(gpio as usize).read();
-
-    if pin.int_ena().bits() == 0 {
-        return None;
-    }
-
-    let trigger = pin.int_type().bits();
+    let trigger = GPIO::regs().pin(gpio as usize).read().int_type().bits();
     Some(
         if trigger == Event::HighLevel as u8 || trigger == Event::RisingEdge as u8 {
             Level::High
@@ -308,7 +330,7 @@ fn prepare_pad(pin: &Armed, kind: SleepKind) {
     low_level::set_config(pin.lp, true, !cfg!(esp32h2), LpFunction::LP_GPIO);
     low_level::pad_hold(pin.lp, kind == SleepKind::Deep);
 
-    PREPARED_PADS.fetch_or(1 << pin.gpio, Ordering::Relaxed);
+    PREPARED_PADS.set(pin.gpio, true);
 }
 
 /// Cuts the pads that are not held loose from the digital peripheral, so that they do not raise
