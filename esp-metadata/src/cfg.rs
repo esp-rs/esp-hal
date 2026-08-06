@@ -733,6 +733,23 @@ driver_configs![
             deep_sleep: bool,
             #[serde(default)]
             wakeup_sources: WakeupSources,
+            /// Register generation of the `ext1` wakeup path, which wakes on a mask of pads.
+            ///
+            /// 1: `RTC_CNTL.ext_wakeup1`, one level bit shared by every pad in the mask.
+            /// 2: `LP_AON.ext_wakeup_cntl`, per-pin levels.
+            /// 3: `PMU` ext wakeup, per-pin levels.
+            ext1_version: Option<u32>,
+            /// Register generation of the per-pin wakeup path, which wakes with the HP GPIO
+            /// peripheral powered down and therefore serves deep sleep.
+            ///
+            /// 1: RTC_IO per-pin. 2: `RTC_CNTL_GPIO_WAKEUP`. 3: LP_IO per-pin.
+            ///
+            /// Unset on esp32h2, whose per-pin path *is* the `ext1` register set. Edge triggers
+            /// exist on version 3 only.
+            pin_wakeup_version: Option<u32>,
+            /// Whether deep-sleep entry must isolate the digital pads to avoid leakage current.
+            #[serde(default)]
+            deep_sleep_needs_gpio_isolation: bool,
         }
     },
     SocProperties {

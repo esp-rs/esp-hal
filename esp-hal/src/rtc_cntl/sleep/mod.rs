@@ -50,6 +50,9 @@ mod wakeup_sources;
 #[instability::unstable]
 pub use wakeup_sources::*;
 
+mod wakeup;
+pub(crate) use wakeup::*;
+
 /// The set of wakeup sources configured to end a sleep.
 ///
 /// This is a thin wrapper around a set of [`WakeupSource`]s. Wakeup source implementations enable
@@ -90,6 +93,27 @@ impl WakeTriggers {
 
         self.as_u32() & property!("sleep.rejectable_mask")
     }
+}
+
+/// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
+///
+/// The wakeup-enable mask survives a deep-sleep wake, so at this point it still holds the intent of
+/// the run that went to sleep. Two things need it in that order: the pads that run armed have to be
+/// released, and then the mask has to start this run empty, because a program begins with no
+/// configured wakeup sources and drivers build the mask up from there.
+pub(crate) fn init(rtc: &Rtc<'_>) {
+    // ESP-IDF releases the pads after a deep-sleep wake only, and only when the previous run armed
+    // an IO wake source.
+    #[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
+    if super::reset_reason(crate::system::Cpu::ProCpu) == Some(super::SocResetReason::CoreDeepSleep)
+        && io_wake_enabled()
+    {
+        RtcSleepConfig::wake_io_reset();
+    }
+
+    RtcSleepConfig::base_settings(rtc);
+
+    set_mask(0);
 }
 
 /// Trait representing a wakeup source.

@@ -484,11 +484,9 @@ impl RtcSleepConfig {
         self.deep
     }
 
-    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
-        Self::wake_io_reset();
-    }
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {}
 
-    fn wake_io_reset() {
+    pub(crate) fn wake_io_reset() {
         Ext1WakeupSource::wake_io_reset();
     }
 
