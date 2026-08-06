@@ -168,7 +168,7 @@ fn configure_pad(pin: &impl LpPin, function: LpFunction) {
         });
     }
 
-    pin.lp_set_config(true, true, function);
+    crate::gpio::lp_io::low_level::set_config(ionum as u8, true, true, function);
 }
 
 impl<'d> LpI2c<'d> {

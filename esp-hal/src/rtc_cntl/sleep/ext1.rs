@@ -4,7 +4,7 @@
 //! chip boots again. Releasing that hold is a boot-time job, and the only part of `ext1` this
 //! module owns; arming the pads belongs to the GPIO driver.
 
-use crate::gpio::LpPin;
+use crate::gpio::lp_io::low_level;
 
 /// Releases the pad hold that a previous sleep took, so the pads follow their drivers again.
 ///
@@ -13,10 +13,10 @@ use crate::gpio::LpPin;
 pub(crate) fn wake_io_reset() {
     cfg_select! {
         sleep_ext1_version = "3" => {
-            fn release(pin: impl LpPin, armed: u32) {
-                // The selection is by digital pin number on this generation.
-                if armed & (1 << pin.number()) != 0 {
-                    pin.lp_pad_hold(false);
+            // The selection is by digital pin number on this generation.
+            fn release(gpio: u8, lp: u8, armed: u32) {
+                if armed & (1 << gpio) != 0 {
+                    low_level::pad_hold(lp, false);
                 }
             }
 
@@ -27,9 +27,9 @@ pub(crate) fn wake_io_reset() {
                 .bits();
         }
         _ => {
-            fn release(pin: impl LpPin, armed: u8) {
-                if armed & (1 << pin.lp_number()) != 0 {
-                    pin.lp_pad_hold(false);
+            fn release(_gpio: u8, lp: u8, armed: u8) {
+                if armed & (1 << lp) != 0 {
+                    low_level::pad_hold(lp, false);
                 }
             }
 
@@ -42,8 +42,8 @@ pub(crate) fn wake_io_reset() {
     }
 
     for_each_lp_function! {
-        (($_lp:ident, LP_GPIOn, $_pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-            release(unsafe { crate::peripherals::$gpio::steal() }, armed);
+        (($_lp:ident, LP_GPIOn, $lp:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
+            release(crate::peripherals::$gpio::NUMBER, $lp, armed);
         };
     }
 

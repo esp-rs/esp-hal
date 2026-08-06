@@ -17,7 +17,14 @@
 use portable_atomic::{AtomicU64, Ordering};
 
 use crate::{
-    gpio::{AnyPin, Event, Level, LpPin, Pin, WakeConfigError, lp_io::LpFunction},
+    gpio::{
+        AnyPin,
+        Event,
+        Level,
+        Pin,
+        WakeConfigError,
+        lp_io::{LpFunction, low_level},
+    },
     peripherals::GPIO,
     rtc_cntl::{
         WakeupSource,
@@ -82,10 +89,13 @@ const MAX_ARMED: usize = LOW_POWER_PADS_TABLE.len();
 #[derive(Debug, Clone, Copy)]
 struct Armed {
     /// The digital pin number.
+    // esp32c2 and esp32c3 keep the pad on the digital IO MUX, so nothing there needs this number.
+    #[cfg_attr(
+        not(any(sleep_ext1_version_is_set, sleep_pin_wakeup_version = "1")),
+        expect(dead_code)
+    )]
     gpio: u8,
     /// The number the low-power registers index the pad by.
-    // esp32c2 and esp32c3 index their only low-power path by digital pin number instead.
-    #[cfg_attr(not(sleep_ext1_version_is_set), expect(dead_code))]
     lp: u8,
     level: Level,
 }
@@ -174,14 +184,13 @@ fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
 fn exit_hook() {
     let prepared = PREPARED_PADS.swap(0, Ordering::Relaxed);
 
-    for &(gpio, _) in LOW_POWER_PADS_TABLE {
+    for &(gpio, lp) in LOW_POWER_PADS_TABLE {
         if prepared & (1 << gpio) == 0 {
             continue;
         }
 
-        let pad = unsafe { AnyPin::steal(gpio) };
-        pad.lp_pad_hold(false);
-        pad.lp_set_config(true, false, LpFunction::LP_GPIO);
+        low_level::pad_hold(lp, false);
+        low_level::set_config(lp, true, false, LpFunction::LP_GPIO);
     }
 }
 
@@ -379,7 +388,7 @@ fn arm_ext1(armed: &[Armed], kind: SleepKind) {
             levels |= bit;
         }
 
-        prepare_pad(pin.gpio, kind);
+        prepare_pad(pin, kind);
     }
 
     write_ext1(pads, levels);
@@ -393,7 +402,7 @@ fn arm_ext1_group<'a>(group: impl Iterator<Item = &'a Armed>, level: Level, kind
     let mut pads = 0;
     for pin in group {
         pads |= 1 << pin.lp;
-        prepare_pad(pin.gpio, kind);
+        prepare_pad(pin, kind);
     }
 
     write_ext1(pads, level);
@@ -467,7 +476,7 @@ fn write_ext1(pads: u32, levels: u32) {
 fn arm_ext0(pin: &Armed) {
     use crate::peripherals::{LPWR, RTC_IO};
 
-    unsafe { AnyPin::steal(pin.gpio) }.lp_set_config(true, true, LpFunction::LP_GPIO);
+    low_level::set_config(pin.lp, true, true, LpFunction::LP_GPIO);
 
     RTC_IO::regs()
         .ext_wakeup0()
@@ -486,8 +495,8 @@ fn arm_ext0(pin: &Armed) {
 ))]
 #[crate::ram]
 fn clear_per_pin() {
-    for &(gpio, _) in LOW_POWER_PADS_TABLE {
-        unsafe { AnyPin::steal(gpio) }.apply_wakeup(false, Level::Low);
+    for &(_, lp) in LOW_POWER_PADS_TABLE {
+        low_level::apply_wakeup(lp, false, Level::Low);
     }
 }
 
@@ -498,8 +507,6 @@ fn clear_per_pin() {
 ))]
 #[crate::ram]
 fn arm_per_pin(pin: &Armed, kind: SleepKind) {
-    let pad = unsafe { AnyPin::steal(pin.gpio) };
-
     cfg_select! {
         sleep_pin_wakeup_version = "2" => {
             {
@@ -507,18 +514,17 @@ fn arm_per_pin(pin: &Armed, kind: SleepKind) {
                 // low-power function to select. ESP-IDF drives the pad to its wake level with the
                 // pull resistors, so that a deep sleep, which isolates the pad, cannot lose it.
                 if kind == SleepKind::Deep {
-                    use crate::gpio::LpPinWithResistors;
-                    pad.lp_pullup(pin.level == Level::Low);
-                    pad.lp_pulldown(pin.level == Level::High);
+                    low_level::pullup_enable(pin.lp, pin.level == Level::Low);
+                    low_level::pulldown_enable(pin.lp, pin.level == Level::High);
                 }
             }
         }
         _ => {
-            prepare_pad(pin.gpio, kind);
+            prepare_pad(pin, kind);
         }
     }
 
-    pad.apply_wakeup(true, pin.level);
+    low_level::apply_wakeup(pin.lp, true, pin.level);
 }
 
 /// Gives the pad to the low-power IO MUX, which is what makes it readable while the
@@ -528,14 +534,12 @@ fn arm_per_pin(pin: &Armed, kind: SleepKind) {
 /// not: nothing it powers down drives the pad, and the hold would freeze an output.
 #[cfg(any(sleep_ext1_version_is_set, sleep_pin_wakeup_version = "1"))]
 #[crate::ram]
-fn prepare_pad(gpio: u8, kind: SleepKind) {
-    let pad = unsafe { AnyPin::steal(gpio) };
-
+fn prepare_pad(pin: &Armed, kind: SleepKind) {
     // esp32h2 reaches the pad through the digital IO MUX, so it has no low-power mux to switch.
-    pad.lp_set_config(true, !cfg!(esp32h2), LpFunction::LP_GPIO);
-    pad.lp_pad_hold(kind == SleepKind::Deep);
+    low_level::set_config(pin.lp, true, !cfg!(esp32h2), LpFunction::LP_GPIO);
+    low_level::pad_hold(pin.lp, kind == SleepKind::Deep);
 
-    PREPARED_PADS.fetch_or(1 << gpio, Ordering::Relaxed);
+    PREPARED_PADS.fetch_or(1 << pin.gpio, Ordering::Relaxed);
 }
 
 /// Clocks the pad-scanning logic that the esp32c2 and esp32c3 per-pin path needs, and clears the

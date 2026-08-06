@@ -327,52 +327,17 @@ impl TryFrom<usize> for AlternateFunction {
     }
 }
 
-/// Trait implemented by low-power pins
+/// Trait implemented by the pins that the low-power domain can reach.
+///
+/// The low-power domain numbers these pads on its own, and the number is what the low-power
+/// registers take. Only some chips give the same pad the same number in both domains, so keep the
+/// two apart: pass [`Self::lp_number`] to the low-power registers, and [`Pin::number`] to the
+/// digital ones.
 #[instability::unstable]
 #[cfg(lp_io_driver_supported)]
 pub trait LpPin: Pin {
     /// LP number of the pin
     fn lp_number(&self) -> u8;
-
-    /// Enables or disables the input path in the low-power domain, selects whether the pad belongs
-    /// to the low-power domain (`mux` is `true`) or to the digital GPIO peripheral, and selects the
-    /// pad's low-power function.
-    ///
-    /// `func` has no effect while the pad belongs to the digital GPIO peripheral.
-    #[doc(hidden)]
-    fn lp_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction);
-
-    /// Enable or disable PAD_HOLD
-    #[doc(hidden)]
-    fn lp_pad_hold(&self, enable: bool);
-
-    /// Enables or disables waking up the chip when the pad reaches `level`.
-    #[doc(hidden)]
-    fn apply_wakeup(&self, wakeup: bool, level: Level);
-
-    /// LP IO MUX functions on this pad that carry LP peripheral input signals.
-    #[cfg(lp_io_has_gpio_matrix)]
-    #[doc(hidden)]
-    fn lp_input_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpInputSignal)];
-
-    /// LP IO MUX functions on this pad that carry LP peripheral output signals.
-    #[cfg(lp_io_has_gpio_matrix)]
-    #[doc(hidden)]
-    fn lp_output_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpOutputSignal)];
-}
-
-/// Trait implemented by low-power pins which support internal pull-up / pull-down
-/// resistors.
-#[instability::unstable]
-#[cfg(lp_io_driver_supported)]
-pub trait LpPinWithResistors: LpPin {
-    /// Enable/disable the internal pull-up resistor
-    #[doc(hidden)]
-    fn lp_pullup(&self, enable: bool);
-
-    /// Enable/disable the internal pull-down resistor
-    #[doc(hidden)]
-    fn lp_pulldown(&self, enable: bool);
 }
 
 /// Common trait implemented by pins
@@ -1660,9 +1625,9 @@ impl<'lt> AnyPin<'lt> {
 
         #[cfg(lp_io_driver_supported)]
         for_each_lp_function! {
-            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
+            (($_signal:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
-                    LpPin::lp_set_config(self, false, false, lp_io::LpFunction::$af);
+                    lp_io::low_level::set_config($lp_pin, false, false, lp_io::LpFunction::$af);
                 }
             };
         }
@@ -2137,117 +2102,6 @@ impl AnyPin<'_> {
                     other => false,
                 };
             };
-        }
-    }
-}
-
-#[cold]
-#[allow(unused)]
-fn pin_does_not_support_function(pin: u8, function: &str) {
-    panic!("Pin {} is not an {}", pin, function)
-}
-
-#[cfg(lp_io_driver_supported)]
-macro_rules! for_each_lp_pin {
-    (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt) => {
-        if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-            #[allow(unused_mut)]
-            let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-            return $code;
-        }
-    };
-
-    (($ident:ident, $target:ident) => $code:tt;) => {
-        for_each_lp_function! {
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                for_each_lp_pin!(@impl $ident, $target, $gpio, $code)
-            };
-        }
-        unreachable!();
-    };
-}
-
-#[cfg(lp_io_driver_supported)]
-macro_rules! for_each_lp_output_pin {
-    (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
-        if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-            for_each_gpio! {
-                // If the pin is an output pin, generate $code
-                ($n:tt, $gpio $in_afs:tt $out_afs:tt ($input:tt [Output])) => {
-                    #[allow(unused_mut)]
-                    let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                    return $code;
-                };
-                // If the pin is not an output pin, generate a panic
-                ($n:tt, $gpio $in_afs:tt $out_afs:tt ($input:tt [])) => {
-                    pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, $kind)
-                };
-            }
-        }
-    };
-
-    (($ident:ident, $target:ident) => $code:tt;) => {
-        for_each_lp_function! {
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                for_each_lp_output_pin!(@impl $ident, $target, $gpio, $code, "LP_IO output")
-            };
-        }
-        unreachable!();
-    };
-}
-
-#[cfg(lp_io_driver_supported)]
-impl LpPin for AnyPin<'_> {
-    fn lp_number(&self) -> u8 {
-        for_each_lp_pin! {
-            (self, target) => { LpPin::lp_number(&target) };
-        }
-    }
-
-    fn lp_set_config(&self, input_enable: bool, mux: bool, func: lp_io::LpFunction) {
-        for_each_lp_pin! {
-            (self, target) => { LpPin::lp_set_config(&target, input_enable, mux, func) };
-        }
-    }
-
-    fn lp_pad_hold(&self, enable: bool) {
-        for_each_lp_pin! {
-            (self, target) => { LpPin::lp_pad_hold(&target, enable) };
-        }
-    }
-
-    fn apply_wakeup(&self, wakeup: bool, level: Level) {
-        for_each_lp_pin! {
-            (self, target) => { LpPin::apply_wakeup(&target, wakeup, level) };
-        }
-    }
-
-    #[cfg(lp_io_has_gpio_matrix)]
-    fn lp_input_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpInputSignal)] {
-        for_each_lp_pin! {
-            (self, target) => { LpPin::lp_input_signals(&target) };
-        }
-    }
-
-    #[cfg(lp_io_has_gpio_matrix)]
-    fn lp_output_signals(&self) -> &'static [(lp_io::LpFunction, lp_io::LpOutputSignal)] {
-        for_each_lp_pin! {
-            (self, target) => { LpPin::lp_output_signals(&target) };
-        }
-    }
-}
-
-#[cfg(lp_io_driver_supported)]
-impl LpPinWithResistors for AnyPin<'_> {
-    fn lp_pullup(&self, enable: bool) {
-        for_each_lp_output_pin! {
-            (self, target) => { LpPinWithResistors::lp_pullup(&target, enable) };
-        }
-    }
-
-    fn lp_pulldown(&self, enable: bool) {
-        for_each_lp_output_pin! {
-            (self, target) => { LpPinWithResistors::lp_pulldown(&target, enable) };
         }
     }
 }

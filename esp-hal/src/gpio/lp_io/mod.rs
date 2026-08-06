@@ -73,13 +73,17 @@ define_lp_functions!();
 #[cfg_attr(lp_io_version = "esp32h2", path = "low_level/esp32h2.rs")]
 #[cfg_attr(lp_io_version = "esp32p4", path = "low_level/esp32p4.rs")]
 #[cfg_attr(lp_io_version = "v4", path = "low_level/v4.rs")]
-mod low_level;
+pub(crate) mod low_level;
 
 /// The trigger type a pad's low-power wakeup register needs to wake the chip at `level`.
 ///
 /// The field takes the same values as the digital interrupt type.
-// esp32h2 has no per-pin wakeup register: its low-power path shares ext1's level mask.
-#[cfg(not(esp32h2))]
+// Only the chips that arm the pads one by one have such a register. The others reach the pads
+// through ext1, which takes a mask.
+#[cfg(all(
+    sleep_pin_wakeup_version_is_set,
+    any(sleep_ext1_version = "1", not(sleep_ext1_version_is_set))
+))]
 pub(crate) const fn wake_trigger(level: super::Level) -> u8 {
     match level {
         super::Level::Low => super::Event::LowLevel as u8,
@@ -108,7 +112,7 @@ pub(crate) fn connect_open_drain_signals(
     input: LpInputSignal,
     output: LpOutputSignal,
 ) {
-    let lp_pin = low_level::init_pin(pin, true);
+    let lp_pin = low_level::init_pin(pin.lp_number(), true);
     low_level::set_open_drain_output(pin.number(), true);
     low_level::input_enable(lp_pin, true);
     low_level::pullup_enable(lp_pin, true);
@@ -129,20 +133,19 @@ pub(crate) use low_level::reset_pin;
 /// Configures an LP pin as an input and routes an LP peripheral's input signal to it.
 #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
 pub(crate) fn connect_input_signal(pin: &(impl LpPin + InputPin), input: LpInputSignal) {
-    let mux_af = pin
-        .lp_input_signals()
+    let lp_pin = pin.lp_number();
+
+    let mux_af = low_level::input_signals(lp_pin)
         .iter()
         .find(|(_, signal)| *signal == input)
         .map(|(af, _)| *af);
 
-    let lp_pin = match mux_af {
-        Some(af) => {
-            let lp_pin = pin.lp_number();
-            pin.lp_set_config(true, true, af);
-            lp_pin
+    match mux_af {
+        Some(af) => low_level::set_config(lp_pin, true, true, af),
+        None => {
+            low_level::init_pin(lp_pin, true);
         }
-        None => low_level::init_pin(pin, true),
-    };
+    }
 
     low_level::input_enable(lp_pin, true);
     route_input(lp_pin, input, mux_af.is_none());
@@ -151,18 +154,17 @@ pub(crate) fn connect_input_signal(pin: &(impl LpPin + InputPin), input: LpInput
 /// Configures an LP pin as an output and routes an LP peripheral's output signal to it.
 #[cfg(all(lp_io_has_gpio_matrix, lp_uart_driver_supported))]
 pub(crate) fn connect_output_signal(pin: &(impl LpPin + OutputPin), output: LpOutputSignal) {
-    let mux_af = pin
-        .lp_output_signals()
+    let lp_pin = pin.lp_number();
+
+    let mux_af = low_level::output_signals(lp_pin)
         .iter()
         .find(|(_, signal)| *signal == output)
         .map(|(af, _)| *af);
 
     match mux_af {
-        Some(af) => {
-            pin.lp_set_config(false, true, af);
-        }
+        Some(af) => low_level::set_config(lp_pin, false, true, af),
         None => {
-            let lp_pin = low_level::init_pin(pin, false);
+            low_level::init_pin(lp_pin, false);
             route_output(lp_pin, output);
         }
     }
@@ -287,12 +289,13 @@ mod ulp_tokens {
             Self::new_untyped(pin)
         }
 
-        pub(super) fn new_untyped<P>(pin: P) -> Self
+        /// Takes a pad that the caller has checked to be the low-power pin numbered `PIN`.
+        pub(super) fn new_untyped<P>(_pin: P) -> Self
         where
-            P: LpPin + OutputPin + 'd,
+            P: Pin + 'd,
         {
-            let lp_pin = low_level::init_pin(&pin, false);
-            low_level::output_enable(lp_pin, true);
+            low_level::init_pin(PIN, false);
+            low_level::output_enable(PIN, true);
 
             Self {
                 phantom: PhantomData,
@@ -316,14 +319,15 @@ mod ulp_tokens {
             Self::new_untyped(pin)
         }
 
-        pub(super) fn new_untyped<P>(pin: P) -> Self
+        /// Takes a pad that the caller has checked to be the low-power pin numbered `PIN`.
+        pub(super) fn new_untyped<P>(_pin: P) -> Self
         where
-            P: LpPin + InputPin + 'd,
+            P: Pin + 'd,
         {
-            let lp_pin = low_level::init_pin(&pin, true);
-            low_level::input_enable(lp_pin, true);
-            low_level::pullup_enable(lp_pin, false);
-            low_level::pulldown_enable(lp_pin, false);
+            low_level::init_pin(PIN, true);
+            low_level::input_enable(PIN, true);
+            low_level::pullup_enable(PIN, false);
+            low_level::pulldown_enable(PIN, false);
 
             Self {
                 phantom: PhantomData,
@@ -357,17 +361,18 @@ mod ulp_tokens {
             Self::new_untyped(pin)
         }
 
+        /// Takes a pad that the caller has checked to be the low-power pin numbered `PIN`.
         pub(super) fn new_untyped<P>(pin: P) -> Self
         where
-            P: LpPin + InputPin + OutputPin + 'd,
+            P: Pin + 'd,
         {
             let gpio = pin.number();
-            let lp_pin = low_level::init_pin(&pin, true);
+            low_level::init_pin(PIN, true);
             low_level::set_open_drain_output(gpio, true);
-            low_level::input_enable(lp_pin, true);
-            low_level::pullup_enable(lp_pin, true);
-            low_level::pulldown_enable(lp_pin, false);
-            low_level::output_enable(lp_pin, true);
+            low_level::input_enable(PIN, true);
+            low_level::pullup_enable(PIN, true);
+            low_level::pulldown_enable(PIN, false);
+            low_level::output_enable(PIN, true);
 
             Self {
                 phantom: PhantomData,

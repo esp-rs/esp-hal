@@ -45,16 +45,25 @@ pub(crate) fn set_interrupt_priority(priority: Priority) {
 }
 
 fn errata36(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
-    use crate::gpio::{LpPinWithResistors, Pin};
+    use crate::gpio::{Pin, lp_io::low_level};
 
     for_each_lp_function! {
-        (LP_GPIOn $( (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),* ) => {
-            const LP_IO_PINS: &[u8] = &[ $( $crate::peripherals::$gpio::NUMBER ),* ];
+        (LP_GPIOn $( (($_sig:ident, LP_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),* ) => {
+            // The digital pin number, and the number the low-power registers index the pad by.
+            const LP_IO_PINS: &[(u8, u8)] = &[ $( ($crate::peripherals::$gpio::NUMBER, $n) ),* ];
         };
     };
 
-    if LP_IO_PINS.contains(&pin.number()) && pin.is_output() {
-        pin.lp_pullup(pull_up);
-        pin.lp_pulldown(pull_down);
+    let lp = LP_IO_PINS
+        .iter()
+        .find(|(gpio, _)| *gpio == pin.number())
+        .map(|(_, lp)| *lp);
+
+    // The low-power registers of the pads that cannot pull anything warn instead.
+    if let Some(lp) = lp
+        && pin.is_output()
+    {
+        low_level::pullup_enable(lp, pull_up);
+        low_level::pulldown_enable(lp, pull_down);
     }
 }
