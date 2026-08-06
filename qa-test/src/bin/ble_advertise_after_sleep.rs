@@ -18,7 +18,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     interrupt::software::SoftwareInterruptControl,
-    rtc_cntl::sleep::{LowPower, TimerWakeupSource},
+    rtc_cntl::sleep::{LowPower, RtcSleepConfig},
     timer::timg::TimerGroup,
 };
 use esp_println::println;
@@ -67,9 +67,6 @@ async fn main(_s: Spawner) {
 
     let mut lpwr = LowPower::new(peripherals.LPWR);
 
-    let sleep_config = esp_hal::rtc_cntl::sleep::RtcSleepConfig::default();
-    let timer = TimerWakeupSource::new(esp_hal::time::Duration::from_secs(SLEEP_SECS));
-
     let connector = BleConnector::new(peripherals.BT, Default::default()).unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);
 
@@ -110,7 +107,10 @@ async fn main(_s: Spawner) {
             Timer::after(Duration::from_millis(200)).await;
 
             info!("[iter {iteration}] entering light sleep for {SLEEP_SECS}s");
-            lpwr.sleep(&sleep_config, &[&timer]);
+            lpwr.set_wakeup_deadline(
+                esp_hal::time::Instant::now() + esp_hal::time::Duration::from_secs(SLEEP_SECS),
+            );
+            lpwr.sleep_light(RtcSleepConfig::default());
 
             println!(
                 "[iter {iteration}] woke up - scan for \"TrouBLE\" now: on an affected C6 it will \
