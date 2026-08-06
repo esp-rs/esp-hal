@@ -4,7 +4,7 @@
 //! costs no power domain, and it reaches the pad through the digital IO MUX, so there is nothing to
 //! allocate and no pad to hand over.
 
-use super::{Armed, low_power_pads};
+use super::{Armed, LP_NUMBERS};
 use crate::{
     gpio::{Level, lp_io::low_level},
     peripherals::LPWR,
@@ -16,7 +16,7 @@ pub(super) fn disable() {}
 
 pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
     // The pads this sleep did not choose must not wake it.
-    for (_, lp) in low_power_pads() {
+    for &lp in LP_NUMBERS.iter().flatten() {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
 
