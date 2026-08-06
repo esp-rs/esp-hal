@@ -648,9 +648,9 @@ impl defmt::Format for EspTwaiFrame {
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(
             f,
-            "EspTwaiFrame {{ EFF: {0=7..8}, RTR: {0=6..7}, SR: {0=4..5}, DLC: {0=0..4}, ID: {1=u32} DATA: {2=[u8]} }}",
+            "EspTwaiFrame {{ id: {1=u32}, EFF: {0=7..8}, RTR: {0=6..7}, SR: {0=4..5}, DLC: {0=0..4}, DATA: {2=[u8]} }}",
             self.info(),
-            match self.identifier().into() {
+            match self.identifier() {
                 Id::Standard(id) => id.as_raw() as u32,
                 Id::Extended(id) => id.as_raw(),
             },
