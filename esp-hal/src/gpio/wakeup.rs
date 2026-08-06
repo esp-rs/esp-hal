@@ -535,6 +535,16 @@ fn arm_per_pin(pin: &Armed, kind: SleepKind) {
 #[cfg(any(sleep_ext1_version_is_set, sleep_pin_wakeup_version = "1"))]
 #[crate::ram]
 fn prepare_pad(pin: &Armed, kind: SleepKind) {
+    // The low-power IO MUX has pull resistors of its own, and the digital ones stop working the
+    // moment the pad changes hands. Carry them over, or a pad that nothing drives floats away from
+    // the level the user pulled it to and wakes the chip at once.
+    #[cfg(not(esp32h2))]
+    {
+        let digital = crate::gpio::io_mux_reg(pin.gpio).read();
+        low_level::pullup_enable(pin.lp, digital.fun_wpu().bit());
+        low_level::pulldown_enable(pin.lp, digital.fun_wpd().bit());
+    }
+
     // esp32h2 reaches the pad through the digital IO MUX, so it has no low-power mux to switch.
     low_level::set_config(pin.lp, true, !cfg!(esp32h2), LpFunction::LP_GPIO);
     low_level::pad_hold(pin.lp, kind == SleepKind::Deep);
