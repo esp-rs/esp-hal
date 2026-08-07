@@ -217,6 +217,16 @@ options:
     default:
       - value: true
 
+  - name: use-xtal32k
+    description: "Enable the external 32 kHz crystal (XTAL32K). When enabled, LP/RTC slow clock
+      defaults to the crystal, XTAL32K is powered at init, and the dedicated crystal
+      GPIO pins are removed from `Peripherals`. Do not use those pads for GPIO, ADC, LP,
+      or any other function (including via `steal` / `AnyPin`) while the crystal is active.
+      When disabled (default), XTAL32K stays off so those pins can be used as hi-Z GPIO."
+    default:
+      - value: false
+    active: "soc_has_xtal32k_pads"
+
   - name: enable-pmp
     description: "Protects additional memory regions via Physical Memory Protection (PMP). (Only RISC-V other than ESP32-C2/C3)"
     default:

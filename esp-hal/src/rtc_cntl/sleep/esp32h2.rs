@@ -7,6 +7,7 @@ use crate::{
         Rtc,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
         sleep::{Ext1WakeupSource, WakeTriggers, pmu_common::SleepTimeConfig},
+        xtal32k,
     },
     soc::clocks::{self, ClockTree, CpuClkConfig, HpRootClkConfig, LpSlowClkConfig},
 };
@@ -138,7 +139,9 @@ impl PowerSleepConfig {
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
 
-        self.lp_sys_active.clk_power.set_xpd_xtal32k(true);
+        self.lp_sys_active
+            .clk_power
+            .set_xpd_xtal32k(xtal32k::use_xtal32k());
         self.lp_sys_active.clk_power.set_xpd_fosc(true);
 
         self.lp_sys_sleep.dig_power.set_mem_dslp(true);
