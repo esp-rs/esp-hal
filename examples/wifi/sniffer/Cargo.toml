@@ -26,6 +26,7 @@ ieee80211 = { version = "0.4.0", default-features = false }
 
 [features]
 esp32 = [
+    "esp-alloc/esp32",
     "esp-backtrace/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-hal/esp32",
@@ -33,6 +34,7 @@ esp32 = [
     "esp-radio/esp32",
 ]
 esp32c2 = [
+    "esp-alloc/esp32c2",
     "esp-backtrace/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-hal/esp32c2",
@@ -40,6 +42,7 @@ esp32c2 = [
     "esp-radio/esp32c2",
 ]
 esp32c3 = [
+    "esp-alloc/esp32c3",
     "esp-backtrace/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-hal/esp32c3",
@@ -47,6 +50,7 @@ esp32c3 = [
     "esp-radio/esp32c3",
 ]
 esp32c5 = [
+    "esp-alloc/esp32c5",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
@@ -54,6 +58,7 @@ esp32c5 = [
     "esp-radio/esp32c5",
 ]
 esp32c6 = [
+    "esp-alloc/esp32c6",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
@@ -61,6 +66,7 @@ esp32c6 = [
     "esp-radio/esp32c6",
 ]
 esp32c61 = [
+    "esp-alloc/esp32c61",
     "esp-backtrace/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-hal/esp32c61",
@@ -68,6 +74,7 @@ esp32c61 = [
     "esp-radio/esp32c61",
 ]
 esp32s2 = [
+    "esp-alloc/esp32s2",
     "esp-backtrace/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-hal/esp32s2",
@@ -75,6 +82,7 @@ esp32s2 = [
     "esp-radio/esp32s2",
 ]
 esp32s3 = [
+    "esp-alloc/esp32s3",
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
