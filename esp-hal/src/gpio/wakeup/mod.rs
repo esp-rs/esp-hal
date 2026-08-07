@@ -122,10 +122,6 @@ static PREPARED_PADS: PadMask = PadMask::new();
 
 for_each_gpio! {
     (all $( ($n:literal, $gpio:ident $_ins:tt $_outs:tt $_attrs:tt) ),*) => {
-        /// Every pad, so that deep-sleep isolation can walk them.
-        #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
-        const PADS: &[u8] = &[ $( $n ),* ];
-
         /// One past the highest pin number, which is what the pad tables are indexed by.
         const PAD_COUNT: usize = {
             let mut highest = 0;
@@ -381,7 +377,7 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
         _ => LPWR::regs().dig_pad_hold().read().bits(),
     };
 
-    for &gpio in PADS {
+    for gpio in 0..PAD_COUNT as u8 {
         // Only the pads the digital supply feeds leak here, and they are exactly the pads with no
         // low-power number. The low-power pads have their own supply, which stays up, and a wake
         // pad is always one of them.
