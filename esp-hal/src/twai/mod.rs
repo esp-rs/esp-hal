@@ -122,6 +122,7 @@
 
 use core::marker::PhantomData;
 
+use bitable::*;
 use enumset::{EnumSet, EnumSetType};
 use procmacros::handler;
 
@@ -446,14 +447,53 @@ pub struct EspTwaiFrame {
 }
 
 impl EspTwaiFrame {
-    /// Frame Information: specifies a frame's type, format, data length, etc.
-    ///
-    /// | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
-    /// |--------|-------|-------|-------|-------|-------|-------|-------|-------|
-    /// |  0x0   |  FF   |  RTR  |  ---  |  SR   | DLC.3 | DLC.2 | DLC.1 | DLC.0 |
-    #[inline(always)]
-    fn info(&self) -> u8 {
-        self.bytes[0]
+    //
+    // A raw TWAI frame is structured by the hardware as follows.
+    //
+    // # Frame Information (byte 0)
+    //
+    // Specifies frame type, format, data length, etc.
+    //
+    // |  Addr  | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
+    // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
+    // |  0x0   |  EFF  |  RTR  |  ---  |  SR*  | DLC.3 | DLC.2 | DLC.1 | DLC.0 |
+    // * Not documented in the technical reference manual
+    //
+    // # Frame Identifier (bytes 1-2 or 1-4)
+    //
+    // Can be 2 or 4 bytes long depending on the frame standard.
+    //
+    // ## Standard Frame Format: 11-bit Identifier
+    //
+    // |  Addr  | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
+    // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
+    // |  0x1   | ID.10 | ID.9  | ID.8  | ID.7  | ID.6  | ID.5  | ID.4  | ID.3  |
+    // |  0x2   | ID.2  | ID.1  | ID.0  |  ---  |  ---  |  ---  |  ---  |  ---  |
+    //
+    // ## Extended Frame Format: 29-bit Identifier
+    //
+    // |  Addr  | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
+    // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
+    // |  0x1   | ID.28 | ID.27 | ID.26 | ID.25 | ID.24 | ID.23 | ID.22 | ID.21 |
+    // |  0x2   | ID.20 | ID.19 | ID.18 | ID.17 | ID.16 | ID.15 | ID.14 | ID.13 |
+    // |  0x3   | ID.12 | ID.11 | ID.10 | ID.9  | ID.8  | ID.7  | ID.6  | ID.5  |
+    // |  0x4   | ID.4  | ID.3  | ID.2  | ID.1  | ID.0  |  ---  |  ---  |  ---  |
+    //
+    // # Data payload (byte 3 or 5 onward)
+    //
+    bits! {
+        /// Frame Format: Extended (EFF) or Standard (SFF)
+        const EFF: Flag<7>;
+        /// Frame type: Transmission Request (RTR) or Data Frame (DF)
+        const RTR: Flag<6>;
+        /// Frame origin: Self Reception (SR) or bus reception
+        const SR: Flag<4>;
+        /// Data Length Code (DLC): data payload in bytes (included in a DF, expected for a RTR)
+        const DLC: Field<0, u4>;
+        /// Standard Identifier: 11-bit
+        const STD_ID: Field<0x1, 5, u11>;
+        /// Extended Identifier: 29-bit
+        const EXT_ID: Field<0x1, 3, u29>;
     }
 
     /// Frame Format (FF): specifies whether content is Extended Frame Format (EFF) or Standard
@@ -463,7 +503,7 @@ impl EspTwaiFrame {
     /// [`Self::id()`].
     #[inline(always)]
     fn is_extended_format(&self) -> bool {
-        self.info() & (0b1 << 7) != 0
+        Self::EFF.is_set(&self.bytes)
     }
 
     /// Remote Transmission Request (RTR): specifies whether content is a data frame or a remote
@@ -471,13 +511,13 @@ impl EspTwaiFrame {
     ///
     /// Note: Remote request frames do not have a data payload, no matter their DLC.
     pub fn is_remote_request(&self) -> bool {
-        self.info() & (0b1 << 6) != 0
+        Self::RTR.is_set(&self.bytes)
     }
 
     /// Self Reception (SR): indicates whether content was sent by us (using the TWAI_SELF_RX_SEQ
     /// command) or received from the bus.
     pub fn is_self_reception(&self) -> bool {
-        self.info() & (0b1 << 4) != 0
+        Self::SR.is_set(&self.bytes)
     }
 
     /// Data Length Code (DLC): specifies the number of data bytes for a data frame, or the number
@@ -486,7 +526,8 @@ impl EspTwaiFrame {
     /// Note: although no frame can have a payload longer than 8, the DLC can be greater than 8 in
     /// rare cases (payload length then is still 8).
     pub fn data_length_code(&self) -> usize {
-        (self.info() & 0b1111) as usize
+        let dlc: u8 = Self::DLC.read(&self.bytes);
+        dlc as usize
     }
 
     /// Length of the data payload: 0 for a RTR frame, 8 if DLC > 8.
@@ -500,32 +541,14 @@ impl EspTwaiFrame {
     /// Frame Identifier: 11-bit long for a SFF frame, 29-bit long for an EFF frame.
     #[inline]
     pub fn identifier(&self) -> Id {
-        let bytes = self.bytes;
         match self.is_extended_format() {
             false => {
-                // Standard Format: 11-bit Identifier, 2 bytes long
-                //
-                // | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
-                // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
-                // |  0x1   | ID.10 | ID.9  | ID.8  | ID.7  | ID.6  | ID.5  | ID.4  | ID.3  |
-                // |  0x2   | ID.2  | ID.1  | ID.0  |  ---  |  ---  |  ---  |  ---  |  ---  |
-                let raw_id: u16 = ((bytes[1] as u16) << 3) | ((bytes[2] as u16) >> 5);
+                let raw_id: u16 = Self::STD_ID.read(&self.bytes);
                 // SAFETY: safe because raw_id is 11 bits long (it cannot exceed StandardId::MAX).
                 unsafe { StandardId::new_unchecked(raw_id).into() }
             }
             true => {
-                // Extended Format: 29-bit Identifier, 4 bytes long
-                //
-                // | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
-                // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
-                // |  0x1   | ID.28 | ID.27 | ID.26 | ID.25 | ID.24 | ID.23 | ID.22 | ID.21 |
-                // |  0x2   | ID.20 | ID.19 | ID.18 | ID.17 | ID.16 | ID.15 | ID.14 | ID.13 |
-                // |  0x3   | ID.12 | ID.11 | ID.10 | ID.9  | ID.8  | ID.7  | ID.6  | ID.5  |
-                // |  0x4   | ID.4  | ID.3  | ID.2  | ID.1  | ID.0  |  ---  |  ---  |  ---  |
-                let raw_id: u32 = ((bytes[1] as u32) << 21)
-                    | ((bytes[2] as u32) << 13)
-                    | ((bytes[3] as u32) << 5)
-                    | ((bytes[4] as u32) >> 3);
+                let raw_id: u32 = Self::EXT_ID.read(&self.bytes);
                 // SAFETY: safe because raw_id is 29 bits long (it cannot exceed ExtendedId::MAX)
                 unsafe { ExtendedId::new_unchecked(raw_id).into() }
             }
@@ -598,26 +621,19 @@ impl EspTwaiFrame {
         // Id
         let (extended_format, data_start): (u8, usize) = match id.into() {
             Id::Standard(id) => {
-                let raw = id.as_raw();
-                bytes[1] = (raw >> 3) as u8;
-                bytes[2] = (raw << 5) as u8;
+                Self::STD_ID.write(&mut bytes, id.as_raw());
                 (0, 3)
             }
             Id::Extended(id) => {
-                let raw = id.as_raw();
-                bytes[1] = (raw >> 21) as u8;
-                bytes[2] = (raw >> 13) as u8;
-                bytes[3] = (raw >> 5) as u8;
-                bytes[4] = (raw << 3) as u8;
+                Self::EXT_ID.write(&mut bytes, id.as_raw());
                 (1, 5)
             }
         };
         // Frame Info
-        let ff = extended_format << 7;
-        let rtr = (remote_request as u8) << 6;
-        let sr = (self_reception as u8) << 4;
-        let dlc = (dlc as u8) & 0b1111;
-        bytes[0] = ff | rtr | sr | dlc;
+        Self::EFF.write(&mut bytes, extended_format);
+        Self::RTR.write(&mut bytes, remote_request as u8);
+        Self::SR.write(&mut bytes, self_reception as u8);
+        Self::DLC.write(&mut bytes, dlc as u8);
         // Data
         let data_end = data_start + data_len;
         bytes[data_start..data_end].copy_from_slice(data);
@@ -649,7 +665,7 @@ impl defmt::Format for EspTwaiFrame {
         defmt::write!(
             f,
             "EspTwaiFrame {{ id: {1=u32}, EFF: {0=7..8}, RTR: {0=6..7}, SR: {0=4..5}, DLC: {0=0..4}, data: {2=[u8]:#x}, raw: {3=[u8]:#x} }}",
-            self.info(),
+            self.bytes[0],
             match self.identifier() {
                 Id::Standard(id) => id.as_raw() as u32,
                 Id::Extended(id) => id.as_raw(),

@@ -60,6 +60,7 @@ static_cell              = "2"
 esp-rom-sys              = { version = "~0.1", path = "../esp-rom-sys" }
 
 # Unstable dependencies that are not (strictly) part of the public API
+bitable                  = { path = "../../bitable" }
 bitfield                 = "0.19"
 delegate                 = "0.13"
 document-features        = "0.2"
