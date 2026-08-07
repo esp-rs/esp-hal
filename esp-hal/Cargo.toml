@@ -121,7 +121,7 @@ esp32s31 = { version = "0.1", features = ["critical-section"], optional = true, 
 esp32p4 = { version = "0.2",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "8d0a072" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
-riscv            = { version = "0.16.1" }
+riscv            = { version = "0.16.1", git = "https://github.com/JurajSadel/riscv.git", branch = "test" }
 esp-riscv-rt     = { version = "0.14.0", path = "../esp-riscv-rt", optional = true }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]

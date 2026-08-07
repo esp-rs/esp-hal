@@ -11,10 +11,8 @@ use procmacros::ram;
 /// [`RtcSleepConfig::with_top_power_down`](crate::rtc_cntl::sleep::RtcSleepConfig::with_top_power_down).
 #[instability::unstable]
 pub use crate::rtc_cntl::retention::SystemRetentionMemory;
-use crate::{
-    peripherals::{LP_AON, PMU},
-    soc::csr,
-};
+use crate::peripherals::{LP_AON, PMU};
+use crate::soc::csr::{NONCRITICAL_WORDS, restore_noncritical, save_noncritical};
 
 /// Incremented only when the CPU domain actually lost and regained power.
 static CPU_POWERDOWN_WAKES: AtomicU32 = AtomicU32::new(0);
@@ -237,77 +235,6 @@ rv_core_critical_regs_restore:
     "#,
     frame = sym RV_CORE_CRITICAL_REGS_FRAME,
 );
-
-// ---------------------------------------------------------------------------
-// Non-critical CSRs (RvCoreNonCriticalSleepFrame)
-// ---------------------------------------------------------------------------
-
-/// Generate the slot count and save/restore routines for the non-critical CSRs
-/// from one list of names.
-// CSR list order matches ESP-IDF `sleep_cpu.c`.
-macro_rules! noncritical_csrs {
-    ($($name:ident),+ $(,)?) => {
-        /// Non-critical CSR slot count; sizes the `noncritical` field.
-        const NONCRITICAL_WORDS: usize = [$(stringify!($name)),+].len();
-
-        #[ram]
-        fn save_noncritical(buf: *mut u32) {
-            let mut i = 0usize;
-            $(
-                unsafe { buf.add(i).write(csr::$name::read() as u32); }
-                i += 1;
-            )+
-            let _ = i;
-        }
-
-        #[ram]
-        fn restore_noncritical(buf: *const u32) {
-            let mut i = 0usize;
-            $(
-                unsafe { csr::$name::write(buf.add(i).read() as usize); }
-                i += 1;
-            )+
-            let _ = i;
-        }
-    };
-}
-
-noncritical_csrs! {
-    mscratch,
-    mideleg,
-    misa,
-    tselect,
-    tdata1,
-    tdata2,
-    tcontrol,
-    pmpaddr0, pmpaddr1, pmpaddr2, pmpaddr3,
-    pmpaddr4, pmpaddr5, pmpaddr6, pmpaddr7,
-    pmpaddr8, pmpaddr9, pmpaddr10, pmpaddr11,
-    pmpaddr12, pmpaddr13, pmpaddr14, pmpaddr15,
-    pmpcfg0, pmpcfg1, pmpcfg2, pmpcfg3,
-    pmaaddr0, pmaaddr1, pmaaddr2, pmaaddr3,
-    pmaaddr4, pmaaddr5, pmaaddr6, pmaaddr7,
-    pmaaddr8, pmaaddr9, pmaaddr10, pmaaddr11,
-    pmaaddr12, pmaaddr13, pmaaddr14, pmaaddr15,
-    pmacfg0, pmacfg1, pmacfg2, pmacfg3,
-    pmacfg4, pmacfg5, pmacfg6, pmacfg7,
-    pmacfg8, pmacfg9, pmacfg10, pmacfg11,
-    pmacfg12, pmacfg13, pmacfg14, pmacfg15,
-    utvec,
-    ustatus,
-    uepc,
-    ucause,
-    mpcer,
-    mpcmr,
-    mpccr,
-    cpu_testbus_ctrl,
-    upcer,
-    upcmr,
-    upccr,
-    ugpio_oen,
-    ugpio_in,
-    ugpio_out,
-}
 
 // ---------------------------------------------------------------------------
 // CPU-domain device registers (INTPRI / cache / PLIC / CLINT)
