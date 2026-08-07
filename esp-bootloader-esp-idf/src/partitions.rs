@@ -1334,6 +1334,134 @@ mod storage_tests {
     }
 }
 
+#[cfg(test)]
+mod sha256_tests {
+    use super::*;
+
+    /// SHA-256 of `0x6000` bytes filled with `0xA5`.
+    const NVS_DIGEST: [u8; 32] = [
+        0xb0, 0x5b, 0x4f, 0x2c, 0xc2, 0xa7, 0x54, 0x25, 0x54, 0xfa, 0x32, 0x8b, 0xd0, 0x5d, 0x86,
+        0x7f, 0x0c, 0x1d, 0xae, 0xed, 0x46, 0x48, 0x8e, 0x31, 0xb0, 0x0c, 0xb0, 0xaa, 0xe5, 0xb5,
+        0x49, 0x81,
+    ];
+
+    /// SHA-256 of the minimal test image body (32 bytes) with `hash_appended = 1`.
+    const IMAGE_DIGEST_WITH_HASH_FLAG: [u8; 32] = [
+        0xb2, 0xb7, 0x64, 0x4a, 0x57, 0x62, 0x46, 0x05, 0xf7, 0xe4, 0xb1, 0xc3, 0xbf, 0x96, 0x5a,
+        0x20, 0x87, 0x37, 0x3d, 0x7a, 0xc6, 0x2d, 0xf8, 0x6a, 0xcf, 0x2b, 0x1a, 0xcf, 0xe4, 0x8e,
+        0xe8, 0xa0,
+    ];
+
+    /// SHA-256 of the same minimal image body with `hash_appended = 0`.
+    const IMAGE_DIGEST_WITHOUT_HASH_FLAG: [u8; 32] = [
+        0x02, 0x50, 0xbb, 0x56, 0xe1, 0x91, 0xf6, 0x6d, 0xde, 0xf1, 0x5e, 0x2d, 0x7c, 0xb4, 0x48,
+        0x23, 0x75, 0x36, 0x52, 0x54, 0x7f, 0xc3, 0xd9, 0xd5, 0x83, 0xaa, 0xca, 0x2e, 0xec, 0xfe,
+        0x99, 0x00,
+    ];
+
+    fn test_flash() -> FlashStorage<'static> {
+        let mut flash = FlashStorage::new();
+        let mut data = [0xffu8; 0x10000];
+        data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN]
+            .copy_from_slice(include_bytes!("../testdata/single_factory_no_ota.bin"));
+        flash.write(0, &data).unwrap();
+        flash
+    }
+
+    /// Header-only ESP image (0 segments); body pads to 32 bytes for the checksum.
+    fn write_minimal_app_image(
+        flash: &mut FlashStorage<'static>,
+        offset: u32,
+        hash_appended: bool,
+    ) {
+        let mut image = [0u8; 64];
+        image[0] = IMAGE_HEADER_MAGIC;
+        image[23] = u8::from(hash_appended);
+        // image[1] = 0 segments; bytes 24..32 are checksum padding
+        if hash_appended {
+            image[32..64].copy_from_slice(&IMAGE_DIGEST_WITH_HASH_FLAG);
+            flash.write(offset, &image).unwrap();
+        } else {
+            flash.write(offset, &image[..32]).unwrap();
+        }
+    }
+
+    #[test]
+    fn sha256_of_data_partition_matches_known_digest() {
+        let mut flash = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut flash, &mut buffer).unwrap();
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+
+        nvs.as_flash_region(&mut flash)
+            .write(0, &[0xa5u8; 0x6000])
+            .unwrap();
+
+        assert_eq!(nvs.sha256(&mut flash).unwrap(), NVS_DIGEST);
+    }
+
+    #[test]
+    fn sha256_of_app_with_appended_hash_returns_validation_digest() {
+        let mut flash = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut flash, &mut buffer).unwrap();
+        let factory = pt
+            .find_partition(PartitionType::App(AppPartitionSubType::Factory))
+            .unwrap()
+            .unwrap();
+
+        write_minimal_app_image(&mut flash, factory.offset(), true);
+
+        assert_eq!(
+            factory.sha256(&mut flash).unwrap(),
+            IMAGE_DIGEST_WITH_HASH_FLAG
+        );
+    }
+
+    #[test]
+    fn sha256_of_app_without_appended_hash_hashes_image() {
+        let mut flash = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut flash, &mut buffer).unwrap();
+        let factory = pt
+            .find_partition(PartitionType::App(AppPartitionSubType::Factory))
+            .unwrap()
+            .unwrap();
+
+        write_minimal_app_image(&mut flash, factory.offset(), false);
+
+        assert_eq!(
+            factory.sha256(&mut flash).unwrap(),
+            IMAGE_DIGEST_WITHOUT_HASH_FLAG
+        );
+    }
+
+    #[test]
+    fn sha256_rejects_corrupt_appended_hash() {
+        let mut flash = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut flash, &mut buffer).unwrap();
+        let factory = pt
+            .find_partition(PartitionType::App(AppPartitionSubType::Factory))
+            .unwrap()
+            .unwrap();
+
+        write_minimal_app_image(&mut flash, factory.offset(), true);
+
+        // Corrupt the appended digest
+        flash.write(factory.offset() + 32, &[0u8; 32]).unwrap();
+
+        assert_eq!(factory.sha256(&mut flash), Err(Error::InvalidImage));
+    }
+}
+
 #[cfg(all(test, feature = "embedded-storage"))]
 mod nor_flash_tests {
     use embedded_storage::nor_flash::{MultiwriteNorFlash, NorFlash, ReadNorFlash};

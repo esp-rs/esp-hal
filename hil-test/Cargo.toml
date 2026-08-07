@@ -12,10 +12,6 @@ name              = "alloc_psram"
 harness           = false
 
 [[bin]]
-name              = "bootloader"
-harness           = false
-
-[[bin]]
 name              = "crypto"
 harness           = false
 
