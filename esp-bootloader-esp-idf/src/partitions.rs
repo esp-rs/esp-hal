@@ -154,6 +154,10 @@ impl PartitionEntry {
     /// - App / bootloader with appended hash: return that digest after verifying it
     /// - App / bootloader without appended hash: hash the image (not the whole partition)
     /// - Other types: hash the entire partition
+    ///
+    /// For app images this is the **validation hash** (shown by
+    /// `esptool.py image-info`), not the ELF file SHA-256 stored in
+    /// [`crate::EspAppDesc`].
     pub fn sha256(&self, flash: &mut FlashStorage<'_>) -> Result<[u8; 32], Error> {
         if self.is_empty() {
             return Err(Error::InvalidArgument);

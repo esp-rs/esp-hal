@@ -30,19 +30,30 @@ fn main() -> ! {
     }
     println!();
 
+    // Factory app partition
+    let factory = pt
+        .find_partition(partitions::PartitionType::App(
+            partitions::AppPartitionSubType::Factory,
+        ))
+        .unwrap()
+        .unwrap();
+
     // The app descriptor (if present) is contained in the first 256 bytes
     // of an app image, right after the image header (24 bytes) and the first
     // section header (8 bytes)
     let mut app_desc = [0u8; 256];
-    pt.find_partition(partitions::PartitionType::App(
-        partitions::AppPartitionSubType::Factory,
-    ))
-    .unwrap()
-    .unwrap()
-    .as_flash_region(&mut flash)
-    .read(32, &mut app_desc)
-    .unwrap();
+    factory
+        .as_flash_region(&mut flash)
+        .read(32, &mut app_desc)
+        .unwrap();
     println!("App descriptor dump {:02x?}", app_desc);
+    println!();
+
+    // Image validation hash
+    println!(
+        "Factory partition SHA-256: {:02x?}",
+        factory.sha256(&mut flash).unwrap()
+    );
     println!();
 
     let nvs = pt

@@ -79,6 +79,5 @@ mod tests {
 
         // Running image must produce a non-zero digest.
         assert!(digest.iter().any(|b| *b != 0));
-        assert_eq!(digest, factory.sha256(&mut flash).unwrap());
     }
 }
