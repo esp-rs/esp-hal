@@ -733,6 +733,11 @@ driver_configs![
             deep_sleep: bool,
             #[serde(default)]
             wakeup_sources: WakeupSources,
+            #[serde(default)]
+            pd_retention: bool,
+            // Needed to work around an H2-specific quirk.
+            #[serde(default)]
+            regdma_sw_trigger: bool,
         }
     },
     SocProperties {
@@ -748,6 +753,8 @@ driver_configs![
             multi_core_enabled: bool,
             #[serde(default)]
             cpu_csr_prv_mode: Option<u32>,
+            #[serde(default)]
+            cpu_csr_set: Option<CpuCsrSet>,
             #[serde(default)]
             internal_memory_cached: bool,
             #[serde(default)]

@@ -20,6 +20,9 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32s31, path = "esp32s31/mod.rs")]
 mod implementation;
 
+#[cfg(cpu_csr_set = "esp_riscv")]
+pub(crate) mod csr;
+
 cfg_select! {
     all(feature = "unstable", ulp_riscv_driver_supported) => {
         pub use self::implementation::*;

@@ -409,6 +409,12 @@ macro_rules! property {
     ("sleep.deep_sleep") => {
         true
     };
+    ("sleep.pd_retention") => {
+        true
+    };
+    ("sleep.regdma_sw_trigger") => {
+        false
+    };
     ("soc.cpu_has_branch_predictor") => {
         false
     };

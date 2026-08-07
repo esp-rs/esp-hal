@@ -26,6 +26,7 @@ has_md5_bsd = true
 cpu_has_csr_pc = true
 cpu_csr_prv_mode = 0xC10
 cpu_mcause_mask = 0x1f
+cpu_csr_set = "esp_riscv"
 
 has_swd_watchdog = true
 
@@ -323,6 +324,7 @@ is_lp_sys = true
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+pd_retention = true
 wakeup_sources = {
     Ext1 = 1,
     Gpio = 2,
