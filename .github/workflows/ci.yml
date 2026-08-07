@@ -22,6 +22,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   MSRV: "1.95.0"
   DEFMT_LOG: trace
+  PROBE_RS_CONFIG_PRESET: local-hil
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
