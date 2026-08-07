@@ -155,6 +155,9 @@ system_clocks = { clock_tree = [
         { name = "MEM_CLOCK", type = "generic", output = "UART_MEM_CLK" },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x100000" } },
     ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
+    ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", wake_locking = true, variants = [
             { name = "REF_TICK", outputs = "REF_TICK" },
@@ -206,6 +209,7 @@ peripheral_clocks = { templates = [
     { name = "Ledc" },
     { name = "Pcnt" },
     { name = "Rmt" },
+    { name = "GpioSd", template_params = { clk_en_template = "let _ = enable;", rst_template = "let _ = reset;" } },
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },

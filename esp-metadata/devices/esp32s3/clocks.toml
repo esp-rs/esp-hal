@@ -86,6 +86,9 @@ system_clocks = { clock_tree = [
             { name = "APB_CLK",  outputs = "APB_CLK"  },
         ] },
     ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
+    ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", wake_locking = true, variants = [
             { name = "APB_CLK",     outputs = "APB_CLK", default = true },
@@ -173,6 +176,7 @@ peripheral_clocks = { templates = [
     { name = "Ledc" },
     { name = "Pcnt" },
     { name = "Rmt" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Uhci0" },
     { name = "I2cExt0" },
     { name = "Spi2" },

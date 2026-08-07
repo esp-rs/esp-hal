@@ -45,7 +45,7 @@ peripherals = [
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
-    { name = "GPIO_SD" },
+    { name = "GPIO_SD", clock_group = "SDM" },
     { name = "HMAC" },
     { name = "HP_APM" },
     { name = "HP_SYS" },
@@ -243,7 +243,8 @@ support_status = "partial"
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 4
 
 [device.ecdsa]
 support_status = { status = "not_supported", issue = 5444 }
