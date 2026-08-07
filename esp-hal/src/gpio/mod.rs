@@ -1671,15 +1671,7 @@ impl<'lt> AnyPin<'lt> {
     pub(crate) fn init_gpio(&self) {
         self.set_output_enable(false);
         self.disable_usb_pads();
-
-        #[cfg(lp_io_driver_supported)]
-        for_each_lp_function! {
-            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
-                if self.number() == crate::peripherals::$gpio::NUMBER {
-                    LpPin::lp_set_config(self, false, false, lp_io::LpFunction::$af);
-                }
-            };
-        }
+        self.reclaim_lp_pad();
 
         GPIO::regs()
             .func_out_sel_cfg(self.number() as usize)
@@ -1691,6 +1683,22 @@ impl<'lt> AnyPin<'lt> {
             w.fun_ie().clear_bit();
             w.slp_sel().clear_bit()
         });
+    }
+
+    #[inline]
+    /// Returns the pad to the digital IO MUX if it is routed to LP IO.
+    pub(crate) fn reclaim_lp_pad(&self) {
+        #[cfg(all(
+            lp_io_driver_supported,
+            not(any(lp_io_version = "v3", lp_io_version = "esp32h2"))
+        ))]
+        for_each_lp_function! {
+            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
+                if self.number() == crate::peripherals::$gpio::NUMBER {
+                    LpPin::lp_set_config(self, false, false, lp_io::LpFunction::$af);
+                }
+            };
+        }
     }
 
     #[procmacros::doc_replace]

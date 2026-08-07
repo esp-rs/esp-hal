@@ -555,7 +555,10 @@ where
     P: Pin + 'd,
 {
     fn from(input: P) -> Self {
-        InputSignal::new(input.degrade())
+        let pin = input.degrade();
+        pin.reclaim_lp_pad();
+
+        InputSignal::new(pin)
     }
 }
 
@@ -742,7 +745,10 @@ where
     P: OutputPin + 'd,
 {
     fn from(output: P) -> Self {
-        OutputSignal::new(output.degrade())
+        let pin = output.degrade();
+        pin.reclaim_lp_pad();
+
+        OutputSignal::new(pin)
     }
 }
 
