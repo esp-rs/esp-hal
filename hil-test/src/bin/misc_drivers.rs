@@ -544,6 +544,8 @@ mod twai {
 
     #[embedded_test::tests(default_timeout = 3)]
     mod blocking_tests {
+        use esp_hal::gpio::{Level, NoPin};
+
         use super::*;
 
         #[init]
@@ -582,11 +584,43 @@ mod twai {
 
             assert_eq!(frame.data(), &[1, 2, 3])
         }
+
+        fn no_init() {}
+
+        #[test(init = no_init)]
+        // Make sure we don't hang when writing to a bus with no receivers
+        // also for non-async
+        fn test_write_into_the_void() {
+            let peripherals = esp_hal::init(esp_hal::Config::default());
+
+            // The bus is permanently recessive, so every transmission attempt
+            // fails immediately (a transmitted dominant bit reads back
+            // recessive) and drives the peripheral into the error-passive
+            // state, at which point the driver must give up on the pending
+            // frame.
+            let config = twai::TwaiConfiguration::new(
+                peripherals.TWAI0,
+                Level::High,
+                NoPin,
+                twai::BaudRate::B1000K,
+                TwaiMode::Normal,
+            );
+
+            let mut twai = config.start();
+
+            let frame = EspTwaiFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
+
+            block!(twai.transmit(&frame)).unwrap();
+            assert_eq!(
+                block!(twai.transmit(&frame)),
+                Err(twai::EspTwaiError::TransmissionAborted)
+            );
+        }
     }
 
     #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
     mod async_tests {
-        use esp_hal::gpio::NoPin;
+        use esp_hal::gpio::{Level, NoPin};
 
         use super::*;
 
@@ -674,7 +708,6 @@ mod twai {
         fn no_init() {}
 
         #[test(init = no_init)]
-        #[ignore]
         // Regression test for https://github.com/esp-rs/esp-hal/issues/5307
         async fn test_write_into_the_void() {
             let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -683,9 +716,14 @@ mod twai {
             let timg0 = TimerGroup::new(peripherals.TIMG0);
             esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
+            // The bus is permanently recessive, so every transmission attempt
+            // fails immediately (a transmitted dominant bit reads back
+            // recessive) and drives the peripheral into the error-passive
+            // state, at which point the driver must give up on the pending
+            // frame.
             let config = twai::TwaiConfiguration::new(
                 peripherals.TWAI0,
-                NoPin,
+                Level::High,
                 NoPin,
                 twai::BaudRate::B1000K,
                 TwaiMode::Normal,
@@ -695,7 +733,10 @@ mod twai {
 
             let frame = EspTwaiFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
 
-            twai.transmit_async(&frame).await.unwrap();
+            assert_eq!(
+                twai.transmit_async(&frame).await,
+                Err(twai::EspTwaiError::TransmissionAborted)
+            );
         }
     }
 }
