@@ -128,7 +128,7 @@ pub(super) fn suspend(info: &Info, en: bool) {
 #[cfg(sleep_driver_supported)]
 pub(super) fn set_wakeup_edge_threshold(info: &Info, threshold: u16) {
     info.regs().sleep_conf2().modify(|_, w| unsafe {
-        // Wake on the number of RX rising edges, the only mode this driver offers.
+        // Wake on a number of rising edges on RX, which is the only mode of this driver.
         w.wk_mode_sel().bits(0);
         w.active_threshold().bits(threshold)
     });

@@ -593,8 +593,8 @@ impl RtcSleepConfig {
                 .wakeup_state()
                 .modify(|_, w| w.wakeup_ena().bits(wakeup_mask));
 
-            // set bits for what rejects the sleep, which is armed by the reject enables `apply`
-            // wrote
+            // Set the bits of the sources that reject the sleep. The reject enables that `apply`
+            // wrote arm those sources.
             LPWR::regs()
                 .slp_reject_conf()
                 .modify(|_, w| w.sleep_reject_ena().bits(reject_mask));

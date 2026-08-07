@@ -1,8 +1,8 @@
 //! The low-power path of esp32c2 and esp32c3.
 //!
-//! These chips have no `ext1`. Their per-pin path gives every low-power pad a level of its own, it
-//! costs no power domain, and it reaches the pad through the digital IO MUX, so there is nothing to
-//! allocate and no pad to hand over.
+//! These chips have no `ext1`. Their per-pin path gives each low-power pad its own level, keeps no
+//! power domain powered, and reaches the pad through the digital IO MUX. There is thus nothing to
+//! allocate, and no pad to move to another IO MUX.
 
 use super::{Armed, LP_NUMBERS, NO_LP_NUMBER};
 use crate::{
@@ -15,19 +15,20 @@ use crate::{
     },
 };
 
-/// These chips have no path of their own to clear: the pads share the GPIO wakeup source.
+/// These chips have no separate path to clear, because all their pads use the GPIO wakeup source.
 pub(super) fn disable() {}
 
 pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
-    // The pads this sleep did not choose must not wake it.
+    // A pad outside this sleep must not wake the chip.
     for &lp in LP_NUMBERS.iter().filter(|&&lp| lp != NO_LP_NUMBER) {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
 
     for pin in armed {
-        // A deep sleep powers the digital IO MUX down, and the pull resistors live there, so the
-        // pad has to keep its own state through the sleep or it floats to whatever level it likes.
-        // The wake resets the chip, which releases the hold, so nothing has to release it here.
+        // Deep sleep powers the digital IO MUX down, and the pull resistors are part of it. The pad
+        // must therefore keep its own state through the sleep, or it floats to an unknown level.
+        // The wake resets the chip and releases the hold, so no other code has to release
+        // it.
         low_level::pad_hold(pin.lp, kind == SleepKind::Deep);
 
         low_level::apply_wakeup(pin.lp, true, pin.level);
@@ -36,7 +37,7 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSl
     prepare_gpio_wakeup();
 }
 
-/// Reports whether this pad ended the last sleep through the per-pin path.
+/// Returns whether this pad ended the last sleep through the per-pin path.
 pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
     // Only a low-power pad can take this path.
     let Some(lp) = super::lp_number(gpio) else {
@@ -59,8 +60,8 @@ pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
     cause.contains(WakeupSource::Gpio) && status & (1 << lp) != 0
 }
 
-/// Clocks the pad-scanning logic that this path needs, and clears the status a previous wake left
-/// latched.
+/// Enables the clock of the pad-scanning logic that this path needs, and clears the status of the
+/// previous wake.
 fn prepare_gpio_wakeup() {
     let gpio_wakeup = cfg_select! {
         esp32c2 => LPWR::regs().cntl_gpio_wakeup(),

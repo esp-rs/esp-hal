@@ -67,8 +67,8 @@ async fn gpio(boot_btn: BOOT_GPIO<'static>) {
     let mut input = Input::new(boot_btn, InputConfig::default().with_pull(Pull::Up));
 
     loop {
-        // A pin that waits for an event also ends a light sleep, so no wake configuration is
-        // needed for this.
+        // A pin that waits for an event also ends a light sleep, so it needs no wakeup
+        // configuration.
         input.wait_for(Event::LowLevel).await;
         esp_println::println!("button low (wakeup cause: {:?})", wakeup_cause());
 

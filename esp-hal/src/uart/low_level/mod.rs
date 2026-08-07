@@ -279,7 +279,7 @@ pub struct Info {
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
 
-    /// The wakeup source this instance owns, if it can wake the chip at all.
+    /// The wakeup source of this instance, or `None` if the instance cannot wake the chip.
     #[cfg(sleep_driver_supported)]
     pub wakeup_source: Option<crate::rtc_cntl::WakeupSource>,
 }
@@ -856,7 +856,7 @@ impl Info {
             return Err(WakeConfigError::EdgeCountUnsupported);
         }
 
-        // The register counts the edges beyond a fixed offset.
+        // The register holds the number of edges above a fixed offset.
         version::set_wakeup_edge_threshold(self, edges - super::WAKEUP_EDGE_OFFSET);
 
         source.enable_with_hooks(Some(keep_peripherals_powered), None);
@@ -873,7 +873,7 @@ impl Info {
     }
 }
 
-/// The RX line is watched by the UART peripheral itself, which therefore has to stay powered.
+/// The UART peripheral monitors the RX line itself, so the peripheral must stay powered.
 #[cfg(sleep_driver_supported)]
 #[crate::ram]
 fn keep_peripherals_powered(
@@ -882,8 +882,8 @@ fn keep_peripherals_powered(
 ) {
     use crate::rtc_cntl::sleep::{SleepKind, SleepResource};
 
-    // A deep sleep powers the peripheral down whatever we ask for, so the current this costs would
-    // buy nothing there.
+    // A deep sleep powers the peripheral down in all cases, so this request gives no wake there. It
+    // only increases the current.
     if kind == SleepKind::Light {
         config.keep_alive(SleepResource::HpPeripherals);
     }
@@ -897,8 +897,8 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-// The wakeup source is spelled out per instance instead of derived from the metadata flag, because
-// an instance that cannot wake the chip has no `WakeupSource` variant to name.
+// Each instance names its wakeup source, and no code calculates the source from the metadata flag.
+// An instance that cannot wake the chip has no `WakeupSource` variant to name.
 macro_rules! impl_instance {
     ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, $wakeup_source:expr) => {
         impl Instance for crate::peripherals::$inst<'_> {

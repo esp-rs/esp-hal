@@ -38,8 +38,8 @@ pub struct DeepSleep {
 impl DeepSleep {
     /// Puts the system into deep sleep.
     ///
-    /// The sleep ends when one of the wakeup sources that the drivers enabled fires. Waking from
-    /// deep sleep resets the chip, so this call does not return.
+    /// The sleep ends when one of the wakeup sources that the drivers enabled becomes active. The
+    /// wake from deep sleep resets the chip, so this function does not return.
     ///
     /// # Panics
     ///
@@ -133,9 +133,9 @@ extern "C" fn auto_light_sleep_hook() -> ! {
 
             let mut lpwr = LowPower::new(unsafe { LPWR::steal() });
 
-            // The deadline stands until it is cleared, so every pass writes it, including the
-            // passes that decide not to sleep. A deadline left over from an earlier pass would
-            // expire and make the next sleep return at once.
+            // The deadline stays until other code clears it, so each pass writes it, also a pass
+            // that makes no sleep. A deadline from an earlier pass expires, and the
+            // next sleep then returns immediately.
             if next_wakeup == u64::MAX {
                 lpwr.clear_wakeup_deadline();
             } else {
@@ -164,10 +164,10 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 _ => {}
             }
 
-            // Every other wakeup source belongs to the driver that owns it: a listening pin wakes
-            // the chip because it is listening, and this hook cannot know which pins those are.
-            // When nothing at all is enabled, the sleep is refused and this returns at once, which
-            // leaves the same `WFI` the hook would have chosen anyway.
+            // The driver of each other wakeup source enables it. A listening pin wakes the chip
+            // because it listens, and this hook cannot know which pins listen. If no source is
+            // enabled, the call refuses the sleep and returns immediately. The code then reaches
+            // the same `WFI` that this hook would select.
             lpwr.sleep_light(RtcSleepConfig::default());
 
             // The alarm timer was gated during light sleep, so its pre-armed alarm is

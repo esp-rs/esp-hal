@@ -23,11 +23,11 @@ pub enum GpioBank {
     _1,
 }
 
-/// A set of pins, in the words the GPIO peripheral groups them into.
+/// A set of pins, in the register words that the GPIO peripheral groups them into.
 ///
-/// The peripheral keeps one register word per bank, so a set of pins that stands beside those
-/// registers is one word per bank too, and [`Self::word`] hands out the word the register's own
-/// mask can be tested against.
+/// The peripheral has one register word for each bank, so a set of pins also has one word for each
+/// bank. [`Self::word`] returns the word of a bank, which the caller can compare with the mask of
+/// the register of that bank.
 pub(crate) struct PadMask([AtomicU32; GpioBank::COUNT]);
 
 impl PadMask {
@@ -60,7 +60,7 @@ impl PadMask {
 }
 
 impl GpioBank {
-    /// Every bank, so that a caller can walk the pins one word at a time.
+    /// All the banks, so that a caller can read the pins one word at a time.
     #[cfg(sleep_driver_supported)]
     pub(crate) const ALL: [Self; Self::COUNT] = cfg_select! {
         gpio_has_bank_1 => [Self::_0, Self::_1],
@@ -69,19 +69,19 @@ impl GpioBank {
 
     /// The pins of this bank that an async wait owns.
     ///
-    /// The interrupt handler clears a pin's bit to signal that its wait is over, so the bit is
-    /// what tells the future it has completed.
+    /// The interrupt handler clears the bit of a pin to report that its wait is complete. The bit
+    /// therefore tells the future that the wait is complete.
     pub(crate) fn async_operations(self) -> &'static AtomicU32 {
         static FLAGS: PadMask = PadMask::new();
 
         FLAGS.word(self)
     }
 
-    /// The pins of this bank that are listening for an interrupt.
+    /// The pins of this bank that listen for an interrupt.
     ///
-    /// The same bits also say which pins may end a light sleep, because the interrupt enable and
-    /// the pad's wakeup enable are written together. Reading them from here saves sleep entry a
-    /// register read per pin.
+    /// The same bits also give the pins that can end a light sleep, because one write sets the
+    /// interrupt enable and the wakeup enable of a pad. Sleep entry reads these bits, and thus
+    /// needs no register read for each pin.
     pub(crate) fn listening(self) -> &'static AtomicU32 {
         static FLAGS: PadMask = PadMask::new();
 

@@ -46,17 +46,17 @@ pub(crate) use wakeup::*;
 
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
-/// The wakeup-enable mask survives a deep-sleep wake, so at this point it still holds the intent of
-/// the run that went to sleep. Two things need it in that order: the pads that run armed have to be
-/// released, and then the mask has to start this run empty, because a program begins with no
-/// configured wakeup sources and drivers build the mask up from there.
+/// The wakeup-enable mask survives a deep-sleep wake, so here it still holds the request of the run
+/// that went to sleep. Two steps need the mask, in this order. First, the code releases the pads
+/// that the previous run armed. Then it clears the mask, because a program starts with no wakeup
+/// sources, and the drivers of the new run build the mask again.
 pub(crate) fn init(rtc: &Rtc<'_>) {
-    // Before anything below disturbs a path, because the pads that ended a deep sleep are readable
-    // only until then.
+    // First, because the pads that ended a deep sleep are readable only until the code below
+    // changes a path.
     crate::gpio::wakeup::record_wakeup();
 
-    // ESP-IDF releases the pads after a deep-sleep wake only, and only when the previous run armed
-    // an IO wake source.
+    // ESP-IDF releases the pads after a deep-sleep wake only, and only if the previous run armed an
+    // IO wake source.
     #[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
     if super::reset_reason(crate::system::Cpu::ProCpu) == Some(super::SocResetReason::CoreDeepSleep)
         && io_wake_enabled()
@@ -71,10 +71,10 @@ pub(crate) fn init(rtc: &Rtc<'_>) {
 
 /// Low-power management.
 ///
-/// The wakeup sources that end a sleep are not passed to the sleep calls. Each driver enables the
-/// source it owns, and the hardware wakeup-enable mask keeps that intent until the driver clears
-/// it — across a light sleep, and across a deep-sleep wake. A sleep call reads the mask back and
-/// derives the rest from it.
+/// The sleep calls do not take the wakeup sources that end the sleep. Each driver enables the
+/// source that it owns, and the hardware wakeup-enable mask keeps that request until the driver
+/// clears it. The mask keeps it through a light sleep, and through a deep-sleep wake. A sleep call
+/// reads the mask back, and calculates the rest of the configuration from it.
 #[instability::unstable]
 pub struct LowPower<'d> {
     _inner: LPWR<'d>,
@@ -88,11 +88,11 @@ impl<'d> LowPower<'d> {
 
     /// Arms the sleep alarm for `deadline`, and enables the timer wakeup source.
     ///
-    /// The deadline is absolute, so the time spent between arming it and sleeping does not shorten
-    /// the sleep. It is a standing request: the wake it causes does not disarm it, and a later call
-    /// replaces it. [`Self::clear_wakeup_deadline`] ends it.
+    /// The deadline is absolute, so the time between this call and the sleep does not make the
+    /// sleep shorter. The deadline is a standing request. The wake that it causes does not
+    /// disarm it, a later call replaces it, and [`Self::clear_wakeup_deadline`] removes it.
     ///
-    /// A deadline in the past ends a light sleep immediately, and panics in [`Self::sleep_deep`].
+    /// A deadline in the past ends a light sleep immediately, and makes [`Self::sleep_deep`] panic.
     #[cfg(sleep_has_wakeup_source_timer)]
     pub fn set_wakeup_deadline(&mut self, deadline: crate::time::Instant) {
         timer::set_deadline(deadline);
@@ -107,17 +107,18 @@ impl<'d> LowPower<'d> {
     /// Enters deep sleep, and does not return.
     ///
     /// In deep sleep the CPUs, most of the RAM, and all digital peripherals that are clocked from
-    /// APB_CLK are powered off. Waking resets the chip, so use the
-    /// [`#[esp_hal::ram(persistent)]`][procmacros::ram] attribute to carry a variable across.
+    /// APB_CLK are powered off. The wake resets the chip, so use the
+    /// [`#[esp_hal::ram(persistent)]`][procmacros::ram] attribute to keep a variable through the
+    /// sleep.
     ///
-    /// This call cannot be rejected, because it cannot return to report it — see
-    /// [`Self::sleep_deep_with_rejection`].
+    /// The hardware cannot reject this sleep, because the function cannot return to report the
+    /// rejection. Use [`Self::sleep_deep_with_rejection`] for that.
     ///
     /// # Panics
     ///
-    /// Panics if no wakeup source is enabled, because nothing could end the sleep, and if the
-    /// armed wakeup deadline is too near for the sleep transition to catch. Both would otherwise
-    /// leave a chip that never wakes and says nothing about why.
+    /// Panics if no wakeup source is enabled, because then nothing can end the sleep. Panics also
+    /// if the armed wakeup deadline is too near for the sleep transition to catch it. In both
+    /// cases the chip never wakes again, and it gives no report of the cause.
     #[cfg(sleep_deep_sleep)]
     pub fn sleep_deep(&mut self, config: RtcSleepConfig) -> ! {
         #[cfg(sleep_has_wakeup_source_timer)]
@@ -135,9 +136,9 @@ impl<'d> LowPower<'d> {
 
     /// Enters deep sleep, and returns only if the hardware rejects the request.
     ///
-    /// A sleep is rejected when one of its wakeup sources is already asserted, which would
-    /// otherwise mean sleeping through the event the caller wants to wake on. The return is the
-    /// whole message, so there is nothing to report beyond it.
+    /// The hardware rejects a sleep if one of its wakeup sources is already asserted. Without the
+    /// rejection, the chip sleeps through the event that the caller wants to wake on. The return of
+    /// this function is the complete report, so it gives no other result.
     ///
     /// # Panics
     ///
@@ -149,18 +150,19 @@ impl<'d> LowPower<'d> {
 
     /// Enters light sleep, and returns when a wakeup source ends it.
     ///
-    /// Light sleep keeps the digital domain's state, so execution continues where it left off.
+    /// Light sleep keeps the state of the digital domain, so the program continues at the same
+    /// place.
     ///
-    /// The call also returns at once, without sleeping, when no wakeup source is enabled, or when
-    /// the hardware rejects the request because a wakeup source is already asserted. Neither is
-    /// reported: a sleep that was refused, rejected, or merely very short are the same thing to the
-    /// caller.
+    /// The function also returns immediately, without a sleep, if no wakeup source is enabled, or
+    /// if the hardware rejects the request because a wakeup source is already asserted. It
+    /// reports neither case. For the caller, a refused sleep, a rejected sleep and a very short
+    /// sleep have the same result.
     #[cfg(sleep_light_sleep)]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) {
         self.sleep(config, SleepKind::Light, true);
     }
 
-    /// Derives the sleep from the wakeup-enable mask, and enters it.
+    /// Calculates the sleep configuration from the wakeup-enable mask, and enters the sleep.
     #[cfg(sleep_driver_supported)]
     #[crate::ram]
     fn sleep(&mut self, config: RtcSleepConfig, kind: SleepKind, allow_reject: bool) {
@@ -169,19 +171,20 @@ impl<'d> LowPower<'d> {
         let mut config = config;
         config.set_sleep_kind(kind);
 
-        // Hooks run before `apply`, so that a vote to keep a power domain alive reaches hardware,
-        // and before the mask is read for the last time, because a hook may enable a source of its
-        // own: GPIO allocates its pins across the paths here.
+        // The hooks run before `apply`, so that a request to keep a power domain powered reaches
+        // the hardware. They also run before the last read of the mask, because a hook can
+        // enable another source. The GPIO hook does this while it allocates its pins to the
+        // paths.
         run_entry_hooks(kind, &mut config);
 
         config.apply();
 
-        // A sleep with no wakeup source would never end, and no counter wrap would save it.
+        // A sleep with no wakeup source never ends. No counter overflow ends it either.
         let wakeup_mask = mask();
         if wakeup_mask == 0 {
             match kind {
-                // Refusing is the same outcome as a rejected sleep, which light sleep does not
-                // report either.
+                // A refused sleep gives the same result as a rejected sleep, and light sleep does
+                // not report that case either.
                 SleepKind::Light => return,
                 SleepKind::Deep => {
                     panic!("no wakeup source is enabled, so nothing could end the sleep")
@@ -193,8 +196,8 @@ impl<'d> LowPower<'d> {
 
         sleep_uart_prepare();
 
-        // Last, because it takes the pads away from whatever was driving them: the wakeup sources
-        // have taken their holds by now, and nothing after this point needs a pad.
+        // Last, because this step takes the pads away from the peripherals that drove them. The
+        // wakeup sources have their holds now, and no later step needs a pad.
         #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
         if kind == SleepKind::Deep {
             crate::gpio::wakeup::isolate_pads_for_deep_sleep();
@@ -237,8 +240,8 @@ impl<'d> LowPower<'d> {
             super::LIGHT_SLEEP_WAKEUP.store(true, portable_atomic::Ordering::Relaxed);
         }
 
-        // Last, because it reads the wakeup cause, which a light sleep only reports once the line
-        // above has run.
+        // Last, because this call reads the wakeup cause, and after a light sleep the cause is
+        // available only after the line above.
         crate::gpio::wakeup::record_wakeup();
     }
 }

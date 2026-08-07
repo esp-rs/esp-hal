@@ -1,10 +1,11 @@
 //! The low-power paths of esp32, esp32s2 and esp32s3.
 //!
-//! `ext1` has a single level for the whole pad mask here, so it can only serve pins that wake on
-//! the same level. It is also the only low-power path that keeps the low-power peripheral domain
-//! powered down, so it takes the largest group of pins that share a level, and the rest pay for
-//! the domain: one pin on `ext0`, which takes a single pad at a level of its own, and any further
-//! pins on the per-pin path, which gives every low-power pad a level of its own.
+//! On these chips, `ext1` has one level for the complete pad mask. It can therefore serve only the
+//! pins that wake on the same level. It is also the only low-power path that keeps the low-power
+//! peripheral domain powered down. It thus takes the largest group of pins with the same level, and
+//! the remaining pins keep that domain powered. One remaining pin goes to `ext0`, which takes a
+//! single pad with its own level. All further pins go to the per-pin path, which gives each
+//! low-power pad its own level.
 
 use super::{Armed, LP_NUMBERS, NO_LP_NUMBER, prepare_pad};
 use crate::{
@@ -17,7 +18,8 @@ use crate::{
     },
 };
 
-/// Clears the paths that this chip's pins can take, so that a stale bit cannot wake the chip.
+/// Clears the paths that the pins of this chip can take, so that no bit of a previous sleep wakes
+/// the chip.
 pub(super) fn disable() {
     WakeupSource::Ext0.disable();
     WakeupSource::Ext1.disable();
@@ -28,9 +30,9 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, config: &mut WrappedSle
 
     let shared = shared_level(armed);
 
-    // Every armed pin gets a path: `ext1` takes one level group, `ext0` one of the leftovers, and
-    // the per-pin path covers every low-power pad, so it takes the rest. A chip with a smaller
-    // per-pin path, or an edge-capable allocation with fewer slots, would break that.
+    // Each armed pin gets a path. `ext1` takes one level group, `ext0` takes one remaining pin, and
+    // the per-pin path takes all the others, because it covers every low-power pad. A chip with a
+    // smaller per-pin path, or an allocation with fewer slots for edge triggers, breaks this rule.
     let mut leftover = false;
     let mut ext0_taken = false;
     for pin in armed {
@@ -52,7 +54,7 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, config: &mut WrappedSle
     }
 
     if leftover {
-        // `ext0` and the per-pin path read the pad through the low-power IO pads.
+        // `ext0` and the per-pin path read the pad through the low-power IO peripheral.
         config.keep_alive(SleepResource::LpPeripherals);
     }
 
@@ -65,11 +67,11 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, config: &mut WrappedSle
     }
 }
 
-/// Picks the level that `ext1` serves, or `None` if it cannot serve any pin.
+/// Selects the level that `ext1` serves, or `None` if it can serve no pin.
 ///
-/// The larger group wins, because every pin outside it costs the low-power peripheral domain. When
-/// the groups are the same size the lower pin number wins, so that two otherwise identical sleeps
-/// draw the same current.
+/// The larger group wins, because each pin outside that group keeps the low-power peripheral domain
+/// powered. If the two groups have the same size, the lower pin number wins. Two sleeps with the
+/// same pins then draw the same current.
 fn shared_level(armed: &[Armed]) -> Option<Level> {
     fn group(armed: &[Armed], level: Level) -> (usize, u8) {
         let mut count = 0;
@@ -84,8 +86,8 @@ fn shared_level(armed: &[Armed]) -> Option<Level> {
     let high = group(armed, Level::High);
     let mut low = group(armed, Level::Low);
 
-    // esp32's low condition is an AND across the selected pads rather than an OR, so a low group
-    // only means what the user asked for while it holds a single pad.
+    // On esp32, `ext1` combines the selected pads with AND for a low level, and not with OR. A low
+    // group therefore does what the user requested only if it holds a single pad.
     if cfg!(esp32) && low.0 > 1 {
         low = (0, u8::MAX);
     }
@@ -130,7 +132,7 @@ fn write_ext1(pads: u32, level: Level) {
         .modify(|_, w| w.ext_wakeup1_lv().bit(level == Level::High));
 }
 
-/// Arms one pad on `ext0`, the oldest of the low-power paths.
+/// Arms one pad on `ext0`, which is the oldest of the low-power paths.
 fn arm_ext0(pin: &Armed, kind: SleepKind) {
     prepare_pad(pin, kind);
 
@@ -144,12 +146,12 @@ fn arm_ext0(pin: &Armed, kind: SleepKind) {
     WakeupSource::Ext0.enable();
 }
 
-/// Reports whether this pad ended the last sleep through one of the three low-power paths.
+/// Returns whether this pad ended the last sleep through one of the three low-power paths.
 ///
-/// `ext0` is the one path with no status of its own, so what answers for it is the pad it was
-/// armed with, which the sleep leaves in place.
+/// Only `ext0` has no status of its own. For that path, the result comes from the pad that the
+/// sleep armed, because the sleep does not clear the selection.
 pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
-    // Only a low-power pad can take any of these paths.
+    // Only a low-power pad can take one of these paths.
     let Some(lp) = super::lp_number(gpio) else {
         return false;
     };
@@ -166,19 +168,19 @@ pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
     let ext0 = cause.contains(WakeupSource::Ext0)
         && RTC_IO::regs().ext_wakeup0().read().sel().bits() == lp;
 
-    // The per-pin path shares the GPIO source with the digital path, and has its own status.
+    // The per-pin path uses the same wakeup source as the digital path, but it has its own status.
     let per_pin = cause.contains(WakeupSource::Gpio) && low_level::wakeup_status() & (1 << lp) != 0;
 
     ext1 || ext0 || per_pin
 }
 
-/// Disarms every pad's per-pin path, so that the pads this sleep did not choose cannot wake it.
+/// Disarms the per-pin path of every pad, so that a pad outside this sleep cannot wake the chip.
 fn clear_per_pin() {
     for &lp in LP_NUMBERS.iter().filter(|&&lp| lp != NO_LP_NUMBER) {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
 
-    // A status this sleep did not set would name the wrong pad as the one that ended it.
+    // A status bit from an earlier sleep names the wrong pad as the pad that ended this sleep.
     low_level::clear_wakeup_status();
 }
 

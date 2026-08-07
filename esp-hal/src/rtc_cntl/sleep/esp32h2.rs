@@ -618,7 +618,7 @@ impl RtcSleepConfig {
 
     /// Cleans up after sleep
     pub(crate) fn finish_sleep(&self) {
-        // The pads a sleep armed are released by the GPIO driver's post-wake hook, which is the
-        // only owner that knows which pads it prepared.
+        // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
+        // driver knows which pads it prepared.
     }
 }

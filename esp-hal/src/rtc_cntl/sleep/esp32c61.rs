@@ -866,7 +866,7 @@ impl RtcSleepConfig {
         // esp-idf returns if the sleep was rejected, we do nothing
         // pmu_ll_hp_is_sleep_reject(PMU_instance()->hal->dev)
 
-        // The pads a sleep armed are released by the GPIO driver's post-wake hook, which is the
-        // only owner that knows which pads it prepared.
+        // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
+        // driver knows which pads it prepared.
     }
 }

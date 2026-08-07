@@ -86,8 +86,8 @@ for_each_lp_function! {
         }
     };
 
-    // The hold register names a field per pad instead of indexing them, so this dispatches on the
-    // low-power number.
+    // The hold register has one named field for each pad, and no index, so this code selects the
+    // field by the low-power number.
     (LP_GPIOn $( (($_lp:ident, LP_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),*) => {
         pub(crate) fn pad_hold(lp: u8, enable: bool) {
             LPWR::regs().pad_hold().modify(|_, w| {
@@ -116,7 +116,7 @@ pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: Level) {
     });
 }
 
-/// The pads whose per-pin wakeup path has triggered, as a mask of low-power numbers.
+/// Returns the pads whose per-pin wakeup path triggered, as a mask of low-power numbers.
 #[cfg(sleep_driver_supported)]
 pub(crate) fn wakeup_status() -> u32 {
     let status = RTC_IO::regs().rtc_gpio_status().read();
@@ -126,11 +126,10 @@ pub(crate) fn wakeup_status() -> u32 {
     }
 }
 
-/// Clears [`wakeup_status`], so that it reports the sleep that is about to start and no earlier
-/// one.
+/// Clears [`wakeup_status`], so that it reports the next sleep and no earlier sleep.
 #[cfg(sleep_driver_supported)]
 pub(crate) fn clear_wakeup_status() {
-    // One bit per low-power pad, and both chips have 22 of them.
+    // One bit for each low-power pad. Both chips have 22 such pads.
     const ALL_PADS: u32 = (1 << 22) - 1;
 
     RTC_IO::regs().rtc_gpio_status_w1tc().write(|w| unsafe {
@@ -194,7 +193,8 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
     with_pin_reg!(lp, |reg| reg.modify(|_, w| w.rde().bit(enable)));
 }
 
-// The pad driver bit lives in the digital GPIO peripheral, so this one takes the digital number.
+// The pad driver bit is part of the digital GPIO peripheral, so this function takes the digital
+// number.
 pub(crate) fn set_open_drain_output(gpio: u8, enable: bool) {
     GPIO::regs()
         .pin(gpio as usize)
@@ -204,7 +204,7 @@ pub(crate) fn set_open_drain_output(gpio: u8, enable: bool) {
 #[cfg(lp_i2c_master_driver_supported)]
 pub(crate) fn reset_pin(lp: u8) {
     output_enable(lp, false);
-    // Every low-power pad of these chips carries the same digital pin number.
+    // On these chips, each low-power pad has the same digital pin number.
     set_open_drain_output(lp, false);
 
     // Resistors, input enable, the pad's LP function and whether it is muxed to the LP IO at all

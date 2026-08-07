@@ -1,27 +1,29 @@
-//! Waking the chip through a pad.
+//! Wake the chip through a pad.
 //!
-//! A pin declares that it may wake the chip, and the interrupt configuration says on what. Sleep
-//! entry then assigns the pins that are listening to the hardware paths the chip has, with the
-//! whole set in view, so the assignment does not depend on the order the pins were configured in.
+//! A pin declares that it can wake the chip, and its interrupt trigger sets the condition. Sleep
+//! entry then assigns all the listening pins to the hardware paths of the chip. It assigns them
+//! together, so the result does not depend on the order in which the user configured the pins.
 //!
-//! There are two kinds of path. The digital path reads the pad through the high-performance GPIO
-//! peripheral, works on every pad, and needs that peripheral powered. Every listening pin gets it,
-//! because the pin's interrupt-enable and wakeup-enable bits are written together. The low-power
-//! paths — `ext0`, `ext1` and the per-pin low-power path — survive the peripheral's power-down, so
-//! they are what deep sleep, and a light sleep that powers the peripheral down, need. Only
-//! low-power pads have them, and a pin has to ask for them through [`WakeupConfig`].
+//! The chip has two kinds of path. The digital path reads the pad through the high-performance GPIO
+//! peripheral. It works on every pad, but it needs that peripheral powered. Every listening pin has
+//! this path, because the driver writes the interrupt-enable bit and the wakeup-enable bit of a pin
+//! together. The low-power paths are `ext0`, `ext1` and the per-pin low-power path. These paths
+//! continue to work when the peripheral is powered down. Deep sleep always powers the peripheral
+//! down, and light sleep powers it down on request, so such a sleep needs a low-power path. Only
+//! low-power pads have one, and a pin must request it with [`WakeupConfig`].
 //!
-//! Which low-power paths a chip has, and how they divide the pins between them, is what the
-//! [`path`] module holds: this module collects the pins and votes for what they need powered.
+//! The [`path`] module holds the low-power paths of the chip, and divides the pins between them.
+//! This module collects the pins and requests the power domains that they need.
 //!
-//! Because it owns the pad tables, this module also holds the deep-sleep pad isolation, which is a
-//! sleep-entry step rather than a wakeup source.
+//! This module also isolates the digital pads before a deep sleep, because it holds the pad tables.
+//! That step is part of sleep entry, and it is not a wakeup source.
 //!
-//! Nothing here runs with the flash inaccessible: sleep entry calls the hooks before it hands the
-//! configuration to hardware, and calls the exit hook after the wake sequence has restored it. The
-//! code therefore stays in flash, where the compiler may inline it.
+//! All of this code runs with the flash accessible. Sleep entry calls the entry hook before it
+//! writes the sleep configuration to hardware, and calls the exit hook after the wake sequence
+//! restores it. The hooks still use the [`ram`][crate::ram] attribute, to keep the flash out of the
+//! sleep path.
 
-// The low-power path is what the version decides, so each generation brings its own allocation.
+// Each generation of the low-power paths needs its own allocation.
 #[cfg_attr(sleep_ext1_version = "1", path = "ext1_v1.rs")]
 #[cfg_attr(sleep_ext1_version = "2", path = "ext1_v2.rs")]
 #[cfg_attr(sleep_ext1_version = "3", path = "ext1_v3.rs")]
@@ -48,24 +50,23 @@ use crate::{
     },
 };
 
-/// Configures whether a pin may wake the chip from sleep.
+/// Configures whether a pin can wake the chip from sleep.
 ///
-/// What wakes the chip is the pin's interrupt trigger, set by
-/// [`listen`][crate::gpio::Input::listen] or by the `wait_for` family: **a pin that is not
-/// listening is not a wakeup source**, and a pin that listens wakes the chip from light sleep
-/// through the digital path without any configuration.
+/// The wake condition is the interrupt trigger of the pin, which
+/// [`listen`][crate::gpio::Input::listen] and the `wait_for` family set. **A pin that does not
+/// listen is not a wakeup source.** A pin that listens wakes the chip from light sleep through the
+/// digital path, and needs no configuration for that.
 ///
-/// # Holding the pad at the level that does not wake the chip
+/// # Hold the pad at the level that does not wake the chip
 ///
-/// A pad that is at its wake level when the sleep starts ends the sleep at once, so something has
-/// to hold it at the other level. That something is the pin's own configuration: sleep keeps the
-/// pull resistors the pin is configured with, and adds none of its own. A pin left with
-/// [`Pull::None`][crate::gpio::Pull::None] and no external resistor therefore floats through the
+/// A pad that is already at its wake level when the sleep starts ends the sleep immediately. The
+/// configuration of the pin must hold the pad at the other level. Sleep keeps the pull resistors
+/// that the pin is configured with, and adds no resistor of its own. A pin with
+/// [`Pull::None`][crate::gpio::Pull::None] and no external resistor therefore floats during the
 /// sleep, and a floating pad wakes the chip immediately and every time.
 ///
-/// So give a level-triggered wake pin a pull against the level it wakes on, or an external
-/// resistor. An external pull-up is the better choice for a pin that wakes the chip on a low
-/// level.
+/// Give a level-triggered wake pin a pull against the level that wakes the chip, or an external
+/// resistor. For a pin that wakes the chip on a low level, use an external pull-up.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -73,39 +74,39 @@ use crate::{
 pub struct WakeupConfig {
     /// Lets the pin wake the chip while the high-performance GPIO peripheral is powered down.
     ///
-    /// This is what deep sleep needs, and what a light sleep that powers the peripheral down
-    /// needs. Only low-power pads have such a path.
+    /// Deep sleep needs this path, and so does a light sleep that powers the peripheral down. Only
+    /// low-power pads have such a path.
     ///
-    /// Sleep entry gives the pad whatever the low-power path needs — the pin's pull resistors stay
-    /// in force either way — and, for a deep sleep, holds the pad, because deep sleep powers down
-    /// whatever drives it. A light sleep gives the pad back to the digital GPIO peripheral when it
-    /// ends; a deep sleep releases the hold when the chip boots again.
+    /// Sleep entry configures the pad as the low-power path requires, and keeps the pull resistors
+    /// of the pin in both cases. Before a deep sleep it also holds the pad, because deep sleep
+    /// powers down the circuit that drives it. A light sleep returns the pad to the digital GPIO
+    /// peripheral when it ends. After a deep sleep, the boot releases the hold.
     low_power_path: bool,
 }
 
-/// The pads that may wake the chip through a low-power path.
+/// The pads that can wake the chip through a low-power path.
 ///
-/// The digital path is recorded in hardware, in the pad's own wakeup-enable bit, but no low-power
-/// register means "may wake" without also arming a level, and esp32h2 has no per-pin low-power
-/// register at all. This record is therefore software. It does not have to survive a deep sleep,
-/// because that wake resets the chip, and a program starts with no wakeup sources.
+/// Hardware records the digital path, in the wakeup-enable bit of the pad. No low-power register
+/// records the request alone, because every such register also arms a level, and esp32h2 has no
+/// per-pin low-power register. This record is therefore in software. It does not have to survive a
+/// deep sleep, because that wake resets the chip, and a program starts with no wakeup sources.
 static LOW_POWER_PADS: PadMask = PadMask::new();
 
-/// The pads that sleep entry gave to the low-power IO MUX, and that a light sleep has to give
-/// back.
+/// The pads that sleep entry moved to the low-power IO MUX, and that a light sleep must move back.
 static PREPARED_PADS: PadMask = PadMask::new();
 
 /// The pads that ended the last sleep.
 ///
-/// Every path reports through a status that something else goes on to clear or to overwrite: the
-/// digital path has no status but the pin's interrupt, which the pin's handler clears, and the
-/// low-power paths keep theirs only until the next sleep arms them again. So the paths are read
-/// where the sleep ends, into this, and [`caused_wakeup`] answers from here alone.
+/// Each path reports through a status that other code clears or overwrites later. The digital path
+/// has no status of its own, only the interrupt of the pin, which the interrupt handler of the pin
+/// clears. A low-power path keeps its status until the next sleep arms the path again.
+/// [`record_wakeup`] therefore reads all the statuses when the sleep ends, and [`caused_wakeup`]
+/// reads only this record.
 static WOKEN_PADS: PadMask = PadMask::new();
 
 for_each_gpio! {
     (all $( ($n:literal, $gpio:ident $_ins:tt $_outs:tt $_attrs:tt) ),*) => {
-        /// One past the highest pin number, which is what the pad tables are indexed by.
+        /// The highest pin number plus one, which is the length of the pad tables.
         const PAD_COUNT: usize = {
             let mut highest = 0;
             $( if $n > highest { highest = $n; } )*
@@ -114,16 +115,16 @@ for_each_gpio! {
     };
 }
 
-/// Marks a pad the low-power registers do not reach, in [`LP_NUMBERS`].
+/// Marks a pad that the low-power registers do not reach, in [`LP_NUMBERS`].
 const NO_LP_NUMBER: u8 = u8::MAX;
 
 for_each_lp_function! {
     (LP_GPIOn $( (($_sig:ident, LP_GPIOn, $lp:literal), $gpio:ident, $_af:ident, $_in:tt $_out:tt) ),*) => {
-        /// The number the low-power registers index each pad by, for the pads they reach.
+        /// The number that the low-power registers use for each pad that they reach.
         ///
         /// The two domains number the pads separately, and only some chips give a pad the same
-        /// number in both, so a low-power register takes the number from here and never the pin
-        /// number.
+        /// number in both domains. A low-power register therefore takes the number from this table,
+        /// and never the pin number.
         const LP_NUMBERS: [u8; PAD_COUNT] = {
             let mut numbers = [NO_LP_NUMBER; PAD_COUNT];
             $( numbers[crate::peripherals::$gpio::NUMBER as usize] = $lp; )*
@@ -132,7 +133,7 @@ for_each_lp_function! {
     };
 }
 
-/// Every pin can be armed at once, so the set of listening pins never outgrows this.
+/// The number of low-power pads. Every one of them can be armed at the same time.
 const MAX_ARMED: usize = {
     let mut count = 0;
     let mut pad = 0;
@@ -149,10 +150,10 @@ const MAX_ARMED: usize = {
 #[derive(Debug, Clone, Copy)]
 struct Armed {
     /// The digital pin number.
-    // esp32c2 and esp32c3 keep the pad on the digital IO MUX, so nothing in their path needs it.
+    // esp32c2 and esp32c3 keep the pad on the digital IO MUX, so their path does not need this.
     #[cfg_attr(not(sleep_ext1_version_is_set), expect(dead_code))]
     gpio: u8,
-    /// The number the low-power registers index the pad by.
+    /// The number that the low-power registers use for the pad.
     lp: u8,
     level: Level,
 }
@@ -181,25 +182,26 @@ pub(crate) fn apply_config(pin: &AnyPin<'_>, config: &WakeupConfig) -> Result<()
     Ok(())
 }
 
-/// Reports whether this pad ended the last sleep.
+/// Returns whether this pad ended the last sleep.
 pub(crate) fn caused_wakeup(pin: &AnyPin<'_>) -> bool {
     WOKEN_PADS.contains(pin.number())
 }
 
-/// Reads the pads that ended the sleep out of the paths and into [`WOKEN_PADS`].
+/// Copies the pads that ended the sleep from the path statuses into [`WOKEN_PADS`].
 ///
-/// A sleep ends in one of two places, and this belongs to both: the end of a light sleep, and the
-/// sleep initialization of a boot that a deep sleep led to. Both call it however the sleep ended,
-/// so that the record never outlives the sleep it describes, and the boot calls it before it
-/// releases the pads the previous run armed, because that takes the `ext1` selection with it.
+/// A sleep ends in one of two places: at the end of a light sleep, and in the sleep initialization
+/// of a boot after a deep sleep. Both places call this function, and they call it after every
+/// sleep, so that the record does not describe an earlier sleep. The boot calls it before it
+/// releases the pads that the previous run armed, because that release also clears the `ext1`
+/// selection.
 #[crate::ram]
 pub(crate) fn record_wakeup() {
     let cause = crate::rtc_cntl::wakeup_cause();
 
     for bank in GpioBank::ALL {
-        // The digital path has nothing but the pin's interrupt, which is still in the status here
-        // unless a handler ran first — which needs interrupts to have been enabled through a light
-        // sleep.
+        // The digital path reports only through the interrupt of the pin. The interrupt status is
+        // still set here, unless an interrupt handler ran first. A handler can only run first if
+        // interrupts were enabled during the light sleep.
         let digital = if cause.contains(WakeupSource::Gpio) {
             bank.read_interrupt_status() & bank.listening().load(Ordering::Relaxed)
         } else {
@@ -216,12 +218,12 @@ pub(crate) fn record_wakeup() {
     }
 }
 
-/// Records that a pad may wake the chip, and registers the hooks that allocate the paths.
+/// Records that a pad can wake the chip, and registers the hooks that allocate the paths.
 ///
-/// The mask bit is inert on its own: waking also needs the digital per-pin bit that `listen`
-/// writes, or a low-power path that the entry hook assigns. The entry hook clears the bit again
-/// when it finds that no pin can wake the chip, so that a sleep with no other wakeup source is
-/// refused rather than never ending.
+/// The mask bit alone does not wake the chip. A wake also needs the per-pin digital bit that
+/// `listen` writes, or a low-power path that the entry hook assigns. If no pin can wake the chip,
+/// the entry hook clears the mask bit again. A sleep with no other wakeup source is then refused,
+/// instead of never ending.
 pub(crate) fn enable() {
     WakeupSource::Gpio.enable_with_hooks(Some(entry_hook), Some(exit_hook));
 }
@@ -229,12 +231,13 @@ pub(crate) fn enable() {
 fn disable() {
     WakeupSource::Gpio.disable();
 
-    // A stale bit of a path this chip has would outlive the hook that cleans it up, and the chip
-    // would carry a wakeup source nobody asked for.
+    // Without this, a bit that a path of this chip still holds outlives the hook that clears it,
+    // and the chip keeps a wakeup source that nobody requested.
     path::disable();
 }
 
-/// The number the low-power registers index `gpio` by, or `None` if they do not reach the pad.
+/// Returns the number that the low-power registers use for `gpio`, or `None` if they do not reach
+/// the pad.
 fn lp_number(gpio: u8) -> Option<u8> {
     match LP_NUMBERS[gpio as usize] {
         NO_LP_NUMBER => None,
@@ -242,19 +245,19 @@ fn lp_number(gpio: u8) -> Option<u8> {
     }
 }
 
-/// Assigns the listening pins to the hardware paths, and votes for what they need powered.
+/// Assigns the listening pins to the hardware paths, and requests the power domains that they need.
 #[crate::ram]
 fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
     let mut buffer = [Armed::NONE; MAX_ARMED];
     let (armed, mut digital) = collect(&mut buffer);
 
-    // Deep sleep powers the high-performance GPIO peripheral down, so the digital path cannot wake
-    // the chip from it however many pins are listening.
+    // Deep sleep powers the high-performance GPIO peripheral down. The digital path then cannot
+    // wake the chip, whatever number of pins listen.
     digital &= kind == SleepKind::Light;
 
     if armed.is_empty() && !digital {
-        // Nothing can wake the chip through a pad, so the record has to go: a mask that claims
-        // otherwise would let a sleep with no other wakeup source through.
+        // No pad can wake the chip, so the record must go. A mask that still claims a GPIO wakeup
+        // source lets a sleep start that no other source can end.
         disable();
         return;
     }
@@ -267,7 +270,7 @@ fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
     path::allocate(armed, kind, config);
 }
 
-/// Gives the pads back to the digital GPIO peripheral after a light sleep.
+/// Returns the pads to the digital GPIO peripheral after a light sleep.
 #[crate::ram]
 fn exit_hook() {
     for bank in GpioBank::ALL {
@@ -287,11 +290,11 @@ fn exit_hook() {
     }
 }
 
-/// Collects the listening pins that asked for a low-power path, and reports whether any pin at all
-/// is listening.
+/// Collects the listening pins that requested a low-power path, and returns whether any pin
+/// listens.
 ///
-/// A pin that listens also ends a light sleep, so the listening record answers both questions, and
-/// neither one needs a walk over the pads.
+/// Every listening pin can end a light sleep, so the record of the listening pins gives both
+/// results. Neither result needs a read of the pin registers.
 fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
     let mut count = 0;
     let mut digital = false;
@@ -305,7 +308,7 @@ fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
             let pin = participants.trailing_zeros();
             participants &= !(1 << pin);
 
-            // Only a pad the low-power registers reach enters the mask, so the number is there.
+            // Only a pad that the low-power registers reach enters the mask, so it has a number.
             let gpio = bank.offset() + pin as u8;
             let Some(lp) = lp_number(gpio) else { continue };
 
@@ -319,13 +322,13 @@ fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
     (&buffer[..count], digital)
 }
 
-/// Returns the level that wakes the chip through this pad, or `None` if its trigger names none.
+/// Returns the level that wakes the chip through this pad, or `None` if the trigger sets no level.
 ///
-/// An edge trigger becomes the level the edge ends on, so that the user's intent survives on the
-/// chips whose wake paths are level-only. `AnyEdge` ends on the level the pin is not at now, which
-/// is what "wake when this changes" means. Sampling it races with the pin, benignly: a pin that
-/// changes before the sleep starts arms a level that is already asserted, so the sleep is rejected
-/// or ends at once.
+/// The wake paths accept a level only, so an edge trigger becomes the level at the end of the edge.
+/// This keeps the request of the user. `AnyEdge` ends at the level that the pin is not at now,
+/// which is the meaning of "wake when the pin changes". This read of the pin can race with the pin,
+/// but the result is safe. If the pin changes before the sleep starts, the path arms a level that
+/// is already present, and the sleep is rejected or ends immediately.
 fn armed_level(gpio: u8) -> Option<Level> {
     let trigger = GPIO::regs().pin(gpio as usize).read().int_type().bits();
     Some(
@@ -341,16 +344,17 @@ fn armed_level(gpio: u8) -> Option<Level> {
     )
 }
 
-/// Gives the pad to the low-power IO MUX, which is what makes it readable while the
-/// high-performance GPIO peripheral is powered down.
+/// Moves the pad to the low-power IO MUX, which makes it readable while the high-performance GPIO
+/// peripheral is powered down.
 ///
-/// A deep sleep also holds the pad, because it powers down whatever drives it. A light sleep does
-/// not: nothing it powers down drives the pad, and the hold would freeze an output.
+/// Before a deep sleep this function also holds the pad, because deep sleep powers down the circuit
+/// that drives it. A light sleep does not hold the pad. A light sleep powers down no circuit that
+/// drives the pad, and a hold would freeze an output.
 #[cfg(sleep_ext1_version_is_set)]
 fn prepare_pad(pin: &Armed, kind: SleepKind) {
-    // The low-power IO MUX has pull resistors of its own, and the digital ones stop working the
-    // moment the pad changes hands. Carry them over, or a pad that nothing drives floats away from
-    // the level the user pulled it to and wakes the chip at once.
+    // The low-power IO MUX has its own pull resistors, and the digital ones stop to work as soon as
+    // the low-power IO MUX takes the pad. Copy the resistors, or an undriven pad floats away from
+    // the level that the user selected, and wakes the chip immediately.
     #[cfg(not(esp32h2))]
     {
         let digital = crate::gpio::io_mux_reg(pin.gpio).read();
@@ -358,20 +362,21 @@ fn prepare_pad(pin: &Armed, kind: SleepKind) {
         low_level::pulldown_enable(pin.lp, digital.fun_wpd().bit());
     }
 
-    // esp32h2 reaches the pad through the digital IO MUX, so it has no low-power mux to switch.
+    // esp32h2 reaches the pad through the digital IO MUX, so it has no low-power MUX to select.
     low_level::set_config(pin.lp, true, !cfg!(esp32h2), LpFunction::LP_GPIO);
     low_level::pad_hold(pin.lp, kind == SleepKind::Deep);
 
     PREPARED_PADS.set(pin.gpio, true);
 }
 
-/// Cuts the pads that are not held loose from the digital peripheral, so that they do not raise
-/// the deep-sleep current through a powered-down output driver.
+/// Disconnects the pads that no hold keeps, so that a powered-down output driver does not increase
+/// the deep-sleep current.
 ///
-/// This is not a property of any wakeup source, so every deep sleep does it, the way ESP-IDF's
-/// `esp_sleep_isolate_digital_gpio` does. It is destructive — a pad that a peripheral was driving
-/// loses that function — which is why it runs at sleep entry, on the chips that cannot hold a
-/// single pad through a deep sleep, and after the wakeup sources have taken the holds they need.
+/// No wakeup source controls this step, so every deep sleep does it, like
+/// `esp_sleep_isolate_digital_gpio` in ESP-IDF. The step is destructive, because a pad loses the
+/// peripheral function that drove it. It therefore runs at sleep entry, on the chips that cannot
+/// hold a single pad through a deep sleep, and after the wakeup sources take the holds that they
+/// need.
 #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
 pub(crate) fn isolate_pads_for_deep_sleep() {
     use crate::{
@@ -379,8 +384,8 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
         peripherals::LPWR,
     };
 
-    // With the hold disabled, no pad keeps its level through the sleep anyway, and ESP-IDF skips
-    // the isolation for the same reason.
+    // If the hold is disabled, no pad keeps its level through the sleep. ESP-IDF also skips the
+    // isolation in that case.
     let dig_iso = LPWR::regs().dig_iso().read();
     let hold_enabled = !dig_iso.dg_pad_force_unhold().bit() && dig_iso.dg_pad_autohold_en().bit();
     if !hold_enabled {
@@ -393,15 +398,15 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
     let held = base.dig_pad_hold().read().bits();
 
     for gpio in 0..PAD_COUNT as u8 {
-        // Only the pads the digital supply feeds leak here, and they are exactly the pads with no
-        // low-power number. The low-power pads have their own supply, which stays up, and a wake
-        // pad is always one of them.
+        // Only the pads that the digital supply feeds leak current, and those are the pads with no
+        // low-power number. The low-power pads have their own supply, which stays powered, and a
+        // wake pad is always a low-power pad.
         if lp_number(gpio).is_some() {
             continue;
         }
 
-        // A pad the user holds keeps the level it was left at, which is the point of holding it,
-        // so isolating it would undo the request.
+        // A pad that the user holds keeps its level, which is the purpose of the hold. Isolation
+        // would cancel that request.
         if held & digital_hold_mask(gpio) != 0 {
             continue;
         }
@@ -414,17 +419,17 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
             w.fun_wpu().clear_bit();
             w.fun_wpd().clear_bit();
             w.fun_ie().clear_bit();
-            // A pad left on a peripheral function raises the deep-sleep current.
+            // A pad that keeps a peripheral function increases the deep-sleep current.
             w.mcu_sel().bits(AlternateFunction::GPIO as u8)
         });
     }
 }
 
-/// The bit that holds `gpio` in the digital pad-hold register.
+/// Returns the bit of `gpio` in the digital pad-hold register.
 ///
-/// The register covers the digital pads only, so the bit is not the pin number on every chip: the
-/// esp32s2 and esp32s3 registers start at the first digital pad, and the esp32 register packs the
-/// pads it has in an order of its own.
+/// The register covers the digital pads only, so the bit position is not the pin number on every
+/// chip. The esp32s2 and esp32s3 registers start at the first digital pad, and the esp32 register
+/// lists its pads in its own order.
 #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
 fn digital_hold_mask(gpio: u8) -> u32 {
     cfg_select! {
@@ -435,7 +440,7 @@ fn digital_hold_mask(gpio: u8) -> u32 {
                 5 => 8,
                 6..=11 => gpio - 4,
                 16..=19 | 21..=23 => gpio - 7,
-                // No other pad is fed by the digital supply, so none is reached here.
+                // The digital supply feeds no other pad, so no other pad reaches this code.
                 _ => return 0,
             }
         }

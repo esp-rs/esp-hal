@@ -1,19 +1,20 @@
-//! What a previous run's `ext1` configuration leaves behind.
+//! The `ext1` configuration that a previous run leaves in the hardware.
 //!
-//! `ext1` holds its pads through a deep sleep, so the pads still hold their sleep levels when the
-//! chip boots again. Releasing that hold is a boot-time job, and the only part of `ext1` this
-//! module owns; arming the pads belongs to the GPIO driver.
+//! `ext1` holds its pads through a deep sleep, so the pads still keep their sleep levels when the
+//! chip boots again. The boot must release that hold. This module does only that part of `ext1`.
+//! The GPIO driver arms the pads.
 
 use crate::gpio::lp_io::low_level;
 
-/// Releases the pad hold that a previous sleep took, so the pads follow their drivers again.
+/// Releases the pad hold of the previous sleep, so that the pads follow their drivers again.
 ///
-/// This releases the hold and nothing else. Reassigning the pad function would steal a pad that
-/// the application has since handed to an LP core, which owns its pads for as long as it runs.
+/// The function releases the hold, and changes nothing else. A change of the pad function can take
+/// a pad away from an LP core, because the application can give a pad to that core, and the core
+/// keeps the pad while it runs.
 pub(crate) fn wake_io_reset() {
     cfg_select! {
         sleep_ext1_version = "3" => {
-            // The selection is by digital pin number on this generation.
+            // This generation selects the pads by digital pin number.
             fn release(gpio: u8, lp: u8, armed: u32) {
                 if armed & (1 << gpio) != 0 {
                     low_level::pad_hold(lp, false);
@@ -47,7 +48,7 @@ pub(crate) fn wake_io_reset() {
         };
     }
 
-    // The pads are free now, so the selection that armed them can go too.
+    // The pads are free now, so clear the selection that armed them.
     #[cfg(sleep_ext1_version = "3")]
     crate::peripherals::PMU::regs().ext_wakeup_sel().reset();
 }

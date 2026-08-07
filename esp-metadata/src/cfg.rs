@@ -733,21 +733,22 @@ driver_configs![
             deep_sleep: bool,
             #[serde(default)]
             wakeup_sources: WakeupSources,
-            /// Register generation of the `ext1` wakeup path, which wakes on a mask of pads.
+            /// The register generation of the `ext1` wakeup path, which wakes on a mask of pads.
             ///
-            /// 1: `RTC_CNTL.ext_wakeup1`, one level bit shared by every pad in the mask.
-            /// 2: `LP_AON.ext_wakeup_cntl`, per-pin levels.
-            /// 3: `PMU` ext wakeup, per-pin levels.
+            /// 1: `RTC_CNTL.ext_wakeup1`, with one level bit for all the pads in the mask.
+            /// 2: `LP_AON.ext_wakeup_cntl`, with one level for each pad.
+            /// 3: `PMU` ext wakeup, with one level for each pad.
             ext1_version: Option<u32>,
-            /// Register generation of the per-pin wakeup path, which wakes with the HP GPIO
-            /// peripheral powered down and therefore serves deep sleep.
+            /// The register generation of the per-pin wakeup path. This path wakes the chip while the
+            /// high-performance GPIO peripheral is powered down, and thus also from deep sleep.
             ///
-            /// 1: RTC_IO per-pin. 2: `RTC_CNTL_GPIO_WAKEUP`. 3: LP_IO per-pin.
+            /// 1: RTC_IO, one register for each pad. 2: `RTC_CNTL_GPIO_WAKEUP`. 3: LP_IO, one
+            /// register for each pad.
             ///
-            /// Unset on esp32h2, whose per-pin path *is* the `ext1` register set. Edge triggers
-            /// exist on version 3 only.
+            /// Not set for esp32h2, where the `ext1` registers are the per-pin path. Only version 3
+            /// supports edge triggers.
             pin_wakeup_version: Option<u32>,
-            /// Whether deep-sleep entry must isolate the digital pads to avoid leakage current.
+            /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
             #[serde(default)]
             deep_sleep_needs_gpio_isolation: bool,
         }

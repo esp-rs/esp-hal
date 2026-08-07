@@ -116,8 +116,8 @@ async fn main(_spawner: Spawner) {
 
     let delay = esp_hal::delay::Delay::new();
 
-    // Let the console drain before arming: the deadline is absolute, and 30 ms of it would
-    // otherwise be spent in the delay.
+    // Send the console output before the code arms the deadline. The deadline is absolute, so a
+    // delay after the arming makes the sleep 30 ms shorter.
     delay.delay_millis(100);
 
     lpwr.set_wakeup_deadline(

@@ -90,8 +90,9 @@ impl<'d> LpCore<'d> {
 
     /// Lets the LP core wake the chip from sleep.
     ///
-    /// The request stands until [`Self::disable_wakeup`] ends it: it survives a sleep, a
-    /// deep-sleep wake, and this driver's `Drop`. It does nothing while the chip is awake.
+    /// The request stays until you call [`Self::disable_wakeup`]. It stays through a sleep, through
+    /// a deep-sleep wake, and after a drop of this driver. While the chip is awake, it does
+    /// nothing.
     pub fn enable_wakeup(&mut self) {
         WakeupSource::LpCore.enable_with_hooks(Some(keep_low_power_domain), None);
     }
@@ -102,8 +103,8 @@ impl<'d> LpCore<'d> {
     }
 }
 
-/// The LP core wakes the chip through the low-power peripherals, which also hold the timer it
-/// usually waits on, so a sleep that powers them down never sees the request.
+/// The LP core wakes the chip through the low-power peripherals, which also contain the timer that
+/// the core usually waits for. A sleep that powers these peripherals down does not get the request.
 #[crate::ram]
 fn keep_low_power_domain(_kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
     config.keep_alive(SleepResource::LpPeripherals);
@@ -154,8 +155,8 @@ fn ulp_lp_core_run(wakeup_src: LpCoreWakeupSource) {
         .cpu()
         .modify(|_, w| w.lpcore_dbgm_unavaliable().clear_bit());
 
-    // Clear the wake requests a previous run left latched. They would reject the next light sleep
-    // without any of them being the event the caller waits for.
+    // Clear the wake requests of a previous run. Such a request rejects the next light sleep, but
+    // it is not the event that the caller waits for.
     pmu.int_clr().write(|w| {
         w.sw().clear_bit_by_one();
         w.lp_cpu_exc().clear_bit_by_one()

@@ -228,7 +228,7 @@ impl From<Level> for bool {
 #[instability::unstable]
 #[non_exhaustive]
 pub enum WakeConfigError {
-    /// The pad has no low-power path, so it cannot wake the chip while the high-performance GPIO
+    /// The pad has no low-power path. It cannot wake the chip while the high-performance GPIO
     /// peripheral is powered down.
     NoLowPowerPath,
 }
@@ -329,10 +329,10 @@ impl TryFrom<usize> for AlternateFunction {
 
 /// Trait implemented by the pins that the low-power domain can reach.
 ///
-/// The low-power domain numbers these pads on its own, and the number is what the low-power
-/// registers take. Only some chips give the same pad the same number in both domains, so keep the
-/// two apart: pass [`Self::lp_number`] to the low-power registers, and [`Pin::number`] to the
-/// digital ones.
+/// The low-power domain has its own numbers for these pads, and the low-power registers take such a
+/// number. Only some chips give a pad the same number in both domains, so do not mix the two
+/// numbers. Give [`Self::lp_number`] to the low-power registers, and [`Pin::number`] to the digital
+/// registers.
 #[instability::unstable]
 #[cfg(lp_io_driver_supported)]
 pub trait LpPin: Pin {
@@ -1087,12 +1087,12 @@ impl<'d> Input<'d> {
     /// otherwise your program will be stuck in a loop as long as the pin is
     /// reading the corresponding level.
     ///
-    /// A listening pin also ends a light sleep. Sleep entry has to express the trigger as a level
-    /// on most chips, so an edge trigger becomes the level the edge ends on: a rising edge becomes
-    /// a high level, a falling edge a low level, and any edge the level the pin is not at when the
-    /// sleep starts. Listening for a rising edge on a line that already sits high therefore ends
-    /// every light sleep at once, without an interrupt, because no edge occurred. Automatic light
-    /// sleep then spins instead of sleeping.
+    /// A listening pin also ends a light sleep. On most chips, sleep entry must give the trigger as
+    /// a level, so an edge trigger becomes the level at the end of the edge. A rising edge becomes
+    /// a high level, a falling edge becomes a low level, and any edge becomes the level that
+    /// the pin is not at when the sleep starts. A pin that listens for a rising edge on a line
+    /// that is already high therefore ends each light sleep immediately, and without an
+    /// interrupt, because no edge occurred. Automatic light sleep then makes no sleep at all.
     ///
     /// ## Examples
     ///
@@ -1179,15 +1179,15 @@ impl<'d> Input<'d> {
         self.pin.is_interrupt_set()
     }
 
-    /// Configures whether the pin may wake the chip from sleep.
+    /// Configures whether the pin can wake the chip from sleep.
     ///
-    /// See [`Flex::apply_wakeup_config`] for what the configuration does, and for what wakes the
+    /// [`Flex::apply_wakeup_config`] describes the configuration, and the conditions that wake the
     /// chip.
     ///
     /// # Errors
     ///
-    /// Returns [`WakeConfigError::NoLowPowerPath`] if the configuration asks for the low-power
-    /// path on a pad that has none.
+    /// Returns [`WakeConfigError::NoLowPowerPath`] if the configuration requests the low-power path
+    /// for a pad that has no such path.
     #[cfg(sleep_driver_supported)]
     #[instability::unstable]
     #[inline]
@@ -1336,21 +1336,21 @@ impl<'d> Flex<'d> {
         self.pin.bank().read_interrupt_status() & self.pin.mask() != 0
     }
 
-    /// Configures whether the pin may wake the chip from sleep.
+    /// Configures whether the pin can wake the chip from sleep.
     ///
-    /// The configuration says which hardware paths the pin may use. What wakes the chip is the
-    /// interrupt trigger, so **a pin that is not listening is not a wakeup source**, and a pin that
+    /// The configuration selects the hardware paths that the pin can use. The wake condition is the
+    /// interrupt trigger, so **a pin that does not listen is not a wakeup source**. A pin that
     /// listens already wakes the chip from light sleep through the digital path. See
     /// [`WakeupConfig`].
     ///
-    /// The configuration outlives this driver, because a pad that wakes the chip from deep sleep
-    /// has to keep doing so while nothing owns it. Call this again with
-    /// [`WakeupConfig::default()`] to end it.
+    /// The configuration stays after the driver is dropped, because a pad that wakes the chip from
+    /// deep sleep must continue to do so while no driver owns it. To remove the configuration, call
+    /// this function again with [`WakeupConfig::default()`].
     ///
     /// # Errors
     ///
-    /// Returns [`WakeConfigError::NoLowPowerPath`] if the configuration asks for the low-power
-    /// path on a pad that has none.
+    /// Returns [`WakeConfigError::NoLowPowerPath`] if the configuration requests the low-power path
+    /// for a pad that has no such path.
     #[cfg(sleep_driver_supported)]
     #[inline]
     #[instability::unstable]
@@ -1360,16 +1360,15 @@ impl<'d> Flex<'d> {
 
     /// Returns whether this pin ended the most recent sleep.
     ///
-    /// More than one pin can end a sleep, so this can be true of several pins at once. It is false
-    /// if the chip did not wake from sleep, and false on a pin that only ended a sleep before the
-    /// most recent one.
+    /// More than one pin can end a sleep, so this function can return `true` for several pins. It
+    /// returns `false` if the chip did not wake from a sleep, and `false` for a pin that ended an
+    /// earlier sleep only.
     ///
-    /// The answer is taken while the sleep ends, so clearing the pin's interrupt afterwards does
-    /// not change it. A pin that ends a light sleep without
-    /// [`WakeupConfig::low_power_path`] is the one case that depends on the interrupt status,
-    /// which its own interrupt handler clears: such a pin reports `false` if the handler runs
-    /// before the sleep call returns, which needs interrupts to have been enabled through the
-    /// sleep.
+    /// esp-hal reads the result while the sleep ends, so a later clear of the interrupt of the pin
+    /// does not change it. One case depends on the interrupt status: a pin that ends a light sleep
+    /// without [`WakeupConfig::low_power_path`]. The interrupt handler of that pin clears the
+    /// status, so the pin reports `false` if the handler runs before the sleep call returns.
+    /// This can only occur if interrupts were enabled during the sleep.
     #[cfg(sleep_driver_supported)]
     #[inline]
     #[instability::unstable]
@@ -1853,11 +1852,11 @@ impl<'lt> AnyPin<'lt> {
         }
     }
 
-    /// Starts listening for `event`, which also makes the pin a light-sleep wakeup source.
+    /// Starts to listen for `event`, which also makes the pin a light-sleep wakeup source.
     ///
-    /// The interrupt enable and the pad's wakeup enable are one register write, and a pin that
-    /// cannot end a light sleep cannot deliver its interrupt either. So listening implies waking
-    /// through the digital path, and the pin needs no configuration for it.
+    /// One register write sets the interrupt enable and the wakeup enable of the pad. A pin that
+    /// cannot end a light sleep also cannot deliver its interrupt. A pin that listens therefore
+    /// always wakes the chip through the digital path, and needs no configuration for that.
     fn listen(&self, event: Event) {
         self.with_gpio_lock(|| {
             // Clear the interrupt status bit for this Pin, just in case the user forgot.
@@ -1873,7 +1872,7 @@ impl<'lt> AnyPin<'lt> {
             );
         });
 
-        // The mask bit is what tells sleep entry to look at the pads at all.
+        // The mask bit tells sleep entry to look at the pads.
         #[cfg(sleep_driver_supported)]
         wakeup::enable();
     }
