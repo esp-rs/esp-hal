@@ -115,8 +115,8 @@ macro_rules! touch {
                 let rtcio = RTC_IO::regs();
                 let sens = SENS::regs();
 
-                // Pad to normal mode (not open-drain). This register belongs to the digital GPIO
-                // peripheral, which numbers the pad differently.
+                // Set the pad to normal mode, and not to open-drain. This register belongs to the
+                // digital GPIO peripheral, which uses its own pad numbers.
                 gpio.pin(self.number() as usize).write(|w| w.pad_driver().clear_bit());
 
                 // clear output

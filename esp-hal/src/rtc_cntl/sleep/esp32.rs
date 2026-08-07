@@ -456,8 +456,8 @@ impl RtcSleepConfig {
             .wakeup_state()
             .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_mask as u16) });
 
-        // esp32 has no reject-source mask: GPIO and SDIO have a reject enable each, and nothing
-        // else can reject. The enables are armed by the reject bits `apply` wrote.
+        // esp32 has no reject-source mask. GPIO and SDIO have one reject enable each, and no other
+        // source can reject a sleep. The reject bits that `apply` wrote arm these enables.
         let rejects = enumset::EnumSet::<WakeupSource>::from_u32_truncated(reject_mask);
         LPWR::regs().slp_reject_conf().modify(|_, w| {
             w.gpio_reject_en().bit(rejects.contains(WakeupSource::Gpio));

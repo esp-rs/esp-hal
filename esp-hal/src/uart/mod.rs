@@ -512,7 +512,7 @@ impl Default for AtCmdConfig {
     }
 }
 
-/// How far past [`MIN_WAKEUP_EDGES`] the hardware counts.
+/// The number of edges that the hardware counts before the threshold register starts.
 #[cfg(sleep_driver_supported)]
 const WAKEUP_EDGE_OFFSET: u16 = cfg_select! {
     esp32 => 2,
@@ -520,15 +520,15 @@ const WAKEUP_EDGE_OFFSET: u16 = cfg_select! {
     _ => 3,
 };
 
-/// The fewest rising edges the hardware can wake on.
+/// The smallest number of rising edges that the hardware can wake on.
 #[cfg(sleep_driver_supported)]
 const MIN_WAKEUP_EDGES: u16 = cfg_select! {
-    // A threshold of zero makes esp32 wake again and again.
+    // With a threshold of zero, esp32 wakes again and again.
     esp32 => WAKEUP_EDGE_OFFSET + 1,
     _ => WAKEUP_EDGE_OFFSET,
 };
 
-/// The most rising edges the hardware can count, over a 10-bit field.
+/// The largest number of rising edges that the hardware can count in its 10-bit field.
 #[cfg(sleep_driver_supported)]
 const MAX_WAKEUP_EDGES: u16 = WAKEUP_EDGE_OFFSET + 0x3FF;
 
@@ -541,14 +541,15 @@ const MAX_WAKEUP_EDGES: u16 = WAKEUP_EDGE_OFFSET + 0x3FF;
 #[instability::unstable]
 #[non_exhaustive]
 pub struct WakeupConfig {
-    /// How many rising edges on the RX line wake the chip.
+    /// The number of rising edges on the RX line that wakes the chip.
     ///
-    /// The hardware counts edges rather than bytes, so how many bytes this takes depends on what
-    /// the sender sends. A byte carries one rising edge at its stop bit, and one more for every
-    /// 0-to-1 transition in the data, so the count is a lower bound on the bytes needed. The
-    /// default is the smallest the hardware accepts.
+    /// The hardware counts edges, and not bytes, so the number of bytes that the chip needs
+    /// depends on the data of the sender. Each byte gives one rising edge at its stop bit, and
+    /// one more edge for each change from 0 to 1 in the data. The number of edges is therefore
+    /// the smallest possible number of bytes. The default is the smallest value that the
+    /// hardware accepts.
     ///
-    /// The range on this chip is
+    /// The permitted range on this chip is
     #[cfg_attr(esp32, doc = "`3..=1025`.")]
     #[cfg_attr(esp32p4, doc = "`6..=1029`.")]
     #[cfg_attr(not(any(esp32, esp32p4)), doc = "`3..=1026`.")]
@@ -574,7 +575,7 @@ pub enum WakeConfigError {
     /// This UART instance cannot wake the chip.
     NotAWakeupSource,
 
-    /// The requested number of rising edges is outside what the hardware can count.
+    /// The hardware cannot count the requested number of rising edges.
     EdgeCountUnsupported,
 }
 
@@ -1404,21 +1405,21 @@ where
 
     /// Lets activity on the RX line wake the chip from light sleep.
     ///
-    /// The chip wakes once it has seen the number of rising edges given by
-    /// [`WakeupConfig::with_rising_edges`]. Deep sleep powers the UART down, so this wakes the chip
-    /// from light sleep only.
+    /// The chip wakes when it counts the number of rising edges that
+    /// [`WakeupConfig::with_rising_edges`] gives. Deep sleep powers the UART down, so this source
+    /// ends a light sleep only.
     ///
-    /// The bytes that trigger the wakeup are lost, and so are any bytes that arrive while the chip
-    /// is waking, which takes long enough to lose several of them at a typical baud rate. A sender
-    /// therefore has to send something the receiver may drop, and repeat the data it wants
-    /// delivered. Sending data after the wake also clears the internal wakeup indication, which
-    /// otherwise makes the next wakeup trigger two edges early.
+    /// The chip loses the bytes that cause the wake. It also loses the bytes that arrive during the
+    /// wake, and at a typical baud rate that wake is long enough to lose several bytes. A sender
+    /// must therefore first send data that the receiver can lose, and then send the data again.
+    /// The first data after the wake also clears the internal wakeup indication. Without that
+    /// write, the next wake occurs two edges early.
     ///
-    /// Because the peripheral itself counts the edges, a light sleep that would power the
-    /// high-performance peripherals down keeps them powered instead, which costs current.
+    /// The peripheral counts the edges itself, so a light sleep keeps the high-performance
+    /// peripherals powered instead of powering them down. This increases the sleep current.
     ///
-    /// The configuration outlives this driver, so that a UART keeps waking the chip while nothing
-    /// owns it. Call [`Self::disable_wakeup`] to end it.
+    /// The configuration stays after the driver is dropped, so that the UART continues to wake the
+    /// chip while no driver owns it. Call [`Self::disable_wakeup`] to remove it.
     ///
     /// # Errors
     ///

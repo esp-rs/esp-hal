@@ -748,7 +748,7 @@ driver_configs![
             /// Not set for esp32h2, where the `ext1` registers are the per-pin path. Only version 3
             /// supports edge triggers.
             pin_wakeup_version: Option<u32>,
-            /// Whether deep-sleep entry must isolate the digital pads to avoid leakage current.
+            /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
             #[serde(default)]
             deep_sleep_needs_gpio_isolation: bool,
         }

@@ -1,7 +1,8 @@
 //! Demonstrates deep sleep with a timer and two pins as wakeup sources.
 //!
-//! Sleep entry picks the hardware path for each pin - `ext0`, `ext1`, or the per-pin low-power
-//! path - so the program only says which pins may wake the chip, and on what.
+//! Sleep entry selects the hardware path of each pin, which is `ext0`, `ext1` or the per-pin
+//! low-power path. The program gives only the pins that can wake the chip, and their wake
+//! condition.
 //!
 //! Wiring
 //!
@@ -51,7 +52,7 @@ fn main() -> ! {
             let (pin_low, pin_high) = (peripherals.GPIO17, peripherals.GPIO18);
         }
         feature = "esp32h2" => {
-            // GPIO9 is typically a boot mode button, low when pressed.
+            // GPIO9 is a boot mode button on most boards. The button pulls the pad low.
             let (pin_low, pin_high) = (peripherals.GPIO9, peripherals.GPIO10);
         }
         _ => {
@@ -65,8 +66,8 @@ fn main() -> ! {
     let wake_reason = wakeup_cause();
     println!("wake reason: {:?}", wake_reason);
 
-    // The pull holds the pin at the level that does not wake the chip, so that the sleep is not
-    // rejected before it starts.
+    // The pull holds the pin at the level that does not wake the chip. The hardware then does not
+    // reject the sleep.
     let mut pin_low = Input::new(pin_low, InputConfig::default().with_pull(Pull::Up));
     let mut pin_high = Input::new(pin_high, InputConfig::default().with_pull(Pull::Down));
 

@@ -1,8 +1,8 @@
 //! The sleep alarm.
 //!
-//! The alarm is the LP timer's first comparator, which ESP-IDF also reserves for the sleep wakeup.
-//! Arming it is a standing request, like every other wakeup source: it survives the wake it causes,
-//! and it ends only when the caller clears it.
+//! The alarm is the first comparator of the LP timer. ESP-IDF also reserves that comparator for the
+//! sleep wakeup. An armed alarm is a standing request, like every other wakeup source. It stays
+//! armed through the wake that it causes, and it ends only when the caller clears it.
 
 use crate::{
     peripherals::RTC_TIMER,
@@ -13,18 +13,19 @@ use crate::{
     time::Instant,
 };
 
-/// The time ESP-IDF budgets between arming the alarm and being asleep, in slow-clock ticks.
+/// The time that ESP-IDF reserves between the arming of the alarm and the start of the sleep, in
+/// slow-clock ticks.
 ///
-/// `SLEEP_TIMER_ALARM_TO_SLEEP_TICKS`, which its comment measures as 80 µs. A deadline nearer than
-/// this cannot be caught by the sleep transition, and the 48-bit counter needs decades to come
-/// round again.
+/// This is `SLEEP_TIMER_ALARM_TO_SLEEP_TICKS`, and its comment gives 80 µs for it. The sleep
+/// transition cannot catch a nearer deadline, and the 48-bit counter needs decades to reach the
+/// deadline again.
 const ALARM_TO_SLEEP_TICKS: u64 = 16;
 
-/// Arms the alarm for `deadline` and enables the timer wakeup source.
+/// Arms the alarm for `deadline`, and enables the timer wakeup source.
 pub(crate) fn set_deadline(deadline: Instant) {
     let now = Instant::now();
 
-    // A deadline in the past must stay in the past: it is how the caller finds out, either as a
+    // A deadline in the past must stay in the past. That is how the caller learns about it, as a
     // rejected light sleep or as a panic in `sleep_deep`.
     let ticks = if deadline >= now {
         let ahead = crate::clock::us_to_rtc_ticks((deadline - now).as_micros());
@@ -39,7 +40,7 @@ pub(crate) fn set_deadline(deadline: Instant) {
     WakeupSource::Timer.enable_with_hooks(Some(entry_hook), None);
 }
 
-/// Disarms the alarm and disables the timer wakeup source.
+/// Disarms the alarm, and disables the timer wakeup source.
 pub(crate) fn clear_deadline() {
     WakeupSource::Timer.disable();
     disarm();
@@ -47,12 +48,13 @@ pub(crate) fn clear_deadline() {
 
 /// Returns whether the armed deadline is too near for the sleep transition to catch it.
 ///
-/// Only a deep sleep needs to ask: a light sleep that misses the alarm is rejected by hardware,
-/// because 007 makes the enabled sources the reject sources, and the alarm status latches.
+/// Only a deep sleep needs this result. The hardware rejects a light sleep that misses the alarm,
+/// because the enabled sources are also the reject sources, and the alarm keeps its status.
 ///
-/// The comparator holds the deadline, so nothing has to keep a copy of it. Its target is readable
-/// on every chip, even where the alarm enable beside it is not, and only a caller that found the
-/// timer source enabled asks, so the target it reads is always one this run armed.
+/// The comparator holds the deadline, so esp-hal keeps no copy of it. The target of the comparator
+/// is readable on every chip, also where the alarm enable beside it is not readable. Only a caller
+/// that finds the timer source enabled calls this function, so the target always comes from this
+/// run.
 pub(crate) fn deadline_missed() -> bool {
     let regs = RTC_TIMER::regs();
 
@@ -73,17 +75,17 @@ pub(crate) fn deadline_missed() -> bool {
 
 #[crate::ram]
 fn entry_hook(_kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
-    // The PMU chips run the comparator from the always-on domain, and ESP-IDF powers their
-    // low-power peripherals down with a timer wake armed.
+    // The PMU chips run the comparator from the always-on domain. ESP-IDF also powers their
+    // low-power peripherals down while a timer wake is armed.
     if !cfg!(soc_has_pmu) {
         config.keep_alive(super::SleepResource::LpPeripherals);
     }
 }
 
-/// Writes the comparator, and clears the status the previous deadline may have left latched.
+/// Writes the comparator, and clears the status that the previous deadline can leave set.
 ///
-/// Clearing belongs here and nowhere else. Sleep entry must leave the status alone, because a
-/// latched status is what makes an expired deadline visible.
+/// Only this function clears the status. Sleep entry must not clear it, because the status is the
+/// only report of an expired deadline.
 fn arm(ticks: u64) {
     let low = (ticks & 0xffff_ffff) as u32;
     let high = ((ticks >> 32) & 0xffff) as u16;
@@ -121,8 +123,8 @@ fn disarm() {
             regs.int_clr().write(|w| w.soc_wakeup().clear_bit_by_one());
         }
         _ => {
-            // The alarm enable is in the same register as the high half of the target, and writing
-            // the target is what arms it again.
+            // The alarm enable is in the same register as the high half of the target. A write of
+            // the target therefore arms the alarm again.
             regs.slp_timer1()
                 .write(|w| unsafe { w.slp_val_hi().bits(0) });
             regs.int_clr().write(|w| w.main_timer().clear_bit_by_one());

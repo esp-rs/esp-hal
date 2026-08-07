@@ -15,7 +15,7 @@ for_each_lp_function! {
         }
     };
 
-    // The signal tables differ per pad, so they dispatch on the low-power number.
+    // Each pad has its own signal table, so this code selects the table by the low-power number.
     (LP_GPIOn $((
         ($_lp_pin_name:ident, LP_GPIOn, $lp_pin:literal),
         $gpio:ident,
@@ -100,7 +100,8 @@ pub(crate) fn pad_hold(lp: u8, enable: bool) {
     });
 }
 
-// The pad driver bit lives in the digital GPIO peripheral, so this one takes the digital number.
+// The pad driver bit is part of the digital GPIO peripheral, so this function takes the digital
+// number.
 pub(crate) fn set_open_drain_output(gpio: u8, enable: bool) {
     crate::peripherals::GPIO::regs()
         .pin(gpio as usize)

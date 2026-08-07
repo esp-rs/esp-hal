@@ -48,8 +48,7 @@ macro_rules! lp_io_analog {
             lp_io_analog!($pin_peri, $lp_pin, $pin_reg, $prefix, $hold);
         )+
 
-        // Every pad has a register of its own, so the pad-specific work dispatches on the
-        // low-power number.
+        // Each pad has its own register, so this code selects the register by the low-power number.
         pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction) {
             paste::paste! {
                 match lp {
@@ -165,15 +164,14 @@ pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: crate::gpio::Level) {
     });
 }
 
-/// The pads whose per-pin wakeup path has triggered, as a mask of low-power numbers.
+/// Returns the pads whose per-pin wakeup path triggered, as a mask of low-power numbers.
 pub(crate) fn wakeup_status() -> u32 {
     RTC_IO::regs().status().read().int().bits()
 }
 
-/// Clears [`wakeup_status`], so that it reports the sleep that is about to start and no earlier
-/// one.
+/// Clears [`wakeup_status`], so that it reports the next sleep and no earlier sleep.
 pub(crate) fn clear_wakeup_status() {
-    // One bit per low-power pad, of which this chip has 18.
+    // One bit for each low-power pad. This chip has 18 such pads.
     const ALL_PADS: u32 = (1 << 18) - 1;
 
     RTC_IO::regs()
@@ -212,8 +210,8 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
     set_pull_field!(lp, rde, enable);
 }
 
-// The pad driver bit lives in the digital GPIO peripheral, and this chip numbers its low-power
-// pads differently, so this one takes the digital number.
+// The pad driver bit is part of the digital GPIO peripheral, and this chip gives a pad a different
+// low-power number, so this function takes the digital number.
 pub(crate) fn set_open_drain_output(gpio: u8, enable: bool) {
     GPIO::regs()
         .pin(gpio as usize)

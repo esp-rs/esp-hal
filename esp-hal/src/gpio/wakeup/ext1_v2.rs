@@ -1,8 +1,8 @@
 //! The low-power path of esp32c5, esp32c6, esp32c61 and esp32h2.
 //!
-//! `ext1` has a level per pad here, and it covers every low-power pad at no cost in sleep current,
-//! so there is nothing to weigh: every pin goes there. The per-pin path these chips also have
-//! stays unused until edge support arrives.
+//! On these chips, `ext1` has one level per pad, covers every low-power pad, and does not increase
+//! the sleep current. There is thus nothing to compare, and every pin goes to `ext1`. These chips
+//! also have a per-pin path, which stays unused until esp-hal supports edge triggers.
 
 use super::{Armed, prepare_pad};
 use crate::{
@@ -15,7 +15,8 @@ use crate::{
     },
 };
 
-/// Clears the paths that this chip's pins can take, so that a stale bit cannot wake the chip.
+/// Clears the paths that the pins of this chip can take, so that no bit of a previous sleep wakes
+/// the chip.
 pub(super) fn disable() {
     WakeupSource::Ext1.disable();
 }
@@ -44,10 +45,10 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSl
     WakeupSource::Ext1.enable();
 }
 
-/// Reports whether this pad ended the last sleep through `ext1`, the one low-power path these
-/// chips use.
+/// Returns whether this pad ended the last sleep through `ext1`, which is the only low-power path
+/// that these chips use.
 pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
-    // Only a low-power pad can take this path, and `ext1` indexes it by its low-power number.
+    // Only a low-power pad can take this path, and `ext1` selects it by its low-power number.
     let Some(lp) = super::lp_number(gpio) else {
         return false;
     };

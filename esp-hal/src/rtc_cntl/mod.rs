@@ -225,8 +225,8 @@ impl WakeupReason {
 
 /// RTC clock.
 pub struct Rtc<'d> {
-    // Holding the peripheral is what keeps a second `Rtc` from existing. The registers are
-    // reached through `RTC_TIMER::regs()`, because the sleep alarm needs them without an `Rtc`.
+    // This field holds the peripheral, which prevents a second `Rtc`. The code uses
+    // `RTC_TIMER::regs()` for the registers, because the sleep alarm needs them without an `Rtc`.
     _rtc_timer: RTC_TIMER<'d>,
     /// Reset Watchdog Timer.
     pub rwdt: Rwdt,
@@ -668,12 +668,12 @@ impl Swd {
 
 /// Reads the LP timer counter, in its own tick units.
 ///
-/// `Rtc` owns `RTC_TIMER`, but the sleep alarm needs the same counter without holding the
-/// peripheral, so the read is a free function. Taking a snapshot writes a register and then reads
-/// the result out of another, so two callers doing that at the same time can read each other's
-/// snapshot. The lock prevents that, at the cost of holding interrupts off for as long as the
-/// snapshot takes — up to about 20 µs on esp32, which needs the update request held high for a
-/// slow-clock period.
+/// `Rtc` owns `RTC_TIMER`, but the sleep alarm needs the same counter without the peripheral. This
+/// read is therefore a free function. A read first writes a register to make a snapshot, and then
+/// reads the snapshot from other registers. Two callers that do this at the same time can read the
+/// snapshot of the other caller, and the lock prevents that. The lock keeps interrupts disabled for
+/// the time of the snapshot, which is up to approximately 20 µs on esp32. That chip needs the
+/// update request set for one slow-clock period.
 #[cfg(lp_timer_driver_supported)]
 pub(crate) fn time_since_boot_raw() -> u64 {
     static SNAPSHOT: esp_sync::NonReentrantMutex<()> = esp_sync::NonReentrantMutex::new(());

@@ -13,8 +13,8 @@ for_each_lp_function! {
         }
     };
 
-    // The wakeup and hold registers name a field per pad instead of indexing them, so these
-    // functions dispatch on the low-power number.
+    // The wakeup register and the hold register have one named field for each pad, and no index, so
+    // these functions select the field by the low-power number.
     (LP_GPIOn $( (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),*) => {
         paste::paste! {
             pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: Level) {
@@ -52,7 +52,7 @@ for_each_lp_function! {
 
 /// Configures the pad.
 ///
-/// The low-power domain reaches the pad through the digital IO MUX, so there is no low-power
+/// The low-power domain reaches the pad through the digital IO MUX. There is thus no low-power
 /// function to select, and the low-power number is the digital pin number.
 pub(crate) fn set_config(lp: u8, input_enable: bool, _mux: bool, _func: LpFunction) {
     IO_MUX::regs().gpio(lp as usize).modify(|_, w| unsafe {
