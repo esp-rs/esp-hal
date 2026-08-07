@@ -368,14 +368,11 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
     if !hold_enabled {
         return;
     }
-
-    let held = cfg_select! {
-        esp32 => crate::peripherals::RTC_IO::regs()
-            .dig_pad_hold()
-            .read()
-            .bits(),
-        _ => LPWR::regs().dig_pad_hold().read().bits(),
+    let base = cfg_select! {
+        esp32 => crate::peripherals::RTC_IO::regs(),
+        _ => LPWR::regs(),
     };
+    let held = base.dig_pad_hold().read().bits();
 
     for gpio in 0..PAD_COUNT as u8 {
         // Only the pads the digital supply feeds leak here, and they are exactly the pads with no
