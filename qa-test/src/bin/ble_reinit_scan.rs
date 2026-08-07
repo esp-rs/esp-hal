@@ -17,7 +17,7 @@
 //! Failure: an iteration receives no advertisements or fails to start the
 //! scan.
 
-//% FEATURES: esp-radio esp-radio/ble esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/ble esp-radio/unstable esp-hal/unstable
 //% CHIP_FILTER: bt_driver_supported
 
 #![no_std]

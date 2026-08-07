@@ -49,7 +49,7 @@ pub(crate) fn enable_ieee802154(en: bool) {
 
     regs!(MODEM_LPCON)
         .clk_conf()
-        .modify(|_, w| w.clk_coex_en().set_bit());
+        .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
 pub(crate) fn enable_bt(en: bool) {
