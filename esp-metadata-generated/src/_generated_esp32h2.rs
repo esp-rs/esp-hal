@@ -397,6 +397,12 @@ macro_rules! property {
     ("sleep.rejectable_mask") => {
         3582
     };
+    ("sleep.ext1_version") => {
+        2
+    };
+    ("sleep.ext1_version", str) => {
+        stringify!(2)
+    };
     ("soc.cpu_has_branch_predictor") => {
         false
     };

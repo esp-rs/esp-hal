@@ -313,6 +313,9 @@ version = 2
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+# esp32h2 has no separate per-pin path: `pin_wakeup_version` stays unset because the per-pin
+# registers *are* the ext1 registers.
+ext1_version = 2
 wakeup_sources = {
     Ext1 = 1,
     Gpio = 2,
