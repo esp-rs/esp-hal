@@ -70,6 +70,12 @@ fn main() -> ! {
     let mut pin_low = Input::new(pin_low, InputConfig::default().with_pull(Pull::Up));
     let mut pin_high = Input::new(pin_high, InputConfig::default().with_pull(Pull::Down));
 
+    println!("low-level pin ended the sleep: {}", pin_low.caused_wakeup());
+    println!(
+        "high-level pin ended the sleep: {}",
+        pin_high.caused_wakeup()
+    );
+
     let config = WakeupConfig::default().with_low_power_path(true);
     pin_low.apply_wakeup_config(&config).unwrap();
     pin_high.apply_wakeup_config(&config).unwrap();

@@ -8,7 +8,11 @@ use super::{Armed, LP_NUMBERS, NO_LP_NUMBER};
 use crate::{
     gpio::{Level, lp_io::low_level},
     peripherals::LPWR,
-    rtc_cntl::sleep::{SleepKind, WrappedSleepConfig},
+    rtc_cntl::{
+        WakeupReason,
+        WakeupSource,
+        sleep::{SleepKind, WrappedSleepConfig},
+    },
 };
 
 /// These chips have no path of their own to clear: the pads share the GPIO wakeup source.
@@ -30,6 +34,29 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSl
     }
 
     prepare_gpio_wakeup();
+}
+
+/// Reports whether this pad ended the last sleep through the per-pin path.
+pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
+    // Only a low-power pad can take this path.
+    let Some(lp) = super::lp_number(gpio) else {
+        return false;
+    };
+
+    let status = cfg_select! {
+        esp32c2 => LPWR::regs()
+            .cntl_gpio_wakeup()
+            .read()
+            .gpio_wakeup_status()
+            .bits(),
+        esp32c3 => LPWR::regs()
+            .gpio_wakeup()
+            .read()
+            .gpio_wakeup_status()
+            .bits(),
+    };
+
+    cause.contains(WakeupSource::Gpio) && status & (1 << lp) != 0
 }
 
 /// Clocks the pad-scanning logic that this path needs, and clears the status a previous wake left

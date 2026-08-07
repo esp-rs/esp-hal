@@ -106,6 +106,11 @@ impl PadMask {
             self.word(bank).fetch_and(!pin, Ordering::Relaxed);
         }
     }
+
+    fn contains(&self, gpio: u8) -> bool {
+        let bank = bank(gpio);
+        self.word(bank).load(Ordering::Relaxed) & (1 << (gpio - bank.offset())) != 0
+    }
 }
 
 /// The pads that may wake the chip through a low-power path.
@@ -119,6 +124,14 @@ static LOW_POWER_PADS: PadMask = PadMask::new();
 /// The pads that sleep entry gave to the low-power IO MUX, and that a light sleep has to give
 /// back.
 static PREPARED_PADS: PadMask = PadMask::new();
+
+/// The pads that ended the last sleep.
+///
+/// Every path reports through a status that something else goes on to clear or to overwrite: the
+/// digital path has no status but the pin's interrupt, which the pin's handler clears, and the
+/// low-power paths keep theirs only until the next sleep arms them again. So the paths are read
+/// where the sleep ends, into this, and [`caused_wakeup`] answers from here alone.
+static WOKEN_PADS: PadMask = PadMask::new();
 
 for_each_gpio! {
     (all $( ($n:literal, $gpio:ident $_ins:tt $_outs:tt $_attrs:tt) ),*) => {
@@ -196,6 +209,41 @@ pub(crate) fn apply_config(pin: &AnyPin<'_>, config: &WakeupConfig) -> Result<()
     }
 
     Ok(())
+}
+
+/// Reports whether this pad ended the last sleep.
+pub(crate) fn caused_wakeup(pin: &AnyPin<'_>) -> bool {
+    WOKEN_PADS.contains(pin.number())
+}
+
+/// Reads the pads that ended the sleep out of the paths and into [`WOKEN_PADS`].
+///
+/// A sleep ends in one of two places, and this belongs to both: the end of a light sleep, and the
+/// sleep initialization of a boot that a deep sleep led to. Both call it however the sleep ended,
+/// so that the record never outlives the sleep it describes, and the boot calls it before it
+/// releases the pads the previous run armed, because that takes the `ext1` selection with it.
+#[crate::ram]
+pub(crate) fn record_wakeup() {
+    let cause = crate::rtc_cntl::wakeup_cause();
+
+    for bank in GpioBank::ALL {
+        // The digital path has nothing but the pin's interrupt, which is still in the status here
+        // unless a handler ran first — which needs interrupts to have been enabled through a light
+        // sleep.
+        let digital = if cause.contains(WakeupSource::Gpio) {
+            bank.read_interrupt_status() & bank.listening().load(Ordering::Relaxed)
+        } else {
+            0
+        };
+
+        WOKEN_PADS.word(bank).store(digital, Ordering::Relaxed);
+    }
+
+    for (gpio, &lp) in LP_NUMBERS.iter().enumerate() {
+        if lp != NO_LP_NUMBER && path::caused_wakeup(gpio as u8, cause) {
+            WOKEN_PADS.set(gpio as u8, true);
+        }
+    }
 }
 
 /// Records that a pad may wake the chip, and registers the hooks that allocate the paths.
