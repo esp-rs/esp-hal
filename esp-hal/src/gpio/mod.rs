@@ -1195,6 +1195,16 @@ impl<'d> Input<'d> {
         self.pin.apply_wakeup_config(config)
     }
 
+    /// Returns whether this pin ended the most recent sleep.
+    ///
+    /// See [`Flex::caused_wakeup`].
+    #[cfg(sleep_driver_supported)]
+    #[instability::unstable]
+    #[inline]
+    pub fn caused_wakeup(&self) -> bool {
+        self.pin.caused_wakeup()
+    }
+
     /// Converts the pin driver into a [`Flex`] driver.
     #[inline]
     #[instability::unstable]
@@ -1346,6 +1356,25 @@ impl<'d> Flex<'d> {
     #[instability::unstable]
     pub fn apply_wakeup_config(&mut self, config: &WakeupConfig) -> Result<(), WakeConfigError> {
         wakeup::apply_config(&self.pin, config)
+    }
+
+    /// Returns whether this pin ended the most recent sleep.
+    ///
+    /// More than one pin can end a sleep, so this can be true of several pins at once. It is false
+    /// if the chip did not wake from sleep, and false on a pin that only ended a sleep before the
+    /// most recent one.
+    ///
+    /// The answer is taken while the sleep ends, so clearing the pin's interrupt afterwards does
+    /// not change it. A pin that ends a light sleep without
+    /// [`WakeupConfig::low_power_path`] is the one case that depends on the interrupt status,
+    /// which its own interrupt handler clears: such a pin reports `false` if the handler runs
+    /// before the sleep call returns, which needs interrupts to have been enabled through the
+    /// sleep.
+    #[cfg(sleep_driver_supported)]
+    #[inline]
+    #[instability::unstable]
+    pub fn caused_wakeup(&self) -> bool {
+        wakeup::caused_wakeup(&self.pin)
     }
 
     // Output functions

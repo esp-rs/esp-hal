@@ -51,6 +51,10 @@ pub(crate) use wakeup::*;
 /// released, and then the mask has to start this run empty, because a program begins with no
 /// configured wakeup sources and drivers build the mask up from there.
 pub(crate) fn init(rtc: &Rtc<'_>) {
+    // Before anything below disturbs a path, because the pads that ended a deep sleep are readable
+    // only until then.
+    crate::gpio::wakeup::record_wakeup();
+
     // ESP-IDF releases the pads after a deep-sleep wake only, and only when the previous run armed
     // an IO wake source.
     #[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
@@ -232,6 +236,10 @@ impl<'d> LowPower<'d> {
         if !config.is_deep_sleep() {
             super::LIGHT_SLEEP_WAKEUP.store(true, portable_atomic::Ordering::Relaxed);
         }
+
+        // Last, because it reads the wakeup cause, which a light sleep only reports once the line
+        // above has run.
+        crate::gpio::wakeup::record_wakeup();
     }
 }
 

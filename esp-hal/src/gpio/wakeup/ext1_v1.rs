@@ -11,6 +11,7 @@ use crate::{
     gpio::{Level, lp_io::low_level},
     peripherals::{LPWR, RTC_IO},
     rtc_cntl::{
+        WakeupReason,
         WakeupSource,
         sleep::{SleepKind, SleepResource, WrappedSleepConfig},
     },
@@ -143,11 +144,42 @@ fn arm_ext0(pin: &Armed, kind: SleepKind) {
     WakeupSource::Ext0.enable();
 }
 
+/// Reports whether this pad ended the last sleep through one of the three low-power paths.
+///
+/// `ext0` is the one path with no status of its own, so what answers for it is the pad it was
+/// armed with, which the sleep leaves in place.
+pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
+    // Only a low-power pad can take any of these paths.
+    let Some(lp) = super::lp_number(gpio) else {
+        return false;
+    };
+
+    let ext1 = cause.contains(WakeupSource::Ext1)
+        && LPWR::regs()
+            .ext_wakeup1_status()
+            .read()
+            .ext_wakeup1_status()
+            .bits()
+            & (1 << lp)
+            != 0;
+
+    let ext0 = cause.contains(WakeupSource::Ext0)
+        && RTC_IO::regs().ext_wakeup0().read().sel().bits() == lp;
+
+    // The per-pin path shares the GPIO source with the digital path, and has its own status.
+    let per_pin = cause.contains(WakeupSource::Gpio) && low_level::wakeup_status() & (1 << lp) != 0;
+
+    ext1 || ext0 || per_pin
+}
+
 /// Disarms every pad's per-pin path, so that the pads this sleep did not choose cannot wake it.
 fn clear_per_pin() {
     for &lp in LP_NUMBERS.iter().filter(|&&lp| lp != NO_LP_NUMBER) {
         low_level::apply_wakeup(lp, false, Level::Low);
     }
+
+    // A status this sleep did not set would name the wrong pad as the one that ended it.
+    low_level::clear_wakeup_status();
 }
 
 fn arm_per_pin(pin: &Armed, kind: SleepKind) {

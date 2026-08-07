@@ -165,6 +165,22 @@ pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: crate::gpio::Level) {
     });
 }
 
+/// The pads whose per-pin wakeup path has triggered, as a mask of low-power numbers.
+pub(crate) fn wakeup_status() -> u32 {
+    RTC_IO::regs().status().read().int().bits()
+}
+
+/// Clears [`wakeup_status`], so that it reports the sleep that is about to start and no earlier
+/// one.
+pub(crate) fn clear_wakeup_status() {
+    // One bit per low-power pad, of which this chip has 18.
+    const ALL_PADS: u32 = (1 << 18) - 1;
+
+    RTC_IO::regs()
+        .status_w1tc()
+        .write(|w| unsafe { w.status_int_w1tc().bits(ALL_PADS) });
+}
+
 #[expect(dead_code)]
 pub(crate) fn init_pin(lp: u8, input_enable: bool) -> u8 {
     set_config(lp, input_enable, true, LpFunction::LP_GPIO);

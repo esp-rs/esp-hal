@@ -116,6 +116,31 @@ pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: Level) {
     });
 }
 
+/// The pads whose per-pin wakeup path has triggered, as a mask of low-power numbers.
+#[cfg(sleep_driver_supported)]
+pub(crate) fn wakeup_status() -> u32 {
+    let status = RTC_IO::regs().rtc_gpio_status().read();
+    cfg_select! {
+        esp32s2 => status.gpio_status_int().bits(),
+        esp32s3 => status.int().bits(),
+    }
+}
+
+/// Clears [`wakeup_status`], so that it reports the sleep that is about to start and no earlier
+/// one.
+#[cfg(sleep_driver_supported)]
+pub(crate) fn clear_wakeup_status() {
+    // One bit per low-power pad, and both chips have 22 of them.
+    const ALL_PADS: u32 = (1 << 22) - 1;
+
+    RTC_IO::regs().rtc_gpio_status_w1tc().write(|w| unsafe {
+        cfg_select! {
+            esp32s2 => w.gpio_status_int_w1tc().bits(ALL_PADS),
+            esp32s3 => w.rtc_gpio_status_int_w1tc().bits(ALL_PADS),
+        }
+    });
+}
+
 for_each_analog_function! {
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
         impl crate::peripherals::$gpio<'_> {

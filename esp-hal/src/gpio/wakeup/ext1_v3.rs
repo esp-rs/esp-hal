@@ -11,6 +11,7 @@ use crate::{
     gpio::Level,
     peripherals::PMU,
     rtc_cntl::{
+        WakeupReason,
         WakeupSource,
         sleep::{SleepKind, WrappedSleepConfig},
     },
@@ -43,6 +44,25 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSl
 
     write_ext1(pads, levels);
     WakeupSource::Ext1.enable();
+}
+
+/// Reports whether this pad ended the last sleep through `ext1`, the one low-power path these
+/// chips use.
+pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
+    // Only a low-power pad can take this path. This `ext1` selects the pads by pin number, and
+    // every low-power pad here has a pin number the status register covers.
+    if super::lp_number(gpio).is_none() {
+        return false;
+    }
+
+    cause.contains(WakeupSource::Ext1)
+        && PMU::regs()
+            .ext_wakeup_st()
+            .read()
+            .ext_wakeup_status()
+            .bits()
+            & (1 << gpio)
+            != 0
 }
 
 fn write_ext1(pads: u32, levels: u32) {
