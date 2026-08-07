@@ -817,10 +817,11 @@ macro_rules! for_each_wakeup_source {
         _for_each_inner_wakeup_source!((Timer, 4)); _for_each_inner_wakeup_source!((Wifi,
         5)); _for_each_inner_wakeup_source!((Uart0, 6));
         _for_each_inner_wakeup_source!((Uart1, 7)); _for_each_inner_wakeup_source!((Sdio,
-        8)); _for_each_inner_wakeup_source!((Bt, 10));
-        _for_each_inner_wakeup_source!((LpCore, 11));
-        _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (WifiBeacon, 3), (Timer,
-        4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Bt, 10), (LpCore, 11)));
+        8)); _for_each_inner_wakeup_source!((Uart2, 9));
+        _for_each_inner_wakeup_source!((Bt, 10)); _for_each_inner_wakeup_source!((LpCore,
+        11)); _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (WifiBeacon, 3),
+        (Timer, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Uart2, 9), (Bt, 10),
+        (LpCore, 11)));
     };
 }
 #[macro_export]
@@ -1130,6 +1131,7 @@ macro_rules! define_clock_tree_types {
         pub enum UartInstance {
             Uart0 = 0,
             Uart1 = 1,
+            Uart2 = 2,
         }
         /// Selects the output frequency of `XTAL_CLK`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1440,8 +1442,8 @@ macro_rules! define_clock_tree_types {
             spi_function_clock: [Option<SpiFunctionClockConfig>; 1],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
-            uart_function_clock: [Option<UartFunctionClockConfig>; 2],
-            uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 2],
+            uart_function_clock: [Option<UartFunctionClockConfig>; 3],
+            uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 3],
             rc_fast_clk_refcount: u32,
             pll_clk_refcount: u32,
             xtal32k_clk_refcount: u32,
@@ -1464,8 +1466,8 @@ macro_rules! define_clock_tree_types {
             spi_function_clock_refcount: [u32; 1],
             timg_function_clock_refcount: [u32; 2],
             timg_wdt_clock_refcount: [u32; 2],
-            uart_function_clock_refcount: [u32; 2],
-            uart_baud_rate_generator_refcount: [u32; 2],
+            uart_function_clock_refcount: [u32; 3],
+            uart_baud_rate_generator_refcount: [u32; 3],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -1544,6 +1546,14 @@ macro_rules! define_clock_tree_types {
             pub fn uart1_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart1 as usize]
             }
+            /// Returns the current configuration of the UART2_FUNCTION_CLOCK clock tree node
+            pub fn uart2_function_clock(&self) -> Option<UartFunctionClockConfig> {
+                self.uart_function_clock[UartInstance::Uart2 as usize]
+            }
+            /// Returns the current configuration of the UART2_BAUD_RATE_GENERATOR clock tree node
+            pub fn uart2_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
+                self.uart_baud_rate_generator[UartInstance::Uart2 as usize]
+            }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
@@ -1559,8 +1569,8 @@ macro_rules! define_clock_tree_types {
                 spi_function_clock: [None; 1],
                 timg_function_clock: [None; 2],
                 timg_wdt_clock: [None; 2],
-                uart_function_clock: [None; 2],
-                uart_baud_rate_generator: [None; 2],
+                uart_function_clock: [None; 3],
+                uart_baud_rate_generator: [None; 3],
                 rc_fast_clk_refcount: 0,
                 pll_clk_refcount: 0,
                 xtal32k_clk_refcount: 0,
@@ -1583,8 +1593,8 @@ macro_rules! define_clock_tree_types {
                 spi_function_clock_refcount: [0; 1],
                 timg_function_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
-                uart_function_clock_refcount: [0; 2],
-                uart_baud_rate_generator_refcount: [0; 2],
+                uart_function_clock_refcount: [0; 3],
+                uart_baud_rate_generator_refcount: [0; 3],
             });
         static XTAL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -1610,10 +1620,10 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static TIMG_WDT_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
-        static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
-        static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
-            [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
+        static UART_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
+        static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 3] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 3];
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
             let old_config = clocks.xtal_clk.replace(config);
             refresh_xtal_clk_downstream(clocks);
@@ -2809,7 +2819,11 @@ macro_rules! define_clock_tree_types {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
                 refresh_timg_wdt_clock_downstream(clocks, child_instance);
             }
-            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
+            for child_instance in [
+                UartInstance::Uart0,
+                UartInstance::Uart1,
+                UartInstance::Uart2,
+            ] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
             }
         }
@@ -2960,6 +2974,8 @@ macro_rules! implement_peripheral_clocks {
             Uart0,
             /// UART1 peripheral clock signal
             Uart1,
+            /// UART2 peripheral clock signal
+            Uart2,
             /// USB_DEVICE peripheral clock signal
             UsbDevice,
         }
@@ -2979,6 +2995,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Timg1,
                 Self::Uart0,
                 Self::Uart1,
+                Self::Uart2,
                 Self::UsbDevice,
             ];
         }
@@ -3040,6 +3057,12 @@ macro_rules! implement_peripheral_clocks {
                 Peripheral::Uart1 => {
                     crate::peripherals::SYSTEM::regs()
                         .uart(1)
+                        .conf()
+                        .modify(|_, w| w.clk_en().bit(enable));
+                }
+                Peripheral::Uart2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .uart(2)
                         .conf()
                         .modify(|_, w| w.clk_en().bit(enable));
                 }
@@ -3108,6 +3131,12 @@ macro_rules! implement_peripheral_clocks {
                 Peripheral::Uart1 => {
                     crate::peripherals::SYSTEM::regs()
                         .uart(1)
+                        .conf()
+                        .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::Uart2 => {
+                    crate::peripherals::SYSTEM::regs()
+                        .uart(2)
                         .conf()
                         .modify(|_, w| w.rst_en().bit(reset));
                 }
@@ -3244,9 +3273,11 @@ macro_rules! for_each_uart {
         macro_rules! _for_each_inner_uart { $(($pattern) => $code;)* ($other : tt) => {}
         } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
         wakeup_source = true)); _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD,
-        U1CTS, U1RTS, wakeup_source = true)); _for_each_inner_uart!((all(0, UART0, Uart0,
-        U0RXD, U0TXD, U0CTS, U0RTS, wakeup_source = true), (1, UART1, Uart1, U1RXD,
-        U1TXD, U1CTS, U1RTS, wakeup_source = true)));
+        U1CTS, U1RTS, wakeup_source = true)); _for_each_inner_uart!((2, UART2, Uart2,
+        U2RXD, U2TXD, U2CTS, U2RTS, wakeup_source = true)); _for_each_inner_uart!((all(0,
+        UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS, wakeup_source = true), (1, UART1,
+        Uart1, U1RXD, U1TXD, U1CTS, U1RTS, wakeup_source = true), (2, UART2, Uart2,
+        U2RXD, U2TXD, U2CTS, U2RTS, wakeup_source = true)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.
@@ -3562,7 +3593,9 @@ macro_rules! for_each_peripheral {
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "UART1 peripheral singleton"] UART1 <= UART1(UART1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART2 peripheral singleton"]
+        UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -3645,6 +3678,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((TIMG0(unstable)));
         _for_each_inner_peripheral!((TIMG1(unstable)));
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
+        _for_each_inner_peripheral!((UART2));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
         _for_each_inner_peripheral!((BT(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
@@ -3858,6 +3892,8 @@ macro_rules! for_each_peripheral {
         UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UART1 peripheral singleton"]
         UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (@ peri_type #[doc = "UART2 peripheral singleton"]
+        UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
@@ -3892,11 +3928,11 @@ macro_rules! for_each_peripheral {
         (PCR(unstable)), (PMU(unstable)), (RNG(unstable)), (SHA(unstable)),
         (SLC(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (UART0), (UART1), (USB_DEVICE(unstable)), (BT(unstable)), (FLASH(unstable)),
-        (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)), (SW_INTERRUPT(unstable)),
-        (WIFI), (PSRAM(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
-        Spi2, 1, AhbGdmaChannel), (I2S0, I2s0, 3, AhbGdmaChannel), (SHA, Sha, 7,
-        AhbGdmaChannel)));
+        (UART0), (UART1), (UART2), (USB_DEVICE(unstable)), (BT(unstable)),
+        (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)),
+        (SW_INTERRUPT(unstable)), (WIFI), (PSRAM(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AhbGdmaChannel), (I2S0,
+        I2s0, 3, AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

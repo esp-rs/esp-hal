@@ -6,7 +6,7 @@ use crate::{
         UartFunctionClockSclk,
         UartInstance,
     },
-    peripherals::{PCR, UART0, UART1},
+    peripherals::{self, PCR},
 };
 
 impl UartInstance {
@@ -16,6 +16,8 @@ impl UartInstance {
         let uart = match self {
             UartInstance::Uart0 => 0,
             UartInstance::Uart1 => 1,
+            #[cfg(soc_has_uart2)]
+            UartInstance::Uart2 => 2,
         };
         PCR::regs()
             .uart(uart)
@@ -49,6 +51,8 @@ impl UartInstance {
             .uart(match self {
                 UartInstance::Uart0 => 0,
                 UartInstance::Uart1 => 1,
+                #[cfg(soc_has_uart2)]
+                UartInstance::Uart2 => 2,
             })
             .clk_conf()
             .modify(|_, w| unsafe {
@@ -73,8 +77,10 @@ impl UartInstance {
         new_config: UartBaudRateGeneratorConfig,
     ) {
         let regs = match self {
-            UartInstance::Uart0 => UART0::regs(),
-            UartInstance::Uart1 => UART1::regs(),
+            UartInstance::Uart0 => peripherals::UART0::regs(),
+            UartInstance::Uart1 => peripherals::UART1::regs(),
+            #[cfg(soc_has_uart2)]
+            UartInstance::Uart2 => peripherals::UART2::regs(),
         };
         regs.clkdiv().write(|w| unsafe {
             w.clkdiv().bits(new_config.integral() as _);
