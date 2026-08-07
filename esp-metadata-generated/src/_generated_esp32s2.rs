@@ -4649,21 +4649,22 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((GPIO8)); _for_each_inner_peripheral!((GPIO9));
         _for_each_inner_peripheral!((GPIO10)); _for_each_inner_peripheral!((GPIO11));
         _for_each_inner_peripheral!((GPIO12)); _for_each_inner_peripheral!((GPIO13));
-        _for_each_inner_peripheral!((GPIO14)); _for_each_inner_peripheral!((GPIO15));
-        _for_each_inner_peripheral!((GPIO16)); _for_each_inner_peripheral!((GPIO17));
-        _for_each_inner_peripheral!((GPIO18)); _for_each_inner_peripheral!((GPIO19));
-        _for_each_inner_peripheral!((GPIO20)); _for_each_inner_peripheral!((GPIO21));
-        _for_each_inner_peripheral!((GPIO26)); _for_each_inner_peripheral!((GPIO27));
-        _for_each_inner_peripheral!((GPIO28)); _for_each_inner_peripheral!((GPIO29));
-        _for_each_inner_peripheral!((GPIO30)); _for_each_inner_peripheral!((GPIO31));
-        _for_each_inner_peripheral!((GPIO32)); _for_each_inner_peripheral!((GPIO33));
-        _for_each_inner_peripheral!((GPIO34)); _for_each_inner_peripheral!((GPIO35));
-        _for_each_inner_peripheral!((GPIO36)); _for_each_inner_peripheral!((GPIO37));
-        _for_each_inner_peripheral!((GPIO38)); _for_each_inner_peripheral!((GPIO39));
-        _for_each_inner_peripheral!((GPIO40)); _for_each_inner_peripheral!((GPIO41));
-        _for_each_inner_peripheral!((GPIO42)); _for_each_inner_peripheral!((GPIO43));
-        _for_each_inner_peripheral!((GPIO44)); _for_each_inner_peripheral!((GPIO45));
-        _for_each_inner_peripheral!((GPIO46));
+        _for_each_inner_peripheral!((GPIO14));
+        _for_each_inner_peripheral!((#[cfg(not(use_xtal32k))] GPIO15));
+        _for_each_inner_peripheral!((#[cfg(not(use_xtal32k))] GPIO16));
+        _for_each_inner_peripheral!((GPIO17)); _for_each_inner_peripheral!((GPIO18));
+        _for_each_inner_peripheral!((GPIO19)); _for_each_inner_peripheral!((GPIO20));
+        _for_each_inner_peripheral!((GPIO21)); _for_each_inner_peripheral!((GPIO26));
+        _for_each_inner_peripheral!((GPIO27)); _for_each_inner_peripheral!((GPIO28));
+        _for_each_inner_peripheral!((GPIO29)); _for_each_inner_peripheral!((GPIO30));
+        _for_each_inner_peripheral!((GPIO31)); _for_each_inner_peripheral!((GPIO32));
+        _for_each_inner_peripheral!((GPIO33)); _for_each_inner_peripheral!((GPIO34));
+        _for_each_inner_peripheral!((GPIO35)); _for_each_inner_peripheral!((GPIO36));
+        _for_each_inner_peripheral!((GPIO37)); _for_each_inner_peripheral!((GPIO38));
+        _for_each_inner_peripheral!((GPIO39)); _for_each_inner_peripheral!((GPIO40));
+        _for_each_inner_peripheral!((GPIO41)); _for_each_inner_peripheral!((GPIO42));
+        _for_each_inner_peripheral!((GPIO43)); _for_each_inner_peripheral!((GPIO44));
+        _for_each_inner_peripheral!((GPIO45)); _for_each_inner_peripheral!((GPIO46));
         _for_each_inner_peripheral!((DMA_SPI2(unstable)));
         _for_each_inner_peripheral!((DMA_SPI3(unstable)));
         _for_each_inner_peripheral!((DMA_I2S0(unstable)));
@@ -4975,24 +4976,25 @@ macro_rules! for_each_peripheral {
         "ULP_RISCV_CORE peripheral singleton"] ULP_RISCV_CORE <= virtual() (unstable))));
         _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
         (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
-        (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
-        (GPIO20), (GPIO21), (GPIO26), (GPIO27), (GPIO28), (GPIO29), (GPIO30), (GPIO31),
-        (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39),
-        (GPIO40), (GPIO41), (GPIO42), (GPIO43), (GPIO44), (GPIO45), (GPIO46),
-        (DMA_SPI2(unstable)), (DMA_SPI3(unstable)), (DMA_I2S0(unstable)),
-        (DMA_CRYPTO(unstable)), (DMA_COPY(unstable)), (AES(unstable)),
-        (APB_SARADC(unstable)), (DEDICATED_GPIO(unstable)), (DS(unstable)),
-        (EXTMEM(unstable)), (FE(unstable)), (FE2(unstable)), (GPIO(unstable)),
-        (GPIO_SD(unstable)), (HMAC(unstable)), (I2C_ANA_MST(unstable)), (I2C0), (I2C1),
-        (I2S0(unstable)), (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)),
-        (LEDC(unstable)), (NRX(unstable)), (PCNT(unstable)), (PMS(unstable)),
-        (RMT(unstable)), (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)),
-        (RTC_TIMER(unstable)), (LP_I2C0(unstable)), (RTC_IO(unstable)), (SENS(unstable)),
-        (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3),
-        (SYSCON(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)),
-        (TIMG1(unstable)), (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)),
-        (USB_FS(unstable)), (XTS_AES(unstable)), (WIFI), (ADC1(unstable)),
-        (ADC2(unstable)), (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
+        (GPIO12), (GPIO13), (GPIO14), (#[cfg(not(use_xtal32k))] GPIO15),
+        (#[cfg(not(use_xtal32k))] GPIO16), (GPIO17), (GPIO18), (GPIO19), (GPIO20),
+        (GPIO21), (GPIO26), (GPIO27), (GPIO28), (GPIO29), (GPIO30), (GPIO31), (GPIO32),
+        (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40),
+        (GPIO41), (GPIO42), (GPIO43), (GPIO44), (GPIO45), (GPIO46), (DMA_SPI2(unstable)),
+        (DMA_SPI3(unstable)), (DMA_I2S0(unstable)), (DMA_CRYPTO(unstable)),
+        (DMA_COPY(unstable)), (AES(unstable)), (APB_SARADC(unstable)),
+        (DEDICATED_GPIO(unstable)), (DS(unstable)), (EXTMEM(unstable)), (FE(unstable)),
+        (FE2(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
+        (I2C_ANA_MST(unstable)), (I2C0), (I2C1), (I2S0(unstable)),
+        (INTERRUPT_CORE0(unstable)), (IO_MUX(unstable)), (LEDC(unstable)),
+        (NRX(unstable)), (PCNT(unstable)), (PMS(unstable)), (RMT(unstable)),
+        (RNG(unstable)), (RSA(unstable)), (LPWR(unstable)), (RTC_TIMER(unstable)),
+        (LP_I2C0(unstable)), (RTC_IO(unstable)), (SENS(unstable)), (SHA(unstable)),
+        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (SYSCON(unstable)),
+        (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
+        (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_FS(unstable)),
+        (XTS_AES(unstable)), (WIFI), (ADC1(unstable)), (ADC2(unstable)),
+        (DAC1(unstable)), (DAC2(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (PSRAM(unstable)), (SW_INTERRUPT(unstable)),
         (ULP_RISCV_CORE(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
         Spi2, 0, SpiDmaChannel), (I2S0, I2s0, 0, I2sDmaChannel), (AES, Aes, 0,

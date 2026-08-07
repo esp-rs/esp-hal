@@ -15,6 +15,7 @@
 
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU},
+    rtc_cntl::xtal32k,
     soc::regi2c,
 };
 
@@ -45,7 +46,7 @@ impl CpuClock {
         ahb_clk: Some(AhbClkConfig::new(3)),
         apb_clk: Some(ApbClkConfig::new(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         timg_calibration_clock: None,
     };
     const PRESET_160: ClockConfig = ClockConfig {
@@ -55,7 +56,7 @@ impl CpuClock {
         ahb_clk: Some(AhbClkConfig::new(3)),
         apb_clk: Some(ApbClkConfig::new(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         timg_calibration_clock: None,
     };
 }

@@ -3928,37 +3928,38 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
-        CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((GPIO0));
-        _for_each_inner_peripheral!((GPIO1)); _for_each_inner_peripheral!((GPIO2));
-        _for_each_inner_peripheral!((GPIO3)); _for_each_inner_peripheral!((GPIO4));
-        _for_each_inner_peripheral!((GPIO5)); _for_each_inner_peripheral!((GPIO6));
-        _for_each_inner_peripheral!((GPIO7)); _for_each_inner_peripheral!((GPIO8));
-        _for_each_inner_peripheral!((GPIO9)); _for_each_inner_peripheral!((GPIO10));
-        _for_each_inner_peripheral!((GPIO11)); _for_each_inner_peripheral!((GPIO12));
-        _for_each_inner_peripheral!((GPIO13)); _for_each_inner_peripheral!((GPIO14));
-        _for_each_inner_peripheral!((GPIO15)); _for_each_inner_peripheral!((GPIO16));
-        _for_each_inner_peripheral!((GPIO17)); _for_each_inner_peripheral!((GPIO18));
-        _for_each_inner_peripheral!((GPIO19)); _for_each_inner_peripheral!((GPIO20));
-        _for_each_inner_peripheral!((GPIO21)); _for_each_inner_peripheral!((GPIO22));
-        _for_each_inner_peripheral!((GPIO23)); _for_each_inner_peripheral!((GPIO24));
-        _for_each_inner_peripheral!((GPIO25)); _for_each_inner_peripheral!((GPIO26));
-        _for_each_inner_peripheral!((GPIO27)); _for_each_inner_peripheral!((GPIO28));
-        _for_each_inner_peripheral!((GPIO30)); _for_each_inner_peripheral!((GPIO31));
-        _for_each_inner_peripheral!((GPIO32)); _for_each_inner_peripheral!((GPIO33));
-        _for_each_inner_peripheral!((GPIO34)); _for_each_inner_peripheral!((GPIO35));
-        _for_each_inner_peripheral!((GPIO36)); _for_each_inner_peripheral!((GPIO37));
-        _for_each_inner_peripheral!((GPIO38)); _for_each_inner_peripheral!((GPIO39));
-        _for_each_inner_peripheral!((GPIO40)); _for_each_inner_peripheral!((GPIO42));
-        _for_each_inner_peripheral!((GPIO43)); _for_each_inner_peripheral!((GPIO44));
-        _for_each_inner_peripheral!((GPIO45)); _for_each_inner_peripheral!((GPIO46));
-        _for_each_inner_peripheral!((GPIO47)); _for_each_inner_peripheral!((GPIO48));
-        _for_each_inner_peripheral!((GPIO49)); _for_each_inner_peripheral!((GPIO50));
-        _for_each_inner_peripheral!((GPIO51)); _for_each_inner_peripheral!((GPIO52));
-        _for_each_inner_peripheral!((GPIO53)); _for_each_inner_peripheral!((GPIO54));
-        _for_each_inner_peripheral!((GPIO55)); _for_each_inner_peripheral!((GPIO56));
-        _for_each_inner_peripheral!((GPIO57)); _for_each_inner_peripheral!((GPIO58));
-        _for_each_inner_peripheral!((GPIO59)); _for_each_inner_peripheral!((GPIO60));
-        _for_each_inner_peripheral!((GPIO61));
+        CPU_CTRL <= virtual() (unstable)));
+        _for_each_inner_peripheral!((#[cfg(not(use_xtal32k))] GPIO0));
+        _for_each_inner_peripheral!((#[cfg(not(use_xtal32k))] GPIO1));
+        _for_each_inner_peripheral!((GPIO2)); _for_each_inner_peripheral!((GPIO3));
+        _for_each_inner_peripheral!((GPIO4)); _for_each_inner_peripheral!((GPIO5));
+        _for_each_inner_peripheral!((GPIO6)); _for_each_inner_peripheral!((GPIO7));
+        _for_each_inner_peripheral!((GPIO8)); _for_each_inner_peripheral!((GPIO9));
+        _for_each_inner_peripheral!((GPIO10)); _for_each_inner_peripheral!((GPIO11));
+        _for_each_inner_peripheral!((GPIO12)); _for_each_inner_peripheral!((GPIO13));
+        _for_each_inner_peripheral!((GPIO14)); _for_each_inner_peripheral!((GPIO15));
+        _for_each_inner_peripheral!((GPIO16)); _for_each_inner_peripheral!((GPIO17));
+        _for_each_inner_peripheral!((GPIO18)); _for_each_inner_peripheral!((GPIO19));
+        _for_each_inner_peripheral!((GPIO20)); _for_each_inner_peripheral!((GPIO21));
+        _for_each_inner_peripheral!((GPIO22)); _for_each_inner_peripheral!((GPIO23));
+        _for_each_inner_peripheral!((GPIO24)); _for_each_inner_peripheral!((GPIO25));
+        _for_each_inner_peripheral!((GPIO26)); _for_each_inner_peripheral!((GPIO27));
+        _for_each_inner_peripheral!((GPIO28)); _for_each_inner_peripheral!((GPIO30));
+        _for_each_inner_peripheral!((GPIO31)); _for_each_inner_peripheral!((GPIO32));
+        _for_each_inner_peripheral!((GPIO33)); _for_each_inner_peripheral!((GPIO34));
+        _for_each_inner_peripheral!((GPIO35)); _for_each_inner_peripheral!((GPIO36));
+        _for_each_inner_peripheral!((GPIO37)); _for_each_inner_peripheral!((GPIO38));
+        _for_each_inner_peripheral!((GPIO39)); _for_each_inner_peripheral!((GPIO40));
+        _for_each_inner_peripheral!((GPIO42)); _for_each_inner_peripheral!((GPIO43));
+        _for_each_inner_peripheral!((GPIO44)); _for_each_inner_peripheral!((GPIO45));
+        _for_each_inner_peripheral!((GPIO46)); _for_each_inner_peripheral!((GPIO47));
+        _for_each_inner_peripheral!((GPIO48)); _for_each_inner_peripheral!((GPIO49));
+        _for_each_inner_peripheral!((GPIO50)); _for_each_inner_peripheral!((GPIO51));
+        _for_each_inner_peripheral!((GPIO52)); _for_each_inner_peripheral!((GPIO53));
+        _for_each_inner_peripheral!((GPIO54)); _for_each_inner_peripheral!((GPIO55));
+        _for_each_inner_peripheral!((GPIO56)); _for_each_inner_peripheral!((GPIO57));
+        _for_each_inner_peripheral!((GPIO58)); _for_each_inner_peripheral!((GPIO59));
+        _for_each_inner_peripheral!((GPIO60)); _for_each_inner_peripheral!((GPIO61));
         _for_each_inner_peripheral!((DMA_AXI_CH0(unstable)));
         _for_each_inner_peripheral!((DMA_AXI_CH1(unstable)));
         _for_each_inner_peripheral!((DMA_AXI_CH2(unstable)));
@@ -4272,16 +4273,17 @@ macro_rules! for_each_peripheral {
         virtual() (unstable)), (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"]
         SW_INTERRUPT <= virtual() (unstable)), (@ peri_type #[doc =
         "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable))));
-        _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
-        (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
-        (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
-        (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
-        (GPIO28), (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36),
-        (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO42), (GPIO43), (GPIO44), (GPIO45),
-        (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50), (GPIO51), (GPIO52), (GPIO53),
-        (GPIO54), (GPIO55), (GPIO56), (GPIO57), (GPIO58), (GPIO59), (GPIO60), (GPIO61),
-        (DMA_AXI_CH0(unstable)), (DMA_AXI_CH1(unstable)), (DMA_AXI_CH2(unstable)),
-        (AES(unstable)), (ASSIST_DEBUG(unstable)), (CACHE(unstable)), (CLIC(unstable)),
+        _for_each_inner_peripheral!((singletons(#[cfg(not(use_xtal32k))] GPIO0),
+        (#[cfg(not(use_xtal32k))] GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6),
+        (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14),
+        (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19), (GPIO20), (GPIO21), (GPIO22),
+        (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27), (GPIO28), (GPIO30), (GPIO31),
+        (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39),
+        (GPIO40), (GPIO42), (GPIO43), (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48),
+        (GPIO49), (GPIO50), (GPIO51), (GPIO52), (GPIO53), (GPIO54), (GPIO55), (GPIO56),
+        (GPIO57), (GPIO58), (GPIO59), (GPIO60), (GPIO61), (DMA_AXI_CH0(unstable)),
+        (DMA_AXI_CH1(unstable)), (DMA_AXI_CH2(unstable)), (AES(unstable)),
+        (ASSIST_DEBUG(unstable)), (CACHE(unstable)), (CLIC(unstable)),
         (CNNT_SYS(unstable)), (ECC(unstable)), (EFUSE(unstable)), (GPIO(unstable)),
         (GPIO_SD(unstable)), (HP_APM(unstable)), (HP_MEM_APM(unstable)),
         (HP_SYS(unstable)), (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0),
@@ -4547,7 +4549,9 @@ macro_rules! for_each_gpio {
 macro_rules! for_each_analog_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_analog_function { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_analog_function!((USJ_DM, GPIO33));
+        tt) => {} } _for_each_inner_analog_function!((XTAL_32K_N, GPIO0));
+        _for_each_inner_analog_function!((XTAL_32K_P, GPIO1));
+        _for_each_inner_analog_function!((USJ_DM, GPIO33));
         _for_each_inner_analog_function!((USJ_DP, GPIO34));
         _for_each_inner_analog_function!((ADC1_CH0, GPIO42));
         _for_each_inner_analog_function!((ADC1_CH1, GPIO43));
@@ -4581,11 +4585,12 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!(((ADC2_CH5, ADCn_CHm, 2, 5), GPIO55));
         _for_each_inner_analog_function!(((ADC2_CH6, ADCn_CHm, 2, 6), GPIO56));
         _for_each_inner_analog_function!(((ADC2_CH7, ADCn_CHm, 2, 7), GPIO57));
-        _for_each_inner_analog_function!((all(USJ_DM, GPIO33), (USJ_DP, GPIO34),
-        (ADC1_CH0, GPIO42), (ADC1_CH1, GPIO43), (ADC1_CH2, GPIO44), (ADC1_CH3, GPIO45),
-        (ADC1_CH4, GPIO46), (ADC1_CH5, GPIO47), (ADC1_CH6, GPIO48), (ADC1_CH7, GPIO49),
-        (ADC2_CH0, GPIO50), (ADC2_CH1, GPIO51), (ADC2_CH2, GPIO52), (ADC2_CH3, GPIO53),
-        (ADC2_CH4, GPIO54), (ADC2_CH5, GPIO55), (ADC2_CH6, GPIO56), (ADC2_CH7, GPIO57)));
+        _for_each_inner_analog_function!((all(XTAL_32K_N, GPIO0), (XTAL_32K_P, GPIO1),
+        (USJ_DM, GPIO33), (USJ_DP, GPIO34), (ADC1_CH0, GPIO42), (ADC1_CH1, GPIO43),
+        (ADC1_CH2, GPIO44), (ADC1_CH3, GPIO45), (ADC1_CH4, GPIO46), (ADC1_CH5, GPIO47),
+        (ADC1_CH6, GPIO48), (ADC1_CH7, GPIO49), (ADC2_CH0, GPIO50), (ADC2_CH1, GPIO51),
+        (ADC2_CH2, GPIO52), (ADC2_CH3, GPIO53), (ADC2_CH4, GPIO54), (ADC2_CH5, GPIO55),
+        (ADC2_CH6, GPIO56), (ADC2_CH7, GPIO57)));
         _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0), GPIO42),
         ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO43), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO44),
         ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO45), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO46),

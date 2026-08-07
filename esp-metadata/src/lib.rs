@@ -781,7 +781,16 @@ This pin may be available with certain limitations. Check your hardware to make 
                     #(#[doc = #docs])* #pin <= virtual ()
                 };
                 all_peripherals.push(quote! { @peri_type #tokens });
-                singleton_peripherals.push(quote! { #pin });
+
+                // The pin type is always defined - drivers and the `for_each_gpio` family of
+                // macros refer to it unconditionally. Only the `Peripherals` field is hidden, so
+                // that an application cannot safely take a pin the crystal is driving.
+                let cfg = if gpio.is_xtal32k() {
+                    quote! { #[cfg(not(use_xtal32k))] }
+                } else {
+                    quote! {}
+                };
+                singleton_peripherals.push(quote! { #cfg #pin });
             }
         }
 

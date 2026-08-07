@@ -3,6 +3,7 @@ use strum::FromRepr;
 use crate::{
     clock::ClockConfig,
     peripherals::{LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
+    rtc_cntl::xtal32k,
     soc::{clocks::LpSlowClkConfig, regi2c},
 };
 
@@ -894,7 +895,7 @@ impl LpSystemInit {
         dig_power.set_mem_dslp(false);
 
         let mut clk_power = LpClkPower::default();
-        clk_power.set_xpd_xtal32k(true);
+        clk_power.set_xpd_xtal32k(xtal32k::use_xtal32k());
         clk_power.set_xpd_rc32k(true);
         clk_power.set_xpd_fosc(true);
 

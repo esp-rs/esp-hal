@@ -3614,7 +3614,8 @@ macro_rules! for_each_peripheral {
         disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt,
         disable_pwr_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
-        _for_each_inner_peripheral!((GPIO0)); _for_each_inner_peripheral!((GPIO1));
+        _for_each_inner_peripheral!((#[cfg(not(use_xtal32k))] GPIO0));
+        _for_each_inner_peripheral!((#[cfg(not(use_xtal32k))] GPIO1));
         _for_each_inner_peripheral!((GPIO2)); _for_each_inner_peripheral!((GPIO3));
         _for_each_inner_peripheral!((GPIO4)); _for_each_inner_peripheral!((GPIO5));
         _for_each_inner_peripheral!((GPIO6)); _for_each_inner_peripheral!((GPIO7));
@@ -3911,14 +3912,15 @@ macro_rules! for_each_peripheral {
         enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt,
         enable_pwr_interrupt, disable_pwr_interrupt })), (@ peri_type #[doc =
         "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable))));
-        _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
-        (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
-        (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
-        (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
-        (GPIO28), (GPIO29), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
-        (ASSIST_DEBUG(unstable)), (CLINT(unstable)), (CACHE(unstable)), (DMA(unstable)),
-        (ECC(unstable)), (ECDSA(unstable)), (EFUSE(unstable)), (ETM(unstable)),
-        (GPIO(unstable)), (GPIO_SD(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
+        _for_each_inner_peripheral!((singletons(#[cfg(not(use_xtal32k))] GPIO0),
+        (#[cfg(not(use_xtal32k))] GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6),
+        (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14),
+        (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19), (GPIO20), (GPIO21), (GPIO22),
+        (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27), (GPIO28), (GPIO29),
+        (DMA_CH0(unstable)), (DMA_CH1(unstable)), (ASSIST_DEBUG(unstable)),
+        (CLINT(unstable)), (CACHE(unstable)), (DMA(unstable)), (ECC(unstable)),
+        (ECDSA(unstable)), (EFUSE(unstable)), (ETM(unstable)), (GPIO(unstable)),
+        (GPIO_SD(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)),
         (I2C_ANA_MST(unstable)), (I2C0), (I2S0(unstable)), (INTERRUPT_CORE0(unstable)),
         (INTPRI(unstable)), (IO_MUX(unstable)), (LP_ANA(unstable)), (LP_AON(unstable)),
         (LP_APM(unstable)), (LP_CLKRST(unstable)), (LPWR(unstable)), (LP_GPIO(unstable)),
