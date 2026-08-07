@@ -382,6 +382,12 @@ macro_rules! property {
     ("sleep.rejectable_mask") => {
         1852
     };
+    ("sleep.pin_wakeup_version") => {
+        2
+    };
+    ("sleep.pin_wakeup_version", str) => {
+        stringify!(2)
+    };
     ("soc.cpu_has_branch_predictor") => {
         false
     };
