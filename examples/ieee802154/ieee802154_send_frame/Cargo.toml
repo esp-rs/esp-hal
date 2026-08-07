@@ -21,18 +21,21 @@ ieee802154 = "0.6.1"
 
 [features]
 esp32c5 = [
+    "esp-alloc/esp32c5",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
     "esp-radio/esp32c5",
 ]
 esp32c6 = [
+    "esp-alloc/esp32c6",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
     "esp-radio/esp32c6",
 ]
 esp32h2 = [
+    "esp-alloc/esp32h2",
     "esp-backtrace/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-hal/esp32h2",

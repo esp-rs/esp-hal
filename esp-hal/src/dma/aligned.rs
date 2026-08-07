@@ -91,6 +91,7 @@ pub(crate) fn region_dma_alignment(addr: usize) -> Option<usize> {
             // larger, always-safe value until the L2 line size is
             // available.
             soc_internal_memory_cached => 128,
+            esp32s31 => 64,
             any(esp32, esp32c5, esp32c61) => 32, /* TODO: fixed 32-bytes, metadata-ify */
             _ => crate::soc::CONFIG_DATA_CACHE_LINE_SIZE,
         });
