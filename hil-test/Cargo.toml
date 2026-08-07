@@ -78,6 +78,10 @@ harness           = false
 name              = "uart"
 harness           = false
 
+[[bin]]
+name              = "ledc"
+harness           = false
+
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 critical-section   = "1"

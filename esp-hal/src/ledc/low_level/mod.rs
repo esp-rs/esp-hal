@@ -3,22 +3,25 @@
 #[cfg_attr(ledc_version = "3", path = "v3.rs")]
 mod version;
 
-#[cfg(ledc_version = "1")]
-use super::timer::HSClockSource;
 use super::{
-    LSGlobalClkSource,
+    LowSpeedGlobalClockSource,
     channel::Number as ChannelNumber,
-    timer::{LSClockSource, Number as TimerNumber},
+    timer::Number as TimerNumber,
 };
-use crate::{gpio::OutputSignal, pac::ledc::RegisterBlock, time::Rate};
+use crate::{gpio::OutputSignal, ledc::timer::ClockSource, pac::ledc::RegisterBlock, time::Rate};
 
 #[inline(always)]
-pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LSGlobalClkSource) {
+pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LowSpeedGlobalClockSource) {
     version::set_global_slow_clock(ledc, clock_source)
 }
 
 #[inline(always)]
-pub(super) fn ls_freq_hw(clock_source: LSClockSource) -> Rate {
+pub(super) fn get_duty_res(ledc: &RegisterBlock, number: TimerNumber, is_hs: bool) -> u8 {
+    version::get_duty_res(ledc, number, is_hs)
+}
+
+#[inline(always)]
+pub(super) fn ls_freq_hw(clock_source: ClockSource) -> Rate {
     version::ls_freq_hw(clock_source)
 }
 
@@ -40,7 +43,7 @@ pub(super) fn ls_update_hw(ledc: &RegisterBlock, number: TimerNumber) {
 
 #[cfg(ledc_version = "1")]
 #[inline(always)]
-pub(super) fn hs_freq_hw(clock_source: HSClockSource) -> Rate {
+pub(super) fn hs_freq_hw(clock_source: ClockSource) -> Rate {
     version::hs_freq_hw(clock_source)
 }
 
@@ -51,7 +54,7 @@ pub(super) fn hs_configure_hw(
     number: TimerNumber,
     divisor: u32,
     duty: u8,
-    clock_source: HSClockSource,
+    clock_source: ClockSource,
 ) {
     version::hs_configure_hw(ledc, number, divisor, duty, clock_source)
 }

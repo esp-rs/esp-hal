@@ -1,20 +1,30 @@
 use super::super::{
-    LSGlobalClkSource,
+    LowSpeedGlobalClockSource,
     channel::Number as ChannelNumber,
-    timer::{LSClockSource, Number as TimerNumber},
+    timer::Number as TimerNumber,
 };
-use crate::{gpio::OutputSignal, pac::ledc::RegisterBlock, soc::clocks, time::Rate};
+use crate::{
+    gpio::OutputSignal,
+    ledc::timer::ClockSource,
+    pac::ledc::RegisterBlock,
+    soc::clocks,
+    time::Rate,
+};
 
-pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LSGlobalClkSource) {
+pub(super) fn set_global_slow_clock(ledc: &RegisterBlock, clock_source: LowSpeedGlobalClockSource) {
     match clock_source {
-        LSGlobalClkSource::APBClk => {
+        LowSpeedGlobalClockSource::APBClock => {
             ledc.conf().write(|w| unsafe { w.apb_clk_sel().bits(1) });
         }
     }
     ledc.timer(0).conf().modify(|_, w| w.para_up().set_bit());
 }
 
-pub(super) fn ls_freq_hw(_clock_source: LSClockSource) -> Rate {
+pub(super) fn get_duty_res(ledc: &RegisterBlock, number: TimerNumber, _is_hs: bool) -> u8 {
+    ledc.timer(number as usize).conf().read().duty_res().bits()
+}
+
+pub(super) fn ls_freq_hw(_clock_source: ClockSource) -> Rate {
     Rate::from_hz(clocks::apb_clk_frequency())
 }
 
@@ -26,10 +36,11 @@ pub(super) fn ls_configure_hw(
     use_ref_tick: bool,
 ) {
     ledc.timer(number as usize).conf().modify(|_, w| unsafe {
-        #[cfg(soc_has_clock_node_ref_tick)]
-        w.tick_sel().bit(use_ref_tick);
-        #[cfg(not(soc_has_clock_node_ref_tick))]
-        let _ = use_ref_tick;
+        if cfg!(soc_has_clock_node_ref_tick) {
+            w.tick_sel().bit(use_ref_tick);
+        } else {
+            let _ = use_ref_tick;
+        }
         w.rst().clear_bit();
         w.pause().clear_bit();
         w.clk_div().bits(divisor);
