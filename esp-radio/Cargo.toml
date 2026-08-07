@@ -165,6 +165,7 @@ print-logs-from-driver = [
 esp32 = [
   "dep:esp32",
   "esp-hal/esp32",
+  "esp-alloc?/esp32",
   "esp-rtos/esp32",
   "esp-radio-rtos-driver/esp32",
   "esp-phy/esp32",
@@ -176,6 +177,7 @@ esp32 = [
 esp32c2 = [
   "dep:esp32c2",
   "esp-hal/esp32c2",
+  "esp-alloc?/esp32c2",
   "esp-rtos/esp32c2",
   "esp-radio-rtos-driver/esp32c2",
   "esp-phy/esp32c2",
@@ -186,6 +188,7 @@ esp32c2 = [
 esp32c3 = [
   "dep:esp32c3",
   "esp-hal/esp32c3",
+  "esp-alloc?/esp32c3",
   "esp-rtos/esp32c3",
   "esp-radio-rtos-driver/esp32c3",
   "esp-phy/esp32c3",
@@ -196,6 +199,7 @@ esp32c3 = [
 esp32c5 = [
   "dep:esp32c5",
   "esp-hal/esp32c5",
+  "esp-alloc?/esp32c5",
   "esp-rtos/esp32c5",
   "esp-radio-rtos-driver/esp32c5",
   "esp-phy/esp32c5",
@@ -206,6 +210,7 @@ esp32c5 = [
 esp32c6 = [
   "dep:esp32c6",
   "esp-hal/esp32c6",
+  "esp-alloc?/esp32c6",
   "esp-rtos/esp32c6",
   "esp-radio-rtos-driver/esp32c6",
   "esp-phy/esp32c6",
@@ -216,6 +221,7 @@ esp32c6 = [
 esp32c61 = [
   "dep:esp32c61",
   "esp-hal/esp32c61",
+  "esp-alloc?/esp32c61",
   "esp-rtos/esp32c61",
   "esp-radio-rtos-driver/esp32c61",
   "esp-phy/esp32c61",
@@ -226,6 +232,7 @@ esp32c61 = [
 esp32h2 = [
   "dep:esp32h2",
   "esp-hal/esp32h2",
+  "esp-alloc?/esp32h2",
   "esp-rtos/esp32h2",
   "esp-radio-rtos-driver/esp32h2",
   "esp-phy/esp32h2",
@@ -236,6 +243,7 @@ esp32h2 = [
 esp32s2 = [
   "dep:esp32s2",
   "esp-hal/esp32s2",
+  "esp-alloc?/esp32s2",
   "esp-rtos/esp32s2",
   "esp-radio-rtos-driver/esp32s2",
   "esp-phy/esp32s2",
@@ -247,6 +255,7 @@ esp32s2 = [
 esp32s3 = [
   "dep:esp32s3",
   "esp-hal/esp32s3",
+  "esp-alloc?/esp32s3",
   "esp-rtos/esp32s3",
   "esp-radio-rtos-driver/esp32s3",
   "esp-phy/esp32s3",
