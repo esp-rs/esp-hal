@@ -42,3 +42,12 @@ pub(crate) fn init_clocks() {
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | DPORT_WIFI_CLK_WIFI_EN) });
 }
+
+pub(crate) fn deinit_clocks() {
+    // Nothing to do: `enable_wifi(false)` (called by the Wi-Fi driver on
+    // deinit) clears `DPORT_WIFI_CLK_WIFI_EN_M`. That mask (0x7cf) is smaller
+    // than the value `init_clocks` writes (0x3807cf), so the upper bits stay
+    // set — ESP-IDF's `periph_ll_wifi_module_disable_clk_set_rst` leaves them
+    // set as well, and they only feed the modem, which
+    // `disable_wifi_power_domain` powers off.
+}

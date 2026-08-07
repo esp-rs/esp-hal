@@ -15,3 +15,10 @@ pub(crate) mod clocks_ll;
 pub(crate) fn init_radio_clocks() {
     clocks_ll::init_clocks();
 }
+
+/// Undo the clock initialization done by [`init_radio_clocks`], gating the
+/// modem clocks again (mirroring ESP-IDF's per-module clock disable).
+#[inline]
+pub(crate) fn deinit_radio_clocks() {
+    clocks_ll::deinit_clocks();
+}
