@@ -17,6 +17,7 @@
 
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU},
+    rtc_cntl::xtal32k,
     soc::regi2c,
 };
 
@@ -50,7 +51,7 @@ impl CpuClock {
         ahb_clk: Some(AhbClkConfig::new(3)), // 40MHz - cannot exceed XTAL_CLK
         apb_clk: Some(ApbClkConfig::new(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         crypto_clk: Some(CryptoClkConfig::PllF480m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         timg_calibration_clock: None,
@@ -62,7 +63,7 @@ impl CpuClock {
         ahb_clk: Some(AhbClkConfig::new(3)), // 40MHz - cannot exceed XTAL_CLK
         apb_clk: Some(ApbClkConfig::new(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         crypto_clk: Some(CryptoClkConfig::PllF480m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         timg_calibration_clock: None,
@@ -74,7 +75,7 @@ impl CpuClock {
         ahb_clk: Some(AhbClkConfig::new(5)), // 40MHz - cannot exceed XTAL_CLK
         apb_clk: Some(ApbClkConfig::new(0)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         crypto_clk: Some(CryptoClkConfig::PllF480m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         timg_calibration_clock: None,

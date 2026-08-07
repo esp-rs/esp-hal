@@ -17,7 +17,6 @@ use crate::{
 };
 
 /// Additional properties (besides those defined in cfg.rs) for [device.gpio].
-/// These don't get turned into symbols, but are used to generate code.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GpioPinsAndSignals {
@@ -31,7 +30,14 @@ pub(crate) struct GpioPinsAndSignals {
     pub output_signals: Vec<IoMuxSignal>,
 }
 
-impl GenericProperty for GpioPinsAndSignals {}
+impl GenericProperty for GpioPinsAndSignals {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        self.pins
+            .iter()
+            .any(|p| p.is_xtal32k())
+            .then(|| vec!["soc_has_xtal32k_pads".to_string()])
+    }
+}
 
 /// Possible special cases that may affect pin availability or functionality.
 ///
@@ -148,6 +154,13 @@ pub(crate) struct PinConfig {
 }
 
 impl PinConfig {
+    /// Returns `true` if this pin is wired to one of the 32 kHz crystal (XTAL32K) pads.
+    pub(crate) fn is_xtal32k(&self) -> bool {
+        (0..AnalogMap::COUNT)
+            .filter_map(|af| self.analog.get(af))
+            .any(|signal| matches!(signal, "XTAL_32K_P" | "XTAL_32K_N"))
+    }
+
     pub(crate) fn limitations(&self) -> Vec<PinLimitation> {
         let mut limitations = self.limitations.clone();
 
