@@ -11,10 +11,6 @@ use crate::{gpio::Level, rtc_cntl::sleep::RtcIoWakeupPinType};
         cfg(any(esp32c3, esp32c2)) => "GPIO3",
         cfg(any(esp32s2, esp32s3)) => "GPIO18"
     },
-    "rtc_pin_trait" => {
-        cfg(any(esp32c3, esp32c2)) => "gpio::LpPinWithResistors",
-        cfg(any(esp32s2, esp32s3)) => "gpio::LpPin"
-    },
 )]
 /// RTC_IO wakeup source
 ///
@@ -42,7 +38,7 @@ use crate::{gpio::Level, rtc_cntl::sleep::RtcIoWakeupPinType};
 ///
 /// let delay = Delay::new();
 /// let timer = TimerWakeupSource::new(Duration::from_secs(10));
-/// let wakeup_pins: &mut [(&mut dyn __rtc_pin_trait__, Level)] = &mut [
+/// let wakeup_pins: &mut [(&mut dyn gpio::LpPin, Level)] = &mut [
 ///     (&mut peripherals.__pin0__, Level::Low),
 ///     (&mut peripherals.__pin1__, Level::High),
 /// ];

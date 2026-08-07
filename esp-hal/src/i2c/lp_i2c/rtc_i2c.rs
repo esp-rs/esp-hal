@@ -4,23 +4,28 @@
 //! address.
 
 use crate::{
-    gpio::{LpPin, lp_io::LpFunction},
+    gpio::{
+        LpPin,
+        lp_io::{LpFunction, low_level},
+    },
     i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
     peripherals::{GPIO, RTC_IO, SENS},
     time::Duration,
 };
 
 fn bind_pin(pin: &impl LpPin, function: LpFunction) {
+    let lp = pin.lp_number();
+
     GPIO::regs()
         .pin(pin.number() as usize)
         .modify(|_, w| w.pad_driver().bit(true));
     RTC_IO::regs()
-        .touch_pad(pin.number() as usize)
+        .touch_pad(lp as usize)
         .modify(|_, w| w.rue().bit(true).rde().bit(false));
     RTC_IO::regs()
         .rtc_gpio_enable_w1ts()
-        .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << pin.number()) });
-    pin.lp_set_config(true, true, function);
+        .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << lp) });
+    low_level::set_config(lp, true, true, function);
 }
 
 for_each_lp_function! {
