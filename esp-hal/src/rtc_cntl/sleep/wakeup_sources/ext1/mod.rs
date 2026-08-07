@@ -23,7 +23,7 @@ mod implementation;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, LowPower, TimerWakeupSource}, wakeup_cause, SocResetReason};
 /// # use esp_hal::system::Cpu;
-/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull, LpPinWithResistors};
+/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull, LpPin};
 /// # use esp_hal::time::Duration;
 /// #
 /// let delay = Delay::new();
@@ -41,7 +41,7 @@ mod implementation;
 ///
 /// core::mem::drop(pin_low_input);
 ///
-/// let wakeup_pins: &mut [(&mut dyn LpPinWithResistors, Level)] =
+/// let wakeup_pins: &mut [(&mut dyn LpPin, Level)] =
 /// &mut [
 ///     (&mut peripherals.__pin_low__, Level::Low),
 ///     (&mut peripherals.__pin_high__, Level::High),

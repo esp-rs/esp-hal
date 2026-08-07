@@ -1,5 +1,9 @@
 use crate::{
-    gpio::{Level, LpPin, lp_io::LpFunction},
+    gpio::{
+        Level,
+        LpPin,
+        lp_io::{LpFunction, low_level},
+    },
     peripherals::LP_AON,
     rtc_cntl::{
         Rtc,
@@ -25,10 +29,10 @@ impl Ext1WakeupSource<'_, '_> {
             let pin_number = pin.lp_number();
 
             if wakeup_pins & (1 << pin_number) != 0 {
-                pin.lp_pad_hold(false);
+                low_level::pad_hold(pin_number, false);
                 cfg_select! {
                     esp32h2 => pin.degrade().init_gpio(),
-                    _ => pin.lp_set_config(false, false, LpFunction::LP_GPIO),
+                    _ => low_level::set_config(pin_number, false, false, LpFunction::LP_GPIO),
                 }
             }
         }
@@ -63,8 +67,8 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
                 Level::Low => 0,
             };
 
-            pin.lp_set_config(true, !cfg!(esp32h2), LpFunction::LP_GPIO);
-            pin.lp_pad_hold(true);
+            low_level::set_config(pin_number, true, !cfg!(esp32h2), LpFunction::LP_GPIO);
+            low_level::pad_hold(pin_number, true);
         }
 
         LP_AON::regs()
@@ -84,10 +88,12 @@ impl Drop for Ext1WakeupSource<'_, '_> {
     fn drop(&mut self) {
         let mut pins = self.pins.borrow_mut();
         for (pin, _level) in pins.iter_mut() {
+            let pin_number = pin.lp_number();
+
             if cfg!(esp32h2) {
-                pin.lp_pad_hold(false);
+                low_level::pad_hold(pin_number, false);
             }
-            pin.lp_set_config(true, false, LpFunction::LP_GPIO);
+            low_level::set_config(pin_number, true, false, LpFunction::LP_GPIO);
         }
     }
 }
