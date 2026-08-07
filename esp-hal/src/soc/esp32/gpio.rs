@@ -109,14 +109,15 @@ macro_rules! touch {
         impl $crate::gpio::TouchPin for $crate::peripherals::$pin_peri<'_> {
             fn set_touch(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::{GPIO, RTC_IO, SENS};
-                use $crate::gpio::LpPin;
+                use $crate::gpio::{LpPin, Pin};
 
                 let gpio = GPIO::regs();
                 let rtcio = RTC_IO::regs();
                 let sens = SENS::regs();
 
-                // Pad to normal mode (not open-drain)
-                gpio.pin(self.lp_number() as usize).write(|w| w.pad_driver().clear_bit());
+                // Set the pad to normal mode, and not to open-drain. This register belongs to the
+                // digital GPIO peripheral, which uses its own pad numbers.
+                gpio.pin(self.number() as usize).write(|w| w.pad_driver().clear_bit());
 
                 // clear output
                 rtcio

@@ -3,10 +3,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::{
-    gpio::{Event, Flex, GpioBank, Input, InputPin, WaitForOptions, WakeConfigError},
-    rtc_cntl::WakeLock,
-};
+use crate::gpio::{Event, Flex, GpioBank, Input, InputPin};
 
 impl Flex<'_> {
     /// Wait until the pin experiences a particular [`Event`].
@@ -17,44 +14,13 @@ impl Flex<'_> {
     ///
     /// Note that calling this function will overwrite previous
     /// [`listen`][Self::listen] operations for this pin.
+    ///
+    /// A wait continues through a light sleep, and a pin that waits also ends the sleep, like a
+    /// listening pin. There is one exception: a wait for an edge on a pin that is already at the
+    /// level at the end of that edge. See [`listen`][Self::listen].
     #[inline]
     #[instability::unstable]
     pub async fn wait_for(&mut self, event: Event) {
-        unwrap!(
-            self.wait_for_with_options(event, WaitForOptions::default())
-                .await
-        );
-    }
-
-    /// Wait until the pin experiences a particular [`Event`], with
-    /// configurable options.
-    ///
-    /// The GPIO driver will disable listening for the event once it occurs,
-    /// or if the `Future` is dropped - which also means this method is **not**
-    /// cancellation-safe, it will always wait for a future event.
-    ///
-    /// Note that calling this function will overwrite previous
-    /// [`listen`][Self::listen] and [`wakeup_enable`][Self::wakeup_enable]
-    /// operations for this pin.
-    ///
-    /// When `options.wake_enable` is `true`, the pin will also wake the
-    /// CPU from light sleep when the event occurs. Only level-triggered
-    /// events ([`Event::LowLevel`] and [`Event::HighLevel`]) support wake-up;
-    /// edge-triggered events will return an error.
-    ///
-    /// # Error
-    ///
-    /// Returns an error if [`WaitForOptions`] specifies `wake_enable: true`
-    /// and the event is an edge trigger ([`Event::RisingEdge`],
-    /// [`Event::FallingEdge`], or [`Event::AnyEdge`]), as edge-triggered
-    /// wake-up is not supported.
-    #[inline]
-    #[instability::unstable]
-    pub async fn wait_for_with_options(
-        &mut self,
-        event: Event,
-        options: WaitForOptions,
-    ) -> Result<(), WakeConfigError> {
         // Make sure this pin is not being processed by an interrupt handler. We need to
         // always take a critical section even if the pin is not listening, because the
         // interrupt handler may be running on another core and the interrupt handler
@@ -62,17 +28,6 @@ impl Flex<'_> {
         // regardless of the pin actually listening or not.
         if self.is_listening() || self.is_interrupt_set() {
             self.unlisten_and_clear();
-        }
-
-        // Validate wake config upfront to avoid partial setup (async bit set but
-        // interrupt not configured).
-        if options.wake_enable {
-            match event {
-                Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
-                    return Err(WakeConfigError::EdgeTriggeringNotSupported);
-                }
-                _ => {}
-            }
         }
 
         // At this point the pin is no longer listening, and not being processed, so we
@@ -89,16 +44,9 @@ impl Flex<'_> {
 
         // Start listening for the event. We only need to do this once, as disabling
         // the interrupt will signal the future to complete.
-        self.pin
-            .listen_with_options(event, true, options.wake_enable)?;
-
-        // Hold a wake lock for the duration of the wait so automatic light sleep does
-        // not gate the GPIO interrupt. When the pin is configured as a light-sleep wake
-        // source, sleeping is intended (the pin will wake the chip), so no lock is held.
-        let _wake_lock = (!options.wake_enable).then(WakeLock::new);
+        self.pin.listen(event);
 
         PinFuture { pin: self }.await;
-        Ok(())
     }
 
     /// Wait until the pin is high.
@@ -172,55 +120,14 @@ impl Input<'_> {
     /// - Dropping the [`Future`] returned by this function will cancel the wait operation. If the
     ///   event occurs after the future is dropped, a consequent wait operation will ignore the
     ///   event.
+    ///
+    /// A wait continues through a light sleep, and a pin that waits also ends the sleep, like a
+    /// listening pin. There is one exception: a wait for an edge on a pin that is already at the
+    /// level at the end of that edge. See [`listen`][Self::listen].
     #[inline]
     #[instability::unstable]
     pub async fn wait_for(&mut self, event: Event) {
         self.pin.wait_for(event).await
-    }
-
-    #[procmacros::doc_replace]
-    /// Wait until the pin experiences a particular [`Event`], with
-    /// configurable options.
-    ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    /// # {before_snippet}
-    /// use esp_hal::gpio::{Event, Input, InputConfig, WaitForOptions};
-    /// let mut input_pin = Input::new(peripherals.GPIO4, InputConfig::default());
-    ///
-    /// input_pin
-    ///     .wait_for_with_options(
-    ///         Event::HighLevel,
-    ///         WaitForOptions::default().with_wake_enable(true),
-    ///     )
-    ///     .await?;
-    /// # {after_snippet}
-    /// ```
-    ///
-    /// ## Cancellation
-    ///
-    /// This function is not cancellation-safe.
-    ///
-    /// - Calling this function will overwrite previous [`listen`][Self::listen] and
-    ///   [`wakeup_enable`][Self::wakeup_enable] operations for this pin, making it side-effectful.
-    /// - Dropping the [`Future`] returned by this function will cancel the wait operation. If the
-    ///   event occurs after the future is dropped, a consequent wait operation will ignore the
-    ///   event.
-    ///
-    /// # Error
-    ///
-    /// Returns an error if [`WaitForOptions`] specifies `wake_enable: true`
-    /// and the event is an edge trigger, as edge-triggered wake-up is not
-    /// supported.
-    #[inline]
-    #[instability::unstable]
-    pub async fn wait_for_with_options(
-        &mut self,
-        event: Event,
-        options: WaitForOptions,
-    ) -> Result<(), WakeConfigError> {
-        self.pin.wait_for_with_options(event, options).await
     }
 
     #[procmacros::doc_replace]

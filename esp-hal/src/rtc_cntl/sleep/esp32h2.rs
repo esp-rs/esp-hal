@@ -6,7 +6,7 @@ use crate::{
     rtc_cntl::{
         Rtc,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
-        sleep::{Ext1WakeupSource, WakeTriggers, pmu_common::SleepTimeConfig},
+        sleep::{SleepKind, pmu_common::SleepTimeConfig},
     },
     soc::clocks::{self, ClockTree, CpuClkConfig, HpRootClkConfig, LpSlowClkConfig},
 };
@@ -484,13 +484,11 @@ impl RtcSleepConfig {
         self.deep
     }
 
-    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
-        Self::wake_io_reset();
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.deep = kind == SleepKind::Deep;
     }
 
-    fn wake_io_reset() {
-        Ext1WakeupSource::wake_io_reset();
-    }
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {}
 
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
@@ -526,10 +524,7 @@ impl RtcSleepConfig {
     /// Configures wakeup options and enters sleep.
     ///
     /// This function does not return if deep sleep is requested.
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
-        let wakeup_mask = wakeup_triggers.as_u32();
-        let reject_mask = wakeup_triggers.reject_mask(self.deep);
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         let _restore_clock_config = ClockTree::with(|clocks| {
             let old_hp_root_clk = clocks.hp_root_clk();
             let old_cpu_divider = clocks.cpu_clk();
@@ -590,7 +585,7 @@ impl RtcSleepConfig {
 
         // pmu_ll_hp_set_reject_enable
         PMU::regs().slp_wakeup_cntl1().modify(|_, w| unsafe {
-            w.slp_reject_en().bit(true);
+            w.slp_reject_en().bit(reject_mask != 0);
             w.sleep_reject_ena().bits(reject_mask)
         });
 
@@ -623,6 +618,7 @@ impl RtcSleepConfig {
 
     /// Cleans up after sleep
     pub(crate) fn finish_sleep(&self) {
-        Self::wake_io_reset();
+        // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
+        // driver knows which pads it prepared.
     }
 }

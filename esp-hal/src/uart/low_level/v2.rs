@@ -126,6 +126,15 @@ pub(super) fn suspend(info: &Info, en: bool) {
 }
 
 #[cfg(sleep_driver_supported)]
+pub(super) fn set_wakeup_edge_threshold(info: &Info, threshold: u16) {
+    info.regs().sleep_conf2().modify(|_, w| unsafe {
+        // Wake on a number of rising edges on RX, which is the only mode of this driver.
+        w.wk_mode_sel().bits(0);
+        w.active_threshold().bits(threshold)
+    });
+}
+
+#[cfg(sleep_driver_supported)]
 pub(super) fn wait_for_suspended(info: &Info) {
     const FSM_IDLE: u8 = 0;
     const FSM_TX_WAIT_SEND: u8 = 0x0F;

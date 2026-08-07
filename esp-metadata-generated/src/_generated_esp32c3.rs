@@ -379,6 +379,18 @@ macro_rules! property {
     ("sleep.deep_sleep") => {
         true
     };
+    ("sleep.rejectable_mask") => {
+        1852
+    };
+    ("sleep.pin_wakeup_version") => {
+        2
+    };
+    ("sleep.pin_wakeup_version", str) => {
+        stringify!(2)
+    };
+    ("sleep.deep_sleep_needs_gpio_isolation") => {
+        true
+    };
     ("soc.cpu_has_branch_predictor") => {
         false
     };

@@ -116,11 +116,13 @@ async fn main(_spawner: Spawner) {
 
     let delay = esp_hal::delay::Delay::new();
 
-    let timer = esp_hal::rtc_cntl::sleep::TimerWakeupSource::new(
-        esp_hal::time::Duration::from_millis(SLEEP_MS),
-    );
-
+    // Send the console output before the code arms the deadline. The deadline is absolute, so a
+    // delay after the arming makes the sleep 30 ms shorter.
     delay.delay_millis(100);
 
-    lpwr.sleep(&config, &[&timer]);
+    lpwr.set_wakeup_deadline(
+        esp_hal::time::Instant::now() + esp_hal::time::Duration::from_millis(SLEEP_MS),
+    );
+
+    lpwr.sleep_deep(config);
 }

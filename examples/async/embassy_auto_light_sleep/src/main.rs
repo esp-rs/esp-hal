@@ -23,7 +23,7 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::{Event, Input, InputConfig, Pull, WaitForOptions},
+    gpio::{Event, Input, InputConfig, Pull},
     interrupt::software::SoftwareInterruptControl,
     peripherals,
     rtc_cntl::WakeLock,
@@ -67,22 +67,12 @@ async fn gpio(boot_btn: BOOT_GPIO<'static>) {
     let mut input = Input::new(boot_btn, InputConfig::default().with_pull(Pull::Up));
 
     loop {
-        input
-            .wait_for_with_options(
-                Event::LowLevel,
-                WaitForOptions::default().with_wake_enable(true),
-            )
-            .await
-            .unwrap();
+        // A pin that waits for an event also ends a light sleep, so it needs no wakeup
+        // configuration.
+        input.wait_for(Event::LowLevel).await;
         esp_println::println!("button low (wakeup cause: {:?})", wakeup_cause());
 
-        input
-            .wait_for_with_options(
-                Event::HighLevel,
-                WaitForOptions::default().with_wake_enable(true),
-            )
-            .await
-            .unwrap();
+        input.wait_for(Event::HighLevel).await;
         esp_println::println!("button high");
     }
 }

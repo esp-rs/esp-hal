@@ -322,7 +322,21 @@ apb_cycle_wait_num = 16 # TODO
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+ext1_version = 1
+pin_wakeup_version = 1
+deep_sleep_needs_gpio_isolation = true
 wakeup_sources = {
+    # A UART wake cannot reject a sleep.
+    rejectable = [
+        "Ext0",
+        "Ext1",
+        "Gpio",
+        "Timer",
+        "Wifi",
+        "Touch",
+        "UlpRiscv",
+        "UlpRiscvTrap",
+    ],
     Ext0 = 0,
     Ext1 = 1,
     Gpio = 2,
