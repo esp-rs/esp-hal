@@ -18,6 +18,13 @@ use crate::{generate_for_each_macro, number};
 /// invocation in `rtc_cntl`), not here.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct WakeupSources {
+    /// The sources that can reject a sleep request, if the chip cannot reject on every source.
+    ///
+    /// A source rejects a sleep request if the source is already asserted at the
+    /// request. Most chips can reject on every source that they can wake from, and
+    /// do not set this field. esp32 has reject enables for `Gpio` and `Sdio` only.
+    rejectable: Option<Vec<String>>,
+
     /// Maps a `WakeupSource` enum variant name to its bit position.
     ///
     /// Each key is used verbatim as the generated enum variant identifier, so it
@@ -26,6 +33,29 @@ pub(crate) struct WakeupSources {
     /// order becomes the variant order of the generated enum.
     #[serde(flatten)]
     sources: IndexMap<String, u8>,
+}
+
+impl WakeupSources {
+    /// The mask of sources that can reject a sleep request.
+    ///
+    /// This is a mask, and not a branch of `for_each_wakeup_source!`, for two reasons. First,
+    /// `esp-hal` needs no more than the mask, because it only intersects the mask with the
+    /// enabled sources. Second, a second branch also repeats those sources in the individual
+    /// matcher of the macro, which defines the `WakeupSource` enum.
+    fn rejectable_mask(&self) -> u32 {
+        let bit = |name: &String| {
+            let bit = self.sources.get(name).unwrap_or_else(|| {
+                panic!("`rejectable` names {name}, which is not a wakeup source")
+            });
+            1u32 << bit
+        };
+
+        match &self.rejectable {
+            // An empty field means that every source can reject, which is the usual case.
+            None => self.sources.values().map(|bit| 1u32 << bit).sum(),
+            Some(names) => names.iter().map(bit).sum(),
+        }
+    }
 }
 
 /// Generates `for_each_wakeup_source!`, which drives the `WakeupSource` enum in
@@ -54,6 +84,19 @@ impl super::GenericProperty for WakeupSources {
         }
 
         Some(sources)
+    }
+
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        if self.sources.is_empty() {
+            return quote! {};
+        }
+
+        let mask = number(self.rejectable_mask());
+        quote! {
+            ("sleep.rejectable_mask") => {
+                #mask
+            };
+        }
     }
 
     fn macros(&self) -> Option<proc_macro2::TokenStream> {
