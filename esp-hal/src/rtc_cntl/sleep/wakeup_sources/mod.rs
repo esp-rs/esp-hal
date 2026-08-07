@@ -23,7 +23,9 @@ cfg_select! {
     _ => {}
 }
 
-// TODO: use a lp_gpio_wakes_from_deep_sleep cfg, or make this universal.
+// Every chip with a `sleep.pin_wakeup_version` has the hardware for this source. The chip list is
+// narrower because only these four chips have a driver for it.
+// TODO: make this universal.
 cfg_select! {
     all(sleep_has_wakeup_source_gpio, any(esp32c2, esp32c3, esp32s2, esp32s3)) => {
         mod rtcio;

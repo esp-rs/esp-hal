@@ -66,6 +66,6 @@ impl<'a, 'b> RtcioWakeupSource<'a, 'b> {
     }
 }
 
-#[cfg_attr(any(esp32s2, esp32s3), path = "s2s3.rs")]
-#[cfg_attr(any(esp32c2, esp32c3), path = "c2c3.rs")]
+#[cfg_attr(sleep_pin_wakeup_version = "1", path = "v1.rs")]
+#[cfg_attr(sleep_pin_wakeup_version = "2", path = "v2.rs")]
 mod implementation;
