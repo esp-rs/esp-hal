@@ -206,7 +206,7 @@ impl<'a, 'd> Ota<'a, 'd> {
         }
 
         if flash.capacity() != 0x2000
-            || flash.raw.partition_type() != PartitionType::Data(DataPartitionSubType::Ota)
+            || flash.partition_type != PartitionType::Data(DataPartitionSubType::Ota)
         {
             return Err(Error::InvalidPartition {
                 expected_size: 0x2000,
@@ -425,12 +425,9 @@ mod tests {
 
     fn ota_region<'a>(
         flash: &'a mut FlashStorage<'static>,
-        binary: &'a mut [u8; 32],
+        binary: [u8; 32],
     ) -> FlashRegion<'a, 'static> {
-        FlashRegion {
-            raw: PartitionEntry { binary },
-            flash,
-        }
+        PartitionEntry { binary }.as_flash_region(flash)
     }
 
     fn init_ota_flash(flash: &mut FlashStorage<'static>) {
@@ -445,12 +442,10 @@ mod tests {
 
     #[test]
     fn test_initial_state_and_next_slot() {
-        let mut binary = PARTITION_RAW;
-
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
-        let mock_region = ota_region(&mut flash, &mut binary);
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -484,14 +479,12 @@ mod tests {
 
     #[test]
     fn test_slot0_valid_next_slot() {
-        let mut binary = PARTITION_RAW;
-
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
         flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
         flash.write(0x1000, SLOT_INITIAL).unwrap();
 
-        let mock_region = ota_region(&mut flash, &mut binary);
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -515,14 +508,12 @@ mod tests {
 
     #[test]
     fn test_slot1_new_next_slot() {
-        let mut binary = PARTITION_RAW;
-
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
         flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
         flash.write(0x1000, SLOT_COUNT_2_NEW).unwrap();
 
-        let mock_region = ota_region(&mut flash, &mut binary);
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -547,12 +538,10 @@ mod tests {
 
     #[test]
     fn test_multi_updates() {
-        let mut binary = PARTITION_RAW;
-
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
-        let mock_region = ota_region(&mut flash, &mut binary);
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -605,12 +594,10 @@ mod tests {
 
     #[test]
     fn test_multi_updates_4_apps() {
-        let mut binary = PARTITION_RAW;
-
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
-        let mock_region = ota_region(&mut flash, &mut binary);
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 4).unwrap();
         assert_eq!(
@@ -682,12 +669,10 @@ mod tests {
 
     #[test]
     fn test_multi_updates_skip_parts() {
-        let mut binary = PARTITION_RAW;
-
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
-        let mock_region = ota_region(&mut flash, &mut binary);
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 16).unwrap();
         assert_eq!(
@@ -733,11 +718,10 @@ mod tests {
 
     #[test]
     fn test_read_erased_slot() {
-        let mut binary = PARTITION_RAW;
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
-        let mut region = ota_region(&mut flash, &mut binary);
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
         let entry = OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET).unwrap();
         assert_eq!(entry.ota_seq, UNINITIALIZED_SEQUENCE);
         assert_eq!(entry.seq_label, [0xff; 20]);
@@ -747,12 +731,11 @@ mod tests {
 
     #[test]
     fn test_read_valid_slot() {
-        let mut binary = PARTITION_RAW;
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
         flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
 
-        let mut region = ota_region(&mut flash, &mut binary);
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
         let entry = OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET).unwrap();
         assert_eq!(entry.ota_seq, 1);
         assert_eq!(entry.ota_state, OtaImageState::Valid);
@@ -760,7 +743,6 @@ mod tests {
 
     #[test]
     fn test_read_rejects_bad_crc() {
-        let mut binary = PARTITION_RAW;
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
@@ -769,7 +751,7 @@ mod tests {
         slot[31] ^= 0xff;
         flash.write(0x0000, &slot).unwrap();
 
-        let mut region = ota_region(&mut flash, &mut binary);
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
         assert!(matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
@@ -778,7 +760,6 @@ mod tests {
 
     #[test]
     fn test_read_rejects_unknown_ota_state() {
-        let mut binary = PARTITION_RAW;
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
@@ -790,7 +771,7 @@ mod tests {
         slot[28..32].copy_from_slice(&crc.to_le_bytes());
         flash.write(0x0000, &slot).unwrap();
 
-        let mut region = ota_region(&mut flash, &mut binary);
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
         assert!(matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
@@ -799,7 +780,6 @@ mod tests {
 
     #[test]
     fn test_read_rejects_erased_seq_with_non_erased_state() {
-        let mut binary = PARTITION_RAW;
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
@@ -807,7 +787,7 @@ mod tests {
         slot[24..28].copy_from_slice(&(OtaImageState::Valid as u32).to_le_bytes());
         flash.write(0x0000, &slot).unwrap();
 
-        let mut region = ota_region(&mut flash, &mut binary);
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
         assert!(matches!(
             OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
             Err(crate::partitions::Error::Invalid)
@@ -816,7 +796,6 @@ mod tests {
 
     #[test]
     fn test_one_corrupt_slot_fails_current_app_partition() {
-        let mut binary = PARTITION_RAW;
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
@@ -826,7 +805,7 @@ mod tests {
         flash.write(0x0000, &corrupt).unwrap();
         flash.write(0x1000, SLOT_COUNT_2_NEW).unwrap();
 
-        let region = ota_region(&mut flash, &mut binary);
+        let region = ota_region(&mut flash, PARTITION_RAW);
         let mut sut = Ota::new(region, 2).unwrap();
         assert_eq!(
             sut.current_app_partition(),
@@ -836,7 +815,6 @@ mod tests {
 
     #[test]
     fn test_reset_to_factory_after_corrupt_ota_data() {
-        let mut binary = PARTITION_RAW;
         let mut flash = FlashStorage::new();
         init_ota_flash(&mut flash);
 
@@ -846,7 +824,7 @@ mod tests {
         flash.write(0x0000, &corrupt).unwrap();
         flash.write(0x1000, SLOT_COUNT_2_NEW).unwrap();
 
-        let region = ota_region(&mut flash, &mut binary);
+        let region = ota_region(&mut flash, PARTITION_RAW);
         let mut sut = Ota::new(region, 2).unwrap();
         assert_eq!(
             sut.current_app_partition(),
