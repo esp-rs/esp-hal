@@ -28,8 +28,7 @@
 #[cfg_attr(not(sleep_ext1_version_is_set), path = "per_pin.rs")]
 mod path;
 
-use portable_atomic::{AtomicU32, Ordering};
-use strum::EnumCount;
+use portable_atomic::Ordering;
 
 use crate::{
     gpio::{
@@ -39,7 +38,7 @@ use crate::{
         Level,
         Pin,
         WakeConfigError,
-        low_level::bank,
+        low_level::PadMask,
         lp_io::{LpFunction, low_level},
     },
     peripherals::GPIO,
@@ -82,35 +81,6 @@ pub struct WakeupConfig {
     /// whatever drives it. A light sleep gives the pad back to the digital GPIO peripheral when it
     /// ends; a deep sleep releases the hold when the chip boots again.
     low_power_path: bool,
-}
-
-/// A set of pads, held in the words the GPIO peripheral groups its pins into.
-struct PadMask([AtomicU32; GpioBank::COUNT]);
-
-impl PadMask {
-    const fn new() -> Self {
-        Self([const { AtomicU32::new(0) }; GpioBank::COUNT])
-    }
-
-    fn word(&self, bank: GpioBank) -> &AtomicU32 {
-        &self.0[bank as usize]
-    }
-
-    fn set(&self, gpio: u8, member: bool) {
-        let bank = bank(gpio);
-        let pin = 1 << (gpio - bank.offset());
-
-        if member {
-            self.word(bank).fetch_or(pin, Ordering::Relaxed);
-        } else {
-            self.word(bank).fetch_and(!pin, Ordering::Relaxed);
-        }
-    }
-
-    fn contains(&self, gpio: u8) -> bool {
-        let bank = bank(gpio);
-        self.word(bank).load(Ordering::Relaxed) & (1 << (gpio - bank.offset())) != 0
-    }
 }
 
 /// The pads that may wake the chip through a low-power path.

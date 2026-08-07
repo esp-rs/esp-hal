@@ -38,6 +38,25 @@ impl PadMask {
     pub(crate) fn word(&self, bank: GpioBank) -> &AtomicU32 {
         &self.0[bank as usize]
     }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn set(&self, gpio: u8, member: bool) {
+        let bank = bank(gpio);
+        let pin = 1 << (gpio - bank.offset());
+
+        if member {
+            self.word(bank).fetch_or(pin, Ordering::Relaxed);
+        } else {
+            self.word(bank).fetch_and(!pin, Ordering::Relaxed);
+        }
+    }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn contains(&self, gpio: u8) -> bool {
+        let bank = bank(gpio);
+
+        self.word(bank).load(Ordering::Relaxed) & (1 << (gpio - bank.offset())) != 0
+    }
 }
 
 impl GpioBank {
