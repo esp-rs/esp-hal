@@ -352,9 +352,6 @@ macro_rules! property {
     ("sleep.regdma_sw_trigger") => {
         false
     };
-    ("sleep.regdma_wait_ops") => {
-        false
-    };
     ("soc.cpu_has_branch_predictor") => {
         true
     };

@@ -735,12 +735,9 @@ driver_configs![
             wakeup_sources: WakeupSources,
             #[serde(default)]
             pd_retention: bool,
+            // Needed to work around an H2-specific quirk.
             #[serde(default)]
             regdma_sw_trigger: bool,
-            // Whether the chip's TOP-domain retention program includes a step that
-            // polls a register, as opposed to only reading and writing them.
-            #[serde(default)]
-            regdma_wait_ops: bool,
         }
     },
     SocProperties {

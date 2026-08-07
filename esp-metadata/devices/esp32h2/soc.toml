@@ -316,7 +316,6 @@ light_sleep = true
 deep_sleep = true
 pd_retention = true
 regdma_sw_trigger = true
-regdma_wait_ops = true
 wakeup_sources = {
     Ext1 = 1,
     Gpio = 2,

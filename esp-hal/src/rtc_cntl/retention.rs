@@ -128,7 +128,7 @@ macro_rules! write_reg {
 }
 
 /// A restore-only `Wait` until `(reg & mask) == value`.
-#[cfg(sleep_regdma_wait_ops)]
+#[allow(unused_macros)]
 macro_rules! wait_reg {
     ($peri:ident, [$($path:tt)+], $value:expr, $mask:expr) => {
         SysOp::Wait {
@@ -683,7 +683,9 @@ enum SysOp {
         mask: u32,
     },
     /// Restore-only poll of `addr` until `(reg & mask) == value`.
-    #[cfg(sleep_regdma_wait_ops)]
+    ///
+    /// Constructed by [`wait_reg!`]; unused on chips whose SYS `OPS` omit it.
+    #[allow(dead_code)]
     Wait {
         addr: fn() -> u32,
         value: u32,
@@ -698,9 +700,10 @@ enum SysOp {
 /// PAU nodes emitted for one [`SysOp`].
 const fn op_nodes(op: &SysOp) -> usize {
     match op {
-        SysOp::Continuous { .. } | SysOp::ContinuousSplit { .. } | SysOp::Write { .. } => 1,
-        #[cfg(sleep_regdma_wait_ops)]
-        SysOp::Wait { .. } => 1,
+        SysOp::Continuous { .. }
+        | SysOp::ContinuousSplit { .. }
+        | SysOp::Write { .. }
+        | SysOp::Wait { .. } => 1,
         SysOp::Uart { .. } => UART_NODE_COUNT,
         SysOp::Systimer { .. } => SYSTIMER_NODE_COUNT,
     }
@@ -712,9 +715,7 @@ const fn op_words(op: &SysOp) -> usize {
         SysOp::Continuous { count, .. } | SysOp::ContinuousSplit { count, .. } => *count as usize,
         SysOp::Uart { .. } => UART_WORDS,
         SysOp::Systimer { .. } => SYSTIMER_CONT_WORDS,
-        SysOp::Write { .. } => 0,
-        #[cfg(sleep_regdma_wait_ops)]
-        SysOp::Wait { .. } => 0,
+        SysOp::Write { .. } | SysOp::Wait { .. } => 0,
     }
 }
 
@@ -1161,7 +1162,6 @@ mod sys_periph {
                     nodes[node] = RegdmaLink::write(addr(), value, mask, true, false);
                     node += 1;
                 }
-                #[cfg(sleep_regdma_wait_ops)]
                 SysOp::Wait { addr, value, mask } => {
                     nodes[node] = RegdmaLink::wait(addr(), value, mask, true, false);
                     node += 1;
