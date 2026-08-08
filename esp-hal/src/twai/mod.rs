@@ -592,7 +592,7 @@ impl EspTwaiFrame {
         // For data frames, assert that:
         // - Data length smaller than 8 must have equal DLC
         // - Data length equal to 8 hmust ave DLC >= 8
-        if !remote_request && ((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8))
+        if !remote_request && (((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8)))
         {
             return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
         }
