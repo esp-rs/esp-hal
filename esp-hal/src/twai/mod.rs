@@ -585,11 +585,15 @@ impl EspTwaiFrame {
         if data_len > 8 || (remote_request & (data_len > 0)) {
             return Err(EspTwaiError::InvalidDataLength(data_len as u8));
         }
-        // Assert that:
-        // - Max DLC is 15
+        // Assert that max DLC is 15
+        if dlc > 15 {
+            return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
+        }
+        // For data frames, assert that:
         // - Data length smaller than 8 must have equal DLC
         // - Data length equal to 8 hmust ave DLC >= 8
-        if dlc > 15 || ((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8)) {
+        if !remote_request && ((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8))
+        {
             return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
         }
 
