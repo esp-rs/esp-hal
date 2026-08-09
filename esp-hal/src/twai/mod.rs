@@ -98,22 +98,22 @@
 //!     can_rx_pin,
 //!     can_tx_pin,
 //!     TWAI_BAUDRATE,
-//!     TwaiMode::SelfTest
+//!     TwaiMode::SelfTest,
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
 //! // undesired messages
-//! can_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
-//! b"x", [b"xxxxxxxx", b"xxxxxxxx"]) });
+//! can_config.set_filter(
+//!     const { SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
+//! );
 //!
 //! // Start the peripheral. This locks the configuration settings of the
 //! // peripheral and puts it into operation mode, allowing packets to be sent
 //! // and received.
 //! let mut can = can_config.start();
 //!
-//! # // TODO: `new_*` should return Result not Option
-//! let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO,
-//!     &[1, 2, 3]).unwrap(); // Wait for a frame to be received.
+//! let frame = EspTwaiFrame::new_data(StandardId::ZERO, &[1, 2, 3], 0, true).unwrap();
+//! // Wait for a frame to be received.
 //! let frame = block!(can.receive())?;
 //!
 //! # loop {}
@@ -409,11 +409,11 @@ impl From<embedded_can::Id> for Id {
 #[instability::unstable]
 impl embedded_can::Frame for EspTwaiFrame {
     fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
-        Self::new(id.into(), data)
+        Self::new_data(id.into(), data, 0, false).ok()
     }
 
     fn new_remote(id: impl Into<embedded_can::Id>, dlc: usize) -> Option<Self> {
-        Self::new_remote(id.into(), dlc)
+        Self::new_request(id.into(), dlc, false).ok()
     }
 
     fn is_extended(&self) -> bool {
@@ -569,39 +569,23 @@ impl EspTwaiFrame {
         Self { bytes }
     }
 
-    /// Make a new [`EspTwaiFrame`] from parameters.
-    fn new_from_parameters(
-        id: impl Into<Id>,
+    /// Make a new [`EspTwaiFrame`] from parameters, without validation.
+    unsafe fn new_unchecked(
         remote_request: bool,
-        self_reception: bool,
-        dlc: usize,
+        id: impl Into<Id>,
         data: &[u8],
-    ) -> Result<Self, EspTwaiError> {
-        let data_len = data.len();
-
-        // Assert that:
-        // - Max data length is 8
-        // - remote request frames have no data payload
-        if data_len > 8 || (remote_request & (data_len > 0)) {
-            return Err(EspTwaiError::InvalidDataLength(data_len as u8));
-        }
-        // Assert that:
-        // - Max DLC is 15
-        // - Data length smaller than 8 must have equal DLC
-        // - Data length equal to 8 hmust ave DLC >= 8
-        if dlc > 15 || ((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8)) {
-            return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
-        }
-
+        dlc: usize,
+        self_reception: bool,
+    ) -> Self {
         let mut bytes = [0u8; 13];
 
         // Id
-        let (extended_format, data_start): (u8, usize) = match id.into() {
+        let (extended_format, data_start): (bool, usize) = match id.into() {
             Id::Standard(id) => {
                 let raw = id.as_raw();
                 bytes[1] = (raw >> 3) as u8;
                 bytes[2] = (raw << 5) as u8;
-                (0, 3)
+                (false, 3)
             }
             Id::Extended(id) => {
                 let raw = id.as_raw();
@@ -609,37 +593,96 @@ impl EspTwaiFrame {
                 bytes[2] = (raw >> 13) as u8;
                 bytes[3] = (raw >> 5) as u8;
                 bytes[4] = (raw << 3) as u8;
-                (1, 5)
+                (true, 5)
             }
         };
         // Frame Info
-        let ff = extended_format << 7;
+        let ff = (extended_format as u8) << 7;
         let rtr = (remote_request as u8) << 6;
         let sr = (self_reception as u8) << 4;
         let dlc = (dlc as u8) & 0b1111;
         bytes[0] = ff | rtr | sr | dlc;
         // Data
-        let data_end = data_start + data_len;
+        let data_end = data_start + data.len();
         bytes[data_start..data_end].copy_from_slice(data);
 
-        Ok(Self { bytes })
+        Self { bytes }
+    }
+
+    /// Create a new Data Frame.
+    ///
+    /// # Arguments
+    /// * `id` - Identifier.
+    /// * `data` - Data payload (up to 8 bytes).
+    /// * `dlc` - Custom Data Length Code (`0` defaults to `data.len()`).
+    /// * `self_reception` - If `true`, this frame will be received after a call to `transmit()`.
+    pub fn new_data(
+        id: impl Into<Id>,
+        data: &[u8],
+        dlc: usize,
+        self_reception: bool,
+    ) -> Result<Self, EspTwaiError> {
+        let data_len = data.len();
+        // Default DLC
+        let dlc = match dlc {
+            0 => data_len,
+            _ => dlc,
+        };
+
+        // Assert that max data length is 8
+        if data_len > 8 {
+            return Err(EspTwaiError::InvalidDataLength(data_len as u8));
+        }
+        // Assert that:
+        // - Max DLC is 15
+        // - Data length smaller than 8 must have equal DLC
+        // - Data length equal to 8 must have DLC >= 8
+        if dlc > 15 || ((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8)) {
+            return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
+        }
+
+        // SAFETY: Safe because we validated the parameters above.
+        unsafe { Ok(Self::new_unchecked(false, id, data, dlc, self_reception)) }
+    }
+
+    /// Create a new Request Frame.
+    ///
+    /// # Arguments
+    /// * `id` - Identifier.
+    /// * `dlc` - Data Length Code.
+    /// * `self_reception` - If `true`, this frame will be received after a call to `transmit()`.
+    pub fn new_request(
+        id: impl Into<Id>,
+        dlc: usize,
+        self_reception: bool,
+    ) -> Result<Self, EspTwaiError> {
+        // Assert that max DLC is 15
+        if dlc > 15 {
+            return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
+        }
+
+        // SAFETY: Safe because we validated the parameters above.
+        unsafe { Ok(Self::new_unchecked(true, id, &[], dlc, self_reception)) }
     }
 
     /// Create a new `EspTwaiFrame` with the specified ID and data payload.
+    #[deprecated(note = "Please use `new_data` instead")]
     pub fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
-        Self::new_from_parameters(id.into(), false, false, data.len(), data).ok()
+        Self::new_data(id, data, 0, false).ok()
     }
 
     /// Create a new `EspTwaiFrame` for a transmission request with the
     /// specified ID and data length (DLC).
+    #[deprecated(note = "Please use `new_request` instead")]
     pub fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
-        Self::new_from_parameters(id.into(), true, false, dlc, &[]).ok()
+        Self::new_request(id, dlc, false).ok()
     }
 
     /// Create a new `EspTwaiFrame` ready for self-reception with the specified
     /// ID and data payload.
+    #[deprecated(note = "Please use `new_data` instead")]
     pub fn new_self_reception(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
-        Self::new_from_parameters(id.into(), false, true, data.len(), data).ok()
+        Self::new_data(id, data, 0, true).ok()
     }
 }
 
