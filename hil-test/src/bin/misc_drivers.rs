@@ -656,8 +656,7 @@ mod twai {
 
         #[test]
         async fn test_async_transmit_and_receive(mut ctx: Context<Async>) {
-            let frame =
-                EspTwaiFrame::new_data(StandardId::ZERO, b"12345678", 0, true).unwrap();
+            let frame = EspTwaiFrame::new_data(StandardId::ZERO, b"12345678", 0, true).unwrap();
             transmit_frames(&mut ctx, &frame, 31).await;
             receive_frames(&mut ctx, 31).await;
         }
@@ -665,8 +664,7 @@ mod twai {
         #[test]
         // regression test for https://github.com/esp-rs/esp-hal/issues/4235
         async fn test_buffer_overrun_on_empty_queue(mut ctx: Context<Async>) {
-            let frame =
-                EspTwaiFrame::new_data(StandardId::ZERO, b"12345678", 0, true).unwrap();
+            let frame = EspTwaiFrame::new_data(StandardId::ZERO, b"12345678", 0, true).unwrap();
 
             interrupt::disable(Cpu::ProCpu, TWAI0);
 
@@ -705,7 +703,8 @@ mod twai {
 
             let mut twai = config.into_async().start();
 
-            let frame = EspTwaiFrame::new_data(StandardId::new(5).unwrap(), b"12345678", 0, false).unwrap();
+            let frame =
+                EspTwaiFrame::new_data(StandardId::new(5).unwrap(), b"12345678", 0, false).unwrap();
 
             twai.transmit_async(&frame).await.unwrap();
         }
