@@ -116,10 +116,10 @@ impl<'d> FlashStorage<'d> {
         Self {
             capacity: chip_specific::get_flash_size() as usize,
             unlocked: false,
-            multi_core_strategy: cfg_select!(
+            multi_core_strategy: cfg_select! {
                 multi_core => MultiCoreStrategy::Error,
                 _ => MultiCoreStrategy::Ignore,
-            ),
+            },
             _flash: flash,
         }
     }
