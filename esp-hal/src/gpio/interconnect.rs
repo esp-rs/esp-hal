@@ -555,7 +555,8 @@ where
     P: Pin + 'd,
 {
     fn from(input: P) -> Self {
-        InputSignal::new(input.degrade())
+        // Safety: the pin singleton proves that no other signal drives this pad.
+        unsafe { input.degrade().into_input_signal() }
     }
 }
 
@@ -742,7 +743,7 @@ where
     P: OutputPin + 'd,
 {
     fn from(output: P) -> Self {
-        OutputSignal::new(output.degrade())
+        output.degrade().into_output_signal()
     }
 }
 

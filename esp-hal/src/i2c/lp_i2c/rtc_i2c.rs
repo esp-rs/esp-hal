@@ -67,6 +67,8 @@ impl<'d> LpI2c<'d> {
             .register_block()
             .ctrl()
             .modify(|_, w| w.i2c_reset().set_bit());
+        // The state machine does not always come out of reset when the pulse is shorter than this.
+        crate::rom::ets_delay_us(20);
         self.i2c
             .register_block()
             .ctrl()
@@ -98,6 +100,13 @@ impl<'d> LpI2c<'d> {
     }
 
     pub(super) fn configure(&mut self, config: &Config) -> Result<(), ConfigError> {
+        let ticks = nanos_to_clock(config.timeout.as_micros().saturating_mul(1_000));
+
+        // The register field is 20 bits wide.
+        if ticks > (1 << 20) - 1 {
+            return Err(ConfigError::TimeoutTooLong);
+        }
+
         self.i2c
             .register_block()
             .scl_low()
@@ -119,8 +128,6 @@ impl<'d> LpI2c<'d> {
             .scl_stop_period()
             .write(|w| unsafe { w.scl_stop_period().bits(config.timing.scl_stop_period) });
 
-        let ticks = nanos_to_clock(config.timeout.as_micros().saturating_mul(1_000));
-        let ticks = ticks.max(2u32.pow(19) - 1);
         self.i2c
             .register_block()
             .to()
@@ -411,7 +418,10 @@ impl<'d> LpI2c<'d> {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub enum ConfigError {}
+pub enum ConfigError {
+    /// The timeout period is longer than the configuration register allows.
+    TimeoutTooLong,
+}
 
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, procmacros::BuilderLite)]
