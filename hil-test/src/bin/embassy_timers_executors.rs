@@ -518,7 +518,7 @@ mod interrupt_spi_dma {
         let dma_rx_buf = dma_rx_buffer!(1024).unwrap();
         let dma_tx_buf = dma_tx_buffer!(1024).unwrap();
 
-        let (_, mosi) = hil_test::common_test_pins!(peripherals);
+        let (miso, mosi) = hil_test::common_test_pins!(peripherals);
 
         let mut spi = Spi::new(
             peripherals.SPI2,
@@ -527,7 +527,7 @@ mod interrupt_spi_dma {
                 .with_mode(Mode::_0),
         )
         .unwrap()
-        .with_miso(unsafe { mosi.clone_unchecked() })
+        .with_miso(miso)
         .with_mosi(mosi)
         .with_dma(dma_channel1)
         .with_buffers(dma_rx_buf, dma_tx_buf)
