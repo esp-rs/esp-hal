@@ -405,12 +405,9 @@ fn parse_chips_from_annotation(
     {
         let meta = parse_meta_line(line)
             .with_context(|| format!("Failed to parse line {}", line_no + 1))?;
-        match meta.key.as_str() {
-            "CHIP_FILTER" => {
-                found = true;
-                chips = parse_chips(meta.value.as_str())?;
-            }
-            _ => {}
+        if meta.key.as_str() == "CHIP_FILTER" {
+            found = true;
+            chips = parse_chips(meta.value.as_str())?;
         }
     }
 
@@ -470,7 +467,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
         let chips = cargo_chips.into_iter().filter(|c| {
             chips_from_annotations
                 .as_ref()
-                .map_or(true, |set| set.contains(c))
+                .is_none_or(|set| set.contains(c))
         });
 
         for chip in chips {

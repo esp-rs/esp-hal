@@ -183,7 +183,7 @@ pub fn build_examples(
     // Build command list
     for example in examples.iter() {
         let command = crate::generate_build_command(
-            &package_path,
+            package_path,
             chip,
             &target,
             example,

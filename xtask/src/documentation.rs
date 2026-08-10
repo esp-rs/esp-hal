@@ -161,11 +161,11 @@ fn build_documentation_for_package(
     manifest: &Manifest,
 ) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
-    if let Some(chip) = chip {
-        if let Err(err) = package.validate_package_chip(&chip) {
-            log::warn!("{err}");
-            return Ok(());
-        }
+    if let Some(chip) = chip
+        && let Err(err) = package.validate_package_chip(&chip)
+    {
+        log::warn!("{err}");
+        return Ok(());
     }
 
     // Build the documentation for the specified package, targeting the
@@ -444,7 +444,7 @@ fn cargo_doc_without_pre_processing(
 ///
 /// The only currently supported function for expressions is `has(<SYMBOL>)`
 /// e.g. `has("psram")`
-fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<(), anyhow::Error> {
+fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &Path) -> Result<(), anyhow::Error> {
     let cargo_toml = std::fs::read_to_string(windows_safe_path(&package_path.join("Cargo.toml")))
         .with_context(|| {
         format!(
@@ -466,11 +466,7 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
 
     let cargo_toml = cargo_toml.lines();
 
-    let chip_cfg = if let Some(chip) = &chip {
-        Some(Config::for_chip(chip))
-    } else {
-        None
-    };
+    let chip_cfg = chip.as_ref().map(|chip| Config::for_chip(chip));
     let mut processed_cargo_toml = Vec::new();
     let mut engine = somni_expr::Context::new();
     engine.add_function("has", move |cond: &str| -> bool {
@@ -642,7 +638,7 @@ pub fn build_documentation_index(
             continue;
         }
         for version_path in fs::read_dir(&package_docs_path)
-            .with_context(|| format!("Failed to read {}", &package_docs_path.display()))?
+            .with_context(|| format!("Failed to read {}", package_docs_path.display()))?
         {
             let version_path = version_path?.path();
             if version_path.is_file() {

@@ -111,7 +111,7 @@ fn main() -> Result<()> {
     builder.init();
 
     let workspace =
-        std::env::current_dir().with_context(|| format!("Failed to get the current dir!"))?;
+        std::env::current_dir().with_context(|| "Failed to get the current dir!".to_string())?;
     let target_path = workspace.join("target");
 
     if std::env::var("CARGO_TARGET_DIR").is_err() {
@@ -224,7 +224,7 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
                     .arg(path.join("target").display().to_string())
                     .build();
 
-                xtask::cargo::run(&cargo_args, &path).with_context(|| {
+                xtask::cargo::run(&cargo_args, path).with_context(|| {
                     format!(
                         "Failed to run `cargo run` with {cargo_args:?} in {}",
                         path.display()
@@ -323,7 +323,7 @@ fn build_check_package_command(
         builder = builder.toolchain(toolchain);
     }
 
-    builder = builder.args(&args);
+    builder = builder.args(args);
 
     if !features.is_empty() {
         builder = builder.arg(format!("--features={}", features.join(",")));
@@ -735,9 +735,9 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // The `ota_example` expects a file named `target/ota_image` - it doesn't
         // care about the contents however
         std::fs::create_dir_all("./target")
-            .with_context(|| format!("Failed to create `./target`"))?;
+            .with_context(|| "Failed to create `./target`".to_string())?;
         std::fs::write("./target/ota_image", "DUMMY")
-            .with_context(|| format!("Failed to create a dummy file required by ota example!"))?;
+            .with_context(|| "Failed to create a dummy file required by ota example!".to_string())?;
 
         examples(
             workspace,
@@ -820,7 +820,7 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
 fn build_rlib(package: &str, chip: &str, target: &str) -> Result<PathBuf> {
     let workspace = std::env::current_dir().with_context(|| "Failed to get the current dir!")?;
     Command::new("cargo")
-        .args(&[
+        .args([
             "+esp",
             "build",
             "--no-default-features",
@@ -830,7 +830,7 @@ fn build_rlib(package: &str, chip: &str, target: &str) -> Result<PathBuf> {
             target,
             "-Zbuild-std=core",
         ])
-        .current_dir(workspace.join(package.to_string()))
+        .current_dir(workspace.join(package))
         .status()
         .context("Failed to run cargo build")?;
 
@@ -858,7 +858,7 @@ fn check_global_symbols(chips: &[Chip]) -> Result<()> {
     for chip in chips {
         let target = package.target_triple(chip)?;
 
-        let rlib_path = match build_rlib(&package.to_string(), &chip.to_string(), &target) {
+        let rlib_path = match build_rlib(package.as_ref(), chip.as_ref(), &target) {
             Ok(path) => path,
             Err(e) => {
                 println!(
@@ -874,7 +874,7 @@ fn check_global_symbols(chips: &[Chip]) -> Result<()> {
         let data = std::fs::read(&rlib_path)
             .with_context(|| format!("Failed to read {}!", rlib_path.display()))?;
         let archive = ArchiveFile::parse(data.as_slice())
-            .with_context(|| format!("Failed to create archive!"))?;
+            .with_context(|| "Failed to create archive!".to_string())?;
 
         let mut problematic_symbols: Vec<(String, SymbolKind, usize)> = Vec::new();
 
@@ -886,12 +886,11 @@ fn check_global_symbols(chips: &[Chip]) -> Result<()> {
             )?;
 
             for symbol in obj.symbols().filter(|s| s.is_global() && s.is_definition()) {
-                if let Ok(name) = symbol.name() {
-                    if try_demangle(name).is_err() {
+                if let Ok(name) = symbol.name()
+                    && try_demangle(name).is_err() {
                         let section = symbol.section_index().map(|i| i.0).unwrap_or(0);
                         problematic_symbols.push((name.to_string(), symbol.kind(), section));
                     }
-                }
             }
         }
 
