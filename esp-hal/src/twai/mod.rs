@@ -1523,13 +1523,7 @@ pub trait PrivateInstance: crate::private::Sealed {
                     TwaiInterrupt::BusError => w.bus_err_int_ena().bit(enable),
                     TwaiInterrupt::ArbitrationLost => w.arb_lost_int_ena().bit(enable),
                     TwaiInterrupt::ErrorPassive => w.err_passive_int_ena().bit(enable),
-                    TwaiInterrupt::ErrorWarning => {
-                        #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
-                        let w = w.err_warn_int_ena().bit(enable);
-                        #[cfg(any(esp32c6, esp32h2))]
-                        let w = w.ext_err_warning_int_ena().bit(enable);
-                        w
-                    }
+                    TwaiInterrupt::ErrorWarning => w.err_warn_int_ena().bit(enable),
                 };
             }
             w
@@ -1884,15 +1878,10 @@ mod asynch {
         // status is still set. Gating on both ensures the bus-off state is
         // signalled only once per entry, instead of on every error warning
         // interrupt while the state persists.
-        if int_raw.bits() & 0b100 > 0 {
+        if int_raw.err_warn_int_st().bit_is_set() {
             let status = register_block.status().read();
 
-            #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))]
-            let error_warning = status.err_st().bit_is_set();
-            #[cfg(any(esp32c6, esp32h2))]
-            let error_warning = status.err().bit_is_set();
-
-            if status.bus_off_st().bit_is_set() && error_warning {
+            if status.bus_off_st().bit_is_set() && status.err_st().bit_is_set() {
                 // Any pending transmission is halted by entering the bus-off
                 // state; abort it to release the transmit buffer.
                 register_block.cmd().write(|w| w.abort_tx().set_bit());
@@ -1935,7 +1924,10 @@ mod asynch {
             async_state.tx_waker.wake();
         }
 
-        if int_raw.bits() & 0b10110100 > 0 {
+        if int_raw.err_warn_int_st().bit_is_set()
+            || int_raw.err_passive_int_st().bit_is_set()
+            || int_raw.bus_err_int_st().bit_is_set()
+        {
             // We might want to use the error code to gather statistics in the
             // future.
             let _ = register_block.err_code_cap().read();
