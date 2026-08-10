@@ -637,7 +637,7 @@ impl EspTwaiFrame {
         // - Max DLC is 15
         // - Data length smaller than 8 must have equal DLC
         // - Data length equal to 8 must have DLC >= 8
-        if dlc > 15 || ((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8)) {
+        if dlc > 15 || ((data_len < 8) && (dlc != data_len)) || ((data_len == 8) && (dlc < 8)) {
             return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
         }
 
