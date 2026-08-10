@@ -1,5 +1,8 @@
 use crate::{
-    gpio::{Level, lp_io::LpFunction},
+    gpio::{
+        Level,
+        lp_io::{LpFunction, low_level},
+    },
     peripherals::LPWR,
     rtc_cntl::{
         Rtc,
@@ -23,9 +26,11 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut pins = self.pins.borrow_mut();
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
-            pin.lp_set_config(true, true, LpFunction::LP_GPIO);
-            pin.lp_pad_hold(true);
-            bits |= 1 << pin.lp_number();
+            let lp_pin = pin.lp_number();
+
+            low_level::set_config(lp_pin, true, true, LpFunction::LP_GPIO);
+            low_level::pad_hold(lp_pin, true);
+            bits |= 1 << lp_pin;
         }
 
         LPWR::regs()
@@ -45,7 +50,7 @@ impl Drop for Ext1WakeupSource<'_, '_> {
     fn drop(&mut self) {
         let mut pins = self.pins.borrow_mut();
         for pin in pins.iter_mut() {
-            pin.lp_set_config(true, false, LpFunction::LP_GPIO);
+            low_level::set_config(pin.lp_number(), true, false, LpFunction::LP_GPIO);
         }
     }
 }
