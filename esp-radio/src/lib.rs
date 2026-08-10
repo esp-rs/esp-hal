@@ -323,10 +323,15 @@ pub(crate) fn init() {
         );
     }
 
+    // Ungate the modem clocks first: `enable_wifi_power_domain` pulses the
+    // modem reset, which is ineffective while the clocks are gated — and
+    // esp-phy's clock guard has gated them again by the time we re-init.
+    // (ESP-IDF never gates these clocks, so its power-up reset always lands.)
+    radio_clocks::init_radio_clocks();
+
     crate::common_adapter::enable_wifi_power_domain();
 
     wifi_set_log_verbose();
-    radio_clocks::init_radio_clocks();
 
     #[cfg(feature = "coex")]
     match crate::wifi::coex_initialize() {
@@ -349,6 +354,27 @@ pub(crate) fn deinit() {
     wifi::shutdown_wifi_isr();
     #[cfg(feature = "ble")]
     ble::shutdown_ble_isr();
+
+    // Gate the BT clocks (the Wi-Fi driver gates its own clocks during
+    // `wifi_deinit`), power down the modem power domain, and gate the
+    // remaining modem clocks, mirroring ESP-IDF's fixed-mask clock control
+    // (`periph_ll_wifi_module_disable_clk_set_rst` and friends). This must
+    // only run once all radios are off: PHY teardown still needs the modem
+    // clocks.
+    #[cfg(feature = "ble")]
+    crate::radio_clocks::clocks_ll::enable_bt(false);
+    crate::common_adapter::disable_wifi_power_domain();
+    crate::radio_clocks::deinit_radio_clocks();
+
+    // After the modem power domain has been powered down, the PHY driver's
+    // internal init flag must be reset, otherwise the next `phy_wakeup_init`
+    // assumes retained PHY registers that the power-down wiped (mirrors
+    // ESP-IDF's `esp_phy_modem_deinit`, "Fix the issue caused by the power
+    // domain off. This issue is only on ESP32C3.").
+    #[cfg(esp32c3)]
+    unsafe {
+        crate::sys::include::phy_init_flag()
+    };
 
     esp_hal::if_unstable_hal! {
         // Allow using `ADC2` again

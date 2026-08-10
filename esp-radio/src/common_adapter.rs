@@ -323,6 +323,10 @@ pub(crate) fn enable_wifi_power_domain() {
             .dig_pwc()
             .modify(|_, w| w.wifi_force_pd().clear_bit());
 
+        // Give the domain time to power up before touching it, mirroring
+        // ESP-IDF's `esp_wifi_bt_power_domain_on`.
+        esp_rom_sys::rom::ets_delay_us(10);
+
         #[cfg(not(esp32))]
         cfg_select! {
             soc_has_apb_ctrl => {
@@ -405,23 +409,29 @@ pub(crate) fn enable_wifi_power_domain() {
             });
         }
         // ESP32-C2 has no separate modem power domain (RTC_CNTL lacks
-        // wifi_force_pd/iso), but a system reset still leaves the shared modem
-        // subsystems in their previous state.
-        esp32c2 => {
-            regs!(APB_CTRL).wifi_rst_en().modify(|_, w| {
-                w.wifibb_rst().set_bit();
-                w.fe_rst().set_bit();
-                w.mac_rst().set_bit();
-                w.ble_rpa_rst().set_bit()
-            });
-            regs!(APB_CTRL).wifi_rst_en().modify(|_, w| {
-                w.wifibb_rst().clear_bit();
-                w.fe_rst().clear_bit();
-                w.mac_rst().clear_bit();
-                w.ble_rpa_rst().clear_bit()
-            });
-        }
+        // wifi_force_pd/iso) — nothing to power up here. ESP-IDF's
+        // `esp_wifi_bt_power_domain_on` is a no-op on this chip for the same
+        // reason; in particular it does not reset the shared modem, whose
+        // state the Wi-Fi driver retains across a deinit/init cycle.
         _ => {}
+    }
+}
+
+/// Power down the Wi-Fi power domain, mirroring `enable_wifi_power_domain` and
+/// ESP-IDF's `esp_wifi_bt_power_domain_off`.
+pub(crate) fn disable_wifi_power_domain() {
+    #[cfg(not(any(soc_has_pmu, esp32c2)))]
+    {
+        let rtc_cntl = regs!(RTC_CNTL);
+
+        // Isolate before powering down.
+        rtc_cntl
+            .dig_iso()
+            .modify(|_, w| w.wifi_force_iso().set_bit());
+
+        rtc_cntl
+            .dig_pwc()
+            .modify(|_, w| w.wifi_force_pd().set_bit());
     }
 }
 

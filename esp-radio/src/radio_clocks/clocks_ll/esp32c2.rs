@@ -31,6 +31,15 @@ pub(crate) fn init_clocks() {
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }
 
+pub(crate) fn deinit_clocks() {
+    // Nothing to do: when the last `PhyClockGuard` drops, esp-phy gates the
+    // shared modem clocks (`SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M`) — the same
+    // state ESP-IDF leaves behind via `wifi_bt_common_module_disable`, and
+    // its `periph_ll_wifi_module_disable_clk_set_rst` is a no-op on ESP32-C2.
+    // Gating anything beyond that here breaks Wi-Fi re-initialization on
+    // ESP32-C2.
+}
+
 pub(crate) fn ble_rtc_clk_init() {
     regs!(MODEM_CLKRST).modem_lp_timer_conf().modify(|_, w| {
         w.lp_timer_sel_xtal32k().clear_bit();
