@@ -266,6 +266,8 @@ support_status = "not_supported"
 support_status = "not_supported"
 [device.avc]
 support_status = "not_supported"  # P4 ANA_CMPR (CH0/CH1)
+[device.bit_scrambler]
+support_status = "not_supported"
 [device.camera]
 support_status = "not_supported"  # LCD_CAM block, camera path
 # [device.dedicated_gpio] requires a `channels` table -- skip for now
@@ -363,6 +365,9 @@ support_status = "not_supported"
 support_status = "not_supported"  # LCD path of LCD_CAM block
 # [device.rmt] requires ram_start / channel_ram_size / channels config -
 # left out until those are mapped from P4 TRM. README row stays blank.
+# [device.parl_io] requires a `version`, and P4 matches neither of the two
+# generations esp-hal knows: it has the 16 data lines of the esp32c6 (version 1)
+# and the clock gating and loop transmission of the esp32h2 (version 2).
 
 [device.rng]
 support_status = { status = "partial", issue = 5982 }

@@ -440,7 +440,7 @@ impl embedded_can::Frame for EspTwaiFrame {
 /// A RAM buffer for a TWAI frame.
 ///
 /// Mirror image of the 13 TWAI_DATA_x_REG registers.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct EspTwaiFrame {
     bytes: [u8; 13],
 }
@@ -648,14 +648,35 @@ impl defmt::Format for EspTwaiFrame {
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(
             f,
-            "EspTwaiFrame {{ EFF: {0=7..8}, RTR: {0=6..7}, SR: {0=4..5}, DLC: {0=1..4}, ID: {1=u32} DATA: {2=[u8]} }}",
+            "EspTwaiFrame {{ id: {1=u32}, EFF: {0=7..8}, RTR: {0=6..7}, SR: {0=4..5}, DLC: {0=0..4}, data: {2=[u8]:#x}, raw: {3=[u8]:#x} }}",
             self.info(),
-            match self.identifier().into() {
+            match self.identifier() {
                 Id::Standard(id) => id.as_raw() as u32,
                 Id::Extended(id) => id.as_raw(),
             },
-            self.data()
+            self.data(),
+            self.as_slice(),
         );
+    }
+}
+
+impl core::fmt::Debug for EspTwaiFrame {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("EspTwaiFrame")
+            .field(
+                "id",
+                &match self.identifier() {
+                    Id::Standard(id) => id.as_raw() as u32,
+                    Id::Extended(id) => id.as_raw(),
+                },
+            )
+            .field("EFF", &(self.is_extended_format() as u8))
+            .field("RTR", &(self.is_remote_request() as u8))
+            .field("SR", &(self.is_self_reception() as u8))
+            .field("DLC", &self.data_length_code())
+            .field("data", &format_args!("{:02x?}", self.data()))
+            .field("raw", &format_args!("{:02x?}", self.as_slice()))
+            .finish()
     }
 }
 

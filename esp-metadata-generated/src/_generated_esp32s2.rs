@@ -376,6 +376,9 @@ macro_rules! property {
     ("sleep.deep_sleep") => {
         true
     };
+    ("sleep.rejectable_mask") => {
+        10543
+    };
     ("soc.cpu_has_branch_predictor") => {
         false
     };

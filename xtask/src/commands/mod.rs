@@ -180,7 +180,8 @@ pub struct LintPackagesArgs {
 )]
 #[derive(Debug, Args)]
 pub struct ExamplesArgs {
-    /// Example to act on ("all" will execute every example).
+    /// Example to act on ("all" will execute every example). Omitting it asks, which needs a
+    /// terminal.
     pub example: Option<String>,
     /// Chip to target.
     #[arg(value_enum, long)]
@@ -294,6 +295,22 @@ pub struct TestsArgs {
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
+const EXAMPLE_ARGUMENT_HINT: &str =
+    "the example name as the first argument, or `all` to act on every example of the package";
+
+/// Asks the caller to pick one of `options`.
+///
+/// A prompt needs someone to answer it, and a caller that is not a person — a script, a CI job, an
+/// agent — would wait for input that never arrives. Say what to pass instead, and stop.
+fn select<T: std::fmt::Display>(message: &str, options: Vec<T>, hint: &str) -> Result<T> {
+    use std::io::IsTerminal;
+    if !std::io::stdin().is_terminal() {
+        bail!("\"{message}\" needs a terminal to answer it. Pass {hint}.");
+    }
+
+    Ok(Select::new(message, options).prompt()?)
+}
+
 /// Execute the given action on the specified examples.
 pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -> Result<()> {
     log::debug!(
@@ -304,7 +321,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     if args.chip.is_none() {
         let chip_variants = Chip::iter().collect::<Vec<_>>();
 
-        let chip = Select::new("Select your target chip:", chip_variants).prompt()?;
+        let chip = select("Select your target chip:", chip_variants, "`--chip <CHIP>`")?;
 
         args.chip = Some(chip);
     }
@@ -374,11 +391,11 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
                     "Example '{example}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package."
                 );
 
-                let example_name = inquire::Select::new(
+                let example_name = select(
                     "Select the example:",
                     examples.iter().map(|ex| ex.binary_name()).collect(),
-                )
-                .prompt()?;
+                    EXAMPLE_ARGUMENT_HINT,
+                )?;
 
                 if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_name)
                 {
@@ -387,11 +404,11 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             }
         }
     } else {
-        let example_name = inquire::Select::new(
+        let example_name = select(
             "Select an example:",
             examples.iter().map(|ex| ex.binary_name()).collect(),
-        )
-        .prompt()?;
+            EXAMPLE_ARGUMENT_HINT,
+        )?;
 
         if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_name) {
             filtered.push(selected.clone());

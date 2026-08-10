@@ -23,11 +23,32 @@ pub enum GpioBank {
     _1,
 }
 
-impl GpioBank {
-    pub(crate) fn async_operations(self) -> &'static AtomicU32 {
-        static FLAGS: [AtomicU32; GpioBank::COUNT] = [const { AtomicU32::new(0) }; GpioBank::COUNT];
+/// A set of pins, in the words the GPIO peripheral groups them into.
+///
+/// The peripheral keeps one register word per bank, so a set of pins that stands beside those
+/// registers is one word per bank too, and [`Self::word`] hands out the word the register's own
+/// mask can be tested against.
+pub(crate) struct PadMask([AtomicU32; GpioBank::COUNT]);
 
-        &FLAGS[self as usize]
+impl PadMask {
+    pub(crate) const fn new() -> Self {
+        Self([const { AtomicU32::new(0) }; GpioBank::COUNT])
+    }
+
+    pub(crate) fn word(&self, bank: GpioBank) -> &AtomicU32 {
+        &self.0[bank as usize]
+    }
+}
+
+impl GpioBank {
+    /// The pins of this bank that an async wait owns.
+    ///
+    /// The interrupt handler clears a pin's bit to signal that its wait is over, so the bit is
+    /// what tells the future it has completed.
+    pub(crate) fn async_operations(self) -> &'static AtomicU32 {
+        static FLAGS: PadMask = PadMask::new();
+
+        FLAGS.word(self)
     }
 
     pub(crate) fn offset(self) -> u8 {
