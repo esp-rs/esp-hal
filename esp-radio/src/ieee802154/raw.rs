@@ -104,8 +104,8 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-/// Gates off the 802.15.4 modem clocks and undoes the radio clock
-/// initialization (`deinit_radio_clocks`) when dropped.
+/// Gates off the 802.15.4 modem clocks and de-initializes the radio clocks
+/// when dropped.
 ///
 /// Must be dropped only after the PHY guards: PHY teardown still requires the
 /// modem clocks.
