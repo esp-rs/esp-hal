@@ -309,3 +309,59 @@ support_status = "not_supported"
 support_status = "not_supported"
 [device.ecdsa]
 support_status = "not_supported"
+
+# Peripherals the chip has, that no driver reaches yet.
+[device.adc]
+support_status = "not_supported"
+[device.avc]
+support_status = "not_supported"
+[device.bit_scrambler]
+support_status = "not_supported"
+[device.camera]
+support_status = "not_supported"
+[device.dac]
+support_status = "not_supported"
+[device.ethernet]
+support_status = "not_supported"
+[device.etm]
+support_status = "not_supported"
+[device.i2c_slave]
+support_status = "not_supported"
+[device.i2s]
+support_status = "not_supported"
+[device.ieee802154]
+support_status = "not_supported"
+[device.key_manager]
+support_status = "not_supported"
+[device.mcpwm]
+support_status = "not_supported"
+[device.pcnt]
+support_status = "not_supported"
+[device.phy]
+support_status = "not_supported"
+[device.rgb_display]
+support_status = "not_supported"
+
+[device.sdm]
+support_status = "not_supported"
+channel_count = 8
+
+[device.temp_sensor]
+support_status = "not_supported"
+[device.touch]
+support_status = "not_supported"
+[device.twai]
+support_status = "not_supported"
+[device.uhci]
+support_status = "not_supported"
+[device.ulp_riscv]
+support_status = "not_supported"
+[device.usb_serial_jtag]
+support_status = "not_supported"
+
+# These peripherals exist as well, but their tables need configuration that only
+# the TRM or the SVD gives, so the support table shows no row for them at all:
+# bt (controller), dedicated_gpio (version and channels, in GPIO_EXT), ledc
+# (version, and eight channels in each of LEDC0 and LEDC1), lp_uart (ram_size),
+# parl_io (version), psram (extmem_origin), rmt (ram_start, channel_ram_size,
+# channels), sdmmc (SDHOST signal routing), wifi (mac_version).

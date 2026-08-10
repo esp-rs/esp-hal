@@ -69,6 +69,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  PROBE_RS_CONFIG_PRESET: local-hil
 
 jobs:
   build:

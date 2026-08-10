@@ -324,6 +324,17 @@ support_status = "partial"
 light_sleep = true
 deep_sleep = true
 wakeup_sources = {
+    # A UART wake cannot reject a sleep.
+    rejectable = [
+        "Ext0",
+        "Ext1",
+        "Gpio",
+        "Timer",
+        "Wifi",
+        "Touch",
+        "UlpRiscv",
+        "UlpRiscvTrap",
+    ],
     Ext0 = 0,
     Ext1 = 1,
     Gpio = 2,

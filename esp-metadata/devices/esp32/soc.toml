@@ -286,6 +286,7 @@ support_status = "partial"
 light_sleep = true
 deep_sleep = true
 wakeup_sources = {
+    rejectable = ["Gpio", "Sdio"],
     Ext0 = 0,
     Ext1 = 1,
     Gpio = 2,
