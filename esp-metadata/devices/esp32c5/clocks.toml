@@ -57,7 +57,7 @@ system_clocks = { clock_tree = [
         { name = "FOSC",      outputs = "RC_FAST_CLK" },
         { name = "PLL_F480M", outputs = "PLL_CLK" },
     ] },
-    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", variants = [
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", always_on = true, variants = [
         { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
         { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },

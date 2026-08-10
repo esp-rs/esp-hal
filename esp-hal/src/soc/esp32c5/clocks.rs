@@ -467,25 +467,20 @@ fn configure_crypto_clk_impl(
     });
 }
 
-// IOMUX_FUNCTION_CLOCK
-
-fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, en: bool) {
-    PCR::regs()
-        .iomux_clk_conf()
-        .modify(|_, w| w.iomux_func_clk_en().bit(en));
-}
-
 fn configure_iomux_function_clock_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<IomuxFunctionClockConfig>,
     new_config: IomuxFunctionClockConfig,
 ) {
     PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
-        w.iomux_func_clk_sel().bits(match new_config {
-            IomuxFunctionClockConfig::XtalClk => 0,
-            IomuxFunctionClockConfig::RcFastClk => 1,
-            IomuxFunctionClockConfig::PllF80m => 2,
-        })
+        w.iomux_func_clk_sel()
+            .bits(match new_config {
+                IomuxFunctionClockConfig::XtalClk => 0,
+                IomuxFunctionClockConfig::RcFastClk => 1,
+                IomuxFunctionClockConfig::PllF80m => 2,
+            })
+            .iomux_func_clk_en()
+            .set_bit()
     });
 }
 

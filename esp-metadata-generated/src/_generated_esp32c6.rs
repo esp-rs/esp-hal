@@ -1500,10 +1500,6 @@ macro_rules! for_each_wakeup_source {
 ///
 /// // IOMUX_FUNCTION_CLOCK
 ///
-/// fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
 /// fn configure_iomux_function_clock_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_config: Option<IomuxFunctionClockConfig>,
@@ -3415,26 +3411,8 @@ macro_rules! define_clock_tree_types {
         ) -> Option<IomuxFunctionClockConfig> {
             clocks.iomux_function_clock
         }
-        pub fn request_iomux_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting IOMUX_FUNCTION_CLOCK");
-            trace!("Enabling IOMUX_FUNCTION_CLOCK");
-            match unwrap!(clocks.iomux_function_clock) {
-                IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
-                IomuxFunctionClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-            }
-            enable_iomux_function_clock_impl(clocks, true);
-        }
-        pub fn release_iomux_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing IOMUX_FUNCTION_CLOCK");
-            trace!("Disabling IOMUX_FUNCTION_CLOCK");
-            enable_iomux_function_clock_impl(clocks, false);
-            match unwrap!(clocks.iomux_function_clock) {
-                IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
-                IomuxFunctionClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-            }
-        }
+        fn request_iomux_function_clock(_clocks: &mut ClockTree) {}
+        fn release_iomux_function_clock(_clocks: &mut ClockTree) {}
         #[allow(unused_variables)]
         pub fn iomux_function_clock_config_frequency(
             clocks: &mut ClockTree,
