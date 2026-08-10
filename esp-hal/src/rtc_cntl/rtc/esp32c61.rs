@@ -2,10 +2,10 @@ use strum::FromRepr;
 
 use crate::{
     peripherals::{LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    rtc_cntl::xtal32k,
     soc::{
         clocks::{ClockConfig, LpSlowClkConfig},
         regi2c,
+        xtal32k,
     },
 };
 

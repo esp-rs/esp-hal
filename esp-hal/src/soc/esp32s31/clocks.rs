@@ -15,7 +15,7 @@ use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
 use crate::{
     pac::HP_ALIVE_SYS,
     peripherals::{HP_SYS_CLKRST, LP_AON_CLK_RST, PMU},
-    rtc_cntl::xtal32k,
+    soc::xtal32k,
 };
 
 define_clock_tree_types!();

@@ -7,8 +7,8 @@ constant_0_input = 0xc0
 constant_1_input = 0x80
 # GPIO29 and GPIO41 are not bonded.
 pins = [
-    { pin =  0,                                                      analog = { 0 = "XTAL_32K_N" }, lp = { 0 = "LP_GPIO0" } },
-    { pin =  1,                                                      analog = { 0 = "XTAL_32K_P" }, lp = { 0 = "LP_GPIO1" } },
+    { pin =  0,                                                      lp = { 0 = "LP_GPIO0" },        analog = { 0 = "XTAL_32K_N" } },
+    { pin =  1,                                                      lp = { 0 = "LP_GPIO1" },        analog = { 0 = "XTAL_32K_P" } },
     { pin =  2, functions = {                    3 = "LCD_DATA19" }, lp = { 0 = "LP_GPIO2" } },
     { pin =  3, functions = {                    3 = "LCD_DATA20" }, lp = { 0 = "LP_GPIO3" } },
     { pin =  4, functions = {                    3 = "LCD_DATA21" }, lp = { 0 = "LP_GPIO4" } },
@@ -39,8 +39,8 @@ pins = [
     { pin = 30, functions = { 0 = "SPIHD" },  limitations = ["spi_flash"] },
     { pin = 31, functions = { 0 = "SPICLK" }, limitations = ["spi_flash"] },
     { pin = 32, functions = { 0 = "SPID" },   limitations = ["spi_flash"] },
-    { pin = 33, functions = {                                  3 = "LCD_DATA12" }, analog = { 0 = "USJ_DM" } },
-    { pin = 34, functions = {                                  3 = "LCD_DATA13" }, analog = { 0 = "USJ_DP" } },
+    { pin = 33, functions = {                                  3 = "LCD_DATA12" },                   analog = { 0 = "USJ_DM" } },
+    { pin = 34, functions = {                                  3 = "LCD_DATA13" },                   analog = { 0 = "USJ_DP" } },
     { pin = 35, functions = {             2 = "REF_GMAC_CLK",  3 = "LCD_DATA14", 4 = "SD2_CDATA0" } },
     { pin = 36, functions = {             2 = "GMAC_PHY_RXDV", 3 = "LCD_DATA15", 4 = "SD2_CDATA1" }, limitations = ["strapping"] },
     { pin = 37, functions = {             2 = "GMAC_PHY_TXEN", 3 = "LCD_DATA16", 4 = "SD2_CDATA2" }, limitations = ["strapping"] },

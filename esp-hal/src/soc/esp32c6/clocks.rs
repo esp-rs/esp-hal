@@ -18,8 +18,7 @@
 
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, TIMG0},
-    rtc_cntl::xtal32k,
-    soc::regi2c,
+    soc::{regi2c, xtal32k},
 };
 
 define_clock_tree_types!();

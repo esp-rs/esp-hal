@@ -7,9 +7,11 @@ use crate::{
         Rtc,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
         sleep::{SleepKind, pmu_common::SleepTimeConfig},
+    },
+    soc::{
+        clocks::{self, ClockTree, CpuClkConfig, HpRootClkConfig, LpSlowClkConfig},
         xtal32k,
     },
-    soc::clocks::{self, ClockTree, CpuClkConfig, HpRootClkConfig, LpSlowClkConfig},
 };
 
 /// Configuration for controlling the behavior during sleep modes.

@@ -18,8 +18,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
     peripherals::{I2C_ANA_MST, LCD_CAM, LPWR, RMT, SYSTEM, TIMG0, TIMG1},
-    rtc_cntl::xtal32k,
-    soc::regi2c,
+    soc::{regi2c, xtal32k},
     time::Rate,
 };
 

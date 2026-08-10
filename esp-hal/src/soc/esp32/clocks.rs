@@ -21,8 +21,8 @@ use crate::{
     clock::RtcClock,
     efuse::VOL_LEVEL_HP_INV,
     peripherals::{APB_CTRL, LPWR, RMT, RTC_IO, SYSTEM, TIMG0},
-    rtc_cntl::{Rtc, xtal32k},
-    soc::regi2c,
+    rtc_cntl::Rtc,
+    soc::{regi2c, xtal32k},
     time::Rate,
 };
 

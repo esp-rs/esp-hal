@@ -135,9 +135,6 @@ pub mod sleep;
 #[cfg_attr(esp32s31, path = "rtc/esp32s31.rs")]
 pub(crate) mod rtc;
 
-#[cfg(soc_has_xtal32k_pads)]
-pub(crate) mod xtal32k;
-
 cfg_select! {
     esp32s31 => {
         use crate::peripherals::{LP_SYS as LP_AON, LP_WDT};

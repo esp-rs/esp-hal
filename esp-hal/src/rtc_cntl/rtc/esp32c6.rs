@@ -3,8 +3,7 @@ use strum::FromRepr;
 use crate::{
     clock::ClockConfig,
     peripherals::{LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    rtc_cntl::xtal32k,
-    soc::{clocks::LpSlowClkConfig, regi2c},
+    soc::{clocks::LpSlowClkConfig, regi2c, xtal32k},
 };
 
 fn pmu_power_domain_force_default() {
