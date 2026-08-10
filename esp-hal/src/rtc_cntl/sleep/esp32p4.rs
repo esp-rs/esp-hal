@@ -910,11 +910,14 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures wakeup options and enters sleep.
+    /// Configures the wakeup options and requests the sleep.
+    ///
+    /// The caller waits for the result of the request. The return value is a guard that restores
+    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
         // Switch the CPU root clock to XTAL for the duration of sleep.
-        let _restore_clock_config = ClockTree::with(|clocks| {
+        let restore_clock_config = ClockTree::with(|clocks| {
             let old_cpu_root_clk = clocks.cpu_root_clk();
 
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
@@ -966,6 +969,15 @@ impl RtcSleepConfig {
             install_mspi_workaround_stub();
             set_boot_from_lp_ram(true);
         }
+
+        // The wake stub itself restores the vector on a real wake, so this guard runs only if the
+        // hardware rejects the sleep. It points the vector back at the HP ROM, so that a later
+        // reset boots normally.
+        let restore_boot_vector = DropGuard::new((), move |_| {
+            if mspi_workaround {
+                set_boot_from_lp_ram(false);
+            }
+        });
 
         // like esp-idf pmu_sleep_start()
 
@@ -1033,20 +1045,7 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl0()
             .write(|w| w.sleep_req().bit(true));
 
-        // In deep sleep we never get here.
-        loop {
-            let int_raw = PMU::regs().int_raw().read();
-            if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                break;
-            }
-        }
-
-        // We only reach this point if the (deep) sleep was rejected: the wake
-        // stub itself restores the vector on a real wake. Point the vector back
-        // at the HP ROM so a later reset boots normally.
-        if mspi_workaround {
-            set_boot_from_lp_ram(false);
-        }
+        (restore_clock_config, restore_boot_vector)
     }
 
     /// Cleans up after sleep.

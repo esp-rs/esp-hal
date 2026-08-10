@@ -9,7 +9,7 @@
 
 use super::{Armed, prepare_pad};
 use crate::{
-    gpio::Level,
+    gpio::{Level, lp_io::low_level},
     peripherals::PMU,
     rtc_cntl::{
         WakeupReason,
@@ -65,6 +65,23 @@ pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
             .bits()
             & (1 << gpio)
             != 0
+}
+
+/// Releases the pads that the previous run armed for a deep sleep.
+///
+/// This `ext1` selects the pads by pin number, and it keeps the selection through the wake. The
+/// hold register uses the low-power number, so the release needs both numbers.
+pub(super) fn wake_io_reset() {
+    let armed = PMU::regs().ext_wakeup_sel().read().ext_wakeup_sel().bits();
+
+    for (gpio, lp) in super::low_power_pads() {
+        if armed & (1 << gpio) != 0 {
+            low_level::pad_hold(lp, false);
+        }
+    }
+
+    // The pads are free now, so clear the selection that armed them.
+    PMU::regs().ext_wakeup_sel().reset();
 }
 
 fn write_ext1(pads: u32, levels: u32) {

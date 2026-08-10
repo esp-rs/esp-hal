@@ -174,6 +174,24 @@ pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
     ext1 || ext0 || per_pin
 }
 
+/// Releases the pads that the previous run armed for a deep sleep, on all three paths.
+///
+/// Each path keeps the pads that it armed through the wake, so the registers still name them here.
+/// `ext0` has one pad and no enable of its own, so its selection counts only while the source is
+/// enabled.
+pub(super) fn wake_io_reset() {
+    let ext1 = LPWR::regs().ext_wakeup1().read().sel().bits();
+    let ext0 = RTC_IO::regs().ext_wakeup0().read().sel().bits();
+    let ext0_armed = crate::rtc_cntl::sleep::enabled_sources().contains(WakeupSource::Ext0);
+    let per_pin = low_level::wakeup_enabled_mask();
+
+    for lp in super::low_power_numbers() {
+        if ext1 & (1 << lp) != 0 || (ext0_armed && ext0 == lp) || per_pin & (1 << lp) != 0 {
+            low_level::pad_hold(lp, false);
+        }
+    }
+}
+
 /// Disarms the per-pin path of every pad, so that a pad outside this sleep cannot wake the chip.
 fn clear_per_pin() {
     for &lp in LP_NUMBERS.iter().filter(|&&lp| lp != NO_LP_NUMBER) {

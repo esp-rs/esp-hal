@@ -220,30 +220,6 @@ pub(crate) fn reject_mask() -> u32 {
     mask() & property!("sleep.rejectable_mask")
 }
 
-/// Returns whether a wakeup source that configures pads is enabled.
-///
-/// Call this before the initialization clears the mask. The result tells the initialization whether
-/// it must release the pads that the previous run armed. ESP-IDF uses the same condition for
-/// `esp_deep_sleep_wakeup_io_reset`.
-#[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
-pub(crate) fn io_wake_enabled() -> bool {
-    let sources = enabled_sources();
-
-    #[allow(unused_mut)]
-    let mut enabled = sources.contains(WakeupSource::Gpio);
-
-    #[cfg(sleep_has_wakeup_source_ext0)]
-    {
-        enabled |= sources.contains(WakeupSource::Ext0);
-    }
-    #[cfg(sleep_has_wakeup_source_ext1)]
-    {
-        enabled |= sources.contains(WakeupSource::Ext1);
-    }
-
-    enabled
-}
-
 /// Runs the sleep-entry hook of every enabled source.
 ///
 /// The mask as read at sleep entry selects the hooks. A hook can enable another source. The GPIO

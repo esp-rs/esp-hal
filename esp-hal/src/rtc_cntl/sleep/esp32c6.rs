@@ -733,11 +733,12 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures wakeup options and enters sleep.
+    /// Configures the wakeup options and requests the sleep.
     ///
-    /// This function does not return if deep sleep is requested.
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
-        let _restore_clock_config = ClockTree::with(|clocks| {
+    /// The caller waits for the result of the request. The return value is a guard that restores
+    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
+        let restore_clock_config = ClockTree::with(|clocks| {
             let old_root = clocks.soc_root_clk();
 
             clocks::configure_soc_root_clk(clocks, SocRootClkConfig::Xtal);
@@ -821,22 +822,13 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl0()
             .write(|w| w.sleep_req().bit(true));
 
-        // In pd_cpu lightsleep and deepsleep mode, we never get here
-        loop {
-            let int_raw = PMU::regs().int_raw().read();
-            if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                break;
-            }
-        }
+        restore_clock_config
     }
 
     /// Cleans up after sleep
     pub(crate) fn finish_sleep(&self) {
         // like esp-idf pmu_sleep_finish()
         // In "pd_cpu lightsleep" and "deepsleep" modes we never get here
-
-        // esp-idf returns if the sleep was rejected, we do nothing
-        // pmu_ll_hp_is_sleep_reject(PMU_instance()->hal->dev)
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.

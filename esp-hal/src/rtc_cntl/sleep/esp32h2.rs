@@ -521,11 +521,12 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures wakeup options and enters sleep.
+    /// Configures the wakeup options and requests the sleep.
     ///
-    /// This function does not return if deep sleep is requested.
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
-        let _restore_clock_config = ClockTree::with(|clocks| {
+    /// The caller waits for the result of the request. The return value is a guard that restores
+    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
+        let restore_clock_config = ClockTree::with(|clocks| {
             let old_hp_root_clk = clocks.hp_root_clk();
             let old_cpu_divider = clocks.cpu_clk();
 
@@ -608,12 +609,7 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl0()
             .write(|w| w.sleep_req().bit(true));
 
-        loop {
-            let int_raw = PMU::regs().int_raw().read();
-            if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                break;
-            }
-        }
+        restore_clock_config
     }
 
     /// Cleans up after sleep

@@ -46,6 +46,24 @@ for_each_lp_function! {
                     }
                 });
             }
+
+            /// Returns the pads that can wake the chip through the per-pin path, as a mask of
+            /// low-power numbers.
+            #[cfg(sleep_driver_supported)]
+            pub(crate) fn wakeup_enabled_mask() -> u32 {
+                let gpio_wakeup = cfg_select! {
+                    esp32c2 => LPWR::regs().cntl_gpio_wakeup().read(),
+                    esp32c3 => LPWR::regs().gpio_wakeup().read(),
+                };
+
+                let mut mask = 0;
+                $(
+                    if gpio_wakeup.[<gpio_pin $pin _wakeup_enable>]().bit_is_set() {
+                        mask |= 1 << $pin;
+                    }
+                )*
+                mask
+            }
         }
     };
 }

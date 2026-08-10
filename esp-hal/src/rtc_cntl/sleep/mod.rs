@@ -15,6 +15,7 @@
 //!    * `BT (Bluetooth) wake` - light sleep only
 
 use crate::{
+    gpio,
     peripherals::LPWR,
     rtc_cntl::{Rtc, WakeupSource},
 };
@@ -35,9 +36,6 @@ mod pmu_common;
 mod sleep_impl;
 pub use sleep_impl::*;
 
-#[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
-mod ext1;
-
 #[cfg(sleep_has_wakeup_source_timer)]
 mod timer;
 
@@ -53,15 +51,14 @@ pub(crate) use wakeup::*;
 pub(crate) fn init(rtc: &Rtc<'_>) {
     // First, because the pads that ended a deep sleep are readable only until the code below
     // changes a path.
-    crate::gpio::wakeup::record_wakeup();
+    gpio::wakeup::record_wakeup();
 
-    // ESP-IDF releases the pads after a deep-sleep wake only, and only if the previous run armed an
-    // IO wake source.
-    #[cfg(any(sleep_ext1_version = "2", sleep_ext1_version = "3"))]
+    // Release the pads after a deep-sleep wake only, and only if the previous
+    // run armed an IO wake source.
     if super::reset_reason(crate::system::Cpu::ProCpu) == Some(super::SocResetReason::CoreDeepSleep)
-        && io_wake_enabled()
+        && gpio::wakeup::wake_enabled()
     {
-        ext1::wake_io_reset();
+        gpio::wakeup::wake_io_reset();
     }
 
     RtcSleepConfig::base_settings(rtc);
@@ -140,6 +137,12 @@ impl<'d> LowPower<'d> {
     /// rejection, the chip sleeps through the event that the caller wants to wake on. The return of
     /// this function is the complete report, so it gives no other result.
     ///
+    /// A rejected request returns the wake pads to their drivers, but it cannot return every pad.
+    /// Sleep entry disconnects the pads that no hold keeps, on the chips that need that step to
+    /// reach the deep-sleep current, and it cannot know their earlier configuration. Configure
+    /// those pads again if this function returns. ESP-IDF has the same limit in
+    /// `esp_deep_sleep_try_to_start`.
+    ///
     /// # Panics
     ///
     /// Panics if no wakeup source is enabled.
@@ -200,7 +203,7 @@ impl<'d> LowPower<'d> {
         // wakeup sources have their holds now, and no later step needs a pad.
         #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
         if kind == SleepKind::Deep {
-            crate::gpio::wakeup::isolate_pads_for_deep_sleep();
+            gpio::wakeup::isolate_pads_for_deep_sleep();
         }
 
         // Latch the systimer value *before* sleeping. The systimer keeps running during
@@ -211,15 +214,22 @@ impl<'d> LowPower<'d> {
         let before = rtc.time_since_boot_raw();
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
-        config.start_sleep(wakeup_mask, reject_mask);
+        let rejected = {
+            // A chip can keep a guard for the length of the sleep, to restore what sleep entry
+            // changed for the sleep only. The guard must therefore outlive the wait below.
+            let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
+            let rejected = wait_for_sleep_result();
 
-        if config.is_deep_sleep() {
-            // Because RTC is in a slower clock domain than the CPU, it
-            // can take several CPU cycles for the sleep mode to start.
-            loop {
-                core::hint::spin_loop();
+            if config.is_deep_sleep() && !rejected {
+                // The chip is entering deep sleep, and the wake resets it. Because RTC is in a
+                // slower clock domain than the CPU, the power-down can take several CPU cycles.
+                loop {
+                    core::hint::spin_loop();
+                }
             }
-        }
+
+            rejected
+        };
 
         config.finish_sleep();
 
@@ -234,15 +244,43 @@ impl<'d> LowPower<'d> {
         run_exit_hooks();
 
         // Unlike deep sleep, light sleep does not reset the chip, so `wakeup_cause` cannot rely on
-        // the reset reason to tell whether a wakeup occurred.
+        // the reset reason to tell whether a wakeup occurred. A rejected request is not a wakeup,
+        // and it must not name a wakeup source.
         // https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/esp_hw_support/sleep_modes.c#L2158
-        if !config.is_deep_sleep() {
+        if !config.is_deep_sleep() && !rejected {
             super::LIGHT_SLEEP_WAKEUP.store(true, portable_atomic::Ordering::Relaxed);
         }
 
         // Last, because this call reads the wakeup cause, and after a light sleep the cause is
         // available only after the line above.
-        crate::gpio::wakeup::record_wakeup();
+        gpio::wakeup::record_wakeup();
+    }
+}
+
+/// Waits for the hardware to report the result of the sleep request, and returns whether the
+/// hardware rejected the request.
+///
+/// A deep sleep powers the CPU down inside this loop, and a light sleep stops the CPU here until a
+/// wakeup source ends the sleep. A rejected request does neither, so the reject interrupt is the
+/// only report of that case. ESP-IDF waits in the same place, in `rtc_sleep_start` and in
+/// `pmu_sleep_start`.
+#[cfg(sleep_driver_supported)]
+fn wait_for_sleep_result() -> bool {
+    loop {
+        cfg_select! {
+            soc_has_pmu => {
+                let int_raw = crate::peripherals::PMU::regs().int_raw().read();
+                if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
+                    return int_raw.soc_sleep_reject().bit_is_set();
+                }
+            }
+            _ => {
+                let int_raw = LPWR::regs().int_raw().read();
+                if int_raw.slp_wakeup().bit_is_set() || int_raw.slp_reject().bit_is_set() {
+                    return int_raw.slp_reject().bit_is_set();
+                }
+            }
+        }
     }
 }
 

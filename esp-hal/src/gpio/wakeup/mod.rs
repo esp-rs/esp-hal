@@ -32,6 +32,9 @@ mod path;
 
 use portable_atomic::Ordering;
 
+// The pad function is selected only on the chips that have a low-power IO MUX.
+#[cfg(sleep_ext1_version_is_set)]
+use crate::gpio::lp_io::LpFunction;
 use crate::{
     gpio::{
         AnyPin,
@@ -41,7 +44,7 @@ use crate::{
         Pin,
         WakeConfigError,
         low_level::PadMask,
-        lp_io::{LpFunction, low_level},
+        lp_io::low_level,
     },
     peripherals::GPIO,
     rtc_cntl::{
@@ -92,7 +95,10 @@ pub struct WakeupConfig {
 /// deep sleep, because that wake resets the chip, and a program starts with no wakeup sources.
 static LOW_POWER_PADS: PadMask = PadMask::new();
 
-/// The pads that sleep entry moved to the low-power IO MUX, and that a light sleep must move back.
+/// The pads that sleep entry prepared, and that the exit hook must return to their driver.
+///
+/// A sleep that ends without a reset has to undo the preparation. A light sleep is such a sleep,
+/// and so is a deep sleep that the hardware rejects.
 static PREPARED_PADS: PadMask = PadMask::new();
 
 /// The pads that ended the last sleep.
@@ -150,8 +156,6 @@ const MAX_ARMED: usize = {
 #[derive(Debug, Clone, Copy)]
 struct Armed {
     /// The digital pin number.
-    // esp32c2 and esp32c3 keep the pad on the digital IO MUX, so their path does not need this.
-    #[cfg_attr(not(sleep_ext1_version_is_set), expect(dead_code))]
     gpio: u8,
     /// The number that the low-power registers use for the pad.
     lp: u8,
@@ -245,6 +249,63 @@ fn lp_number(gpio: u8) -> Option<u8> {
     }
 }
 
+/// Returns every pad that the low-power registers reach, as a pin number and a low-power number.
+fn low_power_pads() -> impl Iterator<Item = (u8, u8)> {
+    LP_NUMBERS
+        .iter()
+        .copied()
+        .enumerate()
+        .filter(|&(_, lp)| lp != NO_LP_NUMBER)
+        .map(|(gpio, lp)| (gpio as u8, lp))
+}
+
+/// Returns the low-power number of every pad that the low-power registers reach.
+#[cfg(not(sleep_ext1_version = "3"))]
+fn low_power_numbers() -> impl Iterator<Item = u8> {
+    low_power_pads().map(|(_, lp)| lp)
+}
+
+/// Returns whether a wakeup source that configures pads is enabled.
+///
+/// Call this before the initialization clears the mask. The result tells the initialization whether
+/// it must release the pads that the previous run armed. ESP-IDF uses the same condition for
+/// `esp_deep_sleep_wakeup_io_reset`.
+pub(crate) fn wake_enabled() -> bool {
+    let sources = crate::rtc_cntl::sleep::enabled_sources();
+
+    #[allow(unused_mut)]
+    let mut enabled = sources.contains(WakeupSource::Gpio);
+
+    #[cfg(sleep_has_wakeup_source_ext0)]
+    {
+        enabled |= sources.contains(WakeupSource::Ext0);
+    }
+    #[cfg(sleep_has_wakeup_source_ext1)]
+    {
+        enabled |= sources.contains(WakeupSource::Ext1);
+    }
+
+    enabled
+}
+
+/// Releases the pads that the previous run armed for a deep sleep.
+///
+/// A deep sleep holds its wake pads, because it powers down the circuit that drives them. The wake
+/// resets the chip, but it does not release the hold: the hold register is in the always-on domain.
+/// A held pad would ignore its driver for the rest of the program, so the boot releases it.
+///
+/// The function releases the hold, and changes nothing else. A change of a pad function can take a
+/// pad from a low-power core, which keeps its pads while it runs.
+pub(crate) fn wake_io_reset() {
+    path::wake_io_reset();
+}
+
+/// Records that sleep entry took the hold of a pad, so that the exit hook releases it.
+#[cfg(not(sleep_ext1_version_is_set))]
+fn hold_taken(gpio: u8) {
+    PREPARED_PADS.set(gpio, true);
+}
+
 /// Assigns the listening pins to the hardware paths, and requests the power domains that they need.
 #[crate::ram]
 fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
@@ -270,7 +331,10 @@ fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
     path::allocate(armed, kind, config);
 }
 
-/// Returns the pads to the digital GPIO peripheral after a light sleep.
+/// Returns the pads to the digital GPIO peripheral after a sleep that did not reset the chip.
+///
+/// A light sleep is such a sleep, and so is a deep sleep that the hardware rejects. The hooks of a
+/// rejected deep sleep run in the same place, because sleep entry prepared the same pads.
 #[crate::ram]
 fn exit_hook() {
     for bank in GpioBank::ALL {
@@ -285,6 +349,10 @@ fn exit_hook() {
             };
 
             low_level::pad_hold(lp, false);
+
+            // Only a chip with a low-power IO MUX moved the pad, so only such a chip has to move it
+            // back. esp32c2 and esp32c3 keep the pad on the digital IO MUX.
+            #[cfg(sleep_ext1_version_is_set)]
             low_level::set_config(lp, true, false, LpFunction::LP_GPIO);
         }
     }

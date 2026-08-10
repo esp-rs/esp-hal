@@ -582,6 +582,9 @@ impl RtcSleepConfig {
         }
     }
 
+    /// Configures the wakeup options and requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         unsafe {
             LPWR::regs()

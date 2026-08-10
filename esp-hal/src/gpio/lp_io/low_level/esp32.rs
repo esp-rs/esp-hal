@@ -75,6 +75,9 @@ macro_rules! lp_io_analog {
             });
         }
 
+        /// One bit for each low-power pad.
+        const ALL_PADS: u32 = 0 $( | 1 << $lp_pin )+;
+
         macro_rules! set_one_pad_field {
             $(
                 ($lp_pin, $field:ident, $enable:ident) => {{
@@ -171,12 +174,30 @@ pub(crate) fn wakeup_status() -> u32 {
 
 /// Clears [`wakeup_status`], so that it reports the next sleep and no earlier sleep.
 pub(crate) fn clear_wakeup_status() {
-    // One bit for each low-power pad. This chip has 18 such pads.
-    const ALL_PADS: u32 = (1 << 18) - 1;
-
     RTC_IO::regs()
         .status_w1tc()
         .write(|w| unsafe { w.status_int_w1tc().bits(ALL_PADS) });
+}
+
+/// Returns the pads that can wake the chip through the per-pin path, as a mask of low-power
+/// numbers.
+pub(crate) fn wakeup_enabled_mask() -> u32 {
+    let mut mask = 0;
+    let mut pads = ALL_PADS;
+    while pads != 0 {
+        let lp = pads.trailing_zeros();
+        pads &= !(1 << lp);
+
+        if RTC_IO::regs()
+            .pin(lp as usize)
+            .read()
+            .wakeup_enable()
+            .bit_is_set()
+        {
+            mask |= 1 << lp;
+        }
+    }
+    mask
 }
 
 #[expect(dead_code)]

@@ -97,6 +97,10 @@ for_each_lp_function! {
                 }
             });
         }
+
+        /// One bit for each low-power pad.
+        #[cfg(sleep_driver_supported)]
+        const ALL_PADS: u32 = 0 $( | 1 << $n )*;
     };
 }
 
@@ -126,12 +130,31 @@ pub(crate) fn wakeup_status() -> u32 {
     }
 }
 
+/// Returns the pads that can wake the chip through the per-pin path, as a mask of low-power
+/// numbers.
+#[cfg(sleep_driver_supported)]
+pub(crate) fn wakeup_enabled_mask() -> u32 {
+    let mut mask = 0;
+    let mut pads = ALL_PADS;
+    while pads != 0 {
+        let lp = pads.trailing_zeros();
+        pads &= !(1 << lp);
+
+        if RTC_IO::regs()
+            .pin(lp as usize)
+            .read()
+            .wakeup_enable()
+            .bit_is_set()
+        {
+            mask |= 1 << lp;
+        }
+    }
+    mask
+}
+
 /// Clears [`wakeup_status`], so that it reports the next sleep and no earlier sleep.
 #[cfg(sleep_driver_supported)]
 pub(crate) fn clear_wakeup_status() {
-    // One bit for each low-power pad. Both chips have 22 such pads.
-    const ALL_PADS: u32 = (1 << 22) - 1;
-
     RTC_IO::regs().rtc_gpio_status_w1tc().write(|w| unsafe {
         cfg_select! {
             esp32s2 => w.gpio_status_int_w1tc().bits(ALL_PADS),
