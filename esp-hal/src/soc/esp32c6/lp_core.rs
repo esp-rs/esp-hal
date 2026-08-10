@@ -23,7 +23,7 @@ use crate::{
     peripherals::{LP_AON, LP_CORE, LP_PERI, LPWR, PMU},
     rtc_cntl::{
         WakeupSource,
-        sleep::{SleepKind, SleepResource, WrappedSleepConfig},
+        sleep::{SleepResource, WrappedSleepConfig},
     },
 };
 
@@ -106,7 +106,7 @@ impl<'d> LpCore<'d> {
 /// The LP core wakes the chip through the low-power peripherals, which also contain the timer that
 /// the core usually waits for. A sleep that powers these peripherals down does not get the request.
 #[crate::ram]
-fn keep_low_power_domain(_kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
+fn keep_low_power_domain(config: &mut WrappedSleepConfig<'_>) {
     config.keep_alive(SleepResource::LpPeripherals);
 }
 

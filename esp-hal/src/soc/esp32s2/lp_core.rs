@@ -45,7 +45,7 @@ use crate::{
     peripherals::LPWR,
     rtc_cntl::{
         WakeupSource,
-        sleep::{SleepKind, SleepResource, WrappedSleepConfig},
+        sleep::{SleepResource, WrappedSleepConfig},
     },
 };
 
@@ -168,7 +168,7 @@ fn enable_wakeup(config: WakeupConfig) {
 /// The ULP core runs from the low-power memory, and reads its pads through the low-power
 /// peripherals. If a sleep powers one of the two down, the core cannot request a wake.
 #[crate::ram]
-fn keep_low_power_domain(_kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
+fn keep_low_power_domain(config: &mut WrappedSleepConfig<'_>) {
     config.keep_alive(SleepResource::LpMemory);
     // ESP-IDF keeps the low-power peripherals powered for an `ext0` wake and a GPIO wake only. A
     // power-down also stops the ULP timer and the GPIO of the ULP core.

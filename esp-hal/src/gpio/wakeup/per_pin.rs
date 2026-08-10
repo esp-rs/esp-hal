@@ -8,17 +8,13 @@ use super::{Armed, LP_NUMBERS, NO_LP_NUMBER};
 use crate::{
     gpio::{Level, lp_io::low_level},
     peripherals::LPWR,
-    rtc_cntl::{
-        WakeupReason,
-        WakeupSource,
-        sleep::{SleepKind, WrappedSleepConfig},
-    },
+    rtc_cntl::{WakeupReason, WakeupSource, sleep::WrappedSleepConfig},
 };
 
 /// These chips have no separate path to clear, because all their pads use the GPIO wakeup source.
 pub(super) fn disable() {}
 
-pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
+pub(super) fn allocate(armed: &[Armed], config: &mut WrappedSleepConfig<'_>) {
     // A pad outside this sleep must not wake the chip.
     for &lp in LP_NUMBERS.iter().filter(|&&lp| lp != NO_LP_NUMBER) {
         low_level::apply_wakeup(lp, false, Level::Low);
@@ -29,7 +25,7 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSl
         // must therefore keep its own state through the sleep, or it floats to an unknown level.
         // The hold outlives the sleep: neither the wake of a light sleep nor the reset of a
         // deep-sleep wake releases it, so it is released in software.
-        if kind == SleepKind::Deep {
+        if config.is_deep_sleep() {
             low_level::pad_hold(pin.lp, true);
             super::hold_taken(pin.gpio);
         }

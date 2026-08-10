@@ -49,7 +49,7 @@ use crate::{
     peripherals::GPIO,
     rtc_cntl::{
         WakeupSource,
-        sleep::{SleepKind, SleepResource, WrappedSleepConfig},
+        sleep::{SleepResource, WrappedSleepConfig},
     },
 };
 
@@ -308,13 +308,13 @@ fn hold_taken(gpio: u8) {
 
 /// Assigns the listening pins to the hardware paths, and requests the power domains that they need.
 #[crate::ram]
-fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
+fn entry_hook(config: &mut WrappedSleepConfig<'_>) {
     let mut buffer = [Armed::NONE; MAX_ARMED];
     let (armed, mut digital) = collect(&mut buffer);
 
     // Deep sleep powers the high-performance GPIO peripheral down. The digital path then cannot
     // wake the chip, whatever number of pins listen.
-    digital &= kind == SleepKind::Light;
+    digital &= !config.is_deep_sleep();
 
     if armed.is_empty() && !digital {
         // No pad can wake the chip, so the record must go. A mask that still claims a GPIO wakeup
@@ -328,7 +328,7 @@ fn entry_hook(kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
         config.keep_alive(SleepResource::HpPeripherals);
     }
 
-    path::allocate(armed, kind, config);
+    path::allocate(armed, config);
 }
 
 /// Returns the pads to the digital GPIO peripheral after a sleep that did not reset the chip.
@@ -419,7 +419,7 @@ fn armed_level(gpio: u8) -> Option<Level> {
 /// that drives it. A light sleep does not hold the pad. A light sleep powers down no circuit that
 /// drives the pad, and a hold would freeze an output.
 #[cfg(sleep_ext1_version_is_set)]
-fn prepare_pad(pin: &Armed, kind: SleepKind) {
+fn prepare_pad(pin: &Armed, deep: bool) {
     // The low-power IO MUX has its own pull resistors, and the digital ones stop to work as soon as
     // the low-power IO MUX takes the pad. Copy the resistors, or an undriven pad floats away from
     // the level that the user selected, and wakes the chip immediately.
@@ -432,7 +432,7 @@ fn prepare_pad(pin: &Armed, kind: SleepKind) {
 
     // esp32h2 reaches the pad through the digital IO MUX, so it has no low-power MUX to select.
     low_level::set_config(pin.lp, true, !cfg!(esp32h2), LpFunction::LP_GPIO);
-    low_level::pad_hold(pin.lp, kind == SleepKind::Deep);
+    low_level::pad_hold(pin.lp, deep);
 
     PREPARED_PADS.set(pin.gpio, true);
 }

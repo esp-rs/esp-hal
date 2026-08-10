@@ -876,16 +876,11 @@ impl Info {
 /// The UART peripheral monitors the RX line itself, so the peripheral must stay powered.
 #[cfg(sleep_driver_supported)]
 #[crate::ram]
-fn keep_peripherals_powered(
-    kind: crate::rtc_cntl::sleep::SleepKind,
-    config: &mut crate::rtc_cntl::sleep::WrappedSleepConfig<'_>,
-) {
-    use crate::rtc_cntl::sleep::{SleepKind, SleepResource};
-
+fn keep_peripherals_powered(config: &mut crate::rtc_cntl::sleep::WrappedSleepConfig<'_>) {
     // A deep sleep powers the peripheral down in all cases, so this request gives no wake there. It
     // only increases the current.
-    if kind == SleepKind::Light {
-        config.keep_alive(SleepResource::HpPeripherals);
+    if !config.is_deep_sleep() {
+        config.keep_alive(crate::rtc_cntl::sleep::SleepResource::HpPeripherals);
     }
 }
 

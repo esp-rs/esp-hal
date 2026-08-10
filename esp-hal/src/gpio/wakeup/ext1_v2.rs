@@ -8,11 +8,7 @@ use super::{Armed, prepare_pad};
 use crate::{
     gpio::{Level, lp_io::low_level},
     peripherals::LP_AON,
-    rtc_cntl::{
-        WakeupReason,
-        WakeupSource,
-        sleep::{SleepKind, WrappedSleepConfig},
-    },
+    rtc_cntl::{WakeupReason, WakeupSource, sleep::WrappedSleepConfig},
 };
 
 /// Clears the paths that the pins of this chip can take, so that no bit of a previous sleep wakes
@@ -21,7 +17,7 @@ pub(super) fn disable() {
     WakeupSource::Ext1.disable();
 }
 
-pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSleepConfig<'_>) {
+pub(super) fn allocate(armed: &[Armed], config: &mut WrappedSleepConfig<'_>) {
     if armed.is_empty() {
         write_ext1(0, 0);
         WakeupSource::Ext1.disable();
@@ -38,7 +34,7 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, _config: &mut WrappedSl
             levels |= bit;
         }
 
-        prepare_pad(pin, kind);
+        prepare_pad(pin, config.is_deep_sleep());
     }
 
     write_ext1(pads, levels);

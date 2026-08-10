@@ -178,7 +178,7 @@ impl<'d> LowPower<'d> {
         // the hardware. They also run before the last read of the mask, because a hook can
         // enable another source. The GPIO hook does this while it allocates its pins to the
         // paths.
-        run_entry_hooks(kind, &mut config);
+        run_entry_hooks(&mut config);
 
         config.apply();
 

@@ -14,7 +14,7 @@ use crate::{
     rtc_cntl::{
         WakeupReason,
         WakeupSource,
-        sleep::{SleepKind, SleepResource, WrappedSleepConfig},
+        sleep::{SleepResource, WrappedSleepConfig},
     },
 };
 
@@ -25,9 +25,10 @@ pub(super) fn disable() {
     WakeupSource::Ext1.disable();
 }
 
-pub(super) fn allocate(armed: &[Armed], kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
+pub(super) fn allocate(armed: &[Armed], config: &mut WrappedSleepConfig<'_>) {
     clear_per_pin();
 
+    let deep = config.is_deep_sleep();
     let shared = shared_level(armed);
 
     // Each armed pin gets a path. `ext1` takes one level group, `ext0` takes one remaining pin, and
@@ -42,10 +43,10 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, config: &mut WrappedSle
 
         leftover = true;
         if !ext0_taken {
-            arm_ext0(pin, kind);
+            arm_ext0(pin, deep);
             ext0_taken = true;
         } else {
-            arm_per_pin(pin, kind);
+            arm_per_pin(pin, deep);
         }
     }
 
@@ -61,7 +62,7 @@ pub(super) fn allocate(armed: &[Armed], kind: SleepKind, config: &mut WrappedSle
     match shared {
         Some(level) => {
             let group = |pin: &&Armed| pin.level == level;
-            arm_ext1(armed.iter().filter(group), level, kind);
+            arm_ext1(armed.iter().filter(group), level, deep);
         }
         None => disarm_ext1(),
     }
@@ -104,11 +105,11 @@ fn shared_level(armed: &[Armed]) -> Option<Level> {
 }
 
 /// Arms one level group on `ext1`.
-fn arm_ext1<'a>(group: impl Iterator<Item = &'a Armed>, level: Level, kind: SleepKind) {
+fn arm_ext1<'a>(group: impl Iterator<Item = &'a Armed>, level: Level, deep: bool) {
     let mut pads = 0;
     for pin in group {
         pads |= 1 << pin.lp;
-        prepare_pad(pin, kind);
+        prepare_pad(pin, deep);
     }
 
     write_ext1(pads, level);
@@ -133,8 +134,8 @@ fn write_ext1(pads: u32, level: Level) {
 }
 
 /// Arms one pad on `ext0`, which is the oldest of the low-power paths.
-fn arm_ext0(pin: &Armed, kind: SleepKind) {
-    prepare_pad(pin, kind);
+fn arm_ext0(pin: &Armed, deep: bool) {
+    prepare_pad(pin, deep);
 
     RTC_IO::regs()
         .ext_wakeup0()
@@ -202,7 +203,7 @@ fn clear_per_pin() {
     low_level::clear_wakeup_status();
 }
 
-fn arm_per_pin(pin: &Armed, kind: SleepKind) {
-    prepare_pad(pin, kind);
+fn arm_per_pin(pin: &Armed, deep: bool) {
+    prepare_pad(pin, deep);
     low_level::apply_wakeup(pin.lp, true, pin.level);
 }

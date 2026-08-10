@@ -64,6 +64,11 @@ impl<'a> WrappedSleepConfig<'a> {
         Self { config }
     }
 
+    /// Returns whether the chip is entering deep sleep, which resets it when it wakes.
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.config.is_deep_sleep()
+    }
+
     /// Keeps `resource` powered during the sleep.
     pub(crate) fn keep_alive(&mut self, resource: SleepResource) {
         // One function for all chips. It keeps the code of one resource together for all chips, so
@@ -127,7 +132,10 @@ impl<'a> WrappedSleepConfig<'a> {
 }
 
 /// Runs at sleep entry, before the sleep configuration reaches hardware.
-pub(crate) type SleepEntryHook = fn(SleepKind, &mut WrappedSleepConfig<'_>);
+///
+/// The configuration already holds the kind of the sleep, so a hook that needs it asks
+/// [`WrappedSleepConfig::is_deep_sleep`].
+pub(crate) type SleepEntryHook = fn(&mut WrappedSleepConfig<'_>);
 
 /// Runs after a light sleep. A deep sleep resets the chip, which runs the initialization again.
 pub(crate) type SleepExitHook = fn();
@@ -226,13 +234,16 @@ pub(crate) fn reject_mask() -> u32 {
 /// hook does this, because it selects between the `ext0`, `ext1` and per-pin paths. The caller
 /// therefore reads the mask again after the hooks. It does not run the hooks again until the mask
 /// stops to change.
-pub(crate) fn run_entry_hooks(kind: SleepKind, config: &mut RtcSleepConfig) {
+///
+/// The caller writes the kind of the sleep to the configuration before this call, so that the hooks
+/// can read it.
+pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) {
     let mut wrapped = WrappedSleepConfig::new(config);
 
     for source in enabled_sources() {
         let hook = HOOKS.with(|hooks| hooks.entry[source as usize]);
         if let Some(hook) = hook {
-            hook(kind, &mut wrapped);
+            hook(&mut wrapped);
         }
     }
 }

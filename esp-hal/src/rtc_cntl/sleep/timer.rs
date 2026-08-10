@@ -6,10 +6,7 @@
 
 use crate::{
     peripherals::RTC_TIMER,
-    rtc_cntl::{
-        WakeupSource,
-        sleep::{SleepKind, WrappedSleepConfig},
-    },
+    rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig},
     time::Instant,
 };
 
@@ -74,7 +71,7 @@ pub(crate) fn deadline_missed() -> bool {
 }
 
 #[crate::ram]
-fn entry_hook(_kind: SleepKind, config: &mut WrappedSleepConfig<'_>) {
+fn entry_hook(config: &mut WrappedSleepConfig<'_>) {
     // The PMU chips run the comparator from the always-on domain. ESP-IDF also powers their
     // low-power peripherals down while a timer wake is armed.
     if !cfg!(soc_has_pmu) {
