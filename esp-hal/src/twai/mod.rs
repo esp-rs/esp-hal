@@ -1219,6 +1219,24 @@ where
         self.regs().status().read().bus_off_st().bit_is_set()
     }
 
+    /// Initiates recovery from the bus-off state.
+    ///
+    /// The peripheral recovers once it has observed 128 occurrences of 11
+    /// consecutive recessive (idle) bits on the bus. Use [`Self::is_bus_off`]
+    /// to poll whether recovery has completed.
+    ///
+    /// Does nothing if the peripheral is not in the bus-off state.
+    #[instability::unstable]
+    pub fn initiate_recovery(&mut self) {
+        if self.is_bus_off() {
+            // Entering the bus-off state parks the peripheral in reset mode;
+            // the 1-to-0 transition of the reset mode bit starts the recovery
+            // sequence.
+            self.regs().mode().modify(|_, w| w.reset_mode().set_bit());
+            self.regs().mode().modify(|_, w| w.reset_mode().clear_bit());
+        }
+    }
+
     /// Get the number of messages that the peripheral has available in the
     /// receive FIFO.
     ///
@@ -1289,6 +1307,14 @@ where
     /// NOTE: TODO: This may not work if using the self reception/self test
     /// functionality. See notes 1 and 2 in the "Frame Identifier" section
     /// of the reference manual.
+    ///
+    /// If a previous frame is still pending and the peripheral has entered the
+    /// error-passive state because of it (the bus cannot carry the frame, e.g.
+    /// no other node acknowledges it), the pending transmission is aborted and
+    /// [`EspTwaiError::TransmissionAborted`] is returned. An unacknowledged
+    /// transmitter's error counter does not increase past the error-passive
+    /// threshold, so without giving up the transmission would be retried
+    /// forever.
     pub fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
         let status = self.regs().status().read();
 
@@ -1298,6 +1324,12 @@ where
         }
         // Check that the peripheral is not already transmitting a packet.
         if status.tx_buf_st().bit_is_clear() {
+            if is_error_passive(self.regs()) {
+                // Give up on the pending frame: the bus is apparently unable to
+                // carry it.
+                self.regs().cmd().write(|w| w.abort_tx().set_bit());
+                return nb::Result::Err(nb::Error::Other(EspTwaiError::TransmissionAborted));
+            }
             return nb::Result::Err(nb::Error::WouldBlock);
         }
 
@@ -1365,6 +1397,10 @@ pub enum TwaiInterrupt {
     ArbitrationLost,
     /// The controller has entered an error passive state.
     ErrorPassive,
+    /// The error or bus status has changed: an error counter crossed the
+    /// error warning limit in either direction, or the controller entered or
+    /// left the bus-off state.
+    ErrorWarning,
 }
 
 /// Represents errors that can occur in the TWAI driver.
@@ -1375,6 +1411,10 @@ pub enum TwaiInterrupt {
 pub enum EspTwaiError {
     /// TWAI peripheral has entered a bus-off state.
     BusOff,
+    /// The transmission was aborted because the peripheral repeatedly failed
+    /// to transmit the frame and entered the error-passive state (e.g. no
+    /// other node on the bus acknowledged the frame).
+    TransmissionAborted,
     /// The received frame contains an invalid DLC.
     NonCompliantDlc(u8),
     /// Invalid data length.
@@ -1483,6 +1523,7 @@ pub trait PrivateInstance: crate::private::Sealed {
                     TwaiInterrupt::BusError => w.bus_err_int_ena().bit(enable),
                     TwaiInterrupt::ArbitrationLost => w.arb_lost_int_ena().bit(enable),
                     TwaiInterrupt::ErrorPassive => w.err_passive_int_ena().bit(enable),
+                    TwaiInterrupt::ErrorWarning => w.err_warn_int_ena().bit(enable),
                 };
             }
             w
@@ -1507,6 +1548,13 @@ pub trait PrivateInstance: crate::private::Sealed {
 /// reading.
 fn release_receive_fifo(register_block: &RegisterBlock) {
     register_block.cmd().write(|w| w.release_buf().set_bit());
+}
+
+/// Check if the peripheral is in the error-passive state, i.e. one of the
+/// error counters has reached 128.
+fn is_error_passive(register_block: &RegisterBlock) -> bool {
+    register_block.tx_err_cnt().read().tx_err_cnt().bits() >= 128
+        || register_block.rx_err_cnt().read().rx_err_cnt().bits() >= 128
 }
 
 /// Write a frame to the peripheral.
@@ -1685,6 +1733,12 @@ mod asynch {
         /// stops it, in case it is activly transmitting. Therefor it could be
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
+        ///
+        /// If the bus cannot carry the frame (e.g. no other node acknowledges
+        /// it), the transmission is aborted once the peripheral enters the
+        /// error-passive or bus-off state and the future resolves to
+        /// [`EspTwaiError::TransmissionAborted`] or [`EspTwaiError::BusOff`],
+        /// respectively.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
             self.tx.transmit_async(frame).await
         }
@@ -1732,7 +1786,21 @@ mod asynch {
             }
 
             // Check that the peripheral is not currently transmitting a packet.
+            // This must come before the error-passive check: a frame whose
+            // buffer has been released was transmitted successfully, no matter
+            // what state the error counters are in.
             if status.tx_buf_st().bit_is_clear() {
+                if is_error_passive(regs) {
+                    // Give up on the pending frame: the bus is apparently
+                    // unable to carry it (e.g. no other node acknowledges it),
+                    // and an unacknowledged transmitter's error counter does
+                    // not increase past the error-passive threshold, so the
+                    // frame would otherwise be retried forever. The pending
+                    // frame is not necessarily this future's own; a blocking
+                    // `transmit` may have left it behind.
+                    regs.cmd().write(|w| w.abort_tx().set_bit());
+                    return Poll::Ready(Err(EspTwaiError::TransmissionAborted));
+                }
                 return Poll::Pending;
             }
 
@@ -1763,6 +1831,12 @@ mod asynch {
         /// stops it, in case it is actively transmitting. Therefor it could be
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
+        ///
+        /// If the bus cannot carry the frame (e.g. no other node acknowledges
+        /// it), the transmission is aborted once the peripheral enters the
+        /// error-passive or bus-off state and the future resolves to
+        /// [`EspTwaiError::TransmissionAborted`] or [`EspTwaiError::BusOff`],
+        /// respectively.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
             TransmitFuture::new(self.twai.reborrow(), frame).await
         }
@@ -1797,20 +1871,29 @@ mod asynch {
         let int_ena_reg = register_block.int_ena();
         let int_ena = int_ena_reg.read();
 
+        // The error warning interrupt fires on every change of the error or
+        // bus status. Entering bus-off sets both the bus-off and the error
+        // warning status; during bus-off recovery the transmit error counter
+        // counts down and the error warning status clears while the bus-off
+        // status is still set. Gating on both ensures the bus-off state is
+        // signalled only once per entry, instead of on every error warning
+        // interrupt while the state persists.
+        if int_raw.err_warn_int_st().bit_is_set() {
+            let status = register_block.status().read();
+
+            if status.bus_off_st().bit_is_set() && status.err_st().bit_is_set() {
+                // Any pending transmission is halted by entering the bus-off
+                // state; abort it to release the transmit buffer.
+                register_block.cmd().write(|w| w.abort_tx().set_bit());
+                let _ = async_state.rx_queue.try_send(Err(EspTwaiError::BusOff));
+                async_state.tx_waker.wake();
+                async_state.err_waker.wake();
+            }
+        }
+
         if int_raw.rx_int_st().bit_is_set() {
             let status_reg = register_block.status();
-            let status = status_reg.read();
-
             let rx_queue = &async_state.rx_queue;
-
-            if status.bus_off_st().bit_is_set() {
-                let _ = rx_queue.try_send(Err(EspTwaiError::BusOff));
-                // Abort transmissions and wake senders if we are in bus-off state.
-                if status.tx_buf_st().bit_is_clear() {
-                    register_block.cmd().write(|w| w.abort_tx().set_bit());
-                    async_state.tx_waker.wake();
-                }
-            }
 
             // Consumme all pending frames in the Rx FIFO
             while register_block
@@ -1841,11 +1924,19 @@ mod asynch {
             async_state.tx_waker.wake();
         }
 
-        if int_raw.bits() & 0b10110100 > 0 {
+        if int_raw.err_warn_int_st().bit_is_set()
+            || int_raw.err_passive_int_st().bit_is_set()
+            || int_raw.bus_err_int_st().bit_is_set()
+        {
             // We might want to use the error code to gather statistics in the
             // future.
             let _ = register_block.err_code_cap().read();
             async_state.err_waker.wake();
+            // A frame that cannot be transmitted never raises the transmit
+            // interrupt, so wake transmitters on errors to let them
+            // re-evaluate their pending frame and give up once the peripheral
+            // reaches the error-passive or bus-off state.
+            async_state.tx_waker.wake();
         }
 
         // Clear interrupt request bits
