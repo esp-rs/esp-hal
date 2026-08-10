@@ -2,9 +2,9 @@ use core::cell::RefCell;
 
 use crate::{gpio::Level, rtc_cntl::sleep::RtcIoWakeupPinType};
 
-#[cfg_attr(any(esp32, esp32s2, esp32s3), path = "v1.rs")]
-#[cfg_attr(any(esp32c5, esp32c6, esp32c61, esp32h2), path = "v2.rs")]
-#[cfg_attr(esp32p4, path = "esp32p4.rs")]
+#[cfg_attr(sleep_ext1_version = "1", path = "v1.rs")]
+#[cfg_attr(sleep_ext1_version = "2", path = "v2.rs")]
+#[cfg_attr(sleep_ext1_version = "3", path = "v3.rs")]
 mod implementation;
 
 #[procmacros::doc_replace(
@@ -23,7 +23,7 @@ mod implementation;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, LowPower, TimerWakeupSource}, wakeup_cause, SocResetReason};
 /// # use esp_hal::system::Cpu;
-/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull, LpPinWithResistors};
+/// # use esp_hal::gpio::{Input, InputConfig, Level, Pull, LpPin};
 /// # use esp_hal::time::Duration;
 /// #
 /// let delay = Delay::new();
@@ -41,7 +41,7 @@ mod implementation;
 ///
 /// core::mem::drop(pin_low_input);
 ///
-/// let wakeup_pins: &mut [(&mut dyn LpPinWithResistors, Level)] =
+/// let wakeup_pins: &mut [(&mut dyn LpPin, Level)] =
 /// &mut [
 ///     (&mut peripherals.__pin_low__, Level::Low),
 ///     (&mut peripherals.__pin_high__, Level::High),
@@ -54,13 +54,13 @@ mod implementation;
 ///
 /// # {after_snippet}
 /// ```
-#[cfg(not(any(esp32, esp32s2, esp32s3)))]
+#[cfg(not(sleep_ext1_version = "1"))]
 #[instability::unstable]
 pub struct Ext1WakeupSource<'a, 'b> {
     pins: RefCell<&'a mut [(&'b mut dyn RtcIoWakeupPinType, Level)]>,
 }
 
-#[cfg(not(any(esp32, esp32s2, esp32s3)))]
+#[cfg(not(sleep_ext1_version = "1"))]
 impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
     /// Creates a new external wake-up source (Ext1) with the specified pins and
     /// wake-up level.
@@ -110,7 +110,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// # }
 /// ```
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(sleep_ext1_version = "1")]
 pub struct Ext1WakeupSource<'a, 'b> {
     /// A collection of pins used as wake-up sources.
     pins: RefCell<&'a mut [&'b mut dyn RtcIoWakeupPinType]>,
@@ -118,7 +118,7 @@ pub struct Ext1WakeupSource<'a, 'b> {
     level: Level,
 }
 
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(sleep_ext1_version = "1")]
 impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
     /// Creates a new external wake-up source (Ext1) with the specified pins and
     /// wake-up level.

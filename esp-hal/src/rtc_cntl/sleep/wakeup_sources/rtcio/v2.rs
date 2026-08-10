@@ -1,29 +1,31 @@
 use super::RtcioWakeupSource;
 use crate::{
-    gpio::{AlternateFunction, Level, LpPinWithResistors, OutputSignal, WakeEvent},
+    gpio::{AlternateFunction, Level, LpPin, OutputSignal, WakeEvent, lp_io::low_level},
     peripherals::{GPIO, IO_MUX, LPWR},
     rtc_cntl::{Rtc, RtcSleepConfig, WakeSource, WakeTriggers, WakeupSource},
 };
 
 impl RtcioWakeupSource<'_, '_> {
-    fn apply_pin(&self, pin: &mut dyn LpPinWithResistors, level: Level) {
+    fn apply_pin(&self, pin: &mut dyn LpPin, level: Level) {
+        let lp_pin = pin.lp_number();
+
         // The pullup/pulldown part is like in gpio_deep_sleep_wakeup_prepare
         let level = match level {
             Level::High => {
-                pin.lp_pullup(false);
-                pin.lp_pulldown(true);
+                low_level::pullup_enable(lp_pin, false);
+                low_level::pulldown_enable(lp_pin, true);
                 WakeEvent::HighLevel
             }
             Level::Low => {
-                pin.lp_pullup(true);
-                pin.lp_pulldown(false);
+                low_level::pullup_enable(lp_pin, true);
+                low_level::pulldown_enable(lp_pin, false);
                 WakeEvent::LowLevel
             }
         };
-        pin.lp_pad_hold(true);
+        low_level::pad_hold(lp_pin, true);
 
         // apply_wakeup does the same as idf's esp_deep_sleep_enable_gpio_wakeup
-        pin.apply_wakeup(true, level);
+        low_level::apply_wakeup(lp_pin, true, level);
     }
 }
 

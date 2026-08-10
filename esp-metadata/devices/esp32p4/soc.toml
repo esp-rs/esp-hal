@@ -420,6 +420,8 @@ channel_count = 8
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+ext1_version = 3
+pin_wakeup_version = 3
 wakeup_sources = {
     # TODO: other sources
     Sdio = 0,

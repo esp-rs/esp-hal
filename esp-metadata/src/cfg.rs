@@ -738,6 +738,21 @@ driver_configs![
             deep_sleep: bool,
             #[serde(default)]
             wakeup_sources: WakeupSources,
+            /// The register generation of the `ext1` wakeup path, which wakes on a mask of pads.
+            ///
+            /// 1: `RTC_CNTL.ext_wakeup1`, with one level bit for all the pads in the mask.
+            /// 2: `LP_AON.ext_wakeup_cntl`, with one level for each pad.
+            /// 3: `PMU` ext wakeup, with one level for each pad.
+            ext1_version: Option<u32>,
+            /// The register generation of the per-pin wakeup path. This path wakes the chip while the
+            /// high-performance GPIO peripheral is powered down, and thus also from deep sleep.
+            ///
+            /// 1: RTC_IO, one register for each pad. 2: `RTC_CNTL_GPIO_WAKEUP`. 3: LP_IO, one
+            /// register for each pad.
+            ///
+            /// Not set for esp32h2, where the `ext1` registers are the per-pin path. Only version 3
+            /// supports edge triggers.
+            pin_wakeup_version: Option<u32>,
         }
     },
     SocProperties {
