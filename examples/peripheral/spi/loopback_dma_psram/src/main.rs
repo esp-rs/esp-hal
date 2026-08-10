@@ -22,10 +22,12 @@
 
 extern crate alloc;
 
+use allocator_api2::boxed::Box;
+use esp_alloc::DmaCompatibleExternalMemory;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::ExternalBurstConfig,
+    dma::{DmaTxBuf, ExternalBurstConfig, aligned::DmaAlignedMut},
     dma_rx_buffer,
     main,
     spi::{
@@ -37,28 +39,6 @@ use esp_hal::{
 use log::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
-
-macro_rules! dma_alloc_tx_buffer {
-    ($size:expr, $align:expr) => {{
-        let layout = core::alloc::Layout::from_size_align($size, $align as usize).unwrap();
-        let buffer = unsafe {
-            let ptr = alloc::alloc::alloc(layout);
-            if ptr.is_null() {
-                error!("dma_alloc_buffer: alloc failed");
-                alloc::alloc::handle_alloc_error(layout);
-            }
-            core::slice::from_raw_parts_mut(ptr, $size)
-        };
-
-        const DMA_CHUNK_SIZE: usize = 4096 - $align as usize;
-        let descriptors = esp_hal::dma_descriptors_impl!($size, DMA_CHUNK_SIZE);
-        esp_hal::dma::DmaTxBuf::new_with_config(
-            descriptors,
-            unsafe { esp_hal::dma::aligned::DmaAlignedMut::new_unchecked(buffer) },
-            $align,
-        )
-    }};
-}
 
 const DMA_BUFFER_SIZE: usize = 8192;
 const DMA_ALIGNMENT: ExternalBurstConfig = cfg_select! {
@@ -89,7 +69,19 @@ fn main() -> ! {
         _ => peripherals.DMA_CH0,
     };
 
-    let mut dma_tx_buf = dma_alloc_tx_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT).unwrap();
+    let buffer = Box::leak(Box::new_in(
+        [0u8; DMA_BUFFER_SIZE],
+        DmaCompatibleExternalMemory,
+    ));
+
+    const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
+    let descriptors = esp_hal::dma_descriptors_impl!(DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
+    let mut dma_tx_buf = DmaTxBuf::new_with_config(
+        descriptors,
+        DmaAlignedMut::new(buffer).unwrap().unsize(),
+        DMA_ALIGNMENT,
+    )
+    .unwrap();
     let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
     // Need to set miso first so that mosi can overwrite the
     // output connection (because we are using the same pin to loop back)
