@@ -437,7 +437,8 @@ driver_configs![
         driver: i2c_master,
         name: "I2C master",
         properties: {
-            /// Register-layout generation derived from the chip SVD.
+            /// Register-layout generation derived from the chip SVD. Also bumped when only the
+            /// function clock configuration differs.
             version: u32,
             #[serde(default)]
             has_fsm_timeouts: bool,
