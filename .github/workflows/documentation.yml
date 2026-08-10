@@ -1,6 +1,9 @@
 name: Documentation
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -21,6 +24,10 @@ on:
           - preview
           - production
 
+concurrency:
+  group: ${{ github.event_name == 'push' && 'docs-main' || format('docs-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -28,7 +35,7 @@ env:
 jobs:
   setup:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
     # required for this step, as stdout is captured by `hal-xtask release tag-releases`
     env:
       RUST_LOG: off
@@ -49,14 +56,14 @@ jobs:
           repository: esp-rs/esp-hal
       - name: Build xtask
         run: |
-          cargo build --package=xtask --features=deploy-docs
-          cp target/debug/xtask ~/.cargo/bin/hal-xtask
+          cargo build --package=esp-devtool --features=deploy-docs
+          cp target/debug/esp-devtool ~/.cargo/bin/hal-xtask
 
       - name: Cache xtask for all jobs
         uses: actions/upload-artifact@v6
         with:
           name: xtask
-          path: target/debug/xtask
+          path: target/debug/esp-devtool
 
       - id: setup_manual
         name: Set up [manual run with specific packages]
@@ -67,18 +74,34 @@ jobs:
 
       - id: setup_pr
         name: Set up [pull request or all packages]
-        if: ${{ github.event_name == 'pull_request' || github.event.inputs.packages == '' }}
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         # Release PRs will ignore the tag values and just check out the latest commit
         run: |
           output=$(hal-xtask release tag-releases)
           echo "packages=${output}" >> "$GITHUB_OUTPUT"
 
+      - id: deploy_target
+        name: Set deploy target
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "base_url=https://docs.espressif.com/projects/rust/" >> "$GITHUB_OUTPUT"
+            echo "channel=main" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.inputs.server }}" = "production" ]; then
+            echo "base_url=https://docs.espressif.com/projects/rust/" >> "$GITHUB_OUTPUT"
+            echo "channel=" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_url=https://preview-docs.espressif.com/projects/rust/" >> "$GITHUB_OUTPUT"
+            echo "channel=" >> "$GITHUB_OUTPUT"
+          fi
+
     outputs:
       packages: "${{ steps.setup_manual.outputs.packages || steps.setup_pr.outputs.packages }}"
+      base_url: ${{ steps.deploy_target.outputs.base_url }}
+      channel: ${{ steps.deploy_target.outputs.channel }}
 
   build:
     needs: setup
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
     strategy:
       fail-fast: true
       matrix:
@@ -106,7 +129,7 @@ jobs:
       # If running a release PR, we want to build docs for the latest commit on the released branch.
       - name: Checkout repository
         uses: actions/checkout@v6
-        if: ${{ github.event_name != 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
         with:
           repository: esp-rs/esp-hal
 
@@ -118,8 +141,12 @@ jobs:
 
       - name: Build documentation
         run: |
-          chmod +x ~/.cargo/bin/xtask
-          ~/.cargo/bin/xtask build documentation --packages=${{ matrix.packages.name }} --base-url ${{ fromJSON('["https://preview-docs.espressif.com/projects/rust/", "https://docs.espressif.com/projects/rust/"]')[github.event.inputs.server == 'production'] }}
+          chmod +x ~/.cargo/bin/esp-devtool
+          CHANNEL_ARGS=""
+          if [ -n "${{ needs.setup.outputs.channel }}" ]; then
+            CHANNEL_ARGS="--channel ${{ needs.setup.outputs.channel }}"
+          fi
+          ~/.cargo/bin/esp-devtool build documentation --packages=${{ matrix.packages.name }} --base-url ${{ needs.setup.outputs.base_url }} $CHANNEL_ARGS
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
@@ -134,7 +161,7 @@ jobs:
   assemble:
     needs: [setup, build]
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release:docs')) }}
 
     steps:
       # Check out the sources, the xtask reads package versions from the Cargo.toml files
@@ -148,8 +175,8 @@ jobs:
       # Create an index for _all_ packages. Per-package workflows don't upload the landing page.
       - name: Create index.html
         run: |
-          chmod +x docs/xtask/xtask
-          docs/xtask/xtask build documentation-index
+          chmod +x docs/xtask/esp-devtool
+          docs/xtask/esp-devtool build documentation-index --base-url ${{ needs.setup.outputs.base_url }}
           rm -rf docs/xtask
 
       - if: ${{ github.event.inputs.server == 'preview' || github.event_name == 'pull_request' }}
@@ -164,8 +191,8 @@ jobs:
           strip_components: 1 # remove the docs prefix
           overwrite: true
 
-      # Deploying to production server is only allowed for manual runs
-      - if: ${{ github.event.inputs.server == 'production' && github.event_name == 'workflow_dispatch' }}
+      # Deploying to production server is allowed for manual production runs and for pushes to main
+      - if: ${{ (github.event.inputs.server == 'production' && github.event_name == 'workflow_dispatch') || github.event_name == 'push' }}
         name: Deploy to production server
         uses: appleboy/scp-action@v0.1.7
         with:

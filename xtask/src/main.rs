@@ -123,7 +123,7 @@ fn main() -> Result<()> {
         Cli::Build(build) => match build {
             Build::Documentation(args) => build_documentation(&workspace, args),
             #[cfg(feature = "deploy-docs")]
-            Build::DocumentationIndex => build_documentation_index(&workspace),
+            Build::DocumentationIndex(args) => build_documentation_index(&workspace, args),
             Build::Examples(args) => examples(&workspace, args, CargoAction::Build(None)),
             Build::Package(args) => build_package(&workspace, args),
             Build::Tests(args) => tests(

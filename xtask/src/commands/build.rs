@@ -23,7 +23,7 @@ pub enum Build {
     Documentation(BuildDocumentationArgs),
     /// Build documentation index.
     #[cfg(feature = "deploy-docs")]
-    DocumentationIndex,
+    DocumentationIndex(BuildDocumentationIndexArgs),
     /// Build all examples for the specified chip.
     Examples(ExamplesArgs),
     /// Build the specified package with the given options.
@@ -54,9 +54,24 @@ pub struct BuildDocumentationArgs {
     /// Base URL of the deployed documentation.
     #[arg(long)]
     pub base_url: Option<String>,
+    /// Documentation channel name (for example `main`).
+    ///
+    /// When set, documentation is written under this name instead of the crate
+    /// version, so a local or CI build cannot overwrite a released docs tree.
+    #[arg(long)]
+    pub channel: Option<String>,
     #[cfg(feature = "preview-docs")]
     #[arg(long)]
     pub serve: bool,
+}
+
+/// Arguments for building the documentation index.
+#[cfg(feature = "deploy-docs")]
+#[derive(Debug, Default, Args)]
+pub struct BuildDocumentationIndexArgs {
+    /// Base URL of the deployed documentation.
+    #[arg(long)]
+    pub base_url: Option<String>,
 }
 
 /// Arguments for building a package.
@@ -100,10 +115,11 @@ pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -
         workspace,
         &mut args.packages,
         &mut args.chips,
-        args.base_url,
+        args.base_url.clone(),
+        args.channel,
     )?;
 
-    crate::documentation::build_documentation_index(workspace, &mut args.packages)?;
+    crate::documentation::build_documentation_index(workspace, &mut args.packages, args.base_url)?;
 
     #[cfg(feature = "preview-docs")]
     if args.serve {
@@ -138,9 +154,12 @@ pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -
 
 /// Build the documentation index for all packages.
 #[cfg(feature = "deploy-docs")]
-pub fn build_documentation_index(workspace: &Path) -> Result<()> {
+pub fn build_documentation_index(
+    workspace: &Path,
+    args: BuildDocumentationIndexArgs,
+) -> Result<()> {
     let mut packages = Package::iter().collect::<Vec<_>>();
-    crate::documentation::build_documentation_index(workspace, &mut packages)?;
+    crate::documentation::build_documentation_index(workspace, &mut packages, args.base_url)?;
 
     Ok(())
 }

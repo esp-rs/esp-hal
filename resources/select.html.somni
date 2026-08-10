@@ -10,23 +10,22 @@
 
   select.addEventListener("change", (e) => {
     const selected = select.value;
+    const packageName = "{{ package }}";
 
-    // Replace the existing version number in the URL with the newly
-    // selected version:
-    let href = window.location.href;
-    href = href.replace(/[\d]+\.[\d]+\.[\d]+[^\/]*/g, selected);
-
-    // Redirect to the new URL:
-    window.location.href = href;
+    // Path layout is always `<base>/<package>/<version>/<rest>`. Replace only
+    // the version segment after the package directory.
+    const url = new URL(window.location.href);
+    const segments = url.pathname.split("/");
+    const packageIndex = segments.indexOf(packageName);
+    if (packageIndex !== -1 && packageIndex + 1 < segments.length) {
+      segments[packageIndex + 1] = selected;
+      url.pathname = segments.join("/");
+      window.location.href = url.toString();
+    }
   });
 
   document.addEventListener("DOMContentLoaded", (e) => {
     const selected = select.value;
-
-    // Remove any options currently present in the select box:
-    for (let child of select.children) {
-      child.remove();
-    }
 
     // Load the manifest JSON file and re-populate the select box with new
     // options for all available versions:
@@ -34,6 +33,14 @@
     fetch(manifestUrl)
       .then((res) => res.json())
       .then(({ versions }) => {
+        // The manifest of a freshly built version may not list it yet. The box must
+        // show the version of the page the reader is on, so keep it as an option.
+        if (!versions.includes(selected)) {
+          versions = [selected].concat(versions);
+        }
+
+        select.replaceChildren();
+
         for (let version of versions) {
           let option = document.createElement("option");
           option.text = version;
