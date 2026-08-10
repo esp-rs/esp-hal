@@ -319,8 +319,8 @@ fn configure_iomux_function_clock_impl(
             .bits(match new_config {
                 IomuxFunctionClockConfig::XtalClk => 0,
                 IomuxFunctionClockConfig::PllF48m => 2,
-            })
-            .iomux_func_clk_en()
+            });
+        w.iomux_func_clk_en()
             .set_bit()
     });
 }

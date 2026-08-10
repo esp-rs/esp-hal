@@ -476,7 +476,8 @@ fn configure_iomux_function_clock_impl(
                 IomuxFunctionClockConfig::RcFastClk => 2,
                 IomuxFunctionClockConfig::XtalClk => 3,
             })
-            .iomux_func_clk_en()
+            .iomux_func_clk_en();
+        w.iomux_func_clk_en()
             .set_bit()
     });
 }
