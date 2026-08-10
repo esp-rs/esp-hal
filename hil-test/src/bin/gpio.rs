@@ -856,16 +856,17 @@ mod tests {
     fn creating_lpio_does_not_panic() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let jtag_pins = cfg_select!(
+        // Do not use JTAG or USB Serial/JTAG pins because they break the tests.
+        let debug_pins = cfg_select!(
             esp32 => [13, 14, 15, 16],
             any(esp32c2, esp32c3) => [4, 5],
-            // S2 JTAG pins are not LP IO pins, rest use USB Serial/JTAG
+            esp32s3 => [19, 20],
             _ => [],
         );
 
         esp_metadata_generated::for_each_lp_function! {
             (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                if !jtag_pins.contains(&$pin) {
+                if !debug_pins.contains(&$pin) {
                     esp_hal::gpio::Input::new(
                         peripherals.$gpio,
                         esp_hal::gpio::InputConfig::default(),
