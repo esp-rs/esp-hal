@@ -47,7 +47,7 @@ peripherals = [
     { name = "EFUSE", hidden = true },
     { name = "EXTMEM" },
     { name = "GPIO" },
-    { name = "GPIO_SD" },
+    { name = "GPIO_SD", clock_group = "SDM" },
     { name = "HINF" },
     { name = "HMAC" },
     { name = "HP_APM" },
@@ -255,7 +255,8 @@ support_status = "partial"
 algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 4
 
 [device.spi_master]
 version = 3

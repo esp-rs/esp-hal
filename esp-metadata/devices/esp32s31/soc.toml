@@ -343,8 +343,11 @@ support_status = "not_supported"
 support_status = "not_supported"
 [device.rgb_display]
 support_status = "not_supported"
+
 [device.sdm]
 support_status = "not_supported"
+channel_count = 8
+
 [device.temp_sensor]
 support_status = "not_supported"
 [device.touch]

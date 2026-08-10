@@ -45,6 +45,11 @@ system_clocks = { clock_tree = [
     { name = "PLL_F80M",  type = "derived", from = "PLL_CLK", output = "80_000_000"  },
     { name = "PLL_F160M", type = "derived", from = "PLL_CLK", output = "160_000_000" },
     { name = "PLL_F240M", type = "derived", from = "PLL_CLK", output = "240_000_000" },
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", always_on = true, variants = [
+        { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
+        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+    ] },
     { name = "LEDC_SCLK", type = "mux", variants = [
         { name = "PLL_F80M",    outputs = "PLL_F80M" },
         { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
@@ -80,6 +85,9 @@ system_clocks = { clock_tree = [
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
         ], div_num = "0 .. 0x100" } },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+    ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
     ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", wake_locking = true, variants = [
@@ -155,6 +163,7 @@ peripheral_clocks = { templates = [
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Rmt" },
     { name = "Ledc" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Systimer", keep_enabled = true },

@@ -53,6 +53,7 @@ impl CpuClock {
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
         apb_clk: Some(ApbClkConfig::new(ApbClkDivisor::_0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -69,6 +70,7 @@ impl CpuClock {
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
         apb_clk: Some(ApbClkConfig::new(ApbClkDivisor::_0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -462,6 +464,21 @@ fn enable_pll_f240m_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
+fn configure_iomux_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<IomuxFunctionClockConfig>,
+    new_config: IomuxFunctionClockConfig,
+) {
+    PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
+        w.iomux_func_clk_sel().bits(match new_config {
+            IomuxFunctionClockConfig::PllF80m => 1,
+            IomuxFunctionClockConfig::RcFastClk => 2,
+            IomuxFunctionClockConfig::XtalClk => 3,
+        });
+        w.iomux_func_clk_en().set_bit()
+    });
+}
+
 // LEDC_SCLK
 
 fn enable_ledc_sclk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -623,6 +640,24 @@ impl ParlIoInstance {
     }
 }
 
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.function_clk_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<SdmFunctionClockConfig>,
+        _new_config: SdmFunctionClockConfig,
+    ) {
+        // Nothing to do.
+    }
+}
 impl RmtInstance {
     // RMT_SCLK
 

@@ -8,6 +8,7 @@ pub(crate) mod interrupt;
 pub(crate) mod lp_io;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
+pub(crate) mod sdm;
 pub(crate) mod sdmmc;
 pub(crate) mod sha;
 pub(crate) mod sleep;
@@ -26,6 +27,7 @@ pub(crate) use i2s::*;
 pub(crate) use interrupt::*;
 pub(crate) use lp_io::*;
 pub(crate) use rmt::*;
+pub(crate) use sdm::*;
 pub(crate) use sdmmc::*;
 pub(crate) use sha::*;
 pub(crate) use sleep::*;
@@ -721,7 +723,10 @@ driver_configs![
     SdmProperties {
         driver: sdm,
         name: "SDM",
-        properties: {}
+        properties: {
+            /// Number of sigma-delta channels.
+            channel_count: SdmChannels,
+        }
     },
     SleepProperties {
         driver: sleep,
