@@ -518,19 +518,19 @@ impl<'d> Io<'d> {
         Io { _io_mux }
     }
 
-    #[doc = cfg_select!(
+    #[doc = cfg_select!{
         any(single_core, esp32s3) => "Sets the the interrupt priority and enables GPIO interrupts.",
         _ => "Sets the interrupt priority and enables GPIO interrupts on all cores.",
-    )]
+    }]
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
         low_level::set_interrupt_priority(prio);
     }
 
-    #[doc = cfg_select!(
+    #[doc = cfg_select!{
         any(single_core, esp32s3) => "Registers an interrupt handler for all GPIO pins.",
         _ => "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores.",
-    )]
+    }]
     #[doc = ""]
     /// Note that when using interrupt handlers registered by this function, or
     /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
