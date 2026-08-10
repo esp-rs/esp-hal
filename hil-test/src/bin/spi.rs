@@ -306,11 +306,10 @@ mod tests {
         #[cfg(all(dma_can_access_psram, feature = "unstable"))]
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
-        let (_, miso) = hil_test::common_test_pins!(peripherals);
+        let (mosi, miso) = hil_test::common_test_pins!(peripherals);
         let sclk = hil_test::unconnected_pin!(peripherals);
 
         // A bit ugly but the peripheral interconnect APIs aren't yet stable.
-        let mosi = unsafe { miso.clone_unchecked() };
         let miso_input = unsafe { miso.clone_unchecked() };
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
         let sclk_input = unsafe { sclk.clone_unchecked() };
@@ -1415,9 +1414,8 @@ mod psram_dma {
         );
         esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
 
-        let (_, miso) = hil_test::common_test_pins!(peripherals);
+        let (mosi, miso) = hil_test::common_test_pins!(peripherals);
         let sclk = hil_test::unconnected_pin!(peripherals);
-        let mosi = unsafe { miso.clone_unchecked() };
 
         let dma_channel = cfg_select! {
             spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
