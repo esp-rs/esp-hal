@@ -46,6 +46,7 @@ pub struct BleConnector<'d> {
 impl Drop for BleConnector<'_> {
     fn drop(&mut self) {
         crate::ble::ble_deinit();
+        crate::ble::clear_bt_state();
     }
 }
 impl<'d> BleConnector<'d> {

@@ -724,9 +724,21 @@ unsafe extern "C" fn ble_npl_callout_mem_reset(callout: *const ble_npl_callout) 
 }
 
 unsafe extern "C" fn ble_npl_callout_deinit(callout: *const ble_npl_callout) {
-    trace!("ble_npl_callout_deinit");
+    trace!("ble_npl_callout_deinit {:?}", callout);
+
+    if unsafe { (*callout).dummy } == 0 {
+        return;
+    }
+
     unsafe {
         ble_npl_callout_stop(callout);
+
+        let co = (*callout).dummy as *mut Callout;
+        compat::timer_compat::compat_timer_done(&raw mut (*co).timer_handle);
+        ble_npl_event_deinit(&raw const (*co).events);
+        crate::compat::malloc::free(co.cast());
+
+        (*callout.cast_mut()).dummy = 0;
     }
 }
 
@@ -978,6 +990,12 @@ unsafe extern "C" fn ble_npl_eventq_get(
 
 unsafe extern "C" fn ble_npl_eventq_init(queue: *mut ble_npl_eventq) {
     trace!("ble_npl_eventq_init {:?}", queue);
+
+    // The controller re-initializes its event queue on every `ble_controller_init` without
+    // deinitializing it first.
+    if unsafe { (*queue).dummy } != 0 {
+        unsafe { ble_npl_eventq_deinit(queue) };
+    }
 
     let queue_ptr = queue::queue_create(EVENT_QUEUE_SIZE as _, core::mem::size_of::<usize>() as _);
 
@@ -1330,6 +1348,9 @@ pub(crate) fn ble_deinit() {
 
         assert!(res == 0, "ble_controller_deinit returned {}", res);
 
+        #[cfg(esp32c2)]
+        os_msys_buf_free();
+
         npl::esp_unregister_npl_funcs();
 
         npl::esp_unregister_ext_funcs();
@@ -1348,7 +1369,30 @@ fn os_msys_buf_alloc() -> bool {
             core::mem::size_of::<OsMembufT>() * SYSINIT_MSYS_2_MEMPOOL_SIZE,
         ) as *mut u32;
 
-        !(OS_MSYS_INIT_1_DATA.is_null() || OS_MSYS_INIT_2_DATA.is_null())
+        if OS_MSYS_INIT_1_DATA.is_null() || OS_MSYS_INIT_2_DATA.is_null() {
+            os_msys_buf_free();
+            return false;
+        }
+
+        true
+    }
+}
+
+#[cfg(esp32c2)]
+fn os_msys_buf_free() {
+    unsafe {
+        // No C2 ROM revision exposes `os_mempool_unregister`, so drop every registered pool before
+        // releasing the memory it points at.
+        r_os_msys_reset();
+
+        if !OS_MSYS_INIT_1_DATA.is_null() {
+            crate::compat::malloc::free(OS_MSYS_INIT_1_DATA.cast());
+            OS_MSYS_INIT_1_DATA = core::ptr::null_mut();
+        }
+        if !OS_MSYS_INIT_2_DATA.is_null() {
+            crate::compat::malloc::free(OS_MSYS_INIT_2_DATA.cast());
+            OS_MSYS_INIT_2_DATA = core::ptr::null_mut();
+        }
     }
 }
 
