@@ -470,15 +470,12 @@ fn configure_iomux_function_clock_impl(
     new_config: IomuxFunctionClockConfig,
 ) {
     PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
-        w.iomux_func_clk_sel()
-            .bits(match new_config {
-                IomuxFunctionClockConfig::PllF80m => 1,
-                IomuxFunctionClockConfig::RcFastClk => 2,
-                IomuxFunctionClockConfig::XtalClk => 3,
-            })
-            .iomux_func_clk_en();
-        w.iomux_func_clk_en()
-            .set_bit()
+        w.iomux_func_clk_sel().bits(match new_config {
+            IomuxFunctionClockConfig::PllF80m => 1,
+            IomuxFunctionClockConfig::RcFastClk => 2,
+            IomuxFunctionClockConfig::XtalClk => 3,
+        });
+        w.iomux_func_clk_en().set_bit()
     });
 }
 
