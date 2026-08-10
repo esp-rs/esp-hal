@@ -217,6 +217,7 @@ impl<'d> LowPower<'d> {
         let rejected = {
             // A chip can keep a guard for the length of the sleep, to restore what sleep entry
             // changed for the sleep only. The guard must therefore outlive the wait below.
+            #[allow(clippy::let_unit_value)]
             let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
             let rejected = wait_for_sleep_result();
 
