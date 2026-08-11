@@ -92,14 +92,19 @@ fn generate(workspace: &Path, check: bool) -> Result<()> {
     dump_cache(workspace)?;
 
     if check {
+        // The README tables are generated from the same inputs, so a stale
+        // README is as much a failure as stale generated code.
+        let paths = ["esp-metadata-generated", "esp-hal/README.md"];
         let res = Command::new("git")
-            .args(["diff", "HEAD", "esp-metadata-generated"])
+            .args(["diff", "HEAD", "--"])
+            .args(paths)
             .current_dir(workspace)
             .output()
-            .context("Failed to run `git diff HEAD esp-metadata-generated`")?;
+            .context("Failed to run `git diff HEAD`")?;
         if !res.stdout.is_empty() {
             bail!(
-                "detected `esp-metadata-generated` changes. Run `cargo update-metadata`, and commit the changes."
+                "detected changes in {}. Run `cargo update-metadata`, and commit the changes.",
+                paths.join(" and ")
             );
         }
     }

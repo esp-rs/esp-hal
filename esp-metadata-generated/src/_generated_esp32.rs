@@ -52,27 +52,6 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
     };
-    ("aes.has_split_text_registers") => {
-        false
-    };
-    ("aes.endianness_configurable") => {
-        true
-    };
-    ("bt.controller") => {
-        "btdm"
-    };
-    ("dma.mem2mem_requires_peripheral") => {
-        false
-    };
-    ("dma.ext_mem_configurable_block_size") => {
-        false
-    };
-    ("dma.separate_in_out_interrupts") => {
-        false
-    };
-    ("ethernet.mii_via_gpio_matrix") => {
-        false
-    };
     ("gpio.version") => {
         1
     };
@@ -123,6 +102,33 @@ macro_rules! property {
     };
     ("gpio.output_signal_max", str) => {
         stringify!(256)
+    };
+    ("lp_io.version") => {
+        "esp32"
+    };
+    ("lp_io.has_gpio_matrix") => {
+        false
+    };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
+    };
+    ("uart.version") => {
+        1
+    };
+    ("uart.version", str) => {
+        stringify!(1)
+    };
+    ("uart.peripheral_controls_mem_clk") => {
+        false
+    };
+    ("uart.has_sclk_divider") => {
+        false
+    };
+    ("uart.has_sclk_enable") => {
+        false
     };
     ("i2c_master.version") => {
         1
@@ -187,6 +193,36 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("spi_master.version") => {
+        1
+    };
+    ("spi_master.version", str) => {
+        stringify!(1)
+    };
+    ("spi_master.fifo_size") => {
+        64
+    };
+    ("spi_master.fifo_size", str) => {
+        stringify!(64)
+    };
+    ("spi_master.bit_order_is_bool") => {
+        true
+    };
+    ("spi_master.has_octal") => {
+        false
+    };
+    ("spi_master.has_app_interrupts") => {
+        false
+    };
+    ("spi_master.has_dma_segmented_transfer") => {
+        false
+    };
+    ("spi_master.has_clk_pre_div") => {
+        false
+    };
+    ("spi_master.dma_can_access_flash") => {
+        false
+    };
     ("i2s.version") => {
         1
     };
@@ -232,54 +268,6 @@ macro_rules! property {
     ("i2s.supports_pdm2pcm") => {
         true
     };
-    ("interrupts.status_registers") => {
-        3
-    };
-    ("interrupts.status_registers", str) => {
-        stringify!(3)
-    };
-    ("ledc.version") => {
-        1
-    };
-    ("ledc.version", str) => {
-        stringify!(1)
-    };
-    ("ledc.channel_count") => {
-        8
-    };
-    ("ledc.channel_count", str) => {
-        stringify!(8)
-    };
-    ("lp_io.version") => {
-        "esp32"
-    };
-    ("lp_io.has_gpio_matrix") => {
-        false
-    };
-    ("mmu.page_size") => {
-        65536
-    };
-    ("mmu.page_size", str) => {
-        stringify!(65536)
-    };
-    ("mmu.entry_num") => {
-        256
-    };
-    ("mmu.entry_num", str) => {
-        stringify!(256)
-    };
-    ("phy.combo_module") => {
-        true
-    };
-    ("psram.octal_spi") => {
-        false
-    };
-    ("psram.extmem_origin") => {
-        1065353216
-    };
-    ("psram.extmem_origin", str) => {
-        stringify!(1065353216)
-    };
     ("rmt.ram_start") => {
         1073047552
     };
@@ -316,6 +304,72 @@ macro_rules! property {
     ("rmt.has_per_channel_clock") => {
         true
     };
+    ("sdmmc.has_iomux") => {
+        true
+    };
+    ("sdmmc.has_gpio_matrix") => {
+        false
+    };
+    ("sdmmc.psram_dma") => {
+        false
+    };
+    ("sdmmc.uhs") => {
+        false
+    };
+    ("bt.controller") => {
+        "btdm"
+    };
+    ("wifi.has_wifi6") => {
+        false
+    };
+    ("wifi.mac_version") => {
+        1
+    };
+    ("wifi.mac_version", str) => {
+        stringify!(1)
+    };
+    ("wifi.has_5g") => {
+        false
+    };
+    ("wifi.csi_supported") => {
+        true
+    };
+    ("ethernet.mii_via_gpio_matrix") => {
+        false
+    };
+    ("phy.combo_module") => {
+        true
+    };
+    ("ledc.version") => {
+        1
+    };
+    ("ledc.version", str) => {
+        stringify!(1)
+    };
+    ("ledc.channel_count") => {
+        8
+    };
+    ("ledc.channel_count", str) => {
+        stringify!(8)
+    };
+    ("sdm.channel_count") => {
+        8
+    };
+    ("sdm.channel_count", str) => {
+        stringify!(8)
+    };
+    ("timergroup.timg_has_timer1") => {
+        true
+    };
+    ("timergroup.timg_has_divcnt_rst") => {
+        false
+    };
+    ("aes.has_split_text_registers") => {
+        false
+    };
+    ("aes.endianness_configurable") => {
+        true
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };
@@ -326,18 +380,6 @@ macro_rules! property {
         true
     };
     ("rng.is_lp_sys") => {
-        false
-    };
-    ("rom.has_crc_le") => {
-        true
-    };
-    ("rom.has_crc_be") => {
-        true
-    };
-    ("rom.has_md5_bsd") => {
-        true
-    };
-    ("rom.has_md5_mbedtls") => {
         false
     };
     ("rsa.version") => {
@@ -357,24 +399,6 @@ macro_rules! property {
     };
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
-    };
-    ("sdmmc.has_iomux") => {
-        true
-    };
-    ("sdmmc.has_gpio_matrix") => {
-        false
-    };
-    ("sdmmc.psram_dma") => {
-        false
-    };
-    ("sdmmc.uhs") => {
-        false
-    };
-    ("sdm.channel_count") => {
-        8
-    };
-    ("sdm.channel_count", str) => {
-        stringify!(8)
     };
     ("sleep.light_sleep") => {
         true
@@ -399,6 +423,54 @@ macro_rules! property {
     };
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
+    };
+    ("dma.mem2mem_requires_peripheral") => {
+        false
+    };
+    ("dma.ext_mem_configurable_block_size") => {
+        false
+    };
+    ("dma.separate_in_out_interrupts") => {
+        false
+    };
+    ("interrupts.status_registers") => {
+        3
+    };
+    ("interrupts.status_registers", str) => {
+        stringify!(3)
+    };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        256
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(256)
+    };
+    ("psram.octal_spi") => {
+        false
+    };
+    ("psram.extmem_origin") => {
+        1065353216
+    };
+    ("psram.extmem_origin", str) => {
+        stringify!(1065353216)
+    };
+    ("rom.has_crc_le") => {
+        true
+    };
+    ("rom.has_crc_be") => {
+        true
+    };
+    ("rom.has_md5_bsd") => {
+        true
+    };
+    ("rom.has_md5_mbedtls") => {
+        false
     };
     ("soc.cpu_has_branch_predictor") => {
         false
@@ -492,77 +564,112 @@ macro_rules! property {
         [crate ::soc::clocks::RmtSclkConfig::RefTick, crate
         ::soc::clocks::RmtSclkConfig::ApbClk]
     };
-    ("spi_master.version") => {
-        1
+}
+/// Defines the `LpInputSignal` and `LpOutputSignal` enums.
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_lp_io_signals {
+    () => {};
+}
+/// This macro can be used to generate code for each channel of the RMT peripheral.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has three options for its "Individual matcher" case:
+///
+/// - `all`: `($num:literal)`
+/// - `tx`: `($num:literal, $idx:literal)`
+/// - `rx`: `($num:literal, $idx:literal)`
+///
+/// Macro fragments:
+///
+/// - `$num`: number of the channel, e.g. `0`
+/// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
+///
+/// Example data:
+///
+/// - `all`: `(0)`
+/// - `tx`: `(1, 1)`
+/// - `rx`: `(2, 0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rmt_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_rmt_channel!((0)); _for_each_inner_rmt_channel!((1));
+        _for_each_inner_rmt_channel!((2)); _for_each_inner_rmt_channel!((3));
+        _for_each_inner_rmt_channel!((4)); _for_each_inner_rmt_channel!((5));
+        _for_each_inner_rmt_channel!((6)); _for_each_inner_rmt_channel!((7));
+        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
+        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
+        _for_each_inner_rmt_channel!((4, 4)); _for_each_inner_rmt_channel!((5, 5));
+        _for_each_inner_rmt_channel!((6, 6)); _for_each_inner_rmt_channel!((7, 7));
+        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
+        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
+        _for_each_inner_rmt_channel!((4, 4)); _for_each_inner_rmt_channel!((5, 5));
+        _for_each_inner_rmt_channel!((6, 6)); _for_each_inner_rmt_channel!((7, 7));
+        _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
+        _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5),
+        (6, 6), (7, 7))); _for_each_inner_rmt_channel!((rx(0, 0), (1, 1), (2, 2), (3, 3),
+        (4, 4), (5, 5), (6, 6), (7, 7)));
     };
-    ("spi_master.version", str) => {
-        stringify!(1)
+}
+/// This macro can be used to generate code for each slot of the SDMMC/SDIO host driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($slot:ident, $idx:literal, $iomux:literal, [$($clk:ident)?]
+/// [$($cmd_in:ident)?] [$($cmd_out:ident)?] [$($data_in:ident),*] [$($data_out:ident),*]
+/// [$($cd:ident)?] [$($wp:ident)?] [$($card_int:ident)?] [$($data_strobe:ident)?]
+/// [$($rst:ident)?])`
+///
+/// Macro fragments:
+///
+/// - `$slot`: the name of the slot (`slot0`, `slot1`).
+/// - `$idx`: the zero-based slot index.
+/// - `$iomux`: `true` if the slot's clock/command/data signals are IO_MUX-routed.
+/// - `$clk`, `$cmd_in`, `$cmd_out`, `$data_in`, `$data_out`: GPIO-matrix bus signal names (absent
+///   for IO_MUX-routed slots).
+/// - `$cd`, `$wp`, `$card_int`, `$data_strobe`, `$rst`: auxiliary signal names, each present only
+///   when the slot routes that signal through the GPIO matrix.
+///
+/// Each optional signal is wrapped in brackets so the branch shape stays uniform: a set
+/// signal appears as `[SIGNAL]`, an absent one as `[]`.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdmmc {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdmmc { $(($pattern) => $code;)* ($other : tt) => {}
+        } _for_each_inner_sdmmc!((slot0, 0, true, [], [], [], [], [],
+        [HOST_CARD_DETECT_N_1], [HOST_CARD_WRITE_PRT_1], [HOST_CARD_INT_N_1], [],
+        [HOST_RST_N_1])); _for_each_inner_sdmmc!((slot1, 1, true, [], [], [], [], [],
+        [HOST_CARD_DETECT_N_2], [HOST_CARD_WRITE_PRT_2], [HOST_CARD_INT_N_2], [],
+        [HOST_RST_N_2])); _for_each_inner_sdmmc!((all(slot0, 0, true, [], [], [], [], [],
+        [HOST_CARD_DETECT_N_1], [HOST_CARD_WRITE_PRT_1], [HOST_CARD_INT_N_1], [],
+        [HOST_RST_N_1]), (slot1, 1, true, [], [], [], [], [], [HOST_CARD_DETECT_N_2],
+        [HOST_CARD_WRITE_PRT_2], [HOST_CARD_INT_N_2], [], [HOST_RST_N_2])));
     };
-    ("spi_master.fifo_size") => {
-        64
-    };
-    ("spi_master.fifo_size", str) => {
-        stringify!(64)
-    };
-    ("spi_master.bit_order_is_bool") => {
-        true
-    };
-    ("spi_master.has_octal") => {
-        false
-    };
-    ("spi_master.has_app_interrupts") => {
-        false
-    };
-    ("spi_master.has_dma_segmented_transfer") => {
-        false
-    };
-    ("spi_master.has_clk_pre_div") => {
-        false
-    };
-    ("spi_master.dma_can_access_flash") => {
-        false
-    };
-    ("timergroup.timg_has_timer1") => {
-        true
-    };
-    ("timergroup.timg_has_divcnt_rst") => {
-        false
-    };
-    ("uart.ram_size") => {
-        128
-    };
-    ("uart.ram_size", str) => {
-        stringify!(128)
-    };
-    ("uart.version") => {
-        1
-    };
-    ("uart.version", str) => {
-        stringify!(1)
-    };
-    ("uart.peripheral_controls_mem_clk") => {
-        false
-    };
-    ("uart.has_sclk_divider") => {
-        false
-    };
-    ("uart.has_sclk_enable") => {
-        false
-    };
-    ("wifi.has_wifi6") => {
-        false
-    };
-    ("wifi.mac_version") => {
-        1
-    };
-    ("wifi.mac_version", str) => {
-        stringify!(1)
-    };
-    ("wifi.has_5g") => {
-        false
-    };
-    ("wifi.csi_supported") => {
-        true
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdm_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
+        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
+        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
+        _for_each_inner_sdm_channel!((4, GPIO_SD4)); _for_each_inner_sdm_channel!((5,
+        GPIO_SD5)); _for_each_inner_sdm_channel!((6, GPIO_SD6));
+        _for_each_inner_sdm_channel!((7, GPIO_SD7));
+        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
+        GPIO_SD2), (3, GPIO_SD3), (4, GPIO_SD4), (5, GPIO_SD5), (6, GPIO_SD6), (7,
+        GPIO_SD7)));
     };
 }
 #[macro_export]
@@ -577,6 +684,71 @@ macro_rules! for_each_aes_key_length {
         _for_each_inner_aes_key_length!((256, 2, 6));
         _for_each_inner_aes_key_length!((bits(128), (192), (256)));
         _for_each_inner_aes_key_length!((modes(128, 0, 4), (192, 1, 5), (256, 2, 6)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_exponentiation {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rsa_exponentiation { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_rsa_exponentiation!((512));
+        _for_each_inner_rsa_exponentiation!((1024));
+        _for_each_inner_rsa_exponentiation!((1536));
+        _for_each_inner_rsa_exponentiation!((2048));
+        _for_each_inner_rsa_exponentiation!((2560));
+        _for_each_inner_rsa_exponentiation!((3072));
+        _for_each_inner_rsa_exponentiation!((3584));
+        _for_each_inner_rsa_exponentiation!((4096));
+        _for_each_inner_rsa_exponentiation!((all(512), (1024), (1536), (2048), (2560),
+        (3072), (3584), (4096)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_multiplication {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rsa_multiplication { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_rsa_multiplication!((512));
+        _for_each_inner_rsa_multiplication!((1024));
+        _for_each_inner_rsa_multiplication!((1536));
+        _for_each_inner_rsa_multiplication!((2048));
+        _for_each_inner_rsa_multiplication!((all(512), (1024), (1536), (2048)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_algorithm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0));
+        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
+        (insecure_against : "length extension"), 0));
+        _for_each_inner_sha_algorithm!((Sha384, "SHA-384"(sizes : 128, 48, 16)
+        (insecure_against :), 0)); _for_each_inner_sha_algorithm!((Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0));
+        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0), (Sha256,
+        "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"), 0),
+        (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 0), (Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_wakeup_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_wakeup_source!((Ext0, 0));
+        _for_each_inner_wakeup_source!((Ext1, 1)); _for_each_inner_wakeup_source!((Gpio,
+        2)); _for_each_inner_wakeup_source!((Timer, 3));
+        _for_each_inner_wakeup_source!((Sdio, 4)); _for_each_inner_wakeup_source!((Wifi,
+        5)); _for_each_inner_wakeup_source!((Uart0, 6));
+        _for_each_inner_wakeup_source!((Uart1, 7));
+        _for_each_inner_wakeup_source!((Touch, 8)); _for_each_inner_wakeup_source!((Ulp,
+        9)); _for_each_inner_wakeup_source!((Bt, 10));
+        _for_each_inner_wakeup_source!((all(Ext0, 0), (Ext1, 1), (Gpio, 2), (Timer, 3),
+        (Sdio, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Touch, 8), (Ulp, 9), (Bt, 10)));
     };
 }
 #[macro_export]
@@ -677,178 +849,6 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
-    };
-}
-/// Defines the `LpInputSignal` and `LpOutputSignal` enums.
-///
-/// This macro is intended to be called in esp-hal only.
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! define_lp_io_signals {
-    () => {};
-}
-/// This macro can be used to generate code for each channel of the RMT peripheral.
-///
-/// For an explanation on the general syntax, as well as usage of individual/repeated
-/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
-///
-/// This macro has three options for its "Individual matcher" case:
-///
-/// - `all`: `($num:literal)`
-/// - `tx`: `($num:literal, $idx:literal)`
-/// - `rx`: `($num:literal, $idx:literal)`
-///
-/// Macro fragments:
-///
-/// - `$num`: number of the channel, e.g. `0`
-/// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
-///
-/// Example data:
-///
-/// - `all`: `(0)`
-/// - `tx`: `(1, 1)`
-/// - `rx`: `(2, 0)`
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_rmt_channel {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_rmt_channel { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_rmt_channel!((0)); _for_each_inner_rmt_channel!((1));
-        _for_each_inner_rmt_channel!((2)); _for_each_inner_rmt_channel!((3));
-        _for_each_inner_rmt_channel!((4)); _for_each_inner_rmt_channel!((5));
-        _for_each_inner_rmt_channel!((6)); _for_each_inner_rmt_channel!((7));
-        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
-        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
-        _for_each_inner_rmt_channel!((4, 4)); _for_each_inner_rmt_channel!((5, 5));
-        _for_each_inner_rmt_channel!((6, 6)); _for_each_inner_rmt_channel!((7, 7));
-        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
-        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
-        _for_each_inner_rmt_channel!((4, 4)); _for_each_inner_rmt_channel!((5, 5));
-        _for_each_inner_rmt_channel!((6, 6)); _for_each_inner_rmt_channel!((7, 7));
-        _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
-        _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5),
-        (6, 6), (7, 7))); _for_each_inner_rmt_channel!((rx(0, 0), (1, 1), (2, 2), (3, 3),
-        (4, 4), (5, 5), (6, 6), (7, 7)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_rsa_exponentiation {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_rsa_exponentiation { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_rsa_exponentiation!((512));
-        _for_each_inner_rsa_exponentiation!((1024));
-        _for_each_inner_rsa_exponentiation!((1536));
-        _for_each_inner_rsa_exponentiation!((2048));
-        _for_each_inner_rsa_exponentiation!((2560));
-        _for_each_inner_rsa_exponentiation!((3072));
-        _for_each_inner_rsa_exponentiation!((3584));
-        _for_each_inner_rsa_exponentiation!((4096));
-        _for_each_inner_rsa_exponentiation!((all(512), (1024), (1536), (2048), (2560),
-        (3072), (3584), (4096)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_rsa_multiplication {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_rsa_multiplication { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_rsa_multiplication!((512));
-        _for_each_inner_rsa_multiplication!((1024));
-        _for_each_inner_rsa_multiplication!((1536));
-        _for_each_inner_rsa_multiplication!((2048));
-        _for_each_inner_rsa_multiplication!((all(512), (1024), (1536), (2048)));
-    };
-}
-/// This macro can be used to generate code for each slot of the SDMMC/SDIO host driver.
-///
-/// For an explanation on the general syntax, as well as usage of individual/repeated
-/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
-///
-/// This macro has one option for its "Individual matcher" case:
-///
-/// Syntax: `($slot:ident, $idx:literal, $iomux:literal, [$($clk:ident)?]
-/// [$($cmd_in:ident)?] [$($cmd_out:ident)?] [$($data_in:ident),*] [$($data_out:ident),*]
-/// [$($cd:ident)?] [$($wp:ident)?] [$($card_int:ident)?] [$($data_strobe:ident)?]
-/// [$($rst:ident)?])`
-///
-/// Macro fragments:
-///
-/// - `$slot`: the name of the slot (`slot0`, `slot1`).
-/// - `$idx`: the zero-based slot index.
-/// - `$iomux`: `true` if the slot's clock/command/data signals are IO_MUX-routed.
-/// - `$clk`, `$cmd_in`, `$cmd_out`, `$data_in`, `$data_out`: GPIO-matrix bus signal names (absent
-///   for IO_MUX-routed slots).
-/// - `$cd`, `$wp`, `$card_int`, `$data_strobe`, `$rst`: auxiliary signal names, each present only
-///   when the slot routes that signal through the GPIO matrix.
-///
-/// Each optional signal is wrapped in brackets so the branch shape stays uniform: a set
-/// signal appears as `[SIGNAL]`, an absent one as `[]`.
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sdmmc {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sdmmc { $(($pattern) => $code;)* ($other : tt) => {}
-        } _for_each_inner_sdmmc!((slot0, 0, true, [], [], [], [], [],
-        [HOST_CARD_DETECT_N_1], [HOST_CARD_WRITE_PRT_1], [HOST_CARD_INT_N_1], [],
-        [HOST_RST_N_1])); _for_each_inner_sdmmc!((slot1, 1, true, [], [], [], [], [],
-        [HOST_CARD_DETECT_N_2], [HOST_CARD_WRITE_PRT_2], [HOST_CARD_INT_N_2], [],
-        [HOST_RST_N_2])); _for_each_inner_sdmmc!((all(slot0, 0, true, [], [], [], [], [],
-        [HOST_CARD_DETECT_N_1], [HOST_CARD_WRITE_PRT_1], [HOST_CARD_INT_N_1], [],
-        [HOST_RST_N_1]), (slot1, 1, true, [], [], [], [], [], [HOST_CARD_DETECT_N_2],
-        [HOST_CARD_WRITE_PRT_2], [HOST_CARD_INT_N_2], [], [HOST_RST_N_2])));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sha_algorithm {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0));
-        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
-        (insecure_against : "length extension"), 0));
-        _for_each_inner_sha_algorithm!((Sha384, "SHA-384"(sizes : 128, 48, 16)
-        (insecure_against :), 0)); _for_each_inner_sha_algorithm!((Sha512,
-        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0));
-        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0), (Sha256,
-        "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"), 0),
-        (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 0), (Sha512,
-        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sdm_channel {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
-        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
-        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
-        _for_each_inner_sdm_channel!((4, GPIO_SD4)); _for_each_inner_sdm_channel!((5,
-        GPIO_SD5)); _for_each_inner_sdm_channel!((6, GPIO_SD6));
-        _for_each_inner_sdm_channel!((7, GPIO_SD7));
-        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
-        GPIO_SD2), (3, GPIO_SD3), (4, GPIO_SD4), (5, GPIO_SD5), (6, GPIO_SD6), (7,
-        GPIO_SD7)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_wakeup_source {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_wakeup_source!((Ext0, 0));
-        _for_each_inner_wakeup_source!((Ext1, 1)); _for_each_inner_wakeup_source!((Gpio,
-        2)); _for_each_inner_wakeup_source!((Timer, 3));
-        _for_each_inner_wakeup_source!((Sdio, 4)); _for_each_inner_wakeup_source!((Wifi,
-        5)); _for_each_inner_wakeup_source!((Uart0, 6));
-        _for_each_inner_wakeup_source!((Uart1, 7));
-        _for_each_inner_wakeup_source!((Touch, 8)); _for_each_inner_wakeup_source!((Ulp,
-        9)); _for_each_inner_wakeup_source!((Bt, 10));
-        _for_each_inner_wakeup_source!((all(Ext0, 0), (Ext1, 1), (Gpio, 2), (Timer, 3),
-        (Sdio, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Touch, 8), (Ulp, 9), (Bt, 10)));
     };
 }
 #[macro_export]

@@ -1470,16 +1470,73 @@ pub fn generate_lib_rs() -> TokenStream {
 }
 
 pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result {
+    // The legend applies to every table, so it is written once, before the
+    // first one.
+    SupportStatusLevel::write_legend(output)?;
+    writeln!(output)?;
+
+    let visible = PeriConfig::drivers()
+        .iter()
+        .filter(|driver| !driver.hide_from_peri_table)
+        .collect::<Vec<_>>();
+
+    // A group is written where its first driver is declared, so the order of
+    // the tables is controlled by the order of the driver definitions.
+    let mut groups = Vec::new();
+    for driver in visible.iter() {
+        if !groups.contains(&driver.group) {
+            groups.push(driver.group);
+        }
+    }
+
+    let mut issues = Vec::new();
+    for group in groups {
+        let drivers = visible
+            .iter()
+            .filter(|driver| driver.group == group)
+            .copied()
+            .collect::<Vec<_>>();
+
+        writeln!(output, "### {group}")?;
+        writeln!(output)?;
+        write_support_table(output, &drivers, &mut issues)?;
+        writeln!(output)?;
+    }
+
+    // Print issue link definitions
+    issues.sort();
+    issues.dedup();
+
+    if !issues.is_empty() {
+        writeln!(
+            output,
+            "[^1]: This cell is clickable and will open the peripheral's issue on GitHub"
+        )?;
+        writeln!(output)?;
+    }
+    for issue in issues {
+        writeln!(
+            output,
+            "[{issue}]: https://github.com/esp-rs/esp-hal/issues/{issue}"
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Writes the support table of a single driver group, and collects the issues
+/// its cells link to.
+fn write_support_table(
+    output: &mut impl Write,
+    drivers: &[&SupportItem],
+    issues: &mut Vec<u32>,
+) -> std::fmt::Result {
     let nothing = "";
 
-    // Calculate the width of the first column.
+    // The width of the first column is calculated per table, so that adding a
+    // driver only reflows the table it is added to.
     let driver_col_width = std::iter::once("Driver")
-        .chain(
-            PeriConfig::drivers()
-                .iter()
-                .filter(|i| !i.hide_from_peri_table)
-                .map(|i| i.name),
-        )
+        .chain(drivers.iter().map(|driver| driver.name))
         .map(|c| c.len())
         .max()
         .unwrap();
@@ -1503,16 +1560,10 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
-    let mut issues = Vec::new();
     for SupportItem {
-        name,
-        config_group,
-        hide_from_peri_table,
-    } in PeriConfig::drivers()
+        name, config_group, ..
+    } in drivers
     {
-        if *hide_from_peri_table {
-            continue;
-        }
         write!(output, "| {name:driver_col_width$} |")?;
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);
@@ -1530,28 +1581,6 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
             }
         }
         writeln!(output)?;
-    }
-
-    writeln!(output)?;
-    SupportStatusLevel::write_legend(output)?;
-    writeln!(output)?;
-
-    // Print issue link definitions
-    issues.sort();
-    issues.dedup();
-
-    if !issues.is_empty() {
-        writeln!(
-            output,
-            "[^1]: This cell is clickable and will open the peripheral's issue on GitHub"
-        )?;
-        writeln!(output)?;
-    }
-    for issue in issues {
-        writeln!(
-            output,
-            "[{issue}]: https://github.com/esp-rs/esp-hal/issues/{issue}"
-        )?;
     }
 
     Ok(())
