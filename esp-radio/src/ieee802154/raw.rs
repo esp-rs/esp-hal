@@ -631,6 +631,7 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
                 // auto tx ack for frame version 0b00 and 0b01
                 // Frame data already copied above. Defer rx_available()
                 // notification until ACK completes (isr_handle_ack_tx_done).
+                ack_config_pending_bit(frm);
                 state.state = Ieee802154State::TxAck;
                 *needs_next_op = false;
             } else if should_send_enhanced_ack(frm) {
@@ -817,6 +818,22 @@ fn isr_handle_tx_abort(tx_abort_reason: u32, needs_next_op: &mut bool) {
 
 fn freq_to_channel(freq: u8) -> u8 {
     (freq - 3) / 5 + 11
+}
+
+/// Provide the hardware with the frame-pending bit for the ACK it is about
+/// to send.
+///
+/// TODO: Revisit once a pending-address table is exposed by the driver.
+fn ack_config_pending_bit(frame: &[u8]) {
+    // The hardware inserts this value only into acks of version 0b00/0b01
+    // frames; 2015 enhanced ACKs carry it inside the software-built frame.
+    if frame_get_version(frame) <= FRAME_VERSION_1 {
+        // Until the driver exposes the pending-address table, claim pending
+        // for every poller in every mode: a spurious "pending" costs a
+        // sleepy device one idle receive window, while a wrong "nothing
+        // pending" makes it sleep through a frame queued for it.
+        set_pending_bit(true);
+    }
 }
 
 fn will_auto_send_ack(frame: &[u8]) -> bool {
