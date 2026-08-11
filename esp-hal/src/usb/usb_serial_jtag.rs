@@ -719,10 +719,15 @@ impl<'d> UsbSerialJtagWriteFuture<'d> {
     fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
         // interrupt
-        peripheral
-            .register_block()
-            .int_ena()
-            .modify(|_, w| w.serial_in_empty().set_bit());
+        //
+        // INT_ENA is also modified by the interrupt handler. Synchronize this
+        // register-level read-modify-write so neither side can restore stale bits.
+        critical_section::with(|_| {
+            peripheral
+                .register_block()
+                .int_ena()
+                .modify(|_, w| w.serial_in_empty().set_bit());
+        });
 
         Self { peripheral }
     }
@@ -762,10 +767,15 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
     fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
         // interrupt
-        peripheral
-            .register_block()
-            .int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().set_bit());
+        //
+        // INT_ENA is also modified by the interrupt handler. Synchronize this
+        // register-level read-modify-write so neither side can restore stale bits.
+        critical_section::with(|_| {
+            peripheral
+                .register_block()
+                .int_ena()
+                .modify(|_, w| w.serial_out_recv_pkt().set_bit());
+        });
 
         Self { peripheral }
     }
@@ -950,13 +960,17 @@ fn async_interrupt_handler() {
     let tx = interrupts.serial_in_empty().bit_is_set();
     let rx = interrupts.serial_out_recv_pkt().bit_is_set();
 
-    if tx {
-        usb.int_ena().modify(|_, w| w.serial_in_empty().clear_bit());
-    }
-    if rx {
-        usb.int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
-    }
+    critical_section::with(|_| {
+        usb.int_ena().modify(|_, w| {
+            if tx {
+                w.serial_in_empty().clear_bit();
+            }
+            if rx {
+                w.serial_out_recv_pkt().clear_bit();
+            }
+            w
+        });
+    });
 
     usb.int_clr().write(|w| {
         if tx {
