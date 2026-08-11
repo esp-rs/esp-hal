@@ -846,15 +846,17 @@ impl UsbSerialJtagTx<'_, Async> {
     async fn flush_tx_async(&mut self) -> Result<(), Error> {
         // Necessary even if `write_async` does set this bit after each chunk.
         //
-        // Reason is, if the last written chunk happens to be exactly 64 bytes, then this transaction is considered _incomplete_.
-        // What that means is, the hardware will process the FIFO queue, send an interrupt when the queue is emptied,
-        // but the packet will stay in the **other peer** internal buffers, waiting for the transaction to "complete".
-        // A completion of such a transaction is signalled by writing 0 or more bytes to the FIFO, and then setting 
-        // the `wr_done` bit.
-        // 
-        // Therefore, an explicit `wr_done` bit set here makes sure that if the last `write_async` ended up filling exactly 64 bytes,
-        // they are flushed here. If `write_async` ended up writing less than 64 bytes, then this `wr_done` bit set here is redundant,
-        // but harmless.
+        // Reason is, if the last written chunk happens to be exactly 64 bytes, then this
+        // transaction is considered _incomplete_. What that means is, the hardware will
+        // process the FIFO queue, send an interrupt when the queue is emptied,
+        // but the packet will stay in the **other peer** internal buffers, waiting for the
+        // transaction to "complete". A completion of such a transaction is signalled by
+        // writing 0 or more bytes to the FIFO, and then setting the `wr_done` bit.
+        //
+        // Therefore, an explicit `wr_done` bit set here makes sure that if the last `write_async`
+        // ended up filling exactly 64 bytes, they are flushed here. If `write_async` ended
+        // up writing less than 64 bytes, then this `wr_done` bit set here is redundant, but
+        // harmless.
         //
         // Places in ESP-IDF where this behavior is documented:
         // - https://github.com/espressif/esp-idf/blob/08e0d30a74ad0bfd5a34933142b80f45619ee410/components/esp_hal_usb/esp32c6/include/hal/usb_serial_jtag_ll.h#L168-L182
