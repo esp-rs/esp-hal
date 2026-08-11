@@ -833,6 +833,10 @@ impl UsbSerialJtagTx<'_, Async> {
     }
 
     async fn flush_tx_async(&mut self) -> Result<(), Error> {
+        // If write_async transfers a multiple of 64 bytes, flush needs to trigger sending a
+        // zero-length packet for the host to consider the transfer complete
+        self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
+
         if self
             .regs()
             .ep1_conf()
