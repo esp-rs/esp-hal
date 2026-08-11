@@ -736,8 +736,9 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // care about the contents however
         std::fs::create_dir_all("./target")
             .with_context(|| "Failed to create `./target`".to_string())?;
-        std::fs::write("./target/ota_image", "DUMMY")
-            .with_context(|| "Failed to create a dummy file required by ota example!".to_string())?;
+        std::fs::write("./target/ota_image", "DUMMY").with_context(|| {
+            "Failed to create a dummy file required by ota example!".to_string()
+        })?;
 
         examples(
             workspace,
@@ -887,10 +888,11 @@ fn check_global_symbols(chips: &[Chip]) -> Result<()> {
 
             for symbol in obj.symbols().filter(|s| s.is_global() && s.is_definition()) {
                 if let Ok(name) = symbol.name()
-                    && try_demangle(name).is_err() {
-                        let section = symbol.section_index().map(|i| i.0).unwrap_or(0);
-                        problematic_symbols.push((name.to_string(), symbol.kind(), section));
-                    }
+                    && try_demangle(name).is_err()
+                {
+                    let section = symbol.section_index().map(|i| i.0).unwrap_or(0);
+                    problematic_symbols.push((name.to_string(), symbol.kind(), section));
+                }
             }
         }
 
