@@ -120,6 +120,11 @@ rc_fast_calibration = { divider = 50, min_rev = 0 }
 [device.gpio]
 support_status = "supported"
 # {include gpio.toml}
+# 
+[device.dedicated_gpio]
+version = "riscv_v1"
+support_status = "not_supported"
+channels = []
 
 [device.io_mux]
 
@@ -339,8 +344,6 @@ support_status = "not_supported"
 support_status = "not_supported"
 [device.pcnt]
 support_status = "not_supported"
-[device.phy]
-support_status = "not_supported"
 [device.rgb_display]
 support_status = "not_supported"
 
@@ -352,7 +355,7 @@ channel_count = 8
 support_status = "not_supported"
 [device.touch]
 support_status = "not_supported"
-[device.twai]
+[device.canfd]
 support_status = "not_supported"
 [device.uhci]
 support_status = "not_supported"
@@ -361,9 +364,60 @@ support_status = "not_supported"
 [device.usb_serial_jtag]
 support_status = "not_supported"
 
-# These peripherals exist as well, but their tables need configuration that only
-# the TRM or the SVD gives, so the support table shows no row for them at all:
-# bt (controller), dedicated_gpio (version and channels, in GPIO_EXT), ledc
-# (version, and eight channels in each of LEDC0 and LEDC1), lp_uart (ram_size),
-# parl_io (version), psram (extmem_origin), rmt (ram_start, channel_ram_size,
-# channels), sdmmc (SDHOST signal routing), wifi (mac_version).
+[device.rmt]
+support_status = "not_supported"
+ram_start = 0x20355800
+channel_ram_size = 48
+channels = ["Tx", "Tx", "Tx", "Tx", "Rx", "Rx", "Rx", "Rx"]
+# TODO capabilities
+
+[device.parl_io]
+support_status = "not_supported"
+version = 1 # FIXME placeholder
+
+[device.sdmmc]
+support_status = "not_supported"
+delay_phase_num = 8 # FIXME: placeholder
+has_iomux = true # FIXME: placeholder
+has_gpio_matrix = true # FIXME: placeholder
+psram_dma = true # FIXME: placeholder
+uhs = false # FIXME: placeholder
+slot_config = []
+
+## Radio
+[device.wifi]
+support_status = "not_supported"
+mac_version = 1 # FIXME: placeholder
+csi_supported = true # FIXME: placeholder
+
+[device.bt]
+support_status = "not_supported"
+controller = "npl" # FIXME: placeholder
+
+[device.phy]
+support_status = "not_supported"
+
+[device.ledc]
+support_status = "not_supported"
+version = 2 # FIXME: placeholder
+channel_count = 8
+
+[device.lp_uart]
+support_status = "not_supported"
+ram_size = 20 # FIXME: placeholder
+
+[device.psram]
+support_status = "not_supported"
+extmem_origin = 0x5000_0000
+
+[device.pixel_accelerator]
+support_status = "not_supported"
+
+[device.asrc]
+support_status = "not_supported"
+
+[device.cordic]
+support_status = "not_supported"
+
+[device.jpeg]
+support_status = "not_supported"

@@ -265,16 +265,13 @@ support_status = "not_supported"
 [device.assist_debug]
 support_status = "not_supported"
 [device.avc]
-support_status = "not_supported"  # P4 ANA_CMPR (CH0/CH1)
+support_status = "not_supported"
 [device.bit_scrambler]
 support_status = "not_supported"
 [device.camera]
-support_status = "not_supported"  # LCD_CAM block, camera path
-# [device.dedicated_gpio] requires a `channels` table -- skip for now
-# until we map the P4 CPU GPIO instance list. README will show this row
-# blank for P4, accurate to the current driver state.
+support_status = "not_supported"
 [device.ds]
-support_status = "not_supported"  # Digital Signature
+support_status = "not_supported"
 [device.ecdsa]
 support_status = "not_supported"
 
@@ -282,11 +279,14 @@ support_status = "not_supported"
 support_status = "partial"
 mii_via_gpio_matrix = true
 
+[device.mipi_csi]
+support_status = "not_supported"
+
 [device.mipi_dsi]
 support_status = "partial"
 
 [device.etm]
-support_status = "not_supported"  # Event Task Matrix
+support_status = "not_supported"
 [device.hmac]
 support_status = "not_supported"
 [device.i2c_slave]
@@ -344,6 +344,9 @@ instances = [
     },
 ]
 
+[device.lp_i2s]
+support_status = "not_supported"
+
 [device.ledc]
 version = 2
 channel_count = 8
@@ -363,11 +366,17 @@ support_status = "not_supported"  # 2 instances (MCPWM0/1)
 support_status = "not_supported"
 [device.rgb_display]
 support_status = "not_supported"  # LCD path of LCD_CAM block
-# [device.rmt] requires ram_start / channel_ram_size / channels config -
-# left out until those are mapped from P4 TRM. README row stays blank.
-# [device.parl_io] requires a `version`, and P4 matches neither of the two
-# generations esp-hal knows: it has the 16 data lines of the esp32c6 (version 1)
-# and the clock gating and loop transmission of the esp32h2 (version 2).
+
+[device.rmt]
+support_status = "not_supported"
+ram_start = 0x500A2800
+channel_ram_size = 48
+channels = ["Tx", "Tx", "Tx", "Tx", "Rx", "Rx", "Rx", "Rx"]
+# TODO capabilities
+
+[device.parl_io]
+support_status = "not_supported"
+version = 1 # FIXME placeholder
 
 [device.rng]
 support_status = { status = "partial", issue = 5982 }
@@ -438,6 +447,14 @@ wakeup_sources = {
 }
 
 [device.spi_slave]
+support_status = "not_supported"
+[device.lp_spi_master]
+support_status = "not_supported"
+[device.lp_spi_slave]
+support_status = "not_supported"
+[device.i3c_master]
+support_status = "not_supported"
+[device.i3c_slave]
 support_status = "not_supported"
 [device.temp_sensor]
 support_status = "not_supported"
@@ -515,3 +532,28 @@ supports_enhanced_security = true
 [device.gpio]
 support_status = "supported"
 # {include gpio.toml}
+
+[device.dedicated_gpio]
+version = "riscv_v1"
+support_status = "not_supported"
+channels = []
+
+[device.key_manager]
+support_status = "not_supported"
+
+[device.isp]
+support_status = "not_supported"
+
+[device.pixel_accelerator]
+support_status = "not_supported"
+
+[device.jpeg]
+support_status = "not_supported"
+
+[device.h264_encoder]
+support_status = "not_supported"
+
+[device.vad]
+support_status = "not_supported"
+
+[device.io_mux]

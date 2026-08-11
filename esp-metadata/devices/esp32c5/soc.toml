@@ -327,7 +327,7 @@ has_region_monitor = true
 [device.avc]
 support_status = { status = "not_supported", issue = 5168 }
 
-[device.twai]
+[device.canfd]
 support_status = { status = "not_supported", issue = 5163 }
 
 [device.key_manager]

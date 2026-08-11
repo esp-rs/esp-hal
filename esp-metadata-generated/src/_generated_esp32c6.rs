@@ -52,63 +52,6 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf"
     };
-    ("aes.has_split_text_registers") => {
-        true
-    };
-    ("aes.endianness_configurable") => {
-        false
-    };
-    ("assist_debug.has_sp_monitor") => {
-        true
-    };
-    ("assist_debug.has_region_monitor") => {
-        true
-    };
-    ("bt.controller") => {
-        "npl"
-    };
-    ("dedicated_gpio.version") => {
-        "riscv_v1"
-    };
-    ("dedicated_gpio.needs_initialization") => {
-        false
-    };
-    ("dedicated_gpio.channel_count") => {
-        8
-    };
-    ("dedicated_gpio.channel_count", str) => {
-        stringify!(8)
-    };
-    ("dma.mem2mem_requires_peripheral") => {
-        false
-    };
-    ("dma.ext_mem_configurable_block_size") => {
-        false
-    };
-    ("dma.separate_in_out_interrupts") => {
-        true
-    };
-    ("dma.gdma_version") => {
-        1
-    };
-    ("dma.gdma_version", str) => {
-        stringify!(1)
-    };
-    ("ecc.zero_extend_writes") => {
-        true
-    };
-    ("ecc.separate_jacobian_point_memory") => {
-        false
-    };
-    ("ecc.has_memory_clock_gate") => {
-        true
-    };
-    ("ecc.supports_enhanced_security") => {
-        false
-    };
-    ("ecc.mem_block_size") => {
-        32
-    };
     ("gpio.version") => {
         2
     };
@@ -159,6 +102,54 @@ macro_rules! property {
     };
     ("gpio.output_signal_max", str) => {
         stringify!(128)
+    };
+    ("dedicated_gpio.version") => {
+        "riscv_v1"
+    };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
+    ("lp_io.version") => {
+        "v4"
+    };
+    ("lp_io.has_gpio_matrix") => {
+        false
+    };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
+    };
+    ("uart.version") => {
+        2
+    };
+    ("uart.version", str) => {
+        stringify!(2)
+    };
+    ("uart.peripheral_controls_mem_clk") => {
+        true
+    };
+    ("uart.has_sclk_divider") => {
+        false
+    };
+    ("uart.has_sclk_enable") => {
+        true
+    };
+    ("lp_uart.ram_size") => {
+        32
+    };
+    ("lp_uart.ram_size", str) => {
+        stringify!(32)
+    };
+    ("uhci.combined_uart_selector_field") => {
+        false
     };
     ("i2c_master.version") => {
         4
@@ -217,6 +208,45 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("lp_i2c_master.version") => {
+        "lp_i2c"
+    };
+    ("lp_i2c_master.fifo_size") => {
+        16
+    };
+    ("lp_i2c_master.fifo_size", str) => {
+        stringify!(16)
+    };
+    ("spi_master.version") => {
+        3
+    };
+    ("spi_master.version", str) => {
+        stringify!(3)
+    };
+    ("spi_master.fifo_size") => {
+        64
+    };
+    ("spi_master.fifo_size", str) => {
+        stringify!(64)
+    };
+    ("spi_master.bit_order_is_bool") => {
+        false
+    };
+    ("spi_master.has_octal") => {
+        false
+    };
+    ("spi_master.has_app_interrupts") => {
+        true
+    };
+    ("spi_master.has_dma_segmented_transfer") => {
+        true
+    };
+    ("spi_master.has_clk_pre_div") => {
+        false
+    };
+    ("spi_master.dma_can_access_flash") => {
+        false
+    };
     ("i2s.version") => {
         2
     };
@@ -262,68 +292,11 @@ macro_rules! property {
     ("i2s.supports_pdm2pcm") => {
         false
     };
-    ("interrupts.status_registers") => {
-        3
-    };
-    ("interrupts.status_registers", str) => {
-        stringify!(3)
-    };
-    ("interrupts.disabled_interrupt") => {
-        31
-    };
-    ("ledc.version") => {
-        3
-    };
-    ("ledc.version", str) => {
-        stringify!(3)
-    };
-    ("ledc.channel_count") => {
-        6
-    };
-    ("ledc.channel_count", str) => {
-        stringify!(6)
-    };
-    ("lp_i2c_master.version") => {
-        "lp_i2c"
-    };
-    ("lp_i2c_master.fifo_size") => {
-        16
-    };
-    ("lp_i2c_master.fifo_size", str) => {
-        stringify!(16)
-    };
-    ("lp_io.version") => {
-        "v4"
-    };
-    ("lp_io.has_gpio_matrix") => {
-        false
-    };
-    ("lp_uart.ram_size") => {
-        32
-    };
-    ("lp_uart.ram_size", str) => {
-        stringify!(32)
-    };
-    ("mmu.page_size") => {
-        65536
-    };
-    ("mmu.page_size", str) => {
-        stringify!(65536)
-    };
-    ("mmu.entry_num") => {
-        256
-    };
-    ("mmu.entry_num", str) => {
-        stringify!(256)
-    };
     ("parl_io.version") => {
         1
     };
     ("parl_io.version", str) => {
         stringify!(1)
-    };
-    ("phy.combo_module") => {
-        true
     };
     ("rmt.ram_start") => {
         1610638336
@@ -361,6 +334,81 @@ macro_rules! property {
     ("rmt.has_per_channel_clock") => {
         false
     };
+    ("bt.controller") => {
+        "npl"
+    };
+    ("wifi.has_wifi6") => {
+        true
+    };
+    ("wifi.mac_version") => {
+        2
+    };
+    ("wifi.mac_version", str) => {
+        stringify!(2)
+    };
+    ("wifi.has_5g") => {
+        false
+    };
+    ("wifi.csi_supported") => {
+        true
+    };
+    ("phy.combo_module") => {
+        true
+    };
+    ("ledc.version") => {
+        3
+    };
+    ("ledc.version", str) => {
+        stringify!(3)
+    };
+    ("ledc.channel_count") => {
+        6
+    };
+    ("ledc.channel_count", str) => {
+        stringify!(6)
+    };
+    ("sdm.channel_count") => {
+        4
+    };
+    ("sdm.channel_count", str) => {
+        stringify!(4)
+    };
+    ("timergroup.timg_has_timer1") => {
+        false
+    };
+    ("timergroup.timg_has_divcnt_rst") => {
+        true
+    };
+    ("timergroup.rc_fast_calibration_divider_min_rev") => {
+        1
+    };
+    ("timergroup.rc_fast_calibration_divider") => {
+        32
+    };
+    ("timergroup.rc_fast_calibration_tick_enable") => {
+        false
+    };
+    ("aes.has_split_text_registers") => {
+        true
+    };
+    ("aes.endianness_configurable") => {
+        false
+    };
+    ("ecc.zero_extend_writes") => {
+        true
+    };
+    ("ecc.separate_jacobian_point_memory") => {
+        false
+    };
+    ("ecc.has_memory_clock_gate") => {
+        true
+    };
+    ("ecc.supports_enhanced_security") => {
+        false
+    };
+    ("ecc.mem_block_size") => {
+        32
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };
@@ -372,18 +420,6 @@ macro_rules! property {
     };
     ("rng.is_lp_sys") => {
         true
-    };
-    ("rom.has_crc_le") => {
-        true
-    };
-    ("rom.has_crc_be") => {
-        true
-    };
-    ("rom.has_md5_bsd") => {
-        true
-    };
-    ("rom.has_md5_mbedtls") => {
-        false
     };
     ("rsa.version") => {
         3
@@ -402,12 +438,6 @@ macro_rules! property {
     };
     ("rsa.memory_size_bytes", str) => {
         stringify!(384)
-    };
-    ("sdm.channel_count") => {
-        4
-    };
-    ("sdm.channel_count", str) => {
-        stringify!(4)
     };
     ("sleep.light_sleep") => {
         true
@@ -431,6 +461,60 @@ macro_rules! property {
         stringify!(3)
     };
     ("sleep.deep_sleep_needs_gpio_isolation") => {
+        false
+    };
+    ("assist_debug.has_sp_monitor") => {
+        true
+    };
+    ("assist_debug.has_region_monitor") => {
+        true
+    };
+    ("dma.mem2mem_requires_peripheral") => {
+        false
+    };
+    ("dma.ext_mem_configurable_block_size") => {
+        false
+    };
+    ("dma.separate_in_out_interrupts") => {
+        true
+    };
+    ("dma.gdma_version") => {
+        1
+    };
+    ("dma.gdma_version", str) => {
+        stringify!(1)
+    };
+    ("interrupts.status_registers") => {
+        3
+    };
+    ("interrupts.status_registers", str) => {
+        stringify!(3)
+    };
+    ("interrupts.disabled_interrupt") => {
+        31
+    };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        256
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(256)
+    };
+    ("rom.has_crc_le") => {
+        true
+    };
+    ("rom.has_crc_be") => {
+        true
+    };
+    ("rom.has_md5_bsd") => {
+        true
+    };
+    ("rom.has_md5_mbedtls") => {
         false
     };
     ("soc.cpu_has_branch_predictor") => {
@@ -579,102 +663,6 @@ macro_rules! property {
         ::soc::clocks::SpiFunctionClockConfig::Xtal, crate
         ::soc::clocks::SpiFunctionClockConfig::RcFast]
     };
-    ("spi_master.version") => {
-        3
-    };
-    ("spi_master.version", str) => {
-        stringify!(3)
-    };
-    ("spi_master.fifo_size") => {
-        64
-    };
-    ("spi_master.fifo_size", str) => {
-        stringify!(64)
-    };
-    ("spi_master.bit_order_is_bool") => {
-        false
-    };
-    ("spi_master.has_octal") => {
-        false
-    };
-    ("spi_master.has_app_interrupts") => {
-        true
-    };
-    ("spi_master.has_dma_segmented_transfer") => {
-        true
-    };
-    ("spi_master.has_clk_pre_div") => {
-        false
-    };
-    ("spi_master.dma_can_access_flash") => {
-        false
-    };
-    ("timergroup.timg_has_timer1") => {
-        false
-    };
-    ("timergroup.timg_has_divcnt_rst") => {
-        true
-    };
-    ("timergroup.rc_fast_calibration_divider_min_rev") => {
-        1
-    };
-    ("timergroup.rc_fast_calibration_divider") => {
-        32
-    };
-    ("timergroup.rc_fast_calibration_tick_enable") => {
-        false
-    };
-    ("uart.ram_size") => {
-        128
-    };
-    ("uart.ram_size", str) => {
-        stringify!(128)
-    };
-    ("uart.version") => {
-        2
-    };
-    ("uart.version", str) => {
-        stringify!(2)
-    };
-    ("uart.peripheral_controls_mem_clk") => {
-        true
-    };
-    ("uart.has_sclk_divider") => {
-        false
-    };
-    ("uart.has_sclk_enable") => {
-        true
-    };
-    ("uhci.combined_uart_selector_field") => {
-        false
-    };
-    ("wifi.has_wifi6") => {
-        true
-    };
-    ("wifi.mac_version") => {
-        2
-    };
-    ("wifi.mac_version", str) => {
-        stringify!(2)
-    };
-    ("wifi.has_5g") => {
-        false
-    };
-    ("wifi.csi_supported") => {
-        true
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_aes_key_length {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_aes_key_length { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_aes_key_length!((128));
-        _for_each_inner_aes_key_length!((256)); _for_each_inner_aes_key_length!((128, 0,
-        4)); _for_each_inner_aes_key_length!((256, 2, 6));
-        _for_each_inner_aes_key_length!((bits(128), (256)));
-        _for_each_inner_aes_key_length!((modes(128, 0, 4), (256, 2, 6)));
-    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
@@ -697,333 +685,6 @@ macro_rules! for_each_dedicated_gpio {
         (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
         CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
         CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_dma_engine {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
-        _for_each_inner_dma_engine!((all("AHB_GDMA")));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_dma_channel {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2));
-        _for_each_inner_dma_channel!(("AHB_GDMA", any_channel = AhbGdmaChannel));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in = DMA_IN_CH0,
-        interrupt_out = DMA_OUT_CH0, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
-        APB_SARADC, PARL_IO])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1,
-        interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1, compatible = [SPI2,
-        UHCI0, I2S0, AES, SHA, APB_SARADC, PARL_IO]));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt_in = DMA_IN_CH2,
-        interrupt_out = DMA_OUT_CH2, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
-        APB_SARADC, PARL_IO])); _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0),
-        ("AHB_GDMA", DMA_CH1), ("AHB_GDMA", DMA_CH2)));
-        _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
-        AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
-        _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
-        DMA_IN_CH0, interrupt_out = DMA_OUT_CH0, compatible = [SPI2, UHCI0, I2S0, AES,
-        SHA, APB_SARADC, PARL_IO]), ("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1,
-        interrupt_out = DMA_OUT_CH1, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
-        APB_SARADC, PARL_IO]), ("AHB_GDMA", DMA_CH2, 2, interrupt_in = DMA_IN_CH2,
-        interrupt_out = DMA_OUT_CH2, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
-        APB_SARADC, PARL_IO]))); _for_each_inner_dma_channel!((no_own_interrupt));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_dma_channel_peri_pair {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_dma_channel_peri_pair { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
-        DMA_CH0, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0,
-        UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, I2S0));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, AES));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, SHA));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, APB_SARADC));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, PARL_IO));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SPI2));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, UHCI0));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, I2S0));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, AES));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SHA));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, APB_SARADC));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, PARL_IO));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SPI2));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, UHCI0));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, I2S0));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, AES));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SHA));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, APB_SARADC));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, PARL_IO));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
-        SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
-        AhbGdmaChannel, UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
-        any_channel = AhbGdmaChannel, I2S0));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
-        AES)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
-        AhbGdmaChannel, SHA)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
-        any_channel = AhbGdmaChannel, APB_SARADC));
-        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
-        PARL_IO)); _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0,
-        SPI2), ("AHB_GDMA", DMA_CH0, UHCI0), ("AHB_GDMA", DMA_CH0, I2S0), ("AHB_GDMA",
-        DMA_CH0, AES), ("AHB_GDMA", DMA_CH0, SHA), ("AHB_GDMA", DMA_CH0, APB_SARADC),
-        ("AHB_GDMA", DMA_CH0, PARL_IO), ("AHB_GDMA", DMA_CH1, SPI2), ("AHB_GDMA",
-        DMA_CH1, UHCI0), ("AHB_GDMA", DMA_CH1, I2S0), ("AHB_GDMA", DMA_CH1, AES),
-        ("AHB_GDMA", DMA_CH1, SHA), ("AHB_GDMA", DMA_CH1, APB_SARADC), ("AHB_GDMA",
-        DMA_CH1, PARL_IO), ("AHB_GDMA", DMA_CH2, SPI2), ("AHB_GDMA", DMA_CH2, UHCI0),
-        ("AHB_GDMA", DMA_CH2, I2S0), ("AHB_GDMA", DMA_CH2, AES), ("AHB_GDMA", DMA_CH2,
-        SHA), ("AHB_GDMA", DMA_CH2, APB_SARADC), ("AHB_GDMA", DMA_CH2, PARL_IO)));
-        _for_each_inner_dma_channel_peri_pair!((any_channels("AHB_GDMA", any_channel =
-        AhbGdmaChannel, SPI2), ("AHB_GDMA", any_channel = AhbGdmaChannel, UHCI0),
-        ("AHB_GDMA", any_channel = AhbGdmaChannel, I2S0), ("AHB_GDMA", any_channel =
-        AhbGdmaChannel, AES), ("AHB_GDMA", any_channel = AhbGdmaChannel, SHA),
-        ("AHB_GDMA", any_channel = AhbGdmaChannel, APB_SARADC), ("AHB_GDMA", any_channel
-        = AhbGdmaChannel, PARL_IO)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_mem2mem_channel {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
-        AhbGdmaChannel, DMA_CH0, 4)); _for_each_inner_mem2mem_channel!(("AHB_GDMA",
-        AhbGdma, AhbGdmaChannel, DMA_CH1, 5));
-        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2,
-        10)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, 0,
-        4, 1, 5, 2, 10)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
-        AhbGdmaChannel)); _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", AhbGdma,
-        AhbGdmaChannel, DMA_CH0, 4), ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH1, 5),
-        ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2, 10)));
-        _for_each_inner_mem2mem_channel!((erased("AHB_GDMA", AhbGdma, AhbGdmaChannel, 0,
-        4, 1, 5, 2, 10))); _for_each_inner_mem2mem_channel!((engines("AHB_GDMA", AhbGdma,
-        AhbGdmaChannel)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! with_aes_dma_engine {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _with_inner_aes_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _with_inner_aes_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! with_i2s_dma_engine {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _with_inner_i2s_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _with_inner_i2s_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! with_parl_io_dma_engine {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _with_inner_parl_io_dma_engine { $(($pattern) => $code;)* ($other :
-        tt) => {} } _with_inner_parl_io_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! with_sha_dma_engine {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _with_inner_sha_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _with_inner_sha_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! with_spi_master_dma_engine {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _with_inner_spi_master_dma_engine { $(($pattern) => $code;)* ($other
-        : tt) => {} } _with_inner_spi_master_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! with_spi_slave_dma_engine {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _with_inner_spi_slave_dma_engine { $(($pattern) => $code;)* ($other
-        : tt) => {} } _with_inner_spi_slave_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! with_uhci_dma_engine {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _with_inner_uhci_dma_engine { $(($pattern) => $code;)* ($other : tt)
-        => {} } _with_inner_uhci_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_ecc_working_mode {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
-        : tt) => {} } _for_each_inner_ecc_working_mode!((0, AffinePointMultiplication));
-        _for_each_inner_ecc_working_mode!((2, AffinePointVerification));
-        _for_each_inner_ecc_working_mode!((3, AffinePointVerificationAndMultiplication));
-        _for_each_inner_ecc_working_mode!((4, JacobianPointMultiplication));
-        _for_each_inner_ecc_working_mode!((6, JacobianPointVerification));
-        _for_each_inner_ecc_working_mode!((7,
-        AffinePointVerificationAndJacobianPointMultiplication));
-        _for_each_inner_ecc_working_mode!((all(0, AffinePointMultiplication), (2,
-        AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
-        JacobianPointMultiplication), (6, JacobianPointVerification), (7,
-        AffinePointVerificationAndJacobianPointMultiplication)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_ecc_curve {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_ecc_curve { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_ecc_curve!((0, P192, 192));
-        _for_each_inner_ecc_curve!((1, P256, 256)); _for_each_inner_ecc_curve!((all(0,
-        P192, 192), (1, P256, 256)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_interrupt {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_interrupt!(([reserved 0] 0));
-        _for_each_inner_interrupt!(([direct_bindable 0] 1));
-        _for_each_inner_interrupt!(([direct_bindable 1] 2));
-        _for_each_inner_interrupt!(([reserved 1] 3));
-        _for_each_inner_interrupt!(([reserved 2] 4));
-        _for_each_inner_interrupt!(([direct_bindable 2] 5));
-        _for_each_inner_interrupt!(([direct_bindable 3] 6));
-        _for_each_inner_interrupt!(([reserved 3] 7));
-        _for_each_inner_interrupt!(([direct_bindable 4] 8));
-        _for_each_inner_interrupt!(([direct_bindable 5] 9));
-        _for_each_inner_interrupt!(([direct_bindable 6] 10));
-        _for_each_inner_interrupt!(([direct_bindable 7] 11));
-        _for_each_inner_interrupt!(([direct_bindable 8] 12));
-        _for_each_inner_interrupt!(([direct_bindable 9] 13));
-        _for_each_inner_interrupt!(([direct_bindable 10] 14));
-        _for_each_inner_interrupt!(([direct_bindable 11] 15));
-        _for_each_inner_interrupt!(([vector 0] 16)); _for_each_inner_interrupt!(([vector
-        1] 17)); _for_each_inner_interrupt!(([vector 2] 18));
-        _for_each_inner_interrupt!(([vector 3] 19)); _for_each_inner_interrupt!(([vector
-        4] 20)); _for_each_inner_interrupt!(([vector 5] 21));
-        _for_each_inner_interrupt!(([vector 6] 22)); _for_each_inner_interrupt!(([vector
-        7] 23)); _for_each_inner_interrupt!(([vector 8] 24));
-        _for_each_inner_interrupt!(([vector 9] 25)); _for_each_inner_interrupt!(([vector
-        10] 26)); _for_each_inner_interrupt!(([vector 11] 27));
-        _for_each_inner_interrupt!(([vector 12] 28)); _for_each_inner_interrupt!(([vector
-        13] 29)); _for_each_inner_interrupt!(([vector 14] 30));
-        _for_each_inner_interrupt!(([disabled 0] 31));
-        _for_each_inner_interrupt!((all([reserved 0] 0), ([direct_bindable 0] 1),
-        ([direct_bindable 1] 2), ([reserved 1] 3), ([reserved 2] 4), ([direct_bindable 2]
-        5), ([direct_bindable 3] 6), ([reserved 3] 7), ([direct_bindable 4] 8),
-        ([direct_bindable 5] 9), ([direct_bindable 6] 10), ([direct_bindable 7] 11),
-        ([direct_bindable 8] 12), ([direct_bindable 9] 13), ([direct_bindable 10] 14),
-        ([direct_bindable 11] 15), ([vector 0] 16), ([vector 1] 17), ([vector 2] 18),
-        ([vector 3] 19), ([vector 4] 20), ([vector 5] 21), ([vector 6] 22), ([vector 7]
-        23), ([vector 8] 24), ([vector 9] 25), ([vector 10] 26), ([vector 11] 27),
-        ([vector 12] 28), ([vector 13] 29), ([vector 14] 30), ([disabled 0] 31)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_classified_interrupt {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_classified_interrupt { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_classified_interrupt!(([direct_bindable 0]
-        1)); _for_each_inner_classified_interrupt!(([direct_bindable 1] 2));
-        _for_each_inner_classified_interrupt!(([direct_bindable 2] 5));
-        _for_each_inner_classified_interrupt!(([direct_bindable 3] 6));
-        _for_each_inner_classified_interrupt!(([direct_bindable 4] 8));
-        _for_each_inner_classified_interrupt!(([direct_bindable 5] 9));
-        _for_each_inner_classified_interrupt!(([direct_bindable 6] 10));
-        _for_each_inner_classified_interrupt!(([direct_bindable 7] 11));
-        _for_each_inner_classified_interrupt!(([direct_bindable 8] 12));
-        _for_each_inner_classified_interrupt!(([direct_bindable 9] 13));
-        _for_each_inner_classified_interrupt!(([direct_bindable 10] 14));
-        _for_each_inner_classified_interrupt!(([direct_bindable 11] 15));
-        _for_each_inner_classified_interrupt!(([vector 0] 16));
-        _for_each_inner_classified_interrupt!(([vector 1] 17));
-        _for_each_inner_classified_interrupt!(([vector 2] 18));
-        _for_each_inner_classified_interrupt!(([vector 3] 19));
-        _for_each_inner_classified_interrupt!(([vector 4] 20));
-        _for_each_inner_classified_interrupt!(([vector 5] 21));
-        _for_each_inner_classified_interrupt!(([vector 6] 22));
-        _for_each_inner_classified_interrupt!(([vector 7] 23));
-        _for_each_inner_classified_interrupt!(([vector 8] 24));
-        _for_each_inner_classified_interrupt!(([vector 9] 25));
-        _for_each_inner_classified_interrupt!(([vector 10] 26));
-        _for_each_inner_classified_interrupt!(([vector 11] 27));
-        _for_each_inner_classified_interrupt!(([vector 12] 28));
-        _for_each_inner_classified_interrupt!(([vector 13] 29));
-        _for_each_inner_classified_interrupt!(([vector 14] 30));
-        _for_each_inner_classified_interrupt!(([reserved 0] 0));
-        _for_each_inner_classified_interrupt!(([reserved 1] 3));
-        _for_each_inner_classified_interrupt!(([reserved 2] 4));
-        _for_each_inner_classified_interrupt!(([reserved 3] 7));
-        _for_each_inner_classified_interrupt!((direct_bindable([direct_bindable 0] 1),
-        ([direct_bindable 1] 2), ([direct_bindable 2] 5), ([direct_bindable 3] 6),
-        ([direct_bindable 4] 8), ([direct_bindable 5] 9), ([direct_bindable 6] 10),
-        ([direct_bindable 7] 11), ([direct_bindable 8] 12), ([direct_bindable 9] 13),
-        ([direct_bindable 10] 14), ([direct_bindable 11] 15)));
-        _for_each_inner_classified_interrupt!((vector([vector 0] 16), ([vector 1] 17),
-        ([vector 2] 18), ([vector 3] 19), ([vector 4] 20), ([vector 5] 21), ([vector 6]
-        22), ([vector 7] 23), ([vector 8] 24), ([vector 9] 25), ([vector 10] 26),
-        ([vector 11] 27), ([vector 12] 28), ([vector 13] 29), ([vector 14] 30)));
-        _for_each_inner_classified_interrupt!((reserved([reserved 0] 0), ([reserved 1]
-        3), ([reserved 2] 4), ([reserved 3] 7)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_interrupt_priority {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
-        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1,
-        Level1)); _for_each_inner_interrupt_priority!((1, 2, Priority2, Level2));
-        _for_each_inner_interrupt_priority!((2, 3, Priority3, Level3));
-        _for_each_inner_interrupt_priority!((3, 4, Priority4, Level4));
-        _for_each_inner_interrupt_priority!((4, 5, Priority5, Level5));
-        _for_each_inner_interrupt_priority!((5, 6, Priority6, Level6));
-        _for_each_inner_interrupt_priority!((6, 7, Priority7, Level7));
-        _for_each_inner_interrupt_priority!((7, 8, Priority8, Level8));
-        _for_each_inner_interrupt_priority!((8, 9, Priority9, Level9));
-        _for_each_inner_interrupt_priority!((9, 10, Priority10, Level10));
-        _for_each_inner_interrupt_priority!((10, 11, Priority11, Level11));
-        _for_each_inner_interrupt_priority!((11, 12, Priority12, Level12));
-        _for_each_inner_interrupt_priority!((12, 13, Priority13, Level13));
-        _for_each_inner_interrupt_priority!((13, 14, Priority14, Level14));
-        _for_each_inner_interrupt_priority!((14, 15, Priority15, Level15));
-        _for_each_inner_interrupt_priority!((all(0, 1, Priority1, Level1), (1, 2,
-        Priority2, Level2), (2, 3, Priority3, Level3), (3, 4, Priority4, Level4), (4, 5,
-        Priority5, Level5), (5, 6, Priority6, Level6), (6, 7, Priority7, Level7), (7, 8,
-        Priority8, Level8), (8, 9, Priority9, Level9), (9, 10, Priority10, Level10), (10,
-        11, Priority11, Level11), (11, 12, Priority12, Level12), (12, 13, Priority13,
-        Level13), (13, 14, Priority14, Level14), (14, 15, Priority15, Level15)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sw_interrupt {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_sw_interrupt!((0, FROM_CPU_INTR0,
-        software_interrupt0)); _for_each_inner_sw_interrupt!((1, FROM_CPU_INTR1,
-        software_interrupt1)); _for_each_inner_sw_interrupt!((2, FROM_CPU_INTR2,
-        software_interrupt2)); _for_each_inner_sw_interrupt!((3, FROM_CPU_INTR3,
-        software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
-        software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
-        FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
     };
 }
 /// Defines the `LpInputSignal` and `LpOutputSignal` enums.
@@ -1067,6 +728,58 @@ macro_rules! for_each_rmt_channel {
         _for_each_inner_rmt_channel!((all(0), (1), (2), (3)));
         _for_each_inner_rmt_channel!((tx(0, 0), (1, 1)));
         _for_each_inner_rmt_channel!((rx(2, 0), (3, 1)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sdm_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
+        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
+        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
+        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
+        GPIO_SD2), (3, GPIO_SD3)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_aes_key_length {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_aes_key_length { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_aes_key_length!((128));
+        _for_each_inner_aes_key_length!((256)); _for_each_inner_aes_key_length!((128, 0,
+        4)); _for_each_inner_aes_key_length!((256, 2, 6));
+        _for_each_inner_aes_key_length!((bits(128), (256)));
+        _for_each_inner_aes_key_length!((modes(128, 0, 4), (256, 2, 6)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_working_mode {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_ecc_working_mode!((0, AffinePointMultiplication));
+        _for_each_inner_ecc_working_mode!((2, AffinePointVerification));
+        _for_each_inner_ecc_working_mode!((3, AffinePointVerificationAndMultiplication));
+        _for_each_inner_ecc_working_mode!((4, JacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((6, JacobianPointVerification));
+        _for_each_inner_ecc_working_mode!((7,
+        AffinePointVerificationAndJacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((all(0, AffinePointMultiplication), (2,
+        AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
+        JacobianPointMultiplication), (6, JacobianPointVerification), (7,
+        AffinePointVerificationAndJacobianPointMultiplication)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_curve {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_curve { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_ecc_curve!((0, P192, 192));
+        _for_each_inner_ecc_curve!((1, P256, 256)); _for_each_inner_ecc_curve!((all(0,
+        P192, 192), (1, P256, 256)));
     };
 }
 #[macro_export]
@@ -1262,18 +975,6 @@ macro_rules! for_each_sha_algorithm {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sdm_channel {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sdm_channel { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_sdm_channel!((0, GPIO_SD0));
-        _for_each_inner_sdm_channel!((1, GPIO_SD1)); _for_each_inner_sdm_channel!((2,
-        GPIO_SD2)); _for_each_inner_sdm_channel!((3, GPIO_SD3));
-        _for_each_inner_sdm_channel!((channels(0, GPIO_SD0), (1, GPIO_SD1), (2,
-        GPIO_SD2), (3, GPIO_SD3)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_wakeup_source {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
@@ -1287,6 +988,305 @@ macro_rules! for_each_wakeup_source {
         _for_each_inner_wakeup_source!((LpCore, 11));
         _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (WifiBeacon, 3), (Timer,
         4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Bt, 10), (LpCore, 11)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_dma_engine!(("AHB_GDMA"));
+        _for_each_inner_dma_engine!((all("AHB_GDMA")));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dma_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dma_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2));
+        _for_each_inner_dma_channel!(("AHB_GDMA", any_channel = AhbGdmaChannel));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in = DMA_IN_CH0,
+        interrupt_out = DMA_OUT_CH0, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
+        APB_SARADC, PARL_IO])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1,
+        interrupt_in = DMA_IN_CH1, interrupt_out = DMA_OUT_CH1, compatible = [SPI2,
+        UHCI0, I2S0, AES, SHA, APB_SARADC, PARL_IO]));
+        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt_in = DMA_IN_CH2,
+        interrupt_out = DMA_OUT_CH2, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
+        APB_SARADC, PARL_IO])); _for_each_inner_dma_channel!((names("AHB_GDMA", DMA_CH0),
+        ("AHB_GDMA", DMA_CH1), ("AHB_GDMA", DMA_CH2)));
+        _for_each_inner_dma_channel!((separate_any_type("AHB_GDMA", any_channel =
+        AhbGdmaChannel))); _for_each_inner_dma_channel!((shared));
+        _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
+        DMA_IN_CH0, interrupt_out = DMA_OUT_CH0, compatible = [SPI2, UHCI0, I2S0, AES,
+        SHA, APB_SARADC, PARL_IO]), ("AHB_GDMA", DMA_CH1, 1, interrupt_in = DMA_IN_CH1,
+        interrupt_out = DMA_OUT_CH1, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
+        APB_SARADC, PARL_IO]), ("AHB_GDMA", DMA_CH2, 2, interrupt_in = DMA_IN_CH2,
+        interrupt_out = DMA_OUT_CH2, compatible = [SPI2, UHCI0, I2S0, AES, SHA,
+        APB_SARADC, PARL_IO]))); _for_each_inner_dma_channel!((no_own_interrupt));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dma_channel_peri_pair {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dma_channel_peri_pair { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        DMA_CH0, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0,
+        UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, SHA));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, PARL_IO));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, SHA));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, PARL_IO));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SPI2));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, SHA));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, PARL_IO));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        SPI2)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        AES)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SHA)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, APB_SARADC));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
+        PARL_IO)); _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0,
+        SPI2), ("AHB_GDMA", DMA_CH0, UHCI0), ("AHB_GDMA", DMA_CH0, I2S0), ("AHB_GDMA",
+        DMA_CH0, AES), ("AHB_GDMA", DMA_CH0, SHA), ("AHB_GDMA", DMA_CH0, APB_SARADC),
+        ("AHB_GDMA", DMA_CH0, PARL_IO), ("AHB_GDMA", DMA_CH1, SPI2), ("AHB_GDMA",
+        DMA_CH1, UHCI0), ("AHB_GDMA", DMA_CH1, I2S0), ("AHB_GDMA", DMA_CH1, AES),
+        ("AHB_GDMA", DMA_CH1, SHA), ("AHB_GDMA", DMA_CH1, APB_SARADC), ("AHB_GDMA",
+        DMA_CH1, PARL_IO), ("AHB_GDMA", DMA_CH2, SPI2), ("AHB_GDMA", DMA_CH2, UHCI0),
+        ("AHB_GDMA", DMA_CH2, I2S0), ("AHB_GDMA", DMA_CH2, AES), ("AHB_GDMA", DMA_CH2,
+        SHA), ("AHB_GDMA", DMA_CH2, APB_SARADC), ("AHB_GDMA", DMA_CH2, PARL_IO)));
+        _for_each_inner_dma_channel_peri_pair!((any_channels("AHB_GDMA", any_channel =
+        AhbGdmaChannel, SPI2), ("AHB_GDMA", any_channel = AhbGdmaChannel, UHCI0),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, I2S0), ("AHB_GDMA", any_channel =
+        AhbGdmaChannel, AES), ("AHB_GDMA", any_channel = AhbGdmaChannel, SHA),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, APB_SARADC), ("AHB_GDMA", any_channel
+        = AhbGdmaChannel, PARL_IO)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_mem2mem_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_mem2mem_channel { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH0, 4)); _for_each_inner_mem2mem_channel!(("AHB_GDMA",
+        AhbGdma, AhbGdmaChannel, DMA_CH1, 5));
+        _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2,
+        10)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma, AhbGdmaChannel, 0,
+        4, 1, 5, 2, 10)); _for_each_inner_mem2mem_channel!(("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel)); _for_each_inner_mem2mem_channel!((channels("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel, DMA_CH0, 4), ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH1, 5),
+        ("AHB_GDMA", AhbGdma, AhbGdmaChannel, DMA_CH2, 10)));
+        _for_each_inner_mem2mem_channel!((erased("AHB_GDMA", AhbGdma, AhbGdmaChannel, 0,
+        4, 1, 5, 2, 10))); _for_each_inner_mem2mem_channel!((engines("AHB_GDMA", AhbGdma,
+        AhbGdmaChannel)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_aes_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_aes_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _with_inner_aes_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_i2s_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_i2s_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _with_inner_i2s_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_parl_io_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_parl_io_dma_engine { $(($pattern) => $code;)* ($other :
+        tt) => {} } _with_inner_parl_io_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_sha_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_sha_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _with_inner_sha_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_spi_master_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_spi_master_dma_engine { $(($pattern) => $code;)* ($other
+        : tt) => {} } _with_inner_spi_master_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_spi_slave_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_spi_slave_dma_engine { $(($pattern) => $code;)* ($other
+        : tt) => {} } _with_inner_spi_slave_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_uhci_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_uhci_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _with_inner_uhci_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_interrupt!(([reserved 0] 0));
+        _for_each_inner_interrupt!(([direct_bindable 0] 1));
+        _for_each_inner_interrupt!(([direct_bindable 1] 2));
+        _for_each_inner_interrupt!(([reserved 1] 3));
+        _for_each_inner_interrupt!(([reserved 2] 4));
+        _for_each_inner_interrupt!(([direct_bindable 2] 5));
+        _for_each_inner_interrupt!(([direct_bindable 3] 6));
+        _for_each_inner_interrupt!(([reserved 3] 7));
+        _for_each_inner_interrupt!(([direct_bindable 4] 8));
+        _for_each_inner_interrupt!(([direct_bindable 5] 9));
+        _for_each_inner_interrupt!(([direct_bindable 6] 10));
+        _for_each_inner_interrupt!(([direct_bindable 7] 11));
+        _for_each_inner_interrupt!(([direct_bindable 8] 12));
+        _for_each_inner_interrupt!(([direct_bindable 9] 13));
+        _for_each_inner_interrupt!(([direct_bindable 10] 14));
+        _for_each_inner_interrupt!(([direct_bindable 11] 15));
+        _for_each_inner_interrupt!(([vector 0] 16)); _for_each_inner_interrupt!(([vector
+        1] 17)); _for_each_inner_interrupt!(([vector 2] 18));
+        _for_each_inner_interrupt!(([vector 3] 19)); _for_each_inner_interrupt!(([vector
+        4] 20)); _for_each_inner_interrupt!(([vector 5] 21));
+        _for_each_inner_interrupt!(([vector 6] 22)); _for_each_inner_interrupt!(([vector
+        7] 23)); _for_each_inner_interrupt!(([vector 8] 24));
+        _for_each_inner_interrupt!(([vector 9] 25)); _for_each_inner_interrupt!(([vector
+        10] 26)); _for_each_inner_interrupt!(([vector 11] 27));
+        _for_each_inner_interrupt!(([vector 12] 28)); _for_each_inner_interrupt!(([vector
+        13] 29)); _for_each_inner_interrupt!(([vector 14] 30));
+        _for_each_inner_interrupt!(([disabled 0] 31));
+        _for_each_inner_interrupt!((all([reserved 0] 0), ([direct_bindable 0] 1),
+        ([direct_bindable 1] 2), ([reserved 1] 3), ([reserved 2] 4), ([direct_bindable 2]
+        5), ([direct_bindable 3] 6), ([reserved 3] 7), ([direct_bindable 4] 8),
+        ([direct_bindable 5] 9), ([direct_bindable 6] 10), ([direct_bindable 7] 11),
+        ([direct_bindable 8] 12), ([direct_bindable 9] 13), ([direct_bindable 10] 14),
+        ([direct_bindable 11] 15), ([vector 0] 16), ([vector 1] 17), ([vector 2] 18),
+        ([vector 3] 19), ([vector 4] 20), ([vector 5] 21), ([vector 6] 22), ([vector 7]
+        23), ([vector 8] 24), ([vector 9] 25), ([vector 10] 26), ([vector 11] 27),
+        ([vector 12] 28), ([vector 13] 29), ([vector 14] 30), ([disabled 0] 31)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_classified_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_classified_interrupt { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_classified_interrupt!(([direct_bindable 0]
+        1)); _for_each_inner_classified_interrupt!(([direct_bindable 1] 2));
+        _for_each_inner_classified_interrupt!(([direct_bindable 2] 5));
+        _for_each_inner_classified_interrupt!(([direct_bindable 3] 6));
+        _for_each_inner_classified_interrupt!(([direct_bindable 4] 8));
+        _for_each_inner_classified_interrupt!(([direct_bindable 5] 9));
+        _for_each_inner_classified_interrupt!(([direct_bindable 6] 10));
+        _for_each_inner_classified_interrupt!(([direct_bindable 7] 11));
+        _for_each_inner_classified_interrupt!(([direct_bindable 8] 12));
+        _for_each_inner_classified_interrupt!(([direct_bindable 9] 13));
+        _for_each_inner_classified_interrupt!(([direct_bindable 10] 14));
+        _for_each_inner_classified_interrupt!(([direct_bindable 11] 15));
+        _for_each_inner_classified_interrupt!(([vector 0] 16));
+        _for_each_inner_classified_interrupt!(([vector 1] 17));
+        _for_each_inner_classified_interrupt!(([vector 2] 18));
+        _for_each_inner_classified_interrupt!(([vector 3] 19));
+        _for_each_inner_classified_interrupt!(([vector 4] 20));
+        _for_each_inner_classified_interrupt!(([vector 5] 21));
+        _for_each_inner_classified_interrupt!(([vector 6] 22));
+        _for_each_inner_classified_interrupt!(([vector 7] 23));
+        _for_each_inner_classified_interrupt!(([vector 8] 24));
+        _for_each_inner_classified_interrupt!(([vector 9] 25));
+        _for_each_inner_classified_interrupt!(([vector 10] 26));
+        _for_each_inner_classified_interrupt!(([vector 11] 27));
+        _for_each_inner_classified_interrupt!(([vector 12] 28));
+        _for_each_inner_classified_interrupt!(([vector 13] 29));
+        _for_each_inner_classified_interrupt!(([vector 14] 30));
+        _for_each_inner_classified_interrupt!(([reserved 0] 0));
+        _for_each_inner_classified_interrupt!(([reserved 1] 3));
+        _for_each_inner_classified_interrupt!(([reserved 2] 4));
+        _for_each_inner_classified_interrupt!(([reserved 3] 7));
+        _for_each_inner_classified_interrupt!((direct_bindable([direct_bindable 0] 1),
+        ([direct_bindable 1] 2), ([direct_bindable 2] 5), ([direct_bindable 3] 6),
+        ([direct_bindable 4] 8), ([direct_bindable 5] 9), ([direct_bindable 6] 10),
+        ([direct_bindable 7] 11), ([direct_bindable 8] 12), ([direct_bindable 9] 13),
+        ([direct_bindable 10] 14), ([direct_bindable 11] 15)));
+        _for_each_inner_classified_interrupt!((vector([vector 0] 16), ([vector 1] 17),
+        ([vector 2] 18), ([vector 3] 19), ([vector 4] 20), ([vector 5] 21), ([vector 6]
+        22), ([vector 7] 23), ([vector 8] 24), ([vector 9] 25), ([vector 10] 26),
+        ([vector 11] 27), ([vector 12] 28), ([vector 13] 29), ([vector 14] 30)));
+        _for_each_inner_classified_interrupt!((reserved([reserved 0] 0), ([reserved 1]
+        3), ([reserved 2] 4), ([reserved 3] 7)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_interrupt_priority {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_interrupt_priority { $(($pattern) => $code;)*
+        ($other : tt) => {} } _for_each_inner_interrupt_priority!((0, 1, Priority1,
+        Level1)); _for_each_inner_interrupt_priority!((1, 2, Priority2, Level2));
+        _for_each_inner_interrupt_priority!((2, 3, Priority3, Level3));
+        _for_each_inner_interrupt_priority!((3, 4, Priority4, Level4));
+        _for_each_inner_interrupt_priority!((4, 5, Priority5, Level5));
+        _for_each_inner_interrupt_priority!((5, 6, Priority6, Level6));
+        _for_each_inner_interrupt_priority!((6, 7, Priority7, Level7));
+        _for_each_inner_interrupt_priority!((7, 8, Priority8, Level8));
+        _for_each_inner_interrupt_priority!((8, 9, Priority9, Level9));
+        _for_each_inner_interrupt_priority!((9, 10, Priority10, Level10));
+        _for_each_inner_interrupt_priority!((10, 11, Priority11, Level11));
+        _for_each_inner_interrupt_priority!((11, 12, Priority12, Level12));
+        _for_each_inner_interrupt_priority!((12, 13, Priority13, Level13));
+        _for_each_inner_interrupt_priority!((13, 14, Priority14, Level14));
+        _for_each_inner_interrupt_priority!((14, 15, Priority15, Level15));
+        _for_each_inner_interrupt_priority!((all(0, 1, Priority1, Level1), (1, 2,
+        Priority2, Level2), (2, 3, Priority3, Level3), (3, 4, Priority4, Level4), (4, 5,
+        Priority5, Level5), (5, 6, Priority6, Level6), (6, 7, Priority7, Level7), (7, 8,
+        Priority8, Level8), (8, 9, Priority9, Level9), (9, 10, Priority10, Level10), (10,
+        11, Priority11, Level11), (11, 12, Priority12, Level12), (12, 13, Priority13,
+        Level13), (13, 14, Priority14, Level14), (14, 15, Priority15, Level15)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sw_interrupt {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sw_interrupt { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sw_interrupt!((0, FROM_CPU_INTR0,
+        software_interrupt0)); _for_each_inner_sw_interrupt!((1, FROM_CPU_INTR1,
+        software_interrupt1)); _for_each_inner_sw_interrupt!((2, FROM_CPU_INTR2,
+        software_interrupt2)); _for_each_inner_sw_interrupt!((3, FROM_CPU_INTR3,
+        software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
+        software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
+        FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
     };
 }
 #[macro_export]

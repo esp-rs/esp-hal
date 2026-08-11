@@ -111,13 +111,15 @@ pub(crate) struct PeriInstance<I = EmptyInstanceConfig> {
 }
 
 /// A single cell in the peripheral support table.
-#[derive(Default)]
 pub(crate) struct SupportItem {
     /// The human-readable name of the driver in the table (leftmost cell.)
     pub name: &'static str,
     /// The ID of the driver ([device.<config_group>]) in the TOML, that this
     /// item corresponds to.
     pub config_group: &'static str,
+    /// The heading of the table the driver is listed in. Groups are written in
+    /// the order they first appear in.
+    pub group: &'static str,
     /// If true, this driver is not shown in the peripheral support table.
     pub hide_from_peri_table: bool,
 }
@@ -177,57 +179,65 @@ macro_rules! driver_configs {
         }
     };
 
-    // Repeat pattern for multiple structs
+    // Repeat pattern for multiple structs, arranged into the groups of the
+    // peripheral support table.
     ($(
-        $struct:ident $(<$instance_config:ident>)? {
-            // This name will be emitted as a cfg symbol, to activate a driver.
-            driver: $driver:ident,
+        // The heading the group is written under in the support table. The
+        // groups appear in the table in the order they are declared in.
+        group $table_group:literal [
+            $(
+                $struct:ident $(<$instance_config:ident>)? {
+                    // This name will be emitted as a cfg symbol, to activate a driver.
+                    driver: $driver:ident,
 
-            // Driver name, used in the generated documentation.
-            name: $name:literal,
+                    // Driver name, used in the generated documentation.
+                    name: $name:literal,
 
-            $(hide_from_peri_table: $hide:literal,)?
+                    $(hide_from_peri_table: $hide:literal,)?
 
-            // When set, the type must provide `fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)>`.
-            // The iterator yields `(name_with_prefix, optional, value)`.
-            $(has_computed_properties: $computed:literal,)?
+                    // When set, the type must provide `fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)>`.
+                    // The iterator yields `(name_with_prefix, optional, value)`.
+                    $(has_computed_properties: $computed:literal,)?
 
-            properties: $tokens:tt
-        },
+                    properties: $tokens:tt
+                },
+            )+
+        ]
     )+) => {
         // Implement the config driver and DriverConfig trait for each driver
-        $(
+        $($(
             driver_configs!(@one $struct $(<$instance_config>)? ($driver) $tokens);
-        )+
+        )+)+
 
         // Generate a single PeriConfig struct that contains all the drivers. Each of the
         // drivers is optional to support devices that may not have all peripherals.
         #[derive(Default, Debug, Clone, serde::Deserialize)]
         pub(crate) struct PeriConfig {
-            $(
+            $($(
                 // Each driver is an optional struct.
                 #[serde(default)]
                 pub(crate) $driver: Option<$struct>,
-            )+
+            )+)+
         }
 
         impl PeriConfig {
             pub fn drivers() -> &'static [SupportItem] {
                 &[
-                    $(
+                    $($(
                         SupportItem {
                             name: $name,
                             config_group: stringify!($driver),
+                            group: $table_group,
                             hide_from_peri_table: driver_configs!(@default false $($hide)?),
                         },
-                    )+
+                    )+)+
                 ]
             }
 
             /// Returns an iterator over all driver names, that are
             /// available on the selected device.
             pub fn driver_names(&self) -> impl Iterator<Item = &str> {
-                [$(
+                [$($(
                     self.$driver.as_ref().and_then(|d| {
                         if d.support_status.is_supported() {
                             Some(stringify!($driver))
@@ -235,20 +245,20 @@ macro_rules! driver_configs {
                             None
                         }
                     }),
-                )*].into_iter().flatten()
+                )*)*].into_iter().flatten()
             }
 
             pub fn driver_instances(&self) -> impl Iterator<Item = String> {
                 // Collect into a vector. This compiles faster than chaining iterators.
                 let mut instances = vec![];
-                $(
+                $($(
                     if let Some(driver) = &self.$driver
                         && driver.support_status.is_supported() {
                         instances.extend(driver.instances.iter().map(|i| {
                             format!("{}.{}", stringify!($driver), i.name)
                         }));
                     }
-                )*
+                )*)*
                 instances.into_iter()
             }
 
@@ -258,7 +268,7 @@ macro_rules! driver_configs {
             pub fn properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
                 // Collect into a vector. This compiles faster than chaining iterators.
                 let mut properties = vec![];
-                $(
+                $($(
                     if let Some(driver) = &self.$driver {
                         if driver.support_status.is_supported() {
                             properties.extend(driver.properties());
@@ -268,14 +278,14 @@ macro_rules! driver_configs {
                             )?
                         }
                     }
-                )*
+                )*)*
                 properties.into_iter()
             }
 
             /// Returns the support status of a peripheral by its name.
             pub fn support_status(&self, driver: &str) -> SupportStatus {
                 let maybe_status = match driver {
-                    $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status),)*
+                    $($(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status),)*)*
                     _ => None,
                 };
                 maybe_status.unwrap_or(SupportStatus { status: SupportStatusLevel::NotAvailable, issue: None })
@@ -284,636 +294,735 @@ macro_rules! driver_configs {
     };
 }
 
-// TODO: sort this similar to how the product portfolio is organized
 driver_configs![
-    AdcProperties {
-        driver: adc,
-        name: "ADC",
-        properties: {}
-    },
-    AesProperties {
-        driver: aes,
-        name: "AES",
-        properties: {
-            key_length: AesKeyLength,
-            #[serde(default)]
-            dma_mode: Vec<String>,
-            has_split_text_registers: bool,
-            endianness_configurable: bool,
-        }
-    },
-    AssistDebugProperties {
-        driver: assist_debug,
-        name: "ASSIST_DEBUG",
-        properties: {
-            #[serde(default)]
-            has_sp_monitor: bool,
-            #[serde(default)]
-            has_region_monitor: bool,
-        }
-    },
-    AvcProperties {
-        driver: avc,
-        name: "Analog Voltage Comparator",
-        properties: {}
-    },
-    BitScramblerProperties {
-        driver: bit_scrambler,
-        name: "Bit Scrambler",
-        properties: {}
-    },
-    BluetoothProperties {
-        driver: bt,
-        name: "Bluetooth",
-        properties: {
-            controller: String,
-        }
-    },
-    CameraProperties {
-        driver: camera,
-        name: "Camera interface", // LCD_CAM, ESP32 I2S, S2 SPI
-        properties: {}
-    },
-    DacProperties {
-        driver: dac,
-        name: "DAC",
-        properties: {}
-    },
-    DedicatedGpioProperties {
-        driver: dedicated_gpio,
-        name: "Dedicated GPIO",
-        properties: {
-            /// Low-level access generation derived from CPU instruction/CSR support.
-            version: String,
-            #[serde(default)]
-            needs_initialization: bool,
-            #[serde(flatten)]
-            channel_properties: DedicatedGpioChannels,
-        }
-    },
-    DmaProperties {
-        driver: dma,
-        name: "DMA",
-        properties: {
-            /// When true, memory-to-memory setup requires a real DMA peripheral (e.g. ESP32-C3/S3).
-            #[serde(default)]
-            mem2mem_requires_peripheral: bool,
-            #[serde(default)]
-            ext_mem_configurable_block_size: bool,
-            #[serde(default)]
-            separate_in_out_interrupts: bool,
-            #[serde(default)]
-            gdma_version: Option<u32>,
-            #[serde(default)]
-            engines: DmaEngines,
-        }
-    },
-    DsProperties {
-        driver: ds,
-        name: "DS",
-        properties: {}
-    },
-    EcdsaProperties {
-        driver: ecdsa,
-        name: "ECDSA",
-        properties: {}
-    },
-    EccProperties {
-        driver: ecc,
-        name: "ECC",
-        properties: {
-            #[serde(default)]
-            zero_extend_writes: bool,
-            #[serde(default)]
-            separate_jacobian_point_memory: bool, // Qx, Qy, Qz memory blocks
-            #[serde(default)]
-            has_memory_clock_gate: bool, // ECC_MULT_MEM_CLOCK_GATE_FORCE_ON
-            #[serde(default)]
-            supports_enhanced_security: bool, // ECC_MULT_SECURITY_MODE
-            #[serde(flatten)]
-            extras: EccDriverProperties,
-        }
-    },
-    EthernetProperties {
-        driver: ethernet,
-        name: "Ethernet",
-        properties: {
-            #[serde(default)]
-            mii_via_gpio_matrix: bool,
-        }
-    },
-    EtmProperties {
-        driver: etm,
-        name: "ETM",
-        properties: {}
-    },
-    GpioProperties {
-        driver: gpio,
-        name: "GPIO",
-        has_computed_properties: true,
-        properties: {
-            /// Digital GPIO register-layout generation derived from the chip SVD.
-            version: u32,
-            #[serde(default)]
-            has_input_sync: bool,
-            gpio_function: u32,
-            constant_0_input: u32,
-            constant_1_input: u32,
-            #[serde(default)]
-            remap_iomux_pin_registers: bool,
-            #[serde(default)] // currently 0 in all devices
-            func_in_sel_offset: u32,
+    group "GPIO" [
+        GpioProperties {
+            driver: gpio,
+            name: "GPIO",
+            has_computed_properties: true,
+            properties: {
+                /// Digital GPIO register-layout generation derived from the chip SVD.
+                version: u32,
+                #[serde(default)]
+                has_input_sync: bool,
+                gpio_function: u32,
+                constant_0_input: u32,
+                constant_1_input: u32,
+                #[serde(default)]
+                remap_iomux_pin_registers: bool,
+                #[serde(default)] // currently 0 in all devices
+                func_in_sel_offset: u32,
 
-            #[serde(flatten)]
-            pins_and_signals: GpioPinsAndSignals,
-        }
-    },
-    HmacProperties {
-        driver: hmac,
-        name: "HMAC",
-        properties: {}
-    },
-    I2cMasterProperties<I2cMasterInstanceConfig> {
-        driver: i2c_master,
-        name: "I2C master",
-        properties: {
-            /// Register-layout generation derived from the chip SVD. Also bumped when only the
-            /// function clock configuration differs.
-            version: u32,
-            #[serde(default)]
-            has_fsm_timeouts: bool,
-            #[serde(default)]
-            has_hw_bus_clear: bool,
-            #[serde(default)]
-            has_bus_timeout_enable: bool,
-            #[serde(default)]
-            separate_filter_config_registers: bool,
-            #[serde(default)]
-            can_estimate_nack_reason: bool,
-            #[serde(default)]
-            has_conf_update: bool,
-            #[serde(default)]
-            has_reliable_fsm_reset: bool,
-            #[serde(default)]
-            has_arbitration_en: bool,
-            #[serde(default)]
-            has_tx_fifo_watermark: bool,
-            #[serde(default)]
-            bus_timeout_is_exponential: bool,
-            /// Whether `I2C_SCL_SP_CONF_REG` has `scl_pd_en`/`sda_pd_en` bits for
-            /// actively holding a line low. All chips except ESP32 have these.
-            #[serde(default)]
-            has_pd_en: bool,
-            #[serde(default)]
-            i2c0_data_register_ahb_address: Option<u32>,
-            max_bus_timeout: u32,
-            ll_intr_mask: u32,
-            fifo_size: u32,
-        }
-    },
-    I2cSlaveProperties {
-        driver: i2c_slave,
-        name: "I2C slave",
-        properties: {}
-    },
-    I2sProperties<I2sInstanceConfig> {
-        driver: i2s,
-        name: "I2S",
-        // The `supports_pdm_tx`/`supports_pdm_rx`/`supports_pcm2pdm`/`supports_pdm2pcm`
-        // flags are derived from the per-instance PDM configuration.
-        has_computed_properties: true,
-        properties: {
-            /// Register-layout generation derived from the chip SVD.
-            version: Option<u32>,
-            /// Default clock source selector written to the I2S clock source register.
-            default_clock_source: Option<u32>,
-            /// Width of the MCLK divider field in the I2S clock register.
-            mclk_divider_bit_width: Option<u32>,
-            /// Largest WS divider value supported by the peripheral.
-            max_ws_width: Option<u32>,
-            #[serde(default)]
-            /// Whether I2S clock/reset control is performed via PCR.
-            clock_configured_by_pcr: bool,
-            #[serde(default)]
-            /// Whether I2S clock/reset control is performed via HP_SYS_CLKRST.
-            clock_configured_by_hp_sys_clkrst: bool,
-            #[serde(default)]
-            /// Whether the chip supports the RX high-pass filter in PDM mode (ESP32-P4).
-            supports_pdm_rx_hp_filter: bool,
-        }
-    },
-    IeeeProperties {
-        driver: ieee802154,
-        name: "IEEE 802.15.4",
-        properties: {}
-    },
-    InterruptProperties {
-        driver: interrupts,
-        name: "Interrupts",
-        properties: {
-            status_registers: u32,
-            controller: InterruptControllerProperties,
-            #[serde(flatten)]
-            software_interrupt_properties: SoftwareInterruptProperties,
-        }
-    },
-    IoMuxProperties {
-        driver: io_mux,
-        name: "IOMUX",
-        properties: {}
-    },
-    KeyManagerProperties {
-        driver: key_manager,
-        name: "Key Manager",
-        properties: {}
-    },
-    LedcProperties {
-        driver: ledc,
-        name: "LEDC",
-        properties: {
-            /// Register-layout generation derived from the chip SVD.
-            version: u32,
-            channel_count: u32,
-        }
-    },
-    LpI2cMasterProperties {
-        driver: lp_i2c_master,
-        name: "LP I2C master",
-        properties: {
-            /// Low-level implementation selected for the chip's low-power I2C master.
-            ///
-            /// The `rtc_i2c*` variants describe the RTC_I2C peripheral, which transfers through a
-            /// single data register and always needs a slave sub-register address. The `lp_i2c`
-            /// variant describes the FIFO-based LP_I2C peripheral.
-            version: String,
-            /// Depth of the TX/RX FIFOs. Unset on peripherals that have no FIFO.
-            fifo_size: Option<u32>,
-        }
-    },
-    LpIoProperties {
-        driver: lp_io,
-        name: "LP IO",
-        properties: {
-            /// Low-level implementation selected for the chip's RTC/LP IO block.
-            version: String,
+                #[serde(flatten)]
+                pins_and_signals: GpioPinsAndSignals,
+            }
+        },
+        DedicatedGpioProperties {
+            driver: dedicated_gpio,
+            name: "Dedicated GPIO",
+            properties: {
+                /// Low-level access generation derived from CPU instruction/CSR support.
+                version: String,
+                #[serde(default)]
+                needs_initialization: bool,
+                #[serde(flatten)]
+                channel_properties: DedicatedGpioChannels,
+            }
+        },
+        IoMuxProperties {
+            driver: io_mux,
+            name: "IOMUX",
+            properties: {}
+        },
+        LpIoProperties {
+            driver: lp_io,
+            name: "LP IO",
+            properties: {
+                /// Low-level implementation selected for the chip's RTC/LP IO block.
+                version: String,
 
-            #[serde(flatten)]
-            signals: LpIoSignals,
-        }
-    },
-    LpUartProperties {
-        driver: lp_uart,
-        name: "LP UART",
-        properties: {
-            ram_size: u32,
-        }
-    },
-    McpwmProperties {
-        driver: mcpwm,
-        name: "MCPWM",
-        properties: {}
-    },
-    MmuProperties {
-        driver: mmu,
-        name: "MMU",
-        hide_from_peri_table: true,
-        properties: {
-            /// MMU page size in bytes.
-            page_size: u32,
-            /// Total number of MMU table entries.
-            entry_num: u32,
-        }
-    },
-    MipiDsiProperties {
-        driver: mipi_dsi,
-        name: "MIPI-DSI",
-        properties: {}
-    },
-    ParlIoProperties {
-        driver: parl_io,
-        name: "PARL_IO",
-        properties: {
-            version: u32,
-            // TODO: model signal counts, RC CLK out capability, etc.
-        }
-    },
-    PcntProperties {
-        driver: pcnt,
-        name: "PCNT",
-        properties: {}
-    },
-    PhyProperties {
-        driver: phy,
-        name: "PHY",
-        properties: {
-            #[serde(default)]
-            combo_module: bool,
-            #[serde(default)]
-            backed_up_digital_register_count: Option<u32>,
-        }
-    },
-    PsramProperties {
-        driver: psram,
-        name: "PSRAM",
-        properties: {
-            #[serde(default)]
-            octal_spi: bool,
-            extmem_origin: u32,
-        }
-    },
-    RgbProperties {
-        driver: rgb_display,
-        name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
-        properties: {}
-    },
-    RmtProperties {
-        driver: rmt,
-        name: "RMT",
-        properties: {
-            ram_start: u32,
-            channel_ram_size: u32,
-            channels: RmtChannelConfig,
-            #[serde(default)]
-            has_tx_immediate_stop: bool,
-            #[serde(default)]
-            has_tx_loop_count: bool,
-            #[serde(default)]
-            has_tx_loop_auto_stop: bool,
-            #[serde(default)]
-            has_tx_carrier_data_only: bool,
-            #[serde(default)]
-            has_tx_sync: bool,
-            #[serde(default)]
-            has_rx_wrap: bool,
-            #[serde(default)]
-            has_rx_demodulation: bool,
-            #[serde(default)]
-            has_per_channel_clock: bool,
-        }
-    },
-    RngProperties {
-        driver: rng,
-        name: "RNG",
-        properties: {
-            apb_cycle_wait_num: u32,
-            #[serde(default)]
-            trng_supported: bool,
-            // true if RNG is not its own peripheral - triggers a different register naming scheme
-            #[serde(default)]
-            is_lp_sys: bool,
-        }
-    },
-    RomProperties {
-        driver: rom,
-        name: "ROM",
-        hide_from_peri_table: true,
-        properties: {
-            #[serde(default)]
-            has_crc_le: bool,
-            #[serde(default)]
-            has_crc_be: bool,
-            #[serde(default)]
-            has_md5_bsd: bool,
-            #[serde(default)]
-            has_md5_mbedtls: bool,
-        }
-    },
-    RsaProperties {
-        driver: rsa,
-        name: "RSA",
-        has_computed_properties: true,
-        properties: {
-            /// Register-layout generation derived from the chip SVD.
-            version: u32,
-            size_increment: u32,
-            memory_size_bytes: u32,
-        }
-    },
-    LpTimer {
-        driver: lp_timer,
-        name: "RTC Timekeeping",
-        properties: {}
-    },
-    Sdmmc {
-        driver: sdmmc,
-        name: "SDMMC/SDIO host",
-        properties: {
-            delay_phase_num: Option<u32>,
-            has_iomux: bool,
-            has_gpio_matrix: bool,
-            psram_dma: bool,
-            uhs: bool,
-            /// Per-slot signal routing; generates `for_each_sdmmc!`.
-            #[serde(default)]
-            slot_config: SdmmcSlots,
-        }
-    },
-    SdSlaveProperties {
-        driver: sd_slave,
-        name: "SDIO slave",
-        properties: {}
-    },
-    ShaProperties {
-        driver: sha,
-        name: "SHA",
-        properties: {
-            #[serde(default)]
-            algo: ShaAlgoMap,
-        }
-    },
-    SdmProperties {
-        driver: sdm,
-        name: "SDM",
-        properties: {
-            /// Number of sigma-delta channels.
-            channel_count: SdmChannels,
-        }
-    },
-    SleepProperties {
-        driver: sleep,
-        name: "Light/deep sleep",
-        properties: {
-            #[serde(default)]
-            light_sleep: bool,
-            #[serde(default)]
-            deep_sleep: bool,
-            #[serde(default)]
-            wakeup_sources: WakeupSources,
-            /// The register generation of the `ext1` wakeup path, which wakes on a mask of pads.
-            ///
-            /// 1: `RTC_CNTL.ext_wakeup1`, with one level bit for all the pads in the mask.
-            /// 2: `LP_AON.ext_wakeup_cntl`, with one level for each pad.
-            /// 3: `PMU` ext wakeup, with one level for each pad.
-            ext1_version: Option<u32>,
-            /// The register generation of the per-pin wakeup path. This path wakes the chip while the
-            /// high-performance GPIO peripheral is powered down, and thus also from deep sleep.
-            ///
-            /// 1: RTC_IO, one register for each pad. 2: `RTC_CNTL_GPIO_WAKEUP`. 3: LP_IO, one
-            /// register for each pad.
-            ///
-            /// Not set for esp32h2, where the `ext1` registers are the per-pin path. Only version 3
-            /// supports edge triggers.
-            pin_wakeup_version: Option<u32>,
-            /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
-            #[serde(default)]
-            deep_sleep_needs_gpio_isolation: bool,
-        }
-    },
-    SocProperties {
-        driver: soc,
-        name: "SOC",
-        hide_from_peri_table: true,
-        properties: {
-            #[serde(default)]
-            cpu_has_branch_predictor: bool,
-            #[serde(default)]
-            cpu_has_csr_pc: bool,
-            #[serde(default)]
-            multi_core_enabled: bool,
-            #[serde(default)]
-            cpu_csr_prv_mode: Option<u32>,
-            #[serde(default)]
-            internal_memory_cached: bool,
-            #[serde(default)]
-            has_swd_watchdog: bool,
-            #[serde(default)]
-            cpu_mcause_mask: u32,
-            #[serde(flatten)]
-            config: SocConfig,
-        }
-    },
-    SpiLcdProperties {
-        driver: spi_lcd,
-        name: "SPI LCD interface", // The LCD mode of the S2's GP-SPI2
-        properties: {}
-    },
-    SpiMasterProperties<SpiMasterInstanceConfig> {
-        driver: spi_master,
-        name: "SPI master",
-        properties: {
-            /// Register-layout generation derived from the chip SVD.
-            version: u32,
-            /// FIFO size in bytes.
-            fifo_size: u32,
-            /// Bit-order fields are single-bit booleans instead of multi-bit fields.
-            #[serde(default)]
-            bit_order_is_bool: bool,
-            #[serde(default)]
-            has_octal: bool,
-            #[serde(default)]
-            has_app_interrupts: bool,
-            #[serde(default)]
-            has_dma_segmented_transfer: bool,
-            /// The PCR has a clock pre-divider before the SPI peripheral.
-            #[serde(default)]
-            has_clk_pre_div: bool,
-            /// SPI DMA can read flash memory directly.
-            #[serde(default)]
-            dma_can_access_flash: bool,
-        }
-    },
-    SpiSlaveProperties<SpiSlaveInstanceConfig> {
-        driver: spi_slave,
-        name: "SPI slave",
-        properties: {}
-    },
-    SysTimerProperties {
-        driver: systimer,
-        name: "SYSTIMER",
-        properties: {}
-    },
-    TempProperties {
-        driver: temp_sensor,
-        name: "Temperature sensor",
-        properties: {}
-    },
-    TimersProperties {
-        driver: timergroup,
-        name: "Timers",
-        properties: {
-            #[serde(default)]
-            timg_has_timer1: bool,
-            #[serde(default)]
-            timg_has_divcnt_rst: bool,
+                #[serde(flatten)]
+                signals: LpIoSignals,
+            }
+        },
+    ]
 
-            #[serde(default)]
-            rc_fast_calibration: Option<RcFastCalibrationProperties>,
-        }
-    },
-    TouchProperties {
-        driver: touch,
-        name: "Touch",
-        properties: {}
-    },
-    TwaiProperties {
-        driver: twai,
-        name: "TWAI / CAN / CANFD",
-        properties: {}
-    },
-    UartProperties<UartInstanceConfig> {
-        driver: uart,
-        name: "UART",
-        properties: {
-            ram_size: u32,
-            version: u32,
-            #[serde(default)]
-            peripheral_controls_mem_clk: bool,
-            // Whether the MCU has a CLK_CONF register _in_ the UART peripheral.
-            #[serde(default)]
-            has_sclk_divider: bool,
-            // Whether the UART's CLK_CONF register has an SCLK enable bit.
-            #[serde(default)]
-            has_sclk_enable: bool,
-        }
-    },
-    UhciProperties {
-        driver: uhci,
-        name: "UHCI",
-        properties: {
-            #[serde(default)]
-            combined_uart_selector_field: bool,
-        }
-    },
-    UlpFsmProperties {
-        driver: ulp_fsm,
-        name: "ULP (FSM)",
-        properties: {}
-    },
-    UlpRiscvProperties {
-        driver: ulp_riscv,
-        name: "ULP (RISC-V)",
-        properties: {}
-    },
-    UsbOtgProperties {
-        driver: usb_otg,
-        name: "USB OTG FS",
-        properties: {
-            fifo_depth_words: u32,
-        }
-    },
-    UsbOtgHsProperties {
-        driver: usb_otg_hs,
-        name: "USB OTG HS",
-        properties: {
-            fifo_depth_words: u32,
-        }
-    },
-    UsbSerialJtagProperties {
-        driver: usb_serial_jtag,
-        name: "USB Serial/JTAG",
-        properties: {}
-    },
-    WifiProperties {
-        driver: wifi,
-        name: "WIFI",
-        properties: {
-            #[serde(default)]
-            has_wifi6: bool,
-            mac_version: u32,
-            #[serde(default)]
-            has_5g: bool,
-            #[serde(default)]
-            csi_supported: bool,
-        }
-    },
+    group "Serial interfaces" [
+        UartProperties<UartInstanceConfig> {
+            driver: uart,
+            name: "UART",
+            properties: {
+                ram_size: u32,
+                version: u32,
+                #[serde(default)]
+                peripheral_controls_mem_clk: bool,
+                // Whether the MCU has a CLK_CONF register _in_ the UART peripheral.
+                #[serde(default)]
+                has_sclk_divider: bool,
+                // Whether the UART's CLK_CONF register has an SCLK enable bit.
+                #[serde(default)]
+                has_sclk_enable: bool,
+            }
+        },
+        LpUartProperties {
+            driver: lp_uart,
+            name: "LP UART",
+            properties: {
+                ram_size: u32,
+            }
+        },
+        UhciProperties {
+            driver: uhci,
+            name: "UHCI",
+            properties: {
+                #[serde(default)]
+                combined_uart_selector_field: bool,
+            }
+        },
+        I2cMasterProperties<I2cMasterInstanceConfig> {
+            driver: i2c_master,
+            name: "I2C master",
+            properties: {
+                /// Register-layout generation derived from the chip SVD. Also bumped when only the
+                /// function clock configuration differs.
+                version: u32,
+                #[serde(default)]
+                has_fsm_timeouts: bool,
+                #[serde(default)]
+                has_hw_bus_clear: bool,
+                #[serde(default)]
+                has_bus_timeout_enable: bool,
+                #[serde(default)]
+                separate_filter_config_registers: bool,
+                #[serde(default)]
+                can_estimate_nack_reason: bool,
+                #[serde(default)]
+                has_conf_update: bool,
+                #[serde(default)]
+                has_reliable_fsm_reset: bool,
+                #[serde(default)]
+                has_arbitration_en: bool,
+                #[serde(default)]
+                has_tx_fifo_watermark: bool,
+                #[serde(default)]
+                bus_timeout_is_exponential: bool,
+                /// Whether `I2C_SCL_SP_CONF_REG` has `scl_pd_en`/`sda_pd_en` bits for
+                /// actively holding a line low. All chips except ESP32 have these.
+                #[serde(default)]
+                has_pd_en: bool,
+                #[serde(default)]
+                i2c0_data_register_ahb_address: Option<u32>,
+                max_bus_timeout: u32,
+                ll_intr_mask: u32,
+                fifo_size: u32,
+            }
+        },
+        LpI2cMasterProperties {
+            driver: lp_i2c_master,
+            name: "LP I2C master",
+            properties: {
+                /// Low-level implementation selected for the chip's low-power I2C master.
+                ///
+                /// The `rtc_i2c*` variants describe the RTC_I2C peripheral, which transfers through a
+                /// single data register and always needs a slave sub-register address. The `lp_i2c`
+                /// variant describes the FIFO-based LP_I2C peripheral.
+                version: String,
+                /// Depth of the TX/RX FIFOs. Unset on peripherals that have no FIFO.
+                fifo_size: Option<u32>,
+            }
+        },
+        I2cSlaveProperties {
+            driver: i2c_slave,
+            name: "I2C slave",
+            properties: {}
+        },
+        I3cMasterProperties {
+            driver: i3c_master,
+            name: "I3C master",
+            properties: {}
+        },
+        I3cSlaveProperties {
+            driver: i3c_slave,
+            name: "I3C slave",
+            properties: {}
+        },
+        SpiMasterProperties<SpiMasterInstanceConfig> {
+            driver: spi_master,
+            name: "SPI master",
+            properties: {
+                /// Register-layout generation derived from the chip SVD.
+                version: u32,
+                /// FIFO size in bytes.
+                fifo_size: u32,
+                /// Bit-order fields are single-bit booleans instead of multi-bit fields.
+                #[serde(default)]
+                bit_order_is_bool: bool,
+                #[serde(default)]
+                has_octal: bool,
+                #[serde(default)]
+                has_app_interrupts: bool,
+                #[serde(default)]
+                has_dma_segmented_transfer: bool,
+                /// The PCR has a clock pre-divider before the SPI peripheral.
+                #[serde(default)]
+                has_clk_pre_div: bool,
+                /// SPI DMA can read flash memory directly.
+                #[serde(default)]
+                dma_can_access_flash: bool,
+            }
+        },
+        SpiSlaveProperties<SpiSlaveInstanceConfig> {
+            driver: spi_slave,
+            name: "SPI slave",
+            properties: {}
+        },
+        LpSpiMasterProperties {
+            driver: lp_spi_master,
+            name: "LP SPI master",
+            properties: {}
+        },
+        LpSpiSlaveProperties {
+            driver: lp_spi_slave,
+            name: "LP SPI slave",
+            properties: {}
+        },
+        I2sProperties<I2sInstanceConfig> {
+            driver: i2s,
+            name: "I2S",
+            // The `supports_pdm_tx`/`supports_pdm_rx`/`supports_pcm2pdm`/`supports_pdm2pcm`
+            // flags are derived from the per-instance PDM configuration.
+            has_computed_properties: true,
+            properties: {
+                /// Register-layout generation derived from the chip SVD.
+                version: Option<u32>,
+                /// Default clock source selector written to the I2S clock source register.
+                default_clock_source: Option<u32>,
+                /// Width of the MCLK divider field in the I2S clock register.
+                mclk_divider_bit_width: Option<u32>,
+                /// Largest WS divider value supported by the peripheral.
+                max_ws_width: Option<u32>,
+                #[serde(default)]
+                /// Whether I2S clock/reset control is performed via PCR.
+                clock_configured_by_pcr: bool,
+                #[serde(default)]
+                /// Whether I2S clock/reset control is performed via HP_SYS_CLKRST.
+                clock_configured_by_hp_sys_clkrst: bool,
+                #[serde(default)]
+                /// Whether the chip supports the RX high-pass filter in PDM mode (ESP32-P4).
+                supports_pdm_rx_hp_filter: bool,
+            }
+        },
+        LpI2sProperties {
+            driver: lp_i2s,
+            name: "LP I2S",
+            properties: {}
+        },
+        ParlIoProperties {
+            driver: parl_io,
+            name: "PARL_IO",
+            properties: {
+                version: u32,
+                // TODO: model signal counts, RC CLK out capability, etc.
+            }
+        },
+        RmtProperties {
+            driver: rmt,
+            name: "RMT",
+            properties: {
+                ram_start: u32,
+                channel_ram_size: u32,
+                channels: RmtChannelConfig,
+                #[serde(default)]
+                has_tx_immediate_stop: bool,
+                #[serde(default)]
+                has_tx_loop_count: bool,
+                #[serde(default)]
+                has_tx_loop_auto_stop: bool,
+                #[serde(default)]
+                has_tx_carrier_data_only: bool,
+                #[serde(default)]
+                has_tx_sync: bool,
+                #[serde(default)]
+                has_rx_wrap: bool,
+                #[serde(default)]
+                has_rx_demodulation: bool,
+                #[serde(default)]
+                has_per_channel_clock: bool,
+            }
+        },
+        Sdmmc {
+            driver: sdmmc,
+            name: "SDMMC/SDIO host",
+            properties: {
+                delay_phase_num: Option<u32>,
+                has_iomux: bool,
+                has_gpio_matrix: bool,
+                psram_dma: bool,
+                uhs: bool,
+                /// Per-slot signal routing; generates `for_each_sdmmc!`.
+                #[serde(default)]
+                slot_config: SdmmcSlots,
+            }
+        },
+        SdSlaveProperties {
+            driver: sd_slave,
+            name: "SDIO slave",
+            properties: {}
+        },
+        TwaiProperties {
+            driver: twai,
+            name: "TWAI",
+            properties: {}
+        },
+        CanFdProperties {
+            driver: canfd,
+            name: "CANFD",
+            properties: {}
+        },
+        UsbOtgProperties {
+            driver: usb_otg,
+            name: "USB OTG FS",
+            properties: {
+                fifo_depth_words: u32,
+            }
+        },
+        UsbOtgHsProperties {
+            driver: usb_otg_hs,
+            name: "USB OTG HS",
+            properties: {
+                fifo_depth_words: u32,
+            }
+        },
+        UsbSerialJtagProperties {
+            driver: usb_serial_jtag,
+            name: "USB Serial/JTAG",
+            properties: {}
+        },
+    ]
+
+    group "Wireless and networking" [
+        BluetoothProperties {
+            driver: bt,
+            name: "Bluetooth",
+            properties: {
+                controller: String,
+            }
+        },
+        WifiProperties {
+            driver: wifi,
+            name: "WIFI",
+            properties: {
+                #[serde(default)]
+                has_wifi6: bool,
+                mac_version: u32,
+                #[serde(default)]
+                has_5g: bool,
+                #[serde(default)]
+                csi_supported: bool,
+            }
+        },
+        IeeeProperties {
+            driver: ieee802154,
+            name: "IEEE 802.15.4",
+            properties: {}
+        },
+        EthernetProperties {
+            driver: ethernet,
+            name: "Ethernet",
+            properties: {
+                #[serde(default)]
+                mii_via_gpio_matrix: bool,
+            }
+        },
+        PhyProperties {
+            driver: phy,
+            name: "PHY",
+            hide_from_peri_table: true,
+            properties: {
+                #[serde(default)]
+                combo_module: bool,
+                #[serde(default)]
+                backed_up_digital_register_count: Option<u32>,
+            }
+        },
+    ]
+
+    group "Display and camera" [
+        CameraProperties {
+            driver: camera,
+            name: "Camera interface", // LCD_CAM, ESP32 I2S, S2 SPI
+            properties: {}
+        },
+        MipiCsiProperties {
+            driver: mipi_csi,
+            name: "MIPI-CSI",
+            properties: {}
+        },
+        MipiDsiProperties {
+            driver: mipi_dsi,
+            name: "MIPI-DSI",
+            properties: {}
+        },
+        RgbProperties {
+            driver: rgb_display,
+            name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
+            properties: {}
+        },
+        SpiLcdProperties {
+            driver: spi_lcd,
+            name: "SPI LCD interface", // The LCD mode of the S2's GP-SPI2
+            properties: {}
+        },
+    ]
+
+    group "Signal processing" [
+        BitScramblerProperties {
+            driver: bit_scrambler,
+            name: "Bit Scrambler",
+            properties: {}
+        },
+        ImageSignalProcessorProperties {
+            driver: isp,
+            name: "Image Signal Processor",
+            properties: {}
+        },
+        PixelProcessingAcceleratorProperties {
+            driver: pixel_accelerator,
+            name: "Pixel Processing Accelerator",
+            properties: {}
+        },
+        JpegProperties {
+            driver: jpeg,
+            name: "JPEG Codec",
+            properties: {}
+        },
+        H264Properties {
+            driver: h264_encoder,
+            name: "H.264 encoder",
+            properties: {}
+        },
+        AudioSampleRateConverterProperties {
+            driver: asrc,
+            name: "Audio Sample Rate Converter",
+            properties: {}
+        },
+        CordicProperties {
+            driver: cordic,
+            name: "CORDIC accelerator",
+            properties: {}
+        },
+        VoiceActivityDetectionProperties {
+            driver: vad,
+            name: "Voice Activity Detection",
+            properties: {}
+        },
+    ]
+
+    group "Analog" [
+        AdcProperties {
+            driver: adc,
+            name: "ADC",
+            properties: {}
+        },
+        AvcProperties {
+            driver: avc,
+            name: "Analog Voltage Comparator",
+            properties: {}
+        },
+        DacProperties {
+            driver: dac,
+            name: "DAC",
+            properties: {}
+        },
+        TempProperties {
+            driver: temp_sensor,
+            name: "Temperature sensor",
+            properties: {}
+        },
+        TouchProperties {
+            driver: touch,
+            name: "Touch",
+            properties: {}
+        },
+    ]
+
+    group "Timers and motor control" [
+        LedcProperties {
+            driver: ledc,
+            name: "LEDC",
+            properties: {
+                /// Register-layout generation derived from the chip SVD.
+                version: u32,
+                channel_count: u32,
+            }
+        },
+        McpwmProperties {
+            driver: mcpwm,
+            name: "MCPWM",
+            properties: {}
+        },
+        PcntProperties {
+            driver: pcnt,
+            name: "PCNT",
+            properties: {}
+        },
+        LpTimer {
+            driver: lp_timer,
+            name: "RTC Timekeeping",
+            properties: {}
+        },
+        SdmProperties {
+            driver: sdm,
+            name: "SDM",
+            properties: {
+                /// Number of sigma-delta channels.
+                channel_count: SdmChannels,
+            }
+        },
+        SysTimerProperties {
+            driver: systimer,
+            name: "SYSTIMER",
+            properties: {}
+        },
+        TimersProperties {
+            driver: timergroup,
+            name: "Timers",
+            properties: {
+                #[serde(default)]
+                timg_has_timer1: bool,
+                #[serde(default)]
+                timg_has_divcnt_rst: bool,
+
+                #[serde(default)]
+                rc_fast_calibration: Option<RcFastCalibrationProperties>,
+            }
+        },
+    ]
+
+    group "Cryptography and security" [
+        AesProperties {
+            driver: aes,
+            name: "AES",
+            properties: {
+                key_length: AesKeyLength,
+                #[serde(default)]
+                dma_mode: Vec<String>,
+                has_split_text_registers: bool,
+                endianness_configurable: bool,
+            }
+        },
+        DsProperties {
+            driver: ds,
+            name: "RSA Digital Signature",
+            properties: {}
+        },
+        EcdsaProperties {
+            driver: ecdsa,
+            name: "ECDSA Digital Signature",
+            properties: {}
+        },
+        EccProperties {
+            driver: ecc,
+            name: "ECC",
+            properties: {
+                #[serde(default)]
+                zero_extend_writes: bool,
+                #[serde(default)]
+                separate_jacobian_point_memory: bool, // Qx, Qy, Qz memory blocks
+                #[serde(default)]
+                has_memory_clock_gate: bool, // ECC_MULT_MEM_CLOCK_GATE_FORCE_ON
+                #[serde(default)]
+                supports_enhanced_security: bool, // ECC_MULT_SECURITY_MODE
+                #[serde(flatten)]
+                extras: EccDriverProperties,
+            }
+        },
+        HmacProperties {
+            driver: hmac,
+            name: "HMAC",
+            properties: {}
+        },
+        KeyManagerProperties {
+            driver: key_manager,
+            name: "Key Manager",
+            properties: {}
+        },
+        RngProperties {
+            driver: rng,
+            name: "RNG",
+            properties: {
+                apb_cycle_wait_num: u32,
+                #[serde(default)]
+                trng_supported: bool,
+                // true if RNG is not its own peripheral - triggers a different register naming scheme
+                #[serde(default)]
+                is_lp_sys: bool,
+            }
+        },
+        RsaProperties {
+            driver: rsa,
+            name: "RSA",
+            has_computed_properties: true,
+            properties: {
+                /// Register-layout generation derived from the chip SVD.
+                version: u32,
+                size_increment: u32,
+                memory_size_bytes: u32,
+            }
+        },
+        ShaProperties {
+            driver: sha,
+            name: "SHA",
+            properties: {
+                #[serde(default)]
+                algo: ShaAlgoMap,
+            }
+        },
+    ]
+
+    group "Low power" [
+        SleepProperties {
+            driver: sleep,
+            name: "Light/deep sleep",
+            properties: {
+                #[serde(default)]
+                light_sleep: bool,
+                #[serde(default)]
+                deep_sleep: bool,
+                #[serde(default)]
+                wakeup_sources: WakeupSources,
+                /// The register generation of the `ext1` wakeup path, which wakes on a mask of pads.
+                ///
+                /// 1: `RTC_CNTL.ext_wakeup1`, with one level bit for all the pads in the mask.
+                /// 2: `LP_AON.ext_wakeup_cntl`, with one level for each pad.
+                /// 3: `PMU` ext wakeup, with one level for each pad.
+                ext1_version: Option<u32>,
+                /// The register generation of the per-pin wakeup path. This path wakes the chip while the
+                /// high-performance GPIO peripheral is powered down, and thus also from deep sleep.
+                ///
+                /// 1: RTC_IO, one register for each pad. 2: `RTC_CNTL_GPIO_WAKEUP`. 3: LP_IO, one
+                /// register for each pad.
+                ///
+                /// Not set for esp32h2, where the `ext1` registers are the per-pin path. Only version 3
+                /// supports edge triggers.
+                pin_wakeup_version: Option<u32>,
+                /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
+                #[serde(default)]
+                deep_sleep_needs_gpio_isolation: bool,
+            }
+        },
+        UlpFsmProperties {
+            driver: ulp_fsm,
+            name: "ULP (FSM)",
+            properties: {}
+        },
+        UlpRiscvProperties {
+            driver: ulp_riscv,
+            name: "ULP (RISC-V)",
+            properties: {}
+        },
+    ]
+
+    group "System" [
+        AssistDebugProperties {
+            driver: assist_debug,
+            name: "ASSIST_DEBUG",
+            properties: {
+                #[serde(default)]
+                has_sp_monitor: bool,
+                #[serde(default)]
+                has_region_monitor: bool,
+            }
+        },
+        DmaProperties {
+            driver: dma,
+            name: "DMA",
+            properties: {
+                /// When true, memory-to-memory setup requires a real DMA peripheral (e.g. ESP32-C3/S3).
+                #[serde(default)]
+                mem2mem_requires_peripheral: bool,
+                #[serde(default)]
+                ext_mem_configurable_block_size: bool,
+                #[serde(default)]
+                separate_in_out_interrupts: bool,
+                #[serde(default)]
+                gdma_version: Option<u32>,
+                #[serde(default)]
+                engines: DmaEngines,
+            }
+        },
+        EtmProperties {
+            driver: etm,
+            name: "ETM",
+            properties: {}
+        },
+        InterruptProperties {
+            driver: interrupts,
+            name: "Interrupts",
+            properties: {
+                status_registers: u32,
+                controller: InterruptControllerProperties,
+                #[serde(flatten)]
+                software_interrupt_properties: SoftwareInterruptProperties,
+            }
+        },
+        MmuProperties {
+            driver: mmu,
+            name: "MMU",
+            hide_from_peri_table: true,
+            properties: {
+                /// MMU page size in bytes.
+                page_size: u32,
+                /// Total number of MMU table entries.
+                entry_num: u32,
+            }
+        },
+        PsramProperties {
+            driver: psram,
+            name: "PSRAM",
+            properties: {
+                #[serde(default)]
+                octal_spi: bool,
+                extmem_origin: u32,
+            }
+        },
+        RomProperties {
+            driver: rom,
+            name: "ROM",
+            hide_from_peri_table: true,
+            properties: {
+                #[serde(default)]
+                has_crc_le: bool,
+                #[serde(default)]
+                has_crc_be: bool,
+                #[serde(default)]
+                has_md5_bsd: bool,
+                #[serde(default)]
+                has_md5_mbedtls: bool,
+            }
+        },
+        SocProperties {
+            driver: soc,
+            name: "SOC",
+            hide_from_peri_table: true,
+            properties: {
+                #[serde(default)]
+                cpu_has_branch_predictor: bool,
+                #[serde(default)]
+                cpu_has_csr_pc: bool,
+                #[serde(default)]
+                multi_core_enabled: bool,
+                #[serde(default)]
+                cpu_csr_prv_mode: Option<u32>,
+                #[serde(default)]
+                internal_memory_cached: bool,
+                #[serde(default)]
+                has_swd_watchdog: bool,
+                #[serde(default)]
+                cpu_mcause_mask: u32,
+                #[serde(flatten)]
+                config: SocConfig,
+            }
+        },
+    ]
 ];

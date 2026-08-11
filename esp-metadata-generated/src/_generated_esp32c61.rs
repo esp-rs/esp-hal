@@ -52,57 +52,6 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-c61_technical_reference_manual_en.pdf"
     };
-    ("assist_debug.has_sp_monitor") => {
-        true
-    };
-    ("assist_debug.has_region_monitor") => {
-        true
-    };
-    ("bt.controller") => {
-        "npl"
-    };
-    ("dedicated_gpio.version") => {
-        "riscv_v1"
-    };
-    ("dedicated_gpio.needs_initialization") => {
-        false
-    };
-    ("dedicated_gpio.channel_count") => {
-        8
-    };
-    ("dedicated_gpio.channel_count", str) => {
-        stringify!(8)
-    };
-    ("dma.mem2mem_requires_peripheral") => {
-        false
-    };
-    ("dma.ext_mem_configurable_block_size") => {
-        false
-    };
-    ("dma.separate_in_out_interrupts") => {
-        true
-    };
-    ("dma.gdma_version") => {
-        2
-    };
-    ("dma.gdma_version", str) => {
-        stringify!(2)
-    };
-    ("ecc.zero_extend_writes") => {
-        true
-    };
-    ("ecc.separate_jacobian_point_memory") => {
-        true
-    };
-    ("ecc.has_memory_clock_gate") => {
-        true
-    };
-    ("ecc.supports_enhanced_security") => {
-        true
-    };
-    ("ecc.mem_block_size") => {
-        32
-    };
     ("gpio.version") => {
         2
     };
@@ -153,6 +102,45 @@ macro_rules! property {
     };
     ("gpio.output_signal_max", str) => {
         stringify!(256)
+    };
+    ("dedicated_gpio.version") => {
+        "riscv_v1"
+    };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
+    ("lp_io.version") => {
+        "v4"
+    };
+    ("lp_io.has_gpio_matrix") => {
+        false
+    };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
+    };
+    ("uart.version") => {
+        2
+    };
+    ("uart.version", str) => {
+        stringify!(2)
+    };
+    ("uart.peripheral_controls_mem_clk") => {
+        true
+    };
+    ("uart.has_sclk_divider") => {
+        false
+    };
+    ("uart.has_sclk_enable") => {
+        true
     };
     ("i2c_master.version") => {
         4
@@ -211,6 +199,36 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("spi_master.version") => {
+        3
+    };
+    ("spi_master.version", str) => {
+        stringify!(3)
+    };
+    ("spi_master.fifo_size") => {
+        64
+    };
+    ("spi_master.fifo_size", str) => {
+        stringify!(64)
+    };
+    ("spi_master.bit_order_is_bool") => {
+        false
+    };
+    ("spi_master.has_octal") => {
+        false
+    };
+    ("spi_master.has_app_interrupts") => {
+        true
+    };
+    ("spi_master.has_dma_segmented_transfer") => {
+        true
+    };
+    ("spi_master.has_clk_pre_div") => {
+        true
+    };
+    ("spi_master.dma_can_access_flash") => {
+        true
+    };
     ("i2s.version") => {
         3
     };
@@ -256,44 +274,56 @@ macro_rules! property {
     ("i2s.supports_pdm2pcm") => {
         false
     };
-    ("interrupts.status_registers") => {
+    ("bt.controller") => {
+        "npl"
+    };
+    ("wifi.has_wifi6") => {
+        true
+    };
+    ("wifi.mac_version") => {
         3
     };
-    ("interrupts.status_registers", str) => {
+    ("wifi.mac_version", str) => {
         stringify!(3)
     };
-    ("interrupts.disabled_interrupt") => {
-        0
-    };
-    ("lp_io.version") => {
-        "v4"
-    };
-    ("lp_io.has_gpio_matrix") => {
+    ("wifi.has_5g") => {
         false
     };
-    ("mmu.page_size") => {
-        65536
-    };
-    ("mmu.page_size", str) => {
-        stringify!(65536)
-    };
-    ("mmu.entry_num") => {
-        512
-    };
-    ("mmu.entry_num", str) => {
-        stringify!(512)
+    ("wifi.csi_supported") => {
+        true
     };
     ("phy.combo_module") => {
         true
     };
-    ("psram.octal_spi") => {
+    ("timergroup.timg_has_timer1") => {
         false
     };
-    ("psram.extmem_origin") => {
-        1107296256
+    ("timergroup.timg_has_divcnt_rst") => {
+        true
     };
-    ("psram.extmem_origin", str) => {
-        stringify!(1107296256)
+    ("timergroup.rc_fast_calibration_divider_min_rev") => {
+        0
+    };
+    ("timergroup.rc_fast_calibration_divider") => {
+        32
+    };
+    ("timergroup.rc_fast_calibration_tick_enable") => {
+        false
+    };
+    ("ecc.zero_extend_writes") => {
+        true
+    };
+    ("ecc.separate_jacobian_point_memory") => {
+        true
+    };
+    ("ecc.has_memory_clock_gate") => {
+        true
+    };
+    ("ecc.supports_enhanced_security") => {
+        true
+    };
+    ("ecc.mem_block_size") => {
+        32
     };
     ("rng.apb_cycle_wait_num") => {
         16
@@ -306,18 +336,6 @@ macro_rules! property {
     };
     ("rng.is_lp_sys") => {
         true
-    };
-    ("rom.has_crc_le") => {
-        true
-    };
-    ("rom.has_crc_be") => {
-        true
-    };
-    ("rom.has_md5_bsd") => {
-        true
-    };
-    ("rom.has_md5_mbedtls") => {
-        false
     };
     ("sleep.light_sleep") => {
         true
@@ -341,6 +359,69 @@ macro_rules! property {
         stringify!(3)
     };
     ("sleep.deep_sleep_needs_gpio_isolation") => {
+        false
+    };
+    ("assist_debug.has_sp_monitor") => {
+        true
+    };
+    ("assist_debug.has_region_monitor") => {
+        true
+    };
+    ("dma.mem2mem_requires_peripheral") => {
+        false
+    };
+    ("dma.ext_mem_configurable_block_size") => {
+        false
+    };
+    ("dma.separate_in_out_interrupts") => {
+        true
+    };
+    ("dma.gdma_version") => {
+        2
+    };
+    ("dma.gdma_version", str) => {
+        stringify!(2)
+    };
+    ("interrupts.status_registers") => {
+        3
+    };
+    ("interrupts.status_registers", str) => {
+        stringify!(3)
+    };
+    ("interrupts.disabled_interrupt") => {
+        0
+    };
+    ("mmu.page_size") => {
+        65536
+    };
+    ("mmu.page_size", str) => {
+        stringify!(65536)
+    };
+    ("mmu.entry_num") => {
+        512
+    };
+    ("mmu.entry_num", str) => {
+        stringify!(512)
+    };
+    ("psram.octal_spi") => {
+        false
+    };
+    ("psram.extmem_origin") => {
+        1107296256
+    };
+    ("psram.extmem_origin", str) => {
+        stringify!(1107296256)
+    };
+    ("rom.has_crc_le") => {
+        true
+    };
+    ("rom.has_crc_be") => {
+        true
+    };
+    ("rom.has_md5_bsd") => {
+        true
+    };
+    ("rom.has_md5_mbedtls") => {
         false
     };
     ("soc.cpu_has_branch_predictor") => {
@@ -436,87 +517,6 @@ macro_rules! property {
         ::soc::clocks::SpiFunctionClockConfig::PllF160m, crate
         ::soc::clocks::SpiFunctionClockConfig::RcFast]
     };
-    ("spi_master.version") => {
-        3
-    };
-    ("spi_master.version", str) => {
-        stringify!(3)
-    };
-    ("spi_master.fifo_size") => {
-        64
-    };
-    ("spi_master.fifo_size", str) => {
-        stringify!(64)
-    };
-    ("spi_master.bit_order_is_bool") => {
-        false
-    };
-    ("spi_master.has_octal") => {
-        false
-    };
-    ("spi_master.has_app_interrupts") => {
-        true
-    };
-    ("spi_master.has_dma_segmented_transfer") => {
-        true
-    };
-    ("spi_master.has_clk_pre_div") => {
-        true
-    };
-    ("spi_master.dma_can_access_flash") => {
-        true
-    };
-    ("timergroup.timg_has_timer1") => {
-        false
-    };
-    ("timergroup.timg_has_divcnt_rst") => {
-        true
-    };
-    ("timergroup.rc_fast_calibration_divider_min_rev") => {
-        0
-    };
-    ("timergroup.rc_fast_calibration_divider") => {
-        32
-    };
-    ("timergroup.rc_fast_calibration_tick_enable") => {
-        false
-    };
-    ("uart.ram_size") => {
-        128
-    };
-    ("uart.ram_size", str) => {
-        stringify!(128)
-    };
-    ("uart.version") => {
-        2
-    };
-    ("uart.version", str) => {
-        stringify!(2)
-    };
-    ("uart.peripheral_controls_mem_clk") => {
-        true
-    };
-    ("uart.has_sclk_divider") => {
-        false
-    };
-    ("uart.has_sclk_enable") => {
-        true
-    };
-    ("wifi.has_wifi6") => {
-        true
-    };
-    ("wifi.mac_version") => {
-        3
-    };
-    ("wifi.mac_version", str) => {
-        stringify!(3)
-    };
-    ("wifi.has_5g") => {
-        false
-    };
-    ("wifi.csi_supported") => {
-        true
-    };
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
@@ -539,6 +539,85 @@ macro_rules! for_each_dedicated_gpio {
         (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
         CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
         CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7)));
+    };
+}
+/// Defines the `LpInputSignal` and `LpOutputSignal` enums.
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_lp_io_signals {
+    () => {};
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_working_mode {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_ecc_working_mode!((0, AffinePointMultiplication));
+        _for_each_inner_ecc_working_mode!((2, AffinePointVerification));
+        _for_each_inner_ecc_working_mode!((3, AffinePointVerificationAndMultiplication));
+        _for_each_inner_ecc_working_mode!((4, JacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((5, AffinePointAddition));
+        _for_each_inner_ecc_working_mode!((6, JacobianPointVerification));
+        _for_each_inner_ecc_working_mode!((7,
+        AffinePointVerificationAndJacobianPointMultiplication));
+        _for_each_inner_ecc_working_mode!((8, ModularAddition));
+        _for_each_inner_ecc_working_mode!((9, ModularSubtraction));
+        _for_each_inner_ecc_working_mode!((10, ModularMultiplication));
+        _for_each_inner_ecc_working_mode!((11, ModularDivision));
+        _for_each_inner_ecc_working_mode!((all(0, AffinePointMultiplication), (2,
+        AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
+        JacobianPointMultiplication), (5, AffinePointAddition), (6,
+        JacobianPointVerification), (7,
+        AffinePointVerificationAndJacobianPointMultiplication), (8, ModularAddition), (9,
+        ModularSubtraction), (10, ModularMultiplication), (11, ModularDivision)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_ecc_curve {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_ecc_curve { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_ecc_curve!((0, P192, 192));
+        _for_each_inner_ecc_curve!((1, P256, 256)); _for_each_inner_ecc_curve!((all(0,
+        P192, 192), (1, P256, 256)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_algorithm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0));
+        _for_each_inner_sha_algorithm!((Sha224, "SHA-224"(sizes : 64, 28, 8)
+        (insecure_against : "length extension"), 1));
+        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
+        (insecure_against : "length extension"), 2));
+        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
+        (insecure_against : "collision", "length extension"), 0), (Sha224,
+        "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
+        (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
+        2)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_wakeup_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_wakeup_source!((Ext1, 1));
+        _for_each_inner_wakeup_source!((Gpio, 2));
+        _for_each_inner_wakeup_source!((WifiBeacon, 3));
+        _for_each_inner_wakeup_source!((Timer, 4)); _for_each_inner_wakeup_source!((Wifi,
+        5)); _for_each_inner_wakeup_source!((Uart0, 6));
+        _for_each_inner_wakeup_source!((Uart1, 7)); _for_each_inner_wakeup_source!((Sdio,
+        8)); _for_each_inner_wakeup_source!((Uart2, 9));
+        _for_each_inner_wakeup_source!((Bt, 10)); _for_each_inner_wakeup_source!((LpCore,
+        11)); _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (WifiBeacon, 3),
+        (Timer, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Uart2, 9), (Bt, 10),
+        (LpCore, 11)));
     };
 }
 #[macro_export]
@@ -634,41 +713,6 @@ macro_rules! with_spi_master_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_spi_master_dma_engine { $(($pattern) => $code;)* ($other
         : tt) => {} } _with_inner_spi_master_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_ecc_working_mode {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_ecc_working_mode { $(($pattern) => $code;)* ($other
-        : tt) => {} } _for_each_inner_ecc_working_mode!((0, AffinePointMultiplication));
-        _for_each_inner_ecc_working_mode!((2, AffinePointVerification));
-        _for_each_inner_ecc_working_mode!((3, AffinePointVerificationAndMultiplication));
-        _for_each_inner_ecc_working_mode!((4, JacobianPointMultiplication));
-        _for_each_inner_ecc_working_mode!((5, AffinePointAddition));
-        _for_each_inner_ecc_working_mode!((6, JacobianPointVerification));
-        _for_each_inner_ecc_working_mode!((7,
-        AffinePointVerificationAndJacobianPointMultiplication));
-        _for_each_inner_ecc_working_mode!((8, ModularAddition));
-        _for_each_inner_ecc_working_mode!((9, ModularSubtraction));
-        _for_each_inner_ecc_working_mode!((10, ModularMultiplication));
-        _for_each_inner_ecc_working_mode!((11, ModularDivision));
-        _for_each_inner_ecc_working_mode!((all(0, AffinePointMultiplication), (2,
-        AffinePointVerification), (3, AffinePointVerificationAndMultiplication), (4,
-        JacobianPointMultiplication), (5, AffinePointAddition), (6,
-        JacobianPointVerification), (7,
-        AffinePointVerificationAndJacobianPointMultiplication), (8, ModularAddition), (9,
-        ModularSubtraction), (10, ModularMultiplication), (11, ModularDivision)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_ecc_curve {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_ecc_curve { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_ecc_curve!((0, P192, 192));
-        _for_each_inner_ecc_curve!((1, P256, 256)); _for_each_inner_ecc_curve!((all(0,
-        P192, 192), (1, P256, 256)));
     };
 }
 #[macro_export]
@@ -796,50 +840,6 @@ macro_rules! for_each_sw_interrupt {
         software_interrupt3)); _for_each_inner_sw_interrupt!((all(0, FROM_CPU_INTR0,
         software_interrupt0), (1, FROM_CPU_INTR1, software_interrupt1), (2,
         FROM_CPU_INTR2, software_interrupt2), (3, FROM_CPU_INTR3, software_interrupt3)));
-    };
-}
-/// Defines the `LpInputSignal` and `LpOutputSignal` enums.
-///
-/// This macro is intended to be called in esp-hal only.
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! define_lp_io_signals {
-    () => {};
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_sha_algorithm {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_sha_algorithm { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_sha_algorithm!((Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0));
-        _for_each_inner_sha_algorithm!((Sha224, "SHA-224"(sizes : 64, 28, 8)
-        (insecure_against : "length extension"), 1));
-        _for_each_inner_sha_algorithm!((Sha256, "SHA-256"(sizes : 64, 32, 8)
-        (insecure_against : "length extension"), 2));
-        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0), (Sha224,
-        "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
-        (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
-        2)));
-    };
-}
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! for_each_wakeup_source {
-    ($($pattern:tt => $code:tt;)*) => {
-        macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_wakeup_source!((Ext1, 1));
-        _for_each_inner_wakeup_source!((Gpio, 2));
-        _for_each_inner_wakeup_source!((WifiBeacon, 3));
-        _for_each_inner_wakeup_source!((Timer, 4)); _for_each_inner_wakeup_source!((Wifi,
-        5)); _for_each_inner_wakeup_source!((Uart0, 6));
-        _for_each_inner_wakeup_source!((Uart1, 7)); _for_each_inner_wakeup_source!((Sdio,
-        8)); _for_each_inner_wakeup_source!((Uart2, 9));
-        _for_each_inner_wakeup_source!((Bt, 10)); _for_each_inner_wakeup_source!((LpCore,
-        11)); _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (WifiBeacon, 3),
-        (Timer, 4), (Wifi, 5), (Uart0, 6), (Uart1, 7), (Sdio, 8), (Uart2, 9), (Bt, 10),
-        (LpCore, 11)));
     };
 }
 #[macro_export]
