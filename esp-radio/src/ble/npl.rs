@@ -716,13 +716,17 @@ unsafe extern "C" fn ble_npl_callout_is_active(callout: *const ble_npl_callout) 
     }
 }
 
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/npl/freertos/src/npl_os_freertos.c#L185-L194>
 unsafe extern "C" fn ble_npl_callout_mem_reset(callout: *const ble_npl_callout) {
-    trace!("ble_npl_callout_mem_reset");
-    unsafe {
-        ble_npl_callout_stop(callout);
-    }
+    trace!("ble_npl_callout_mem_reset {:?}", callout);
+
+    let co = unsafe { (*callout).dummy } as *mut Callout;
+    assert!(!co.is_null());
+
+    unsafe { ble_npl_event_reset(&raw const (*co).events) };
 }
 
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/npl/freertos/src/npl_os_freertos.c#L962-L998>
 unsafe extern "C" fn ble_npl_callout_deinit(callout: *const ble_npl_callout) {
     trace!("ble_npl_callout_deinit {:?}", callout);
 
@@ -731,8 +735,6 @@ unsafe extern "C" fn ble_npl_callout_deinit(callout: *const ble_npl_callout) {
     }
 
     unsafe {
-        ble_npl_callout_stop(callout);
-
         let co = (*callout).dummy as *mut Callout;
         compat::timer_compat::compat_timer_done(&raw mut (*co).timer_handle);
         ble_npl_event_deinit(&raw const (*co).events);
@@ -991,10 +993,14 @@ unsafe extern "C" fn ble_npl_eventq_get(
 unsafe extern "C" fn ble_npl_eventq_init(queue: *mut ble_npl_eventq) {
     trace!("ble_npl_eventq_init {:?}", queue);
 
-    // The controller re-initializes its event queue on every `ble_controller_init` without
-    // deinitializing it first.
-    if unsafe { (*queue).dummy } != 0 {
-        unsafe { ble_npl_eventq_deinit(queue) };
+    // Keep the existing queue and empty it, the way IDF's `npl_freertos_eventq_init` calls
+    // `xQueueReset` instead of allocating again.
+    // <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/npl/freertos/src/npl_os_freertos.c#L135-L164>
+    let existing = unsafe { (*queue).dummy };
+    if existing != 0 {
+        let mut event: usize = 0;
+        while queue::queue_receive(existing as *mut c_void, (&raw mut event).cast(), 0) != 0 {}
+        return;
     }
 
     let queue_ptr = queue::queue_create(EVENT_QUEUE_SIZE as _, core::mem::size_of::<usize>() as _);
@@ -1357,6 +1363,7 @@ pub(crate) fn ble_deinit() {
     }
 }
 
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L218-L279>
 #[cfg(esp32c2)]
 fn os_msys_buf_alloc() -> bool {
     unsafe {
@@ -1378,6 +1385,7 @@ fn os_msys_buf_alloc() -> bool {
     }
 }
 
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L281-L318>
 #[cfg(esp32c2)]
 fn os_msys_buf_free() {
     unsafe {

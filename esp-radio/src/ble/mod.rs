@@ -144,9 +144,7 @@ impl defmt::Format for ReceivedPacket {
 pub(crate) fn clear_bt_state() {
     BT_STATE.with(|state| {
         state.rx_queue.clear();
-        state.rx_queue.shrink_to_fit();
         state.hci_read_data.clear();
-        state.hci_read_data.shrink_to_fit();
     });
 }
 
