@@ -1,9 +1,9 @@
 use crate::{
     gpio::{
         LpPin,
-        lp_io::{LpFunction, LpInputSignal, LpOutputSignal},
+        lp_io::{LpFunction, LpInputSignal, LpOutputSignal, hold_bit},
     },
-    peripherals::{LP_GPIO, LP_IO_MUX},
+    peripherals::{HP_SYS, LP_GPIO, LP_IO_MUX},
 };
 
 for_each_lp_function! {
@@ -90,14 +90,37 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
 }
 
 pub(crate) fn pad_hold(lp: u8, enable: bool) {
-    LP_IO_MUX::regs().lp_pad_hold().modify(|r, w| unsafe {
-        let bits = r.reg_lp_gpio_hold().bits();
-        w.reg_lp_gpio_hold().bits(if enable {
-            bits | (1 << lp)
-        } else {
-            bits & !(1 << lp)
-        })
-    });
+    let _ = hold_bit!(
+        LP_IO_MUX::regs().lp_pad_hold(),
+        reg_lp_gpio_hold,
+        lp,
+        Some(enable)
+    );
+}
+
+/// Reads the hold bit of the pad of `gpio`, and writes it first if `enable` is [`Some`].
+///
+/// The registers start at the first pad of the digital supply, which follows the 16 low-power pads.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: Option<bool>) -> bool {
+    let Some(bit) = gpio.checked_sub(16) else {
+        return false;
+    };
+
+    if bit < 32 {
+        hold_bit!(
+            HP_SYS::regs().gpio_o_hold_ctrl0(),
+            reg_gpio_0_hold_low,
+            bit,
+            enable
+        )
+    } else {
+        hold_bit!(
+            HP_SYS::regs().gpio_o_hold_ctrl1(),
+            reg_gpio_0_hold_high,
+            bit - 32,
+            enable
+        )
+    }
 }
 
 // The pad driver bit is part of the digital GPIO peripheral, so this function takes the digital

@@ -541,6 +541,41 @@ mod tests {
         assert_eq!(test_gpio2.is_set_low(), true);
     }
 
+    #[test]
+    #[cfg(all(feature = "unstable", lp_io_driver_supported))]
+    fn creating_a_driver_releases_the_hold_of_a_pad(mut ctx: Context) {
+        let probe = Input::new(
+            ctx.test_gpio2.reborrow(),
+            InputConfig::default().with_pull(Pull::None),
+        );
+
+        // A program that held the pad while it drove a high level.
+        {
+            let mut pin = Flex::new(ctx.test_gpio1.reborrow());
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
+            pin.set_high();
+
+            pin.set_pad_hold(true);
+
+            pin.set_low();
+            ctx.delay.delay_millis(1);
+            assert_eq!(
+                probe.level(),
+                Level::High,
+                "the hold does not keep the level of the pad"
+            );
+        }
+
+        let mut pin = Flex::new(ctx.test_gpio1.reborrow());
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+        pin.set_low();
+
+        ctx.delay.delay_millis(1);
+        assert_eq!(probe.level(), Level::Low, "the pad is still held");
+    }
+
     // Tests touch pin (GPIO2) as AnyPin and Output
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]

@@ -850,6 +850,16 @@ impl<'d> Output<'d> {
         self.pin.toggle();
     }
 
+    /// Takes or releases the hold of the pad.
+    ///
+    /// A held pad keeps its level, its function and its resistors, and it ignores this driver.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn set_pad_hold(&mut self, enable: bool) {
+        self.pin.set_pad_hold(enable);
+    }
+
     /// Converts the pin driver into a [`Flex`] driver.
     #[inline]
     #[instability::unstable]
@@ -1205,6 +1215,16 @@ impl<'d> Input<'d> {
         self.pin.caused_wakeup()
     }
 
+    /// Takes or releases the hold of the pad.
+    ///
+    /// A held pad keeps its level, its function and its resistors, and it ignores this driver.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn set_pad_hold(&mut self, enable: bool) {
+        self.pin.set_pad_hold(enable);
+    }
+
     /// Converts the pin driver into a [`Flex`] driver.
     #[inline]
     #[instability::unstable]
@@ -1265,6 +1285,16 @@ impl<'d> Flex<'d> {
     #[instability::unstable]
     pub fn set_input_enable(&mut self, enable_input: bool) {
         self.pin.set_input_enable(enable_input);
+    }
+
+    /// Takes or releases the hold of the pad.
+    ///
+    /// A held pad keeps its level, its function and its resistors, and it ignores this driver.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn set_pad_hold(&mut self, enable: bool) {
+        self.pin.set_pad_hold(enable);
     }
 
     /// Get whether the pin input level is high.
@@ -1616,10 +1646,14 @@ impl<'lt> AnyPin<'lt> {
             macro_rules! disable_usb_fs_pads {
                 ($gpio:ident) => {
                     if self.number() == crate::peripherals::$gpio::NUMBER {
-                        #[cfg(esp32p4)]
-                        disable_usb_fs_pads(crate::peripherals::$gpio::NUMBER);
-                        #[cfg(not(esp32p4))]
-                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
+                        cfg_select! {
+                            esp32p4 => {
+                                disable_usb_fs_pads(crate::peripherals::$gpio::NUMBER);
+                            }
+                            _ => {
+                                disable_usb_pads(crate::peripherals::$gpio::NUMBER);
+                            }
+                        }
                     }
                 };
             }
@@ -1641,6 +1675,20 @@ impl<'lt> AnyPin<'lt> {
         }
     }
 
+    /// Takes or releases the hold of the pad.
+    ///
+    /// A held pad keeps its level, its function and its resistors, and it ignores its driver. Sleep
+    /// takes the hold of a wakeup pad, because a deep sleep powers the circuit that drives the pad
+    /// down.
+    #[cfg(lp_io_driver_supported)]
+    pub(crate) fn set_pad_hold(&self, enable: bool) {
+        if let Some(lp) = lp_io::lp_number(self.number()) {
+            lp_io::low_level::pad_hold(lp, enable);
+        } else {
+            lp_io::low_level::digital_pad_hold(self.number(), Some(enable));
+        }
+    }
+
     #[inline]
     /// Resets the GPIO to a known state.
     ///
@@ -1651,14 +1699,16 @@ impl<'lt> AnyPin<'lt> {
         self.set_output_enable(false);
         self.disable_usb_pads();
 
+        // A held pad ignores every configuration that follows the hold, and only a power-on reset
+        // releases the hold by itself. Without this, a pad that an earlier program held keeps its
+        // level for the rest of the life of the chip.
+        #[cfg(lp_io_driver_supported)]
+        self.set_pad_hold(false);
+
         #[cfg(lp_io_driver_supported)]
         for_each_lp_function! {
             (($_signal:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
-                    // A held pad ignores every later configuration, and only a power-on reset
-                    // releases the hold. Without this, a pad that an earlier program held keeps its
-                    // level for the rest of the life of the chip.
-                    lp_io::low_level::pad_hold($lp_pin, false);
                     lp_io::low_level::set_config($lp_pin, false, false, lp_io::LpFunction::$af);
                 }
             };

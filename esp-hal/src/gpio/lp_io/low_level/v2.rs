@@ -1,5 +1,9 @@
 use crate::{
-    gpio::{Level, LpPin, lp_io::LpFunction},
+    gpio::{
+        Level,
+        LpPin,
+        lp_io::{LpFunction, hold_bit},
+    },
     peripherals::{GPIO, LPWR, RTC_IO, SENS},
 };
 
@@ -102,6 +106,18 @@ for_each_lp_function! {
         #[cfg(sleep_driver_supported)]
         const ALL_PADS: u32 = 0 $( | 1 << $n )*;
     };
+}
+
+/// Reads the hold bit of the pad of `gpio`, and writes it first if `enable` is [`Some`].
+///
+/// The register starts at the first pad of the digital supply, and the low-power pads take the
+/// numbers below it.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: Option<bool>) -> bool {
+    let Some(bit) = gpio.checked_sub(21) else {
+        return false;
+    };
+
+    hold_bit!(LPWR::regs().dig_pad_hold(), dig_pad_hold, bit, enable)
 }
 
 pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction) {

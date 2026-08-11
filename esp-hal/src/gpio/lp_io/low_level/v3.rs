@@ -1,5 +1,10 @@
 use crate::{
-    gpio::{AlternateFunction, Level, LpPin, lp_io::LpFunction},
+    gpio::{
+        AlternateFunction,
+        Level,
+        LpPin,
+        lp_io::{LpFunction, hold_bit},
+    },
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
@@ -66,6 +71,14 @@ for_each_lp_function! {
             }
         }
     };
+}
+
+/// Reads the hold bit of the pad of `gpio`, and writes it first if `enable` is [`Some`].
+///
+/// The register numbers the pads of the digital supply the way the digital registers do, and the
+/// low-power pads have their own register.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: Option<bool>) -> bool {
+    hold_bit!(LPWR::regs().dig_pad_hold(), dig_pad_hold, gpio, enable)
 }
 
 /// Configures the pad.

@@ -1,5 +1,5 @@
 use crate::{
-    gpio::lp_io::LpFunction,
+    gpio::lp_io::{LpFunction, hold_bit},
     peripherals::{GPIO, LPWR, RTC_IO},
 };
 
@@ -170,6 +170,23 @@ macro_rules! set_pull_field {
             _ => unreachable!(),
         }
     }};
+}
+
+/// Reads the hold bit of the pad of `gpio`, and writes it first if `enable` is [`Some`].
+///
+/// The register covers the pads of the digital supply, and lists them in its own order. The digital
+/// supply feeds no other pad, so no other pad reaches this function.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: Option<bool>) -> bool {
+    let bit = match gpio {
+        1 => 1,
+        3 => 0,
+        5 => 8,
+        6..=11 => gpio - 4,
+        16..=19 | 21..=23 => gpio - 7,
+        _ => return false,
+    };
+
+    hold_bit!(RTC_IO::regs().dig_pad_hold(), dig_pad_hold, bit, enable)
 }
 
 pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: crate::gpio::Level) {

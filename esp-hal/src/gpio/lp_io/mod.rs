@@ -197,25 +197,58 @@ fn route_output(lp_pin: u8, output: LpOutputSignal) {
         });
 }
 
+/// Returns the number that the low-power registers use for `gpio`, if they reach the pad.
+// Needed because AnyPin::lp_number is infallible
+pub(crate) fn lp_number(gpio: u8) -> Option<u8> {
+    for_each_lp_function! {
+        (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
+            if gpio == crate::peripherals::$gpio::NUMBER {
+                return Some($pin);
+            }
+        };
+    }
+
+    None
+}
+
+/// Reads the hold bit of a pad, and writes it first if `enable` is [`Some`].
+///
+/// Every chip keeps the holds of a group of pads in one register, so the callers of this macro pass
+/// the register, the field that holds the group, and the bit of the pad in that field.
+macro_rules! hold_bit {
+    ($reg:expr, $field:ident, $bit:expr, $enable:expr) => {{
+        let reg = $reg;
+        let mask = 1 << $bit;
+
+        if let Some(enable) = $enable {
+            reg.modify(|r, w| unsafe {
+                let bits = r.$field().bits();
+                w.$field()
+                    .bits(if enable { bits | mask } else { bits & !mask })
+            });
+        }
+
+        reg.read().$field().bits() & mask != 0
+    }};
+}
+
+pub(crate) use hold_bit;
+
+/// Returns whether something holds the pad of `gpio`.
+///
+/// The function reports the pads of the digital supply, and returns `false` for a pad that the
+/// low-power registers reach.
+#[cfg(sleep_deep_sleep_needs_gpio_isolation)]
+pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
+    low_level::digital_pad_hold(gpio, None)
+}
+
 /// Tokens to hand out a pin to a low-power CPU.
 // FIXME: tokens should be 'static to be handed out.
 #[cfg(ulp_riscv_driver_supported)]
 mod ulp_tokens {
     use super::*;
     use crate::gpio::Pin;
-
-    // Needed because AnyPin::lp_number is infallible
-    fn lp_number(gpio: u8) -> Option<u8> {
-        for_each_lp_function! {
-            (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                if gpio == crate::peripherals::$gpio::NUMBER {
-                    return Some($pin);
-                }
-            };
-        }
-
-        None
-    }
 
     impl<'d> crate::gpio::Input<'d> {
         /// Hands the pin over to the low-power core.
