@@ -66,20 +66,29 @@ macro_rules! lp_io_analog {
             }
         }
 
+        /// Reads the hold bit of the pad, and writes it first if `enable` is
+        /// [`Some`].
+        ///
         /// A hold takes two bits on this chip, one in the pad register and one
         /// in the always-on register. The pad keeps the bit of the pad register
-        /// through a reset, so a release must clear both.
-        pub(crate) fn pad_hold(lp: u8, enable: bool) {
+        /// through a reset, so a release must clear both, and either bit alone
+        /// keeps the pad frozen.
+        pub(crate) fn pad_hold(lp: u8, enable: Option<bool>) -> bool {
             paste::paste! {
                 match lp {
                     $(
                         $lp_pin => {
-                            RTC_IO::regs()
-                                .$pin_reg
-                                .modify(|_, w| w.[<$prefix hold>]().bit(enable));
-                            LPWR::regs()
-                                .hold_force()
-                                .modify(|_, w| w.$hold().bit(enable));
+                            if let Some(enable) = enable {
+                                RTC_IO::regs()
+                                    .$pin_reg
+                                    .modify(|_, w| w.[<$prefix hold>]().bit(enable));
+                                LPWR::regs()
+                                    .hold_force()
+                                    .modify(|_, w| w.$hold().bit(enable));
+                            }
+
+                            RTC_IO::regs().$pin_reg.read().[<$prefix hold>]().bit_is_set()
+                                || LPWR::regs().hold_force().read().$hold().bit_is_set()
                         }
                     )+
                     _ => unreachable!(),

@@ -29,10 +29,11 @@ for_each_lp_function! {
     };
 }
 
-pub(crate) fn pad_hold(lp: u8, enable: bool) {
+/// Reads the hold bit of the pad, and writes it first if `enable` is [`Some`].
+pub(crate) fn pad_hold(lp: u8, enable: Option<bool>) -> bool {
     // The low-power number of a pad is its digital number on these chips, and one register holds
     // every pad.
-    digital_pad_hold(lp, Some(enable));
+    digital_pad_hold(lp, enable)
 }
 
 /// Reads the hold bit of the pad of `gpio`, and writes it first if `enable` is [`Some`].

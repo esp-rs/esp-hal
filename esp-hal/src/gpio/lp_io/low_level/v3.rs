@@ -43,13 +43,22 @@ for_each_lp_function! {
                 });
             }
 
-            pub(crate) fn pad_hold(lp: u8, enable: bool) {
-                LPWR::regs().pad_hold().modify(|_, w| {
-                    match lp {
-                        $( $pin => w.[<gpio_pin $pin _hold>]().bit(enable), )*
-                        _ => unreachable!(),
-                    }
-                });
+            /// Reads the hold bit of the pad, and writes it first if `enable` is [`Some`].
+            pub(crate) fn pad_hold(lp: u8, enable: Option<bool>) -> bool {
+                if let Some(enable) = enable {
+                    LPWR::regs().pad_hold().modify(|_, w| {
+                        match lp {
+                            $( $pin => w.[<gpio_pin $pin _hold>]().bit(enable), )*
+                            _ => unreachable!(),
+                        }
+                    });
+                }
+
+                let r = LPWR::regs().pad_hold().read();
+                match lp {
+                    $( $pin => r.[<gpio_pin $pin _hold>]().bit_is_set(), )*
+                    _ => unreachable!(),
+                }
             }
 
             /// Returns the pads that can wake the chip through the per-pin path, as a mask of

@@ -89,13 +89,14 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
         .modify(|_, w| w.rde().bit(enable));
 }
 
-pub(crate) fn pad_hold(lp: u8, enable: bool) {
-    let _ = hold_bit!(
+/// Reads the hold bit of the pad, and writes it first if `enable` is [`Some`].
+pub(crate) fn pad_hold(lp: u8, enable: Option<bool>) -> bool {
+    hold_bit!(
         LP_IO_MUX::regs().lp_pad_hold(),
         reg_lp_gpio_hold,
         lp,
-        Some(enable)
-    );
+        enable
+    )
 }
 
 /// Reads the hold bit of the pad of `gpio`, and writes it first if `enable` is [`Some`].

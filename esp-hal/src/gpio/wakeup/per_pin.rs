@@ -26,7 +26,7 @@ pub(super) fn allocate(armed: &[Armed], config: &mut WrappedSleepConfig<'_>) {
         // The hold outlives the sleep: neither the wake of a light sleep nor the reset of a
         // deep-sleep wake releases it, so it is released in software.
         if config.is_deep_sleep() {
-            low_level::pad_hold(pin.lp, true);
+            low_level::pad_hold(pin.lp, Some(true));
             super::hold_taken(pin.gpio);
         }
 
@@ -68,7 +68,7 @@ pub(super) fn wake_io_reset() {
 
     for lp in super::low_power_numbers() {
         if armed & (1 << lp) != 0 {
-            low_level::pad_hold(lp, false);
+            low_level::pad_hold(lp, Some(false));
         }
     }
 }

@@ -860,6 +860,14 @@ impl<'d> Output<'d> {
         self.pin.set_pad_hold(enable);
     }
 
+    /// Returns whether something holds the pad.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn is_pad_held(&self) -> bool {
+        self.pin.is_pad_held()
+    }
+
     /// Converts the pin driver into a [`Flex`] driver.
     #[inline]
     #[instability::unstable]
@@ -1225,6 +1233,14 @@ impl<'d> Input<'d> {
         self.pin.set_pad_hold(enable);
     }
 
+    /// Returns whether something holds the pad.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn is_pad_held(&self) -> bool {
+        self.pin.is_pad_held()
+    }
+
     /// Converts the pin driver into a [`Flex`] driver.
     #[inline]
     #[instability::unstable]
@@ -1295,6 +1311,14 @@ impl<'d> Flex<'d> {
     #[cfg(lp_io_driver_supported)]
     pub fn set_pad_hold(&mut self, enable: bool) {
         self.pin.set_pad_hold(enable);
+    }
+
+    /// Returns whether something holds the pad.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn is_pad_held(&self) -> bool {
+        self.pin.is_pad_held()
     }
 
     /// Get whether the pin input level is high.
@@ -1682,10 +1706,25 @@ impl<'lt> AnyPin<'lt> {
     /// down.
     #[cfg(lp_io_driver_supported)]
     pub(crate) fn set_pad_hold(&self, enable: bool) {
+        self.pad_hold(Some(enable));
+    }
+
+    /// Returns whether something holds the pad.
+    #[cfg(lp_io_driver_supported)]
+    pub(crate) fn is_pad_held(&self) -> bool {
+        self.pad_hold(None)
+    }
+
+    /// Reads the hold bit of the pad, and writes it first if `enable` is [`Some`].
+    ///
+    /// A pad that the low-power registers reach keeps its hold in the low-power domain, and every
+    /// other pad has a bit in a register of the digital pads.
+    #[cfg(lp_io_driver_supported)]
+    fn pad_hold(&self, enable: Option<bool>) -> bool {
         if let Some(lp) = lp_io::lp_number(self.number()) {
-            lp_io::low_level::pad_hold(lp, enable);
+            lp_io::low_level::pad_hold(lp, enable)
         } else {
-            lp_io::low_level::digital_pad_hold(self.number(), Some(enable));
+            lp_io::low_level::digital_pad_hold(self.number(), enable)
         }
     }
 

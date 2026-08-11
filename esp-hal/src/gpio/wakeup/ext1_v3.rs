@@ -72,7 +72,7 @@ pub(super) fn wake_io_reset() {
 
     for (gpio, lp) in super::low_power_pads() {
         if armed & (1 << gpio) != 0 {
-            low_level::pad_hold(lp, false);
+            low_level::pad_hold(lp, Some(false));
         }
     }
 

@@ -93,13 +93,22 @@ for_each_lp_function! {
     // The hold register has one named field for each pad, and no index, so this code selects the
     // field by the low-power number.
     (LP_GPIOn $( (($_lp:ident, LP_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),*) => {
-        pub(crate) fn pad_hold(lp: u8, enable: bool) {
-            LPWR::regs().pad_hold().modify(|_, w| {
-                match lp {
-                    $( $n => hold_field!(w, $gpio).bit(enable), )*
-                    _ => unreachable!(),
-                }
-            });
+        /// Reads the hold bit of the pad, and writes it first if `enable` is [`Some`].
+        pub(crate) fn pad_hold(lp: u8, enable: Option<bool>) -> bool {
+            if let Some(enable) = enable {
+                LPWR::regs().pad_hold().modify(|_, w| {
+                    match lp {
+                        $( $n => hold_field!(w, $gpio).bit(enable), )*
+                        _ => unreachable!(),
+                    }
+                });
+            }
+
+            let r = LPWR::regs().pad_hold().read();
+            match lp {
+                $( $n => hold_field!(r, $gpio).bit_is_set(), )*
+                _ => unreachable!(),
+            }
         }
 
         /// One bit for each low-power pad.

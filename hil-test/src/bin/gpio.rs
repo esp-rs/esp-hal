@@ -557,6 +557,7 @@ mod tests {
             pin.set_high();
 
             pin.set_pad_hold(true);
+            assert!(pin.is_pad_held(), "the pad does not report its hold");
 
             pin.set_low();
             ctx.delay.delay_millis(1);
@@ -571,6 +572,8 @@ mod tests {
         pin.apply_output_config(&OutputConfig::default());
         pin.set_output_enable(true);
         pin.set_low();
+
+        assert!(!pin.is_pad_held(), "the pad still reports a hold");
 
         ctx.delay.delay_millis(1);
         assert_eq!(probe.level(), Level::Low, "the pad is still held");

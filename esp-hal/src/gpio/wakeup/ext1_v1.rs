@@ -188,7 +188,7 @@ pub(super) fn wake_io_reset() {
 
     for lp in super::low_power_numbers() {
         if ext1 & (1 << lp) != 0 || (ext0_armed && ext0 == lp) || per_pin & (1 << lp) != 0 {
-            low_level::pad_hold(lp, false);
+            low_level::pad_hold(lp, Some(false));
         }
     }
 }

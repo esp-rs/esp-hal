@@ -71,7 +71,7 @@ pub(super) fn wake_io_reset() {
 
     for lp in super::low_power_numbers() {
         if armed & (1 << lp) != 0 {
-            low_level::pad_hold(lp, false);
+            low_level::pad_hold(lp, Some(false));
         }
     }
 }
