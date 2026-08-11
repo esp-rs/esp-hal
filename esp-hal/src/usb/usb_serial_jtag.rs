@@ -955,10 +955,13 @@ fn async_interrupt_handler() {
     }
 
     usb.int_clr().write(|w| {
-        w.serial_in_empty()
-            .clear_bit_by_one()
-            .serial_out_recv_pkt()
-            .clear_bit_by_one()
+        if tx {
+            w.serial_in_empty().clear_bit_by_one();
+        }
+        if rx {
+            w.serial_out_recv_pkt().clear_bit_by_one();
+        }
+        w
     });
 
     if rx {
