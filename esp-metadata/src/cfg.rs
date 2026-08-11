@@ -436,6 +436,16 @@ driver_configs![
             name: "I2C slave",
             properties: {}
         },
+        I3cMasterProperties {
+            driver: i3c_master,
+            name: "I3C master",
+            properties: {}
+        },
+        I3cSlaveProperties {
+            driver: i3c_slave,
+            name: "I3C slave",
+            properties: {}
+        },
         SpiMasterProperties<SpiMasterInstanceConfig> {
             driver: spi_master,
             name: "SPI master",
@@ -623,6 +633,11 @@ driver_configs![
             name: "Camera interface", // LCD_CAM, ESP32 I2S, S2 SPI
             properties: {}
         },
+        MipiCsiProperties {
+            driver: mipi_csi,
+            name: "MIPI-CSI",
+            properties: {}
+        },
         MipiDsiProperties {
             driver: mipi_dsi,
             name: "MIPI-DSI",
@@ -644,6 +659,36 @@ driver_configs![
         BitScramblerProperties {
             driver: bit_scrambler,
             name: "Bit Scrambler",
+            properties: {}
+        },
+        ImageSignalProcessorProperties {
+            driver: isp,
+            name: "Image Signal Processor",
+            properties: {}
+        },
+        PixelProcessingAcceleratorProperties {
+            driver: pixel_accelerator,
+            name: "Pixel Processing Accelerator",
+            properties: {}
+        },
+        JpegProperties {
+            driver: jpeg,
+            name: "JPEG Codec",
+            properties: {}
+        },
+        H264Properties {
+            driver: h264_encoder,
+            name: "H.264 encoder",
+            properties: {}
+        },
+        AudioSampleRateConverterProperties {
+            driver: asrc,
+            name: "Audio Sample Rate Converter",
+            properties: {}
+        },
+        CordicProperties {
+            driver: cordic,
+            name: "CORDIC accelerator",
             properties: {}
         },
     ]
@@ -743,12 +788,12 @@ driver_configs![
         },
         DsProperties {
             driver: ds,
-            name: "DS",
+            name: "RSA Digital Signature",
             properties: {}
         },
         EcdsaProperties {
             driver: ecdsa,
-            name: "ECDSA",
+            name: "ECDSA Digital Signature",
             properties: {}
         },
         EccProperties {
