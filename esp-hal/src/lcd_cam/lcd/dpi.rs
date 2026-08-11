@@ -135,7 +135,7 @@ impl<'d, Dm> Dpi<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Create a new instance of the RGB/DPI driver.
+    /// Creates a new instance of the RGB/DPI driver.
     pub fn new(
         lcd: Lcd<'d, Dm>,
         channel: impl LcdDmaTxChannel<'d>,

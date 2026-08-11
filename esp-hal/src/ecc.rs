@@ -507,7 +507,7 @@ for_each_ecc_working_mode! {
 }
 
 impl<'d> Ecc<'d, Blocking> {
-    /// Create a new instance in [Blocking] mode.
+    /// Creates a new instance in [Blocking] mode.
     pub fn new(ecc: ECC<'d>, config: Config) -> Self {
         let this = Self {
             _ecc: ecc,
@@ -869,7 +869,7 @@ where
 
     /// Retrieve the scalar result of the operation.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if point verification failed, or if `out` is not the correct size.
     pub fn read_scalar_result(&self, out: &mut [u8]) -> Result<(), OperationError>
@@ -889,7 +889,7 @@ where
 
     /// Retrieve the affine point result of the operation.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if point verification failed, or if `x` or `y` are not the correct size.
     pub fn read_affine_point_result(&self, x: &mut [u8], y: &mut [u8]) -> Result<(), OperationError>
@@ -903,7 +903,7 @@ where
 
     /// Retrieve the Jacobian point result of the operation.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if point verification failed, or if `x`, `y`, or `z` are not the correct
     /// size.
@@ -1228,7 +1228,7 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// Once the operation is processed, the result can be retrieved from the designated buffer.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if `out` is not the correct size.
     pub fn with_scalar_result(mut self, out: &'op mut [u8]) -> Result<Self, KeyLengthMismatch>
@@ -1249,7 +1249,7 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// Once the operation is processed, the result can be retrieved from the designated buffers.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if `x` or `y` are not the correct size.
     pub fn with_affine_point_result(
@@ -1272,7 +1272,7 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// Once the operation is processed, the result can be retrieved from the designated buffers.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns an error if `x`, `y`, or `z` are not the correct size.
     pub fn with_jacobian_point_result(
@@ -1319,7 +1319,7 @@ pub struct EccHandle<'t>(Handle<'t, EccWorkItem>);
 impl EccHandle<'_> {
     /// Polls the status of the work item.
     ///
-    /// This function returns `true` if the item has been processed.
+    /// Returns `true` if the item has been processed.
     #[inline]
     pub fn poll(&mut self) -> bool {
         self.0.poll()
@@ -1327,7 +1327,7 @@ impl EccHandle<'_> {
 
     /// Polls the work item to completion, by busy-looping.
     ///
-    /// This function returns immediately if `poll` returns `true`.
+    /// Returns immediately if `poll` returns `true`.
     #[inline]
     pub fn wait_blocking(self) -> Status {
         self.0.wait_blocking()

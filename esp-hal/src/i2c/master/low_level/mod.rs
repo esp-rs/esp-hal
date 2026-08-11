@@ -967,7 +967,7 @@ impl Driver<'_> {
 
     /// Checks for I2C transmission errors and handles them.
     ///
-    /// This function inspects specific I2C-related interrupts to detect errors
+    /// Inspects specific I2C-related interrupts to detect errors
     /// during communication, such as timeouts, failed acknowledgments, or
     /// arbitration loss. If an error is detected, the function handles it
     /// by resetting the I2C peripheral to clear the error condition and then
@@ -1010,7 +1010,7 @@ impl Driver<'_> {
 
     /// Updates the configuration of the I2C peripheral.
     ///
-    /// This function ensures that the configuration values, such as clock
+    /// Ensures that the configuration values, such as clock
     /// settings, SDA/SCL filtering, timeouts, and other operational
     /// parameters, which are configured in other functions, are properly
     /// propagated to the I2C hardware. This step is necessary to synchronize

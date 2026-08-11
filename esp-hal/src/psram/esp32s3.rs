@@ -397,7 +397,7 @@ pub(crate) mod quad_spi_impl {
     /// 1, will also update SPI1 timing registers. Should only be set to 1 when
     /// do tuning.
     ///
-    /// This function should always be called after `mspi_timing_flash_tuning`
+    /// Should always be called after `mspi_timing_flash_tuning`
     /// or `calculate_best_flash_tuning_config`
     #[ram]
     fn mspi_timing_enter_high_speed_mode(control_spi1: bool, config: &PsramConfig) {

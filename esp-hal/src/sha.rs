@@ -116,7 +116,7 @@ pub struct Sha<'d> {
 }
 
 impl<'d> Sha<'d> {
-    /// Create a new instance of the SHA Accelerator driver.
+    /// Creates a new instance of the SHA Accelerator driver.
     pub fn new(sha: SHA<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
@@ -506,7 +506,7 @@ pub struct Context<A: ShaAlgorithm> {
 
 #[cfg(not(esp32))]
 impl<A: ShaAlgorithm> Context<A> {
-    /// Create a new empty context
+    /// Creates a new empty context
     pub fn new() -> Self {
         Self {
             state: DigestState::new(A::ALGORITHM_KIND),
@@ -1323,7 +1323,7 @@ pub struct ShaHandle<'t>(Handle<'t, ShaOperation>);
 impl ShaHandle<'_> {
     /// Polls the status of the work item.
     ///
-    /// This function returns `true` if the item has been processed.
+    /// Returns `true` if the item has been processed.
     #[inline]
     pub fn poll(&mut self) -> bool {
         self.0.poll()
@@ -1331,7 +1331,7 @@ impl ShaHandle<'_> {
 
     /// Polls the work item to completion, by busy-looping.
     ///
-    /// This function returns immediately if `poll` returns `true`.
+    /// Returns immediately if `poll` returns `true`.
     #[inline]
     pub fn wait_blocking(self) -> Status {
         self.0.wait_blocking()

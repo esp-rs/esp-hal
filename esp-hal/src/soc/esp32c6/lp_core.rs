@@ -51,12 +51,12 @@ pub struct LpCore<'d> {
 }
 
 impl<'d> LpCore<'d> {
-    /// Create a new instance using [LpCoreClockSource::RcFastClk]
+    /// Creates a new instance using [LpCoreClockSource::RcFastClk]
     pub fn new(lp_core: LP_CORE<'d>) -> Self {
         LpCore::new_with_clock(lp_core, LpCoreClockSource::RcFastClk)
     }
 
-    /// Create a new instance using the given clock
+    /// Creates a new instance using the given clock
     pub fn new_with_clock(lp_core: LP_CORE<'d>, clk_src: LpCoreClockSource) -> Self {
         match clk_src {
             LpCoreClockSource::RcFastClk => LPWR::regs()

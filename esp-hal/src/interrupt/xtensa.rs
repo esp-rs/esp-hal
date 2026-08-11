@@ -297,7 +297,7 @@ pub(crate) fn current_raw_runlevel() -> u32 {
 ///
 /// # Safety
 ///
-/// This function must only be used to raise the runlevel and to restore it
+/// Must only be used to raise the runlevel and to restore it
 /// to a previous value. It must not be used to arbitrarily lower the
 /// runlevel.
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
@@ -402,7 +402,7 @@ cfg_select! {
 ///
 /// # Safety
 ///
-/// This function must be called only during core startup.
+/// Must be called only during core startup.
 #[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
 pub(crate) unsafe fn init_vectoring() {
     // Enable vectored interrupts. No configuration is needed because these interrupts have

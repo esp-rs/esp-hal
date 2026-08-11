@@ -692,14 +692,14 @@ struct DriverConfig {
 
 impl<'d> I2c<'d, Blocking> {
     #[procmacros::doc_replace]
-    /// Create a new I2C instance.
+    /// Creates a new I2C instance.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// A [`ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -860,7 +860,7 @@ impl<'d> I2c<'d, Async> {
     /// Note that dropping the returned Future will abort the transfer, but doing so will
     /// block while the driver is finishing clearing and releasing the bus.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -889,12 +889,12 @@ impl<'d> I2c<'d, Async> {
     /// Note that dropping the returned Future will abort the transfer, but doing so will
     /// block while the driver is finishing clearing and releasing the bus.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// passed buffer has zero length.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -925,12 +925,12 @@ impl<'d> I2c<'d, Async> {
     /// Note that dropping the returned Future will abort the transfer, but doing so will
     /// block while the driver is finishing clearing and releasing the bus.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// passed buffer has zero length.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -983,12 +983,12 @@ impl<'d> I2c<'d, Async> {
         any(esp32, esp32s2),
         doc = "\n\nOn ESP32 and ESP32-S2 there might be issues combining large read/write operations with small (<3 bytes) read/write operations.\n\n"
     )]
-    /// ## Errors
+    /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// buffer passed to an [`Operation`] has zero length.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1048,7 +1048,7 @@ where
     ///
     /// This will replace previous pin assignments for this signal.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// Basic usage
     ///
@@ -1100,7 +1100,7 @@ where
     ///
     /// This will replace previous pin assignments for this signal.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// Basic usage
     ///
@@ -1145,7 +1145,7 @@ where
     #[procmacros::doc_replace]
     /// Writes bytes to slave with given `address`
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1165,7 +1165,7 @@ where
     #[procmacros::doc_replace]
     /// Reads enough bytes from slave with `address` to fill `buffer`
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1180,7 +1180,7 @@ where
     /// # {after_snippet}
     /// ```
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the passed buffer has
     /// zero length.
@@ -1196,12 +1196,12 @@ where
     /// Writes bytes to slave with given `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the passed buffer has
     /// zero length.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1245,7 +1245,7 @@ where
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1266,7 +1266,7 @@ where
         any(esp32, esp32s2),
         doc = "\n\nOn ESP32 and ESP32-S2 it is advisable to not combine large read/write operations with small (<3 bytes) read/write operations.\n\n"
     )]
-    /// ## Errors
+    /// # Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// buffer passed to an [`Operation`] has zero length.
@@ -1284,12 +1284,12 @@ where
     #[procmacros::doc_replace]
     /// Applies a new configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// A [`ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

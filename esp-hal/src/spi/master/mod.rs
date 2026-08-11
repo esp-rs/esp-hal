@@ -703,13 +703,13 @@ impl<Dm: DriverMode> Sealed for Spi<'_, Dm> {}
 
 impl<'d> Spi<'d, Blocking> {
     #[procmacros::doc_replace]
-    /// Constructs an SPI instance in 8bit dataframe mode.
+    /// Creates a new SPI instance in 8-bit dataframe mode.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// See [`Spi::apply_config`].
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -808,7 +808,7 @@ impl<'d> Spi<'d, Async> {
     #[procmacros::doc_replace]
     /// Waits for the completion of previous operations.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -835,12 +835,12 @@ impl<'d> Spi<'d, Async> {
     #[procmacros::doc_replace]
     /// Sends `words` to the slave. Returns the `words` received from the slave.
     ///
-    /// This function aborts the transfer when its Future is dropped. Some
+    /// Aborts the transfer when its Future is dropped. Some
     /// amount of data may have been transferred before the Future is
     /// dropped. Dropping the future may block for a short while to ensure
     /// the transfer is aborted.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -876,7 +876,7 @@ impl<'d> Spi<'d, Async> {
     /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
     /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
     ///
-    /// This function aborts the transfer when its Future is dropped. Some amount of data may have
+    /// Aborts the transfer when its Future is dropped. Some amount of data may have
     /// been transferred before the Future is dropped. Dropping the future may block for a short
     /// while to ensure the transfer is aborted.
     ///
@@ -912,7 +912,7 @@ impl<'d> Spi<'d, Async> {
     /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
     /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
     ///
-    /// This function aborts the transfer when its Future is dropped. Some amount of data may have
+    /// Aborts the transfer when its Future is dropped. Some amount of data may have
     /// been transferred before the Future is dropped. Dropping the future may block for a short
     /// while to ensure the transfer is aborted.
     ///
@@ -1031,7 +1031,7 @@ where
     ///
     /// Disconnects the previous pin that was assigned with `with_sck`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1060,7 +1060,7 @@ where
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1086,7 +1086,7 @@ where
     /// You want to use this for full-duplex SPI or
     /// [DataMode::SingleTwoDataLines]
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1193,7 +1193,7 @@ where
     /// If frequency passed in config exceeds __max_frequency__ or is below 70kHz,
     /// [`ConfigError::FrequencyOutOfRange`] error will be returned.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1215,7 +1215,7 @@ where
     /// Write bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1245,7 +1245,7 @@ where
     /// Read bytes from SPI. The provided slice is filled with data received
     /// from the slave.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1274,7 +1274,7 @@ where
     /// Sends `words` to the slave. The received data will be written to
     /// `words`, overwriting its contents.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

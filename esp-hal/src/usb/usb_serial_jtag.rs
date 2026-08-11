@@ -317,7 +317,7 @@ where
 }
 
 impl<'d> UsbSerialJtag<'d, Blocking> {
-    /// Create a new USB serial/JTAG instance with defaults
+    /// Creates a new USB serial/JTAG instance with defaults
     pub fn new(usb_device: USB_DEVICE<'d>) -> Self {
         Self::new_inner(usb_device)
     }

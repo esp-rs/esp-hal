@@ -100,7 +100,7 @@ impl Input<'_> {
     #[procmacros::doc_replace]
     /// Wait until the pin experiences a particular [`Event`].
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -111,9 +111,9 @@ impl Input<'_> {
     /// # {after_snippet}
     /// ```
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is not cancellation-safe.
+    /// **Not** cancellation-safe.
     ///
     /// - Calling this function will overwrite previous [`listen`][Self::listen] operations for this
     ///   pin, making it side-effectful.
@@ -135,7 +135,7 @@ impl Input<'_> {
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -155,7 +155,7 @@ impl Input<'_> {
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -175,7 +175,7 @@ impl Input<'_> {
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -195,7 +195,7 @@ impl Input<'_> {
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -216,7 +216,7 @@ impl Input<'_> {
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

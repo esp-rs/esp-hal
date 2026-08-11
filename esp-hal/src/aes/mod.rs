@@ -719,7 +719,7 @@ pub mod dma {
     /// - When the data is not correctly aligned to the needs of the hardware (e.g. when using a
     ///   stream cipher mode, the data length is not an integer multiple of 16 bytes).
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1422,7 +1422,7 @@ impl<'d> AesBackend<'d> {
     ///
     /// The backend needs to be [`start`][Self::start]ed before it can execute AES operations.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1443,7 +1443,7 @@ impl<'d> AesBackend<'d> {
     ///
     /// The driver stops operating when the returned object is dropped.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1556,7 +1556,7 @@ impl AesContext {
     ///
     /// For an example, see the documentation of [`AesBackend`].
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// - If the lengths of the input and output buffers don't match, an error is returned.
     /// - The ECB and OFB cipher modes require the data length to be a multiple of the block size
@@ -1584,7 +1584,7 @@ impl AesContext {
     /// The returned Handle must be polled until it returns `true`. Dropping the handle
     /// before the operation finishes will cancel the operation.
     ///
-    /// This function operates similar to [`AesContext::process`], but it overwrites the data buffer
+    /// Operates similar to [`AesContext::process`], but it overwrites the data buffer
     /// with the result of the transformation.
     ///
     /// ```rust, no_run
@@ -1618,7 +1618,7 @@ impl AesContext {
     /// # {after_snippet}
     /// ```
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// The ECB and OFB cipher modes require the data length to be a multiple of the block size
     /// (16), otherwise an error is returned.
@@ -1649,7 +1649,7 @@ pub struct AesHandle<'t>(Handle<'t, AesOperation>);
 impl AesHandle<'_> {
     /// Polls the status of the work item.
     ///
-    /// This function returns `true` if the item has been processed.
+    /// Returns `true` if the item has been processed.
     #[inline]
     pub fn poll(&mut self) -> bool {
         self.0.poll()
@@ -1657,7 +1657,7 @@ impl AesHandle<'_> {
 
     /// Polls the work item to completion, by busy-looping.
     ///
-    /// This function returns immediately if `poll` returns `true`.
+    /// Returns immediately if `poll` returns `true`.
     #[inline]
     pub fn wait_blocking(self) -> Status {
         self.0.wait_blocking()

@@ -107,7 +107,7 @@ impl Drop for RsaGuard {
 }
 
 impl<'d> Rsa<'d, Blocking> {
-    /// Create a new instance in [Blocking] mode.
+    /// Creates a new instance in [Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rsa: RSA<'d>) -> Self {
@@ -163,7 +163,7 @@ impl crate::interrupt::InterruptConfigurable for Rsa<'_, Blocking> {
 }
 
 impl<'d> Rsa<'d, Async> {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Creates a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Rsa<'d, Blocking> {
         self.internal_enable_disable_interrupt(false);
         self.rsa.disable_peri_interrupt_on_all_cores();
@@ -187,7 +187,7 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// After the RSA accelerator is released from reset, the memory blocks
     /// needs to be initialized, only after that peripheral should be used.
-    /// This function would return without an error if the memory is
+    /// Would return without an error if the memory is
     /// initialized.
     fn ready(&self) -> bool {
         low_level::ready(self.regs())
@@ -811,7 +811,7 @@ impl<'d> RsaBackend<'d> {
     #[procmacros::doc_replace]
     /// Creates a new RSA backend.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -832,7 +832,7 @@ impl<'d> RsaBackend<'d> {
     ///
     /// The driver stops operating when the returned object is dropped.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1296,7 +1296,7 @@ impl RsaContext {
     /// When the operation is completed, the result will be stored in `result`. The `result` is
     /// twice as wide as the inputs.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust,no_run
     /// # {before_snippet}

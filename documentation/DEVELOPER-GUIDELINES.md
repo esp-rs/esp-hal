@@ -284,6 +284,21 @@ Modules should have the following documentation format:
 - Use rustdoc syntax for linking to other documentation items instead of markdown links where possible
   - https://doc.rust-lang.org/rustdoc/write-documentation/linking-to-items-by-name.html
 
+## Item documentation
+
+Guidelines for documenting functions, types, and other public items. Module-level docs use `##` headings (see above); **item-level** docs use rustdoc's special `#` sections so they render correctly.
+
+- Start with a one-sentence summary in third-person present tense (e.g. `Sets the baud rate.`, not `Set the baud rate.` or `This function sets the baud rate.`).
+- Constructors should begin with `Creates a new …` (e.g. ``Creates a new UART instance in [`Blocking`] mode.``).
+- Use these section headings where applicable — as `#` headings, not `##`:
+  - `# Errors` for fallible functions
+  - `# Panics` for functions that may panic
+  - `# Safety` for `unsafe` functions
+  - `# Cancellation Safety` for async functions and futures
+  - `# Examples` for doctests (prefer `rust, no_run` and `before_snippet!()` / `after_snippet!()`)
+- Do not repeat the summary in section bodies (e.g. put error conditions under `# Errors`, not in a leading `Returns a … if …` paragraph before the section).
+- Prefer rustdoc intra-doc links (e.g. ``[`Type`]``) over raw URLs or markdown links to rustdoc items.
+
 ## Breaking changes
 
 We check our stable API surface using semver-checks. To facilitate these checks, we do a number of preprocessing steps to ensure we're only checking _our_ stable API. We may want to allow breaking changes, in the case of fixing soundness issues etc. In this case, all that is required is to add the `breaking-change-<crate-name>` label to the PR making the change.

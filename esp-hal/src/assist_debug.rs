@@ -35,7 +35,7 @@ pub struct DebugAssist<'d> {
 }
 
 impl<'d> DebugAssist<'d> {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Creates a new instance in [crate::Blocking] mode.
     pub fn new(debug_assist: ASSIST_DEBUG<'d>) -> Self {
         // NOTE: We should enable the debug assist, however, it's always enabled in ROM
         //       code already.

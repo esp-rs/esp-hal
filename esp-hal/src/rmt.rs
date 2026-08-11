@@ -338,7 +338,7 @@ impl PulseCode {
     /// Maximum value for the `length1` and `length2` fields.
     pub const MAX_LEN: u16 = 0x7FFF;
 
-    /// Create a new instance.
+    /// Creates a new instance.
     ///
     /// Panics if `length1` or `length2` exceed the maximum representable range.
     #[inline]
@@ -353,7 +353,7 @@ impl PulseCode {
         unsafe { Self::new_unchecked(level1, length1, level2, length2) }
     }
 
-    /// Create a new instance.
+    /// Creates a new instance.
     ///
     /// If `length1` or `length2` exceed the maximum representable range, they
     /// will be clamped to `Self::MAX_LEN`.
@@ -376,7 +376,7 @@ impl PulseCode {
         unsafe { Self::new_unchecked(level1, length1, level2, length2) }
     }
 
-    /// Create a new instance, attempting to convert lengths to `u16` first.
+    /// Creates a new instance, attempting to convert lengths to `u16` first.
     ///
     /// This is slightly more convenient when passing in longer integers (e.g. `u32`) resulting from
     /// a preceding calculation.
@@ -402,7 +402,7 @@ impl PulseCode {
         Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
     }
 
-    /// Create a new instance without checking that code lengths are in range.
+    /// Creates a new instance without checking that code lengths are in range.
     ///
     /// # Safety
     ///
@@ -422,7 +422,7 @@ impl PulseCode {
         )
     }
 
-    /// Create a new instance that is an end marker with `Level::Low`.
+    /// Creates a new instance that is an end marker with `Level::Low`.
     ///
     /// This corresponds to the all-zero [`PulseCode`], i.e. with both level and
     /// length fields set to zero, equivalent to (but more semantic than)
@@ -914,16 +914,16 @@ impl ChannelIndex {
 }
 
 impl<'rmt> Rmt<'rmt, Blocking> {
-    /// Create a new RMT instance.
+    /// Creates a new RMT instance.
     ///
     /// The `frequency` parameter configures the global RMT counter clock. Use
     /// [`Rmt::frequency`] to retrieve the actual configured frequency when
     /// converting real-time pulse durations to [`PulseCode`] lengths; this is
     /// not necessarily the APB clock frequency.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function can return
+    /// Can return
     /// - [`ConfigError::UnreachableTargetFrequency`].
     pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, ConfigError> {
         let clk_src = ClockSource::default();
@@ -1331,9 +1331,9 @@ where
 
     /// Change the configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function can return
+    /// Can return
     /// - [`ConfigError::MemoryBlockNotAvailable`],
     /// - [`ConfigError::MemsizeOutOfRange`].
     pub fn apply_config(&mut self, config: &TxChannelConfig) -> Result<(), ConfigError> {
@@ -1360,9 +1360,9 @@ where
 
     /// Change the configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function can return
+    /// Can return
     /// - [`ConfigError::MemoryBlockNotAvailable`],
     /// - [`ConfigError::MemsizeOutOfRange`],
     /// - [`ConfigError::IdleThresholdOutOfRange`].
@@ -1378,7 +1378,7 @@ where
 {
     /// Configure the TX channel
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns errors under the same conditions as [`Channel<Tx>::apply_config`].
     fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, ConfigError>
@@ -1393,7 +1393,7 @@ where
 {
     /// Configure the RX channel
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// Returns errors under the same conditions as [`Channel<Rx>::apply_config`].
     fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, ConfigError>

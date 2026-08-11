@@ -29,11 +29,11 @@ impl<'d> TrngSource<'d> {
     ///
     /// # Panics
     ///
-    /// This function panics if the internal counter overflows.
+    /// Panics if the internal counter overflows.
     ///
     /// # Safety
     ///
-    /// This function must only be called after a new entropy source has been enabled.
+    /// Must only be called after a new entropy source has been enabled.
     #[instability::unstable]
     pub unsafe fn increase_entropy_source_counter() {
         if TRNG_ENABLED.fetch_add(1, Ordering::Relaxed) == usize::MAX {
@@ -43,15 +43,15 @@ impl<'d> TrngSource<'d> {
 
     /// Decreases the internal entropy source counter.
     ///
-    /// This function should only be called **before** disabling an entropy source (such as the
+    /// Should only be called **before** disabling an entropy source (such as the
     /// radio).
     ///
-    /// This function should only be called as many times as
+    /// Should only be called as many times as
     /// [`TrngSource::increase_entropy_source_counter`] was called.
     ///
     /// # Panics
     ///
-    /// This function panics if the internal counter underflows. Dropping the `TrngSource` will
+    /// Panics if the internal counter underflows. Dropping the `TrngSource` will
     /// panic if this function is called more times than
     /// [`TrngSource::increase_entropy_source_counter`].
     #[instability::unstable]
@@ -78,11 +78,11 @@ impl<'d> TrngSource<'d> {
 
     /// Attempts to disable the TRNG.
     ///
-    /// This function returns `Err(TrngSource)` if there are TRNG users.
+    /// Returns `Err(TrngSource)` if there are TRNG users.
     ///
     /// # Panics
     ///
-    /// This function panics if the TRNG is not enabled (i.e. it has been disabled by calling
+    /// Panics if the TRNG is not enabled (i.e. it has been disabled by calling
     /// [`TrngSource::decrease_entropy_source_counter`] incorrectly).
     #[instability::unstable]
     pub fn try_disable(self) -> Result<(), Self> {
@@ -200,7 +200,7 @@ impl Clone for Trng {
 impl Trng {
     /// Attempts to create a new True Random Number Generator (TRNG) instance.
     ///
-    /// This function returns a new `Trng` instance on success, or an error if the
+    /// Returns a new `Trng` instance on success, or an error if the
     /// [`TrngSource`] is not active.
     #[inline]
     #[instability::unstable]

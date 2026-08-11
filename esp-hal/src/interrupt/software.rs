@@ -193,7 +193,7 @@ for_each_sw_interrupt! {
         }
 
         impl<'d> SoftwareInterruptControl<'d> {
-            /// Create a new instance of the software interrupt control.
+            /// Creates a new instance of the software interrupt control.
             pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT<'d>) -> Self {
                 SoftwareInterruptControl {
                     $(

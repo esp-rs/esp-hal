@@ -17,7 +17,7 @@
 //! ### Peripheral drivers
 //!
 //! The HAL implements both [`Blocking`] _and_ [`Async`] APIs for all applicable peripherals.
-//! Where applicable, driver implement the [embedded-hal] and
+//! Where applicable, drivers implement the [embedded-hal] and
 //! [embedded-hal-async] traits. Drivers that don't currently have a stable API
 //! are marked as `unstable` in the documentation.
 //!
@@ -439,7 +439,7 @@ trait RegisterToggle {
 
     /// Toggles bits in the register, applying the given operation to set and clear them.
     ///
-    /// This method is more efficient than two modify calls, as it will not read the register
+    /// More efficient than two modify calls, as it will not read the register
     /// value twice.
     fn toggle(&self, op: impl Fn(&mut W<Self::Reg>, bool) -> &mut W<Self::Reg>);
 }
@@ -699,7 +699,7 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
     ///
     /// # Panics
     ///
-    /// This function will panic if the CPU clock configuration is not **exactly** one of the
+    /// Panics if the CPU clock configuration is not **exactly** one of the
     /// [`CpuClock`] presets.
     #[cfg_attr(feature = "unstable", deprecated(note = "Use `clock_config` instead."))] // TODO: mention ClockTree APIs once they are exposed to the user.
     pub fn cpu_clock(&self) -> CpuClock {

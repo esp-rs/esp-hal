@@ -95,7 +95,7 @@ pub(crate) fn psram_range() -> Range<usize> {
 
 /// # Safety
 ///
-/// This function must only be called once.
+/// Must only be called once.
 unsafe fn set_psram_range(range: Range<usize>) {
     MAPPED_PSRAM_START.store(range.start, Ordering::Relaxed);
     MAPPED_PSRAM_END.store(range.end, Ordering::Release);

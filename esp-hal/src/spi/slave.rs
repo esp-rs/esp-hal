@@ -94,7 +94,7 @@ pub struct Spi<'d, Dm: DriverMode> {
     _guard: PeripheralGuard,
 }
 impl<'d> Spi<'d, Blocking> {
-    /// Constructs an SPI instance in 8bit dataframe mode.
+    /// Creates a new SPI instance in 8-bit dataframe mode.
     #[instability::unstable]
     pub fn new(spi: impl Instance + 'd, mode: Mode) -> Spi<'d, Blocking> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
@@ -385,7 +385,7 @@ pub mod dma {
 
         /// Checks if the transfer is complete.
         ///
-        /// This method returns `true` if both RX and TX operations are done,
+        /// Returns `true` if both RX and TX operations are done,
         /// and the SPI instance is no longer busy.
         #[instability::unstable]
         pub fn is_done(&self) -> bool {
@@ -407,7 +407,7 @@ pub mod dma {
 
         /// Waits for the DMA transfer to complete.
         ///
-        /// This method blocks until the transfer is finished and returns the
+        /// Blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
         #[instability::unstable]
         pub fn wait(mut self) -> (SpiDma<'d, Dm>, Buf) {

@@ -1769,7 +1769,7 @@ pub struct DmaLoopBuf {
 }
 
 impl DmaLoopBuf {
-    /// Create a new [DmaLoopBuf].
+    /// Creates a new [DmaLoopBuf].
     pub fn new(
         mut descriptors: DmaAlignedMut<'static, [DmaDescriptor]>,
         mut buffer: DmaAlignedMut<'static, [u8]>,

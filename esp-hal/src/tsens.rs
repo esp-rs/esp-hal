@@ -88,7 +88,7 @@ pub struct Temperature {
 }
 
 impl Temperature {
-    /// Create a new temperature value
+    /// Creates a new temperature value
     #[inline]
     pub fn new(raw_value: u8, offset: i8) -> Self {
         Self { raw_value, offset }
@@ -124,7 +124,7 @@ pub struct TemperatureSensor<'d> {
 }
 
 impl<'d> TemperatureSensor<'d> {
-    /// Create a new temperature sensor instance with configuration
+    /// Creates a new temperature sensor instance with configuration
     /// The sensor will be automatically powered up
     pub fn new(peripheral: TSENS<'d>, config: Config) -> Result<Self, ConfigError> {
         // NOTE: We need enable ApbSarAdc before enabling Tsens

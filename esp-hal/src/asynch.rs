@@ -10,7 +10,7 @@ pub struct AtomicWaker {
 }
 
 impl AtomicWaker {
-    /// Create a new `AtomicWaker`.
+    /// Creates a new `AtomicWaker`.
     #[allow(clippy::new_without_default)]
     pub const fn new() -> Self {
         Self {

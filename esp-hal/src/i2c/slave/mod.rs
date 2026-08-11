@@ -150,7 +150,7 @@ impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2cSlave<'_, Dm> {
 }
 
 impl<'d> I2cSlave<'d, Blocking> {
-    /// Create a new I2C slave instance.
+    /// Creates a new I2C slave instance.
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 

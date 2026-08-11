@@ -768,7 +768,7 @@ for_each_i2s! {
 }
 
 impl<'d> I2sParallel<'d, crate::Blocking> {
-    /// Create a new I2S Parallel Interface
+    /// Creates a new I2S Parallel Interface
     pub fn new<I: Instance + 'd>(
         i2s: I,
         channel: impl I2sParallelDmaChannel<'d, I>,

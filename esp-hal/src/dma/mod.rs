@@ -817,7 +817,7 @@ impl<'a> DescriptorSet<'a> {
 
     /// Associate each descriptor with a chunk of the buffer.
     ///
-    /// This function checks the alignment and location of the buffer.
+    /// Checks the alignment and location of the buffer.
     ///
     /// See [`Self::set_up_buffer_ptrs`] for more details.
     fn link_with_buffer(
@@ -908,12 +908,12 @@ impl<'a> DescriptorSet<'a> {
 
     /// Associate each descriptor with a chunk of the buffer.
     ///
-    /// This function does not check the alignment and location of the buffer,
+    /// Does not check the alignment and location of the buffer,
     /// because some callers may not have enough information currently.
     ///
-    /// This function does not set up descriptor lengths or states.
+    /// Does not set up descriptor lengths or states.
     ///
-    /// This function also does not link descriptors into a linked list. This is
+    /// Also does not link descriptors into a linked list. This is
     /// intentional, because it is done in `set_up_descriptors` to support
     /// changing length without requiring buffer pointers to be set
     /// repeatedly.

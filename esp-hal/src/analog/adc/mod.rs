@@ -137,7 +137,7 @@ pub struct AdcConfig<ADCX> {
 
 #[cfg(feature = "unstable")]
 impl<ADCX> AdcConfig<ADCX> {
-    /// Create a new configuration struct with its default values
+    /// Creates a new configuration struct with its default values
     pub fn new() -> Self {
         Self::default()
     }
@@ -222,7 +222,7 @@ pub trait AdcChannel {
 /// calibrated ADC reads, all you need to do is call `enable_pin_with_cal`
 /// and specify some implementor of this trait.
 pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
-    /// Create a new calibration scheme for the given attenuation.
+    /// Creates a new calibration scheme for the given attenuation.
     fn new_cal(atten: Attenuation) -> Self;
 
     /// Return the basic ADC bias value.

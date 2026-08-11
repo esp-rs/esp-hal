@@ -47,7 +47,7 @@ impl Rate {
     #[procmacros::doc_replace]
     /// Shorthand for creating a rate which represents hertz.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -63,7 +63,7 @@ impl Rate {
     #[procmacros::doc_replace]
     /// Shorthand for creating a rate which represents kilohertz.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -79,7 +79,7 @@ impl Rate {
     #[procmacros::doc_replace]
     /// Shorthand for creating a rate which represents megahertz.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -95,7 +95,7 @@ impl Rate {
     #[procmacros::doc_replace]
     /// Convert the `Rate` to an integer number of Hz.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -112,7 +112,7 @@ impl Rate {
     #[procmacros::doc_replace]
     /// Convert the `Rate` to an integer number of kHz.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -129,7 +129,7 @@ impl Rate {
     #[procmacros::doc_replace]
     /// Convert the `Rate` to an integer number of MHz.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -146,7 +146,7 @@ impl Rate {
     #[procmacros::doc_replace]
     /// Convert the `Rate` to a `Duration`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -254,7 +254,7 @@ impl Instant {
     /// Note that this function returns an unreliable value before <code>esp_hal::init()</code> is
     /// called. </section>
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -275,7 +275,7 @@ impl Instant {
     #[procmacros::doc_replace]
     /// Returns the elapsed `Duration` since boot.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -292,7 +292,7 @@ impl Instant {
     #[procmacros::doc_replace]
     /// Returns the elapsed `Duration` since this `Instant` was created.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -399,7 +399,7 @@ impl Duration {
     #[procmacros::doc_replace]
     /// Creates a duration which represents microseconds.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -415,7 +415,7 @@ impl Duration {
     #[procmacros::doc_replace]
     /// Creates a duration which represents milliseconds.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -431,7 +431,7 @@ impl Duration {
     #[procmacros::doc_replace]
     /// Creates a duration which represents seconds.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -447,7 +447,7 @@ impl Duration {
     #[procmacros::doc_replace]
     /// Creates a duration which represents minutes.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -463,7 +463,7 @@ impl Duration {
     #[procmacros::doc_replace]
     /// Creates a duration which represents hours.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -559,7 +559,7 @@ impl Duration {
     #[procmacros::doc_replace]
     /// Add two durations while checking for overflow.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -586,7 +586,7 @@ impl Duration {
     #[procmacros::doc_replace]
     /// Subtract two durations while checking for overflow.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -613,7 +613,7 @@ impl Duration {
     #[procmacros::doc_replace]
     /// Add two durations, returning the maximum value if overflow occurred.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -637,7 +637,7 @@ impl Duration {
     /// Subtract two durations, returning the minimum value if the result would
     /// be negative.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

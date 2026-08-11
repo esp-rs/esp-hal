@@ -776,7 +776,7 @@ impl Channels {
     ///   disabled channels repeat the data from the last active channel. This field is ignored in
     ///   the receiver unit.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// The following example prepares configuration for 6 channels. Only 1st and 4th channels
     /// are active. Channels 2-3 will use the same data as the 1st, and channels 5-6 will use the

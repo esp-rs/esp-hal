@@ -457,7 +457,7 @@ pub struct ClkInPin<'d> {
     pin: interconnect::InputSignal<'d>,
 }
 impl<'d> ClkInPin<'d> {
-    /// Create a new ClkInPin
+    /// Creates a new ClkInPin
     pub fn new(pin: impl PeripheralInput<'d>) -> Self {
         Self { pin: pin.into() }
     }
@@ -480,7 +480,7 @@ pub struct RxClkInPin<'d> {
     sample_edge: SampleEdge,
 }
 impl<'d> RxClkInPin<'d> {
-    /// Create a new RxClkInPin
+    /// Creates a new RxClkInPin
     pub fn new(pin: impl PeripheralInput<'d>, sample_edge: SampleEdge) -> Self {
         Self {
             pin: pin.into(),
@@ -573,7 +573,7 @@ impl<P> TxPinConfigIncludingValidPin<P>
 where
     P: ContainsValidSignalPin + TxPins + ConfigurePins,
 {
-    /// Create a new [TxPinConfigIncludingValidPin]
+    /// Creates a new [TxPinConfigIncludingValidPin]
     pub fn new(tx_pins: P) -> Self {
         Self { tx_pins }
     }
@@ -608,7 +608,7 @@ macro_rules! tx_pins {
 
             impl<'d> $name<'d>
             {
-                /// Create a new TX pin
+                /// Creates a new TX pin
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
@@ -709,7 +709,7 @@ impl<'d, P> RxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
 {
-    /// Create a new [RxPinConfigWithValidPin]
+    /// Creates a new [RxPinConfigWithValidPin]
     pub fn new(rx_pins: P, valid_pin: impl PeripheralInput<'d>, enable_mode: EnableMode) -> Self {
         Self {
             rx_pins,
@@ -762,7 +762,7 @@ impl<P> RxPinConfigIncludingValidPin<P>
 where
     P: ContainsValidSignalPin + RxPins + ConfigurePins,
 {
-    /// Create a new [RxPinConfigIncludingValidPin]
+    /// Creates a new [RxPinConfigIncludingValidPin]
     pub fn new(rx_pins: P, enable_mode: EnableMode) -> Self {
         Self {
             rx_pins,
@@ -809,7 +809,7 @@ macro_rules! rx_pins {
 
             impl<'d> $name<'d>
             {
-                /// Create a new RX pin
+                /// Creates a new RX pin
                 #[allow(clippy::too_many_arguments)]
                 pub fn new(
                     $(
@@ -1070,7 +1070,7 @@ where
 }
 
 impl<'d> ParlIo<'d, Blocking> {
-    /// Create a new instance of [ParlIo]
+    /// Creates a new instance of [ParlIo]
     pub fn new(
         _parl_io: PARL_IO<'d>,
         dma_channel: impl ParlIoDmaChannel<'d>,

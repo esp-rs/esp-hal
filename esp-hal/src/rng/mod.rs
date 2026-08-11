@@ -102,7 +102,7 @@ impl Rng {
     #[procmacros::doc_replace]
     /// Reads currently available `u32` integer from `RNG`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -123,7 +123,7 @@ impl Rng {
     /// Reads enough bytes from hardware random number generator to fill
     /// `buffer`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

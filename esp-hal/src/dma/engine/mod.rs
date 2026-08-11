@@ -198,7 +198,7 @@ pub trait DmaChannel: Sized + crate::private::Sealed {
     ///
     /// # Safety
     ///
-    /// This function must only be used if the separate halves are used by the
+    /// Must only be used if the separate halves are used by the
     /// same peripheral.
     unsafe fn split_internal(self, _: Internal) -> (Self::Rx, Self::Tx);
 }

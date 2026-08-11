@@ -215,7 +215,7 @@ where
 }
 
 impl<'d> Mem2Mem<'d, Blocking> {
-    /// Create a new [`Mem2Mem`] instance.
+    /// Creates a new [`Mem2Mem`] instance.
     pub fn new<CH>(
         channel: CH,
         #[cfg(dma_mem2mem_requires_peripheral)] peripheral: impl DmaEligiblePeripheral<CH::Erased>,
@@ -230,7 +230,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
         Self::new_inner(channel, dma_peri)
     }
 
-    /// Create a new [`Mem2Mem`] instance.
+    /// Creates a new [`Mem2Mem`] instance.
     ///
     /// # Safety
     ///

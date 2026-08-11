@@ -236,7 +236,7 @@ pub struct Rtc<'d> {
 }
 
 impl<'d> Rtc<'d> {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Creates a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rtc_timer: RTC_TIMER<'d>) -> Self {

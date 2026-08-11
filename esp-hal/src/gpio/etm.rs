@@ -99,7 +99,7 @@ pub struct Channels<'d> {
 }
 
 impl<'d> Channels<'d> {
-    /// Create a new instance
+    /// Creates a new instance
     pub fn new(peripheral: GPIO_SD<'d>) -> Self {
         Self {
             _gpio_sd: peripheral,

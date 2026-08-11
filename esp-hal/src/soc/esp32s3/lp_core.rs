@@ -66,7 +66,7 @@ pub struct UlpCoreTimerCycles {
 }
 impl UlpCoreTimerCycles {
     /// Creates a new Ulp Timer cycle count configuration.
-    /// ## Panics
+    /// # Panics
     ///
     /// Panics if the cycles value is outside of the value range (0 ..= 0xFFFFFF).
     pub const fn new(cycles: u32) -> Self {

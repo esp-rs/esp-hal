@@ -103,7 +103,7 @@ pub struct SingleStandardFilter {
 
 impl SingleStandardFilter {
     #[procmacros::doc_replace]
-    /// Create a new filter that matches against a single 11-bit standard id.
+    /// Creates a new filter that matches against a single 11-bit standard id.
     /// The filter can match against the packet's id, RTR bit, and first two
     /// bytes of the payload.
     ///
@@ -511,7 +511,7 @@ impl DualExtendedFilter {
             raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
         }
     }
-    /// Create a new filter matching the first 16 bits of two 29-bit IDs.
+    /// Creates a new filter matching the first 16 bits of two 29-bit IDs.
     ///
     /// The masks indicate which bits of the code the filter should match
     /// against. Set bits in the mask indicate that the corresponding bit in

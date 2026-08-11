@@ -411,7 +411,7 @@ pub(crate) fn current_raw_runlevel() -> u32 {
 ///
 /// # Safety
 ///
-/// This function must only be used to raise the runlevel and to restore it
+/// Must only be used to raise the runlevel and to restore it
 /// to a previous value. It must not be used to arbitrarily lower the
 /// runlevel.
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
@@ -467,7 +467,7 @@ pub(crate) fn priority_to_cpu_interrupt(_interrupt: Interrupt, level: Priority) 
 ///
 /// # Safety
 ///
-/// This function must be called only during core startup.
+/// Must be called only during core startup.
 #[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
 pub(crate) unsafe fn init_vectoring() {
     use riscv::register::mtvec;
@@ -564,7 +564,7 @@ pub(crate) mod rt {
 
     /// # Safety
     ///
-    /// This function is called from an assembly trap handler.
+    /// Called from an assembly trap handler.
     #[doc(hidden)]
     #[unsafe(link_section = ".trap.rust")]
     #[unsafe(export_name = "_start_trap_rust_hal")]

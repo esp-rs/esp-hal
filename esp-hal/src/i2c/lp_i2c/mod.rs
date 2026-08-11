@@ -193,12 +193,12 @@ impl<'d> LpI2c<'d> {
     )]
     /// Creates a new instance of the `LpI2c` peripheral.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if the provided config is
     /// invalid.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -248,12 +248,12 @@ impl<'d> LpI2c<'d> {
     )]
     /// Applies a new configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if the provided config is
     /// invalid.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -287,12 +287,12 @@ impl<'d> LpI2c<'d> {
     /// The transfer consists of a single write transaction that sends the device address, the
     /// register address, then `data`.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`Error::TransactionSizeLimitExceeded`] is returned if `data` is longer than the driver
     /// can transfer in a single transaction.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -328,12 +328,12 @@ impl<'d> LpI2c<'d> {
     /// The transfer writes the device address and the register address, then repeats the start
     /// condition to read `data` back.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`Error::TransactionSizeLimitExceeded`] is returned if `data` is longer than the driver
     /// can transfer in a single transaction.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

@@ -161,7 +161,7 @@ fn mspi_timing_psram_tuning() {
 /// 1, will also update SPI1 timing registers. Should only be set to 1 when
 /// do tuning.
 ///
-/// This function should always be called after `mspi_timing_flash_tuning`
+/// Should always be called after `mspi_timing_flash_tuning`
 /// or `calculate_best_flash_tuning_config`
 #[ram]
 fn mspi_timing_enter_high_speed_mode(config: &PsramConfig) {

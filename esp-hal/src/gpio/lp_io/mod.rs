@@ -27,7 +27,7 @@
     ulp_riscv_driver_supported,
     doc = "
 
-## Handing a pin to the low-power core
+## Handing off a pin to the low-power core
 
 [`LowPowerInput`], [`LowPowerOutput`], and [`LowPowerOutputOpenDrain`] are opaque tokens that
 represent a pad owned by the low-power domain. Obtain them by consuming a

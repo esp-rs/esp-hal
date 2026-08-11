@@ -348,11 +348,11 @@ pub trait Pin: Sealed {
     #[procmacros::doc_replace]
     /// Type-erase this pin into an [`AnyPin`].
     ///
-    /// This function converts pin singletons (`GPIO0<'_>`, …), which are all
+    /// Converts pin singletons (`GPIO0<'_>`, …), which are all
     /// different types, into the same type. It is useful for creating
     /// arrays of pins, or avoiding generics.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -448,7 +448,7 @@ pub struct Io<'d> {
 }
 
 impl<'d> Io<'d> {
-    /// Initialize the I/O driver.
+    /// Creates a new I/O driver.
     #[instability::unstable]
     pub fn new(_io_mux: IO_MUX<'d>) -> Self {
         Io { _io_mux }
@@ -629,7 +629,7 @@ impl<'d> Output<'d> {
     /// The `config` parameter sets the drive mode, drive strength, and pull
     /// direction of the pin.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// The following example configures `GPIO5` to pulse a LED once. The
     /// example assumes that the LED is connected such that it is on when
@@ -678,7 +678,7 @@ impl<'d> Output<'d> {
     /// Note that the signal returned by this function is
     /// [frozen](interconnect::OutputSignal::freeze).
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -697,7 +697,7 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Change the configuration.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -715,7 +715,7 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Set the output as high.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -733,7 +733,7 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Set the output as low.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -749,9 +749,9 @@ impl<'d> Output<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Set the output level.ç
+    /// Sets the output level.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -769,10 +769,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns whether the pin is set to high level.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
+    /// Reads back the value set using `set_level`, `set_high` or
     /// `set_low`. It does not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -790,10 +790,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns whether the pin is set to low level.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
+    /// Reads back the value set using `set_level`, `set_high` or
     /// `set_low`. It does not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -811,10 +811,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns which level the pin is set to.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
+    /// Reads back the value set using `set_level`, `set_high` or
     /// `set_low`. It does not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -835,7 +835,7 @@ impl<'d> Output<'d> {
     /// If the pin was previously set to high, it will be set to low, and vice
     /// versa.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -933,7 +933,7 @@ impl<'d> Input<'d> {
     /// The `pull` parameter configures internal pull-up or pull-down
     /// resistors.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// The following example configures `GPIO5` to read a button press. The
     /// example assumes that the button is connected such that the pin is low
@@ -985,7 +985,7 @@ impl<'d> Input<'d> {
     /// Note that the signal returned by this function is
     /// [frozen](interconnect::InputSignal::freeze).
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1006,7 +1006,7 @@ impl<'d> Input<'d> {
     #[procmacros::doc_replace]
     /// Get whether the pin input level is high.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1024,7 +1024,7 @@ impl<'d> Input<'d> {
     #[procmacros::doc_replace]
     /// Get whether the pin input level is low.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1042,7 +1042,7 @@ impl<'d> Input<'d> {
     #[procmacros::doc_replace]
     /// Get the current pin input level.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1060,7 +1060,7 @@ impl<'d> Input<'d> {
     #[procmacros::doc_replace]
     /// Change the configuration.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1094,7 +1094,7 @@ impl<'d> Input<'d> {
     /// that is already high therefore ends each light sleep immediately, and without an
     /// interrupt, because no edge occurred. Automatic light sleep then makes no sleep at all.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// ### Print something when a button is pressed.
     /// ```rust, no_run
@@ -1251,7 +1251,7 @@ impl<'d> Flex<'d> {
 
     /// Applies the given input configuration to the pin.
     ///
-    /// This function does not set the pin as input (i.e. it does not enable the
+    /// Does not set the pin as input (i.e. it does not enable the
     /// input buffer). Note that the pull direction is common between the
     /// input and output configuration.
     #[inline]
@@ -1380,7 +1380,7 @@ impl<'d> Flex<'d> {
 
     /// Applies the given output configuration to the pin.
     ///
-    /// This function does not set the pin to output (i.e. it does not enable
+    /// Does not set the pin to output (i.e. it does not enable
     /// the output driver). Note that the pull direction is common between
     /// the input and output configuration.
     #[inline]
@@ -1395,7 +1395,7 @@ impl<'d> Flex<'d> {
     /// [`Self::set_low`] or [`Self::set_level`] to set the output level before
     /// enabling the output.
     ///
-    /// This function does not disable the input buffer.
+    /// Does not disable the input buffer.
     #[inline]
     #[instability::unstable]
     pub fn set_output_enable(&mut self, enable_output: bool) {
@@ -1519,7 +1519,7 @@ impl<'d> Flex<'d> {
     /// [frozen](interconnect::InputSignal::freeze). On the other hand,
     /// the pin driver is free to change settings.
     ///
-    /// This function allows you to configure an input-output pin, then keep
+    /// Allows you to configure an input-output pin, then keep
     /// working with the output half. This is mainly intended for testing,
     /// allowing you to drive a peripheral from a signal generated by
     /// software.
@@ -1644,7 +1644,7 @@ impl<'lt> AnyPin<'lt> {
     #[inline]
     /// Resets the GPIO to a known state.
     ///
-    /// This function needs to be called before using the GPIO pin:
+    /// Needs to be called before using the GPIO pin:
     /// - Before converting it into signals
     /// - Before using it as an input or output
     pub(crate) fn init_gpio(&self) {
@@ -1688,9 +1688,9 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// # Panics
     ///
-    /// This function panics if the pin is not an output pin.
+    /// Panics if the pin is not an output pin.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1754,7 +1754,7 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// # Panics
     ///
-    /// This function panics if the pin is not an output pin.
+    /// Panics if the pin is not an output pin.
     #[inline]
     #[instability::unstable]
     pub fn into_output_signal(self) -> interconnect::OutputSignal<'lt> {
@@ -2010,7 +2010,7 @@ impl AnyPin<'_> {
     #[procmacros::doc_replace]
     /// Attempts to downcast the pin into the underlying GPIO instance.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust,no_run
     /// # {before_snippet}
@@ -2051,7 +2051,7 @@ impl AnyPin<'_> {
     ///
     /// Panics if the pin with the given number does not exist.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2079,7 +2079,7 @@ impl AnyPin<'_> {
     ///
     /// Ensure that only one instance of a pin is in use at one time.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2098,10 +2098,10 @@ impl AnyPin<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Create a new AnyPin object that is limited to the lifetime of the
+    /// Creates a new AnyPin object that is limited to the lifetime of the
     /// passed reference.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

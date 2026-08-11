@@ -153,7 +153,7 @@ pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
 
 /// Read bit value.
 ///
-/// This function panics if the field's bit length is not equal to 1.
+/// Panics if the field's bit length is not equal to 1.
 #[inline(always)]
 #[instability::unstable]
 pub fn read_bit(field: EfuseField) -> bool {

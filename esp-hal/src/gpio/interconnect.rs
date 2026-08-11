@@ -161,7 +161,7 @@ pub trait PeripheralOutput<'d>: Into<OutputSignal<'d>> + PeripheralSignal<'d> {
 
     /// Disconnects the peripheral output from an output signal target.
     ///
-    /// This function clears the entry in the IO MUX that
+    /// Clears the entry in the IO MUX that
     /// associates this output pin with a previously connected
     /// [signal](`gpio::OutputSignal`). Any other outputs connected to the
     /// peripheral remain intact.
@@ -333,7 +333,7 @@ impl gpio::InputSignal {
     /// so if you want to disconnect it from GPIOs, you should connect it to a
     /// constant level.
     ///
-    /// This function allows connecting a peripheral input to either a
+    /// Allows connecting a peripheral input to either a
     /// [`PeripheralInput`] or [`PeripheralOutput`] implementation.
     #[inline]
     #[instability::unstable]
@@ -616,8 +616,8 @@ impl<'d> InputSignal<'d> {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it allows peripherals to modify the pin
-    /// configuration again. This can lead to undefined behavior if the pin
+    /// Allows peripherals to modify the pin configuration again. This can lead to undefined
+    /// behavior if the pin configuration again. This can lead to undefined behavior if the pin
     /// is being configured by multiple peripherals at the same time. It can
     /// also lead to surprising behavior if the pin is passed to multiple
     /// peripherals that expect conflicting settings.
@@ -792,8 +792,8 @@ impl<'d> OutputSignal<'d> {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it allows peripherals to modify the pin
-    /// configuration again. This can lead to undefined behavior if the pin
+    /// Allows peripherals to modify the pin configuration again. This can lead to undefined
+    /// behavior if the pin configuration again. This can lead to undefined behavior if the pin
     /// is being configured by multiple peripherals at the same time.
     /// It can also lead to surprising behavior if the pin is passed to multiple
     /// peripherals that expect conflicting settings.

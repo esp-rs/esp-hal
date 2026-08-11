@@ -211,7 +211,7 @@ impl<'d> SystemTimer<'d> {
         }
     }
 
-    /// Create a new instance.
+    /// Creates a new instance.
     pub fn new(_systimer: SYSTIMER<'d>) -> Self {
         // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         if PeripheralClockControl::enable(PeripheralEnable::Systimer) {

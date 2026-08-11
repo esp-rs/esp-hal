@@ -28,7 +28,7 @@ pub(crate) struct VTable<T: Sync + Send> {
     /// accepted. If there is no driver currently processing the queue, this function will
     /// return None to prevent removing the work item from the queue.
     ///
-    /// This function should be as short as possible.
+    /// Should be as short as possible.
     pub(crate) post: fn(NonNull<()>, &mut T) -> Option<Poll>,
 
     /// Polls the status of the current work item.
@@ -36,17 +36,17 @@ pub(crate) struct VTable<T: Sync + Send> {
     /// The work queue ensures that the item passed here has been first passed to the driver by
     /// `post`.
     ///
-    /// This function should be as short as possible.
+    /// Should be as short as possible.
     pub(crate) poll: fn(NonNull<()>, &mut T) -> Poll,
 
     /// Attempts to abort processing a work item.
     ///
-    /// This function should be as short as possible.
+    /// Should be as short as possible.
     pub(crate) cancel: fn(NonNull<()>, &mut T),
 
     /// Called when the driver may be stopped.
     ///
-    /// This function should be as short as possible.
+    /// Should be as short as possible.
     pub(crate) stop: fn(NonNull<()>),
 }
 
@@ -112,7 +112,7 @@ impl<T: Sync + Send> Inner<T> {
 
     /// Runs one processing iteration.
     ///
-    /// This function enqueues a new work item or polls the status of the currently processed one.
+    /// Enqueues a new work item or polls the status of the currently processed one.
     /// Returns whether the function should be re-called by the caller.
     fn process(&mut self) -> bool {
         if let Some(mut current) = self.current {
@@ -204,7 +204,7 @@ impl<T: Sync + Send> Inner<T> {
     ///
     /// The function returns true when the item was immediately cancelled.
     ///
-    /// This function is not `unsafe` because it only dereferences `work_item` if the function has
+    /// Not `unsafe` because it only dereferences `work_item` if the function has
     /// determined that the item belongs to this queue.
     fn cancel(&mut self, mut work_item: NonNull<WorkItem<T>>) -> bool {
         if self.current == Some(work_item) {
@@ -244,7 +244,7 @@ impl<T: Sync + Send> Inner<T> {
     /// Returns `true` if the work item was successfully removed, `false` if the work item was not
     /// found in the queue.
     ///
-    /// This function is not `unsafe` because it does not dereference `ptr`, so it does not matter
+    /// Not `unsafe` because it does not dereference `ptr`, so it does not matter
     /// that `ptr` may belong to a different work queue.
     fn remove(&mut self, ptr: NonNull<WorkItem<T>>) -> bool {
         // Walk the queue to find `ptr`.
@@ -405,7 +405,7 @@ impl<T: Sync + Send> WorkQueue<T> {
 
     /// Polls the queue once and returns the status of the given work item.
     ///
-    /// ## Safety
+    /// # Safety
     ///
     /// The caller must ensure that `item` belongs to the polled queue. An item belongs to the
     /// **last queue it was enqueued in**, even if the item is no longer in the queue's linked
@@ -468,7 +468,7 @@ impl<T: Sync + Send + Clone> Clone for WorkItem<T> {
 impl<T: Sync + Send> WorkItem<T> {
     /// Completes the work item.
     ///
-    /// This function is intended to be called from the underlying drivers.
+    /// Intended to be called from the underlying drivers.
     pub fn complete(&mut self, status: Status) {
         self.status = Poll::Ready(status);
         self.waker.wake();
@@ -555,7 +555,7 @@ impl<'t, T: Sync + Send> Handle<'t, T> {
 
     /// Polls the work item to completion, by busy-looping.
     ///
-    /// This function returns immediately if `poll` returns `true`.
+    /// Returns immediately if `poll` returns `true`.
     #[inline]
     pub fn wait_blocking(mut self) -> Status {
         loop {

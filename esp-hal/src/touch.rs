@@ -183,7 +183,7 @@ impl<'d> Touch<'d, OneShot, Blocking> {
     /// Initializes the touch peripheral and returns this marker struct.
     /// Optionally accepts configuration options.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -240,7 +240,7 @@ impl<'d> Touch<'d, Continuous, Blocking> {
     /// Initializes the touch peripheral in continuous mode and returns this
     /// marker struct. Optionally accepts configuration options.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -280,7 +280,7 @@ impl<'d> Touch<'d, Continuous, Async> {
     /// - `rtc`: The RTC peripheral is needed to configure the required interrupts.
     /// - `config`: Optional configuration options.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -389,7 +389,7 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     ///
     /// ## Note for [`OneShot`] mode:
     ///
-    /// This function might block forever, if
+    /// Might block forever, if
     /// [`start_measurement`](Self::start_measurement) was not called before. As
     /// measurements are not cleared, the touch values might also be
     /// outdated, if it has been some time since the last call to that
@@ -416,7 +416,7 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     /// - `threshold`: The threshold above/below which the pin is considered touched. Above/below
     ///   depends on the configuration of `touch` in [`new`](Self::new) (defaults to below).
     ///
-    /// ## Example
+    /// # Examples
     pub fn listen(&mut self, threshold: u16) {
         self.pin.set_threshold(threshold, Internal);
         listen(self.pin.touch_nr(Internal))

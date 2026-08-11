@@ -119,7 +119,7 @@ pub struct LpUart {
 }
 
 impl LpUart {
-    /// Initialize the UART driver using the provided configuration
+    /// Creates a new low-power UART instance with the provided configuration.
     // TODO: CTS and RTS pins
     pub fn new(
         uart: LP_UART<'static>,

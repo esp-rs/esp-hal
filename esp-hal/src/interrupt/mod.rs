@@ -489,7 +489,7 @@ impl RunLevel {
     #[procmacros::doc_replace]
     /// Returns the current run level.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -509,7 +509,7 @@ impl RunLevel {
     ///
     /// # Safety
     ///
-    /// This function must only be used to raise the run level and to restore it
+    /// Must only be used to raise the run level and to restore it
     /// to a previous value. It must not be used to arbitrarily lower the
     /// run level.
     #[inline]
@@ -521,9 +521,9 @@ impl RunLevel {
     #[procmacros::doc_replace]
     /// Checks if the run level indicates thread mode.
     ///
-    /// This function can be used to determine if the CPU is executing an interrupt handler.
+    /// Can be used to determine if the CPU is executing an interrupt handler.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

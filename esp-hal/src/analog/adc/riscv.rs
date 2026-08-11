@@ -367,7 +367,7 @@ where
 
     /// Request that the ADC begin a conversion on the specified pin
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     pub fn read_oneshot<PIN, CS>(
@@ -494,7 +494,7 @@ impl<'d, ADCX> Adc<'d, ADCX, Async>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Creates a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Adc<'d, ADCX, Blocking> {
         if release_async_adc() {
             // Disable ADC interrupt on all cores if the last async ADC instance is disabled
@@ -513,7 +513,7 @@ where
 
     /// Request that the ADC begin a conversion on the specified pin
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16

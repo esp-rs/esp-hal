@@ -12,7 +12,7 @@
 //! for a summary on the protocol.
 //!
 //! ## Configuration
-//! The driver  offers functions for initializing the TWAI peripheral, setting
+//! The driver offers functions for initializing the TWAI peripheral, setting
 //! up the timing parameters, configuring acceptance filters, handling
 //! interrupts, and transmitting/receiving messages on the TWAI bus.
 //!
@@ -459,7 +459,7 @@ impl EspTwaiFrame {
     /// Frame Format (FF): specifies whether content is Extended Frame Format (EFF) or Standard
     /// Frame Format (SFF).
     ///
-    /// This method is private: interested clients should deduce the frame format from
+    /// For internal use only. Interested clients should deduce the frame format from
     /// [`Self::id()`].
     #[inline(always)]
     fn is_extended_format(&self) -> bool {
@@ -625,18 +625,18 @@ impl EspTwaiFrame {
         Ok(Self { bytes })
     }
 
-    /// Create a new `EspTwaiFrame` with the specified ID and data payload.
+    /// Creates a new `EspTwaiFrame` with the specified ID and data payload.
     pub fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
         Self::new_from_parameters(id.into(), false, false, data.len(), data).ok()
     }
 
-    /// Create a new `EspTwaiFrame` for a transmission request with the
+    /// Creates a new `EspTwaiFrame` for a transmission request with the
     /// specified ID and data length (DLC).
     pub fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
         Self::new_from_parameters(id.into(), true, false, dlc, &[]).ok()
     }
 
-    /// Create a new `EspTwaiFrame` ready for self-reception with the specified
+    /// Creates a new `EspTwaiFrame` ready for self-reception with the specified
     /// ID and data payload.
     pub fn new_self_reception(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
         Self::new_from_parameters(id.into(), false, true, data.len(), data).ok()
@@ -1077,7 +1077,7 @@ where
 }
 
 impl<'d> TwaiConfiguration<'d, Blocking> {
-    /// Create a new instance of [TwaiConfiguration]
+    /// Creates a new instance of [TwaiConfiguration]
     ///
     /// You will need to use a transceiver to connect to the TWAI bus
     pub fn new(
@@ -1090,7 +1090,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
         Self::new_internal(peripheral.degrade(), rx_pin, tx_pin, baud_rate, false, mode)
     }
 
-    /// Create a new instance of [TwaiConfiguration] meant to connect two ESP32s
+    /// Creates a new instance of [TwaiConfiguration] meant to connect two ESP32s
     /// directly
     ///
     /// You don't need a transceiver by following the description in the

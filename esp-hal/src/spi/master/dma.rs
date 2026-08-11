@@ -1739,7 +1739,7 @@ where
 impl<Buf> SpiDmaTransfer<'_, Async, Buf> {
     /// Waits for the DMA transfer to complete asynchronously.
     ///
-    /// This method awaits the completion of both RX and TX operations.
+    /// Awaits the completion of both RX and TX operations.
     #[instability::unstable]
     pub async fn wait_for_done(&mut self) {
         self.spi_dma.wait_for_idle_async().await;
@@ -1760,7 +1760,7 @@ where
 
     /// Checks if the transfer is complete.
     ///
-    /// This method returns `true` if both RX and TX operations are done,
+    /// Returns `true` if both RX and TX operations are done,
     /// and the SPI instance is no longer busy.
     #[instability::unstable]
     pub fn is_done(&self) -> bool {
@@ -1769,7 +1769,7 @@ where
 
     /// Waits for the DMA transfer to complete.
     ///
-    /// This method blocks until the transfer is finished and returns the
+    /// Blocks until the transfer is finished and returns the
     /// `SpiDma` instance and the associated buffer.
     #[instability::unstable]
     pub fn wait(mut self) -> (SpiDma<'d, Dm>, Buf) {

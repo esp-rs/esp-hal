@@ -422,7 +422,7 @@ where
 
     /// Request that the ADC begin a conversion on the specified pin
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     pub fn read_oneshot<PIN, CS>(

@@ -294,7 +294,7 @@ where
 }
 
 impl<'a, S: TimerSpeed> Timer<'a, S> {
-    /// Create a new instance of a timer
+    /// Creates a new instance of a timer
     pub fn new(ledc: &'a pac::ledc::RegisterBlock, number: Number) -> Self {
         Timer {
             ledc,

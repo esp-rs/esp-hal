@@ -403,7 +403,7 @@ impl<'d> Uhci<'d, Blocking> {
         uhci
     }
 
-    /// Create a new instance in [crate::Async] mode.
+    /// Creates a new instance in [crate::Async] mode.
     pub fn into_async(self) -> Uhci<'d, Async> {
         Uhci {
             uart: self.uart.into_async(),
@@ -415,7 +415,7 @@ impl<'d> Uhci<'d, Blocking> {
 }
 
 impl<'d> Uhci<'d, Async> {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Creates a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
         Uhci {
             uart: self.uart.into_blocking(),
@@ -565,7 +565,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
 
     /// Waits for the DMA transfer to complete.
     ///
-    /// This method blocks until the transfer is finished and returns the
+    /// Blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
     pub fn wait(mut self) -> (Result<(), Error>, UhciTx<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
@@ -698,7 +698,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
 
     /// Waits for the DMA transfer to complete.
     ///
-    /// This method blocks until the transfer is finished and returns the
+    /// Blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
     pub fn wait(mut self) -> (Result<(), Error>, UhciRx<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {

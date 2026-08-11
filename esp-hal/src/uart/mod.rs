@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The UART is a hardware peripheral which handles communication using serial
-//! communication interfaces, such as RS232 and RS485. This peripheral provides!
+//! communication interfaces, such as RS232 and RS485. This peripheral provides
 //! a cheap and ubiquitous method for full- and half-duplex communication
 //! between devices.
 //!
@@ -759,14 +759,14 @@ impl core::fmt::Display for ConfigError {
 
 impl<'d> UartTx<'d, Blocking> {
     #[procmacros::doc_replace]
-    /// Create a new UART TX instance in [`Blocking`] mode.
+    /// Creates a new UART TX instance in [`Blocking`] mode.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns a [`ConfigError`] if the configuration is not
+    /// Returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -827,7 +827,7 @@ impl<'d> UartTx<'d, Async> {
 
     /// Write data into the TX buffer.
     ///
-    /// This function writes the provided buffer `bytes` into the UART transmit
+    /// Writes the provided buffer `bytes` into the UART transmit
     /// buffer. If the buffer is full, the function waits asynchronously for
     /// space in the buffer to become available.
     ///
@@ -837,9 +837,9 @@ impl<'d> UartTx<'d, Async> {
     /// Upon an error, the function returns immediately and the contents of the
     /// internal FIFO are not modified.
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is cancellation safe.
+    /// Cancellation-safe.
     pub async fn write_async(&mut self, bytes: &[u8]) -> Result<usize, TxError> {
         // We need to loop in case the TX empty interrupt was fired but not cleared
         // before, but the FIFO itself was filled up by a previous write.
@@ -867,13 +867,13 @@ impl<'d> UartTx<'d, Async> {
 
     /// Asynchronously flushes the UART transmit buffer.
     ///
-    /// This function ensures that all pending data in the transmit FIFO has
+    /// Ensures that all pending data in the transmit FIFO has
     /// been sent over the UART. If the FIFO contains data, it waits for the
     /// transmission to complete before returning.
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is cancellation safe.
+    /// Cancellation-safe.
     pub async fn flush_async(&mut self) -> Result<(), TxError> {
         // Nothing is guaranteed to clear the Done status, so let's loop here in case Tx
         // was Done before the last write operation that pushed data into the
@@ -892,7 +892,7 @@ impl<'d> UartTx<'d, Async> {
     /// Duration is in bits, the time it takes to transfer one bit at the
     /// current baud rate.
     ///
-    /// This function restores the original TX line state after the break signal is sent, even if
+    /// Restores the original TX line state after the break signal is sent, even if
     /// the future is cancelled.
     #[instability::unstable]
     pub async fn send_break_async<D: DelayNs>(&mut self, delay: &mut D, bits: u32) {
@@ -947,9 +947,9 @@ where
 
     /// Change the configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns a [`ConfigError`] if the configuration is not
+    /// Returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
@@ -970,16 +970,16 @@ where
 
     /// Write bytes.
     ///
-    /// This function writes data to the internal TX FIFO of the UART
+    /// Writes data to the internal TX FIFO of the UART
     /// peripheral. The data is then transmitted over the UART TX line.
     ///
     /// The function returns the number of bytes written to the FIFO. This may
     /// be less than the length of the provided data. The function may only
     /// return 0 if the provided data is empty.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns a [`TxError`] if an error occurred during the
+    /// Returns a [`TxError`] if an error occurred during the
     /// write operation.
     #[instability::unstable]
     pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
@@ -996,7 +996,7 @@ where
 
     /// Flush the transmit buffer.
     ///
-    /// This function blocks until all data in the TX FIFO has been
+    /// Blocks until all data in the TX FIFO has been
     /// transmitted.
     #[instability::unstable]
     pub fn flush(&mut self) -> Result<(), TxError> {
@@ -1067,7 +1067,7 @@ where
 
     /// Disables all TX-related interrupts for this UART instance.
     ///
-    /// This function clears and disables the `transmit FIFO empty` interrupt,
+    /// Clears and disables the `transmit FIFO empty` interrupt,
     /// `transmit break done`, `transmit break idle done`, and `transmit done`
     /// interrupts.
     fn disable_tx_interrupts(&self) {
@@ -1093,11 +1093,11 @@ where
 
 impl<'d> UartRx<'d, Blocking> {
     #[procmacros::doc_replace]
-    /// Create a new UART RX instance in [`Blocking`] mode.
+    /// Creates a new UART RX instance in [`Blocking`] mode.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns a [`ConfigError`] if the configuration is not
+    /// Returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     ///
     /// ```rust, no_run
@@ -1115,7 +1115,7 @@ impl<'d> UartRx<'d, Blocking> {
 
     /// Waits for a break condition to be detected.
     ///
-    /// This function polls the break-detection interrupt status and returns once
+    /// Polls the break-detection interrupt status and returns once
     /// the receiver has detected a break condition. After detection, the break
     /// status is automatically cleared.
     #[instability::unstable]
@@ -1129,7 +1129,7 @@ impl<'d> UartRx<'d, Blocking> {
 
     /// Waits for a break condition to be detected with a timeout.
     ///
-    /// This function polls the break-detection interrupt status until a break is
+    /// Polls the break-detection interrupt status until a break is
     /// detected or the specified timeout expires. Returns `true` if a break was
     /// detected, `false` if the timeout elapsed. After successful detection, the
     /// break status is automatically cleared.
@@ -1247,7 +1247,7 @@ impl<'d> UartRx<'d, Async> {
 
     /// Read data asynchronously.
     ///
-    /// This function reads data from the UART receive buffer into the
+    /// Reads data from the UART receive buffer into the
     /// provided buffer. If the buffer is empty, the function waits
     /// asynchronously for data to become available, or for an error to occur.
     ///
@@ -1260,9 +1260,9 @@ impl<'d> UartRx<'d, Async> {
     /// Upon an error, the function returns immediately and the contents of the
     /// internal FIFO are not modified.
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is cancellation safe.
+    /// Cancellation-safe.
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         if buf.is_empty() {
             return Ok(0);
@@ -1275,16 +1275,16 @@ impl<'d> UartRx<'d, Async> {
 
     /// Fill buffer asynchronously.
     ///
-    /// This function reads data into the provided buffer. If the internal FIFO
+    /// Reads data into the provided buffer. If the internal FIFO
     /// does not contain enough data, the function waits asynchronously for data
     /// to become available, or for an error to occur.
     ///
     /// Note that this function may ignore the `rx_fifo_full_threshold` setting
     /// to ensure that it does not wait for more data than the buffer can hold.
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is **not** cancellation safe. If the future is dropped
+    /// **Not** cancellation-safe. If the future is dropped
     /// before it resolves, or if an error occurs during the read operation,
     /// previously read data may be lost.
     pub async fn read_exact_async(&mut self, mut buf: &mut [u8]) -> Result<(), RxError> {
@@ -1382,9 +1382,9 @@ where
 
     /// Change the configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns a [`ConfigError`] if the configuration is not
+    /// Returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
@@ -1470,9 +1470,9 @@ where
     /// be less than the length of the buffer. This function only returns 0
     /// if the provided buffer is empty.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns an [`RxError`] if a reported error occurred since
+    /// Returns an [`RxError`] if a reported error occurred since
     /// the last call to [`Self::check_for_errors`], [`Self::read_buffered`], or
     /// this function.
     ///
@@ -1485,16 +1485,16 @@ where
 
     /// Read already received bytes.
     ///
-    /// This function reads the already received bytes from the FIFO into the
+    /// Reads the already received bytes from the FIFO into the
     /// provided buffer. The function does not wait for the FIFO to actually
     /// contain any bytes.
     ///
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer, and it may also be 0.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns an [`RxError`] if a reported error occurred since
+    /// Returns an [`RxError`] if a reported error occurred since
     /// the last call to [`Self::check_for_errors`], [`Self::read`], or this
     /// function.
     ///
@@ -1507,7 +1507,7 @@ where
 
     /// Disables all RX-related interrupts for this UART instance.
     ///
-    /// This function clears and disables the `receive FIFO full` interrupt,
+    /// Clears and disables the `receive FIFO full` interrupt,
     /// `receive FIFO overflow`, `receive FIFO timeout`, and `AT command
     /// byte detection` interrupts.
     fn disable_rx_interrupts(&self) {
@@ -1529,14 +1529,14 @@ where
 
 impl<'d> Uart<'d, Blocking> {
     #[procmacros::doc_replace]
-    /// Create a new UART instance in [`Blocking`] mode.
+    /// Creates a new UART instance in [`Blocking`] mode.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns a [`ConfigError`] if the configuration is not
+    /// Returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1584,7 +1584,7 @@ impl<'d> Uart<'d, Blocking> {
     #[procmacros::doc_replace]
     /// Listen for the given interrupts
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// **Note**: In practice a proper serial terminal should be used
     /// to connect to the board (espflash won't work)
@@ -1710,7 +1710,7 @@ impl<'d> Uart<'d, Async> {
     #[procmacros::doc_replace]
     /// Write data into the TX buffer.
     ///
-    /// This function writes the provided buffer `bytes` into the UART transmit
+    /// Writes the provided buffer `bytes` into the UART transmit
     /// buffer. If the buffer is full, the function waits asynchronously for
     /// space in the buffer to become available.
     ///
@@ -1720,11 +1720,11 @@ impl<'d> Uart<'d, Async> {
     /// Upon an error, the function returns immediately and the contents of the
     /// internal FIFO are not modified.
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is cancellation safe.
+    /// Cancellation-safe.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1745,15 +1745,15 @@ impl<'d> Uart<'d, Async> {
     #[procmacros::doc_replace]
     /// Asynchronously flushes the UART transmit buffer.
     ///
-    /// This function ensures that all pending data in the transmit FIFO has
+    /// Ensures that all pending data in the transmit FIFO has
     /// been sent over the UART. If the FIFO contains data, it waits for the
     /// transmission to complete before returning.
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is cancellation safe.
+    /// Cancellation-safe.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1775,7 +1775,7 @@ impl<'d> Uart<'d, Async> {
     #[procmacros::doc_replace]
     /// Read data asynchronously.
     ///
-    /// This function reads data from the UART receive buffer into the
+    /// Reads data from the UART receive buffer into the
     /// provided buffer. If the buffer is empty, the function waits
     /// asynchronously for data to become available, or for an error to occur.
     ///
@@ -1788,11 +1788,11 @@ impl<'d> Uart<'d, Async> {
     /// Upon an error, the function returns immediately and the contents of the
     /// internal FIFO are not modified.
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is cancellation safe.
+    /// Cancellation-safe.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1816,16 +1816,16 @@ impl<'d> Uart<'d, Async> {
 
     /// Fill buffer asynchronously.
     ///
-    /// This function reads data from the UART receive buffer into the
+    /// Reads data from the UART receive buffer into the
     /// provided buffer. If the buffer is empty, the function waits
     /// asynchronously for data to become available, or for an error to occur.
     ///
     /// Note that this function may ignore the `rx_fifo_full_threshold` setting
     /// to ensure that it does not wait for more data than the buffer can hold.
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is **not** cancellation safe. If the future is dropped
+    /// **Not** cancellation-safe. If the future is dropped
     /// before it resolves, or if an error occurs during the read operation,
     /// previously read data may be lost.
     #[instability::unstable]
@@ -1848,7 +1848,7 @@ impl<'d> Uart<'d, Async> {
     /// Duration is in bits, the time it takes to transfer one bit at the
     /// current baud rate.
     ///
-    /// This function restores the original TX line state after the break signal is sent, even if
+    /// Restores the original TX line state after the break signal is sent, even if
     /// the future is cancelled.
     #[instability::unstable]
     pub async fn send_break_async<D: DelayNs>(&mut self, delay: &mut D, bits: u32) {
@@ -1897,7 +1897,7 @@ where
     /// initially high, to avoid receiving a non-data byte caused by an
     /// initial low signal level.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1917,7 +1917,7 @@ where
     /// Sets the specified pin to push-pull output and connects it to the UART
     /// TX signal.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1934,7 +1934,7 @@ where
     #[procmacros::doc_replace]
     /// Configure CTS pin
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1953,7 +1953,7 @@ where
     #[procmacros::doc_replace]
     /// Configure RTS pin
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1981,7 +1981,7 @@ where
     /// will not block. Otherwise, the functions will not return until the buffer is
     /// ready.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2006,19 +2006,19 @@ where
     #[procmacros::doc_replace]
     /// Writes bytes.
     ///
-    /// This function writes data to the internal TX FIFO of the UART
+    /// Writes data to the internal TX FIFO of the UART
     /// peripheral. The data is then transmitted over the UART TX line.
     ///
     /// The function returns the number of bytes written to the FIFO. This may
     /// be less than the length of the provided data. The function may only
     /// return 0 if the provided data is empty.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns a [`TxError`] if an error occurred during the
+    /// Returns a [`TxError`] if an error occurred during the
     /// write operation.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2036,7 +2036,7 @@ where
     #[procmacros::doc_replace]
     /// Flush the transmit buffer of the UART
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2067,7 +2067,7 @@ where
     /// Data that does not get stored due to an error will be lost and does not count
     /// towards the number of bytes in the receive buffer.
     // TODO: once we add support for UART_ERR_WR_MASK it needs to be documented here.
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2116,15 +2116,15 @@ where
     /// be less than the length of the buffer. This function only returns 0
     /// if the provided buffer is empty.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns an [`RxError`] if a reported error occurred since
+    /// Returns an [`RxError`] if a reported error occurred since
     /// the last check for errors.
     ///
     /// If the error occurred before this function was called, the contents of
     /// the FIFO are not modified.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2147,12 +2147,12 @@ where
     #[procmacros::doc_replace]
     /// Change the configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns a [`ConfigError`] if the configuration is not
+    /// Returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2200,7 +2200,7 @@ where
     /// This is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2233,7 +2233,7 @@ where
     /// This is particularly useful when running separate transmit and receive
     /// futures concurrently.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2269,16 +2269,16 @@ where
 
     /// Read already received bytes.
     ///
-    /// This function reads the already received bytes from the FIFO into the
+    /// Reads the already received bytes from the FIFO into the
     /// provided buffer. The function does not wait for the FIFO to actually
     /// contain any bytes.
     ///
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer, and it may also be 0.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function returns an [`RxError`] if a reported error occurred since
+    /// Returns an [`RxError`] if a reported error occurred since
     /// the last check for errors.
     ///
     /// If the error occurred before this function was called, the contents of

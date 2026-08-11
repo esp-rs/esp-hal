@@ -616,7 +616,7 @@ pub struct DedicatedGpioOutput<'lt> {
 impl<'lt> DedicatedGpioOutput<'lt> {
     /// Creates a new dedicated GPIO output driver.
     ///
-    /// This function returns an empty driver. You will need to add output drivers to it using the
+    /// Returns an empty driver. You will need to add output drivers to it using the
     /// [`Self::with_pin`] method.
     pub fn new<CH>(channel: CH) -> Self
     where
@@ -1057,7 +1057,7 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     ///
     /// A bit is set to 1 if that channel is currently included in the bundle.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1096,7 +1096,7 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     /// Attaches (enables) a dedicated output driver in this bundle. After enabling, you will
     /// be able to control the output channels of `out` via this bundle.
     ///
-    /// This method logically borrows the provided [`DedicatedGpioOutput`] for the lifetime `'lt`.
+    /// Logically borrows the provided [`DedicatedGpioOutput`] for the lifetime `'lt`.
     /// Multiple bundles may borrow the same output driver at the same time. Check examples in the
     /// module-level documentation for more.
     ///
@@ -1156,7 +1156,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// For every bit set to 1 in `bits`, the corresponding dedicated output channel is driven
     /// high. Bits set to 0 are left unchanged.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// `bundle.set_high(0b1011_0001)` sets channels 0, 4, 5, and 7 high.
     ///
@@ -1191,7 +1191,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// For every bit set to 1 in `bits`, the corresponding dedicated output channel is driven
     /// low. Bits set to 0 are left unchanged.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// `bundle.set_low(0b1011_0001)` sets channels 0, 4, 5, and 7 low.
     ///
@@ -1225,14 +1225,14 @@ You should only disable dedicated GPIO drivers that were configured on the same 
 
     /// Writes output levels for **all channels included by this bundle**.
     ///
-    /// This method updates the output state of every channel whose bit is set in
+    /// Updates the output state of every channel whose bit is set in
     /// [`Self::mask`]. Channels not included in the bundle are not modified.
     ///
     /// `bits` provides the level for each channel in the bundle:
     /// - bit = 0 -> low
     /// - bit = 1 -> high
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// If `self.mask()` is `0b1111_0000` (bundle contains channels 4..=7), then
     /// `bundle.write_bits(0b0001_0000)` sets channel 4 high and channels 5..=7 low,
@@ -1240,7 +1240,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     ///
     /// <section class="warning">
     ///
-    /// This function only writes channels selected by [`Self::mask`]. It will **not**
+    /// Only writes channels selected by [`Self::mask`]. It will **not**
     /// change channels outside the mask, even if `bits` contains 1s there.
     ///
     /// Make sure this "masked write" behavior matches what you intend.
@@ -1262,7 +1262,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     ///
     /// For channels outside the bundle mask, the corresponding bits are always 0.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
     /// `output_levels()` will only contain bits 0, 1, and 3, regardless of the output
@@ -1384,7 +1384,7 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     ///
     /// A bit is set to 1 if that channel is currently included in the bundle.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1421,7 +1421,7 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     /// Attaches (enables) an already-configured dedicated input driver to this bundle. After
     /// enabling, you will be able to read the input channels of `inp` via this bundle.
     ///
-    /// This method logically borrows the provided [`DedicatedGpioInput`] for the lifetime `'lt`.
+    /// Logically borrows the provided [`DedicatedGpioInput`] for the lifetime `'lt`.
     /// Multiple bundles may borrow the same input driver at the same time. Check examples in the
     /// module-level documentation for more.
     ///
@@ -1480,7 +1480,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     ///
     /// For channels outside the bundle mask, the corresponding bits are always 0.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
     /// `levels()` will only contain bits 0, 1, and 3, regardless of the state
@@ -1635,7 +1635,7 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     ///
     /// A bit is set to 1 if that channel is currently included in the bundle.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1666,7 +1666,7 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     /// enabling, you will be able to control the input/output channels of `flex` via this
     /// bundle.
     ///
-    /// This method logically borrows the provided [`DedicatedGpioFlex`] for the lifetime `'lt`.
+    /// Logically borrows the provided [`DedicatedGpioFlex`] for the lifetime `'lt`.
     /// Multiple bundles may borrow the same flex driver at the same time. Check examples in the
     /// module-level documentation for more.
     ///
@@ -1726,7 +1726,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// For every bit set to 1 in `bits`, the corresponding channel is driven high.
     /// Bits set to 0 are left unchanged.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// If the bundle contains channels 0 and 2, then `bundle.set_high(0b0000_0101)` sets
     /// channel 0 and 2 high.
@@ -1762,7 +1762,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     /// For every bit set to 1 in `bits`, the corresponding channel is driven low.
     /// Bits set to 0 are left unchanged.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// If the bundle contains channels 0 and 2, then `bundle.set_low(0b0000_0101)` sets
     /// channel 0 and 2 low.
@@ -1795,14 +1795,14 @@ You should only disable dedicated GPIO drivers that were configured on the same 
 
     /// Writes output levels for **all channels included by this bundle**.
     ///
-    /// This method updates the output state of every channel whose bit is set in
+    /// Updates the output state of every channel whose bit is set in
     /// [`Self::mask`]. Channels not included in the bundle are not modified.
     ///
     /// `bits` provides the level for each channel in the bundle:
     /// - bit = 0 -> low
     /// - bit = 1 -> high
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// If `self.mask()` is `0b1111_0000` (bundle contains channels 4..=7), then
     /// `bundle.write_bits(0b0001_0000)` sets channel 4 high and channels 5..=7 low,
@@ -1810,7 +1810,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     ///
     /// <section class="warning">
     ///
-    /// This function only writes channels selected by [`Self::mask`]. It will **not**
+    /// Only writes channels selected by [`Self::mask`]. It will **not**
     /// change channels outside the mask, even if `bits` contains 1s there.
     ///
     /// Make sure this "masked write" behavior matches what you intend.
@@ -1831,7 +1831,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     ///
     /// For channels outside the bundle mask, the corresponding bits are always 0.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
     /// `output_levels()` will only contain bits 0, 1, and 3, regardless of the output
@@ -1851,7 +1851,7 @@ You should only disable dedicated GPIO drivers that were configured on the same 
     ///
     /// For channels outside the bundle mask, the corresponding bits are always 0.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// If the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then
     /// `levels()` will only contain bits 0, 1, and 3, regardless of the state

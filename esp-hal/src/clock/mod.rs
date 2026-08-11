@@ -101,7 +101,7 @@ impl CpuClock {
     #[procmacros::doc_replace]
     /// Use the highest possible frequency for a particular chip.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -148,7 +148,7 @@ impl RtcClock {
     /// Measure the frequency of one of the TIMG0 calibration clocks,
     /// using XTAL_CLK as the reference clock.
     ///
-    /// This function will time out and return 0 if the time for the given
+    /// Times out and returns 0 if the time for the given
     /// number of cycles to be counted exceeds the expected time twice. This
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design

@@ -499,7 +499,7 @@ impl Info {
 
     /// Configures the RX-FIFO threshold
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::RxFifoThresholdNotSupported`] if the provided value is zero
     /// or exceeds [`Info::RX_FIFO_MAX_THRHD`].
@@ -523,7 +523,7 @@ impl Info {
 
     /// Configures the TX-FIFO threshold
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::TxFifoThresholdNotSupported`] if the provided value exceeds
     /// [`Info::TX_FIFO_MAX_THRHD`].
@@ -559,7 +559,7 @@ impl Info {
     /// `timeout` - the number of symbols ("bytes") to wait for before
     /// triggering a timeout. Pass None to disable the timeout.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::TimeoutTooLong`] if the provided value exceeds
     /// the maximum value for SOC:
