@@ -833,6 +833,8 @@ impl UsbSerialJtagTx<'_, Async> {
     }
 
     async fn flush_tx_async(&mut self) -> Result<(), Error> {
+        self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
+
         if self
             .regs()
             .ep1_conf()
