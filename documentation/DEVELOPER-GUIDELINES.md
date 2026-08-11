@@ -288,6 +288,8 @@ Modules should have the following documentation format:
 
 Guidelines for documenting functions, types, and other public items. Module-level docs use `##` headings (see above); **item-level** docs use rustdoc's special `#` sections so they render correctly.
 
+Rustdoc in esp-hal is **reference material**. Follow [ASD-STE100](#simplified-technical-english-asd-ste100) for clarity and the [Espressif Manual of Style (EMoS)](https://mos.espressif.com/) for Espressif-specific conventions. Use second person only in procedural text (`# Examples`, module `## Examples`).
+
 - Start with a one-sentence summary in third-person present tense (e.g. `Sets the baud rate.`, not `Set the baud rate.` or `This function sets the baud rate.`).
 - Constructors should begin with `Creates a new …` (e.g. ``Creates a new UART instance in [`Blocking`] mode.``).
 - Use these section headings where applicable — as `#` headings, not `##`:
@@ -301,7 +303,7 @@ Guidelines for documenting functions, types, and other public items. Module-leve
 
 ### Simplified Technical English (ASD-STE100)
 
-API documentation should follow [ASD-STE100](https://www.asd-ste100.org/) where practical. STE is a controlled-language standard: it limits ambiguous wording so technical text has one clear meaning. That helps readers who use English as a second language and keeps docs easier to parse.
+API documentation should follow [ASD-STE100](https://www.asd-ste100.org/) where practical. STE is a controlled-language standard: it limits ambiguous wording so technical text has one clear meaning. That helps readers who use English as a second language and keeps docs easier to parse. Pair STE with [EMoS](#espressif-manual-of-style-emos) for Espressif product naming and reference-style voice.
 
 We apply STE **principles** to rustdoc, not a word-by-word check against ASD’s full approved dictionary (~900 words). For exact ASD wording, use the [official standard](https://www.asd-ste100.org/). Do not use STE for marketing or narrative copy where tone matters.
 
@@ -310,19 +312,21 @@ We apply STE **principles** to rustdoc, not a word-by-word check against ASD’s
 - Use short sentences. Put one idea in each sentence. Aim for about 20 words or fewer in summaries and procedure-style lines; up to about 25 words in longer descriptions before splitting.
 - Use the present tense and active voice.
 - Prefer simple tenses. Use simple present for behavior (e.g. “Returns the baud rate.”). Avoid present perfect (“has returned”) unless the timing relative to another event matters.
+- Passive voice is acceptable when the actor is irrelevant and the doc should emphasize the peripheral, register, or result (e.g. “The reset source code is stored in `LP_CLKRST_RESET_CAUSE`.”).
 - Do not start item summaries with “This function”, “This struct”, “This enum”, or “This error”.
-- Do not use “Note that”. State the fact directly.
+- Do not use “Note that”. State the fact directly. Prefer `# Panics`, `# Safety`, and `# Errors` over informal “Note:” callouts in item docs.
 - Use “must” for requirements, “can” for ability, and “do not” for prohibitions.
 - Avoid “will” when the present tense is enough.
 - Avoid “allows you to”. Use “lets” or rewrite the sentence.
 - Keep subjects and verbs explicit. Do not drop words to save space if that makes the meaning unclear.
+- Do not use contractions (`can't`, `don't`, `it's`). Write the full words.
 
 #### Wording
 
 - **One word, one meaning.** Pick one verb for one action and use it consistently (e.g. always “Returns” for fallible results, not “Returns” in one place and “Gives back” in another).
 - **One part of speech per word.** If a word is a noun in one doc, do not use it as a verb elsewhere unless that is normal English for the domain.
 - **Short noun phrases.** Keep stacked nouns to about three words (e.g. “DMA transfer buffer”). Split longer phrases into a short clause.
-- **Domain terms.** Keep necessary peripheral and chip names (`TWAI`, `eFuse`, …). Define uncommon terms once in module docs or link to the TRM / a glossary. Do not replace a precise technical term with a vague synonym.
+- **Domain terms.** Keep necessary peripheral and chip names (`TWAI`, `eFuse`, …). Define uncommon terms once in module docs or link to the TRM / a glossary. Do not replace a precise technical term with a vague synonym. Use Espressif-preferred spellings from [EMoS](#espressif-manual-of-style-emos).
 
 #### Structure
 
@@ -331,11 +335,50 @@ We apply STE **principles** to rustdoc, not a word-by-word check against ASD’s
 - Field docs use the same third-person style as function summaries where they are full sentences.
 - Use `# Examples` or bullet lists for three or more steps, conditions, or options. Do not bury a sequence in one long sentence.
 - Keep one topic per paragraph in longer module docs (roughly six sentences or fewer).
+- In lists of complete sentences, end each item with a full stop. In lists of fragments, omit end punctuation.
 
 #### Limits
 
 - Do not shorten a sentence if that drops a safety condition, exception, scope qualifier, or numeric limit. Keep the longer phrasing when precision matters.
 - STE favors plain, literal prose. That is appropriate for API docs; it is not a goal for changelog voice or user-facing tutorials outside the HAL reference.
+
+### Espressif Manual of Style (EMoS)
+
+[EMoS](https://mos.espressif.com/) is Espressif’s documentation style guide. The [quick reference](https://mos.espressif.com/quick-reference-guide/quick-reference-guide__EN.html) covers most rules relevant to esp-hal rustdoc. EMoS targets manuals and guides as well as reference; apply only what fits API docs.
+
+#### Point of view
+
+- **Reference (default):** Item summaries, `# Errors`, field docs, and module overview text use an **impersonal** voice — describe what the type or peripheral does, not who uses it.
+- **Procedures:** `# Examples` and module `## Examples` may use **second person** and the imperative mood (`Configure the pins.`, `Create a [`Uart`]`).
+- Do not address the reader as “users”, “the user”, or “you” outside examples.
+- Do not use “we” or “I” in rustdoc.
+- Do not switch point of view within one doc comment or module section.
+
+#### Spelling and terms
+
+- Use **American English** spelling (e.g. `center`, `color`, `initialize`).
+- Spell out an abbreviation or acronym on **first use** in a module (e.g. `two-wire automotive interface (TWAI)`). Skip the expansion when the short form is more familiar than the full term (`USB`, `DMA`).
+- Use technical terms **consistently** across drivers. When unsure, check Espressif’s published docs and TRM naming before inventing a synonym.
+- Prefer established Espressif forms: `eFuse` (not `Efuse`), `Wi-Fi` (hyphenated), register and field names as in the TRM (`EFUSE_CONF_REG`, `EFUSE_OP_CODE`).
+
+#### Numbers, units, and hardware values
+
+- In prose, spell out **one through nine**; use numerals for **10 and higher**, unless all numbers in the same category should match (e.g. a list of interface counts).
+- Use **numerals** for measurements, bit widths, clock rates, and parameters (`8-bit`, `40 MHz`, `115200` baud).
+- Put a **space** between a number and its unit (`40 MHz`, `85 °C`, `10 ms`).
+- For addresses, register values, and bit patterns, use **hexadecimal** with an `0x` prefix (`0x9000`, `0x5A5A`). Do not use Verilog-style literals (`1'b1`, `1'h0`).
+- Use an **en dash** without spaces for numeric ranges (`GPIO0–GPIO3`, `0x1000–0x2000`).
+
+#### Modes and headings
+
+- For hardware or driver **mode** names, use title case for the name and lowercase `mode` (`Station mode`, `Light-sleep mode`). Do not put `the` before a mode name.
+- Module `##` headings use title case (`## Usage`, `## Implementation State`). Rustdoc `#` sections follow Rust convention (`# Errors`, `# Examples`).
+
+#### Punctuation
+
+- Use the **Oxford comma** in lists of three or more items.
+- Do not use `/` to mean “or” (`UART or SPI`, not `UART/SPI`).
+- Use English punctuation in English docs.
 
 ## Breaking changes
 
