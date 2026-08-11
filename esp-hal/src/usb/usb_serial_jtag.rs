@@ -818,17 +818,6 @@ impl<'d> UsbSerialJtag<'d, Async> {
 
 impl UsbSerialJtagTx<'_, Async> {
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        // TODO: Not cancel safe.
-        // If the future is dropped, the FIFO will be left in an inconsistent state,
-        // because `write_async` assumes the queue is completely empty upon its entry.
-        //
-        // Perhaps, rewrite to look a bit like `write_byte_nb`, i.e.:
-        // 1. Check that the FIFO is not full, or else async-wait for it to become not-full;
-        // 2. Write in the FIFO until either the FIFO is full or all bytes are written;
-        // 3. Return the number of bytes written.
-        //
-        // This way, `write_async` will never write more than 64 bytes,
-        // but `Write::write_all` compensates for that.
         for chunk in words.chunks(64) {
             for byte in chunk {
                 self.regs()
@@ -844,24 +833,8 @@ impl UsbSerialJtagTx<'_, Async> {
     }
 
     async fn flush_tx_async(&mut self) -> Result<(), Error> {
-        // Necessary even if `write_async` does set this bit after each chunk.
-        //
-        // Reason is, if the last written chunk happens to be exactly 64 bytes, then this
-        // transaction is considered _incomplete_. What that means is, the hardware will
-        // process the FIFO queue, send an interrupt when the queue is emptied,
-        // but the packet will stay in the **other peer** internal buffers, waiting for the
-        // transaction to "complete". A completion of such a transaction is signalled by
-        // writing 0 or more bytes to the FIFO, and then setting the `wr_done` bit.
-        //
-        // Therefore, an explicit `wr_done` bit set here makes sure that if the last `write_async`
-        // ended up filling exactly 64 bytes, they are flushed here. If `write_async` ended
-        // up writing less than 64 bytes, then this `wr_done` bit set here is redundant, but
-        // harmless.
-        //
-        // Places in ESP-IDF where this behavior is documented:
-        // - https://github.com/espressif/esp-idf/blob/08e0d30a74ad0bfd5a34933142b80f45619ee410/components/esp_hal_usb/esp32c6/include/hal/usb_serial_jtag_ll.h#L168-L182
-        // - https://github.com/espressif/esp-idf/blob/08e0d30a74ad0bfd5a34933142b80f45619ee410/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag.c#L113-L118
-        // - https://github.com/espressif/esp-idf/blob/08e0d30a74ad0bfd5a34933142b80f45619ee410/components/esp_driver_usb_serial_jtag/src/usb_serial_jtag_vfs.c#L347-L350
+        // If write_async transfers a multiple of 64 bytes, flush needs to trigger sending a
+        // zero-length packet for the host to consider the transfer complete
         self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
         if self
