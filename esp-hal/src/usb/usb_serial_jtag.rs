@@ -848,7 +848,7 @@ impl UsbSerialJtagTx<'_, Async> {
         //
         // Reason is, if the last written chunk happens to be exactly 64 bytes, then this transaction is considered _incomplete_.
         // What that means is, the hardware will process the FIFO queue, send an interrupt when the queue is emptied,
-        // but will NOT actually send those 64 bytes to the other peer. It would wait instead for the transaction to "complete".
+        // but the packet will stay in the **other peer** internal buffers, waiting for the transaction to "complete".
         // A completion of such a transaction is signalled by writing 0 or more bytes to the FIFO, and then setting 
         // the `wr_done` bit.
         // 
