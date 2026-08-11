@@ -1,8 +1,5 @@
 use crate::{
-    gpio::{
-        LpPin,
-        lp_io::{LpFunction, hold_bit},
-    },
+    gpio::{LpPin, lp_io::LpFunction},
     peripherals::LP_AON,
 };
 
@@ -29,16 +26,30 @@ for_each_lp_function! {
     };
 }
 
-/// Reads the hold bit of the pad, and writes it first if `enable` is [`Some`].
-pub(crate) fn pad_hold(lp: u8, enable: Option<bool>) -> bool {
-    // The low-power number of a pad is its digital number on these chips, and one register holds
-    // every pad.
-    digital_pad_hold(lp, enable)
+// The low-power number of a pad is its digital number on these chips, and one register holds every
+// pad, so both paths write the same bit.
+pub(crate) fn pad_hold(lp: u8, enable: bool) {
+    digital_pad_hold(lp, enable);
 }
 
-/// Reads the hold bit of the pad of `gpio`, and writes it first if `enable` is [`Some`].
-pub(crate) fn digital_pad_hold(gpio: u8, enable: Option<bool>) -> bool {
-    hold_bit!(LP_AON::regs().gpio_hold0(), gpio_hold0, gpio, enable)
+/// Returns whether something holds the pad.
+pub(crate) fn is_pad_held(lp: u8) -> bool {
+    is_digital_pad_held(lp)
+}
+
+/// Takes or releases the hold of the pad of `gpio`.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
+    let mask = 1 << gpio;
+    LP_AON::regs().gpio_hold0().modify(|r, w| unsafe {
+        let bits = r.gpio_hold0().bits();
+        w.gpio_hold0()
+            .bits(if enable { bits | mask } else { bits & !mask })
+    });
+}
+
+/// Returns whether something holds the pad of `gpio`.
+pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
+    LP_AON::regs().gpio_hold0().read().gpio_hold0().bits() & (1 << gpio) != 0
 }
 
 pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction) {

@@ -1704,27 +1704,29 @@ impl<'lt> AnyPin<'lt> {
     /// A held pad keeps its level, its function and its resistors, and it ignores its driver. Sleep
     /// takes the hold of a wakeup pad, because a deep sleep powers the circuit that drives the pad
     /// down.
+    ///
+    /// A pad that the low-power registers reach keeps its hold in the low-power domain, and every
+    /// other pad has a bit in a register of the digital pads.
     #[cfg(lp_io_driver_supported)]
     pub(crate) fn set_pad_hold(&self, enable: bool) {
-        self.pad_hold(Some(enable));
+        GPIO_LOCK.lock(|| {
+            if let Some(lp) = lp_io::lp_number(self.number()) {
+                lp_io::low_level::pad_hold(lp, enable);
+            } else {
+                lp_io::low_level::digital_pad_hold(self.number(), enable);
+            }
+        })
     }
 
     /// Returns whether something holds the pad.
     #[cfg(lp_io_driver_supported)]
     pub(crate) fn is_pad_held(&self) -> bool {
-        self.pad_hold(None)
-    }
-
-    /// Reads the hold bit of the pad, and writes it first if `enable` is [`Some`].
-    ///
-    /// A pad that the low-power registers reach keeps its hold in the low-power domain, and every
-    /// other pad has a bit in a register of the digital pads.
-    #[cfg(lp_io_driver_supported)]
-    fn pad_hold(&self, enable: Option<bool>) -> bool {
+        // No lock necessary, as this pin cannot be written
+        // while this function is being called.
         if let Some(lp) = lp_io::lp_number(self.number()) {
-            lp_io::low_level::pad_hold(lp, enable)
+            lp_io::low_level::is_pad_held(lp)
         } else {
-            lp_io::low_level::digital_pad_hold(self.number(), enable)
+            lp_io::low_level::is_digital_pad_held(self.number())
         }
     }
 

@@ -211,38 +211,6 @@ pub(crate) fn lp_number(gpio: u8) -> Option<u8> {
     None
 }
 
-/// Reads the hold bit of a pad, and writes it first if `enable` is [`Some`].
-///
-/// Every chip keeps the holds of a group of pads in one register, so the callers of this macro pass
-/// the register, the field that holds the group, and the bit of the pad in that field.
-macro_rules! hold_bit {
-    ($reg:expr, $field:ident, $bit:expr, $enable:expr) => {{
-        let reg = $reg;
-        let mask = 1 << $bit;
-
-        if let Some(enable) = $enable {
-            reg.modify(|r, w| unsafe {
-                let bits = r.$field().bits();
-                w.$field()
-                    .bits(if enable { bits | mask } else { bits & !mask })
-            });
-        }
-
-        reg.read().$field().bits() & mask != 0
-    }};
-}
-
-pub(crate) use hold_bit;
-
-/// Returns whether something holds the pad of `gpio`.
-///
-/// The function reports the pads of the digital supply, and returns `false` for a pad that the
-/// low-power registers reach.
-#[cfg(sleep_deep_sleep_needs_gpio_isolation)]
-pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
-    low_level::digital_pad_hold(gpio, None)
-}
-
 /// Tokens to hand out a pin to a low-power CPU.
 // FIXME: tokens should be 'static to be handed out.
 #[cfg(ulp_riscv_driver_supported)]

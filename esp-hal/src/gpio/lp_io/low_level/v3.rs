@@ -1,10 +1,5 @@
 use crate::{
-    gpio::{
-        AlternateFunction,
-        Level,
-        LpPin,
-        lp_io::{LpFunction, hold_bit},
-    },
+    gpio::{AlternateFunction, Level, LpPin, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
@@ -43,17 +38,17 @@ for_each_lp_function! {
                 });
             }
 
-            /// Reads the hold bit of the pad, and writes it first if `enable` is [`Some`].
-            pub(crate) fn pad_hold(lp: u8, enable: Option<bool>) -> bool {
-                if let Some(enable) = enable {
-                    LPWR::regs().pad_hold().modify(|_, w| {
-                        match lp {
-                            $( $pin => w.[<gpio_pin $pin _hold>]().bit(enable), )*
-                            _ => unreachable!(),
-                        }
-                    });
-                }
+            pub(crate) fn pad_hold(lp: u8, enable: bool) {
+                LPWR::regs().pad_hold().modify(|_, w| {
+                    match lp {
+                        $( $pin => w.[<gpio_pin $pin _hold>]().bit(enable), )*
+                        _ => unreachable!(),
+                    }
+                });
+            }
 
+            /// Returns whether something holds the pad.
+            pub(crate) fn is_pad_held(lp: u8) -> bool {
                 let r = LPWR::regs().pad_hold().read();
                 match lp {
                     $( $pin => r.[<gpio_pin $pin _hold>]().bit_is_set(), )*
@@ -82,12 +77,22 @@ for_each_lp_function! {
     };
 }
 
-/// Reads the hold bit of the pad of `gpio`, and writes it first if `enable` is [`Some`].
+/// Takes or releases the hold of the pad of `gpio`.
 ///
 /// The register numbers the pads of the digital supply the way the digital registers do, and the
 /// low-power pads have their own register.
-pub(crate) fn digital_pad_hold(gpio: u8, enable: Option<bool>) -> bool {
-    hold_bit!(LPWR::regs().dig_pad_hold(), dig_pad_hold, gpio, enable)
+pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
+    let mask = 1 << gpio;
+    LPWR::regs().dig_pad_hold().modify(|r, w| unsafe {
+        let bits = r.dig_pad_hold().bits();
+        w.dig_pad_hold()
+            .bits(if enable { bits | mask } else { bits & !mask })
+    });
+}
+
+/// Returns whether something holds the pad of `gpio`.
+pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
+    LPWR::regs().dig_pad_hold().read().dig_pad_hold().bits() & (1 << gpio) != 0
 }
 
 /// Configures the pad.

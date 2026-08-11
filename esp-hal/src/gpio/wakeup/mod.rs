@@ -348,7 +348,7 @@ fn exit_hook() {
                 continue;
             };
 
-            low_level::pad_hold(lp, Some(false));
+            low_level::pad_hold(lp, false);
 
             // Only a chip with a low-power IO MUX moved the pad, so only such a chip has to move it
             // back. esp32c2 and esp32c3 keep the pad on the digital IO MUX.
@@ -432,7 +432,7 @@ fn prepare_pad(pin: &Armed, deep: bool) {
 
     // esp32h2 reaches the pad through the digital IO MUX, so it has no low-power MUX to select.
     low_level::set_config(pin.lp, true, !cfg!(esp32h2), LpFunction::LP_GPIO);
-    low_level::pad_hold(pin.lp, Some(deep));
+    low_level::pad_hold(pin.lp, deep);
 
     PREPARED_PADS.set(pin.gpio, true);
 }
@@ -469,7 +469,7 @@ pub(crate) fn isolate_pads_for_deep_sleep() {
 
         // A pad that the user holds keeps its level, which is the purpose of the hold. Isolation
         // would cancel that request.
-        if crate::gpio::lp_io::is_digital_pad_held(gpio) {
+        if crate::gpio::lp_io::low_level::is_digital_pad_held(gpio) {
             continue;
         }
 
