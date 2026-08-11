@@ -818,6 +818,17 @@ impl<'d> UsbSerialJtag<'d, Async> {
 
 impl UsbSerialJtagTx<'_, Async> {
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
+        // TODO: Not cancel safe.
+        // If the future is dropped, the FIFO will be left in an inconsistent state,
+        // because `write_async` assumes the queue is completely empty upon its entry.
+        //
+        // Perhaps, rewrite to look a bit like `write_byte_nb`, i.e.:
+        // 1. Check that the FIFO is not full, or else async-wait for it to become not-full;
+        // 2. Write in the FIFO until either the FIFO is full or all bytes are written;
+        // 3. Return the number of bytes written.
+        //
+        // This way, `write_async` will never write more than 64 bytes,
+        // but `Write::write_all` compensates for that.
         for chunk in words.chunks(64) {
             for byte in chunk {
                 self.regs()
