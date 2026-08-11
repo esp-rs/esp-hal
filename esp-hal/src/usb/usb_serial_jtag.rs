@@ -827,6 +827,18 @@ impl<'d> UsbSerialJtag<'d, Async> {
 }
 
 impl UsbSerialJtagTx<'_, Async> {
+    async fn wait_tx_ready(&mut self) {
+        while self
+            .regs()
+            .ep1_conf()
+            .read()
+            .serial_in_ep_data_free()
+            .bit_is_clear()
+        {
+            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
+        }
+    }
+
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(64) {
             for byte in chunk {
@@ -837,6 +849,7 @@ impl UsbSerialJtagTx<'_, Async> {
             self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
             UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
+            self.wait_tx_ready().await;
         }
 
         Ok(())
@@ -846,16 +859,8 @@ impl UsbSerialJtagTx<'_, Async> {
         // If write_async transfers a multiple of 64 bytes, flush needs to trigger sending a
         // zero-length packet for the host to consider the transfer complete
         self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
-
-        if self
-            .regs()
-            .ep1_conf()
-            .read()
-            .serial_in_ep_data_free()
-            .bit_is_clear()
-        {
-            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
-        }
+        UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
+        self.wait_tx_ready().await;
 
         Ok(())
     }
