@@ -512,6 +512,95 @@ impl Default for AtCmdConfig {
     }
 }
 
+/// The number of edges that the hardware counts before the threshold register starts.
+#[cfg(sleep_driver_supported)]
+const WAKEUP_EDGE_OFFSET: u16 = cfg_select! {
+    esp32 => 2,
+    esp32p4 => 6,
+    _ => 3,
+};
+
+/// The smallest number of rising edges that the hardware can wake on.
+#[cfg(sleep_driver_supported)]
+const MIN_WAKEUP_EDGES: u16 = cfg_select! {
+    // With a threshold of zero, esp32 wakes again and again.
+    esp32 => WAKEUP_EDGE_OFFSET + 1,
+    _ => WAKEUP_EDGE_OFFSET,
+};
+
+/// The largest number of rising edges that the hardware can count in its 10-bit field.
+#[cfg(sleep_driver_supported)]
+const MAX_WAKEUP_EDGES: u16 = WAKEUP_EDGE_OFFSET + 0x3FF;
+
+/// Configures how the UART wakes the chip from light sleep.
+///
+/// See [`UartRx::enable_wakeup`].
+#[cfg(sleep_driver_supported)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub struct WakeupConfig {
+    /// The number of rising edges on the RX line that wakes the chip.
+    ///
+    /// The hardware counts edges, and not bytes, so the number of bytes that the chip needs
+    /// depends on the data of the sender. Each byte gives one rising edge at its stop bit, and
+    /// one more edge for each change from 0 to 1 in the data. The number of edges is therefore
+    /// the smallest possible number of bytes. The default is the smallest value that the
+    /// hardware accepts.
+    ///
+    /// The permitted range on this chip is
+    #[cfg_attr(esp32, doc = "`3..=1025`.")]
+    #[cfg_attr(esp32p4, doc = "`6..=1029`.")]
+    #[cfg_attr(not(any(esp32, esp32p4)), doc = "`3..=1026`.")]
+    rising_edges: u16,
+}
+
+#[cfg(sleep_driver_supported)]
+impl Default for WakeupConfig {
+    fn default() -> Self {
+        Self {
+            rising_edges: MIN_WAKEUP_EDGES,
+        }
+    }
+}
+
+/// A wakeup configuration error.
+#[cfg(sleep_driver_supported)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+#[non_exhaustive]
+pub enum WakeConfigError {
+    /// This UART instance cannot wake the chip.
+    NotAWakeupSource,
+
+    /// The hardware cannot count the requested number of rising edges.
+    EdgeCountUnsupported,
+}
+
+#[cfg(sleep_driver_supported)]
+#[instability::unstable]
+impl core::error::Error for WakeConfigError {}
+
+#[cfg(sleep_driver_supported)]
+#[instability::unstable]
+impl core::fmt::Display for WakeConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            WakeConfigError::NotAWakeupSource => {
+                write!(f, "This UART instance cannot wake the chip")
+            }
+            WakeConfigError::EdgeCountUnsupported => {
+                write!(
+                    f,
+                    "The requested number of rising edges is not supported, it must be {MIN_WAKEUP_EDGES}..={MAX_WAKEUP_EDGES}"
+                )
+            }
+        }
+    }
+}
+
 struct UartBuilder<'d, Dm: DriverMode> {
     uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
@@ -1314,6 +1403,42 @@ where
         Ok(())
     }
 
+    /// Lets activity on the RX line wake the chip from light sleep.
+    ///
+    /// The chip wakes when it counts the number of rising edges that
+    /// [`WakeupConfig::with_rising_edges`] gives. Deep sleep powers the UART down, so this source
+    /// ends a light sleep only.
+    ///
+    /// The chip loses the bytes that cause the wake. It also loses the bytes that arrive during the
+    /// wake, and at a typical baud rate that wake is long enough to lose several bytes. A sender
+    /// must therefore first send data that the receiver can lose, and then send the data again.
+    /// The first data after the wake also clears the internal wakeup indication. Without that
+    /// write, the next wake occurs two edges early.
+    ///
+    /// The peripheral counts the edges itself, so a light sleep keeps the high-performance
+    /// peripherals powered instead of powering them down. This increases the sleep current.
+    ///
+    /// The configuration stays after the driver is dropped, so that the UART continues to wake the
+    /// chip while no driver owns it. Call [`Self::disable_wakeup`] to remove it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WakeConfigError::NotAWakeupSource`] if this UART instance cannot wake the chip,
+    /// and [`WakeConfigError::EdgeCountUnsupported`] if the hardware cannot count the requested
+    /// number of edges.
+    #[cfg(sleep_driver_supported)]
+    #[instability::unstable]
+    pub fn enable_wakeup(&mut self, config: &WakeupConfig) -> Result<(), WakeConfigError> {
+        self.uart.info().enable_wakeup(config)
+    }
+
+    /// Stops the UART from waking the chip.
+    #[cfg(sleep_driver_supported)]
+    #[instability::unstable]
+    pub fn disable_wakeup(&mut self) {
+        self.uart.info().disable_wakeup();
+    }
+
     /// Reads and clears RX error conditions set by received data.
     ///
     /// Only errors enabled in [`RxConfig::with_reported_errors`] are returned;
@@ -2045,6 +2170,28 @@ where
         self.rx.apply_config(config)?;
         self.tx.apply_config(config)?;
         Ok(())
+    }
+
+    /// Lets activity on the RX line wake the chip from light sleep.
+    ///
+    /// See [`UartRx::enable_wakeup`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WakeConfigError::NotAWakeupSource`] if this UART instance cannot wake the chip,
+    /// and [`WakeConfigError::EdgeCountUnsupported`] if the hardware cannot count the requested
+    /// number of edges.
+    #[cfg(sleep_driver_supported)]
+    #[instability::unstable]
+    pub fn enable_wakeup(&mut self, config: &WakeupConfig) -> Result<(), WakeConfigError> {
+        self.rx.enable_wakeup(config)
+    }
+
+    /// Stops the UART from waking the chip.
+    #[cfg(sleep_driver_supported)]
+    #[instability::unstable]
+    pub fn disable_wakeup(&mut self) {
+        self.rx.disable_wakeup();
     }
 
     #[procmacros::doc_replace]

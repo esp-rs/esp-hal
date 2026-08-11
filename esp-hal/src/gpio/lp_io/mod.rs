@@ -75,6 +75,23 @@ define_lp_functions!();
 #[cfg_attr(lp_io_version = "v4", path = "low_level/v4.rs")]
 pub(crate) mod low_level;
 
+/// Returns the trigger type that the low-power wakeup register of a pad needs to wake the chip at
+/// `level`.
+///
+/// The field takes the same values as the digital interrupt type.
+// Only the chips that arm the pads one by one have such a register. The other chips reach the pads
+// through `ext1`, which takes a mask.
+#[cfg(all(
+    sleep_pin_wakeup_version_is_set,
+    any(sleep_ext1_version = "1", not(sleep_ext1_version_is_set))
+))]
+pub(crate) const fn wake_trigger(level: super::Level) -> u8 {
+    match level {
+        super::Level::Low => super::Event::LowLevel as u8,
+        super::Level::High => super::Event::HighLevel as u8,
+    }
+}
+
 /// Trait implemented by pins with a known low-power pin number.
 #[cfg(ulp_riscv_driver_supported)]
 #[doc(hidden)]
@@ -273,7 +290,7 @@ mod ulp_tokens {
             Self::new_untyped(pin)
         }
 
-        /// Takes a pad that the caller has checked to be the low-power pin numbered `PIN`.
+        /// Takes a pad that the caller confirmed to be the low-power pin with the number `PIN`.
         pub(super) fn new_untyped<P>(_pin: P) -> Self
         where
             P: Pin + 'd,
@@ -303,7 +320,7 @@ mod ulp_tokens {
             Self::new_untyped(pin)
         }
 
-        /// Takes a pad that the caller has checked to be the low-power pin numbered `PIN`.
+        /// Takes a pad that the caller confirmed to be the low-power pin with the number `PIN`.
         pub(super) fn new_untyped<P>(_pin: P) -> Self
         where
             P: Pin + 'd,
@@ -345,7 +362,7 @@ mod ulp_tokens {
             Self::new_untyped(pin)
         }
 
-        /// Takes a pad that the caller has checked to be the low-power pin numbered `PIN`.
+        /// Takes a pad that the caller confirmed to be the low-power pin with the number `PIN`.
         pub(super) fn new_untyped<P>(pin: P) -> Self
         where
             P: Pin + 'd,

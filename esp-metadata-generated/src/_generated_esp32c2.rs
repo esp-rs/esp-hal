@@ -292,6 +292,9 @@ macro_rules! property {
     ("sleep.pin_wakeup_version", str) => {
         stringify!(2)
     };
+    ("sleep.deep_sleep_needs_gpio_isolation") => {
+        true
+    };
     ("soc.cpu_has_branch_predictor") => {
         false
     };

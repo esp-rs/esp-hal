@@ -49,7 +49,7 @@ fn errata36(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
 
     for_each_lp_function! {
         (LP_GPIOn $( (($_sig:ident, LP_GPIOn, $n:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),* ) => {
-            // The digital pin number, and the number the low-power registers index the pad by.
+            // The digital pin number, and the number that the low-power registers use for the pad.
             const LP_IO_PINS: &[(u8, u8)] = &[ $( ($crate::peripherals::$gpio::NUMBER, $n) ),* ];
         };
     };
@@ -59,7 +59,8 @@ fn errata36(pin: &AnyPin<'_>, pull_up: bool, pull_down: bool) {
         .find(|(gpio, _)| *gpio == pin.number())
         .map(|(_, lp)| *lp);
 
-    // The low-power registers of the pads that cannot pull anything warn instead.
+    // Some low-power pads have no pull resistors. The two functions below log a warning for such a
+    // pad, and write no register.
     if let Some(lp) = lp
         && pin.is_output()
     {

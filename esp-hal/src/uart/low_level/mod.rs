@@ -20,6 +20,8 @@ use super::{
     UartInterrupt,
     any,
 };
+#[cfg(sleep_driver_supported)]
+use super::{WakeConfigError, WakeupConfig};
 use crate::{
     asynch::AtomicWaker,
     gpio::{InputSignal, OutputSignal},
@@ -276,6 +278,10 @@ pub struct Info {
 
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
+
+    /// The wakeup source of this instance, or `None` if the instance cannot wake the chip.
+    #[cfg(sleep_driver_supported)]
+    pub wakeup_source: Option<crate::rtc_cntl::WakeupSource>,
 }
 
 /// Peripheral state for a UART instance.
@@ -837,6 +843,45 @@ impl Info {
     pub(crate) fn resume_from_sleep(&self) {
         version::suspend(self, false);
     }
+
+    /// Lets this instance wake the chip from light sleep.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn enable_wakeup(&self, config: &WakeupConfig) -> Result<(), WakeConfigError> {
+        let source = self
+            .wakeup_source
+            .ok_or(WakeConfigError::NotAWakeupSource)?;
+
+        let edges = config.rising_edges();
+        if !(super::MIN_WAKEUP_EDGES..=super::MAX_WAKEUP_EDGES).contains(&edges) {
+            return Err(WakeConfigError::EdgeCountUnsupported);
+        }
+
+        // The register holds the number of edges above a fixed offset.
+        version::set_wakeup_edge_threshold(self, edges - super::WAKEUP_EDGE_OFFSET);
+
+        source.enable_with_hooks(Some(keep_peripherals_powered), None);
+
+        Ok(())
+    }
+
+    /// Stops this instance from waking the chip.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn disable_wakeup(&self) {
+        if let Some(source) = self.wakeup_source {
+            source.disable();
+        }
+    }
+}
+
+/// The UART peripheral monitors the RX line itself, so the peripheral must stay powered.
+#[cfg(sleep_driver_supported)]
+#[crate::ram]
+fn keep_peripherals_powered(config: &mut crate::rtc_cntl::sleep::WrappedSleepConfig<'_>) {
+    // A deep sleep powers the peripheral down in all cases, so this request gives no wake there. It
+    // only increases the current.
+    if !config.is_deep_sleep() {
+        config.keep_alive(crate::rtc_cntl::sleep::SleepResource::HpPeripherals);
+    }
 }
 
 impl PartialEq for Info {
@@ -847,8 +892,10 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-for_each_uart! {
-    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) => {
+// Each instance names its wakeup source, and no code calculates the source from the metadata flag.
+// An instance that cannot wake the chip has no `WakeupSource` variant to name.
+macro_rules! impl_instance {
+    ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, $wakeup_source:expr) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[handler]
@@ -873,10 +920,21 @@ for_each_uart! {
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
+                    #[cfg(sleep_driver_supported)]
+                    wakeup_source: $wakeup_source,
                 };
                 (&PERIPHERAL, &STATE)
             }
         }
+    };
+}
+
+for_each_uart! {
+    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = true) => {
+        impl_instance!($inst, $peri, $rxd, $txd, $cts, $rts, Some(crate::rtc_cntl::WakeupSource::$peri));
+    };
+    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = false) => {
+        impl_instance!($inst, $peri, $rxd, $txd, $cts, $rts, None);
     };
 }
 

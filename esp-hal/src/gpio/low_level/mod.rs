@@ -3,7 +3,7 @@
 #[cfg_attr(gpio_version = "3", path = "v3.rs")]
 mod version;
 
-use portable_atomic::AtomicU32;
+use portable_atomic::{AtomicU32, Ordering};
 use strum::EnumCount;
 pub(crate) use version::{
     enable_interrupt,
@@ -23,11 +23,11 @@ pub enum GpioBank {
     _1,
 }
 
-/// A set of pins, in the words the GPIO peripheral groups them into.
+/// A set of pins, in the register words that the GPIO peripheral groups them into.
 ///
-/// The peripheral keeps one register word per bank, so a set of pins that stands beside those
-/// registers is one word per bank too, and [`Self::word`] hands out the word the register's own
-/// mask can be tested against.
+/// The peripheral has one register word for each bank, so a set of pins also has one word for each
+/// bank. [`Self::word`] returns the word of a bank, which the caller can compare with the mask of
+/// the register of that bank.
 pub(crate) struct PadMask([AtomicU32; GpioBank::COUNT]);
 
 impl PadMask {
@@ -38,14 +38,51 @@ impl PadMask {
     pub(crate) fn word(&self, bank: GpioBank) -> &AtomicU32 {
         &self.0[bank as usize]
     }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn set(&self, gpio: u8, member: bool) {
+        let bank = bank(gpio);
+        let pin = 1 << (gpio - bank.offset());
+
+        if member {
+            self.word(bank).fetch_or(pin, Ordering::Relaxed);
+        } else {
+            self.word(bank).fetch_and(!pin, Ordering::Relaxed);
+        }
+    }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn contains(&self, gpio: u8) -> bool {
+        let bank = bank(gpio);
+
+        self.word(bank).load(Ordering::Relaxed) & (1 << (gpio - bank.offset())) != 0
+    }
 }
 
 impl GpioBank {
+    /// All the banks, so that a caller can read the pins one word at a time.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) const ALL: [Self; Self::COUNT] = cfg_select! {
+        gpio_has_bank_1 => [Self::_0, Self::_1],
+        _ => [Self::_0],
+    };
+
     /// The pins of this bank that an async wait owns.
     ///
-    /// The interrupt handler clears a pin's bit to signal that its wait is over, so the bit is
-    /// what tells the future it has completed.
+    /// The interrupt handler clears the bit of a pin to report that its wait is complete. The bit
+    /// therefore tells the future that the wait is complete.
     pub(crate) fn async_operations(self) -> &'static AtomicU32 {
+        static FLAGS: PadMask = PadMask::new();
+
+        FLAGS.word(self)
+    }
+
+    /// The pins of this bank that listen for an interrupt.
+    ///
+    /// The same bits also give the pins that can end a light sleep, because one write sets the
+    /// interrupt enable and the wakeup enable of a pad. Sleep entry reads these bits, and thus
+    /// needs no register read for each pin.
+    pub(crate) fn listening(self) -> &'static AtomicU32 {
         static FLAGS: PadMask = PadMask::new();
 
         FLAGS.word(self)
@@ -173,13 +210,23 @@ pub(crate) fn set_int_enable(
     int_type: u8,
     wake_up_from_light_sleep: bool,
 ) {
-    GPIO::regs().pin(gpio_num as usize).modify(|_, w| unsafe {
-        if let Some(int_ena) = int_ena {
-            w.int_ena().bits(int_ena);
-        }
+    let mut listening = false;
+    GPIO::regs().pin(gpio_num as usize).modify(|r, w| unsafe {
+        let enabled = int_ena.unwrap_or_else(|| r.int_ena().bits());
+        listening = enabled != 0;
+
+        w.int_ena().bits(enabled);
         w.int_type().bits(int_type);
         w.wakeup_enable().bit(wake_up_from_light_sleep)
     });
+
+    let bank = bank(gpio_num);
+    let pin = 1 << (gpio_num - bank.offset());
+    if listening {
+        bank.listening().fetch_or(pin, Ordering::Relaxed);
+    } else {
+        bank.listening().fetch_and(!pin, Ordering::Relaxed);
+    }
 }
 
 pub(crate) fn is_int_enabled(gpio_num: u8) -> bool {

@@ -15,7 +15,7 @@ use crate::{
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
-        sleep::{Ext1WakeupSource, WakeTriggers, pmu_common::SleepTimeConfig},
+        sleep::{SleepKind, pmu_common::SleepTimeConfig},
     },
     soc::clocks::{self, ClockTree, CpuRootClkConfig, LpSlowClkConfig},
 };
@@ -870,9 +870,11 @@ impl RtcSleepConfig {
         self.deep_slp()
     }
 
-    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
-        Ext1WakeupSource::wake_io_reset();
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.deep = kind == SleepKind::Deep;
     }
+
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {}
 
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
@@ -908,15 +910,14 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures wakeup options and enters sleep.
+    /// Configures the wakeup options and requests the sleep.
+    ///
+    /// The caller waits for the result of the request. The return value is a guard that restores
+    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
-        // ESP32-P4 PMU wakeup-source bitmap (esp-idf `pmu_bit_defs.h`).
-        let wakeup_mask = wakeup_triggers.as_u32();
-        let reject_mask = wakeup_triggers.reject_mask(self.deep);
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
         // Switch the CPU root clock to XTAL for the duration of sleep.
-        let _restore_clock_config = ClockTree::with(|clocks| {
+        let restore_clock_config = ClockTree::with(|clocks| {
             let old_cpu_root_clk = clocks.cpu_root_clk();
 
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
@@ -969,6 +970,15 @@ impl RtcSleepConfig {
             set_boot_from_lp_ram(true);
         }
 
+        // The wake stub itself restores the vector on a real wake, so this guard runs only if the
+        // hardware rejects the sleep. It points the vector back at the HP ROM, so that a later
+        // reset boots normally.
+        let restore_boot_vector = DropGuard::new((), move |_| {
+            if mspi_workaround {
+                set_boot_from_lp_ram(false);
+            }
+        });
+
         // like esp-idf pmu_sleep_start()
 
         // lp_aon_hal_inform_wakeup_type: on P4 RTC_SLEEP_MODE_REG is
@@ -986,7 +996,7 @@ impl RtcSleepConfig {
             .write(|w| unsafe { w.bits(wakeup_mask) });
 
         PMU::regs().slp_wakeup_cntl1().modify(|_, w| unsafe {
-            w.slp_reject_en().bit(true);
+            w.slp_reject_en().bit(reject_mask != 0);
             w.sleep_reject_ena().bits(reject_mask)
         });
 
@@ -1035,20 +1045,7 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl0()
             .write(|w| w.sleep_req().bit(true));
 
-        // In deep sleep we never get here.
-        loop {
-            let int_raw = PMU::regs().int_raw().read();
-            if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                break;
-            }
-        }
-
-        // We only reach this point if the (deep) sleep was rejected: the wake
-        // stub itself restores the vector on a real wake. Point the vector back
-        // at the HP ROM so a later reset boots normally.
-        if mspi_workaround {
-            set_boot_from_lp_ram(false);
-        }
+        (restore_clock_config, restore_boot_vector)
     }
 
     /// Cleans up after sleep.
@@ -1061,7 +1058,8 @@ impl RtcSleepConfig {
             .imm_pad_hold_all()
             .write(|w| w.tie_low_pad_slp_sel().set_bit());
 
-        Ext1WakeupSource::wake_io_reset();
+        // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
+        // driver knows which pads it prepared.
 
         // Re-enumerate USB-Serial-JTAG (only disabled for light sleep; in deep
         // sleep we never reach here).

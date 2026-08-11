@@ -25,7 +25,7 @@ pub(crate) fn pad_hold(lp: u8, enable: bool) {
 
 /// Configures the pad.
 ///
-/// The low-power domain reaches the pad through the digital IO MUX, so there is no low-power
+/// The low-power domain reaches the pad through the digital IO MUX. There is thus no low-power
 /// function to select.
 pub(crate) fn set_config(lp: u8, input_enable: bool, _mux: bool, _func: LpFunction) {
     IO_MUX::regs()
@@ -81,8 +81,8 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
         .modify(|_, w| w.fun_wpd().bit(enable));
 }
 
-// The pad driver bit lives in the digital GPIO peripheral, and this chip numbers its low-power
-// pads differently, so this one takes the digital number.
+// The pad driver bit is part of the digital GPIO peripheral, and this chip gives a pad a different
+// low-power number, so this function takes the digital number.
 #[expect(dead_code)]
 pub(crate) fn set_open_drain_output(gpio: u8, enable: bool) {
     GPIO::regs()

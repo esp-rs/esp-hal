@@ -1,5 +1,5 @@
 use crate::{
-    gpio::{AlternateFunction, LpPin, WakeEvent, lp_io::LpFunction},
+    gpio::{AlternateFunction, Level, LpPin, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
@@ -13,12 +13,12 @@ for_each_lp_function! {
         }
     };
 
-    // The wakeup and hold registers name a field per pad instead of indexing them, so these
-    // functions dispatch on the low-power number.
+    // The wakeup register and the hold register have one named field for each pad, and no index, so
+    // these functions select the field by the low-power number.
     (LP_GPIOn $( (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),*) => {
         paste::paste! {
-            pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, event: WakeEvent) {
-                let trigger = event as u8;
+            pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: Level) {
+                let trigger = crate::gpio::lp_io::wake_trigger(level);
 
                 let gpio_wakeup = cfg_select! {
                     esp32c2 => LPWR::regs().cntl_gpio_wakeup(),
@@ -46,13 +46,31 @@ for_each_lp_function! {
                     }
                 });
             }
+
+            /// Returns the pads that can wake the chip through the per-pin path, as a mask of
+            /// low-power numbers.
+            #[cfg(sleep_driver_supported)]
+            pub(crate) fn wakeup_enabled_mask() -> u32 {
+                let gpio_wakeup = cfg_select! {
+                    esp32c2 => LPWR::regs().cntl_gpio_wakeup().read(),
+                    esp32c3 => LPWR::regs().gpio_wakeup().read(),
+                };
+
+                let mut mask = 0;
+                $(
+                    if gpio_wakeup.[<gpio_pin $pin _wakeup_enable>]().bit_is_set() {
+                        mask |= 1 << $pin;
+                    }
+                )*
+                mask
+            }
         }
     };
 }
 
 /// Configures the pad.
 ///
-/// The low-power domain reaches the pad through the digital IO MUX, so there is no low-power
+/// The low-power domain reaches the pad through the digital IO MUX. There is thus no low-power
 /// function to select, and the low-power number is the digital pin number.
 pub(crate) fn set_config(lp: u8, input_enable: bool, _mux: bool, _func: LpFunction) {
     IO_MUX::regs().gpio(lp as usize).modify(|_, w| unsafe {
@@ -85,18 +103,6 @@ pub(crate) fn input_enable(lp: u8, enable: bool) {
     IO_MUX::regs()
         .gpio(lp as usize)
         .modify(|_, w| w.fun_ie().bit(enable));
-}
-
-pub(crate) fn pullup_enable(lp: u8, enable: bool) {
-    IO_MUX::regs()
-        .gpio(lp as usize)
-        .modify(|_, w| w.fun_wpu().bit(enable));
-}
-
-pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
-    IO_MUX::regs()
-        .gpio(lp as usize)
-        .modify(|_, w| w.fun_wpd().bit(enable));
 }
 
 #[expect(dead_code)]
