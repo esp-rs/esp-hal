@@ -92,16 +92,28 @@ macro_rules! property {
         true
     };
     ("gpio.input_signal_max") => {
-        203
+        229
     };
     ("gpio.input_signal_max", str) => {
-        stringify!(203)
+        stringify!(229)
     };
     ("gpio.output_signal_max") => {
         256
     };
     ("gpio.output_signal_max", str) => {
         stringify!(256)
+    };
+    ("dedicated_gpio.version") => {
+        "riscv_v2"
+    };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
     };
     ("lp_io.version") => {
         "esp32p4"
@@ -555,6 +567,39 @@ macro_rules! property {
         [crate ::soc::clocks::MipiDsiPhyCfgClkConfig::PllF20m, crate
         ::soc::clocks::MipiDsiPhyCfgClkConfig::RcFast, crate
         ::soc::clocks::MipiDsiPhyCfgClkConfig::PllF25m]
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dedicated_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dedicated_gpio { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_dedicated_gpio!((0));
+        _for_each_inner_dedicated_gpio!((1)); _for_each_inner_dedicated_gpio!((2));
+        _for_each_inner_dedicated_gpio!((3)); _for_each_inner_dedicated_gpio!((4));
+        _for_each_inner_dedicated_gpio!((5)); _for_each_inner_dedicated_gpio!((6));
+        _for_each_inner_dedicated_gpio!((7)); _for_each_inner_dedicated_gpio!((0, 0,
+        CPU_GPIO_0)); _for_each_inner_dedicated_gpio!((0, 1, CPU_GPIO_1));
+        _for_each_inner_dedicated_gpio!((0, 2, CPU_GPIO_2));
+        _for_each_inner_dedicated_gpio!((0, 3, CPU_GPIO_3));
+        _for_each_inner_dedicated_gpio!((0, 4, CPU_GPIO_4));
+        _for_each_inner_dedicated_gpio!((0, 5, CPU_GPIO_5));
+        _for_each_inner_dedicated_gpio!((0, 6, CPU_GPIO_6));
+        _for_each_inner_dedicated_gpio!((0, 7, CPU_GPIO_7));
+        _for_each_inner_dedicated_gpio!((1, 0, CPU_GPIO_8));
+        _for_each_inner_dedicated_gpio!((1, 1, CPU_GPIO_9));
+        _for_each_inner_dedicated_gpio!((1, 2, CPU_GPIO_10));
+        _for_each_inner_dedicated_gpio!((1, 3, CPU_GPIO_11));
+        _for_each_inner_dedicated_gpio!((1, 4, CPU_GPIO_12));
+        _for_each_inner_dedicated_gpio!((1, 5, CPU_GPIO_13));
+        _for_each_inner_dedicated_gpio!((1, 6, CPU_GPIO_14));
+        _for_each_inner_dedicated_gpio!((1, 7, CPU_GPIO_15));
+        _for_each_inner_dedicated_gpio!((channels(0), (1), (2), (3), (4), (5), (6),
+        (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
+        CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
+        CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7), (1, 0, CPU_GPIO_8), (1, 1,
+        CPU_GPIO_9), (1, 2, CPU_GPIO_10), (1, 3, CPU_GPIO_11), (1, 4, CPU_GPIO_12), (1,
+        5, CPU_GPIO_13), (1, 6, CPU_GPIO_14), (1, 7, CPU_GPIO_15)));
     };
 }
 /// Defines the `LpInputSignal` and `LpOutputSignal` enums.
@@ -5602,6 +5647,8 @@ macro_rules! for_each_peripheral {
         #[doc = "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
         FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
         CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((GPIO0));
@@ -5698,6 +5745,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((USB_FS(unstable)));
         _for_each_inner_peripheral!((USB_HS(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
+        _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
         _for_each_inner_peripheral!((SPI2, Spi2, 1, AxiGdmaChannel));
@@ -5960,9 +6008,10 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)), (@
         peri_type #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)),
-        (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <=
-        virtual() (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
-        CPU_CTRL <= virtual() (unstable))));
+        (@ peri_type #[doc = "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <=
+        virtual() (unstable)), (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"]
+        SW_INTERRUPT <= virtual() (unstable)), (@ peri_type #[doc =
+        "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable))));
         _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
         (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
         (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
@@ -5989,7 +6038,7 @@ macro_rules! for_each_peripheral {
         (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)),
         (AES(unstable)), (SHA(unstable)), (RSA(unstable)), (ECC(unstable)),
         (USB_FS(unstable)), (USB_HS(unstable)), (FLASH(unstable)),
-        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        (GPIO_DEDICATED(unstable)), (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (SPI3,
         Spi3, 2, AxiGdmaChannel), (I2S0, I2s0, 3, AhbGdmaChannel), (I2S1, I2s1, 4,
         AhbGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (I2S2, I2s2, 5, AhbGdmaChannel),
@@ -6784,6 +6833,22 @@ macro_rules! define_io_mux_signals {
             PARLIO_RX_DATA13        = 201,
             PARLIO_RX_DATA14        = 202,
             PARLIO_RX_DATA15        = 203,
+            CPU_GPIO_0              = 214,
+            CPU_GPIO_1              = 215,
+            CPU_GPIO_2              = 216,
+            CPU_GPIO_3              = 217,
+            CPU_GPIO_4              = 218,
+            CPU_GPIO_5              = 219,
+            CPU_GPIO_6              = 220,
+            CPU_GPIO_7              = 221,
+            CPU_GPIO_8              = 222,
+            CPU_GPIO_9              = 223,
+            CPU_GPIO_10             = 224,
+            CPU_GPIO_11             = 225,
+            CPU_GPIO_12             = 226,
+            CPU_GPIO_13             = 227,
+            CPU_GPIO_14             = 228,
+            CPU_GPIO_15             = 229,
             MTCK,
             MTDI,
             MTMS,
@@ -6993,6 +7058,22 @@ macro_rules! define_io_mux_signals {
             PARLIO_TX_DATA15           = 203,
             CONSTANT0                  = 212,
             CONSTANT1                  = 213,
+            CPU_GPIO_0                 = 214,
+            CPU_GPIO_1                 = 215,
+            CPU_GPIO_2                 = 216,
+            CPU_GPIO_3                 = 217,
+            CPU_GPIO_4                 = 218,
+            CPU_GPIO_5                 = 219,
+            CPU_GPIO_6                 = 220,
+            CPU_GPIO_7                 = 221,
+            CPU_GPIO_8                 = 222,
+            CPU_GPIO_9                 = 223,
+            CPU_GPIO_10                = 224,
+            CPU_GPIO_11                = 225,
+            CPU_GPIO_12                = 226,
+            CPU_GPIO_13                = 227,
+            CPU_GPIO_14                = 228,
+            CPU_GPIO_15                = 229,
             PARLIO_TX_CS               = 242,
             EMAC_PTP_PPS               = 243,
             ANA_COMP0                  = 244,

@@ -103,6 +103,18 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(256)
     };
+    ("dedicated_gpio.version") => {
+        "riscv_v2"
+    };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
     ("uart.ram_size") => {
         128
     };
@@ -421,6 +433,39 @@ macro_rules! property {
     };
     ("clock_tree.i2c.function_clock.div_num") => {
         (0, 255)
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dedicated_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dedicated_gpio { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_dedicated_gpio!((0));
+        _for_each_inner_dedicated_gpio!((1)); _for_each_inner_dedicated_gpio!((2));
+        _for_each_inner_dedicated_gpio!((3)); _for_each_inner_dedicated_gpio!((4));
+        _for_each_inner_dedicated_gpio!((5)); _for_each_inner_dedicated_gpio!((6));
+        _for_each_inner_dedicated_gpio!((7)); _for_each_inner_dedicated_gpio!((0, 0,
+        CPU_GPIO_0)); _for_each_inner_dedicated_gpio!((0, 1, CPU_GPIO_1));
+        _for_each_inner_dedicated_gpio!((0, 2, CPU_GPIO_2));
+        _for_each_inner_dedicated_gpio!((0, 3, CPU_GPIO_3));
+        _for_each_inner_dedicated_gpio!((0, 4, CPU_GPIO_4));
+        _for_each_inner_dedicated_gpio!((0, 5, CPU_GPIO_5));
+        _for_each_inner_dedicated_gpio!((0, 6, CPU_GPIO_6));
+        _for_each_inner_dedicated_gpio!((0, 7, CPU_GPIO_7));
+        _for_each_inner_dedicated_gpio!((1, 0, CPU_GPIO_8));
+        _for_each_inner_dedicated_gpio!((1, 1, CPU_GPIO_9));
+        _for_each_inner_dedicated_gpio!((1, 2, CPU_GPIO_10));
+        _for_each_inner_dedicated_gpio!((1, 3, CPU_GPIO_11));
+        _for_each_inner_dedicated_gpio!((1, 4, CPU_GPIO_12));
+        _for_each_inner_dedicated_gpio!((1, 5, CPU_GPIO_13));
+        _for_each_inner_dedicated_gpio!((1, 6, CPU_GPIO_14));
+        _for_each_inner_dedicated_gpio!((1, 7, CPU_GPIO_15));
+        _for_each_inner_dedicated_gpio!((channels(0), (1), (2), (3), (4), (5), (6),
+        (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
+        CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
+        CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7), (1, 0, CPU_GPIO_8), (1, 1,
+        CPU_GPIO_9), (1, 2, CPU_GPIO_10), (1, 3, CPU_GPIO_11), (1, 4, CPU_GPIO_12), (1,
+        5, CPU_GPIO_13), (1, 6, CPU_GPIO_14), (1, 7, CPU_GPIO_15)));
     };
 }
 #[macro_export]
@@ -3926,6 +3971,8 @@ macro_rules! for_each_peripheral {
         disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
         CPU_CTRL <= virtual() (unstable)));
@@ -4013,6 +4060,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
         _for_each_inner_peripheral!((USB_HS(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
+        _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
         _for_each_inner_peripheral!((SPI2, Spi2, 1, AxiGdmaChannel));
@@ -4270,9 +4318,11 @@ macro_rules! for_each_peripheral {
         peri_type #[doc = "USB_HS peripheral singleton"] USB_HS <= USB_OTG_HS(USB_OTG_HS
         : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "FLASH peripheral singleton"] FLASH <=
-        virtual() (unstable)), (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"]
-        SW_INTERRUPT <= virtual() (unstable)), (@ peri_type #[doc =
-        "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable))));
+        virtual() (unstable)), (@ peri_type #[doc =
+        "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)),
+        (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <=
+        virtual() (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
+        CPU_CTRL <= virtual() (unstable))));
         _for_each_inner_peripheral!((singletons(#[cfg(not(use_xtal32k))] GPIO0),
         (#[cfg(not(use_xtal32k))] GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6),
         (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14),
@@ -4297,7 +4347,7 @@ macro_rules! for_each_peripheral {
         (AXI_GDMA(unstable)), (SHA(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)),
         (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1), (UART2),
         (UART3), (USB_DEVICE(unstable)), (USB_HS(unstable)), (FLASH(unstable)),
-        (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
+        (GPIO_DEDICATED(unstable)), (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
         _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (SPI3,
         Spi3, 2, AxiGdmaChannel), (AES, Aes, 4, AxiGdmaChannel)));
     };
@@ -5064,6 +5114,14 @@ macro_rules! define_io_mux_signals {
             CPU_GPIO_5          = 219,
             CPU_GPIO_6          = 220,
             CPU_GPIO_7          = 221,
+            CPU_GPIO_8          = 222,
+            CPU_GPIO_9          = 223,
+            CPU_GPIO_10         = 224,
+            CPU_GPIO_11         = 225,
+            CPU_GPIO_12         = 226,
+            CPU_GPIO_13         = 227,
+            CPU_GPIO_14         = 228,
+            CPU_GPIO_15         = 229,
             SIG_IN_FUNC251      = 251,
             SIG_IN_FUNC252      = 252,
             SIG_IN_FUNC253      = 253,
@@ -5221,6 +5279,14 @@ macro_rules! define_io_mux_signals {
             CPU_GPIO_5  = 219,
             CPU_GPIO_6  = 220,
             CPU_GPIO_7  = 221,
+            CPU_GPIO_8  = 222,
+            CPU_GPIO_9  = 223,
+            CPU_GPIO_10 = 224,
+            CPU_GPIO_11 = 225,
+            CPU_GPIO_12 = 226,
+            CPU_GPIO_13 = 227,
+            CPU_GPIO_14 = 228,
+            CPU_GPIO_15 = 229,
             GPIO        = 256,
             MTDO,
             MTCK,

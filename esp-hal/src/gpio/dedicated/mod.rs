@@ -125,6 +125,7 @@ use strum::EnumCount as _;
 #[cfg_attr(dedicated_gpio_version = "esp32s2", path = "low_level/esp32s2.rs")]
 #[cfg_attr(dedicated_gpio_version = "esp32s3", path = "low_level/esp32s3.rs")]
 #[cfg_attr(dedicated_gpio_version = "riscv_v1", path = "low_level/riscv_v1.rs")]
+#[cfg_attr(dedicated_gpio_version = "riscv_v2", path = "low_level/riscv_v2.rs")]
 mod low_level;
 
 use crate::{
@@ -794,7 +795,7 @@ impl<'lt> DedicatedGpioFlex<'lt> {
     }
 
     /// Enables or disables the output buffer of the GPIO pin.
-    #[cfg(dedicated_gpio_version = "riscv_v1")] // Xtensas always have the output enabled.
+    #[cfg(riscv)] // Xtensas always have the output enabled.
     pub fn set_output_enabled(&mut self, enabled: bool) {
         #[cfg(all(debug_assertions, multi_core))]
         debug_assert_eq!(
