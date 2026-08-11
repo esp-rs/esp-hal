@@ -66,16 +66,16 @@ semihosting        = { version = "0.1", features = ["stdio", "panic-handler"] }
 embedded-test      = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
 
 # radio HIL deps
-embassy-net = { version = "0.8.0", features = [
+embassy-net = { version = "0.9.0", features = [
     "dhcpv4",
     "medium-ethernet",
     "tcp",
     "dns",
 ] }
 reqwless = { version = "0.14.0", default-features = false }
-edge-dhcp = "0.7.0"
-edge-nal = "0.6.0"
-edge-nal-embassy = "0.8.1"
+edge-dhcp = "0.8.0"
+edge-nal = "0.7.0"
+edge-nal-embassy = "0.9.0"
 trouble-host = { version = "0.7.0", default-features = false, features = [
     "central",
     "default-packet-pool-mtu-255",

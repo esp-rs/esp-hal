@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 embassy-executor = "0.10.0"
-embassy-net = { version = "0.8.0", features = [ # TODO: update once stnpc-net-embassy gets updated
+embassy-net = { version = "0.9.0", features = [
     "dhcpv4",
     "medium-ethernet",
     "udp",
@@ -28,8 +28,8 @@ esp-radio = { path = "../../../esp-radio", features = [
     "wifi"
 ] }
 static_cell = "2.1.0"
-sntpc = { version = "0.8", default-features = false }
-sntpc-net-embassy = { version = "0.8", default-features = false }
+sntpc = { version = "0.11", default-features = false }
+sntpc-net-embassy = { version = "0.11", default-features = false }
 jiff = { version = "0.2.10", default-features = false, features = ["static"] }
 
 [features]
