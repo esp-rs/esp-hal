@@ -476,6 +476,16 @@ driver_configs![
             name: "SPI slave",
             properties: {}
         },
+        LpSpiMasterProperties {
+            driver: lp_spi_master,
+            name: "LP SPI master",
+            properties: {}
+        },
+        LpSpiSlaveProperties {
+            driver: lp_spi_slave,
+            name: "LP SPI slave",
+            properties: {}
+        },
         I2sProperties<I2sInstanceConfig> {
             driver: i2s,
             name: "I2S",
@@ -501,6 +511,11 @@ driver_configs![
                 /// Whether the chip supports the RX high-pass filter in PDM mode (ESP32-P4).
                 supports_pdm_rx_hp_filter: bool,
             }
+        },
+        LpI2sProperties {
+            driver: lp_i2s,
+            name: "LP I2S",
+            properties: {}
         },
         ParlIoProperties {
             driver: parl_io,
@@ -556,7 +571,12 @@ driver_configs![
         },
         TwaiProperties {
             driver: twai,
-            name: "TWAI / CAN / CANFD",
+            name: "TWAI",
+            properties: {}
+        },
+        CanFdProperties {
+            driver: canfd,
+            name: "CANFD",
             properties: {}
         },
         UsbOtgProperties {
@@ -689,6 +709,11 @@ driver_configs![
         CordicProperties {
             driver: cordic,
             name: "CORDIC accelerator",
+            properties: {}
+        },
+        VoiceActivityDetectionProperties {
+            driver: vad,
+            name: "Voice Activity Detection",
             properties: {}
         },
     ]

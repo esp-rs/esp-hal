@@ -33,7 +33,6 @@ has_swd_watchdog = true
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_SARADC" },
-    { name = "DEDICATED_GPIO" },
     { name = "DS" },
     { name = "EFUSE", hidden = true },
     { name = "EXTMEM" },

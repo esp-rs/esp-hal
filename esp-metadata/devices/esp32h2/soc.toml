@@ -382,3 +382,6 @@ controller = "npl"
 [device.ieee802154]
 
 [device.phy]
+
+[device.avc]
+support_status = "not_supported"
