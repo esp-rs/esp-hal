@@ -50,7 +50,7 @@ transfer.wait();
 )]
 //! ## Implementation State
 //!
-//! This driver is currently **unstable**.
+//! Currently **unstable**.
 //!
 //! There are several options for working with the SPI peripheral in slave mode,
 //! but the code currently only supports:
@@ -121,21 +121,21 @@ impl<'d> Spi<'d, Blocking> {
         signal.connect_to(&pin);
     }
 
-    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    /// Assigns the SCK (Serial Clock) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_sck(self, sclk: impl PeripheralInput<'d>) -> Self {
         self.connect_input_pin(sclk, self.spi.info().sclk);
         self
     }
 
-    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    /// Assigns the MOSI (Master Out Slave In) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_mosi(self, mosi: impl PeripheralInput<'d>) -> Self {
         self.connect_input_pin(mosi, self.spi.info().mosi);
         self
     }
 
-    /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    /// Assigns the MISO (Master In Slave Out) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_miso(self, miso: impl PeripheralOutput<'d>) -> Self {
         let miso = miso.into();
@@ -147,7 +147,7 @@ impl<'d> Spi<'d, Blocking> {
         self
     }
 
-    /// Assign the CS (Chip Select) pin for the SPI instance.
+    /// Assigns the CS (Chip Select) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_cs(self, cs: impl PeripheralInput<'d>) -> Self {
         self.connect_input_pin(cs, self.spi.info().cs);
@@ -234,7 +234,7 @@ pub mod dma {
 
         /// Register a buffer for a DMA write.
         ///
-        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
+        /// Returns a [`SpiDmaTransfer`]. The maximum amount of data to
         /// be sent is 32736 bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
@@ -269,7 +269,7 @@ pub mod dma {
 
         /// Register a buffer for a DMA read.
         ///
-        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
+        /// Returns a [`SpiDmaTransfer`]. The maximum amount of data to
         /// be received is 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
@@ -304,7 +304,7 @@ pub mod dma {
 
         /// Register buffers for a DMA transfer.
         ///
-        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
+        /// Returns a [`SpiDmaTransfer`]. The maximum amount of data to
         /// be sent/received is 32736 bytes.
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
@@ -355,8 +355,7 @@ pub mod dma {
 
     /// A structure representing a DMA transfer for SPI.
     ///
-    /// This structure holds references to the SPI instance, DMA buffers, and
-    /// transfer status.
+    /// Holds references to the SPI instance, DMA buffers, and transfer status.
     #[instability::unstable]
     pub struct SpiDmaTransfer<'d, Dm, Buf>
     where

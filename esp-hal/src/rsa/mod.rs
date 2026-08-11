@@ -144,7 +144,7 @@ impl<'d> Rsa<'d, Blocking> {
 
     /// Registers an interrupt handler for the RSA peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -310,7 +310,7 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
     /// of the exponent. I.e. the less the Hamming weight, the greater the
     /// performance.
     ///
-    /// Note: this compromises security by enabling timing-based side-channel attacks.
+    /// Compromises security by enabling timing-based side-channel attacks.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -327,7 +327,7 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
     /// exponentiation by discarding the exponent's bits before the most
     /// significant set bit.
     ///
-    /// Note: this compromises security by effectively decreasing the key length.
+    /// Compromises security by effectively decreasing the key length.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -454,9 +454,9 @@ where
 
     /// Reads the result to the given buffer.
     ///
-    /// This is a blocking function: it waits for the RSA operation to complete,
-    /// then reads the results into the provided buffer. `start_exponentiation` must be
-    /// called before calling this function.
+    /// Blocks until the RSA operation completes,
+    /// then reads the results into the provided buffer. Call
+    /// `start_exponentiation` before this function.
     pub fn read_results(&mut self, outbuf: &mut T::InputType) {
         self.rsa.read_results(outbuf);
     }
@@ -534,9 +534,9 @@ where
 
     /// Reads the result to the given buffer.
     ///
-    /// This is a blocking function: it waits for the RSA operation to complete,
-    /// then reads the results into the provided buffer. `start_modular_multiplication` must be
-    /// called before calling this function.
+    /// Blocks until the RSA operation completes,
+    /// then reads the results into the provided buffer. Call
+    /// `start_modular_multiplication` before this function.
     pub fn read_results(&mut self, outbuf: &mut T::InputType) {
         self.rsa.read_results(outbuf);
     }
@@ -592,9 +592,9 @@ where
 
     /// Reads the result to the given buffer.
     ///
-    /// This is a blocking function: it waits for the RSA operation to complete,
-    /// then reads the results into the provided buffer. `start_multiplication` must be
-    /// called before calling this function.
+    /// Blocks until the RSA operation completes,
+    /// then reads the results into the provided buffer. Call
+    /// `start_multiplication` before this function.
     pub fn read_results<const O: usize>(&mut self, outbuf: &mut T::OutputType)
     where
         T: Multi<OutputType = [u32; O]>,
@@ -775,13 +775,13 @@ enum RsaBackendState<'d> {
 #[procmacros::doc_replace]
 /// RSA processing backend.
 ///
-/// The backend processes work items placed in the RSA work queue. The backend needs to be created
-/// and started for operations to be processed. This allows you to perform operations on the RSA
-/// accelerator without carrying around the peripheral singleton, or the driver.
+/// Processes work items placed in the RSA work queue. Create and start the
+/// backend before operations run. The backend lets you use the RSA
+/// accelerator without carrying the peripheral singleton or the driver.
 ///
-/// The [`RsaContext`] struct can enqueue work items that this backend will process.
+/// The [`RsaContext`] struct can enqueue work items that this backend processes.
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -1015,7 +1015,7 @@ impl<'d> RsaBackend<'d> {
 
 /// An active work queue driver.
 ///
-/// This object must be kept around, otherwise RSA operations will never complete.
+/// Keep this object alive, or RSA operations never complete.
 ///
 /// For a usage example, see [`RsaBackend`].
 pub struct RsaWorkQueueDriver<'t, 'd> {
@@ -1081,12 +1081,12 @@ fn rsa_work_queue_handler() {
     }
 }
 
-/// An RSA work queue user.
+/// RSA work queue user.
 ///
-/// This object allows performing [big number multiplication][Self::multiply], [big number modular
-/// multiplication][Self::modular_multiply] and [big number modular
-/// exponentiation][Self::modular_exponentiate] with hardware acceleration. To perform these
-/// operations, the [`RsaBackend`] must be started, otherwise these operations will never complete.
+/// Performs [big number multiplication][Self::multiply], [big number modular
+/// multiplication][Self::modular_multiply], and [big number modular
+/// exponentiation][Self::modular_exponentiate] with hardware acceleration. Start
+/// [`RsaBackend`] first, or these operations never complete.
 #[cfg_attr(
     not(rsa_version = "1"),
     doc = " \nThe context is created with a secure configuration by default. You can enable hardware acceleration
@@ -1220,8 +1220,8 @@ impl RsaContext {
     /// # {after_snippet}
     /// ```
     ///
-    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
-    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
+    /// Performs the calculation asynchronously. Returns an [`RsaHandle`] to
+    /// poll the status of the calculation, wait for completion, or cancel the
     /// operation (by dropping the handle).
     ///
     /// When the operation is completed, the result will be stored in `result`.
@@ -1258,8 +1258,8 @@ impl RsaContext {
     /// For an example how these values can be calculated and used, see
     /// [Self::modular_exponentiate].
     ///
-    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
-    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
+    /// Performs the calculation asynchronously. Returns an [`RsaHandle`] to
+    /// poll the status of the calculation, wait for completion, or cancel the
     /// operation (by dropping the handle).
     ///
     /// When the operation is completed, the result will be stored in `result`.
@@ -1289,8 +1289,8 @@ impl RsaContext {
     #[procmacros::doc_replace]
     /// Starts a multiplication operation, performing `Z = X * Y`.
     ///
-    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
-    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
+    /// Performs the calculation asynchronously. Returns an [`RsaHandle`] to
+    /// poll the status of the calculation, wait for completion, or cancel the
     /// operation (by dropping the handle).
     ///
     /// When the operation is completed, the result will be stored in `result`. The `result` is

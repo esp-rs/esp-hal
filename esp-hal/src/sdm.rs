@@ -6,7 +6,7 @@
 //! GPIO matrix signal. Each channel can be configured with a carrier frequency
 //! and pulse density, then routed to one output pin.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! Generate a sigma-delta output signal on a GPIO pin.
 //!
@@ -103,9 +103,9 @@ for_each_sdm_channel!(
         paste::paste! {
             /// Sigma-delta peripheral.
             ///
-            /// This type only owns the SDM peripheral token and exposes the hardware
-            /// channel creators. Moving individual channel creators out of this
-            /// collection is supported.
+            /// Owns only the SDM peripheral token and exposes the hardware channel
+            /// creators. Moving individual channel creators out of this collection is
+            /// supported.
             #[derive(Debug)]
             #[non_exhaustive]
             pub struct Sdm<'d> {

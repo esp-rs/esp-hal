@@ -13,9 +13,9 @@ use crate::{
 /// The time that ESP-IDF reserves between the arming of the alarm and the start of the sleep, in
 /// slow-clock ticks.
 ///
-/// This is `SLEEP_TIMER_ALARM_TO_SLEEP_TICKS`, and its comment gives 80 µs for it. The sleep
-/// transition cannot catch a nearer deadline, and the 48-bit counter needs decades to reach the
-/// deadline again.
+/// `SLEEP_TIMER_ALARM_TO_SLEEP_TICKS`; ESP-IDF reserves this time between arming the alarm and
+/// starting sleep. The sleep transition cannot catch a nearer deadline, and the 48-bit counter
+/// needs decades to reach the deadline again.
 const ALARM_TO_SLEEP_TICKS: u64 = 16;
 
 /// Arms the alarm for `deadline`, and enables the timer wakeup source.

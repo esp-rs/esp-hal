@@ -18,7 +18,7 @@
 //! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
 //! newer `GDMA` controller.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Initialize and utilize DMA controller in `SPI`
 //!
@@ -90,11 +90,11 @@ bitfield::bitfield! {
 
     /// Specifies the number of valid bytes in the buffer that this descriptor points to.
     ///
-    /// This field in a transmit descriptor is written by software and indicates how many bytes can
+    /// In a transmit descriptor, software writes this field. It indicates how many bytes can
     /// be read from the buffer.
     ///
-    /// This field in a receive descriptor is written by hardware automatically and indicates how
-    /// many valid bytes have been stored into the buffer.
+    /// In a receive descriptor, hardware writes this field automatically. It indicates how
+    /// many valid bytes are stored in the buffer.
     pub length, set_length: 23, 12;
 
     /// For receive descriptors, software needs to clear this bit to 0, and hardware will set it to 1 after receiving
@@ -150,7 +150,7 @@ pub struct DmaDescriptor {
 
     /// Address of the next descriptor.
     /// If the current descriptor is the last one, this value is 0.
-    /// This field can only point to internal RAM.
+    /// Can point only to internal RAM.
     pub next: *mut DmaDescriptor,
 }
 
@@ -188,12 +188,12 @@ impl DmaDescriptor {
         self.set_suc_eof(set_eof);
     }
 
-    /// Set the size of the buffer. See [DmaDescriptorFlags::size].
+    /// Sets the size of the buffer. See [`DmaDescriptorFlags::size`].
     pub fn set_size(&mut self, len: usize) {
         self.flags.set_size(len as u16)
     }
 
-    /// Set the length of the descriptor. See [DmaDescriptorFlags::length].
+    /// Sets the length of the descriptor. See [`DmaDescriptorFlags::length`].
     pub fn set_length(&mut self, len: usize) {
         self.flags.set_length(len as u16)
     }
@@ -209,12 +209,12 @@ impl DmaDescriptor {
         self.flags.length() as usize
     }
 
-    /// Set the suc_eof bit. See [DmaDescriptorFlags::suc_eof].
+    /// Sets the `suc_eof` bit. See [`DmaDescriptorFlags::suc_eof`].
     pub fn set_suc_eof(&mut self, suc_eof: bool) {
         self.flags.set_suc_eof(suc_eof)
     }
 
-    /// Set the owner. See [DmaDescriptorFlags::owner].
+    /// Sets the owner. See [`DmaDescriptorFlags::owner`].
     pub fn set_owner(&mut self, owner: Owner) {
         let owner = match owner {
             Owner::Cpu => false,
@@ -283,7 +283,7 @@ pub enum DmaRxInterrupt {
 
     /// Triggered when an error is detected in the data segment corresponding to
     /// a descriptor received via receive channel n.
-    /// This interrupt is used only for UHCI0 peripheral (UART0 or UART1).
+    /// Used only for the UHCI0 peripheral (UART0 or UART1).
     ErrorEof,
 
     /// Triggered when the suc_eof bit in a receive descriptor is 1 and the data
@@ -1048,7 +1048,7 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
-    /// Configure the channel.
+    /// Configures the channel.
     #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.rx_impl.set_priority(priority);
@@ -1272,7 +1272,7 @@ where
         self.tx_impl.runtime_ensure_compatible(peripheral);
     }
 
-    /// Configure the channel priority.
+    /// Configures the channel priority.
     #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx_impl.set_priority(priority);
@@ -1473,7 +1473,7 @@ where
         }
     }
 
-    /// Configure the channel priorities.
+    /// Configures the channel priorities.
     #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx.set_priority(priority);

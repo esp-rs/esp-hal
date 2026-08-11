@@ -2,13 +2,13 @@
 //!
 //! ## Overview
 //!
-//! This driver implements the I2C Slave mode. In this mode, the MCU responds to
+//! I2C slave mode driver. The MCU responds to
 //! and communicates with one or more master devices. The MCU acts as a slave
 //! device on the I2C bus, identified by its unique I2C address.
 //!
 //! ## Implementation
 //!
-//! This driver supports both Blocking and Async modes, using hardware SCL clock stretching
+//! Supports both blocking and async modes, using hardware SCL clock stretching
 //! to handle flow control. The async implementation runs a callback-free waker model, waking
 //! the task waker when stretching or transaction completeness interrupts occur.
 

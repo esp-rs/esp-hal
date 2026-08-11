@@ -80,7 +80,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// Invalidate all cache items in ICache.
         fn Cache_Invalidate_ICache_All();
 
-        /// Set ICache modes: cache size, associate ways and cache line size.
+        /// Sets ICache modes: cache size, associate ways, and cache line size.
         ///
         /// @param cache_size_t cache_size : the cache size, can be CACHE_SIZE_HALF and
         /// CACHE_SIZE_FULL
@@ -112,7 +112,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
             sram3_layout: u32,
         );
 
-        /// Set DCache modes: cache size, associate ways and cache line size.
+        /// Sets DCache modes: cache size, associate ways, and cache line size.
         ///
         /// [`cache_size`]: u32 the cache size, can be CACHE_SIZE_HALF and CACHE_SIZE_FULL
         /// [`ways`]: u32 the associate ways of cache, can only be CACHE_4WAYS_ASSOC
@@ -122,7 +122,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// Invalidate all cache items in DCache.
         fn Cache_Invalidate_DCache_All();
 
-        /// Enable DCache access for the cpu.
+        /// Enables DCache access for the CPU.
         ///
         /// @param  uint32_t autoload : DCache will preload then.
         fn Cache_Enable_DCache(autoload: u32);

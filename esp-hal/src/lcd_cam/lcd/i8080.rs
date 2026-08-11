@@ -7,7 +7,7 @@
 //! format/timing. The driver mandates DMA (Direct Memory Access) for
 //! efficient data transfer.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### MIPI-DSI Display
 //!
@@ -199,8 +199,7 @@ where
     }
 
     /// Configures the byte order for data transmission in 16-bit mode.
-    /// This must be set to [ByteOrder::default()] when transmitting in 8-bit
-    /// mode.
+    /// Must be [`ByteOrder::default()`] when transmitting in 8-bit mode.
     pub fn set_byte_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
         self.regs()
@@ -210,8 +209,7 @@ where
     }
 
     /// Configures the byte order for data transmission in 8-bit mode.
-    /// This must be set to [ByteOrder::default()] when transmitting in 16-bit
-    /// mode.
+    /// Must be [`ByteOrder::default()`] when transmitting in 16-bit mode.
     pub fn set_8bits_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
         self.regs()
@@ -357,7 +355,7 @@ where
     /// Passing a `Command<u8>` will make this an 8-bit transfer and a
     /// `Command<u16>` will make this a 16-bit transfer.
     ///
-    /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
+    /// A 16-bit transfer on an 8-bit bus silently truncates the 2nd
     /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
     /// byte to 2 bytes.
     pub fn send<W: Into<u16> + Copy, BUF: DmaTxBuffer>(
@@ -470,7 +468,7 @@ pub struct I8080Transfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         self.i8080
             .regs()
@@ -489,7 +487,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     ///
-    /// Note: This also clears the transfer interrupt so it can be used in
+    /// Also clears the transfer interrupt so it can be used in
     /// interrupt handlers to "handle" the interrupt.
     pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, Dm>, BUF::Final) {
         while !self.is_done() {}

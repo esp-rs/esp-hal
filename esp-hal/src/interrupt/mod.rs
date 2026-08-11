@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Interrupt support
 //!
-//! This module contains code to configure and handle peripheral interrupts.
+//! Configures and handles peripheral interrupts.
 //!
 //! ## Overview
 //!
@@ -12,13 +12,13 @@
 //! handler routine, which polls the interrupt controller and calls the appropriate handlers for the
 //! pending peripheral interrupts.
 //!
-//! This default handler implements interrupt nesting - meaning a higher [`Priority`] interrupt can
+//! The default handler implements interrupt nesting: a higher [`Priority`] interrupt can
 //! preempt a lower priority interrupt handler. The number of priorities is a chip-specific detail.
 //!
 //! ## Usage
 //!
-//! Peripheral drivers manage interrupts for you. Where appropriate, a `set_interrupt_handler`
-//! function is provided, which allows you to register a function to handle interrupts at a priority
+//! Peripheral drivers manage interrupts for you. Where appropriate, a
+//! [`set_interrupt_handler`] function registers a handler for interrupts at a priority
 //! level of your choosing. Interrupt handler functions need to be marked by the [`#[handler]`]
 //! attribute. These drivers also provide `listen` and `unlisten` functions that control whether an
 //! interrupt will be generated for the matching event or not. For more information and examples,
@@ -103,9 +103,9 @@ pub trait InterruptConfigurable: crate::private::Sealed {
         doc = "Registers an interrupt handler for the peripheral on the current core."
     )]
     #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
-    /// handlers. Some peripherals offer a shared interrupt handler for
-    /// multiple purposes. It's the users duty to honor this.
+    /// Replaces any previously registered interrupt handlers. Some peripherals
+    /// offer a shared interrupt handler for multiple purposes. You must honor
+    /// this.
     ///
     /// You can restore the default/unhandled interrupt handler by using
     /// [DEFAULT_INTERRUPT_HANDLER]
@@ -134,7 +134,7 @@ impl IsrCallback {
 
     /// The callback function.
     ///
-    /// This is aligned and can be called.
+    /// The function pointer is aligned and callable.
     pub fn callback(self) -> extern "C" fn() {
         self.f
     }
@@ -163,8 +163,8 @@ pub struct InterruptHandler {
 }
 
 impl InterruptHandler {
-    /// Creates a new [InterruptHandler] which will call the given function at
-    /// the given priority.
+    /// Creates a new [InterruptHandler] that calls the given function at the
+    /// given priority.
     pub const fn new(f: extern "C" fn(), prio: Priority) -> Self {
         Self { f, prio }
     }
@@ -192,7 +192,7 @@ pub struct InterruptStatus {
 }
 
 impl InterruptStatus {
-    /// Get status of a particular peripheral interrupt
+    /// Returns whether a particular peripheral interrupt is pending.
     #[instability::unstable]
     #[inline]
     pub fn is_pending(interrupt: Interrupt) -> bool {
@@ -270,7 +270,7 @@ impl InterruptStatus {
         }
     }
 
-    /// Get status of peripheral interrupts
+    /// Returns the status of peripheral interrupts on the current CPU.
     #[instability::unstable]
     pub fn current() -> InterruptStatus {
         let cpu = Cpu::current();
@@ -285,13 +285,13 @@ impl InterruptStatus {
         (self.status[interrupt as usize / 32] & (1 << (interrupt % 32))) != 0
     }
 
-    /// Set the given interrupt status bit
+    /// Sets the given interrupt status bit.
     #[instability::unstable]
     pub fn set(&mut self, interrupt: u8) {
         self.status[interrupt as usize / 32] |= 1 << (interrupt % 32);
     }
 
-    /// Return an iterator over the set interrupt status bits
+    /// Returns an iterator over the set interrupt status bits.
     #[instability::unstable]
     pub fn iterator(&self) -> InterruptStatusIterator {
         InterruptStatusIterator {
@@ -404,8 +404,7 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
 
 /// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.
 ///
-/// Note that interrupts still need to be enabled globally for interrupts
-/// to be serviced.
+/// You must also enable interrupts globally for interrupts to be serviced.
 ///
 /// Internally, this function maps the interrupt to the appropriate CPU interrupt
 /// for the specified priority level.
@@ -420,7 +419,7 @@ pub(crate) fn enable_on_cpu(cpu: Cpu, interrupt: Interrupt, level: Priority) {
     map_raw(cpu, interrupt, cpu_interrupt as u32);
 }
 
-/// Disable the given peripheral interrupt.
+/// Disables the given peripheral interrupt.
 ///
 /// Internally, this function maps the interrupt to a disabled CPU interrupt.
 #[inline]
@@ -445,7 +444,7 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
     }
 }
 
-/// Get cpu interrupt assigned to peripheral interrupt
+/// Returns the CPU interrupt assigned to a peripheral interrupt.
 #[cfg(all(feature = "rt", gpio_driver_supported))]
 pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     mapped_to_raw(cpu, interrupt as u32)
@@ -478,7 +477,7 @@ pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
 pub enum RunLevel {
     /// Thread mode.
     ///
-    /// This is the lowest level. No interrupts are masked by the run level.
+    /// Lowest run level. No interrupts are masked by the run level.
     ThreadMode,
 
     /// An elevated level, usually an interrupt handler's.

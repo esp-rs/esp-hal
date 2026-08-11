@@ -34,7 +34,7 @@
 //!   - `DMA`
 //!   - `system` (to configure and enable the I2S peripheral)
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -337,7 +337,7 @@ where
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         self.i2s.instance.is_tx_done()
     }

@@ -99,10 +99,10 @@ pub trait ChannelIFace<'a, S: TimerSpeed + 'a>
 where
     Channel<'a, S>: ChannelHW,
 {
-    /// Configure channel
+    /// Configures the channel.
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error>;
 
-    /// Set channel duty HW
+    /// Sets the channel duty in hardware.
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error>;
 
     /// Start a duty-cycle fade
@@ -119,14 +119,14 @@ where
 
 /// Channel HW interface
 pub trait ChannelHW {
-    /// Configure Channel HW except for the duty which is set via
+    /// Configures the channel hardware except for the duty, which is set via
     /// [`Self::set_duty_hw`].
     fn configure_hw(&mut self) -> Result<(), Error>;
-    /// Configure the hardware for the channel with a specific pin
+    /// Configures the hardware for the channel with a specific pin
     /// configuration.
     fn configure_hw_with_drive_mode(&mut self, cfg: DriveMode) -> Result<(), Error>;
 
-    /// Set channel duty HW
+    /// Sets the channel duty in hardware.
     fn set_duty_hw(&self, duty: u32);
 
     /// Start a duty-cycle fade HW
@@ -152,7 +152,7 @@ pub struct Channel<'a, S: TimerSpeed> {
 }
 
 impl<'a, S: TimerSpeed> Channel<'a, S> {
-    /// Return a new channel
+    /// Creates a new channel.
     pub fn new(number: Number, output_pin: impl PeripheralOutput<'a>) -> Self {
         let ledc = LEDC::regs();
         Channel {
@@ -168,7 +168,7 @@ impl<'a, S: TimerSpeed> ChannelIFace<'a, S> for Channel<'a, S>
 where
     Channel<'a, S>: ChannelHW,
 {
-    /// Configure channel
+    /// Configures the channel.
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error> {
         self.timer = Some(config.timer);
 
@@ -178,7 +178,7 @@ where
         Ok(())
     }
 
-    /// Set duty % of channel
+    /// Sets the channel duty as a percentage.
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error> {
         let duty_exp;
         if let Some(timer) = self.timer {
@@ -355,7 +355,7 @@ impl<S> ChannelHW for Channel<'_, S>
 where
     S: crate::ledc::timer::TimerSpeed,
 {
-    /// Configure Channel HW
+    /// Configures the channel hardware.
     fn configure_hw(&mut self) -> Result<(), Error> {
         self.configure_hw_with_drive_mode(DriveMode::PushPull)
     }
@@ -384,7 +384,7 @@ where
         Ok(())
     }
 
-    /// Set duty in channel HW
+    /// Sets the duty in the channel hardware.
     fn set_duty_hw(&self, duty: u32) {
         low_level::set_duty_hw(self.ledc, self.number, S::IS_HS, duty);
         self.start_duty_without_fading();

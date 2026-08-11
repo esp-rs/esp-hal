@@ -6,7 +6,7 @@
 //! The touch sensor peripheral allows for cheap and robust user interfaces by
 //! e.g., dedicating a part of the pcb as touch button.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -83,7 +83,7 @@ pub struct TouchConfig {
     pub sleep_cycles: Option<u16>,
 }
 
-/// This struct marks a successfully initialized touch peripheral
+/// Marks a successfully initialized touch peripheral.
 pub struct Touch<'d, Tm: TouchMode, Dm: DriverMode> {
     _inner: TOUCH<'d>,
     _touch_mode: PhantomData<Tm>,
@@ -269,9 +269,9 @@ impl<'d> Touch<'d, Continuous, Async> {
     ///
     /// ## Warning:
     ///
-    /// This uses [`RTC_CORE`](crate::peripherals::Interrupt::RTC_CORE)
-    /// interrupts under the hood. So the whole async part breaks if you install
-    /// an interrupt handler with [`Rtc::set_interrupt_handler()`][1].
+    /// Uses [`RTC_CORE`](crate::peripherals::Interrupt::RTC_CORE) interrupts
+    /// under the hood. The async driver stops working if you install an
+    /// interrupt handler with [`Rtc::set_interrupt_handler()`][1].
     ///
     /// [1]: ../rtc_cntl/struct.Rtc.html#method.set_interrupt_handler
     ///

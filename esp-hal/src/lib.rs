@@ -4,7 +4,7 @@
 )]
 //! # Bare-metal (`no_std`) HAL for all Espressif ESP32 devices.
 //!
-//! This documentation is built for the
+//! Built for the
 #![doc = concat!("**", chip_pretty!(), "**")]
 //! . Please ensure you are reading the correct [documentation] for your target
 //! device.
@@ -30,10 +30,10 @@
 //!
 //! These singletons, by default, represent peripherals for the entire lifetime
 //! of the program. To allow for reusing peripherals, the HAL provides a
-//! `reborrow` method on each peripheral singleton. This method creates a new
-//! handle to the peripheral with a shorter lifetime. This allows you to pass
-//! the handle to a driver, while still keeping the original handle alive. Once
-//! you drop the driver, you will be able to reborrow the peripheral again.
+//! `reborrow` method on each peripheral singleton creates a new handle to the
+//! peripheral with a shorter lifetime. Pass the handle to a driver while keeping
+//! the original handle alive. Once you drop the driver, you can reborrow the
+//! peripheral again.
 #![cfg_attr(
     // Feature-gated so that this doesn't prevent gradual device bringup. Any
     // stable driver would serve the purpose here, so this block will be part
@@ -58,7 +58,7 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //! reference:
 //!
 //! ```rust, ignore
-//! // Note that in this case, `peripherals` needs to be mutable.
+//! // In this case, `peripherals` must be mutable.
 //! let mut peripherals = esp_hal::init(esp_hal::Config::default());
 //!
 //! let i2c = I2C::new(peripherals.I2C0.reborrow(), /* ... */);
@@ -73,7 +73,7 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //! let i2c = I2C::new(peripherals.I2C0.reborrow(), /* ... */);
 //! ```
 //!
-//! ## Examples
+//! # Examples
 //!
 //! We have a plethora of [examples] in the esp-hal repository. We use
 //! an [xtask] to automate the building, running, and testing of code and
@@ -151,7 +151,7 @@ fn main() -> ! {
 //!
 //! We've exposed some configuration options that don't fit into cargo
 //! features. These can be set via environment variables, or via cargo's `[env]`
-//! section inside `.cargo/config.toml`. Note that unstable options can only be
+//! section inside `.cargo/config.toml`. Unstable options can only be
 //! enabled when the `unstable` feature is enabled for the crate. Below is a
 //! table of tunable parameters for this crate:
 #![doc = ""]
@@ -174,8 +174,8 @@ fn main() -> ! {
 //! esp-hal = { version = "1", default-features = false } }
 //! ```
 //!
-//! This ensures that the `rt` feature is not enabled, nor any chip features. The application that
-//! uses your library will then be able to choose the chip feature it needs and enable `rt` such
+//! Keeps the `rt` feature disabled, along with all chip features. The application
+//! that uses your library can then choose the chip feature it needs and enable `rt` so
 //! that only the final user application calls [`init`].
 //!
 //! If your library depends on `unstable` features, you *must* use the `requires-unstable` feature,
@@ -439,7 +439,7 @@ trait RegisterToggle {
 
     /// Toggles bits in the register, applying the given operation to set and clear them.
     ///
-    /// More efficient than two modify calls, as it will not read the register
+    /// More efficient than two modify calls, as it does not read the register
     /// value twice.
     fn toggle(&self, op: impl Fn(&mut W<Self::Reg>, bool) -> &mut W<Self::Reg>);
 }
@@ -539,8 +539,8 @@ let uart = Uart::new(peripherals.UART0, Config::default())?
 /// available in async mode, as they are handled by the driver's interrupt
 /// handlers.
 ///
-/// Note that async functions usually take up more space than their blocking
-/// counterparts, and they are generally slower. This is because async functions
+/// Async functions usually take up more space than their blocking
+/// counterparts, and they are generally slower. Async functions
 /// are implemented using a state machine that is driven by interrupts and is
 /// polled by a runtime. For short operations, the overhead of the state machine
 /// can be significant. Consider using the blocking functions on the async
@@ -549,8 +549,8 @@ let uart = Uart::new(peripherals.UART0, Config::default())?
 /// When initializing an async driver, the driver disables user-specified
 /// interrupt handlers, and sets up internal interrupt handlers that drive the
 /// driver's async API. The driver's interrupt handlers run on the same core as
-/// the driver was initialized on. This means that the driver can not be sent
-/// across threads, to prevent incorrect concurrent access to the peripheral.
+/// the driver was initialized on. The driver cannot be sent across threads,
+/// to prevent incorrect concurrent access to the peripheral.
 ///
 /// Switching back to blocking mode will disable the interrupt handlers and
 /// return the driver to a state where it can be sent across threads.
@@ -638,12 +638,11 @@ pub(crate) static ESP_HAL_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 #[procmacros::doc_replace]
 /// System configuration.
 ///
-/// This `struct` is marked with `#[non_exhaustive]` and can't be instantiated
-/// directly. This is done to prevent breaking changes when new fields are added
-/// to the `struct`. Instead, use the [`Config::default()`] method to create a
-/// new instance.
+/// Marked `#[non_exhaustive]` and cannot be instantiated directly, to prevent
+/// breaking changes when new fields are added. Use [`Config::default()`] to
+/// create a new instance.
 ///
-/// ## Examples
+/// # Exampless
 ///
 /// ### Default initialization
 ///
@@ -719,10 +718,9 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 #[procmacros::doc_replace]
 /// Initialize the system.
 ///
-/// This function sets up the CPU clock and watchdog, then, returns the
-/// peripherals and clocks.
+/// Sets up the CPU clock and watchdog, then returns the peripherals and clocks.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}

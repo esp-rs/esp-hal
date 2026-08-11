@@ -237,7 +237,7 @@ fn init_psram_inner(config: &mut PsramConfig) -> bool {
     true
 }
 
-/// Set bus-clock divider for both PSRAM_MSPI0 (SRAM_CLK at 0x50) and
+/// Sets the bus-clock divider for both PSRAM_MSPI0 (SRAM_CLK at 0x50) and
 /// PSRAM_MSPI1 (CLOCK at 0x14). For divider=2 the value is
 /// (N=1)<<16 | (H=0)<<8 | (L=1)<<0 = 0x00010001. For divider=1 the
 /// fast path bit `CLK_EQU_SYSCLK` (bit 31) is set instead.
@@ -269,7 +269,7 @@ fn set_bus_clock(clock: u32) -> bool {
     true
 }
 
-/// Enable DLL timing calibration for both controllers. Both DLL bits
+/// Enables DLL timing calibration for both controllers. Both DLL bits
 /// live in MSPI0's register space (per IDF `psram_ctrlr_ll_enable_dll`):
 fn enable_dll() {
     /// MSPI3 DLL (0x5008_E180), bit 5
@@ -361,27 +361,27 @@ impl PsramPad {
         IOMUX_MSPI_BASE + self as u32
     }
 
-    /// Set this pad's drive-strength field (bits [13:12]) to `drv`,
+    /// Sets this pad's drive-strength field (bits [13:12]) to `drv`,
     /// preserving the other bits.
     unsafe fn set_drv(self, drv: u32) {
         unsafe { mmio_clrsetbits_32(self.reg_addr(), 0x3 << 12, (drv & 0x3) << 12) };
     }
 
-    /// Set drive strength on every pad in `Self::ALL`.
+    /// Sets drive strength on every pad in `Self::ALL`.
     unsafe fn set_drv_all(drv: u32) {
         for pad in Self::ALL {
             unsafe { pad.set_drv(drv) };
         }
     }
 
-    /// Set bit 0 (XPD power-up enable) of this pad's PIN0 register.
+    /// Sets bit 0 (XPD power-up enable) of this pad's PIN0 register.
     /// Used on strobe to power on the strobe input buffer needed.
     unsafe fn enable_xpd(self) {
         unsafe { mmio_setbits_32(self.reg_addr(), 1) };
     }
 }
 
-/// Configure PSRAM PHY pads.
+/// Configures PSRAM PHY pads.
 ///
 /// Mirrors IDF `mspi_timing_ll_pin_drv_set(2)` +
 /// `mspi_timing_ll_enable_dqs(true)`. Both DQS XPD bits must be on for
@@ -395,7 +395,7 @@ fn psram_pad_init() {
     }
 }
 
-/// Set PSRAM CS timing on the AXI controller's SMEM_AC register
+/// Sets PSRAM CS timing on the AXI controller's SMEM_AC register
 /// (0x5008_E1A0). SMEM_CS_SETUP=1, SMEM_CS_HOLD=1, setup_time=N-1,
 /// hold_time=N-1, hold_delay=N-1, split_trans_en=1.
 fn set_cs_timing() {
@@ -508,11 +508,11 @@ const ROM_SPI_PSRAM_CMD_NUM: i32 = 3;
 const ROM_SPI_PSRAM_CS_MASK: u8 = 1 << 1;
 
 unsafe extern "C" {
-    /// Set the controller's read mode (e.g. OPI-DTR). Configures cmd/addr/
+    /// Sets the controller's read mode (e.g. OPI-DTR). Configures cmd/addr/
     /// data line counts (8-line for OPI) and DDR mode bits in one call.
     /// Linked from `esp32p4.rom.ld`: `esp_rom_spi_set_op_mode = 0x4fc00110`.
     fn esp_rom_spi_set_op_mode(spi_num: i32, mode: u32);
-    /// Configure command/addr/dummy/data phases for next transaction.
+    /// Configures command/addr/dummy/data phases for the next transaction.
     /// Writes USR / USER1 / USER2 / ADDR / MOSI_DLEN / MISO_DLEN / W0..
     /// Linked from `esp32p4.rom.ld`: `esp_rom_spi_cmd_config = 0x4fc00108`.
     fn esp_rom_spi_cmd_config(spi_num: i32, pcmd: *mut EspRomSpiCmd);
@@ -855,7 +855,7 @@ fn p4_rev3_psram_workaround() {
     }
 }
 
-/// Configure PSRAM_MSPI0 (AXI cache) for HEX/DDR access at 0x4800_0000.
+/// Configures PSRAM_MSPI0 (AXI cache) for HEX/DDR access at 0x4800_0000.
 ///
 /// Faithful port of IDF `s_config_mspi_for_psram` from
 /// `esp_psram_impl_ap_hex.c`. Each register field is named after its

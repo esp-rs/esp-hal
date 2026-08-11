@@ -5,7 +5,7 @@ mod fields;
 #[instability::unstable]
 pub use fields::*;
 
-/// Get status of SPI boot encryption.
+/// Returns the status of SPI boot encryption.
 #[instability::unstable]
 pub fn flash_encryption() -> bool {
     !super::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
@@ -13,13 +13,13 @@ pub fn flash_encryption() -> bool {
         .is_multiple_of(2)
 }
 
-/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+/// Returns the multiplier for the timeout value of the RWDT STAGE 0 register.
 #[instability::unstable]
 pub fn rwdt_multiplier() -> u8 {
     super::read_field_le::<u8>(WDT_DELAY_SEL)
 }
 
-/// Get efuse block version
+/// Returns the eFuse block version.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
 #[instability::unstable]
@@ -32,7 +32,7 @@ pub fn block_version() -> (u8, u8) {
     )
 }
 
-/// Get version of RTC calibration block
+/// Returns the RTC calibration block version.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/caf1a18/components/efuse/esp32c61/esp_efuse_rtc_calib.c#L20>
 #[instability::unstable]

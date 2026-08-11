@@ -73,7 +73,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         self.cfg1().write(|w| unsafe { w.mod_().bits(0) });
     }
 
-    /// Set the timer counter to the provided value
+    /// Sets the timer counter to the provided value.
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
         // SAFETY:
         // We only write to our TIMERx_SYNC register
@@ -185,7 +185,7 @@ impl TimerClockConfig {
         })
     }
 
-    /// Set the method for updating the PWM period
+    /// Sets the method for updating the PWM period.
     pub fn with_period_updating_method(self, method: PeriodUpdatingMethod) -> Self {
         Self {
             period_updating_method: method,
@@ -193,7 +193,7 @@ impl TimerClockConfig {
         }
     }
 
-    /// Get the timer clock frequency.
+    /// Returns the timer clock frequency.
     ///
     /// ### Note:
     /// The actual value is rounded down to the nearest `u32` value
@@ -231,9 +231,9 @@ pub enum PwmWorkingMode {
     /// value. Then it starts to decrement again. In this case, the PWM period
     /// is also equal to the value of period field + 1.
     Decrease = 2,
-    /// This is a combination of the two modes mentioned above. The PWM timer
+    /// Combines the two modes above. The PWM timer
     /// starts increasing from zero until the period value is reached. Then,
-    /// the timer decreases back to zero. This pattern is then repeated. The
+    /// the timer decreases back to zero. The pattern repeats. The
     /// PWM period is the result of the value of the period field × 2.
     UpDown   = 3,
 }

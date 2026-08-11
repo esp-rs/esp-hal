@@ -7,15 +7,15 @@
 
 use crate::efuse::EfuseField;
 
-/// Disable programming of individual eFuses
+/// Disables programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 8);
 ///
 pub const RESERVED_0_8: EfuseField = EfuseField::new(0, 0, 8, 24);
-/// Disable reading from BlOCK3
+/// Disables reading from BLOCK3
 pub const RD_DIS: EfuseField = EfuseField::new(0, 1, 32, 2);
 /// RTC watchdog timeout threshold; in unit of slow clock cycle
 pub const WDT_DELAY_SEL: EfuseField = EfuseField::new(0, 1, 34, 2);
-/// Set this bit to disable pad jtag
+/// Sets this bit to disable pad jtag
 pub const DIS_PAD_JTAG: EfuseField = EfuseField::new(0, 1, 36, 1);
 /// The bit be set to disable icache in download mode
 pub const DIS_DOWNLOAD_ICACHE: EfuseField = EfuseField::new(0, 1, 37, 1);
@@ -25,16 +25,16 @@ pub const DIS_DOWNLOAD_MANUAL_ENCRYPT: EfuseField = EfuseField::new(0, 1, 38, 1)
 pub const SPI_BOOT_CRYPT_CNT: EfuseField = EfuseField::new(0, 1, 39, 3);
 /// Flash encryption key length
 pub const XTS_KEY_LENGTH_256: EfuseField = EfuseField::new(0, 1, 42, 1);
-/// Set the default UARTboot message output mode
+/// Sets the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 1, 43, 2);
-/// Set this bit to force ROM code to send a resume command during SPI boot
+/// Sets this bit to force ROM code to send a resume command during SPI boot
 pub const FORCE_SEND_RESUME: EfuseField = EfuseField::new(0, 1, 45, 1);
-/// Set this bit to disable download mode (boot_mode\[3:0\] = 0; 1; 2; 4; 5; 6;
+/// Sets this bit to disable download mode (boot_mode\[3:0\] = 0; 1; 2; 4; 5; 6;
 /// 7)
 pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 1, 46, 1);
-/// This bit set means disable direct_boot mode
+/// When set, disables direct_boot mode
 pub const DIS_DIRECT_BOOT: EfuseField = EfuseField::new(0, 1, 47, 1);
-/// Set this bit to enable secure UART download mode
+/// Sets this bit to enable secure UART download mode
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 1, 48, 1);
 /// Configures flash waiting time after power-up; in unit of ms. If the value is
 /// less than 15; the waiting time is the configurable value.  Otherwise; the

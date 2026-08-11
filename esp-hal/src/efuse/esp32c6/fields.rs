@@ -7,9 +7,9 @@
 
 use crate::efuse::EfuseField;
 
-/// Disable programming of individual eFuses
+/// Disables programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 32);
-/// Disable reading from BlOCK4-10
+/// Disables reading from BLOCK4-10
 pub const RD_DIS: EfuseField = EfuseField::new(0, 1, 32, 7);
 /// Represents whether pad of uart and sdio is swapped or not. 1: swapped. 0:
 /// not swapped
@@ -125,7 +125,7 @@ pub const DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 
 /// Represents whether security download is enabled or disabled. 1: enabled. 0:
 /// disabled
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 133, 1);
-/// Set the default UARTboot message output mode
+/// Sets the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 134, 2);
 /// Reserved
 pub const RPT4_RESERVED3_4: EfuseField = EfuseField::new(0, 4, 136, 1);

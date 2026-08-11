@@ -224,7 +224,7 @@ impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
         }
     }
 
-    /// Converts this object into a mutable reference.
+    /// Converts into a mutable reference.
     pub fn into_inner(self) -> &'a mut T {
         self.0
     }
@@ -236,7 +236,7 @@ impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
 }
 
 impl<'a, T, const N: usize> DmaAlignedMut<'a, [T; N]> {
-    /// Converts this object into a slice reference.
+    /// Converts into a slice reference.
     pub fn unsize(self) -> DmaAlignedMut<'a, [T]> {
         DmaAlignedMut(self.0)
     }
@@ -328,7 +328,7 @@ impl<'a, T: ?Sized> DmaAlignedRef<'a, T> {
 
     /// Writes back the cached copy of this data to memory.
     ///
-    /// This only flushes the CPU cache to memory (so a DMA engine reading from
+    /// Only flushes the CPU cache to memory (so a DMA engine reading from
     /// memory observes the latest CPU writes); it does not mutate the value, so
     /// it is sound to perform through a shared reference.
     #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
@@ -348,7 +348,7 @@ impl<'a, T: ?Sized> DmaAlignedRef<'a, T> {
         }
     }
 
-    /// Converts this object into a shared reference.
+    /// Converts into a shared reference.
     pub fn into_inner(self) -> &'a T {
         self.0
     }

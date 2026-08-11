@@ -5,7 +5,7 @@
 //! useful for communication with external peripherals.
 //!
 //! ## Configuration
-//! This peripheral is capable of operating in either master or slave mode. For
+//! Capable of operating in either master or slave mode. For
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.
 

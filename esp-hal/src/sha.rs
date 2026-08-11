@@ -2,11 +2,11 @@
 //! # Secure Hash Algorithm (SHA) Accelerator
 //!
 //! ## Overview
-//! This SHA accelerator is a hardware device that speeds up the SHA algorithm
+//! SHA accelerator hardware that speeds up the SHA algorithm
 //! significantly, compared to a SHA algorithm implemented solely in software
 //!
 //! ## Configuration
-//! This driver allows you to perform cryptographic hash operations using
+//! Performs cryptographic hash operations using
 //! various hash algorithms supported by the SHA peripheral, such as:
 //! * SHA-1
 //! * SHA-224
@@ -25,7 +25,7 @@
 //! to retrieve the hash value and repeat the process for a new hash calculation
 //! if needed.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Using the `Sha` driver
 //!
@@ -128,9 +128,10 @@ impl<'d> Sha<'d> {
         ShaDigest::new(self)
     }
 
-    /// Start a new digest and take ownership of the driver.
-    /// This is useful for storage outside a function body. i.e. in static or
-    /// struct.
+    /// Starts a new digest and takes ownership of the driver.
+    ///
+    /// Useful for storage outside a function body, for example in a `static` or
+    /// struct field.
     pub fn start_owned<A: ShaAlgorithm>(self) -> ShaDigest<'d, A, Self> {
         ShaDigest::new(self)
     }
@@ -340,10 +341,10 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 // - Registers need to be written one u32 at a time, no u8 access
 // - This means that we need to buffer bytes coming in up to 4 u8's in order to create a full u32
 
-/// An active digest
+/// Active digest.
 ///
-/// This implementation might fail after u32::MAX/8 bytes, to increase please
-/// see ::finish() length/self.cursor usage
+/// Can fail after `u32::MAX / 8` bytes. To increase the limit, see
+/// `finish()` length and `self.cursor` usage.
 pub struct ShaDigest<'d, A, S: BorrowMut<Sha<'d>>> {
     sha: S,
     state: DigestState,
@@ -532,7 +533,7 @@ impl<A: ShaAlgorithm> Default for Context<A> {
     }
 }
 
-/// This trait encapsulates the configuration for a specific SHA algorithm.
+/// Configuration for a specific SHA algorithm.
 pub trait ShaAlgorithm: crate::private::Sealed {
     /// Constant containing the name of the algorithm as a string.
     const ALGORITHM: &'static str;
@@ -554,7 +555,7 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     type DigestOutputSize: digest::array::ArraySize + 'static;
 }
 
-/// Note: digest has a blanket trait implementation for [digest::Digest] for any
+/// `digest` has a blanket trait implementation for [digest::Digest] for any
 /// element that implements FixedOutput + Default + Update + HashMarker
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::HashMarker for ShaDigest<'d, A, S> {}
 
@@ -727,7 +728,7 @@ for_each_sha_algorithm! {
     ( $name:ident, $full_name:literal (sizes: $block_size:literal, $digest_len:literal, $message_length_bytes:literal) (insecure_against: $($attack_kind:literal),*), $mode_bits:literal ) => {
         #[doc = concat!("Hardware-accelerated ", $full_name, " implementation")]
         ///
-        /// This struct manages the context and state required for processing data using the selected hashing algorithm.
+        /// Manages the context and state required for processing data using the selected hashing algorithm.
 
         ///
         /// The struct provides various functionalities such as initializing the hashing
@@ -735,7 +736,7 @@ for_each_sha_algorithm! {
         /// hashing operation to generate the final digest.
         $(
             #[doc = ""]
-            #[doc = concat!(" > ⚠️ Note that this algorithm is known to be insecure against ", $attack_kind, " attacks.")]
+            #[doc = concat!(" > ⚠️ This algorithm is known to be insecure against ", $attack_kind, " attacks.")]
         )*
         #[non_exhaustive]
         pub struct $name;
@@ -850,7 +851,7 @@ enum ShaOperationKind {
 #[procmacros::doc_replace]
 /// CPU-driven SHA processing backend.
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -1105,7 +1106,7 @@ impl<'d> ShaBackend<'d> {
 
 /// An active work queue driver.
 ///
-/// This object must be kept around, otherwise SHA operations will never complete.
+/// Keep this object alive, or SHA operations never complete.
 pub struct ShaWorkQueueDriver<'t, 'd> {
     inner: WorkQueueDriver<'t, ShaBackend<'d>, ShaOperation>,
 }

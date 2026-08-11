@@ -16,11 +16,11 @@
 //! up the timing parameters, configuring acceptance filters, handling
 //! interrupts, and transmitting/receiving messages on the TWAI bus.
 //!
-//! This driver manages the ISO 11898-1 compatible TWAI
+//! Manages the ISO 11898-1 compatible TWAI
 //! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
 //! Format (29-bit) frame identifiers.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Transmitting and Receiving Messages
 //!
@@ -148,10 +148,10 @@ pub mod filter;
 
 /// TWAI error kind
 ///
-/// This represents a common set of TWAI operation errors. HAL implementations
-/// are free to define more specific or additional error types. However, by
-/// providing a mapping to these common TWAI errors, generic code can still
-/// react to them.
+/// Common TWAI operation errors.
+///
+/// HAL implementations are free to define more specific or additional error types. Generic code
+/// can react to these common errors when implementations map to them.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[non_exhaustive]
 pub enum ErrorKind {
@@ -258,7 +258,7 @@ impl StandardId {
 
     /// Tries to create a `StandardId` from a raw 16-bit integer.
     ///
-    /// This will return `None` if `raw` is out of range of an 11-bit integer
+    /// Returns `None` if `raw` is out of range of an 11-bit integer
     /// (`> 0x7FF`).
     #[inline]
     pub fn new(raw: u16) -> Option<Self> {
@@ -314,7 +314,7 @@ impl ExtendedId {
 
     /// Tries to create a `ExtendedId` from a raw 32-bit integer.
     ///
-    /// This will return `None` if `raw` is out of range of an 29-bit integer
+    /// Returns `None` if `raw` is out of range of a 29-bit integer
     /// (`> 0x1FFF_FFFF`).
     #[inline]
     pub fn new(raw: u32) -> Option<Self> {
@@ -469,7 +469,7 @@ impl EspTwaiFrame {
     /// Remote Transmission Request (RTR): specifies whether content is a data frame or a remote
     /// request frame (on-demand polling).
     ///
-    /// Note: Remote request frames do not have a data payload, no matter their DLC.
+    /// Remote request frames do not have a data payload, no matter their DLC.
     pub fn is_remote_request(&self) -> bool {
         self.info() & (0b1 << 6) != 0
     }
@@ -483,7 +483,7 @@ impl EspTwaiFrame {
     /// Data Length Code (DLC): specifies the number of data bytes for a data frame, or the number
     /// of data bytes requested by a remote frame.
     ///
-    /// Note: although no frame can have a payload longer than 8, the DLC can be greater than 8 in
+    /// Although no frame can have a payload longer than 8, the DLC can be greater than 8 in
     /// rare cases (payload length then is still 8).
     pub fn data_length_code(&self) -> usize {
         (self.info() & 0b1111) as usize
@@ -541,11 +541,11 @@ impl EspTwaiFrame {
         }
     }
 
-    /// Frame Data: data payload, 0 to 8 bytes long.
+    /// Data payload, 0 to 8 bytes long.
     ///
-    /// Returns a reference to a slice:
-    /// * empty in case of a Remote Transmission Request
-    /// * 8 bytes long in case DLC > 8
+    /// Returns a slice that is:
+    /// * empty for a Remote Transmission Request
+    /// * 8 bytes long when DLC > 8
     #[inline]
     pub fn data(&self) -> &[u8] {
         let data_start = self.data_offset();
@@ -553,7 +553,7 @@ impl EspTwaiFrame {
         &self.bytes[data_start..data_end]
     }
 
-    /// Returns a slice reference to the relevant frame bytes.
+    /// Returns a slice of the relevant frame bytes.
     fn as_slice(&self) -> &[u8] {
         let len = self.data_offset() + self.data_length();
         &self.bytes[0..len]
@@ -718,10 +718,9 @@ pub enum BaudRate {
     B500K,
     /// A baud rate of 1 Mbps.
     B1000K,
-    /// A custom baud rate defined by the user.
+    /// Custom baud rate defined by the user.
     ///
-    /// This variant allows users to specify their own timing configuration
-    /// using a `TimingConfig` struct.
+    /// Uses a [`TimingConfig`] struct for the timing configuration.
     Custom(TimingConfig),
 }
 
@@ -909,9 +908,9 @@ where
         crate::interrupt::bind_handler(self.twai.interrupt(), handler);
     }
 
-    /// Set the bitrate of the bus.
+    /// Sets the bitrate of the bus.
     ///
-    /// Note: The timings currently assume a APB_CLK of 80MHz.
+    /// Timings currently assume an APB_CLK of 80 MHz.
     fn set_baud_rate(&mut self, baud_rate: BaudRate) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
@@ -970,12 +969,11 @@ where
             .modify(|_, w| w.clock_off().set_bit());
     }
 
-    /// Set up the acceptance filter on the device.
+    /// Sets up the acceptance filter on the device.
     ///
-    /// NOTE: On a bus with mixed 11-bit and 29-bit packet id's, you may
-    /// experience an 11-bit filter match against a 29-bit frame and vice
-    /// versa. Your application should check the id again once a frame has
-    /// been received to make sure it is the expected value.
+    /// On a bus with mixed 11-bit and 29-bit packet IDs, an 11-bit filter can
+    /// match a 29-bit frame and vice versa. The application must check the ID
+    /// again after a frame is received.
     ///
     /// You may use a `const {}` block to ensure that the filter is parsed
     /// during program compilation.
@@ -1006,7 +1004,7 @@ where
         }
     }
 
-    /// Set the error warning threshold.
+    /// Sets the error warning threshold.
     ///
     /// In the case when any of an error counter value exceeds the threshold, or
     /// all the error counter values are below the threshold, an error
@@ -1018,7 +1016,7 @@ where
             .write(|w| unsafe { w.err_warning_limit().bits(limit) });
     }
 
-    /// Set the operating mode based on provided option
+    /// Sets the operating mode based on the provided option.
     fn set_mode(&self, mode: TwaiMode) {
         self.regs().mode().modify(|_, w| {
             // self-test mode turns off acknowledgement requirement
@@ -1119,7 +1117,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
 
     /// Registers an interrupt handler for the TWAI peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
@@ -1237,11 +1235,11 @@ where
         }
     }
 
-    /// Get the number of messages that the peripheral has available in the
+    /// Returns the number of messages that the peripheral has available in the
     /// receive FIFO.
     ///
-    /// Note that this may not be the number of valid messages in the receive
-    /// FIFO due to fifo overflow/overrun.
+    /// The count can be higher than the number of valid messages in the receive
+    /// FIFO after a FIFO overflow or overrun.
     pub fn num_available_messages(&self) -> u8 {
         self.regs()
             .rx_message_cnt()
@@ -1253,7 +1251,7 @@ where
     /// Clear the receive FIFO, discarding any valid, partial, or invalid
     /// packets.
     ///
-    /// This is typically used to clear an overrun receive FIFO.
+    /// Clears an overrun receive FIFO.
     ///
     /// TODO: Not sure if this needs to be guarded against Bus Off or other
     /// error states.
@@ -1298,7 +1296,7 @@ where
     /// Transmit a frame.
     ///
     /// Because of how the TWAI registers are set up, we have to do some
-    /// assembly of bytes. Note that these registers serve a filter
+    /// assembly of bytes. These registers serve a filter
     /// configuration role when the device is in configuration mode so
     /// patching the svd files to improve this may be non-trivial.
     ///
@@ -1403,9 +1401,7 @@ pub enum TwaiInterrupt {
     ErrorWarning,
 }
 
-/// Represents errors that can occur in the TWAI driver.
-/// This enum defines the possible errors that can be encountered when
-/// interacting with the TWAI peripheral.
+/// Errors that can occur in the TWAI driver.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EspTwaiError {
@@ -1438,10 +1434,10 @@ impl embedded_can::Error for EspTwaiError {
 /// the destination.
 ///
 /// # Safety
-/// This function is marked unsafe because it reads arbitrarily from
-/// memory-mapped registers. Specifically, this function is used with the
-/// TWAI_DATA_x_REG registers which has different results based on the mode of
-/// the peripheral.
+/// Reads arbitrarily from memory-mapped registers.
+///
+/// Used with the TWAI_DATA_x_REG registers. The read result depends on the
+/// peripheral mode.
 #[inline(always)]
 unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
     for (i, dest) in dest.iter_mut().enumerate() {
@@ -1456,10 +1452,10 @@ unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
 /// the destination.
 ///
 /// # Safety
-/// This function is marked unsafe because it writes arbitrarily to
-/// memory-mapped registers. Specifically, this function is used with the
-/// TWAI_DATA_x_REG registers which has different results based on the mode of
-/// the peripheral.
+/// Writes arbitrarily to memory-mapped registers.
+///
+/// Used with the TWAI_DATA_x_REG registers. The write result depends on the
+/// peripheral mode.
 #[inline(always)]
 unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     for (i, src) in src.iter().enumerate() {
@@ -1488,7 +1484,7 @@ where
         nb::Result::Ok(None)
     }
 
-    /// Return a received frame if there are any available.
+    /// Returns a received frame when one is available.
     fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
         self.rx.receive()
     }
@@ -1510,7 +1506,7 @@ pub trait PrivateInstance: crate::private::Sealed {
     /// Provides an asynchronous interrupt handler for TWAI instance.
     fn async_handler(&self) -> InterruptHandler;
 
-    /// Returns a reference to the register block for TWAI instance.
+    /// Returns a reference to the register block for the TWAI instance.
     fn register_block(&self) -> &RegisterBlock;
 
     /// Enables/disables interrupts for the TWAI peripheral based on the `enable` flag.
@@ -1543,7 +1539,7 @@ pub trait PrivateInstance: crate::private::Sealed {
     fn async_state(&self) -> &asynch::TwaiAsyncState;
 }
 
-/// Release the message in the buffer. This will decrement the received
+/// Releases the message in the buffer and decrements the received
 /// message counter and prepare the next message in the FIFO for
 /// reading.
 fn release_receive_fifo(register_block: &RegisterBlock) {

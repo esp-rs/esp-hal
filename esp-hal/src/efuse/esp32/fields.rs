@@ -9,11 +9,11 @@ use crate::efuse::EfuseField;
 
 /// Efuse write disable mask
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 16);
-/// Disable reading from BlOCK1-3
+/// Disables reading from BlOCK1-3
 pub const RD_DIS: EfuseField = EfuseField::new(0, 0, 16, 4);
 /// Flash encryption is enabled if this field has an odd number of bits set
 pub const FLASH_CRYPT_CNT: EfuseField = EfuseField::new(0, 0, 20, 7);
-/// Disable UART download mode. Valid for ESP32 V3 and newer; only
+/// Disables UART download mode. Valid for ESP32 V3 and newer; only
 pub const UART_DOWNLOAD_DIS: EfuseField = EfuseField::new(0, 0, 27, 1);
 /// reserved
 pub const RESERVED_0_28: EfuseField = EfuseField::new(0, 0, 28, 4);
@@ -74,7 +74,7 @@ pub const SPI_PAD_CONFIG_CS0: EfuseField = EfuseField::new(0, 5, 175, 5);
 pub const CHIP_VER_REV2: EfuseField = EfuseField::new(0, 5, 180, 1);
 /// Reserved; it was created by set_missed_fields_in_regs func
 pub const RESERVE_0_181: EfuseField = EfuseField::new(0, 5, 181, 1);
-/// This field stores the voltage level for CPU to run at 240 MHz; or for
+/// Voltage level for CPU at 240 MHz, or for
 /// flash/PSRAM to run at 80 MHz.0x0: level 7; 0x1: level 6; 0x2: level 5; 0x3:
 /// level 4. (RO)
 pub const VOL_LEVEL_HP_INV: EfuseField = EfuseField::new(0, 5, 182, 2);
@@ -86,7 +86,7 @@ pub const RESERVE_0_186: EfuseField = EfuseField::new(0, 5, 186, 2);
 pub const FLASH_CRYPT_CONFIG: EfuseField = EfuseField::new(0, 5, 188, 4);
 /// Efuse variable block length scheme
 pub const CODING_SCHEME: EfuseField = EfuseField::new(0, 6, 192, 2);
-/// Disable ROM BASIC interpreter fallback
+/// Disables ROM BASIC interpreter fallback
 pub const CONSOLE_DEBUG_DISABLE: EfuseField = EfuseField::new(0, 6, 194, 1);
 ///
 pub const DISABLE_SDIO_HOST: EfuseField = EfuseField::new(0, 6, 195, 1);
@@ -94,13 +94,13 @@ pub const DISABLE_SDIO_HOST: EfuseField = EfuseField::new(0, 6, 195, 1);
 pub const ABS_DONE_0: EfuseField = EfuseField::new(0, 6, 196, 1);
 /// Secure boot V2 is enabled for bootloader image
 pub const ABS_DONE_1: EfuseField = EfuseField::new(0, 6, 197, 1);
-/// Disable JTAG
+/// Disables JTAG
 pub const JTAG_DISABLE: EfuseField = EfuseField::new(0, 6, 198, 1);
-/// Disable flash encryption in UART bootloader
+/// Disables flash encryption in UART bootloader
 pub const DISABLE_DL_ENCRYPT: EfuseField = EfuseField::new(0, 6, 199, 1);
-/// Disable flash decryption in UART bootloader
+/// Disables flash decryption in UART bootloader
 pub const DISABLE_DL_DECRYPT: EfuseField = EfuseField::new(0, 6, 200, 1);
-/// Disable flash cache in UART bootloader
+/// Disables flash cache in UART bootloader
 pub const DISABLE_DL_CACHE: EfuseField = EfuseField::new(0, 6, 201, 1);
 /// Usage of efuse block 3 (reserved)
 pub const KEY_STATUS: EfuseField = EfuseField::new(0, 6, 202, 1);

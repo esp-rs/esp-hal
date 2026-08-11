@@ -16,7 +16,7 @@
 //! available for the ESP32 only, while Low Speed channels are available for all
 //! supported chips.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Low Speed Channel
 //!
@@ -120,7 +120,7 @@ impl Speed for LowSpeed {
 }
 
 impl<'d> Ledc<'d> {
-    /// Return a new LEDC
+    /// Creates a new LEDC instance.
     pub fn new(_instance: LEDC<'d>) -> Self {
         if PeripheralClockControl::enable(PeripheralEnable::Ledc) {
             PeripheralClockControl::reset(PeripheralEnable::Ledc);
@@ -134,17 +134,17 @@ impl<'d> Ledc<'d> {
         Ledc { _instance, ledc }
     }
 
-    /// Set global slow clock source
+    /// Sets the global slow clock source.
     pub fn set_global_slow_clock(&mut self, clock_source: LSGlobalClkSource) {
         low_level::set_global_slow_clock(self.ledc, clock_source);
     }
 
-    /// Return a new timer
+    /// Creates a new timer.
     pub fn timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<'d, S> {
         Timer::new(self.ledc, number)
     }
 
-    /// Return a new channel
+    /// Creates a new channel.
     pub fn channel<S: TimerSpeed>(
         &self,
         number: channel::Number,

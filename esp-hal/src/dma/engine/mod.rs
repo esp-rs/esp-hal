@@ -74,11 +74,11 @@ pub trait RegisterAccess: Sealed {
     /// Reset the state machine of the channel and FIFO pointer.
     fn reset(&self);
 
-    /// Enable/Disable INCR burst transfer for channel reading
+    /// Enables or disables INCR burst transfer for channel reading.
     /// accessing data in internal RAM.
     fn set_burst_mode(&self, burst_mode: BurstConfig);
 
-    /// Enable/Disable burst transfer for channel reading
+    /// Enables or disables burst transfer for channel reading.
     /// descriptors in internal RAM.
     fn set_descr_burst_mode(&self, burst_mode: bool);
 
@@ -87,23 +87,22 @@ pub trait RegisterAccess: Sealed {
     #[cfg(dma_max_priority_is_set)]
     fn set_priority(&self, priority: crate::dma::DmaPriority);
 
-    /// Select a peripheral for the channel.
+    /// Selects a peripheral for the channel.
     fn set_peripheral(&self, _peripheral: u8) {}
 
-    /// Set the address of the first descriptor.
+    /// Sets the address of the first descriptor.
     fn set_link_addr(&self, address: u32);
 
-    /// Enable the channel for data transfer.
+    /// Enables the channel for data transfer.
     fn start(&self);
 
-    /// Stop the channel from transferring data.
+    /// Stops the channel from transferring data.
     fn stop(&self);
 
-    /// Mount a new descriptor.
+    /// Mounts a new descriptor.
     fn restart(&self);
 
-    /// Configure the bit to enable checking the owner attribute of the
-    /// descriptor.
+    /// Configures whether to check the owner attribute of the descriptor.
     fn set_check_owner(&self, check_owner: Option<bool>);
 
     #[cfg(dma_ext_mem_configurable_block_size)]

@@ -251,7 +251,7 @@ impl Driver {
         version::init_spi_data_mode(self, cmd_mode, address_mode, data_mode)
     }
 
-    /// Enable or disable listening for the given interrupts.
+    /// Enables or disables listening for the given interrupts.
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     pub(super) fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
         version::enable_listen(self, interrupts, enable);
@@ -389,7 +389,7 @@ impl Driver {
 
     /// Read bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't
+    /// Sends out a stuffing byte for every byte to read. Does not
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
@@ -423,7 +423,7 @@ impl Driver {
 
     /// Read received bytes from SPI FIFO.
     ///
-    /// Copies the contents of the SPI receive FIFO into `words`. This function
+    /// Copies the contents of the SPI receive FIFO into `words`.
     /// doesn't perform any data transfer. If you want to read the response to
     /// something you have written before, consider using [`Self::transfer`]
     /// instead.

@@ -108,7 +108,7 @@ bitfield::bitfield! {
     pub xtal_fpu, set_xtal_fpu: 27;
     /// Keep the BBPLL oscillator powered up in sleep.
     pub bbpll_fpu, set_bbpll_fpu: 28;
-    /// Enable clock gating when the CPU is in wait-for-interrupt state.
+    /// Enables clock gating when the CPU is in wait-for-interrupt state.
     pub cpu_waiti_clk_gate, set_cpu_waiti_clk_gate: 29;
     /// Calibrate Ocode to make bandgap voltage more precise.
     pub cali_ocode, set_cali_ocode: 30;

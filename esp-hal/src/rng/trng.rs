@@ -70,7 +70,7 @@ impl<'d> TrngSource<'d> {
 
     /// Returns whether the TRNG is currently enabled.
     ///
-    /// Note that entropy sources can be disabled at any time.
+    /// Entropy sources can be disabled at any time.
     #[instability::unstable]
     pub fn is_enabled() -> bool {
         TRNG_ENABLED.load(Ordering::Relaxed) > 0
@@ -121,16 +121,15 @@ impl Drop for TrngSource<'_> {
 pub enum TrngError {
     /// The [`TrngSource`] is not enabled.
     ///
-    /// This error is returned by [`Trng::try_new`] when the RNG is not configured
-    /// to generate true random numbers.
+    /// RNG is not configured to generate true random numbers.
     TrngSourceNotEnabled,
 }
 
 /// True Random Number Generator (TRNG)
 ///
-/// The `Trng` struct represents a true random number generator that combines
-/// the randomness from the hardware RNG and an ADC. This struct provides
-/// methods to generate random numbers and fill buffers with random bytes.
+/// True random number generator that combines randomness from the hardware RNG
+/// and an ADC. Provides methods to generate random numbers and fill buffers with
+/// random bytes.
 /// Due to pulling the entropy source from the ADC, it uses the associated
 /// registers, so to use TRNG we need to "occupy" the ADC peripheral.
 ///
@@ -142,7 +141,7 @@ pub enum TrngError {
         _ => "GPIO3"
     }
 ))]
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}

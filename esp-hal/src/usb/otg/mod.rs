@@ -15,7 +15,7 @@
     usb_otg_driver_supported,
     doc = r#"
 
-## Example: Full-Speed USB
+## Examples: Full-Speed USB
 
 ```rust, no_run
 # {before_snippet}
@@ -34,7 +34,7 @@ let usb = Usb::new_fs(
     usb_otg_hs_driver_supported,
     doc = r#"
 
-## Example: High-Speed USB
+## Examples: High-Speed USB
 
 ```rust, no_run
 # {before_snippet}

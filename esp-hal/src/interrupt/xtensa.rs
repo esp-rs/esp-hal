@@ -107,7 +107,7 @@ impl CpuInterrupt {
         true
     }
 
-    /// Enable the CPU interrupt
+    /// Enables the CPU interrupt.
     #[inline]
     #[instability::unstable]
     pub fn enable(self) {
@@ -121,7 +121,7 @@ impl CpuInterrupt {
         unsafe { xtensa_lx::interrupt::clear(1 << self as u32) };
     }
 
-    /// Get interrupt priority for the CPU
+    /// Returns the interrupt priority for the CPU.
     #[inline]
     #[instability::unstable]
     pub fn priority(self) -> Priority {
@@ -287,7 +287,7 @@ pub(crate) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
 
 // Runlevel APIs
 
-/// Get the current run level (the level below which interrupts are masked).
+/// Returns the current run level (the level below which interrupts are masked).
 pub(crate) fn current_raw_runlevel() -> u32 {
     xtensa_lx::interrupt::get_level()
 }
@@ -334,9 +334,8 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
 
 /// Wait for an interrupt to occur.
 ///
-/// This function causes the current CPU core to execute its Wait For Interrupt
-/// (WFI or equivalent) instruction. After executing this function, the CPU core
-/// will stop execution until an interrupt occurs.
+/// Executes the Wait For Interrupt (WFI or equivalent) instruction on the
+/// current CPU core. The CPU core stops execution until an interrupt occurs.
 #[inline(always)]
 #[instability::unstable]
 pub fn wait_for_interrupt() {

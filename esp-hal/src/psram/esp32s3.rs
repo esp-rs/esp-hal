@@ -30,7 +30,7 @@ pub enum FlashFreq {
     #[default]
     FlashFreq80m  = 80,
     /// Flash frequency 120 MHz
-    /// This is not recommended, see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>
+    /// Not recommended; see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>.
     FlashFreq120m = 120,
 }
 
@@ -44,7 +44,7 @@ pub enum SpiRamFreq {
     /// PSRAM frequency 80 MHz
     Freq80m  = 80,
     /// PSRAM frequency 120 MHz
-    /// This is not recommended, see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>
+    /// Not recommended; see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>.
     Freq120m = 120,
 }
 
@@ -115,7 +115,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
 
         fn Cache_Resume_DCache(param: u32);
 
-        /// Set DCache mmu mapping.
+        /// Sets DCache MMU mapping.
         ///
         /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid.
         /// [`vaddr`]: u32 Virtual address in CPU address space.
@@ -312,7 +312,7 @@ pub(crate) mod quad_spi_impl {
             oen_inv: bool,
         );
 
-        /// Enable Quad I/O pin functions
+        /// Enables Quad I/O pin functions.
         ///
         /// Sets the HD & WP pin functions for Quad I/O modes, based on the
         /// efuse SPI pin configuration.
@@ -391,11 +391,10 @@ pub(crate) mod quad_spi_impl {
         // see https://github.com/espressif/esp-idf/blob/4e24516ee2731eb55687182d4e061b5b93a9e33f/components/esp_hw_support/mspi_timing_tuning.c#L391-L415
     }
 
-    /// Set SPI0 FLASH and PSRAM module clock, din_num, din_mode and extra
-    /// dummy, according to the configuration got from timing tuning
-    /// function (`calculate_best_flash_tuning_config`). iF control_spi1 ==
-    /// 1, will also update SPI1 timing registers. Should only be set to 1 when
-    /// do tuning.
+    /// Sets SPI0 FLASH and PSRAM module clock, `din_num`, `din_mode`, and extra
+    /// dummy according to the configuration from the timing tuning function
+    /// (`calculate_best_flash_tuning_config`). If `control_spi1 == 1`, also
+    /// updates SPI1 timing registers. Set `control_spi1` to 1 only when doing tuning.
     ///
     /// Should always be called after `mspi_timing_flash_tuning`
     /// or `calculate_best_flash_tuning_config`

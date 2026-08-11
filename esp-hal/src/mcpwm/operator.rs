@@ -5,7 +5,7 @@
 //! signals and handling various aspects related to `PWM` signal generation.
 //!
 //! ## Configuration
-//! This module provides flexibility in configuring the PWM outputs. Its
+//! Provides flexibility in configuring the PWM outputs. Its
 //! implementation allows for motor control and other applications that demand
 //! accurate pulse timing and sophisticated modulation techniques.
 
@@ -119,8 +119,8 @@ impl DeadTimeCfg {
         )
     }
 
-    /// Set PWMA/PWMB stream to bypass everything except output_swap
-    /// This means no deadtime is applied when enabled
+    /// Sets the PWMA/PWMB stream to bypass everything except `output_swap`.
+    /// No deadtime is applied when enabled.
     #[must_use]
     pub const fn set_bypass(self, stream: PWMStream, enable: bool) -> Self {
         self.set_flag(
@@ -238,8 +238,8 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
 
     /// Link two pins using the deadtime generator
     ///
-    /// This is useful for complementary or mirrored signals with or without
-    /// configured deadtime
+    /// Useful for complementary or mirrored signals with or without
+    /// configured deadtime.
     pub fn with_linked_pins(
         self,
         pin_a: impl PeripheralOutput<'d>,
@@ -274,7 +274,7 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
     /// [`PwmUpdateMethod::empty`]
     pub const EMPTY: Self = Self::new(PwmActions::empty(), PwmUpdateMethod::empty());
 
-    /// Get a configuration using the given `PwmActions` and `PwmUpdateMethod`
+    /// Returns a configuration using the given `PwmActions` and `PwmUpdateMethod`.
     pub const fn new(actions: PwmActions<IS_A>, update_method: PwmUpdateMethod) -> Self {
         PwmPinConfig {
             actions,
@@ -310,7 +310,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin
     }
 
-    /// Configure what actions should be taken on timing events
+    /// Configures what actions are taken on timing events.
     pub fn set_actions(&mut self, value: PwmActions<IS_A>) {
         // SAFETY:
         // We only write to our GENx_x register
@@ -322,7 +322,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         ch.gen_((!IS_A) as usize).write(|w| unsafe { w.bits(bits) });
     }
 
-    /// Set how a new timestamp syncs with the timer
+    /// Sets how a new timestamp syncs with the timer.
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
         // SAFETY:
         // We only write to our GENx_x_UPMETHOD register
@@ -366,8 +366,8 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         }
     }
 
-    /// Get the old timestamp.
-    /// The value of the timestamp will take effect according to the set
+    /// Returns the previous timestamp.
+    /// The value takes effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn timestamp(&self) -> u16 {
         // SAFETY:
@@ -389,7 +389,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         }
     }
 
-    /// Get the period of the timer.
+    /// Returns the period of the timer.
     pub fn period(&self) -> u16 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
@@ -428,12 +428,12 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::Erro
 impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetDutyCycle
     for PwmPin<'_, PWM, OP, IS_A>
 {
-    /// Get the max duty of the PwmPin
+    /// Returns the max duty of the `PwmPin`.
     fn max_duty_cycle(&self) -> u16 {
         self.period()
     }
 
-    /// Set the max duty of the PwmPin
+    /// Sets the max duty of the `PwmPin`.
     fn set_duty_cycle(&mut self, duty: u16) -> Result<(), core::convert::Infallible> {
         self.set_timestamp(duty);
         Ok(())
@@ -512,20 +512,20 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         LinkedPins { pin_a, pin_b }
     }
 
-    /// Configure what actions should be taken on timing events
+    /// Configures what actions are taken on timing events.
     pub fn set_actions_a(&mut self, value: PwmActions<true>) {
         self.pin_a.set_actions(value)
     }
-    /// Configure what actions should be taken on timing events
+    /// Configures what actions are taken on timing events.
     pub fn set_actions_b(&mut self, value: PwmActions<false>) {
         self.pin_b.set_actions(value)
     }
 
-    /// Set how a new timestamp syncs with the timer
+    /// Sets how a new timestamp syncs with the timer.
     pub fn set_update_method_a(&mut self, update_method: PwmUpdateMethod) {
         self.pin_a.set_update_method(update_method)
     }
-    /// Set how a new timestamp syncs with the timer
+    /// Sets how a new timestamp syncs with the timer.
     pub fn set_update_method_b(&mut self, update_method: PwmUpdateMethod) {
         self.pin_b.set_update_method(update_method)
     }
@@ -543,7 +543,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         self.pin_b.set_timestamp(value)
     }
 
-    /// Configure the deadtime generator
+    /// Configures the deadtime generator.
     pub fn set_deadtime_cfg(&mut self, config: DeadTimeCfg) {
         #[cfg(esp32s3)]
         let dt_cfg = unsafe { Self::ch() }.db_cfg();
@@ -552,7 +552,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         dt_cfg.write(|w| unsafe { w.bits(config.cfg_reg) });
     }
 
-    /// Set the deadtime generator rising edge delay
+    /// Sets the deadtime generator rising edge delay.
     pub fn set_rising_edge_deadtime(&mut self, dead_time: u16) {
         #[cfg(esp32s3)]
         let dt_red = unsafe { Self::ch() }.db_red_cfg();
@@ -560,7 +560,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         let dt_red = unsafe { Self::ch() }.dt_red_cfg();
         dt_red.write(|w| unsafe { w.red().bits(dead_time) });
     }
-    /// Set the deadtime generator falling edge delay
+    /// Sets the deadtime generator falling edge delay.
     pub fn set_falling_edge_deadtime(&mut self, dead_time: u16) {
         #[cfg(esp32s3)]
         let dt_fed = unsafe { Self::ch() }.db_fed_cfg();
@@ -581,14 +581,14 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
 pub enum UpdateAction {
     /// Clear the output by setting it to a low level.
     SetLow  = 1,
-    /// Set the output to a high level.
+    /// Sets the output to a high level.
     SetHigh = 2,
     /// Change the current output level to the opposite value.
     /// If it is currently pulled high, pull it low, or vice versa.
     Toggle  = 3,
 }
 
-/// Settings for what actions should be taken on timing events
+/// Settings for actions taken on timing events.
 ///
 /// ### Note:
 /// The hardware supports using a timestamp A event to trigger an action on
@@ -704,13 +704,13 @@ impl PwmUpdateMethod {
         PwmUpdateMethod(0)
     }
 
-    /// Enable syncing new timestamp values when timer is equal to zero
+    /// Enables syncing new timestamp values when the timer is equal to zero.
     pub const fn sync_on_timer_equals_zero(mut self) -> Self {
         self.0 |= 0b0001;
         self
     }
 
-    /// Enable syncing new timestamp values when timer is equal to period
+    /// Enables syncing new timestamp values when the timer is equal to period.
     pub const fn sync_on_timer_equals_period(mut self) -> Self {
         self.0 |= 0b0010;
         self

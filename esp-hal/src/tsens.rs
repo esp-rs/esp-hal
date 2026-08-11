@@ -17,7 +17,7 @@
 //!
 //! The temperature sensor can be configured with different clock sources.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! The following example will measure the internal chip temperature every
 //! second, and print it
@@ -75,9 +75,9 @@ pub struct Config {
 pub enum ConfigError {}
 
 /// Temperature value
-/// This struct stores the raw ADC value, and can be used to calculate the
-/// temperature in Celsius using the formula:
-/// `(raw_value * 0.4386) - (offset * 27.88) - 20.52`
+/// Stores the raw ADC value. Use the formula
+/// `(raw_value * 0.4386) - (offset * 27.88) - 20.52` to calculate the
+/// temperature in Celsius.
 #[derive(Debug)]
 pub struct Temperature {
     /// Raw ADC value
@@ -94,20 +94,20 @@ impl Temperature {
         Self { raw_value, offset }
     }
 
-    /// Get the temperature in Celsius
+    /// Returns the temperature in Celsius.
     #[inline]
     pub fn to_celsius(&self) -> f32 {
         (self.raw_value as f32) * 0.4386 - (self.offset as f32) * 27.88 - 20.52
     }
 
-    /// Get the temperature in Fahrenheit
+    /// Returns the temperature in Fahrenheit.
     #[inline]
     pub fn to_fahrenheit(&self) -> f32 {
         let celsius = self.to_celsius();
         (celsius * 1.8) + 32.0
     }
 
-    /// Get the temperature in Kelvin
+    /// Returns the temperature in Kelvin.
     #[inline]
     pub fn to_kelvin(&self) -> f32 {
         let celsius = self.to_celsius();
@@ -169,7 +169,7 @@ impl<'d> TemperatureSensor<'d> {
         Ok(())
     }
 
-    /// Get the raw temperature value
+    /// Returns the raw temperature value.
     #[inline]
     pub fn get_temperature(&self) -> Temperature {
         let raw_value = APB_SARADC::regs().tsens_ctrl().read().out().bits();

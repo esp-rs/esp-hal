@@ -10,7 +10,7 @@ mod volatile_cell {
 
     /// An interior-mutable cell that always performs volatile reads and writes.
     ///
-    /// This ensures that the compiler never caches descriptor field values in
+    /// Ensures that the compiler never caches descriptor field values in
     /// registers, which is necessary because both the CPU and the DMA engine
     /// may update descriptor words concurrently.
     #[repr(transparent)]

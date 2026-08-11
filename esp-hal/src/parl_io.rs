@@ -11,7 +11,7 @@
 //! ## Configuration
 //! The driver uses DMA (Direct Memory Access) for efficient data transfer.
 //!
-//! ## Examples
+//! # Examples
 //! ### Initialization for RX
 //!
 //! ```rust, no_run
@@ -206,13 +206,13 @@ pub enum BitPackOrder {
 }
 
 #[cfg(parl_io_version = "1")]
-/// Enable Mode
+/// Enables mode.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EnableMode {
-    /// Enable at high level
+    /// Enables at high level.
     HighLevel,
-    /// Enable at low level
+    /// Enables at low level.
     LowLevel,
     /// Positive pulse start (data bit included) & Positive pulse end (data bit
     /// included)
@@ -286,11 +286,11 @@ impl EnableMode {
 }
 
 #[cfg(parl_io_version = "2")]
-/// Enable Mode
+/// Enables mode.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EnableMode {
-    /// Enable at high level
+    /// Enables at high level.
     HighLevel,
     /// Positive pulse start (data bit included) & Positive pulse end (data bit
     /// included)
@@ -438,7 +438,7 @@ pub struct ClkOutPin<'d> {
     pin: interconnect::OutputSignal<'d>,
 }
 impl<'d> ClkOutPin<'d> {
-    /// Create a ClkOutPin
+    /// Creates a new `ClkOutPin`.
     pub fn new(pin: impl PeripheralOutput<'d>) -> Self {
         Self { pin: pin.into() }
     }
@@ -516,7 +516,7 @@ impl<'d, P> TxPinConfigWithValidPin<'d, P>
 where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins + 'd,
 {
-    /// Create a [TxPinConfigWithValidPin]
+    /// Creates a new [`TxPinConfigWithValidPin`].
     pub fn new(tx_pins: P, valid_pin: impl PeripheralOutput<'d>) -> Self {
         Self {
             tx_pins,
@@ -899,7 +899,7 @@ impl<'d, Dm> TxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Configure TX to use the given pins and settings
+    /// Configures TX to use the given pins and settings.
     pub fn with_config<P, CP>(
         self,
         mut tx_pins: P,
@@ -946,7 +946,7 @@ impl<'d, Dm> RxCreator<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Configure RX to use the given pins and settings
+    /// Configures RX to use the given pins and settings.
     pub fn with_config<P, CP>(
         self,
         mut rx_pins: P,
@@ -1169,7 +1169,7 @@ where
 {
     /// Perform a DMA write.
     ///
-    /// This will return a [ParlIoTxTransfer]
+    /// Returns a [`ParlIoTxTransfer`].
     ///
     /// The maximum amount of data to be sent is 32736 bytes.
     pub fn write<BUF>(
@@ -1247,7 +1247,7 @@ pub struct ParlIoTxTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> ParlIoTxTransfer<'d, BUF, Dm> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         Instance::is_tx_eof()
     }
@@ -1321,7 +1321,7 @@ where
 {
     /// Perform a DMA read.
     ///
-    /// This will return a [ParlIoRxTransfer]
+    /// Returns a [`ParlIoRxTransfer`].
     ///
     /// When the number of bytes is specified, the maximum amount of data is
     /// 32736 bytes and the transfer ends when the number of specified bytes
@@ -1411,7 +1411,7 @@ pub struct ParlIoRxTransfer<'d, BUF: DmaRxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> ParlIoRxTransfer<'d, BUF, Dm> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         if self.dma_result.is_some() {
             return true;

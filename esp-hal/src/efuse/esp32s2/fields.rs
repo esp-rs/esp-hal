@@ -7,25 +7,25 @@
 
 use crate::efuse::EfuseField;
 
-/// Disable programming of individual eFuses
+/// Disables programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 32);
-/// Disable reading from BlOCK4-10
+/// Disables reading from BLOCK4-10
 pub const RD_DIS: EfuseField = EfuseField::new(0, 1, 32, 7);
 /// Reserved
 pub const DIS_RTC_RAM_BOOT: EfuseField = EfuseField::new(0, 1, 39, 1);
-/// Set this bit to disable Icache
+/// Sets this bit to disable Icache
 pub const DIS_ICACHE: EfuseField = EfuseField::new(0, 1, 40, 1);
-/// Set this bit to disable Dcache
+/// Sets this bit to disable Dcache
 pub const DIS_DCACHE: EfuseField = EfuseField::new(0, 1, 41, 1);
 /// Disables Icache when SoC is in Download mode
 pub const DIS_DOWNLOAD_ICACHE: EfuseField = EfuseField::new(0, 1, 42, 1);
 /// Disables Dcache when SoC is in Download mode
 pub const DIS_DOWNLOAD_DCACHE: EfuseField = EfuseField::new(0, 1, 43, 1);
-/// Set this bit to disable the function that forces chip into download mode
+/// Sets this bit to disable the function that forces chip into download mode
 pub const DIS_FORCE_DOWNLOAD: EfuseField = EfuseField::new(0, 1, 44, 1);
-/// Set this bit to disable USB OTG function
+/// Sets this bit to disable USB OTG function
 pub const DIS_USB: EfuseField = EfuseField::new(0, 1, 45, 1);
-/// Set this bit to disable the TWAI Controller function
+/// Sets this bit to disable the TWAI Controller function
 pub const DIS_TWAI: EfuseField = EfuseField::new(0, 1, 46, 1);
 /// Disables capability to Remap RAM to ROM address space
 pub const DIS_BOOT_REMAP: EfuseField = EfuseField::new(0, 1, 47, 1);
@@ -44,9 +44,9 @@ pub const USB_DREFH: EfuseField = EfuseField::new(0, 1, 52, 2);
 /// Controls single-end input threshold vrefl; 0.8 V to 1.04 V with step of 80
 /// mV; stored in eFuse
 pub const USB_DREFL: EfuseField = EfuseField::new(0, 1, 54, 2);
-/// Set this bit to exchange USB D+ and D- pins
+/// Sets this bit to exchange USB D+ and D- pins
 pub const USB_EXCHG_PINS: EfuseField = EfuseField::new(0, 1, 56, 1);
-/// Set this bit to enable external USB PHY
+/// Sets this bit to enable external USB PHY
 pub const USB_EXT_PHY_ENABLE: EfuseField = EfuseField::new(0, 1, 57, 1);
 /// If set; forces USB BVALID to 1
 pub const USB_FORCE_NOPERSIST: EfuseField = EfuseField::new(0, 1, 58, 1);
@@ -65,12 +65,12 @@ pub const VDD_SPI_DREFL: EfuseField = EfuseField::new(0, 2, 66, 2);
 pub const VDD_SPI_XPD: EfuseField = EfuseField::new(0, 2, 68, 1);
 /// If VDD_SPI_FORCE is 1; determines VDD_SPI voltage
 pub const VDD_SPI_TIEH: EfuseField = EfuseField::new(0, 2, 69, 1);
-/// Set this bit to use XPD_VDD_PSI_REG and VDD_SPI_TIEH to configure VDD_SPI
+/// Sets this bit to use XPD_VDD_PSI_REG and VDD_SPI_TIEH to configure VDD_SPI
 /// LDO
 pub const VDD_SPI_FORCE: EfuseField = EfuseField::new(0, 2, 70, 1);
-/// Set SPI regulator to 0 to configure init\[1:0\]=0
+/// Sets SPI regulator to 0 to configure init\[1:0\]=0
 pub const VDD_SPI_EN_INIT: EfuseField = EfuseField::new(0, 2, 71, 1);
-/// Set SPI regulator to 1 to enable output current limit
+/// Sets SPI regulator to 1 to enable output current limit
 pub const VDD_SPI_ENCURLIM: EfuseField = EfuseField::new(0, 2, 72, 1);
 /// Tunes the current limit threshold of SPI regulator when tieh=0; about 800
 /// mA/(8+d)
@@ -103,30 +103,30 @@ pub const KEY_PURPOSE_4: EfuseField = EfuseField::new(0, 3, 104, 4);
 pub const KEY_PURPOSE_5: EfuseField = EfuseField::new(0, 3, 108, 4);
 /// Purpose of KEY6
 pub const KEY_PURPOSE_6: EfuseField = EfuseField::new(0, 3, 112, 4);
-/// Set this bit to enable secure boot
+/// Sets this bit to enable secure boot
 pub const SECURE_BOOT_EN: EfuseField = EfuseField::new(0, 3, 116, 1);
-/// Set this bit to enable aggressive secure boot key revocation mode
+/// Sets this bit to enable aggressive secure boot key revocation mode
 pub const SECURE_BOOT_AGGRESSIVE_REVOKE: EfuseField = EfuseField::new(0, 3, 117, 1);
 /// Reserved (used for four backups method)
 pub const RPT4_RESERVED1: EfuseField = EfuseField::new(0, 3, 118, 6);
 /// Configures flash startup delay after SoC power-up; in unit of (ms/2). When
 /// the value is 15; delay is 7.5 ms
 pub const FLASH_TPUW: EfuseField = EfuseField::new(0, 3, 124, 4);
-/// Set this bit to disable all download boot modes
+/// Sets this bit to disable all download boot modes
 pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 128, 1);
-/// Set this bit to disable Legacy SPI boot mode
+/// Sets this bit to disable Legacy SPI boot mode
 pub const DIS_LEGACY_SPI_BOOT: EfuseField = EfuseField::new(0, 4, 129, 1);
 /// Selects the default UART for printing boot messages
 pub const UART_PRINT_CHANNEL: EfuseField = EfuseField::new(0, 4, 130, 1);
 /// Reserved (used for four backups method)
 pub const RPT4_RESERVED3: EfuseField = EfuseField::new(0, 4, 131, 1);
-/// Set this bit to disable use of USB OTG in UART download boot mode
+/// Sets this bit to disable use of USB OTG in UART download boot mode
 pub const DIS_USB_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 132, 1);
-/// Set this bit to enable secure UART download mode (read/write flash only)
+/// Sets this bit to enable secure UART download mode (read/write flash only)
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 133, 1);
-/// Set the default UART boot message output mode
+/// Sets the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 134, 2);
-/// Set default power supply for GPIO33-GPIO37; set when SPI flash is
+/// Sets the default power supply for GPIO33-GPIO37 when SPI flash is
 /// initialized
 pub const PIN_POWER_SELECTION: EfuseField = EfuseField::new(0, 4, 136, 1);
 /// SPI flash type

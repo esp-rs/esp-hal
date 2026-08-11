@@ -13,9 +13,9 @@
 //! low-power pads have one, and a pin must request it with [`WakeupConfig`].
 //!
 //! The [`path`] module holds the low-power paths of the chip, and divides the pins between them.
-//! This module collects the pins and requests the power domains that they need.
+//! Collects the pins and requests the power domains that they need.
 //!
-//! This module also isolates the digital pads before a deep sleep, because it holds the pad tables.
+//! Also isolates the digital pads before a deep sleep, because it holds the pad tables.
 //! That step is part of sleep entry, and it is not a wakeup source.
 //!
 //! All of this code runs with the flash accessible. Sleep entry calls the entry hook before it
@@ -393,7 +393,7 @@ fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
 /// Returns the level that wakes the chip through this pad, or `None` if the trigger sets no level.
 ///
 /// The wake paths accept a level only, so an edge trigger becomes the level at the end of the edge.
-/// This keeps the request of the user. `AnyEdge` ends at the level that the pin is not at now,
+/// Preserves the user's request. `AnyEdge` ends at the level that the pin is not at now,
 /// which is the meaning of "wake when the pin changes". This read of the pin can race with the pin,
 /// but the result is safe. If the pin changes before the sleep starts, the path arms a level that
 /// is already present, and the sleep is rejected or ends immediately.

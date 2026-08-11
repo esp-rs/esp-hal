@@ -3,7 +3,7 @@
 //!
 //! ## Overview
 //!
-//! This driver implements the I2C Master mode. In this mode, the MCU initiates
+//! I2C master mode driver. The MCU initiates
 //! and controls the I2C communication with one or more slave devices. Slave
 //! devices are identified by their unique I2C addresses.
 //!
@@ -165,7 +165,7 @@ const CLEAR_BUS_TIMEOUT_MS: Duration = Duration::from_millis(50);
 pub enum I2cAddress {
     /// 7-bit address mode type.
     ///
-    /// Note that 7-bit addresses are specified in **right-aligned** form, e.g.
+    /// 7-bit addresses are specified in **right-aligned** form, e.g.
     /// in the range `0x00..=0x7F`.
     ///
     /// For example, a device that has the seven bit address of `0b011_0010`,
@@ -213,7 +213,7 @@ impl From<u8> for I2cAddress {
 #[doc = ""]
 #[cfg_attr(
     i2c_master_bus_timeout_is_exponential,
-    doc = "Note that the effective timeout may be longer than the value configured here."
+    doc = "The effective timeout may be longer than the value configured here."
 )]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -223,7 +223,7 @@ pub enum BusTimeout {
     /// Use the maximum timeout value.
     Maximum,
 
-    /// Disable timeout control.
+    /// Disables timeout control.
     #[cfg(i2c_master_has_bus_timeout_enable)]
     Disabled,
 
@@ -268,12 +268,11 @@ impl BusTimeout {
 
 /// Software timeout for I2C operations.
 ///
-/// This timeout is used to limit the duration of I2C operations in software.
-/// Note that using this in conjunction with `async` operations will cause the
-/// task to be woken up continuously until the operation completes or the
-/// timeout is reached. You should prefer using an asynchronous
-/// timeout mechanism (like [`embassy_time::with_timeout`]) for better
-/// efficiency.
+/// Limits the duration of I2C operations in software.
+///
+/// Using this with `async` operations wakes the task continuously until the
+/// operation completes or the timeout is reached. Prefer an asynchronous timeout
+/// mechanism (like [`embassy_time::with_timeout`]) for better efficiency.
 ///
 /// [`embassy_time::with_timeout`]: https://docs.rs/embassy-time/0.4.0/embassy_time/fn.with_timeout.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -534,7 +533,7 @@ enum Command {
     Stop,
     End,
     Write {
-        /// This bit is to set an expected ACK value for the transmitter.
+        /// Expected ACK value for the transmitter.
         ack_exp: Ack,
         /// Enables checking the ACK value received against the ack_exp value.
         ack_check_en: bool,
@@ -659,7 +658,7 @@ impl Default for Config {
 #[procmacros::doc_replace]
 /// I2C driver
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -857,8 +856,8 @@ impl<'d> I2c<'d, Async> {
     #[procmacros::doc_replace]
     /// Writes bytes to slave with given `address`.
     ///
-    /// Note that dropping the returned Future will abort the transfer, but doing so will
-    /// block while the driver is finishing clearing and releasing the bus.
+    /// Dropping the returned Future aborts the transfer and blocks while the
+    /// driver clears and releases the bus.
     ///
     /// # Examples
     ///
@@ -886,8 +885,8 @@ impl<'d> I2c<'d, Async> {
     #[procmacros::doc_replace]
     /// Reads enough bytes from slave with `address` to fill `buffer`.
     ///
-    /// Note that dropping the returned Future will abort the transfer, but doing so will
-    /// block while the driver is finishing clearing and releasing the bus.
+    /// Dropping the returned Future aborts the transfer and blocks while the
+    /// driver clears and releases the bus.
     ///
     /// # Errors
     ///
@@ -922,8 +921,8 @@ impl<'d> I2c<'d, Async> {
     /// Writes bytes to slave with given `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*.
     ///
-    /// Note that dropping the returned Future will abort the transfer, but doing so will
-    /// block while the driver is finishing clearing and releasing the bus.
+    /// Dropping the returned Future aborts the transfer and blocks while the
+    /// driver clears and releases the bus.
     ///
     /// # Errors
     ///
@@ -962,8 +961,8 @@ impl<'d> I2c<'d, Async> {
     #[procmacros::doc_replace]
     /// Execute the provided operations on the I2C bus as a single transaction.
     ///
-    /// Note that dropping the returned Future will abort the transfer, but doing so will
-    /// block while the driver is finishing clearing and releasing the bus.
+    /// Dropping the returned Future aborts the transfer and blocks while the
+    /// driver clears and releases the bus.
     ///
     /// Transaction contract:
     /// - Before executing the first operation an ST is sent automatically. This is followed by
@@ -1043,10 +1042,10 @@ where
     ///
     /// If this function is called with a pin singleton (e.g. `GPIO2`), the pin will be configured
     /// to use the internal pull-up resistor. If this is undesired, call this function with a fully
-    /// configured [`Flex`][crate::gpio::Flex] pin driver. Note that if you use `Flex`, the I2C
-    /// driver will not change the pin's configuration in any way.
+    /// configured [`Flex`][crate::gpio::Flex] pin driver. With `Flex`, the I2C
+    /// driver does not change the pin's configuration.
     ///
-    /// This will replace previous pin assignments for this signal.
+    /// Replaces previous pin assignments for this signal.
     ///
     /// # Examples
     ///
@@ -1095,10 +1094,10 @@ where
     ///
     /// If this function is called with a pin singleton (e.g. `GPIO2`), the pin will be configured
     /// to use the internal pull-up resistor. If this is undesired, call this function with a fully
-    /// configured [`Flex`][crate::gpio::Flex] pin driver. Note that if you use `Flex`, the I2C
-    /// driver will not change the pin's configuration in any way.
+    /// configured [`Flex`][crate::gpio::Flex] pin driver. With `Flex`, the I2C
+    /// driver does not change the pin's configuration.
     ///
-    /// This will replace previous pin assignments for this signal.
+    /// Replaces previous pin assignments for this signal.
     ///
     /// # Examples
     ///

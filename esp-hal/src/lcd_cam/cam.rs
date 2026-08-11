@@ -11,7 +11,7 @@
 //! `with_master_clock` method on the camera driver. The driver (due to the
 //! peripheral) mandates DMA (Direct Memory Access) for efficient data transfer.
 //!
-//! ## Examples
+//! # Examples
 //! ## Master Mode
 //! Following code shows how to receive some bytes from an 8 bit DVP stream in
 //! master mode.
@@ -457,7 +457,7 @@ pub struct CameraTransfer<'d, BUF: DmaRxBuffer> {
 }
 
 impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         // This peripheral doesn't really "complete". As long the camera (or anything
         // pretending to be :D) sends data, it will receive it and pass it to the DMA.
@@ -492,7 +492,7 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
     ///
-    /// Note: The camera doesn't really "finish" its transfer, so what you're
+    /// The camera does not really "finish" its transfer, so what you are
     /// really waiting for here is a DMA Error. You typically just want to
     /// call [Self::stop] once you have the data you need.
     pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d>, BUF::Final) {
@@ -572,7 +572,7 @@ pub struct Config {
     /// The pixel clock frequency for the camera interface.
     frequency: Rate,
 
-    /// Enable 16 bit mode (instead of 8 bit).
+    /// Enables 16-bit mode (instead of 8-bit).
     enable_2byte_mode: bool,
 
     /// The byte order for the camera data.
@@ -593,7 +593,7 @@ pub struct Config {
     /// If set, the line interrupt is enabled and will be triggered when
     /// the number of received lines reaches this value + 1.
     ///
-    /// This is a 7 bit value which means a max of 128 lines.
+    /// 7-bit value; maximum 128 lines.
     line_interrupt: Option<u8>,
 
     /// Invert VSYNC signal, valid in high level.

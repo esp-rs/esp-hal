@@ -515,8 +515,8 @@ impl Poll {
 
 /// A reference to a posted [`WorkItem`].
 ///
-/// This struct ensures that the work item is valid until the item is processed or is removed from
-/// the work queue.
+/// Keeps the work item valid until it is processed or removed from the work
+/// queue.
 ///
 /// Dropping the handle cancels the work item, but may block for some time if the work item is
 /// already being processed.
@@ -733,7 +733,7 @@ impl<T: Sync + Send> WorkQueueFrontend<T> {
 
     /// Posts the work item to the queue.
     ///
-    /// Returns a [`Handle`] that can be used to wait for the work item to complete.
+    /// Returns a [`Handle`] to wait for the work item to complete.
     pub fn post<'t>(&'t mut self, queue: &'t WorkQueue<T>) -> Handle<'t, T> {
         queue.post_work(&mut self.work_item)
     }

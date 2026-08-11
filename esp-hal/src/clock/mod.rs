@@ -31,7 +31,7 @@
 //! Once the clock configuration is applied, the clock frequencies become
 //! `frozen` and cannot be changed.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
@@ -58,8 +58,8 @@ pub(crate) mod dividers;
 /// # Low-level clock control
 ///
 /// <section class="warning">
-/// This module provides experimental low-level clock control functionality. These functions
-/// can render your device temporarily unusable. Use with caution.
+/// Experimental low-level clock control functionality. These functions can
+/// render your device temporarily unusable. Use with caution.
 /// </section>
 #[doc = ""]
 #[instability::unstable]
@@ -133,7 +133,7 @@ use crate::soc::clocks::TimgCalibrationClockConfig;
 impl RtcClock {
     pub(crate) const CAL_FRACT: u32 = 19;
 
-    /// Get the nominal value of the RTC_SLOW_CLK source.
+    /// Returns the nominal value of the RTC_SLOW_CLK source.
     #[instability::unstable]
     #[cfg(any(soc_has_clock_node_lp_slow_clk, soc_has_clock_node_rtc_slow_clk))]
     pub fn slow_freq() -> Rate {
@@ -239,7 +239,7 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
 
 impl RtcClock {
     /// Uses a TIMG0 feature to count clock cycles of a high-frequency clock, for a period of time
-    /// that is measured by a low-frequency clock. This function can be used to calibrate two
+    /// measured by a low-frequency clock. Can calibrate two
     /// clocks to each other, e.g. to determine a rough value of the XTAL clock, or to determine
     /// the current frequency of a low-precision RC oscillator.
     #[cfg(soc_has_clock_node_timg_calibration_clock)]

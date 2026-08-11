@@ -7,9 +7,9 @@
 
 use crate::efuse::EfuseField;
 
-/// Disable programming of individual eFuses
+/// Disables programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 32);
-/// Disable reading from BlOCK4-10
+/// Disables reading from BLOCK4-10
 pub const RD_DIS: EfuseField = EfuseField::new(0, 1, 32, 7);
 /// Reserved
 pub const RPT4_RESERVED0_4: EfuseField = EfuseField::new(0, 1, 39, 1);
@@ -32,7 +32,7 @@ pub const SPI_DOWNLOAD_MSPI_DIS: EfuseField = EfuseField::new(0, 1, 45, 1);
 /// Represents whether TWAI function is disabled or enabled. 1: disabled. 0:
 /// enabled
 pub const DIS_TWAI: EfuseField = EfuseField::new(0, 1, 46, 1);
-/// Set this bit to enable selection between usb_to_jtag and pad_to_jtag through
+/// Sets this bit to enable selection between usb_to_jtag and pad_to_jtag through
 /// strapping gpio25 when both EFUSE_DIS_PAD_JTAG and EFUSE_DIS_USB_JTAG are
 /// equal to 0
 pub const JTAG_SEL_ENABLE: EfuseField = EfuseField::new(0, 1, 47, 1);
@@ -60,9 +60,9 @@ pub const VDD_SPI_AS_GPIO: EfuseField = EfuseField::new(0, 1, 58, 1);
 /// Configures the curve of ECDSA calculation: 0: only enable P256. 1: only
 /// enable P192. 2: both enable P256 and P192. 3: only enable P256
 pub const ECDSA_CURVE_MODE: EfuseField = EfuseField::new(0, 1, 59, 2);
-/// Set this bit to permanently turn on ECC const-time mode
+/// Sets this bit to permanently turn on ECC const-time mode
 pub const ECC_FORCE_CONST_TIME: EfuseField = EfuseField::new(0, 1, 61, 1);
-/// Set this bit to control the xts pseudo-round anti-dpa attack function: 0:
+/// Sets this bit to control the xts pseudo-round anti-dpa attack function: 0:
 /// controlled by register. 1-3: the higher the value is; the more pseudo-rounds
 /// are inserted to the xts-aes calculation
 pub const XTS_DPA_PSEUDO_LEVEL: EfuseField = EfuseField::new(0, 1, 62, 2);
@@ -103,7 +103,7 @@ pub const SECURE_BOOT_EN: EfuseField = EfuseField::new(0, 3, 116, 1);
 /// Represents whether revoking aggressive secure boot is enabled or disabled.
 /// 1: enabled. 0: disabled
 pub const SECURE_BOOT_AGGRESSIVE_REVOKE: EfuseField = EfuseField::new(0, 3, 117, 1);
-/// Set these bits to enable power glitch function when chip power on
+/// Sets these bits to enable power glitch function when chip power on
 pub const POWERGLITCH_EN1: EfuseField = EfuseField::new(0, 3, 118, 5);
 /// reserved
 pub const RESERVED_0_123: EfuseField = EfuseField::new(0, 3, 123, 1);
@@ -117,7 +117,7 @@ pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 128, 1);
 /// Represents whether direct boot mode is disabled or enabled. 1: disabled. 0:
 /// enabled
 pub const DIS_DIRECT_BOOT: EfuseField = EfuseField::new(0, 4, 129, 1);
-/// Set this bit to disable USB-Serial-JTAG print during rom boot
+/// Sets this bit to disable USB-Serial-JTAG print during rom boot
 pub const DIS_USB_SERIAL_JTAG_ROM_PRINT: EfuseField = EfuseField::new(0, 4, 130, 1);
 /// Reserved
 pub const RPT4_RESERVED3_5: EfuseField = EfuseField::new(0, 4, 131, 1);
@@ -127,7 +127,7 @@ pub const DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 
 /// Represents whether security download is enabled or disabled. 1: enabled. 0:
 /// disabled
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 133, 1);
-/// Set the default UARTboot message output mode
+/// Sets the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 134, 2);
 /// Represents whether ROM code is forced to send a resume command during SPI
 /// boot. 1: forced. 0:not forced
@@ -137,9 +137,9 @@ pub const SECURE_VERSION: EfuseField = EfuseField::new(0, 4, 137, 16);
 /// Represents whether FAST VERIFY ON WAKE is disabled or enabled when Secure
 /// Boot is enabled. 1: disabled. 0: enabled
 pub const SECURE_BOOT_DISABLE_FAST_WAKE: EfuseField = EfuseField::new(0, 4, 153, 1);
-/// Set bits to enable hysteresis function of PAD0~5
+/// Sets bits to enable hysteresis function of PAD0~5
 pub const HYS_EN_PAD0: EfuseField = EfuseField::new(0, 4, 154, 6);
-/// Set bits to enable hysteresis function of PAD6~27
+/// Sets bits to enable hysteresis function of PAD6~27
 pub const HYS_EN_PAD1: EfuseField = EfuseField::new(0, 5, 160, 22);
 /// Reserved
 pub const RPT4_RESERVED4_1: EfuseField = EfuseField::new(0, 5, 182, 2);

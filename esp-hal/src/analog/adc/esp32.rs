@@ -243,8 +243,7 @@ impl<'d, ADCX> Adc<'d, ADCX, crate::Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configure a given ADC instance using the provided configuration, and
-    /// initialize the ADC for use
+    /// Creates and initializes an ADC instance with the given configuration.
     ///
     /// # Panics
     ///

@@ -68,7 +68,7 @@ macro_rules! trm_markdown_link {
 #[doc(hidden)]
 /// Shorthand to define AnyPeripheral instances.
 ///
-/// This macro generates the following:
+/// Generates the following:
 ///
 /// - An `AnyPeripheral` struct, name provided by the macro call.
 /// - An `any::Degrade` trait which is supposed to be used as a supertrait of a relevant Instance.
@@ -139,7 +139,7 @@ macro_rules! any_peripheral {
 
         $(#[$meta])*
         ///
-        /// This struct is a type-erased version of a peripheral singleton. It is useful
+        /// Type-erased version of a peripheral singleton. Useful
         /// for creating arrays of peripherals, or avoiding generics. Peripheral singletons
         /// can be type erased by using their `From` implementation.
         ///
@@ -323,7 +323,7 @@ macro_rules! at_least_version {
 
 /// Macro to ignore tokens.
 ///
-/// This is useful when we need existence of a metavariable (to expand a
+/// Useful when a metavariable must exist (to expand a
 /// repetition), but we don't need to use it.
 #[macro_export]
 #[doc(hidden)]
@@ -336,7 +336,7 @@ macro_rules! ignore {
 ///
 /// The symbol name be formatted as `_ESP_METADATA_<category>_<name>`.
 ///
-/// This metadata is zero cost, i.e. the value will not be flashed to the
+/// Zero-cost metadata; the value is not flashed to the
 /// device.
 #[macro_export]
 #[doc(hidden)]

@@ -289,7 +289,7 @@ impl BurstConfig {
     /// Calculates an alignment that is compatible with the current burst
     /// configuration.
     ///
-    /// This is an over-estimation so that Descriptors can be safely used with
+    /// Over-estimates alignment so that descriptors can be safely used with
     /// any DMA channel in any direction.
     pub const fn min_compatible_alignment(self) -> usize {
         let in_alignment = self.min_dram_alignment(TransferDirection::In);
@@ -312,7 +312,7 @@ impl BurstConfig {
     /// Calculates a chunk size that is compatible with the current burst
     /// configuration's alignment requirements.
     ///
-    /// This is an over-estimation so that Descriptors can be safely used with
+    /// Over-estimates alignment so that descriptors can be safely used with
     /// any DMA channel in any direction.
     pub const fn max_compatible_chunk_size(self) -> usize {
         Self::chunk_size_for_alignment(self.min_compatible_alignment())
@@ -431,7 +431,7 @@ pub struct Preparation {
     /// operating and fires
     /// [DmaRxInterrupt::DescriptorError]/[DmaTxInterrupt::DescriptorError].
     ///
-    /// This field allows buffer implementation to configure this behaviour.
+    /// Lets buffer implementations configure this behaviour.
     /// - `Some(true)`: DMA channel must check the owner bit.
     /// - `Some(false)`: DMA channel must NOT check the owner bit.
     /// - `None`: DMA channel should check the owner bit if it is supported.
@@ -447,8 +447,7 @@ pub struct Preparation {
     /// Most implementations won't have any such requirements and will work
     /// correctly regardless of whether the DMA channel checks or not.
     ///
-    /// Note: If the DMA channel doesn't support the provided option,
-    /// preparation will fail.
+    /// Preparation fails if the DMA channel does not support the provided option.
     pub check_owner: Option<bool>,
 
     /// Configures whether the DMA channel automatically clears the
@@ -458,8 +457,7 @@ pub struct Preparation {
     /// For RX transfers, this is always true and the value specified here is
     /// ignored.
     ///
-    /// Note: SPI_DMA on the ESP32 does not support this and will panic if set
-    /// to true.
+    /// SPI_DMA on the ESP32 does not support this and panics if set to `true`.
     pub auto_write_back: bool,
 }
 
@@ -483,22 +481,21 @@ pub unsafe trait DmaTxBuffer {
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
-    /// Note: This operation is idempotent.
+    /// Idempotent operation.
     fn prepare(&mut self) -> Preparation;
 
-    /// This is called before the DMA starts using the buffer.
+    /// Called before the DMA starts using the buffer.
     fn into_view(self) -> Self::View;
 
-    /// This is called after the DMA is done using the buffer.
+    /// Called after the DMA is done using the buffer.
     fn from_view(view: Self::View) -> Self::Final;
 }
 
 /// [DmaRxBuffer] is a DMA descriptor + memory combo that can be used for
 /// receiving data from a peripheral's FIFO to a DMA channel.
 ///
-/// Note: Implementations of this trait may only support having a single EOF bit
-/// which resides in the last descriptor. There will be a separate trait in
-/// future to support multiple EOFs.
+/// Implementations may only support a single EOF bit in the last descriptor.
+/// A separate trait for multiple EOFs is planned.
 ///
 /// # Safety
 ///
@@ -517,13 +514,13 @@ pub unsafe trait DmaRxBuffer {
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
-    /// Note: This operation is idempotent.
+    /// Idempotent operation.
     fn prepare(&mut self) -> Preparation;
 
-    /// This is called before the DMA starts using the buffer.
+    /// Called before the DMA starts using the buffer.
     fn into_view(self) -> Self::View;
 
-    /// This is called after the DMA is done using the buffer.
+    /// Called after the DMA is done using the buffer.
     fn from_view(view: Self::View) -> Self::Final;
 }
 
@@ -533,11 +530,11 @@ pub unsafe trait DmaRxBuffer {
 /// descriptors/buffers.
 pub struct BufView<T>(T);
 
-/// DMA transmit buffer
+/// DMA transmit buffer.
 ///
-/// This is a contiguous buffer linked together by DMA descriptors of length
+/// Contiguous buffer linked together by DMA descriptors of length
 /// 4095 at most. It can only be used for transmitting data to a peripheral's
-/// FIFO. See [DmaRxBuf] for receiving data.
+/// FIFO. See [`DmaRxBuf`] for receiving data.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaTxBuf(ScopedDmaTxBuf<'static>);
@@ -587,7 +584,7 @@ impl DmaTxBuf {
         self.0.capacity()
     }
 
-    /// Return the number of bytes that would be transmitted by this buf.
+    /// Returns the number of bytes that would be transmitted by this buffer.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.0.len()
@@ -644,11 +641,11 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
     }
 }
 
-/// DMA receive buffer
+/// DMA receive buffer.
 ///
-/// This is a contiguous buffer linked together by DMA descriptors of length
+/// Contiguous buffer linked together by DMA descriptors of length
 /// 4092. It can only be used for receiving data from a peripheral's FIFO.
-/// See [DmaTxBuf] for transmitting data.
+/// See [`DmaTxBuf`] for transmitting data.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaRxBuf(ScopedDmaRxBuf<'static>);
@@ -724,7 +721,7 @@ impl DmaRxBuf {
         self.0.as_mut_slice()
     }
 
-    /// Return the number of bytes that was received by this buf.
+    /// Returns the number of bytes received by this buffer.
     pub fn number_of_received_bytes(&self) -> usize {
         self.0.number_of_received_bytes()
     }
@@ -769,7 +766,7 @@ unsafe impl DmaRxBuffer for DmaRxBuf {
 
 /// DMA transmit and receive buffer.
 ///
-/// This is a (single) contiguous buffer linked together by two sets of DMA
+/// Single contiguous buffer linked together by two sets of DMA
 /// descriptors of length 4092 each.
 /// It can be used for simultaneously transmitting to and receiving from a
 /// peripheral's FIFO. These are typically full-duplex transfers.
@@ -845,12 +842,12 @@ impl DmaRxTxBuf {
         )
     }
 
-    /// Return the size of the underlying buffer.
+    /// Returns the size of the underlying buffer.
     pub fn capacity(&self) -> usize {
         self.buffer.len()
     }
 
-    /// Return the number of bytes that would be transmitted by this buf.
+    /// Returns the number of bytes that would be transmitted by this buffer.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.tx_descriptors
@@ -973,9 +970,9 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
     }
 }
 
-/// DMA Streaming Receive Buffer.
+/// DMA streaming receive buffer.
 ///
-/// This is a contiguous buffer linked together by DMA descriptors, and the
+/// Contiguous buffer linked together by DMA descriptors, and the
 /// buffer is evenly distributed between each descriptor provided.
 ///
 /// It is used for continuously streaming data from a peripheral's FIFO.
@@ -1003,8 +1000,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 /// interrupt will fire and the DMA will stop writing, at which point it is up
 /// to you to resume/restart the transfer.
 ///
-/// Note: This buffer will not tell you when this condition occurs, you should
-/// check with the driver to see if the DMA has stopped.
+/// Does not signal when this condition occurs. Check with the driver to see if the DMA has stopped.
 ///
 /// When constructing this buffer, it is important to tune the ratio between the
 /// chunk size and buffer size appropriately. Smaller chunk sizes means you
@@ -1174,12 +1170,11 @@ impl DmaRxStreamBufView {
         total_bytes - remaining.len()
     }
 
-    /// Returns a slice into the buffer containing available data.
-    /// This will be the longest possible contiguous slice into the buffer that
+    /// Returns a slice into the buffer that contains available data.
+    /// The slice is the longest possible contiguous slice into the buffer that
     /// contains data that is available to read.
     ///
-    /// Note: This function ignores EOFs, see [Self::peek_until_eof] if you need
-    /// EOF support.
+    /// Ignores EOFs; see [`Self::peek_until_eof`] for EOF support.
     pub fn peek(&mut self) -> &[u8] {
         let (slice, _) = self.peek_internal(false);
         slice
@@ -1195,7 +1190,7 @@ impl DmaRxStreamBufView {
 
     /// Consumes the first `n` bytes from the available data, returning any
     /// fully consumed descriptors back to the DMA.
-    /// This is typically called after [Self::peek]/[Self::peek_until_eof].
+    /// Call this after [`Self::peek`] or [`Self::peek_until_eof`].
     ///
     /// Returns the number of bytes that were actually consumed.
     pub fn consume(&mut self, n: usize) -> usize {
@@ -1335,9 +1330,9 @@ impl DmaRxStreamBufView {
     }
 }
 
-/// DMA Streaming Transmit Buffer.
+/// DMA streaming transmit buffer.
 ///
-/// This is symmetric implementation to [DmaRxStreamBuf], used for continuously
+/// Symmetric implementation to [`DmaRxStreamBuf`], used for continuously
 /// streaming data to a peripheral's FIFO.
 ///
 /// The list starts out like so `A(full) -> B(full) -> C(full) -> D(full) -> NULL`.
@@ -1753,16 +1748,16 @@ unsafe impl DmaRxBuffer for EmptyBuf {
     }
 }
 
-/// DMA Loop Buffer
+/// DMA loop buffer.
 ///
-/// This consists of a single descriptor that points to itself and points to a
+/// Consists of a single descriptor that points to itself and points to a
 /// single buffer, resulting in the buffer being transmitted over and over
 /// again, indefinitely.
 ///
-/// Note: A DMA descriptor is 12 bytes. If your buffer is significantly shorter
-/// than this, the DMA channel will spend more time reading the descriptor than
-/// it does reading the buffer, which may leave it unable to keep up with the
-/// bandwidth requirements of some peripherals at high frequencies.
+/// A DMA descriptor is 12 bytes. If the buffer is significantly shorter than
+/// this, the DMA channel spends more time reading the descriptor than the
+/// buffer, which may prevent it from meeting bandwidth requirements at high
+/// frequencies.
 pub struct DmaLoopBuf {
     descriptor: DmaAlignedMut<'static, [DmaDescriptor]>,
     buffer: DmaAlignedMut<'static, [u8]>,
@@ -1848,7 +1843,7 @@ impl DerefMut for DmaLoopBuf {
 ///
 /// Fow low level use, where none of the pre-made buffers really fit.
 ///
-/// This type likely never should be visible outside of esp-hal.
+/// Internal type. Do not use outside esp-hal.
 pub(crate) struct NoBuffer(pub(crate) Preparation);
 impl NoBuffer {
     fn prep(&self) -> Preparation {

@@ -1,6 +1,6 @@
 //! # Timekeeping
 //!
-//! This module provides types for representing frequency and duration, as well
+//! Types for representing frequency and duration, as well
 //! as an instant in time. Time is measured since boot, and can be accessed
 //! by the [`Instant::now`] function.
 
@@ -482,7 +482,7 @@ impl Duration {
             #[procmacros::doc_replace]
             /// Convert the `Duration` to an integer number of microseconds.
             ///
-            /// ## Example
+            /// # Examples
             ///
             /// ```rust, no_run
             /// # {before_snippet}
@@ -497,7 +497,7 @@ impl Duration {
             #[procmacros::doc_replace]
             /// Convert the `Duration` to an integer number of milliseconds.
             ///
-            /// ## Example
+            /// # Examples
             ///
             /// ```rust, no_run
             /// # {before_snippet}
@@ -512,7 +512,7 @@ impl Duration {
             #[procmacros::doc_replace]
             /// Convert the `Duration` to an integer number of seconds.
             ///
-            /// ## Example
+            /// # Examples
             ///
             /// ```rust, no_run
             /// # {before_snippet}
@@ -527,7 +527,7 @@ impl Duration {
             #[procmacros::doc_replace]
             /// Convert the `Duration` to an integer number of minutes.
             ///
-            /// ## Example
+            /// # Examples
             ///
             /// ```rust, no_run
             /// # {before_snippet}
@@ -542,7 +542,7 @@ impl Duration {
             #[procmacros::doc_replace]
             /// Convert the `Duration` to an integer number of hours.
             ///
-            /// ## Example
+            /// # Examples
             ///
             /// ```rust, no_run
             /// # {before_snippet}

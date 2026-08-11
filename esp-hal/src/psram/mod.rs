@@ -3,7 +3,7 @@
 //!
 //! ## Overview
 //!
-//! This module provides support to interface with `PSRAM` devices connected to the MCU.
+//! Support for interfacing with `PSRAM` devices connected to the MCU.
 //! PSRAM provides additional external memory to supplement the internal memory of the MCU,
 //! allowing for increased storage capacity and improved performance in certain applications.
 #![doc = ""]
@@ -13,11 +13,11 @@
         `esp-hal` will try to automatically detect the best option, but manual configuration is also possible and more reliable.")
 )]
 #![doc = ""]
-//! ## Examples
+//! # Examples
 //!
 //! ### PSRAM as heap memory
 //!
-//! This example shows how to use PSRAM as heap-memory via esp-alloc.
+//! Shows how to use PSRAM as heap-memory via esp-alloc.
 //!
 //! <section class="warning">
 //! The PSRAM example <em>must</em> be built in release mode!

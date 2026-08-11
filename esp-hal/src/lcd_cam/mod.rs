@@ -1,7 +1,7 @@
 //! # LCD and Camera
 //!
 //! ## Overview
-//! This peripheral consists of an LCD module and a Camera module, which can be
+//! LCD and camera modules, which can be
 //! used simultaneously. For more information on these modules, please refer to
 //! the documentation in their respective modules.
 
@@ -103,8 +103,7 @@ impl<'d> LcdCam<'d, Blocking> {
 
     /// Registers an interrupt handler for the LCD_CAM peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::system::Cpu::other() {

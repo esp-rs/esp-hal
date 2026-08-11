@@ -5,7 +5,7 @@
 //! and drivers, like routing fixed logic levels to peripheral inputs, or
 //! inverting input and output signals.
 //!
-//! > Note that routing a signal through the GPIO matrix adds some latency to
+//! > Routing a signal through the GPIO matrix adds some latency to
 //! > the signal. This is not a problem for most peripherals, but it can be an
 //! > issue for high-speed peripherals like SPI or I2S. `esp-hal` tries to
 //! > bypass the GPIO matrix when possible (e.g. when the pin can be configured
@@ -29,7 +29,7 @@
 //! - A fixed logic [`Level`]
 //! - [`NoPin`]
 //!
-//! Note that some of these exist for convenience only. `Level` is meaningful as
+//! Some of these exist for convenience only. `Level` is meaningful as
 //! a peripheral input, but not as a peripheral output. `NoPin` is a placeholder
 //! for when a peripheral driver does not require a pin, but the API requires
 //! one. It is equivalent to [`Level::Low`].
@@ -42,9 +42,8 @@
 //! then be individually connected to a peripheral input or output signal. This
 //! allows for flexible routing of signals between peripherals and GPIO pins.
 //!
-//! Note that only configured GPIO drivers can be safely turned into signals.
-//! This conversion freezes the pin configuration, otherwise it would be
-//! possible for multiple peripheral drivers to configure the same GPIO pin at
+//! Only configured GPIO drivers can be safely turned into signals. The
+//! conversion freezes the pin configuration; otherwise it is possible for multiple peripheral drivers to configure the same GPIO pin at
 //! the same time, which is undefined behavior.
 //!
 //! ### Splitting pins into signals
@@ -122,14 +121,14 @@ use crate::{
     private::{self, Sealed},
 };
 
-/// The base of all peripheral signals.
+/// Base trait for all peripheral signals.
 ///
-/// This trait represents a signal in the GPIO matrix. Signals are converted or
+/// Represents a signal in the GPIO matrix. Signals are converted or
 /// split from GPIO pins and can be connected to peripheral inputs and outputs.
 ///
 /// All signals can be peripheral inputs, but not all output-like types should
-/// be allowed to be passed as inputs. This trait bridges this gap by defining
-/// the logic, but not declaring the signal to be an actual Input signal.
+/// be passed as inputs. Defines the connection logic without requiring an
+/// actual [`Input`] signal.
 pub trait PeripheralSignal<'d>: Sealed {
     /// Connects the peripheral input to an input signal source.
     #[doc(hidden)] // Considered unstable
@@ -326,14 +325,13 @@ impl gpio::InputSignal {
 
     /// Connects a peripheral input signal to a GPIO or a constant level.
     ///
-    /// Note that connecting multiple GPIOs to a single peripheral input is not
-    /// possible and the previous connection will be replaced.
+    /// You cannot connect multiple GPIOs to a single peripheral input. A new
+    /// connection replaces the previous one.
     ///
-    /// Also note that a peripheral input must always be connected to something,
-    /// so if you want to disconnect it from GPIOs, you should connect it to a
-    /// constant level.
+    /// A peripheral input must always be connected to something. To disconnect
+    /// it from GPIOs, connect it to a constant level.
     ///
-    /// Allows connecting a peripheral input to either a
+    /// Connects a peripheral input to either a
     /// [`PeripheralInput`] or [`PeripheralOutput`] implementation.
     #[inline]
     #[instability::unstable]
@@ -349,11 +347,11 @@ impl gpio::OutputSignal {
 
     /// Connects a peripheral output signal to a GPIO.
     ///
-    /// Note that connecting multiple output signals to a single GPIO is not
-    /// possible and the previous connection will be replaced.
+    /// You cannot connect multiple output signals to a single GPIO. A new
+    /// connection replaces the previous one.
     ///
-    /// Also note that it is possible to connect a peripheral output signal to
-    /// multiple GPIOs, and old connections will not be cleared automatically.
+    /// You can connect one peripheral output signal to multiple GPIOs. Old
+    /// connections are not cleared automatically.
     #[inline]
     #[instability::unstable]
     pub fn connect_to<'d>(self, pin: &impl PeripheralOutput<'d>) {
@@ -602,7 +600,7 @@ impl<'d> InputSignal<'d> {
 
     /// Freezes the pin configuration.
     ///
-    /// This will prevent peripheral drivers using this signal from modifying
+    /// Prevents peripheral drivers that use this signal from modifying
     /// the pin settings.
     pub fn freeze(mut self) -> Self {
         self.flags.insert(InputFlags::Frozen);
@@ -611,16 +609,13 @@ impl<'d> InputSignal<'d> {
 
     /// Unfreezes the pin configuration.
     ///
-    /// This will enable peripheral drivers to modify the pin settings
-    /// again.
+    /// Lets peripheral drivers modify the pin settings again.
     ///
     /// # Safety
     ///
-    /// Allows peripherals to modify the pin configuration again. This can lead to undefined
-    /// behavior if the pin configuration again. This can lead to undefined behavior if the pin
-    /// is being configured by multiple peripherals at the same time. It can
-    /// also lead to surprising behavior if the pin is passed to multiple
-    /// peripherals that expect conflicting settings.
+    /// Do not configure the same pin from multiple peripherals at the same
+    /// time. Passing the pin to peripherals that expect conflicting settings
+    /// can also lead to undefined behavior.
     pub unsafe fn unfreeze(&mut self) {
         self.flags.remove(InputFlags::Frozen);
     }
@@ -634,21 +629,21 @@ impl<'d> InputSignal<'d> {
 
     /// Returns `true` if the input signal is high.
     ///
-    /// Note that this does not take [`Self::with_input_inverter`] into account.
+    /// Does not take [`Self::with_input_inverter`] into account.
     pub fn is_input_high(&self) -> bool {
         self.pin.is_input_high()
     }
 
     /// Returns the current signal level.
     ///
-    /// Note that this does not take [`Self::with_input_inverter`] into account.
+    /// Does not take [`Self::with_input_inverter`] into account.
     pub fn level(&self) -> Level {
         self.is_input_high().into()
     }
 
     /// Returns `true` if the input signal is configured to be inverted.
     ///
-    /// Note that the hardware is not configured until the signal is actually
+    /// The hardware is not configured until the signal is actually
     /// connected to a peripheral.
     pub fn is_input_inverted(&self) -> bool {
         self.flags.contains(InputFlags::InvertInput)
@@ -714,7 +709,7 @@ enum OutputFlags {
 /// for configuring the pin with the correct settings, peripheral drivers will
 /// not be able to modify the pin settings.
 ///
-/// Note that connecting this to a peripheral input will enable the input stage
+/// Connecting this signal to a peripheral input enables the input stage
 /// of the GPIO pin.
 ///
 /// Multiple pins can be connected to one output signal.
@@ -778,7 +773,7 @@ impl<'d> OutputSignal<'d> {
 
     /// Freezes the pin configuration.
     ///
-    /// This will prevent peripheral drivers using this signal from
+    /// Prevents peripheral drivers that use this signal from
     /// modifying the pin settings.
     pub fn freeze(mut self) -> Self {
         self.flags.insert(OutputFlags::Frozen);
@@ -787,16 +782,13 @@ impl<'d> OutputSignal<'d> {
 
     /// Unfreezes the pin configuration.
     ///
-    /// This will enable peripheral drivers to modify the pin settings
-    /// again.
+    /// Lets peripheral drivers modify the pin settings again.
     ///
     /// # Safety
     ///
-    /// Allows peripherals to modify the pin configuration again. This can lead to undefined
-    /// behavior if the pin configuration again. This can lead to undefined behavior if the pin
-    /// is being configured by multiple peripherals at the same time.
-    /// It can also lead to surprising behavior if the pin is passed to multiple
-    /// peripherals that expect conflicting settings.
+    /// Do not configure the same pin from multiple peripherals at the same
+    /// time. Passing the pin to peripherals that expect conflicting settings
+    /// can also lead to undefined behavior.
     pub unsafe fn unfreeze(&mut self) {
         self.flags.remove(OutputFlags::Frozen);
     }
@@ -810,7 +802,7 @@ impl<'d> OutputSignal<'d> {
 
     /// Returns `true` if the input signal is configured to be inverted.
     ///
-    /// Note that the hardware is not configured until the signal is actually
+    /// The hardware is not configured until the signal is actually
     /// connected to a peripheral.
     pub fn is_input_inverted(&self) -> bool {
         self.flags.contains(OutputFlags::InvertInput)
@@ -818,7 +810,7 @@ impl<'d> OutputSignal<'d> {
 
     /// Returns `true` if the output signal is configured to be inverted.
     ///
-    /// Note that the hardware is not configured until the signal is actually
+    /// The hardware is not configured until the signal is actually
     /// connected to a peripheral.
     pub fn is_output_inverted(&self) -> bool {
         self.flags.contains(OutputFlags::InvertOutput)
@@ -853,14 +845,14 @@ impl<'d> OutputSignal<'d> {
 
     /// Returns `true` if the input signal is high.
     ///
-    /// Note that this does not take [`Self::with_input_inverter`] into account.
+    /// Does not take [`Self::with_input_inverter`] into account.
     pub fn is_input_high(&self) -> bool {
         self.pin.is_input_high()
     }
 
     /// Returns `true` if the output signal is set high.
     ///
-    /// Note that this does not take [`Self::with_output_inverter`] into
+    /// Does not take [`Self::with_output_inverter`] into
     /// account.
     pub fn is_set_high(&self) -> bool {
         self.pin.is_set_high()

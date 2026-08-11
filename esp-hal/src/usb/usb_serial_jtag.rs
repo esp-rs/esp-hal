@@ -8,10 +8,9 @@
 //! possible for any computer with a USB host (hereafter referred to as 'host'),
 //! without any active external components.
 //!
-//! This peripheral integrates the functionality of both a USB-to-serial
-//! converter as well as a USB-to-JTAG adapter. As this device directly
-//! interfaces with an external USB host using only the two data lines required
-//! by USB 2.0, only two pins are required to be dedicated to this functionality
+//! Integrates the functionality of both a USB-to-serial converter and a
+//! USB-to-JTAG adapter. The device interfaces with an external USB host using
+//! only the two data lines required by USB 2.0, so only two pins are needed
 //! for debugging.
 //!
 //! The USB Serial/JTAG controller boasts the following features:
@@ -39,7 +38,7 @@
 //! available. See the examples below for more information on how to interact
 //! with this driver.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Sending and Receiving Data
 //! ```rust, no_run
@@ -308,7 +307,7 @@ where
             .bit_is_set()
     }
 
-    /// Reset RX-PACKET-RECV interrupt
+    /// Clears the RX-PACKET-RECV interrupt.
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
         self.regs()
             .int_clr()
@@ -437,15 +436,14 @@ where
         self.rx.rx_packet_recv_interrupt_set()
     }
 
-    /// Reset RX-PACKET-RECV interrupt
+    /// Clears the RX-PACKET-RECV interrupt.
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
         self.rx.reset_rx_packet_recv_interrupt()
     }
 
     /// Registers an interrupt handler for the USB Serial JTAG peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.rx.peripheral.disable_peri_interrupt_on_all_cores();
@@ -456,10 +454,10 @@ where
 /// USB Serial/JTAG peripheral instance
 #[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
-    /// Get a reference to the peripheral's underlying register block
+    /// Returns a reference to the peripheral's underlying register block.
     fn register_block(&self) -> &RegisterBlock;
 
-    /// Disable all transmit interrupts for the peripheral
+    /// Disables all transmit interrupts for the peripheral.
     fn disable_tx_interrupts(&self) {
         self.register_block()
             .int_ena()
@@ -470,7 +468,7 @@ pub trait Instance: crate::private::Sealed {
             .write(|w| w.serial_in_empty().clear_bit_by_one());
     }
 
-    /// Disable all receive interrupts for the peripheral
+    /// Disables all receive interrupts for the peripheral.
     fn disable_rx_interrupts(&self) {
         self.register_block()
             .int_ena()

@@ -19,7 +19,7 @@
 //! That is where instruction trace comes in, which provides trace of the
 //! program execution.
 //!
-//! ## Examples
+//! # Examples
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::trace::Trace;
@@ -199,7 +199,7 @@ impl<'d> Trace<'d> {
 /// Trace peripheral instance
 #[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
-    /// Get a reference to the peripheral's underlying register block
+    /// Returns a reference to the peripheral's underlying register block.
     fn register_block(&self) -> &RegisterBlock;
 
     /// Peripheral

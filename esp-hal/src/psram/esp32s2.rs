@@ -37,7 +37,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 16;
 
     unsafe extern "C" {
-        /// Set DCache mmu mapping.
+        /// Sets DCache MMU mapping.
         ///
         /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid.
         /// [`vaddr`]: u32 Virtual address in CPU address space.
@@ -407,7 +407,7 @@ pub(crate) mod utils {
         unsafe extern "C" {
             fn esp_rom_efuse_get_flash_gpio_info() -> u32;
 
-            /// Enable Quad I/O pin functions
+            /// Enables Quad I/O pin functions.
             ///
             /// Sets the HD & WP pin functions for Quad I/O modes, based on the
             /// efuse SPI pin configuration.

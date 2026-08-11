@@ -14,7 +14,7 @@
     not(systimer_driver_supported),
     doc = "See the [timg] module for more information."
 )]
-//! ## Examples
+//! # Examples
 //!
 //! ### One-shot Timer
 //!
@@ -82,15 +82,15 @@ pub enum Error {
 
 /// Functionality provided by any timer peripheral.
 pub trait Timer: crate::private::Sealed {
-    /// Start the timer.
+    /// Starts the timer.
     #[doc(hidden)]
     fn start(&self);
 
-    /// Stop the timer.
+    /// Stops the timer.
     #[doc(hidden)]
     fn stop(&self);
 
-    /// Reset the timer value to 0.
+    /// Resets the timer value to 0.
     #[doc(hidden)]
     fn reset(&self);
 
@@ -106,15 +106,15 @@ pub trait Timer: crate::private::Sealed {
     #[doc(hidden)]
     fn load_value(&self, value: Duration) -> Result<(), Error>;
 
-    /// Enable auto reload of the loaded value.
+    /// Enables auto reload of the loaded value.
     #[doc(hidden)]
     fn enable_auto_reload(&self, auto_reload: bool);
 
-    /// Enable or disable the timer's interrupt.
+    /// Enables or disables the timer's interrupt.
     #[doc(hidden)]
     fn enable_interrupt(&self, state: bool);
 
-    /// Clear the timer's interrupt.
+    /// Clears the timer's interrupt.
     fn clear_interrupt(&self);
 
     /// Has the timer triggered?
@@ -142,7 +142,7 @@ pub struct OneShotTimer<'d, Dm: DriverMode> {
 }
 
 impl<'d> OneShotTimer<'d, Blocking> {
-    /// Construct a new instance of [`OneShotTimer`].
+    /// Creates a new [`OneShotTimer`].
     pub fn new(inner: impl Timer + Into<AnyTimer<'d>>) -> OneShotTimer<'d, Blocking> {
         Self {
             inner: inner.into(),
@@ -290,30 +290,30 @@ where
         Ok(())
     }
 
-    /// Stop the timer
+    /// Stops the timer.
     pub fn stop(&mut self) {
         self.inner.stop();
     }
 
-    /// Set the interrupt handler
+    /// Sets the interrupt handler.
     ///
-    /// Note that this will replace any previously set interrupt handler
+    /// Replaces any previously set interrupt handler.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
 
-    /// Listen for interrupt
+    /// Listens for interrupt.
     pub fn listen(&mut self) {
         self.inner.enable_interrupt(true);
     }
 
-    /// Unlisten for interrupt
+    /// Stops listening for interrupt.
     pub fn unlisten(&mut self) {
         self.inner.enable_interrupt(false);
     }
 
-    /// Clear the interrupt flag
+    /// Clears the interrupt flag.
     pub fn clear_interrupt(&mut self) {
         self.inner.clear_interrupt();
     }
@@ -349,7 +349,7 @@ pub struct PeriodicTimer<'d, Dm: DriverMode> {
 }
 
 impl<'d> PeriodicTimer<'d, Blocking> {
-    /// Construct a new instance of [`PeriodicTimer`].
+    /// Creates a new [`PeriodicTimer`].
     pub fn new(inner: impl Timer + Into<AnyTimer<'d>>) -> PeriodicTimer<'d, Blocking> {
         Self {
             inner: inner.into(),
@@ -425,25 +425,25 @@ where
         Ok(())
     }
 
-    /// Set the interrupt handler
+    /// Sets the interrupt handler.
     ///
-    /// Note that this will replace any previously set interrupt handler
+    /// Replaces any previously set interrupt handler.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.inner.set_interrupt_handler(handler);
     }
 
-    /// Listen for interrupt
+    /// Listens for interrupt.
     pub fn listen(&mut self) {
         self.inner.enable_interrupt(true);
     }
 
-    /// Unlisten for interrupt
+    /// Stops listening for interrupt.
     pub fn unlisten(&mut self) {
         self.inner.enable_interrupt(false);
     }
 
-    /// Clear the interrupt flag
+    /// Clears the interrupt flag.
     pub fn clear_interrupt(&mut self) {
         self.inner.clear_interrupt();
     }

@@ -2,7 +2,7 @@ use super::*;
 
 /// DMA transmit buffer
 ///
-/// This is a contiguous buffer linked together by DMA descriptors of length
+/// Contiguous buffer linked together by DMA descriptors of length
 /// 4095 at most. It can only be used for transmitting data to a peripheral's
 /// FIFO. See [ScopedDmaRxBuf] for receiving data.
 #[derive(Debug)]
@@ -79,7 +79,7 @@ impl<'a> ScopedDmaTxBuf<'a> {
         self.buffer.len()
     }
 
-    /// Return the number of bytes that would be transmitted by this buf.
+    /// Returns the number of bytes that would be transmitted by this buffer.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.descriptors
@@ -173,7 +173,7 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
 
 /// DMA receive buffer
 ///
-/// This is a contiguous buffer linked together by DMA descriptors of length
+/// Contiguous buffer linked together by DMA descriptors of length
 /// 4092. It can only be used for receiving data from a peripheral's FIFO.
 /// See [ScopedDmaTxBuf] for transmitting data.
 #[derive(Debug)]
@@ -290,7 +290,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
         &mut self.buffer
     }
 
-    /// Return the number of bytes that was received by this buf.
+    /// Returns the number of bytes received by this buffer.
     pub fn number_of_received_bytes(&self) -> usize {
         self.sync_received_from_dma();
         self.descriptors

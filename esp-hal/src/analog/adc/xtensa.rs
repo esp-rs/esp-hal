@@ -97,10 +97,10 @@ pub trait RegisterAccess {
     /// Read sample data
     fn read_data() -> u16;
 
-    /// Set up ADC hardware for calibration
+    /// Sets up ADC hardware for calibration.
     fn calibration_init();
 
-    /// Set calibration parameter to ADC hardware
+    /// Sets the calibration parameter in ADC hardware.
     fn set_init_code(data: u16);
 
     /// Reset flags
@@ -334,8 +334,7 @@ impl<'d, ADCX> Adc<'d, ADCX, crate::Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configure a given ADC instance using the provided configuration, and
-    /// initialize the ADC for use
+    /// Creates and initializes an ADC instance with the given configuration.
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
         let guard = GenericPeripheralGuard::new();
         let sensors = SENS::regs();

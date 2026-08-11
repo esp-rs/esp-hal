@@ -1,7 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
 //! Dedicated GPIO access.
 //!
-//! This module implements fast GPIO access using special-purpose CPU features.
+//! Fast GPIO access using special-purpose CPU features.
 //! Dedicated GPIO access works by connecting peripheral signals between the CPU
 //! and the GPIO pins, instead of using the GPIO registers via the peripheral bus.
 //!
@@ -39,7 +39,7 @@
 //!
 //! ## Low-level functions
 //!
-//! This module also exposes low-level helpers for direct, channel-bitmask-based access:
+//! Also exposes low-level helpers for direct, channel-bitmask-based access:
 //! - [`write_ll`]: write output levels for a selected set of channels in one operation
 //! - [`read_all_ll`]: read the current input levels of all channels
 //! - [`output_levels_ll`]: read the current output levels of all channels
@@ -57,7 +57,7 @@ Do not send the drivers to another core, either directly, or indirectly via a th
 </section>
 "#
 )]
-//! ## Examples
+//! # Examples
 //! ### sharing drivers across multiple bundles
 //!
 //! The same driver can be borrowed by multiple bundles at the same time.
@@ -114,7 +114,7 @@ Do not send the drivers to another core, either directly, or indirectly via a th
 //! # {after_snippet}
 //! ```
 //!
-//! This pattern is useful when different subsystems want different views of the same set of
+//! Useful when different subsystems want different views of the same set of
 //! input channels without duplicating driver setup.
 
 use core::{convert::Infallible, marker::PhantomData};
@@ -478,13 +478,13 @@ impl<const CH: u8> OutputChannel for &mut DedicatedGpioOutputChannel<'_, CH> {
     doc = r#"
 
 <section class="warning">
-Note that the driver must only be used on the core that has created it. Do not send the driver to
+The driver must only be used on the core that created it. Do not send the driver to
 another core, either directly, or indirectly via a thread that is not pinned to a core.
 </section>
 "#
 )]
 #[doc = ""]
-/// ## Examples
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -573,13 +573,13 @@ impl embedded_hal::digital::InputPin for DedicatedGpioInput<'_> {
     doc = r#"
 
 <section class="warning">
-Note that the driver must only be used on the core that has created it. Do not send the driver to
+The driver must only be used on the core that created it. Do not send the driver to
 another core, either directly, or indirectly via a thread that is not pinned to a core.
 </section>
 "#
 )]
 #[doc = ""]
-/// ## Examples
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -636,7 +636,7 @@ impl<'lt> DedicatedGpioOutput<'lt> {
     /// Adds a new output driver to the GPIO pins.
     ///
     /// A dedicated GPIO output driver can control any number of GPIO pins. The pins will be
-    /// released when the driver is dropped. This function does not change the state of the newly
+    /// released when the driver is dropped. Does not change the state of the newly
     /// added GPIO pin.
     pub fn with_pin(mut self, pin: impl OutputDriver + 'lt) -> Self {
         pin.set_output_connection(self.signal);
@@ -737,13 +737,13 @@ On ESP32-S2 and ESP32-S3, the GPIO's output is always enabled.
     doc = r#"
 
 <section class="warning">
-Note that the driver must only be used on the core that has created it. Do not send the driver to
+The driver must only be used on the core that created it. Do not send the driver to
 another core, either directly, or indirectly via a thread that is not pinned to a core.
 </section>
 "#
 )]
 #[doc = ""]
-/// ## Examples
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -971,7 +971,7 @@ configured on the same core, and the bundle must only be used on the core that c
 "#
 )]
 #[doc = ""]
-/// ## Examples
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -1102,7 +1102,7 @@ impl<'lt> DedicatedGpioOutputBundle<'lt> {
     ///
     /// ## Notes
     ///
-    /// - This function does not change any GPIO output state.
+    /// - Does not change any GPIO output state.
     #[cfg_attr(
         multi_core,
         doc = r#"
@@ -1123,7 +1123,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
 
     /// Disables a dedicated output driver in this bundle.
     ///
-    /// This updates the internal mask by clearing the channel bit(s) of `out`. After disabling,
+    /// Updates the internal mask by clearing the channel bit(s) of `out`. After disabling,
     /// future *bundle* operations will no longer touch those channels.
     ///
     /// ## Notes
@@ -1315,7 +1315,7 @@ configured on the same core, and the bundle must only be used on the core that c
 "#
 )]
 #[doc = ""]
-/// ## Examples
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -1427,7 +1427,7 @@ impl<'lt> DedicatedGpioInputBundle<'lt> {
     ///
     /// ## Notes
     ///
-    /// - This function does not change any input state.
+    /// - Does not change any input state.
     #[cfg_attr(
         multi_core,
         doc = r#"
@@ -1448,7 +1448,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
 
     /// Disables a dedicated input driver in this bundle.
     ///
-    /// This updates the internal mask by clearing the channel bit(s) of `inp`. After disabling,
+    /// Updates the internal mask by clearing the channel bit(s) of `inp`. After disabling,
     /// future *bundle* operations will no longer touch those channels.
     ///
     /// ## Notes
@@ -1560,7 +1560,7 @@ running on core 1.
 "#
 )]
 #[doc = ""]
-/// ## Examples
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -1672,7 +1672,7 @@ impl<'lt> DedicatedGpioFlexBundle<'lt> {
     ///
     /// ## Notes
     ///
-    /// - This function does not change any input/output state.
+    /// - Does not change any input/output state.
     #[cfg_attr(
         multi_core,
         doc = r#"
@@ -1693,7 +1693,7 @@ All dedicated GPIO drivers in a bundle must be configured on the same core as th
 
     /// Disables a dedicated flex driver in this bundle.
     ///
-    /// This updates the internal mask by clearing the channel bit(s) of `flex`. After disabling,
+    /// Updates the internal mask by clearing the channel bit(s) of `flex`. After disabling,
     /// future *bundle* operations will no longer touch those channels.
     ///
     /// ## Notes

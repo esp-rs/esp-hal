@@ -1,6 +1,6 @@
 //! Helper functions for TRNG functionality
 
-/// Enable true randomness by enabling the entropy source.
+/// Enables true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     let rtc_cntl = crate::peripherals::LPWR::regs();
@@ -106,7 +106,7 @@ pub(crate) fn ensure_randomness() {
     }
 }
 
-/// Disable true randomness. Unlocks `ADC` peripheral.
+/// Disables true randomness. Unlocks the `ADC` peripheral.
 pub(crate) fn revert_trng() {
     let sens = crate::peripherals::SENS::regs();
     let i2s0 = crate::peripherals::I2S0::regs();

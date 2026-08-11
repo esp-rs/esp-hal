@@ -21,7 +21,7 @@
 //! be specified.
 //!
 //! The UART controller can be configured to invert the polarity of the pins.
-//! This is achieved by inverting the desired pins, and then constructing the
+//! Achieved by inverting the desired pins, then constructing the
 //! UART instance using the inverted pins.
 //!
 //! ## Usage
@@ -957,7 +957,7 @@ where
 
     /// Returns whether the UART buffer is ready to accept more data.
     ///
-    /// If this function returns `true`, [`Self::write`] will not block.
+    /// Returns `true` when [`Self::write`] does not block.
     #[instability::unstable]
     pub fn write_ready(&self) -> bool {
         self.uart.info().tx_fifo_count() < Info::UART_FIFO_SIZE
@@ -1341,7 +1341,7 @@ where
     ///
     /// Sets the specified pin to input and connects it to the UART RX signal.
     ///
-    /// Note: when you listen for the output of the UART peripheral, you should
+    /// When listening for UART output,
     /// configure the driver side (i.e. the TX pin), or ensure that the line is
     /// initially high, to avoid receiving a non-data byte caused by an
     /// initial low signal level.
@@ -1444,7 +1444,7 @@ where
 
     /// Returns whether the UART buffer has data.
     ///
-    /// If this function returns `true`, [`Self::read`] will not block.
+    /// Returns `true` when [`Self::read`] does not block.
     #[instability::unstable]
     pub fn read_ready(&self) -> bool {
         self.uart.info().rx_fifo_count() > 0
@@ -1453,13 +1453,13 @@ where
     /// Read bytes.
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
-    /// FIFO. This function reads the bytes from the RX FIFO and returns
+    /// FIFO. Reads bytes from the RX FIFO and returns
     /// them in the provided buffer. If the hardware buffer is empty, this
     /// function will block until data is available. The [`Self::read_ready`]
     /// function can be used to check if data is available without blocking.
     ///
     /// The function returns the number of bytes read into the buffer. This may
-    /// be less than the length of the buffer. This function only returns 0
+    /// be less than the length of the buffer. Only returns 0
     /// if the provided buffer is empty.
     ///
     /// # Errors
@@ -1883,7 +1883,7 @@ where
     ///
     /// Sets the specified pin to input and connects it to the UART RX signal.
     ///
-    /// Note: when you listen for the output of the UART peripheral, you should
+    /// When listening for UART output,
     /// configure the driver side (i.e. the TX pin), or ensure that the line is
     /// initially high, to avoid receiving a non-data byte caused by an
     /// initial low signal level.
@@ -1969,7 +1969,7 @@ where
     /// Returns whether the UART TX buffer is ready to accept more data.
     ///
     /// If this function returns `true`, [`Self::write`] and [`Self::write_async`]
-    /// will not block. Otherwise, the functions will not return until the buffer is
+    /// does not block. Otherwise, the functions do not return until the buffer is
     /// ready.
     ///
     /// # Examples
@@ -2052,7 +2052,7 @@ where
     /// Returns whether the UART receive buffer has at least one byte of data.
     ///
     /// If this function returns `true`, [`Self::read`] and [`Self::read_async`]
-    /// will not block. Otherwise, they will not return until data is available.
+    /// does not block. Otherwise, they do not return until data is available.
     ///
     /// Data that does not get stored due to an error will be lost and does not count
     /// towards the number of bytes in the receive buffer.
@@ -2097,13 +2097,13 @@ where
     /// Read received bytes.
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
-    /// FIFO. This function reads the bytes from the RX FIFO and returns
+    /// FIFO. Reads bytes from the RX FIFO and returns
     /// them in the provided buffer. If the hardware buffer is empty, this
     /// function will block until data is available. The [`Self::read_ready`]
     /// function can be used to check if data is available without blocking.
     ///
     /// The function returns the number of bytes read into the buffer. This may
-    /// be less than the length of the buffer. This function only returns 0
+    /// be less than the length of the buffer. Only returns 0
     /// if the provided buffer is empty.
     ///
     /// # Errors

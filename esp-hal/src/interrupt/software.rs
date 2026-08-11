@@ -8,7 +8,7 @@
 //! interrupts using the [`raise()`][SoftwareInterrupt::raise] and
 //! [`reset()`][SoftwareInterrupt::reset] methods.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -180,10 +180,10 @@ impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<'_, NUM> {
 
 for_each_sw_interrupt! {
     (all $( ($n:literal, $i:ident, $field:ident) ),*) => {
-        /// This gives access to the available software interrupts.
+        /// Provides access to the available software interrupts.
         ///
-        /// This struct contains several instances of software interrupts that can be
-        /// used for signaling between different parts of a program or system.
+        /// Contains several software interrupt instances for signaling between
+        /// different parts of a program or system.
         #[non_exhaustive]
         pub struct SoftwareInterruptControl<'d> {
             $(

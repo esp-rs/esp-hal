@@ -105,7 +105,7 @@ pub enum Error {
 #[procmacros::doc_replace]
 /// Control CPU Cores
 ///
-/// ## Examples
+/// # Exampless
 /// ```rust, no_run
 /// # {before_snippet}
 /// # use esp_hal::delay::Delay;
@@ -196,7 +196,7 @@ impl<'d> CpuControl<'d> {
 
     /// Start the APP (second) core.
     ///
-    /// The second core will start running the closure `entry`. Note that if the
+    /// The second core starts running the closure `entry`. If the
     /// closure exits, the core will be parked.
     ///
     /// Dropping the returned guard will park the core.
@@ -227,7 +227,7 @@ impl<'d> CpuControl<'d> {
 
     /// Start the APP (second) core.
     ///
-    /// The second core will start running the closure `entry`. Note that if the
+    /// The second core starts running the closure `entry`. If the
     /// closure exits, the core will be parked.
     ///
     /// Dropping the returned guard will park the core.

@@ -98,9 +98,8 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
 mod xtensa {
     use core::arch::{global_asm, naked_asm};
 
-    /// The ESP32 has a first stage bootloader that handles loading program data
-    /// into the right place therefore we skip loading it again. This function
-    /// is called by xtensa-lx-rt in Reset.
+    /// The ESP32 has a first-stage bootloader that loads program data, so this
+    /// routine skips loading it again. Called by xtensa-lx-rt on reset.
     #[unsafe(export_name = "__init_data")]
     extern "C" fn __init_data() -> bool {
         false

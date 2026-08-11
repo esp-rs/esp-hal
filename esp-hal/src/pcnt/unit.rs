@@ -61,15 +61,15 @@ impl From<u8> for ZeroMode {
 #[derive(Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Events {
-    /// Set when the pulse counter reaches the low limit.
+    /// Raised when the pulse counter reaches the low limit.
     pub low_limit: bool,
-    /// Set when the pulse counter reaches the high limit.
+    /// Raised when the pulse counter reaches the high limit.
     pub high_limit: bool,
-    /// Set when the pulse counter crosses threshold 0.
+    /// Raised when the pulse counter crosses threshold 0.
     pub threshold0: bool,
-    /// Set when the pulse counter crosses threshold 1.
+    /// Raised when the pulse counter crosses threshold 1.
     pub threshold1: bool,
-    /// Set when the pulse counter reaches zero.
+    /// Raised when the pulse counter reaches zero.
     pub zero: bool,
 }
 
@@ -87,7 +87,7 @@ pub struct Unit<'d, const NUM: usize> {
 static MUTEX: RawMutex = RawMutex::new();
 
 impl<const NUM: usize> Unit<'_, NUM> {
-    /// return a new Unit
+    /// Creates a new unit.
     pub(super) fn new() -> Self {
         Self {
             counter: Counter::new(),
@@ -105,7 +105,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// If None is specified, then no interrupt is triggered and
     /// the count wraps around after [i16::MIN].
     ///
-    /// Note: The specified value must be negative.
+    /// The specified value must be negative.
     pub fn set_low_limit(&self, value: Option<i16>) -> Result<(), InvalidLowLimit> {
         let pcnt = PCNT::regs();
         let unit = pcnt.unit(NUM);
@@ -136,7 +136,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// If None is specified, then no interrupt is triggered and
     /// the count wraps around after [i16::MAX].
     ///
-    /// Note: The specified value must be positive.
+    /// The specified value must be positive.
     pub fn set_high_limit(&self, value: Option<i16>) -> Result<(), InvalidHighLimit> {
         let pcnt = PCNT::regs();
         let unit = pcnt.unit(NUM);
@@ -194,7 +194,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// `threshold` is the minimum number of APB_CLK cycles for a pulse to be
     /// considered valid. If it is None, the filter is disabled.
     ///
-    /// Note: This maximum possible threshold is 1023.
+    /// Maximum possible threshold is 1023.
     pub fn set_filter(&self, threshold: Option<u16>) -> Result<(), InvalidFilterThreshold> {
         let pcnt = PCNT::regs();
         let unit = pcnt.unit(NUM);
@@ -249,7 +249,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
         });
     }
 
-    /// Get the latest events for this unit.
+    /// Returns the latest events for this unit.
     pub fn events(&self) -> Events {
         let status = PCNT::regs().u_status(NUM).read();
 
@@ -262,12 +262,12 @@ impl<const NUM: usize> Unit<'_, NUM> {
         }
     }
 
-    /// Get the mode of the last zero crossing
+    /// Returns the mode of the last zero crossing.
     pub fn zero_mode(&self) -> ZeroMode {
         PCNT::regs().u_status(NUM).read().zero_mode().bits().into()
     }
 
-    /// Enable interrupts for this unit.
+    /// Enables interrupts for this unit.
     pub fn listen(&self) {
         MUTEX.lock(|| {
             PCNT::regs()
@@ -276,7 +276,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
         });
     }
 
-    /// Disable interrupts for this unit.
+    /// Disables interrupts for this unit.
     pub fn unlisten(&self) {
         MUTEX.lock(|| {
             PCNT::regs()
@@ -294,14 +294,14 @@ impl<const NUM: usize> Unit<'_, NUM> {
             .bit()
     }
 
-    /// Clear the interrupt bit for this unit.
+    /// Clears the interrupt bit for this unit.
     pub fn reset_interrupt(&self) {
         PCNT::regs()
             .int_clr()
             .write(|w| w.cnt_thr_event_u(NUM as u8).set_bit());
     }
 
-    /// Get the current counter value.
+    /// Returns the current counter value.
     pub fn value(&self) -> i16 {
         self.counter.get()
     }
@@ -334,7 +334,7 @@ impl<const NUM: usize> Counter<'_, NUM> {
         }
     }
 
-    /// Get the current counter value.
+    /// Returns the current counter value.
     pub fn get(&self) -> i16 {
         let pcnt = PCNT::regs();
         pcnt.u_cnt(NUM).read().cnt().bits() as i16

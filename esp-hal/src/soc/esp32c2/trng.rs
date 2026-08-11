@@ -3,7 +3,7 @@ use crate::{
     soc::regi2c,
 };
 
-/// Enable true randomness by enabling the entropy source.
+/// Enables true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     let rtc_cntl = LPWR::regs();
@@ -81,7 +81,7 @@ pub(crate) fn ensure_randomness() {
     }
 }
 
-/// Disable true randomness. Unlocks `ADC` peripheral.
+/// Disables true randomness. Unlocks the `ADC` peripheral.
 pub(crate) fn revert_trng() {
     let apb_saradc = APB_SARADC::regs();
     let rtc_cntl = LPWR::regs();

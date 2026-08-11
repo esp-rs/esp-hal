@@ -126,7 +126,7 @@ fn power_control_init() {
     });
 }
 
-/// Configure whether certain peripherals are powered down in deep sleep
+/// Configures whether certain peripherals are powered down in deep sleep.
 fn rtc_sleep_pu() {
     LPWR::regs()
         .dig_pwc()

@@ -5,14 +5,14 @@ use crate::efuse::ChipRevision;
 
 // RNG must be marked `virtual` for this to work.
 impl RNG<'_> {
-    /// Return a reference to the register block
+    /// Returns a reference to the register block.
     #[inline(always)]
     #[instability::unstable]
     pub const fn regs<'a>() -> &'a RngRegisterBlock {
         &RngRegisterBlock
     }
 
-    /// Return a reference to the register block
+    /// Returns a reference to the register block.
     #[inline(always)]
     #[instability::unstable]
     pub fn register_block(&self) -> &RngRegisterBlock {

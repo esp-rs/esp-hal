@@ -44,7 +44,7 @@
 //! channels are indicated by n which is used as a placeholder for the channel
 //! number, and by m for RX channels.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Initialization
 //!
@@ -378,11 +378,11 @@ impl PulseCode {
 
     /// Creates a new instance, attempting to convert lengths to `u16` first.
     ///
-    /// This is slightly more convenient when passing in longer integers (e.g. `u32`) resulting from
+    /// Slightly more convenient when passing in longer integers (e.g. `u32`) from
     /// a preceding calculation.
     ///
-    /// If `length1` or `length2` fail to convert to `u16` or exceed the maximum representable
-    /// range, this will return `None`.
+    /// Returns `None` if `length1` or `length2` fail to convert to `u16` or exceed
+    /// the maximum representable range.
     #[inline]
     pub fn try_new(
         level1: Level,
@@ -424,7 +424,7 @@ impl PulseCode {
 
     /// Creates a new instance that is an end marker with `Level::Low`.
     ///
-    /// This corresponds to the all-zero [`PulseCode`], i.e. with both level and
+    /// Corresponds to the all-zero [`PulseCode`], i.e. with both level and
     /// length fields set to zero, equivalent to (but more semantic than)
     /// `PulseCode::from(0u32)` and [`PulseCode::default()`].
     // FIXME: Consider adding a variant with `level1`, `length1` and `level2` arguments
@@ -513,7 +513,7 @@ impl PulseCode {
         Some(self)
     }
 
-    /// Return whether this pulse code contains an end marker.
+    /// Returns whether this pulse code contains an end marker.
     ///
     /// Equivalent to `self.length1() == 0 || self.length2() == 0`.
     #[inline]
@@ -575,7 +575,7 @@ impl From<PulseCode> for u32 {
 
 /// Memory size associated to a channel.
 ///
-/// This is a newtype around the number of blocks as u8, thus not requiring any
+/// Newtype around the number of blocks as `u8`, thus not requiring any
 /// extra space. However, it is useful to abstract memory sizes into their own
 /// type to make explicit whether they refer to a number of RAM blocks or a
 /// number of pulse codes and to centralize conversion between both.
@@ -589,13 +589,13 @@ impl MemSize {
         Self(blocks)
     }
 
-    /// Return the number of RMT RAM blocks specified by this `MemSize`.
+    /// Returns the number of RMT RAM blocks specified by this `MemSize`.
     #[inline]
     const fn blocks(self) -> u8 {
         self.0
     }
 
-    /// Return the number of RMT pulse codes specified by this `MemSize`.
+    /// Returns the number of RMT pulse codes specified by this `MemSize`.
     #[inline]
     const fn codes(self) -> usize {
         self.0 as usize * property!("rmt.channel_ram_size")
@@ -760,7 +760,7 @@ for_each_rmt_channel!(
 
                 /// Returns the configured RMT counter clock frequency.
                 ///
-                /// This is the actual frequency after the global RMT clock divider has been
+                /// Actual frequency after the global RMT clock divider has been
                 /// configured. Pulse code lengths are expressed in cycles of
                 /// this clock divided by the channel divider configured with
                 /// [`TxChannelConfig::with_clk_divider`] or [`RxChannelConfig::with_clk_divider`].
@@ -1314,7 +1314,7 @@ where
 {
     /// Connect a pin to the channel's output signal.
     ///
-    /// This will replace previous pin assignments for this signal.
+    /// Replaces previous pin assignments for this signal.
     pub fn with_pin(mut self, pin: impl PeripheralOutput<'ch>) -> Self {
         let pin = pin.into();
 
@@ -1347,7 +1347,7 @@ where
 {
     /// Connect a pin to the channel's input signal.
     ///
-    /// This will replace previous pin assignments for this signal.
+    /// Replaces previous pin assignments for this signal.
     pub fn with_pin(self, pin: impl PeripheralInput<'ch>) -> Self {
         let pin = pin.into();
         pin.apply_input_config(&InputConfig::default());
@@ -1376,7 +1376,7 @@ pub trait TxChannelCreator<'ch, Dm>
 where
     Dm: crate::DriverMode,
 {
-    /// Configure the TX channel
+    /// Configures the TX channel.
     ///
     /// # Errors
     ///
@@ -1391,7 +1391,7 @@ pub trait RxChannelCreator<'ch, Dm>
 where
     Dm: crate::DriverMode,
 {
-    /// Configure the RX channel
+    /// Configures the RX channel.
     ///
     /// # Errors
     ///
@@ -1746,9 +1746,8 @@ impl LoopMode {
 /// Channel in TX mode
 impl<'ch> Channel<'ch, Blocking, Tx> {
     /// Start transmitting the given pulse code sequence.
-    /// This returns a [`TxTransaction`] which can be used to wait for
-    /// the transaction to complete and get back the channel for further
-    /// use.
+    /// Returns a [`TxTransaction`] to wait for the transaction to complete and
+    /// get back the channel for further use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit<'data>(
         self,
@@ -1777,8 +1776,8 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
 
     /// Start transmitting the given pulse code continuously.
     ///
-    /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
-    /// ongoing transmission and get back the channel for further use.
+    /// Returns a [`ContinuousTxTransaction`] to stop the ongoing transmission
+    /// and get back the channel for further use.
     ///
     /// The `mode` argument determines whether transmission will continue until explicitly stopped
     /// or for a fixed number of iterations; see [`LoopMode`] for more details.
@@ -1923,8 +1922,8 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
         }
     )]
     /// Start receiving pulse codes into the given buffer.
-    /// This returns a [RxTransaction] which can be used to wait for receive to
-    /// complete and get back the channel for further use.
+    /// Returns a [`RxTransaction`] to wait for receive to complete and get back
+    /// the channel for further use.
     ///
     /// # {rx_size_limit}
     #[cfg_attr(place_rmt_driver_in_ram, ram)]

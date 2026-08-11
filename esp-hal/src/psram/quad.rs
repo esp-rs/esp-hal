@@ -109,7 +109,7 @@ pub(crate) fn psram_init(config: &mut super::PsramConfig) {
 unsafe extern "C" {
     fn esp_rom_gpio_connect_out_signal(gpio_num: u8, signal_idx: u8, out_inv: bool, oen_inv: bool);
 
-    /// Enable Quad I/O pin functions
+    /// Enables Quad I/O pin functions.
     ///
     /// Sets the HD & WP pin functions for Quad I/O modes, based on the
     /// efuse SPI pin configuration.
@@ -155,11 +155,10 @@ fn mspi_timing_psram_tuning() {
     // for now we just use the user provided setting (which might be default settings)
 }
 
-/// Set SPI0 FLASH and PSRAM module clock, din_num, din_mode and extra
-/// dummy, according to the configuration got from timing tuning
-/// function (`calculate_best_flash_tuning_config`). iF control_spi1 ==
-/// 1, will also update SPI1 timing registers. Should only be set to 1 when
-/// do tuning.
+/// Sets SPI0 FLASH and PSRAM module clock, `din_num`, `din_mode`, and extra
+/// dummy according to the configuration from the timing tuning function
+/// (`calculate_best_flash_tuning_config`). If `control_spi1 == 1`, also
+/// updates SPI1 timing registers. Set `control_spi1` to 1 only when doing tuning.
 ///
 /// Should always be called after `mspi_timing_flash_tuning`
 /// or `calculate_best_flash_tuning_config`

@@ -187,31 +187,31 @@ impl TimerSpeed for HighSpeed {
 
 /// Interface for Timers
 pub trait TimerIFace<S: TimerSpeed> {
-    /// Return the frequency of the timer
+    /// Returns the frequency of the timer.
     fn freq(&self) -> Option<Rate>;
 
-    /// Configure the timer
+    /// Configures the timer.
     fn configure(&mut self, config: config::Config<S::ClockSourceType>) -> Result<(), Error>;
 
     /// Check if the timer has been configured
     fn is_configured(&self) -> bool;
 
-    /// Return the duty resolution of the timer
+    /// Returns the duty resolution of the timer.
     fn duty(&self) -> Option<config::Duty>;
 
-    /// Return the timer number
+    /// Returns the timer number.
     fn number(&self) -> Number;
 
-    /// Return the timer frequency, or 0 if not configured
+    /// Returns the timer frequency, or 0 if not configured.
     fn frequency(&self) -> u32;
 }
 
 /// Interface for HW configuration of timer
 pub trait TimerHW<S: TimerSpeed> {
-    /// Get the current source timer frequency from the HW
+    /// Returns the current source timer frequency from the hardware.
     fn freq_hw(&self) -> Option<Rate>;
 
-    /// Configure the HW for the timer
+    /// Configures the hardware for the timer.
     fn configure_hw(&self, divisor: u32);
 
     /// Update the timer in HW
@@ -234,12 +234,12 @@ impl<'a, S: TimerSpeed> TimerIFace<S> for Timer<'a, S>
 where
     Timer<'a, S>: TimerHW<S>,
 {
-    /// Return the frequency of the timer
+    /// Returns the frequency of the timer.
     fn freq(&self) -> Option<Rate> {
         self.freq_hw()
     }
 
-    /// Configure the timer
+    /// Configures the timer.
     fn configure(&mut self, config: config::Config<S::ClockSourceType>) -> Result<(), Error> {
         self.duty = Some(config.duty);
         self.clock_source = Some(config.clock_source);
@@ -277,17 +277,17 @@ where
         self.configured
     }
 
-    /// Return the duty resolution of the timer
+    /// Returns the duty resolution of the timer.
     fn duty(&self) -> Option<config::Duty> {
         self.duty
     }
 
-    /// Return the timer number
+    /// Returns the timer number.
     fn number(&self) -> Number {
         self.number
     }
 
-    /// Return the timer frequency
+    /// Returns the timer frequency.
     fn frequency(&self) -> u32 {
         self.frequency
     }
@@ -311,12 +311,12 @@ impl<'a, S: TimerSpeed> Timer<'a, S> {
 
 /// Timer HW implementation for LowSpeed timers
 impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
-    /// Get the current source timer frequency from the HW
+    /// Returns the current source timer frequency from the hardware.
     fn freq_hw(&self) -> Option<Rate> {
         self.clock_source.map(low_level::ls_freq_hw)
     }
 
-    /// Configure the HW for the timer
+    /// Configures the hardware for the timer.
     fn configure_hw(&self, divisor: u32) {
         let duty = unwrap!(self.duty) as u8;
         #[cfg(soc_has_clock_node_ref_tick)]
@@ -335,12 +335,12 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
 #[cfg(ledc_version = "1")]
 /// Timer HW implementation for HighSpeed timers
 impl TimerHW<HighSpeed> for Timer<'_, HighSpeed> {
-    /// Get the current source timer frequency from the HW
+    /// Returns the current source timer frequency from the hardware.
     fn freq_hw(&self) -> Option<Rate> {
         self.clock_source.map(low_level::hs_freq_hw)
     }
 
-    /// Configure the HW for the timer
+    /// Configures the hardware for the timer.
     fn configure_hw(&self, divisor: u32) {
         let duty = unwrap!(self.duty) as u8;
         low_level::hs_configure_hw(

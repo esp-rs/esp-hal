@@ -7,38 +7,38 @@
 
 use crate::efuse::EfuseField;
 
-/// Disable programming of individual eFuses
+/// Disables programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 32);
-/// Disable reading from BlOCK4-10
+/// Disables reading from BLOCK4-10
 pub const RD_DIS: EfuseField = EfuseField::new(0, 1, 32, 7);
-/// Set this bit to disable boot from RTC RAM
+/// Sets this bit to disable boot from RTC RAM
 pub const DIS_RTC_RAM_BOOT: EfuseField = EfuseField::new(0, 1, 39, 1);
-/// Set this bit to disable Icache
+/// Sets this bit to disable Icache
 pub const DIS_ICACHE: EfuseField = EfuseField::new(0, 1, 40, 1);
-/// Set this bit to disable function of usb switch to jtag in module of usb
+/// Sets this bit to disable function of usb switch to jtag in module of usb
 /// device
 pub const DIS_USB_JTAG: EfuseField = EfuseField::new(0, 1, 41, 1);
-/// Set this bit to disable Icache in download mode (boot_mode\[3:0\] is 0; 1;
+/// Sets this bit to disable Icache in download mode (boot_mode\[3:0\] is 0; 1;
 /// 2; 3; 6; 7)
 pub const DIS_DOWNLOAD_ICACHE: EfuseField = EfuseField::new(0, 1, 42, 1);
 /// USB-Serial-JTAG
 pub const DIS_USB_SERIAL_JTAG: EfuseField = EfuseField::new(0, 1, 43, 1);
-/// Set this bit to disable the function that forces chip into download mode
+/// Sets this bit to disable the function that forces chip into download mode
 pub const DIS_FORCE_DOWNLOAD: EfuseField = EfuseField::new(0, 1, 44, 1);
 /// Reserved (used for four backups method)
 pub const RPT4_RESERVED6: EfuseField = EfuseField::new(0, 1, 45, 1);
-/// Set this bit to disable CAN function
+/// Sets this bit to disable CAN function
 pub const DIS_TWAI: EfuseField = EfuseField::new(0, 1, 46, 1);
-/// Set this bit to enable selection between usb_to_jtag and pad_to_jtag through
+/// Sets this bit to enable selection between usb_to_jtag and pad_to_jtag through
 /// strapping gpio10 when both reg_dis_usb_jtag and reg_dis_pad_jtag are equal
 /// to 0
 pub const JTAG_SEL_ENABLE: EfuseField = EfuseField::new(0, 1, 47, 1);
-/// Set these bits to disable JTAG in the soft way (odd number 1 means disable
+/// Sets these bits to disable JTAG in the soft way (odd number 1 means disable
 /// ). JTAG can be enabled in HMAC module
 pub const SOFT_DIS_JTAG: EfuseField = EfuseField::new(0, 1, 48, 3);
-/// Set this bit to disable JTAG in the hard way. JTAG is disabled permanently
+/// Sets this bit to disable JTAG in the hard way. JTAG is disabled permanently
 pub const DIS_PAD_JTAG: EfuseField = EfuseField::new(0, 1, 51, 1);
-/// Set this bit to disable flash encryption when in download boot modes
+/// Sets this bit to disable flash encryption when in download boot modes
 pub const DIS_DOWNLOAD_MANUAL_ENCRYPT: EfuseField = EfuseField::new(0, 1, 52, 1);
 /// Controls single-end input threshold vrefh; 1.76 V to 2 V with step of 80 mV;
 /// stored in eFuse
@@ -46,13 +46,13 @@ pub const USB_DREFH: EfuseField = EfuseField::new(0, 1, 53, 2);
 /// Controls single-end input threshold vrefl; 0.8 V to 1.04 V with step of 80
 /// mV; stored in eFuse
 pub const USB_DREFL: EfuseField = EfuseField::new(0, 1, 55, 2);
-/// Set this bit to exchange USB D+ and D- pins
+/// Sets this bit to exchange USB D+ and D- pins
 pub const USB_EXCHG_PINS: EfuseField = EfuseField::new(0, 1, 57, 1);
-/// Set this bit to vdd spi pin function as gpio
+/// Sets this bit to vdd spi pin function as gpio
 pub const VDD_SPI_AS_GPIO: EfuseField = EfuseField::new(0, 1, 58, 1);
-/// Enable btlc gpio
+/// Enables btlc gpio
 pub const BTLC_GPIO_ENABLE: EfuseField = EfuseField::new(0, 1, 59, 2);
-/// Set this bit to enable power glitch function
+/// Sets this bit to enable power glitch function
 pub const POWERGLITCH_EN: EfuseField = EfuseField::new(0, 1, 61, 1);
 /// Sample delay configuration of power glitch
 pub const POWER_GLITCH_DSENSE: EfuseField = EfuseField::new(0, 1, 62, 2);
@@ -82,9 +82,9 @@ pub const KEY_PURPOSE_4: EfuseField = EfuseField::new(0, 3, 104, 4);
 pub const KEY_PURPOSE_5: EfuseField = EfuseField::new(0, 3, 108, 4);
 /// Reserved (used for four backups method)
 pub const RPT4_RESERVED3: EfuseField = EfuseField::new(0, 3, 112, 4);
-/// Set this bit to enable secure boot
+/// Sets this bit to enable secure boot
 pub const SECURE_BOOT_EN: EfuseField = EfuseField::new(0, 3, 116, 1);
-/// Set this bit to enable revoking aggressive secure boot
+/// Sets this bit to enable revoking aggressive secure boot
 pub const SECURE_BOOT_AGGRESSIVE_REVOKE: EfuseField = EfuseField::new(0, 3, 117, 1);
 /// Reserved (used for four backups method)
 pub const RPT4_RESERVED0: EfuseField = EfuseField::new(0, 3, 118, 6);
@@ -92,29 +92,29 @@ pub const RPT4_RESERVED0: EfuseField = EfuseField::new(0, 3, 118, 6);
 /// less than 15; the waiting time is the configurable value; Otherwise; the
 /// waiting time is twice the configurable value
 pub const FLASH_TPUW: EfuseField = EfuseField::new(0, 3, 124, 4);
-/// Set this bit to disable download mode (boot_mode\[3:0\] = 0; 1; 2; 3; 6; 7)
+/// Sets this bit to disable download mode (boot_mode\[3:0\] = 0; 1; 2; 3; 6; 7)
 pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 128, 1);
-/// Disable direct boot mode
+/// Disables direct boot mode
 pub const DIS_DIRECT_BOOT: EfuseField = EfuseField::new(0, 4, 129, 1);
 /// USB printing
 pub const DIS_USB_SERIAL_JTAG_ROM_PRINT: EfuseField = EfuseField::new(0, 4, 130, 1);
 /// ECC mode in ROM
 pub const FLASH_ECC_MODE: EfuseField = EfuseField::new(0, 4, 131, 1);
-/// Disable UART download mode through USB-Serial-JTAG
+/// Disables UART download mode through USB-Serial-JTAG
 pub const DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 132, 1);
-/// Set this bit to enable secure UART download mode
+/// Sets this bit to enable secure UART download mode
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 133, 1);
-/// Set the default UARTboot message output mode
+/// Sets the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 134, 2);
 /// GPIO33-GPIO37 power supply selection in ROM code
 pub const PIN_POWER_SELECTION: EfuseField = EfuseField::new(0, 4, 136, 1);
 /// Maximum lines of SPI flash
 pub const FLASH_TYPE: EfuseField = EfuseField::new(0, 4, 137, 1);
-/// Set Flash page size
+/// Sets the flash page size
 pub const FLASH_PAGE_SIZE: EfuseField = EfuseField::new(0, 4, 138, 2);
-/// Set 1 to enable ECC for flash boot
+/// Sets 1 to enable ECC for flash boot
 pub const FLASH_ECC_EN: EfuseField = EfuseField::new(0, 4, 140, 1);
-/// Set this bit to force ROM code to send a resume command during SPI boot
+/// Sets this bit to force ROM code to send a resume command during SPI boot
 pub const FORCE_SEND_RESUME: EfuseField = EfuseField::new(0, 4, 141, 1);
 /// Secure version (used by ESP-IDF anti-rollback feature)
 pub const SECURE_VERSION: EfuseField = EfuseField::new(0, 4, 142, 16);

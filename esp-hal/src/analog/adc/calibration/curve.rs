@@ -37,11 +37,11 @@ pub trait AdcHasCurveCal {
 
 /// Curve fitting ADC calibration scheme
 ///
-/// This scheme implements polynomial error correction using predefined
-/// coefficient sets for each attenuation. It returns readings in mV.
+/// Implements polynomial error correction using predefined coefficient sets for
+/// each attenuation. Returns readings in mV.
 ///
-/// This scheme also includes basic calibration ([`super::AdcCalBasic`]) and
-/// line fitting ([`AdcCalLine`]).
+/// Also includes basic calibration ([`super::AdcCalBasic`]) and line fitting
+/// ([`AdcCalLine`]).
 #[derive(Clone, Copy)]
 pub struct AdcCalCurve<ADCX> {
     line: AdcCalLine<ADCX>,
@@ -51,10 +51,9 @@ pub struct AdcCalCurve<ADCX> {
     /// The constant coefficient comes first; the error polynomial is
     /// `coeff[0] + coeff[1] * x + ... + coeff[n] * x^n`.
     ///
-    /// This calibration works by first applying linear calibration. Then
-    /// the error polynomial is applied to the output of linear calibration.
-    /// The output of the polynomial is our estimate of the error; it gets
-    /// subtracted from linear calibration's output to get the final reading.
+    /// Applies linear calibration first, then the error polynomial to its output.
+    /// The polynomial estimates the error; subtract it from the linear output
+    /// to get the final reading.
     coeff: &'static [CurveCoeff],
 
     _phantom: PhantomData<ADCX>,

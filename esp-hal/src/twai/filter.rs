@@ -46,7 +46,7 @@ pub trait Filter {
         Self::FILTER_TYPE
     }
 
-    /// Get the register level representation of the filter.
+    /// Returns the register-level representation of the filter.
     fn to_registers(&self) -> [u8; 8];
 }
 
@@ -230,7 +230,7 @@ pub struct SingleExtendedFilter {
 }
 
 impl SingleExtendedFilter {
-    /// Create a filter that matches against a single 29-bit extended id.
+    /// Creates a filter that matches a single 29-bit extended ID.
     ///
     /// The filter can match against the packet's id and the RTR bit.
     ///
@@ -318,7 +318,7 @@ pub struct DualStandardFilter {
 }
 
 impl DualStandardFilter {
-    /// Create a filter that matches against two standard 11-bit standard IDs.
+    /// Creates a filter that matches two standard 11-bit IDs.
     ///
     /// The first filter part can match a packet's id, RTR bit, and the first
     /// byte of the payload. The second filter part can match a packet's id
@@ -467,8 +467,7 @@ pub struct DualExtendedFilter {
 }
 
 impl DualExtendedFilter {
-    /// Create a filter that matches the first 16 bits of two 29-bit extended
-    /// IDs.
+    /// Creates a filter that matches the first 16 bits of two 29-bit extended IDs.
     ///
     /// # Examples
     /// A filter that matches IDs with 4 bits either set or reset in the higher

@@ -48,11 +48,11 @@
 //!
 //! Clock source is __clock_src__ by default.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Output a 20 kHz signal
 //!
-//! This example uses timer0 and operator0 of the MCPWM0 peripheral to output a
+//! Uses timer0 and operator0 of the MCPWM0 peripheral to output a
 //! 50% duty signal at 20 kHz. The signal will be output to the pin assigned to
 //! `pin`.
 //!
@@ -184,7 +184,7 @@ impl PeripheralClockConfig {
         Rate::from_hz(clocks::McpwmInstance::Mcpwm0.function_clock_frequency())
     }
 
-    /// Get a clock configuration with the given prescaler.
+    /// Returns a clock configuration with the given prescaler.
     ///
     /// With standard system clock configurations the input clock to the MCPWM
     /// peripheral is `160 MHz`.
@@ -200,13 +200,11 @@ impl PeripheralClockConfig {
         }
     }
 
-    /// Get a clock configuration with the given frequency.
+    /// Returns a clock configuration with the given frequency.
     ///
-    /// ### Note:
-    /// This will try to select an appropriate prescaler for the
-    /// [`PeripheralClockConfig::with_prescaler`] method.
-    /// If the calculated prescaler is not in the range `0..u8::MAX`
-    /// [`FrequencyError`] will be returned.
+    /// Selects an appropriate prescaler for
+    /// [`PeripheralClockConfig::with_prescaler`].
+    /// [`FrequencyError`] is returned when the calculated prescaler is not in the range `0..u8::MAX`.
     ///
     /// With standard system clock configurations the input clock to the MCPWM
     /// peripheral is `160 MHz`.
@@ -229,15 +227,14 @@ impl PeripheralClockConfig {
         Ok(Self::with_prescaler(prescaler as u8))
     }
 
-    /// Get the peripheral clock frequency.
+    /// Returns the peripheral clock frequency.
     ///
-    /// ### Note:
-    /// The actual value is rounded down to the nearest `u32` value
+    /// The actual value is rounded down to the nearest `u32` value.
     pub fn frequency(&self) -> Rate {
         self.frequency
     }
 
-    /// Get a timer clock configuration with the given prescaler.
+    /// Returns a timer clock configuration with the given prescaler.
     ///
     /// The resulting timer frequency depends on the chosen
     /// [`timer::PwmWorkingMode`].
@@ -255,12 +252,10 @@ impl PeripheralClockConfig {
         timer::TimerClockConfig::with_prescaler(self, period, mode, prescaler)
     }
 
-    /// Get a timer clock configuration with the given frequency.
+    /// Returns a timer clock configuration with the given frequency.
     ///
-    /// ### Note:
-    /// This will try to select an appropriate prescaler for the timer.
-    /// If the calculated prescaler is not in the range `0..u8::MAX`
-    /// [`FrequencyError`] will be returned.
+    /// Selects an appropriate prescaler for the timer.
+    /// [`FrequencyError`] is returned when the calculated prescaler is not in the range `0..u8::MAX`.
     ///
     /// See [`PeripheralClockConfig::timer_clock_with_prescaler`] for how the
     /// frequency is calculated.
@@ -282,9 +277,9 @@ pub struct FrequencyError;
 
 /// A MCPWM peripheral
 pub trait PwmPeripheral: crate::private::Sealed {
-    /// Get a pointer to the peripheral RegisterBlock
+    /// Returns a pointer to the peripheral register block.
     fn block() -> *const RegisterBlock;
-    /// Get operator GPIO mux output signal
+    /// Returns the operator GPIO mux output signal.
     fn output_signal<const OP: u8, const IS_A: bool>() -> OutputSignal;
     /// Peripheral
     fn peripheral() -> Peripheral;

@@ -521,8 +521,7 @@ where
 
 /// A structure representing a DMA transfer for UHCI/UART.
 ///
-/// This structure holds references to the UHCI instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the UHCI instance, DMA buffers, and transfer status.
 pub struct UhciDmaTxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
@@ -544,7 +543,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
         }
     }
 
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         self.uhci.channel_tx.is_done()
     }
@@ -654,8 +653,7 @@ where
 
 /// A structure representing a DMA transfer for UHCI/UART.
 ///
-/// This structure holds references to the UHCI instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the UHCI instance, DMA buffers, and transfer status.
 pub struct UhciDmaRxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
@@ -677,7 +675,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
         }
     }
 
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         self.uhci.channel_rx.is_done()
     }

@@ -77,7 +77,7 @@ use crate::{
 pub enum SpiInterrupt {
     /// Indicates that the SPI transaction has completed successfully.
     ///
-    /// This interrupt is triggered when an SPI transaction has finished
+    /// Triggered when an SPI transaction has finished
     /// transmitting and receiving data.
     TransferDone,
 
@@ -219,7 +219,7 @@ impl Command {
 
 /// SPI address, ranging from 1 to 32 bits, paired with a data mode.
 ///
-/// This can be used to specify the address phase of SPI transactions.
+/// Specifies the address phase of SPI transactions.
 /// Can be [Address::None] if address phase should be suppressed.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -431,8 +431,7 @@ pub struct Config {
     /// frequencies. To reduce the time required to reconfigure the bus, we
     /// cache clock register's value here, for each configuration.
     ///
-    /// This field is not intended to be set by the user, and is only used
-    /// internally.
+    /// Internal field. Do not set this value.
     #[builder_lite(skip)]
     reg: Result<u32, ConfigError>,
 
@@ -457,7 +456,7 @@ pub struct Config {
     /// Minimum transfer size in bytes below which CPU-driven (blocking) I/O
     /// is used instead of async or DMA transfers.
     ///
-    /// This can reduce overhead for small transfers where DMA setup or
+    /// Can reduce overhead for small transfers where DMA setup or
     /// async context-switch cost exceeds the benefit. For
     /// [`SpiDma`][crate::spi::master::dma::SpiDma], the threshold applies in
     /// both blocking and async DMA modes: when met, DMA is disabled and the
@@ -489,7 +488,7 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Set the frequency of the SPI bus clock.
+    /// Sets the frequency of the SPI bus clock.
     ///
     /// The closest available frequency that does not exceed `frequency` is used,
     /// so the bus never runs faster than requested.
@@ -500,7 +499,7 @@ impl Config {
         self
     }
 
-    /// Set the clock source of the SPI bus.
+    /// Sets the clock source of the SPI bus.
     #[instability::unstable]
     pub fn with_clock_source(mut self, clock_source: ClockSource) -> Self {
         self.clock_source = clock_source;
@@ -673,7 +672,7 @@ impl core::fmt::Display for ConfigError {
 #[procmacros::doc_replace]
 /// SPI peripheral driver
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -766,7 +765,7 @@ impl<'d> Spi<'d, Blocking> {
     )]
     /// # Registers an interrupt handler for the __peripheral_on__.
     ///
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     ///
     /// You can restore the default/unhandled interrupt handler by using

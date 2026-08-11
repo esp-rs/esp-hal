@@ -5,16 +5,16 @@ mod fields;
 #[instability::unstable]
 pub use fields::*;
 
-/// Selects which ADC we are interested in the efuse calibration data for
+/// Selects which ADC the eFuse calibration data applies to
 #[instability::unstable]
 pub enum AdcCalibUnit {
-    /// Select efuse calibration data for ADC1
+    /// eFuse calibration data for ADC1.
     ADC1,
     /// Select efuse calibration data for ADC2
     ADC2,
 }
 
-/// Get status of SPI boot encryption.
+/// Returns the status of SPI boot encryption.
 #[instability::unstable]
 pub fn flash_encryption() -> bool {
     !super::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
@@ -22,13 +22,13 @@ pub fn flash_encryption() -> bool {
         .is_multiple_of(2)
 }
 
-/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+/// Returns the multiplier for the timeout value of the RWDT STAGE 0 register.
 #[instability::unstable]
 pub fn rwdt_multiplier() -> u8 {
     super::read_field_le::<u8>(WDT_DELAY_SEL)
 }
 
-/// Get efuse block version
+/// Returns the eFuse block version.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
 #[instability::unstable]
@@ -41,7 +41,7 @@ pub fn block_version() -> (u8, u8) {
     )
 }
 
-/// Get version of RTC calibration block
+/// Returns the RTC calibration block version.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L15>
 #[instability::unstable]
@@ -51,7 +51,7 @@ pub fn rtc_calib_version() -> u8 {
     if major == 1 { 1 } else { 0 }
 }
 
-/// Get ADC initial code for specified attenuation from efuse
+/// Returns the ADC initial code for the specified attenuation from eFuse.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L28>
 #[instability::unstable]
@@ -105,7 +105,7 @@ pub fn rtc_calib_init_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
     )
 }
 
-/// Get ADC reference point voltage for specified attenuation in millivolts
+/// Returns the ADC reference point voltage for the specified attenuation in millivolts.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
 #[instability::unstable]
@@ -113,7 +113,7 @@ pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, _atten: Attenuation) -> u16 {
     850
 }
 
-/// Get ADC reference point digital code for specified attenuation
+/// Returns the ADC reference point digital code for the specified attenuation.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32s3/esp_efuse_rtc_calib.c#L63>
 #[instability::unstable]

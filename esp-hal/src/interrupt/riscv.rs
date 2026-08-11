@@ -106,7 +106,7 @@ impl CpuInterrupt {
         VECTORED_CPU_INTERRUPT_RANGE.contains(&(self as u32))
     }
 
-    /// Enable the CPU interrupt
+    /// Enables the CPU interrupt.
     #[inline]
     #[instability::unstable]
     pub fn enable(self) {
@@ -120,25 +120,24 @@ impl CpuInterrupt {
         cpu_int::clear_raw(self as u32);
     }
 
-    /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
+    /// Sets the interrupt kind (level or edge) of a CPU interrupt.
     ///
-    /// This is safe to call when the `vectored` feature is enabled. The
-    /// vectored interrupt handler will take care of clearing edge interrupt
-    /// bits.
+    /// Safe to call when the `vectored` feature is enabled. The vectored
+    /// interrupt handler clears edge interrupt bits.
     #[inline]
     #[instability::unstable]
     pub fn set_kind(self, kind: InterruptKind) {
         cpu_int::set_kind_raw(self as u32, kind);
     }
 
-    /// Set the priority level of a CPU interrupt
+    /// Sets the priority level of a CPU interrupt.
     #[inline]
     #[instability::unstable]
     pub fn set_priority(self, priority: Priority) {
         cpu_int::set_priority_raw(self as u32, priority);
     }
 
-    /// Get interrupt priority for the CPU
+    /// Returns the interrupt priority for the CPU.
     #[inline]
     #[instability::unstable]
     pub fn priority(self) -> Priority {
@@ -290,21 +289,21 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
     vector
 };
 
-/// Enable an interrupt by directly binding it to an available CPU interrupt
+/// Enables an interrupt by directly binding it to an available CPU interrupt.
 ///
-/// ⚠️ This installs a *raw trap handler*, the `handler` user provides is written directly into the
+/// ⚠️ Installs a *raw trap handler*: the `handler` you provide is written directly into the
 /// CPU interrupt vector table. That means:
 ///
-/// - Provided handler will be used as an actual trap-handler
-/// - It is user's responsibility to:
-///   - Save and restore all registers they use.
+/// - The provided handler is used as an actual trap handler.
+/// - You must:
+///   - Save and restore all registers you use.
 ///   - Clear the interrupt source if necessary.
 ///   - Return using the `mret` instruction.
-/// - The handler should be declared as naked function. The compiler will not insert a function
-///   prologue/epilogue for the user, normal Rust `fn` will result in an error.
+/// - Declare the handler as a naked function. The compiler does not insert a function
+///   prologue/epilogue; a normal Rust `fn` results in an error.
 ///
-/// Unless you are sure that you need such low-level control to achieve the lowest possible latency,
-/// you most likely want to use [`enable`][crate::interrupt::enable] instead.
+/// Unless you need such low-level control for the lowest possible latency,
+/// use [`enable`][crate::interrupt::enable] instead.
 #[instability::unstable]
 pub fn enable_direct(
     interrupt: Interrupt,
@@ -401,7 +400,7 @@ fn encode_jal_x0(target: usize, pc: usize) -> u32 {
 
 // Runlevel APIs
 
-/// Get the current run level (the level below which interrupts are masked).
+/// Returns the current run level (the level below which interrupts are masked).
 pub(crate) fn current_raw_runlevel() -> u32 {
     cpu_int::current_runlevel() as u32
 }
@@ -441,12 +440,10 @@ fn cpu_wait_mode_on() -> bool {
 
 /// Wait for an interrupt to occur.
 ///
-/// This function causes the current CPU core to execute its Wait For Interrupt
-/// (WFI or equivalent) instruction. After executing this function, the CPU core
-/// will stop execution until an interrupt occurs.
+/// Executes the Wait For Interrupt (WFI or equivalent) instruction on the
+/// current CPU core. The CPU core stops execution until an interrupt occurs.
 ///
-/// This function will return immediately when a debugger is attached, so it is intended to be
-/// called in a loop.
+/// Returns immediately when a debugger is attached. Call in a loop.
 #[inline(always)]
 #[instability::unstable]
 pub fn wait_for_interrupt() {

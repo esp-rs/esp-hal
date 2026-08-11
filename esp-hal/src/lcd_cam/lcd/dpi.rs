@@ -7,7 +7,7 @@
 //! know as RGB) format/timing. The driver mandates DMA (Direct Memory Access)
 //! for efficient data transfer.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### A display
 //!
@@ -525,7 +525,7 @@ pub struct DpiTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         self.dpi.regs().lcd_user().read().lcd_start().bit_is_clear()
     }
@@ -539,7 +539,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     ///
-    /// Note: If you specified `next_frame_en` as true in [Dpi::send], you're
+    /// If you specified `next_frame_en` as `true` in [`Dpi::send`], you are
     /// just waiting for a DMA error when you call this.
     pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF::Final) {
         while !self.is_done() {
@@ -700,7 +700,7 @@ pub struct Format {
 
 /// The timing numbers for the driver to follow.
 ///
-/// Note: The names of the fields in this struct don't match what you
+/// Field names do not match what you
 /// would typically find in an LCD's datasheet. Carefully read the doc on each
 /// field to understand what to set it to.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -708,7 +708,7 @@ pub struct Format {
 pub struct FrameTiming {
     /// The horizontal total width of a frame (in units of PCLK).
     ///
-    /// This should be greater than `horizontal_blank_front_porch` +
+    /// Must be greater than `horizontal_blank_front_porch` +
     /// `horizontal_active_width`.
     ///
     /// Max is 4096 (12 bits).
@@ -716,10 +716,10 @@ pub struct FrameTiming {
 
     /// The horizontal blank front porch of a frame (in units of PCLK).
     ///
-    /// This is the number of PCLKs between the start of the line and the start
-    /// of active data in the line.
+    /// Number of PCLKs between the start of the line and the start of active
+    /// data in the line.
     ///
-    /// Note: This includes `hsync_width`.
+    /// Includes `hsync_width`.
     ///
     /// Max is 2048 (11 bits).
     pub horizontal_blank_front_porch: usize,
@@ -732,7 +732,7 @@ pub struct FrameTiming {
 
     /// The vertical total height of a frame (in units of lines).
     ///
-    /// This should be greater than `vertical_blank_front_porch` +
+    /// Must be greater than `vertical_blank_front_porch` +
     /// `vertical_active_height`.
     ///
     /// Max is 1024 (10 bits).
@@ -740,10 +740,9 @@ pub struct FrameTiming {
 
     /// The vertical blank front porch height of a frame (in units of lines).
     ///
-    /// This is the number of (blank/invalid) lines before the start of the
-    /// frame.
+    /// Number of (blank/invalid) lines before the start of the frame.
     ///
-    /// Note: This includes `vsync_width`.
+    /// Includes `vsync_width`.
     ///
     /// Max is 256 (8 bits).
     pub vertical_blank_front_porch: usize,
@@ -754,23 +753,22 @@ pub struct FrameTiming {
     /// Max is 1024 (10 bits).
     pub vertical_active_height: usize,
 
-    /// It is the width of LCD_VSYNC active pulse in a line (in units of lines).
+    /// Width of the LCD_VSYNC active pulse in a line (in units of lines).
     ///
     /// Max is 128 (7 bits).
     pub vsync_width: usize,
 
     /// The width of LCD_HSYNC active pulse in a line (in units of PCLK).
     ///
-    /// This should be less than vertical_blank_front_porch, otherwise the hsync
-    /// pulse will overlap with valid pixel data.
+    /// Must be less than `vertical_blank_front_porch`, otherwise the hsync
+    /// pulse overlaps with valid pixel data.
     ///
     /// Max is 128 (7 bits).
     pub hsync_width: usize,
 
-    /// It is the position of LCD_HSYNC active pulse in a line (in units of
-    /// PCLK).
+    /// Position of the LCD_HSYNC active pulse in a line (in units of PCLK).
     ///
-    /// This should be less than horizontal_total_width.
+    /// Must be less than `horizontal_total_width`.
     ///
     /// Max is 128 (7 bits).
     pub hsync_position: usize,

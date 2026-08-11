@@ -14,9 +14,9 @@
 //!
 //! ## Usage
 //!
-//! This module implements the blocking [DelayNs] trait from [embedded-hal].
+//! Blocking [`DelayNs`] trait implementation from [embedded-hal].
 //!
-//! ## Examples
+//! # Examples
 //! ### Delay for 1 second
 //! ```rust, no_run
 //! # {before_snippet}

@@ -199,11 +199,9 @@ for_each_mem2mem_channel! {
     };
 }
 
-/// DMA Memory to Memory pseudo-Peripheral
+/// DMA memory-to-memory pseudo-peripheral.
 ///
-/// This is a pseudo-peripheral that allows for memory to memory transfers.
-/// It is not a real peripheral, but a way to use the DMA engine for memory
-/// to memory transfers.
+/// Pseudo-peripheral for memory-to-memory transfers using the DMA engine.
 pub struct Mem2Mem<'d, Dm>
 where
     Dm: DriverMode,
@@ -245,7 +243,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
         Self::new_inner(channel, peripheral)
     }
 
-    /// Convert Mem2Mem to an async Mem2Mem.
+    /// Converts [`Mem2Mem`] to async mode.
     pub fn into_async(self) -> Mem2Mem<'d, Async> {
         Mem2Mem {
             rx: self.rx.into_async(),
@@ -276,7 +274,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
         }
     }
 
-    /// Shortcut to create a [SimpleMem2Mem]
+    /// Creates a [`SimpleMem2Mem`] from this instance.
     pub fn with_descriptors(
         self,
         rx_descriptors: &'d mut [DmaDescriptor],
@@ -297,7 +295,7 @@ where
 }
 
 impl<'d> Mem2MemRx<'d, Blocking> {
-    /// Convert Mem2MemRx to an async Mem2MemRx.
+    /// Converts [`Mem2MemRx`] to async mode.
     pub fn into_async(self) -> Mem2MemRx<'d, Async> {
         Mem2MemRx {
             channel: self.channel.into_async(),
@@ -310,7 +308,7 @@ impl<'d, Dm> Mem2MemRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Start the RX half of a memory to memory transfer.
+    /// Starts the RX half of a memory-to-memory transfer.
     pub fn receive<BUF>(
         mut self,
         mut buf: BUF,
@@ -351,7 +349,7 @@ where
     BUF: DmaRxBuffer,
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         let done_interrupts = DmaRxInterrupt::DescriptorError | DmaRxInterrupt::DescriptorEmpty;
         !self
@@ -448,7 +446,7 @@ where
 }
 
 impl<'d> Mem2MemTx<'d, Blocking> {
-    /// Convert Mem2MemTx to an async Mem2MemTx.
+    /// Converts [`Mem2MemTx`] to async mode.
     pub fn into_async(self) -> Mem2MemTx<'d, Async> {
         Mem2MemTx {
             channel: self.channel.into_async(),
@@ -461,7 +459,7 @@ impl<'d, Dm> Mem2MemTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Start the TX half of a memory to memory transfer.
+    /// Starts the TX half of a memory-to-memory transfer.
     pub fn send<BUF>(
         mut self,
         mut buf: BUF,
@@ -502,7 +500,7 @@ where
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         let done_interrupts = DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof;
         !self
@@ -589,8 +587,9 @@ where
     }
 }
 
-/// A simple and easy to use wrapper around [SimpleMem2Mem].
-/// More complex memory to memory transfers should use [Mem2Mem] directly.
+/// Simplified wrapper around [`Mem2Mem`].
+///
+/// For more complex memory-to-memory transfers, use [`Mem2Mem`] directly.
 pub struct SimpleMem2Mem<'d, Dm>
 where
     Dm: DriverMode,
@@ -616,7 +615,7 @@ impl<'d, Dm> SimpleMem2Mem<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Creates a new [SimpleMem2Mem].
+    /// Creates a new [`SimpleMem2Mem`].
     pub fn new(
         mem2mem: Mem2Mem<'d, Dm>,
         rx_descriptors: &'d mut [DmaDescriptor],
@@ -643,7 +642,7 @@ impl<'d, Dm> SimpleMem2Mem<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Starts a memory to memory transfer.
+    /// Starts a memory-to-memory transfer.
     pub fn start_transfer(
         &mut self,
         rx_buffer: &mut [u8],
@@ -745,7 +744,7 @@ impl<Dm> SimpleMem2MemTransfer<'_, '_, Dm>
 where
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         let State::Active(rx, tx) = &self.0.state else {
             unreachable!()
@@ -761,7 +760,7 @@ where
                 .contains(DmaRxInterrupt::SuccessfulEof)
     }
 
-    /// Wait for the transfer to finish.
+    /// Waits for the transfer to finish.
     pub fn wait(self) -> Result<(), DmaError> {
         while !self.is_done() {}
         Ok(())

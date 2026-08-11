@@ -198,7 +198,7 @@ pub(crate) fn bank(_gpio_num: u8) -> GpioBank {
     GpioBank::_0
 }
 
-/// Set GPIO event listening.
+/// Sets GPIO event listening.
 ///
 /// - `gpio_num`: the pin to configure
 /// - `int_ena`: maskable and non-maskable CPU interrupt bits. None to leave unchanged.

@@ -81,7 +81,7 @@
 //!
 //! Diagrams from _ESP-IDF Programming Guide_; rendered by Wavedrom.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### I2S Read
 //!
@@ -245,7 +245,7 @@ with_i2s_dma_engine! {
 }
 
 impl<'d> I2s<'d, crate::Blocking> {
-    /// Construct a new I2S instance in TDM mode.
+    /// Creates a new I2S instance in TDM mode.
     pub fn new<I: Instance + 'd>(
         i2s: I,
         channel: impl I2sMasterDmaChannel<'d, I>,
@@ -254,7 +254,7 @@ impl<'d> I2s<'d, crate::Blocking> {
         Self::new_internal(i2s, channel.into(), Config::Tdm(config))
     }
 
-    /// Construct a new I2S instance in PDM mode.
+    /// Creates a new I2S instance in PDM mode.
     #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
     pub fn new_pdm<I: Instance + PdmInstance + 'd>(
         i2s: I,
@@ -271,8 +271,7 @@ pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_
 
 /// A structure representing a DMA transfer.
 ///
-/// This structure holds references to the driver instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the driver instance, DMA buffers, and transfer status.
 #[instability::unstable]
 pub struct I2sTxDmaTransfer<'d, Dm, Buf>
 where
@@ -289,7 +288,7 @@ where
     Dm: DriverMode,
     Buf: DmaTxBuffer,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         self.completed || self.i2s_tx.i2s.info().is_tx_done()
     }
@@ -306,7 +305,7 @@ where
         }
     }
 
-    /// Immediately stop the transfer and return the peripheral and buffer.
+    /// Stops the transfer immediately and returns the peripheral and buffer.
     pub fn stop(mut self) -> (I2sTx<'d, Dm>, Buf::Final) {
         self.i2s_tx.tx_channel.stop_transfer();
         self.i2s_tx.i2s.info().tx_stop();
@@ -406,8 +405,7 @@ impl<Dm: DriverMode, BUF: DmaTxBuffer> Drop for I2sTxDmaTransfer<'_, Dm, BUF> {
 
 /// A structure representing a DMA transfer.
 ///
-/// This structure holds references to the driver instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the driver instance, DMA buffers, and transfer status.
 #[instability::unstable]
 pub struct I2sRxDmaTransfer<'d, Dm, Buf>
 where
@@ -424,7 +422,7 @@ where
     Dm: DriverMode,
     Buf: DmaRxBuffer,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns `true` when [`Self::wait`] does not block.
     pub fn is_done(&self) -> bool {
         self.completed || self.i2s_rx.i2s.info().is_rx_done()
     }
@@ -442,7 +440,7 @@ where
         }
     }
 
-    /// Immediately stop the transfer and return the peripheral and buffer.
+    /// Stops the transfer immediately and returns the peripheral and buffer.
     pub fn stop(mut self) -> (I2sRx<'d, Dm>, Buf::Final) {
         self.i2s_rx.i2s.info().rx_stop();
         self.i2s_rx.rx_channel.stop_transfer();
@@ -773,7 +771,7 @@ impl Channels {
     ///   active. Inactive channels do not consume or write data in the DMA buffer.
     /// - `fill` determines the behavior of inactive channels. `Some(n)` will make all inactive
     ///   channel send out specified value, truncated to the channel width. `None` will make
-    ///   disabled channels repeat the data from the last active channel. This field is ignored in
+    ///   disabled channels repeat the data from the last active channel. Ignored in
     ///   the receiver unit.
     ///
     /// # Examples
@@ -1207,8 +1205,7 @@ where
         doc = "Registers an interrupt handler for the peripheral on the current core."
     )]
     #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     ///
     /// You can restore the default/unhandled interrupt handler by using
     /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
@@ -1218,7 +1215,7 @@ where
         self.i2s_tx.i2s.set_interrupt_handler(handler);
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts.
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
@@ -1228,7 +1225,7 @@ where
             .enable_listen(interrupts.into(), true);
     }
 
-    /// Unlisten the given interrupts
+    /// Stops listening for the given interrupts.
     #[instability::unstable]
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
@@ -1238,7 +1235,7 @@ where
             .enable_listen(interrupts.into(), false);
     }
 
-    /// Gets asserted interrupts
+    /// Returns asserted interrupts.
     #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<I2sInterrupt> {
         // tx.i2s and rx.i2s is the same, we could use either one
@@ -1534,7 +1531,7 @@ where
     /// The number of read bytes might be less than the capacity of the provided buffer since the
     /// peripheral might not completely fill each descriptor's buffer.
     ///
-    /// This will return a [I2sRxDmaTransfer]
+    /// Returns an [`I2sRxDmaTransfer`].
     pub fn read<BUF>(
         mut self,
         mut buffer: BUF,

@@ -25,7 +25,7 @@ use crate::{
 
 /// Channel index used by the static VDMA block-done ISR.
 ///
-/// Set before the channel is started; read by the ISR which cannot capture
+/// Sets before the channel starts; read by the ISR, which cannot capture
 /// runtime state.  A single MIPI-DSI instance is the only VDMA user, so
 /// this value is stable for the lifetime of `DsiDpi`.
 static VDMA_ISR_CHANNEL: atomic::AtomicU8 = atomic::AtomicU8::new(0);

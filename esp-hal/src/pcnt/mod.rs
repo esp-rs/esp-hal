@@ -13,7 +13,7 @@
 //!    * [channel]
 //!    * [unit]
 //!
-//! ## Examples
+//! # Examples
 //! ### Decoding a quadrature encoder
 //!
 //! ```rust, no_run
@@ -133,7 +133,7 @@ pub struct Pcnt<'d> {
 }
 
 impl<'d> Pcnt<'d> {
-    /// Return a new PCNT
+    /// Creates a new PCNT instance.
     pub fn new(_instance: PCNT<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
         let pcnt = PCNT::regs();
@@ -175,9 +175,9 @@ impl<'d> Pcnt<'d> {
         }
     }
 
-    /// Set the interrupt handler for the PCNT peripheral.
+    /// Sets the interrupt handler for the PCNT peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {

@@ -12,7 +12,7 @@
 //!
 //! ## Overview
 //!
-//! This is the host driver for the LP_I2C peripheral, which is primarily meant to be driven by
+//! Host driver for the LP_I2C peripheral, primarily meant to be driven by
 //! the ULP.
 //!
 //! The driver always sends a slave sub-register address along with the device address. This makes
@@ -156,7 +156,7 @@ pub enum Error {
 )]
 /// Low-power I2C driver
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}

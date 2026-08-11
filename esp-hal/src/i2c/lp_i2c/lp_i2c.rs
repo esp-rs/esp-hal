@@ -1,6 +1,6 @@
 //! LP_I2C implementation of the low-power I2C driver.
 //!
-//! This peripheral is a FIFO-based I2C master that executes a list of commands.
+//! FIFO-based I2C master that executes a list of commands.
 
 #[cfg(not(lp_io_has_gpio_matrix))]
 use crate::gpio::{LpPin, lp_io::LpFunction};
@@ -54,7 +54,7 @@ enum Command {
     Stop,
     End,
     Write {
-        /// This bit is to set an expected ACK value for the transmitter.
+        /// Expected ACK value for the transmitter.
         ack_exp: Ack,
         /// Enables checking the ACK value received against the ack_exp
         /// value.

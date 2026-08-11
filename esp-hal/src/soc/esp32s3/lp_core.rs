@@ -13,7 +13,7 @@
 //! operation. The `UlpCore` struct is initialized with a peripheral reference
 //! to the `ULP CORE` instance.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}

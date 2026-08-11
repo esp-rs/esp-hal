@@ -16,7 +16,7 @@
 //! When using AES-DMA, the peripheral can be configured to use different block
 //! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Encrypting and decrypting a message
 //!
@@ -347,11 +347,10 @@ pub enum Endianness {
     LittleEndian = 0,
 }
 
-/// Provides DMA (Direct Memory Access) support for AES operations.
+/// DMA support for AES operations.
 ///
-/// This module enhances the AES capabilities by utilizing DMA to handle data
-/// transfer, which can significantly speed up operations when dealing with
-/// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
+/// Uses DMA to handle data transfer, which can speed up operations with
+/// large data volumes. Supports cipher modes such as ECB, CBC, OFB,
 /// CTR, CFB8, and CFB128.
 #[cfg(aes_supports_dma)]
 pub mod dma {
@@ -430,7 +429,7 @@ pub mod dma {
     }
 
     impl<'d> super::Aes<'d> {
-        /// Enable DMA for the current instance of the AES driver
+        /// Enables DMA for the current AES driver instance.
         pub fn with_dma(self, channel: impl AesDmaChannel<'d>) -> AesDma<'d> {
             let channel = Channel::new(channel.into());
             channel.runtime_ensure_compatible(self.aes.dma_peripheral());
@@ -507,7 +506,7 @@ pub mod dma {
 
         /// Perform a DMA transfer.
         ///
-        /// This will return a [AesTransfer].
+        /// Returns an [`AesTransfer`].
         pub fn process<K, RXBUF, TXBUF>(
             mut self,
             number_of_blocks: usize,
@@ -604,7 +603,7 @@ pub mod dma {
     }
 
     impl<'d, RX: DmaRxBuffer, TX: DmaTxBuffer> AesTransfer<'d, RX, TX> {
-        /// Returns true when [Self::wait] will not block.
+        /// Returns `true` when [`Self::wait`] does not block.
         pub fn is_done(&self) -> bool {
             self.aes_dma.is_done()
         }
@@ -782,7 +781,7 @@ pub mod dma {
         ///
         /// The backend needs to be [`start`][Self::start]ed before it can execute AES operations.
         ///
-        /// ## Example
+        /// # Examples
         ///
         /// ```rust, no_run
         /// # {before_snippet}
@@ -814,7 +813,7 @@ pub mod dma {
         ///
         /// The driver stops operating when the returned object is dropped.
         ///
-        /// ## Example
+        /// # Examples
         ///
         /// ```rust, no_run
         /// # {before_snippet}
@@ -1053,7 +1052,7 @@ pub mod dma {
 
     /// An active work queue driver.
     ///
-    /// This object must be kept around, otherwise AES operations will never complete.
+    /// Keep this object alive, or AES operations never complete.
     pub struct AesDmaWorkQueueDriver<'t, 'd> {
         _inner: WorkQueueDriver<'t, AesDmaBackend<'d>, AesOperation>,
     }
@@ -1378,7 +1377,7 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
 #[procmacros::doc_replace]
 /// CPU-driven AES processing backend.
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -1496,7 +1495,7 @@ pub enum Error {
 
 /// An active work queue driver.
 ///
-/// This object must be kept around, otherwise AES operations will never complete.
+/// Keep this object alive, or AES operations never complete.
 pub struct AesWorkQueueDriver<'t, 'd> {
     inner: WorkQueueDriver<'t, AesBackend<'d>, AesOperation>,
 }
@@ -1637,9 +1636,9 @@ impl AesContext {
     }
 }
 
-/// The handle to the pending AES operation.
+/// Handle to a pending AES operation.
 ///
-/// This object is returned by [`AesContext::process`] and [`AesContext::process_in_place`].
+/// Returned by [`AesContext::process`] and [`AesContext::process_in_place`].
 ///
 /// Dropping this handle before the operation finishes will cancel the operation.
 ///

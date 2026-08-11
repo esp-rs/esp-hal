@@ -40,7 +40,7 @@ impl RefCounts {
 static PERIPHERAL_REF_COUNT: NonReentrantMutex<RefCounts> =
     NonReentrantMutex::new(RefCounts::new());
 
-/// Disable all peripherals.
+/// Disables all peripherals.
 ///
 /// Peripherals listed in [KEEP_ENABLED] are NOT disabled.
 #[cfg_attr(not(feature = "rt"), expect(dead_code))]
@@ -144,8 +144,8 @@ impl PeripheralClockControl {
 
     /// Enables the given peripheral.
     ///
-    /// This keeps track of enabling a peripheral - i.e. a peripheral
-    /// is only enabled with the first call attempt to enable it.
+    /// Tracks peripheral enable requests; the peripheral is enabled only on the
+    /// first enable call.
     ///
     /// Returns `true` if it actually enabled the peripheral.
     pub(crate) fn enable(peripheral: Peripheral) -> bool {
@@ -154,8 +154,8 @@ impl PeripheralClockControl {
 
     /// Enables the given peripheral.
     ///
-    /// This keeps track of enabling a peripheral - i.e. a peripheral
-    /// is only enabled with the first call attempt to enable it.
+    /// Tracks peripheral enable requests; the peripheral is enabled only on the
+    /// first enable call.
     ///
     /// Returns `true` if it actually enabled the peripheral.
     fn enable_with_counts(peripheral: Peripheral, ref_counts: &mut RefCounts) -> bool {
@@ -164,8 +164,8 @@ impl PeripheralClockControl {
 
     /// Disables the given peripheral.
     ///
-    /// This keeps track of disabling a peripheral - i.e. it only
-    /// gets disabled when the number of enable/disable attempts is balanced.
+    /// Tracks peripheral disable requests; the peripheral is disabled only when
+    /// enable and disable calls are balanced.
     ///
     /// Returns `true` if it actually disabled the peripheral.
     pub(crate) fn disable(peripheral: Peripheral) -> bool {

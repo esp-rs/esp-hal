@@ -4,7 +4,7 @@
 //! the sleep current. There is thus nothing to compare, and every pin goes to `ext1`. These chips
 //! also have a per-pin path, which stays unused until esp-hal supports edge triggers.
 //!
-//! This `ext1` selects the pads by pin number, and not by low-power number like the generation
+//! `ext1` selects pads by pin number, not by low-power number like the generation
 //! before it.
 
 use super::{Armed, prepare_pad};
@@ -65,7 +65,7 @@ pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
 
 /// Releases the pads that the previous run armed for a deep sleep.
 ///
-/// This `ext1` selects the pads by pin number, and it keeps the selection through the wake. The
+/// `ext1` selects the pads by pin number and keeps the selection through the wake. The
 /// hold register uses the low-power number, so the release needs both numbers.
 pub(super) fn wake_io_reset() {
     let armed = PMU::regs().ext_wakeup_sel().read().ext_wakeup_sel().bits();

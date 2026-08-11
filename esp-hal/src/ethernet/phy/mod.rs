@@ -33,7 +33,7 @@ pub mod bmcr {
     pub const RESET: u16 = 1 << 15;
     /// Select 100 Mbps (when auto-neg disabled).
     pub const SPEED_100: u16 = 1 << 13;
-    /// Enable auto-negotiation.
+    /// Enables auto-negotiation.
     pub const ANEN: u16 = 1 << 12;
     /// Restart auto-negotiation.
     pub const RESTART_AN: u16 = 1 << 9;

@@ -1,6 +1,6 @@
 //! RTC_I2C implementation of the low-power I2C driver.
 //!
-//! This peripheral transfers through a single data register and always needs a slave sub-register
+//! Transfers through a single data register and always needs a slave sub-register
 //! address.
 
 use crate::{
@@ -490,7 +490,7 @@ enum Command {
     Start,
     Stop,
     Write {
-        /// This bit is to set an expected ACK value for the transmitter.
+        /// Expected ACK value for the transmitter.
         ack_exp: Ack,
         /// Enables checking the ACK value received against the ack_exp
         /// value.

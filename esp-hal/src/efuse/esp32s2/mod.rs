@@ -5,7 +5,7 @@ mod fields;
 #[instability::unstable]
 pub use fields::*;
 
-/// Get status of SPI boot encryption.
+/// Returns the status of SPI boot encryption.
 #[instability::unstable]
 pub fn flash_encryption() -> bool {
     !super::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
@@ -13,7 +13,7 @@ pub fn flash_encryption() -> bool {
         .is_multiple_of(2)
 }
 
-/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+/// Returns the multiplier for the timeout value of the RWDT STAGE 0 register.
 #[instability::unstable]
 pub fn rwdt_multiplier() -> u8 {
     super::read_field_le::<u8>(WDT_DELAY_SEL)

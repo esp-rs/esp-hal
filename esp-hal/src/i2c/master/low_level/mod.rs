@@ -545,9 +545,8 @@ impl Driver<'_> {
 
     /// Implements s_i2c_master_clear_bus
     ///
-    /// If a transaction ended incorrectly for some reason, the slave may drive
-    /// SDA indefinitely. This function forces the slave to release the
-    /// bus by sending 9 clock pulses.
+    /// If a transaction ended incorrectly, the slave may hold SDA low
+    /// indefinitely. Sends 9 clock pulses to force the slave to release the bus.
     fn clear_bus_blocking(&self, reset_fsm: bool) {
         let mut future = ClearBusFuture::new(*self, reset_fsm);
         let start = Instant::now();

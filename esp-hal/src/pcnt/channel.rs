@@ -66,7 +66,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
         });
     }
 
-    /// Set the control signal (pin/high/low) for this channel
+    /// Sets the control signal (pin/high/low) for this channel.
     pub fn set_ctrl_signal<'d>(&self, source: impl PeripheralInput<'d>) -> &Self {
         let signal = match UNIT {
             0 => match NUM {
@@ -126,7 +126,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
         self
     }
 
-    /// Set the edge signal (pin/high/low) for this channel
+    /// Sets the edge signal (pin/high/low) for this channel.
     pub fn set_edge_signal<'d>(&self, source: impl PeripheralInput<'d>) -> &Self {
         let signal = match UNIT {
             0 => match NUM {

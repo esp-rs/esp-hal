@@ -27,7 +27,7 @@
 //! For more information, please refer to the
 //! # {documentation}
 //!
-//! ## Example
+//! # Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}

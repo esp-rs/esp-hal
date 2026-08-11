@@ -7,9 +7,9 @@
 
 use crate::efuse::EfuseField;
 
-/// Disable programming of individual eFuses
+/// Disables programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 32);
-/// Disable reading from BlOCK4-10
+/// Disables reading from BLOCK4-10
 pub const RD_DIS: EfuseField = EfuseField::new(0, 1, 32, 7);
 /// Represents the anti-rollback secure version of the 2nd stage bootloader used
 /// by the ROM bootloader (the high part of the field)
@@ -17,7 +17,7 @@ pub const BOOTLOADER_ANTI_ROLLBACK_SECURE_VERSION_HI: EfuseField = EfuseField::n
 /// Represents whether cache is disabled
 pub const DIS_ICACHE: EfuseField = EfuseField::new(0, 1, 40, 1);
 /// Represents whether the USB-to-JTAG function in USB Serial/JTAG is disabled.
-/// Note that EFUSE_DIS_USB_JTAG is available only when
+/// `EFUSE_DIS_USB_JTAG` is available only when
 /// EFUSE_DIS_USB_SERIAL_JTAG is configured to 0
 pub const DIS_USB_JTAG: EfuseField = EfuseField::new(0, 1, 41, 1);
 /// Represents whether the ani-rollback check for the 2nd stage bootloader is
@@ -135,7 +135,7 @@ pub const DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 
 /// is supported. Reading/writing RAM or registers is not supported (i.e. stub
 /// download is not supported)
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 133, 1);
-/// Set the default UART boot message output mode
+/// Sets the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 134, 2);
 /// Represents whether ROM code is forced to send a resume command during SPI
 /// boot

@@ -7,33 +7,33 @@
 //! `xtask` package's `README.md` file.
 use crate::efuse::EfuseField;
 
-/// Disable programming of individual eFuses
+/// Disables programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 32);
-/// Disable reading from BLOCK4-9
+/// Disables reading from BLOCK4-9
 pub const RD_DIS: EfuseField = EfuseField::new(0, 1, 32, 7);
 /// Reserved
 pub const RESERVE_0_39: EfuseField = EfuseField::new(0, 1, 39, 3);
-/// Disable USB JTAG function
+/// Disables USB JTAG function
 pub const DIS_USB_JTAG: EfuseField = EfuseField::new(0, 1, 42, 1);
-/// Disable USB-Serial-JTAG
+/// Disables USB-Serial-JTAG
 pub const DIS_USB_SERIAL_JTAG: EfuseField = EfuseField::new(0, 1, 43, 1);
-/// Disable force download mode
+/// Disables force download mode
 pub const DIS_FORCE_DOWNLOAD: EfuseField = EfuseField::new(0, 1, 44, 1);
-/// Disable SPI0 during boot_mode_download
+/// Disables SPI0 during boot_mode_download
 pub const SPI_DOWNLOAD_MSPI_DIS: EfuseField = EfuseField::new(0, 1, 45, 1);
-/// Disable TWAI
+/// Disables TWAI
 pub const DIS_TWAI: EfuseField = EfuseField::new(0, 1, 46, 1);
-/// Enable JTAG selection via strapping pin
+/// Enables JTAG selection via strapping pin
 pub const JTAG_SEL_ENABLE: EfuseField = EfuseField::new(0, 1, 47, 1);
 /// Soft-disable JTAG (odd = disabled, even = enabled)
 pub const SOFT_DIS_JTAG: EfuseField = EfuseField::new(0, 1, 48, 3);
 /// Permanently disable JTAG
 pub const DIS_PAD_JTAG: EfuseField = EfuseField::new(0, 1, 51, 1);
-/// Disable manual flash encryption
+/// Disables manual flash encryption
 pub const DIS_DOWNLOAD_MANUAL_ENCRYPT: EfuseField = EfuseField::new(0, 1, 52, 1);
 /// Reserved
 pub const RESERVE_0_53: EfuseField = EfuseField::new(0, 1, 53, 1);
-/// Disable Wi-Fi 6
+/// Disables Wi-Fi 6
 pub const DIS_WIFI6: EfuseField = EfuseField::new(0, 1, 54, 1);
 /// HUK generation state (odd count = invalid)
 pub const HUK_GEN_STATE: EfuseField = EfuseField::new(0, 1, 55, 5);
@@ -43,19 +43,19 @@ pub const RESERVE_0_60: EfuseField = EfuseField::new(0, 1, 60, 4);
 pub const KM_RND_SWITCH_CYCLE: EfuseField = EfuseField::new(0, 2, 64, 1);
 /// Reserved
 pub const RESERVE_0_65: EfuseField = EfuseField::new(0, 2, 65, 1);
-/// Disable KM deploy modes (per-bit: ecdsa, flash/spi, hmac/aes, ds/rma, psram)
+/// Disables KM deploy modes (per-bit: ecdsa, flash/spi, hmac/aes, ds/rma, psram)
 pub const KM_DISABLE_DEPLOY_MODE: EfuseField = EfuseField::new(0, 2, 66, 5);
 /// Restrict each KM key to single-deploy (per-bit)
 pub const KM_DEPLOY_ONLY_ONCE: EfuseField = EfuseField::new(0, 2, 71, 5);
 /// Force use of key manager key (per-bit)
 pub const FORCE_USE_KEY_MANAGER_KEY: EfuseField = EfuseField::new(0, 2, 76, 5);
-/// Disable software-written init key; force efuse_init_key
+/// Disables software-written init key; force efuse_init_key
 pub const FORCE_DISABLE_SW_INIT_KEY: EfuseField = EfuseField::new(0, 2, 81, 1);
-/// Configure flash encryption to use XTS-128 key (0 = 128-bit, 1 = 256-bit)
+/// Configures flash encryption to use XTS-128 key (0 = 128-bit, 1 = 256-bit)
 pub const KM_XTS_KEY_LENGTH_256: EfuseField = EfuseField::new(0, 2, 82, 1);
 /// RTC watchdog STG0 timeout multiplier
 pub const WDT_DELAY_SEL: EfuseField = EfuseField::new(0, 2, 83, 1);
-/// Disable all SM crypto functions (SM2, SM3)
+/// Disables all SM crypto functions (SM2, SM3)
 pub const DIS_SM_CRYPT: EfuseField = EfuseField::new(0, 2, 84, 1);
 /// Enables flash encryption counter
 pub const SPI_BOOT_CRYPT_CNT: EfuseField = EfuseField::new(0, 2, 85, 3);
@@ -83,15 +83,15 @@ pub const ECC_FORCE_CONST_TIME: EfuseField = EfuseField::new(0, 3, 121, 1);
 pub const ECDSA_DISABLE_SOFT_K: EfuseField = EfuseField::new(0, 3, 122, 1);
 /// SPA secure level (clock random divide mode)
 pub const SEC_DPA_LEVEL: EfuseField = EfuseField::new(0, 3, 123, 2);
-/// Enable XTS clock anti-DPA attack
+/// Enables XTS clock anti-DPA attack
 pub const XTS_DPA_CLK_ENABLE: EfuseField = EfuseField::new(0, 3, 125, 1);
 /// Reserved
 pub const RESERVE_0_126: EfuseField = EfuseField::new(0, 3, 126, 2);
 /// XTS pseudo-round anti-DPA level (0 = register-controlled)
 pub const XTS_DPA_PSEUDO_LEVEL: EfuseField = EfuseField::new(0, 4, 128, 2);
-/// Enable secure boot
+/// Enables secure boot
 pub const SECURE_BOOT_EN: EfuseField = EfuseField::new(0, 4, 130, 1);
-/// Enable aggressive revocation for secure boot
+/// Enables aggressive revocation for secure boot
 pub const SECURE_BOOT_AGGRESSIVE_REVOKE: EfuseField = EfuseField::new(0, 4, 131, 1);
 /// Reserved
 pub const RESERVE_0_132: EfuseField = EfuseField::new(0, 4, 132, 1);
@@ -99,23 +99,23 @@ pub const RESERVE_0_132: EfuseField = EfuseField::new(0, 4, 132, 1);
 pub const FLASH_TYPE: EfuseField = EfuseField::new(0, 4, 133, 1);
 /// Reserved
 pub const RESERVE_0_134: EfuseField = EfuseField::new(0, 4, 134, 3);
-/// Disable USB-OTG download mode
+/// Disables USB-OTG download mode
 pub const DIS_USB_OTG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 137, 1);
 /// Reserved
 pub const RESERVE_0_138: EfuseField = EfuseField::new(0, 4, 138, 2);
 /// Flash power-up waiting time (ms; ≥15 = 2× programmed value)
 pub const FLASH_TPUW: EfuseField = EfuseField::new(0, 4, 140, 4);
-/// Disable download mode
+/// Disables download mode
 pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 144, 1);
-/// Disable direct boot mode
+/// Disables direct boot mode
 pub const DIS_DIRECT_BOOT: EfuseField = EfuseField::new(0, 4, 145, 1);
-/// Disable USB print from ROM
+/// Disables USB print from ROM
 pub const DIS_USB_SERIAL_JTAG_ROM_PRINT: EfuseField = EfuseField::new(0, 4, 146, 1);
 /// Lock KM efuse key
 pub const LOCK_KM_KEY: EfuseField = EfuseField::new(0, 4, 147, 1);
-/// Disable USB download mode
+/// Disables USB download mode
 pub const DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 148, 1);
-/// Enable security download
+/// Enables security download
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 149, 1);
 /// UART print control (00=force on, 01=GPIO8 low, 10=GPIO8 high, 11=force off)
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 150, 2);
@@ -125,9 +125,9 @@ pub const FORCE_SEND_RESUME: EfuseField = EfuseField::new(0, 4, 152, 1);
 pub const RESERVE_0_153: EfuseField = EfuseField::new(0, 4, 153, 7);
 /// Secure version for anti-rollback
 pub const SECURE_VERSION: EfuseField = EfuseField::new(0, 5, 160, 16);
-/// Disable fast verify on wake when secure boot is enabled
+/// Disables fast verify on wake when secure boot is enabled
 pub const SECURE_BOOT_DISABLE_FAST_WAKE: EfuseField = EfuseField::new(0, 5, 176, 1);
-/// Enable hysteresis on corresponding pad
+/// Enables hysteresis on corresponding pad
 pub const HYS_EN_PAD: EfuseField = EfuseField::new(0, 5, 177, 1);
 /// Reserved
 pub const RESERVE_0_178: EfuseField = EfuseField::new(0, 5, 178, 14);
@@ -135,23 +135,23 @@ pub const RESERVE_0_178: EfuseField = EfuseField::new(0, 5, 178, 14);
 pub const RESERVE_0_192: EfuseField = EfuseField::new(0, 6, 192, 2);
 /// Select DCDC vset from efuse_dcdc_vset
 pub const DCDC_VSET_EN: EfuseField = EfuseField::new(0, 6, 194, 1);
-/// Disable watchdog
+/// Disables watchdog
 pub const DIS_WDT: EfuseField = EfuseField::new(0, 6, 195, 1);
-/// Disable super-watchdog
+/// Disables super-watchdog
 pub const DIS_SWD: EfuseField = EfuseField::new(0, 6, 196, 1);
 /// Reserved
 pub const RESERVE_0_197: EfuseField = EfuseField::new(0, 6, 197, 6);
-/// Enable secure boot using SHA-384
+/// Enables secure boot using SHA-384
 pub const SECURE_BOOT_SHA384_EN: EfuseField = EfuseField::new(0, 6, 203, 1);
 /// Anti-rollback secure version for 2nd-stage bootloader
 pub const BOOTLOADER_ANTI_ROLLBACK_SECURE_VERSION: EfuseField = EfuseField::new(0, 6, 204, 4);
-/// Enable anti-rollback check for 2nd-stage bootloader
+/// Enables anti-rollback check for 2nd-stage bootloader
 pub const BOOTLOADER_ANTI_ROLLBACK_EN: EfuseField = EfuseField::new(0, 6, 208, 1);
-/// Enable anti-rollback SECURE_VERSION update from ROM bootloader
+/// Enables anti-rollback SECURE_VERSION update from ROM bootloader
 pub const BOOTLOADER_ANTI_ROLLBACK_UPDATE_IN_ROM: EfuseField = EfuseField::new(0, 6, 209, 1);
 /// Starting flash sector of recovery bootloader (0 or 0xFFF = disabled)
 pub const RECOVERY_BOOTLOADER_FLASH_SECTOR: EfuseField = EfuseField::new(0, 6, 210, 12);
-/// Enable RMA function in download mode (01/10 = enabled, 00/11 = disabled)
+/// Enables RMA function in download mode (01/10 = enabled, 00/11 = disabled)
 pub const RMA_ENA: EfuseField = EfuseField::new(0, 6, 222, 2);
 /// Number of times the RMA session has been entered
 pub const RMA_SESSION_COUNTER: EfuseField = EfuseField::new(0, 7, 224, 3);
@@ -159,13 +159,13 @@ pub const RMA_SESSION_COUNTER: EfuseField = EfuseField::new(0, 7, 224, 3);
 pub const RMA_NONCE_ENA: EfuseField = EfuseField::new(0, 7, 227, 2);
 /// Use HUK_info as CHIP_info source in RMA (0 = UNIQ_id)
 pub const RMA_CHIP_INFO_SOURCE: EfuseField = EfuseField::new(0, 7, 229, 1);
-/// Disable FAST_VEF in RMA session
+/// Disables FAST_VEF in RMA session
 pub const RMA_DISABLE_FAST_VEF: EfuseField = EfuseField::new(0, 7, 230, 1);
-/// Enable PVT power glitch monitor 0
+/// Enables PVT power glitch monitor 0
 pub const PVT_0_GLITCH_EN: EfuseField = EfuseField::new(0, 7, 231, 1);
 /// Glitch mode for PVT monitor 0
 pub const PVT_0_GLITCH_MODE: EfuseField = EfuseField::new(0, 7, 232, 2);
-/// Enable PVT power glitch monitor 1
+/// Enables PVT power glitch monitor 1
 pub const PVT_1_GLITCH_EN: EfuseField = EfuseField::new(0, 7, 234, 1);
 /// Glitch mode for PVT monitor 1
 pub const PVT_1_GLITCH_MODE: EfuseField = EfuseField::new(0, 7, 235, 2);
@@ -173,11 +173,11 @@ pub const PVT_1_GLITCH_MODE: EfuseField = EfuseField::new(0, 7, 235, 2);
 pub const PMU_FLASH_POWER_SEL: EfuseField = EfuseField::new(0, 7, 237, 1);
 /// Validate PMU_FLASH_POWER_SEL
 pub const PMU_FLASH_POWER_SEL_EN: EfuseField = EfuseField::new(0, 7, 238, 1);
-/// Enable power glitch detection
+/// Enables power glitch detection
 pub const POWER_GLITCH_EN: EfuseField = EfuseField::new(0, 7, 239, 4);
-/// Enable XTS-AES shadow core countermeasure against fault injection
+/// Enables XTS-AES shadow core countermeasure against fault injection
 pub const ENA_XTS_SHADOW: EfuseField = EfuseField::new(0, 7, 243, 1);
-/// Enable ciphertext scrambler for external memory
+/// Enables ciphertext scrambler for external memory
 pub const ENA_SPI_BOOT_CRYPT_SCRAMBLER: EfuseField = EfuseField::new(0, 7, 244, 1);
 /// Select crypto peripheral for re-enabling JTAG (0 = RMA, 1 = HMAC)
 pub const RE_ENABLE_JTAG_SOURCE: EfuseField = EfuseField::new(0, 7, 245, 1);
@@ -263,7 +263,7 @@ pub const SYS_DATA_PART2_3: EfuseField = EfuseField::new(9, 3, 96, 32);
 pub const SYS_DATA_PART2_4: EfuseField = EfuseField::new(9, 4, 128, 32);
 /// Second-part system data word 5
 pub const SYS_DATA_PART2_5: EfuseField = EfuseField::new(9, 5, 160, 32);
-/// Enable USB device D+/D- pin swap
+/// Enables USB device D+/D- pin swap
 pub const USB_DEVICE_EXCHG_PINS: EfuseField = EfuseField::new(9, 6, 192, 1);
 /// USB device single-end input high threshold (1.76–2V, 80mV steps)
 pub const USB_DEVICE_DREFH: EfuseField = EfuseField::new(9, 6, 193, 2);

@@ -66,7 +66,7 @@ pub(crate) fn pre_system_reset() {
     crate::rom::ets_set_appcpu_boot_addr(0);
 }
 
-/// Disable Core 1's CPU clock and hold it in global reset.
+/// Disables Core 1's CPU clock and holds it in global reset.
 ///
 /// Called from `pre_init` on every boot to undo any state left by a previous
 /// run that survived a software reset (HP_SYS_CLKRST registers are not

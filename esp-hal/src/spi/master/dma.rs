@@ -89,7 +89,7 @@ impl<'d> Spi<'d, Blocking> {
 )]
 /// DMA-controlled SPI driver.
 ///
-/// This driver uses DMA to transfer data, allowing the CPU to continue working while the SPI
+/// Uses DMA to transfer data, so the CPU can continue working while the SPI
 /// transfer is in progress.
 ///
 /// The driver provides two separate approaches to transferring data:
@@ -108,7 +108,7 @@ impl<'d> Spi<'d, Blocking> {
 /// These approaches provide different trade-offs between memory usage / CPU overhead and ease of
 /// use. `embedded-hal` traits are implemented by the slice-based API's functions.
 ///
-/// ## Examples
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -334,7 +334,7 @@ impl<'d> SpiDma<'d, Blocking> {
         doc = "Registers an interrupt handler for the peripheral on the current core."
     )]
     #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     ///
     /// You can restore the default/unhandled interrupt handler by using
@@ -639,9 +639,9 @@ impl<'d> SpiDma<'d, Async> {
 
     /// Half-duplex read.
     ///
-    /// This performs the command, address, dummy, and data phases as a single
-    /// SPI transaction. Because command and address phases cannot be split
-    /// across multiple DMA transfers, `buffer` must fit in one DMA transfer or
+    /// Performs the command, address, dummy, and data phases as a single
+    /// SPI transaction. Command and address phases cannot be split
+    /// across multiple DMA transfers, so `buffer` must fit in one DMA transfer or
     /// in the configured internal RX copy buffer.
     #[instability::unstable]
     pub async fn half_duplex_read_async(
@@ -703,9 +703,9 @@ impl<'d> SpiDma<'d, Async> {
 
     /// Half-duplex write.
     ///
-    /// This performs the command, address, dummy, and data phases as a single
-    /// SPI transaction. Because command and address phases cannot be split
-    /// across multiple DMA transfers, `buffer` must fit in one DMA transfer or
+    /// Performs the command, address, dummy, and data phases as a single
+    /// SPI transaction. Command and address phases cannot be split
+    /// across multiple DMA transfers, so `buffer` must fit in one DMA transfer or
     /// in the configured internal TX copy buffer.
     #[instability::unstable]
     pub async fn half_duplex_write_async(
@@ -1191,10 +1191,10 @@ aligned, otherwise the driver requires copying the entire buffer."
         self
     }
 
-    /// Perform a DMA write.
+    /// Performs a DMA write.
     ///
-    /// This will return a [SpiDmaTransfer] owning the buffer and the
-    /// SPI instance. The maximum amount of data to be sent is 32736
+    /// Returns a [`SpiDmaTransfer`] that owns the buffer and the
+    /// SPI instance. The maximum amount of data to send is 32736
     /// bytes.
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
@@ -1230,11 +1230,10 @@ aligned, otherwise the driver requires copying the entire buffer."
         unsafe { self.start_dma_transfer(bytes_to_read, 0, buffer, tx_buffer) }
     }
 
-    /// Perform a DMA read.
+    /// Performs a DMA read.
     ///
-    /// This will return a [SpiDmaTransfer] owning the buffer and
-    /// the SPI instance. The maximum amount of data to be
-    /// received is 32736 bytes.
+    /// Returns a [`SpiDmaTransfer`] that owns the buffer and
+    /// the SPI instance. The maximum amount of data to receive is 32736 bytes.
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
@@ -1271,11 +1270,11 @@ aligned, otherwise the driver requires copying the entire buffer."
         }
     }
 
-    /// Perform a DMA transfer
+    /// Performs a DMA transfer.
     ///
-    /// This will return a [SpiDmaTransfer] owning the buffers and
-    /// the SPI instance. The maximum amount of data to be
-    /// sent/received is 32736 bytes.
+    /// Returns a [`SpiDmaTransfer`] that owns the buffers and
+    /// the SPI instance. The maximum amount of data to send or receive is
+    /// 32736 bytes.
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
@@ -1333,7 +1332,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         unsafe { self.start_transfer_dma(false, bytes_to_read, 0, buffer, tx_buffer) }
     }
 
-    /// Perform a half-duplex read operation using DMA.
+    /// Performs a half-duplex read operation using DMA.
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
@@ -1394,7 +1393,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         unsafe { self.start_transfer_dma(false, 0, bytes_to_write, rx_buffer, buffer) }
     }
 
-    /// Perform a half-duplex write operation using DMA.
+    /// Performs a half-duplex write operation using DMA.
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
@@ -1724,7 +1723,7 @@ aligned, otherwise the driver requires copying the entire buffer."
 
 /// A structure representing a DMA transfer for SPI.
 ///
-/// This structure holds references to the SPI instance, DMA buffers, and
+/// Holds references to the SPI instance, DMA buffers, and
 /// transfer status.
 #[instability::unstable]
 pub struct SpiDmaTransfer<'d, Dm, Buf>

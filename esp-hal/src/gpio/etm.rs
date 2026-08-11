@@ -19,7 +19,7 @@
 //! - FALL_EDGE: Indicates that the output signal of the corresponding GPIO has a falling edge
 //! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO is reversed
 //!
-//! ## Examples
+//! # Examples
 //! ### Toggle an LED When a Button is Pressed
 //! ```rust, no_run
 //! # {before_snippet}
@@ -225,7 +225,7 @@ impl crate::etm::EtmEvent for Event<'_> {
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OutputConfig {
-    /// Set to open-drain output
+    /// Sets open-drain output mode.
     pub open_drain: bool,
     /// Only used when open-drain
     pub pull: Pull,

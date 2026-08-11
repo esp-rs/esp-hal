@@ -119,7 +119,7 @@ pub(crate) fn bind_default_interrupt_handler() {
 
 /// The default GPIO interrupt handler, when the user has not set one.
 ///
-/// This handler will disable all pending interrupts and leave the interrupt
+/// Disables all pending interrupts and leave the interrupt
 /// status bits unchanged. This enables functions like `is_interrupt_set` to
 /// work correctly.
 #[ram]
@@ -156,7 +156,7 @@ fn default_gpio_interrupt_handler() {
 
 /// The user GPIO interrupt handler, when the user has set one.
 ///
-/// This handler only disables interrupts associated with async pins. The user
+/// Disables only interrupts associated with async pins. The user
 /// handler is responsible for clearing the interrupt status bits or disabling
 /// the interrupts.
 #[ram]

@@ -22,6 +22,6 @@
 //!       * This enumeration defines output signals for the GPIO mux. Each output signal is assigned
 //!         a specific value.
 //!
-//! This trait provides functions to read the interrupt status and NMI status
+//! Functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.

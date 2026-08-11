@@ -142,7 +142,7 @@ impl PdmSlotMask {
     /// Line 3, right slot.
     pub const LINE3_RIGHT: Self = Self(1 << 6);
 
-    /// Create a mask from raw slot bits.
+    /// Creates a mask from raw slot bits.
     pub const fn from_bits(bits: u16) -> Self {
         Self(bits)
     }
@@ -247,7 +247,7 @@ pub struct PdmTxSlotConfig {
     #[cfg(not(i2s_version = "1"))]
     /// Output line routing mode.
     pub line_mode: PdmTxLineMode,
-    /// Enable the TX high-pass filter.
+    /// Enables the TX high-pass filter.
     pub hp_en: bool,
     /// High-pass filter cut-off frequency in Hz.
     pub hp_cut_off_freq_hz: f32,
@@ -339,7 +339,7 @@ pub struct PdmRxSlotConfig {
     pub data_format: PdmDataFormat,
 
     #[cfg(i2s_supports_pdm_rx_hp_filter)]
-    /// Enable the RX high-pass filter.
+    /// Enables the RX high-pass filter.
     pub hp_en: bool,
 
     #[cfg(i2s_supports_pdm_rx_hp_filter)]

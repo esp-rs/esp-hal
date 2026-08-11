@@ -1,6 +1,6 @@
 //! # Peripheral Instances
 //!
-//! This module creates singleton instances for each of the various peripherals,
+//! Singleton instances for each of the various peripherals,
 //! and re-exports them to allow users to access and use them in their
 //! applications.
 //!
@@ -68,7 +68,7 @@ macro_rules! create_peripheral {
                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral, and enables the interrupt.
                 ///
                 /// <section class="warning">
-                /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                /// Low-level interrupt API. Unless you're writing drivers, use a higher-level API instead.
                 /// </section>
                 ///
                 #[instability::unstable]
@@ -80,16 +80,16 @@ macro_rules! create_peripheral {
                 #[doc = concat!("Enables the ", stringify!($interrupt), " peripheral interrupt on the given priority level.")]
                 ///
                 /// <section class="warning">
-                /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                /// Low-level interrupt API. Unless you're writing drivers, use a higher-level API instead.
                 /// </section>
                 #[cfg_attr(multi_core, doc = "The interrupt handler will be enabled on the core that calls this function.")]
                 ///
-                /// Note that a suitable interrupt handler needs to be set up before the first interrupt
-                /// is triggered, otherwise the default handler will panic.
+                /// A suitable interrupt handler must be set up before the first interrupt
+                /// is triggered; otherwise the default handler panics.
                 #[cfg_attr(not(feature = "unstable"), doc = "To set up an interrupt handler, create a function that has the same (non-mangled) name as the interrupt you want to handle.")]
                 #[cfg_attr(feature = "unstable", doc = concat!("To set up an interrupt handler, use [`Self::", stringify!($bind), "`] or create a function that has the same (non-mangled) name as the interrupt you want to handle."))]
                 ///
-                /// ## Examples
+                /// # Examples
                 ///
                 /// ```rust, no_run
                 /// # {before_snippet}
@@ -114,7 +114,7 @@ macro_rules! create_peripheral {
                     #[doc = concat!("Disables the ",  stringify!($interrupt), " peripheral interrupt handler on the current CPU core.")]
                     ///
                     /// <section class="warning">
-                    /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                    /// Low-level interrupt API. Unless you're writing drivers, use a higher-level API instead.
                     /// </section>
                     #[instability::unstable]
                     pub fn $disable(&self) {
@@ -125,7 +125,7 @@ macro_rules! create_peripheral {
                     #[doc = concat!("Disables the ",  stringify!($interrupt), " peripheral interrupt handler on all cores.")]
                     ///
                     /// <section class="warning">
-                    /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                    /// Low-level interrupt API. Unless you're writing drivers, use a higher-level API instead.
                     /// </section>
                     #[allow(dead_code, reason = "Peripheral may be unstable")]
                     pub fn [<$disable _on_all_cores>](&self) {

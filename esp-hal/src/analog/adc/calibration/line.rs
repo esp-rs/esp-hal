@@ -21,8 +21,8 @@ const GAIN_SCALE: u32 = 1 << 16;
 
 /// Line fitting ADC calibration scheme
 ///
-/// This scheme implements gain correction based on reference points, and
-/// returns readings in mV.
+/// Implements gain correction based on reference points and returns readings in
+/// mV.
 ///
 /// A reference point is a pair of a reference voltage and the corresponding
 /// mean raw digital ADC value. Such values are usually stored in efuse bit
@@ -33,7 +33,7 @@ const GAIN_SCALE: u32 = 1 << 16;
 /// may varies in range 1.0..=1.2 V. Currently this method is used as a fallback
 /// (with 1.1 V by default) when calibration data is missing.
 ///
-/// This scheme also includes basic calibration ([`AdcCalBasic`]).
+/// Also includes basic calibration ([`AdcCalBasic`]).
 #[derive(Clone, Copy)]
 pub struct AdcCalLine<ADCX> {
     basic: AdcCalBasic<ADCX>,

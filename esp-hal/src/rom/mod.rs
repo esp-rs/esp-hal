@@ -13,7 +13,7 @@
 //! It uses `CRC` error-checking techniques to detect changes in data during
 //! transmission or storage.
 //!
-//! This module also implements the `MD5` algorithm, which is widely used for
+//! Also implements the `MD5` algorithm, widely used for
 //! cryptographic hash function. It's commonly used to verify data integrity and
 //! to check whether the data has been modified.
 //!

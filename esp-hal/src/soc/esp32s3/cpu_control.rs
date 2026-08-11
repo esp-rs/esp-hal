@@ -2,7 +2,7 @@
 //!
 //! ## Overview
 //!
-//! This module provides essential functionality for controlling
+//! Essential functionality for controlling
 //! and managing the APP (second) CPU core on the `ESP32-S3` chip. It is used to
 //! start and stop program execution on the APP core.
 

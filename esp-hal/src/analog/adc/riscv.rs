@@ -115,7 +115,7 @@ where
 
 #[doc(hidden)]
 pub trait RegisterAccess {
-    /// Configure onetime sampling parameters
+    /// Configures one-time sampling parameters.
     fn config_onetime_sample(channel: u8, attenuation: u8);
 
     /// Start onetime sampling
@@ -130,10 +130,10 @@ pub trait RegisterAccess {
     /// Reset flags
     fn reset();
 
-    /// Set up ADC hardware for calibration
+    /// Sets up ADC hardware for calibration.
     fn calibration_init();
 
-    /// Set calibration parameter to ADC hardware
+    /// Sets the calibration parameter in ADC hardware.
     fn set_init_code(data: u16);
 }
 
@@ -325,8 +325,7 @@ impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configure a given ADC instance using the provided configuration, and
-    /// initialize the ADC for use
+    /// Creates and initializes an ADC instance with the given configuration.
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
@@ -593,15 +592,15 @@ fn handle_async<ADCX: Instance>(_instance: ADCX) {
     ADCX::unlisten();
 }
 
-/// Enable asynchronous access.
+/// Enables asynchronous access.
 pub trait Instance: crate::private::Sealed {
-    /// Enable the ADC interrupt
+    /// Enables the ADC interrupt.
     fn listen();
 
-    /// Disable the ADC interrupt
+    /// Disables the ADC interrupt.
     fn unlisten();
 
-    /// Clear the ADC interrupt
+    /// Clears the ADC interrupt.
     fn clear_interrupt();
 
     /// Obtain the waker for the ADC interrupt

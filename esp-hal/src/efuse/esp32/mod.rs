@@ -41,7 +41,7 @@ pub fn core_count() -> u32 {
 
 /// Returns the maximum rated clock of the CPU in MHz.
 ///
-/// Note that the actual clock may be lower, depending on the current power
+/// The actual clock may be lower, depending on the current power
 /// configuration of the chip, clock source, and other settings.
 #[instability::unstable]
 pub fn max_cpu_frequency() -> Rate {
@@ -78,7 +78,7 @@ pub fn chip_type() -> ChipType {
     }
 }
 
-/// Get status of SPI boot encryption.
+/// Returns the status of SPI boot encryption.
 #[instability::unstable]
 pub fn flash_encryption() -> bool {
     !super::read_field_le::<u8>(FLASH_CRYPT_CNT)

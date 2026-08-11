@@ -7,9 +7,9 @@
 
 use crate::efuse::EfuseField;
 
-/// Disable programming of individual eFuses
+/// Disables programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 32);
-/// Disable reading from BlOCK4-10
+/// Disables reading from BLOCK4-10
 pub const RD_DIS: EfuseField = EfuseField::new(0, 1, 32, 7);
 /// Represents whether cache is disabled. 1: Disabled 0: Enabled.
 pub const DIS_ICACHE: EfuseField = EfuseField::new(0, 1, 39, 1);
@@ -89,7 +89,7 @@ pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 3, 96, 1);
 /// Enable
 pub const DIS_DIRECT_BOOT: EfuseField = EfuseField::new(0, 3, 97, 1);
 /// Represents whether print from USB-Serial-JTAG is disabled or enabled. 1.
-/// Disable 0: Enable
+/// Disables 0: Enable
 pub const DIS_USB_SERIAL_JTAG_ROM_PRINT: EfuseField = EfuseField::new(0, 3, 98, 1);
 /// Represents whether the USB-Serial-JTAG download function is disabled or
 /// enabled. 1: Disable 0: Enable
@@ -107,7 +107,7 @@ pub const SECURE_VERSION: EfuseField = EfuseField::new(0, 3, 104, 16);
 /// Represents whether FAST_VERIFY_ON_WAKE is disable or enable when Secure Boot
 /// is enable
 pub const SECURE_BOOT_DISABLE_FAST_WAKE: EfuseField = EfuseField::new(0, 3, 120, 1);
-/// Set bits to enable hysteresis function of PAD0~27
+/// Sets bits to enable hysteresis function of PAD0~27
 pub const HYS_EN_PAD: EfuseField = EfuseField::new(0, 3, 121, 1);
 /// Represents whether xts-aes anti-dpa attack clock is enabled. 1. Enable. 0:
 /// Disable.

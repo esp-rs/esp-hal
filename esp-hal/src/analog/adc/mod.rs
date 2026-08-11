@@ -23,7 +23,7 @@
 //! basic calibration, curve fitting or linear interpolation. The calibration
 //! schemes can be used to improve the accuracy of the ADC readings.
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### Read an analog signal from a pin
 //!
@@ -142,7 +142,7 @@ impl<ADCX> AdcConfig<ADCX> {
         Self::default()
     }
 
-    /// Enable the specified pin with the given attenuation
+    /// Enables the specified pin with the given attenuation.
     pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCX>
     where
         PIN: AdcChannel + AnalogPin,
@@ -158,8 +158,8 @@ impl<ADCX> AdcConfig<ADCX> {
         }
     }
 
-    /// Enable the specified pin with the given attenuation and calibration
-    /// scheme
+    /// Enables the specified pin with the given attenuation and calibration
+    /// scheme.
     #[cfg(not(esp32))]
     #[cfg(feature = "unstable")]
     pub fn enable_pin_with_cal<PIN, CS>(
@@ -206,7 +206,7 @@ pub trait CalibrationAccess: RegisterAccess {
 
     fn enable_vdef(enable: bool);
 
-    /// Enable internal calibration voltage source
+    /// Enables the internal calibration voltage source.
     fn connect_cal(source: AdcCalSource, enable: bool);
 }
 
@@ -225,7 +225,7 @@ pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
     /// Creates a new calibration scheme for the given attenuation.
     fn new_cal(atten: Attenuation) -> Self;
 
-    /// Return the basic ADC bias value.
+    /// Returns the basic ADC bias value.
     fn adc_cal(&self) -> u16 {
         0
     }
@@ -245,22 +245,22 @@ impl<ADCX> AdcCalScheme<ADCX> for () {
 /// A helper trait to get access to ADC calibration efuses.
 #[cfg(not(any(esp32, esp32s2)))]
 trait AdcCalEfuse {
-    /// Get ADC calibration init code
+    /// Returns the ADC calibration init code.
     ///
     /// Returns digital value for zero voltage for a given attenuation
     fn init_code(atten: Attenuation) -> Option<u16>;
 
-    /// Get ADC calibration reference point voltage
+    /// Returns the ADC calibration reference point voltage.
     ///
     /// Returns reference voltage (millivolts) for a given attenuation
     fn cal_mv(atten: Attenuation) -> u16;
 
-    /// Get ADC calibration reference point digital value
+    /// Returns the ADC calibration reference point digital value.
     ///
     /// Returns digital value for reference voltage for a given attenuation
     fn cal_code(atten: Attenuation) -> Option<u16>;
 
-    /// Get the ADC channel specific calibration
+    /// Returns the ADC channel-specific calibration.
     ///
     /// Returns digital per channel offset from reference voltage
     #[cfg(esp32c5)]

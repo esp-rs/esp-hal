@@ -32,7 +32,7 @@
 //! GPIO interrupts. For more information, see the
 //! [`InterruptConfigurable::set_interrupt_handler`](crate::interrupt::InterruptConfigurable::set_interrupt_handler).
 //!
-//! This driver also implements pin-related traits from [embedded-hal] and
+//! Also implements pin-related traits from [embedded-hal] and
 //! [Wait](embedded_hal_async::digital::Wait) trait from [embedded-hal-async].
 //!
 //! ## GPIO interconnect
@@ -1217,7 +1217,7 @@ impl<'d> Input<'d> {
 ///
 /// Enabling the input stage does not change the output stage, and vice versa.
 /// Disabling the input or output stages don't forget their configuration.
-/// Disabling the output stage will not change the output level, but it will
+/// Disabling the output stage does not change the output level, but it
 /// disable the driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1248,7 +1248,7 @@ impl<'d> Flex<'d> {
     /// Applies the given input configuration to the pin.
     ///
     /// Does not set the pin as input (i.e. it does not enable the
-    /// input buffer). Note that the pull direction is common between the
+    /// input buffer). The pull direction is common between the
     /// input and output configuration.
     #[inline]
     #[instability::unstable]
@@ -1377,7 +1377,7 @@ impl<'d> Flex<'d> {
     /// Applies the given output configuration to the pin.
     ///
     /// Does not set the pin to output (i.e. it does not enable
-    /// the output driver). Note that the pull direction is common between
+    /// the output driver). The pull direction is common between
     /// the input and output configuration.
     #[inline]
     #[instability::unstable]

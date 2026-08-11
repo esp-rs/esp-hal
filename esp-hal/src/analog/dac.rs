@@ -19,7 +19,7 @@
 //! Developers can choose the  DAC channel they want to use based on the GPIO
 //! pin assignments for each channel.
 //!
-//! ## Examples
+//! # Examples
 //! ### Write a value to a DAC channel
 //! ```rust, no_run
 //! # {before_snippet}

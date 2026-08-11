@@ -27,7 +27,7 @@ use crate::{
     work_queue::{Handle, Poll, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
 
-/// This macro defines 4 other macros:
+/// Defines 4 other macros:
 /// - `doc_summary` that takes the first line of the documentation and returns it as a string
 /// - `result_type` that generates the return types for each operation
 /// - `operation` that generates the operation function
@@ -107,8 +107,7 @@ macro_rules! define_operations {
 
 ## Errors
 
-This function will return an error if the bitlength of the parameters is different
-from the bitlength of the prime fields of the curve."]
+[`ConfigError`] when the bit length of the parameters differs from the prime field bit length of the curve."]
                     #[inline]
                     pub fn $function<'op>(
                         &'op mut self,
@@ -365,9 +364,9 @@ define_operations! {
 
 const MEM_BLOCK_SIZE: usize = property!("ecc.mem_block_size");
 
-/// The ECC Accelerator driver.
+/// ECC Accelerator driver.
 ///
-/// Note that as opposed to commonly used standards, this driver operates on
+/// Unlike commonly used standards, this driver operates on
 /// **little-endian** data.
 pub struct Ecc<'d, Dm: DriverMode> {
     _ecc: ECC<'d>,
@@ -416,7 +415,7 @@ pub struct Config {
     #[cfg(ecc_has_memory_clock_gate)]
     force_enable_mem_clock: bool,
 
-    /// Enable constant time operation and minimized power consumption variation for
+    /// Enables constant-time operation and minimized power consumption variation for
     /// point-multiplication operations.
     #[cfg_attr(
         esp32h2,
@@ -765,7 +764,7 @@ for_each_ecc_working_mode! {
 
             /// Register an interrupt handler for the ECC peripheral.
             ///
-            /// Note that this will replace any previously registered interrupt
+            /// Replaces any previously registered interrupt
             /// handlers.
             #[instability::unstable]
             pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -819,9 +818,9 @@ pub trait OperationReturnsJacobianPoint: EccOperation {}
 /// Marks operations that verify that the input point is on the curve.
 pub trait OperationVerifiesPoint: EccOperation {}
 
-/// The result of an ECC operation.
+/// Result of an ECC operation.
 ///
-/// This struct can be used to read the result of an ECC operation. The methods which can be used
+/// Reads the result of an ECC operation. The available methods
 /// depend on the operation. An operation can compute multiple values, such as an affine point and
 /// a Jacobian point at the same time.
 #[must_use]
@@ -1046,7 +1045,7 @@ enum DriverState<'d> {
 
 /// ECC processing backend.
 ///
-/// This struct enables shared access to the device's ECC hardware using a work queue.
+/// Enables shared access to the device ECC hardware through a work queue.
 pub struct EccBackend<'d> {
     driver: DriverState<'d>,
     config: Config,
@@ -1180,7 +1179,7 @@ impl<'d> EccBackend<'d> {
 
 /// An active work queue driver.
 ///
-/// This object must be kept around, otherwise ECC operations will never complete.
+/// Keep this object alive, or ECC operations never complete.
 pub struct EccWorkQueueDriver<'t, 'd> {
     inner: WorkQueueDriver<'t, EccBackend<'d>, EccWorkItem>,
 }

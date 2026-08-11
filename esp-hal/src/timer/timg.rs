@@ -21,7 +21,7 @@
 //! - Generate one-shot alarms; trigger events once
 //! - Free-running; fetching a high-resolution timestamp on demand
 //!
-//! ## Examples
+//! # Examples
 //!
 //! ### General-purpose Timer
 //!
@@ -184,7 +184,7 @@ impl<'d, T> TimerGroup<'d, T>
 where
     T: TimerGroupInstance + 'd,
 {
-    /// Construct a new instance of [`TimerGroup`] in blocking mode
+    /// Creates a new [`TimerGroup`] in blocking mode.
     pub fn new(_timer_group: T) -> Self {
         // TODO: use PeripheralGuard
         if PeripheralClockControl::enable(T::peripheral()) {
@@ -591,7 +591,7 @@ impl<TG> Wdt<TG>
 where
     TG: TimerGroupInstance,
 {
-    /// Construct a new instance of [`Wdt`]
+    /// Creates a new [`Wdt`].
     pub fn new() -> Self {
         let mut this = Self {
             phantom: PhantomData,
@@ -607,14 +607,14 @@ where
         this
     }
 
-    /// Enable the watchdog timer instance
+    /// Enables the watchdog timer instance.
     pub fn enable(&mut self) {
         // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
         //         a mutable reference.
         unsafe { self.set_wdt_enabled(true) };
     }
 
-    /// Disable the watchdog timer instance
+    /// Disables the watchdog timer instance.
     pub fn disable(&mut self) {
         // SAFETY: The `TG` instance being modified is owned by `self`, which is behind
         //         a mutable reference.
@@ -625,9 +625,8 @@ where
     ///
     /// # Safety
     ///
-    /// This bypasses the usual ownership rules for the peripheral, so users
-    /// must take care to ensure that no driver instance is active for the
-    /// timer.
+    /// Bypasses the usual ownership rules for the peripheral. You must ensure
+    /// that no driver instance is active for the timer.
     pub unsafe fn set_wdt_enabled(&mut self, enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
@@ -687,7 +686,7 @@ where
             .write(|w| unsafe { w.wdt_wkey().bits(wkey) });
     }
 
-    /// Set the timeout, in microseconds, of the watchdog timer
+    /// Sets the watchdog timeout, in microseconds.
     pub fn set_timeout(&mut self, stage: MwdtStage, timeout: Duration) {
         cfg_select! {
             soc_has_clock_node_timg_wdt_clock => {
@@ -739,7 +738,7 @@ where
         self.set_write_protection(true);
     }
 
-    /// Set the stage action of the MWDT for a specific stage.
+    /// Sets the stage action of the MWDT for a specific stage.
     ///
     /// Modifies MWDT behavior only if a custom bootloader with
     /// the following modifications is used:
