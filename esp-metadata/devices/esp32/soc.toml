@@ -382,7 +382,7 @@ extmem_origin = 0x3F800000
 [device.lp_timer]
 
 [device.ulp_fsm]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 376 }
 
 ## Radio
 [device.wifi]
