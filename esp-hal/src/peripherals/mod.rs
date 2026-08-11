@@ -184,7 +184,7 @@ for_each_peripheral! {
     };
 
     // Define the Peripherals struct
-    (singletons $( ( $(#[$cfg:meta])* $name:ident $(($unstable:ident))?) ),*) => {
+    (singletons $( ( $(#[$cfg:meta])* $name:ident $(($unstable:ident $(#[$unstable_cfg:meta])*))?) ),*) => {
         // We need a way to ignore the "unstable" marker, but macros can't generate attributes or struct fields.
         // The solution is printing an empty doc comment.
         macro_rules! ignore { ($any:tt) => {""} }
@@ -230,6 +230,7 @@ for_each_peripheral! {
                 pub $name: $name<'static>,
 
                 $(
+                    $(#[$unstable_cfg])*
                     #[doc = concat!("The ", stringify!($name), " peripheral.")]
                     #[doc = "**This API is marked as unstable** and is only available when the `unstable`
                             crate feature is enabled. This comes with no stability guarantees, and could be changed
