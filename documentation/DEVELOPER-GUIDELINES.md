@@ -299,6 +299,21 @@ Guidelines for documenting functions, types, and other public items. Module-leve
 - Do not repeat the summary in section bodies (e.g. put error conditions under `# Errors`, not in a leading `Returns a … if …` paragraph before the section).
 - Prefer rustdoc intra-doc links (e.g. ``[`Type`]``) over raw URLs or markdown links to rustdoc items.
 
+### Simplified Technical English (ASD-STE100)
+
+API documentation should follow [ASD-STE100](https://www.asd-ste100.org/) where practical. STE keeps docs clear for readers who use English as a second language.
+
+- Use short sentences. Put one idea in each sentence.
+- Use the present tense and active voice.
+- Do not start item summaries with “This function”, “This struct”, “This enum”, or “This error”.
+- Do not use “Note that”. State the fact directly.
+- Use “must” for requirements, “can” for ability, and “do not” for prohibitions.
+- Avoid “will” when the present tense is enough.
+- Avoid “allows you to”. Use “lets” or rewrite the sentence.
+- In `# Errors`, name the error type and the condition (e.g. ``[`ConfigError`] when the baud rate is not supported.``). Do not write “Returns a … if …”.
+- Enum variant docs are noun phrases or short statements, not “This error occurs when …”.
+- Field docs use the same third-person style as function summaries where they are full sentences.
+
 ## Breaking changes
 
 We check our stable API surface using semver-checks. To facilitate these checks, we do a number of preprocessing steps to ensure we're only checking _our_ stable API. We may want to allow breaking changes, in the case of fixing soundness issues etc. In this case, all that is required is to add the `breaking-change-<crate-name>` label to the PR making the change.

@@ -771,7 +771,7 @@ impl<'d> I2c<'d, Blocking> {
         doc = "Registers an interrupt handler for the peripheral on the current core."
     )]
     #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     ///
     /// You can restore the default/unhandled interrupt handler by passing

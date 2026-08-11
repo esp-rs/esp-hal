@@ -142,36 +142,36 @@ impl AnyUart<'_> {
 pub enum RxError {
     /// An RX FIFO overflow happened.
     ///
-    /// This error occurs when RX FIFO is full and a new byte is received. The
-    /// RX FIFO is then automatically reset by the driver.
+    /// The RX FIFO is full and a new byte is received. The
+    /// driver then automatically resets the RX FIFO.
     FifoOverflowed,
 
     /// A glitch was detected on the RX line.
     ///
-    /// This error occurs when an unexpected or erroneous signal (glitch) is
-    /// detected on the UART RX line, which could lead to incorrect data
+    /// An unexpected or erroneous signal (glitch) is
+    /// detected on the UART RX line. The signal can cause incorrect data
     /// reception.
     GlitchOccurred,
 
     /// A framing error was detected on the RX line.
     ///
-    /// This error occurs when the received data does not conform to the
+    /// The received data does not conform to the
     /// expected UART frame format.
     FrameFormatViolated,
 
     /// A parity error was detected on the RX line.
     ///
-    /// This error occurs when the parity bit in the received data does not
+    /// The parity bit in the received data does not
     /// match the expected parity configuration.
     ParityMismatch,
 }
 
 impl core::error::Error for RxError {}
 
-/// UART RX error conditions that can be reported by read operations.
+/// UART RX error conditions that read operations can report.
 ///
-/// This enum can be used with [`RxConfig::with_reported_errors`] to choose
-/// which hardware RX error conditions should make read operations return an
+/// Use with [`RxConfig::with_reported_errors`] to choose
+/// which hardware RX error conditions make read operations return an
 /// [`RxError`].
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -229,10 +229,9 @@ impl core::error::Error for TxError {}
 #[instability::unstable]
 pub use crate::soc::clocks::UartFunctionClockSclk as ClockSource;
 
-/// Number of data bits
+/// Number of data bits in each UART frame.
 ///
-/// This enum represents the various configurations for the number of data
-/// bits used in UART communication. The number of data bits defines the
+/// The number of data bits defines the
 /// length of each transmitted or received data frame.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -268,11 +267,9 @@ pub enum Parity {
     Odd,
 }
 
-/// Number of stop bits
-///
 /// The stop bit(s) signal the end of a data packet in UART communication.
-/// This enum defines the possible configurations for the number of stop
-/// bits.
+///
+/// Defines the number of stop bits in each frame.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum StopBits {
@@ -313,10 +310,10 @@ pub enum SwFlowControl {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum CtsConfig {
-    /// Enable CTS flow control (TX).
+    /// Enables CTS flow control (TX).
     Enabled,
     #[default]
-    /// Disable CTS flow control (TX).
+    /// Disables CTS flow control (TX).
     Disabled,
 }
 
@@ -325,10 +322,10 @@ pub enum CtsConfig {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum RtsConfig {
-    /// Enable RTS flow control with a FIFO threshold (RX).
+    /// Enables RTS flow control with a FIFO threshold (RX).
     Enabled(u8),
     #[default]
-    /// Disable RTS flow control.
+    /// Disables RTS flow control.
     Disabled,
 }
 
@@ -572,7 +569,7 @@ impl Default for WakeupConfig {
 #[instability::unstable]
 #[non_exhaustive]
 pub enum WakeConfigError {
-    /// This UART instance cannot wake the chip.
+    /// The UART instance cannot wake the chip.
     NotAWakeupSource,
 
     /// The hardware cannot count the requested number of rising edges.
@@ -662,7 +659,7 @@ where
 #[procmacros::doc_replace]
 /// UART (Full-duplex)
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -715,7 +712,7 @@ pub enum ConfigError {
 
     /// The requested baud rate is not supported.
     ///
-    /// This error is returned if:
+    /// Returned when:
     ///  * the baud rate exceeds 5MBaud or is equal to zero.
     ///  * the user has specified an exact baud rate or with some percentage of deviation to the
     ///    desired value, and the driver cannot reach this speed.
@@ -763,8 +760,7 @@ impl<'d> UartTx<'d, Blocking> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ConfigError`] if the configuration is not
-    /// supported by the hardware.
+    /// [`ConfigError`] when the configuration is not supported by the hardware.
     ///
     /// # Examples
     ///
@@ -912,7 +908,7 @@ impl<'d, Dm> UartTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Configure RTS pin
+    /// Configures the RTS pin.
     #[instability::unstable]
     pub fn with_rts(mut self, rts: impl PeripheralOutput<'d>) -> Self {
         let rts = rts.into();
@@ -945,12 +941,11 @@ where
         self
     }
 
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
     /// # Errors
     ///
-    /// Returns a [`ConfigError`] if the configuration is not
-    /// supported by the hardware.
+    /// [`ConfigError`] when the configuration is not supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
@@ -979,8 +974,7 @@ where
     ///
     /// # Errors
     ///
-    /// Returns a [`TxError`] if an error occurred during the
-    /// write operation.
+    /// [`TxError`] when a write operation fails.
     #[instability::unstable]
     pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
         self.uart.info().write(data)
@@ -1097,8 +1091,7 @@ impl<'d> UartRx<'d, Blocking> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ConfigError`] if the configuration is not
-    /// supported by the hardware.
+    /// [`ConfigError`] when the configuration is not supported by the hardware.
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1254,7 +1247,7 @@ impl<'d> UartRx<'d, Async> {
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer.
     ///
-    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// The function can ignore the `rx_fifo_full_threshold` setting
     /// to ensure that it does not wait for more data than the buffer can hold.
     ///
     /// Upon an error, the function returns immediately and the contents of the
@@ -1279,7 +1272,7 @@ impl<'d> UartRx<'d, Async> {
     /// does not contain enough data, the function waits asynchronously for data
     /// to become available, or for an error to occur.
     ///
-    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// The function can ignore the `rx_fifo_full_threshold` setting
     /// to ensure that it does not wait for more data than the buffer can hold.
     ///
     /// # Cancellation Safety
@@ -1312,7 +1305,7 @@ impl<'d> UartRx<'d, Async> {
 
     /// Waits for a break condition to be detected asynchronously.
     ///
-    /// This is an async function that will await until a break condition is
+    /// Waits asynchronously until a break condition is
     /// detected on the RX line. After detection, the break interrupt flag is
     /// automatically cleared.
     #[instability::unstable]
@@ -1380,12 +1373,11 @@ where
         self.uart.info().clear_rx_break_detected();
     }
 
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
     /// # Errors
     ///
-    /// Returns a [`ConfigError`] if the configuration is not
-    /// supported by the hardware.
+    /// [`ConfigError`] when the configuration is not supported by the hardware.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
@@ -1533,8 +1525,7 @@ impl<'d> Uart<'d, Blocking> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ConfigError`] if the configuration is not
-    /// supported by the hardware.
+    /// [`ConfigError`] when the configuration is not supported by the hardware.
     ///
     /// # Examples
     ///
@@ -1570,7 +1561,7 @@ impl<'d> Uart<'d, Blocking> {
         doc = "Registers an interrupt handler for the peripheral on the current core."
     )]
     #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     ///
     /// You can restore the default/unhandled interrupt handler by using
@@ -1673,7 +1664,7 @@ impl<'d> Uart<'d, Blocking> {
 
     /// Waits for a break condition to be detected.
     ///
-    /// This is a blocking function that will continuously check for a break condition.
+    /// Blocks until a break condition is detected.
     /// After detection, the break interrupt flag is automatically cleared.
     #[instability::unstable]
     pub fn wait_for_break(&mut self) {
@@ -1682,8 +1673,8 @@ impl<'d> Uart<'d, Blocking> {
 
     /// Waits for a break condition to be detected with a timeout.
     ///
-    /// This is a blocking function that will check for a break condition up to
-    /// the specified timeout. Returns `true` if a break was detected, `false` if
+    /// Blocks until a break condition is detected or the timeout elapses.
+    /// Returns `true` if a break was detected, `false` if
     /// the timeout elapsed. After successful detection, the break interrupt flag
     /// is automatically cleared.
     ///
@@ -1782,7 +1773,7 @@ impl<'d> Uart<'d, Async> {
     /// The function returns the number of bytes read into the buffer. This may
     /// be less than the length of the buffer.
     ///
-    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// The function can ignore the `rx_fifo_full_threshold` setting
     /// to ensure that it does not wait for more data than the buffer can hold.
     ///
     /// Upon an error, the function returns immediately and the contents of the
@@ -1820,7 +1811,7 @@ impl<'d> Uart<'d, Async> {
     /// provided buffer. If the buffer is empty, the function waits
     /// asynchronously for data to become available, or for an error to occur.
     ///
-    /// Note that this function may ignore the `rx_fifo_full_threshold` setting
+    /// The function can ignore the `rx_fifo_full_threshold` setting
     /// to ensure that it does not wait for more data than the buffer can hold.
     ///
     /// # Cancellation Safety
@@ -1835,7 +1826,7 @@ impl<'d> Uart<'d, Async> {
 
     /// Waits for a break condition to be detected asynchronously.
     ///
-    /// This is an async function that will await until a break condition is
+    /// Waits asynchronously until a break condition is
     /// detected on the RX line. After detection, the break interrupt flag is
     /// automatically cleared.
     #[instability::unstable]
@@ -1932,7 +1923,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Configure CTS pin
+    /// Configures the CTS pin.
     ///
     /// # Examples
     ///
@@ -1951,7 +1942,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Configure RTS pin
+    /// Configures the RTS pin.
     ///
     /// # Examples
     ///
@@ -2015,8 +2006,7 @@ where
     ///
     /// # Errors
     ///
-    /// Returns a [`TxError`] if an error occurred during the
-    /// write operation.
+    /// [`TxError`] when a write operation fails.
     ///
     /// # Examples
     ///
@@ -2145,12 +2135,11 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
     /// # Errors
     ///
-    /// Returns a [`ConfigError`] if the configuration is not
-    /// supported by the hardware.
+    /// [`ConfigError`] when the configuration is not supported by the hardware.
     ///
     /// # Examples
     ///
@@ -2195,10 +2184,10 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Split the UART into a transmitter and receiver
+    /// Splits the UART into a transmitter and receiver.
     ///
-    /// This is particularly useful when having two tasks correlating to
-    /// transmitting and receiving.
+    /// Useful when two tasks handle
+    /// transmit and receive separately.
     ///
     /// # Examples
     ///
@@ -2230,8 +2219,8 @@ where
     /// transmitter and receiver are borrowed from the original UART, which can
     /// be used again after those borrows end.
     ///
-    /// This is particularly useful when running separate transmit and receive
-    /// futures concurrently.
+    /// Useful when transmit and receive
+    /// futures run concurrently.
     ///
     /// # Examples
     ///

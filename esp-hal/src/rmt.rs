@@ -435,7 +435,7 @@ impl PulseCode {
         Self(0)
     }
 
-    /// Set all levels and lengths to 0.
+    /// Sets all levels and lengths to 0.
     ///
     /// In other words, assigns the value of [`PulseCode::end_marker()`] to `self`.
     #[inline]
@@ -469,7 +469,7 @@ impl PulseCode {
         ((self.0 >> LENGTH2_SHIFT) & LENGTH_MASK) as u16
     }
 
-    /// Set `level1` and return the modified [`PulseCode`].
+    /// Sets `level1` and returns the modified [`PulseCode`].
     #[inline]
     pub const fn with_level1(mut self, level: Level) -> Self {
         self.0 &= !LEVEL1_MASK;
@@ -477,7 +477,7 @@ impl PulseCode {
         self
     }
 
-    /// Set `level2` and return the modified [`PulseCode`].
+    /// Sets `level2` and returns the modified [`PulseCode`].
     #[inline]
     pub const fn with_level2(mut self, level: Level) -> Self {
         self.0 &= !LEVEL2_MASK;
@@ -485,7 +485,7 @@ impl PulseCode {
         self
     }
 
-    /// Set `length1` and return the modified [`PulseCode`].
+    /// Sets `length1` and returns the modified [`PulseCode`].
     ///
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
@@ -499,7 +499,7 @@ impl PulseCode {
         Some(self)
     }
 
-    /// Set `length2` and return the modified [`PulseCode`].
+    /// Sets `length2` and returns the modified [`PulseCode`].
     ///
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
@@ -583,7 +583,7 @@ impl From<PulseCode> for u32 {
 struct MemSize(u8);
 
 impl MemSize {
-    /// Create from the given number of RMT RAM blocks.
+    /// Creates from the given number of RMT RAM blocks.
     #[inline]
     const fn from_blocks(blocks: u8) -> Self {
         Self(blocks)
@@ -939,7 +939,7 @@ impl<'rmt> Rmt<'rmt, Blocking> {
 
     /// Registers an interrupt handler for the RMT peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {

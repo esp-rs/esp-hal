@@ -182,7 +182,7 @@ for_each_wakeup_source! {
         /// sources configured to end a sleep) and [`WakeupReason`] (the source(s) that caused the
         /// most recent wakeup, see [`wakeup_cause`]).
         ///
-        /// Note that the available variants depend on the target chip.
+        /// The available variants depend on the target chip.
         #[derive(Debug, enumset::EnumSetType)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum WakeupSource {
@@ -199,7 +199,7 @@ for_each_wakeup_source! {
 /// Returned by [`wakeup_cause`]. This is a thin wrapper around the set of [`WakeupSource`]s that
 /// were reported by the hardware. The set is empty if the chip was not woken from sleep.
 ///
-/// Note that the available sources depend on the target chip.
+/// The available sources depend on the target chip.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(sleep_driver_supported)]
@@ -248,15 +248,15 @@ impl<'d> Rtc<'d> {
         }
     }
 
-    /// Get the time since boot in the raw register units.
+    /// Returns the time since boot in the raw register units.
     #[cfg(lp_timer_driver_supported)]
     fn time_since_boot_raw(&self) -> u64 {
         time_since_boot_raw()
     }
 
-    /// Get the time elapsed since the last power-on reset.
+    /// Returns the time elapsed since the last power-on reset.
     ///
-    /// It should be noted that any reset or sleep, other than a power-up reset, will not stop or
+    /// Any reset or sleep, other than a power-up reset, does not stop or
     /// reset the RTC timer.
     #[cfg(lp_timer_driver_supported)]
     pub fn time_since_power_up(&self) -> Duration {
@@ -281,7 +281,7 @@ impl<'d> Rtc<'d> {
         l + (h << 32)
     }
 
-    /// Set the current value of the boot time registers in microseconds.
+    /// Sets the current value of the boot time registers in microseconds.
     #[cfg(lp_timer_driver_supported)]
     fn set_boot_time_us(&self, boot_time_us: u64) {
         // Please see `boot_time_us` for documentation on registers and peripherals
@@ -303,12 +303,12 @@ impl<'d> Rtc<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Get the current time in microseconds.
+    /// Returns the current time in microseconds.
     ///
-    /// # Example
+    /// # Examples
     ///
-    /// This example shows how to get the weekday of the current time in
-    /// New York using the `jiff` crate. This example works in core-only
+    /// The example below gets the weekday of the current time in
+    /// New York using the `jiff` crate. The example works in core-only
     /// environments without dynamic memory allocation.
     ///
     /// ```rust, no_run
@@ -344,7 +344,7 @@ impl<'d> Rtc<'d> {
         }
     }
 
-    /// Set the current time in microseconds.
+    /// Sets the current time in microseconds.
     #[cfg(lp_timer_driver_supported)]
     pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
@@ -391,7 +391,7 @@ impl<'d> Rtc<'d> {
 
     /// Register an interrupt handler for the RTC.
     ///
-    /// Note that this will replace any previously registered interrupt
+    /// Replaces any previously registered interrupt
     /// handlers.
     #[instability::unstable]
     #[cfg(lp_timer_driver_supported)]
@@ -457,14 +457,14 @@ pub struct Rwdt;
 
 /// RTC Watchdog Timer driver.
 impl Rwdt {
-    /// Enable the watchdog timer instance.
-    /// Watchdog starts with default settings (`stage 0` resets the system, the
-    /// others are deactivated)
+    /// Enables the watchdog timer instance.
+    /// The watchdog starts with default settings (`stage 0` resets the system, the
+    /// others are deactivated).
     pub fn enable(&mut self) {
         self.set_enabled(true);
     }
 
-    /// Disable the watchdog timer instance.
+    /// Disables the watchdog timer instance.
     pub fn disable(&mut self) {
         self.set_enabled(false);
     }
@@ -578,7 +578,7 @@ impl Rwdt {
         self.set_write_protection(true);
     }
 
-    /// Configure timeout value for the selected stage.
+    /// Configures the timeout value for the selected stage.
     pub fn set_timeout(&mut self, stage: RwdtStage, timeout: Duration) {
         let timeout_raw = crate::clock::us_to_rtc_ticks(timeout.as_micros()) as u32;
 
@@ -598,7 +598,7 @@ impl Rwdt {
         self.set_write_protection(true);
     }
 
-    /// Set the action for a specific stage.
+    /// Sets the action for a specific stage.
     pub fn set_stage_action(&mut self, stage: RwdtStage, action: RwdtStageAction) {
         self.set_write_protection(false);
 
@@ -628,12 +628,12 @@ pub struct Swd;
 /// Super Watchdog driver
 #[cfg(soc_has_swd_watchdog)]
 impl Swd {
-    /// Enable the watchdog timer instance
+    /// Enables the watchdog timer instance.
     pub fn enable(&mut self) {
         self.set_enabled(true);
     }
 
-    /// Disable the watchdog timer instance
+    /// Disables the watchdog timer instance.
     pub fn disable(&mut self) {
         self.set_enabled(false);
     }
@@ -722,7 +722,7 @@ pub(crate) fn time_since_boot_raw() -> u64 {
     })
 }
 
-/// Return reset reason.
+/// Returns the reset reason.
 pub fn reset_reason(cpu: Cpu) -> Option<SocResetReason> {
     let reason = crate::rom::rtc_get_reset_reason(cpu as u32);
 
@@ -733,7 +733,7 @@ pub fn reset_reason(cpu: Cpu) -> Option<SocResetReason> {
 #[cfg(sleep_driver_supported)]
 static LIGHT_SLEEP_WAKEUP: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
 
-/// Return the cause(s) of the most recent wakeup.
+/// Returns the cause(s) of the most recent wakeup.
 ///
 /// A sleep can be ended by more than one source simultaneously, so all matching sources are
 /// returned. The result is empty if the chip was not woken from sleep (for example on a cold boot,
@@ -811,7 +811,7 @@ impl WakeLock {
 
     /// Releases a wake lock, allowing automatic light sleep when no wake locks are held.
     ///
-    /// Note that this function should only be called to release a wake lock acquired via
+    /// Call this function only to release a wake lock acquired via
     /// [`Self::acquire`].
     pub fn release() {
         #[cfg(sleep_light_sleep)]

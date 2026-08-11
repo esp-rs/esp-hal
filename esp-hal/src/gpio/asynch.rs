@@ -12,7 +12,7 @@ impl Flex<'_> {
     /// or if the `Future` is dropped - which also means this method is **not**
     /// cancellation-safe, it will always wait for a future event.
     ///
-    /// Note that calling this function will overwrite previous
+    /// A call to this function overwrites previous
     /// [`listen`][Self::listen] operations for this pin.
     ///
     /// A wait continues through a light sleep, and a pin that waits also ends the sleep, like a
