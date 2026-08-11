@@ -22,7 +22,7 @@ use crate::{
     efuse::VOL_LEVEL_HP_INV,
     peripherals::{APB_CTRL, LPWR, RMT, RTC_IO, SYSTEM, TIMG0},
     rtc_cntl::Rtc,
-    soc::regi2c,
+    soc::{regi2c, xtal32k},
     time::Rate,
 };
 
@@ -56,7 +56,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_4)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };
@@ -67,7 +67,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_2)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };
@@ -78,7 +78,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_2)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };

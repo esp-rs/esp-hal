@@ -5,6 +5,7 @@ use crate::{
     soc::{
         clocks::{ClockConfig, LpSlowClkConfig},
         regi2c,
+        xtal32k,
     },
 };
 
@@ -900,7 +901,7 @@ impl LpSystemInit {
         dig_power.set_mem_dslp(false);
 
         let mut clk_power = LpClkPower::default();
-        clk_power.set_xpd_xtal32k(true);
+        clk_power.set_xpd_xtal32k(xtal32k::use_xtal32k());
         // ESP32-C5 disables RC32K in LP active by default.
         clk_power.set_xpd_rc32k(false);
         clk_power.set_xpd_fosc(true);

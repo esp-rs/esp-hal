@@ -15,6 +15,7 @@ use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
 use crate::{
     pac::HP_ALIVE_SYS,
     peripherals::{HP_SYS_CLKRST, LP_AON_CLK_RST, PMU},
+    soc::xtal32k,
 };
 
 define_clock_tree_types!();
@@ -51,7 +52,7 @@ impl CpuClock {
         ahb_clk: Some(AhbClkConfig::new(1)),
         apb_clk: Some(ApbClkConfig::new(1)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         timg_calibration_clock: None,
     };
     const PRESET_240: ClockConfig = ClockConfig {
@@ -62,7 +63,7 @@ impl CpuClock {
         ahb_clk: Some(AhbClkConfig::new(2)),
         apb_clk: Some(ApbClkConfig::new(1)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         timg_calibration_clock: None,
     };
     const PRESET_320: ClockConfig = ClockConfig {
@@ -73,7 +74,7 @@ impl CpuClock {
         ahb_clk: Some(AhbClkConfig::new(2)),
         apb_clk: Some(ApbClkConfig::new(1)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         timg_calibration_clock: None,
     };
 }

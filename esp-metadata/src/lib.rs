@@ -781,7 +781,16 @@ This pin may be available with certain limitations. Check your hardware to make 
                     #(#[doc = #docs])* #pin <= virtual ()
                 };
                 all_peripherals.push(quote! { @peri_type #tokens });
-                singleton_peripherals.push(quote! { #pin });
+
+                // The pin type is always defined - drivers and the `for_each_gpio` family of
+                // macros refer to it unconditionally. Only the `Peripherals` field is hidden, so
+                // that an application cannot safely take a pin the crystal is driving.
+                let cfg = if gpio.is_xtal32k() {
+                    quote! { #[cfg(not(use_xtal32k))] }
+                } else {
+                    quote! {}
+                };
+                singleton_peripherals.push(stable_singleton(&cfg, &pin));
             }
         }
 
@@ -819,7 +828,7 @@ This pin may be available with certain limitations. Check your hardware to make 
                         #[doc = #singleton_doc] #ch_name <= #pac ( #(#interrupts),* )
                     };
                     all_peripherals.push(quote! { @peri_type #tokens (unstable) });
-                    singleton_peripherals.push(quote! { #ch_name (unstable) });
+                    singleton_peripherals.push(unstable_singleton(&quote! {}, &ch_name));
                 }
             }
         }
@@ -851,12 +860,12 @@ This pin may be available with certain limitations. Check your hardware to make 
             {
                 all_peripherals.push(quote! { @peri_type #tokens });
                 if !peri.hidden {
-                    singleton_peripherals.push(quote! { #hal });
+                    singleton_peripherals.push(stable_singleton(&quote! {}, &hal));
                 }
             } else {
                 all_peripherals.push(quote! { @peri_type #tokens (unstable) });
                 if !peri.hidden {
-                    singleton_peripherals.push(quote! { #hal (unstable) });
+                    singleton_peripherals.push(unstable_singleton(&quote! {}, &hal));
                 }
             }
         }
@@ -924,6 +933,17 @@ This pin may be available with certain limitations. Check your hardware to make 
             .map(|cfg| format!("cargo:rustc-cfg={cfg}"))
             .collect()
     }
+}
+
+// A stable entry of the `singletons` branch of `for_each_peripheral!`.
+fn stable_singleton(cfg: &TokenStream, name: &proc_macro2::Ident) -> TokenStream {
+    quote! { #cfg #name }
+}
+
+// An unstable entry of the `singletons` branch of `for_each_peripheral!`.
+// `cfg` is repeated due to a rust limitation.
+fn unstable_singleton(cfg: &TokenStream, name: &proc_macro2::Ident) -> TokenStream {
+    quote! { #cfg #name (unstable #cfg) }
 }
 
 type Branch<'a> = (&'a str, &'a [TokenStream]);
