@@ -301,18 +301,41 @@ Guidelines for documenting functions, types, and other public items. Module-leve
 
 ### Simplified Technical English (ASD-STE100)
 
-API documentation should follow [ASD-STE100](https://www.asd-ste100.org/) where practical. STE keeps docs clear for readers who use English as a second language.
+API documentation should follow [ASD-STE100](https://www.asd-ste100.org/) where practical. STE is a controlled-language standard: it limits ambiguous wording so technical text has one clear meaning. That helps readers who use English as a second language and keeps docs easier to parse.
 
-- Use short sentences. Put one idea in each sentence.
+We apply STE **principles** to rustdoc, not a word-by-word check against ASD’s full approved dictionary (~900 words). For exact ASD wording, use the [official standard](https://www.asd-ste100.org/). Do not use STE for marketing or narrative copy where tone matters.
+
+#### Style
+
+- Use short sentences. Put one idea in each sentence. Aim for about 20 words or fewer in summaries and procedure-style lines; up to about 25 words in longer descriptions before splitting.
 - Use the present tense and active voice.
+- Prefer simple tenses. Use simple present for behavior (e.g. “Returns the baud rate.”). Avoid present perfect (“has returned”) unless the timing relative to another event matters.
 - Do not start item summaries with “This function”, “This struct”, “This enum”, or “This error”.
 - Do not use “Note that”. State the fact directly.
 - Use “must” for requirements, “can” for ability, and “do not” for prohibitions.
 - Avoid “will” when the present tense is enough.
 - Avoid “allows you to”. Use “lets” or rewrite the sentence.
+- Keep subjects and verbs explicit. Do not drop words to save space if that makes the meaning unclear.
+
+#### Wording
+
+- **One word, one meaning.** Pick one verb for one action and use it consistently (e.g. always “Returns” for fallible results, not “Returns” in one place and “Gives back” in another).
+- **One part of speech per word.** If a word is a noun in one doc, do not use it as a verb elsewhere unless that is normal English for the domain.
+- **Short noun phrases.** Keep stacked nouns to about three words (e.g. “DMA transfer buffer”). Split longer phrases into a short clause.
+- **Domain terms.** Keep necessary peripheral and chip names (`TWAI`, `eFuse`, …). Define uncommon terms once in module docs or link to the TRM / a glossary. Do not replace a precise technical term with a vague synonym.
+
+#### Structure
+
 - In `# Errors`, name the error type and the condition (e.g. ``[`ConfigError`] when the baud rate is not supported.``). Do not write “Returns a … if …”.
 - Enum variant docs are noun phrases or short statements, not “This error occurs when …”.
 - Field docs use the same third-person style as function summaries where they are full sentences.
+- Use `# Examples` or bullet lists for three or more steps, conditions, or options. Do not bury a sequence in one long sentence.
+- Keep one topic per paragraph in longer module docs (roughly six sentences or fewer).
+
+#### Limits
+
+- Do not shorten a sentence if that drops a safety condition, exception, scope qualifier, or numeric limit. Keep the longer phrasing when precision matters.
+- STE favors plain, literal prose. That is appropriate for API docs; it is not a goal for changelog voice or user-facing tutorials outside the HAL reference.
 
 ## Breaking changes
 
