@@ -17,6 +17,15 @@ use hil_test as _;
 mod tests {
     use super::*;
 
+    fn flash_from_peripherals(
+        peripherals: esp_hal::peripherals::Peripherals,
+    ) -> FlashStorage<'static> {
+        let flash = FlashStorage::new(peripherals.FLASH);
+        #[cfg(multi_core)]
+        let flash = flash.multicore_auto_park();
+        flash
+    }
+
     // Test we place the app descriptor at the right position in the image and we
     // can read it
     #[test]
@@ -25,9 +34,7 @@ mod tests {
 
         let mut bytes = [0u8; 256];
 
-        let mut flash = FlashStorage::new(peripherals.FLASH);
-        #[cfg(multi_core)]
-        let mut flash = flash.multicore_auto_park();
+        let mut flash = flash_from_peripherals(peripherals);
 
         // esp-idf 2nd stage bootloader would expect the app-descriptor at the start of
         // DROM it also expects DROM segment to the the first page of the
@@ -47,9 +54,7 @@ mod tests {
         let mut bytes1 = [0u8; 256];
         let mut bytes2 = [0u8; 256];
 
-        let mut flash = FlashStorage::new(peripherals.FLASH);
-        #[cfg(multi_core)]
-        let mut flash = flash.multicore_auto_park();
+        let mut flash = flash_from_peripherals(peripherals);
 
         for offset in (0x10_000..0x20_000).step_by(128) {
             flash.read(offset, &mut bytes1).unwrap();
@@ -67,9 +72,7 @@ mod tests {
         let mut bytes1 = [0u8; 256];
         let mut bytes2 = [0u8; 256];
 
-        let mut flash = FlashStorage::new(peripherals.FLASH);
-        #[cfg(multi_core)]
-        let mut flash = flash.multicore_auto_park();
+        let mut flash = flash_from_peripherals(peripherals);
 
         flash.write_encrypted(0x9000, &[0x0u8; 256]).unwrap();
 
