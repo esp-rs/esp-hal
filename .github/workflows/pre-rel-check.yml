@@ -49,10 +49,6 @@ jobs:
 
       - name: init-local-registry
         run: |
-          # this example relies on a Cargo.lock file and won't compile after `cargo update` - for now lets remove it
-          # include it once that is resolved
-          rm -rf examples/async/embassy_usb_ethernet
-
           cargo xrel-check init
           cargo xrel-check update
           cargo xrel-check replace-path-deps
