@@ -2339,6 +2339,8 @@ where
         self.regs()
             .idle_conf()
             .modify(|_, w| unsafe { w.tx_idle_num().bits(0) });
+        // IDF calls `uart_ll_update` after writing `idle_conf`
+        sync_regs(self.regs());
 
         crate::rom::ets_delay_us(15);
 
