@@ -66,13 +66,25 @@ macro_rules! lp_io_analog {
             }
         }
 
+        /// A hold takes two bits on this chip, one in the pad register and one
+        /// in the always-on register. The pad keeps the bit of the pad register
+        /// through a reset, so a release must clear both.
         pub(crate) fn pad_hold(lp: u8, enable: bool) {
-            LPWR::regs().hold_force().modify(|_, w| {
+            paste::paste! {
                 match lp {
-                    $( $lp_pin => w.$hold().bit(enable), )+
+                    $(
+                        $lp_pin => {
+                            RTC_IO::regs()
+                                .$pin_reg
+                                .modify(|_, w| w.[<$prefix hold>]().bit(enable));
+                            LPWR::regs()
+                                .hold_force()
+                                .modify(|_, w| w.$hold().bit(enable));
+                        }
+                    )+
                     _ => unreachable!(),
                 }
-            });
+            }
         }
 
         /// One bit for each low-power pad.

@@ -1655,6 +1655,10 @@ impl<'lt> AnyPin<'lt> {
         for_each_lp_function! {
             (($_signal:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
+                    // A held pad ignores every later configuration, and only a power-on reset
+                    // releases the hold. Without this, a pad that an earlier program held keeps its
+                    // level for the rest of the life of the chip.
+                    lp_io::low_level::pad_hold($lp_pin, false);
                     lp_io::low_level::set_config($lp_pin, false, false, lp_io::LpFunction::$af);
                 }
             };
