@@ -104,16 +104,14 @@ Our self-hosted runners have the following setup:
   - Probe: `ESP-Prog` connected with the [following connections][connection_s31]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32 (`esp32-jtag`):
-  - Devkit: `ESP32-DevKitC-V4` connected via UART (`UART` port).
+  - Devkit: `ESP32-ETHERNET-A-v1.2` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO32` and `GPIO33` are I2C pins.
     - `GPIO2` and `GPIO4` are connected.
-  - Probe: `ESP-Prog` connected with the [following connections][connection_esp32]
   - RPi: Raspbian 12 configured with the following [setup]
 
 [connection_s31]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_c2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_s2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
-[connection_esp32]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware.html#configure-hardware
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 [setup]: #rpi-setup
 
