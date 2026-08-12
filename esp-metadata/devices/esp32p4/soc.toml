@@ -197,6 +197,8 @@ ll_intr_mask = 0x3ffff
 fifo_size = 32
 has_bus_timeout_enable = true
 max_bus_timeout = 0x1F
+can_estimate_nack_reason = true # txfifo_raddr is present
+has_conf_update = true
 has_arbitration_en = true
 has_pd_en = true
 
