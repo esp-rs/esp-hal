@@ -710,6 +710,9 @@ where
 // Static instance of the waker for each component of the peripheral:
 static WAKER_TX: AtomicWaker = AtomicWaker::new();
 static WAKER_RX: AtomicWaker = AtomicWaker::new();
+// TX and RX interrupts are enabled independently. Once either is enabled, its
+// handler can preempt the other side's INT_ENA read-modify-write and cause
+// stale enable bits to be restored. Serialize all INT_ENA updates.
 static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -721,9 +724,6 @@ impl<'d> UsbSerialJtagWriteFuture<'d> {
     fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
         // interrupt
-        //
-        // INT_ENA is also modified by the interrupt handler. Synchronize this
-        // register-level read-modify-write so neither side can restore stale bits.
         INT_ENA_LOCK.lock(|| {
             peripheral
                 .register_block()
@@ -769,9 +769,6 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
     fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
         // interrupt
-        //
-        // INT_ENA is also modified by the interrupt handler. Synchronize this
-        // register-level read-modify-write so neither side can restore stale bits.
         INT_ENA_LOCK.lock(|| {
             peripheral
                 .register_block()
@@ -830,14 +827,22 @@ impl<'d> UsbSerialJtag<'d, Async> {
 
 impl UsbSerialJtagTx<'_, Async> {
     async fn wait_tx_ready(&mut self) {
-        while self
-            .regs()
-            .ep1_conf()
-            .read()
-            .serial_in_ep_data_free()
-            .bit_is_clear()
-        {
+        loop {
+            // Immediately after WR_DONE, DATA_FREE may still reflect the previous
+            // transfer's ready state. Wait for a new IN_EMPTY event before trusting it.
             UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
+
+            // A pending or early interrupt can wake the future before the FIFO is
+            // actually ready. Keep waiting until the hardware confirms readiness.
+            if self
+                .regs()
+                .ep1_conf()
+                .read()
+                .serial_in_ep_data_free()
+                .bit_is_set()
+            {
+                break;
+            }
         }
     }
 
@@ -850,7 +855,6 @@ impl UsbSerialJtagTx<'_, Async> {
             }
             self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
-            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
             self.wait_tx_ready().await;
         }
 
@@ -861,7 +865,6 @@ impl UsbSerialJtagTx<'_, Async> {
         // If write_async transfers a multiple of 64 bytes, flush needs to trigger sending a
         // zero-length packet for the host to consider the transfer complete
         self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
-        UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
         self.wait_tx_ready().await;
 
         Ok(())
