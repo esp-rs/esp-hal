@@ -149,10 +149,10 @@ macro_rules! property {
         false
     };
     ("i2c_master.can_estimate_nack_reason") => {
-        false
+        true
     };
     ("i2c_master.has_conf_update") => {
-        false
+        true
     };
     ("i2c_master.has_reliable_fsm_reset") => {
         false
