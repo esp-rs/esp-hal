@@ -6,8 +6,7 @@
 //!
 //! Built for the
 #![doc = concat!("**", chip_pretty!(), "**")]
-//! . Please ensure you are reading the correct [documentation] for your target
-//! device.
+//! . Read the correct [documentation] for the target device.
 //!
 //! ## Overview
 //!
@@ -18,7 +17,7 @@
 //!
 //! The HAL implements both [`Blocking`] _and_ [`Async`] APIs for all applicable peripherals.
 //! Where applicable, drivers implement the [embedded-hal] and
-//! [embedded-hal-async] traits. Drivers that don't currently have a stable API
+//! [embedded-hal-async] traits. Drivers that do not currently have a stable API
 //! are marked as `unstable` in the documentation.
 //!
 //! ### Peripheral singletons
@@ -32,8 +31,8 @@
 //! of the program. To allow for reusing peripherals, the HAL provides a
 //! `reborrow` method on each peripheral singleton creates a new handle to the
 //! peripheral with a shorter lifetime. Pass the handle to a driver while keeping
-//! the original handle alive. Once you drop the driver, you can reborrow the
-//! peripheral again.
+//! the original handle alive. After the driver is dropped, the peripheral can be
+//! reborrowed again.
 #![cfg_attr(
     // Feature-gated so that this doesn't prevent gradual device bringup. Any
     // stable driver would serve the purpose here, so this block will be part
@@ -52,10 +51,9 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 ```
 "#
 )]
-//! If you want to use the peripheral in multiple places (for example, you want
-//! to drop the driver for some period of time to minimize power consumption),
-//! you can reborrow the peripheral singleton and pass it to the driver by
-//! reference:
+//! To use a peripheral in multiple places (for example, to drop the driver
+//! temporarily to minimize power consumption), reborrow the peripheral
+//! singleton and pass it to the driver by reference:
 //!
 //! ```rust, ignore
 //! // In this case, `peripherals` must be mutable.
@@ -75,9 +73,8 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!
 //! ## Examples
 //!
-//! We have a plethora of [examples] in the esp-hal repository. We use
-//! an [xtask] to automate the building, running, and testing of code and
-//! examples within esp-hal.
+//! The esp-hal repository includes a large set of [examples]. An [xtask] automates
+//! building, running, and testing code and examples within esp-hal.
 //!
 //! Invoke the following command in the root of the esp-hal repository to get
 //! started:
@@ -88,14 +85,11 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //!
 //! ## Creating a Project
 //!
-//! We have a [book] that explains the full esp-hal ecosystem
-//! and how to get started, it's advisable to give that a read
-//! before proceeding. We also have a [training] that covers some common
-//! scenarios with examples.
+//! The [book] explains the full esp-hal ecosystem and how to get started.
+//! The [training] covers common scenarios with examples.
 //!
-//! We have developed a project generation tool, [esp-generate], which we
-//! recommend when starting new projects. It can be installed and run, e.g.
-//! for the ESP32-C6, as follows:
+//! The [esp-generate] project generation tool is recommended for new projects.
+//! It can be installed and run, e.g. for the ESP32-C6, as follows:
 //!
 //! ```bash
 //! cargo install esp-generate
@@ -149,7 +143,7 @@ fn main() -> ! {
 )]
 //! ## Additional configuration
 //!
-//! We've exposed some configuration options that don't fit into cargo
+//! Configuration options that do not fit into Cargo features are exposed via
 //! features. These can be set via environment variables, or via cargo's `[env]`
 //! section inside `.cargo/config.toml`. Unstable options can only be
 //! enabled when the `unstable` feature is enabled for the crate. Below is a
@@ -159,15 +153,15 @@ fn main() -> ! {
 #![doc = ""]
 //! ## Don't use `core::mem::forget`
 //!
-//! You should never use `core::mem::forget` on any type defined in [esp crates].
+//! Do not use `core::mem::forget` on any type defined in [esp crates].
 //! Many types heavily rely on their `Drop` implementation to not leave the
-//! hardware in undefined state which can cause undefined behaviour in your program.
+//! hardware in undefined state which can cause undefined behaviour in the program.
 //!
-//! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
+//! Consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in the project.
 //!
 //! ## Library usage
 //!
-//! If you intend to write a library that uses esp-hal, you should import it as follows:
+//! Libraries that use esp-hal should import it as follows:
 //!
 //! ```toml
 //! [dependencies]

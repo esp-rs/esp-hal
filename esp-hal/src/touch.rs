@@ -365,9 +365,8 @@ impl<P: TouchPin, Tm: TouchMode, Dm: DriverMode> TouchPad<P, Tm, Dm> {
     /// Usually a lower value means higher capacitance, thus indicating touch
     /// event.
     ///
-    /// Returns `None` if the value is not yet ready. (Note: Measurement must be
-    /// started manually with [`start_measurement`](Self::start_measurement) if
-    /// the touch peripheral is in [`OneShot`] mode).
+    /// Returns `None` if the value is not yet ready. In [`OneShot`] mode,
+    /// [`start_measurement`](Self::start_measurement) must be called manually.
     pub fn try_read(&mut self) -> Option<u16> {
         if unsafe { &*crate::peripherals::SENS::ptr() }
             .sar_touch_ctrl2()

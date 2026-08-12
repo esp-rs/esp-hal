@@ -1,7 +1,7 @@
 //! Clock tree definitions and implementations for ESP32-S3.
 //!
 //! Remarks:
-//! - Enabling a clock node assumes it has first been configured. Some fixed clock nodes don't need
+//! - Enabling a clock node assumes it has first been configured. Some fixed clock nodes do not need
 //!   to be configured.
 //! - Some information may be assumed, e.g. the possibility to disable watchdog timers before clock
 //!   configuration.

@@ -35,8 +35,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 
     /// Applies the given timer configuration.
     ///
-    /// ### Note:
-    /// The prescaler and period configuration will be applied immediately by
+    /// The prescaler and period configuration is applied immediately by
     /// default and before setting the [`PwmWorkingMode`].
     /// If the timer is already running, call [`Timer::stop`]
     /// and/or [`Timer::set_counter`] first
@@ -195,8 +194,7 @@ impl TimerClockConfig {
 
     /// Returns the timer clock frequency.
     ///
-    /// ### Note:
-    /// The actual value is rounded down to the nearest `u32` value
+    /// The actual value is rounded down to the nearest `u32` value.
     pub fn frequency(&self) -> Rate {
         self.frequency
     }

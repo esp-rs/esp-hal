@@ -9,10 +9,9 @@
 //!
 //! ## Configuration
 //!
-//! The driver can be configured using the [`Config`] struct. To create a
-//! configuration, you can use the [`Config::default()`] method, and then modify
-//! the individual settings as needed, by calling `with_*` methods on the
-//! [`Config`] struct.
+//! The driver can be configured using the [`Config`] struct. Create a
+//! configuration with [`Config::default()`], then modify individual settings
+//! by calling `with_*` methods on the [`Config`] struct.
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -22,11 +21,10 @@
 //! # {after_snippet}
 //! ```
 //!
-//! You will then need to pass the configuration to [`I2c::new`], and you can
-//! also change the configuration later by calling [`I2c::apply_config`].
+//! Pass the configuration to [`I2c::new`]. The configuration can be changed
+//! later with [`I2c::apply_config`].
 //!
-//! You will also need to specify the SDA and SCL pins when you create the
-//! driver instance.
+//! SDA and SCL pins are also required when the driver instance is created.
 //! ```rust, no_run
 //! # {before_snippet}
 //! use esp_hal::i2c::master::I2c;
@@ -74,7 +72,7 @@
 //! )?;
 //! # {after_snippet}
 //! ```
-//! If you configure the driver to `async` mode, the driver also provides
+//! In `async` mode, the driver also provides asynchronous versions of these
 //! asynchronous versions of these methods:
 //! ```rust, no_run
 //! # {before_snippet}
@@ -109,7 +107,7 @@
 //! ```
 //!
 //! The I2C driver also implements [embedded-hal] and [embedded-hal-async]
-//! traits, so you can use it with any crate that supports these traits.
+//! traits for use with supporting crates.
 //!
 //! [embedded-hal]: embedded_hal::i2c
 //! [embedded-hal-async]: embedded_hal_async::i2c

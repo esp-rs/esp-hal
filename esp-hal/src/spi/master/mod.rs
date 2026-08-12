@@ -11,8 +11,8 @@
 //!
 //! ### Exclusive access to the SPI bus
 //!
-//! If all you want to do is to communicate to a single device, and you initiate
-//! transactions yourself, there are a number of ways to achieve this:
+//! For communication with a single device, when the application initiates
+//! transactions directly, use one of the following approaches:
 //!
 //! - Use the [`SpiBus`] or [`SpiBusAsync`] trait and its associated functions to initiate
 //!   transactions with simultaneous reads and writes, or
@@ -21,8 +21,8 @@
 //!
 //! ### Shared SPI access
 //!
-//! If you have multiple devices on the same SPI bus that each have their own CS
-//! line (and optionally, configuration), you may want to have a look at the
+//! When multiple devices share the same SPI bus, each with its own CS line
+//! (and optionally, configuration), see the implementations provided by
 //! implementations provided by [`embedded-hal-bus`] and
 //! [`embassy-embedded-hal`].
 //!

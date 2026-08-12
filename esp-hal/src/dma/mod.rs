@@ -45,14 +45,14 @@
 //! # {after_snippet}
 //! ```
 //!
-//! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
-//! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
+//! ⚠️ Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
+//! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, one descriptor is required.
 //!
-//! ⚠️ Note: For chips that support DMA to/from PSRAM DMA transfers to/from PSRAM
+//! ⚠️ On chips that support DMA to/from PSRAM, transfers to/from PSRAM
 //! have extra alignment requirements. The address and size of the buffer pointed to by
 //! each descriptor must be a multiple of the cache line (block) size.
 //!
-//! For convenience you can use the [crate::dma_buffers] macro.
+//! For convenience, use the [`crate::dma_buffers`] macro.
 
 use core::{cmp::min, fmt::Debug, marker::PhantomData, sync::atomic::compiler_fence};
 

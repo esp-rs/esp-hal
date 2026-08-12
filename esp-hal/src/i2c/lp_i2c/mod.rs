@@ -21,10 +21,9 @@
 //!
 //! ## Configuration
 //!
-//! The driver can be configured using the [`Config`] struct. To create a
-//! configuration, you can use the [`Config::default()`] method, and then modify
-//! the individual settings as needed, by calling `with_*` methods on the
-//! [`Config`] struct.
+//! The driver can be configured using the [`Config`] struct. Create a
+//! configuration with [`Config::default()`], then modify individual settings
+//! by calling `with_*` methods on the [`Config`] struct.
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -34,11 +33,10 @@
 //! # {after_snippet}
 //! ```
 //!
-//! You will then need to pass the configuration to [`LpI2c::new`], and you can
-//! also change the configuration later by calling [`LpI2c::apply_config`].
+//! Pass the configuration to [`LpI2c::new`]. The configuration can be changed
+//! later with [`LpI2c::apply_config`].
 //!
-//! You will also need to specify the SDA and SCL pins when you create the
-//! driver instance.
+//! SDA and SCL pins are also required when the driver instance is created.
 //!
 //! ```rust, no_run
 //! # {before_snippet}

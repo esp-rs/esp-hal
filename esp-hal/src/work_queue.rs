@@ -298,7 +298,7 @@ impl<T: Sync + Send> Inner<T> {
     /// Decreases the suspend counter.
     ///
     /// When it reaches 0, this function wakes async tasks that poll the queue. They need to be
-    /// waken to ensure that their items don't end up stuck. Blocking pollers will eventually end up
+    /// woken to ensure that their items do not end up stuck. Blocking pollers eventually
     /// looping when their turn comes.
     fn resume(&mut self) {
         self.suspend_count -= 1;

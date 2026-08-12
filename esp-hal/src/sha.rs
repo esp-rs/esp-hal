@@ -19,11 +19,10 @@
 //! peripheral on ESP chips can handle large data streams efficiently, making it
 //! suitable for cryptographic applications that require secure hashing.
 //!
-//! To use the SHA Peripheral Driver, you need to initialize it with the desired
-//! SHA mode and the corresponding SHA peripheral. Once initialized, you can
-//! update the hash calculation by providing input data, finish the calculation
-//! to retrieve the hash value and repeat the process for a new hash calculation
-//! if needed.
+//! The SHA peripheral driver is initialized with the desired SHA mode and the
+//! corresponding SHA peripheral instance. After initialization, input data
+//! updates the hash calculation, `finish` retrieves the hash value, and the
+//! process can be repeated for a new calculation when needed.
 //!
 //! ## Examples
 //!

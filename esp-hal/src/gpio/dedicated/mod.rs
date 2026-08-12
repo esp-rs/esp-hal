@@ -5,31 +5,30 @@
 //! Dedicated GPIO access works by connecting peripheral signals between the CPU
 //! and the GPIO pins, instead of using the GPIO registers via the peripheral bus.
 //!
-//! To use dedicated GPIOs, first you must obtain the channel objects. The channels
-//! are created by calling the [`DedicatedGpio::new`] function. The fields of the
-//! [`DedicatedGpio`] struct represent the channels. The channels are [`DedicatedGpioChannel`]
-//! objects, which by default represent both input and output channels. The channels can be split
-//! into [`DedicatedGpioInputChannel`] and [`DedicatedGpioOutputChannel`] halves, or may be
-//! used unsplit.
+//! Dedicated GPIO channels are obtained from the [`DedicatedGpio::new`] function.
+//! The fields of the [`DedicatedGpio`] struct represent the channels. The channels are
+//! [`DedicatedGpioChannel`] objects, which by default represent both input and output channels.
+//! The channels can be split into [`DedicatedGpioInputChannel`] and [`DedicatedGpioOutputChannel`]
+//! halves, or used unsplit.
 #![doc = concat!(r#"
 
  > "#, chip!() , r#" specific: There are "#, property!("dedicated_gpio.channel_count", str) , r#" dedicated GPIO channels available.
 
  "#)]
-//! Next, configure the pins you want to use as normal GPIO pin drivers. Then you can wrap them
+//! Next, configure the pins as normal GPIO pin drivers, then wrap them
 //! into the dedicated GPIO drivers:
 //! - [`DedicatedGpioInput`]
 //! - [`DedicatedGpioOutput`]
 //! - [`DedicatedGpioFlex`]
 //!
 //! The drivers can take channels and pins by value or by reference. Pass these objects by reference
-//! if you plan on reusing them again, after dropping the dedicated driver.
+//! when they will be reused after dropping the dedicated driver.
 //!
 //! Due to how the hardware works, [`DedicatedGpioOutput`] can drive any number of GPIO pins.
 //!
 //! ## Bundles
 //!
-//! If you need to read or update multiple channels together, you can use the bundle helpers:
+//! For reading or updating multiple channels together, use the bundle helpers:
 //! - [`DedicatedGpioInputBundle`]
 //! - [`DedicatedGpioOutputBundle`]
 //! - [`DedicatedGpioFlexBundle`]

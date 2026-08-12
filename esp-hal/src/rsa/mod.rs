@@ -1129,7 +1129,7 @@ impl RsaContext {
     /// exponentiation by discarding the exponent's bits before the most
     /// significant set bit.
     ///
-    /// > ⚠️ Note: this compromises security by effectively decreasing the key length.
+    /// > ⚠️ This compromises security by effectively decreasing the key length.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -1145,7 +1145,7 @@ impl RsaContext {
     /// of the exponent. I.e. the less the Hamming weight, the greater the
     /// performance.
     ///
-    /// > ⚠️ Note: this compromises security by enabling timing-based side-channel attacks.
+    /// > ⚠️ This compromises security by enabling timing-based side-channel attacks.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]

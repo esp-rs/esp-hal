@@ -17,18 +17,19 @@
 //!
 //! ## Usage
 //!
-//! Peripheral drivers manage interrupts for you. Where appropriate, a
-//! [`set_interrupt_handler`] function registers a handler for interrupts at a priority
-//! level of your choosing. Interrupt handler functions need to be marked by the [`#[handler]`]
-//! attribute. These drivers also provide `listen` and `unlisten` functions that control whether an
-//! interrupt will be generated for the matching event or not. For more information and examples,
-//! consult the documentation of the specific peripheral drivers.
+//! Peripheral drivers manage interrupts automatically. Where appropriate, a
+//! [`set_interrupt_handler`] function registers a handler for interrupts at a
+//! chosen priority level. Interrupt handler functions need to be marked by the
+//! [`#[handler]`] attribute. These drivers also provide `listen` and `unlisten`
+//! functions that control whether an interrupt is generated for the matching
+//! event. For more information and examples, consult the documentation of the
+//! specific peripheral drivers.
 //!
-//! If you are writing your own peripheral driver, you will need to first register interrupt
-//! handlers using the [peripheral singletons'] `bind_X_interrupt` functions. You can use the
-//! matching `enable` and `disable` functions to control the peripheral interrupt in the interrupt
-//! matrix, or you can, depending on the peripheral, set or clear the appropriate enable bits in the
-//! `int_ena` register.
+//! Custom peripheral drivers must first register interrupt handlers using the
+//! [peripheral singletons'] `bind_X_interrupt` functions. Use the matching
+//! `enable` and `disable` functions to control the peripheral interrupt in the
+//! interrupt matrix, or set or clear the appropriate enable bits in the
+//! `int_ena` register, depending on the peripheral.
 //!
 //! [`#[handler]`]: crate::handler
 //! [peripheral singletons']: crate::peripherals::I2C0

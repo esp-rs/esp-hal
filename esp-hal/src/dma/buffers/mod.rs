@@ -444,7 +444,7 @@ pub struct Preparation {
     /// perform this check as the ownership bit will not be set before the
     /// channel tries to consume the descriptor.
     ///
-    /// Most implementations won't have any such requirements and will work
+    /// Most implementations do not have any such requirements and work
     /// correctly regardless of whether the DMA channel checks or not.
     ///
     /// Preparation fails if the DMA channel does not support the provided option.
@@ -475,7 +475,7 @@ pub unsafe trait DmaTxBuffer {
 
     /// The type returned to the user when a transfer finishes.
     ///
-    /// Some buffers don't need to be reconstructed.
+    /// Some buffers do not need to be reconstructed.
     type Final;
 
     /// Prepares the buffer for an imminent transfer and returns
@@ -508,7 +508,7 @@ pub unsafe trait DmaRxBuffer {
 
     /// The type returned to the user when a transfer finishes.
     ///
-    /// Some buffers don't need to be reconstructed.
+    /// Some buffers do not need to be reconstructed.
     type Final;
 
     /// Prepares the buffer for an imminent transfer and returns

@@ -7,13 +7,13 @@
 //! - Async operations take pins by `&mut self`, so they can only be accessed after the operation is
 //!   complete, or cancelled. They may be defined to overwrite the configuration of the manual
 //!   interrupt API, but not affect the interrupt handler.
-//! - Manual `listen` operations don't need to be prepared for async operations, but async
+//! - Manual `listen` operations do not need to be prepared for async operations, but async
 //!   operations need to be prepared to handle cases where the pin was configured to listen for an
 //!   event - or even that the user unlistened the pin but left the interrupt status set.
 //!
-//! The user should be careful when using the async API and the manual interrupt
-//! API together. For performance reasons, we will not prevent the user handler
-//! from running in response to an async event.
+//! Care is required when using the async API and the manual interrupt API
+//! together. For performance reasons, the built-in handler does not prevent a
+//! custom handler from running in response to an async event.
 //!
 //! ## Single-shot interaction with user interrupt handlers
 //!
@@ -46,10 +46,10 @@
 //! handler is called. The flag is not accessible by the user, so they can't
 //! force-complete an async operation accidentally from the interrupt handler.
 //!
-//! We could technically use the interrupt status on single-core chips, but it
-//! would be slightly more complicated to prevent the user from breaking things.
-//! (If the user were to clear the interrupt status, we would need to re-enable
-//! it, for PinFuture to detect the completion).
+//! On single-core chips, interrupt status could be used instead, but that
+//! would be slightly more complicated to prevent misuse.
+//! (If interrupt status were cleared externally, it would need to be re-enabled
+//! for `PinFuture` to detect completion).
 
 use portable_atomic::{AtomicPtr, Ordering};
 use strum::EnumCount;

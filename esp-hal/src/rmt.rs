@@ -198,7 +198,7 @@
 //! # }
 //! ```
 //!
-//! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
+//! On ESP32 and ESP32-S2, the base frequency must be 80 MHz.
 
 use core::{
     default::Default,

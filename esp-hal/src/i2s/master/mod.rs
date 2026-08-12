@@ -39,8 +39,8 @@
 //!
 //! ### Standards
 //!
-//! I2S supports different standards, which you can access using [`TdmConfig::new_tdm_philips`]
-//! and related helpers. You can also configure custom data formats using methods such as
+//! I2S supports different standards through [`TdmConfig::new_tdm_philips`] and
+//! related helpers. Custom data formats are configured with methods such as
 //! [`TdmConfig::with_msb_shift`], [`TdmConfig::with_ws_width`], [`TdmConfig::with_ws_polarity`],
 //! etc.
 //!

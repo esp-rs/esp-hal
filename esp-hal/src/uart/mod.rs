@@ -1576,8 +1576,7 @@ impl<'d> Uart<'d, Blocking> {
     ///
     /// # Examples
     ///
-    /// **Note**: In practice a proper serial terminal should be used
-    /// to connect to the board (espflash won't work)
+    /// A proper serial terminal is required to connect to the board (`espflash` does not work).
     ///
     /// ```rust, no_run
     /// # {before_snippet}

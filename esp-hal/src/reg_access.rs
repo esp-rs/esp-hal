@@ -2,7 +2,7 @@
 //!
 //! ## Overview
 //!
-//! Collection of struct which helps you write to registers.
+//! Collection of helpers for writing to registers.
 
 #[cfg(any(ethernet_driver_supported, mipi_dsi_driver_supported))]
 mod volatile_cell {

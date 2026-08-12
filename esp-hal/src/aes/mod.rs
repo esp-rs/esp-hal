@@ -1557,7 +1557,7 @@ impl AesContext {
     ///
     /// # Errors
     ///
-    /// - If the lengths of the input and output buffers don't match, an error is returned.
+    /// - If the lengths of the input and output buffers do not match, an error is returned.
     /// - The ECB and OFB cipher modes require the data length to be a multiple of the block size
     ///   (16), otherwise an error is returned.
     pub fn process<'t>(

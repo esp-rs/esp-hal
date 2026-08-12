@@ -158,7 +158,7 @@ impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
         cfg(soc_internal_memory_cached) => "64",
         _ => "4"
     })]
-    /// Creates a new [`DmaAlignedMut`] from a mutable variable, if it's
+    /// Creates a new [`DmaAlignedMut`] from a mutable variable when it is
     /// provably compatible.
     ///
     /// In internal memory, the address and size of the variable
@@ -276,7 +276,7 @@ impl<'a, T: ?Sized> DmaAlignedRef<'a, T> {
         cfg(soc_internal_memory_cached) => "64",
         _ => "4"
     })]
-    /// Creates a new [`DmaAlignedRef`] from a shared reference, if it's
+    /// Creates a new [`DmaAlignedRef`] from a shared reference when it is
     /// provably compatible.
     ///
     /// In internal memory, the address and size of the value

@@ -49,8 +49,8 @@
 //! ### Splitting pins into signals
 //!
 //! GPIO pin types such as [`GPIO0`] or [`AnyPin`] can be **unsafely**
-//! [split](AnyPin::split) into signals. In this case you need to carefully
-//! ensure that only a single driver configures the split pin, by selectively
+//! [split](AnyPin::split) into signals. The caller must ensure that only a
+//! single driver configures the split pin, by selectively
 //! [freezing](`InputSignal::freeze`) the signals.
 #![cfg_attr(
     uart_driver_supported,

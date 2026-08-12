@@ -12,11 +12,10 @@
 //! # {etm_availability}
 //! ## Working with pins
 //!
-//! After initializing the HAL, you can access the individual pins using the
-//! [`crate::Peripherals`] struct. These pins can then be used as general
-//! purpose digital IO using pin drivers, or they can be passed to peripherals
-//! (such as SPI, UART, I2C, etc.), or can be [`split`]
-//! into peripheral signals for advanced use.
+//! Individual pins are available from [`crate::Peripherals`] after HAL
+//! initialization. These pins can be used as general-purpose digital I/O using
+//! pin drivers, passed to peripherals (such as SPI, UART, I2C, and so on), or
+//! [`split`] into peripheral signals for advanced use.
 //!
 //! Pin drivers can be created using [`Flex::new`], [`Input::new`] and
 //! [`Output::new`].
@@ -37,16 +36,14 @@
 //!
 //! ## GPIO interconnect
 //!
-//! Sometimes you may want to connect peripherals together without using
-//! external hardware. The [`interconnect`] module provides tools to achieve
-//! this using GPIO pins.
+//! Peripherals can be connected together without external hardware. The
+//! [`interconnect`] module provides tools for this using GPIO pins.
 //!
-//! To obtain peripheral signals, use the [`split`] method to split a
-//! pin into an input and output signal. Alternatively, you may use
-//! [`Flex::split`], [`Flex::into_peripheral_output`],
-//! [`Flex::peripheral_input`], and similar methods to split a pin driver into
-//! an input and output signal. You can then pass these signals to the
-//! peripheral drivers similar to how you would pass a pin.
+//! To obtain peripheral signals, use the [`split`] method to split a pin into
+//! an input and output signal. Alternatively, [`Flex::split`],
+//! [`Flex::into_peripheral_output`], [`Flex::peripheral_input`], and similar
+//! methods split a pin driver into input and output signals. These signals are
+//! passed to peripheral drivers in the same way as pins.
 //!
 //! [embedded-hal]: embedded_hal
 //! [embedded-hal-async]: embedded_hal_async
@@ -1678,7 +1675,7 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that peripheral drivers don't configure the same
+    /// The caller must ensure that peripheral drivers do not configure the same
     /// GPIO at the same time in multiple places. This includes clones of the
     /// `InputSignal` struct, as well as the `OutputSignal` struct.
     ///
@@ -1728,7 +1725,7 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that peripheral drivers don't configure the same
+    /// The caller must ensure that peripheral drivers do not configure the same
     /// GPIO at the same time in multiple places. This includes clones of the
     /// `InputSignal` struct.
     #[inline]
@@ -2161,7 +2158,7 @@ for_each_gpio! {
             ///
             /// # Safety
             ///
-            /// The caller must ensure that peripheral drivers don't configure the same
+            /// The caller must ensure that peripheral drivers do not configure the same
             /// GPIO at the same time in multiple places. This includes clones of the
             /// `InputSignal` struct, as well as the `OutputSignal` struct.
             ///

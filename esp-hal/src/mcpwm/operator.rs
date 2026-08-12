@@ -190,8 +190,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
 
     /// Select a [`Timer`] to be the timing reference for this operator
     ///
-    /// ### Note:
-    /// By default TIMER0 is used
+    /// `TIMER0` is used by default.
     pub fn set_timer<const TIM: u8>(&mut self, timer: &Timer<TIM, PWM>) {
         let _ = timer;
         // SAFETY:
@@ -225,7 +224,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         PwmPin::new(pin, config)
     }
 
-    /// See both the A and the B output with the given pins and configurations
+    /// Configures both the A and B outputs with the given pins and configurations.
     pub fn with_pins(
         self,
         pin_a: impl PeripheralOutput<'d>,
@@ -590,7 +589,6 @@ pub enum UpdateAction {
 
 /// Settings for actions taken on timing events.
 ///
-/// ### Note:
 /// The hardware supports using a timestamp A event to trigger an action on
 /// output B or vice versa. For clearer ownership semantics this HAL does not
 /// support such configurations.
