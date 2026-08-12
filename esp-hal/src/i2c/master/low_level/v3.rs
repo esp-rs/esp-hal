@@ -101,20 +101,7 @@ pub(super) fn read_fifo(register_block: &RegisterBlock) -> u8 {
 }
 
 pub(super) fn write_fifo(register_block: &RegisterBlock, data: u8) {
-    cfg_select! {
-        esp32p4 => {
-            // The TX FIFO takes bytes through the data register, as on the other chips, but the
-            // P4 SVD describes that register as read-only, so the write needs the raw pointer.
-            // TODO: file an esp-pacs issue/PR so the P4 SVD marks the data register writable.
-            // Once that lands, this branch can collapse into the general `else` arm below.
-            unsafe {
-                register_block.data().as_ptr().write_volatile(data as u32);
-            }
-        }
-        _ => {
-            register_block
-                .data()
-                .write(|w| unsafe { w.fifo_rdata().bits(data) });
-        }
-    }
+    register_block
+        .data()
+        .write(|w| unsafe { w.fifo_rdata().bits(data) });
 }
