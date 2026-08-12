@@ -97,6 +97,7 @@ peripherals = [
     { name = "USB_HS", pac = "USB_OTG_HS", interrupts = { peri = "USB_OTG_HS" } },
 
     { name = "FLASH", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "CPU_CTRL", virtual = true },
 ]
@@ -120,11 +121,14 @@ rc_fast_calibration = { divider = 50, min_rev = 0 }
 [device.gpio]
 support_status = "supported"
 # {include gpio.toml}
-# 
+
 [device.dedicated_gpio]
-version = "riscv_v1"
-support_status = "not_supported"
-channels = []
+version = "riscv_v2"
+support_status = "partial"
+channels = [
+    ["CPU_GPIO_0", "CPU_GPIO_1",  "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
+    ["CPU_GPIO_8", "CPU_GPIO_9",  "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
+]
 
 [device.io_mux]
 
