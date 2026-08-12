@@ -532,7 +532,16 @@ mod twai {
         peripherals::Interrupt::TWAI0,
         system::Cpu,
         timer::timg::TimerGroup,
-        twai::{self, ErrorKind, EspTwaiFrame, StandardId, TwaiMode, filter::SingleStandardFilter},
+        twai::{
+            self,
+            DataFrame,
+            ErrorKind,
+            RequestFrame,
+            StandardId,
+            TwaiFrame,
+            TwaiMode,
+            filter::SingleStandardFilter,
+        },
     };
     use nb::block;
 
@@ -540,6 +549,42 @@ mod twai {
 
     struct Context<D: DriverMode> {
         twai: twai::Twai<'static, D>,
+    }
+
+    #[embedded_test::tests]
+    mod frame_tests {
+        use super::*;
+
+        #[test]
+        #[should_panic]
+        fn test_data_too_long() {
+            let data = [0u8; 9];
+            DataFrame::new(StandardId::ZERO, &data).unwrap();
+        }
+
+        #[test]
+        #[should_panic]
+        fn test_dlc_too_big() {
+            RequestFrame::new(StandardId::ZERO, 16).unwrap();
+        }
+
+        #[test]
+        fn test_data_valid_custom_dlc() {
+            let data = [0u8; 8];
+            DataFrame::new_custom_dlc(StandardId::ZERO, &data, 15).unwrap();
+        }
+
+        #[test]
+        #[should_panic]
+        fn test_data_invalid_custom_dlc() {
+            let data = [0u8; 7];
+            DataFrame::new_custom_dlc(StandardId::ZERO, &data, 15).unwrap();
+        }
+
+        #[test]
+        fn test_request_valid_custom_dlc() {
+            RequestFrame::new(StandardId::ZERO, 15).unwrap();
+        }
     }
 
     #[embedded_test::tests(default_timeout = 3)]
@@ -576,13 +621,23 @@ mod twai {
         }
 
         #[test]
-        fn test_send_receive(mut ctx: Context<Blocking>) {
-            let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3]).unwrap();
+        fn test_send_receive_data(mut ctx: Context<Blocking>) {
+            let frame = DataFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3], 3).unwrap();
             block!(ctx.twai.transmit(&frame)).unwrap();
 
             let frame = block!(ctx.twai.receive()).unwrap();
 
             assert_eq!(frame.data(), &[1, 2, 3])
+        }
+
+        #[test]
+        fn test_send_receive_request(mut ctx: Context<Blocking>) {
+            let frame = RequestFrame::new_self_reception(StandardId::ZERO, 4).unwrap();
+            block!(ctx.twai.transmit(&frame)).unwrap();
+
+            let frame = block!(ctx.twai.receive()).unwrap();
+
+            assert_eq!(frame.data_length_code(), 4)
         }
 
         fn no_init() {}
@@ -608,7 +663,7 @@ mod twai {
 
             let mut twai = config.start();
 
-            let frame = EspTwaiFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
+            let frame = DataFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
 
             block!(twai.transmit(&frame)).unwrap();
             assert_eq!(
@@ -651,7 +706,7 @@ mod twai {
             Context { twai }
         }
 
-        async fn transmit_frames(ctx: &mut Context<Async>, frame: &EspTwaiFrame, count: usize) {
+        async fn transmit_frames(ctx: &mut Context<Async>, frame: &TwaiFrame, count: usize) {
             for _ in 0..count {
                 ctx.twai.transmit_async(frame).await.unwrap();
             }
@@ -678,8 +733,7 @@ mod twai {
 
         #[test]
         async fn test_async_transmit_and_receive(mut ctx: Context<Async>) {
-            let frame =
-                EspTwaiFrame::new_self_reception(StandardId::new(0).unwrap(), b"12345678").unwrap();
+            let frame = DataFrame::new_self_reception(StandardId::ZERO, b"12345678", 8).unwrap();
             transmit_frames(&mut ctx, &frame, 31).await;
             receive_frames(&mut ctx, 31).await;
         }
@@ -687,8 +741,7 @@ mod twai {
         #[test]
         // regression test for https://github.com/esp-rs/esp-hal/issues/4235
         async fn test_buffer_overrun_on_empty_queue(mut ctx: Context<Async>) {
-            let frame =
-                EspTwaiFrame::new_self_reception(StandardId::new(0).unwrap(), b"12345678").unwrap();
+            let frame = DataFrame::new_self_reception(StandardId::ZERO, b"12345678", 8).unwrap();
 
             interrupt::disable(Cpu::ProCpu, TWAI0);
 
@@ -731,7 +784,7 @@ mod twai {
 
             let mut twai = config.into_async().start();
 
-            let frame = EspTwaiFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
+            let frame = DataFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
 
             assert_eq!(
                 twai.transmit_async(&frame).await,
