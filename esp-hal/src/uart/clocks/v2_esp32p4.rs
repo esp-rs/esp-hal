@@ -18,10 +18,8 @@ impl UartInstance {
             // off, next probe soft-reset hits ROM with UART0 gated - chip freezes.
             // Other UARTs have no such ROM role.
             UartInstance::Uart0 => {
-                if en {
-                    regs.peri_clk_ctrl110()
-                        .modify(|_, w| w.uart0_clk_en().set_bit());
-                }
+                regs.peri_clk_ctrl110()
+                    .modify(|_, w| w.uart0_clk_en().bit(en));
             }
             UartInstance::Uart1 => {
                 regs.peri_clk_ctrl111()
