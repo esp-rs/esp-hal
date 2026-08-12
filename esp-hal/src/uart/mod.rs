@@ -2339,6 +2339,8 @@ where
         self.regs()
             .idle_conf()
             .modify(|_, w| unsafe { w.tx_idle_num().bits(0) });
+        // `idle_conf` is a sync register.
+        sync_regs(self.regs());
 
         crate::rom::ets_delay_us(15);
 
