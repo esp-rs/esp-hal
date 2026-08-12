@@ -98,7 +98,7 @@ fn regi2c_enable_block(block: u8) {
     }
 }
 
-/// Wait for I2C bus to become idle.
+/// Waits for I2C bus to become idle.
 #[inline]
 fn wait_i2c_idle() {
     unsafe {
@@ -109,7 +109,7 @@ fn wait_i2c_idle() {
     }
 }
 
-/// Read an analog I2C register.
+/// Reads an analog I2C register.
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     regi2c_enable_block(block);
     wait_i2c_idle();
@@ -128,7 +128,7 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     ((val >> REGI2C_RTC_DATA_SHIFT) & REGI2C_RTC_DATA_MASK) as u8
 }
 
-/// Write an analog I2C register.
+/// Writes an analog I2C register.
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     regi2c_enable_block(block);
     wait_i2c_idle();

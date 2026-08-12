@@ -26,7 +26,7 @@ pub(crate) fn i2s_sclk_frequency() -> u32 {
     }
 }
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
@@ -91,12 +91,12 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// CACHE_LINE_SIZE_16B, CACHE_LINE_SIZE_32B
         fn Cache_Set_ICache_Mode(cache_size: u32, ways: u32, cache_line_size: u32);
 
-        /// Resume ICache access for the cpu.
+        /// Resumes ICache access for the cpu.
         ///
         /// @param  uint32_t autoload : ICache will preload then.
         fn Cache_Resume_ICache(autoload: u32);
 
-        /// Allocate memory to used by ICache and DCache.
+        /// Allocates memory to used by ICache and DCache.
         ///
         /// [`sram0_layout`]: u32 the usage of first 8KB internal memory block,
         /// can be CACHE_MEMORY_INVALID,

@@ -71,7 +71,7 @@ pub trait RegisterAccess: Sealed {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard>;
 
-    /// Reset the state machine of the channel and FIFO pointer.
+    /// Resets the state machine of the channel and FIFO pointer.
     fn reset(&self);
 
     /// Enables or disables INCR burst transfer for channel reading.

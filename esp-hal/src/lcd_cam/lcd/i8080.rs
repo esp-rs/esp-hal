@@ -7,7 +7,7 @@
 //! format/timing. The driver mandates DMA (Direct Memory Access) for
 //! efficient data transfer.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### MIPI-DSI Display
 //!

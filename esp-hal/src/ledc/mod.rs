@@ -16,7 +16,7 @@
 //! available for the ESP32 only, while Low Speed channels are available for all
 //! supported chips.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Low Speed Channel
 //!

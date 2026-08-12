@@ -42,7 +42,7 @@ impl<const SIZE: usize> Default for Stack<SIZE> {
 
 #[allow(clippy::len_without_is_empty)]
 impl<const SIZE: usize> Stack<SIZE> {
-    /// Construct a stack of length SIZE, uninitialized
+    /// Creates a stack of length SIZE, uninitialized
     #[instability::unstable]
     pub const fn new() -> Stack<SIZE> {
         const {
@@ -176,7 +176,7 @@ impl<'d> CpuControl<'d> {
         unsafe { internal_park_core(core, false) };
     }
 
-    /// Run the core1 closure.
+    /// Runs the core1 closure.
     #[inline(never)]
     pub(crate) unsafe fn start_core1_run<F>() -> !
     where
@@ -194,7 +194,7 @@ impl<'d> CpuControl<'d> {
         }
     }
 
-    /// Start the APP (second) core.
+    /// Starts the APP (second) core.
     ///
     /// The second core starts running the closure `entry`. If the
     /// closure exits, the core will be parked.
@@ -225,7 +225,7 @@ impl<'d> CpuControl<'d> {
         self.start_app_core_with_stack_guard_offset(stack, stack_guard_offset, entry)
     }
 
-    /// Start the APP (second) core.
+    /// Starts the APP (second) core.
     ///
     /// The second core starts running the closure `entry`. If the
     /// closure exits, the core will be parked.

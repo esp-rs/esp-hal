@@ -1,6 +1,6 @@
 //! Utils
 //!
-//! # Overview
+//! ## Overview
 //!
 //! Collection of struct which helps you write to registers.
 
@@ -54,7 +54,7 @@ mod alignment_helper {
         fn u32_to_bytes(word: u32) -> [u8; 4];
     }
 
-    /// Use BE for ESP32, NE otherwise
+    /// Big-endian for ESP32, native-endian otherwise
     #[derive(Debug, Clone)]
     pub(crate) struct SocDependentEndianess;
 

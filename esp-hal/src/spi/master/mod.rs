@@ -548,7 +548,7 @@ impl Config {
     ///
     /// The peripheral divides the source clock by `pre * n`, so this is the
     /// smallest divider that does not overshoot. `n` also determines the duty
-    /// cycle resolution, so out of pairs forming that divider we want the one
+    /// cycle resolution, so among pairs forming that divider the pair with the
     /// with the largest `n`.
     ///
     /// Out-of-range frequencies (see [`Config::validate`]) yield the slowest pair
@@ -768,8 +768,8 @@ impl<'d> Spi<'d, Blocking> {
     /// Replaces any previously registered interrupt
     /// handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
-    /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    /// Restores the default interrupt handler via
+    /// [`crate::interrupt::DEFAULT_INTERRUPT_HANDLER`].
     ///
     /// # Panics
     ///
@@ -1053,8 +1053,8 @@ where
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
     /// Enables output functionality for the pin, and connects it as the MOSI
-    /// signal. You want to use this for full-duplex SPI or
-    /// if you intend to use [DataMode::SingleTwoDataLines].
+    /// signal. For full-duplex SPI or
+    /// when using [`DataMode::SingleTwoDataLines`].
     ///
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
@@ -1082,7 +1082,7 @@ where
     /// Enables input functionality for the pin, and connects it to the MISO
     /// signal.
     ///
-    /// You want to use this for full-duplex SPI or
+    /// For full-duplex SPI or
     /// [DataMode::SingleTwoDataLines]
     ///
     /// # Examples
@@ -1116,10 +1116,9 @@ where
     /// Disconnects the previous pin that was assigned with `with_sio0` or
     /// `with_mosi`.
     ///
-    /// Use this if any of the devices on the bus use half-duplex SPI.
+    /// Required when any device on the bus uses half-duplex SPI.
     ///
-    /// See also [Self::with_mosi] when you only need a one-directional MOSI
-    /// signal.
+    /// See also [`Self::with_mosi`] for a one-directional MOSI signal.
     #[instability::unstable]
     pub fn with_sio0(mut self, mosi: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         self.spi.pins().sio_pins[0] = self.connect_sio_pin(mosi.into(), 0);
@@ -1134,10 +1133,9 @@ where
     ///
     /// Disconnects the previous pin that was assigned with `with_sio1`.
     ///
-    /// Use this if any of the devices on the bus use half-duplex SPI.
+    /// Required when any device on the bus uses half-duplex SPI.
     ///
-    /// See also [Self::with_miso] when you only need a one-directional MISO
-    /// signal.
+    /// See also [`Self::with_miso`] for a one-directional MISO signal.
     #[instability::unstable]
     pub fn with_sio1(mut self, sio1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         self.spi.pins().sio_pins[1] = self.connect_sio_pin(sio1.into(), 1);
@@ -1211,7 +1209,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Write bytes to SPI. After writing, flush is called to ensure all data
+    /// Writes bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
     ///
     /// # Examples
@@ -1241,7 +1239,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Read bytes from SPI. The provided slice is filled with data received
+    /// Reads bytes from SPI. The provided slice is filled with data received
     /// from the slave.
     ///
     /// # Examples

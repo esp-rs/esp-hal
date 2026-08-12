@@ -6,7 +6,7 @@
 //! GPIO matrix signal. Each channel can be configured with a carrier frequency
 //! and pulse density, then routed to one output pin.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! Generate a sigma-delta output signal on a GPIO pin.
 //!

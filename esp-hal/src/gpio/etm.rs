@@ -19,7 +19,7 @@
 //! - FALL_EDGE: Indicates that the output signal of the corresponding GPIO has a falling edge
 //! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO is reversed
 //!
-//! # Examples
+//! ## Examples
 //! ### Toggle an LED When a Button is Pressed
 //! ```rust, no_run
 //! # {before_snippet}
@@ -142,7 +142,7 @@ impl Default for InputConfig {
 pub struct EventChannel<const C: u8> {}
 
 impl<const C: u8> EventChannel<C> {
-    /// Trigger at rising edge
+    /// Triggers at rising edge
     pub fn rising_edge<'d>(
         self,
         pin: impl Into<InputSignal<'d>>,
@@ -151,7 +151,7 @@ impl<const C: u8> EventChannel<C> {
         self.into_event(pin, pin_config, EventKind::Rising)
     }
 
-    /// Trigger at falling edge
+    /// Triggers at falling edge
     pub fn falling_edge<'d>(
         self,
         pin: impl Into<InputSignal<'d>>,
@@ -160,7 +160,7 @@ impl<const C: u8> EventChannel<C> {
         self.into_event(pin, pin_config, EventKind::Falling)
     }
 
-    /// Trigger at any edge
+    /// Triggers at any edge
     pub fn any_edge<'d>(
         self,
         pin: impl Into<InputSignal<'d>>,

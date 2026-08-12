@@ -176,11 +176,11 @@ pub enum ResponseLen {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CommandFlags {
-    /// Wait for the data line to be free before issuing.
+    /// Waits for the data line to be free before issuing.
     pub wait_complete: bool,
     /// Stop/abort command (CMD12, CMD52 abort).
     pub stop_abort: bool,
-    /// Poll DAT0 until the card releases busy (R1b).
+    /// Polls DAT0 until the card releases busy (R1b).
     pub busy: bool,
 }
 

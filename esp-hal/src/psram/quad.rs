@@ -32,7 +32,7 @@ pub(super) enum MspiTimingSpeedMode {
     ///
     /// As a tradeoff, the performance of the MSPI (devices) are switched to a very low speed
     MspiTimingSpeedModeLowPerf,
-    /// Normal performance speed mode, MSPI speed is the same as you configured
+    /// Normal performance speed mode; MSPI speed matches the configured
     MspiTimingSpeedModeNormalPerf,
 }
 

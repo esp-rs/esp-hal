@@ -71,10 +71,10 @@ pub mod an {
 /// crates without depending on the concrete [`MdioDriver`]. PHY and
 /// register addresses are 5-bit Clause 22 fields (0-31).
 pub trait MdioBus {
-    /// Read a 16-bit PHY register.
+    /// Reads a 16-bit PHY register.
     fn read(&mut self, phy_addr: u8, reg_addr: u8) -> u16;
 
-    /// Write a 16-bit PHY register.
+    /// Writes a 16-bit PHY register.
     fn write(&mut self, phy_addr: u8, reg_addr: u8, value: u16);
 }
 

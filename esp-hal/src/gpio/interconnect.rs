@@ -43,8 +43,8 @@
 //! allows for flexible routing of signals between peripherals and GPIO pins.
 //!
 //! Only configured GPIO drivers can be safely turned into signals. The
-//! conversion freezes the pin configuration; otherwise it is possible for multiple peripheral drivers to configure the same GPIO pin at
-//! the same time, which is undefined behavior.
+//! conversion freezes the pin configuration; otherwise it is possible for multiple peripheral
+//! drivers to configure the same GPIO pin at the same time, which is undefined behavior.
 //!
 //! ### Splitting pins into signals
 //!
@@ -325,7 +325,7 @@ impl gpio::InputSignal {
 
     /// Connects a peripheral input signal to a GPIO or a constant level.
     ///
-    /// You cannot connect multiple GPIOs to a single peripheral input. A new
+    /// Multiple GPIOs cannot connect to a single peripheral input. A new
     /// connection replaces the previous one.
     ///
     /// A peripheral input must always be connected to something. To disconnect
@@ -347,10 +347,10 @@ impl gpio::OutputSignal {
 
     /// Connects a peripheral output signal to a GPIO.
     ///
-    /// You cannot connect multiple output signals to a single GPIO. A new
+    /// Multiple output signals cannot connect to a single GPIO. A new
     /// connection replaces the previous one.
     ///
-    /// You can connect one peripheral output signal to multiple GPIOs. Old
+    /// One peripheral output signal can connect to multiple GPIOs. Old
     /// connections are not cleared automatically.
     #[inline]
     #[instability::unstable]

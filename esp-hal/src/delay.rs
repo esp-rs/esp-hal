@@ -16,7 +16,7 @@
 //!
 //! Blocking [`DelayNs`] trait implementation from [embedded-hal].
 //!
-//! # Examples
+//! ## Examples
 //! ### Delay for 1 second
 //! ```rust, no_run
 //! # {before_snippet}

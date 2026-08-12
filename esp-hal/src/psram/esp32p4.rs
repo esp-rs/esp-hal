@@ -78,7 +78,7 @@ pub struct PsramConfig {
     // pub ecc: bool, // or any other enum.
 }
 
-/// Initialize PSRAM.
+/// Initializes PSRAM.
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     init_psram_inner(config)
 }
@@ -112,10 +112,10 @@ pub struct PsramTimingParams {
     /// MR4.wr_latency field value.
     pub mr4_wl: u8,
 
-    /// Read dummy length in bits for sync data reads (cache path).
+    /// Reads dummy length in bits for sync data reads (cache path).
     pub rd_dummy_bits: u32,
 
-    /// Write dummy length in bits for sync data writes (cache path).
+    /// Writes dummy length in bits for sync data writes (cache path).
     pub wr_dummy_bits: u32,
 
     /// Register-read dummy length for direct command path (MSPI3).
@@ -428,7 +428,7 @@ const MR_ADDR_MR6_MR7: u32 = 0x6;
 /// MR8 only used in current state, MR9 is unused or reserved.
 const MR_ADDR_MR8_MR9: u32 = 0x8;
 
-/// Read an 8-bit mode-register pair from the AP HEX PSRAM chip.
+/// Reads an 8-bit mode-register pair from the AP HEX PSRAM chip.
 ///
 /// Returns `(low, high)` where:
 ///   - `low`  = the MR at `mr_addr`
@@ -443,7 +443,7 @@ fn psram_mr_read(timing: &PsramTimingParams, mr_addr: u32) -> (u8, u8) {
     ((pair & 0xFF) as u8, ((pair >> 8) & 0xFF) as u8)
 }
 
-/// Write an 8-bit mode-register pair to the AP HEX PSRAM chip.
+/// Writes an 8-bit mode-register pair to the AP HEX PSRAM chip.
 ///
 /// `low` goes to the MR at `mr_addr`, `high` goes to the MR at
 /// `mr_addr + 1`. For pair addresses whose high slot is reserved, pass
@@ -454,7 +454,7 @@ fn psram_mr_write(mr_addr: u32, low: u8, high: u8) {
     mspi1_reg_write16(mr_addr, pair)
 }
 
-/// Initialize AP HEX PSRAM mode registers via PSRAM_MSPI1 OPI DTR
+/// Initializes AP HEX PSRAM mode registers via PSRAM_MSPI1 OPI DTR
 /// referenced IDF `hex_psram_mode_reg_t`), missing on TRM
 /// MR0: drive_str[1:0], read_latency[4:2], lt[5]
 /// MR4: wr_latency[7:5]
@@ -661,12 +661,12 @@ fn write_psram_mmu_entry(entry_id: u32, page: u16) {
     });
 }
 
-/// Map PSRAM physical pages into the virtual address space via MMU.
+/// Maps PSRAM physical pages into the virtual address space via MMU.
 ///
 /// ESP32-P4 has TWO independent MMUs:
 ///   - Flash MMU (id 0): registers in `SPI_MEM_C` (FLASH_SPI0)
 ///   - PSRAM MMU (id 1): registers in `SPI_MEM_S` (PSRAM_MSPI0) at the `MMU_ITEM_INDEX_REG` /
-///     `MMU_ITEM_CONTENT_REG` offsets we use here.
+///     `MMU_ITEM_CONTENT_REG` offsets documented below.
 ///
 /// Each PSRAM MMU entry is a 32-bit word:
 ///   - bits [9:0] : physical page number (`SOC_MMU_PSRAM_VALID_VAL_MASK = 0x3FF`)

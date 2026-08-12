@@ -100,8 +100,8 @@ pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 /// Represents a pin-peripheral connection that, when dropped, disconnects the
 /// peripheral from the pin.
 ///
-/// Apply this only to output signals. You cannot connect multiple inputs to the
-/// same peripheral signal.
+/// For output signals only. Multiple inputs cannot connect to the same
+/// peripheral signal.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct PinGuard {
@@ -199,7 +199,7 @@ impl Level {
         }
     }
 
-    /// Convert a [`Level`] to [`bool`].
+    /// Converts a [`Level`] to [`bool`].
     ///
     /// Like `<bool as From<Level>>::from(self)`, but `const`.
     pub(crate) const fn const_into(self) -> bool {
@@ -468,17 +468,17 @@ impl<'d> Io<'d> {
         _ => "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores.",
     }]
     #[doc = ""]
-    /// When you use interrupt handlers registered by this function, or
+    /// When interrupt handlers are registered by this function, or
     /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, esp-hal does
     /// **not** clear the interrupt status register or the interrupt enable
-    /// setting for you. You must do one of the following based on your use case:
+    /// setting automatically. One of the following approaches applies:
     ///
-    /// - Disable the interrupt enable setting for the GPIO pin to handle an event once
-    ///   per call to [`listen()`]. With this method, [`is_interrupt_set()`] returns
-    ///   `true` if the interrupt is set even after your handler has finished.
-    /// - Clear the interrupt status register to handle an event repeatedly after
-    ///   [`listen()`] is called. With this method, [`is_interrupt_set()`] returns `false`
-    ///   after your handler has finished.
+    /// - Disable the interrupt enable setting for the GPIO pin to handle an event once per call to
+    ///   [`listen()`]. With this method, [`is_interrupt_set()`] returns `true` if the interrupt is
+    ///   set even after your handler has finished.
+    /// - Clear the interrupt status register to handle an event repeatedly after [`listen()`] is
+    ///   called. With this method, [`is_interrupt_set()`] returns `false` after your handler has
+    ///   finished.
     ///
     /// [`listen()`]: Input::listen
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
@@ -503,10 +503,11 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
 
 /// Drives the GPIO async API from a user-installed raw GPIO interrupt handler.
 ///
-/// Use this entry point when you bypass esp-hal's GPIO ISR
-/// dispatch (typically by defining your own `#[unsafe(no_mangle)]
-/// unsafe extern "C" fn GPIO()`, or by registering your own handler via
-/// [`crate::interrupt::bind_handler`]) and you must keep the GPIO async API working.
+/// Entry point for driving the GPIO async API from a user-installed raw GPIO
+/// interrupt handler. Call this when esp-hal's GPIO ISR dispatch is bypassed
+/// (typically by defining a custom `#[unsafe(no_mangle)] unsafe extern "C" fn GPIO()`,
+/// or by registering a handler via [`crate::interrupt::bind_handler`]) while the GPIO
+/// async API must remain functional.
 ///
 /// # Safety
 ///
@@ -516,7 +517,7 @@ pub unsafe fn handle_gpio_interrupt() {
     unsafe { interrupt::handle_gpio_interrupt_impl() }
 }
 
-/// Complete any in-flight async wait on a single GPIO pin.
+/// Completes any in-flight async wait on a single GPIO pin.
 ///
 /// Per-pin counterpart of [`handle_gpio_interrupt`].
 ///
@@ -1071,14 +1072,14 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Listen for interrupts.
+    /// Listens for interrupts.
     ///
     /// The interrupts will be handled by the handler set using
     /// [`Io::set_interrupt_handler`]. All GPIO pins share the same
     /// interrupt handler.
     ///
     /// [`Event::LowLevel`] and [`Event::HighLevel`] fire
-    /// continuously when the pin is low or high. You must use
+    /// continuously when the pin is low or high. Use
     /// a custom interrupt handler to stop listening for these events,
     /// otherwise your program will be stuck in a loop as long as the pin is
     /// reading the corresponding level.
@@ -1154,14 +1155,14 @@ impl<'d> Input<'d> {
         self.pin.listen(event);
     }
 
-    /// Stop listening for interrupts
+    /// Stops listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
     }
 
-    /// Clear the interrupt status bit for this Pin
+    /// Clears the interrupt status bit for this pin.
     #[inline]
     #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
@@ -1216,7 +1217,7 @@ impl<'d> Input<'d> {
 /// separately configurable, and they have independent enable states.
 ///
 /// Enabling the input stage does not change the output stage, and vice versa.
-/// Disabling the input or output stages don't forget their configuration.
+/// Disabling the input or output stages does not clear their configuration.
 /// Disabling the output stage does not change the output level, but it
 /// disable the driver.
 #[derive(Debug)]
@@ -1284,7 +1285,7 @@ impl<'d> Flex<'d> {
         self.pin.is_input_high().into()
     }
 
-    /// Listen for interrupts.
+    /// Listens for interrupts.
     ///
     /// See [`Input::listen`] for more information and an example.
     #[inline]
@@ -1293,7 +1294,7 @@ impl<'d> Flex<'d> {
         self.pin.listen(event);
     }
 
-    /// Stop listening for interrupts.
+    /// Stops listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn unlisten(&mut self) {
@@ -1309,14 +1310,14 @@ impl<'d> Flex<'d> {
         });
     }
 
-    /// Check if the pin is listening for interrupts.
+    /// Returns whether the pin is listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn is_listening(&self) -> bool {
         is_int_enabled(self.pin.number())
     }
 
-    /// Clear the interrupt status bit for this Pin
+    /// Clears the interrupt status bit for this pin.
     #[inline]
     #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
@@ -1514,9 +1515,9 @@ impl<'d> Flex<'d> {
     /// The signal is
     /// [frozen](interconnect::InputSignal::freeze). The pin driver is free to change settings.
     ///
-    /// Lets you configure an input-output pin, then keep
+    /// Configures an input-output pin, then keeps
     /// working with the output half. The main use is testing:
-    /// you can drive a peripheral from a signal generated by
+    /// a peripheral can be driven from a signal generated by
     /// software.
     ///
     /// # Safety
@@ -1718,7 +1719,7 @@ impl<'lt> AnyPin<'lt> {
         (input, output)
     }
 
-    /// Convert the pin into an input signal.
+    /// Converts the pin into an input signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
@@ -1742,7 +1743,7 @@ impl<'lt> AnyPin<'lt> {
         input
     }
 
-    /// Convert the pin into an output signal.
+    /// Converts the pin into an output signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
@@ -2072,7 +2073,7 @@ impl AnyPin<'_> {
     ///
     /// # Safety
     ///
-    /// Ensure that only one instance of a pin is in use at one time.
+    /// Ensures that only one instance of a pin is in use at one time.
     ///
     /// # Examples
     ///

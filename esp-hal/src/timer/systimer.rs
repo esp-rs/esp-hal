@@ -413,8 +413,7 @@ impl Alarm<'_> {
     ///
     /// # Safety
     ///
-    /// You must ensure that you're only using one instance of this type at a
-    /// time.
+    /// Only one instance of this type may be in use at a time.
     pub unsafe fn clone_unchecked(&self) -> Self {
         Self {
             comp: self.comp,
@@ -425,8 +424,8 @@ impl Alarm<'_> {
 
     /// Creates a new peripheral reference with a shorter lifetime.
     ///
-    /// Use this method if you would like to keep working with the peripheral
-    /// after you dropped the driver that consumes this.
+    /// Returns the peripheral for continued use after configuration
+    /// after the consuming driver is dropped.
     ///
     /// See [Peripheral singleton] section for more information.
     ///

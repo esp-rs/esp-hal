@@ -17,13 +17,11 @@ impl Internal {
     ///
     /// # Safety
     ///
-    /// By calling this function, you accept that you are using an internal
-    /// API that is not guaranteed to be documented, stable, working
-    /// and may change at any time.
+    /// The caller accepts that this internal API is not guaranteed to be documented,
+    /// stable, or working, and may change at any time.
     ///
-    /// You declare that you have tried to look for other solutions, that
-    /// you have opened a feature request or an issue to discuss the
-    /// need for this function.
+    /// The caller confirms that other solutions were considered and that a feature
+    /// request or issue was opened to discuss the need for this function.
     pub unsafe fn conjure() -> Self {
         Self
     }

@@ -7,7 +7,7 @@ use crate::peripherals::{EXTMEM, IO_MUX, MMU_TABLE, SPI0, SPI1};
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PsramMode {
-    /// Try to detect the PSRAM mode. While convenient, not entirely reliable.
+    /// Attempts to detect the PSRAM mode. While convenient, not entirely reliable.
     #[default]
     Auto,
 
@@ -79,7 +79,7 @@ pub struct PsramConfig {
     pub ram_frequency: SpiRamFreq,
 }
 
-/// Initialize PSRAM to be used for data.
+/// Initializes PSRAM to be used for data.
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     let success = match config.mode {

@@ -94,7 +94,7 @@ bitfield::bitfield! {
     /// Writing an invalid value sets this to the default value 0x0.
     pub u8, action, set_action: 15, 12;
 
-    /// Set to `1` if the selected trigger fired previously. Clear manually.
+    /// `1` when the selected trigger previously fired. Cleared manually.
     pub bool, hit, set_hit: 20;
 
     /// 0: Both Debug and M mode can write the tdata1 and tdata2 registers at the selected tselect.
@@ -124,7 +124,7 @@ pub(crate) struct WatchPoint {
     tdata2: u32,
 }
 
-/// Clear the watchpoint
+/// Clears the watchpoint.
 #[cfg(riscv)]
 pub(crate) unsafe fn clear_watchpoint(id: u8) -> WatchPoint {
     assert!(id < 4);
@@ -148,7 +148,7 @@ pub(crate) unsafe fn clear_watchpoint(id: u8) -> WatchPoint {
     WatchPoint { tdata1, tdata2 }
 }
 
-/// Clear the watchpoint
+/// Restores a previously cleared watchpoint.
 #[cfg(riscv)]
 pub(crate) unsafe fn restore_watchpoint(id: u8, watchpoint: WatchPoint) {
     DEBUGGER_LOCK.lock(|| unsafe {
@@ -164,7 +164,7 @@ pub(crate) unsafe fn restore_watchpoint(id: u8, watchpoint: WatchPoint) {
     });
 }
 
-/// Clear the watchpoint
+/// Returns whether the watchpoint has been hit.
 #[cfg(all(riscv, feature = "exception-handler"))]
 pub(crate) unsafe fn watchpoint_hit(id: u8) -> bool {
     assert!(id < 4);

@@ -113,7 +113,7 @@ impl CpuInterrupt {
         cpu_int::enable_cpu_interrupt_raw(self as u32);
     }
 
-    /// Clear the CPU interrupt status bit
+    /// Clears the CPU interrupt status bit
     #[inline]
     #[instability::unstable]
     pub fn clear(self) {
@@ -291,18 +291,18 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
 
 /// Enables an interrupt by directly binding it to an available CPU interrupt.
 ///
-/// ⚠️ Installs a *raw trap handler*: the `handler` you provide is written directly into the
+/// ⚠️ Installs a *raw trap handler*: the provided `handler` is written directly into the
 /// CPU interrupt vector table. That means:
 ///
 /// - The provided handler is used as an actual trap handler.
-/// - You must:
-///   - Save and restore all registers you use.
+/// - The handler must:
+///   - Save and restore all registers it uses.
 ///   - Clear the interrupt source if necessary.
 ///   - Return using the `mret` instruction.
 /// - Declare the handler as a naked function. The compiler does not insert a function
 ///   prologue/epilogue; a normal Rust `fn` results in an error.
 ///
-/// Unless you need such low-level control for the lowest possible latency,
+/// Unless low-level control is required for the lowest possible latency,
 /// use [`enable`][crate::interrupt::enable] instead.
 #[instability::unstable]
 pub fn enable_direct(
@@ -438,7 +438,7 @@ fn cpu_wait_mode_on() -> bool {
     }
 }
 
-/// Wait for an interrupt to occur.
+/// Waits for an interrupt to occur.
 ///
 /// Executes the Wait For Interrupt (WFI or equivalent) instruction on the
 /// current CPU core. The CPU core stops execution until an interrupt occurs.

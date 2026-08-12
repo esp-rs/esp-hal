@@ -91,10 +91,10 @@ pub trait RegisterAccess {
 
     fn start_sample();
 
-    /// Check if sampling is done
+    /// Returns whethersampling is done
     fn is_done() -> bool;
 
-    /// Read sample data
+    /// Reads sample data
     fn read_data() -> u16;
 
     /// Sets up ADC hardware for calibration.
@@ -103,7 +103,7 @@ pub trait RegisterAccess {
     /// Sets the calibration parameter in ADC hardware.
     fn set_init_code(data: u16);
 
-    /// Reset flags
+    /// Resets flags
     fn reset();
 }
 
@@ -399,7 +399,7 @@ where
         }
     }
 
-    /// Start and wait for a conversion on the specified pin and return the
+    /// Starts and wait for a conversion on the specified pin and return the
     /// result
     pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
     where

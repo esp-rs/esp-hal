@@ -38,7 +38,7 @@ pub fn is_running(core: Cpu) -> bool {
     code != 0x86
 }
 
-/// Prepare Core 1 for an imminent system reset.
+/// Prepares Core 1 for an imminent system reset.
 ///
 /// Mirrors IDF's `esp_restart_noos()` pre-reset sequence for ESP32-P4:
 /// 1. Briefly reset Core 1's CPU (LP AON domain, so it takes effect even with global reset still

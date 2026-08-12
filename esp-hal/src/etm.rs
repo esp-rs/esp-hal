@@ -21,7 +21,7 @@
 //!
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/etm.html)")]
-//! # Examples
+//! ## Examples
 //!
 //! ### Control LED by the button via ETM
 //! ```rust, no_run

@@ -169,7 +169,7 @@ static HOOKS: NonReentrantMutex<Hooks> = NonReentrantMutex::new(Hooks {
 impl WakeupSource {
     /// Enables this source, so that it can end a sleep.
     ///
-    /// The source stays enabled until you call [`Self::disable`]. It also stays enabled through a
+    /// The source stays enabled until [`Self::disable`] is called. It also stays enabled through a
     /// sleep and through a deep-sleep wake. While the chip is awake, an enabled source does
     /// nothing.
     // On a chip where all the implemented sources need hooks, nothing calls this function.

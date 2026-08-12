@@ -414,7 +414,7 @@ impl PdmTxConfig {
         }
     }
 
-    /// Validate TX configuration against hardware capabilities.
+    /// Validates TX configuration against hardware capabilities.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.slot.data_format == PdmDataFormat::Pcm && !info.pcm2pdm {
             return Err(PdmError::PcmFormatUnsupported);
@@ -468,7 +468,7 @@ impl PdmRxConfig {
         }
     }
 
-    /// Validate RX configuration against hardware capabilities.
+    /// Validates RX configuration against hardware capabilities.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.slot.data_format == PdmDataFormat::Pcm && !info.pdm2pcm {
             return Err(PdmError::PcmFormatUnsupported);
@@ -516,7 +516,7 @@ impl PdmConfig {
         }
     }
 
-    /// Validate that exactly one direction is configured and that the settings
+    /// Validates that exactly one direction is configured and that the settings
     /// are valid for the given I2S instance.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.tx.is_none() && self.rx.is_none() {

@@ -35,7 +35,7 @@ pub const RTC_CNTL_CK8M_WAIT_SLP_CYCLES: u8 = 4;
 pub const RTC_CNTL_WAKEUP_DELAY_CYCLES: u8 = 7;
 /// Power-up cycles for other blocks.
 pub const RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES: u8 = 1;
-/// Wait cycles for other blocks.
+/// Waits cycles for other blocks.
 pub const RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES: u16 = 1;
 /// Minimum sleep value (in cycles).
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 128;
@@ -44,23 +44,23 @@ pub const RTC_CNTL_DBG_ATTEN_DEFAULT: u8 = 3;
 
 /// Power-up cycles for RTC memory.
 pub const RTC_MEM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for RTC memory.
+/// Waits cycles for RTC memory.
 pub const RTC_MEM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for ROM and RAM.
 pub const ROM_RAM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for ROM and RAM.
+/// Waits cycles for ROM and RAM.
 pub const ROM_RAM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for Wi-Fi.
 pub const WIFI_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for Wi-Fi.
+/// Waits cycles for Wi-Fi.
 pub const WIFI_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for RTC components.
 pub const RTC_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for RTC components.
+/// Waits cycles for RTC components.
 pub const RTC_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for the digital wrap components.
 pub const DG_WRAP_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for the digital wrap components.
+/// Waits cycles for the digital wrap components.
 pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 
 /// Default wait cycles for the 8MHz clock.

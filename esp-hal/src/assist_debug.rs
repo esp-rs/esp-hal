@@ -13,7 +13,7 @@
 //! last seen PC (e.g. _Saved PC:0x42002ff2_). Make sure the reset was triggered
 //! by a TIMG watchdog. Not an RTC or SWD watchdog.
 //!
-//! # Examples
+//! ## Examples
 //! Visit the [Debug Assist] example for an example of using the Debug
 //! Assistant.
 //!
@@ -43,7 +43,7 @@ impl<'d> DebugAssist<'d> {
         DebugAssist { debug_assist }
     }
 
-    /// Register an interrupt handler for the Debug Assist module.
+    /// Registers an interrupt handler for the Debug Assist module.
     ///
     /// Replaces any previously registered interrupt
     /// handlers.
@@ -143,7 +143,7 @@ impl DebugAssist<'_> {
         self.internal_disable_sp_monitor(0)
     }
 
-    /// Clear SP monitoring interrupt on main core.
+    /// Clears SP monitoring interrupt on main core.
     pub fn clear_sp_monitor_interrupt(&mut self) {
         self.internal_clear_sp_monitor_interrupt(0)
     }
@@ -173,7 +173,7 @@ impl<'d> DebugAssist<'d> {
         self.internal_disable_sp_monitor(1)
     }
 
-    /// Clear SP monitoring interrupt on secondary core.
+    /// Clears SP monitoring interrupt on secondary core.
     pub fn clear_core1_sp_monitor_interrupt(&mut self) {
         self.internal_clear_sp_monitor_interrupt(1)
     }
@@ -317,7 +317,7 @@ impl DebugAssist<'_> {
 
     /// Enables region monitoring of read/write performed by the main CPU in
     /// memory region 0. When the bus reads or writes in the
-    /// specified memory region, an interrupt is triggered. You can monitor two memory
+    /// specified memory region, an interrupt is triggered. Up to two memory
     /// regions (region 0 and region 1) at the same time.
     pub fn enable_region0_monitor(
         &mut self,
@@ -334,7 +334,7 @@ impl DebugAssist<'_> {
         self.internal_disable_region0_monitor(0)
     }
 
-    /// Clear region0 monitoring interrupt on main core.
+    /// Clears region0 monitoring interrupt on main core.
     pub fn clear_region0_monitor_interrupt(&mut self) {
         self.internal_clear_region0_monitor_interrupt(0)
     }
@@ -362,7 +362,7 @@ impl DebugAssist<'_> {
         self.internal_disable_region1_monitor(0)
     }
 
-    /// Clear region1 monitoring interrupt on main core.
+    /// Clears region1 monitoring interrupt on main core.
     pub fn clear_region1_monitor_interrupt(&mut self) {
         self.internal_clear_region1_monitor_interrupt(0)
     }
@@ -398,7 +398,7 @@ impl DebugAssist<'_> {
         self.internal_disable_region0_monitor(1)
     }
 
-    /// Clear region0 monitoring interrupt on secondary core.
+    /// Clears region0 monitoring interrupt on secondary core.
     pub fn clear_core1_region0_monitor_interrupt(&mut self) {
         self.internal_clear_region0_monitor_interrupt(1)
     }
@@ -426,7 +426,7 @@ impl DebugAssist<'_> {
         self.internal_disable_region1_monitor(1)
     }
 
-    /// Clear region1 monitoring interrupt on secondary core.
+    /// Clears region1 monitoring interrupt on secondary core.
     pub fn clear_core1_region1_monitor_interrupt(&mut self) {
         self.internal_clear_region1_monitor_interrupt(1)
     }

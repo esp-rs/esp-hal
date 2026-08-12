@@ -11,7 +11,7 @@
 //! `with_master_clock` method on the camera driver. The driver (due to the
 //! peripheral) mandates DMA (Direct Memory Access) for efficient data transfer.
 //!
-//! # Examples
+//! ## Examples
 //! ## Master Mode
 //! Following code shows how to receive some bytes from an 8 bit DVP stream in
 //! master mode.
@@ -76,11 +76,11 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EofMode {
-    /// Generate GDMA SUC EOF by data byte length.
+    /// Generates GDMA SUC EOF by data byte length.
     ///
     /// When the length of received data reaches this value + 1, GDMA in_suc_eof is triggered.
     ByteLen(u16),
-    /// Generate GDMA SUC EOF by the vsync signal
+    /// Generates GDMA SUC EOF by the vsync signal
     VsyncSignal,
 }
 
@@ -492,9 +492,8 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
     ///
-    /// The camera does not really "finish" its transfer, so what you are
-    /// really waiting for here is a DMA Error. You typically just want to
-    /// call [Self::stop] once you have the data you need.
+    /// The camera does not finish its transfer; this waits for a DMA error.
+    /// Call [`Self::stop`] once enough data has been received.
     pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d>, BUF::Final) {
         while !self.is_done() {}
 
@@ -596,16 +595,16 @@ pub struct Config {
     /// 7-bit value; maximum 128 lines.
     line_interrupt: Option<u8>,
 
-    /// Invert VSYNC signal, valid in high level.
+    /// Inverts VSYNC signal, valid in high level.
     invert_vsync: bool,
 
-    /// Invert HSYNC signal, valid in high level.
+    /// Inverts HSYNC signal, valid in high level.
     invert_hsync: bool,
 
-    /// Invert H_ENABLE signal (Also known as "Data Enable"), valid in high level.
+    /// Inverts H_ENABLE signal (Also known as "Data Enable"), valid in high level.
     invert_h_enable: bool,
 
-    /// Invert PCLK signal.
+    /// Inverts PCLK signal.
     invert_pixel_clock: bool,
 }
 

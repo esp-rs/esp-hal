@@ -31,7 +31,7 @@
 //! Once the clock configuration is applied, the clock frequencies become
 //! `frozen` and cannot be changed.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
@@ -99,7 +99,7 @@ cfg_select! {
 
 impl CpuClock {
     #[procmacros::doc_replace]
-    /// Use the highest possible frequency for a particular chip.
+    /// Highest possible frequency for a particular chip.
     ///
     /// # Examples
     ///
@@ -523,7 +523,7 @@ pub fn xtal_clock() -> Rate {
     Rate::from_hz(ll::xtal_clk_frequency())
 }
 
-/// Read the calibrated RTC slow clock period from the STORE1 register.
+/// Reads the calibrated RTC slow clock period from the STORE1 register.
 ///
 /// The period is in unit of microseconds, represented as a fixed-point number
 /// with `RtcClock::CAL_FRACT` fractional bits.
@@ -539,14 +539,14 @@ pub(crate) fn rtc_slow_cal_period() -> u32 {
     reg.read().bits()
 }
 
-/// Read the calibrated RTC fast clock period from memory.
+/// Reads the calibrated RTC fast clock period from memory.
 #[cfg_attr(not(soc_has_pmu), expect(dead_code))]
 #[cfg_attr(esp32s31, expect(dead_code))]
 pub(crate) fn rtc_fast_cal_period() -> u32 {
     RC_FAST_CAL_VAL.load(core::sync::atomic::Ordering::Relaxed)
 }
 
-/// Convert RTC slow clock ticks to microseconds using the calibrated period.
+/// Converts RTC slow clock ticks to microseconds using the calibrated period.
 #[cfg(lp_timer_driver_supported)]
 pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
     let period = rtc_slow_cal_period() as u64;
@@ -565,7 +565,7 @@ pub(crate) fn rtc_ticks_to_us(ticks: u64) -> u64 {
     upper * period + ((lower * period) >> RtcClock::CAL_FRACT)
 }
 
-/// Convert microseconds to RTC slow clock ticks using the calibrated period.
+/// Converts microseconds to RTC slow clock ticks using the calibrated period.
 pub(crate) fn us_to_rtc_ticks(time_in_us: u64) -> u64 {
     let period = rtc_slow_cal_period() as u64;
 

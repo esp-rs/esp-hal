@@ -232,7 +232,7 @@ pub mod dma {
             }
         }
 
-        /// Register a buffer for a DMA write.
+        /// Registers a buffer for a DMA write.
         ///
         /// Returns a [`SpiDmaTransfer`]. The maximum amount of data to
         /// be sent is 32736 bytes.
@@ -267,7 +267,7 @@ pub mod dma {
             Ok(SpiDmaTransfer::new(self, buffer, false, true))
         }
 
-        /// Register a buffer for a DMA read.
+        /// Registers a buffer for a DMA read.
         ///
         /// Returns a [`SpiDmaTransfer`]. The maximum amount of data to
         /// be received is 32736 bytes.
@@ -302,7 +302,7 @@ pub mod dma {
             Ok(SpiDmaTransfer::new(self, buffer, true, false))
         }
 
-        /// Register buffers for a DMA transfer.
+        /// Registers buffers for a DMA transfer.
         ///
         /// Returns a [`SpiDmaTransfer`]. The maximum amount of data to
         /// be sent/received is 32736 bytes.
@@ -618,7 +618,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with[Self::register_block] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// System peripheral marker.
@@ -678,7 +678,7 @@ impl Info {
         });
     }
 
-    /// Initialize for full-duplex 1 bit mode
+    /// Initializes for full-duplex 1 bit mode
     fn init(&self) {
         #[cfg(soc_has_pcr)]
         crate::peripherals::PCR::regs()

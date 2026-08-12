@@ -33,7 +33,7 @@ use crate::{
 /// A DMA channel singleton that supports memory-to-memory transfers on this chip.
 ///
 /// Only channels listed in device metadata (`mem2mem = true`) implement this trait.
-/// Use [`Mem2Mem::new`] to construct a transfer engine from such a channel.
+/// See [`Mem2Mem::new`] to construct a transfer engine from such a channel.
 #[diagnostic::on_unimplemented(
     message = "this DMA channel does not support memory-to-memory transfers",
     note = "Use a channel with `mem2mem = true` in device metadata. See `Mem2Mem::new`."
@@ -232,9 +232,8 @@ impl<'d> Mem2Mem<'d, Blocking> {
     ///
     /// # Safety
     ///
-    /// You must ensure that you're not using DMA for the same peripheral and
-    /// that you're the only one using the peripheral. You must also ensure that
-    /// the peripheral is compatible with the channel.
+    /// The caller must not use DMA for the same peripheral concurrently and must be
+    /// the sole user of the peripheral. The peripheral must also be compatible with the channel.
     #[cfg(dma_mem2mem_requires_peripheral)]
     pub unsafe fn new_unsafe<CH>(channel: CH, peripheral: DmaPeripheral) -> Self
     where

@@ -118,16 +118,16 @@ pub trait RegisterAccess {
     /// Configures one-time sampling parameters.
     fn config_onetime_sample(channel: u8, attenuation: u8);
 
-    /// Start onetime sampling
+    /// Starts onetime sampling
     fn start_onetime_sample();
 
-    /// Check if sampling is done
+    /// Returns whethersampling is done
     fn is_done() -> bool;
 
-    /// Read sample data
+    /// Reads sample data
     fn read_data() -> u16;
 
-    /// Reset flags
+    /// Resets flags
     fn reset();
 
     /// Sets up ADC hardware for calibration.

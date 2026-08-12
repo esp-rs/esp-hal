@@ -171,7 +171,7 @@ pub const PVT_1_GLITCH_EN: EfuseField = EfuseField::new(0, 7, 234, 1);
 pub const PVT_1_GLITCH_MODE: EfuseField = EfuseField::new(0, 7, 235, 2);
 /// Flash power select (1 = 3.3V, 0 = 1.8V)
 pub const PMU_FLASH_POWER_SEL: EfuseField = EfuseField::new(0, 7, 237, 1);
-/// Validate PMU_FLASH_POWER_SEL
+/// Validates PMU_FLASH_POWER_SEL
 pub const PMU_FLASH_POWER_SEL_EN: EfuseField = EfuseField::new(0, 7, 238, 1);
 /// Enables power glitch detection
 pub const POWER_GLITCH_EN: EfuseField = EfuseField::new(0, 7, 239, 4);

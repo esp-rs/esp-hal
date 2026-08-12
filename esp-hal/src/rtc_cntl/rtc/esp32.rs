@@ -46,7 +46,7 @@ pub enum SocResetReason {
     Cpu0RtcWdt    = 0x0D,
     /// CPU0 resets CPU1 by DPORT_APPCPU_RESETTING
     Cpu1Cpu0      = 0x0E,
-    /// Reset when the VDD voltage is not stable
+    /// Resets when the VDD voltage is not stable
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,

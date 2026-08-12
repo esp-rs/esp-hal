@@ -255,7 +255,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 pub struct Info {
     /// Pointer to the register block for this UART instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with[Self::register_block] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// The system peripheral marker.
@@ -313,7 +313,7 @@ impl Info {
         unsafe { &*self.register_block }
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts
     pub(super) fn enable_listen(&self, interrupts: EnumSet<UartInterrupt>, enable: bool) {
         let reg_block = self.regs();
 
@@ -554,7 +554,7 @@ impl Info {
     )]
     /// Configures the Receive Timeout detection setting
     ///
-    /// ## Arguments
+    /// # Arguments
     ///
     /// `timeout` - the number of symbols ("bytes") to wait for before
     /// triggering a timeout. Pass None to disable the timeout.

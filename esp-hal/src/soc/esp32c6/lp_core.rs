@@ -78,21 +78,21 @@ impl<'d> LpCore<'d> {
         this
     }
 
-    /// Stop the LP core
+    /// Stops the LP core
     pub fn stop(&mut self) {
         ulp_lp_core_stop();
     }
 
-    /// Start the LP core
+    /// Starts the LP core
     pub fn run(&mut self, wakeup_src: LpCoreWakeupSource) {
         ulp_lp_core_run(wakeup_src);
     }
 
     /// Lets the LP core wake the chip from sleep.
     ///
-    /// The request stays until you call [`Self::disable_wakeup`]. It stays through a sleep, through
-    /// a deep-sleep wake, and after a drop of this driver. While the chip is awake, it does
-    /// nothing.
+    /// The request stays until [`Self::disable_wakeup`] is called. It stays through a sleep,
+    /// through a deep-sleep wake, and after a drop of this driver. While the chip is awake, it
+    /// does nothing.
     pub fn enable_wakeup(&mut self) {
         WakeupSource::LpCore.enable_with_hooks(Some(keep_low_power_domain), None);
     }

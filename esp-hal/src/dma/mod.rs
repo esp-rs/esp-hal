@@ -18,7 +18,7 @@
 //! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
 //! newer `GDMA` controller.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Initialize and utilize DMA controller in `SPI`
 //!
@@ -302,7 +302,7 @@ pub const CHUNK_SIZE: usize = 4092;
 #[procmacros::doc_replace]
 /// Convenience macro to create DMA buffers and descriptors.
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_buffers;
@@ -327,7 +327,7 @@ macro_rules! dma_buffers {
 #[procmacros::doc_replace]
 /// Convenience macro to create DMA descriptors.
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_descriptors;
@@ -354,7 +354,7 @@ macro_rules! dma_descriptors {
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
 /// size.
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_buffers_chunk_size;
@@ -388,7 +388,7 @@ macro_rules! dma_buffers_chunk_size {
 #[procmacros::doc_replace]
 /// Convenience macro to create DMA descriptors with specific chunk size
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_descriptors_chunk_size;
@@ -499,7 +499,7 @@ macro_rules! dma_descriptor_count {
 /// Convenience macro to create a DmaRxBuf from buffer size. The buffer and
 /// descriptors are statically allocated and used to create the `DmaRxBuf`.
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_rx_buffer;
@@ -523,7 +523,7 @@ macro_rules! dma_rx_buffer {
 /// Convenience macro to create a DmaTxBuf from buffer size. The buffer and
 /// descriptors are statically allocated and used to create the `DmaTxBuf`.
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_tx_buffer;
@@ -551,7 +551,7 @@ macro_rules! dma_tx_buffer {
 ///
 /// Smaller chunk sizes are recommended for lower latency.
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_rx_stream_buffer;
@@ -582,7 +582,7 @@ macro_rules! dma_rx_stream_buffer {
 ///
 /// Smaller chunk sizes are recommended for lower latency.
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_tx_stream_buffer;
@@ -608,7 +608,7 @@ macro_rules! dma_tx_stream_buffer {
 #[procmacros::doc_replace]
 /// Convenience macro to create a [DmaLoopBuf] from a buffer size.
 ///
-/// ## Usage
+/// # Examples
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_loop_buffer;
@@ -1431,7 +1431,7 @@ where
         self.tx.set_interrupt_handler(handler);
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<DmaInterrupt>>) {
         for interrupt in interrupts.into() {
             match interrupt {

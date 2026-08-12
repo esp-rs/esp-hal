@@ -25,7 +25,7 @@
 //! to retrieve the hash value and repeat the process for a new hash calculation
 //! if needed.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Using the `Sha` driver
 //!
@@ -123,7 +123,7 @@ impl<'d> Sha<'d> {
         Self { sha, _guard: guard }
     }
 
-    /// Start a new digest.
+    /// Starts a new digest.
     pub fn start<'a, A: ShaAlgorithm>(&'a mut self) -> ShaDigest<'d, A, &'a mut Self> {
         ShaDigest::new(self)
     }
@@ -448,7 +448,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         self.sha.borrow_mut().update(&mut self.state, incoming)
     }
 
-    /// Finish of the calculation (if not already) and copy result to output
+    /// Finishes of the calculation (if not already) and copy result to output
     /// After `finish()` is called `update()`s will contribute to a new hash
     /// which can be calculated again with `finish()`.
     ///

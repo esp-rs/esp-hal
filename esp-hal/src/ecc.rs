@@ -762,7 +762,7 @@ for_each_ecc_working_mode! {
                 self.info().reset()
             }
 
-            /// Register an interrupt handler for the ECC peripheral.
+            /// Registers an interrupt handler for the ECC peripheral.
             ///
             /// Replaces any previously registered interrupt
             /// handlers.

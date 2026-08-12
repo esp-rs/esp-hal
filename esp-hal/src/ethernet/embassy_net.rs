@@ -5,7 +5,7 @@
 //! Ethernet peripheral to be used as a network interface with
 //! [`embassy-net`](https://crates.io/crates/embassy-net).
 //!
-//! # Usage
+//! ## Usage
 //!
 //! After obtaining an `Ethernet<'_, Async, P>` instance, pass it directly to
 //! `embassy_net::new()` — the [`Driver`] impl is inherent on the type.

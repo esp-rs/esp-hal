@@ -138,7 +138,7 @@ impl<'d> LowPower<'d> {
     /// this function is the complete report, so it gives no other result.
     ///
     /// A rejected request returns the wake pads to their drivers, but it cannot return every pad.
-    /// Sleep entry disconnects the pads that no hold keeps, on the chips that need that step to
+    /// Sleeps entry disconnects the pads that no hold keeps, on the chips that need that step to
     /// reach the deep-sleep current, and it cannot know their earlier configuration. Configure
     /// those pads again if this function returns. ESP-IDF has the same limit in
     /// `esp_deep_sleep_try_to_start`.

@@ -220,7 +220,7 @@ impl From<u8> for I2cAddress {
 #[non_exhaustive]
 #[instability::unstable]
 pub enum BusTimeout {
-    /// Use the maximum timeout value.
+    /// Maximum timeout value.
     Maximum,
 
     /// Disables timeout control.
@@ -236,7 +236,7 @@ impl BusTimeout {
     ///
     /// Newer devices only support power-of-two timeouts, so we'll have to take
     /// the logarithm of the timeout value. This may cause considerably
-    /// longer (at most ~double) timeouts than configured. We may provide an
+    /// longer (at most about double) timeouts than configured. An
     /// `ApbCycles` variant in the future to allow specifying the timeout in
     /// APB cycles directly.
     fn apb_cycles(self, half_bus_cycle: u32) -> Result<Option<u32>, ConfigError> {
@@ -481,10 +481,10 @@ enum OpKind {
 #[derive(Debug, PartialEq, Eq, Hash, strum::Display)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Operation<'a> {
-    /// Write data from the provided buffer.
+    /// Writes data from the provided buffer.
     Write(&'a [u8]),
 
-    /// Read data into the provided buffer.
+    /// Reads data into the provided buffer.
     Read(&'a mut [u8]),
 }
 
@@ -773,8 +773,8 @@ impl<'d> I2c<'d, Blocking> {
     /// Replaces any previously registered interrupt
     /// handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by passing
-    /// [DEFAULT_INTERRUPT_HANDLER][crate::interrupt::DEFAULT_INTERRUPT_HANDLER].
+    /// Restores the default interrupt handler via
+    /// [`DEFAULT_INTERRUPT_HANDLER`][crate::interrupt::DEFAULT_INTERRUPT_HANDLER].
     ///
     /// # Panics
     ///
@@ -785,7 +785,7 @@ impl<'d> I2c<'d, Blocking> {
         self.i2c.set_interrupt_handler(handler);
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<Event>>) {
         self.i2c.info().enable_listen(interrupts.into(), true)
@@ -959,7 +959,7 @@ impl<'d> I2c<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Execute the provided operations on the I2C bus as a single transaction.
+    /// Executes the provided operations on the I2C bus as a single transaction.
     ///
     /// Dropping the returned Future aborts the transfer and blocks while the
     /// driver clears and releases the bus.
@@ -1038,7 +1038,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Connect a pin to the I2C SDA signal.
+    /// Connects a pin to the I2C SDA signal.
     ///
     /// If this function is called with a pin singleton (e.g. `GPIO2`), the pin will be configured
     /// to use the internal pull-up resistor. If this is undesired, call this function with a fully
@@ -1090,7 +1090,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Connect a pin to the I2C SCL signal.
+    /// Connects a pin to the I2C SCL signal.
     ///
     /// If this function is called with a pin singleton (e.g. `GPIO2`), the pin will be configured
     /// to use the internal pull-up resistor. If this is undesired, call this function with a fully
@@ -1227,7 +1227,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Execute the provided operations on the I2C bus.
+    /// Executes the provided operations on the I2C bus.
     ///
     /// Transaction contract:
     /// - Before executing the first operation an ST is sent automatically. This is followed by

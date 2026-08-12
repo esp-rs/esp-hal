@@ -356,7 +356,7 @@ impl Drop for Uart0SclkGuard {
     }
 }
 
-/// Ensure UART0's source clock stays enabled for boot ROM compatibility.
+/// Ensures UART0's source clock stays enabled for boot ROM compatibility.
 ///
 /// On some chips, resetting or waking up while UART0's source clock is disabled
 /// can prevent the boot ROM from starting correctly. This only requests the

@@ -12,7 +12,7 @@
 ))]
 //! Low Power IO (LP_IO)
 //!
-//! # Overview
+//! ## Overview
 //!
 //! The hardware provides GPIO pins with low-power capabilities and analog
 //! functions. These pins are controlled by the LP IO peripheral, which some

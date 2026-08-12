@@ -40,7 +40,7 @@ fn calibrate_ocode() {}
 
 fn set_rtc_dig_dbias() {}
 
-/// Perform clock control related initialization
+/// Performs clock control related initialization
 fn clock_control_init() {
     let extmem = EXTMEM::regs();
     let spi_mem_0 = SPI0::regs();
@@ -61,7 +61,7 @@ fn clock_control_init() {
     spi_mem_1.clock_gate().modify(|_, w| w.clk_en().clear_bit());
 }
 
-/// Perform power control related initialization
+/// Performs power control related initialization
 fn power_control_init() {
     let rtc_cntl = LPWR::regs();
     let system = SYSTEM::regs();

@@ -18,13 +18,13 @@ impl AtomicWaker {
         }
     }
 
-    /// Register a waker. Overwrites the previous waker, if any.
+    /// Registers a waker. Overwrites the previous waker, if any.
     #[inline]
     pub fn register(&self, w: &Waker) {
         self.waker.register(w);
     }
 
-    /// Wake the registered waker, if any.
+    /// Wakes the registered waker, if any.
     #[crate::ram]
     pub fn wake(&self) {
         self.waker.wake();

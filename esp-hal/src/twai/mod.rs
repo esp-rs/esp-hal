@@ -20,7 +20,7 @@
 //! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
 //! Format (29-bit) frame identifiers.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Transmitting and Receiving Messages
 //!
@@ -240,7 +240,7 @@ pub enum TwaiMode {
     /// Self-test mode (no acknowledgement required for a successful message
     /// transmission)
     SelfTest,
-    /// Listen only operating mode
+    /// Listens only operating mode
     ListenOnly,
 }
 
@@ -559,7 +559,7 @@ impl EspTwaiFrame {
         &self.bytes[0..len]
     }
 
-    /// Make a new [`EspTwaiFrame`] from TWAI_DATA_x_REG registers.
+    /// Creates a new [`EspTwaiFrame`] from TWAI_DATA_x_REG registers.
     pub(super) fn new_from_registers(register_block: &RegisterBlock) -> Self {
         let mut bytes: [u8; 13] = [0; 13];
         // SAFETY: Safe because it is a constant-size, read-only access to the 13 data registers
@@ -569,7 +569,7 @@ impl EspTwaiFrame {
         Self { bytes }
     }
 
-    /// Make a new [`EspTwaiFrame`] from parameters.
+    /// Creates a new [`EspTwaiFrame`] from parameters.
     fn new_from_parameters(
         id: impl Into<Id>,
         remote_request: bool,
@@ -725,7 +725,7 @@ pub enum BaudRate {
 }
 
 impl BaudRate {
-    /// Convert the BaudRate into the timings that the peripheral needs.
+    /// Converts the BaudRate into the timings that the peripheral needs.
     // See: https://github.com/espressif/esp-idf/tree/ab4200e/components/esp_hal_twai/include/hal/twai_types.h
     const fn timing(self) -> TimingConfig {
         #[cfg(not(esp32h2))]
@@ -975,7 +975,7 @@ where
     /// match a 29-bit frame and vice versa. The application must check the ID
     /// again after a frame is received.
     ///
-    /// You may use a `const {}` block to ensure that the filter is parsed
+    /// A `const {}` block can ensure that the filter is parsed
     /// during program compilation.
     ///
     /// The filter is not applied to the peripheral until [`Self::start`] is
@@ -1077,7 +1077,7 @@ where
 impl<'d> TwaiConfiguration<'d, Blocking> {
     /// Creates a new instance of [TwaiConfiguration]
     ///
-    /// You will need to use a transceiver to connect to the TWAI bus
+    /// A transceiver is required to connect to the TWAI bus.
     pub fn new(
         peripheral: impl Instance + 'd,
         rx_pin: impl PeripheralInput<'d>,
@@ -1091,8 +1091,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
     /// Creates a new instance of [TwaiConfiguration] meant to connect two ESP32s
     /// directly
     ///
-    /// You don't need a transceiver by following the description in the
-    /// `twai.rs` example
+    /// Direct ESP32-to-ESP32 connection without a transceiver; see the `twai.rs` example
     pub fn new_no_transceiver(
         peripheral: impl Instance + 'd,
         rx_pin: impl PeripheralInput<'d>,
@@ -1103,7 +1102,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
         Self::new_internal(peripheral.degrade(), rx_pin, tx_pin, baud_rate, true, mode)
     }
 
-    /// Convert the configuration into an async configuration.
+    /// Converts the configuration into an async configuration.
     pub fn into_async(mut self) -> TwaiConfiguration<'d, Async> {
         self.set_interrupt_handler(self.twai.async_handler());
         TwaiConfiguration {
@@ -1126,7 +1125,7 @@ impl<'d> TwaiConfiguration<'d, Blocking> {
 }
 
 impl<'d> TwaiConfiguration<'d, Async> {
-    /// Convert the configuration into a blocking configuration.
+    /// Converts the configuration into a blocking configuration.
     pub fn into_blocking(self) -> TwaiConfiguration<'d, Blocking> {
         use crate::{interrupt, system::Cpu};
 
@@ -1183,7 +1182,7 @@ where
         }
     }
 
-    /// Stop the peripheral, putting it into reset mode and enabling
+    /// Stops the peripheral, putting it into reset mode and enabling
     /// reconfiguration.
     pub fn stop(self) -> TwaiConfiguration<'d, Dm> {
         // Put the peripheral into reset/configuration mode by setting the reset mode
@@ -1212,7 +1211,7 @@ where
         self.regs().tx_err_cnt().read().tx_err_cnt().bits()
     }
 
-    /// Check if the controller is in a bus off state.
+    /// Returns whether the controller is in a bus-off state.
     pub fn is_bus_off(&self) -> bool {
         self.regs().status().read().bus_off_st().bit_is_set()
     }
@@ -1248,7 +1247,7 @@ where
             .bits()
     }
 
-    /// Clear the receive FIFO, discarding any valid, partial, or invalid
+    /// Clears the receive FIFO, discarding any valid, partial, or invalid
     /// packets.
     ///
     /// Clears an overrun receive FIFO.
@@ -1293,11 +1292,10 @@ where
         self.twai.register_block()
     }
 
-    /// Transmit a frame.
+    /// Transmits a frame.
     ///
-    /// Because of how the TWAI registers are set up, we have to do some
-    /// assembly of bytes. These registers serve a filter
-    /// configuration role when the device is in configuration mode so
+    /// TWAI register layout requires byte assembly before transmission. These registers serve a
+    /// filter configuration role when the device is in configuration mode so
     /// patching the svd files to improve this may be non-trivial.
     ///
     /// [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf#subsubsection.29.4.4.2)
@@ -1352,7 +1350,7 @@ where
         self.twai.register_block()
     }
 
-    /// Receive a frame
+    /// Receives a frame
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
         let status = self.regs().status().read();
 
@@ -1430,7 +1428,7 @@ impl embedded_can::Error for EspTwaiError {
     }
 }
 
-/// Copy data from multiple TWAI_DATA_x_REG registers, packing the source into
+/// Copies data from multiple TWAI_DATA_x_REG registers, packing the source into
 /// the destination.
 ///
 /// # Safety
@@ -1448,7 +1446,7 @@ unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
     }
 }
 
-/// Copy data to multiple TWAI_DATA_x_REG registers, unpacking the source into
+/// Copies data to multiple TWAI_DATA_x_REG registers, unpacking the source into
 /// the destination.
 ///
 /// # Safety
@@ -1474,7 +1472,7 @@ where
     type Frame = EspTwaiFrame;
     type Error = EspTwaiError;
 
-    /// Transmit a frame.
+    /// Transmits a frame.
     fn transmit(&mut self, frame: &Self::Frame) -> nb::Result<Option<Self::Frame>, Self::Error> {
         self.tx.transmit(frame)?;
 
@@ -1526,7 +1524,7 @@ pub trait PrivateInstance: crate::private::Sealed {
         });
     }
 
-    /// Listen for given interrupts.
+    /// Listens for the given interrupts.
     fn listen(&mut self, interrupts: impl Into<EnumSet<TwaiInterrupt>>) {
         self.enable_interrupts(interrupts.into(), true);
     }
@@ -1546,14 +1544,14 @@ fn release_receive_fifo(register_block: &RegisterBlock) {
     register_block.cmd().write(|w| w.release_buf().set_bit());
 }
 
-/// Check if the peripheral is in the error-passive state, i.e. one of the
+/// Returns whether the peripheral is in the error-passive state, i.e. one of the
 /// error counters has reached 128.
 fn is_error_passive(register_block: &RegisterBlock) -> bool {
     register_block.tx_err_cnt().read().tx_err_cnt().bits() >= 128
         || register_block.rx_err_cnt().read().rx_err_cnt().bits() >= 128
 }
 
-/// Write a frame to the peripheral.
+/// Writes a frame to the peripheral.
 fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
     // SAFETY: safe because there are 13 data registers and the slice is 13 bytes long max
     unsafe {

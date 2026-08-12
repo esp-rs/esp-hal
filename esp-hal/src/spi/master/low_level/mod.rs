@@ -151,7 +151,7 @@ pub trait QspiInstance: Instance {}
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with[Self::register_block] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// The system peripheral marker.
@@ -212,7 +212,7 @@ impl Driver {
         self.update();
     }
 
-    /// Initialize for full-duplex 1 bit mode
+    /// Initializes for full-duplex 1 bit mode
     pub(super) fn init(&self) {
         version::enable_peripheral_clock(self);
 
@@ -355,7 +355,7 @@ impl Driver {
         }
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn write_one(&self, words: &[u8]) -> Result<(), Error> {
         if words.len() > FIFO_SIZE {
@@ -367,7 +367,7 @@ impl Driver {
         Ok(())
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn write(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
@@ -377,7 +377,7 @@ impl Driver {
         Ok(())
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
@@ -387,10 +387,10 @@ impl Driver {
         Ok(())
     }
 
-    /// Read bytes from SPI.
+    /// Reads bytes from SPI.
     ///
     /// Sends out a stuffing byte for every byte to read. Does not
-    /// perform flushing. If you want to read the response to something you
+    /// perform flushing. To read the response to a prior
     /// have written before, consider using [`Self::transfer`] instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn read(&self, words: &mut [u8]) -> Result<(), Error> {
@@ -404,10 +404,10 @@ impl Driver {
         Ok(())
     }
 
-    /// Read bytes from SPI.
+    /// Reads bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. If you want to read
-    /// the response to something you have written before, consider using
+    /// Sends out a stuffing byte for every byte to read. To read
+    /// the response to a prior write, use
     /// [`Self::transfer`] instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) async fn read_async(&self, words: &mut [u8]) -> Result<(), Error> {
@@ -421,11 +421,11 @@ impl Driver {
         Ok(())
     }
 
-    /// Read received bytes from SPI FIFO.
+    /// Reads received bytes from SPI FIFO.
     ///
     /// Copies the contents of the SPI receive FIFO into `words`.
-    /// doesn't perform any data transfer. If you want to read the response to
-    /// something you have written before, consider using [`Self::transfer`]
+    /// does not perform any data transfer. To read the response to
+    /// a prior write, use [`Self::transfer`]
     /// instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn read_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {

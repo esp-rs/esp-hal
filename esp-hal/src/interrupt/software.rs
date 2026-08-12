@@ -8,7 +8,7 @@
 //! interrupts using the [`raise()`][SoftwareInterrupt::raise] and
 //! [`reset()`][SoftwareInterrupt::reset] methods.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -65,8 +65,7 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
     ///
     /// # Safety
     ///
-    /// You must ensure that you're only using one instance of this type at a
-    /// time.
+    /// Only one instance of this type may be in use at a time.
     #[inline]
     pub unsafe fn steal() -> Self {
         Self {
@@ -76,8 +75,8 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
 
     /// Creates a new peripheral reference with a shorter lifetime.
     ///
-    /// Use this method if you would like to keep working with the peripheral
-    /// after you dropped the driver that consumes this.
+    /// Returns the peripheral for continued use after configuration
+    /// after the consuming driver is dropped.
     ///
     /// See [Peripheral singleton] section for more information.
     ///
@@ -106,7 +105,7 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
         interrupt::bind_handler(interrupt, handler);
     }
 
-    /// Trigger this software-interrupt
+    /// Triggers this software-interrupt
     #[crate::ram]
     pub fn raise(&self) {
         let regs = cfg_select! {

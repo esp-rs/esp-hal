@@ -59,7 +59,7 @@ impl DeadTimeCfg {
     const S7: u32 = 0b00_0000_0100_0000_0000;
     /// DEB_MODE
     const _S8: u32 = 0b00_0000_0001_0000_0000;
-    /// Use PT_clk instead of PWM_clk
+    /// PT_clk instead of PWM_clk
     const CLK_SEL: u32 = 0b10_0000_0000_0000_0000;
 
     /// Uses the following configuration:
@@ -207,7 +207,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         });
     }
 
-    /// Use the A output with the given pin and configuration
+    /// A output with the given pin and configuration
     pub fn with_pin_a(
         self,
         pin: impl PeripheralOutput<'d>,
@@ -216,7 +216,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         PwmPin::new(pin, config)
     }
 
-    /// Use the B output with the given pin and configuration
+    /// B output with the given pin and configuration
     pub fn with_pin_b(
         self,
         pin: impl PeripheralOutput<'d>,
@@ -225,7 +225,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         PwmPin::new(pin, config)
     }
 
-    /// Use both the A and the B output with the given pins and configurations
+    /// See both the A and the B output with the given pins and configurations
     pub fn with_pins(
         self,
         pin_a: impl PeripheralOutput<'d>,
@@ -343,7 +343,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         });
     }
 
-    /// Write a new timestamp.
+    /// Writes a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn set_timestamp(&mut self, value: u16) {
@@ -530,13 +530,13 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         self.pin_b.set_update_method(update_method)
     }
 
-    /// Write a new timestamp.
+    /// Writes a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn set_timestamp_a(&mut self, value: u16) {
         self.pin_a.set_timestamp(value)
     }
-    /// Write a new timestamp.
+    /// Writes a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn set_timestamp_b(&mut self, value: u16) {
@@ -579,7 +579,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
 #[non_exhaustive]
 #[repr(u32)]
 pub enum UpdateAction {
-    /// Clear the output by setting it to a low level.
+    /// Clears the output by setting it to a low level.
     SetLow  = 1,
     /// Sets the output to a high level.
     SetHigh = 2,
@@ -618,17 +618,17 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         PwmActions(0)
     }
 
-    /// Choose an `UpdateAction` for an `UTEZ` event
+    /// Selects an `UpdateAction` for a `UTEZ` event.
     pub const fn on_up_counting_timer_equals_zero(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 0)
     }
 
-    /// Choose an `UpdateAction` for an `UTEP` event
+    /// Selects an `UpdateAction` for a `UTEP` event.
     pub const fn on_up_counting_timer_equals_period(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 2)
     }
 
-    /// Choose an `UpdateAction` for an `UTEA`/`UTEB` event
+    /// Selects an `UpdateAction` for a `UTEA`/`UTEB` event.
     pub const fn on_up_counting_timer_equals_timestamp(self, action: UpdateAction) -> Self {
         match IS_A {
             true => self.with_value_at_offset(action as u32, 4),
@@ -636,7 +636,7 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         }
     }
 
-    /// Choose an `UpdateAction` for an `UTEA`/`UTEB` event where you can
+    /// Selects an `UpdateAction` for a `UTEA`/`UTEB` event that can
     /// specify which of the A/B to use
     pub const fn on_up_counting_timer_equals_ch_timestamp<const CH_A: bool>(
         self,
@@ -648,17 +648,17 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         }
     }
 
-    /// Choose an `UpdateAction` for an `DTEZ` event
+    /// Selects an `UpdateAction` for a `DTEZ` event.
     pub const fn on_down_counting_timer_equals_zero(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 12)
     }
 
-    /// Choose an `UpdateAction` for an `DTEP` event
+    /// Selects an `UpdateAction` for a `DTEP` event.
     pub const fn on_down_counting_timer_equals_period(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 14)
     }
 
-    /// Choose an `UpdateAction` for an `DTEA`/`DTEB` event
+    /// Selects an `UpdateAction` for a `DTEA`/`DTEB` event.
     pub const fn on_down_counting_timer_equals_timestamp(self, action: UpdateAction) -> Self {
         match IS_A {
             true => self.with_value_at_offset(action as u32, 16),
@@ -666,7 +666,7 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         }
     }
 
-    /// Choose an `UpdateAction` for an `DTEA`/`DTEB` event where you can
+    /// Selects an `UpdateAction` for a `DTEA`/`DTEB` event that can
     /// specify which of the A/B to use
     pub const fn on_down_counting_timer_equals_ch_timestamp<const CH_A: bool>(
         self,

@@ -59,7 +59,7 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
         self.virtual_channel
     }
 
-    /// Send a DCS write command with zero or more parameters.
+    /// Sends a DCS write command with zero or more parameters.
     ///
     /// Uses a short-write packet for 0 or 1 parameters, a long-write packet
     /// otherwise.

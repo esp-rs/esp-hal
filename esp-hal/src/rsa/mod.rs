@@ -775,9 +775,9 @@ enum RsaBackendState<'d> {
 #[procmacros::doc_replace]
 /// RSA processing backend.
 ///
-/// Processes work items placed in the RSA work queue. Create and start the
-/// backend before operations run. The backend lets you use the RSA
-/// accelerator without carrying the peripheral singleton or the driver.
+/// Processes work items placed in the RSA work queue. The backend must be
+/// created and started before operations run. It provides RSA accelerator access
+/// without carrying the peripheral singleton or the driver.
 ///
 /// The [`RsaContext`] struct can enqueue work items that this backend processes.
 ///

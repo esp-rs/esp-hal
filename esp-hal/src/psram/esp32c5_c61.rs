@@ -130,7 +130,7 @@ impl Default for PsramConfig {
     }
 }
 
-/// Initialize PSRAM to be used for data.
+/// Initializes PSRAM to be used for data.
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     quad::psram_init(config);
@@ -330,7 +330,7 @@ pub(crate) fn mspi_timing_ll_set_core_clock(core_clk_mhz: u32) {
         .modify(|_, w| unsafe { w.mspi_fast_div_num().bits(divider - 1) });
 }
 
-/// Calculate spi_flash clock frequency division parameters for register.
+/// Calculates spi_flash clock frequency division parameters for register.
 #[inline(always)]
 fn mspi_timing_ll_calculate_clock_reg(clkdiv: u32) -> u32 {
     if clkdiv == 1 {

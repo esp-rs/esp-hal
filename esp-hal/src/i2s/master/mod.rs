@@ -81,7 +81,7 @@
 //!
 //! Diagrams from _ESP-IDF Programming Guide_; rendered by Wavedrom.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### I2S Read
 //!
@@ -205,7 +205,7 @@ pub enum I2sInterrupt {
     /// Receive buffer hung, indicating a stall in data reception.
     RxHung,
 
-    /// Transmit buffer hung, indicating a stall in data transmission.
+    /// Transmits buffer hung, indicating a stall in data transmission.
     TxHung,
 
     #[cfg(not(i2s_version = "1"))]
@@ -771,8 +771,8 @@ impl Channels {
     ///   active. Inactive channels do not consume or write data in the DMA buffer.
     /// - `fill` determines the behavior of inactive channels. `Some(n)` will make all inactive
     ///   channel send out specified value, truncated to the channel width. `None` will make
-    ///   disabled channels repeat the data from the last active channel. Ignored in
-    ///   the receiver unit.
+    ///   disabled channels repeat the data from the last active channel. Ignored in the receiver
+    ///   unit.
     ///
     /// # Examples
     ///
@@ -1207,8 +1207,8 @@ where
     #[doc = ""]
     /// Replaces any previously registered interrupt handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
-    /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    /// Restores the default interrupt handler via
+    /// [`crate::interrupt::DEFAULT_INTERRUPT_HANDLER`].
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // tx.i2s and rx.i2s is the same, we could use either one
@@ -1464,7 +1464,7 @@ impl<'d, Dm> I2sTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Perform a DMA write.
+    /// Performs a DMA write.
     #[allow(clippy::type_complexity)]
     #[instability::unstable]
     pub fn write<TX: DmaTxBuffer>(
@@ -1526,7 +1526,7 @@ impl<'d, Dm> I2sRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Perform a DMA read.
+    /// Performs a DMA read.
     ///
     /// The number of read bytes might be less than the capacity of the provided buffer since the
     /// peripheral might not completely fill each descriptor's buffer.
@@ -1707,12 +1707,12 @@ pub(crate) mod private {
             self
         }
 
-        /// Connect the PDM clock pin (maps to the WS output signal).
+        /// Connects the PDM clock pin (maps to the WS output signal).
         pub fn with_clk(self, clk: impl PeripheralOutput<'d>) -> Self {
             self.with_ws(clk)
         }
 
-        /// Connect a second PDM TX data line (line 1, two-line DAC mode, HW v2+).
+        /// Connects a second PDM TX data line (line 1, two-line DAC mode, HW v2+).
         #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
         pub fn with_dout2(self, dout: impl PeripheralOutput<'d>) -> Result<Self, ConfigError> {
             let dout = dout.into();
@@ -1786,12 +1786,12 @@ pub(crate) mod private {
             self
         }
 
-        /// Connect the PDM clock pin (maps to the WS output signal).
+        /// Connects the PDM clock pin (maps to the WS output signal).
         pub fn with_clk(self, clk: impl PeripheralOutput<'d>) -> Self {
             self.with_ws(clk)
         }
 
-        /// Connect a PDM RX data line (`line` 0..=`pdm_max_rx_lines`-1).
+        /// Connects a PDM RX data line (`line` 0..=`pdm_max_rx_lines`-1).
         #[cfg(i2s_supports_pdm_rx)]
         pub fn with_din_line(
             self,

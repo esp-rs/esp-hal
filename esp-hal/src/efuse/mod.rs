@@ -83,7 +83,7 @@ impl EfuseField {
     }
 }
 
-/// Read field value in a little-endian order
+/// Reads a field value in little-endian order.
 #[inline(always)]
 #[instability::unstable]
 pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
@@ -151,7 +151,7 @@ pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
     unsafe { output.assume_init() }
 }
 
-/// Read bit value.
+/// Reads a bit value.
 ///
 /// Panics if the field's bit length is not equal to 1.
 #[inline(always)]
@@ -484,8 +484,8 @@ pub enum InterfaceMacAddress {
 
 /// Hardware (MAC) address.
 ///
-/// Use [`as_bytes`](Self::as_bytes) for raw access, or the
-/// [`Display`](core::fmt::Display) impl for colon-separated hex
+/// Raw byte access is available via [`as_bytes`](Self::as_bytes); colon-separated hex
+/// formatting is available via [`Display`](core::fmt::Display)
 /// (e.g. `aa:bb:cc:dd:ee:ff`).
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

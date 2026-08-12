@@ -3,8 +3,8 @@
 //! ## Overview
 //!
 //! The `GPIO` module provides functions and configurations for controlling the
-//! `General Purpose Input/Output` pins on the `ESP32` chip. It allows you to
-//! configure pins as inputs or outputs, set their state and read their state.
+//! `General Purpose Input/Output` pins on the `ESP32` chip. Pins can be
+//! configured as inputs or outputs, and their state can be set or read.
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:

@@ -193,7 +193,7 @@ pub trait TimerIFace<S: TimerSpeed> {
     /// Configures the timer.
     fn configure(&mut self, config: config::Config<S::ClockSourceType>) -> Result<(), Error>;
 
-    /// Check if the timer has been configured
+    /// Returns whetherthe timer has been configured
     fn is_configured(&self) -> bool;
 
     /// Returns the duty resolution of the timer.
@@ -214,7 +214,7 @@ pub trait TimerHW<S: TimerSpeed> {
     /// Configures the hardware for the timer.
     fn configure_hw(&self, divisor: u32);
 
-    /// Update the timer in HW
+    /// Updates the timer in HW
     fn update_hw(&self);
 }
 
@@ -272,7 +272,7 @@ where
         Ok(())
     }
 
-    /// Check if the timer has been configured
+    /// Returns whetherthe timer has been configured
     fn is_configured(&self) -> bool {
         self.configured
     }
@@ -326,7 +326,7 @@ impl TimerHW<LowSpeed> for Timer<'_, LowSpeed> {
         low_level::ls_configure_hw(self.ledc, self.number, divisor, duty, use_ref_tick);
     }
 
-    /// Update the timer in HW
+    /// Updates the timer in HW
     fn update_hw(&self) {
         low_level::ls_update_hw(self.ledc, self.number);
     }
@@ -352,7 +352,7 @@ impl TimerHW<HighSpeed> for Timer<'_, HighSpeed> {
         );
     }
 
-    /// Update the timer in HW
+    /// Updates the timer in HW
     fn update_hw(&self) {
         low_level::hs_update_hw();
     }

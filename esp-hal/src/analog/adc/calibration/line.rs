@@ -16,7 +16,7 @@ use crate::analog::adc::{
 /// See also [`AdcCalLine`].
 pub trait AdcHasLineCal {}
 
-/// We store the gain as a u32, but it's really a fixed-point number.
+/// Gain is stored as a `u32` fixed-point value.
 const GAIN_SCALE: u32 = 1 << 16;
 
 /// Line fitting ADC calibration scheme

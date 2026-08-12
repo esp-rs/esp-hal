@@ -20,7 +20,7 @@ impl RNG<'_> {
     }
 }
 
-/// Register block overlay for the RNG peripheral
+/// Registers block overlay for the RNG peripheral
 #[instability::unstable]
 pub struct RngRegisterBlock;
 

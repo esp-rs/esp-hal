@@ -105,7 +105,7 @@ where
     /// Sets the channel duty in hardware.
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error>;
 
-    /// Start a duty-cycle fade
+    /// Starts a duty-cycle fade.
     fn start_duty_fade(
         &self,
         start_duty_pct: u8,
@@ -113,7 +113,7 @@ where
         duration_ms: u16,
     ) -> Result<(), Error>;
 
-    /// Check whether a duty-cycle fade is running
+    /// Returns whether a duty-cycle fade is running
     fn is_duty_fade_running(&self) -> bool;
 }
 
@@ -129,7 +129,7 @@ pub trait ChannelHW {
     /// Sets the channel duty in hardware.
     fn set_duty_hw(&self, duty: u32);
 
-    /// Start a duty-cycle fade HW
+    /// Starts a duty-cycle fade in hardware.
     fn start_duty_fade_hw(
         &self,
         start_duty: u32,
@@ -139,7 +139,7 @@ pub trait ChannelHW {
         duty_per_cycle: u16,
     );
 
-    /// Check whether a duty-cycle fade is running HW
+    /// Returns whether a duty-cycle fade is running HW
     fn is_duty_fade_running_hw(&self) -> bool;
 }
 
@@ -204,7 +204,7 @@ where
         Ok(())
     }
 
-    /// Start a duty fade from one % to another.
+    /// Starts a duty fade from one percent to another.
     ///
     /// There's a constraint on the combination of timer frequency, timer PWM
     /// duty resolution (the bit count), the fade "range" (abs(start-end)), and
@@ -391,7 +391,7 @@ where
         self.update_channel();
     }
 
-    /// Start a duty-cycle fade HW
+    /// Starts a duty-cycle fade in hardware.
     fn start_duty_fade_hw(
         &self,
         start_duty: u32,

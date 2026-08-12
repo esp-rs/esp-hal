@@ -44,7 +44,7 @@
 //! channels are indicated by n which is used as a placeholder for the channel
 //! number, and by m for RX channels.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Initialization
 //!
@@ -1049,7 +1049,7 @@ mod state {
     }
 
     impl RmtState {
-        /// Check whether this state corresponds to a rx, tx, or other configuration.
+        /// Returns whether this state corresponds to a rx, tx, or other configuration.
         #[allow(unused)]
         #[inline]
         pub(super) fn is_tx(&self) -> Option<bool> {
@@ -1060,7 +1060,7 @@ mod state {
             }
         }
 
-        /// Convert a `u8` to `Self` without checking that it has a valid value for the enum.
+        /// Converts a `u8` to `Self` without checking that it has a valid value for the enum.
         ///
         /// # Safety
         ///
@@ -1071,7 +1071,7 @@ mod state {
             unsafe { core::mem::transmute::<_, Self>(value) }
         }
 
-        /// Load channel state from the global `STATE` by channel index.
+        /// Loads channel state from the global `STATE` by channel index.
         ///
         /// # Safety:
         ///
@@ -1082,7 +1082,7 @@ mod state {
             unsafe { Self::from_u8_unchecked(STATE[channel as usize].load(ordering)) }
         }
 
-        /// Store the given state to all channel states for an index range in reverse order.
+        /// Stores the given state to all channel states for an index range in reverse order.
         #[inline]
         pub(super) fn store_range_rev(self, range: Range<u8>, ordering: Ordering) {
             for ch_num in range.rev() {
@@ -1090,14 +1090,14 @@ mod state {
             }
         }
 
-        /// Store channel state to the global `STATE` given a `DynChannelAccess`.
+        /// Stores channel state to the global `STATE` given a `DynChannelAccess`.
         #[allow(unused)]
         #[inline]
         pub(super) fn store<Dir: Direction>(self, raw: DynChannelAccess<Dir>, ordering: Ordering) {
             STATE[raw.channel() as usize].store(self as u8, ordering);
         }
 
-        /// Load channel state from the global `STATE` given a `DynChannelAccess`.
+        /// Loads channel state from the global `STATE` given a `DynChannelAccess`.
         #[allow(unused)]
         #[inline]
         pub(super) fn load<Dir: Direction>(raw: DynChannelAccess<Dir>, ordering: Ordering) -> Self {
@@ -1106,7 +1106,7 @@ mod state {
             unsafe { Self::load_by_channel_number(raw.channel(), ordering) }
         }
 
-        /// Perform a compare_exchange on the global `STATE` by channel index.
+        /// Performs a compare_exchange on the global `STATE` by channel index.
         #[inline]
         pub(super) fn compare_exchange(
             ch_num: u8,
@@ -1312,7 +1312,7 @@ impl<'ch, Dm> Channel<'ch, Dm, Tx>
 where
     Dm: crate::DriverMode,
 {
-    /// Connect a pin to the channel's output signal.
+    /// Connects a pin to the channel's output signal.
     ///
     /// Replaces previous pin assignments for this signal.
     pub fn with_pin(mut self, pin: impl PeripheralOutput<'ch>) -> Self {
@@ -1345,7 +1345,7 @@ impl<'ch, Dm> Channel<'ch, Dm, Rx>
 where
     Dm: crate::DriverMode,
 {
-    /// Connect a pin to the channel's input signal.
+    /// Connects a pin to the channel's input signal.
     ///
     /// Replaces previous pin assignments for this signal.
     pub fn with_pin(self, pin: impl PeripheralInput<'ch>) -> Self {
@@ -1515,7 +1515,7 @@ impl<'ch> TxTransaction<'ch, '_> {
         status
     }
 
-    /// Check transmission status and write new data to the hardware if
+    /// Checks transmission status and write new data to the hardware if
     /// necessary.
     ///
     /// Returns whether transmission has ended (whether successfully or with an
@@ -1525,7 +1525,7 @@ impl<'ch> TxTransaction<'ch, '_> {
         matches!(self.poll_internal(), Some(Event::Error | Event::End))
     }
 
-    /// Wait for the transaction to complete
+    /// Waits for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn wait(
         mut self,
@@ -1564,7 +1564,7 @@ pub struct ContinuousTxTransaction<'ch> {
 impl<'ch> ContinuousTxTransaction<'ch> {
     // FIXME: This interface isn't great, since one cannot use the waiting time until tx is stopped
     // for other things! Implement a poll-like interface similar to TxTransaction!
-    /// Stop transaction when the current iteration ends.
+    /// Stops transaction when the current iteration ends.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn stop_next(
         self,
@@ -1572,7 +1572,7 @@ impl<'ch> ContinuousTxTransaction<'ch> {
         self.stop_impl(false)
     }
 
-    /// Stop transaction as soon as possible.
+    /// Stops transaction as soon as possible.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn stop(self) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         self.stop_impl(true)
@@ -1619,7 +1619,7 @@ impl<'ch> ContinuousTxTransaction<'ch> {
         }
     }
 
-    /// Check if the `loopcount` interrupt bit is set.
+    /// Returns whetherthe `loopcount` interrupt bit is set
     ///
     /// Whether this implies that the transmission has stopped depends on the [`LoopMode`] value
     /// provided when starting it.
@@ -1745,7 +1745,7 @@ impl LoopMode {
 
 /// Channel in TX mode
 impl<'ch> Channel<'ch, Blocking, Tx> {
-    /// Start transmitting the given pulse code sequence.
+    /// Starts transmitting the given pulse code sequence.
     /// Returns a [`TxTransaction`] to wait for the transaction to complete and
     /// get back the channel for further use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
@@ -1774,7 +1774,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         })
     }
 
-    /// Start transmitting the given pulse code continuously.
+    /// Starts transmitting the given pulse code continuously.
     ///
     /// Returns a [`ContinuousTxTransaction`] to stop the ongoing transmission
     /// and get back the channel for further use.
@@ -1880,7 +1880,7 @@ impl<'ch> RxTransaction<'ch, '_> {
         status
     }
 
-    /// Check receive status
+    /// Checks receive status
     ///
     /// Returns whether reception has ended (whether successfully or with an
     /// error). In that case, a subsequent call to `wait()` returns immediately.
@@ -1889,7 +1889,7 @@ impl<'ch> RxTransaction<'ch, '_> {
         matches!(self.poll_internal(), Some(Event::Error | Event::End))
     }
 
-    /// Wait for the transaction to complete
+    /// Waits for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     // The return type isn't nice, but the blocking API needs a broader redesign anyway.
     #[allow(clippy::type_complexity)]
@@ -1921,7 +1921,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
             _ => ""
         }
     )]
-    /// Start receiving pulse codes into the given buffer.
+    /// Starts receiving pulse codes into the given buffer.
     /// Returns a [`RxTransaction`] to wait for receive to complete and get back
     /// the channel for further use.
     ///
@@ -2008,7 +2008,7 @@ impl core::future::Future for TxFuture<'_> {
 
 /// TX channel in async mode
 impl Channel<'_, Async, Tx> {
-    /// Start transmitting the given pulse code sequence.
+    /// Starts transmitting the given pulse code sequence.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit(&mut self, mut data: &[PulseCode]) -> impl Future<Output = Result<(), Error>> {
         let raw = self.raw;
@@ -2116,7 +2116,7 @@ impl Channel<'_, Async, Rx> {
             _ => ""
         }
     )]
-    /// Start receiving a pulse code sequence.
+    /// Starts receiving a pulse code sequence.
     ///
     /// # {rx_size_limit}
     #[cfg_attr(place_rmt_driver_in_ram, ram)]

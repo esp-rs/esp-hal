@@ -7,7 +7,7 @@
 //! know as RGB) format/timing. The driver mandates DMA (Direct Memory Access)
 //! for efficient data transfer.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### A display
 //!
@@ -539,8 +539,8 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     ///
-    /// If you specified `next_frame_en` as `true` in [`Dpi::send`], you are
-    /// just waiting for a DMA error when you call this.
+    /// When `next_frame_en` is `true` in [`Dpi::send`], this call may return only
+    /// after a DMA error.
     pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF::Final) {
         while !self.is_done() {
             core::hint::spin_loop();

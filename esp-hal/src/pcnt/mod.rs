@@ -13,7 +13,7 @@
 //!    * [channel]
 //!    * [unit]
 //!
-//! # Examples
+//! ## Examples
 //! ### Decoding a quadrature encoder
 //!
 //! ```rust, no_run

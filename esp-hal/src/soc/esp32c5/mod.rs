@@ -51,7 +51,7 @@ pub(crate) fn enable_branch_predictor() {
     }
 }
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {

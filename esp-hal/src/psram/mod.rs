@@ -13,7 +13,7 @@
         `esp-hal` will try to automatically detect the best option, but manual configuration is also possible and more reliable.")
 )]
 #![doc = ""]
-//! # Examples
+//! ## Examples
 //!
 //! ### PSRAM as heap memory
 //!

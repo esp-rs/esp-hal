@@ -48,7 +48,7 @@
 //!
 //! Clock source is __clock_src__ by default.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Output a 20 kHz signal
 //!
@@ -204,7 +204,8 @@ impl PeripheralClockConfig {
     ///
     /// Selects an appropriate prescaler for
     /// [`PeripheralClockConfig::with_prescaler`].
-    /// [`FrequencyError`] is returned when the calculated prescaler is not in the range `0..u8::MAX`.
+    /// [`FrequencyError`] is returned when the calculated prescaler is not in the range
+    /// `0..u8::MAX`.
     ///
     /// With standard system clock configurations the input clock to the MCPWM
     /// peripheral is `160 MHz`.
@@ -255,7 +256,8 @@ impl PeripheralClockConfig {
     /// Returns a timer clock configuration with the given frequency.
     ///
     /// Selects an appropriate prescaler for the timer.
-    /// [`FrequencyError`] is returned when the calculated prescaler is not in the range `0..u8::MAX`.
+    /// [`FrequencyError`] is returned when the calculated prescaler is not in the range
+    /// `0..u8::MAX`.
     ///
     /// See [`PeripheralClockConfig::timer_clock_with_prescaler`] for how the
     /// frequency is calculated.
@@ -269,8 +271,8 @@ impl PeripheralClockConfig {
     }
 }
 
-/// Target frequency could not be set.
-/// Check how the frequency is calculated in the corresponding method docs.
+/// Target frequency could not be set. See the corresponding method docs for
+/// frequency calculation.
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FrequencyError;

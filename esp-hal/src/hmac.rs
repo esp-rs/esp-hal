@@ -27,7 +27,7 @@
 //! 32-byte pattern of 0x00 for re-enabling JTAG and a 32-byte pattern of 0xff
 //! for deriving the AES key for the DS module.
 //!
-//! # Examples
+//! ## Examples
 //! Visit the [HMAC] example to learn how to use the HMAC accelerator
 //!
 //! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/hmac/src/main.rs

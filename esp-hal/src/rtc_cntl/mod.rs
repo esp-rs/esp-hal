@@ -228,7 +228,7 @@ pub struct Rtc<'d> {
     // This field holds the peripheral, which prevents a second `Rtc`. The code uses
     // `RTC_TIMER::regs()` for the registers, because the sleep alarm needs them without an `Rtc`.
     _rtc_timer: RTC_TIMER<'d>,
-    /// Reset Watchdog Timer.
+    /// Resets Watchdog Timer.
     pub rwdt: Rwdt,
     /// Super Watchdog
     #[cfg(soc_has_swd_watchdog)]
@@ -263,7 +263,7 @@ impl<'d> Rtc<'d> {
         Duration::from_micros(crate::clock::rtc_ticks_to_us(self.time_since_boot_raw()))
     }
 
-    /// Read the current value of the boot time registers in microseconds.
+    /// Reads the current value of the boot time registers in microseconds.
     #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
@@ -368,7 +368,7 @@ impl<'d> Rtc<'d> {
 
     /// Temporarily disable log messages of the ROM bootloader.
     ///
-    /// If you need to permanently disable the ROM bootloader messages, you'll
+    /// To permanently disable the ROM bootloader messages,
     /// need to set the corresponding eFuse.
     pub fn disable_rom_message_printing(&self) {
         // Corresponding documentation:
@@ -389,7 +389,7 @@ impl<'d> Rtc<'d> {
         reg.modify(|r, w| unsafe { w.bits(r.bits() | disable_mask) });
     }
 
-    /// Register an interrupt handler for the RTC.
+    /// Registers an interrupt handler for the RTC.
     ///
     /// Replaces any previously registered interrupt
     /// handlers.
@@ -424,14 +424,14 @@ impl crate::interrupt::InterruptConfigurable for Rtc<'_> {
 pub enum RwdtStageAction {
     /// No effect on the system.
     Off         = 0,
-    /// Trigger an interrupt.
+    /// Triggers an interrupt.
     Interrupt   = 1,
-    /// Reset the CPU core.
+    /// Resets the CPU core.
     ResetCpu    = 2,
-    /// Reset the main system.
+    /// Resets the main system.
     /// The power management unit and RTC peripherals will not be reset.
     ResetCore   = 3,
-    /// Reset the main system, power management unit and RTC peripherals.
+    /// Resets the main system, power management unit and RTC peripherals.
     ResetSystem = 4,
 }
 
@@ -497,17 +497,17 @@ impl Rwdt {
         self.set_write_protection(true);
     }
 
-    /// Listen for interrupts on stage 0.
+    /// Listens for interrupts on stage 0.
     pub fn listen(&mut self) {
         self.set_listen(true);
     }
 
-    /// Stop listening for interrupts on stage 0.
+    /// Stops listening for interrupts on stage 0.
     pub fn unlisten(&mut self) {
         self.set_listen(false);
     }
 
-    /// Clear interrupt.
+    /// Clears interrupt.
     pub fn clear_interrupt(&mut self) {
         self.set_write_protection(false);
 
@@ -521,7 +521,7 @@ impl Rwdt {
         self.set_write_protection(true);
     }
 
-    /// Check if the interrupt is set.
+    /// Returns whetherthe interrupt is set
     pub fn is_interrupt_set(&self) -> bool {
         cfg_select! {
             esp32p4 => LP_WDT::regs().int_st().read().lp_wdt().bit_is_set(),

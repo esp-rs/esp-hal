@@ -141,7 +141,7 @@ pub enum BitOrder {
     /// Do not change bit order.
     #[default]
     Native   = 0,
-    /// Invert bit order.
+    /// Inverts bit order.
     Inverted = 1,
 }
 
@@ -152,7 +152,7 @@ pub enum ByteOrder {
     /// Do not change byte order.
     #[default]
     Native   = 0,
-    /// Invert byte order.
+    /// Inverts byte order.
     Inverted = 1,
 }
 

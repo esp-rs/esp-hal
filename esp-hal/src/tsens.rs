@@ -17,7 +17,7 @@
 //!
 //! The temperature sensor can be configured with different clock sources.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! The following example will measure the internal chip temperature every
 //! second, and print it
@@ -53,9 +53,9 @@ use crate::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ClockSource {
-    /// Use RC_FAST clock source
+    /// RC_FAST clock source
     RcFast,
-    /// Use XTAL clock source
+    /// XTAL clock source
     #[default]
     Xtal,
 }
@@ -151,7 +151,7 @@ impl<'d> TemperatureSensor<'d> {
             .modify(|_, w| w.pu().set_bit());
     }
 
-    /// Power down the temperature sensor - useful if you want to save power
+    /// Powers down the temperature sensor to reduce power consumption
     pub fn power_down(&self) {
         APB_SARADC::regs()
             .tsens_ctrl()

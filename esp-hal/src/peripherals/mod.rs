@@ -56,7 +56,7 @@ macro_rules! create_peripheral {
 
             /// Creates a new peripheral reference with a shorter lifetime.
             ///
-            /// Use this method if you would like to keep working with the peripheral after
+            /// Returns the peripheral for continued use after configuration after
             /// you dropped the driver that consumes this.
             #[inline]
             #[allow(dead_code)]

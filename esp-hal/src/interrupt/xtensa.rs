@@ -114,7 +114,7 @@ impl CpuInterrupt {
         enable_cpu_interrupt_raw(self as u32);
     }
 
-    /// Clear the CPU interrupt status bit
+    /// Clears the CPU interrupt status bit
     #[inline]
     #[instability::unstable]
     pub fn clear(self) {
@@ -200,19 +200,19 @@ impl Priority {
 #[repr(u8)]
 #[non_exhaustive]
 pub enum ElevatedRunLevel {
-    /// Run level 1.
+    /// Runs level 1.
     Level1 = 1,
-    /// Run level 2.
+    /// Runs level 2.
     Level2 = 2,
-    /// Run level 3.
+    /// Runs level 3.
     Level3 = 3,
-    /// Run level 4.
+    /// Runs level 4.
     Level4 = 4,
-    /// Run level 5.
+    /// Runs level 5.
     Level5 = 5,
-    /// Run level 6.
+    /// Runs level 6.
     Level6 = 6,
-    /// Run level 7.
+    /// Runs level 7.
     Level7 = 7,
 }
 
@@ -332,7 +332,7 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     unwrap!(RunLevel::try_from_u32(token & 0x0F))
 }
 
-/// Wait for an interrupt to occur.
+/// Waits for an interrupt to occur.
 ///
 /// Executes the Wait For Interrupt (WFI or equivalent) instruction on the
 /// current CPU core. The CPU core stops execution until an interrupt occurs.

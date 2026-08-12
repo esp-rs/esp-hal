@@ -209,7 +209,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
         }
     }
 
-    /// Connect a pin to the I2C SDA signal.
+    /// Connects a pin to the I2C SDA signal.
     pub fn with_sda(mut self, sda: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.sda_input;
@@ -218,7 +218,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
         self
     }
 
-    /// Connect a pin to the I2C SCL signal.
+    /// Connects a pin to the I2C SCL signal.
     pub fn with_scl(mut self, scl: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;

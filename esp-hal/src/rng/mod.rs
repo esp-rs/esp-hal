@@ -27,7 +27,7 @@
 //! For more information, please refer to the
 //! # {documentation}
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -82,7 +82,7 @@ pub use trng::*;
 
 /// (Pseudo-)Random Number Generator.
 ///
-/// To generate pseudo-random numbers, you can create [`Rng`] at any time.
+/// Generates pseudo-random numbers. An [`Rng`] instance can be created at any time.
 #[cfg_attr(
     rng_trng_supported,
     doc = r"To generate true random numbers, see [`Trng`]."

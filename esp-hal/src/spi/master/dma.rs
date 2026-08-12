@@ -99,11 +99,11 @@ impl<'d> Spi<'d, Blocking> {
 ///   passing them to [`with_buffers`](SpiDma::with_buffers) before the first transfer begins. For
 ///   more details on when copying is necessary, see the documentation of the
 ///   [`with_buffers`](SpiDma::with_buffers) method.
-/// - The buffer API allows transferring externally managed buffers. In this mode, you provide the
-///   buffers to be transferred. The buffer objects ensure that data is located in appropriate
-///   memory regions. The buffers and the driver object are moved into transfer objects for the
-///   duration of the transfer. These functions take [`DmaRxBuf`] and [`DmaTxBuf`] objects as
-///   arguments as well as the number of bytes to transfer, and their names end with `_buffer`.
+/// - The buffer API allows transferring externally managed buffers. In this mode, the caller
+///   provides the buffers to be transferred. The buffer objects ensure that data is located in
+///   appropriate memory regions. The buffers and the driver object are moved into transfer objects
+///   for the duration of the transfer. These functions take [`DmaRxBuf`] and [`DmaTxBuf`] objects
+///   as arguments as well as the number of bytes to transfer, and their names end with `_buffer`.
 ///
 /// These approaches provide different trade-offs between memory usage / CPU overhead and ease of
 /// use. `embedded-hal` traits are implemented by the slice-based API's functions.
@@ -301,7 +301,7 @@ impl<'d> SpiDma<'d, Blocking> {
         Self::new_inner(spi, channel)
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
         self.driver().enable_listen(interrupts.into(), true);
@@ -337,8 +337,8 @@ impl<'d> SpiDma<'d, Blocking> {
     /// Replaces any previously registered interrupt
     /// handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
-    /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    /// Restores the default interrupt handler via
+    /// [`crate::interrupt::DEFAULT_INTERRUPT_HANDLER`].
     ///
     /// # Panics
     ///
@@ -458,7 +458,7 @@ impl<'d> SpiDma<'d, Async> {
         Ok(())
     }
 
-    /// Transmit the given buffer to the bus.
+    /// Transmits the given buffer to the bus.
     #[instability::unstable]
     pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         if words.is_empty() {
@@ -498,7 +498,7 @@ impl<'d> SpiDma<'d, Async> {
         Ok(())
     }
 
-    /// Transfer by writing out a buffer and reading the response from
+    /// Transfers by writing out a buffer and reading the response from
     /// the bus into another buffer.
     #[instability::unstable]
     pub async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
@@ -579,7 +579,7 @@ impl<'d> SpiDma<'d, Async> {
         }
     }
 
-    /// Transfer by writing out a buffer and reading the response from
+    /// Transfers by writing out a buffer and reading the response from
     /// the bus into the same buffer.
     #[instability::unstable]
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {

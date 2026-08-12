@@ -240,7 +240,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
         });
     }
 
-    /// Resume the counter
+    /// Resumes the counter
     pub fn resume(&self) {
         MUTEX.lock(|| {
             PCNT::regs()

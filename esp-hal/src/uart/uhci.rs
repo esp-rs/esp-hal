@@ -348,7 +348,7 @@ where
         self.uart.set_config(uart_config)
     }
 
-    /// Split the Uhci into UhciRx and UhciTx
+    /// Splits the Uhci into UhciRx and UhciTx
     pub fn split(self) -> (UhciRx<'d, Dm>, UhciTx<'d, Dm>) {
         let (uart_rx, uart_tx) = self.uart.split();
         (
@@ -431,9 +431,9 @@ pub struct UhciTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Internal UHCI struct. Use it to configure the UHCI peripheral
+    /// Internal UHCI peripheral. Configuration is available through the struct methods.
     uhci_per: AnyUhci<'static>,
-    /// Tx of the used uart. You can configure it by accessing the value
+    /// TX half of the UART.
     pub uart_tx: UartTx<'d, Dm>,
     channel_tx: ChannelTx<Dm, ErasedTxChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
@@ -477,9 +477,9 @@ pub struct UhciRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Internal UHCI struct. Use it to configure the UHCI peripheral
+    /// Internal UHCI peripheral. Configuration is available through the struct methods.
     uhci_per: AnyUhci<'static>,
-    /// Rx of the used uart. You can configure it by accessing the value
+    /// RX half of the UART.
     pub uart_rx: UartRx<'d, Dm>,
     channel_rx: ChannelRx<Dm, ErasedRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
@@ -602,7 +602,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
 }
 
 impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
-    /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
+    /// Waits for the DMA transfer to complete asynchronously. [`Self::wait`] must still be called
     pub async fn wait_for_done(&mut self) {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
@@ -725,7 +725,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
 }
 
 impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
-    /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
+    /// Waits for the DMA transfer to complete asynchronously. [`Self::wait`] must still be called
     pub async fn wait_for_done(&mut self) {
         let res = DmaRxFuture::new(&mut self.uhci.channel_rx).await;
         if let Err(err) = res {

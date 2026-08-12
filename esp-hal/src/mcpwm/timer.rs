@@ -33,12 +33,12 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         }
     }
 
-    /// Apply the given timer configuration.
+    /// Applies the given timer configuration.
     ///
     /// ### Note:
     /// The prescaler and period configuration will be applied immediately by
     /// default and before setting the [`PwmWorkingMode`].
-    /// If the timer is already running you might want to call [`Timer::stop`]
+    /// If the timer is already running, call [`Timer::stop`]
     /// and/or [`Timer::set_counter`] first
     /// (if the new period is larger than the current counter value this will
     /// cause weird behavior).
@@ -67,7 +67,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         });
     }
 
-    /// Stop the timer in its current state
+    /// Stops the timer in its current state.
     pub fn stop(&mut self) {
         // freeze the timer
         self.cfg1().write(|w| unsafe { w.mod_().bits(0) });
@@ -88,7 +88,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         });
     }
 
-    /// Read the counter value and counter direction of the timer
+    /// Reads the counter value and counter direction of the timer.
     pub fn status(&self) -> (u16, CounterDirection) {
         // SAFETY:
         // We only read from our TIMERx_STATUS register
@@ -116,8 +116,8 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 
 /// Clock configuration of a MCPWM timer
 ///
-/// Use [`PeripheralClockConfig::timer_clock_with_prescaler`](super::PeripheralClockConfig::timer_clock_with_prescaler) or
-/// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency) to it.
+/// See [`PeripheralClockConfig::timer_clock_with_prescaler`](super::PeripheralClockConfig::timer_clock_with_prescaler) or
+/// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency).
 #[derive(Copy, Clone)]
 pub struct TimerClockConfig {
     frequency: Rate,

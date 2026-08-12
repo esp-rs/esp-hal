@@ -19,7 +19,7 @@
 //! That is where instruction trace comes in, which provides trace of the
 //! program execution.
 //!
-//! # Examples
+//! ## Examples
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::trace::Trace;
@@ -60,7 +60,7 @@ pub struct Trace<'d> {
 }
 
 impl<'d> Trace<'d> {
-    /// Construct a new instance
+    /// Creates a new instance
     pub fn new(peripheral: TRACE0<'d>) -> Self {
         let guard = PeripheralGuard::new(peripheral.peripheral());
 
@@ -71,7 +71,7 @@ impl<'d> Trace<'d> {
         }
     }
 
-    /// Start tracing, writing data into the `buffer`
+    /// Starts tracing, writing data into the `buffer`
     pub fn start_trace(&mut self, buffer: &'d mut [u8]) {
         let reg_block = self.peripheral.register_block();
 
@@ -107,9 +107,9 @@ impl<'d> Trace<'d> {
         reg_block.trigger().write(|w| w.on().set_bit());
     }
 
-    /// Stop tracing
+    /// Stops tracing
     ///
-    /// Be aware that valid data might not start at index 0 and you need to
+    /// Valid data might not start at index 0; the
     /// account for wrapping when reading the data.
     pub fn stop_trace(&mut self) -> Result<TraceResult, Error> {
         let reg_block = self.peripheral.register_block();

@@ -312,7 +312,7 @@ impl<'d> MipiDsi<'d> {
         })
     }
 
-    /// Attach a command-mode (DBI) interface for panel init sequences.
+    /// Attaches a command-mode (DBI) interface for panel init sequences.
     pub fn dbi(&mut self, virtual_channel: u8) -> dbi::DsiDbi<'_, 'd> {
         dbi::DsiDbi::new(self, virtual_channel)
     }
@@ -431,7 +431,7 @@ fn hs_freq_range(lane_mbps: f32) -> u8 {
         .map_or(0x00, |&(_, sel)| sel)
 }
 
-/// Compute PLL M and N divisors.
+/// Computes PLL M and N divisors.
 ///
 /// Constraint: 5 MHz ≤ f_ref/N ≤ 40 MHz, M must be even.
 /// Returns `(M, N, actual_lane_rate_mbps)` or `None` if no solution found.

@@ -13,7 +13,7 @@
 //! The `UlpCore` struct is initialized with a peripheral reference to the `ULP
 //! CORE` instance.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -118,9 +118,9 @@ impl<'d> UlpCore<'d> {
 
     /// Lets the ULP core wake the chip from sleep.
     ///
-    /// The request stays until you call [`Self::disable_wakeup`]. It stays through a sleep, through
-    /// a deep-sleep wake, and after a drop of this driver. While the chip is awake, it does
-    /// nothing.
+    /// The request stays until [`Self::disable_wakeup`] is called. It stays through a sleep,
+    /// through a deep-sleep wake, and after a drop of this driver. While the chip is awake, it
+    /// does nothing.
     pub fn enable_wakeup(&mut self, config: WakeupConfig) {
         enable_wakeup(config);
     }

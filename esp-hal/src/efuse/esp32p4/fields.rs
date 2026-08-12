@@ -496,7 +496,7 @@ pub const SECURE_BOOT_SHA384_EN: EfuseField = EfuseField::new(0, 5, 179, 1);
 pub const DIS_WDT: EfuseField = EfuseField::new(0, 5, 180, 1);
 /// Sets bit to disable super-watchdog
 pub const DIS_SWD: EfuseField = EfuseField::new(0, 5, 181, 1);
-/// Use to configure glitch mode
+/// See to configure glitch mode
 pub const PVT_GLITCH_MODE: EfuseField = EfuseField::new(0, 5, 182, 2);
 /// `[MAC_FACTORY]` MAC address (low 32 bits)
 pub const MAC0: EfuseField = EfuseField::new(1, 0, 0, 32);

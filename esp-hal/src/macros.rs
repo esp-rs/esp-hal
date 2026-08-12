@@ -164,7 +164,7 @@ macro_rules! any_peripheral {
 
             /// Creates a new peripheral reference with a shorter lifetime.
             ///
-            /// Use this method if you would like to keep working with the peripheral after
+            /// Returns the peripheral for continued use after configuration after
             /// you dropped the driver that consumes this.
             ///
             /// See [Peripheral singleton] section for more information.
@@ -324,7 +324,7 @@ macro_rules! at_least_version {
 /// Macro to ignore tokens.
 ///
 /// Useful when a metavariable must exist (to expand a
-/// repetition), but we don't need to use it.
+/// repetition), but it is not used.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! ignore {
@@ -462,7 +462,7 @@ macro_rules! assign_resources {
 
                 /// Creates a new reference to the peripheral group with a shorter lifetime.
                 ///
-                /// Use this method if you would like to keep working with the peripherals after
+                /// Returns the peripheral for continued use after configurations after
                 /// you dropped the drivers that consume this.
                 pub fn reborrow(&mut self) -> $group_struct<'_> {
                     $group_struct {
@@ -495,7 +495,7 @@ macro_rules! assign_resources {
 
             /// Creates a new reference to the assigned peripherals with a shorter lifetime.
             ///
-            /// Use this method if you would like to keep working with the peripherals after
+            /// Returns the peripheral for continued use after configurations after
             /// you dropped the drivers that consume this.
             pub fn reborrow(&mut self) -> $struct_name<'_> {
                 $struct_name {

@@ -14,7 +14,7 @@
     not(systimer_driver_supported),
     doc = "See the [timg] module for more information."
 )]
-//! # Examples
+//! ## Examples
 //!
 //! ### One-shot Timer
 //!
@@ -102,7 +102,7 @@ pub trait Timer: crate::private::Sealed {
     #[doc(hidden)]
     fn now(&self) -> Instant;
 
-    /// Load a target value into the timer.
+    /// Loads a target value into the timer.
     #[doc(hidden)]
     fn load_value(&self, value: Duration) -> Result<(), Error>;
 
@@ -189,7 +189,7 @@ impl<'d> OneShotTimer<'d, Async> {
         self.delay_async(Duration::from_micros(us as u64)).await;
     }
 
-    /// Wait for *at least* the time interval `timeout`.
+    /// Waits for *at least* the time interval `timeout`.
     ///
     /// Once the time period elapses, the underlying timer hardware does not automatically schedule
     /// the next timeout. The next timeout is scheduled only when `delay_async` is called again.
@@ -274,7 +274,7 @@ where
         self.clear_interrupt();
     }
 
-    /// Start counting until the given timeout and raise an interrupt
+    /// Starts counting until the given timeout and raise an interrupt
     pub fn schedule(&mut self, timeout: Duration) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();
@@ -378,7 +378,7 @@ impl<'d> PeriodicTimer<'d, Async> {
         }
     }
 
-    /// Wait for *at least* the time interval loaded by [`PeriodicTimer::start`].
+    /// Waits for *at least* the time interval loaded by [`PeriodicTimer::start`].
     ///
     /// Once the time period elapses, the underlying timer hardware automatically schedules the
     /// next timeout.
@@ -392,7 +392,7 @@ impl<Dm> PeriodicTimer<'_, Dm>
 where
     Dm: DriverMode,
 {
-    /// Start a new count down.
+    /// Starts a new count down.
     pub fn start(&mut self, period: Duration) -> Result<(), Error> {
         if self.inner.is_running() {
             self.inner.stop();

@@ -42,7 +42,7 @@ pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_DEFAULT: u8 = 15;
 /// Power-up setting for other blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
-/// Wait cycles for other blocks.
+/// Waits cycles for other blocks.
 pub const OTHER_BLOCKS_WAIT: u16 = 1;
 /// WiFi power-up cycles.
 pub const WIFI_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;

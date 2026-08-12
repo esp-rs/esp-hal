@@ -603,7 +603,7 @@ pub struct HpLpParam {
     xtal_stable_wait_cycle: u16,
 }
 
-/// Sleep timing parameter configuration (pmu_sleep_param_config_t).
+/// Sleeps timing parameter configuration (pmu_sleep_param_config_t).
 #[derive(Clone, Copy)]
 pub struct ParamSleepConfig {
     hp_sys: HpParam,

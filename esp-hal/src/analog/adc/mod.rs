@@ -23,7 +23,7 @@
 //! basic calibration, curve fitting or linear interpolation. The calibration
 //! schemes can be used to improve the accuracy of the ADC readings.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Read an analog signal from a pin
 //!
@@ -90,9 +90,9 @@ pub enum Attenuation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum AdcCalSource {
-    /// Use Ground as the calibration source
+    /// Ground calibration source
     Gnd,
-    /// Use Vref as the calibration source
+    /// Vref calibration source
     Ref,
 }
 
@@ -218,9 +218,8 @@ pub trait AdcChannel {
 
 /// A trait abstracting over calibration methods.
 ///
-/// The methods in this trait are mostly for internal use. To get
-/// calibrated ADC reads, all you need to do is call `enable_pin_with_cal`
-/// and specify some implementor of this trait.
+/// The methods in this trait are mostly for internal use. For calibrated ADC
+/// reads, call `enable_pin_with_cal` and specify an implementor of this trait.
 pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
     /// Creates a new calibration scheme for the given attenuation.
     fn new_cal(atten: Attenuation) -> Self;
@@ -230,7 +229,7 @@ pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
         0
     }
 
-    /// Convert ADC value.
+    /// Converts ADC value.
     fn adc_val(&self, val: u16) -> u16 {
         val
     }

@@ -474,7 +474,7 @@ impl<'d> DsiDpi<'d> {
 
     /// Block until the DSI bridge signals the start of the next vertical blank.
     ///
-    /// Use this to pace rendering to the display refresh rate.  Any vsync event
+    /// Paces rendering to the display refresh rate. Any vsync event
     /// that is already pending (i.e. fired while the CPU was busy rendering)
     /// will be returned immediately.
     pub fn wait_for_vsync(&mut self) {

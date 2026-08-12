@@ -265,7 +265,7 @@ pub struct Info {
 
     /// Pointer to the register block for this I2C instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with[Self::register_block] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// System peripheral marker.
@@ -296,7 +296,7 @@ impl Info {
         unsafe { &*self.register_block }
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts
     pub(super) fn enable_listen(&self, interrupts: EnumSet<Event>, enable: bool) {
         let reg_block = self.regs();
 
@@ -760,7 +760,7 @@ impl Driver<'_> {
     ///   address.
     /// - `stop` indicates whether the operation will end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
-    ///   we should not nack the last byte.
+    ///   the last byte is not NACKed when another read operation follows.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_read<'a, I>(
         &self,
@@ -1079,7 +1079,7 @@ impl Driver<'_> {
     ///   address.
     /// - `stop` indicates whether the operation should end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
-    ///   we should not nack the last byte.
+    ///   the last byte is not NACKed when another read operation follows.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn start_read_operation(
         &self,
@@ -1150,7 +1150,7 @@ impl Driver<'_> {
     ///   address.
     /// - `stop` indicates whether the operation should end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
-    ///   we should not nack the last byte.
+    ///   the last byte is not NACKed when another read operation follows.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn read_operation_blocking(
         &self,
@@ -1215,7 +1215,7 @@ impl Driver<'_> {
     ///   address.
     /// - `stop` indicates whether the operation should end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
-    ///   we should not nack the last byte.
+    ///   the last byte is not NACKed when another read operation follows.
     /// - `cmd_iterator` is an iterator over the command registers.
     async fn read_operation(
         &self,
@@ -1869,7 +1869,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 
 /// Adds a command to the I2C command sequence.
 ///
-/// Make sure the first command after a FSM reset is a START, otherwise
+/// Ensures the first command after a FSM reset is a START, otherwise
 /// the hardware will hang with no timeouts.
 fn add_cmd<'a, I>(cmd_iterator: &mut I, command: Command) -> Result<(), Error>
 where

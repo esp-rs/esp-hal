@@ -70,7 +70,7 @@ pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 
 /// Power-up cycles for other hardware blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
-/// Wait cycles for other hardware blocks to stabilize.
+/// Waits cycles for other hardware blocks to stabilize.
 pub const OTHER_BLOCKS_WAIT: u16 = 1;
 
 /// Disables GPIO interrupt.
@@ -98,9 +98,9 @@ bitfield::bitfield! {
     pub u8, xtal_wait, set_xtal_wait: 15, 8;
     /// Number of rtc_fast_clk cycles to wait for PLL clock to be ready
     pub u8, pll_wait, set_pll_wait: 23, 16;
-    /// Perform clock control related initialization.
+    /// Performs clock control related initialization.
     pub clkctl_init, set_clkctl_init: 24;
-    /// Perform power control related initialization.
+    /// Performs power control related initialization.
     pub pwrctl_init, set_pwrctl_init: 25;
     /// Force power down RTC_DBOOST
     pub rtc_dboost_fpd, set_rtc_dboost_fpd: 26;

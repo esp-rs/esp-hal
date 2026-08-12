@@ -51,7 +51,7 @@ pub enum SocResetReason {
     Cpu0JtagCpu   = 0x18,
 }
 
-/// Clear all force flags on PMU power domains to allow normal power management.
+/// Clears all force flags on PMU power domains to allow normal power management.
 ///
 /// eco5 power domains (verified against PAC):
 ///   - TOP: power_pd_top_cntl (system top-level)

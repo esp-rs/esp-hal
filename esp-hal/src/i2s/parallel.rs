@@ -34,7 +34,7 @@
 //!   - `DMA`
 //!   - `system` (to configure and enable the I2S peripheral)
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -298,7 +298,7 @@ impl<'d, Dm> I2sParallel<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Write data to the I2S peripheral
+    /// Writes data to the I2S peripheral
     pub fn send<BUF: DmaTxBuffer>(
         mut self,
         mut data: BUF,
@@ -342,7 +342,7 @@ where
         self.i2s.instance.is_tx_done()
     }
 
-    /// Wait for the transfer to finish
+    /// Waits for the transfer to finish
     pub fn wait(mut self) -> (I2sParallel<'d, Dm>, BUF::Final) {
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
@@ -361,7 +361,7 @@ impl<BUF> I2sParallelTransfer<'_, BUF, Async>
 where
     BUF: DmaTxBuffer,
 {
-    /// Wait for the transfer to finish
+    /// Waits for the transfer to finish
     pub async fn wait_for_done(&mut self) -> Result<(), DmaError> {
         DmaTxFuture::new(&mut self.i2s.tx_channel).await
     }

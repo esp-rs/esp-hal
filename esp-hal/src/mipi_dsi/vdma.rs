@@ -117,7 +117,7 @@ impl VdmaLinkItem {
         self._res3.set(0);
     }
 
-    /// Update the source address in this LLI.
+    /// Updates the source address in this LLI.
     ///
     /// Safe to call while the DMA is running: the controller latches `sar_lo`
     /// at the **start** of each block, so an in-flight block is unaffected and

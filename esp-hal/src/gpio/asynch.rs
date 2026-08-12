@@ -6,7 +6,7 @@ use core::{
 use crate::gpio::{Event, Flex, GpioBank, Input, InputPin};
 
 impl Flex<'_> {
-    /// Wait until the pin experiences a particular [`Event`].
+    /// Waits until the pin experiences a particular [`Event`].
     ///
     /// The GPIO driver will disable listening for the event once it occurs,
     /// or if the `Future` is dropped - which also means this method is **not**
@@ -49,7 +49,7 @@ impl Flex<'_> {
         PinFuture { pin: self }.await;
     }
 
-    /// Wait until the pin is high.
+    /// Waits until the pin is high.
     ///
     /// See [Self::wait_for] for more information.
     #[inline]
@@ -58,7 +58,7 @@ impl Flex<'_> {
         self.wait_for(Event::HighLevel).await
     }
 
-    /// Wait until the pin is low.
+    /// Waits until the pin is low.
     ///
     /// See [Self::wait_for] for more information.
     #[inline]
@@ -67,7 +67,7 @@ impl Flex<'_> {
         self.wait_for(Event::LowLevel).await
     }
 
-    /// Wait for the pin to undergo a transition from low to high.
+    /// Waits for the pin to undergo a transition from low to high.
     ///
     /// See [Self::wait_for] for more information.
     #[inline]
@@ -76,7 +76,7 @@ impl Flex<'_> {
         self.wait_for(Event::RisingEdge).await
     }
 
-    /// Wait for the pin to undergo a transition from high to low.
+    /// Waits for the pin to undergo a transition from high to low.
     ///
     /// See [Self::wait_for] for more information.
     #[inline]
@@ -85,7 +85,7 @@ impl Flex<'_> {
         self.wait_for(Event::FallingEdge).await
     }
 
-    /// Wait for the pin to undergo any transition, i.e low to high OR high
+    /// Waits for the pin to undergo any transition, i.e low to high OR high
     /// to low.
     ///
     /// See [Self::wait_for] for more information.
@@ -98,7 +98,7 @@ impl Flex<'_> {
 
 impl Input<'_> {
     #[procmacros::doc_replace]
-    /// Wait until the pin experiences a particular [`Event`].
+    /// Waits until the pin experiences a particular [`Event`].
     ///
     /// # Examples
     ///
@@ -131,7 +131,7 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait until the pin is high.
+    /// Waits until the pin is high.
     ///
     /// See [Self::wait_for] for more information.
     ///
@@ -151,7 +151,7 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait until the pin is low.
+    /// Waits until the pin is low.
     ///
     /// See [Self::wait_for] for more information.
     ///
@@ -171,7 +171,7 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait for the pin to undergo a transition from low to high.
+    /// Waits for the pin to undergo a transition from low to high.
     ///
     /// See [Self::wait_for] for more information.
     ///
@@ -191,7 +191,7 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait for the pin to undergo a transition from high to low.
+    /// Waits for the pin to undergo a transition from high to low.
     ///
     /// See [Self::wait_for] for more information.
     ///
@@ -211,7 +211,7 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait for the pin to undergo any transition, i.e low to high OR high
+    /// Waits for the pin to undergo any transition, i.e low to high OR high
     /// to low.
     ///
     /// See [Self::wait_for] for more information.

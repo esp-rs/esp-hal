@@ -73,7 +73,7 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //! let i2c = I2C::new(peripherals.I2C0.reborrow(), /* ... */);
 //! ```
 //!
-//! # Examples
+//! ## Examples
 //!
 //! We have a plethora of [examples] in the esp-hal repository. We use
 //! an [xtask] to automate the building, running, and testing of code and
@@ -669,7 +669,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Apply a clock configuration.
+    /// Applies a clock configuration.
     #[cfg_attr(
         feature = "unstable",
         doc = r"
@@ -685,7 +685,7 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
         }
     }
 
-    /// Apply a clock configuration.
+    /// Applies a clock configuration.
     #[cfg(not(feature = "unstable"))]
     pub fn with_cpu_clock(self, cpu_clock: CpuClock) -> Self {
         Self {
@@ -716,7 +716,7 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 }
 
 #[procmacros::doc_replace]
-/// Initialize the system.
+/// Initializes the system.
 ///
 /// Sets up the CPU clock and watchdog, then returns the peripherals and clocks.
 ///

@@ -80,10 +80,10 @@ pub struct WakeupConfig {
     /// Deep sleep needs this path, and so does a light sleep that powers the peripheral down. Only
     /// low-power pads have such a path.
     ///
-    /// Sleep entry configures the pad as the low-power path requires, and keeps the pull resistors
-    /// of the pin in both cases. Before a deep sleep it also holds the pad, because deep sleep
-    /// powers down the circuit that drives it. A light sleep returns the pad to the digital GPIO
-    /// peripheral when it ends. After a deep sleep, the boot releases the hold.
+    /// Sleeps entry configures the pad as the low-power path requires, and keeps the pull
+    /// resistors of the pin in both cases. Before a deep sleep it also holds the pad, because
+    /// deep sleep powers down the circuit that drives it. A light sleep returns the pad to the
+    /// digital GPIO peripheral when it ends. After a deep sleep, the boot releases the hold.
     low_power_path: bool,
 }
 

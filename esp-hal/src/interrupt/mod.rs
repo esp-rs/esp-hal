@@ -104,11 +104,10 @@ pub trait InterruptConfigurable: crate::private::Sealed {
     )]
     #[doc = ""]
     /// Replaces any previously registered interrupt handlers. Some peripherals
-    /// offer a shared interrupt handler for multiple purposes. You must honor
+    /// offer a shared interrupt handler for multiple purposes. The handler must honor
     /// this.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
-    /// [DEFAULT_INTERRUPT_HANDLER]
+    /// Restores the default interrupt handler via [`DEFAULT_INTERRUPT_HANDLER`].
     fn set_interrupt_handler(&mut self, handler: InterruptHandler);
 }
 
@@ -121,7 +120,7 @@ pub struct IsrCallback {
 }
 
 impl IsrCallback {
-    /// Construct a new callback from the callback function.
+    /// Creates a new callback from the callback function.
     pub fn new(f: extern "C" fn()) -> Self {
         // a valid fn pointer is non zero
         Self { f }
@@ -404,7 +403,7 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
 
 /// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.
 ///
-/// You must also enable interrupts globally for interrupts to be serviced.
+/// Interrupts must also be enabled globally for peripheral interrupts to be serviced.
 ///
 /// Internally, this function maps the interrupt to the appropriate CPU interrupt
 /// for the specified priority level.

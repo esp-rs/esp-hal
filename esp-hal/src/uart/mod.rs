@@ -168,9 +168,8 @@ pub enum RxError {
 
 impl core::error::Error for RxError {}
 
-/// UART RX error conditions that read operations can report.
-///
-/// Use with [`RxConfig::with_reported_errors`] to choose
+/// UART RX error conditions that read operations can report. Used with
+/// [`RxConfig::with_reported_errors`] to choose
 /// which hardware RX error conditions make read operations return an
 /// [`RxError`].
 #[derive(Debug, EnumSetType)]
@@ -345,7 +344,7 @@ pub struct HwFlowControl {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum BaudrateTolerance {
-    /// Accept the closest achievable baud rate without restriction.
+    /// Accepts the closest achievable baud rate without restriction.
     #[default]
     Closest,
     /// In this setting, the deviation of only 1% from the desired baud value is
@@ -821,7 +820,7 @@ impl<'d> UartTx<'d, Async> {
         }
     }
 
-    /// Write data into the TX buffer.
+    /// Writes data into the TX buffer.
     ///
     /// Writes the provided buffer `bytes` into the UART transmit
     /// buffer. If the buffer is full, the function waits asynchronously for
@@ -963,7 +962,7 @@ where
         self.uart.info().tx_fifo_count() < Info::UART_FIFO_SIZE
     }
 
-    /// Write bytes.
+    /// Writes bytes.
     ///
     /// Writes data to the internal TX FIFO of the UART
     /// peripheral. The data is then transmitted over the UART TX line.
@@ -988,7 +987,7 @@ where
         Ok(())
     }
 
-    /// Flush the transmit buffer.
+    /// Flushes the transmit buffer.
     ///
     /// Blocks until all data in the TX FIFO has been
     /// transmitted.
@@ -1127,7 +1126,7 @@ impl<'d> UartRx<'d, Blocking> {
     /// detected, `false` if the timeout elapsed. After successful detection, the
     /// break status is automatically cleared.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `timeout` - Maximum time to wait for a break condition
     #[instability::unstable]
     pub fn wait_for_break_with_timeout(&mut self, timeout: crate::time::Duration) -> bool {
@@ -1238,7 +1237,7 @@ impl<'d> UartRx<'d, Async> {
         Ok(())
     }
 
-    /// Read data asynchronously.
+    /// Reads data asynchronously.
     ///
     /// Reads data from the UART receive buffer into the
     /// provided buffer. If the buffer is empty, the function waits
@@ -1450,7 +1449,7 @@ where
         self.uart.info().rx_fifo_count() > 0
     }
 
-    /// Read bytes.
+    /// Reads bytes.
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
     /// FIFO. Reads bytes from the RX FIFO and returns
@@ -1475,7 +1474,7 @@ where
         self.uart.info().read(buf, self.reported_errors)
     }
 
-    /// Read already received bytes.
+    /// Reads already received bytes.
     ///
     /// Reads the already received bytes from the FIFO into the
     /// provided buffer. The function does not wait for the FIFO to actually
@@ -1564,8 +1563,8 @@ impl<'d> Uart<'d, Blocking> {
     /// Replaces any previously registered interrupt
     /// handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
-    /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
+    /// Restores the default interrupt handler via
+    /// [`crate::interrupt::DEFAULT_INTERRUPT_HANDLER`].
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // `self.tx.uart` and `self.rx.uart` are the same
@@ -1573,7 +1572,7 @@ impl<'d> Uart<'d, Blocking> {
     }
 
     #[procmacros::doc_replace]
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts.
     ///
     /// # Examples
     ///
@@ -1678,7 +1677,7 @@ impl<'d> Uart<'d, Blocking> {
     /// the timeout elapsed. After successful detection, the break interrupt flag
     /// is automatically cleared.
     ///
-    /// ## Arguments
+    /// # Arguments
     /// * `timeout` - Maximum time to wait for a break condition
     #[instability::unstable]
     pub fn wait_for_break_with_timeout(&mut self, timeout: crate::time::Duration) -> bool {
@@ -1699,7 +1698,7 @@ impl<'d> Uart<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Write data into the TX buffer.
+    /// Writes data into the TX buffer.
     ///
     /// Writes the provided buffer `bytes` into the UART transmit
     /// buffer. If the buffer is full, the function waits asynchronously for
@@ -1764,7 +1763,7 @@ impl<'d> Uart<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Read data asynchronously.
+    /// Reads data asynchronously.
     ///
     /// Reads data from the UART receive buffer into the
     /// provided buffer. If the buffer is empty, the function waits
@@ -2024,7 +2023,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Flush the transmit buffer of the UART
+    /// Flushes the transmit buffer of the UART.
     ///
     /// # Examples
     ///
@@ -2094,7 +2093,7 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Read received bytes.
+    /// Reads received bytes.
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
     /// FIFO. Reads bytes from the RX FIFO and returns
@@ -2256,7 +2255,7 @@ where
         self.rx.check_for_errors()
     }
 
-    /// Read already received bytes.
+    /// Reads already received bytes.
     ///
     /// Reads the already received bytes from the FIFO into the
     /// provided buffer. The function does not wait for the FIFO to actually

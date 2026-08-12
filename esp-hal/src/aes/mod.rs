@@ -16,7 +16,7 @@
 //! When using AES-DMA, the peripheral can be configured to use different block
 //! cipher modes such as ECB, CBC, OFB, CTR, CFB8, and CFB128.
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### Encrypting and decrypting a message
 //!
@@ -504,7 +504,7 @@ pub mod dma {
             })
         }
 
-        /// Perform a DMA transfer.
+        /// Performs a DMA transfer.
         ///
         /// Returns an [`AesTransfer`].
         pub fn process<K, RXBUF, TXBUF>(

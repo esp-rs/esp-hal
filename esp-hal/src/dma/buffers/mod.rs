@@ -590,7 +590,7 @@ impl DmaTxBuf {
         self.0.len()
     }
 
-    /// Reset the descriptors to only transmit `len` amount of bytes from this
+    /// Resets the descriptors to only transmit `len` amount of bytes from this
     /// buf.
     ///
     /// The number of bytes in data must be less than or equal to the buffer
@@ -702,7 +702,7 @@ impl DmaRxBuf {
         self.0.len()
     }
 
-    /// Reset the descriptors to only receive `len` amount of bytes into this
+    /// Resets the descriptors to only receive `len` amount of bytes into this
     /// buf.
     ///
     /// The number of bytes in data must be less than or equal to the buffer
@@ -881,7 +881,7 @@ impl DmaRxTxBuf {
         Ok(())
     }
 
-    /// Reset the descriptors to only transmit/receive `len` amount of bytes
+    /// Resets the descriptors to only transmit/receive `len` amount of bytes
     /// with this buf.
     ///
     /// `len` must be less than or equal to the buffer size.
@@ -978,7 +978,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 /// It is used for continuously streaming data from a peripheral's FIFO.
 ///
 /// It does so by maintaining sliding window of descriptors that progresses when
-/// you call [DmaRxStreamBufView::consume].
+/// [`DmaRxStreamBufView::consume`] is called.
 ///
 /// The list starts out like so `A (empty) -> B (empty) -> C (empty) -> D
 /// (empty) -> NULL`.
@@ -989,7 +989,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 /// - `A (full)  -> B (full)  -> C (empty) -> D (empty) -> NULL`
 /// - `A (full)  -> B (full)  -> C (full)  -> D (empty) -> NULL`
 ///
-/// As you call [DmaRxStreamBufView::consume] the list (approximately)
+/// As [`DmaRxStreamBufView::consume`] is called, the list (approximately)
 /// progresses like so:
 /// - `A (full)  -> B (full)  -> C (full)  -> D (empty) -> NULL`
 /// - `B (full)  -> C (full)  -> D (empty) -> A (empty) -> NULL`
@@ -997,15 +997,15 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 /// - `D (empty) -> A (empty) -> B (empty) -> C (empty) -> NULL`
 ///
 /// If all the descriptors fill up, the [DmaRxInterrupt::DescriptorEmpty]
-/// interrupt will fire and the DMA will stop writing, at which point it is up
-/// to you to resume/restart the transfer.
+/// interrupt will fire and the DMA will stop writing, at which point the
+/// transfer must be resumed or restarted.
 ///
 /// Does not signal when this condition occurs. Check with the driver to see if the DMA has stopped.
 ///
 /// When constructing this buffer, it is important to tune the ratio between the
 /// chunk size and buffer size appropriately. Smaller chunk sizes means you
 /// receive data more frequently but this means the DMA interrupts
-/// ([DmaRxInterrupt::Done]) also fire more frequently (if you use them).
+/// ([`DmaRxInterrupt::Done`]) also fire more frequently when enabled.
 ///
 /// See [DmaRxStreamBufView] for APIs available whilst a transfer is in
 /// progress.
@@ -1343,14 +1343,14 @@ impl DmaRxStreamBufView {
 /// - `A(empty) -> B(empty) -> C(full)  -> D(full) -> NULL`
 /// - `A(empty) -> B(empty) -> C(empty) -> D(full) -> NULL`
 ///
-/// As you call [DmaTxStreamBufView::push] the list (approximately) progresses like so:
+/// As [`DmaTxStreamBufView::push`] is called, the list (approximately) progresses like so:
 /// - `A(empty) -> B(empty) -> C(empty) -> D(full) -> NULL`
 /// - `B(empty) -> C(empty) -> D(full)  -> A(full) -> NULL`
 /// - `C(empty) -> D(full)  -> A(full)  -> B(full) -> NULL`
 /// - `D(full)  -> A(full)  -> B(full)  -> C(full) -> NULL`
 ///
 /// If all the descriptors run out, the [DmaTxInterrupt::TotalEof] interrupt will fire and DMA
-/// will stop writing, at which point it is up to you to resume/restart the transfer.
+/// will stop writing, at which point the transfer must be resumed or restarted.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaTxStreamBuf {
@@ -1418,7 +1418,7 @@ impl DmaTxStreamBuf {
         (self.descriptors, self.buffer)
     }
 
-    /// Push the buffer with the given data before DMA transfer starts.
+    /// Pushes the buffer with the given data before DMA transfer starts.
     ///
     /// Otherwise the streaming buffer will transfer garbage data to
     /// DMA so that CPU has enough time to fill the buffer after transfer starts.
@@ -1430,7 +1430,7 @@ impl DmaTxStreamBuf {
         })
     }
 
-    /// Push the buffer with the given data before DMA transfer starts.
+    /// Pushes the buffer with the given data before DMA transfer starts.
     ///
     /// Returns the number of bytes filled.
     pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
@@ -1677,7 +1677,7 @@ impl DmaTxStreamBufView {
 
 static mut EMPTY: InternalMemory<[DmaDescriptor; 1]> = InternalMemory::new([DmaDescriptor::EMPTY]);
 
-/// An empty buffer that can be used when you don't need to transfer any data.
+/// An empty buffer for transfers that carry no data.
 pub struct EmptyBuf;
 
 unsafe impl DmaTxBuffer for EmptyBuf {
@@ -1959,7 +1959,7 @@ pub(crate) unsafe fn prepare_for_tx(
     ))
 }
 
-/// Prepare buffers to receive data from DMA.
+/// Prepares buffers to receive data from DMA.
 ///
 /// The function returns the DMA buffer, and the number of bytes that will be transferred.
 ///

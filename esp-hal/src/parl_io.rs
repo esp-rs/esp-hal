@@ -11,7 +11,7 @@
 //! ## Configuration
 //! The driver uses DMA (Direct Memory Access) for efficient data transfer.
 //!
-//! # Examples
+//! ## Examples
 //! ### Initialization for RX
 //!
 //! ```rust, no_run
@@ -1092,7 +1092,7 @@ impl<'d> ParlIo<'d, Blocking> {
         })
     }
 
-    /// Convert to an async version.
+    /// Converts to an async version.
     pub fn into_async(self) -> ParlIo<'d, Async> {
         internal_set_interrupt_handler(interrupt_handler);
 
@@ -1117,7 +1117,7 @@ impl<'d> ParlIo<'d, Blocking> {
         internal_set_interrupt_handler(handler);
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
         internal_listen(interrupts.into(), true);
     }
@@ -1148,7 +1148,7 @@ impl crate::interrupt::InterruptConfigurable for ParlIo<'_, Blocking> {
 }
 
 impl<'d> ParlIo<'d, Async> {
-    /// Convert to a blocking version.
+    /// Converts to a blocking version.
     pub fn into_blocking(self) -> ParlIo<'d, Blocking> {
         ParlIo {
             tx: TxCreator {
@@ -1167,7 +1167,7 @@ impl<'d, Dm> ParlIoTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Perform a DMA write.
+    /// Performs a DMA write.
     ///
     /// Returns a [`ParlIoTxTransfer`].
     ///
@@ -1319,7 +1319,7 @@ impl<'d, Dm> ParlIoRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Perform a DMA read.
+    /// Performs a DMA read.
     ///
     /// Returns a [`ParlIoRxTransfer`].
     ///
@@ -1632,9 +1632,9 @@ mod private {
 
     /// Generation of GDMA SUC EOF
     pub(super) enum EofMode {
-        /// Generate GDMA SUC EOF by data byte length
+        /// Generates GDMA SUC EOF by data byte length
         ByteLen,
-        /// Generate GDMA SUC EOF by the external enable signal
+        /// Generates GDMA SUC EOF by the external enable signal
         EnableSignal,
     }
 

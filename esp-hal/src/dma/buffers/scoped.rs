@@ -108,7 +108,7 @@ impl<'a> ScopedDmaTxBuf<'a> {
         Ok(())
     }
 
-    /// Reset the descriptors to only transmit `len` amount of bytes from this
+    /// Resets the descriptors to only transmit `len` amount of bytes from this
     /// buf.
     ///
     /// The number of bytes in data must be less than or equal to the buffer
@@ -271,7 +271,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
         )
     }
 
-    /// Reset the descriptors to only receive `len` amount of bytes into this
+    /// Resets the descriptors to only receive `len` amount of bytes into this
     /// buf.
     ///
     /// The number of bytes in data must be less than or equal to the buffer
@@ -333,7 +333,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
         })
     }
 
-    /// Read DMA-written RX data from memory on cached SoCs.
+    /// Reads DMA-written RX data from memory on cached SoCs.
     fn sync_received_from_dma(&self) {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         {

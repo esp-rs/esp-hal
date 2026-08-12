@@ -21,7 +21,7 @@
 //! - Generate one-shot alarms; trigger events once
 //! - Free-running; fetching a high-resolution timestamp on demand
 //!
-//! # Examples
+//! ## Examples
 //!
 //! ### General-purpose Timer
 //!
@@ -332,8 +332,7 @@ impl Timer<'_> {
     ///
     /// # Safety
     ///
-    /// You must ensure that you're only using one instance of this type at a
-    /// time.
+    /// Only one instance of this type may be in use at a time.
     pub unsafe fn clone_unchecked(&self) -> Self {
         Self {
             register_block: self.register_block,
@@ -345,8 +344,8 @@ impl Timer<'_> {
 
     /// Creates a new peripheral reference with a shorter lifetime.
     ///
-    /// Use this method if you would like to keep working with the peripheral
-    /// after you dropped the driver that consumes this.
+    /// Returns the peripheral for continued use after configuration
+    /// after the consuming driver is dropped.
     ///
     /// See [Peripheral singleton] section for more information.
     ///
@@ -557,11 +556,11 @@ fn timeout_to_ticks(timeout: Duration, clock: Rate, divider: u32) -> Option<u64>
 pub enum MwdtStageAction {
     /// No effect on the system.
     Off         = 0,
-    /// Trigger an interrupt.
+    /// Triggers an interrupt.
     Interrupt   = 1,
-    /// Reset the CPU core.
+    /// Resets the CPU core.
     ResetCpu    = 2,
-    /// Reset the main system, power management unit and RTC peripherals.
+    /// Resets the main system, power management unit and RTC peripherals.
     ResetSystem = 3,
 }
 
@@ -625,8 +624,8 @@ where
     ///
     /// # Safety
     ///
-    /// Bypasses the usual ownership rules for the peripheral. You must ensure
-    /// that no driver instance is active for the timer.
+    /// Bypasses the usual ownership rules for the peripheral. No driver instance
+    /// may be active for the timer.
     pub unsafe fn set_wdt_enabled(&mut self, enabled: bool) {
         let reg_block = unsafe { &*TG::register_block() };
 
