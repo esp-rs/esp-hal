@@ -1071,10 +1071,19 @@ impl Future for SpiFuture<'_> {
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.driver.busy() {
-            self.driver.state.waker.register(cx.waker());
-            self.driver.enable_listen(Self::EVENTS, true);
+        if !self.driver.busy() {
+            self.driver.clear_interrupts(Self::EVENTS);
+            return Poll::Ready(());
+        }
 
+        self.driver.state.waker.register(cx.waker());
+        self.driver.enable_listen(Self::EVENTS, true);
+
+        // On some chips the interrupt enable bit and the interrupt status bit are in the same
+        // register. If the transfer ends while we enable the interrupt, the read-modify-write
+        // clears the status bit, and the peripheral does not request an interrupt. Check the
+        // peripheral again to detect this case.
+        if self.driver.busy() {
             Poll::Pending
         } else {
             self.driver.clear_interrupts(Self::EVENTS);
