@@ -140,6 +140,14 @@ impl defmt::Format for ReceivedPacket {
     }
 }
 
+/// Drops packets the host never read, so they don't outlive the controller.
+pub(crate) fn clear_bt_state() {
+    BT_STATE.with(|state| {
+        state.rx_queue.clear();
+        state.hci_read_data.clear();
+    });
+}
+
 /// Checks if there is any HCI data available to read.
 #[instability::unstable]
 pub fn have_hci_read_data() -> bool {
