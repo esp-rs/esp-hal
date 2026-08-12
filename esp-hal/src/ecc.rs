@@ -107,7 +107,7 @@ macro_rules! define_operations {
 
 ## Errors
 
-[`ConfigError`] when the bit length of the parameters differs from the prime field bit length of the curve."]
+[`KeyLengthMismatch`] when the bit length of the parameters differs from the prime field bit length of the curve."]
                     #[inline]
                     pub fn $function<'op>(
                         &'op mut self,

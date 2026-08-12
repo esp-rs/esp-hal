@@ -18,7 +18,7 @@
 //! ## Usage
 //!
 //! Peripheral drivers manage interrupts automatically. Where appropriate, a
-//! [`set_interrupt_handler`] function registers a handler for interrupts at a
+//! [`InterruptConfigurable::set_interrupt_handler`] registers a handler for interrupts at a
 //! chosen priority level. Interrupt handler functions need to be marked by the
 //! [`#[handler]`] attribute. These drivers also provide `listen` and `unlisten`
 //! functions that control whether an interrupt is generated for the matching

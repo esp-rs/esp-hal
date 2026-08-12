@@ -14,7 +14,7 @@
 //!
 //! ## Usage
 //!
-//! Blocking [`DelayNs`] trait implementation from [embedded-hal].
+//! Blocking [DelayNs] trait implementation from [embedded-hal].
 //!
 //! ## Examples
 //! ### Delay for 1 second
