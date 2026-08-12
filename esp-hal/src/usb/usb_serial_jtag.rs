@@ -121,6 +121,7 @@
 use core::task::Poll;
 use core::{convert::Infallible, marker::PhantomData};
 
+use esp_sync::RawMutex;
 use procmacros::handler;
 
 use crate::{
@@ -709,6 +710,7 @@ where
 // Static instance of the waker for each component of the peripheral:
 static WAKER_TX: AtomicWaker = AtomicWaker::new();
 static WAKER_RX: AtomicWaker = AtomicWaker::new();
+static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagWriteFuture<'d> {
@@ -722,7 +724,7 @@ impl<'d> UsbSerialJtagWriteFuture<'d> {
         //
         // INT_ENA is also modified by the interrupt handler. Synchronize this
         // register-level read-modify-write so neither side can restore stale bits.
-        critical_section::with(|_| {
+        INT_ENA_LOCK.lock(|| {
             peripheral
                 .register_block()
                 .int_ena()
@@ -770,7 +772,7 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
         //
         // INT_ENA is also modified by the interrupt handler. Synchronize this
         // register-level read-modify-write so neither side can restore stale bits.
-        critical_section::with(|_| {
+        INT_ENA_LOCK.lock(|| {
             peripheral
                 .register_block()
                 .int_ena()
@@ -965,7 +967,7 @@ fn async_interrupt_handler() {
     let tx = interrupts.serial_in_empty().bit_is_set();
     let rx = interrupts.serial_out_recv_pkt().bit_is_set();
 
-    critical_section::with(|_| {
+    INT_ENA_LOCK.lock(|| {
         usb.int_ena().modify(|_, w| {
             if tx {
                 w.serial_in_empty().clear_bit();
