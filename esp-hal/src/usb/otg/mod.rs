@@ -1,12 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "dm_pin" => {
-        cfg(any(esp32s2, esp32s3)) => "GPIO19",
-        cfg(esp32p4) => "GPIO26",
-    },
-    "dp_pin" => {
-        cfg(any(esp32s2, esp32s3)) => "GPIO20",
-        cfg(esp32p4) => "GPIO27",
-    },
+    "dm_pin" => gpio_for_analog_signal!(USB_FS_DM),
+    "dp_pin" => gpio_for_analog_signal!(USB_FS_DP),
 ))]
 //! USB On-The-Go
 //!

@@ -26,11 +26,60 @@ struct Replacements {
     // Replaces `# {tag}` placeholders with the attribute contents. Replaces the entire line.
     line_replacements: HashMap<String, Vec<TokenStream2>>,
 
-    // Placeholder => [(condition, string contents)], may be unconditional.
+    // Placeholder => [(condition, contents)], may be unconditional.
     //
-    // Replaces `__tag__` placeholders with the string contents. Replaces only the placeholder
+    // Replaces `__tag__` placeholders with the contents. Replaces only the placeholder
     // inside the line, and applies the condition to the entire line if present.
-    inline_replacements: HashMap<String, Vec<(Option<TokenStream>, String)>>,
+    inline_replacements: HashMap<String, Vec<(Option<TokenStream>, Inline)>>,
+}
+
+/// The value of an inline replacement.
+enum Inline {
+    /// A string, spliced into the line as it is.
+    Text(String),
+
+    /// Tokens that expand to a string literal, such as a call to a macro that knows the current
+    /// chip. The line is assembled with `concat!`, as the value is only known once the doc
+    /// attribute is expanded.
+    Expanded(TokenStream2),
+}
+
+impl Inline {
+    fn new(value: &Expr) -> Self {
+        if let Expr::Lit(ExprLit {
+            lit: Lit::Str(lit_str),
+            ..
+        }) = value
+        {
+            Self::Text(lit_str.value())
+        } else {
+            Self::Expanded(quote! { #value })
+        }
+    }
+
+    /// Returns the contents of a `doc` attribute for `line`, with `placeholder` replaced.
+    fn doc_attribute(&self, line: &str, placeholder: &str) -> TokenStream2 {
+        match self {
+            Inline::Text(text) => {
+                let line = create_raw_string(&line.replace(placeholder, text));
+                quote! { doc = #line }
+            }
+            Inline::Expanded(tokens) => {
+                let mut pieces = vec![];
+                let mut parts = line.split(placeholder).peekable();
+                while let Some(part) = parts.next() {
+                    if !part.is_empty() {
+                        pieces.push(create_raw_string(part));
+                    }
+                    if parts.peek().is_some() {
+                        pieces.push(tokens.clone());
+                    }
+                }
+
+                quote! { doc = concat!( #(#pieces),* ) }
+            }
+        }
+    }
 }
 
 impl Replacements {
@@ -53,12 +102,11 @@ impl Replacements {
                 .find(|(k, _v)| trimmed.contains(k.as_str()))
             {
                 for (cfg, replacement) in replacements.iter() {
-                    let line = line.replace(placeholder, replacement);
-                    let line = create_raw_string(&line);
+                    let doc = replacement.doc_attribute(line, placeholder);
                     let attr_inner = if let Some(condition) = cfg {
-                        quote! { cfg_attr(#condition, doc = #line) }
+                        quote! { cfg_attr(#condition, #doc) }
                     } else {
-                        quote! { doc = #line }
+                        doc
                     };
                     if outer {
                         attrs.push(syn::parse_quote_spanned! { span => #[ #attr_inner ] });
@@ -103,7 +151,7 @@ impl Parse for Replacements {
             line_replacements.insert(format!("# {{{placeholder}}}"), replacement);
         };
         let mut add_inline_replacement =
-            |placeholder: &str, replacement: Vec<(Option<TokenStream2>, String)>| {
+            |placeholder: &str, replacement: Vec<(Option<TokenStream2>, Inline)>| {
                 // The placeholder must be a valid Rust identifier to keep rustfmt happy
                 inline_replacements.insert(format!("__{placeholder}__"), replacement);
             };
@@ -113,13 +161,7 @@ impl Parse for Replacements {
             for arg in args {
                 match arg.replacement {
                     ReplacementKind::Literal(expr) => {
-                        if let Expr::Lit(ExprLit {
-                            lit: Lit::Str(ref lit_str),
-                            ..
-                        }) = expr
-                        {
-                            add_inline_replacement(&arg.placeholder, vec![(None, lit_str.value())]);
-                        }
+                        add_inline_replacement(&arg.placeholder, vec![(None, Inline::new(&expr))]);
 
                         add_line_replacement(
                             &arg.placeholder,
@@ -131,19 +173,10 @@ impl Parse for Replacements {
                     ReplacementKind::Choice(items) => {
                         let mut conditions = vec![];
                         let mut bodies = vec![];
-                        let mut lit_strs = vec![];
                         let mut cfgs = vec![];
 
                         for branch in items {
                             let body = branch.body;
-
-                            if let Expr::Lit(ExprLit {
-                                lit: Lit::Str(ref lit_str),
-                                ..
-                            }) = body
-                            {
-                                lit_strs.push(lit_str.value());
-                            }
 
                             match branch.condition {
                                 Some(Meta::List(cfg)) if cfg.path.is_ident("cfg") => {
@@ -177,14 +210,12 @@ impl Parse for Replacements {
                             .collect::<Vec<_>>();
                         add_line_replacement(&arg.placeholder, branches);
 
-                        if lit_strs.len() == bodies.len() {
-                            let branches = conditions
-                                .into_iter()
-                                .map(Some)
-                                .zip(lit_strs)
-                                .collect::<Vec<_>>();
-                            add_inline_replacement(&arg.placeholder, branches);
-                        }
+                        let branches = conditions
+                            .into_iter()
+                            .map(Some)
+                            .zip(bodies.iter().map(Inline::new))
+                            .collect::<Vec<_>>();
+                        add_inline_replacement(&arg.placeholder, branches);
                     }
                 }
             }
@@ -538,6 +569,64 @@ mod tests {
                 /// let peripherals = esp_hal::init(esp_hal::Config::default());
                 #[doc = crate::after_snippet!()]
                 /// ```
+                struct Foo {}
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_inline_macro_replacements() {
+        let result = replace(
+            quote! {
+                "pin" => gpio_for_analog_signal!(USB_FS_DP)
+            }
+            .into(),
+            quote! {
+                /// ```rust, no_run
+                /// let pin = peripherals.__pin__;
+                /// ```
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote! {
+                /// ```rust, no_run
+                #[doc = concat!(r" let pin = peripherals.", gpio_for_analog_signal!(USB_FS_DP), r";")]
+                /// ```
+                struct Foo {}
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_conditional_inline_macro_replacements() {
+        let result = replace(
+            quote! {
+                "pin" => {
+                    cfg(esp32s3) => gpio_for_lp_signal!(SAR_I2C_SDA_0),
+                    _ => gpio_for_lp_signal!(LP_I2C_SDA)
+                }
+            }
+            .into(),
+            quote! {
+                /// let pin = peripherals.__pin__;
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote! {
+                #[cfg_attr(esp32s3, doc = concat!(r" let pin = peripherals.", gpio_for_lp_signal!(SAR_I2C_SDA_0), r";"))]
+                #[cfg_attr(not(any(esp32s3)), doc = concat!(r" let pin = peripherals.", gpio_for_lp_signal!(LP_I2C_SDA), r";"))]
                 struct Foo {}
             }
             .to_string()

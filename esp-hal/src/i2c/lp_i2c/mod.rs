@@ -1,13 +1,11 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "sda" => {
-        cfg(esp32s3) => "GPIO1",
-        cfg(esp32c5) => "GPIO2",
-        _ => "GPIO6"
+        cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SDA_0),
+        _ => gpio_for_lp_signal!(LP_I2C_SDA)
     },
     "scl" => {
-        cfg(esp32s3) => "GPIO2",
-        cfg(esp32c5) => "GPIO3",
-        _ => "GPIO7"
+        cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SCL_1),
+        _ => gpio_for_lp_signal!(LP_I2C_SCL)
     }
 ))]
 //! # Low-power I2C driver
@@ -148,14 +146,12 @@ pub enum Error {
 
 #[procmacros::doc_replace(
     "sda" => {
-        cfg(esp32s3) => "GPIO1",
-        cfg(esp32c5) => "GPIO2",
-        _ => "GPIO6"
+        cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SDA_0),
+        _ => gpio_for_lp_signal!(LP_I2C_SDA)
     },
     "scl" => {
-        cfg(esp32s3) => "GPIO2",
-        cfg(esp32c5) => "GPIO3",
-        _ => "GPIO7"
+        cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SCL_1),
+        _ => gpio_for_lp_signal!(LP_I2C_SCL)
     }
 )]
 /// Low-power I2C driver
@@ -187,14 +183,12 @@ pub struct LpI2c<'d> {
 impl<'d> LpI2c<'d> {
     #[procmacros::doc_replace(
         "sda" => {
-            cfg(esp32s3) => "GPIO1",
-            cfg(esp32c5) => "GPIO2",
-            _ => "GPIO6"
+            cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SDA_0),
+            _ => gpio_for_lp_signal!(LP_I2C_SDA)
         },
         "scl" => {
-            cfg(esp32s3) => "GPIO2",
-            cfg(esp32c5) => "GPIO3",
-            _ => "GPIO7"
+            cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SCL_1),
+            _ => gpio_for_lp_signal!(LP_I2C_SCL)
         }
     )]
     /// Creates a new instance of the `LpI2c` peripheral.
@@ -244,14 +238,12 @@ impl<'d> LpI2c<'d> {
 
     #[procmacros::doc_replace(
         "sda" => {
-            cfg(esp32s3) => "GPIO1",
-            cfg(esp32c5) => "GPIO2",
-            _ => "GPIO6"
+            cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SDA_0),
+            _ => gpio_for_lp_signal!(LP_I2C_SDA)
         },
         "scl" => {
-            cfg(esp32s3) => "GPIO2",
-            cfg(esp32c5) => "GPIO3",
-            _ => "GPIO7"
+            cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SCL_1),
+            _ => gpio_for_lp_signal!(LP_I2C_SCL)
         }
     )]
     /// Applies a new configuration.
@@ -282,14 +274,12 @@ impl<'d> LpI2c<'d> {
 
     #[procmacros::doc_replace(
         "sda" => {
-            cfg(esp32s3) => "GPIO1",
-            cfg(esp32c5) => "GPIO2",
-            _ => "GPIO6"
+            cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SDA_0),
+            _ => gpio_for_lp_signal!(LP_I2C_SDA)
         },
         "scl" => {
-            cfg(esp32s3) => "GPIO2",
-            cfg(esp32c5) => "GPIO3",
-            _ => "GPIO7"
+            cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SCL_1),
+            _ => gpio_for_lp_signal!(LP_I2C_SCL)
         }
     )]
     /// Writes `data` to the `register` of the slave with the given `address`.
@@ -324,14 +314,12 @@ impl<'d> LpI2c<'d> {
 
     #[procmacros::doc_replace(
         "sda" => {
-            cfg(esp32s3) => "GPIO1",
-            cfg(esp32c5) => "GPIO2",
-            _ => "GPIO6"
+            cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SDA_0),
+            _ => gpio_for_lp_signal!(LP_I2C_SDA)
         },
         "scl" => {
-            cfg(esp32s3) => "GPIO2",
-            cfg(esp32c5) => "GPIO3",
-            _ => "GPIO7"
+            cfg(lp_i2c_master_version = "rtc_i2c") => gpio_for_lp_signal!(SAR_I2C_SCL_1),
+            _ => gpio_for_lp_signal!(LP_I2C_SCL)
         }
     )]
     /// Reads enough bytes from the `register` of the slave with the given `address` to fill
