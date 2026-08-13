@@ -14,7 +14,21 @@ function classifyMatrixJob(job) {
 
   const conclusion = runTests.conclusion;
   if (conclusion === "skipped") {
-    return { kind: "skipped" };
+    // A successful job intentionally skipped this chip because it had no ELFs.
+    // An unsuccessful job skipped this step because an earlier step failed.
+    if (job.conclusion === "success") {
+      return { kind: "skipped" };
+    }
+    if (
+      job.conclusion === "failure" ||
+      job.conclusion === "cancelled" ||
+      job.conclusion === null
+    ) {
+      return { kind: "failed" };
+    }
+    return {
+      error: `job "${job.name}" has skipped "${RUN_TESTS_STEP}" step and unexpected conclusion: ${job.conclusion}`,
+    };
   }
   if (conclusion === "success") {
     return { kind: "passed" };
