@@ -6348,31 +6348,31 @@ macro_rules! for_each_analog_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_analog_function { $(($pattern) => $code;)* ($other :
         tt) => {} } _for_each_inner_analog_function!((XTAL_32K_P, GPIO0));
-        _for_each_inner_analog_function!((ADC0_CH0, GPIO0));
+        _for_each_inner_analog_function!((ADC1_CH0, GPIO0));
         _for_each_inner_analog_function!((XTAL_32K_N, GPIO1));
-        _for_each_inner_analog_function!((ADC0_CH1, GPIO1));
-        _for_each_inner_analog_function!((ADC0_CH2, GPIO2));
-        _for_each_inner_analog_function!((ADC0_CH3, GPIO3));
-        _for_each_inner_analog_function!((ADC0_CH4, GPIO4));
-        _for_each_inner_analog_function!((ADC0_CH5, GPIO5));
-        _for_each_inner_analog_function!((ADC0_CH6, GPIO6));
+        _for_each_inner_analog_function!((ADC1_CH1, GPIO1));
+        _for_each_inner_analog_function!((ADC1_CH2, GPIO2));
+        _for_each_inner_analog_function!((ADC1_CH3, GPIO3));
+        _for_each_inner_analog_function!((ADC1_CH4, GPIO4));
+        _for_each_inner_analog_function!((ADC1_CH5, GPIO5));
+        _for_each_inner_analog_function!((ADC1_CH6, GPIO6));
         _for_each_inner_analog_function!((USJ_DM, GPIO12));
         _for_each_inner_analog_function!((USJ_DP, GPIO13));
-        _for_each_inner_analog_function!(((ADC0_CH0, ADCn_CHm, 0, 0), GPIO0));
-        _for_each_inner_analog_function!(((ADC0_CH1, ADCn_CHm, 0, 1), GPIO1));
-        _for_each_inner_analog_function!(((ADC0_CH2, ADCn_CHm, 0, 2), GPIO2));
-        _for_each_inner_analog_function!(((ADC0_CH3, ADCn_CHm, 0, 3), GPIO3));
-        _for_each_inner_analog_function!(((ADC0_CH4, ADCn_CHm, 0, 4), GPIO4));
-        _for_each_inner_analog_function!(((ADC0_CH5, ADCn_CHm, 0, 5), GPIO5));
-        _for_each_inner_analog_function!(((ADC0_CH6, ADCn_CHm, 0, 6), GPIO6));
-        _for_each_inner_analog_function!((all(XTAL_32K_P, GPIO0), (ADC0_CH0, GPIO0),
-        (XTAL_32K_N, GPIO1), (ADC0_CH1, GPIO1), (ADC0_CH2, GPIO2), (ADC0_CH3, GPIO3),
-        (ADC0_CH4, GPIO4), (ADC0_CH5, GPIO5), (ADC0_CH6, GPIO6), (USJ_DM, GPIO12),
-        (USJ_DP, GPIO13))); _for_each_inner_analog_function!((ADCn_CHm((ADC0_CH0,
-        ADCn_CHm, 0, 0), GPIO0), ((ADC0_CH1, ADCn_CHm, 0, 1), GPIO1), ((ADC0_CH2,
-        ADCn_CHm, 0, 2), GPIO2), ((ADC0_CH3, ADCn_CHm, 0, 3), GPIO3), ((ADC0_CH4,
-        ADCn_CHm, 0, 4), GPIO4), ((ADC0_CH5, ADCn_CHm, 0, 5), GPIO5), ((ADC0_CH6,
-        ADCn_CHm, 0, 6), GPIO6)));
+        _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO0));
+        _for_each_inner_analog_function!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO1));
+        _for_each_inner_analog_function!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO2));
+        _for_each_inner_analog_function!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3));
+        _for_each_inner_analog_function!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO4));
+        _for_each_inner_analog_function!(((ADC1_CH5, ADCn_CHm, 1, 5), GPIO5));
+        _for_each_inner_analog_function!(((ADC1_CH6, ADCn_CHm, 1, 6), GPIO6));
+        _for_each_inner_analog_function!((all(XTAL_32K_P, GPIO0), (ADC1_CH0, GPIO0),
+        (XTAL_32K_N, GPIO1), (ADC1_CH1, GPIO1), (ADC1_CH2, GPIO2), (ADC1_CH3, GPIO3),
+        (ADC1_CH4, GPIO4), (ADC1_CH5, GPIO5), (ADC1_CH6, GPIO6), (USJ_DM, GPIO12),
+        (USJ_DP, GPIO13))); _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0,
+        ADCn_CHm, 1, 0), GPIO0), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO1), ((ADC1_CH2,
+        ADCn_CHm, 1, 2), GPIO2), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3), ((ADC1_CH4,
+        ADCn_CHm, 1, 4), GPIO4), ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO5), ((ADC1_CH6,
+        ADCn_CHm, 1, 6), GPIO6)));
     };
 }
 /// This macro can be used to generate code for each LP function of each GPIO.
@@ -6547,6 +6547,197 @@ macro_rules! for_each_iomux_function {
         _0), ((SDIO_DATA1, SDIO_DATAn, 1), GPIO21, _0), ((SDIO_DATA2, SDIO_DATAn, 2),
         GPIO22, _0), ((SDIO_DATA3, SDIO_DATAn, 3), GPIO23, _0)));
         _for_each_inner_iomux_function!((SPICSn((SPICS0, SPICSn, 0), GPIO24, _0)));
+    };
+}
+/// Returns the name of the GPIO that provides the given signal, as a string.
+///
+/// The macro takes the name of a direct function - a digital IO MUX function, an analog
+/// function, or an LP IO MUX function - and expands to a string literal like `"GPIO4"`. It
+/// is meant to keep documentation free of per-chip pin lists.
+///
+/// Signals that are not wired to a pad on this chip have to be routed through the GPIO
+/// matrix, which can reach any pad. The macro has no pad to return for those, so it accepts
+/// an optional fallback to expand to instead. The fallback is not validated.
+///
+/// If multiple pads provide the signal, the macro returns one that is not reserved for some
+/// other purpose, such as booting or interfacing with flash.
+///
+/// Example usage:
+/// - `gpio_for_signal!(ADC1_CH0)`
+/// - `gpio_for_signal!(LP_I2C_SDA, "GPIO6")`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_signal {
+    (XTAL_32K_P $(, $_fallback:literal)?) => {
+        "GPIO0"
+    };
+    (ADC1_CH0 $(, $_fallback:literal)?) => {
+        "GPIO0"
+    };
+    (LP_GPIO0 $(, $_fallback:literal)?) => {
+        "GPIO0"
+    };
+    (LP_UART_DTRN $(, $_fallback:literal)?) => {
+        "GPIO0"
+    };
+    (XTAL_32K_N $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (ADC1_CH1 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (LP_GPIO1 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (LP_UART_DSRN $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (FSPIQ $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (ADC1_CH2 $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (LP_GPIO2 $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (LP_UART_RTSN $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (ADC1_CH3 $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (LP_GPIO3 $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (LP_UART_CTSN $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (MTMS $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (FSPIHD $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (ADC1_CH4 $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (LP_GPIO4 $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (LP_UART_RXD $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (MTDI $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (FSPIWP $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (ADC1_CH5 $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (LP_GPIO5 $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (LP_UART_TXD $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (MTCK $(, $_fallback:literal)?) => {
+        "GPIO6"
+    };
+    (FSPICLK $(, $_fallback:literal)?) => {
+        "GPIO6"
+    };
+    (ADC1_CH6 $(, $_fallback:literal)?) => {
+        "GPIO6"
+    };
+    (LP_GPIO6 $(, $_fallback:literal)?) => {
+        "GPIO6"
+    };
+    (LP_I2C_SDA $(, $_fallback:literal)?) => {
+        "GPIO6"
+    };
+    (MTDO $(, $_fallback:literal)?) => {
+        "GPIO7"
+    };
+    (FSPID $(, $_fallback:literal)?) => {
+        "GPIO7"
+    };
+    (LP_GPIO7 $(, $_fallback:literal)?) => {
+        "GPIO7"
+    };
+    (LP_I2C_SCL $(, $_fallback:literal)?) => {
+        "GPIO7"
+    };
+    (USJ_DM $(, $_fallback:literal)?) => {
+        "GPIO12"
+    };
+    (USJ_DP $(, $_fallback:literal)?) => {
+        "GPIO13"
+    };
+    (U0TXD $(, $_fallback:literal)?) => {
+        "GPIO16"
+    };
+    (FSPICS0 $(, $_fallback:literal)?) => {
+        "GPIO16"
+    };
+    (U0RXD $(, $_fallback:literal)?) => {
+        "GPIO17"
+    };
+    (FSPICS1 $(, $_fallback:literal)?) => {
+        "GPIO17"
+    };
+    (SDIO_CMD $(, $_fallback:literal)?) => {
+        "GPIO18"
+    };
+    (FSPICS2 $(, $_fallback:literal)?) => {
+        "GPIO18"
+    };
+    (SDIO_CLK $(, $_fallback:literal)?) => {
+        "GPIO19"
+    };
+    (FSPICS3 $(, $_fallback:literal)?) => {
+        "GPIO19"
+    };
+    (SDIO_DATA0 $(, $_fallback:literal)?) => {
+        "GPIO20"
+    };
+    (FSPICS4 $(, $_fallback:literal)?) => {
+        "GPIO20"
+    };
+    (SDIO_DATA1 $(, $_fallback:literal)?) => {
+        "GPIO21"
+    };
+    (FSPICS5 $(, $_fallback:literal)?) => {
+        "GPIO21"
+    };
+    (SDIO_DATA2 $(, $_fallback:literal)?) => {
+        "GPIO22"
+    };
+    (SDIO_DATA3 $(, $_fallback:literal)?) => {
+        "GPIO23"
+    };
+    (SPICS0 $(, $_fallback:literal)?) => {
+        "GPIO24"
+    };
+    (SPIQ $(, $_fallback:literal)?) => {
+        "GPIO25"
+    };
+    (SPIWP $(, $_fallback:literal)?) => {
+        "GPIO26"
+    };
+    (SPIHD $(, $_fallback:literal)?) => {
+        "GPIO28"
+    };
+    (SPICLK $(, $_fallback:literal)?) => {
+        "GPIO29"
+    };
+    (SPID $(, $_fallback:literal)?) => {
+        "GPIO30"
+    };
+    ($_signal:ident, $fallback:literal) => {
+        $fallback
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.

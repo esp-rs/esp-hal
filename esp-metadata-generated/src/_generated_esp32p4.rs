@@ -6693,6 +6693,347 @@ macro_rules! for_each_iomux_function {
         GPIO44, _0)));
     };
 }
+/// Returns the name of the GPIO that provides the given signal, as a string.
+///
+/// The macro takes the name of a direct function - a digital IO MUX function, an analog
+/// function, or an LP IO MUX function - and expands to a string literal like `"GPIO4"`. It
+/// is meant to keep documentation free of per-chip pin lists.
+///
+/// Signals that are not wired to a pad on this chip have to be routed through the GPIO
+/// matrix, which can reach any pad. The macro has no pad to return for those, so it accepts
+/// an optional fallback to expand to instead. The fallback is not validated.
+///
+/// If multiple pads provide the signal, the macro returns one that is not reserved for some
+/// other purpose, such as booting or interfacing with flash.
+///
+/// Example usage:
+/// - `gpio_for_signal!(ADC1_CH0)`
+/// - `gpio_for_signal!(LP_I2C_SDA, "GPIO6")`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_signal {
+    (LP_GPIO0 $(, $_fallback:literal)?) => {
+        "GPIO0"
+    };
+    (LP_GPIO1 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (MTCK $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (LP_GPIO2 $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (MTDI $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (LP_GPIO3 $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (MTMS $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (LP_GPIO4 $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (MTDO $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (LP_GPIO5 $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (SPI2_HOLD $(, $_fallback:literal)?) => {
+        "GPIO6"
+    };
+    (LP_GPIO6 $(, $_fallback:literal)?) => {
+        "GPIO6"
+    };
+    (SPI2_CS $(, $_fallback:literal)?) => {
+        "GPIO7"
+    };
+    (LP_GPIO7 $(, $_fallback:literal)?) => {
+        "GPIO7"
+    };
+    (UART0_RTS $(, $_fallback:literal)?) => {
+        "GPIO8"
+    };
+    (SPI2_D $(, $_fallback:literal)?) => {
+        "GPIO8"
+    };
+    (LP_GPIO8 $(, $_fallback:literal)?) => {
+        "GPIO8"
+    };
+    (UART0_CTS $(, $_fallback:literal)?) => {
+        "GPIO9"
+    };
+    (SPI2_CK $(, $_fallback:literal)?) => {
+        "GPIO9"
+    };
+    (LP_GPIO9 $(, $_fallback:literal)?) => {
+        "GPIO9"
+    };
+    (UART1_TXD $(, $_fallback:literal)?) => {
+        "GPIO10"
+    };
+    (SPI2_Q $(, $_fallback:literal)?) => {
+        "GPIO10"
+    };
+    (LP_GPIO10 $(, $_fallback:literal)?) => {
+        "GPIO10"
+    };
+    (UART1_RXD $(, $_fallback:literal)?) => {
+        "GPIO11"
+    };
+    (SPI2_WP $(, $_fallback:literal)?) => {
+        "GPIO11"
+    };
+    (LP_GPIO11 $(, $_fallback:literal)?) => {
+        "GPIO11"
+    };
+    (UART1_RTS $(, $_fallback:literal)?) => {
+        "GPIO12"
+    };
+    (LP_GPIO12 $(, $_fallback:literal)?) => {
+        "GPIO12"
+    };
+    (UART1_CTS $(, $_fallback:literal)?) => {
+        "GPIO13"
+    };
+    (LP_GPIO13 $(, $_fallback:literal)?) => {
+        "GPIO13"
+    };
+    (LP_UART_TXD $(, $_fallback:literal)?) => {
+        "GPIO14"
+    };
+    (LP_GPIO14 $(, $_fallback:literal)?) => {
+        "GPIO14"
+    };
+    (LP_UART_RXD $(, $_fallback:literal)?) => {
+        "GPIO15"
+    };
+    (LP_GPIO15 $(, $_fallback:literal)?) => {
+        "GPIO15"
+    };
+    (ADC1_CH0 $(, $_fallback:literal)?) => {
+        "GPIO16"
+    };
+    (ADC1_CH1 $(, $_fallback:literal)?) => {
+        "GPIO17"
+    };
+    (ADC1_CH2 $(, $_fallback:literal)?) => {
+        "GPIO18"
+    };
+    (ADC1_CH3 $(, $_fallback:literal)?) => {
+        "GPIO19"
+    };
+    (ADC1_CH4 $(, $_fallback:literal)?) => {
+        "GPIO20"
+    };
+    (ADC1_CH5 $(, $_fallback:literal)?) => {
+        "GPIO21"
+    };
+    (DBG_PSRAM_CK $(, $_fallback:literal)?) => {
+        "GPIO22"
+    };
+    (ADC1_CH6 $(, $_fallback:literal)?) => {
+        "GPIO22"
+    };
+    (REF_50M_CLK $(, $_fallback:literal)?) => {
+        "GPIO23"
+    };
+    (DBG_PSRAM_CS $(, $_fallback:literal)?) => {
+        "GPIO23"
+    };
+    (ADC1_CH7 $(, $_fallback:literal)?) => {
+        "GPIO23"
+    };
+    (USJ_DM $(, $_fallback:literal)?) => {
+        "GPIO24"
+    };
+    (USJ_DP $(, $_fallback:literal)?) => {
+        "GPIO25"
+    };
+    (USB_FS_DM $(, $_fallback:literal)?) => {
+        "GPIO26"
+    };
+    (USB_FS_DP $(, $_fallback:literal)?) => {
+        "GPIO27"
+    };
+    (EMAC_RXDV $(, $_fallback:literal)?) => {
+        "GPIO28"
+    };
+    (DBG_PSRAM_D $(, $_fallback:literal)?) => {
+        "GPIO28"
+    };
+    (EMAC_RXD0 $(, $_fallback:literal)?) => {
+        "GPIO29"
+    };
+    (DBG_PSRAM_Q $(, $_fallback:literal)?) => {
+        "GPIO29"
+    };
+    (EMAC_RXD1 $(, $_fallback:literal)?) => {
+        "GPIO30"
+    };
+    (DBG_PSRAM_WP $(, $_fallback:literal)?) => {
+        "GPIO30"
+    };
+    (EMAC_RXER $(, $_fallback:literal)?) => {
+        "GPIO31"
+    };
+    (DBG_PSRAM_HOLD $(, $_fallback:literal)?) => {
+        "GPIO31"
+    };
+    (EMAC_RMII_CLK $(, $_fallback:literal)?) => {
+        "GPIO44"
+    };
+    (DBG_PSRAM_DQ4 $(, $_fallback:literal)?) => {
+        "GPIO32"
+    };
+    (EMAC_TXEN $(, $_fallback:literal)?) => {
+        "GPIO40"
+    };
+    (DBG_PSRAM_DQ5 $(, $_fallback:literal)?) => {
+        "GPIO33"
+    };
+    (SPI2_IO4 $(, $_fallback:literal)?) => {
+        "GPIO34"
+    };
+    (EMAC_TXD0 $(, $_fallback:literal)?) => {
+        "GPIO41"
+    };
+    (DBG_PSRAM_DQ6 $(, $_fallback:literal)?) => {
+        "GPIO34"
+    };
+    (SPI2_IO5 $(, $_fallback:literal)?) => {
+        "GPIO35"
+    };
+    (EMAC_TXD1 $(, $_fallback:literal)?) => {
+        "GPIO42"
+    };
+    (DBG_PSRAM_DQ7 $(, $_fallback:literal)?) => {
+        "GPIO35"
+    };
+    (SPI2_IO6 $(, $_fallback:literal)?) => {
+        "GPIO36"
+    };
+    (EMAC_TXER $(, $_fallback:literal)?) => {
+        "GPIO43"
+    };
+    (DBG_PSRAM_DQS_0 $(, $_fallback:literal)?) => {
+        "GPIO36"
+    };
+    (UART0_TXD $(, $_fallback:literal)?) => {
+        "GPIO37"
+    };
+    (SPI2_IO7 $(, $_fallback:literal)?) => {
+        "GPIO37"
+    };
+    (UART0_RXD $(, $_fallback:literal)?) => {
+        "GPIO38"
+    };
+    (SPI2_DQS $(, $_fallback:literal)?) => {
+        "GPIO38"
+    };
+    (SD1_DATA0 $(, $_fallback:literal)?) => {
+        "GPIO39"
+    };
+    (BIST $(, $_fallback:literal)?) => {
+        "GPIO39"
+    };
+    (DBG_PSRAM_DQ8 $(, $_fallback:literal)?) => {
+        "GPIO39"
+    };
+    (SD1_DATA1 $(, $_fallback:literal)?) => {
+        "GPIO40"
+    };
+    (DBG_PSRAM_DQ9 $(, $_fallback:literal)?) => {
+        "GPIO40"
+    };
+    (SD1_DATA2 $(, $_fallback:literal)?) => {
+        "GPIO41"
+    };
+    (DBG_PSRAM_DQ10 $(, $_fallback:literal)?) => {
+        "GPIO41"
+    };
+    (SD1_DATA3 $(, $_fallback:literal)?) => {
+        "GPIO42"
+    };
+    (DBG_PSRAM_DQ11 $(, $_fallback:literal)?) => {
+        "GPIO42"
+    };
+    (SD1_CLK $(, $_fallback:literal)?) => {
+        "GPIO43"
+    };
+    (DBG_PSRAM_DQ12 $(, $_fallback:literal)?) => {
+        "GPIO43"
+    };
+    (SD1_CMD $(, $_fallback:literal)?) => {
+        "GPIO44"
+    };
+    (DBG_PSRAM_DQ13 $(, $_fallback:literal)?) => {
+        "GPIO44"
+    };
+    (SD1_DATA4 $(, $_fallback:literal)?) => {
+        "GPIO45"
+    };
+    (DBG_PSRAM_DQ14 $(, $_fallback:literal)?) => {
+        "GPIO45"
+    };
+    (SD1_DATA5 $(, $_fallback:literal)?) => {
+        "GPIO46"
+    };
+    (DBG_PSRAM_DQ15 $(, $_fallback:literal)?) => {
+        "GPIO46"
+    };
+    (SD1_DATA6 $(, $_fallback:literal)?) => {
+        "GPIO47"
+    };
+    (DBG_PSRAM_DQS_1 $(, $_fallback:literal)?) => {
+        "GPIO47"
+    };
+    (SD1_DATA7 $(, $_fallback:literal)?) => {
+        "GPIO48"
+    };
+    (DBG_FLASH_CS $(, $_fallback:literal)?) => {
+        "GPIO49"
+    };
+    (ADC2_CH0 $(, $_fallback:literal)?) => {
+        "GPIO49"
+    };
+    (DBG_FLASH_Q $(, $_fallback:literal)?) => {
+        "GPIO50"
+    };
+    (ADC2_CH1 $(, $_fallback:literal)?) => {
+        "GPIO50"
+    };
+    (DBG_FLASH_WP $(, $_fallback:literal)?) => {
+        "GPIO51"
+    };
+    (ADC2_CH2 $(, $_fallback:literal)?) => {
+        "GPIO51"
+    };
+    (DBG_FLASH_HOLD $(, $_fallback:literal)?) => {
+        "GPIO52"
+    };
+    (ADC2_CH3 $(, $_fallback:literal)?) => {
+        "GPIO52"
+    };
+    (DBG_FLASH_CK $(, $_fallback:literal)?) => {
+        "GPIO53"
+    };
+    (ADC2_CH4 $(, $_fallback:literal)?) => {
+        "GPIO53"
+    };
+    (DBG_FLASH_D $(, $_fallback:literal)?) => {
+        "GPIO54"
+    };
+    (ADC2_CH5 $(, $_fallback:literal)?) => {
+        "GPIO54"
+    };
+    ($_signal:ident, $fallback:literal) => {
+        $fallback
+    };
+}
 /// Defines the `InputSignal` and `OutputSignal` enums.
 ///
 /// This macro is intended to be called in esp-hal only.

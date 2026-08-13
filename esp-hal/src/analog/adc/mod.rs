@@ -1,9 +1,5 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "analog_pin" => {
-        cfg(esp32) => "GPIO32",
-        cfg(any(esp32s2, esp32s3)) => "GPIO3",
-        cfg(not(any(esp32, esp32s2, esp32s3)))  => "GPIO2"
-    }
+    "analog_pin" => gpio_for_signal!(ADC1_CH0),
 ))]
 //! # Analog to Digital Converter (ADC)
 //!

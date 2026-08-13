@@ -5271,6 +5271,137 @@ macro_rules! for_each_iomux_function {
         ((FSPICS5, FSPICSn, 5), GPIO27, _2)));
     };
 }
+/// Returns the name of the GPIO that provides the given signal, as a string.
+///
+/// The macro takes the name of a direct function - a digital IO MUX function, an analog
+/// function, or an LP IO MUX function - and expands to a string literal like `"GPIO4"`. It
+/// is meant to keep documentation free of per-chip pin lists.
+///
+/// Signals that are not wired to a pad on this chip have to be routed through the GPIO
+/// matrix, which can reach any pad. The macro has no pad to return for those, so it accepts
+/// an optional fallback to expand to instead. The fallback is not validated.
+///
+/// If multiple pads provide the signal, the macro returns one that is not reserved for some
+/// other purpose, such as booting or interfacing with flash.
+///
+/// Example usage:
+/// - `gpio_for_signal!(ADC1_CH0)`
+/// - `gpio_for_signal!(LP_I2C_SDA, "GPIO6")`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_signal {
+    (FSPIQ $(, $_fallback:literal)?) => {
+        "GPIO0"
+    };
+    (FSPICS0 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (ADC1_CH0 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (MTMS $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (FSPIWP $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (ADC1_CH1 $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (MTDI $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (FSPIHD $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (ADC1_CH2 $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (MTCK $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (FSPICLK $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (ADC1_CH3 $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (MTDO $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (FSPID $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (ADC1_CH4 $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (LP_GPIO0 $(, $_fallback:literal)?) => {
+        "GPIO7"
+    };
+    (LP_GPIO1 $(, $_fallback:literal)?) => {
+        "GPIO8"
+    };
+    (LP_GPIO2 $(, $_fallback:literal)?) => {
+        "GPIO9"
+    };
+    (ZCD0 $(, $_fallback:literal)?) => {
+        "GPIO10"
+    };
+    (LP_GPIO3 $(, $_fallback:literal)?) => {
+        "GPIO10"
+    };
+    (ZCD1 $(, $_fallback:literal)?) => {
+        "GPIO11"
+    };
+    (LP_GPIO4 $(, $_fallback:literal)?) => {
+        "GPIO11"
+    };
+    (LP_GPIO5 $(, $_fallback:literal)?) => {
+        "GPIO12"
+    };
+    (XTAL_32K_P $(, $_fallback:literal)?) => {
+        "GPIO13"
+    };
+    (LP_GPIO6 $(, $_fallback:literal)?) => {
+        "GPIO13"
+    };
+    (XTAL_32K_N $(, $_fallback:literal)?) => {
+        "GPIO14"
+    };
+    (LP_GPIO7 $(, $_fallback:literal)?) => {
+        "GPIO14"
+    };
+    (U0RXD $(, $_fallback:literal)?) => {
+        "GPIO23"
+    };
+    (FSPICS1 $(, $_fallback:literal)?) => {
+        "GPIO23"
+    };
+    (U0TXD $(, $_fallback:literal)?) => {
+        "GPIO24"
+    };
+    (FSPICS2 $(, $_fallback:literal)?) => {
+        "GPIO24"
+    };
+    (FSPICS3 $(, $_fallback:literal)?) => {
+        "GPIO25"
+    };
+    (FSPICS4 $(, $_fallback:literal)?) => {
+        "GPIO26"
+    };
+    (USJ_DM $(, $_fallback:literal)?) => {
+        "GPIO26"
+    };
+    (FSPICS5 $(, $_fallback:literal)?) => {
+        "GPIO27"
+    };
+    (USJ_DP $(, $_fallback:literal)?) => {
+        "GPIO27"
+    };
+    ($_signal:ident, $fallback:literal) => {
+        $fallback
+    };
+}
 /// Defines the `InputSignal` and `OutputSignal` enums.
 ///
 /// This macro is intended to be called in esp-hal only.

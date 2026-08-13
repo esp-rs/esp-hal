@@ -126,6 +126,9 @@ pub enum TrngError {
     TrngSourceNotEnabled,
 }
 
+#[cfg_attr(docsrs, procmacros::doc_replace(
+    "analog_pin" => gpio_for_signal!(ADC1_CH4),
+))]
 /// True Random Number Generator (TRNG)
 ///
 /// The `Trng` struct represents a true random number generator that combines
@@ -136,12 +139,7 @@ pub enum TrngError {
 ///
 /// To generate true random numbers, an instance of [`TrngSource`] is required. Once created, you
 /// can create [`Trng`] instances at any time, as long as the [`TrngSource`] is alive.
-#[cfg_attr(docsrs, procmacros::doc_replace(
-    "analog_pin" => {
-        cfg(esp32) => "GPIO32",
-        _ => "GPIO3"
-    }
-))]
+///
 /// ## Example
 ///
 /// ```rust, no_run
