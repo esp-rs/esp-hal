@@ -139,34 +139,51 @@ impl From<Command> for u16 {
 /// LP I2C function.
 #[cfg(not(lp_io_has_gpio_matrix))]
 fn configure_pad(pin: &impl LpPin, function: LpFunction) {
-    use crate::peripherals::LP_IO;
+    cfg_select! {
+        esp32c6 => {
+            use crate::peripherals::{LP_IO as LP_GPIO, LP_IO as LP_IO_MUX};
+        }
+        esp32c5 => {
+            use crate::peripherals::LP_GPIO;
+            use crate::peripherals::LP_IO_MUX;
+        }
+    }
 
     let ionum = pin.lp_number() as usize;
-    let lp_io = LP_IO::regs();
-    unsafe {
-        // Set the IO pin to high to avoid them from toggling from Low to
-        // High state during initialization. This can register a spurious
-        // I2C start condition.
-        lp_io
-            .out_data_w1ts()
-            .write(|w| w.out_data_w1ts().bits(1 << ionum));
 
-        // Set output mode to Open Drain
-        lp_io.pin(ionum).modify(|_, w| w.pad_driver().set_bit());
-
-        // Enable output (writing to write-1-to-set register, then internally the
-        // `GPIO_OUT_REG` will be set)
-        lp_io
-            .out_enable_w1ts()
-            .write(|w| w.enable_w1ts().bits(1 << ionum));
-
-        lp_io.gpio(ionum).modify(|_, w| {
-            // Disable the internal weak pull-down
-            w.fun_wpd().clear_bit();
-            // Enable the internal weak pull-up
-            w.fun_wpu().set_bit()
-        });
+    // Set the IO pin to high to avoid them from toggling from Low to
+    // High state during initialization. This can register a spurious
+    // I2C start condition.
+    cfg_select! {
+        esp32c6 => {
+            LP_GPIO::regs()
+                .out_data_w1ts()
+                .write(|w| unsafe { w.out_data_w1ts().bits(1 << ionum) });
+        }
+        esp32c5 => {
+            LP_GPIO::regs()
+                .out_w1ts()
+                .write(|w| unsafe { w.out_w1ts().bits(1 << ionum) });
+        }
     }
+
+    // Set output mode to Open Drain
+    LP_GPIO::regs()
+        .pin(ionum)
+        .modify(|_, w| w.pad_driver().set_bit());
+
+    // Enable output (writing to write-1-to-set register, then internally the
+    // `GPIO_OUT_REG` will be set)
+    LP_GPIO::regs()
+        .out_enable_w1ts()
+        .write(|w| unsafe { w.enable_w1ts().bits(1 << ionum) });
+
+    LP_IO_MUX::regs().gpio(ionum).modify(|_, w| {
+        // Disable the internal weak pull-down
+        w.fun_wpd().clear_bit();
+        // Enable the internal weak pull-up
+        w.fun_wpu().set_bit()
+    });
 
     crate::gpio::lp_io::low_level::set_config(ionum as u8, true, true, function);
 }

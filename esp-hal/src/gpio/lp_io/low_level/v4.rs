@@ -9,7 +9,11 @@ cfg_select! {
     }
     any(esp32c5, esp32c61) => {
         // Only a low-power peripheral or a low-power core reads and drives the pads.
-        #[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
+        #[cfg(any(
+            ulp_riscv_driver_supported,
+            lp_io_has_gpio_matrix,
+            lp_i2c_master_driver_supported,
+        ))]
         use crate::peripherals::LP_GPIO;
         use crate::peripherals::LP_IO_MUX;
     }
@@ -55,7 +59,11 @@ pub(crate) fn init_pin(lp: u8, input_enable: bool) -> u8 {
     lp
 }
 
-#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
+#[cfg(any(
+    ulp_riscv_driver_supported,
+    lp_io_has_gpio_matrix,
+    lp_i2c_master_driver_supported,
+))]
 pub(crate) fn output_enable(lp: u8, enable: bool) {
     if enable {
         LP_GPIO::regs()
@@ -89,7 +97,11 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
 
 // On these chips, the pad driver bit is part of the low-power GPIO peripheral, so this function
 // takes the low-power number, like the functions beside it.
-#[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
+#[cfg(any(
+    ulp_riscv_driver_supported,
+    lp_io_has_gpio_matrix,
+    lp_i2c_master_driver_supported,
+))]
 pub(crate) fn set_open_drain_output(lp: u8, enable: bool) {
     LP_GPIO::regs()
         .pin(lp as usize)

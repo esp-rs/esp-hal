@@ -202,6 +202,15 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("lp_i2c_master.version") => {
+        "lp_i2c"
+    };
+    ("lp_i2c_master.fifo_size") => {
+        16
+    };
+    ("lp_i2c_master.fifo_size", str) => {
+        stringify!(16)
+    };
     ("spi_master.version") => {
         3
     };

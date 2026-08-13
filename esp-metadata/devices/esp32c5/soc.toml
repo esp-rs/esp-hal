@@ -348,7 +348,7 @@ support_status = { status = "not_supported", issue = 5155 }
 ram_size = 32
 
 [device.lp_i2c_master]
-support_status = "not_supported"
+support_status = "partial"
 version = "lp_i2c"
 fifo_size = 16
 
