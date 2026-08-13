@@ -39,6 +39,7 @@ impl Manifest {
         }
     }
 
+    /// Sorts channel names first, then versions from newest to oldest.
     fn normalize_versions(&mut self) {
         self.versions.sort_by_key(|v| {
             let trimmed = v.trim();
@@ -46,14 +47,10 @@ impl Manifest {
             let rank = match trimmed.to_lowercase().as_str() {
                 "main" => 0,
                 "git" => 1,
-                _ => 2,
+                _ if semver.is_some() => 2,
+                _ => 3,
             };
-            (
-                semver.is_none(),
-                std::cmp::Reverse(semver),
-                rank,
-                trimmed.to_lowercase(),
-            )
+            (rank, std::cmp::Reverse(semver), trimmed.to_lowercase())
         });
     }
 }
@@ -64,6 +61,7 @@ pub fn build_documentation(
     packages: &mut [Package],
     chips: &mut [Chip],
     base_url: Option<String>,
+    channel: Option<String>,
 ) -> Result<()> {
     log::info!("Building documentation for packages: {packages:?} on chips: {chips:?}");
     let output_path = workspace.join("docs");
@@ -79,9 +77,13 @@ pub fn build_documentation(
             continue;
         }
 
-        // Download the manifest from the documentation server if able,
-        // otherwise just create a default (empty) manifest:
-        let mut manifest = fetch_manifest(&base_url, package)?;
+        // Download the manifest from the documentation server. A package that was never
+        // deployed has no manifest, but a failed download must not look like an empty
+        // manifest: the manifest decides if this build may claim the `latest` redirect.
+        let mut manifest = match fetch_manifest(&base_url, package)? {
+            ManifestFetch::Found(manifest) => manifest,
+            ManifestFetch::NotFound => Manifest::default(),
+        };
 
         // If the package does not have chip features, then just ignore
         // whichever chip(s) were specified as arguments:
@@ -99,16 +101,32 @@ pub fn build_documentation(
             vec![]
         };
 
-        // Update the package manifest to include the latest version:
         let version = crate::package_version(workspace, *package)?;
-        manifest.insert_version(version.to_string());
+        let version_label = channel.clone().unwrap_or_else(|| version.to_string());
+
+        // Update the package manifest to include the channel or crate version:
+        manifest.insert_version(&version_label);
 
         // Build the documentation for the package:
         if chips.is_empty() {
-            build_documentation_for_package(workspace, package, None)?;
+            build_documentation_for_package(
+                workspace,
+                package,
+                None,
+                &version,
+                channel.as_deref(),
+                &manifest,
+            )?;
         } else {
             for chip in chips {
-                build_documentation_for_package(workspace, package, Some(chip))?;
+                build_documentation_for_package(
+                    workspace,
+                    package,
+                    Some(chip),
+                    &version,
+                    channel.as_deref(),
+                    &manifest,
+                )?;
             }
         }
 
@@ -128,7 +146,7 @@ pub fn build_documentation(
 
         // Patch the generated documentation to include a select box for the version:
         #[cfg(feature = "deploy-docs")]
-        patch_documentation_index_for_package(workspace, package, &version, &base_url)?;
+        patch_documentation_index_for_package(workspace, package, &version_label, &base_url)?;
     }
 
     Ok(())
@@ -138,15 +156,16 @@ fn build_documentation_for_package(
     workspace: &Path,
     package: &Package,
     chip: Option<Chip>,
+    version: &semver::Version,
+    channel: Option<&str>,
+    manifest: &Manifest,
 ) -> Result<()> {
-    let version = crate::package_version(workspace, *package)?;
-
     // Ensure that the package/chip combination provided are valid:
-    if let Some(chip) = chip {
-        if let Err(err) = package.validate_package_chip(&chip) {
-            log::warn!("{err}");
-            return Ok(());
-        }
+    if let Some(chip) = chip
+        && let Err(err) = package.validate_package_chip(&chip)
+    {
+        log::warn!("{err}");
+        return Ok(());
     }
 
     // Build the documentation for the specified package, targeting the
@@ -159,10 +178,11 @@ fn build_documentation_for_package(
         docs_path.display()
     );
 
+    let version_component = docs_version_component(version, channel);
     let mut output_path = workspace
         .join("docs")
         .join(package.to_string())
-        .join(version.to_string());
+        .join(&version_component);
 
     if let Some(chip) = chip {
         // Sometimes we need to specify a chip feature, but it does not affect the
@@ -186,29 +206,83 @@ fn build_documentation_for_package(
         )
     })?;
 
-    // create "/latest" redirect - assuming that the current version is the latest.
-    //
     // Hosted docs rely on nginx to rewrite `/latest/...` deep links to `/latest/?path=...`.
-    let latest_path = if package.chip_features_matter() {
-        output_path
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("latest")
-    } else {
-        output_path.parent().unwrap().join("latest")
-    };
-    log::info!("Creating latest version redirect at {:?}", latest_path);
-    create_dir_all(latest_path.clone())
-        .with_context(|| format!("Failed to create dir in {}", latest_path.display()))?;
-    let latest_html = latest_redirect_html(workspace, package, &version)
-        .with_context(|| format!("Failed to render latest redirect for {}", package))?;
-    std::fs::File::create(latest_path.clone().join("index.html"))?
-        .write_all(latest_html.as_bytes())
-        .with_context(|| format!("Failed to create or write to {}", latest_path.display()))?;
+    if should_write_latest_redirect(version, channel, manifest) {
+        let latest_path = if package.chip_features_matter() {
+            output_path
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("latest")
+        } else {
+            output_path.parent().unwrap().join("latest")
+        };
+        log::info!("Creating latest version redirect at {:?}", latest_path);
+        create_dir_all(latest_path.clone())
+            .with_context(|| format!("Failed to create dir in {}", latest_path.display()))?;
+        let latest_html = latest_redirect_html(workspace, package, version)
+            .with_context(|| format!("Failed to render latest redirect for {}", package))?;
+        std::fs::File::create(latest_path.clone().join("index.html"))?
+            .write_all(latest_html.as_bytes())
+            .with_context(|| format!("Failed to create or write to {}", latest_path.display()))?;
+    }
 
     Ok(())
+}
+
+/// Directory name under `docs/<package>/` for this build.
+fn docs_version_component(version: &semver::Version, channel: Option<&str>) -> String {
+    match channel {
+        Some(channel) => channel.to_string(),
+        None => version.to_string(),
+    }
+}
+
+/// Whether a version may claim the `latest` redirect or a root-index row.
+///
+/// Any stable release is eligible. A pre-release is eligible only when it is
+/// `X.0.0-pre` for some major version `X >= 1` (for example `1.0.0-beta.0`).
+fn is_eligible_docs_version(version: &semver::Version) -> bool {
+    version.pre.is_empty() || (version.major >= 1 && version.minor == 0 && version.patch == 0)
+}
+
+/// Whether this build should write `latest/index.html`.
+fn should_write_latest_redirect(
+    version: &semver::Version,
+    channel: Option<&str>,
+    manifest: &Manifest,
+) -> bool {
+    if channel.is_some() {
+        return false;
+    }
+    if !is_eligible_docs_version(version) {
+        return false;
+    }
+    // Only a version that may claim the redirect itself can block this build from
+    // claiming it. An ineligible pre-release must not hold `latest` hostage.
+    match highest_eligible_version(manifest) {
+        Some(highest) => *version >= highest,
+        None => true,
+    }
+}
+
+/// Highest eligible semver in `manifest`, if it holds one.
+fn highest_eligible_version(manifest: &Manifest) -> Option<semver::Version> {
+    let mut best: Option<semver::Version> = None;
+    for entry in &manifest.versions {
+        let Ok(ver) = semver::Version::parse(entry) else {
+            continue;
+        };
+        if !is_eligible_docs_version(&ver) {
+            continue;
+        }
+        best = Some(match best {
+            None => ver,
+            Some(b) => ver.max(b),
+        });
+    }
+    best
 }
 
 /// Relative URL from `latest/index.html` to this package's versioned docs root.
@@ -370,7 +444,7 @@ fn cargo_doc_without_pre_processing(
 ///
 /// The only currently supported function for expressions is `has(<SYMBOL>)`
 /// e.g. `has("psram")`
-fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<(), anyhow::Error> {
+fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &Path) -> Result<(), anyhow::Error> {
     let cargo_toml = std::fs::read_to_string(windows_safe_path(&package_path.join("Cargo.toml")))
         .with_context(|| {
         format!(
@@ -392,11 +466,7 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &PathBuf) -> Result<
 
     let cargo_toml = cargo_toml.lines();
 
-    let chip_cfg = if let Some(chip) = &chip {
-        Some(Config::for_chip(chip))
-    } else {
-        None
-    };
+    let chip_cfg = chip.as_ref().map(|chip| Config::for_chip(chip));
     let mut processed_cargo_toml = Vec::new();
     let mut engine = somni_expr::Context::new();
     engine.add_function("has", move |cond: &str| -> bool {
@@ -470,14 +540,14 @@ fn restore_cargo_toml(package_path: PathBuf) -> Result<(), anyhow::Error> {
 fn patch_documentation_index_for_package(
     workspace: &Path,
     package: &Package,
-    version: &semver::Version,
+    version: &str,
     base_url: &Option<String>,
 ) -> Result<()> {
     use kuchikiki::traits::*;
 
     let package_name = package.to_string().replace('-', "_");
     let package_path = workspace.join("docs").join(package.to_string());
-    let version_path = package_path.join(version.to_string());
+    let version_path = package_path.join(version);
 
     let mut index_paths = Vec::new();
 
@@ -488,15 +558,15 @@ fn patch_documentation_index_for_package(
             let chip_path = chip_path?.path();
             if chip_path.is_dir() {
                 let path = chip_path.join(&package_name).join("index.html");
-                index_paths.push((version.clone(), path));
+                index_paths.push(path);
             }
         }
     } else {
         let path = version_path.join(&package_name).join("index.html");
-        index_paths.push((version.clone(), path));
+        index_paths.push(path);
     }
 
-    for (version, index_path) in index_paths {
+    for index_path in index_paths {
         let html = fs::read_to_string(&index_path)
             .with_context(|| format!("Failed to read {}", index_path.display()))?;
         let document = kuchikiki::parse_html().one(html);
@@ -529,38 +599,12 @@ fn patch_documentation_index_for_package(
 // ----------------------------------------------------------------------------
 // Build Documentation Index
 
-/// Returns the highest stable (non-prerelease) `semver::Version` found among the version-named
-/// directories under `package_docs_path`. Used to avoid defaulting to pre-releases when a stable
-/// version exists alongside a pre-release.
-fn latest_stable_docs_version(package_docs_path: &Path) -> Option<semver::Version> {
-    let mut best: Option<semver::Version> = None;
-    let entries = fs::read_dir(package_docs_path).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        // Skip non-directory entries
-        if !path.is_dir() {
-            continue;
-        }
-        let name = path.file_name()?.to_string_lossy();
-        // Parse the version from the directory name
-        let Ok(ver) = name.parse::<semver::Version>() else {
-            continue;
-        };
-        // Skip pre-release versions
-        if !ver.pre.is_empty() {
-            continue;
-        }
-        // If multiple stable versions exist, return the highest one
-        best = Some(match best {
-            None => ver,
-            Some(b) => ver.max(b),
-        });
-    }
-    best
-}
-
 /// Build the documentation index for all packages.
-pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> Result<()> {
+pub fn build_documentation_index(
+    workspace: &Path,
+    packages: &mut [Package],
+    base_url: Option<String>,
+) -> Result<()> {
     let docs_path = workspace.join("docs");
     let resources_path = workspace.join("resources");
 
@@ -585,7 +629,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         let package_docs_path = docs_path.join(package.as_ref());
 
         // Each path we iterate over should be the directory for a given version of
-        // the package's documentation (non-semver names, e.g. `latest`, are skipped).
+        // the package's documentation (`latest` is skipped).
         if !package_docs_path.exists() {
             log::warn!(
                 "Package documentation path does not exist: '{}', skipping",
@@ -594,7 +638,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
             continue;
         }
         for version_path in fs::read_dir(&package_docs_path)
-            .with_context(|| format!("Failed to read {}", &package_docs_path.display()))?
+            .with_context(|| format!("Failed to read {}", package_docs_path.display()))?
         {
             let version_path = version_path?.path();
             if version_path.is_file() {
@@ -602,6 +646,14 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                     "Path is not a directory, skipping: '{}'",
                     version_path.display()
                 );
+                continue;
+            }
+
+            let version_label = version_path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            if version_label == "latest" {
                 continue;
             }
 
@@ -630,22 +682,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
             chips.sort();
 
-            let channel = version_path
-                .file_name()
-                .map(|n| n.to_string_lossy())
-                .unwrap_or_default();
-            let current_version = match channel.parse::<semver::Version>() {
-                Ok(v) => v,
-                Err(_) => {
-                    log::debug!(
-                        "Skipping package doc directory (not semver): {}",
-                        version_path.display()
-                    );
-                    continue;
-                }
-            };
-
-            let meta = generate_documentation_meta_for_package(*package, &chips, current_version)?;
+            let meta = generate_documentation_meta_for_package(*package, &chips, &version_label)?;
 
             // Render the template to HTML and write it out to the desired path:
             let html = render_template(&resources_path, "package_index.html.somni", {
@@ -672,7 +709,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     )
     .context("Failed to copy esp-rs-grey-bg.svg")?;
 
-    let meta = generate_documentation_meta_for_index(workspace)?;
+    let meta = generate_documentation_meta_for_index(workspace, &base_url)?;
 
     // Render the template to HTML and write it out to the desired path:
     let html = render_template(&resources_path, "index.html.somni", {
@@ -696,14 +733,14 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 fn generate_documentation_meta_for_package(
     package: Package,
     chips: &[Chip],
-    doc_tree_version: semver::Version,
+    doc_tree_version: &str,
 ) -> Result<Vec<Meta>> {
     let mut metadata = Vec::new();
     let types = &mut TemplateTypes::default();
 
     let name = package.to_string();
     let crate_name = name.replace('-', "_");
-    let version = doc_tree_version.to_string();
+    let version = doc_tree_version;
 
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
@@ -719,7 +756,7 @@ fn generate_documentation_meta_for_package(
             types,
             Meta {
                 name: name.as_str(),
-                version: version.as_str(),
+                version: version,
                 chip: chip_name.as_str(),
                 chip_pretty: chip.pretty_name(),
                 package: crate_name.as_str(),
@@ -732,7 +769,10 @@ fn generate_documentation_meta_for_package(
     Ok(metadata)
 }
 
-fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Meta>> {
+fn generate_documentation_meta_for_index(
+    workspace: &Path,
+    base_url: &Option<String>,
+) -> Result<Vec<Meta>> {
     let mut metadata = Vec::new();
     let docs_path = workspace.join("docs");
     let types = &mut TemplateTypes::default();
@@ -743,9 +783,14 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Meta>> 
             continue;
         }
 
-        let cargo_version = crate::package_version(workspace, package)?;
-        let package_docs_path = docs_path.join(package.as_ref());
-        let version = latest_stable_docs_version(&package_docs_path).unwrap_or(cargo_version);
+        let manifest = load_manifest_for_index(&docs_path, &package, base_url)?;
+        // A manifest that holds no eligible version must not send the reader to a channel
+        // that this package may never have deployed. The version of this checkout is the
+        // best guess that a release run can make.
+        let version = match highest_eligible_version(&manifest) {
+            Some(version) => version.to_string(),
+            None => crate::package_version(workspace, package)?.to_string(),
+        };
 
         let url = if package.chip_features_matter() {
             format!("{package}/{version}/index.html")
@@ -755,7 +800,6 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Meta>> 
         };
 
         let name = package.to_string();
-        let version = version.to_string();
         metadata.push(somni_struct!(
             types,
             Meta {
@@ -771,34 +815,95 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Meta>> 
     Ok(metadata)
 }
 
+fn load_manifest_for_index(
+    docs_path: &Path,
+    package: &Package,
+    base_url: &Option<String>,
+) -> Result<Manifest> {
+    let local_path = docs_path.join(package.to_string()).join("manifest.json");
+    if local_path.exists() {
+        let contents = fs::read_to_string(&local_path)
+            .with_context(|| format!("Failed to read {}", local_path.display()))?;
+        return serde_json::from_str(&contents)
+            .with_context(|| format!("Failed to parse {}", local_path.display()));
+    }
+
+    match fetch_manifest(base_url, package)? {
+        ManifestFetch::Found(manifest) => Ok(manifest),
+        ManifestFetch::NotFound => Ok(Manifest::default()),
+    }
+}
+
 // ----------------------------------------------------------------------------
 // Helper Functions
 
-fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<Manifest> {
-    let mut manifest_url = base_url
-        .clone()
-        .unwrap_or_default()
-        .trim_end_matches('/')
-        .to_string();
-    manifest_url.push_str(&format!("/{package}/manifest.json"));
+#[derive(Debug)]
+enum ManifestFetch {
+    /// Present when `deploy-docs` successfully downloads a manifest.
+    #[allow(dead_code)]
+    Found(Manifest),
+    /// HTTP 404, missing base URL, or `deploy-docs` disabled.
+    NotFound,
+}
 
-    #[cfg(feature = "deploy-docs")]
-    let manifest = match reqwest::blocking::get(manifest_url) {
-        Ok(resp) if resp.status().is_success() => resp.json::<Manifest>()?,
-        Ok(resp) => {
-            log::warn!("Unable to fetch package manifest: {}", resp.status());
-            Manifest::default()
-        }
-        Err(err) => {
-            log::warn!("Unable to fetch package manifest: {err}");
-            Manifest::default()
-        }
+fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<ManifestFetch> {
+    let Some(base_url) = base_url
+        .as_ref()
+        .map(|url| url.trim_end_matches('/'))
+        .filter(|url| !url.is_empty())
+    else {
+        return Ok(ManifestFetch::NotFound);
     };
 
-    #[cfg(not(feature = "deploy-docs"))]
-    let manifest = Manifest::default();
+    let manifest_url = format!("{base_url}/{package}/manifest.json");
 
-    Ok(manifest)
+    #[cfg(feature = "deploy-docs")]
+    {
+        /// A transient failure of the documentation server must not fail a build, but the
+        /// manifest is also too important to give up on. Try this many times.
+        const ATTEMPTS: u32 = 4;
+
+        let mut last_error = None;
+        for attempt in 1..=ATTEMPTS {
+            if attempt > 1 {
+                // Back off for 1s, 2s, then 4s.
+                let delay = std::time::Duration::from_secs(1 << (attempt - 2));
+                log::warn!(
+                    "Retrying manifest download in {}s ({attempt}/{ATTEMPTS})",
+                    delay.as_secs()
+                );
+                std::thread::sleep(delay);
+            }
+
+            last_error = match reqwest::blocking::get(&manifest_url) {
+                Ok(resp) if resp.status().is_success() => {
+                    return Ok(ManifestFetch::Found(resp.json()?));
+                }
+                // The package was never deployed. Retrying cannot change that.
+                Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => {
+                    return Ok(ManifestFetch::NotFound);
+                }
+                Ok(resp) => Some(anyhow::anyhow!(
+                    "Unable to fetch package manifest from {manifest_url}: {}",
+                    resp.status()
+                )),
+                Err(err) => Some(anyhow::anyhow!(
+                    "Unable to fetch package manifest from {manifest_url}: {err}"
+                )),
+            };
+        }
+
+        Err(last_error.unwrap().context(format!(
+            "Failed to fetch the manifest of {package} in {ATTEMPTS} attempts"
+        )))
+    }
+
+    #[cfg(not(feature = "deploy-docs"))]
+    {
+        let _ = manifest_url;
+        let _ = package;
+        Ok(ManifestFetch::NotFound)
+    }
 }
 
 fn render_template(resources: &Path, template: &str, env: Env) -> Result<String> {
@@ -816,70 +921,143 @@ fn render_template(resources: &Path, template: &str, env: Env) -> Result<String>
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path};
+    use std::path::Path;
 
     use somni_expr::somni_struct;
     use somni_template::{Env, Iter, TemplateTypes};
-    use tempfile::TempDir;
 
     use super::{
         Manifest,
+        docs_version_component,
         generate_documentation_meta_for_package,
+        highest_eligible_version,
+        is_eligible_docs_version,
         latest_redirect_base,
         latest_redirect_html,
-        latest_stable_docs_version,
         render_template,
+        should_write_latest_redirect,
     };
 
     fn workspace() -> &'static Path {
         Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
     }
 
-    fn mkdir(root: &Path, name: &str) {
-        fs::create_dir_all(root.join(name)).unwrap();
+    fn version(s: &str) -> semver::Version {
+        semver::Version::parse(s).unwrap()
+    }
+
+    fn manifest(versions: &[&str]) -> Manifest {
+        let mut manifest = Manifest::default();
+        for v in versions {
+            manifest.insert_version(*v);
+        }
+        manifest
     }
 
     #[test]
-    fn picks_highest_stable_and_ignores_prerelease_and_nonsemver_names() {
-        let tmp = TempDir::new().unwrap();
-        let root = tmp.path();
-        mkdir(root, "0.9.0");
-        mkdir(root, "1.0.0");
-        mkdir(root, "1.1.0-rc.0");
-        mkdir(root, "2.0.0");
-        mkdir(root, "latest");
-        mkdir(root, "main");
+    fn eligible_docs_version_rule() {
+        assert!(is_eligible_docs_version(&version("0.5.0")));
+        assert!(is_eligible_docs_version(&version("1.0.0")));
+        assert!(is_eligible_docs_version(&version("1.0.0-beta.0")));
+        assert!(is_eligible_docs_version(&version("2.0.0-rc.1")));
+        assert!(!is_eligible_docs_version(&version("0.6.0-rc.0")));
+        assert!(!is_eligible_docs_version(&version("1.1.0-rc.0")));
+        assert!(!is_eligible_docs_version(&version("1.0.1-beta.0")));
+    }
+
+    #[test]
+    fn latest_redirect_respects_channel_eligibility_and_manifest() {
+        let empty = Manifest::default();
+        assert!(should_write_latest_redirect(
+            &version("1.0.0-beta.0"),
+            None,
+            &empty
+        ));
+        assert!(!should_write_latest_redirect(
+            &version("1.0.0-beta.0"),
+            Some("main"),
+            &empty
+        ));
+        assert!(!should_write_latest_redirect(
+            &version("1.1.0-rc.0"),
+            None,
+            &empty
+        ));
+        assert!(should_write_latest_redirect(
+            &version("0.5.0"),
+            None,
+            &empty
+        ));
+        assert!(!should_write_latest_redirect(
+            &version("0.6.0-rc.0"),
+            None,
+            &empty
+        ));
+
+        let with_beta = manifest(&["1.0.0-beta.0", "main"]);
+        assert!(!should_write_latest_redirect(
+            &version("0.24.0"),
+            None,
+            &with_beta
+        ));
+        assert!(should_write_latest_redirect(
+            &version("1.0.0"),
+            None,
+            &with_beta
+        ));
+        assert!(!should_write_latest_redirect(
+            &version("1.1.0-rc.0"),
+            None,
+            &with_beta
+        ));
+
+        // A pre-release that cannot claim the redirect must not block a release from
+        // claiming it, even though it sorts higher.
+        let with_rc = manifest(&["1.0.0", "1.1.0-rc.0", "main"]);
+        assert!(should_write_latest_redirect(
+            &version("1.0.1"),
+            None,
+            &with_rc
+        ));
+        // A rebuild of the release that holds the redirect keeps it.
+        assert!(should_write_latest_redirect(
+            &version("1.0.0"),
+            None,
+            &with_rc
+        ));
+        // An older release does not take the redirect from a newer one.
+        assert!(!should_write_latest_redirect(
+            &version("0.9.0"),
+            None,
+            &with_rc
+        ));
+    }
+
+    #[test]
+    fn channel_replaces_version_in_output_path_component() {
         assert_eq!(
-            latest_stable_docs_version(root),
-            Some("2.0.0".parse().unwrap())
+            docs_version_component(&version("1.1.0"), Some("main")),
+            "main"
         );
+        assert_eq!(docs_version_component(&version("1.1.0"), None), "1.1.0");
     }
 
     #[test]
-    fn returns_none_when_only_prereleases() {
-        let tmp = TempDir::new().unwrap();
-        mkdir(tmp.path(), "1.0.0-beta.0");
-        mkdir(tmp.path(), "1.1.0-rc.0");
-        assert_eq!(latest_stable_docs_version(tmp.path()), None);
-    }
-
-    #[test]
-    fn returns_none_for_empty_dir() {
-        let tmp = TempDir::new().unwrap();
-        assert_eq!(latest_stable_docs_version(tmp.path()), None);
-    }
-
-    #[test]
-    fn skips_files_and_unparseable_dir_names() {
-        let tmp = TempDir::new().unwrap();
-        let root = tmp.path();
-        mkdir(root, "1.0.0");
-        fs::write(root.join("not-a-dir"), b"x").unwrap();
-        mkdir(root, "not-a-version");
+    fn index_version_selects_highest_eligible() {
         assert_eq!(
-            latest_stable_docs_version(root),
-            Some("1.0.0".parse().unwrap())
+            highest_eligible_version(&manifest(&["1.0.0-beta.0", "1.1.0-rc.0", "main"])),
+            Some(version("1.0.0-beta.0"))
         );
+        assert_eq!(
+            highest_eligible_version(&manifest(&["0.5.0", "0.6.0-rc.0"])),
+            Some(version("0.5.0"))
+        );
+        assert_eq!(
+            highest_eligible_version(&manifest(&["1.0.0", "1.1.0", "main"])),
+            Some(version("1.1.0"))
+        );
+        assert_eq!(highest_eligible_version(&manifest(&["main"])), None);
+        assert_eq!(highest_eligible_version(&Manifest::default()), None);
     }
 
     #[test]
@@ -932,7 +1110,10 @@ mod tests {
             ),
             "{html}"
         );
+        assert!(html.contains(r#"const packageName = "esp-hal";"#), "{html}");
+        assert!(html.contains("segments.indexOf(packageName)"), "{html}");
         assert!(html.contains(".then(({ versions }) => {"), "{html}");
+        assert!(html.contains("versions.includes(selected)"), "{html}");
     }
 
     #[test]
@@ -941,7 +1122,7 @@ mod tests {
         let meta = generate_documentation_meta_for_package(
             crate::Package::EspHal,
             &[crate::Chip::Esp32c6, crate::Chip::Esp32s3],
-            semver::Version::parse("1.0.0").unwrap(),
+            "1.0.0",
         )
         .unwrap();
 
@@ -967,6 +1148,33 @@ mod tests {
         );
         assert!(
             html.contains("<span class=\"crate-version\">1.0.0</span>"),
+            "{html}"
+        );
+    }
+
+    #[test]
+    fn package_index_renders_channel_label() {
+        let meta = generate_documentation_meta_for_package(
+            crate::Package::EspHal,
+            &[crate::Chip::Esp32c6],
+            "main",
+        )
+        .unwrap();
+
+        let html = render_template(
+            &workspace().join("resources"),
+            "package_index.html.somni",
+            {
+                let mut env = Env::new();
+                env.value("package", "esp_hal")
+                    .value("metadata", Iter(meta));
+                env
+            },
+        )
+        .unwrap();
+
+        assert!(
+            html.contains("<span class=\"crate-version\">main</span>"),
             "{html}"
         );
     }
@@ -1040,6 +1248,8 @@ mod tests {
         assert_eq!(
             manifest.versions,
             vec![
+                "main", // Rank 0
+                "git",  // Rank 1
                 "1.2.0",
                 "1.1.1",
                 "1.1.0",
@@ -1050,9 +1260,7 @@ mod tests {
                 "1.0.0-beta.1",
                 "1.0.0-beta.0",
                 "0.9.0",   // Semver descending
-                "main",    // Rank 0
-                "git",     // Rank 1
-                "nightly"  // Rank 2 + alphabetical
+                "nightly"  // Rank 3 + alphabetical
             ]
         );
     }

@@ -169,7 +169,7 @@ fn check_crate_before_bumping(manifest: &mut CargoToml) -> Result<()> {
         let mut error_message = String::new();
         for (dep_kind, errors) in errors {
             if !error_message.is_empty() {
-                error_message.push_str("\n");
+                error_message.push('\n');
             }
             writeln!(&mut error_message, "In [{dep_kind}]:").unwrap();
             for (krate, error) in errors {
@@ -193,7 +193,7 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
         Ok(())
     }
 
-    fn check_for_non_version_deps<'a, T: TableLike>(dependency: &T) -> Result<()> {
+    fn check_for_non_version_deps<T: TableLike>(dependency: &T) -> Result<()> {
         if let Some(version) = dependency.get("version") {
             if let Some(version) = version.as_str() {
                 validate_simple_version(version)?;
@@ -280,7 +280,7 @@ fn bump_crate_version(
             let content = fs::read_to_string(&p)
                 .with_context(|| format!("Could not read {}", p.display()))?;
             CargoToml::from_str(&bumped_package.workspace, Package::Examples, &content)
-                .with_context(|| format!("Could not parse Cargo.toml"))
+                .with_context(|| "Could not parse Cargo.toml".to_string())
         }));
 
     for dependent in tomls {
@@ -460,16 +460,16 @@ fn finalize_placeholders(
     let is_prerelease = !new_version.pre.is_empty();
 
     walk_dir(&bumped_package.package_path(), &skip_paths, &mut |path| {
-        if is_prerelease {
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with("MIGRATING-") && name.ends_with(".md") {
-                    log::info!(
-                        "  Skipping migration guide {} (pre-release)",
-                        path.display()
-                    );
-                    return;
-                }
-            }
+        if is_prerelease
+            && let Some(name) = path.file_name().and_then(|n| n.to_str())
+            && name.starts_with("MIGRATING-")
+            && name.ends_with(".md")
+        {
+            log::info!(
+                "  Skipping migration guide {} (pre-release)",
+                path.display()
+            );
+            return;
         }
 
         let content = match fs::read_to_string(path) {

@@ -132,15 +132,15 @@ impl Package {
 
         // This is intended to opt-out in case there are features that look like chip names, but
         // aren't supposed to be handled like them.
-        if let Some(metadata) = toml.espressif_metadata() {
-            if let Some(Item::Value(ov)) = metadata.get("has_chip_features") {
-                let Value::Boolean(ov) = ov else {
-                    log::warn!("Invalid value for 'has_chip_features' in metadata");
-                    return false;
-                };
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(Item::Value(ov)) = metadata.get("has_chip_features")
+        {
+            let Value::Boolean(ov) = ov else {
+                log::warn!("Invalid value for 'has_chip_features' in metadata");
+                return false;
+            };
 
-                return *ov.value();
-            }
+            return *ov.value();
         }
 
         features
@@ -230,10 +230,11 @@ impl Package {
 
         // Look for files matching the pattern "MIGRATING-*.md"
         for entry in entries.flatten() {
-            if let Some(file_name) = entry.file_name().to_str() {
-                if file_name.starts_with("MIGRATING-") && file_name.ends_with(".md") {
-                    return true;
-                }
+            if let Some(file_name) = entry.file_name().to_str()
+                && file_name.starts_with("MIGRATING-")
+                && file_name.ends_with(".md")
+            {
+                return true;
             }
         }
 
@@ -256,7 +257,7 @@ impl Package {
             .filter_map(Result::ok)
             .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
             .any(|entry| {
-                std::fs::read_to_string(entry.path()).map_or(false, |src| src.contains("#[test]"))
+                std::fs::read_to_string(entry.path()).is_ok_and(|src| src.contains("#[test]"))
             })
     }
 
@@ -420,9 +421,7 @@ impl Package {
         metadata_key: &str,
     ) -> Option<CheckConfig> {
         let toml = self.toml();
-        let Some(ref toml) = *toml else {
-            return None;
-        };
+        let toml = toml.as_ref()?;
 
         if let Some(metadata) = toml.espressif_metadata()
             && let Some(config_meta) = metadata.get(metadata_key)
@@ -471,9 +470,7 @@ impl Package {
         metadata_key: &str,
     ) -> Option<Vec<CheckConfig>> {
         let toml = self.toml();
-        let Some(ref toml) = *toml else {
-            return None;
-        };
+        let toml = toml.as_ref()?;
         let mut cases = Vec::new();
 
         if let Some(metadata) = toml.espressif_metadata()
@@ -922,35 +919,31 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     let cmd = CargoArgsBuilder::default();
 
     match package {
-        Package::EspConfig => {
-            return cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .features(&vec!["build".into(), "tui".into()])
-                    .build(),
-                &package_path,
-            );
-        }
+        Package::EspConfig => cargo::run(
+            &cmd.clone()
+                .subcommand("test")
+                .features(&["build".into(), "tui".into()])
+                .build(),
+            &package_path,
+        ),
 
-        Package::EspBootloaderEspIdf => {
-            return cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .arg("--lib")
-                    .arg("--tests")
-                    .features(&vec!["std".into(), "embedded-storage".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            );
-        }
+        Package::EspBootloaderEspIdf => cargo::run(
+            &cmd.clone()
+                .subcommand("test")
+                .arg("--lib")
+                .arg("--tests")
+                .features(&["std".into(), "embedded-storage".into()])
+                .arg("--")
+                .arg("--test-threads=1")
+                .build(),
+            &package_path,
+        ),
 
         Package::EspStorage => {
             cargo::run(
                 &cmd.clone()
                     .subcommand("test")
-                    .features(&vec!["emulation".into()])
+                    .features(&["emulation".into()])
                     .arg("--")
                     .arg("--test-threads=1")
                     .build(),
@@ -960,7 +953,7 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
             cargo::run(
                 &cmd.clone()
                     .subcommand("test")
-                    .features(&vec!["emulation".into(), "bytewise-read".into()])
+                    .features(&["emulation".into(), "bytewise-read".into()])
                     .arg("--")
                     .arg("--test-threads=1")
                     .build(),
@@ -974,42 +967,38 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
                     .toolchain("nightly")
                     .subcommand("miri")
                     .subcommand("test")
-                    .features(&vec!["emulation".into()])
+                    .features(&["emulation".into()])
                     .arg("--")
                     .arg("--test-threads=1")
                     .build(),
                 &package_path,
             )?;
 
-            return cargo::run(
+            cargo::run(
                 &cmd.clone()
                     .toolchain("nightly")
                     .subcommand("miri")
                     .subcommand("test")
-                    .features(&vec!["emulation".into(), "bytewise-read".into()])
+                    .features(&["emulation".into(), "bytewise-read".into()])
                     .arg("--")
                     .arg("--test-threads=1")
                     .build(),
                 &package_path,
-            );
+            )
         }
-        Package::EspHalProcmacros => {
-            return cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .features(&vec![
-                        "has-lp-core".into(),
-                        "is-lp-core".into(),
-                        "rtc-slow".into(),
-                        "rtc-fast".into(),
-                    ])
-                    .build(),
-                &package_path,
-            );
-        }
-        Package::EspMetadata => {
-            return cargo::run(&cmd.clone().subcommand("test").build(), &package_path);
-        }
+        Package::EspHalProcmacros => cargo::run(
+            &cmd.clone()
+                .subcommand("test")
+                .features(&[
+                    "has-lp-core".into(),
+                    "is-lp-core".into(),
+                    "rtc-slow".into(),
+                    "rtc-fast".into(),
+                ])
+                .build(),
+            &package_path,
+        ),
+        Package::EspMetadata => cargo::run(&cmd.clone().subcommand("test").build(), &package_path),
         _ => Err(anyhow!(
             "Instructions for host testing were not provided for: '{}'",
             package,
@@ -1096,11 +1085,11 @@ pub fn format_package_path(
     log::debug!("{cargo_args:#?}");
 
     if check {
-        return cargo::run(&cargo_args, &package_path);
+        return cargo::run(&cargo_args, package_path);
     }
 
     retry_on_failure(&format!("Formatting {}", package_path.display()), || {
-        cargo::run(&cargo_args, &package_path)
+        cargo::run(&cargo_args, package_path)
     })
 }
 

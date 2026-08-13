@@ -229,10 +229,10 @@ impl ExamplesPackage {
     }
 
     fn single_project_examples(&self) -> bool {
-        match self {
-            ExamplesPackage::Examples | ExamplesPackage::CompileTests => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            ExamplesPackage::Examples | ExamplesPackage::CompileTests
+        )
     }
 }
 
@@ -417,12 +417,9 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
     // Execute the specified action:
     match action {
-        CargoAction::Build(out_path) => build_examples(
-            args,
-            filtered,
-            &package_path,
-            out_path.as_ref().map(|p| p.as_path()),
-        ),
+        CargoAction::Build(out_path) => {
+            build_examples(args, filtered, &package_path, out_path.as_deref())
+        }
         CargoAction::Run => run_examples(args, filtered, &package_path),
     }
 }
@@ -500,15 +497,12 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 &[]
             } else {
                 (action == CargoAction::Run)
-                    .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
+                    .then(|| filter.as_ref().map(std::slice::from_ref))
                     .flatten()
                     .unwrap_or(&[])
             };
 
-            let matched: Vec<_> = all_tests
-                .iter()
-                .filter(|t| t.matches(test_arg.as_deref()))
-                .collect();
+            let matched: Vec<_> = all_tests.iter().filter(|t| t.matches(test_arg)).collect();
 
             if matched.is_empty() {
                 if is_radio_package
