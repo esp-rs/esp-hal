@@ -4,10 +4,12 @@
 
 #[cfg(not(lp_io_has_gpio_matrix))]
 use crate::gpio::{LpPin, lp_io::LpFunction};
+#[cfg(not(esp32p4))]
+use crate::peripherals::LPWR;
 use crate::{
-    i2c::lp_i2c::{Error, LpI2c, Scl, Sda},
+    i2c::lp_i2c::{Error, LpI2c},
     pac::lp_i2c0::RegisterBlock,
-    peripherals::{LP_PERI, LPWR},
+    peripherals::LP_PERI,
     time::Rate,
 };
 
@@ -22,14 +24,14 @@ const COMMAND_SLOTS: usize = 8;
 #[cfg(not(lp_io_has_gpio_matrix))]
 for_each_lp_function! {
     (LP_I2C_SDA, $gpio:ident, $af:ident) => {
-        impl Sda for crate::peripherals::$gpio<'_> {
+        impl super::Sda for crate::peripherals::$gpio<'_> {
             fn connect_sda(&self) {
                 configure_pad(self, LpFunction::$af);
             }
         }
     };
     (LP_I2C_SCL, $gpio:ident, $af:ident) => {
-        impl Scl for crate::peripherals::$gpio<'_> {
+        impl super::Scl for crate::peripherals::$gpio<'_> {
             fn connect_scl(&self) {
                 configure_pad(self, LpFunction::$af);
             }
@@ -139,34 +141,50 @@ impl From<Command> for u16 {
 /// LP I2C function.
 #[cfg(not(lp_io_has_gpio_matrix))]
 fn configure_pad(pin: &impl LpPin, function: LpFunction) {
-    use crate::peripherals::LP_IO;
+    cfg_select! {
+        esp32c6 => {
+            use crate::peripherals::{LP_IO as LP_GPIO, LP_IO as LP_IO_MUX};
+        }
+        esp32c5 => {
+            use crate::peripherals::{LP_GPIO, LP_IO_MUX};
+        }
+    }
 
     let ionum = pin.lp_number() as usize;
-    let lp_io = LP_IO::regs();
-    unsafe {
-        // Set the IO pin to high to avoid them from toggling from Low to
-        // High state during initialization. This can register a spurious
-        // I2C start condition.
-        lp_io
-            .out_data_w1ts()
-            .write(|w| w.out_data_w1ts().bits(1 << ionum));
 
-        // Set output mode to Open Drain
-        lp_io.pin(ionum).modify(|_, w| w.pad_driver().set_bit());
-
-        // Enable output (writing to write-1-to-set register, then internally the
-        // `GPIO_OUT_REG` will be set)
-        lp_io
-            .out_enable_w1ts()
-            .write(|w| w.enable_w1ts().bits(1 << ionum));
-
-        lp_io.gpio(ionum).modify(|_, w| {
-            // Disable the internal weak pull-down
-            w.fun_wpd().clear_bit();
-            // Enable the internal weak pull-up
-            w.fun_wpu().set_bit()
-        });
+    // Set the IO pin to high to avoid them from toggling from Low to
+    // High state during initialization. This can register a spurious
+    // I2C start condition.
+    cfg_select! {
+        esp32c6 => {
+            LP_GPIO::regs()
+                .out_data_w1ts()
+                .write(|w| unsafe { w.out_data_w1ts().bits(1 << ionum) });
+        }
+        esp32c5 => {
+            LP_GPIO::regs()
+                .out_w1ts()
+                .write(|w| unsafe { w.out_w1ts().bits(1 << ionum) });
+        }
     }
+
+    // Set output mode to Open Drain
+    LP_GPIO::regs()
+        .pin(ionum)
+        .modify(|_, w| w.pad_driver().set_bit());
+
+    // Enable output (writing to write-1-to-set register, then internally the
+    // `GPIO_OUT_REG` will be set)
+    LP_GPIO::regs()
+        .out_enable_w1ts()
+        .write(|w| unsafe { w.enable_w1ts().bits(1 << ionum) });
+
+    LP_IO_MUX::regs().gpio(ionum).modify(|_, w| {
+        // Disable the internal weak pull-down
+        w.fun_wpd().clear_bit();
+        // Enable the internal weak pull-up
+        w.fun_wpu().set_bit()
+    });
 
     crate::gpio::lp_io::low_level::set_config(ionum as u8, true, true, function);
 }
@@ -184,31 +202,23 @@ impl<'d> LpI2c<'d> {
             .modify(|_, w| w.sclk_active().set_bit());
 
         // Enable LP I2C controller clock
-        LP_PERI::regs()
-            .clk_en()
-            .modify(|_, w| w.lp_ext_i2c_ck_en().set_bit());
-
-        LP_PERI::regs()
-            .reset_en()
-            .modify(|_, w| w.lp_ext_i2c_reset_en().set_bit());
-        LP_PERI::regs()
-            .reset_en()
-            .modify(|_, w| w.lp_ext_i2c_reset_en().clear_bit());
+        self.enable(true);
+        self.reset();
     }
 
     pub(super) fn configure(&mut self, config: &Config) -> Result<(), ConfigError> {
-        // Set LP I2C source clock
-        LPWR::regs()
-            .lpperi()
-            .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
+        self.select_lp_fast_clock();
 
         // Initialize LP I2C Master mode
-        self.i2c.register_block().ctr().modify(|_, w| unsafe {
+        self.i2c.register_block().ctr().write(|w| unsafe {
             // Clear register
             w.bits(0);
             // Use open drain output for SDA and SCL
-            w.sda_force_out().set_bit();
-            w.scl_force_out().set_bit();
+            #[cfg(not(esp32p4))]
+            {
+                w.sda_force_out().set_bit();
+                w.scl_force_out().set_bit();
+            }
             // Ensure that clock is enabled
             w.clk_en().set_bit()
         });
@@ -226,10 +236,7 @@ impl<'d> LpI2c<'d> {
 
         self.reset_fifo();
 
-        // Set LP I2C source clock
-        LPWR::regs()
-            .lpperi()
-            .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
+        self.select_lp_fast_clock();
 
         // Configure LP I2C timing paramters. source_clk is ignored for LP_I2C in this
         // call
@@ -603,39 +610,54 @@ impl<'d> LpI2c<'d> {
 
     /// Resets the transmit and receive FIFO buffers.
     fn reset_fifo(&self) {
-        self.i2c
-            .register_block()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().set_bit());
+        let fifo_conf = self.i2c.register_block().fifo_conf();
 
-        self.i2c
-            .register_block()
-            .fifo_conf()
-            .modify(|_, w| w.tx_fifo_rst().clear_bit());
-
-        self.i2c
-            .register_block()
-            .fifo_conf()
-            .modify(|_, w| w.rx_fifo_rst().set_bit());
-
-        self.i2c
-            .register_block()
-            .fifo_conf()
-            .modify(|_, w| w.rx_fifo_rst().clear_bit());
+        fifo_conf.modify(|_, w| w.tx_fifo_rst().set_bit());
+        fifo_conf.modify(|_, w| w.tx_fifo_rst().clear_bit());
+        fifo_conf.modify(|_, w| w.rx_fifo_rst().set_bit());
+        fifo_conf.modify(|_, w| w.rx_fifo_rst().clear_bit());
     }
 
-    pub(super) fn disable(&mut self) {
-        // Reset the peripheral so that it stops driving the bus, then take away its clocks.
-        LP_PERI::regs()
-            .reset_en()
-            .modify(|_, w| w.lp_ext_i2c_reset_en().set_bit());
-        LP_PERI::regs()
-            .reset_en()
-            .modify(|_, w| w.lp_ext_i2c_reset_en().clear_bit());
+    fn select_lp_fast_clock(&mut self) {
+        // 0 selects LP_FAST / RTC_FAST.
+        cfg_select! {
+            esp32p4 => {
+                LP_PERI::regs()
+                    .core_clk_sel()
+                    .modify(|_, w| unsafe { w.lp_i2c_clk_sel().bits(0) });
+            }
+            _ => {
+                LPWR::regs()
+                    .lpperi()
+                    .modify(|_, w| w.lp_i2c_clk_sel().clear_bit());
+            }
+        }
+    }
 
-        LP_PERI::regs()
-            .clk_en()
-            .modify(|_, w| w.lp_ext_i2c_ck_en().clear_bit());
+    pub(super) fn enable(&mut self, enable: bool) {
+        let clk_en = LP_PERI::regs().clk_en();
+        cfg_select! {
+            esp32p4 => clk_en.modify(|_, w| w.ck_en_lp_i2c().bit(enable)),
+            _ => clk_en.modify(|_, w| w.lp_ext_i2c_ck_en().bit(enable)),
+        };
+    }
+    pub(super) fn disable(&mut self) {
+        self.reset();
+        self.enable(false);
+    }
+
+    pub(super) fn reset(&mut self) {
+        let reset_en = LP_PERI::regs().reset_en();
+        cfg_select! {
+            esp32p4 => {
+                reset_en.modify(|_, w| w.rst_en_lp_i2c().set_bit());
+                reset_en.modify(|_, w| w.rst_en_lp_i2c().clear_bit());
+            }
+            _ => {
+                reset_en.modify(|_, w| w.lp_ext_i2c_reset_en().set_bit());
+                reset_en.modify(|_, w| w.lp_ext_i2c_reset_en().clear_bit());
+            }
+        }
     }
 }
 

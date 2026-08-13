@@ -61,7 +61,11 @@ fn generate(workspace: &Path, check: bool) -> Result<()> {
             bail!("Checking the generated code needs `cargo +nightly fmt`, which is not available");
         }
 
-        log::debug!("`cargo +nightly fmt` is not available, only refreshing the metadata cache");
+        log::warn!(
+            "`cargo +nightly fmt` is not available; skipping code generation and only \
+             refreshing the metadata cache. Install a nightly toolchain with the rustfmt \
+             component, then re-run `cargo update-metadata`."
+        );
         dump_cache(workspace)?;
 
         return Ok(());
