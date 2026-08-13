@@ -1,14 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "lp_io" => {
-        cfg(esp32) => "GPIO12",
-        cfg(any(esp32s2, esp32s3)) => "GPIO21",
-        cfg(esp32h2) => "GPIO8",
-        _ => "GPIO1"
-    },
-    "lp_num" => {
-        cfg(any(esp32s2, esp32s3)) => "21",
-        _ => "1"
-    }
+    "lp_io" => gpio_for_signal!(LP_GPIO1),
+    "lp_num" => "1"
 ))]
 //! Low Power IO (LP_IO)
 //!

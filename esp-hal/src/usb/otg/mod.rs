@@ -1,6 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "dm_pin" => gpio_for_analog_signal!(USB_FS_DM),
-    "dp_pin" => gpio_for_analog_signal!(USB_FS_DP),
+    "dm_pin" => gpio_for_signal!(USB_FS_DM),
+    "dp_pin" => gpio_for_signal!(USB_FS_DP),
 ))]
 //! USB On-The-Go
 //!

@@ -677,8 +677,6 @@ pub(crate) fn generate_gpios(
     let lp_functions_enum = render_lp_functions(gpio);
 
     let gpio_for_signal = render_gpio_for_signal(gpio);
-    let gpio_for_lp_signal = render_gpio_for_lp_signal(gpio, lp_io);
-    let gpio_for_analog_signal = render_gpio_for_analog_signal(gpio);
 
     quote! {
         /// This macro can be used to generate code for each `GPIOn` instance.
@@ -791,10 +789,6 @@ pub(crate) fn generate_gpios(
 
         #gpio_for_signal
 
-        #gpio_for_lp_signal
-
-        #gpio_for_analog_signal
-
         /// Defines the `InputSignal` and `OutputSignal` enums.
         ///
         /// This macro is intended to be called in esp-hal only.
@@ -859,244 +853,59 @@ fn preferred_pad<'a>(mut candidates: impl Iterator<Item = &'a PinConfig>) -> Opt
     Some(unrestricted.unwrap_or(first))
 }
 
-/// Picks a pad for a signal that is routed through the GPIO matrix, and as such is not tied to a
-/// particular pad.
-///
-/// Indexing by the signal ID keeps the choice stable, and gives different pads to signals with
-/// neighbouring IDs. Drivers tend to have signals with neighbouring IDs, so their documentation
-/// will not want to use the same pad twice.
-fn pad_for_matrix_signal(candidates: &[&PinConfig], id: usize) -> Option<usize> {
-    if candidates.is_empty() {
-        return None;
-    }
-
-    Some(candidates[id % candidates.len()].pin)
-}
-
-/// Renders a macro that maps signal names to the name of a pad that can carry the signal.
-fn render_signal_to_gpio_macro(
-    macro_name: &str,
-    docs: TokenStream,
-    pads: &[(&str, usize)],
-) -> TokenStream {
-    if pads.is_empty() {
-        return quote! {};
-    }
-
-    let macro_name = format_ident!("{macro_name}");
-    let branches = pads.iter().map(|(signal, pin)| {
-        let signal = format_ident!("{signal}");
-        let gpio = format!("GPIO{pin}");
-        quote! {
-            (#signal) => { #gpio };
-        }
-    });
-
-    quote! {
-        #docs
-        #[macro_export]
-        #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-        macro_rules! #macro_name {
-            #(#branches)*
-        }
-    }
-}
-
-/// Renders `gpio_for_signal!`, which maps peripheral signals to the name of a pad that can carry
+/// Renders `gpio_for_signal!`, which maps direct functions to the name of the pad that provides
 /// them.
 fn render_gpio_for_signal(gpio: &super::GpioProperties) -> TokenStream {
     let pins = &gpio.pins_and_signals.pins;
-    let signals = &gpio.pins_and_signals.input_signals;
-    let out_signals = &gpio.pins_and_signals.output_signals;
 
-    // Pads that can be freely used by a signal routed through the GPIO matrix.
-    let free_pads = pins
-        .iter()
-        .filter(|pin| pin.limitations().is_empty())
-        .collect::<Vec<_>>();
-
-    let mut pads = vec![];
-    for signal in signals.iter().chain(out_signals.iter()) {
-        let name = signal.name.as_str();
-        if pads.iter().any(|(pad_signal, _)| *pad_signal == name) {
-            continue;
-        }
-
-        // Prefer the pad that can carry the signal through the IO MUX, bypassing the GPIO matrix.
-        let iomux_pad =
-            preferred_pad(pins.iter().filter(|pin| {
-                (0..FunctionMap::COUNT).any(|af| pin.functions.get(af) == Some(name))
-            }));
-
-        let pin = match iomux_pad {
-            Some(pad) => Some(pad.pin),
-            // Signals without an IO MUX pad have to be routed through the GPIO matrix, which can
-            // reach any pad.
-            None => signal
-                .id
-                .and_then(|id| pad_for_matrix_signal(&free_pads, id)),
-        };
-
-        if let Some(pin) = pin {
-            pads.push((name, pin));
-        }
-    }
-
-    render_signal_to_gpio_macro(
-        "gpio_for_signal",
-        quote! {
-            /// Returns the name of a GPIO that can carry the given peripheral signal, as a string.
-            ///
-            /// The macro takes the name of a signal from the `InputSignal` or `OutputSignal` enums,
-            /// and expands to a string literal like `"GPIO4"`. It is meant to keep documentation
-            /// free of per-chip pin lists.
-            ///
-            /// If the signal can be routed through the IO MUX, the macro returns the pad that
-            /// provides the signal as an alternate function. Otherwise the signal is routed through
-            /// the GPIO matrix and can reach any pad, in which case the macro returns an arbitrary
-            /// (but stable) pad that is not reserved for some other purpose, such as booting or
-            /// interfacing with flash.
-            ///
-            /// Example usage: `gpio_for_signal!(U1TXD)`
-        },
-        &pads,
-    )
-}
-
-/// Renders `gpio_for_analog_signal!`, which maps analog signals to the name of the pad that
-/// provides them.
-fn render_gpio_for_analog_signal(gpio: &super::GpioProperties) -> TokenStream {
-    let pins = &gpio.pins_and_signals.pins;
-
-    let mut pads: Vec<(&str, usize)> = vec![];
+    // Collect the pads that provide each direct function. Digital, analog and LP functions share a
+    // namespace here: a signal is either wired to a pad, or it is not.
+    let mut candidates: IndexMap<&str, Vec<&PinConfig>> = IndexMap::new();
     for pin in pins.iter() {
-        for af in 0..AnalogMap::COUNT {
-            let Some(name) = pin.analog.get(af) else {
-                continue;
-            };
+        let digital = (0..FunctionMap::COUNT).filter_map(|af| pin.functions.get(af));
+        let analog = (0..AnalogMap::COUNT).filter_map(|af| pin.analog.get(af));
+        let low_power = (0..LowPowerMap::COUNT).filter_map(|af| pin.lp.get(af));
 
-            if pads.iter().any(|(pad_signal, _)| *pad_signal == name) {
-                continue;
-            }
-
-            // Analog functions are wired to specific pads, there is no matrix to route them
-            // through.
-            let pad =
-                preferred_pad(pins.iter().filter(|pin| {
-                    (0..AnalogMap::COUNT).any(|af| pin.analog.get(af) == Some(name))
-                }));
-
-            if let Some(pad) = pad {
-                pads.push((name, pad.pin));
-            }
+        for signal in digital.chain(analog).chain(low_power) {
+            candidates.entry(signal).or_default().push(pin);
         }
     }
 
-    render_signal_to_gpio_macro(
-        "gpio_for_analog_signal",
-        quote! {
-            /// Returns the name of the GPIO that provides the given analog signal, as a string.
-            ///
-            /// The macro takes the name of an analog function, and expands to a string literal like
-            /// `"GPIO4"`. It is meant to keep documentation free of per-chip pin lists.
-            ///
-            /// Analog functions are wired to particular pads, so the returned pad is the one that
-            /// provides the signal. If multiple pads provide it, the macro returns one that is not
-            /// reserved for some other purpose, such as booting or interfacing with flash.
-            ///
-            /// Example usage: `gpio_for_analog_signal!(ADC1_CH0)`
-        },
-        &pads,
-    )
-}
+    let branches = candidates.iter().filter_map(|(signal, pads)| {
+        let pad = preferred_pad(pads.iter().copied())?;
 
-/// Renders `gpio_for_lp_signal!`, which maps LP peripheral signals to the name of a pad that can
-/// carry them.
-fn render_gpio_for_lp_signal(
-    gpio: &super::GpioProperties,
-    lp_io: Option<&super::LpIoSignals>,
-) -> TokenStream {
-    let pins = &gpio.pins_and_signals.pins;
+        let signal = format_ident!("{signal}");
+        let gpio = format!("GPIO{}", pad.pin);
 
-    // Pads that can be freely used by an LP signal routed through the LP GPIO matrix. Only pads
-    // that belong to the low-power domain can carry LP signals.
-    let free_pads = pins
-        .iter()
-        .filter(|pin| {
-            pin.limitations().is_empty()
-                && (0..LowPowerMap::COUNT)
-                    .filter_map(|af| pin.lp.get(af))
-                    .any(|signal| signal.starts_with("LP_GPIO"))
+        Some(quote! {
+            (#signal $(, $_fallback:literal)?) => { #gpio };
         })
-        .collect::<Vec<_>>();
+    });
 
-    fn add_signal<'a>(
-        pads: &mut Vec<(&'a str, usize)>,
-        pins: &'a [PinConfig],
-        free_pads: &[&PinConfig],
-        name: &'a str,
-        id: Option<usize>,
-    ) {
-        if pads.iter().any(|(pad_signal, _)| *pad_signal == name) {
-            return;
-        }
-
-        // Prefer the pad that provides the signal as an LP IO MUX function.
-        let iomux_pad = preferred_pad(
-            pins.iter()
-                .filter(|pin| (0..LowPowerMap::COUNT).any(|af| pin.lp.get(af) == Some(name))),
-        );
-
-        let pin = match iomux_pad {
-            Some(pad) => Some(pad.pin),
-            None => id.and_then(|id| pad_for_matrix_signal(free_pads, id)),
-        };
-
-        if let Some(pin) = pin {
-            pads.push((name, pin));
+    quote! {
+        /// Returns the name of the GPIO that provides the given signal, as a string.
+        ///
+        /// The macro takes the name of a direct function - a digital IO MUX function, an analog
+        /// function, or an LP IO MUX function - and expands to a string literal like `"GPIO4"`. It
+        /// is meant to keep documentation free of per-chip pin lists.
+        ///
+        /// Signals that are not wired to a pad on this chip have to be routed through the GPIO
+        /// matrix, which can reach any pad. The macro has no pad to return for those, so it accepts
+        /// an optional fallback to expand to instead. The fallback is not validated.
+        ///
+        /// If multiple pads provide the signal, the macro returns one that is not reserved for some
+        /// other purpose, such as booting or interfacing with flash.
+        ///
+        /// Example usage:
+        /// - `gpio_for_signal!(ADC1_CH0)`
+        /// - `gpio_for_signal!(LP_I2C_SDA, "GPIO6")`
+        #[macro_export]
+        #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+        macro_rules! gpio_for_signal {
+            #(#branches)*
+            ($_signal:ident, $fallback:literal) => { $fallback };
         }
     }
-
-    let mut pads = vec![];
-
-    // LP IO MUX functions first: a dedicated pad is a better answer than an arbitrary one.
-    for pin in pins.iter() {
-        for af in 0..LowPowerMap::COUNT {
-            if let Some(signal) = pin.lp.get(af) {
-                add_signal(&mut pads, pins, &free_pads, signal, None);
-            }
-        }
-    }
-
-    if let Some(lp_io) = lp_io {
-        for signal in lp_io
-            .lp_input_signals
-            .iter()
-            .chain(lp_io.lp_output_signals.iter())
-        {
-            add_signal(&mut pads, pins, &free_pads, &signal.name, signal.id);
-        }
-    }
-
-    render_signal_to_gpio_macro(
-        "gpio_for_lp_signal",
-        quote! {
-            /// Returns the name of a GPIO that can carry the given LP peripheral signal, as a
-            /// string.
-            ///
-            /// The macro takes the name of an LP IO MUX function, or of a signal from the
-            /// `LpInputSignal` or `LpOutputSignal` enums, and expands to a string literal like
-            /// `"GPIO4"`. It is meant to keep documentation free of per-chip pin lists.
-            ///
-            /// If the signal is available on a pad as an LP IO MUX function, the macro returns that
-            /// pad. Otherwise the signal is routed through the LP GPIO matrix and can reach any LP
-            /// pad, in which case the macro returns an arbitrary (but stable) LP pad that is not
-            /// reserved for some other purpose, such as booting or debugging.
-            ///
-            /// Example usage: `gpio_for_lp_signal!(LP_I2C_SDA)`
-        },
-        &pads,
-    )
 }
 
 /// Renders the `LpFunction` enum, which lists the LP IO MUX functions of the chip.

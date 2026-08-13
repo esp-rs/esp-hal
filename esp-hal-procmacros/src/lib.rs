@@ -150,7 +150,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```rust, ignore
 /// #[doc_replace(
 ///   "literal_placeholder" => "literal value",
-///   "generated_placeholder" => gpio_for_analog_signal!(USB_FS_DP),
+///   "generated_placeholder" => gpio_for_signal!(USB_FS_DP),
 ///   "conditional_placeholder" => {
 ///     cfg(condition1) => "value 1",
 ///     cfg(condition2) => "value 2",

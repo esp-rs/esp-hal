@@ -579,7 +579,7 @@ mod tests {
     fn test_inline_macro_replacements() {
         let result = replace(
             quote! {
-                "pin" => gpio_for_analog_signal!(USB_FS_DP)
+                "pin" => gpio_for_signal!(USB_FS_DP)
             }
             .into(),
             quote! {
@@ -596,7 +596,7 @@ mod tests {
             result.to_string(),
             quote! {
                 /// ```rust, no_run
-                #[doc = concat!(r" let pin = peripherals.", gpio_for_analog_signal!(USB_FS_DP), r";")]
+                #[doc = concat!(r" let pin = peripherals.", gpio_for_signal!(USB_FS_DP), r";")]
                 /// ```
                 struct Foo {}
             }
@@ -609,8 +609,8 @@ mod tests {
         let result = replace(
             quote! {
                 "pin" => {
-                    cfg(esp32s3) => gpio_for_lp_signal!(SAR_I2C_SDA_0),
-                    _ => gpio_for_lp_signal!(LP_I2C_SDA)
+                    cfg(esp32s3) => gpio_for_signal!(SAR_I2C_SDA_0),
+                    _ => gpio_for_signal!(LP_I2C_SDA, "GPIO6")
                 }
             }
             .into(),
@@ -625,8 +625,8 @@ mod tests {
         assert_eq!(
             result.to_string(),
             quote! {
-                #[cfg_attr(esp32s3, doc = concat!(r" let pin = peripherals.", gpio_for_lp_signal!(SAR_I2C_SDA_0), r";"))]
-                #[cfg_attr(not(any(esp32s3)), doc = concat!(r" let pin = peripherals.", gpio_for_lp_signal!(LP_I2C_SDA), r";"))]
+                #[cfg_attr(esp32s3, doc = concat!(r" let pin = peripherals.", gpio_for_signal!(SAR_I2C_SDA_0), r";"))]
+                #[cfg_attr(not(any(esp32s3)), doc = concat!(r" let pin = peripherals.", gpio_for_signal!(LP_I2C_SDA, "GPIO6"), r";"))]
                 struct Foo {}
             }
             .to_string()

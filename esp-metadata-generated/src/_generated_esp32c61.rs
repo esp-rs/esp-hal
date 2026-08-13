@@ -4244,313 +4244,135 @@ macro_rules! for_each_iomux_function {
         GPIO27, _0), ((SDIO_DATA1, SDIO_DATAn, 1), GPIO28, _0)));
     };
 }
-/// Returns the name of a GPIO that can carry the given peripheral signal, as a string.
+/// Returns the name of the GPIO that provides the given signal, as a string.
 ///
-/// The macro takes the name of a signal from the `InputSignal` or `OutputSignal` enums,
-/// and expands to a string literal like `"GPIO4"`. It is meant to keep documentation
-/// free of per-chip pin lists.
+/// The macro takes the name of a direct function - a digital IO MUX function, an analog
+/// function, or an LP IO MUX function - and expands to a string literal like `"GPIO4"`. It
+/// is meant to keep documentation free of per-chip pin lists.
 ///
-/// If the signal can be routed through the IO MUX, the macro returns the pad that
-/// provides the signal as an alternate function. Otherwise the signal is routed through
-/// the GPIO matrix and can reach any pad, in which case the macro returns an arbitrary
-/// (but stable) pad that is not reserved for some other purpose, such as booting or
-/// interfacing with flash.
+/// Signals that are not wired to a pad on this chip have to be routed through the GPIO
+/// matrix, which can reach any pad. The macro has no pad to return for those, so it accepts
+/// an optional fallback to expand to instead. The fallback is not validated.
 ///
-/// Example usage: `gpio_for_signal!(U1TXD)`
+/// If multiple pads provide the signal, the macro returns one that is not reserved for some
+/// other purpose, such as booting or interfacing with flash.
+///
+/// Example usage:
+/// - `gpio_for_signal!(ADC1_CH0)`
+/// - `gpio_for_signal!(LP_I2C_SDA, "GPIO6")`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! gpio_for_signal {
-    (U0RXD) => {
-        "GPIO10"
-    };
-    (U0CTS) => {
-        "GPIO26"
-    };
-    (U0DSR) => {
-        "GPIO27"
-    };
-    (U1RXD) => {
-        "GPIO28"
-    };
-    (U1CTS) => {
-        "GPIO29"
-    };
-    (U1DSR) => {
+    (XTAL_32K_P $(, $_fallback:literal)?) => {
         "GPIO0"
     };
-    (I2S_MCLK) => {
-        "GPIO1"
-    };
-    (I2SO_BCK) => {
-        "GPIO2"
-    };
-    (I2SO_WS) => {
-        "GPIO22"
-    };
-    (I2SI_SD) => {
-        "GPIO23"
-    };
-    (I2SI_BCK) => {
-        "GPIO24"
-    };
-    (I2SI_WS) => {
-        "GPIO25"
-    };
-    (CPU_GPIO_0) => {
-        "GPIO24"
-    };
-    (CPU_GPIO_1) => {
-        "GPIO25"
-    };
-    (CPU_GPIO_2) => {
-        "GPIO26"
-    };
-    (CPU_GPIO_3) => {
-        "GPIO27"
-    };
-    (CPU_GPIO_4) => {
-        "GPIO28"
-    };
-    (CPU_GPIO_5) => {
-        "GPIO29"
-    };
-    (CPU_GPIO_6) => {
+    (LP_GPIO0 $(, $_fallback:literal)?) => {
         "GPIO0"
     };
-    (CPU_GPIO_7) => {
+    (XTAL_32K_N $(, $_fallback:literal)?) => {
         "GPIO1"
     };
-    (USB_JTAG_TDO_BRIDGE) => {
+    (ADC1_CH0 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (LP_GPIO1 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (FSPIQ $(, $_fallback:literal)?) => {
         "GPIO2"
     };
-    (I2CEXT0_SCL) => {
+    (ADC1_CH1 $(, $_fallback:literal)?) => {
         "GPIO2"
     };
-    (I2CEXT0_SDA) => {
-        "GPIO22"
+    (LP_GPIO2 $(, $_fallback:literal)?) => {
+        "GPIO2"
     };
-    (FSPICLK) => {
+    (MTMS $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (FSPIHD $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (ADC1_CH2 $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (LP_GPIO3 $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (MTDI $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (FSPIWP $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (ADC1_CH3 $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (LP_GPIO4 $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
+    (MTCK $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (LP_GPIO5 $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (MTDO $(, $_fallback:literal)?) => {
         "GPIO6"
     };
-    (FSPIQ) => {
-        "GPIO2"
+    (FSPICLK $(, $_fallback:literal)?) => {
+        "GPIO6"
     };
-    (FSPID) => {
+    (LP_GPIO6 $(, $_fallback:literal)?) => {
+        "GPIO6"
+    };
+    (FSPID $(, $_fallback:literal)?) => {
         "GPIO7"
     };
-    (FSPIHD) => {
-        "GPIO3"
-    };
-    (FSPIWP) => {
-        "GPIO4"
-    };
-    (FSPICS0) => {
+    (FSPICS0 $(, $_fallback:literal)?) => {
         "GPIO8"
     };
-    (U2RXD) => {
-        "GPIO25"
-    };
-    (U2CTS) => {
-        "GPIO26"
-    };
-    (U2DSR) => {
-        "GPIO27"
-    };
-    (SIG_IN_FUNC97) => {
-        "GPIO28"
-    };
-    (SIG_IN_FUNC98) => {
-        "GPIO29"
-    };
-    (SIG_IN_FUNC99) => {
-        "GPIO0"
-    };
-    (SIG_IN_FUNC100) => {
-        "GPIO1"
-    };
-    (SDIO_CLK) => {
-        "GPIO26"
-    };
-    (SDIO_CMD) => {
-        "GPIO25"
-    };
-    (SDIO_DATA0) => {
-        "GPIO27"
-    };
-    (SDIO_DATA1) => {
-        "GPIO28"
-    };
-    (SDIO_DATA2) => {
-        "GPIO22"
-    };
-    (SDIO_DATA3) => {
-        "GPIO23"
-    };
-    (MTDI) => {
-        "GPIO4"
-    };
-    (MTDO) => {
-        "GPIO6"
-    };
-    (MTCK) => {
-        "GPIO5"
-    };
-    (MTMS) => {
-        "GPIO3"
-    };
-    (LEDC_LS_SIG0) => {
-        "GPIO0"
-    };
-    (LEDC_LS_SIG1) => {
-        "GPIO1"
-    };
-    (LEDC_LS_SIG2) => {
-        "GPIO2"
-    };
-    (LEDC_LS_SIG3) => {
-        "GPIO22"
-    };
-    (LEDC_LS_SIG4) => {
-        "GPIO23"
-    };
-    (LEDC_LS_SIG5) => {
-        "GPIO24"
-    };
-    (U0TXD) => {
-        "GPIO11"
-    };
-    (U0RTS) => {
-        "GPIO26"
-    };
-    (U0DTR) => {
-        "GPIO27"
-    };
-    (U1TXD) => {
-        "GPIO28"
-    };
-    (U1RTS) => {
-        "GPIO29"
-    };
-    (U1DTR) => {
-        "GPIO0"
-    };
-    (I2SO_SD) => {
-        "GPIO23"
-    };
-    (I2SO_SD1) => {
-        "GPIO26"
-    };
-    (U2TXD) => {
-        "GPIO25"
-    };
-    (U2RTS) => {
-        "GPIO26"
-    };
-    (U2DTR) => {
-        "GPIO27"
-    };
-    (FSPICS1) => {
-        "GPIO14"
-    };
-    (FSPICS2) => {
-        "GPIO23"
-    };
-    (FSPICS3) => {
-        "GPIO24"
-    };
-    (FSPICS4) => {
-        "GPIO25"
-    };
-    (FSPICS5) => {
-        "GPIO26"
-    };
-    (SDIO_TOHOST_INT) => {
-        "GPIO22"
-    };
-    (GPIO) => {
-        "GPIO22"
-    };
-}
-/// Returns the name of a GPIO that can carry the given LP peripheral signal, as a
-/// string.
-///
-/// The macro takes the name of an LP IO MUX function, or of a signal from the
-/// `LpInputSignal` or `LpOutputSignal` enums, and expands to a string literal like
-/// `"GPIO4"`. It is meant to keep documentation free of per-chip pin lists.
-///
-/// If the signal is available on a pad as an LP IO MUX function, the macro returns that
-/// pad. Otherwise the signal is routed through the LP GPIO matrix and can reach any LP
-/// pad, in which case the macro returns an arbitrary (but stable) LP pad that is not
-/// reserved for some other purpose, such as booting or debugging.
-///
-/// Example usage: `gpio_for_lp_signal!(LP_I2C_SDA)`
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! gpio_for_lp_signal {
-    (LP_GPIO0) => {
-        "GPIO0"
-    };
-    (LP_GPIO1) => {
-        "GPIO1"
-    };
-    (LP_GPIO2) => {
-        "GPIO2"
-    };
-    (LP_GPIO3) => {
-        "GPIO3"
-    };
-    (LP_GPIO4) => {
-        "GPIO4"
-    };
-    (LP_GPIO5) => {
-        "GPIO5"
-    };
-    (LP_GPIO6) => {
-        "GPIO6"
-    };
-}
-/// Returns the name of the GPIO that provides the given analog signal, as a string.
-///
-/// The macro takes the name of an analog function, and expands to a string literal like
-/// `"GPIO4"`. It is meant to keep documentation free of per-chip pin lists.
-///
-/// Analog functions are wired to particular pads, so the returned pad is the one that
-/// provides the signal. If multiple pads provide it, the macro returns one that is not
-/// reserved for some other purpose, such as booting or interfacing with flash.
-///
-/// Example usage: `gpio_for_analog_signal!(ADC1_CH0)`
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-macro_rules! gpio_for_analog_signal {
-    (XTAL_32K_P) => {
-        "GPIO0"
-    };
-    (XTAL_32K_N) => {
-        "GPIO1"
-    };
-    (ADC1_CH0) => {
-        "GPIO1"
-    };
-    (ADC1_CH1) => {
-        "GPIO2"
-    };
-    (ADC1_CH2) => {
-        "GPIO3"
-    };
-    (ADC1_CH3) => {
-        "GPIO4"
-    };
-    (ZCD0) => {
+    (ZCD0 $(, $_fallback:literal)?) => {
         "GPIO8"
     };
-    (ZCD1) => {
+    (ZCD1 $(, $_fallback:literal)?) => {
         "GPIO9"
     };
-    (USJ_DM) => {
+    (U0RXD $(, $_fallback:literal)?) => {
+        "GPIO10"
+    };
+    (U0TXD $(, $_fallback:literal)?) => {
+        "GPIO11"
+    };
+    (USJ_DM $(, $_fallback:literal)?) => {
         "GPIO12"
     };
-    (USJ_DP) => {
+    (USJ_DP $(, $_fallback:literal)?) => {
         "GPIO13"
+    };
+    (FSPICS1 $(, $_fallback:literal)?) => {
+        "GPIO14"
+    };
+    (SDIO_DATA2 $(, $_fallback:literal)?) => {
+        "GPIO22"
+    };
+    (SDIO_DATA3 $(, $_fallback:literal)?) => {
+        "GPIO23"
+    };
+    (SDIO_CMD $(, $_fallback:literal)?) => {
+        "GPIO25"
+    };
+    (SDIO_CLK $(, $_fallback:literal)?) => {
+        "GPIO26"
+    };
+    (SDIO_DATA0 $(, $_fallback:literal)?) => {
+        "GPIO27"
+    };
+    (SDIO_DATA1 $(, $_fallback:literal)?) => {
+        "GPIO28"
+    };
+    ($_signal:ident, $fallback:literal) => {
+        $fallback
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.
