@@ -1,10 +1,12 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "sda" => {
         cfg(esp32s3) => "GPIO1",
+        cfg(esp32c5) => "GPIO2",
         _ => "GPIO6"
     },
     "scl" => {
         cfg(esp32s3) => "GPIO2",
+        cfg(esp32c5) => "GPIO3",
         _ => "GPIO7"
     }
 ))]
@@ -147,10 +149,12 @@ pub enum Error {
 #[procmacros::doc_replace(
     "sda" => {
         cfg(esp32s3) => "GPIO1",
+        cfg(esp32c5) => "GPIO2",
         _ => "GPIO6"
     },
     "scl" => {
         cfg(esp32s3) => "GPIO2",
+        cfg(esp32c5) => "GPIO3",
         _ => "GPIO7"
     }
 )]
@@ -184,10 +188,12 @@ impl<'d> LpI2c<'d> {
     #[procmacros::doc_replace(
         "sda" => {
             cfg(esp32s3) => "GPIO1",
+            cfg(esp32c5) => "GPIO2",
             _ => "GPIO6"
         },
         "scl" => {
             cfg(esp32s3) => "GPIO2",
+            cfg(esp32c5) => "GPIO3",
             _ => "GPIO7"
         }
     )]
@@ -239,10 +245,12 @@ impl<'d> LpI2c<'d> {
     #[procmacros::doc_replace(
         "sda" => {
             cfg(esp32s3) => "GPIO1",
+            cfg(esp32c5) => "GPIO2",
             _ => "GPIO6"
         },
         "scl" => {
             cfg(esp32s3) => "GPIO2",
+            cfg(esp32c5) => "GPIO3",
             _ => "GPIO7"
         }
     )]
@@ -275,10 +283,12 @@ impl<'d> LpI2c<'d> {
     #[procmacros::doc_replace(
         "sda" => {
             cfg(esp32s3) => "GPIO1",
+            cfg(esp32c5) => "GPIO2",
             _ => "GPIO6"
         },
         "scl" => {
             cfg(esp32s3) => "GPIO2",
+            cfg(esp32c5) => "GPIO3",
             _ => "GPIO7"
         }
     )]
@@ -315,10 +325,12 @@ impl<'d> LpI2c<'d> {
     #[procmacros::doc_replace(
         "sda" => {
             cfg(esp32s3) => "GPIO1",
+            cfg(esp32c5) => "GPIO2",
             _ => "GPIO6"
         },
         "scl" => {
             cfg(esp32s3) => "GPIO2",
+            cfg(esp32c5) => "GPIO3",
             _ => "GPIO7"
         }
     )]

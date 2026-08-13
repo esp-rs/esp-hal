@@ -107,3 +107,19 @@ pub(crate) fn set_open_drain_output(gpio: u8, enable: bool) {
         .pin(gpio as usize)
         .modify(|_, w| w.pad_driver().bit(enable));
 }
+
+#[cfg(lp_i2c_master_driver_supported)]
+pub(crate) fn reset_pin(lp: u8) {
+    LP_GPIO::regs()
+        .clk_en()
+        .modify(|_, w| w.reg_clk_en().set_bit());
+    while LP_GPIO::regs().clk_en().read().reg_clk_en().bit_is_clear() {}
+
+    output_enable(lp, false);
+    // On this chip, each low-power pad has the same digital pin number.
+    set_open_drain_output(lp, false);
+
+    // Resistors, input enable, the pad's LP function and whether it is muxed to the LP IO at all
+    // are all held in this register. Resetting it hands the pad back to the digital IO MUX.
+    LP_IO_MUX::regs().pad(lp as usize).reset();
+}
