@@ -18,6 +18,10 @@ impl FlashStorage<'_> {
     ///
     /// Returns [`FlashStorageError::OutOfBounds`] if the read would extend past
     /// the end of the flash.
+    #[cfg_attr(
+        multi_core,
+        doc = "Returns [`FlashStorageError::OtherCoreRunning`] if the other core is active, because this function changes the flash MMU and the cache."
+    )]
     pub fn read_encrypted(
         &mut self,
         offset: u32,
@@ -63,6 +67,10 @@ impl FlashStorage<'_> {
     ///
     /// Returns [`FlashStorageError::OutOfBounds`] if the write would extend past
     /// the end of the flash.
+    #[cfg_attr(
+        multi_core,
+        doc = "Returns [`FlashStorageError::OtherCoreRunning`] if the other core is active, because this function changes the flash MMU and the cache."
+    )]
     pub fn write_encrypted(
         &mut self,
         offset: u32,

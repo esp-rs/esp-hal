@@ -31,13 +31,15 @@ pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 
 
 #[ram]
 pub(crate) fn spiflash_write_encrypted(dest_addr: u32, data: *mut u32, len: u32) -> i32 {
-    let rc = maybe_with_critical_section(|| unsafe {
-        esp_rom_spiflash_write_encrypted(dest_addr, data, len)
-    });
-    if rc == 0 {
-        crate::mmu::invalidate_flash_cache(dest_addr, len);
-    }
-    rc
+    maybe_with_critical_section(|| {
+        let rc = unsafe { esp_rom_spiflash_write_encrypted(dest_addr, data, len) };
+        if rc == 0 {
+            // Some chips turn the cache off to invalidate it, which no interrupt handler in
+            // flash must interrupt.
+            crate::mmu::invalidate_flash_cache(dest_addr, len);
+        }
+        rc
+    })
 }
 
 pub(crate) fn read_flash_encrypted(

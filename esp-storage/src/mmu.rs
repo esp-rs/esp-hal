@@ -38,6 +38,10 @@ use crate::FlashStorageError;
 pub(crate) struct FlashMmapGuard {
     entry_id: u32,
     vaddr: *const u8,
+    #[cfg_attr(
+        esp32,
+        expect(dead_code, reason = "the ESP32 can only flush the whole cache")
+    )]
     page_size: u32,
     /// When `false` the entry was already mapped and must not be invalidated
     owned: bool,
@@ -66,12 +70,17 @@ impl FlashMmapGuard {
 }
 
 /// Map a flash physical address to a virtual address for encrypted reading.
+///
+/// The returned mapping is ready to be read through: a temporary slot can retain cache lines from
+/// its previous mapping, so the complete mapping is invalidated before this function returns.
 pub(crate) fn map_flash_page(paddr: u32) -> Result<FlashMmapGuard, FlashStorageError> {
     let page_size = mmu_page_size();
     let page_paddr = paddr & !(page_size - 1);
 
     if let Some(entry_id) = find_existing_entry(page_paddr) {
-        return FlashMmapGuard::new(entry_id, page_size, false);
+        let guard = FlashMmapGuard::new(entry_id, page_size, false)?;
+        invalidate_cache(guard.vaddr as u32, page_size);
+        return Ok(guard);
     }
 
     cfg_select! {
@@ -80,10 +89,20 @@ pub(crate) fn map_flash_page(paddr: u32) -> Result<FlashMmapGuard, FlashStorageE
             s2::map_entry(entry_id, page_paddr)?;
             FlashMmapGuard::new(entry_id, page_size, true)
         }
+        esp32 => {
+            let entry_id = find_free_entry().ok_or(FlashStorageError::NotSupported)?;
+            let guard = FlashMmapGuard::new(entry_id, page_size, true)?;
+            // Writing the entry and making it visible to the cache must happen in one
+            // cache-off window.
+            esp32_cache::map_entry(entry(entry_id), page_paddr);
+            Ok(guard)
+        }
         _ => {
             let entry_id = find_free_entry().ok_or(FlashStorageError::NotSupported)?;
             write_flash_entry(entry_id, page_paddr);
-            FlashMmapGuard::new(entry_id, page_size, true)
+            let guard = FlashMmapGuard::new(entry_id, page_size, true)?;
+            invalidate_cache(guard.vaddr as u32, page_size);
+            Ok(guard)
         }
     }
 }
@@ -96,9 +115,16 @@ pub(crate) fn unmap_flash_page(guard: FlashMmapGuard) {
         return;
     }
 
-    invalidate_cache(guard.vaddr as u32, guard.page_size);
-    if guard.owned {
-        set_entry_invalid(guard.entry_id);
+    cfg_select! {
+        esp32 => {
+            esp32_cache::unmap_entry(guard.owned.then(|| entry(guard.entry_id)));
+        }
+        _ => {
+            invalidate_cache(guard.vaddr as u32, guard.page_size);
+            if guard.owned {
+                set_entry_invalid(guard.entry_id);
+            }
+        }
     }
 }
 
@@ -119,9 +145,6 @@ pub(crate) fn read_flash_encrypted(offset: u32, bytes: &mut [u8]) -> Result<(), 
 
         crate::maybe_with_critical_section(|| {
             let guard = map_flash_page(page_base)?;
-            // A temporary slot can retain cache lines from its previous mapping. Invalidate
-            // the complete mapping before reading, matching ESP-IDF's MMU mapping sequence.
-            invalidate_cache(guard.vaddr() as u32, guard.page_size);
             let src = unsafe { guard.vaddr().add(in_page) };
             unsafe {
                 ptr::copy_nonoverlapping(src, remaining.as_mut_ptr(), chunk);
@@ -196,13 +219,8 @@ fn invalidate_cache(vaddr: u32, size: u32) {
 
 #[cfg(esp32)]
 fn invalidate_cache(_vaddr: u32, _size: u32) {
-    unsafe extern "C" {
-        fn Cache_Flush_rom(cpu: u32);
-    }
-    unsafe {
-        Cache_Flush_rom(0);
-        Cache_Flush_rom(1);
-    }
+    // The ESP32 cache cannot invalidate a single address range, so the whole cache is flushed.
+    esp32_cache::flush_caches();
 }
 
 #[cfg(not(esp32s2))]
@@ -357,10 +375,12 @@ mod table {
         unsafe { &*pac::MMU_TABLE::ptr() }
     }
 
+    #[inline(always)]
     pub(super) fn mmu_page_size() -> u32 {
         property!("mmu.page_size")
     }
 
+    #[inline(always)]
     pub(super) fn flash_page_number(page_paddr: u32) -> u32 {
         page_paddr >> 16
     }
@@ -386,12 +406,25 @@ mod table {
     }
 
     fn with_entry<R>(entry_id: u32, f: impl FnOnce(pac::mmu_table::entry::R) -> R) -> R {
-        f(mmu_table().entry(entry_id as usize).read())
+        f(entry(entry_id).read())
     }
 
+    /// Look up one MMU entry.
+    ///
+    /// The ESP32 looks the entry up before it turns the cache off: the bounds check of the
+    /// lookup can call into flash, which is not reachable with the cache off.
+    #[inline(always)]
+    pub(super) fn entry(entry_id: u32) -> &'static pac::mmu_table::ENTRY {
+        mmu_table().entry(entry_id as usize)
+    }
+
+    // The ESP32 calls the two functions below with the cache off, where a call into flash would
+    // hang. Inlining them into the caller in RAM keeps them reachable.
     #[cfg(not(esp32s2))]
-    fn write_flash_entry_inner(entry_id: u32, page: u16) {
-        mmu_table().entry(entry_id as usize).write(|w| {
+    #[inline(always)]
+    pub(super) fn write_entry(entry: &pac::mmu_table::ENTRY, page_paddr: u32) {
+        let page = flash_page_number(page_paddr) as u16;
+        entry.write(|w| {
             cfg_select! {
                 any(esp32, esp32c2, esp32c3) => unsafe { w.paddr().bits(page as u8) },
                 _ => unsafe { w.paddr().bits(page) },
@@ -403,10 +436,14 @@ mod table {
         });
     }
 
+    #[inline(always)]
+    pub(super) fn invalidate_entry(entry: &pac::mmu_table::ENTRY) {
+        entry.write(|w| w.invalid().set_bit());
+    }
+
+    #[inline(always)]
     pub(super) fn set_entry_invalid(entry_id: u32) {
-        mmu_table()
-            .entry(entry_id as usize)
-            .write(|w| w.invalid().set_bit());
+        invalidate_entry(entry(entry_id));
     }
 
     pub(super) fn entry_is_valid(entry_id: u32) -> bool {
@@ -417,14 +454,139 @@ mod table {
         with_entry(entry_id, |entry| entry.paddr().bits() as u32)
     }
 
-    #[cfg(not(esp32s2))]
+    // The ESP32 writes the entry with the cache off, and so uses `write_entry` directly.
+    #[cfg(not(any(esp32, esp32s2)))]
+    #[inline(always)]
     pub(super) fn write_flash_entry(entry_id: u32, page_paddr: u32) {
-        write_flash_entry_inner(entry_id, flash_page_number(page_paddr) as u16);
+        write_entry(entry(entry_id), page_paddr);
     }
 
     #[cfg(not(esp32s2))]
     pub(super) fn entry_count() -> u32 {
         esp_hal::peripherals::MMU_TABLE::regs().entry_iter().count() as u32
+    }
+}
+
+/// Flash MMU and cache maintenance for the ESP32.
+///
+/// The ESP32 cache must be off while the flash MMU is written or the cache is flushed. Both
+/// operations disturb a cache fill that runs at the same time, and the core that waits for the
+/// fill then hangs. ESP-IDF turns the cache off around both operations, see `s_do_mapping()` in
+/// `components/esp_mm/esp_mmu_map.c`.
+///
+/// Code that runs with the cache off must not access flash, which is why the functions below are
+/// placed in RAM and only call ROM code.
+#[cfg(esp32)]
+mod esp32_cache {
+    use procmacros::ram;
+
+    use super::*;
+
+    unsafe extern "C" {
+        fn Cache_Flush_rom(cpu: u32);
+    }
+
+    /// The caches that were on before this crate turned them off.
+    #[derive(Clone, Copy)]
+    struct CachesOn {
+        pro: bool,
+        app: bool,
+    }
+
+    #[inline(always)]
+    fn dport() -> &'static pac::dport::RegisterBlock {
+        unsafe { &*pac::DPORT::ptr() }
+    }
+
+    /// Turn off the cache of both cores.
+    ///
+    /// The flash MMU is shared, so the other core must not read through it either. The caller
+    /// makes sure that the other core does not execute from flash in the meantime.
+    #[inline(always)]
+    fn cache_off() -> CachesOn {
+        let on = CachesOn {
+            pro: dport().pro_cache_ctrl().read().pro_cache_enable().bit(),
+            app: dport().app_cache_ctrl().read().app_cache_enable().bit(),
+        };
+
+        // A cache must be idle before it is turned off, see `cache_ll_l1_disable_cache()`.
+        if on.pro {
+            while dport().pro_dcache_dbug0().read().pro_cache_state().bits() != 1 {}
+            dport()
+                .pro_cache_ctrl()
+                .modify(|_, w| w.pro_cache_enable().clear_bit());
+        }
+        if on.app {
+            while dport().app_dcache_dbug0().read().app_cache_state().bits() != 1 {}
+            dport()
+                .app_cache_ctrl()
+                .modify(|_, w| w.app_cache_enable().clear_bit());
+        }
+
+        // Complete the writes above before the flash MMU is written.
+        let _ = dport().pro_cache_ctrl().read();
+
+        on
+    }
+
+    /// Drop every cached line, so that both cores see the current mapping.
+    #[inline(always)]
+    fn flush(on: CachesOn) {
+        // A cache that is off holds no lines that its core can hit.
+        unsafe {
+            if on.pro {
+                Cache_Flush_rom(0);
+            }
+            if on.app {
+                Cache_Flush_rom(1);
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn cache_on(on: CachesOn) {
+        if on.pro {
+            dport()
+                .pro_cache_ctrl()
+                .modify(|_, w| w.pro_cache_enable().set_bit());
+        }
+        if on.app {
+            dport()
+                .app_cache_ctrl()
+                .modify(|_, w| w.app_cache_enable().set_bit());
+        }
+
+        // The caller returns to flash right away, so make sure that the cache is on again before
+        // the next instruction is fetched: reading the register back completes the write.
+        let _ = dport().pro_cache_ctrl().read();
+    }
+
+    /// Map `page_paddr` into `entry` and make the new mapping visible.
+    #[ram]
+    pub(super) fn map_entry(entry: &pac::mmu_table::ENTRY, page_paddr: u32) {
+        let on = cache_off();
+        write_entry(entry, page_paddr);
+        flush(on);
+        cache_on(on);
+    }
+
+    /// Drop the lines of a temporary mapping and invalidate its entry, if we own it.
+    #[ram]
+    pub(super) fn unmap_entry(owned_entry: Option<&pac::mmu_table::ENTRY>) {
+        let on = cache_off();
+        if let Some(entry) = owned_entry {
+            invalidate_entry(entry);
+        }
+        flush(on);
+        cache_on(on);
+    }
+
+    /// Drop every cached line.
+    #[ram]
+    pub(super) fn flush_caches() {
+        let on = cache_off();
+        flush(on);
+        cache_on(on);
     }
 }
 
