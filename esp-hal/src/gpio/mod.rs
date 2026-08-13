@@ -2216,3 +2216,66 @@ for_each_gpio! {
 }
 
 define_io_mux_reg!();
+
+// Implement the signal traits outside of interconnect, so that the impls
+// don't inherit the module-level instability.
+mod io_matrix_impls {
+    use crate::gpio::{
+        self,
+        AnyPin,
+        interconnect::{
+            InputSignal,
+            OutputSignal,
+            PeripheralInput,
+            PeripheralOutput,
+            PeripheralSignal,
+        },
+    };
+
+    impl<'d> PeripheralSignal<'d> for AnyPin<'d> {
+        fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
+            let pin = unsafe { self.clone_unchecked() };
+            InputSignal::new(pin).connect_input_to_peripheral(signal);
+        }
+    }
+    impl<'d> PeripheralInput<'d> for AnyPin<'d> {}
+
+    impl<'d> PeripheralOutput<'d> for AnyPin<'d> {
+        fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal) {
+            let pin = unsafe { self.clone_unchecked() };
+            OutputSignal::new(pin).connect_peripheral_to_output(signal);
+        }
+        fn disconnect_from_peripheral_output(&self) {
+            let pin = unsafe { self.clone_unchecked() };
+            OutputSignal::new(pin).disconnect_from_peripheral_output();
+        }
+    }
+
+    for_each_gpio! {
+        ($n:literal, $gpio:ident $($_rest:tt)*) => {
+            impl<'d> PeripheralSignal<'d> for crate::peripherals::$gpio<'d> {
+                fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
+                    let pin = unsafe { AnyPin::steal($n) };
+                    pin.connect_input_to_peripheral(signal);
+                }
+            }
+            impl<'d> PeripheralInput<'d> for crate::peripherals::$gpio<'d> {}
+        };
+    }
+
+    for_each_gpio! {
+        ($n:literal, $gpio:ident $_af_ins:tt $_af_outs:tt ($input:tt [Output])) => {
+            impl<'d> PeripheralOutput<'d> for crate::peripherals::$gpio<'d>
+            {
+                fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal) {
+                    let pin = unsafe { AnyPin::steal($n) };
+                    pin.connect_peripheral_to_output(signal);
+                }
+                fn disconnect_from_peripheral_output(&self) {
+                    let pin = unsafe { AnyPin::steal($n) };
+                    pin.disconnect_from_peripheral_output();
+                }
+            }
+        };
+    }
+}
