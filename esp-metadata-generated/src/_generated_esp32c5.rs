@@ -5625,6 +5625,534 @@ macro_rules! for_each_iomux_function {
         _for_each_inner_iomux_function!((FSPICSn((FSPICS0, FSPICSn, 0), GPIO10, _2)));
     };
 }
+/// Returns the name of a GPIO that can carry the given peripheral signal, as a string.
+///
+/// The macro takes the name of a signal from the `InputSignal` or `OutputSignal` enums,
+/// and expands to a string literal like `"GPIO4"`. It is meant to keep documentation
+/// free of per-chip pin lists.
+///
+/// If the signal can be routed through the IO MUX, the macro returns the pad that
+/// provides the signal as an alternate function. Otherwise the signal is routed through
+/// the GPIO matrix and can reach any pad, in which case the macro returns an arbitrary
+/// (but stable) pad that is not reserved for some other purpose, such as booting or
+/// interfacing with flash.
+///
+/// Example usage: `gpio_for_signal!(U1TXD)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_signal {
+    (U0RXD) => {
+        "GPIO12"
+    };
+    (U0CTS) => {
+        "GPIO24"
+    };
+    (U0DSR) => {
+        "GPIO0"
+    };
+    (U1RXD) => {
+        "GPIO1"
+    };
+    (U1CTS) => {
+        "GPIO6"
+    };
+    (U1DSR) => {
+        "GPIO8"
+    };
+    (I2S_MCLK) => {
+        "GPIO9"
+    };
+    (I2SO_BCK) => {
+        "GPIO10"
+    };
+    (I2SO_WS) => {
+        "GPIO23"
+    };
+    (I2SI_SD) => {
+        "GPIO24"
+    };
+    (I2SI_BCK) => {
+        "GPIO0"
+    };
+    (I2SI_WS) => {
+        "GPIO1"
+    };
+    (CPU_GPIO_0) => {
+        "GPIO8"
+    };
+    (CPU_GPIO_1) => {
+        "GPIO9"
+    };
+    (CPU_GPIO_2) => {
+        "GPIO10"
+    };
+    (CPU_GPIO_3) => {
+        "GPIO23"
+    };
+    (CPU_GPIO_4) => {
+        "GPIO24"
+    };
+    (CPU_GPIO_5) => {
+        "GPIO0"
+    };
+    (CPU_GPIO_6) => {
+        "GPIO1"
+    };
+    (CPU_GPIO_7) => {
+        "GPIO6"
+    };
+    (USB_JTAG_TDO_BRIDGE) => {
+        "GPIO8"
+    };
+    (I2CEXT0_SCL) => {
+        "GPIO23"
+    };
+    (I2CEXT0_SDA) => {
+        "GPIO24"
+    };
+    (PARL_RX_DATA0) => {
+        "GPIO0"
+    };
+    (PARL_RX_DATA1) => {
+        "GPIO1"
+    };
+    (PARL_RX_DATA2) => {
+        "GPIO6"
+    };
+    (PARL_RX_DATA3) => {
+        "GPIO8"
+    };
+    (PARL_RX_DATA4) => {
+        "GPIO9"
+    };
+    (PARL_RX_DATA5) => {
+        "GPIO10"
+    };
+    (PARL_RX_DATA6) => {
+        "GPIO23"
+    };
+    (PARL_RX_DATA7) => {
+        "GPIO24"
+    };
+    (FSPICLK) => {
+        "GPIO6"
+    };
+    (FSPIQ) => {
+        "GPIO2"
+    };
+    (FSPID) => {
+        "GPIO7"
+    };
+    (FSPIHD) => {
+        "GPIO4"
+    };
+    (FSPIWP) => {
+        "GPIO5"
+    };
+    (FSPICS0) => {
+        "GPIO10"
+    };
+    (PARL_RX_CLK) => {
+        "GPIO23"
+    };
+    (PARL_TX_CLK) => {
+        "GPIO24"
+    };
+    (RMT_SIG_0) => {
+        "GPIO0"
+    };
+    (RMT_SIG_1) => {
+        "GPIO1"
+    };
+    (TWAI0_RX) => {
+        "GPIO6"
+    };
+    (TWAI1_RX) => {
+        "GPIO23"
+    };
+    (PCNT0_RST) => {
+        "GPIO9"
+    };
+    (PCNT1_RST) => {
+        "GPIO10"
+    };
+    (PCNT2_RST) => {
+        "GPIO23"
+    };
+    (PCNT3_RST) => {
+        "GPIO24"
+    };
+    (PWM0_SYNC0) => {
+        "GPIO0"
+    };
+    (PWM0_SYNC1) => {
+        "GPIO1"
+    };
+    (PWM0_SYNC2) => {
+        "GPIO6"
+    };
+    (PWM0_F0) => {
+        "GPIO8"
+    };
+    (PWM0_F1) => {
+        "GPIO9"
+    };
+    (PWM0_F2) => {
+        "GPIO10"
+    };
+    (PWM0_CAP0) => {
+        "GPIO23"
+    };
+    (PWM0_CAP1) => {
+        "GPIO24"
+    };
+    (PWM0_CAP2) => {
+        "GPIO0"
+    };
+    (SIG_IN_FUNC97) => {
+        "GPIO1"
+    };
+    (SIG_IN_FUNC98) => {
+        "GPIO6"
+    };
+    (SIG_IN_FUNC99) => {
+        "GPIO8"
+    };
+    (SIG_IN_FUNC100) => {
+        "GPIO9"
+    };
+    (PCNT0_SIG_CH0) => {
+        "GPIO10"
+    };
+    (PCNT0_SIG_CH1) => {
+        "GPIO23"
+    };
+    (PCNT0_CTRL_CH0) => {
+        "GPIO24"
+    };
+    (PCNT0_CTRL_CH1) => {
+        "GPIO0"
+    };
+    (PCNT1_SIG_CH0) => {
+        "GPIO1"
+    };
+    (PCNT1_SIG_CH1) => {
+        "GPIO6"
+    };
+    (PCNT1_CTRL_CH0) => {
+        "GPIO8"
+    };
+    (PCNT1_CTRL_CH1) => {
+        "GPIO9"
+    };
+    (PCNT2_SIG_CH0) => {
+        "GPIO10"
+    };
+    (PCNT2_SIG_CH1) => {
+        "GPIO23"
+    };
+    (PCNT2_CTRL_CH0) => {
+        "GPIO24"
+    };
+    (PCNT2_CTRL_CH1) => {
+        "GPIO0"
+    };
+    (PCNT3_SIG_CH0) => {
+        "GPIO1"
+    };
+    (PCNT3_SIG_CH1) => {
+        "GPIO6"
+    };
+    (PCNT3_CTRL_CH0) => {
+        "GPIO8"
+    };
+    (PCNT3_CTRL_CH1) => {
+        "GPIO9"
+    };
+    (SDIO_CLK) => {
+        "GPIO9"
+    };
+    (SDIO_CMD) => {
+        "GPIO10"
+    };
+    (SDIO_DATA0) => {
+        "GPIO8"
+    };
+    (SDIO_DATA1) => {
+        "GPIO7"
+    };
+    (SDIO_DATA2) => {
+        "GPIO14"
+    };
+    (SDIO_DATA3) => {
+        "GPIO13"
+    };
+    (MTDI) => {
+        "GPIO3"
+    };
+    (MTDO) => {
+        "GPIO5"
+    };
+    (MTCK) => {
+        "GPIO4"
+    };
+    (MTMS) => {
+        "GPIO2"
+    };
+    (LEDC_LS_SIG0) => {
+        "GPIO0"
+    };
+    (LEDC_LS_SIG1) => {
+        "GPIO1"
+    };
+    (LEDC_LS_SIG2) => {
+        "GPIO6"
+    };
+    (LEDC_LS_SIG3) => {
+        "GPIO8"
+    };
+    (LEDC_LS_SIG4) => {
+        "GPIO9"
+    };
+    (LEDC_LS_SIG5) => {
+        "GPIO10"
+    };
+    (U0TXD) => {
+        "GPIO11"
+    };
+    (U0RTS) => {
+        "GPIO24"
+    };
+    (U0DTR) => {
+        "GPIO0"
+    };
+    (U1TXD) => {
+        "GPIO1"
+    };
+    (U1RTS) => {
+        "GPIO6"
+    };
+    (U1DTR) => {
+        "GPIO8"
+    };
+    (I2SO_SD) => {
+        "GPIO24"
+    };
+    (I2SO_SD1) => {
+        "GPIO6"
+    };
+    (PARL_TX_DATA0) => {
+        "GPIO0"
+    };
+    (PARL_TX_DATA1) => {
+        "GPIO1"
+    };
+    (PARL_TX_DATA2) => {
+        "GPIO6"
+    };
+    (PARL_TX_DATA3) => {
+        "GPIO8"
+    };
+    (PARL_TX_DATA4) => {
+        "GPIO9"
+    };
+    (PARL_TX_DATA5) => {
+        "GPIO10"
+    };
+    (PARL_TX_DATA6) => {
+        "GPIO23"
+    };
+    (PARL_TX_DATA7) => {
+        "GPIO24"
+    };
+    (TWAI0_TX) => {
+        "GPIO6"
+    };
+    (TWAI0_BUS_OFF_ON) => {
+        "GPIO8"
+    };
+    (TWAI0_CLKOUT) => {
+        "GPIO9"
+    };
+    (TWAI0_STANDBY) => {
+        "GPIO10"
+    };
+    (TWAI1_TX) => {
+        "GPIO23"
+    };
+    (TWAI1_BUS_OFF_ON) => {
+        "GPIO24"
+    };
+    (TWAI1_CLKOUT) => {
+        "GPIO0"
+    };
+    (TWAI1_STANDBY) => {
+        "GPIO1"
+    };
+    (GPIO_SD0) => {
+        "GPIO9"
+    };
+    (GPIO_SD1) => {
+        "GPIO10"
+    };
+    (GPIO_SD2) => {
+        "GPIO23"
+    };
+    (GPIO_SD3) => {
+        "GPIO24"
+    };
+    (PWM0_0A) => {
+        "GPIO0"
+    };
+    (PWM0_0B) => {
+        "GPIO1"
+    };
+    (PWM0_1A) => {
+        "GPIO6"
+    };
+    (PWM0_1B) => {
+        "GPIO8"
+    };
+    (PWM0_2A) => {
+        "GPIO9"
+    };
+    (PWM0_2B) => {
+        "GPIO10"
+    };
+    (PARL_TX_CS) => {
+        "GPIO23"
+    };
+    (FSPICS1) => {
+        "GPIO10"
+    };
+    (FSPICS2) => {
+        "GPIO23"
+    };
+    (FSPICS3) => {
+        "GPIO24"
+    };
+    (FSPICS4) => {
+        "GPIO0"
+    };
+    (FSPICS5) => {
+        "GPIO1"
+    };
+    (GPIO) => {
+        "GPIO0"
+    };
+}
+/// Returns the name of a GPIO that can carry the given LP peripheral signal, as a
+/// string.
+///
+/// The macro takes the name of an LP IO MUX function, or of a signal from the
+/// `LpInputSignal` or `LpOutputSignal` enums, and expands to a string literal like
+/// `"GPIO4"`. It is meant to keep documentation free of per-chip pin lists.
+///
+/// If the signal is available on a pad as an LP IO MUX function, the macro returns that
+/// pad. Otherwise the signal is routed through the LP GPIO matrix and can reach any LP
+/// pad, in which case the macro returns an arbitrary (but stable) LP pad that is not
+/// reserved for some other purpose, such as booting or debugging.
+///
+/// Example usage: `gpio_for_lp_signal!(LP_I2C_SDA)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_lp_signal {
+    (LP_UART_DTRN) => {
+        "GPIO0"
+    };
+    (LP_GPIO0) => {
+        "GPIO0"
+    };
+    (LP_UART_DSRN) => {
+        "GPIO1"
+    };
+    (LP_GPIO1) => {
+        "GPIO1"
+    };
+    (LP_UART_RTSN) => {
+        "GPIO2"
+    };
+    (LP_GPIO2) => {
+        "GPIO2"
+    };
+    (LP_I2C_SDA) => {
+        "GPIO2"
+    };
+    (LP_UART_CTSN) => {
+        "GPIO3"
+    };
+    (LP_GPIO3) => {
+        "GPIO3"
+    };
+    (LP_I2C_SCL) => {
+        "GPIO3"
+    };
+    (LP_UART_RXD) => {
+        "GPIO4"
+    };
+    (LP_GPIO4) => {
+        "GPIO4"
+    };
+    (LP_UART_TXD) => {
+        "GPIO5"
+    };
+    (LP_GPIO5) => {
+        "GPIO5"
+    };
+    (LP_GPIO6) => {
+        "GPIO6"
+    };
+}
+/// Returns the name of the GPIO that provides the given analog signal, as a string.
+///
+/// The macro takes the name of an analog function, and expands to a string literal like
+/// `"GPIO4"`. It is meant to keep documentation free of per-chip pin lists.
+///
+/// Analog functions are wired to particular pads, so the returned pad is the one that
+/// provides the signal. If multiple pads provide it, the macro returns one that is not
+/// reserved for some other purpose, such as booting or interfacing with flash.
+///
+/// Example usage: `gpio_for_analog_signal!(ADC1_CH0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_analog_signal {
+    (XTAL_32K_P) => {
+        "GPIO0"
+    };
+    (XTAL_32K_N) => {
+        "GPIO1"
+    };
+    (ADC1_CH0) => {
+        "GPIO1"
+    };
+    (ADC1_CH1) => {
+        "GPIO2"
+    };
+    (ADC1_CH2) => {
+        "GPIO3"
+    };
+    (ADC1_CH3) => {
+        "GPIO4"
+    };
+    (ADC1_CH4) => {
+        "GPIO5"
+    };
+    (ADC1_CH5) => {
+        "GPIO6"
+    };
+    (ZCD0) => {
+        "GPIO8"
+    };
+    (ZCD1) => {
+        "GPIO9"
+    };
+    (USJ_DM) => {
+        "GPIO13"
+    };
+    (USJ_DP) => {
+        "GPIO14"
+    };
+}
 /// Defines the `InputSignal` and `OutputSignal` enums.
 ///
 /// This macro is intended to be called in esp-hal only.

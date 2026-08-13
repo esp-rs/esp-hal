@@ -6693,6 +6693,1188 @@ macro_rules! for_each_iomux_function {
         GPIO44, _0)));
     };
 }
+/// Returns the name of a GPIO that can carry the given peripheral signal, as a string.
+///
+/// The macro takes the name of a signal from the `InputSignal` or `OutputSignal` enums,
+/// and expands to a string literal like `"GPIO4"`. It is meant to keep documentation
+/// free of per-chip pin lists.
+///
+/// If the signal can be routed through the IO MUX, the macro returns the pad that
+/// provides the signal as an alternate function. Otherwise the signal is routed through
+/// the GPIO matrix and can reach any pad, in which case the macro returns an arbitrary
+/// (but stable) pad that is not reserved for some other purpose, such as booting or
+/// interfacing with flash.
+///
+/// Example usage: `gpio_for_signal!(U1TXD)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_signal {
+    (SDHOST_CCMD_IN_2) => {
+        "GPIO1"
+    };
+    (SDHOST_CDATA_IN_20) => {
+        "GPIO6"
+    };
+    (SDHOST_CDATA_IN_21) => {
+        "GPIO7"
+    };
+    (SDHOST_CDATA_IN_22) => {
+        "GPIO8"
+    };
+    (SDHOST_CDATA_IN_23) => {
+        "GPIO9"
+    };
+    (SDHOST_CDATA_IN_24) => {
+        "GPIO10"
+    };
+    (SDHOST_CDATA_IN_25) => {
+        "GPIO11"
+    };
+    (SDHOST_CDATA_IN_26) => {
+        "GPIO12"
+    };
+    (SDHOST_CDATA_IN_27) => {
+        "GPIO13"
+    };
+    (UART0_RXD) => {
+        "GPIO38"
+    };
+    (UART0_CTS) => {
+        "GPIO9"
+    };
+    (UART0_DSR) => {
+        "GPIO16"
+    };
+    (UART1_RXD) => {
+        "GPIO11"
+    };
+    (UART1_CTS) => {
+        "GPIO13"
+    };
+    (UART1_DSR) => {
+        "GPIO19"
+    };
+    (UART2_RXD) => {
+        "GPIO20"
+    };
+    (UART2_CTS) => {
+        "GPIO21"
+    };
+    (UART2_DSR) => {
+        "GPIO22"
+    };
+    (UART3_RXD) => {
+        "GPIO23"
+    };
+    (UART3_CTS) => {
+        "GPIO26"
+    };
+    (UART3_DSR) => {
+        "GPIO27"
+    };
+    (UART4_RXD) => {
+        "GPIO28"
+    };
+    (UART4_CTS) => {
+        "GPIO29"
+    };
+    (UART4_DSR) => {
+        "GPIO30"
+    };
+    (I2S0_O_BCK) => {
+        "GPIO31"
+    };
+    (I2S0_MCLK) => {
+        "GPIO39"
+    };
+    (I2S0_O_WS) => {
+        "GPIO40"
+    };
+    (I2S0_I_SD) => {
+        "GPIO41"
+    };
+    (I2S0_I_BCK) => {
+        "GPIO42"
+    };
+    (I2S0_I_WS) => {
+        "GPIO43"
+    };
+    (I2S1_O_BCK) => {
+        "GPIO44"
+    };
+    (I2S1_MCLK) => {
+        "GPIO45"
+    };
+    (I2S1_O_WS) => {
+        "GPIO46"
+    };
+    (I2S1_I_SD) => {
+        "GPIO47"
+    };
+    (I2S1_I_BCK) => {
+        "GPIO48"
+    };
+    (I2S1_I_WS) => {
+        "GPIO49"
+    };
+    (I2S2_O_BCK) => {
+        "GPIO50"
+    };
+    (I2S2_MCLK) => {
+        "GPIO51"
+    };
+    (I2S2_O_WS) => {
+        "GPIO52"
+    };
+    (I2S2_I_SD) => {
+        "GPIO53"
+    };
+    (I2S2_I_BCK) => {
+        "GPIO54"
+    };
+    (I2S2_I_WS) => {
+        "GPIO0"
+    };
+    (I2S0_I_SD1) => {
+        "GPIO1"
+    };
+    (I2S0_I_SD2) => {
+        "GPIO6"
+    };
+    (I2S0_I_SD3) => {
+        "GPIO7"
+    };
+    (SPI3_CK) => {
+        "GPIO9"
+    };
+    (SPI3_Q) => {
+        "GPIO10"
+    };
+    (SPI3_D) => {
+        "GPIO11"
+    };
+    (SPI3_HOLD) => {
+        "GPIO12"
+    };
+    (SPI3_WP) => {
+        "GPIO13"
+    };
+    (SPI3_CS) => {
+        "GPIO14"
+    };
+    (SPI2_CK) => {
+        "GPIO9"
+    };
+    (SPI2_Q) => {
+        "GPIO10"
+    };
+    (SPI2_D) => {
+        "GPIO8"
+    };
+    (SPI2_HOLD) => {
+        "GPIO6"
+    };
+    (SPI2_WP) => {
+        "GPIO11"
+    };
+    (SPI2_IO4) => {
+        "GPIO34"
+    };
+    (SPI2_IO5) => {
+        "GPIO35"
+    };
+    (SPI2_IO6) => {
+        "GPIO36"
+    };
+    (SPI2_IO7) => {
+        "GPIO37"
+    };
+    (SPI2_CS) => {
+        "GPIO7"
+    };
+    (I2C0_SCL) => {
+        "GPIO39"
+    };
+    (I2C0_SDA) => {
+        "GPIO40"
+    };
+    (I2C1_SCL) => {
+        "GPIO41"
+    };
+    (I2C1_SDA) => {
+        "GPIO42"
+    };
+    (UART0_SLP_CLK) => {
+        "GPIO45"
+    };
+    (UART1_SLP_CLK) => {
+        "GPIO46"
+    };
+    (UART2_SLP_CLK) => {
+        "GPIO47"
+    };
+    (UART3_SLP_CLK) => {
+        "GPIO48"
+    };
+    (UART4_SLP_CLK) => {
+        "GPIO49"
+    };
+    (TWAI0_RX) => {
+        "GPIO51"
+    };
+    (TWAI1_RX) => {
+        "GPIO54"
+    };
+    (TWAI2_RX) => {
+        "GPIO6"
+    };
+    (PWM0_SYNC0) => {
+        "GPIO9"
+    };
+    (PWM0_SYNC1) => {
+        "GPIO10"
+    };
+    (PWM0_SYNC2) => {
+        "GPIO11"
+    };
+    (PWM0_F0) => {
+        "GPIO12"
+    };
+    (PWM0_F1) => {
+        "GPIO13"
+    };
+    (PWM0_F2) => {
+        "GPIO14"
+    };
+    (PWM0_CAP0) => {
+        "GPIO15"
+    };
+    (PWM0_CAP1) => {
+        "GPIO16"
+    };
+    (PWM0_CAP2) => {
+        "GPIO17"
+    };
+    (PWM1_SYNC0) => {
+        "GPIO18"
+    };
+    (PWM1_SYNC1) => {
+        "GPIO19"
+    };
+    (PWM1_SYNC2) => {
+        "GPIO20"
+    };
+    (PWM1_F0) => {
+        "GPIO21"
+    };
+    (PWM1_F1) => {
+        "GPIO22"
+    };
+    (PWM1_F2) => {
+        "GPIO23"
+    };
+    (PWM1_CAP0) => {
+        "GPIO26"
+    };
+    (PWM1_CAP1) => {
+        "GPIO27"
+    };
+    (PWM1_CAP2) => {
+        "GPIO28"
+    };
+    (EMAC_MDI) => {
+        "GPIO29"
+    };
+    (EMAC_COL) => {
+        "GPIO30"
+    };
+    (EMAC_CRS) => {
+        "GPIO31"
+    };
+    (USB_FS_IDDIG) => {
+        "GPIO39"
+    };
+    (USB_FS_AVALID) => {
+        "GPIO40"
+    };
+    (USB_FS_SRP_BVALID) => {
+        "GPIO41"
+    };
+    (USB_FS_VBUSVALID) => {
+        "GPIO42"
+    };
+    (USB_SRP_SESSEND) => {
+        "GPIO43"
+    };
+    (ULPI_CLK) => {
+        "GPIO46"
+    };
+    (USB_HSPHY_REFCLK) => {
+        "GPIO47"
+    };
+    (SDHOST_CARD_DETECT_N_1) => {
+        "GPIO0"
+    };
+    (SDHOST_CARD_DETECT_N_2) => {
+        "GPIO1"
+    };
+    (SDHOST_CARD_INT_N_1) => {
+        "GPIO6"
+    };
+    (SDHOST_CARD_INT_N_2) => {
+        "GPIO7"
+    };
+    (SDHOST_CARD_WRITE_PRT_1) => {
+        "GPIO8"
+    };
+    (SDHOST_CARD_WRITE_PRT_2) => {
+        "GPIO9"
+    };
+    (SDHOST_DATA_STROBE_1) => {
+        "GPIO10"
+    };
+    (SDHOST_DATA_STROBE_2) => {
+        "GPIO11"
+    };
+    (I3C_MST_SCL) => {
+        "GPIO12"
+    };
+    (I3C_MST_SDA) => {
+        "GPIO13"
+    };
+    (I3C_SLV_SCL) => {
+        "GPIO14"
+    };
+    (I3C_SLV_SDA) => {
+        "GPIO15"
+    };
+    (USB_JTAG_TDO_BRIDGE) => {
+        "GPIO18"
+    };
+    (CAM_PCLK) => {
+        "GPIO45"
+    };
+    (CAM_H_ENABLE) => {
+        "GPIO46"
+    };
+    (CAM_H_SYNC) => {
+        "GPIO47"
+    };
+    (CAM_V_SYNC) => {
+        "GPIO48"
+    };
+    (EMAC_RXDV) => {
+        "GPIO28"
+    };
+    (EMAC_RXD0) => {
+        "GPIO29"
+    };
+    (EMAC_RXD1) => {
+        "GPIO30"
+    };
+    (EMAC_RXD2) => {
+        "GPIO17"
+    };
+    (EMAC_RXD3) => {
+        "GPIO18"
+    };
+    (EMAC_RXER) => {
+        "GPIO31"
+    };
+    (EMAC_RX_CLK) => {
+        "GPIO20"
+    };
+    (EMAC_TX_CLK) => {
+        "GPIO21"
+    };
+    (PARLIO_RX_CLK) => {
+        "GPIO22"
+    };
+    (PARLIO_TX_CLK) => {
+        "GPIO23"
+    };
+    (PARLIO_RX_DATA0) => {
+        "GPIO26"
+    };
+    (PARLIO_RX_DATA1) => {
+        "GPIO27"
+    };
+    (PARLIO_RX_DATA2) => {
+        "GPIO28"
+    };
+    (PARLIO_RX_DATA3) => {
+        "GPIO29"
+    };
+    (PARLIO_RX_DATA4) => {
+        "GPIO30"
+    };
+    (PARLIO_RX_DATA5) => {
+        "GPIO31"
+    };
+    (PARLIO_RX_DATA6) => {
+        "GPIO39"
+    };
+    (PARLIO_RX_DATA7) => {
+        "GPIO40"
+    };
+    (PARLIO_RX_DATA8) => {
+        "GPIO41"
+    };
+    (PARLIO_RX_DATA9) => {
+        "GPIO42"
+    };
+    (PARLIO_RX_DATA10) => {
+        "GPIO43"
+    };
+    (PARLIO_RX_DATA11) => {
+        "GPIO44"
+    };
+    (PARLIO_RX_DATA12) => {
+        "GPIO45"
+    };
+    (PARLIO_RX_DATA13) => {
+        "GPIO46"
+    };
+    (PARLIO_RX_DATA14) => {
+        "GPIO47"
+    };
+    (PARLIO_RX_DATA15) => {
+        "GPIO48"
+    };
+    (CPU_GPIO_0) => {
+        "GPIO8"
+    };
+    (CPU_GPIO_1) => {
+        "GPIO9"
+    };
+    (CPU_GPIO_2) => {
+        "GPIO10"
+    };
+    (CPU_GPIO_3) => {
+        "GPIO11"
+    };
+    (CPU_GPIO_4) => {
+        "GPIO12"
+    };
+    (CPU_GPIO_5) => {
+        "GPIO13"
+    };
+    (CPU_GPIO_6) => {
+        "GPIO14"
+    };
+    (CPU_GPIO_7) => {
+        "GPIO15"
+    };
+    (CPU_GPIO_8) => {
+        "GPIO16"
+    };
+    (CPU_GPIO_9) => {
+        "GPIO17"
+    };
+    (CPU_GPIO_10) => {
+        "GPIO18"
+    };
+    (CPU_GPIO_11) => {
+        "GPIO19"
+    };
+    (CPU_GPIO_12) => {
+        "GPIO20"
+    };
+    (CPU_GPIO_13) => {
+        "GPIO21"
+    };
+    (CPU_GPIO_14) => {
+        "GPIO22"
+    };
+    (CPU_GPIO_15) => {
+        "GPIO23"
+    };
+    (MTCK) => {
+        "GPIO2"
+    };
+    (MTDI) => {
+        "GPIO3"
+    };
+    (MTMS) => {
+        "GPIO4"
+    };
+    (MTDO) => {
+        "GPIO5"
+    };
+    (SD1_DATA0) => {
+        "GPIO39"
+    };
+    (SD1_DATA1) => {
+        "GPIO40"
+    };
+    (SD1_DATA2) => {
+        "GPIO41"
+    };
+    (SD1_DATA3) => {
+        "GPIO42"
+    };
+    (SD1_CLK) => {
+        "GPIO43"
+    };
+    (SD1_CMD) => {
+        "GPIO44"
+    };
+    (SD1_DATA4) => {
+        "GPIO45"
+    };
+    (SD1_DATA5) => {
+        "GPIO46"
+    };
+    (SD1_DATA6) => {
+        "GPIO47"
+    };
+    (SD1_DATA7) => {
+        "GPIO48"
+    };
+    (EMAC_RMII_CLK) => {
+        "GPIO44"
+    };
+    (REF_50M_CLK) => {
+        "GPIO23"
+    };
+    (BIST) => {
+        "GPIO39"
+    };
+    (DBG_PSRAM_CK) => {
+        "GPIO22"
+    };
+    (DBG_PSRAM_CS) => {
+        "GPIO23"
+    };
+    (DBG_PSRAM_D) => {
+        "GPIO28"
+    };
+    (DBG_PSRAM_Q) => {
+        "GPIO29"
+    };
+    (DBG_PSRAM_WP) => {
+        "GPIO30"
+    };
+    (DBG_PSRAM_HOLD) => {
+        "GPIO31"
+    };
+    (DBG_PSRAM_DQ4) => {
+        "GPIO32"
+    };
+    (DBG_PSRAM_DQ5) => {
+        "GPIO33"
+    };
+    (DBG_PSRAM_DQ6) => {
+        "GPIO34"
+    };
+    (DBG_PSRAM_DQ7) => {
+        "GPIO35"
+    };
+    (DBG_PSRAM_DQS_0) => {
+        "GPIO36"
+    };
+    (DBG_PSRAM_DQ8) => {
+        "GPIO39"
+    };
+    (DBG_PSRAM_DQ9) => {
+        "GPIO40"
+    };
+    (DBG_PSRAM_DQ10) => {
+        "GPIO41"
+    };
+    (DBG_PSRAM_DQ11) => {
+        "GPIO42"
+    };
+    (DBG_PSRAM_DQ12) => {
+        "GPIO43"
+    };
+    (DBG_PSRAM_DQ13) => {
+        "GPIO44"
+    };
+    (DBG_PSRAM_DQ14) => {
+        "GPIO45"
+    };
+    (DBG_PSRAM_DQ15) => {
+        "GPIO46"
+    };
+    (DBG_PSRAM_DQS_1) => {
+        "GPIO47"
+    };
+    (DBG_FLASH_CS) => {
+        "GPIO49"
+    };
+    (DBG_FLASH_Q) => {
+        "GPIO50"
+    };
+    (DBG_FLASH_WP) => {
+        "GPIO51"
+    };
+    (DBG_FLASH_HOLD) => {
+        "GPIO52"
+    };
+    (DBG_FLASH_CK) => {
+        "GPIO53"
+    };
+    (DBG_FLASH_D) => {
+        "GPIO54"
+    };
+    (SPI2_DQS) => {
+        "GPIO38"
+    };
+    (SDHOST_CCLK_OUT_2) => {
+        "GPIO0"
+    };
+    (SDHOST_CCMD_OUT_2) => {
+        "GPIO1"
+    };
+    (SDHOST_CDATA_OUT_20) => {
+        "GPIO6"
+    };
+    (SDHOST_CDATA_OUT_21) => {
+        "GPIO7"
+    };
+    (SDHOST_CDATA_OUT_22) => {
+        "GPIO8"
+    };
+    (SDHOST_CDATA_OUT_23) => {
+        "GPIO9"
+    };
+    (SDHOST_CDATA_OUT_24) => {
+        "GPIO10"
+    };
+    (SDHOST_CDATA_OUT_25) => {
+        "GPIO11"
+    };
+    (SDHOST_CDATA_OUT_26) => {
+        "GPIO12"
+    };
+    (SDHOST_CDATA_OUT_27) => {
+        "GPIO13"
+    };
+    (UART0_TXD) => {
+        "GPIO37"
+    };
+    (UART0_RTS) => {
+        "GPIO8"
+    };
+    (UART0_DTR) => {
+        "GPIO16"
+    };
+    (UART1_TXD) => {
+        "GPIO10"
+    };
+    (UART1_RTS) => {
+        "GPIO12"
+    };
+    (UART1_DTR) => {
+        "GPIO19"
+    };
+    (UART2_TXD) => {
+        "GPIO20"
+    };
+    (UART2_RTS) => {
+        "GPIO21"
+    };
+    (UART2_DTR) => {
+        "GPIO22"
+    };
+    (UART3_TXD) => {
+        "GPIO23"
+    };
+    (UART3_RTS) => {
+        "GPIO26"
+    };
+    (UART3_DTR) => {
+        "GPIO27"
+    };
+    (UART4_TXD) => {
+        "GPIO28"
+    };
+    (UART4_RTS) => {
+        "GPIO29"
+    };
+    (UART4_DTR) => {
+        "GPIO30"
+    };
+    (I2S0_O_SD) => {
+        "GPIO41"
+    };
+    (I2S1_O_SD) => {
+        "GPIO47"
+    };
+    (I2S2_O_SD) => {
+        "GPIO53"
+    };
+    (I2S0_O_SD1) => {
+        "GPIO1"
+    };
+    (SPI3_CS2) => {
+        "GPIO7"
+    };
+    (SPI3_CS1) => {
+        "GPIO8"
+    };
+    (SPI2_CS1) => {
+        "GPIO27"
+    };
+    (SPI2_CS2) => {
+        "GPIO28"
+    };
+    (SPI2_CS3) => {
+        "GPIO29"
+    };
+    (SPI2_CS4) => {
+        "GPIO30"
+    };
+    (SPI2_CS5) => {
+        "GPIO31"
+    };
+    (GPIO_SD0) => {
+        "GPIO43"
+    };
+    (GPIO_SD1) => {
+        "GPIO44"
+    };
+    (GPIO_SD2) => {
+        "GPIO45"
+    };
+    (GPIO_SD3) => {
+        "GPIO46"
+    };
+    (GPIO_SD4) => {
+        "GPIO47"
+    };
+    (GPIO_SD5) => {
+        "GPIO48"
+    };
+    (GPIO_SD6) => {
+        "GPIO49"
+    };
+    (GPIO_SD7) => {
+        "GPIO50"
+    };
+    (TWAI0_TX) => {
+        "GPIO51"
+    };
+    (TWAI0_BUS_OFF_ON) => {
+        "GPIO52"
+    };
+    (TWAI0_CLKOUT) => {
+        "GPIO53"
+    };
+    (TWAI1_TX) => {
+        "GPIO54"
+    };
+    (TWAI1_BUS_OFF_ON) => {
+        "GPIO0"
+    };
+    (TWAI1_CLKOUT) => {
+        "GPIO1"
+    };
+    (TWAI2_TX) => {
+        "GPIO6"
+    };
+    (TWAI2_BUS_OFF_ON) => {
+        "GPIO7"
+    };
+    (TWAI2_CLKOUT) => {
+        "GPIO8"
+    };
+    (PWM0_CH0_A) => {
+        "GPIO9"
+    };
+    (PWM0_CH0_B) => {
+        "GPIO10"
+    };
+    (PWM0_CH1_A) => {
+        "GPIO11"
+    };
+    (PWM0_CH1_B) => {
+        "GPIO12"
+    };
+    (PWM0_CH2_A) => {
+        "GPIO13"
+    };
+    (PWM0_CH2_B) => {
+        "GPIO14"
+    };
+    (PWM1_CH0_A) => {
+        "GPIO15"
+    };
+    (PWM1_CH0_B) => {
+        "GPIO16"
+    };
+    (PWM1_CH1_A) => {
+        "GPIO17"
+    };
+    (PWM1_CH1_B) => {
+        "GPIO18"
+    };
+    (PWM1_CH2_A) => {
+        "GPIO19"
+    };
+    (PWM1_CH2_B) => {
+        "GPIO20"
+    };
+    (TWAI0_STANDBY) => {
+        "GPIO27"
+    };
+    (TWAI1_STANDBY) => {
+        "GPIO28"
+    };
+    (TWAI2_STANDBY) => {
+        "GPIO29"
+    };
+    (EMAC_MDC) => {
+        "GPIO30"
+    };
+    (EMAC_MDO) => {
+        "GPIO31"
+    };
+    (USB_SRP_DISCHRGVBUS) => {
+        "GPIO39"
+    };
+    (USB_OTG11_IDPULLUP) => {
+        "GPIO40"
+    };
+    (USB_OTG11_DPPULLDOWN) => {
+        "GPIO41"
+    };
+    (USB_OTG11_DMPULLDOWN) => {
+        "GPIO42"
+    };
+    (USB_OTG11_DRVVBUS) => {
+        "GPIO43"
+    };
+    (USB_SRP_CHRGVBUS) => {
+        "GPIO44"
+    };
+    (RNG_CHAIN_CLK) => {
+        "GPIO46"
+    };
+    (I3C_MST_SCL_PULLUP_EN) => {
+        "GPIO16"
+    };
+    (I3C_MST_SDA_PULLUP_EN) => {
+        "GPIO17"
+    };
+    (USB_JTAG_TDI_BRIDGE) => {
+        "GPIO18"
+    };
+    (USB_JTAG_TMS_BRIDGE) => {
+        "GPIO19"
+    };
+    (USB_JTAG_TCK_BRIDGE) => {
+        "GPIO20"
+    };
+    (USB_JTAG_TRST_BRIDGE) => {
+        "GPIO21"
+    };
+    (LCD_CS) => {
+        "GPIO22"
+    };
+    (LCD_DC) => {
+        "GPIO23"
+    };
+    (SD_RST_N_1) => {
+        "GPIO26"
+    };
+    (SD_RST_N_2) => {
+        "GPIO27"
+    };
+    (SDHOST_CCMD_OD_PULLUP_EN_N) => {
+        "GPIO28"
+    };
+    (LCD_PCLK) => {
+        "GPIO29"
+    };
+    (CAM_CLK) => {
+        "GPIO30"
+    };
+    (LCD_H_ENABLE) => {
+        "GPIO31"
+    };
+    (LCD_H_SYNC) => {
+        "GPIO39"
+    };
+    (LCD_V_SYNC) => {
+        "GPIO40"
+    };
+    (EMAC_TXEN) => {
+        "GPIO40"
+    };
+    (EMAC_TXD0) => {
+        "GPIO41"
+    };
+    (EMAC_TXD1) => {
+        "GPIO42"
+    };
+    (EMAC_TXD2) => {
+        "GPIO17"
+    };
+    (EMAC_TXD3) => {
+        "GPIO18"
+    };
+    (EMAC_TXER) => {
+        "GPIO43"
+    };
+    (PARLIO_TX_DATA0) => {
+        "GPIO26"
+    };
+    (PARLIO_TX_DATA1) => {
+        "GPIO27"
+    };
+    (PARLIO_TX_DATA2) => {
+        "GPIO28"
+    };
+    (PARLIO_TX_DATA3) => {
+        "GPIO29"
+    };
+    (PARLIO_TX_DATA4) => {
+        "GPIO30"
+    };
+    (PARLIO_TX_DATA5) => {
+        "GPIO31"
+    };
+    (PARLIO_TX_DATA6) => {
+        "GPIO39"
+    };
+    (PARLIO_TX_DATA7) => {
+        "GPIO40"
+    };
+    (PARLIO_TX_DATA8) => {
+        "GPIO41"
+    };
+    (PARLIO_TX_DATA9) => {
+        "GPIO42"
+    };
+    (PARLIO_TX_DATA10) => {
+        "GPIO43"
+    };
+    (PARLIO_TX_DATA11) => {
+        "GPIO44"
+    };
+    (PARLIO_TX_DATA12) => {
+        "GPIO45"
+    };
+    (PARLIO_TX_DATA13) => {
+        "GPIO46"
+    };
+    (PARLIO_TX_DATA14) => {
+        "GPIO47"
+    };
+    (PARLIO_TX_DATA15) => {
+        "GPIO48"
+    };
+    (CONSTANT0) => {
+        "GPIO6"
+    };
+    (CONSTANT1) => {
+        "GPIO7"
+    };
+    (PARLIO_TX_CS) => {
+        "GPIO45"
+    };
+    (EMAC_PTP_PPS) => {
+        "GPIO46"
+    };
+    (ANA_COMP0) => {
+        "GPIO47"
+    };
+    (ANA_COMP1) => {
+        "GPIO48"
+    };
+    (GPIO) => {
+        "GPIO8"
+    };
+}
+/// Returns the name of a GPIO that can carry the given LP peripheral signal, as a
+/// string.
+///
+/// The macro takes the name of an LP IO MUX function, or of a signal from the
+/// `LpInputSignal` or `LpOutputSignal` enums, and expands to a string literal like
+/// `"GPIO4"`. It is meant to keep documentation free of per-chip pin lists.
+///
+/// If the signal is available on a pad as an LP IO MUX function, the macro returns that
+/// pad. Otherwise the signal is routed through the LP GPIO matrix and can reach any LP
+/// pad, in which case the macro returns an arbitrary (but stable) LP pad that is not
+/// reserved for some other purpose, such as booting or debugging.
+///
+/// Example usage: `gpio_for_lp_signal!(LP_I2C_SDA)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_lp_signal {
+    (LP_GPIO0) => {
+        "GPIO0"
+    };
+    (LP_GPIO1) => {
+        "GPIO1"
+    };
+    (LP_GPIO2) => {
+        "GPIO2"
+    };
+    (LP_GPIO3) => {
+        "GPIO3"
+    };
+    (LP_GPIO4) => {
+        "GPIO4"
+    };
+    (LP_GPIO5) => {
+        "GPIO5"
+    };
+    (LP_GPIO6) => {
+        "GPIO6"
+    };
+    (LP_GPIO7) => {
+        "GPIO7"
+    };
+    (LP_GPIO8) => {
+        "GPIO8"
+    };
+    (LP_GPIO9) => {
+        "GPIO9"
+    };
+    (LP_GPIO10) => {
+        "GPIO10"
+    };
+    (LP_GPIO11) => {
+        "GPIO11"
+    };
+    (LP_GPIO12) => {
+        "GPIO12"
+    };
+    (LP_GPIO13) => {
+        "GPIO13"
+    };
+    (LP_UART_TXD) => {
+        "GPIO14"
+    };
+    (LP_GPIO14) => {
+        "GPIO14"
+    };
+    (LP_UART_RXD) => {
+        "GPIO15"
+    };
+    (LP_GPIO15) => {
+        "GPIO15"
+    };
+    (LP_I2C_SCL) => {
+        "GPIO0"
+    };
+    (LP_I2C_SDA) => {
+        "GPIO1"
+    };
+    (LP_UART_CTSN) => {
+        "GPIO7"
+    };
+    (LP_UART_DSRN) => {
+        "GPIO8"
+    };
+    (LP_SPI_CK) => {
+        "GPIO9"
+    };
+    (LP_SPI_CS) => {
+        "GPIO10"
+    };
+    (LP_SPI_D) => {
+        "GPIO11"
+    };
+    (LP_SPI_Q) => {
+        "GPIO12"
+    };
+    (LP_I2S_I_BCK) => {
+        "GPIO13"
+    };
+    (LP_I2S_I_SD) => {
+        "GPIO14"
+    };
+    (LP_I2S_I_WS) => {
+        "GPIO15"
+    };
+    (LP_I2S_O_BCK) => {
+        "GPIO0"
+    };
+    (LP_I2S_O_WS) => {
+        "GPIO1"
+    };
+    (LP_UART_RTSN) => {
+        "GPIO7"
+    };
+    (LP_UART_DTRN) => {
+        "GPIO8"
+    };
+    (LP_I2S_O_SD) => {
+        "GPIO14"
+    };
+}
+/// Returns the name of the GPIO that provides the given analog signal, as a string.
+///
+/// The macro takes the name of an analog function, and expands to a string literal like
+/// `"GPIO4"`. It is meant to keep documentation free of per-chip pin lists.
+///
+/// Analog functions are wired to particular pads, so the returned pad is the one that
+/// provides the signal. If multiple pads provide it, the macro returns one that is not
+/// reserved for some other purpose, such as booting or interfacing with flash.
+///
+/// Example usage: `gpio_for_analog_signal!(ADC1_CH0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! gpio_for_analog_signal {
+    (ADC1_CH0) => {
+        "GPIO16"
+    };
+    (ADC1_CH1) => {
+        "GPIO17"
+    };
+    (ADC1_CH2) => {
+        "GPIO18"
+    };
+    (ADC1_CH3) => {
+        "GPIO19"
+    };
+    (ADC1_CH4) => {
+        "GPIO20"
+    };
+    (ADC1_CH5) => {
+        "GPIO21"
+    };
+    (ADC1_CH6) => {
+        "GPIO22"
+    };
+    (ADC1_CH7) => {
+        "GPIO23"
+    };
+    (USJ_DM) => {
+        "GPIO24"
+    };
+    (USJ_DP) => {
+        "GPIO25"
+    };
+    (USB_FS_DM) => {
+        "GPIO26"
+    };
+    (USB_FS_DP) => {
+        "GPIO27"
+    };
+    (ADC2_CH0) => {
+        "GPIO49"
+    };
+    (ADC2_CH1) => {
+        "GPIO50"
+    };
+    (ADC2_CH2) => {
+        "GPIO51"
+    };
+    (ADC2_CH3) => {
+        "GPIO52"
+    };
+    (ADC2_CH4) => {
+        "GPIO53"
+    };
+    (ADC2_CH5) => {
+        "GPIO54"
+    };
+}
 /// Defines the `InputSignal` and `OutputSignal` enums.
 ///
 /// This macro is intended to be called in esp-hal only.
