@@ -66,13 +66,42 @@ macro_rules! lp_io_analog {
             }
         }
 
+        /// A hold takes two bits on this chip, one in the pad register and one
+        /// in the always-on register. The pad keeps the bit of the pad register
+        /// through a reset, so a release must clear both.
         pub(crate) fn pad_hold(lp: u8, enable: bool) {
-            LPWR::regs().hold_force().modify(|_, w| {
+            paste::paste! {
                 match lp {
-                    $( $lp_pin => w.$hold().bit(enable), )+
+                    $(
+                        $lp_pin => {
+                            RTC_IO::regs()
+                                .$pin_reg
+                                .modify(|_, w| w.[<$prefix hold>]().bit(enable));
+                            LPWR::regs()
+                                .hold_force()
+                                .modify(|_, w| w.$hold().bit(enable));
+                        }
+                    )+
                     _ => unreachable!(),
                 }
-            });
+            }
+        }
+
+        /// Returns whether something holds the pad.
+        ///
+        /// Either bit of [`pad_hold`] alone keeps the pad frozen.
+        pub(crate) fn is_pad_held(lp: u8) -> bool {
+            paste::paste! {
+                match lp {
+                    $(
+                        $lp_pin => {
+                            RTC_IO::regs().$pin_reg.read().[<$prefix hold>]().bit_is_set()
+                                || LPWR::regs().hold_force().read().$hold().bit_is_set()
+                        }
+                    )+
+                    _ => unreachable!(),
+                }
+            }
         }
 
         /// One bit for each low-power pad.
@@ -158,6 +187,44 @@ macro_rules! set_pull_field {
             _ => unreachable!(),
         }
     }};
+}
+
+/// Returns the bit of the pad of `gpio` in the hold register of the digital pads.
+///
+/// The register covers the pads of the digital supply, and lists them in its own order. The digital
+/// supply feeds no other pad, so no other pad reaches this function.
+fn digital_hold_bit(gpio: u8) -> Option<u8> {
+    Some(match gpio {
+        1 => 1,
+        3 => 0,
+        5 => 8,
+        6..=11 => gpio - 4,
+        16..=19 | 21..=23 => gpio - 7,
+        _ => return None,
+    })
+}
+
+/// Takes or releases the hold of the pad of `gpio`.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
+    let Some(bit) = digital_hold_bit(gpio) else {
+        return;
+    };
+
+    let mask = 1 << bit;
+    RTC_IO::regs().dig_pad_hold().modify(|r, w| unsafe {
+        let bits = r.dig_pad_hold().bits();
+        w.dig_pad_hold()
+            .bits(if enable { bits | mask } else { bits & !mask })
+    });
+}
+
+/// Returns whether something holds the pad of `gpio`.
+pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
+    let Some(bit) = digital_hold_bit(gpio) else {
+        return false;
+    };
+
+    RTC_IO::regs().dig_pad_hold().read().dig_pad_hold().bits() & (1 << bit) != 0
 }
 
 pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: crate::gpio::Level) {

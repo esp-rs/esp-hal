@@ -197,25 +197,26 @@ fn route_output(lp_pin: u8, output: LpOutputSignal) {
         });
 }
 
+/// Returns the number that the low-power registers use for `gpio`, if they reach the pad.
+// Needed because AnyPin::lp_number is infallible
+pub(crate) fn lp_number(gpio: u8) -> Option<u8> {
+    for_each_lp_function! {
+        (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
+            if gpio == crate::peripherals::$gpio::NUMBER {
+                return Some($pin);
+            }
+        };
+    }
+
+    None
+}
+
 /// Tokens to hand out a pin to a low-power CPU.
 // FIXME: tokens should be 'static to be handed out.
 #[cfg(ulp_riscv_driver_supported)]
 mod ulp_tokens {
     use super::*;
     use crate::gpio::Pin;
-
-    // Needed because AnyPin::lp_number is infallible
-    fn lp_number(gpio: u8) -> Option<u8> {
-        for_each_lp_function! {
-            (($_signal:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
-                if gpio == crate::peripherals::$gpio::NUMBER {
-                    return Some($pin);
-                }
-            };
-        }
-
-        None
-    }
 
     impl<'d> crate::gpio::Input<'d> {
         /// Hands the pin over to the low-power core.

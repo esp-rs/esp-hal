@@ -3,7 +3,7 @@ use crate::{
         LpPin,
         lp_io::{LpFunction, LpInputSignal, LpOutputSignal},
     },
-    peripherals::{LP_GPIO, LP_IO_MUX},
+    peripherals::{HP_SYS, LP_GPIO, LP_IO_MUX},
 };
 
 for_each_lp_function! {
@@ -90,14 +90,73 @@ pub(crate) fn pulldown_enable(lp: u8, enable: bool) {
 }
 
 pub(crate) fn pad_hold(lp: u8, enable: bool) {
+    let mask = 1 << lp;
     LP_IO_MUX::regs().lp_pad_hold().modify(|r, w| unsafe {
         let bits = r.reg_lp_gpio_hold().bits();
-        w.reg_lp_gpio_hold().bits(if enable {
-            bits | (1 << lp)
-        } else {
-            bits & !(1 << lp)
-        })
+        w.reg_lp_gpio_hold()
+            .bits(if enable { bits | mask } else { bits & !mask })
     });
+}
+
+/// Returns whether something holds the pad.
+pub(crate) fn is_pad_held(lp: u8) -> bool {
+    LP_IO_MUX::regs()
+        .lp_pad_hold()
+        .read()
+        .reg_lp_gpio_hold()
+        .bits()
+        & (1 << lp)
+        != 0
+}
+
+/// Takes or releases the hold of the pad of `gpio`.
+///
+/// The registers start at the first pad of the digital supply, which follows the 16 low-power pads.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
+    let Some(bit) = gpio.checked_sub(16) else {
+        return;
+    };
+
+    if bit < 32 {
+        let mask = 1 << bit;
+        HP_SYS::regs().gpio_o_hold_ctrl0().modify(|r, w| unsafe {
+            let bits = r.reg_gpio_0_hold_low().bits();
+            w.reg_gpio_0_hold_low()
+                .bits(if enable { bits | mask } else { bits & !mask })
+        });
+    } else {
+        let mask = 1 << (bit - 32);
+        HP_SYS::regs().gpio_o_hold_ctrl1().modify(|r, w| unsafe {
+            let bits = r.reg_gpio_0_hold_high().bits();
+            w.reg_gpio_0_hold_high()
+                .bits(if enable { bits | mask } else { bits & !mask })
+        });
+    }
+}
+
+/// Returns whether something holds the pad of `gpio`.
+pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
+    let Some(bit) = gpio.checked_sub(16) else {
+        return false;
+    };
+
+    if bit < 32 {
+        HP_SYS::regs()
+            .gpio_o_hold_ctrl0()
+            .read()
+            .reg_gpio_0_hold_low()
+            .bits()
+            & (1 << bit)
+            != 0
+    } else {
+        HP_SYS::regs()
+            .gpio_o_hold_ctrl1()
+            .read()
+            .reg_gpio_0_hold_high()
+            .bits()
+            & (1 << (bit - 32))
+            != 0
+    }
 }
 
 // The pad driver bit is part of the digital GPIO peripheral, so this function takes the digital

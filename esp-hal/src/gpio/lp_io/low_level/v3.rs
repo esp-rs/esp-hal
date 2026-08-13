@@ -47,6 +47,15 @@ for_each_lp_function! {
                 });
             }
 
+            /// Returns whether something holds the pad.
+            pub(crate) fn is_pad_held(lp: u8) -> bool {
+                let r = LPWR::regs().pad_hold().read();
+                match lp {
+                    $( $pin => r.[<gpio_pin $pin _hold>]().bit_is_set(), )*
+                    _ => unreachable!(),
+                }
+            }
+
             /// Returns the pads that can wake the chip through the per-pin path, as a mask of
             /// low-power numbers.
             #[cfg(sleep_driver_supported)]
@@ -66,6 +75,24 @@ for_each_lp_function! {
             }
         }
     };
+}
+
+/// Takes or releases the hold of the pad of `gpio`.
+///
+/// The register numbers the pads of the digital supply the way the digital registers do, and the
+/// low-power pads have their own register.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
+    let mask = 1 << gpio;
+    LPWR::regs().dig_pad_hold().modify(|r, w| unsafe {
+        let bits = r.dig_pad_hold().bits();
+        w.dig_pad_hold()
+            .bits(if enable { bits | mask } else { bits & !mask })
+    });
+}
+
+/// Returns whether something holds the pad of `gpio`.
+pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
+    LPWR::regs().dig_pad_hold().read().dig_pad_hold().bits() & (1 << gpio) != 0
 }
 
 /// Configures the pad.
