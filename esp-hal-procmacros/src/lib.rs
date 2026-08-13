@@ -133,8 +133,9 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// expanded to the `esp_hal::before_snippet!()` and `esp_hal::after_snippet!()` macros, and are
 /// expected to be used in example code blocks.
 ///
-/// In-line replacements can be placed in the middle of a line as `__placeholder__`. Only one
-/// placeholder can be used per line.
+/// In-line replacements can be placed in the middle of a line as `__placeholder__`. A line may
+/// contain any number of them. Should the replacements be conditional, the line is emitted for
+/// every combination of their values.
 ///
 /// You can also define custom replacements in the attribute. A replacement can be
 /// an unconditional literal (i.e. a string that is always substituted into the doc comment),

@@ -34,6 +34,7 @@ struct Replacements {
 }
 
 /// The value of an inline replacement.
+#[derive(Clone)]
 enum Inline {
     /// A string, spliced into the line as it is.
     Text(String),
@@ -56,30 +57,12 @@ impl Inline {
             Self::Expanded(quote! { #value })
         }
     }
+}
 
-    /// Returns the contents of a `doc` attribute for `line`, with `placeholder` replaced.
-    fn doc_attribute(&self, line: &str, placeholder: &str) -> TokenStream2 {
-        match self {
-            Inline::Text(text) => {
-                let line = create_raw_string(&line.replace(placeholder, text));
-                quote! { doc = #line }
-            }
-            Inline::Expanded(tokens) => {
-                let mut pieces = vec![];
-                let mut parts = line.split(placeholder).peekable();
-                while let Some(part) = parts.next() {
-                    if !part.is_empty() {
-                        pieces.push(create_raw_string(part));
-                    }
-                    if parts.peek().is_some() {
-                        pieces.push(tokens.clone());
-                    }
-                }
-
-                quote! { doc = concat!( #(#pieces),* ) }
-            }
-        }
-    }
+/// A piece of a documentation line: either a chunk of the line, or a placeholder to replace.
+enum Piece<'a> {
+    Text(&'a str),
+    Replacement(&'a str),
 }
 
 impl Replacements {
@@ -96,31 +79,13 @@ impl Replacements {
                         attrs.push(syn::parse_quote_spanned! { span => #![ #line ] });
                     }
                 }
-            } else if let Some((placeholder, replacements)) = self
-                .inline_replacements
-                .iter()
-                .find(|(k, _v)| trimmed.contains(k.as_str()))
-            {
-                for (cfg, replacement) in replacements.iter() {
-                    let doc = replacement.doc_attribute(line, placeholder);
-                    let attr_inner = if let Some(condition) = cfg {
-                        quote! { cfg_attr(#condition, #doc) }
-                    } else {
-                        doc
-                    };
+            } else {
+                for attr_inner in self.inline_attributes(line) {
                     if outer {
                         attrs.push(syn::parse_quote_spanned! { span => #[ #attr_inner ] });
                     } else {
                         attrs.push(syn::parse_quote_spanned! { span => #![ #attr_inner ] });
                     }
-                }
-            } else {
-                // Just append the line, in the expected format (`doc = r" Foobar"`)
-                let line = create_raw_string(line);
-                if outer {
-                    attrs.push(syn::parse_quote_spanned! { span => #[doc = #line] });
-                } else {
-                    attrs.push(syn::parse_quote_spanned! { span => #![doc = #line] });
                 }
             }
             attributes.extend(attrs);
@@ -128,6 +93,131 @@ impl Replacements {
 
         attributes
     }
+
+    /// Splits a line into chunks of text and the placeholders between them.
+    fn split_line<'a>(&'a self, mut line: &'a str) -> Vec<Piece<'a>> {
+        let mut pieces = vec![];
+
+        loop {
+            // Take the placeholder that comes first. Should multiple placeholders start at the same
+            // position, the longest one wins, as the shorter ones are then part of its name.
+            let next = self
+                .inline_replacements
+                .keys()
+                .filter_map(|placeholder| {
+                    line.find(placeholder.as_str())
+                        .map(|at| (at, placeholder.len(), placeholder))
+                })
+                .min_by_key(|(at, length, _)| (*at, std::cmp::Reverse(*length)));
+
+            let Some((at, length, placeholder)) = next else {
+                if !line.is_empty() {
+                    pieces.push(Piece::Text(line));
+                }
+                return pieces;
+            };
+
+            if at > 0 {
+                pieces.push(Piece::Text(&line[..at]));
+            }
+            pieces.push(Piece::Replacement(placeholder));
+            line = &line[at + length..];
+        }
+    }
+
+    /// Returns the contents of the `doc` attributes that `line` expands to.
+    ///
+    /// A line without placeholders expands to a single attribute. Otherwise, each placeholder
+    /// contributes as many attributes as it has conditional values, so a line is emitted for every
+    /// combination of the values of its placeholders.
+    fn inline_attributes(&self, line: &str) -> Vec<TokenStream2> {
+        let pieces = self.split_line(line);
+
+        // The placeholders of the line, in order of first appearance. A placeholder used multiple
+        // times in the same line takes the same value in each of its places.
+        let mut placeholders: Vec<&str> = vec![];
+        for piece in pieces.iter() {
+            if let Piece::Replacement(placeholder) = piece
+                && !placeholders.contains(placeholder)
+            {
+                placeholders.push(placeholder);
+            }
+        }
+
+        if placeholders.is_empty() {
+            let line = create_raw_string(line);
+            return vec![quote! { doc = #line }];
+        }
+
+        let values = placeholders
+            .iter()
+            .map(|placeholder| &self.inline_replacements[*placeholder])
+            .collect::<Vec<_>>();
+
+        let combinations = values.iter().map(|values| values.len()).product();
+
+        let mut attributes = vec![];
+        for combination in 0..combinations {
+            // Decode the number of the combination into an index into each placeholder's values.
+            // The last placeholder varies the fastest.
+            let mut rest = combination;
+            let mut choices = vec![0; values.len()];
+            for (choice, values) in choices.iter_mut().zip(values.iter()).rev() {
+                *choice = rest % values.len();
+                rest /= values.len();
+            }
+
+            let choice = |placeholder: &str| {
+                let index = placeholders.iter().position(|p| *p == placeholder).unwrap();
+                &values[index][choices[index]]
+            };
+
+            let conditions = placeholders
+                .iter()
+                .filter_map(|placeholder| choice(placeholder).0.as_ref())
+                .collect::<Vec<_>>();
+
+            let doc = quote_doc_line(pieces.iter().map(|piece| match piece {
+                Piece::Text(text) => Inline::Text((*text).to_string()),
+                Piece::Replacement(placeholder) => choice(placeholder).1.clone(),
+            }));
+
+            attributes.push(match conditions.as_slice() {
+                [] => doc,
+                [condition] => quote! { cfg_attr(#condition, #doc) },
+                conditions => quote! { cfg_attr(all( #(#conditions),* ), #doc) },
+            });
+        }
+
+        attributes
+    }
+}
+
+/// Assembles the contents of a `doc` attribute out of the pieces of a line.
+///
+/// Text is concatenated as far as possible, so that a line that is fully known here becomes a
+/// single string. The rest is left to `concat!`, which runs once the attribute is expanded and the
+/// remaining pieces are known.
+fn quote_doc_line(pieces: impl Iterator<Item = Inline>) -> TokenStream2 {
+    let mut parts: Vec<Inline> = vec![];
+    for piece in pieces {
+        match (parts.last_mut(), piece) {
+            (Some(Inline::Text(text)), Inline::Text(next)) => text.push_str(&next),
+            (_, piece) => parts.push(piece),
+        }
+    }
+
+    if let [Inline::Text(text)] = parts.as_slice() {
+        let line = create_raw_string(text);
+        return quote! { doc = #line };
+    }
+
+    let parts = parts.iter().map(|part| match part {
+        Inline::Text(text) => create_raw_string(text),
+        Inline::Expanded(tokens) => tokens.clone(),
+    });
+
+    quote! { doc = concat!( #(#parts),* ) }
 }
 
 fn create_raw_string(line: &str) -> TokenStream2 {
@@ -627,6 +717,97 @@ mod tests {
             quote! {
                 #[cfg_attr(esp32s3, doc = concat!(r" let pin = peripherals.", gpio_for_signal!(SAR_I2C_SDA_0), r";"))]
                 #[cfg_attr(not(any(esp32s3)), doc = concat!(r" let pin = peripherals.", gpio_for_signal!(LP_I2C_SDA, "GPIO6"), r";"))]
+                struct Foo {}
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_multiple_inline_replacements() {
+        let result = replace(
+            quote! {
+                "first" => "Alpha",
+                "second" => "Beta"
+            }
+            .into(),
+            quote! {
+                /// __first__ and __second__, __first__ again.
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote! {
+                #[doc = r" Alpha and Beta, Alpha again."]
+                struct Foo {}
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_multiple_conditional_inline_replacements() {
+        let result = replace(
+            quote! {
+                "first" => {
+                    cfg(esp32) => "one",
+                    _ => "two"
+                },
+                "second" => {
+                    cfg(esp32c6) => "three",
+                    _ => "four"
+                }
+            }
+            .into(),
+            quote! {
+                /// __first__ __second__
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote! {
+                #[cfg_attr(all(esp32, esp32c6), doc = r" one three")]
+                #[cfg_attr(all(esp32, not(any(esp32c6))), doc = r" one four")]
+                #[cfg_attr(all(not(any(esp32)), esp32c6), doc = r" two three")]
+                #[cfg_attr(all(not(any(esp32)), not(any(esp32c6))), doc = r" two four")]
+                struct Foo {}
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_multiple_mixed_inline_replacements() {
+        let result = replace(
+            quote! {
+                "pin" => gpio_for_signal!(USB_FS_DP),
+                "index" => {
+                    cfg(esp32) => "1",
+                    _ => "2"
+                }
+            }
+            .into(),
+            quote! {
+                /// __pin__ is DP of USB __index__.
+                struct Foo {
+                }
+            }
+            .into(),
+        );
+
+        assert_eq!(
+            result.to_string(),
+            quote! {
+                #[cfg_attr(esp32, doc = concat!(r" ", gpio_for_signal!(USB_FS_DP), r" is DP of USB 1."))]
+                #[cfg_attr(not(any(esp32)), doc = concat!(r" ", gpio_for_signal!(USB_FS_DP), r" is DP of USB 2."))]
                 struct Foo {}
             }
             .to_string()
