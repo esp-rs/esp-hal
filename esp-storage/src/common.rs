@@ -207,7 +207,10 @@ impl<'d> FlashStorage<'d> {
         let initialized = unsafe {
             core::slice::from_raw_parts_mut(bytes.as_mut_ptr().cast::<u8>(), bytes.len())
         };
-        chip_specific::read_flash_encrypted(offset, initialized)
+        // Reading encrypted flash changes the flash MMU and the cache, which the other core must
+        // not use while this happens.
+        self.multi_core_strategy
+            .with(|| chip_specific::read_flash_encrypted(offset, initialized))
     }
 
     pub(crate) fn internal_write_encrypted(
