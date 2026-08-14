@@ -126,7 +126,7 @@ macro_rules! coeff_tables {
     };
 }
 
-#[cfg(any(esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
+#[cfg(any(esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3))]
 mod impls {
     use super::*;
 
@@ -220,6 +220,29 @@ mod impls {
                 -0.3801417550380255,
                 -0.0006020352420772,
                 0.0000012442478488,
+            ],
+        ];
+
+
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/1e76669a8b940f5dc25adc35065cb53de3c71423/components/esp_adc/esp32c61/curve_fitting_coefficients.c>
+        #[cfg(esp32c61)]
+        CURVES_COEFFS1 [
+            _0dB => [
+                -0.8668885650149671,
+                0.0015630376830615,
+            ],
+            _2p5dB => [
+                -0.1090569589734153,
+                0.0013859487941542,
+            ],
+            _6dB => [
+                -1.4231790752153335,
+                0.00122016745867,
+            ],
+            _11dB => [
+                -1.3204544579940347,
+                -0.0011762579610906,
+                0.0000007639928529,
             ],
         ];
 

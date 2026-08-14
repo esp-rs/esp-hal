@@ -103,6 +103,7 @@ peripheral_clocks = { templates = [
     { name = "I2cExt0", template_params = { peripheral = "i2c0" }},
     { name = "AhbGdma", template_params = { peripheral = "gdma" } },
     { name = "I2s0", template_params = { peripheral = "i2s" } },
+    { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" } }, # used by some wifi calibration steps.
     { name = "Spi2" },
 
     { name = "Sha" },
