@@ -125,6 +125,7 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 ## Key references
 
 - `documentation/DEVELOPER-GUIDELINES.md` — full API design rules
+- `documentation/API-DOC-RULES.md` — API / rustdoc writing rules (STE, EMoS, item docs)
 - `documentation/CONTRIBUTING.md` — contribution workflow
 - `xtask/README.md` — metadata annotations and xtask usage
 - `.github/workflows/ci.yml` — CI steps and MSRV
