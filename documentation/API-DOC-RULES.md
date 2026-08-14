@@ -22,7 +22,7 @@ Rustdoc in esp-hal is **reference material**. Follow [ASD-STE100](#simplified-te
   - `# Safety` for `unsafe` functions
   - `# Cancellation Safety` for async functions and futures
   - `# Examples` for doctests (prefer `rust, no_run` and `before_snippet!()` / `after_snippet!()`) - prefer `# Examples` over `# Usage`
-- Avoid empty sections
+- Avoid empty sections. If a section has no body (for example `# Examples` with no code fence, or `# Errors` with no conditions), remove the heading entirely — do not leave a bare `# Examples` / `# Errors` / `# Panics` / `# Safety` line above the item.
 - The order of sections should be `# Examples`, `# Panics`, `# Errors`, `# Cancellation Safety`, `# Safety`, `# Undefined Behavior`
 - Do not repeat the summary in section bodies (e.g. put error conditions under `# Errors`, not in a leading `Returns a … if …` paragraph before the section).
 - Prefer rustdoc intra-doc links (e.g. ``[`Type`]``) over raw URLs or markdown links to rustdoc items.
@@ -32,10 +32,13 @@ Rustdoc in esp-hal is **reference material**. Follow [ASD-STE100](#simplified-te
     - Bad: `Used with[Self::register_block] to access the register block.`
   - After bulk edits, check that words were not merged across boundaries (`whether` + `the`, `with` + ``[`Type`]``, `that` + `can`, etc.).
   - Don't merge regular comments and cfg-gated (cfg_attr) comments.
+- Do not leave stray or accidental characters in doc comments (keyboard typos, dead keys, paste artifacts). Summaries must end with normal ASCII punctuation (`.`, `?`, or `!`) — not letters stuck after the full stop (e.g. `Sets the output level.ç`).
 
 ## Mechanical doc edits
 
 Avoid repository-wide search-and-replace on doc comments (e.g. `Check if` → `Returns whether`, imperative → third person) without reviewing each hunk.
+
+Style/tense passes alone are not enough. Also scan for empty sections, copy-paste mistakes, and stray characters — those do not show up in the usual “imperative → third person” greps.
 
 After any bulk doc pass:
 
@@ -44,6 +47,8 @@ After any bulk doc pass:
    - merged words: `whetherthe`, `whethersampling`, `with[`, `than can`
    - mixed tense: `(Starts|Checks|Returns).+ and (wait|write|return|copy)\b`
    - typos: `Fow `, `Finishes of`, British spellings (`behaviour`, `whilst`, `initialised`)
+   - empty sections: `# Examples` / `# Errors` / `# Panics` / `# Safety` / `# Cancellation Safety` immediately followed by the next item or another `#` heading with no body
+   - stray characters: unexpected non-ASCII in `///` / `//!` lines (e.g. `ç`, `Ã`, mojibake), or a letter immediately after a sentence-ending `.` (`level.ç`, `pin.x`)
 3. Run `cargo xtask build documentation --packages=esp-hal --chips=<chip>` (esp-hal denies `rustdoc::all` warnings).
 
 ## Simplified Technical English (ASD-STE100)
@@ -127,3 +132,4 @@ We apply STE **principles** to rustdoc, not a word-by-word check against ASD’s
 - Use the **Oxford comma** in lists of three or more items.
 - Do not use `/` to mean “or” (`UART or SPI`, not `UART/SPI`).
 - Use English punctuation in English docs.
+- Prefer ASCII punctuation in item summaries (`.`, `,`, `;`, `:`). Intentional Unicode (en dashes in ranges, `µs`, curly quotes in quoted TRM text) is fine; accidental accents or paste garbage is not.
