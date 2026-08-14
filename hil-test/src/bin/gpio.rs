@@ -754,6 +754,18 @@ mod tests {
         }
         assert_eq!(input_dedicated.level(), Level::High);
         assert_eq!(output_dedicated.output_level(), Level::High);
+        // It used to only be possible for dedicated gpio to drive the pin High, not back to Low
+        // again on the esp32s2 and esp32s3, this makes sure that is not the case
+        output_dedicated.set_level(Level::Low);
+        #[cfg(esp32s2)]
+        unsafe {
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+            core::arch::asm!("nop");
+        }
+        assert_eq!(input_dedicated.level(), Level::Low);
+        assert_eq!(output_dedicated.output_level(), Level::Low);
     }
 
     #[test]
