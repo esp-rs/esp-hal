@@ -1157,6 +1157,9 @@ pub enum WifiError {
     /// Passed arguments are invalid.
     InvalidArguments,
 
+    /// The operation is not supported.
+    NotSupported,
+
     /// An unspecified error occurred in the radio driver.
     Other,
 
@@ -1200,6 +1203,7 @@ impl WifiError {
             // are returned without any logging.
             ESP_ERR_NO_MEM => WifiError::OutOfMemory,
             ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
+            ESP_ERR_NOT_SUPPORTED => WifiError::NotSupported,
             ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
             ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
