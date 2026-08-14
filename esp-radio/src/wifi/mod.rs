@@ -3572,8 +3572,12 @@ impl WifiController<'_> {
         &self,
         target: impl Into<twt::FlowTarget>,
     ) -> Result<twt::ITwtTeardownStatus, WifiError> {
-        let target = target.into();
-
+        self.itwt_teardown_internal(target.into()).await
+    }
+    async fn itwt_teardown_internal(
+        &self,
+        target: twt::FlowTarget,
+    ) -> Result<twt::ITwtTeardownStatus, WifiError> {
         event::enable_wifi_events(WifiEvent::IndividualTargetWakeTimeTeardown.into());
 
         let mut subscriber = EVENT_CHANNEL
@@ -3634,8 +3638,14 @@ impl WifiController<'_> {
         target: impl Into<twt::FlowTarget>,
         suspend_time: Duration,
     ) -> Result<(), WifiError> {
-        let target = target.into();
-
+        self.itwt_suspend_internal(target.into(), suspend_time)
+            .await
+    }
+    async fn itwt_suspend_internal(
+        &self,
+        target: twt::FlowTarget,
+        suspend_time: Duration,
+    ) -> Result<(), WifiError> {
         event::enable_wifi_events(WifiEvent::IndividualTargetWakeTimeSuspend.into());
 
         let mut subscriber = EVENT_CHANNEL
@@ -3765,8 +3775,12 @@ impl WifiController<'_> {
         &self,
         flows: impl Into<EnumSet<twt::FlowId>>,
     ) -> Result<twt::TwtWakeupInfo, twt::TwtWaitError> {
-        let flows = flows.into();
-
+        self.wait_for_next_twt_wakeup_internal(flows.into()).await
+    }
+    async fn wait_for_next_twt_wakeup_internal(
+        &self,
+        flows: EnumSet<twt::FlowId>,
+    ) -> Result<twt::TwtWakeupInfo, twt::TwtWaitError> {
         event::enable_wifi_events(
             WifiEvent::TargetWakeTimeWakeup
                 | WifiEvent::IndividualTargetWakeTimeTeardown
