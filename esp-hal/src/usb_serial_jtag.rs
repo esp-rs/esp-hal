@@ -121,6 +121,7 @@
 use core::task::Poll;
 use core::{convert::Infallible, marker::PhantomData};
 
+use esp_sync::RawMutex;
 use procmacros::handler;
 
 use crate::{
@@ -702,6 +703,10 @@ where
 // Static instance of the waker for each component of the peripheral:
 static WAKER_TX: AtomicWaker = AtomicWaker::new();
 static WAKER_RX: AtomicWaker = AtomicWaker::new();
+// TX and RX interrupts are enabled independently. Once either is enabled, its
+// handler can preempt the other side's INT_ENA read-modify-write and cause
+// stale enable bits to be restored. Serialize all INT_ENA updates.
+static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagWriteFuture<'d> {
@@ -712,10 +717,12 @@ impl<'d> UsbSerialJtagWriteFuture<'d> {
     fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
         // interrupt
-        peripheral
-            .register_block()
-            .int_ena()
-            .modify(|_, w| w.serial_in_empty().set_bit());
+        INT_ENA_LOCK.lock(|| {
+            peripheral
+                .register_block()
+                .int_ena()
+                .modify(|_, w| w.serial_in_empty().set_bit());
+        });
 
         Self { peripheral }
     }
@@ -755,10 +762,12 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
     fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
         // interrupt
-        peripheral
-            .register_block()
-            .int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().set_bit());
+        INT_ENA_LOCK.lock(|| {
+            peripheral
+                .register_block()
+                .int_ena()
+                .modify(|_, w| w.serial_out_recv_pkt().set_bit());
+        });
 
         Self { peripheral }
     }
@@ -808,6 +817,26 @@ impl<'d> UsbSerialJtag<'d, Async> {
 }
 
 impl UsbSerialJtagTx<'_, Async> {
+    async fn wait_tx_ready(&mut self) {
+        loop {
+            // Immediately after WR_DONE, DATA_FREE may still reflect the previous
+            // transfer's ready state. Wait for a new IN_EMPTY event before trusting it.
+            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
+
+            // A pending or early interrupt can wake the future before the FIFO is
+            // actually ready. Keep waiting until the hardware confirms readiness.
+            if self
+                .regs()
+                .ep1_conf()
+                .read()
+                .serial_in_ep_data_free()
+                .bit_is_set()
+            {
+                break;
+            }
+        }
+    }
+
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(64) {
             for byte in chunk {
@@ -817,7 +846,7 @@ impl UsbSerialJtagTx<'_, Async> {
             }
             self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
-            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
+            self.wait_tx_ready().await;
         }
 
         Ok(())
@@ -827,16 +856,7 @@ impl UsbSerialJtagTx<'_, Async> {
         // If write_async transfers a multiple of 64 bytes, flush needs to trigger sending a
         // zero-length packet for the host to consider the transfer complete
         self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
-
-        if self
-            .regs()
-            .ep1_conf()
-            .read()
-            .serial_in_ep_data_free()
-            .bit_is_clear()
-        {
-            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
-        }
+        self.wait_tx_ready().await;
 
         Ok(())
     }
@@ -941,13 +961,17 @@ fn async_interrupt_handler() {
     let tx = interrupts.serial_in_empty().bit_is_set();
     let rx = interrupts.serial_out_recv_pkt().bit_is_set();
 
-    if tx {
-        usb.int_ena().modify(|_, w| w.serial_in_empty().clear_bit());
-    }
-    if rx {
-        usb.int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
-    }
+    INT_ENA_LOCK.lock(|| {
+        usb.int_ena().modify(|_, w| {
+            if tx {
+                w.serial_in_empty().clear_bit();
+            }
+            if rx {
+                w.serial_out_recv_pkt().clear_bit();
+            }
+            w
+        });
+    });
 
     usb.int_clr().write(|w| {
         w.serial_in_empty()
