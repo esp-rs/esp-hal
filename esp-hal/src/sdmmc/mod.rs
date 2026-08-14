@@ -63,11 +63,13 @@ use crate::{
     peripherals::{Interrupt, SDHOST},
     private::DropGuard,
     system::{Peripheral, PeripheralGuard},
+    time::{Duration, Instant},
 };
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "esp32s31.rs")]
 mod chip_specific;
 
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
@@ -78,7 +80,11 @@ mod bounce;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockSource {
     /// 160 MHz PLL.
+    #[cfg(not(esp32s31))]
     Pll160m,
+    /// 500 MHz PLL.
+    #[cfg(esp32s31)]
+    Mpll,
     /// Crystal oscillator.
     #[cfg(not(esp32p4))]
     Xtal,
@@ -130,14 +136,24 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self {
-            clock_source: ClockSource::Pll160m,
-            module_div: 2,
-        }
+        Self::const_default()
     }
 }
 
 impl Config {
+    pub(crate) const fn const_default() -> Self {
+        cfg_select! {
+            esp32s31 => Self {
+                clock_source: ClockSource::Mpll,
+                module_div: 8,
+            },
+            _ => Self {
+                clock_source: ClockSource::Pll160m,
+                module_div: 2,
+            },
+        }
+    }
+
     /// Validates field ranges.
     fn validate(&self) -> Result<(), ConfigError> {
         if !(2..=16).contains(&self.module_div) {
@@ -918,10 +934,7 @@ struct Settings {
 
 impl Settings {
     const INIT: Self = Settings {
-        module: Config {
-            clock_source: ClockSource::Pll160m,
-            module_div: 2,
-        },
+        module: Config::const_default(),
         slots: [SlotSettings::INIT; SLOT_COUNT],
     };
 
@@ -1277,11 +1290,8 @@ impl<'d> SdHostController<'d> {
     /// shared (engine-wide) module clock from `config`.
     pub fn new(peri: SDHOST<'d>, config: Config) -> Result<Self, ConfigError> {
         config.validate()?;
-        // P4 powers the SD card / IO domain from an on-chip LDO that must be
-        // up before any card communication.
-        #[cfg(esp32p4)]
-        chip_specific::enable_sd_io_ldo();
         let guard = PeripheralGuard::new(Peripheral::SdioHost);
+        chip_specific::chip_setup();
         let this = Self {
             _peri: peri,
             _guard: guard,
@@ -1291,9 +1301,8 @@ impl<'d> SdHostController<'d> {
         // Module clock first, then the DesignWare reset, then quiesce
         // interrupts. The module clock is engine-wide, so it is programmed once
         // here and the config is stashed for slots to derive their card
-        // dividers from. The clock must precede `reset_engine` because on P4
-        // the controller's CIU has no functional clock until the module clock
-        // (in `HP_SYS_CLKRST`) is running, so its reset would never complete.
+        // dividers from. The clock setup must precede `reset_engine` because
+        // the module clock drives the FIFO reset.
         chip_specific::set_module_clock(config.clock_source, config.module_div);
         this.reset_engine();
 
@@ -1321,7 +1330,7 @@ impl<'d> SdHostController<'d> {
         // A reset timeout means the controller never left reset; there is no
         // matching `ConfigError` and the first card command would surface it
         // as a timeout regardless, so this is best-effort.
-        let _ = poll_until(|| {
+        let _ = poll_until_timeout(Duration::from_millis(100), || {
             let c = r.ctrl().read();
             !c.controller_reset().bit_is_set()
                 && !c.fifo_reset().bit_is_set()
@@ -1998,6 +2007,16 @@ fn poll_until(mut ready: impl FnMut() -> bool) -> Result<(), Error> {
     Err(Error::Timeout)
 }
 
+fn poll_until_timeout(timeout: Duration, mut ready: impl FnMut() -> bool) -> Result<(), Error> {
+    let start = Instant::now();
+    while !ready() {
+        if start.elapsed() > timeout {
+            return Err(Error::Timeout);
+        }
+    }
+    Ok(())
+}
+
 /// Spins until the CIU accepts the command (`start_cmd` self-clears).
 fn wait_command_accepted() -> Result<(), Error> {
     let r = SDHOST::regs();
@@ -2335,6 +2354,9 @@ fn disable_idmac() {
 /// Module clock in Hz for a given source and divider.
 fn module_hz(source: ClockSource, div: u8) -> u32 {
     let base = match source {
+        #[cfg(esp32s31)]
+        ClockSource::Mpll => 500_000_000,
+        #[cfg(not(esp32s31))]
         ClockSource::Pll160m => 160_000_000,
         //#[cfg(esp32p4)]
         // ClockSource::Apll => unimplemented!(),

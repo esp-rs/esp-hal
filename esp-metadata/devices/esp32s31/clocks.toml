@@ -139,6 +139,7 @@ peripheral_clocks = { templates = [
     { name = "Spi3", template_params = { peripheral = "gpspi3" } },
     { name = "I2c0", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}", ctrl_reg = "i2c_ctrl0(0)" } },
     { name = "I2c1", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}", ctrl_reg = "i2c_ctrl0(1)" } },
+    { name = "SdioHost", template_params = { clk_en = "{{sys_clk}}", rst_template = "crate::peripherals::CNNT_SYS::regs().sys_hp_sdmmc_ctrl().modify(|_, w| w.sys_sdmmc_rst_en().bit(reset));" } },
     # DMA engines
     { name = "AxiGdma", template_params = { peripheral = "axi_pdma", clk_en = "{{sys_clk}}" } },
     { name = "AhbGdma", template_params = { peripheral = "ahb_pdma", clk_en = "{{sys_clk}}" } },
