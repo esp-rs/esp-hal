@@ -205,7 +205,7 @@ peripheral_clocks = { templates = [
     # Connectivity -- EMAC and SDMMC reset live in dedicated registers, no HP_RST_EN gate.
     { name = "Emac",  template_params = { clk_en_template = "{{sys_clk_template}}", rst_template = "{{no_rst}}" } },
     { name = "SdioHost", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "sdmmc", rst_template = "crate::peripherals::LP_AON_CLKRST::regs().lp_aonclkrst_hp_sdmmc_emac_rst_ctrl().modify(|_, w| w.lp_aonclkrst_rst_en_sdmmc().bit(reset));" } },
-    { name = "Uhci",  template_params = { clk_en_template = "{{sys_apb_clk_template}}", rst_group = "1" } },
+    { name = "Uhci0", template_params = { clk_en_template = "{{sys_apb_clk_template}}", peripheral = "uhci", rst_group = "1" } },
     # Crypto -- shared crypto_sys_clk_en bit; each peripheral has its own reset bit.
     { name = "Aes",   template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "crypto", rst_group = "2" } },
     { name = "Sha",   template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "crypto", rst_group = "2" } },

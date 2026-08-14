@@ -81,6 +81,7 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" }, stable = true, clock_group = "UART" },
     { name = "UART3", interrupts = { peri = "UART3" }, stable = true, clock_group = "UART" },
     { name = "UART4", interrupts = { peri = "UART4" }, stable = true, clock_group = "UART" },
+    { name = "UHCI0" },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true, clock_group = "SPI" },
@@ -205,8 +206,9 @@ engines = [
         name = "AHB_GDMA",
         max_priority = 5,
         burst_sizes = [0, 4, 16, 32], # unclear if 64 byte (INCR16) is supported
-        drivers = ["i2s"],
+        drivers = ["i2s", "uhci"],
         peripheral_instances = [
+            { name = "UHCI0", dma_id = 2 },
             { name = "I2S0", dma_id = 3 },
             { name = "I2S1", dma_id = 4 },
             { name = "I2S2", dma_id = 5 },
@@ -457,7 +459,8 @@ support_status = "not_supported"
 [device.touch]
 support_status = "not_supported"
 [device.uhci]
-support_status = "not_supported"
+support_status = "partial"
+combined_uart_selector_field = true
 [device.ulp_riscv]
 support_status = "not_supported"
 
