@@ -853,22 +853,10 @@ impl UsbSerialJtagTx<'_, Async> {
     }
 
     async fn flush_tx_async(&mut self) -> Result<(), Error> {
-<<<<<<< HEAD:esp-hal/src/usb_serial_jtag.rs
-        if self
-            .regs()
-            .ep1_conf()
-            .read()
-            .serial_in_ep_data_free()
-            .bit_is_clear()
-        {
-            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
-        }
-=======
         // If write_async transfers a multiple of 64 bytes, flush needs to trigger sending a
         // zero-length packet for the host to consider the transfer complete
         self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
         self.wait_tx_ready().await;
->>>>>>> ab45d33cf (USB-serial: prevent async data loss under bidirectional load (#6104)):esp-hal/src/usb/usb_serial_jtag.rs
 
         Ok(())
     }
