@@ -21,6 +21,7 @@ use crate::{
 
 #[cfg_attr(dma_gdma_version = "1", path = "ahb_v1.rs")]
 #[cfg_attr(dma_gdma_version = "2", path = "ahb_v2.rs")]
+#[cfg_attr(dma_gdma_version = "3", path = "ahb_v3.rs")]
 mod implementation;
 
 /// Immutable per-channel metadata owned by each `DMA_CH*` singleton.

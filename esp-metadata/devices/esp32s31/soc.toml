@@ -83,6 +83,7 @@ peripherals = [
     { name = "SPI2", interrupts = { peri = "SPI2" }, clock_group = "SPI", stable = true },
     { name = "SPI3", interrupts = { peri = "SPI3" }, clock_group = "SPI", stable = true },
     { name = "AXI_GDMA", pac = "AXI_DMA" },
+    { name = "DMA", pac = "AHB_DMA" },
     { name = "SHA" },
     { name = "SYSTEM", pac = "HP_SYS" },
     { name = "SYSTIMER" },
@@ -93,6 +94,7 @@ peripherals = [
     { name = "UART1", interrupts = { peri = "UART1" }, clock_group = "UART", stable = true },
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
     { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART", stable = true },
+    { name = "UHCI0" },
     { name = "USB_DEVICE" },
     { name = "USB_HS", pac = "USB_OTG_HS", interrupts = { peri = "USB_OTG_HS" } },
 
@@ -237,10 +239,25 @@ support_status = "not_supported"
 
 [device.dma]
 support_status = "partial"
-gdma_version = 2
+gdma_version = 3
 separate_in_out_interrupts = true
-# TODO: add AHB_GDMA and LP_GDMA engines
+# TODO: add LP_GDMA engine
 engines = [
+    {
+        name = "AHB_GDMA",
+        max_priority = 5,
+        drivers = ["uhci"],
+        peripheral_instances = [
+            { name = "UHCI0", dma_id = 0 },
+        ],
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, mem2mem_id = 9, interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
+            { name = "DMA_CH1", interrupt_in = "AHB_PDMA_IN_CH1", interrupt_out = "AHB_PDMA_OUT_CH1" },
+            { name = "DMA_CH2", interrupt_in = "AHB_PDMA_IN_CH2", interrupt_out = "AHB_PDMA_OUT_CH2" },
+            { name = "DMA_CH3", interrupt_in = "AHB_PDMA_IN_CH3", interrupt_out = "AHB_PDMA_OUT_CH3" },
+            { name = "DMA_CH4", interrupt_in = "AHB_PDMA_IN_CH4", interrupt_out = "AHB_PDMA_OUT_CH4" },
+        ]
+    },
     {
         name = "AXI_GDMA",
         max_priority = 15,
@@ -362,7 +379,8 @@ support_status = "not_supported"
 [device.canfd]
 support_status = "not_supported"
 [device.uhci]
-support_status = "not_supported"
+support_status = "partial"
+combined_uart_selector_field = true
 [device.ulp_riscv]
 support_status = "not_supported"
 [device.usb_serial_jtag]
