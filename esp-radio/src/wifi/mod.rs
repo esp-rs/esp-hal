@@ -910,6 +910,9 @@ pub enum WifiError {
     /// Passed arguments are invalid.
     InvalidArguments,
 
+    /// The operation is not supported
+    NotSupported,
+
     /// Generic failure - not further specified.
     Failed,
 
@@ -947,6 +950,7 @@ impl WifiError {
         match code as u32 {
             crate::sys::include::ESP_ERR_NO_MEM => WifiError::OutOfMemory,
             crate::sys::include::ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
+            crate::sys::include::ESP_ERR_NOT_SUPPORTED => WifiError::NotSupported,
             crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
             crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
