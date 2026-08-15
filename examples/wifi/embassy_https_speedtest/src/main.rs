@@ -324,9 +324,6 @@ async fn main(spawner: Spawner) -> ! {
     let tcp_rx_buf = mk_static!([u8; TCP_BUF_SIZE], [0u8; TCP_BUF_SIZE]);
     let tcp_tx_buf = mk_static!([u8; TCP_BUF_SIZE], [0u8; TCP_BUF_SIZE]);
 
-    // The TLS record and header buffers live in internal RAM: the software
-    // AES-GCM decrypt is much faster there than in PSRAM, and a slow reader
-    // makes the server's streaming write time out (truncating the body).
     #[cfg(not(feature = "plain-http"))]
     let tls_read_buf = mk_static!([u8; TLS_READ_BUF_SIZE], [0u8; TLS_READ_BUF_SIZE]);
     #[cfg(not(feature = "plain-http"))]
@@ -531,8 +528,7 @@ async fn run_download<'a>(
         if received == content_length {
             break;
         }
-        // The server occasionally stops delivering data partway through the
-        // body; time out so the outer loop can retry on the next pass.
+        // Time out so the outer loop can retry on the next pass in case of a stall
         let result = embassy_time::with_timeout(
             Duration::from_secs(5),
             transport.read(&mut payload[received..]),
@@ -589,8 +585,6 @@ async fn run_upload<'a>(
     )
     .await?;
 
-    // The server parses the body as a form unless the content type marks it
-    // as opaque binary data.
     let request = format!(
         "{UP_METHOD} {UP_URL} HTTP/1.1\r\nHost: {UP_HOST}\r\nContent-Length: {}\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n",
         payload.len()
