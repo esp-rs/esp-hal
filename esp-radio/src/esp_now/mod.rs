@@ -408,7 +408,9 @@ pub struct EspNowManager<'d> {
 
 impl EspNowManager<'_> {
     /// Set primary Wi-Fi channel.
-    /// Should only be used when using ESP-NOW without access point or station.
+    /// When using ESP-NOW with an access point or station,
+    /// the device cannot switch channels after connecting to Wi-Fi.
+    /// It can only transmit and receive data on the current Wi-Fi channel.
     #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_set_channel(channel, 0) })
