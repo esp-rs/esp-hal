@@ -41,14 +41,13 @@
 
 extern crate alloc;
 
-use alloc::format;
-use alloc::vec::Vec;
+use alloc::{format, vec::Vec};
 
 use embassy_executor::Spawner;
 use embassy_net::{
     IpAddress,
-    Ipv4Address,
     IpEndpoint,
+    Ipv4Address,
     Runner,
     Stack,
     StackResources,
@@ -80,13 +79,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{
-    Config,
-    ControllerConfig,
-    Interface,
-    WifiController,
-    sta::StationConfig,
-};
+use esp_radio::wifi::{Config, ControllerConfig, Interface, WifiController, sta::StationConfig};
 #[cfg(not(feature = "plain-http"))]
 use rand_core::{CryptoRng, RngCore};
 
@@ -245,7 +238,8 @@ impl CryptoRng for WifiRng {}
 #[cfg(not(feature = "plain-http"))]
 struct VerifyingProvider {
     rng: WifiRng,
-    // NB NoClock: certificate expiry dates are not checked, only the chain signatures and the hostname.
+    // NB NoClock: certificate expiry dates are not checked, only the chain signatures and the
+    // hostname.
     verifier: CertVerifier<'static, Aes128GcmSha256, NoClock, 4096>,
 }
 
@@ -277,7 +271,6 @@ impl From<embassy_net::tcp::ConnectError> for Error {
         Self::Connect(e)
     }
 }
-
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
@@ -386,7 +379,6 @@ async fn main(spawner: Spawner) -> ! {
     }
 }
 
-
 #[embassy_executor::task]
 async fn connection_task(mut controller: WifiController<'static>) {
     println!("start connection task");
@@ -415,7 +407,6 @@ async fn connection_task(mut controller: WifiController<'static>) {
 async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }
-
 
 async fn connect<'a>(
     stack: &Stack<'static>,
@@ -662,7 +653,10 @@ async fn read_head(
 ) -> Result<(u16, usize, usize, usize), Error> {
     let mut len = 0;
     let head_end = loop {
-        let n = transport.read(&mut buf[len..]).await.map_err(Error::Transport)?;
+        let n = transport
+            .read(&mut buf[len..])
+            .await
+            .map_err(Error::Transport)?;
         if n == 0 {
             println!("read_head: connection closed before the response headers arrived");
             return Err(Error::Http);
@@ -679,11 +673,10 @@ async fn read_head(
 
     let head = &buf[..head_end];
     let status_line_end = head.iter().position(|&b| b == b'\r').ok_or(Error::Http)?;
-    let status_line = core::str::from_utf8(&head[..status_line_end])
-        .map_err(|_| {
-            println!("read_head: non-utf8 status line");
-            Error::Http
-        })?;
+    let status_line = core::str::from_utf8(&head[..status_line_end]).map_err(|_| {
+        println!("read_head: non-utf8 status line");
+        Error::Http
+    })?;
     println!("response head: {status_line}");
     let status: u16 = status_line
         .split(' ')
