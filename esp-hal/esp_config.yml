@@ -52,6 +52,14 @@ options:
       - value: 3740121773
     display_hint: Hex
 
+  - name: ensure-main-stack-minimum
+    description: Prevent successful build if the main stack is smaller than the configured minimum number of bytes.
+    default:
+      - value: 8192
+    constraints:
+      - type:
+          validator: non_negative_integer
+
   - name: init-stack-ptr-range-check
     description: Check that the stack pointer is in range during initialization.
     default:
