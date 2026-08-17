@@ -262,6 +262,7 @@ jobs:
         with:
           name: xtask-aarch64
           path: target/aarch64-unknown-linux-gnu/release/esp-devtool
+          if-no-files-found: error
 
   hil:
     needs: [build, devtool]
