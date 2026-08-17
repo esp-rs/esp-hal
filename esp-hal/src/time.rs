@@ -329,7 +329,7 @@ impl core::ops::Sub for Instant {
     #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
         // Avoid "Sub failed! Other > self" panics
-        Duration::from_micros(self.0.as_ticks().wrapping_sub(rhs.0.as_ticks()))
+        Duration::from_micros(self.0.ticks().wrapping_sub(rhs.0.ticks()))
     }
 }
 
@@ -409,7 +409,7 @@ impl Duration {
     /// ```
     #[inline]
     pub const fn from_micros(val: u64) -> Self {
-        Self(InnerDuration::from_micros(val))
+        Self(InnerDuration::micros(val))
     }
 
     #[procmacros::doc_replace]
@@ -425,7 +425,7 @@ impl Duration {
     /// ```
     #[inline]
     pub const fn from_millis(val: u64) -> Self {
-        Self(InnerDuration::from_millis(val))
+        Self(InnerDuration::millis(val))
     }
 
     #[procmacros::doc_replace]
@@ -441,7 +441,7 @@ impl Duration {
     /// ```
     #[inline]
     pub const fn from_secs(val: u64) -> Self {
-        Self(InnerDuration::from_secs(val))
+        Self(InnerDuration::secs(val))
     }
 
     #[procmacros::doc_replace]
@@ -457,7 +457,7 @@ impl Duration {
     /// ```
     #[inline]
     pub const fn from_minutes(val: u64) -> Self {
-        Self(InnerDuration::from_minutes(val))
+        Self(InnerDuration::minutes(val))
     }
 
     #[procmacros::doc_replace]
@@ -473,7 +473,7 @@ impl Duration {
     /// ```
     #[inline]
     pub const fn from_hours(val: u64) -> Self {
-        Self(InnerDuration::from_hours(val))
+        Self(InnerDuration::hours(val))
     }
 
     delegate::delegate! {
@@ -491,7 +491,7 @@ impl Duration {
             /// let micros = duration.as_micros();
             /// # {after_snippet}
             /// ```
-            #[call(as_micros)]
+            #[call(to_micros)]
             pub const fn as_micros(&self) -> u64;
 
             #[procmacros::doc_replace]
@@ -506,7 +506,7 @@ impl Duration {
             /// let millis = duration.as_millis();
             /// # {after_snippet}
             /// ```
-            #[call(as_millis)]
+            #[call(to_millis)]
             pub const fn as_millis(&self) -> u64;
 
             #[procmacros::doc_replace]
@@ -521,7 +521,7 @@ impl Duration {
             /// let secs = duration.as_secs();
             /// # {after_snippet}
             /// ```
-            #[call(as_secs)]
+            #[call(to_secs)]
             pub const fn as_secs(&self) -> u64;
 
             #[procmacros::doc_replace]
@@ -536,7 +536,7 @@ impl Duration {
             /// let minutes = duration.as_minutes();
             /// # {after_snippet}
             /// ```
-            #[call(as_minutes)]
+            #[call(to_minutes)]
             pub const fn as_minutes(&self) -> u64;
 
             #[procmacros::doc_replace]
@@ -551,7 +551,7 @@ impl Duration {
             /// let hours = duration.as_hours();
             /// # {after_snippet}
             /// ```
-            #[call(as_hours)]
+            #[call(to_hours)]
             pub const fn as_hours(&self) -> u64;
         }
     }
