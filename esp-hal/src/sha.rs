@@ -95,7 +95,8 @@ use core::{
 };
 
 /// Re-export digest for convenience
-pub use digest::Digest;
+pub use digest_010::Digest as Digest010;
+pub use digest_011::Digest as Digest011;
 
 use crate::{
     peripherals::SHA,
@@ -553,18 +554,28 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     const DIGEST_LENGTH: usize;
 
     #[doc(hidden)]
-    type DigestOutputSize: digest::generic_array::ArrayLength<u8> + 'static;
+    type Digest010OutputSize: digest_010::generic_array::ArrayLength<u8> + 'static;
+    #[doc(hidden)]
+    type Digest011OutputSize: digest_011::array::ArraySize;
 }
 
-/// Note: digest has a blanket trait implementation for [digest::Digest] for any
+/// Note: digest has a blanket trait implementation for Digest for any
 /// element that implements FixedOutput + Default + Update + HashMarker
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::HashMarker for ShaDigest<'d, A, S> {}
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_010::HashMarker for ShaDigest<'d, A, S> {}
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_011::HashMarker for ShaDigest<'d, A, S> {}
 
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::OutputSizeUser for ShaDigest<'d, A, S> {
-    type OutputSize = A::DigestOutputSize;
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_010::OutputSizeUser
+    for ShaDigest<'d, A, S>
+{
+    type OutputSize = A::Digest010OutputSize;
+}
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_011::OutputSizeUser
+    for ShaDigest<'d, A, S>
+{
+    type OutputSize = A::Digest011OutputSize;
 }
 
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_010::Update for ShaDigest<'d, A, S> {
     fn update(&mut self, mut remaining: &[u8]) {
         while !remaining.is_empty() {
             remaining = nb::block!(Self::update(self, remaining)).unwrap();
@@ -572,8 +583,22 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::Update for ShaDigest<'d
     }
 }
 
-impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest::FixedOutput for ShaDigest<'d, A, S> {
-    fn finalize_into(mut self, out: &mut digest::Output<Self>) {
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_011::Update for ShaDigest<'d, A, S> {
+    fn update(&mut self, mut remaining: &[u8]) {
+        while !remaining.is_empty() {
+            remaining = nb::block!(Self::update(self, remaining)).unwrap();
+        }
+    }
+}
+
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_010::FixedOutput for ShaDigest<'d, A, S> {
+    fn finalize_into(mut self, out: &mut digest_010::Output<Self>) {
+        nb::block!(self.finish(out)).unwrap();
+    }
+}
+
+impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_011::FixedOutput for ShaDigest<'d, A, S> {
+    fn finalize_into(mut self, out: &mut digest_011::Output<Self>) {
         nb::block!(self.finish(out)).unwrap();
     }
 }
@@ -751,7 +776,8 @@ for_each_sha_algorithm! {
             const CHUNK_LENGTH: usize = Self::ALGORITHM_KIND.chunk_length();
             const DIGEST_LENGTH: usize = Self::ALGORITHM_KIND.digest_length();
 
-            type DigestOutputSize = paste::paste!(digest::consts::[< U $digest_len >]);
+            type Digest010OutputSize = paste::paste!(digest_010::consts::[< U $digest_len >]);
+            type Digest011OutputSize = paste::paste!(digest_011::consts::[< U $digest_len >]);
         }
     };
 }
@@ -1421,26 +1447,51 @@ macro_rules! impl_worker_context {
         }
 
         // Implementing these implies Digest, too
-        impl digest::HashMarker for $name {}
+        impl digest_010::HashMarker for $name {}
+        impl digest_011::HashMarker for $name {}
 
-        impl digest::OutputSizeUser for $name {
-            type OutputSize = paste::paste!(digest::consts::[< U $digest_len >]);
+        impl digest_010::OutputSizeUser for $name {
+            type OutputSize = paste::paste!(digest_010::consts::[< U $digest_len >]);
         }
 
-        impl digest::Update for $name {
+        impl digest_011::OutputSizeUser for $name {
+            type OutputSize = paste::paste!(digest_011::consts::[< U $digest_len >]);
+        }
+
+        impl digest_010::Update for $name {
             fn update(&mut self, data: &[u8]) {
                 Self::update(self, data).wait_blocking();
             }
         }
 
-        impl digest::FixedOutput for $name {
-            fn finalize_into(mut self, out: &mut digest::Output<Self>) {
+        impl digest_011::Update for $name {
+            fn update(&mut self, data: &[u8]) {
+                Self::update(self, data).wait_blocking();
+            }
+        }
+
+        impl digest_010::FixedOutput for $name {
+            fn finalize_into(mut self, out: &mut digest_010::Output<Self>) {
                 Self::finalize(&mut self, out.as_mut()).wait_blocking();
             }
         }
 
-        impl digest::core_api::BlockSizeUser for $name {
-            type BlockSize = paste::paste!(digest::consts::[< U $block_size >]);
+        impl digest_011::FixedOutput for $name {
+            fn finalize_into(mut self, out: &mut digest_011::Output<Self>) {
+                Self::finalize(&mut self, out.as_mut()).wait_blocking();
+            }
+        }
+
+        impl digest_010::core_api::BlockSizeUser for $name {
+            type BlockSize = paste::paste!(digest_010::consts::[< U $block_size >]);
+
+            fn block_size() -> usize {
+                $block_size
+            }
+        }
+
+        impl digest_011::block_api::BlockSizeUser for $name {
+            type BlockSize = paste::paste!(digest_011::consts::[< U $block_size >]);
 
             fn block_size() -> usize {
                 $block_size

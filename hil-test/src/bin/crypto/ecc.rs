@@ -1,8 +1,8 @@
 use core::ops::Mul;
 
 use crypto_bigint::{
-    Encoding,
-    modular::runtime_mod::{DynResidue, DynResidueParams},
+    Odd,
+    modular::{FixedMontyForm, FixedMontyParams},
 };
 use elliptic_curve::{
     Curve,
@@ -297,14 +297,14 @@ fn affine_to_jacobian(
             match curve {
                 $(
                     EllipticCurve::$name => {
-                        let modulus = DynResidueParams::new(&< uint!($name) >::from_be_slice(prime_field));
-                        let z = DynResidue::new(&< uint!($name) >::from_be_slice(k), modulus);
+                        let modulus = FixedMontyParams::new(Odd::new(< uint!($name) >::from_be_slice(prime_field)).unwrap());
+                        let z = FixedMontyForm::new(&< uint!($name) >::from_be_slice(k), &modulus);
 
-                        let x_affine = DynResidue::new(&< uint!($name) >::from_be_slice(sw_x), modulus);
+                        let x_affine = FixedMontyForm::new(&< uint!($name) >::from_be_slice(sw_x), &modulus);
                         let x_jacobian = x_affine * z * z;
                         sw_x.copy_from_slice(x_jacobian.retrieve().to_be_bytes().as_ref());
 
-                        let y_affine = DynResidue::new(&< uint!($name) >::from_be_slice(sw_y), modulus);
+                        let y_affine = FixedMontyForm::new(&< uint!($name) >::from_be_slice(sw_y), &modulus);
                         let y_jacobian = y_affine * z * z * z;
                         sw_y.copy_from_slice(y_jacobian.retrieve().to_be_bytes().as_ref());
                     },
@@ -326,12 +326,12 @@ fn finite_field_division(
             match curve {
                 $(
                     EllipticCurve::$name => {
-                        let modulus = DynResidueParams::new(&< uint!($name) >::from_be_slice(prime_field));
-                        let y_res = DynResidue::new(&< uint!($name) >::from_be_slice(sw_y), modulus);
-                        let k_res = DynResidue::new(&< uint!($name) >::from_be_slice(sw_k), modulus);
+                        let modulus = FixedMontyParams::new(Odd::new(< uint!($name) >::from_be_slice(prime_field)).unwrap());
+                        let y_res = FixedMontyForm::new(&< uint!($name) >::from_be_slice(sw_y), &modulus);
+                        let k_res = FixedMontyForm::new(&< uint!($name) >::from_be_slice(sw_k), &modulus);
                         sw_y.copy_from_slice(
                             y_res
-                                .mul(&(k_res.invert().0))
+                                .mul(k_res.invert().unwrap())
                                 .retrieve()
                                 .to_be_bytes()
                                 .as_ref(),
