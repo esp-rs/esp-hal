@@ -24,7 +24,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     gpio::{Flex, OutputConfig},
-    interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
 };
 
@@ -49,9 +48,8 @@ async fn main(spawner: Spawner) {
     enc_b.set_output_enable(true);
     enc_b.set_input_enable(true);
 
-    let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
     let timg0 = TimerGroup::new(p.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
     spawner.spawn(toggle(enc_a_clone, enc_b_clone, &SIGNAL).unwrap());
     spawner.spawn(wait(enc_a, enc_b, &SIGNAL).unwrap());

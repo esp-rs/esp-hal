@@ -17,7 +17,6 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     handler,
-    interrupt::software::SoftwareInterruptControl,
     time::Duration,
     timer::{OneShotTimer, systimer::SystemTimer},
 };
@@ -88,9 +87,8 @@ async fn main(spawner: Spawner) {
 
     Hooks::init();
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    esp_rtos::start(systimer.alarm0, sw_int.software_interrupt0);
+    esp_rtos::start(systimer.alarm0, peripherals.FROM_CPU_INTR0);
     println!("Embassy initialized!");
 
     spawner.spawn(TASK1.spawn(|| Task1 {}).unwrap());

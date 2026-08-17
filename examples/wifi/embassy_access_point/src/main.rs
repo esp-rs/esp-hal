@@ -28,13 +28,7 @@ use embassy_net::{
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
-    ram,
-    rng::Rng,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::wifi::{Config, ControllerConfig, Interface, WifiController, ap::AccessPointConfig};
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -61,8 +55,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let access_point_config =
         Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));

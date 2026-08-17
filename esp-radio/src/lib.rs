@@ -33,7 +33,7 @@
 //!
 //! ```rust, no_run
 #![doc = esp_hal::before_snippet!()]
-//! use esp_hal::interrupt::software::SoftwareInterruptControl;
+//! use esp_hal::interrupt::software::SoftwareInterrupt;
 //! use esp_hal::ram;
 //! use esp_hal::timer::timg::TimerGroup;
 //!
@@ -41,11 +41,10 @@
 //! esp_alloc::heap_allocator!(size: 36 * 1024);
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! let sw_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //!
 //! // THIS IS IMPORTANT FOR WIFI AND BLE: You MUST start the scheduler
 //! // before initializing the radio!
-//! esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
+//! esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 #![cfg_attr(
     wifi_driver_supported,
     doc = r#"

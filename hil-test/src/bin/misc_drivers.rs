@@ -528,7 +528,7 @@ mod twai {
         Blocking,
         DriverMode,
         interrupt,
-        interrupt::{Priority, software::SoftwareInterruptControl},
+        interrupt::Priority,
         peripherals::Interrupt::TWAI0,
         system::Cpu,
         timer::timg::TimerGroup,
@@ -640,11 +640,9 @@ mod twai {
                 TwaiMode::SelfTest,
             );
 
-            let _sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
             let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-            esp_rtos::start(timg0.timer0, _sw_int.software_interrupt0);
+            esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
             let twai = config.into_async().start();
 
@@ -712,9 +710,8 @@ mod twai {
         async fn test_write_into_the_void() {
             let peripherals = esp_hal::init(esp_hal::Config::default());
 
-            let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+            esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
             // The bus is permanently recessive, so every transmission attempt
             // fails immediately (a transmitted dominant bit reads back

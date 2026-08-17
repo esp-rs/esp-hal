@@ -17,11 +17,7 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
 use esp_println::println;
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
@@ -38,8 +34,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     // The sniffer borrows the controller, so we only need the controller here —
     // no station/AP `Interface` is required for promiscuous capture.

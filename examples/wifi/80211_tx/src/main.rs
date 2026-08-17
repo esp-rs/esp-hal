@@ -11,14 +11,7 @@ use core::marker::PhantomData;
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    delay::Delay,
-    interrupt::software::SoftwareInterruptControl,
-    ram,
-    time::Duration,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, delay::Delay, ram, time::Duration, timer::timg::TimerGroup};
 use esp_println::println;
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
@@ -47,8 +40,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     // The sniffer borrows the controller, so we only need the controller here —
     // no station/AP `Interface` is required for raw 802.11 transmit.

@@ -63,17 +63,16 @@ mod tests {
     fn fpu_is_enabled_on_core1_with_preempt(p: Peripherals) {
         use core::sync::atomic::{AtomicBool, Ordering};
 
-        use esp_hal::{interrupt::software::SoftwareInterruptControl, timer::timg::TimerGroup};
+        use esp_hal::timer::timg::TimerGroup;
 
         static DONE: AtomicBool = AtomicBool::new(false);
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         esp_rtos::start_second_core::<8192>(
             p.CPU_CTRL,
-            sw_ints.software_interrupt1,
+            p.FROM_CPU_INTR1,
             #[allow(static_mut_refs)]
             unsafe {
                 &mut crate::APP_CORE_STACK

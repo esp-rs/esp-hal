@@ -34,7 +34,6 @@ use esp_backtrace as _;
 use esp_hal::sdmmc::DelayPhase;
 use esp_hal::{
     gpio::{Input, InputConfig, Pull},
-    interrupt::software::SoftwareInterruptControl,
     sdmmc::{Config, SdHostController, SlotConfig},
     timer::timg::TimerGroup,
 };
@@ -72,9 +71,8 @@ const fn pattern_byte(i: usize) -> u8 {
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     esp_println::logger::init_logger(log::LevelFilter::Info);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let controller = SdHostController::new(peripherals.SDHOST, Config::default()).unwrap();
     let slot_config = SlotConfig::default();

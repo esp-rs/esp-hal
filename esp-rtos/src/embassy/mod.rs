@@ -4,7 +4,12 @@ use core::{cell::UnsafeCell, mem::MaybeUninit, ptr::NonNull, sync::atomic::Order
 
 use embassy_executor::{SendSpawner, Spawner, raw};
 use esp_hal::{
-    interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
+    interrupt::{
+        InterruptHandler,
+        Priority,
+        software::{Instance, SoftwareInterrupt},
+    },
+    peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, FROM_CPU_INTR2, FROM_CPU_INTR3},
     system::Cpu,
     time::{Duration, Instant},
 };
@@ -144,10 +149,10 @@ impl ThreadFlag {
 #[ram]
 fn __pender(context: *mut ()) {
     match context as usize {
-        0 => unsafe { SoftwareInterrupt::<0>::steal().raise() },
-        1 => unsafe { SoftwareInterrupt::<1>::steal().raise() },
-        2 => unsafe { SoftwareInterrupt::<2>::steal().raise() },
-        3 => unsafe { SoftwareInterrupt::<3>::steal().raise() },
+        0 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise(),
+        1 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).raise(),
+        2 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).raise(),
+        3 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR3::steal() }).raise(),
         _ => {
             // This forces us to keep the embassy timer queue separate, otherwise we'd need to
             // reentrantly lock SCHEDULER.
@@ -346,8 +351,13 @@ impl InterruptExecutorStorage {
 }
 
 extern "C" fn handle_interrupt<const NUM: u8>() {
-    let swi = unsafe { SoftwareInterrupt::<NUM>::steal() };
-    swi.reset();
+    match NUM {
+        0 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
+        1 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
+        2 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).reset(),
+        3 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR3::steal() }).reset(),
+        _ => unreachable!(),
+    };
 
     unsafe {
         // SAFETY: The executor is always initialized before the interrupt is enabled.
@@ -360,10 +370,10 @@ impl<const SWI: u8> InterruptExecutor<SWI> {
     /// Create a new `InterruptExecutor`.
     /// This takes the software interrupt to be used internally.
     #[inline]
-    pub const fn new(interrupt: SoftwareInterrupt<'static, SWI>) -> Self {
+    pub const fn new(interrupt: impl Instance<SWI> + 'static) -> Self {
         Self {
             executor: UnsafeCell::new(MaybeUninit::uninit()),
-            interrupt,
+            interrupt: SoftwareInterrupt::new(interrupt),
         }
     }
 

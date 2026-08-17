@@ -6,16 +6,16 @@ mod tests {
     use defmt::info;
     use esp_hal::{
         clock::CpuClock,
-        interrupt::{
-            Priority,
-            software::{SoftwareInterrupt, SoftwareInterruptControl},
-        },
-        peripherals::TIMG0,
+        interrupt::{Priority, software::SoftwareInterrupt},
+        peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR2, TIMG0},
         time::{Duration, Instant},
         timer::timg::TimerGroup,
     };
     #[cfg(multi_core)]
-    use esp_hal::{peripherals::CPU_CTRL, system::Cpu};
+    use esp_hal::{
+        peripherals::{CPU_CTRL, FROM_CPU_INTR1},
+        system::Cpu,
+    };
     use esp_radio_rtos_driver::{
         self as preempt,
         queue::QueueHandle,
@@ -27,8 +27,8 @@ mod tests {
 
     struct Context {
         #[cfg(multi_core)]
-        sw_int1: SoftwareInterrupt<'static, 1>,
-        sw_int2: SoftwareInterrupt<'static, 2>,
+        sw_int1: FROM_CPU_INTR1<'static>,
+        sw_int2: FROM_CPU_INTR2<'static>,
         #[cfg(multi_core)]
         cpu_cntl: CPU_CTRL<'static>,
     }
@@ -36,8 +36,9 @@ mod tests {
     #[allow(unused)] // compile test
     fn baremetal_preempt_can_be_initialized_with_any_timer(
         timer: esp_hal::timer::AnyTimer<'static>,
+        int: FROM_CPU_INTR0<'static>,
     ) {
-        esp_rtos::start(timer, unsafe { SoftwareInterrupt::<'static, 0>::steal() });
+        esp_rtos::start(timer, int);
     }
 
     #[init]
@@ -47,14 +48,13 @@ mod tests {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
 
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         Context {
             #[cfg(multi_core)]
-            sw_int1: sw_ints.software_interrupt1,
-            sw_int2: sw_ints.software_interrupt2,
+            sw_int1: p.FROM_CPU_INTR1,
+            sw_int2: p.FROM_CPU_INTR2,
             #[cfg(multi_core)]
             cpu_cntl: p.CPU_CTRL,
         }
@@ -66,7 +66,7 @@ mod tests {
     #[should_panic]
     fn panics_in_interrupt_context() {
         #[embassy_executor::task]
-        async fn try_init(timer: TIMG0<'static>, sw_int0: SoftwareInterrupt<'static, 0>) {
+        async fn try_init(timer: TIMG0<'static>, sw_int0: FROM_CPU_INTR0<'static>) {
             let timg0 = TimerGroup::new(timer);
             esp_rtos::start(timg0.timer0, sw_int0);
         }
@@ -76,15 +76,13 @@ mod tests {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
 
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-
         static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-        let executor_core0 = InterruptExecutor::new(sw_ints.software_interrupt1);
+        let executor_core0 = InterruptExecutor::new(p.FROM_CPU_INTR1);
         let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
         let spawner = executor_core0.start(Priority::Priority1);
 
-        spawner.spawn(try_init(p.TIMG0, sw_ints.software_interrupt0).unwrap());
+        spawner.spawn(try_init(p.TIMG0, p.FROM_CPU_INTR0).unwrap());
     }
 
     #[test]
@@ -323,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn interrupt_handler_is_not_preempted_by_context_switch(mut ctx: Context) {
+    fn interrupt_handler_is_not_preempted_by_context_switch(ctx: Context) {
         // In this test, we start a thread, and make it wait for a signal. We then trigger a
         // low-priority interrupt, which sets the signal and exits the test. The test must not time
         // out.
@@ -354,14 +352,15 @@ mod tests {
 
         #[esp_hal::handler]
         fn sw_handler() {
-            unsafe { SoftwareInterrupt::<'static, 2>::steal() }.reset();
+            SoftwareInterrupt::<'static, 2>::new(unsafe { FROM_CPU_INTR2::steal() }).reset();
             let sem = unsafe { &*SEM.load(Ordering::Relaxed) };
             sem.give();
             embedded_test::export::check_outcome(());
         }
 
-        ctx.sw_int2.set_interrupt_handler(sw_handler);
-        ctx.sw_int2.raise();
+        let mut sw_int2 = SoftwareInterrupt::new(ctx.sw_int2);
+        sw_int2.set_interrupt_handler(sw_handler);
+        sw_int2.raise();
 
         loop {}
     }
@@ -879,8 +878,7 @@ mod second_core_only {
 
     use esp_hal::{
         clock::CpuClock,
-        interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
-        peripherals::CPU_CTRL,
+        peripherals::{CPU_CTRL, FROM_CPU_INTR1},
         system::Cpu,
         time::Duration,
         timer::timg::{Timer, TimerGroup},
@@ -891,7 +889,7 @@ mod second_core_only {
 
     struct Context {
         cpu_control: CPU_CTRL<'static>,
-        sw_int1: SoftwareInterrupt<'static, 1>,
+        sw_int1: FROM_CPU_INTR1<'static>,
         timer: Timer<'static>,
     }
 
@@ -902,12 +900,11 @@ mod second_core_only {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
 
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
 
         Context {
             cpu_control: p.CPU_CTRL,
-            sw_int1: sw_ints.software_interrupt1,
+            sw_int1: p.FROM_CPU_INTR1,
             timer: timg0.timer0,
         }
     }

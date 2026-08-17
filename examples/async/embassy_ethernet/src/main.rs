@@ -53,7 +53,6 @@ use esp_hal::{
         phy::{MdioBus, Phy, PhyError, generic::GenericPhy},
     },
     gpio::{Level, Output, OutputConfig},
-    interrupt::software::SoftwareInterruptControl,
     rng::Rng,
     timer::timg::TimerGroup,
 };
@@ -143,8 +142,7 @@ async fn main(spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     // ── PHY reset ─────────────────────────────────────────────────────────────
     // Assert reset for at least 100 ms, then release and wait ≥ 300 ms for the PHY to stabilise.

@@ -24,7 +24,6 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Event, Input, InputConfig, Pull},
-    interrupt::software::SoftwareInterruptControl,
     peripherals,
     rtc_cntl::WakeLock,
     system::wakeup_cause,
@@ -108,15 +107,10 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let p = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
     let timg0 = TimerGroup::new(p.TIMG0);
 
     let sleep = esp_rtos::sleep::configure(p.LPWR);
-    esp_rtos::start_with_idle_hook(
-        timg0.timer0,
-        sw_int.software_interrupt0,
-        sleep.light_sleep_hook,
-    );
+    esp_rtos::start_with_idle_hook(timg0.timer0, p.FROM_CPU_INTR0, sleep.light_sleep_hook);
 
     let boot_btn = cfg_select! {
         any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => p.GPIO0,
@@ -139,17 +133,12 @@ async fn main(spawner: Spawner) {
         static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
         let app_core_stack = APP_CORE_STACK.init(Stack::new());
 
-        esp_rtos::start_second_core(
-            p.CPU_CTRL,
-            sw_int.software_interrupt1,
-            app_core_stack,
-            move || {
-                static EXECUTOR: StaticCell<Executor> = StaticCell::new();
-                let executor = EXECUTOR.init(Executor::new());
-                executor.run(|spawner| {
-                    spawner.spawn(periodic_core2().unwrap());
-                });
-            },
-        );
+        esp_rtos::start_second_core(p.CPU_CTRL, p.FROM_CPU_INTR1, app_core_stack, move || {
+            static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+            let executor = EXECUTOR.init(Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(periodic_core2().unwrap());
+            });
+        });
     }
 }

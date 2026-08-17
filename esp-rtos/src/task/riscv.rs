@@ -1,8 +1,14 @@
 #[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 
+#[cfg(multi_core)]
+use esp_hal::peripherals::FROM_CPU_INTR1;
 use esp_hal::{
-    interrupt::{self, software::SoftwareInterrupt},
+    interrupt::{
+        self,
+        software::{Instance, SoftwareInterrupt},
+    },
+    peripherals::FROM_CPU_INTR0,
     system::Cpu,
 };
 
@@ -150,7 +156,7 @@ pub fn task_switch(_old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
     }
 }
 
-pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: SoftwareInterrupt<'static, IRQ>) {
+pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: impl Instance<IRQ> + 'static) {
     // Register a direct-bound interrupt handler, so that we don't have to worry about other
     // interrupt handlers interfering.
 
@@ -171,7 +177,7 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: SoftwareInterrupt<'static,
 }
 
 #[cfg(multi_core)]
-pub(crate) fn setup_smp<const IRQ: u8>(irq: SoftwareInterrupt<'static, IRQ>) {
+pub(crate) fn setup_smp<const IRQ: u8>(irq: impl Instance<IRQ> + 'static) {
     setup_multitasking(irq);
 }
 
@@ -367,9 +373,9 @@ unsafe extern "C" fn swint_handler_trampoline() {
 #[esp_hal::ram]
 extern "C" fn swint_handler() {
     match Cpu::current() {
-        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.reset(),
+        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
         #[cfg(multi_core)]
-        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.reset(),
+        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
     }
 
     SCHEDULER.with(|scheduler| scheduler.switch_task());
@@ -384,8 +390,8 @@ pub(crate) fn yield_task() {
     }
 
     match Cpu::current() {
-        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
+        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise(),
         #[cfg(multi_core)]
-        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
+        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).raise(),
     }
 }

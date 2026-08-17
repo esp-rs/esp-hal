@@ -3,11 +3,8 @@ mod tests {
     use defmt::info;
     use esp_hal::{
         handler,
-        interrupt::{
-            Priority,
-            software::{SoftwareInterrupt, SoftwareInterruptControl},
-        },
-        peripherals::Peripherals,
+        interrupt::{Priority, software::SoftwareInterrupt},
+        peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, FROM_CPU_INTR2, Peripherals},
     };
     use portable_atomic::{AtomicU32, Ordering};
 
@@ -23,14 +20,14 @@ mod tests {
         #[handler(priority = Priority::min())]
         fn handler_low_prio() {
             info!("Low runs");
-            unsafe { SoftwareInterrupt::<0>::steal().reset() };
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset();
 
             // Fire the checker interrupt. It must run after this one and the higher prio one are
             // done.
-            unsafe { SoftwareInterrupt::<2>::steal().raise() };
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).raise();
 
             // Trigger high priority interrupt before incrementing counter
-            unsafe { SoftwareInterrupt::<1>::steal().raise() };
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).raise();
             // Se that high priority interrupted us
             hil_test::assert_eq!(COUNTER.load(Ordering::Relaxed), 1);
 
@@ -41,7 +38,7 @@ mod tests {
         #[handler(priority = Priority::min())]
         fn handler_low_prio_checker() {
             info!("Checker runs");
-            unsafe { SoftwareInterrupt::<2>::steal().reset() };
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).reset();
 
             // Se that we didn't interrupt anything
             hil_test::assert_eq!(COUNTER.load(Ordering::Relaxed), 2);
@@ -53,7 +50,7 @@ mod tests {
         #[handler(priority = Priority::max())]
         fn handler_high_prio() {
             info!("High runs");
-            unsafe { SoftwareInterrupt::<1>::steal().reset() };
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset();
 
             // See if we interrupted the low priority handler as we should
             assert_eq!(COUNTER.load(Ordering::Relaxed), 0);
@@ -61,19 +58,15 @@ mod tests {
             info!("High returns");
         }
 
-        let mut sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
+        let mut interrupt0 = SoftwareInterrupt::new(p.FROM_CPU_INTR0);
+        let mut interrupt1 = SoftwareInterrupt::new(p.FROM_CPU_INTR1);
+        let mut interrupt2 = SoftwareInterrupt::new(p.FROM_CPU_INTR2);
 
-        sw_ints
-            .software_interrupt0
-            .set_interrupt_handler(handler_low_prio);
-        sw_ints
-            .software_interrupt1
-            .set_interrupt_handler(handler_high_prio);
-        sw_ints
-            .software_interrupt2
-            .set_interrupt_handler(handler_low_prio_checker);
+        interrupt0.set_interrupt_handler(handler_low_prio);
+        interrupt1.set_interrupt_handler(handler_high_prio);
+        interrupt2.set_interrupt_handler(handler_low_prio_checker);
 
-        sw_ints.software_interrupt0.raise();
+        interrupt0.raise();
         hil_test::assert_eq!(COUNTER.load(Ordering::Relaxed), 3);
     }
 }

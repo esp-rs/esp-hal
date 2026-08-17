@@ -12,7 +12,6 @@ use embassy_executor::Spawner;
 use esp_alloc;
 use esp_backtrace as _;
 use esp_hal::{
-    interrupt::software::SoftwareInterruptControl,
     rtc_cntl::sleep::{LowPower, RtcSleepConfig},
     time::{Duration, Instant},
     timer::timg::TimerGroup,
@@ -32,9 +31,8 @@ async fn main(_spawner: Spawner) {
     esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: 64 * 1024);
 
     // Preempt scheduler (WiFi)
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let delay = esp_hal::delay::Delay::new();
     delay.delay_millis(100);

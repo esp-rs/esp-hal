@@ -19,7 +19,7 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    interrupt::{Priority, software::SoftwareInterruptControl},
+    interrupt::Priority,
     main,
     system::{Cpu, CpuControl, Stack},
     timer::timg::TimerGroup,
@@ -73,9 +73,8 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
@@ -85,7 +84,7 @@ fn main() -> ! {
     let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-    let executor_core1 = InterruptExecutor::new(sw_int.software_interrupt1);
+    let executor_core1 = InterruptExecutor::new(peripherals.FROM_CPU_INTR1);
     let executor_core1 = EXECUTOR_CORE_1.init(executor_core1);
 
     static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
@@ -103,7 +102,7 @@ fn main() -> ! {
         .unwrap();
 
     static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<2>> = StaticCell::new();
-    let executor_core0 = InterruptExecutor::new(sw_int.software_interrupt2);
+    let executor_core0 = InterruptExecutor::new(peripherals.FROM_CPU_INTR2);
     let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
     let spawner = executor_core0.start(Priority::Priority1);

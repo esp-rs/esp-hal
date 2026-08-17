@@ -21,7 +21,6 @@ use esp_backtrace as _;
 use esp_hal::{
     dma_rx_stream_buffer,
     i2s::master::{Channels, DataFormat, I2s, TdmConfig},
-    interrupt::software::SoftwareInterruptControl,
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -34,9 +33,8 @@ async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let dma_channel = cfg_select! {
         i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,

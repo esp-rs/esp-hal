@@ -93,8 +93,11 @@ peripherals = [
     { name = "DAC2", virtual = true },
     { name = "FLASH", virtual = true },
     { name = "PSRAM", virtual = true },
-    { name = "SW_INTERRUPT", virtual = true },
     { name = "TOUCH", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
 ]
 
 [device.soc.clocks]

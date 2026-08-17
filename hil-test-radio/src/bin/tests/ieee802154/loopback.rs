@@ -1,12 +1,7 @@
 #[embedded_test::tests(default_timeout = 30, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
     use embassy_time::{Duration, Timer};
-    use esp_hal::{
-        clock::CpuClock,
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::Peripherals,
-        timer::timg::TimerGroup,
-    };
+    use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
     use esp_radio::ieee802154::{Config, Frame, Ieee802154};
     use hil_test::ieee802154::{CHANNEL, DUT_ADDRESS, PAN_ID, PAYLOAD, SUPPORT_ADDRESS};
     use ieee802154::mac::{
@@ -62,8 +57,7 @@ mod tests {
 
     fn start_radio(p: Peripherals) -> Ieee802154<'static> {
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let mut ieee802154 = Ieee802154::new(p.IEEE802154);
         ieee802154.set_config(dut_config());
