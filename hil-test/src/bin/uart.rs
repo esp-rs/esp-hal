@@ -29,10 +29,11 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let config = cfg_select! {
-            esp32s31 => esp_hal::Config::default(),
-            _ => esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
-        };
+        let config =
+            cfg_select! {
+                esp32s31 => esp_hal::Config::default(),
+                _ => esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+            };
         let peripherals = esp_hal::init(config);
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
@@ -160,12 +161,13 @@ mod tests {
         // working as expected. We will also using different clock sources
         // while we're at it.
 
-        let fastest_clock_source = cfg_select! {
-            esp32c2 => ClockSource::PllF40m,
-            any(esp32c5, esp32c6, esp32c61, esp32p4, esp32s31) => ClockSource::PllF80m,
-            esp32h2 => ClockSource::PllF48m,
-            _ => ClockSource::Apb,
-        };
+        let fastest_clock_source =
+            cfg_select! {
+                esp32c2 => ClockSource::PllF40m,
+                any(esp32c5, esp32c6, esp32c61, esp32p4, esp32s31) => ClockSource::PllF80m,
+                esp32h2 => ClockSource::PllF48m,
+                _ => ClockSource::Apb,
+            };
 
         let configs = [
             #[cfg(not(soc_has_clock_node_ref_tick))]
@@ -1425,6 +1427,8 @@ mod new_tests {
         }
 
         // Run the test for each UART instance
+        // https://github.com/esp-rs/esp-hal/issues/6138
+        let uart_count = if cfg!(esp32) { 2 } else { UART_COUNT };
         for (tx_num, rx_num) in (0..UART_COUNT).map(|i| (i, (i + 1) % UART_COUNT)) {
             inner(
                 tx_num,
