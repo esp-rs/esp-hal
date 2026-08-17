@@ -758,8 +758,15 @@ impl core::fmt::Display for ConfigError {
 }
 
 impl<'d> UartTx<'d, Blocking> {
-    #[procmacros::doc_replace]
+    #[procmacros::doc_replace(
+        "note" => {
+            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
+            _ => ""
+        }
+    )]
     /// Create a new UART TX instance in [`Blocking`] mode.
+    ///
+    /// __note__
     ///
     /// ## Errors
     ///
@@ -1092,8 +1099,15 @@ where
 }
 
 impl<'d> UartRx<'d, Blocking> {
-    #[procmacros::doc_replace]
+    #[procmacros::doc_replace(
+        "note" => {
+            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
+            _ => ""
+        }
+    )]
     /// Create a new UART RX instance in [`Blocking`] mode.
+    ///
+    /// __note__
     ///
     /// ## Errors
     ///
@@ -1528,8 +1542,15 @@ where
 }
 
 impl<'d> Uart<'d, Blocking> {
-    #[procmacros::doc_replace]
+    #[procmacros::doc_replace(
+        "note" => {
+            cfg(esp32) => "**esp32-specific ⚠️**: `UART2` is not recommended for use.",
+            _ => ""
+        }
+    )]
     /// Create a new UART instance in [`Blocking`] mode.
+    ///
+    /// __note__
     ///
     /// ## Errors
     ///
@@ -2328,10 +2349,7 @@ where
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
-        // Reset Tx/Rx FIFOs
-        self.rx.uart.info().rxfifo_reset();
-        self.rx.uart.info().txfifo_reset();
-
+        // Applying config also resets Tx/Rx FIFOs
         self.apply_config(&config)?;
 
         // Don't wait after transmissions by default,

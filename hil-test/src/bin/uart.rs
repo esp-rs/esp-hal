@@ -1390,6 +1390,57 @@ mod new_tests {
     }
 
     #[test]
+    #[timeout(10)]
+    fn creating_uart_clears_fifo(mut ctx: Context) {
+        fn inner(
+            tx_instance: usize,
+            rx: AnyUart<'_>,
+            rx_pin: AnyPin<'_>,
+            mut tx: AnyUart<'_>,
+            mut tx_pin: AnyPin<'_>,
+        ) {
+            info!("Testing UART{}", tx_instance);
+
+            let config = uart::Config::default().with_baudrate(115200);
+            let mut rx = Uart::new(rx, config).unwrap().with_rx(rx_pin);
+
+            for i in 0..50 {
+                let mut uart = Uart::new(tx.reborrow(), config)
+                    .unwrap()
+                    .with_tx(tx_pin.reborrow());
+                uart.write(b"abc").unwrap();
+                uart.flush().unwrap();
+
+                let mut buf = [0u8; 4];
+                let read = rx.read(&mut buf).unwrap();
+
+                assert_eq!(
+                    &buf[..read],
+                    b"abc",
+                    "UART{}: failed in iteration #{}",
+                    tx_instance,
+                    i
+                );
+            }
+
+            info!("UART{} test passed", tx_instance);
+        }
+
+        // Run the test for each UART instance
+        // https://github.com/esp-rs/esp-hal/issues/6138
+        let uart_count = if cfg!(esp32) { 2 } else { UART_COUNT };
+        for (tx_num, rx_num) in (0..UART_COUNT).map(|i| (i, (i + 1) % UART_COUNT)) {
+            inner(
+                tx_num,
+                unsafe { ctx.uart[rx_num].clone_unchecked() },
+                ctx.rx.reborrow(),
+                unsafe { ctx.uart[tx_num].clone_unchecked() },
+                ctx.tx.reborrow(),
+            );
+        }
+    }
+
+    #[test]
     async fn async_send_receive(mut ctx: Context) {
         async fn inner(instance: usize, mut driver: Uart<'_, Async>) {
             info!("Testing UART{}", instance);

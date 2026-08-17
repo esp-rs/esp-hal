@@ -256,7 +256,7 @@ timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
-support_status = "supported"
+support_status = { status = "supported", issue = 6138 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },

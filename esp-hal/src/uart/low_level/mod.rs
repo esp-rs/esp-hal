@@ -944,16 +944,24 @@ pub(super) struct UartClockGuard<'t> {
 
 impl<'t> UartClockGuard<'t> {
     pub(super) fn new(uart: AnyUart<'t>) -> Self {
+        let this = Self::new_inner(uart, false);
+        crate::rom::ets_delay_us(100);
+        this
+    }
+
+    pub(super) fn new_inner(uart: AnyUart<'t>, clone: bool) -> Self {
         ClockTree::with(|clocks| {
             let clock = uart.info().clock_instance;
 
-            // Apply default SCLK configuration
-            let sclk_config = ClockConfig::new(
-                Default::default(),
-                #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4, esp32s31))]
-                0,
-            );
-            clock.configure_function_clock(clocks, sclk_config);
+            // Apply default SCLK configuration when first instance is created.
+            if !clone {
+                let sclk_config = ClockConfig::new(
+                    Default::default(),
+                    #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4, esp32s31))]
+                    0,
+                );
+                clock.configure_function_clock(clocks, sclk_config);
+            }
             clock.request_function_clock(clocks);
             clock.request_baud_rate_generator(clocks);
             #[cfg(soc_has_clock_node_uart_mem_clock)]
@@ -966,7 +974,7 @@ impl<'t> UartClockGuard<'t> {
 
 impl Clone for UartClockGuard<'_> {
     fn clone(&self) -> Self {
-        Self::new(unsafe { self.uart.clone_unchecked() })
+        Self::new_inner(unsafe { self.uart.clone_unchecked() }, true)
     }
 }
 
