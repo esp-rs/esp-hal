@@ -29,11 +29,10 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        let config =
-            cfg_select! {
-                esp32s31 => esp_hal::Config::default(),
-                _ => esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
-            };
+        let config = cfg_select! {
+            esp32s31 => esp_hal::Config::default(),
+            _ => esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        };
         let peripherals = esp_hal::init(config);
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
@@ -161,13 +160,12 @@ mod tests {
         // working as expected. We will also using different clock sources
         // while we're at it.
 
-        let fastest_clock_source =
-            cfg_select! {
-                esp32c2 => ClockSource::PllF40m,
-                any(esp32c5, esp32c6, esp32c61, esp32p4, esp32s31) => ClockSource::PllF80m,
-                esp32h2 => ClockSource::PllF48m,
-                _ => ClockSource::Apb,
-            };
+        let fastest_clock_source = cfg_select! {
+            esp32c2 => ClockSource::PllF40m,
+            any(esp32c5, esp32c6, esp32c61, esp32p4, esp32s31) => ClockSource::PllF80m,
+            esp32h2 => ClockSource::PllF48m,
+            _ => ClockSource::Apb,
+        };
 
         let configs = [
             #[cfg(not(soc_has_clock_node_ref_tick))]
@@ -1386,6 +1384,55 @@ mod new_tests {
                 .with_tx(ctx.tx.reborrow())
                 .with_rx(ctx.rx.reborrow());
             inner(i, uart);
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    fn creating_uart_clears_fifo(mut ctx: Context) {
+        fn inner(
+            tx_instance: usize,
+            rx: AnyUart<'_>,
+            rx_pin: AnyPin<'_>,
+            mut tx: AnyUart<'_>,
+            mut tx_pin: AnyPin<'_>,
+        ) {
+            info!("Testing UART{}", tx_instance);
+
+            let config = uart::Config::default().with_baudrate(115200);
+            let mut rx = Uart::new(rx, config).unwrap().with_rx(rx_pin);
+
+            for i in 0..50 {
+                let mut uart = Uart::new(tx.reborrow(), config)
+                    .unwrap()
+                    .with_tx(tx_pin.reborrow());
+                uart.write(b"abc").unwrap();
+                uart.flush().unwrap();
+
+                let mut buf = [0u8; 4];
+                let read = rx.read(&mut buf).unwrap();
+
+                assert_eq!(
+                    &buf[..read],
+                    b"abc",
+                    "UART{}: failed in iteration #{}",
+                    tx_instance,
+                    i
+                );
+            }
+
+            info!("UART{} test passed", tx_instance);
+        }
+
+        // Run the test for each UART instance
+        for (tx_num, rx_num) in (0..UART_COUNT).map(|i| (i, (i + 1) % UART_COUNT)) {
+            inner(
+                tx_num,
+                unsafe { ctx.uart[rx_num].clone_unchecked() },
+                ctx.rx.reborrow(),
+                unsafe { ctx.uart[tx_num].clone_unchecked() },
+                ctx.tx.reborrow(),
+            );
         }
     }
 
