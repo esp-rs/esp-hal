@@ -9,6 +9,7 @@ mod tests {
     use embassy_time::{Duration, Timer};
     use esp_hal::{clock::CpuClock, peripherals::Peripherals, rng::Rng, timer::timg::TimerGroup};
     use esp_radio::wifi::{
+        AuthenticationMethodConfig,
         Config,
         ControllerConfig,
         Interface,
@@ -35,7 +36,7 @@ mod tests {
         Config::Station(
             StationConfig::default()
                 .with_ssid("AP")
-                .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
+                .with_authentication(AuthenticationMethodConfig::Open),
         )
     }
 

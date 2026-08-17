@@ -48,7 +48,7 @@
 //! range [8, 84]. Note that values above roughly 65 (~16dBm) have been reported to cause
 //! authentication failures on some hardware, so setting it to the maximum is not always better.
 
-use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
+use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, string::String, vec::Vec};
 use core::{
     fmt::{Debug, Write},
     marker::PhantomData,
@@ -814,6 +814,97 @@ impl From<&str> for Ssid {
 impl From<&[u8]> for Ssid {
     fn from(ssid: &[u8]) -> Self {
         Self::from_raw(ssid, ssid.len() as u8)
+    }
+}
+
+/// Authentication Configuration for a Wi-Fi network.
+#[derive(Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum AuthenticationMethodConfig {
+    /// Open authentication.
+    Open,
+
+    /// Wired Equivalent Privacy (WEP) authentication and password.
+    Wep(String),
+
+    /// Wi-Fi Protected Access (WPA) authentication and password.
+    Wpa(String),
+
+    /// Wi-Fi Protected Access 2 (WPA2) Personal authentication and password.
+    Wpa2Personal(String),
+
+    /// WPA/WPA2 Personal authentication and password (supports both).
+    WpaWpa2Personal(String),
+}
+
+impl AuthenticationMethodConfig {
+    fn validate(&self, require_non_empty_password: bool) -> Result<(), WifiError> {
+        match self {
+            AuthenticationMethodConfig::Open => Ok(()),
+            AuthenticationMethodConfig::Wep(password)
+            | AuthenticationMethodConfig::Wpa(password)
+            | AuthenticationMethodConfig::Wpa2Personal(password)
+            | AuthenticationMethodConfig::WpaWpa2Personal(password) => {
+                if require_non_empty_password && password.is_empty() {
+                    Err(WifiError::InvalidPassword)
+                } else if password.len() > 64 {
+                    Err(WifiError::InvalidArguments)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    fn auth_method(&self) -> AuthenticationMethod {
+        match self {
+            AuthenticationMethodConfig::Open => AuthenticationMethod::None,
+            AuthenticationMethodConfig::Wep(_) => AuthenticationMethod::Wep,
+            AuthenticationMethodConfig::Wpa(_) => AuthenticationMethod::Wpa,
+            AuthenticationMethodConfig::Wpa2Personal(_) => AuthenticationMethod::Wpa2Personal,
+            AuthenticationMethodConfig::WpaWpa2Personal(_) => AuthenticationMethod::WpaWpa2Personal,
+        }
+    }
+
+    fn password(&self) -> &str {
+        match self {
+            AuthenticationMethodConfig::Open => "",
+            AuthenticationMethodConfig::Wep(password)
+            | AuthenticationMethodConfig::Wpa(password)
+            | AuthenticationMethodConfig::Wpa2Personal(password)
+            | AuthenticationMethodConfig::WpaWpa2Personal(password) => password.as_str(),
+        }
+    }
+}
+
+impl core::fmt::Debug for AuthenticationMethodConfig {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Open => f.debug_tuple("Open").finish(),
+            Self::Wep(_) => f.debug_tuple("Wep").field(&"**REDACTED**").finish(),
+            Self::Wpa(_) => f.debug_tuple("Wpa").field(&"**REDACTED**").finish(),
+            Self::Wpa2Personal(_) => f
+                .debug_tuple("Wpa2Personal")
+                .field(&"**REDACTED**")
+                .finish(),
+            Self::WpaWpa2Personal(_) => f
+                .debug_tuple("WpaWpa2Personal")
+                .field(&"**REDACTED**")
+                .finish(),
+        }
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for AuthenticationMethodConfig {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        match self {
+            Self::Open => defmt::write!(fmt, "Open"),
+            Self::Wep(_) => defmt::write!(fmt, "Wep(**REDACTED**)"),
+            Self::Wpa(_) => defmt::write!(fmt, "Wpa(**REDACTED**)"),
+            Self::Wpa2Personal(_) => defmt::write!(fmt, "Wpa2Personal(**REDACTED**)"),
+            Self::WpaWpa2Personal(_) => defmt::write!(fmt, "WpaWpa2Personal(**REDACTED**)"),
+        }
     }
 }
 
@@ -2667,13 +2758,13 @@ impl WifiController<'_> {
     ///
     /// ```rust,no_run
     /// # {before_snippet}
-    /// # use esp_radio::wifi::{Config, sta::StationConfig};
+    /// # use esp_radio::wifi::{AuthenticationMethodConfig, Config, sta::StationConfig};
     /// # let mut controller =
     /// #    esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// let station_config = Config::Station(
     ///     StationConfig::default()
     ///         .with_ssid("SSID")
-    ///         .with_password("PASSWORD".into()),
+    ///         .with_authentication(AuthenticationMethodConfig::Wpa2Personal("PASSWORD".into())),
     /// );
     ///
     /// controller.set_config(&station_config)?;
@@ -3204,7 +3295,7 @@ ignored."
                 password: [0; 64],
                 ssid_len: 0,
                 channel: config.channel,
-                authmode: config.auth_method.to_raw(),
+                authmode: config.authentication.auth_method().to_raw(),
                 ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
                 // Clip max_connection in the same way as done internally in esp_wifi_set_config.
                 // Doing this here so that we can do easy comparisons below
@@ -3229,14 +3320,13 @@ ignored."
             },
         };
 
-        if config.auth_method == AuthenticationMethod::None && !config.password.is_empty() {
-            return Err(WifiError::InvalidArguments);
-        }
+        config.authentication.validate(true)?;
 
         unsafe {
             cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
             cfg.ap.ssid_len = config.ssid.len() as u8;
-            cfg.ap.password[0..(config.password.len())].copy_from_slice(config.password.as_bytes());
+            cfg.ap.password[0..(config.authentication.password().len())]
+                .copy_from_slice(config.authentication.password().as_bytes());
 
             // Compare the new ap config with the current. Only update if something is changing.
             // This avoids unnecessary connection issues.
@@ -3265,7 +3355,7 @@ ignored."
                 sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
                 threshold: wifi_scan_threshold_t {
                     rssi: -99,
-                    authmode: config.auth_method.to_raw(),
+                    authmode: config.authentication.auth_method().to_raw(),
                     rssi_5g_adjustment: 0,
                 },
                 pmf_cfg: wifi_pmf_config_t {
@@ -3283,14 +3373,12 @@ ignored."
             },
         };
 
-        if config.auth_method == AuthenticationMethod::None && !config.password.is_empty() {
-            return Err(WifiError::InvalidArguments);
-        }
+        config.authentication.validate(false)?;
 
         unsafe {
             cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
-            cfg.sta.password[0..(config.password.len())]
-                .copy_from_slice(config.password.as_bytes());
+            cfg.sta.password[0..(config.authentication.password().len())]
+                .copy_from_slice(config.authentication.password().as_bytes());
 
             // Compare the new sta config with the current. Only update if something is changing.
             // This avoids unnecessary connection issues.

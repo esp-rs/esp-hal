@@ -9,8 +9,6 @@
 
 extern crate alloc;
 
-use alloc::string::ToString;
-
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer, WithTimeout};
 use esp_backtrace as _;
@@ -23,6 +21,8 @@ use esp_hal::{
 };
 use esp_println::println;
 use esp_radio::wifi::{
+    AuthenticationMethod,
+    AuthenticationMethodConfig,
     Config,
     scan::{ScanConfig, ScanTypeConfig},
     sta::StationConfig,
@@ -98,8 +98,18 @@ async fn main(_spawner: Spawner) {
                 StationConfig::default()
                     .with_ssid(best_one.ssid.clone())
                     .with_bssid(best_one.bssid)
-                    .with_auth_method(best_one.auth_method.unwrap())
-                    .with_password(PASSWORD.to_string())
+                    .with_authentication(match best_one.auth_method {
+                        Some(AuthenticationMethod::Wpa2Personal) => {
+                            AuthenticationMethodConfig::Wpa2Personal(PASSWORD.into())
+                        }
+                        Some(AuthenticationMethod::None) => AuthenticationMethodConfig::Open,
+                        _ => {
+                            panic!(
+                                "Unsupported authentication method: {:?}",
+                                best_one.auth_method
+                            );
+                        }
+                    })
                     .with_channel(best_one.channel),
             );
             controller.set_config(&station_config).unwrap();
