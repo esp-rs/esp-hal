@@ -2328,10 +2328,7 @@ where
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
 
-        // Reset Tx/Rx FIFOs
-        self.rx.uart.info().rxfifo_reset();
-        self.rx.uart.info().txfifo_reset();
-
+        // Applying config also resets Tx/Rx FIFOs
         self.apply_config(&config)?;
 
         // Don't wait after transmissions by default,
