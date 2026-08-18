@@ -493,6 +493,9 @@ macro_rules! property {
     ("psram.octal_spi") => {
         true
     };
+    ("psram.hex_spi") => {
+        false
+    };
     ("psram.extmem_origin") => {
         1006632960
     };

@@ -359,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(esp32))]
+    #[cfg(aes_supports_dma)]
     fn test_aes_dma_ecb() {
         use esp_hal::{
             aes::dma::AesDma,
@@ -600,7 +600,7 @@ mod work_queue_dma_tests {
 
         esp_alloc::heap_allocator!(size: 32 * 1024);
 
-        #[cfg(soc_has_psram)]
+        #[cfg(all(soc_has_psram, dma_can_access_psram))]
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
         let dma = cfg_select! {
@@ -629,7 +629,7 @@ mod work_queue_dma_tests {
     }
 
     #[test]
-    #[cfg(soc_has_psram)]
+    #[cfg(all(soc_has_psram, dma_can_access_psram))]
     fn test_aes_dma_work_queue_psram(mut ctx: Context) {
         let _backend = ctx.aes.start();
 

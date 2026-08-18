@@ -217,29 +217,7 @@ fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn enable_mpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
-        HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .modify(|_, w| w.mspi_cal_stop().clear_bit());
-
-        // MPLL = XTAL * fb_div / ref_div = 40 MHz * 8 / 1.
-        LP_AON_CLK_RST::regs().mspi_div().modify(|_, w| unsafe {
-            let ref_div = 1;
-            let fb_div = 500 * (ref_div + 1) / 40 - 1;
-            w.mspi_fb_div().bits(fb_div as u8)
-        });
-
-        while HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .read()
-            .mspi_cal_end()
-            .bit_is_clear()
-        {
-            core::hint::spin_loop();
-        }
-
-        HP_SYS_CLKRST::regs()
-            .ana_pll_ctrl0()
-            .modify(|_, w| w.mspi_cal_stop().set_bit());
+        psram_phy_ldo_init();
 
         HP_SYS_CLKRST::regs()
             .ref_25m_ctrl0()
@@ -273,6 +251,70 @@ fn enable_mpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
         w.hp_active_xpd_mpll().bit(en);
         w.hp_active_xpd_mpll_i2c().bit(en)
     });
+}
+
+/// Program the PMU external LDO regulators for the MSPI PHY
+fn psram_phy_ldo_init() {
+    // Limit inrush current while the output cap charges; keep ripple
+    // suppression (voltage detector) enabled.
+    PMU::regs()
+        .ext_ldo_ctrl()
+        .modify(|_, w| w.ext_cur_lim().set_bit());
+
+    // Set up for 1800mV
+    let (dref, mul) = ldo_voltage_to_params(1800);
+    PMU::regs().ext_ldo_ctrl().modify(|_, w| unsafe {
+        w.ext_ldo_mul().bits(mul);
+        w.ext_ldo_dref().bits(dref);
+        w.ext_ldo_tie_high().clear_bit()
+    });
+
+    PMU::regs()
+        .ext_ldo_ctrl()
+        .modify(|_, w| w.ext_ldo_en_vdet().set_bit());
+
+    PMU::regs()
+        .psram_cfg()
+        .modify(|_, w| w.psram_xpd().set_bit());
+
+    // Drop the inrush current limit once the output has settled.
+    PMU::regs()
+        .ext_ldo_ctrl()
+        .modify(|_, w| w.ext_cur_lim().clear_bit());
+    crate::rom::ets_delay_us(1000);
+}
+
+// Returns None if rail voltage is to be used.
+fn ldo_voltage_to_params(voltage_mv: u16) -> (u8, u8) {
+    // to avoid using FPU, enlarge the constants by 1000 as fixed point
+    const K_1000: u32 = 1000;
+    const VOS_1000: u32 = 0;
+    const C_1000: u32 = 1000;
+
+    // TODO: [ESP32S31] IDF-15510 For efuse calibration.
+
+    // iterate all the possible dref and mul values to find the best match
+    let mut min_voltage_diff = 400_000_000;
+    let mut matched_dref = 0;
+    let mut matched_mul = 0;
+    for dref_val in 0..16 {
+        let vref_20 = if dref_val < 9 {
+            10 + dref_val
+        } else {
+            20 + (dref_val - 9) * 2
+        };
+        for mul_val in 0..8 {
+            let vout_80000000 = (vref_20 * K_1000 + 20 * VOS_1000) * (4000 + mul_val * C_1000);
+            let diff = (voltage_mv as u32 * 80000).abs_diff(vout_80000000);
+            if diff < min_voltage_diff {
+                min_voltage_diff = diff;
+                matched_dref = dref_val as u8;
+                matched_mul = mul_val as u8;
+            }
+        }
+    }
+
+    (matched_dref, matched_mul)
 }
 
 fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -509,5 +551,31 @@ impl TimgInstance {
         _new: TimgWdtClockConfig,
     ) {
         // TODO: Configure the selected timer group's watchdog-clock source.
+    }
+}
+
+impl PsramInstance {
+    // PSRAM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs().psram_ctrl0().modify(|_, w| {
+            w.pll_clk_en().bit(en);
+            w.core_clk_en().bit(en)
+        });
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<PsramFunctionClockConfig>,
+        new_config: PsramFunctionClockConfig,
+    ) {
+        HP_SYS_CLKRST::regs().psram_ctrl0().modify(|_, w| unsafe {
+            w.clk_src_sel().bits(match new_config {
+                PsramFunctionClockConfig::Xtal => 0,
+                PsramFunctionClockConfig::Mpll => 1,
+                PsramFunctionClockConfig::Cpll => 2,
+            })
+        });
     }
 }

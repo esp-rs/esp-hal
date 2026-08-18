@@ -495,6 +495,8 @@ algo = {
 
 [device.psram]
 extmem_origin = 0x4800_0000
+hex_spi = true
+octal_spi = true
 
 [device.rsa]
 version = 3

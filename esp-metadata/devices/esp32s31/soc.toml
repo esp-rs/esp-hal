@@ -61,6 +61,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
+    { name = "IOMUX_MSPI_PIN", hidden = true },
     { name = "LP_AON_CLK_RST", pac = "LP_AON_CLKRST" },
     { name = "LP_APM" },
     { name = "LP_GPIO" },
@@ -80,6 +81,8 @@ peripherals = [
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SPI0" },
     { name = "SPI1" },
+    { name = "MEMSPI2", hidden = true },
+    { name = "MEMSPI3", hidden = true },
     { name = "SPI2", interrupts = { peri = "SPI2" }, clock_group = "SPI", stable = true },
     { name = "SPI3", interrupts = { peri = "SPI3" }, clock_group = "SPI", stable = true },
     { name = "AXI_GDMA", pac = "AXI_DMA" },
@@ -99,6 +102,7 @@ peripherals = [
     { name = "USB_HS", pac = "USB_OTG_HS", interrupts = { peri = "USB_OTG_HS" } },
 
     { name = "FLASH", virtual = true },
+    { name = "PSRAM", virtual = true, clock_group = "PSRAM" },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "CPU_CTRL", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
@@ -248,7 +252,8 @@ separate_in_out_interrupts = true
 engines = [
     {
         name = "AHB_GDMA",
-        max_priority = 5,
+        max_priority = 15,
+        burst_sizes = [0, 4, 16, 32, 64],
         drivers = ["uhci"],
         peripheral_instances = [
             { name = "UHCI0", dma_id = 0 },
@@ -264,12 +269,15 @@ engines = [
     {
         name = "AXI_GDMA",
         max_priority = 15,
-        internal_ram_burst_sizes = [8, 16, 32, 64],
+        burst_sizes = [8, 16, 32, 64, 128],
         drivers = ["spi_master", "aes"],
         peripheral_instances = [
+            # LCD_CAM
             { name = "SPI2", dma_id = 1 },
             { name = "SPI3", dma_id = 2 },
+            # PARL_IO
             { name = "AES",  dma_id = 4 },
+            { name = "SHA",  dma_id = 5 },
         ],
         channels = [
             { name = "DMA_AXI_CH0", mem2mem = true, mem2mem_id = 6, interrupt_in = "AXI_PDMA_IN_CH0", interrupt_out = "AXI_PDMA_OUT_CH0" },
@@ -432,8 +440,8 @@ support_status = "not_supported"
 ram_size = 20 # FIXME: placeholder
 
 [device.psram]
-support_status = "not_supported"
 extmem_origin = 0x5000_0000
+octal_spi = true
 
 [device.pixel_accelerator]
 support_status = "not_supported"
