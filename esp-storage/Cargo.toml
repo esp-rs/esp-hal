@@ -11,6 +11,7 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+chip-features-matter = true
 check-configs = [
     { features = [] },
     { features = ["embedded-storage"] },

@@ -213,24 +213,15 @@ fn validate_package(package: &CargoToml, step: &PackagePlan) -> Result<Preflight
         );
     }
 
-    if let Some(metadata) = package.espressif_metadata()
-        && let Some(Item::Value(forever_unstable)) = metadata.get("forever-unstable")
+    // Special case: some packages are perma-unstable, meaning they won't ever
+    // have a stable release. For these packages, we always use a patch release.
+    if let Some(true) = package.espressif_metadata_bool("forever-unstable")
+        && step.bump != VersionBump::patch()
     {
-        // Special case: some packages are perma-unstable, meaning they won't ever
-        // have a stable release. For these packages, we always use a patch release.
-        let forever_unstable = if let Value::Boolean(forever_unstable) = forever_unstable {
-            *forever_unstable.value()
-        } else {
-            log::warn!("Invalid value for 'forever-unstable' in metadata - must be a boolean");
-            true
-        };
-
-        if forever_unstable && step.bump != VersionBump::patch() {
-            bail!(
-                "Cannot bump perma-unstable package {} to a non-patch version",
-                step.package
-            );
-        }
+        bail!(
+            "Cannot bump perma-unstable package {} to a non-patch version",
+            step.package
+        );
     }
 
     Ok(Preflight::Bump)

@@ -113,6 +113,21 @@ pub enum Package {
     CompileTests,
 }
 
+// Returns the root directory of the esp-hal repository.
+fn repo_root() -> PathBuf {
+    let cwd = std::env::current_dir().unwrap();
+    let mut cwd = cwd.as_path();
+    loop {
+        if cwd.join("xtask").exists() && cwd.join("esp-hal").exists() {
+            return cwd.to_path_buf();
+        }
+        let Some(parent) = cwd.parent() else {
+            panic!("Looks like you are not in the esp-hal repository");
+        };
+        cwd = parent;
+    }
+}
+
 static TOML: Mutex<Option<HashMap<Package, Option<CargoToml>>>> = Mutex::new(None);
 
 impl Package {
@@ -132,15 +147,8 @@ impl Package {
 
         // This is intended to opt-out in case there are features that look like chip names, but
         // aren't supposed to be handled like them.
-        if let Some(metadata) = toml.espressif_metadata()
-            && let Some(Item::Value(ov)) = metadata.get("has_chip_features")
-        {
-            let Value::Boolean(ov) = ov else {
-                log::warn!("Invalid value for 'has_chip_features' in metadata");
-                return false;
-            };
-
-            return *ov.value();
+        if let Some(has_chip_features) = toml.espressif_metadata_bool("has_chip_features") {
+            return has_chip_features;
         }
 
         features
@@ -162,20 +170,8 @@ impl Package {
             // No Cargo.toml in the package, must be the examples
             return true;
         };
-        let Some(metadata) = toml.espressif_metadata() else {
-            return false;
-        };
-
-        let Some(Item::Value(value)) = metadata.get("skip-doctests") else {
-            return false;
-        };
-
-        let Value::Boolean(value) = value else {
-            log::warn!("Invalid value for 'skip-doctests' in metadata");
-            return false;
-        };
-
-        *value.value()
+        toml.espressif_metadata_bool("skip-doctests")
+            .unwrap_or(false)
     }
 
     /// Does the package have inline assembly?
@@ -263,27 +259,18 @@ impl Package {
 
     /// Does the package need to be built with the standard library?
     pub fn needs_build_std(&self) -> bool {
-        use Package::*;
-
-        !matches!(self, EspConfig | EspMetadata)
+        self.toml()
+            .as_ref()
+            .and_then(|toml| toml.espressif_metadata_bool("needs-build-std"))
+            .unwrap_or(true)
     }
 
     /// Do the package's chip-specific cargo features affect the public API?
     pub fn chip_features_matter(&self) -> bool {
-        use Package::*;
-
-        matches!(
-            self,
-            EspHal
-                | EspLpHal
-                | EspRadio
-                | EspPhy
-                | EspRomSys
-                | EspBootloaderEspIdf
-                | EspMetadataGenerated
-                | EspRtos
-                | EspStorage
-        )
+        self.toml()
+            .as_ref()
+            .and_then(|toml| toml.espressif_metadata_bool("chip-features-matter"))
+            .unwrap_or(false)
     }
 
     /// Should documentation be built for the package, and should the package be
@@ -528,7 +515,7 @@ impl Package {
 
             tomls
                 .entry(*self)
-                .or_insert_with(|| CargoToml::new(&std::env::current_dir().unwrap(), *self).ok())
+                .or_insert_with(|| CargoToml::new(&repo_root(), *self).ok())
         })
     }
 
@@ -549,17 +536,8 @@ impl Package {
         let Some(ref toml) = *toml else {
             return false;
         };
-        let Some(metadata) = toml.espressif_metadata() else {
-            return false;
-        };
-
-        let Some(Item::Value(targets_lp_core)) = metadata.get("targets_lp_core") else {
-            return false;
-        };
-
-        targets_lp_core
-            .as_bool()
-            .expect("targets_lp_core must be a boolean")
+        toml.espressif_metadata_bool("targets_lp_core")
+            .unwrap_or(false)
     }
 
     /// Return the target triple for a given package/chip pair.
@@ -620,17 +598,8 @@ impl Package {
             // No Cargo.toml in the package, must be the examples
             return false;
         };
-        let Some(metadata) = toml.espressif_metadata() else {
-            return false;
-        };
-
-        let Some(Item::Value(semver_checked)) = metadata.get("semver-checked") else {
-            return false;
-        };
-
-        semver_checked
-            .as_bool()
-            .expect("semver-checked must be a boolean")
+        toml.espressif_metadata_bool("semver-checked")
+            .unwrap_or(false)
     }
 
     #[cfg(feature = "semver-checks")]

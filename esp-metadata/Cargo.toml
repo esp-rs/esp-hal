@@ -10,6 +10,7 @@ license       = "MIT OR Apache-2.0"
 publish       = false
 
 [package.metadata.espressif]
+needs-build-std = false
 forever-unstable = true
 changelog-exempt = true
 check-configs = [

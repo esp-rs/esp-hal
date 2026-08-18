@@ -623,6 +623,16 @@ impl CargoToml {
         espressif.as_table()
     }
 
+    pub fn espressif_metadata_bool(&self, key: &str) -> Option<bool> {
+        self.espressif_metadata()
+            .and_then(|table| table.get(key))
+            .map(|value| {
+                value
+                    .as_bool()
+                    .unwrap_or_else(|| panic!("{key} must be a boolean"))
+            })
+    }
+
     /// Create a `CargoToml` instance from a manifest string.
     pub fn from_str(workspace: &Path, package: Package, manifest: &str) -> Result<Self> {
         // Parse the manifest string into a mutable TOML document.
