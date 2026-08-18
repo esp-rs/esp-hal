@@ -13,6 +13,7 @@ exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
 [package.metadata.espressif]
 semver-checked = true
+chip-features-matter = true
 doc-config = { features = ["unstable", "rt"], append = [
     { if = 'usb_otg_driver_supported', features = ["__usb_otg"] },
     { if = 'bt_driver_supported', features = ["__bluetooth"] },
