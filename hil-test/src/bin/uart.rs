@@ -1429,7 +1429,7 @@ mod new_tests {
         // Run the test for each UART instance
         // https://github.com/esp-rs/esp-hal/issues/6138
         let uart_count = if cfg!(esp32) { 2 } else { UART_COUNT };
-        for (tx_num, rx_num) in (0..UART_COUNT).map(|i| (i, (i + 1) % UART_COUNT)) {
+        for (tx_num, rx_num) in (0..uart_count).map(|i| (i, (i + 1) % uart_count)) {
             inner(
                 tx_num,
                 unsafe { ctx.uart[rx_num].clone_unchecked() },
