@@ -7,13 +7,7 @@ mod tests {
         tcp::client::{TcpClient, TcpClientState},
     };
     use embassy_time::{Duration, Timer};
-    use esp_hal::{
-        clock::CpuClock,
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::Peripherals,
-        rng::Rng,
-        timer::timg::TimerGroup,
-    };
+    use esp_hal::{clock::CpuClock, peripherals::Peripherals, rng::Rng, timer::timg::TimerGroup};
     use esp_radio::wifi::{
         Config,
         ControllerConfig,
@@ -137,8 +131,7 @@ mod tests {
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let wifi_interface = Interface::station();
         let controller = esp_radio::wifi::WifiController::new(
@@ -153,8 +146,7 @@ mod tests {
     #[test]
     async fn wifi_drop(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
         let mut wifi = p.WIFI;

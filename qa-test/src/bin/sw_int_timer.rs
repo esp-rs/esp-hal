@@ -8,8 +8,9 @@
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
+    interrupt::software::SoftwareInterrupt,
     main,
+    peripherals::FROM_CPU_INTR0,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -19,8 +20,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    let mut sw_int = sw_ints.software_interrupt0;
+    let mut sw_int = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
 
     sw_int.set_interrupt_handler(sw_int_handler);
 
@@ -34,6 +34,6 @@ fn main() -> ! {
 
 #[esp_hal::handler]
 fn sw_int_handler() {
-    unsafe { SoftwareInterrupt::<'static, 0>::steal() }.reset();
+    unsafe { SoftwareInterrupt::new(FROM_CPU_INTR0::steal()) }.reset();
     log::info!("Triggered");
 }

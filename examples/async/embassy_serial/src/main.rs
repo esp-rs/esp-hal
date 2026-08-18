@@ -13,7 +13,6 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
     Async,
-    interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
     uart::{AtCmdConfig, Config, RxConfig, Uart, UartRx, UartTx},
 };
@@ -71,9 +70,8 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     // Default pins for Uart communication
     let (tx_pin, rx_pin) = cfg_select! {

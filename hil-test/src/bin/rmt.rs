@@ -461,6 +461,8 @@ cfg_select! {
 struct Context {
     rmt: RMT<'static>,
     pin: AnyPin<'static>,
+
+    #[cfg(esp32)]
     pin2: AnyPin<'static>,
 }
 
@@ -517,20 +519,17 @@ mod tests {
 
         esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
-        let software_interrupt =
-            esp_hal::interrupt::software::SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
         let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-        esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
+        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
-        let pins = hil_test::common_test_pins!(peripherals);
-        let (pin, pin2) = (AnyPin::from(pins.1), AnyPin::from(pins.0));
+        let (pin, _pin2) = hil_test::common_test_pins!(peripherals);
 
         Context {
             rmt: peripherals.RMT,
-            pin,
-            pin2,
+            pin: AnyPin::from(pin),
+            #[cfg(esp32)]
+            pin2: AnyPin::from(_pin2),
         }
     }
 

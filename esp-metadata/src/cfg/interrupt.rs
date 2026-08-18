@@ -10,7 +10,7 @@ pub struct SoftwareInterruptProperties {
     count: u32,
 }
 
-/// Generates `for_each_sw_interrupt!` which can be used to implement SoftwareInterruptControl.
+/// Generates `for_each_sw_interrupt!`.
 impl GenericProperty for SoftwareInterruptProperties {
     fn macros(&self) -> Option<TokenStream> {
         let channels = (0..self.count)

@@ -1,9 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Software Interrupts
 //!
-//! The [`SoftwareInterruptControl`] struct gives access to the available
-//! software interrupts.
-//!
 //! The [`SoftwareInterrupt`] struct allows raising or resetting software
 //! interrupts using the [`raise()`][SoftwareInterrupt::raise] and
 //! [`reset()`][SoftwareInterrupt::reset] methods.
@@ -12,10 +9,8 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-//!
 //! // Take the interrupt you want to use.
-//! let mut int0 = sw_ints.software_interrupt0;
+//! let mut int0 = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
 //!
 //! // Set up the interrupt handler. Do this in a critical section so the global
 //! // contains the interrupt object before the interrupt is triggered.
@@ -27,7 +22,7 @@
 //!
 //! # use core::cell::RefCell;
 //! # use critical_section::Mutex;
-//! # use esp_hal::interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl};
+//! # use esp_hal::interrupt::software::SoftwareInterrupt;
 //! // ... somewhere outside of your main function
 //!
 //! // Define a shared handle to the software interrupt.
@@ -51,6 +46,7 @@ use core::marker::PhantomData;
 use crate::{
     interrupt::{self, InterruptConfigurable, InterruptHandler},
     peripherals::Interrupt,
+    private::Sealed,
     system::Cpu,
 };
 
@@ -60,30 +56,14 @@ pub struct SoftwareInterrupt<'d, const NUM: u8> {
     _lifetime: PhantomData<&'d mut ()>,
 }
 
-impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
-    /// Unsafely create an instance of this peripheral out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// You must ensure that you're only using one instance of this type at a
-    /// time.
+impl<'d, const NUM: u8> SoftwareInterrupt<'d, NUM> {
+    /// Create a software interrupt driver.
     #[inline]
-    pub unsafe fn steal() -> Self {
+    pub const fn new(instance: impl Instance<NUM> + 'd) -> Self {
+        core::mem::forget(instance); // needed to make `new` const
         Self {
             _lifetime: PhantomData,
         }
-    }
-
-    /// Creates a new peripheral reference with a shorter lifetime.
-    ///
-    /// Use this method if you would like to keep working with the peripheral
-    /// after you dropped the driver that consumes this.
-    ///
-    /// See [Peripheral singleton] section for more information.
-    ///
-    /// [Peripheral singleton]: crate#peripheral-singletons
-    pub fn reborrow(&mut self) -> SoftwareInterrupt<'_, NUM> {
-        unsafe { SoftwareInterrupt::steal() }
     }
 
     /// Sets the interrupt handler for this software-interrupt
@@ -178,31 +158,11 @@ impl<const NUM: u8> InterruptConfigurable for SoftwareInterrupt<'_, NUM> {
     }
 }
 
-for_each_sw_interrupt! {
-    (all $( ($n:literal, $i:ident, $field:ident) ),*) => {
-        /// This gives access to the available software interrupts.
-        ///
-        /// This struct contains several instances of software interrupts that can be
-        /// used for signaling between different parts of a program or system.
-        #[non_exhaustive]
-        pub struct SoftwareInterruptControl<'d> {
-            $(
-                #[doc = concat!("Software interrupt ", stringify!($n), ".")]
-                pub $field: SoftwareInterrupt<'d, $n>,
-            )*
-        }
+/// A software interrupt instance.
+pub trait Instance<const NUM: u8>: Sealed {}
 
-        impl<'d> SoftwareInterruptControl<'d> {
-            /// Create a new instance of the software interrupt control.
-            pub fn new(_peripheral: crate::peripherals::SW_INTERRUPT<'d>) -> Self {
-                SoftwareInterruptControl {
-                    $(
-                        $field: SoftwareInterrupt {
-                            _lifetime: PhantomData,
-                        },
-                    )*
-                }
-            }
-        }
+for_each_sw_interrupt! {
+    ($n:literal, $i:ident, $field:ident) => {
+        impl Instance<$n> for crate::peripherals::$i<'_> {}
     };
 }

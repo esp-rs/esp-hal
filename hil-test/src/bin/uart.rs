@@ -406,10 +406,8 @@ mod async_tests {
     use esp_hal::{
         Async,
         Blocking,
-        interrupt::{
-            Priority,
-            software::{SoftwareInterrupt, SoftwareInterruptControl},
-        },
+        interrupt::Priority,
+        peripherals::FROM_CPU_INTR1,
         timer::timg::TimerGroup,
         uart::{self, Uart, UartRx},
     };
@@ -417,7 +415,7 @@ mod async_tests {
     use hil_test::mk_static;
 
     struct Context {
-        interrupt: SoftwareInterrupt<'static, 1>,
+        interrupt: FROM_CPU_INTR1<'static>,
         uart: Uart<'static, Async>,
     }
 
@@ -454,13 +452,11 @@ mod async_tests {
             .with_rx(rx)
             .into_async();
 
-        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
         Context {
-            interrupt: sw_int.software_interrupt1,
+            interrupt: peripherals.FROM_CPU_INTR1,
             uart,
         }
     }
@@ -549,7 +545,6 @@ mod async_tx_rx {
     use embedded_io_async::Write;
     use esp_hal::{
         Async,
-        interrupt::software::SoftwareInterruptControl,
         timer::timg::TimerGroup,
         uart::{self, RxConfig, RxError, RxErrorKind, UartRx, UartTx},
     };
@@ -573,9 +568,8 @@ mod async_tx_rx {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
         let tx = UartTx::new(peripherals.UART0, uart::Config::default())
             .unwrap()
@@ -893,7 +887,6 @@ mod async_tx_rx_split {
     use embassy_time::Timer;
     use esp_hal::{
         Async,
-        interrupt::software::SoftwareInterruptControl,
         timer::timg::TimerGroup,
         uart::{self, RxConfig, Uart, UartRx, UartTx},
     };
@@ -909,9 +902,8 @@ mod async_tx_rx_split {
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
         let (rx, tx) = Uart::new(peripherals.UART0, uart::Config::default())
             .unwrap()
@@ -972,7 +964,6 @@ mod uhci {
         dma::{DmaRxBuf, DmaTxBuf},
         dma_rx_buffer,
         dma_tx_buffer,
-        interrupt::software::SoftwareInterruptControl,
         peripherals::Peripherals,
         timer::timg::TimerGroup,
         uart::{self, Uart, uhci::Uhci},
@@ -1011,10 +1002,8 @@ mod uhci {
 
     #[test]
     fn test_send_receive(ctx: Context) {
-        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
-
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0, ctx.peripherals.FROM_CPU_INTR0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1070,10 +1059,8 @@ mod uhci {
 
     #[test]
     fn test_long_strings(ctx: Context) {
-        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
-
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0, ctx.peripherals.FROM_CPU_INTR0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1129,10 +1116,8 @@ mod uhci {
 
     #[test]
     async fn test_send_receive_async(ctx: Context) {
-        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
-
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0, ctx.peripherals.FROM_CPU_INTR0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1190,10 +1175,8 @@ mod uhci {
 
     #[test]
     async fn test_long_strings_async(ctx: Context) {
-        let sw_int = SoftwareInterruptControl::new(ctx.peripherals.SW_INTERRUPT);
-
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0, ctx.peripherals.FROM_CPU_INTR0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1317,7 +1300,6 @@ mod new_tests {
         Async,
         Blocking,
         gpio::{AnyPin, Pin},
-        interrupt::software::SoftwareInterruptControl,
         timer::timg::TimerGroup,
         uart::{self, AnyUart, Uart},
     };
@@ -1341,9 +1323,8 @@ mod new_tests {
             esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
         );
 
-        let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let (rx, tx) = hil_test::common_test_pins!(p);
 

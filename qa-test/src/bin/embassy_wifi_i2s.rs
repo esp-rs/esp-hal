@@ -15,7 +15,6 @@ use esp_backtrace as _;
 use esp_hal::{
     dma::DmaRxStreamBuf,
     i2s::master::{Channels, DataFormat, I2s, TdmConfig},
-    interrupt::software::SoftwareInterruptControl,
     ram,
     rng::Rng,
     time::Rate,
@@ -137,9 +136,8 @@ async fn main(spawner: Spawner) {
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
     // Preempt scheduler (WiFi)
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     esp_rtos::CurrentThreadHandle::get().set_priority(30);
 

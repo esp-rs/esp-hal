@@ -28,9 +28,7 @@
 //! use esp_hal::timer::timg::TimerGroup;
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //!
-//! use esp_hal::interrupt::software::SoftwareInterruptControl;
-//! let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-//! esp_rtos::start(timg0.timer0, software_interrupt.software_interrupt0);
+//! esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 #![cfg_attr(
     multi_core,
     doc = "
@@ -41,7 +39,7 @@ use esp_hal::system::Stack;
 static STACK: ConstStaticCell<Stack<8192>> = ConstStaticCell::new(Stack::new());
 esp_rtos::start_second_core(
     peripherals.CPU_CTRL,
-    software_interrupt.software_interrupt1,
+    peripherals.FROM_CPU_INTR1,
     STACK.take(),
     || {}, // Second core's main function.
 );
@@ -113,20 +111,18 @@ light sleep may cause unexpected behavior.
 # #[global_allocator]
 # static ALLOCATOR: FakeHeap = FakeHeap;
 
-use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::timer::timg::TimerGroup;
 
 # fn main() {
 let p = esp_hal::init(esp_hal::Config::default());
 
-let sw_int = SoftwareInterruptControl::new(p.SW_INTERRUPT);
 let timg0 = TimerGroup::new(p.TIMG0);
 
 let sleep = esp_rtos::sleep::configure(p.LPWR);
 
 esp_rtos::start_with_idle_hook(
     timg0.timer0,
-    sw_int.software_interrupt0,
+    p.FROM_CPU_INTR0,
     sleep.light_sleep_hook,
 );
 # }
@@ -180,14 +176,14 @@ use esp_hal::timer::systimer::Alarm;
 use esp_hal::timer::timg::Timer;
 use esp_hal::{
     Blocking,
-    interrupt::software::SoftwareInterrupt,
+    peripherals::FROM_CPU_INTR0,
     system::Cpu,
     time::Instant,
     timer::{AnyTimer, OneShotTimer, any::Degrade},
 };
 #[cfg(multi_core)]
 use esp_hal::{
-    peripherals::CPU_CTRL,
+    peripherals::{CPU_CTRL, FROM_CPU_INTR1},
     system::{CpuControl, Stack},
     time::Duration,
 };
@@ -376,7 +372,7 @@ fn assert_thread_mode(function: &str) {
 /// idle hook will wait for an interrupt.
 ///
 /// For information about the arguments, see [`start_with_idle_hook`].
-pub fn start(timer: impl TimerSource, int0: SoftwareInterrupt<'static, 0>) {
+pub fn start(timer: impl TimerSource, int0: FROM_CPU_INTR0<'static>) {
     start_with_idle_hook(timer, int0, crate::task::idle_hook)
 }
 
@@ -396,13 +392,10 @@ pub fn start(timer: impl TimerSource, int0: SoftwareInterrupt<'static, 0>) {
 /// - An `AnyTimer` instance
 /// - A `OneShotTimer` instance
 ///
-/// The `int0` argument must be `SoftwareInterrupt<0>` which will be used to trigger context
-/// switches.
-///
 /// For an example, see the [crate-level documentation][self].
 pub fn start_with_idle_hook(
     timer: impl TimerSource,
-    int0: SoftwareInterrupt<'static, 0>,
+    int0: FROM_CPU_INTR0<'static>,
     idle_hook: IdleFn,
 ) {
     init_tracing();
@@ -458,7 +451,7 @@ pub fn start_with_idle_hook(
 #[cfg(multi_core)]
 pub fn start_second_core<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
-    int1: SoftwareInterrupt<'static, 1>,
+    int1: FROM_CPU_INTR1<'static>,
     stack: &'static mut Stack<STACK_SIZE>,
     func: impl FnOnce() + Send + 'static,
 ) {
@@ -549,7 +542,7 @@ fn suspend_main_task() {
 #[cfg(multi_core)]
 pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL,
-    int1: SoftwareInterrupt<'static, 1>,
+    int1: FROM_CPU_INTR1<'static>,
     stack: &'static mut Stack<STACK_SIZE>,
     stack_guard_offset: Option<usize>,
     func: impl FnOnce() + Send + 'static,
@@ -635,7 +628,6 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
 /// # #[global_allocator]
 /// # static ALLOCATOR: FakeHeap = FakeHeap;
 /// use esp_hal::{
-///     interrupt::software::SoftwareInterruptControl,
 ///     system::Stack,
 ///     timer::timg::TimerGroup,
 /// };
@@ -644,11 +636,10 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
 /// static STACK: ConstStaticCell<Stack<8192>> = ConstStaticCell::new(Stack::new());
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 ///
 /// esp_rtos::start_on_second_core_only(
 ///     peripherals.CPU_CTRL,
-///     software_interrupt.software_interrupt1,
+///     peripherals.FROM_CPU_INTR1,
 ///     timg0.timer0,
 ///     STACK.take(),
 ///     || {
@@ -662,7 +653,7 @@ pub fn start_second_core_with_stack_guard_offset<const STACK_SIZE: usize>(
 #[cfg(multi_core)]
 pub fn start_on_second_core_only<const STACK_SIZE: usize>(
     cpu_control: CPU_CTRL<'static>,
-    int1: SoftwareInterrupt<'static, 1>,
+    int1: FROM_CPU_INTR1<'static>,
     timer: impl TimerSource + Send,
     stack: &'static mut Stack<STACK_SIZE>,
     func: impl FnOnce() + Send + 'static,

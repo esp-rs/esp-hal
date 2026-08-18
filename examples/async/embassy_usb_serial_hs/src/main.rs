@@ -19,7 +19,6 @@ use embassy_usb::{
 };
 use esp_backtrace as _;
 use esp_hal::{
-    interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
     usb::otg::{
         Usb,
@@ -36,9 +35,8 @@ async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let usb = Usb::new_hs(peripherals.USB_HS);
 

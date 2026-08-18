@@ -18,11 +18,7 @@ use embassy_futures::join::join;
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::ble::controller::BleConnector;
 use trouble_host::prelude::*;
@@ -36,9 +32,8 @@ async fn main(_s: Spawner) {
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let bluetooth = peripherals.BT;
     let connector = BleConnector::new(bluetooth, esp_radio::ble::Config::default()).unwrap();

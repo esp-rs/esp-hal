@@ -5691,37 +5691,43 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
         FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SW_INTERRUPT peripheral singleton"] SW_INTERRUPT <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
-        CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((GPIO0));
-        _for_each_inner_peripheral!((GPIO1)); _for_each_inner_peripheral!((GPIO2));
-        _for_each_inner_peripheral!((GPIO3)); _for_each_inner_peripheral!((GPIO4));
-        _for_each_inner_peripheral!((GPIO5)); _for_each_inner_peripheral!((GPIO6));
-        _for_each_inner_peripheral!((GPIO7)); _for_each_inner_peripheral!((GPIO8));
-        _for_each_inner_peripheral!((GPIO9)); _for_each_inner_peripheral!((GPIO10));
-        _for_each_inner_peripheral!((GPIO11)); _for_each_inner_peripheral!((GPIO12));
-        _for_each_inner_peripheral!((GPIO13)); _for_each_inner_peripheral!((GPIO14));
-        _for_each_inner_peripheral!((GPIO15)); _for_each_inner_peripheral!((GPIO16));
-        _for_each_inner_peripheral!((GPIO17)); _for_each_inner_peripheral!((GPIO18));
-        _for_each_inner_peripheral!((GPIO19)); _for_each_inner_peripheral!((GPIO20));
-        _for_each_inner_peripheral!((GPIO21)); _for_each_inner_peripheral!((GPIO22));
-        _for_each_inner_peripheral!((GPIO23)); _for_each_inner_peripheral!((GPIO24));
-        _for_each_inner_peripheral!((GPIO25)); _for_each_inner_peripheral!((GPIO26));
-        _for_each_inner_peripheral!((GPIO27)); _for_each_inner_peripheral!((GPIO28));
-        _for_each_inner_peripheral!((GPIO29)); _for_each_inner_peripheral!((GPIO30));
-        _for_each_inner_peripheral!((GPIO31)); _for_each_inner_peripheral!((GPIO32));
-        _for_each_inner_peripheral!((GPIO33)); _for_each_inner_peripheral!((GPIO34));
-        _for_each_inner_peripheral!((GPIO35)); _for_each_inner_peripheral!((GPIO36));
-        _for_each_inner_peripheral!((GPIO37)); _for_each_inner_peripheral!((GPIO38));
-        _for_each_inner_peripheral!((GPIO39)); _for_each_inner_peripheral!((GPIO40));
-        _for_each_inner_peripheral!((GPIO41)); _for_each_inner_peripheral!((GPIO42));
-        _for_each_inner_peripheral!((GPIO43)); _for_each_inner_peripheral!((GPIO44));
-        _for_each_inner_peripheral!((GPIO45)); _for_each_inner_peripheral!((GPIO46));
-        _for_each_inner_peripheral!((GPIO47)); _for_each_inner_peripheral!((GPIO48));
-        _for_each_inner_peripheral!((GPIO49)); _for_each_inner_peripheral!((GPIO50));
-        _for_each_inner_peripheral!((GPIO51)); _for_each_inner_peripheral!((GPIO52));
-        _for_each_inner_peripheral!((GPIO53)); _for_each_inner_peripheral!((GPIO54));
+        CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "FROM_CPU_INTR3 peripheral singleton"] FROM_CPU_INTR3 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((GPIO0)); _for_each_inner_peripheral!((GPIO1));
+        _for_each_inner_peripheral!((GPIO2)); _for_each_inner_peripheral!((GPIO3));
+        _for_each_inner_peripheral!((GPIO4)); _for_each_inner_peripheral!((GPIO5));
+        _for_each_inner_peripheral!((GPIO6)); _for_each_inner_peripheral!((GPIO7));
+        _for_each_inner_peripheral!((GPIO8)); _for_each_inner_peripheral!((GPIO9));
+        _for_each_inner_peripheral!((GPIO10)); _for_each_inner_peripheral!((GPIO11));
+        _for_each_inner_peripheral!((GPIO12)); _for_each_inner_peripheral!((GPIO13));
+        _for_each_inner_peripheral!((GPIO14)); _for_each_inner_peripheral!((GPIO15));
+        _for_each_inner_peripheral!((GPIO16)); _for_each_inner_peripheral!((GPIO17));
+        _for_each_inner_peripheral!((GPIO18)); _for_each_inner_peripheral!((GPIO19));
+        _for_each_inner_peripheral!((GPIO20)); _for_each_inner_peripheral!((GPIO21));
+        _for_each_inner_peripheral!((GPIO22)); _for_each_inner_peripheral!((GPIO23));
+        _for_each_inner_peripheral!((GPIO24)); _for_each_inner_peripheral!((GPIO25));
+        _for_each_inner_peripheral!((GPIO26)); _for_each_inner_peripheral!((GPIO27));
+        _for_each_inner_peripheral!((GPIO28)); _for_each_inner_peripheral!((GPIO29));
+        _for_each_inner_peripheral!((GPIO30)); _for_each_inner_peripheral!((GPIO31));
+        _for_each_inner_peripheral!((GPIO32)); _for_each_inner_peripheral!((GPIO33));
+        _for_each_inner_peripheral!((GPIO34)); _for_each_inner_peripheral!((GPIO35));
+        _for_each_inner_peripheral!((GPIO36)); _for_each_inner_peripheral!((GPIO37));
+        _for_each_inner_peripheral!((GPIO38)); _for_each_inner_peripheral!((GPIO39));
+        _for_each_inner_peripheral!((GPIO40)); _for_each_inner_peripheral!((GPIO41));
+        _for_each_inner_peripheral!((GPIO42)); _for_each_inner_peripheral!((GPIO43));
+        _for_each_inner_peripheral!((GPIO44)); _for_each_inner_peripheral!((GPIO45));
+        _for_each_inner_peripheral!((GPIO46)); _for_each_inner_peripheral!((GPIO47));
+        _for_each_inner_peripheral!((GPIO48)); _for_each_inner_peripheral!((GPIO49));
+        _for_each_inner_peripheral!((GPIO50)); _for_each_inner_peripheral!((GPIO51));
+        _for_each_inner_peripheral!((GPIO52)); _for_each_inner_peripheral!((GPIO53));
+        _for_each_inner_peripheral!((GPIO54));
         _for_each_inner_peripheral!((DMA_CH0(unstable)));
         _for_each_inner_peripheral!((DMA_CH1(unstable)));
         _for_each_inner_peripheral!((DMA_CH2(unstable)));
@@ -5792,8 +5798,11 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((USB_HS(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
-        _for_each_inner_peripheral!((SW_INTERRUPT(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
+        _for_each_inner_peripheral!((FROM_CPU_INTR0(unstable)));
+        _for_each_inner_peripheral!((FROM_CPU_INTR1(unstable)));
+        _for_each_inner_peripheral!((FROM_CPU_INTR2(unstable)));
+        _for_each_inner_peripheral!((FROM_CPU_INTR3(unstable)));
         _for_each_inner_peripheral!((SPI2, Spi2, 1, AxiGdmaChannel));
         _for_each_inner_peripheral!((UHCI0, Uhci0, 2, AhbGdmaChannel));
         _for_each_inner_peripheral!((SPI3, Spi3, 2, AxiGdmaChannel));
@@ -6059,17 +6068,21 @@ macro_rules! for_each_peripheral {
         = "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)), (@
         peri_type #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)),
         (@ peri_type #[doc = "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <=
-        virtual() (unstable)), (@ peri_type #[doc = "SW_INTERRUPT peripheral singleton"]
-        SW_INTERRUPT <= virtual() (unstable)), (@ peri_type #[doc =
-        "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable))));
-        _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
-        (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11),
-        (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19),
-        (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27),
-        (GPIO28), (GPIO29), (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35),
-        (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42), (GPIO43),
-        (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50), (GPIO51),
-        (GPIO52), (GPIO53), (GPIO54), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
+        virtual() (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
+        CPU_CTRL <= virtual() (unstable)), (@ peri_type #[doc =
+        "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual() (unstable)),
+        (@ peri_type #[doc = "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <=
+        virtual() (unstable)), (@ peri_type #[doc =
+        "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <= virtual() (unstable)),
+        (@ peri_type #[doc = "FROM_CPU_INTR3 peripheral singleton"] FROM_CPU_INTR3 <=
+        virtual() (unstable)))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1),
+        (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10),
+        (GPIO11), (GPIO12), (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18),
+        (GPIO19), (GPIO20), (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26),
+        (GPIO27), (GPIO28), (GPIO29), (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34),
+        (GPIO35), (GPIO36), (GPIO37), (GPIO38), (GPIO39), (GPIO40), (GPIO41), (GPIO42),
+        (GPIO43), (GPIO44), (GPIO45), (GPIO46), (GPIO47), (GPIO48), (GPIO49), (GPIO50),
+        (GPIO51), (GPIO52), (GPIO53), (GPIO54), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
         (DMA_CH2(unstable)), (DMA_AXI_CH0(unstable)), (DMA_AXI_CH1(unstable)),
         (DMA_AXI_CH2(unstable)), (VDMA_CH0(unstable)), (VDMA_CH1(unstable)),
         (VDMA_CH2(unstable)), (VDMA_CH3(unstable)), (GPIO(unstable)),
@@ -6089,11 +6102,13 @@ macro_rules! for_each_peripheral {
         (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)),
         (AES(unstable)), (SHA(unstable)), (RSA(unstable)), (ECC(unstable)),
         (USB_FS(unstable)), (USB_HS(unstable)), (FLASH(unstable)),
-        (GPIO_DEDICATED(unstable)), (SW_INTERRUPT(unstable)), (CPU_CTRL(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 1, AxiGdmaChannel), (UHCI0,
-        Uhci0, 2, AhbGdmaChannel), (SPI3, Spi3, 2, AxiGdmaChannel), (I2S0, I2s0, 3,
-        AhbGdmaChannel), (I2S1, I2s1, 4, AhbGdmaChannel), (AES, Aes, 4, AxiGdmaChannel),
-        (I2S2, I2s2, 5, AhbGdmaChannel), (SHA, Sha, 5, AxiGdmaChannel)));
+        (GPIO_DEDICATED(unstable)), (CPU_CTRL(unstable)), (FROM_CPU_INTR0(unstable)),
+        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
+        Spi2, 1, AxiGdmaChannel), (UHCI0, Uhci0, 2, AhbGdmaChannel), (SPI3, Spi3, 2,
+        AxiGdmaChannel), (I2S0, I2s0, 3, AhbGdmaChannel), (I2S1, I2s1, 4,
+        AhbGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (I2S2, I2s2, 5, AhbGdmaChannel),
+        (SHA, Sha, 5, AxiGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

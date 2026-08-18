@@ -98,9 +98,12 @@ peripherals = [
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "PSRAM", virtual = true },
-    { name = "SW_INTERRUPT", virtual = true },
     { name = "ULP_RISCV_CORE", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
 ]
 
 [device.soc.clocks]

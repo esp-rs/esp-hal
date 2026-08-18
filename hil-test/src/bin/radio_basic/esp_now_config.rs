@@ -1,11 +1,6 @@
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())]
 mod tests {
-    use esp_hal::{
-        clock::CpuClock,
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::Peripherals,
-        timer::timg::TimerGroup,
-    };
+    use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
     use esp_radio::{
         esp_now::{Error, EspNowError, EspNowWifiInterface, PeerInfo},
         wifi::{ControllerConfig, WifiController},
@@ -35,8 +30,7 @@ mod tests {
     #[test]
     fn espnow_max_encrypt_num_is_honored(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let controller = WifiController::new(
             p.WIFI,
@@ -64,8 +58,7 @@ mod tests {
     #[test]
     fn espnow_max_encrypt_num_raises_the_limit(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let controller = WifiController::new(
             p.WIFI,
@@ -86,8 +79,7 @@ mod tests {
     #[test]
     fn sta_disconnected_pm_can_be_configured(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let mut wifi = p.WIFI;
         for enabled in [true, false] {

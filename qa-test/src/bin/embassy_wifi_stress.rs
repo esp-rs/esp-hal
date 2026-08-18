@@ -18,7 +18,6 @@ use esp_hal::{
     Config as EspConfig,
     clock::CpuClock,
     init as initialize_esp_hal,
-    interrupt::software::SoftwareInterruptControl,
     ram,
     timer::timg::TimerGroup,
 };
@@ -42,9 +41,8 @@ async fn main(_spawner: Spawner) {
     // only have one memory region to make it easier to spot leaks
     esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let mut i = 0;
     loop {

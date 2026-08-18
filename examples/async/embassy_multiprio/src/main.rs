@@ -19,10 +19,7 @@
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
-use esp_hal::{
-    interrupt::{Priority, software::SoftwareInterruptControl},
-    timer::timg::TimerGroup,
-};
+use esp_hal::{interrupt::Priority, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
@@ -73,12 +70,11 @@ async fn main(low_prio_spawner: Spawner) {
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     static EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
-    let executor = InterruptExecutor::new(sw_int.software_interrupt2);
+    let executor = InterruptExecutor::new(peripherals.FROM_CPU_INTR2);
     let executor = EXECUTOR.init(executor);
 
     let spawner = executor.start(Priority::Priority3);

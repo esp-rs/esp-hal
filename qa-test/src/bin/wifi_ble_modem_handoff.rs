@@ -16,14 +16,7 @@ use embassy_futures::{join::join, select::select};
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
-    ram,
-    rng::Rng,
-    system::software_reset,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, ram, rng::Rng, system::software_reset, timer::timg::TimerGroup};
 use esp_radio::{
     ble::controller::BleConnector,
     wifi::{Config, ControllerConfig, WifiController, ap::AccessPointConfig},
@@ -116,8 +109,7 @@ async fn main(_s: Spawner) -> ! {
     init_heap();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     // Read the iteration left behind by the previous boot, then bump it so the
     // next boot (after our software reset) runs the other radio.

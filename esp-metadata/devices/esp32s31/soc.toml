@@ -48,7 +48,7 @@ peripherals = [
     { name = "CLIC" },
     { name = "CNNT_SYS" },
     { name = "ECC" },
-    { name = "EFUSE" },
+    { name = "EFUSE", hidden = true },
     { name = "GPIO" },
     { name = "GPIO_SD", pac = "GPIO_EXT" },
     { name = "HP_APM" },
@@ -100,8 +100,11 @@ peripherals = [
 
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
-    { name = "SW_INTERRUPT", virtual = true },
     { name = "CPU_CTRL", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
 ]
 
 [device.soc.clocks]

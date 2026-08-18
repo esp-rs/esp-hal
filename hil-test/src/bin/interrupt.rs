@@ -16,11 +16,7 @@ use core::{arch::asm, cell::RefCell};
 use critical_section::Mutex;
 use esp_hal::{
     clock::CpuClock,
-    interrupt::{
-        self,
-        Priority,
-        software::{SoftwareInterrupt, SoftwareInterruptControl},
-    },
+    interrupt::{self, Priority, software::SoftwareInterrupt},
     peripherals::Interrupt,
 };
 use hil_test as _;
@@ -77,7 +73,6 @@ mod tests {
     fn init() -> Context {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let peripherals = esp_hal::init(config);
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         let cpu_intr = cfg_select! {
             soc_has_intpri => &peripherals.INTPRI,
@@ -92,7 +87,7 @@ mod tests {
         critical_section::with(|cs| {
             SWINT0
                 .borrow_ref_mut(cs)
-                .replace(sw_ints.software_interrupt0)
+                .replace(SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0))
         });
 
         interrupt::enable_direct(

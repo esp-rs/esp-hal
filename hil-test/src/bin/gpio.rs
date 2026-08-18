@@ -6,7 +6,7 @@
 
 #![no_std]
 #![no_main]
-#![cfg_attr(esp32s2, feature(asm_experimental_arch))]
+#![cfg_attr(all(esp32s2, feature = "unstable"), feature(asm_experimental_arch))]
 
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
 use hil_test as _;
@@ -57,8 +57,8 @@ struct Context {
     #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     dedicated_gpio: DedicatedGpio<'static>,
 
-    #[cfg(all(multi_core, feature = "unstable"))]
-    int1: esp_hal::interrupt::software::SoftwareInterrupt<'static, 1>,
+    #[cfg(feature = "unstable")]
+    int1: esp_hal::peripherals::FROM_CPU_INTR1<'static>,
     #[cfg(all(multi_core, feature = "unstable"))]
     cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
     #[cfg(all(multi_core, feature = "unstable"))]
@@ -158,17 +158,11 @@ mod tests {
         let io = Io::new(peripherals.IO_MUX);
 
         #[cfg(feature = "unstable")]
-        #[cfg_attr(not(all(multi_core, feature = "unstable")), expect(unused_variables))]
         let int1 = {
-            let sw_int = esp_hal::interrupt::software::SoftwareInterruptControl::new(
-                peripherals.SW_INTERRUPT,
-            );
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            let int0 = sw_int.software_interrupt0;
-            let int1 = sw_int.software_interrupt1;
-            esp_rtos::start(timg0.timer0, int0);
-            int1
+            esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+            peripherals.FROM_CPU_INTR1
         };
 
         Context {
@@ -180,7 +174,7 @@ mod tests {
             io,
             #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
             dedicated_gpio: DedicatedGpio::new(peripherals.GPIO_DEDICATED),
-            #[cfg(all(multi_core, feature = "unstable"))]
+            #[cfg(feature = "unstable")]
             int1,
             #[cfg(all(multi_core, feature = "unstable"))]
             cpu_ctrl: peripherals.CPU_CTRL,
@@ -618,14 +612,12 @@ mod tests {
     #[test]
     #[cfg(feature = "unstable")]
     fn interrupt_executor_is_not_frozen(ctx: Context) {
-        use esp_hal::interrupt::{Priority, software::SoftwareInterrupt};
+        use esp_hal::interrupt::Priority;
         use esp_rtos::embassy::InterruptExecutor;
         use static_cell::StaticCell;
 
         static INTERRUPT_EXECUTOR: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-        let interrupt_executor = INTERRUPT_EXECUTOR.init(InterruptExecutor::new(unsafe {
-            SoftwareInterrupt::<1>::steal()
-        }));
+        let interrupt_executor = INTERRUPT_EXECUTOR.init(InterruptExecutor::new(ctx.int1));
 
         let spawner = interrupt_executor.start(Priority::max());
 
@@ -682,14 +674,11 @@ mod tests {
         // exact number of edge transitions.
 
         use esp_hal::{
-            interrupt::software::SoftwareInterruptControl,
-            peripherals::{CPU_CTRL, SW_INTERRUPT},
+            peripherals::CPU_CTRL,
             system::{Cpu, CpuControl, Stack},
         };
         use esp_rtos::embassy::Executor;
         use hil_test::mk_static;
-
-        let sw_int = unsafe { SoftwareInterruptControl::new(SW_INTERRUPT::steal()) };
 
         let mut out_pin = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
         let in_pin = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
@@ -703,7 +692,7 @@ mod tests {
 
         esp_rtos::start_second_core(
             unsafe { CPU_CTRL::steal() },
-            sw_int.software_interrupt1,
+            ctx.int1,
             app_core_stack,
             move || {
                 let executor = mk_static!(Executor, Executor::new());
