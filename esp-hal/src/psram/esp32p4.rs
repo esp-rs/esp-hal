@@ -1,7 +1,6 @@
-//! PSRAM driver for ESP32-P4X (chip revision v3.x / ECO5+).
-//!
-//! P4 has two PSRAM controllers wired to the same DQ pads
-//! The structure is looks same with DDR controller but not same.
+//! PSRAM driver for ESP32-P4.
+
+use pac::spi0::RegisterBlock as PsramSpi0RegisterBlock;
 
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
@@ -18,6 +17,10 @@ const MSPI0_BASE: u32 = 0x5008_E000;
 
 /// PSRAM_MSPI1 base, direct-command controller.
 const MSPI1_BASE: u32 = 0x5008_F000;
+
+/// IOMUX_MSPI_PIN base. Each PSRAM pad has a `..._PIN0_REG` at this base
+/// plus the pad-specific offset given by `PsramPad`.
+const IOMUX_MSPI_BASE: u32 = 0x500E_1200;
 
 /// Volatile 32-bit read.
 #[inline(always)]
@@ -65,7 +68,7 @@ pub enum PsramMode {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PsramConfig {
-    /// PSRAM interface mode (Hex 16-line vs Oct 8-line). Default: Hex.
+    /// PSRAM interface mode.
     pub mode: PsramMode,
 
     /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density.
@@ -223,7 +226,7 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
         p4_rev3_psram_workaround();
     }
 
-    mmu_map_psram(config); // MMU mapping here
+    mmu_map_psram(config);
 
     true
 }
@@ -233,10 +236,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
     start..start + config.size.get()
 }
 
-/// Set bus-clock divider for both PSRAM_MSPI0 (SRAM_CLK at 0x50) and
-/// PSRAM_MSPI1 (CLOCK at 0x14). For divider=2 the value is
-/// (N=1)<<16 | (H=0)<<8 | (L=1)<<0 = 0x00010001. For divider=1 the
-/// fast path bit `CLK_EQU_SYSCLK` (bit 31) is set instead.
+/// Set bus-clock divider for both PSRAM_MSPI0 and PSRAM_MSPI1.
 fn set_bus_clock(clock: u32) -> bool {
     let source_mhz = PsramInstance::Psram.function_clock_frequency() / 1_000_000;
     if !source_mhz.is_multiple_of(clock) {
@@ -252,8 +252,8 @@ fn set_bus_clock(clock: u32) -> bool {
     const MSPI0_SRAM_CLK: u32 = MSPI0_BASE + 0x50;
     const MSPI1_CLOCK: u32 = MSPI1_BASE + 0x14;
 
-    let val = if div == 1 {
-        1u32 << 31
+    let val = if div <= 1 {
+        1u32 << 31 // EQU_SYSCLK
     } else {
         ((div - 1) << 16) | ((div / 2 - 1) << 8) | (div - 1)
     };
@@ -265,12 +265,12 @@ fn set_bus_clock(clock: u32) -> bool {
     true
 }
 
-/// Enable DLL timing calibration for both controllers. Both DLL bits
-/// live in MSPI0's register space (per IDF `psram_ctrlr_ll_enable_dll`):
+/// Enable DLL timing calibration for both controllers.
 fn enable_dll() {
-    /// MSPI3 DLL (0x5008_E180), bit 5
+    // IDF: psram_ctrlr_ll_enable_dll
+    // MSPI3 DLL, bit 5
     const MEM_TIMING_CALI: u32 = MSPI0_BASE + 0x180;
-    /// MSPI2 DLL (0x5008_E190), bit 5
+    // MSPI2 DLL, bit 5
     const SMEM_TIMING_CALI: u32 = MSPI0_BASE + 0x190;
     const DLL_BIT: u32 = 1 << 5;
     unsafe {
@@ -278,10 +278,6 @@ fn enable_dll() {
         mmio_setbits_32(SMEM_TIMING_CALI, DLL_BIT);
     }
 }
-
-/// IOMUX_MSPI_PIN base. Each PSRAM pad has a `..._PIN0_REG` at this base
-/// plus the pad-specific offset given by `PsramPad`.
-const IOMUX_MSPI_BASE: u32 = 0x500E_1200;
 
 /// PSRAM IOMUX pads. Discriminant = byte offset from `IOMUX_MSPI_BASE`
 /// to that pad's `IOMUX_MSPI_PIN_PSRAM_<name>_PIN0_REG`. Per-pad DRV
@@ -357,7 +353,7 @@ impl PsramPad {
         IOMUX_MSPI_BASE + self as u32
     }
 
-    /// Set this pad's drive-strength field (bits [13:12]) to `drv`,
+    /// Set this pad's drive-strength field to `drv`,
     /// preserving the other bits.
     unsafe fn set_drv(self, drv: u32) {
         unsafe { mmio_clrsetbits_32(self.reg_addr(), 0x3 << 12, (drv & 0x3) << 12) };
@@ -370,7 +366,7 @@ impl PsramPad {
         }
     }
 
-    /// Set bit 0 (XPD power-up enable) of this pad's PIN0 register.
+    /// Set XPD power-up enable.
     /// Used on strobe to power on the strobe input buffer needed.
     unsafe fn enable_xpd(self) {
         unsafe { mmio_setbits_32(self.reg_addr(), 1) };
@@ -380,9 +376,7 @@ impl PsramPad {
 /// Configure PSRAM PHY pads.
 ///
 /// Mirrors IDF `mspi_timing_ll_pin_drv_set(2)` +
-/// `mspi_timing_ll_enable_dqs(true)`. Both DQS XPD bits must be on for
-/// DDR reads to latch data; drive strength = 2 matches IDF default for
-/// AP HEX PSRAM at 200 MHz.
+/// `mspi_timing_ll_enable_dqs(true)`.
 fn psram_pad_init() {
     unsafe {
         PsramPad::set_drv_all(2);
@@ -391,8 +385,8 @@ fn psram_pad_init() {
     }
 }
 
-/// Set PSRAM CS timing on the AXI controller's SMEM_AC register
-/// (0x5008_E1A0). SMEM_CS_SETUP=1, SMEM_CS_HOLD=1, setup_time=N-1,
+/// Set PSRAM CS timing on the AXI controller's SMEM_AC register.
+/// SMEM_CS_SETUP=1, SMEM_CS_HOLD=1, setup_time=N-1,
 /// hold_time=N-1, hold_delay=N-1, split_trans_en=1.
 fn set_cs_timing() {
     const SMEM_AC: u32 = MSPI0_BASE + 0x1A0;
@@ -429,11 +423,6 @@ const MR_ADDR_MR8_MR9: u32 = 0x8;
 /// Returns `(low, high)` where:
 ///   - `low`  = the MR at `mr_addr`
 ///   - `high` = the MR at `mr_addr + 1`
-///
-/// For pair addresses where the high byte is a reserved slot
-/// (MR_ADDR_MR4_MR5 / MR_ADDR_MR6 / MR_ADDR_MR8_MR9 — see the table at the
-/// `MR_ADDR_*` constants), the `high` value is don't-care and the
-/// caller should ignore it.
 fn psram_mr_read(timing: &PsramTimingParams, mr_addr: u32) -> (u8, u8) {
     let pair = mspi1_reg_read16(timing, mr_addr);
     ((pair & 0xFF) as u8, ((pair >> 8) & 0xFF) as u8)
@@ -443,15 +432,14 @@ fn psram_mr_read(timing: &PsramTimingParams, mr_addr: u32) -> (u8, u8) {
 ///
 /// `low` goes to the MR at `mr_addr`, `high` goes to the MR at
 /// `mr_addr + 1`. For pair addresses whose high slot is reserved, pass
-/// the value previously read back (read-modify-write) to keep the chip
-/// state consistent.
+/// the value previously read back (read-modify-write).
 fn psram_mr_write(mr_addr: u32, low: u8, high: u8) {
     let pair = (low as u16) | ((high as u16) << 8);
     mspi1_reg_write16(mr_addr, pair)
 }
 
 /// Initialize AP HEX PSRAM mode registers via PSRAM_MSPI1 OPI DTR
-/// referenced IDF `hex_psram_mode_reg_t`), missing on TRM
+/// referenced IDF `hex_psram_mode_reg_t`).
 /// MR0: drive_str[1:0], read_latency[4:2], lt[5]
 /// MR4: wr_latency[7:5]
 /// MR8: bl[1:0], bt[2], rbx[3], x16[6]
@@ -479,8 +467,9 @@ fn init_mr_registers(timing: &PsramTimingParams) {
     psram_mr_write(MR_ADDR_MR8_MR9, mr8, mr9); // keep previous MR9
 }
 
-/// Mirror of IDF's `esp_rom_spi_cmd_t` (rom/opi_flash.h). Layout must match
-/// the C struct exactly; the ROM driver reads it via the pointer.
+/// Mirror of IDF's `esp_rom_spi_cmd_t` (rom/opi_flash.h).
+///
+/// Layout must match the C struct exactly; the ROM driver reads it via the pointer.
 #[repr(C)]
 struct EspRomSpiCmd {
     cmd: u16,
@@ -614,7 +603,7 @@ fn mspi1_reg_write16(addr: u32, data: u16) {
 
     unsafe {
         esp_rom_spi_set_op_mode(ROM_SPI_PSRAM_CMD_NUM, ESP_ROM_SPIFLASH_OPI_DTR_MODE);
-        esp_rom_spi_cmd_config(ROM_SPI_PSRAM_CMD_NUM, &mut conf as *mut EspRomSpiCmd);
+        esp_rom_spi_cmd_config(ROM_SPI_PSRAM_CMD_NUM, &raw mut conf);
     }
     let mut empty: [u8; 0] = [];
     let _ = mspi1_kick_and_collect(&mut empty);
@@ -635,8 +624,8 @@ fn psram_detect_size(speed_params: &PsramTimingParams) -> usize {
 
 /// PSRAM_MSPI0 register block (same layout as `SPI0`, different base address).
 #[inline(always)]
-fn psram_mspi0() -> &'static pac::spi0::RegisterBlock {
-    unsafe { &*(MSPI0_BASE as *const pac::spi0::RegisterBlock) }
+fn psram_mspi0() -> &'static PsramSpi0RegisterBlock {
+    unsafe { &*(MSPI0_BASE as *const PsramSpi0RegisterBlock) }
 }
 
 fn select_psram_mmu_entry(entry_id: u32) {
@@ -758,18 +747,6 @@ fn reset_psram_mspi() {
 ///
 /// Port of IDF `esp_psram_p4_rev3_workaround` (`esp_psram.c`). Must be called
 /// after `configure_psram_mspi` and before `mmu_map_psram`.
-///
-/// The silicon bug requires two dummy PSRAM reads followed by a controller
-/// reset before the real MMU mapping is committed.  The dummy reads must reach
-/// the PSRAM hardware (not just the L1 cache), so they are issued at
-/// `0x8800_0000` — an alias that shares the same MMU linear address
-/// (`addr & 0xFFF_FFFF`) as the cached PSRAM base `0x4800_0000` but bypasses
-/// the L1 cache.  Core error responses are suppressed for the duration because
-/// the address is outside the normally-mapped window; the reads are expected to
-/// produce garbage.  The controller reset clears all MSPI0 registers, so the
-/// registers configured by `configure_psram_mspi`, `set_bus_clock`,
-/// `enable_dll`, and `set_cs_timing` are backed up before the reset and
-/// restored afterwards.
 fn p4_rev3_psram_workaround() {
     /// MSPI0 registers touched by `configure_psram_mspi`, `set_bus_clock`,
     /// `enable_dll`, and `set_cs_timing` that must survive the controller reset.
@@ -831,36 +808,6 @@ fn p4_rev3_psram_workaround() {
 /// Faithful port of IDF `s_config_mspi_for_psram` from
 /// `esp_psram_impl_ap_hex.c`. Each register field is named after its
 /// `psram_ctrlr_ll_*` setter so the mapping is straightforward to verify.
-///
-/// Field layout (PSRAM_MSPI0 / SPIMEM2 register bit positions):
-///
-/// `CACHE_SCTRL` (0x40):
-///   - bit 0:      `cache_usr_saddr_4byte`
-///   - bit 3:      `usr_wr_sram_dummy`
-///   - bit 4:      `usr_rd_sram_dummy`
-///   - bit 5:      `cache_sram_usr_rcmd`
-///   - bits 11:6:  `sram_rdummy_cyclelen`
-///   - bits 19:14: `sram_addr_bitlen`
-///   - bit 20:     `cache_sram_usr_wcmd`
-///   - bit 21:     `sram_oct`
-///   - bits 27:22: `sram_wdummy_cyclelen`
-///
-/// `SRAM_CMD` (0x44):
-///   - bit 18: `sdin_oct`
-///   - bit 19: `sdout_oct`
-///   - bit 20: `saddr_oct`
-///   - bit 21: `scmd_oct`
-///   - bit 22: `sdummy_rin`
-///   - bit 23: `sdummy_wout`
-///   - bit 26: `sdin_hex`
-///   - bit 27: `sdout_hex`
-///
-/// `MEM_CTRL1` (0x70): `ar_splice_en` bit 25, `aw_splice_en` bit 26.
-///
-/// `SMEM_DDR` (0xD8): bit 0 `smem_ddr_en`, bit 1 `smem_var_dummy`,
-///                    bit 2 `smem_ddr_rdat_swp`, bit 3 `smem_ddr_wdat_swp`.
-///
-/// `CACHE_FCTRL` (0x3C): bit 0 `mem_axi_req_en`, bit 1 `close_axi_inf_en`.
 fn configure_psram_mspi(timing: &PsramTimingParams, base: u32) {
     // Dummy bit-counts come from the active speed parameter table.
     let rd_dummy_n = timing.rd_dummy_bits;
