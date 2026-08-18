@@ -677,10 +677,17 @@ impl PsramInstance {
         self,
         _clocks: &mut ClockTree,
         _old_config: Option<PsramFunctionClockConfig>,
-        _new_config: PsramFunctionClockConfig,
+        new_config: PsramFunctionClockConfig,
     ) {
         HP_SYS_CLKRST::regs()
             .peri_clk_ctrl00()
-            .modify(|_, w| unsafe { w.psram_clk_src_sel().bits(1) }); // 1 = MPLL
+            .modify(|_, w| unsafe {
+                w.psram_clk_src_sel().bits(match new_config {
+                    PsramFunctionClockConfig::Xtal => 0,
+                    PsramFunctionClockConfig::Mpll => 1,
+                    PsramFunctionClockConfig::Spll => 2,
+                    PsramFunctionClockConfig::Cpll => 3,
+                })
+            });
     }
 }

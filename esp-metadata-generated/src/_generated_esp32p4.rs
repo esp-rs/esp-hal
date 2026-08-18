@@ -525,6 +525,12 @@ macro_rules! property {
         ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
         ::soc::clocks::TimgCalibrationClockConfig::Xtal32kClk]
     };
+    ("clock_tree.psram.function_clock") => {
+        [crate ::soc::clocks::PsramFunctionClockConfig::Xtal, crate
+        ::soc::clocks::PsramFunctionClockConfig::Mpll, crate
+        ::soc::clocks::PsramFunctionClockConfig::Spll, crate
+        ::soc::clocks::PsramFunctionClockConfig::Cpll]
+    };
     ("clock_tree.uart.function_clock.sclk") => {
         [crate ::soc::clocks::UartFunctionClockSclk::Xtal, crate
         ::soc::clocks::UartFunctionClockSclk::PllF80m, crate
@@ -2398,17 +2404,19 @@ macro_rules! define_clock_tree_types {
             /// Selects `PLL_F25M`.
             PllF25m,
         }
-        /// Configures the `PSRAM_FUNCTION_CLOCK` clock node.
-        ///
-        /// The output is calculated as `OUTPUT = MPLL_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        /// The list of clock signals that the `PSRAM_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct PsramFunctionClockConfig {}
-        impl PsramFunctionClockConfig {
-            /// Creates a new configuration for the FUNCTION_CLOCK clock node.
-            pub const fn new() -> Self {
-                Self {}
-            }
+        pub enum PsramFunctionClockConfig {
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            /// Selects `MPLL_CLK`.
+            Mpll,
+            /// Selects `SPLL_CLK`.
+            Spll,
+            /// Selects `CPLL_CLK`.
+            Cpll,
         }
         /// Represents the device's clock tree.
         pub struct ClockTree {
@@ -2695,6 +2703,8 @@ macro_rules! define_clock_tree_types {
         static MIPI_DSI_PHY_PLL_REFCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static MIPI_DSI_PHY_CFG_CLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
+        static PSRAM_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         fn request_xtal_clk(_clocks: &mut ClockTree) {}
         fn release_xtal_clk(_clocks: &mut ClockTree) {}
@@ -4219,11 +4229,29 @@ macro_rules! define_clock_tree_types {
             pub fn configure_function_clock(
                 self,
                 clocks: &mut ClockTree,
-                config: PsramFunctionClockConfig,
+                new_selector: PsramFunctionClockConfig,
             ) {
-                let old_config = clocks.psram_function_clock[self as usize].replace(config);
+                let old_selector = clocks.psram_function_clock[self as usize].replace(new_selector);
                 refresh_psram_function_clock_downstream(clocks, self);
-                self.configure_function_clock_impl(clocks, old_config, config);
+                if clocks.psram_function_clock_refcount[self as usize] > 0 {
+                    match new_selector {
+                        PsramFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        PsramFunctionClockConfig::Mpll => request_mpll_clk(clocks),
+                        PsramFunctionClockConfig::Spll => request_spll_clk(clocks),
+                        PsramFunctionClockConfig::Cpll => request_cpll_clk(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            PsramFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                            PsramFunctionClockConfig::Mpll => release_mpll_clk(clocks),
+                            PsramFunctionClockConfig::Spll => release_spll_clk(clocks),
+                            PsramFunctionClockConfig::Cpll => release_cpll_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                }
             }
             pub fn function_clock_config(
                 self,
@@ -4237,7 +4265,12 @@ macro_rules! define_clock_tree_types {
                     &mut clocks.psram_function_clock_refcount[self as usize],
                 ) {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
-                    request_mpll_clk(clocks);
+                    match unwrap!(clocks.psram_function_clock[self as usize]) {
+                        PsramFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        PsramFunctionClockConfig::Mpll => request_mpll_clk(clocks),
+                        PsramFunctionClockConfig::Spll => request_spll_clk(clocks),
+                        PsramFunctionClockConfig::Cpll => request_cpll_clk(clocks),
+                    }
                     self.enable_function_clock_impl(clocks, true);
                 }
             }
@@ -4248,7 +4281,12 @@ macro_rules! define_clock_tree_types {
                 ) {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
                     self.enable_function_clock_impl(clocks, false);
-                    release_mpll_clk(clocks);
+                    match unwrap!(clocks.psram_function_clock[self as usize]) {
+                        PsramFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                        PsramFunctionClockConfig::Mpll => release_mpll_clk(clocks),
+                        PsramFunctionClockConfig::Spll => release_spll_clk(clocks),
+                        PsramFunctionClockConfig::Cpll => release_cpll_clk(clocks),
+                    }
                 }
             }
             #[allow(unused_variables)]
@@ -4256,13 +4294,24 @@ macro_rules! define_clock_tree_types {
                 clocks: &mut ClockTree,
                 config: PsramFunctionClockConfig,
             ) -> u32 {
-                mpll_clk_frequency()
+                match config {
+                    PsramFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    PsramFunctionClockConfig::Mpll => mpll_clk_frequency(),
+                    PsramFunctionClockConfig::Spll => spll_clk_frequency(),
+                    PsramFunctionClockConfig::Cpll => cpll_clk_frequency(),
+                }
             }
             pub fn function_clock_frequency(self) -> u32 {
-                mpll_clk_frequency()
+                PSRAM_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
             }
-            pub fn function_clock_source_frequency() -> u32 {
-                mpll_clk_frequency()
+            pub fn function_clock_source_frequency(source: PsramFunctionClockConfig) -> u32 {
+                match source {
+                    PsramFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    PsramFunctionClockConfig::Mpll => mpll_clk_frequency(),
+                    PsramFunctionClockConfig::Spll => spll_clk_frequency(),
+                    PsramFunctionClockConfig::Cpll => cpll_clk_frequency(),
+                }
             }
         }
         /// Clock tree configuration.
@@ -4363,6 +4412,9 @@ macro_rules! define_clock_tree_types {
             for child_instance in [MipiDsiInstance::MipiDsi] {
                 refresh_mipi_dsi_phy_pll_refclk_downstream(clocks, child_instance);
             }
+            for child_instance in [PsramInstance::Psram] {
+                refresh_psram_function_clock_downstream(clocks, child_instance);
+            }
         }
         fn refresh_spll_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.spll_clk {
@@ -4393,6 +4445,9 @@ macro_rules! define_clock_tree_types {
                 refresh_mipi_dsi_dpi_clk_downstream(clocks, child_instance);
                 refresh_mipi_dsi_phy_pll_refclk_downstream(clocks, child_instance);
                 refresh_mipi_dsi_phy_cfg_clk_downstream(clocks, child_instance);
+            }
+            for child_instance in [PsramInstance::Psram] {
+                refresh_psram_function_clock_downstream(clocks, child_instance);
             }
         }
         fn refresh_mpll_clk_downstream(clocks: &mut ClockTree) {
@@ -4578,6 +4633,12 @@ macro_rules! define_clock_tree_types {
             clocks: &mut ClockTree,
             instance: PsramInstance,
         ) {
+            if let Some(config) = clocks.psram_function_clock[instance as usize] {
+                PSRAM_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    PsramInstance::function_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
         }
     };
 }

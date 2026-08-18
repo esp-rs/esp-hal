@@ -5,7 +5,7 @@
 
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
-    clock::ll::{ClockTree, PsramInstance, mpll_clk_frequency, request_mpll_clk},
+    clock::ll::{ClockTree, PsramFunctionClockConfig, PsramInstance},
     efuse,
     peripherals::{HP_SYS, HP_SYS_CLKRST, PMU},
     soc::pac,
@@ -80,20 +80,23 @@ pub struct PsramConfig {
 
 /// PSRAM timing parameters.
 ///
-/// These values should be tuned together with the MPLL frequency. The MPLL frequency must be an
-/// integer multiple of the PSRAM frequency.
+/// These values should be tuned together with the source clock frequency. The source clock
+/// frequency must be an integer multiple of the PSRAM frequency.
 ///
-/// | Variant   | MPLL | div | MR0.RL | MR4.WL | RD dummy bits
-/// |-----------|------|-----|--------|--------|--------------
-/// | `MHZ_20`  | 400  | 20  | 2      | 2      | 18
-/// | `MHZ_80`  | 320  | 4   | 2      | 2      | 18
-/// | `MHZ_125` | 500  | 4   | 2      | 2      | 18
-/// | `MHZ_200` | 400  | 2   | 4      | 1      | 26
-/// | `MHZ_250` | 500  | 2   | 6      | 3      | 34
+/// | Variant   | Source | div | MR0.RL | MR4.WL | RD dummy bits
+/// |-----------|--------|-----|--------|--------|--------------
+/// | `MHZ_20`  | 400    | 20  | 2      | 2      | 18
+/// | `MHZ_80`  | 320    | 4   | 2      | 2      | 18
+/// | `MHZ_125` | 500    | 4   | 2      | 2      | 18
+/// | `MHZ_200` | 400    | 2   | 4      | 1      | 26
+/// | `MHZ_250` | 500    | 2   | 6      | 3      | 34
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PsramTimingParams {
-    /// Bus clock frequency in MHz. Must divide MPLL evenly.
+    /// PSRAM clock source.
+    pub clock_source: PsramFunctionClockConfig,
+
+    /// Bus clock frequency in MHz. Must divide the source clock evenly.
     pub clock: u32,
 
     /// MR0.read_latency field value (cycles = 2 * value + 6).
@@ -121,6 +124,7 @@ impl Default for PsramTimingParams {
 impl PsramTimingParams {
     /// Preset for 20 MHz clock speed.
     pub const MHZ_20: Self = Self {
+        clock_source: PsramFunctionClockConfig::Mpll,
         clock: 20,
         mr0_rl: 2,
         mr4_wl: 2,
@@ -131,6 +135,7 @@ impl PsramTimingParams {
 
     /// Preset for 80 MHz clock speed.
     pub const MHZ_80: Self = Self {
+        clock_source: PsramFunctionClockConfig::Mpll,
         clock: 80,
         mr0_rl: 2,
         mr4_wl: 2,
@@ -141,6 +146,7 @@ impl PsramTimingParams {
 
     /// Preset for 125 MHz clock speed.
     pub const MHZ_125: Self = Self {
+        clock_source: PsramFunctionClockConfig::Mpll,
         clock: 125,
         mr0_rl: 2,
         mr4_wl: 2,
@@ -151,6 +157,7 @@ impl PsramTimingParams {
 
     /// Preset for 200 MHz clock speed.
     pub const MHZ_200: Self = Self {
+        clock_source: PsramFunctionClockConfig::Mpll,
         clock: 200,
         mr0_rl: 4,
         mr4_wl: 1,
@@ -161,6 +168,7 @@ impl PsramTimingParams {
 
     /// Preset for 250 MHz clock speed.
     pub const MHZ_250: Self = Self {
+        clock_source: PsramFunctionClockConfig::Mpll,
         clock: 250,
         mr0_rl: 6,
         mr4_wl: 3,
@@ -181,13 +189,14 @@ const AP_HEX_CS_HOLD_DELAY: u32 = 3;
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     psram_phy_ldo_init();
 
-    ClockTree::with(request_mpll_clk);
-
     // Module clock + clock source
     enable_psram_mspi();
     reset_psram_mspi();
 
-    ClockTree::with(|clocks| PsramInstance::Psram.request_function_clock(clocks));
+    ClockTree::with(|clocks| {
+        PsramInstance::Psram.configure_function_clock(clocks, config.timing.clock_source);
+        PsramInstance::Psram.request_function_clock(clocks);
+    });
 
     // Controller + PHY pad bring-up.
     if !set_bus_clock(config.timing.clock) {
@@ -209,7 +218,6 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     // Silicon revision 3.0 (ECO5) requires two dummy PSRAM reads + a controller
     // reset before the real MMU mapping is committed.  Port of IDF's
     // `esp_psram_p4_rev3_workaround` in `esp_psram.c`.
-    #[cfg(esp32p4)]
     if efuse::chip_revision() == efuse::ChipRevision::from_combined(300) {
         debug!("Applying P4 v3.0 PSRAM workaround");
         p4_rev3_psram_workaround();
@@ -230,16 +238,16 @@ pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
 /// (N=1)<<16 | (H=0)<<8 | (L=1)<<0 = 0x00010001. For divider=1 the
 /// fast path bit `CLK_EQU_SYSCLK` (bit 31) is set instead.
 fn set_bus_clock(clock: u32) -> bool {
-    let mpll_mhz = mpll_clk_frequency() / 1_000_000;
-    if !mpll_mhz.is_multiple_of(clock) {
+    let source_mhz = PsramInstance::Psram.function_clock_frequency() / 1_000_000;
+    if !source_mhz.is_multiple_of(clock) {
         error!(
-            "MPLL frequency must be an integer multiple of PSRAM frequency. MPLL={} MHz, PSRAM={} MHz",
-            mpll_mhz, clock
+            "PSRAM source clock frequency must be an integer multiple of PSRAM frequency. Source={} MHz, PSRAM={} MHz",
+            source_mhz, clock
         );
         return false;
     }
 
-    let div = mpll_mhz / clock;
+    let div = source_mhz / clock;
 
     const MSPI0_SRAM_CLK: u32 = MSPI0_BASE + 0x50;
     const MSPI1_CLOCK: u32 = MSPI1_BASE + 0x14;
@@ -762,7 +770,6 @@ fn reset_psram_mspi() {
 /// registers configured by `configure_psram_mspi`, `set_bus_clock`,
 /// `enable_dll`, and `set_cs_timing` are backed up before the reset and
 /// restored afterwards.
-#[cfg(esp32p4)]
 fn p4_rev3_psram_workaround() {
     /// MSPI0 registers touched by `configure_psram_mspi`, `set_bus_clock`,
     /// `enable_dll`, and `set_cs_timing` that must survive the controller reset.
