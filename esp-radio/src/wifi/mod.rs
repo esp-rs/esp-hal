@@ -113,6 +113,14 @@ mod internal;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
+// The total hardware encryption key slots available that are shared between
+// ESP-NOW encrypted peers and the AP connections.
+// See https://github.com/espressif/esp-idf/blob/master/components/esp_wifi/Kconfig#L589
+#[cfg(esp32c2)]
+const TOTAL_HW_ENCRYPT_KEYS: u8 = 4;
+#[cfg(not(esp32c2))]
+const TOTAL_HW_ENCRYPT_KEYS: u8 = 17;
+
 /// The link state of a network device.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2227,6 +2235,18 @@ pub struct ControllerConfig {
     #[builder_lite(unstable)]
     rx_ba_win: u8,
 
+    /// Enable WiFi Power Management for station at disconnected status.
+    #[builder_lite(unstable)]
+    sta_disconnected_pm: bool,
+
+    /// Maximum encrypt number of peers supported by ESP-NOW.
+    ///
+    /// There are a fixed number of hardware encryption keys, and they are shared between ESP-NOW
+    /// and SoftAP. SoftAP will use however many are left over by ESP-NOW (unless configured to use
+    /// fewer).
+    #[builder_lite(unstable)]
+    espnow_max_encrypt_num: u8,
+
     /// Initial Wi-Fi configuration.
     #[builder_lite(reference)]
     initial_config: Config,
@@ -2250,6 +2270,12 @@ impl Default for ControllerConfig {
 
             rx_ba_win: 6,
 
+            sta_disconnected_pm: crate::sys::include::CONFIG_ESP_WIFI_STA_DISCONNECTED_PM_ENABLE
+                == 1,
+
+            espnow_max_encrypt_num: crate::sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM
+                as _,
+
             country_info: CountryInfo::from(*b"CN"),
 
             initial_config: Config::Station(StationConfig::default()),
@@ -2264,6 +2290,9 @@ impl ControllerConfig {
         }
         if self.rx_ba_win as u16 >= 2 * (self.static_rx_buf_num as u16) {
             warn!("RX BA window size should be less than twice the number of static RX buffers.");
+        }
+        if self.espnow_max_encrypt_num > TOTAL_HW_ENCRYPT_KEYS {
+            warn!("ESP-NOW max encrypted peers should be at most the number of hardware keys.");
         }
     }
 }
@@ -2375,9 +2404,8 @@ impl<'d> WifiController<'d> {
                 beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
                 mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
                 feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
-                sta_disconnected_pm: false,
-                espnow_max_encrypt_num: crate::sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM
-                    as i32,
+                sta_disconnected_pm: config.sta_disconnected_pm as _,
+                espnow_max_encrypt_num: config.espnow_max_encrypt_num as _,
 
                 tx_hetb_queue_num: 3,
                 dump_hesigb_enable: false,
@@ -3164,20 +3192,12 @@ ignored."
         Err(WifiError::Failed)
     }
 
-    // The total hardware encryption key slots available that are shared between
-    // ESP-NOW encrypted peers and the AP connections.
-    // See https://github.com/espressif/esp-idf/blob/master/components/esp_wifi/Kconfig#L589
-    #[cfg(esp32c2)]
-    const TOTAL_HW_ENCRYPT_KEYS: u8 = 4;
-    #[cfg(not(esp32c2))]
-    const TOTAL_HW_ENCRYPT_KEYS: u8 = 17;
-
-    // The upper limit of connections available for the AP. The user set limit in apply_ap_config
-    // is clipped to this value
-    const AP_MAX_CONNECTIONS: u8 =
-        Self::TOTAL_HW_ENCRYPT_KEYS.saturating_sub(CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM as u8);
-
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
+        // The upper limit of connections available for the AP. The user set limit in
+        // apply_ap_config is clipped to this value
+        let ap_max_connections = TOTAL_HW_ENCRYPT_KEYS
+            .saturating_sub(unsafe { internal::G_CONFIG.espnow_max_encrypt_num } as _);
+
         let mut cfg = wifi_config_t {
             ap: wifi_ap_config_t {
                 ssid: [0; 32],
@@ -3188,7 +3208,7 @@ ignored."
                 ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
                 // Clip max_connection in the same way as done internally in esp_wifi_set_config.
                 // Doing this here so that we can do easy comparisons below
-                max_connection: (config.max_connections as u8).min(Self::AP_MAX_CONNECTIONS),
+                max_connection: (config.max_connections as u8).min(ap_max_connections),
                 beacon_interval: 100,
                 pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
                 ftm_responder: false,
