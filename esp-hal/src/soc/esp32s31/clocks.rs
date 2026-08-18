@@ -53,6 +53,10 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
         timg_calibration_clock: None,
     };
     const PRESET_240: ClockConfig = ClockConfig {
@@ -64,6 +68,10 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
         timg_calibration_clock: None,
     };
     const PRESET_320: ClockConfig = ClockConfig {
@@ -75,6 +83,10 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
         timg_calibration_clock: None,
     };
 }
@@ -418,6 +430,22 @@ fn configure_timg_calibration_clock_impl(
             w.clk_src_sel().bits(source);
             w.clk_div_num().bits(divider - 1)
         });
+}
+
+// IOMUX_FUNCTION_CLOCK
+
+fn configure_iomux_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<IomuxFunctionClockConfig>,
+    new_config: IomuxFunctionClockConfig,
+) {
+    HP_SYS_CLKRST::regs().iomux_ctrl0().modify(|_, w| unsafe {
+        w.clk_src_sel().bit(matches!(
+            new_config.source,
+            IomuxFunctionClockSource::PllF80m
+        ));
+        w.clk_div_num().bits(new_config.div_num as u8)
+    });
 }
 
 impl TimgInstance {
