@@ -94,7 +94,6 @@ peripherals = [
     { name = "TWAI0", interrupts = { peri = "TWAI0" } },
     { name = "TWAI1", interrupts = { peri = "TWAI1" } },
     { name = "TWAI2", interrupts = { peri = "TWAI2" } },
-    { name = "PSRAM", virtual = true },
     # DMA: P4 has three DMA blocks; see [device.dma] below for the table.
     # esp-hal's `Dma` singleton needs the GDMA v2 layout, so map it to AHB_DMA.
     { name = "DMA", pac = "AHB_DMA" },
@@ -124,6 +123,7 @@ peripherals = [
     { name = "USB_WRAP", hidden = true },
 
     { name = "FLASH", virtual = true },
+    { name = "PSRAM", virtual = true, clock_group = "PSRAM" },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "CPU_CTRL", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },

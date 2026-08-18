@@ -5,7 +5,7 @@
 
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
-    clock::ll::{ClockTree, mpll_clk_frequency, request_mpll_clk},
+    clock::ll::{ClockTree, PsramInstance, mpll_clk_frequency, request_mpll_clk},
     efuse,
     peripherals::{HP_SYS, HP_SYS_CLKRST, PMU},
     soc::pac,
@@ -76,16 +76,6 @@ pub struct PsramConfig {
     // TODO: ECC enable.
     // The MSPI0 controller has a ECC engine.
     // pub ecc: bool, // or any other enum.
-}
-
-/// Initialize PSRAM.
-pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
-    init_psram_inner(config)
-}
-
-pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
-    let start = EXTMEM_ORIGIN;
-    start..start + config.size.get()
 }
 
 /// PSRAM timing parameters.
@@ -186,26 +176,18 @@ const AP_HEX_CS_SETUP_TIME: u32 = 4;
 const AP_HEX_CS_HOLD_TIME: u32 = 4;
 const AP_HEX_CS_HOLD_DELAY: u32 = 3;
 
+/// Initialize PSRAM.
 #[crate::ram]
-fn init_psram_inner(config: &mut PsramConfig) -> bool {
+pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     psram_phy_ldo_init();
 
     ClockTree::with(request_mpll_clk);
 
     // Module clock + clock source
-    HP_SYS_CLKRST::regs()
-        .soc_clk_ctrl0()
-        .modify(|_, w| w.psram_sys_clk_en().set_bit());
-
+    enable_psram_mspi();
     reset_psram_mspi();
 
-    HP_SYS_CLKRST::regs()
-        .peri_clk_ctrl00()
-        .modify(|_, w| unsafe {
-            w.psram_pll_clk_en().set_bit();
-            w.psram_core_clk_en().set_bit();
-            w.psram_clk_src_sel().bits(1) // 1 = MPLL
-        });
+    ClockTree::with(|clocks| PsramInstance::Psram.request_function_clock(clocks));
 
     // Controller + PHY pad bring-up.
     if !set_bus_clock(config.timing.clock) {
@@ -227,6 +209,7 @@ fn init_psram_inner(config: &mut PsramConfig) -> bool {
     // Silicon revision 3.0 (ECO5) requires two dummy PSRAM reads + a controller
     // reset before the real MMU mapping is committed.  Port of IDF's
     // `esp_psram_p4_rev3_workaround` in `esp_psram.c`.
+    #[cfg(esp32p4)]
     if efuse::chip_revision() == efuse::ChipRevision::from_combined(300) {
         debug!("Applying P4 v3.0 PSRAM workaround");
         p4_rev3_psram_workaround();
@@ -235,6 +218,11 @@ fn init_psram_inner(config: &mut PsramConfig) -> bool {
     mmu_map_psram(config); // MMU mapping here
 
     true
+}
+
+pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
+    let start = EXTMEM_ORIGIN;
+    start..start + config.size.get()
 }
 
 /// Set bus-clock divider for both PSRAM_MSPI0 (SRAM_CLK at 0x50) and
@@ -501,11 +489,8 @@ struct EspRomSpiCmd {
 /// `esp_rom_spiflash_read_mode_t`. Only OPI_DTR is used here.
 const ESP_ROM_SPIFLASH_OPI_DTR_MODE: u32 = 7;
 /// MSPI controller index used for direct (non-cache) PSRAM commands.
-/// Maps to `PSRAM_CTRLR_LL_MSPI_ID_3` in IDF (`PSRAM_MSPI1` = 0x5008_F000).
+/// Maps to `PSRAM_CTRLR_LL_MSPI_ID_3` in IDF.
 const ROM_SPI_PSRAM_CMD_NUM: i32 = 3;
-/// CS mask: PSRAM lives on CS1 (bit 1). Flash on CS0.
-#[expect(dead_code)]
-const ROM_SPI_PSRAM_CS_MASK: u8 = 1 << 1;
 
 unsafe extern "C" {
     /// Set the controller's read mode (e.g. OPI-DTR). Configures cmd/addr/
@@ -696,30 +681,6 @@ fn mmu_map_psram(config: &PsramConfig) {
     }
 }
 
-#[allow(dead_code)]
-pub(crate) fn cache_invalidate(addr: u32, size: u32) {
-    let cache = unsafe { crate::pac::CACHE::steal() };
-    cache.sync_addr().write(|w| unsafe { w.bits(addr) });
-    cache.sync_size().write(|w| unsafe { w.bits(size) });
-    cache
-        .sync_ctrl()
-        .modify(|_, w| w.invalidate_ena().set_bit());
-    while !cache.sync_ctrl().read().sync_done().bit_is_set() {
-        core::hint::spin_loop();
-    }
-}
-
-#[allow(dead_code)]
-pub(crate) fn cache_writeback(addr: u32, size: u32) {
-    let cache = unsafe { crate::pac::CACHE::steal() };
-    cache.sync_addr().write(|w| unsafe { w.bits(addr) });
-    cache.sync_size().write(|w| unsafe { w.bits(size) });
-    cache.sync_ctrl().modify(|_, w| w.writeback_ena().set_bit());
-    while !cache.sync_ctrl().read().sync_done().bit_is_set() {
-        core::hint::spin_loop();
-    }
-}
-
 /// Program the PMU external LDO regulators for the MSPI PHY
 fn psram_phy_ldo_init() {
     PMU::regs()
@@ -768,19 +729,21 @@ fn psram_phy_ldo_init() {
     crate::rom::ets_delay_us(50);
 }
 
+fn enable_psram_mspi() {
+    HP_SYS_CLKRST::regs()
+        .soc_clk_ctrl0()
+        .modify(|_, w| w.psram_sys_clk_en().set_bit());
+}
+
 fn reset_psram_mspi() {
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_axi().set_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_apb().set_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_apb().clear_bit());
-    HP_SYS_CLKRST::regs()
-        .hp_rst_en0()
-        .modify(|_, w| w.rst_en_dual_mspi_axi().clear_bit());
+    HP_SYS_CLKRST::regs().hp_rst_en0().modify(|_, w| {
+        w.rst_en_dual_mspi_axi().set_bit();
+        w.rst_en_dual_mspi_apb().set_bit()
+    });
+    HP_SYS_CLKRST::regs().hp_rst_en0().modify(|_, w| {
+        w.rst_en_dual_mspi_axi().clear_bit();
+        w.rst_en_dual_mspi_apb().clear_bit()
+    });
 }
 
 /// ESP32-P4 silicon revision 3.0 workaround.
@@ -799,6 +762,7 @@ fn reset_psram_mspi() {
 /// registers configured by `configure_psram_mspi`, `set_bus_clock`,
 /// `enable_dll`, and `set_cs_timing` are backed up before the reset and
 /// restored afterwards.
+#[cfg(esp32p4)]
 fn p4_rev3_psram_workaround() {
     /// MSPI0 registers touched by `configure_psram_mspi`, `set_bus_clock`,
     /// `enable_dll`, and `set_cs_timing` that must survive the controller reset.

@@ -662,3 +662,25 @@ fn configure_timg_calibration_clock_impl(
             })
         });
 }
+
+impl PsramInstance {
+    // PSRAM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs().peri_clk_ctrl00().modify(|_, w| {
+            w.psram_pll_clk_en().bit(en);
+            w.psram_core_clk_en().bit(en)
+        });
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<PsramFunctionClockConfig>,
+        _new_config: PsramFunctionClockConfig,
+    ) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl00()
+            .modify(|_, w| unsafe { w.psram_clk_src_sel().bits(1) }); // 1 = MPLL
+    }
+}

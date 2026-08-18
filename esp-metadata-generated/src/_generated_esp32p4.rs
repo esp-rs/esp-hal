@@ -1827,6 +1827,22 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl PsramInstance {
+///     // PSRAM_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<PsramFunctionClockConfig>,
+///         _new_config: PsramFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
@@ -1866,6 +1882,11 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum MipiDsiInstance {
             MipiDsi = 0,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum PsramInstance {
+            Psram = 0,
         }
         /// Selects the output frequency of `CPLL_CLK`. Depends on `XTAL_CLK`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2377,6 +2398,18 @@ macro_rules! define_clock_tree_types {
             /// Selects `PLL_F25M`.
             PllF25m,
         }
+        /// Configures the `PSRAM_FUNCTION_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = MPLL_CLK`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct PsramFunctionClockConfig {}
+        impl PsramFunctionClockConfig {
+            /// Creates a new configuration for the FUNCTION_CLOCK clock node.
+            pub const fn new() -> Self {
+                Self {}
+            }
+        }
         /// Represents the device's clock tree.
         pub struct ClockTree {
             cpll_clk: Option<CpllClkConfig>,
@@ -2401,6 +2434,7 @@ macro_rules! define_clock_tree_types {
             mipi_dsi_dpi_clk: [Option<MipiDsiDpiClkConfig>; 1],
             mipi_dsi_phy_pll_refclk: [Option<MipiDsiPhyPllRefclkConfig>; 1],
             mipi_dsi_phy_cfg_clk: [Option<MipiDsiPhyCfgClkConfig>; 1],
+            psram_function_clock: [Option<PsramFunctionClockConfig>; 1],
             cpll_clk_refcount: u32,
             spll_clk_refcount: u32,
             mpll_clk_refcount: u32,
@@ -2423,6 +2457,7 @@ macro_rules! define_clock_tree_types {
             mipi_dsi_dpi_clk_refcount: [u32; 1],
             mipi_dsi_phy_pll_refclk_refcount: [u32; 1],
             mipi_dsi_phy_cfg_clk_refcount: [u32; 1],
+            psram_function_clock_refcount: [u32; 1],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -2565,6 +2600,10 @@ macro_rules! define_clock_tree_types {
             pub fn mipi_dsi_phy_cfg_clk(&self) -> Option<MipiDsiPhyCfgClkConfig> {
                 self.mipi_dsi_phy_cfg_clk[MipiDsiInstance::MipiDsi as usize]
             }
+            /// Returns the current configuration of the PSRAM_FUNCTION_CLOCK clock tree node
+            pub fn psram_function_clock(&self) -> Option<PsramFunctionClockConfig> {
+                self.psram_function_clock[PsramInstance::Psram as usize]
+            }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
@@ -2590,6 +2629,7 @@ macro_rules! define_clock_tree_types {
                 mipi_dsi_dpi_clk: [None; 1],
                 mipi_dsi_phy_pll_refclk: [None; 1],
                 mipi_dsi_phy_cfg_clk: [None; 1],
+                psram_function_clock: [None; 1],
                 cpll_clk_refcount: 0,
                 spll_clk_refcount: 0,
                 mpll_clk_refcount: 0,
@@ -2612,6 +2652,7 @@ macro_rules! define_clock_tree_types {
                 mipi_dsi_dpi_clk_refcount: [0; 1],
                 mipi_dsi_phy_pll_refclk_refcount: [0; 1],
                 mipi_dsi_phy_cfg_clk_refcount: [0; 1],
+                psram_function_clock_refcount: [0; 1],
             });
         static CPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -4174,6 +4215,56 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
+        impl PsramInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                config: PsramFunctionClockConfig,
+            ) {
+                let old_config = clocks.psram_function_clock[self as usize].replace(config);
+                refresh_psram_function_clock_downstream(clocks, self);
+                self.configure_function_clock_impl(clocks, old_config, config);
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<PsramFunctionClockConfig> {
+                clocks.psram_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(
+                    &mut clocks.psram_function_clock_refcount[self as usize],
+                ) {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    request_mpll_clk(clocks);
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(
+                    &mut clocks.psram_function_clock_refcount[self as usize],
+                ) {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    release_mpll_clk(clocks);
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                clocks: &mut ClockTree,
+                config: PsramFunctionClockConfig,
+            ) -> u32 {
+                mpll_clk_frequency()
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                mpll_clk_frequency()
+            }
+            pub fn function_clock_source_frequency() -> u32 {
+                mpll_clk_frequency()
+            }
+        }
         /// Clock tree configuration.
         ///
         /// The fields of this struct are optional, with the following caveats:
@@ -4315,6 +4406,9 @@ macro_rules! define_clock_tree_types {
             for child_instance in [MipiDsiInstance::MipiDsi] {
                 refresh_mipi_dsi_phy_pll_refclk_downstream(clocks, child_instance);
                 refresh_mipi_dsi_phy_cfg_clk_downstream(clocks, child_instance);
+            }
+            for child_instance in [PsramInstance::Psram] {
+                refresh_psram_function_clock_downstream(clocks, child_instance);
             }
         }
         fn refresh_iomux_function_clock_downstream(clocks: &mut ClockTree) {
@@ -4479,6 +4573,11 @@ macro_rules! define_clock_tree_types {
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+        }
+        fn refresh_psram_function_clock_downstream(
+            clocks: &mut ClockTree,
+            instance: PsramInstance,
+        ) {
         }
     };
 }
@@ -5634,21 +5733,19 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "TWAI2 peripheral singleton"]
         TWAI2 <= TWAI2(TWAI2 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "DMA peripheral singleton"] DMA
-        <= AHB_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "ETH peripheral singleton"] ETH
-        <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
-        EMAC_MAC <= EMAC_MAC() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <= virtual(DSI_BRIDGE : {
-        bind_bridge_interrupt, enable_bridge_interrupt, disable_bridge_interrupt }, DSI :
-        { bind_dsi_interrupt, enable_dsi_interrupt, disable_dsi_interrupt })
-        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "VDMA peripheral singleton"] VDMA <= DMA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        #[doc = "DMA peripheral singleton"] DMA <= AHB_DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "AXI_GDMA peripheral singleton"]
+        AXI_GDMA <= AXI_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
+        EMAC_DMA <= EMAC_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MIPI_DSI peripheral singleton"]
+        MIPI_DSI <= virtual(DSI_BRIDGE : { bind_bridge_interrupt,
+        enable_bridge_interrupt, disable_bridge_interrupt }, DSI : { bind_dsi_interrupt,
+        enable_dsi_interrupt, disable_dsi_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "VDMA peripheral singleton"]
+        VDMA <= DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MIPI_DSI_BRIDGE peripheral singleton"] MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE()
@@ -5690,6 +5787,8 @@ macro_rules! for_each_peripheral {
         #[doc = "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
         FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
         CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
@@ -5777,7 +5876,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((TWAI0(unstable)));
         _for_each_inner_peripheral!((TWAI1(unstable)));
         _for_each_inner_peripheral!((TWAI2(unstable)));
-        _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
         _for_each_inner_peripheral!((AXI_GDMA(unstable)));
         _for_each_inner_peripheral!((ETH(unstable)));
@@ -5797,6 +5895,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((USB_FS(unstable)));
         _for_each_inner_peripheral!((USB_HS(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
+        _for_each_inner_peripheral!((PSRAM(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR0(unstable)));
@@ -6024,16 +6123,15 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "TWAI2 peripheral singleton"] TWAI2 <= TWAI2(TWAI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)), (@ peri_type
-        #[doc = "DMA peripheral singleton"] DMA <= AHB_DMA() (unstable)), (@ peri_type
-        #[doc = "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)), (@
-        peri_type #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@
-        peri_type #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA()
-        (unstable)), (@ peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <=
-        EMAC_MAC() (unstable)), (@ peri_type #[doc = "MIPI_DSI peripheral singleton"]
-        MIPI_DSI <= virtual(DSI_BRIDGE : { bind_bridge_interrupt,
-        enable_bridge_interrupt, disable_bridge_interrupt }, DSI : { bind_dsi_interrupt,
-        enable_dsi_interrupt, disable_dsi_interrupt }) (unstable)), (@ peri_type #[doc =
+        = "DMA peripheral singleton"] DMA <= AHB_DMA() (unstable)), (@ peri_type #[doc =
+        "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)), (@ peri_type
+        #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@ peri_type
+        #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)), (@
+        peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC()
+        (unstable)), (@ peri_type #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <=
+        virtual(DSI_BRIDGE : { bind_bridge_interrupt, enable_bridge_interrupt,
+        disable_bridge_interrupt }, DSI : { bind_dsi_interrupt, enable_dsi_interrupt,
+        disable_dsi_interrupt }) (unstable)), (@ peri_type #[doc =
         "VDMA peripheral singleton"] VDMA <= DMA() (unstable)), (@ peri_type #[doc =
         "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST()
         (unstable)), (@ peri_type #[doc = "MIPI_DSI_BRIDGE peripheral singleton"]
@@ -6067,12 +6165,13 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)), (@
         peri_type #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)),
-        (@ peri_type #[doc = "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <=
-        virtual() (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
-        CPU_CTRL <= virtual() (unstable)), (@ peri_type #[doc =
-        "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual() (unstable)),
-        (@ peri_type #[doc = "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <=
-        virtual() (unstable)), (@ peri_type #[doc =
+        (@ peri_type #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual()
+        (unstable)), (@ peri_type #[doc = "GPIO_DEDICATED peripheral singleton"]
+        GPIO_DEDICATED <= virtual() (unstable)), (@ peri_type #[doc =
+        "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable)), (@ peri_type
+        #[doc = "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual()
+        (unstable)), (@ peri_type #[doc = "FROM_CPU_INTR1 peripheral singleton"]
+        FROM_CPU_INTR1 <= virtual() (unstable)), (@ peri_type #[doc =
         "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <= virtual() (unstable)),
         (@ peri_type #[doc = "FROM_CPU_INTR3 peripheral singleton"] FROM_CPU_INTR3 <=
         virtual() (unstable)))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1),
@@ -6096,12 +6195,12 @@ macro_rules! for_each_peripheral {
         (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1), (UART2), (UART3),
         (UART4), (UHCI0(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3),
         (I2C0), (I2C1), (I2S0(unstable)), (I2S1(unstable)), (I2S2(unstable)),
-        (TWAI0(unstable)), (TWAI1(unstable)), (TWAI2(unstable)), (PSRAM(unstable)),
-        (DMA(unstable)), (AXI_GDMA(unstable)), (ETH(unstable)), (MIPI_DSI(unstable)),
+        (TWAI0(unstable)), (TWAI1(unstable)), (TWAI2(unstable)), (DMA(unstable)),
+        (AXI_GDMA(unstable)), (ETH(unstable)), (MIPI_DSI(unstable)),
         (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
         (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)), (ADC(unstable)),
         (AES(unstable)), (SHA(unstable)), (RSA(unstable)), (ECC(unstable)),
-        (USB_FS(unstable)), (USB_HS(unstable)), (FLASH(unstable)),
+        (USB_FS(unstable)), (USB_HS(unstable)), (FLASH(unstable)), (PSRAM(unstable)),
         (GPIO_DEDICATED(unstable)), (CPU_CTRL(unstable)), (FROM_CPU_INTR0(unstable)),
         (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
         (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
