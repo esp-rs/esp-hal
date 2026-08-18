@@ -27,6 +27,7 @@ use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
     interrupt::software::SoftwareInterruptControl,
+    ram,
     rng::Rng,
     rtc_cntl::Rtc,
     timer::timg::TimerGroup,
@@ -91,7 +92,8 @@ async fn main(spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(config);
     let rtc = Rtc::new(peripherals.RTC_TIMER);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
