@@ -113,6 +113,21 @@ pub enum Package {
     CompileTests,
 }
 
+// Returns the root directory of the esp-hal repository.
+fn repo_root() -> PathBuf {
+    let cwd = std::env::current_dir().unwrap();
+    let mut cwd = cwd.as_path();
+    loop {
+        if cwd.join("xtask").exists() && cwd.join("esp-hal").exists() {
+            return cwd.to_path_buf();
+        }
+        let Some(parent) = cwd.parent() else {
+            panic!("Looks like you are not in the esp-hal repository");
+        };
+        cwd = parent;
+    }
+}
+
 static TOML: Mutex<Option<HashMap<Package, Option<CargoToml>>>> = Mutex::new(None);
 
 impl Package {
@@ -507,7 +522,7 @@ impl Package {
 
             tomls
                 .entry(*self)
-                .or_insert_with(|| CargoToml::new(&std::env::current_dir().unwrap(), *self).ok())
+                .or_insert_with(|| CargoToml::new(&repo_root(), *self).ok())
         })
     }
 
