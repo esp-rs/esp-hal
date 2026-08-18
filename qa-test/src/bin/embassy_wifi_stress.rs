@@ -64,13 +64,12 @@ async fn main(_spawner: Spawner) {
 
         {
             println!("Connecting to WiFi SSID: {}", SSID);
-            let scan_config =
-                ScanConfig::default()
-                    .with_ssid(SSID)
-                    .with_scan_type(ScanTypeConfig::Active {
-                        min: esp_hal::time::Duration::from_millis(50),
-                        max: esp_hal::time::Duration::from_millis(200),
-                    });
+            let scan_config = ScanConfig::default()
+                .with_ssid(SSID.try_into().unwrap())
+                .with_scan_type(ScanTypeConfig::Active {
+                    min: esp_hal::time::Duration::from_millis(50),
+                    max: esp_hal::time::Duration::from_millis(200),
+                });
             println!("Scanning for WiFi networks");
             let aps = controller
                 .scan_async(&scan_config)
@@ -96,11 +95,11 @@ async fn main(_spawner: Spawner) {
 
             let station_config = Config::Station(
                 StationConfig::default()
-                    .with_ssid(best_one.ssid.clone())
+                    .with_ssid(best_one.ssid)
                     .with_bssid(best_one.bssid)
                     .with_authentication(match best_one.auth_method {
                         Some(AuthenticationMethod::Wpa2Personal) => {
-                            AuthenticationMethodConfig::Wpa2Personal(PASSWORD.into())
+                            AuthenticationMethodConfig::Wpa2Personal(PASSWORD.try_into().unwrap())
                         }
                         Some(AuthenticationMethod::None) => AuthenticationMethodConfig::Open,
                         _ => {

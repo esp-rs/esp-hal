@@ -35,7 +35,6 @@ pub struct AccessPointInfo {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AccessPointConfig {
     /// The SSID of the access point.
-    #[builder_lite(skip_setter)]
     pub(crate) ssid: Ssid,
     /// Whether the SSID is hidden or visible.
     pub(crate) ssid_hidden: bool,
@@ -62,18 +61,13 @@ pub struct AccessPointConfig {
 }
 
 impl AccessPointConfig {
-    /// Set the SSID of the access point.
-    pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
-        self.ssid = ssid.into();
-        self
-    }
-
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
+        if let Some(password) = self.authentication.password() {
+            if password.is_empty() {
+                warn!("Access point password is empty.");
+                return Err(WifiError::InvalidPassword);
+            }
         }
-
-        self.authentication.validate(true)?;
 
         if !(1..=10).contains(&self.dtim_period) {
             return Err(WifiError::InvalidArguments);
@@ -86,7 +80,7 @@ impl AccessPointConfig {
 impl Default for AccessPointConfig {
     fn default() -> Self {
         Self {
-            ssid: "iot-device".into(),
+            ssid: "iot-device".try_into().expect("SSID length is valid"),
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
@@ -144,7 +138,7 @@ pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
         .iter()
         .position(|&c| c == 0)
         .unwrap_or(record.ssid.len());
-    let ssid = Ssid::from(&record.ssid[..str_len]);
+    let ssid = Ssid::try_from(&record.ssid[..str_len]).expect("SSID length is valid");
 
     AccessPointInfo {
         ssid,

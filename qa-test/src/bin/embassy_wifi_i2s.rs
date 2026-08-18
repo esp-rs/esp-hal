@@ -174,8 +174,10 @@ async fn main(spawner: Spawner) {
     // WiFi + network stack
     let station_config = Config::Station(
         StationConfig::default()
-            .with_ssid(SSID)
-            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(PASSWORD.into())),
+            .with_ssid(SSID.try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                PASSWORD.try_into().unwrap(),
+            )),
     );
 
     println!("Starting wifi");

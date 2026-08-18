@@ -29,7 +29,6 @@ pub enum ScanMethod {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct StationConfig {
     /// The SSID of the Wi-Fi network.
-    #[builder_lite(skip_setter)]
     pub(crate) ssid: Ssid,
     /// The BSSID (MAC address) of the station.
     pub(crate) bssid: Option<[u8; 6]>,
@@ -65,19 +64,7 @@ pub struct StationConfig {
 }
 
 impl StationConfig {
-    /// Set the SSID of the access point.
-    pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
-        self.ssid = ssid.into();
-        self
-    }
-
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
-        self.authentication.validate(false)?;
-
         if !(6..=31).contains(&self.beacon_timeout) {
             return Err(WifiError::InvalidArguments);
         }
@@ -91,7 +78,9 @@ impl Default for StationConfig {
         StationConfig {
             ssid: Ssid::default(),
             bssid: None,
-            authentication: AuthenticationMethodConfig::Wpa2Personal("".into()),
+            authentication: AuthenticationMethodConfig::Wpa2Personal(
+                "".try_into().expect("Password length is valid"),
+            ),
             channel: None,
             protocols: Protocols::default(),
             listen_interval: 3,

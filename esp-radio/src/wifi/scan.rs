@@ -84,7 +84,6 @@ pub struct ScanConfig {
     /// If [`None`] is passed, all SSIDs will be returned.
     /// If [`Some`] is passed, only the APs matching the given SSID will be
     /// returned.
-    #[builder_lite(skip_setter)]
     pub(crate) ssid: Option<Ssid>,
     /// BSSID to filter for.
     /// If [`None`] is passed, all BSSIDs will be returned.
@@ -104,20 +103,6 @@ pub struct ScanConfig {
     /// If [`None`] is passed, all networks will be returned.
     /// If [`Some`] is passed, the specified number of networks will be returned.
     pub(crate) max: Option<usize>,
-}
-
-impl ScanConfig {
-    /// Set the SSID of the access point.
-    pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
-        self.ssid = Some(ssid.into());
-        self
-    }
-
-    /// Clears the SSID.
-    pub fn with_ssid_none(mut self) -> Self {
-        self.ssid = None;
-        self
-    }
 }
 
 /// Wi-Fi scan results.

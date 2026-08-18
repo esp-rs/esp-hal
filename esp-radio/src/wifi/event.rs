@@ -1071,7 +1071,7 @@ impl EventInfo {
                 let ev = unsafe { StationConnected::from_raw_event_data(payload) };
 
                 Some(EventInfo::StationConnected {
-                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()),
+                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()).expect("SSID length is valid"),
                     bssid: ev.bssid().try_into().unwrap(),
                     channel: ev.channel(),
                     authmode: ev.authmode(),
@@ -1081,7 +1081,7 @@ impl EventInfo {
             WifiEvent::StationDisconnected => {
                 let ev = unsafe { StationDisconnected::from_raw_event_data(payload) };
                 Some(EventInfo::StationDisconnected {
-                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()),
+                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()).expect("SSID length is valid"),
                     bssid: ev.bssid().try_into().unwrap(),
                     reason: ev.reason() as u16,
                     rssi: ev.rssi(),
@@ -1121,7 +1121,7 @@ impl EventInfo {
                     credentials: Collection(ev
                         .access_point_cred()[..ev.access_point_cred_cnt() as usize].iter()
                         .map(|cred| CredentialsInfo {
-                            ssid: cred.ssid().into(),
+                            ssid: cred.ssid().try_into().expect("SSID length is valid"),
                             passphrase: cred.passphrase().try_into().unwrap(),
                         })
                         .collect()),

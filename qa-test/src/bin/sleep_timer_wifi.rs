@@ -57,8 +57,10 @@ async fn main(_spawner: Spawner) -> ! {
 
     let station_config = wifi::Config::Station(
         StationConfig::default()
-            .with_ssid("FakeNetwork")
-            .with_authentication(AuthenticationMethodConfig::Wpa2Personal("password".into())),
+            .with_ssid("FakeNetwork".try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                "password".try_into().unwrap(),
+            )),
     );
     let _wifi_interface = Interface::station();
     let mut controller = WifiController::new(

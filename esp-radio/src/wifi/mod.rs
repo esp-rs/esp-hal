@@ -735,7 +735,9 @@ impl DisconnectReason {
     }
 }
 
-/// Information about a connected station.
+/// A Wi-Fi SSID.
+///
+/// Can be up to 32 bytes long (i.e. not characters). Longer SSIDs are rejected.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Ssid {
@@ -744,24 +746,39 @@ pub struct Ssid {
 }
 
 impl Ssid {
-    pub(crate) fn new(ssid: &str) -> Self {
+    pub(crate) fn new(ssid: &str) -> Result<Self, WifiError> {
         let mut ssid_bytes = [0u8; 32];
         let bytes = ssid.as_bytes();
-        let len = usize::min(32, bytes.len());
+
+        if bytes.len() > 32 {
+            warn!("SSID is longer than 32 bytes");
+            return Err(WifiError::InvalidSsid);
+        }
+
+        let len = bytes.len();
         ssid_bytes[..len].copy_from_slice(bytes);
 
         Self::from_raw(&ssid_bytes, len as u8)
     }
 
-    pub(crate) fn from_raw(ssid: &[u8], len: u8) -> Self {
+    pub(crate) fn from_raw(ssid: &[u8], len: u8) -> Result<Self, WifiError> {
+        let len = len as usize;
+        if len > 32 {
+            warn!("SSID is longer than 32 bytes");
+            return Err(WifiError::InvalidSsid);
+        }
+        if ssid.len() < len {
+            warn!("SSID buffer shorter than reported length");
+            return Err(WifiError::InvalidSsid);
+        }
+
         let mut ssid_bytes = [0u8; 32];
-        let len = usize::min(32, len as usize);
         ssid_bytes[..len].copy_from_slice(&ssid[..len]);
 
-        Self {
+        Ok(Self {
             ssid: ssid_bytes,
             len: len as u8,
-        }
+        })
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
@@ -799,26 +816,38 @@ impl Debug for Ssid {
     }
 }
 
-impl From<alloc::string::String> for Ssid {
-    fn from(ssid: alloc::string::String) -> Self {
+impl TryFrom<alloc::string::String> for Ssid {
+    type Error = WifiError;
+
+    fn try_from(ssid: alloc::string::String) -> Result<Self, Self::Error> {
         Self::new(&ssid)
     }
 }
 
-impl From<&str> for Ssid {
-    fn from(ssid: &str) -> Self {
+impl TryFrom<&str> for Ssid {
+    type Error = WifiError;
+
+    fn try_from(ssid: &str) -> Result<Self, Self::Error> {
         Self::new(ssid)
     }
 }
 
-impl From<&[u8]> for Ssid {
-    fn from(ssid: &[u8]) -> Self {
+impl TryFrom<&[u8]> for Ssid {
+    type Error = WifiError;
+
+    fn try_from(ssid: &[u8]) -> Result<Self, Self::Error> {
+        if ssid.len() > 32 {
+            warn!("SSID is longer than 32 bytes");
+            return Err(WifiError::InvalidSsid);
+        }
+
         Self::from_raw(ssid, ssid.len() as u8)
     }
 }
 
 /// Authentication Configuration for a Wi-Fi network.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum AuthenticationMethodConfig {
     /// Open authentication.
@@ -838,23 +867,6 @@ pub enum AuthenticationMethodConfig {
 }
 
 impl AuthenticationMethodConfig {
-    fn validate(&self, require_non_empty_password: bool) -> Result<(), WifiError> {
-        match self {
-            AuthenticationMethodConfig::Open => Ok(()),
-            AuthenticationMethodConfig::Wep(password)
-            | AuthenticationMethodConfig::Wpa(password)
-            | AuthenticationMethodConfig::Wpa2Personal(password)
-            | AuthenticationMethodConfig::WpaWpa2Personal(password) => {
-                if require_non_empty_password && password.is_empty() {
-                    warn!("The password is empty");
-                    Err(WifiError::InvalidPassword)
-                } else {
-                    Ok(())
-                }
-            }
-        }
-    }
-
     fn auth_method(&self) -> AuthenticationMethod {
         match self {
             AuthenticationMethodConfig::Open => AuthenticationMethod::None,
@@ -865,51 +877,20 @@ impl AuthenticationMethodConfig {
         }
     }
 
-    fn password(&self) -> &[u8] {
+    fn password(&self) -> Option<&[u8]> {
         match self {
-            AuthenticationMethodConfig::Open => &[],
+            AuthenticationMethodConfig::Open => None,
             AuthenticationMethodConfig::Wep(password)
             | AuthenticationMethodConfig::Wpa(password)
             | AuthenticationMethodConfig::Wpa2Personal(password)
-            | AuthenticationMethodConfig::WpaWpa2Personal(password) => password.as_bytes(),
-        }
-    }
-}
-
-impl core::fmt::Debug for AuthenticationMethodConfig {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Open => f.debug_tuple("Open").finish(),
-            Self::Wep(_) => f.debug_tuple("Wep").field(&"**REDACTED**").finish(),
-            Self::Wpa(_) => f.debug_tuple("Wpa").field(&"**REDACTED**").finish(),
-            Self::Wpa2Personal(_) => f
-                .debug_tuple("Wpa2Personal")
-                .field(&"**REDACTED**")
-                .finish(),
-            Self::WpaWpa2Personal(_) => f
-                .debug_tuple("WpaWpa2Personal")
-                .field(&"**REDACTED**")
-                .finish(),
-        }
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for AuthenticationMethodConfig {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        match self {
-            Self::Open => defmt::write!(fmt, "Open"),
-            Self::Wep(_) => defmt::write!(fmt, "Wep(**REDACTED**)"),
-            Self::Wpa(_) => defmt::write!(fmt, "Wpa(**REDACTED**)"),
-            Self::Wpa2Personal(_) => defmt::write!(fmt, "Wpa2Personal(**REDACTED**)"),
-            Self::WpaWpa2Personal(_) => defmt::write!(fmt, "WpaWpa2Personal(**REDACTED**)"),
+            | AuthenticationMethodConfig::WpaWpa2Personal(password) => Some(password.as_bytes()),
         }
     }
 }
 
 /// A password.
-/// Can be up to 64 bytes long (i.e. not characters).
-/// Longer passwords will be truncated to 64 bytes.
+///
+/// Can be up to 64 bytes long (i.e. not characters). Longer passwords are rejected.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Password {
     password: [u8; 64],
@@ -917,23 +898,24 @@ pub struct Password {
 }
 
 impl Password {
-    pub(crate) fn new(password: &str) -> Self {
+    pub(crate) fn new(password: &str) -> Result<Self, WifiError> {
         Self::from_raw(password.as_bytes())
     }
 
-    pub(crate) fn from_raw(password: &[u8]) -> Self {
+    pub(crate) fn from_raw(password: &[u8]) -> Result<Self, WifiError> {
         if password.len() > 64 {
-            warn!("Password is longer than 64 bytes, truncating");
+            warn!("Password is longer than 64 bytes");
+            return Err(WifiError::InvalidPassword);
         }
 
         let mut pwd_bytes = [0u8; 64];
-        let len = usize::min(64, password.len());
-        pwd_bytes[..len].copy_from_slice(&password[..len]);
+        let len = password.len();
+        pwd_bytes[..len].copy_from_slice(password);
 
-        Self {
+        Ok(Self {
             password: pwd_bytes,
             len: len as u8,
-        }
+        })
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
@@ -962,25 +944,29 @@ impl Default for Password {
 
 impl Debug for Password {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str("Password( ** REDACTED **)")
+        f.write_str("**REDACTED**")
     }
 }
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for Password {
     fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "Password( ** REDACTED **)")
+        defmt::write!(fmt, "**REDACTED**")
     }
 }
 
-impl From<&str> for Password {
-    fn from(password: &str) -> Self {
+impl TryFrom<&str> for Password {
+    type Error = WifiError;
+
+    fn try_from(password: &str) -> Result<Self, Self::Error> {
         Self::new(password)
     }
 }
 
-impl From<&[u8]> for Password {
-    fn from(password: &[u8]) -> Self {
+impl TryFrom<&[u8]> for Password {
+    type Error = WifiError;
+
+    fn try_from(password: &[u8]) -> Result<Self, Self::Error> {
         Self::from_raw(password)
     }
 }
@@ -2673,7 +2659,7 @@ impl WifiController<'_> {
     /// use esp_radio::wifi::Protocols;
     ///
     /// let controller_config = ControllerConfig::default().with_initial_config(Config::AccessPoint(
-    ///     AccessPointConfig::default().with_ssid("esp-radio"),
+    ///     AccessPointConfig::default().with_ssid("esp-radio".try_into()?),
     /// ));
     /// let mut wifi_controller =
     ///     esp_radio::wifi::WifiController::new(peripherals.WIFI, controller_config)?;
@@ -2840,8 +2826,10 @@ impl WifiController<'_> {
     /// #    esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// let station_config = Config::Station(
     ///     StationConfig::default()
-    ///         .with_ssid("SSID")
-    ///         .with_authentication(AuthenticationMethodConfig::Wpa2Personal("PASSWORD".into())),
+    ///         .with_ssid("SSID".try_into()?)
+    ///         .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+    ///             "PASSWORD".try_into()?,
+    ///         )),
     /// );
     ///
     /// controller.set_config(&station_config)?;
@@ -3361,6 +3349,8 @@ ignored."
     }
 
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
+        config.validate()?;
+
         // The upper limit of connections available for the AP. The user set limit in
         // apply_ap_config is clipped to this value
         let ap_max_connections = TOTAL_HW_ENCRYPT_KEYS
@@ -3397,13 +3387,12 @@ ignored."
             },
         };
 
-        config.authentication.validate(true)?;
-
         unsafe {
             cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
             cfg.ap.ssid_len = config.ssid.len() as u8;
-            cfg.ap.password[0..(config.authentication.password().len())]
-                .copy_from_slice(config.authentication.password());
+            if let Some(password) = config.authentication.password() {
+                cfg.ap.password[0..(password.len())].copy_from_slice(password);
+            }
 
             // Compare the new ap config with the current. Only update if something is changing.
             // This avoids unnecessary connection issues.
@@ -3420,6 +3409,8 @@ ignored."
     }
 
     fn apply_sta_config(&mut self, config: &StationConfig) -> Result<(), WifiError> {
+        config.validate()?;
+
         let mut cfg = wifi_config_t {
             sta: wifi_sta_config_t {
                 ssid: [0; 32],
@@ -3450,12 +3441,11 @@ ignored."
             },
         };
 
-        config.authentication.validate(false)?;
-
         unsafe {
             cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
-            cfg.sta.password[0..(config.authentication.password().len())]
-                .copy_from_slice(config.authentication.password());
+            if let Some(password) = config.authentication.password() {
+                cfg.sta.password[0..(password.len())].copy_from_slice(password);
+            }
 
             // Compare the new sta config with the current. Only update if something is changing.
             // This avoids unnecessary connection issues.

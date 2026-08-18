@@ -61,7 +61,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let access_point_config = Config::AccessPoint(
         AccessPointConfig::default()
-            .with_ssid("AP")
+            .with_ssid("AP".try_into().unwrap())
             .with_authentication(AuthenticationMethodConfig::Open),
     );
 

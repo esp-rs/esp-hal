@@ -57,8 +57,9 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
-    let access_point_config =
-        Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio"));
+    let access_point_config = Config::AccessPoint(
+        AccessPointConfig::default().with_ssid("esp-radio".try_into().unwrap()),
+    );
 
     println!("Starting wifi");
     let device = esp_radio::wifi::Interface::access_point();

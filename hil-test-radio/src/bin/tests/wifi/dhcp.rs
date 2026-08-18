@@ -35,7 +35,7 @@ mod tests {
     fn station_config() -> Config {
         Config::Station(
             StationConfig::default()
-                .with_ssid("AP")
+                .with_ssid("AP".try_into().unwrap())
                 .with_authentication(AuthenticationMethodConfig::Open),
         )
     }

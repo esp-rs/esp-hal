@@ -145,7 +145,8 @@ async fn main(_s: Spawner) -> ! {
 
 /// Bring up a Wi-Fi SoftAP and keep it beaconing for `active_ms`.
 async fn run_wifi(wifi: esp_hal::peripherals::WIFI<'static>, active_ms: u32) {
-    let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid(AP_SSID));
+    let ap_config =
+        Config::AccessPoint(AccessPointConfig::default().with_ssid(AP_SSID.try_into().unwrap()));
 
     // Creating the controller in AP mode calls `esp_wifi_start()`, so the radio
     // starts beaconing immediately.

@@ -35,8 +35,10 @@ async fn main(_spawner: Spawner) {
     {
         let station_config = Config::Station(
             StationConfig::default()
-                .with_ssid(SSID)
-                .with_authentication(AuthenticationMethodConfig::Wpa2Personal(PASSWORD.into())),
+                .with_ssid(SSID.try_into().unwrap())
+                .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                    PASSWORD.try_into().unwrap(),
+                )),
         );
 
         let mut wifi_interface = esp_radio::wifi::Interface::station();
@@ -71,8 +73,10 @@ async fn main(_spawner: Spawner) {
     {
         let station_config = Config::Station(
             StationConfig::default()
-                .with_ssid(SSID)
-                .with_authentication(AuthenticationMethodConfig::Wpa2Personal(PASSWORD.into())),
+                .with_ssid(SSID.try_into().unwrap())
+                .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                    PASSWORD.try_into().unwrap(),
+                )),
         );
 
         let mut wifi_interface = esp_radio::wifi::Interface::station();

@@ -85,9 +85,11 @@ async fn main(spawner: Spawner) -> ! {
 
     let access_point_station_config = Config::AccessPointStation(
         StationConfig::default()
-            .with_ssid(SSID)
-            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(PASSWORD.into())),
-        AccessPointConfig::default().with_ssid("esp-radio-apsta"),
+            .with_ssid(SSID.try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                PASSWORD.try_into().unwrap(),
+            )),
+        AccessPointConfig::default().with_ssid("esp-radio-apsta".try_into().unwrap()),
     );
 
     println!("Starting wifi");
