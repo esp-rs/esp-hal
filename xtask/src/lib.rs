@@ -147,15 +147,8 @@ impl Package {
 
         // This is intended to opt-out in case there are features that look like chip names, but
         // aren't supposed to be handled like them.
-        if let Some(metadata) = toml.espressif_metadata()
-            && let Some(Item::Value(ov)) = metadata.get("has_chip_features")
-        {
-            let Value::Boolean(ov) = ov else {
-                log::warn!("Invalid value for 'has_chip_features' in metadata");
-                return false;
-            };
-
-            return *ov.value();
+        if let Some(has_chip_features) = toml.espressif_metadata_bool("has_chip_features") {
+            return has_chip_features;
         }
 
         features
