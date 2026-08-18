@@ -62,11 +62,11 @@ pub struct AccessPointConfig {
 
 impl AccessPointConfig {
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
-        if let Some(password) = self.authentication.password() {
-            if password.is_empty() {
-                warn!("Access point password is empty.");
-                return Err(WifiError::InvalidPassword);
-            }
+        if let Some(password) = self.authentication.password()
+            && password.is_empty()
+        {
+            warn!("Access point password is empty.");
+            return Err(WifiError::InvalidPassword);
         }
 
         if !(1..=10).contains(&self.dtim_period) {
