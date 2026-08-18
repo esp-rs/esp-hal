@@ -1,52 +1,15 @@
 //! PSRAM driver for ESP32-P4.
 
-use pac::spi0::RegisterBlock as PsramSpi0RegisterBlock;
+use esp32p4::{generic::Reg, iomux_mspi_pin::psram_d_pin0::PSRAM_D_PIN0_SPEC};
 
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
     clock::ll::{ClockTree, PsramFunctionClockConfig, PsramInstance},
     efuse,
-    peripherals::{HP_SYS, HP_SYS_CLKRST, PMU},
-    soc::pac,
+    peripherals::{HP_SYS, HP_SYS_CLKRST, IOMUX_MSPI_PIN, MEMSPI2, MEMSPI3, PMU},
 };
 
 const MMU_PAGE_SIZE: usize = property!("mmu.page_size");
-
-/// PSRAM_MSPI0 base, AXI cache controller.
-const MSPI0_BASE: u32 = 0x5008_E000;
-
-/// PSRAM_MSPI1 base, direct-command controller.
-const MSPI1_BASE: u32 = 0x5008_F000;
-
-/// IOMUX_MSPI_PIN base. Each PSRAM pad has a `..._PIN0_REG` at this base
-/// plus the pad-specific offset given by `PsramPad`.
-const IOMUX_MSPI_BASE: u32 = 0x500E_1200;
-
-/// Volatile 32-bit read.
-#[inline(always)]
-unsafe fn mmio_read_32(addr: u32) -> u32 {
-    unsafe { (addr as *const u32).read_volatile() }
-}
-
-/// Volatile 32-bit write (full overwrite).
-#[inline(always)]
-unsafe fn mmio_write_32(addr: u32, val: u32) {
-    unsafe { (addr as *mut u32).write_volatile(val) }
-}
-
-/// Read-modify-write: set every bit of `mask`. Equivalent to
-/// `*addr |= mask`.
-#[inline(always)]
-unsafe fn mmio_setbits_32(addr: u32, mask: u32) {
-    unsafe { mmio_write_32(addr, mmio_read_32(addr) | mask) }
-}
-
-/// Read-modify-write: clear `clear`-bits then set `set`-bits.
-/// Equivalent to `*addr = (*addr & !clear) | set`.
-#[inline(always)]
-unsafe fn mmio_clrsetbits_32(addr: u32, clear: u32, set: u32) {
-    unsafe { mmio_write_32(addr, (mmio_read_32(addr) & !clear) | set) }
-}
 
 /// PSRAM interface mode (line count of the data bus).
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -85,14 +48,6 @@ pub struct PsramConfig {
 ///
 /// These values should be tuned together with the source clock frequency. The source clock
 /// frequency must be an integer multiple of the PSRAM frequency.
-///
-/// | Variant   | Source | div | MR0.RL | MR4.WL | RD dummy bits
-/// |-----------|--------|-----|--------|--------|--------------
-/// | `MHZ_20`  | 400    | 20  | 2      | 2      | 18
-/// | `MHZ_80`  | 320    | 4   | 2      | 2      | 18
-/// | `MHZ_125` | 500    | 4   | 2      | 2      | 18
-/// | `MHZ_200` | 400    | 2   | 4      | 1      | 26
-/// | `MHZ_250` | 500    | 2   | 6      | 3      | 34
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PsramTimingParams {
@@ -109,10 +64,14 @@ pub struct PsramTimingParams {
     pub mr4_wl: u8,
 
     /// Read dummy length in bits for sync data reads (cache path).
-    pub rd_dummy_bits: u32,
+    ///
+    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
+    pub rd_dummy_bits: u8,
 
     /// Write dummy length in bits for sync data writes (cache path).
-    pub wr_dummy_bits: u32,
+    ///
+    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
+    pub wr_dummy_bits: u8,
 
     /// Register-read dummy length for direct command path (MSPI3).
     pub reg_dummy_bits: u32,
@@ -131,8 +90,8 @@ impl PsramTimingParams {
         clock: 20,
         mr0_rl: 2,
         mr4_wl: 2,
-        rd_dummy_bits: 18,
-        wr_dummy_bits: 8,
+        rd_dummy_bits: 17,
+        wr_dummy_bits: 7,
         reg_dummy_bits: 8,
     };
 
@@ -142,8 +101,8 @@ impl PsramTimingParams {
         clock: 80,
         mr0_rl: 2,
         mr4_wl: 2,
-        rd_dummy_bits: 18,
-        wr_dummy_bits: 8,
+        rd_dummy_bits: 17,
+        wr_dummy_bits: 7,
         reg_dummy_bits: 8,
     };
 
@@ -153,8 +112,8 @@ impl PsramTimingParams {
         clock: 125,
         mr0_rl: 2,
         mr4_wl: 2,
-        rd_dummy_bits: 18,
-        wr_dummy_bits: 8,
+        rd_dummy_bits: 17,
+        wr_dummy_bits: 7,
         reg_dummy_bits: 8,
     };
 
@@ -164,8 +123,8 @@ impl PsramTimingParams {
         clock: 200,
         mr0_rl: 4,
         mr4_wl: 1,
-        rd_dummy_bits: 26,
-        wr_dummy_bits: 12,
+        rd_dummy_bits: 25,
+        wr_dummy_bits: 11,
         reg_dummy_bits: 12,
     };
 
@@ -175,17 +134,11 @@ impl PsramTimingParams {
         clock: 250,
         mr0_rl: 6,
         mr4_wl: 3,
-        rd_dummy_bits: 34,
-        wr_dummy_bits: 16,
+        rd_dummy_bits: 33,
+        wr_dummy_bits: 15,
         reg_dummy_bits: 16,
     };
 }
-
-/// CS timing constants (matches IDF AP_HEX_PSRAM_CS_*). Independent of
-/// `SpiRamFreq` -- IDF uses the same values across all speed branches.
-const AP_HEX_CS_SETUP_TIME: u32 = 4;
-const AP_HEX_CS_HOLD_TIME: u32 = 4;
-const AP_HEX_CS_HOLD_DELAY: u32 = 3;
 
 /// Initialize PSRAM.
 #[crate::ram]
@@ -216,7 +169,7 @@ pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
         config.size = PsramSize::Size(psram_detect_size(&config.timing));
     }
 
-    configure_psram_mspi(&config.timing, MSPI0_BASE); // basic AXI configuration here
+    configure_psram_mspi_hex(&config.timing); // basic AXI configuration here
 
     // Silicon revision 3.0 (ECO5) requires two dummy PSRAM reads + a controller
     // reset before the real MMU mapping is committed.  Port of IDF's
@@ -247,130 +200,45 @@ fn set_bus_clock(clock: u32) -> bool {
         return false;
     }
 
-    let div = source_mhz / clock;
+    let div = (source_mhz / clock) as u8;
 
-    const MSPI0_SRAM_CLK: u32 = MSPI0_BASE + 0x50;
-    const MSPI1_CLOCK: u32 = MSPI1_BASE + 0x14;
-
-    let val = if div <= 1 {
-        1u32 << 31 // EQU_SYSCLK
+    if div <= 1 {
+        MEMSPI2::regs().sram_clk().write(|w| unsafe {
+            w.sclk_equ_sysclk().set_bit();
+            w.sclkcnt_n().bits(0);
+            w.sclkcnt_h().bits(0);
+            w.sclkcnt_l().bits(0)
+        });
+        MEMSPI3::regs().clock().write(|w| unsafe {
+            w.clk_equ_sysclk().set_bit();
+            w.clkcnt_n().bits(0);
+            w.clkcnt_h().bits(0);
+            w.clkcnt_l().bits(0)
+        });
     } else {
-        ((div - 1) << 16) | ((div / 2 - 1) << 8) | (div - 1)
+        MEMSPI2::regs().sram_clk().write(|w| unsafe {
+            w.sclkcnt_n().bits(div - 1);
+            w.sclkcnt_h().bits(div / 2 - 1);
+            w.sclkcnt_l().bits(div - 1)
+        });
+        MEMSPI3::regs().clock().write(|w| unsafe {
+            w.clkcnt_n().bits(div - 1);
+            w.clkcnt_h().bits(div / 2 - 1);
+            w.clkcnt_l().bits(div - 1)
+        });
     };
-    unsafe {
-        mmio_write_32(MSPI0_SRAM_CLK, val);
-        mmio_write_32(MSPI1_CLOCK, val);
-    }
 
     true
 }
 
 /// Enable DLL timing calibration for both controllers.
 fn enable_dll() {
-    // IDF: psram_ctrlr_ll_enable_dll
-    // MSPI3 DLL, bit 5
-    const MEM_TIMING_CALI: u32 = MSPI0_BASE + 0x180;
-    // MSPI2 DLL, bit 5
-    const SMEM_TIMING_CALI: u32 = MSPI0_BASE + 0x190;
-    const DLL_BIT: u32 = 1 << 5;
-    unsafe {
-        mmio_setbits_32(MEM_TIMING_CALI, DLL_BIT);
-        mmio_setbits_32(SMEM_TIMING_CALI, DLL_BIT);
-    }
-}
-
-/// PSRAM IOMUX pads. Discriminant = byte offset from `IOMUX_MSPI_BASE`
-/// to that pad's `IOMUX_MSPI_PIN_PSRAM_<name>_PIN0_REG`. Per-pad DRV
-/// field is bits [13:12]; DQS0 and DQS1 additionally have an XPD enable
-/// at bit 0.
-#[repr(u32)]
-#[derive(Copy, Clone)]
-enum PsramPad {
-    /// DQ0. Matches IDF `IOMUX_MSPI_PIN_PSRAM_D_PIN0_REG` (legacy SPI
-    /// MOSI naming retained on the IOMUX register itself).
-    Dq0  = 0x1C,
-    /// DQ1. IDF `IOMUX_MSPI_PIN_PSRAM_Q_PIN0_REG` (legacy SPI MISO).
-    Dq1  = 0x20,
-    /// DQ2. IDF `IOMUX_MSPI_PIN_PSRAM_WP_PIN0_REG` (legacy WP).
-    Dq2  = 0x24,
-    /// DQ3. IDF `IOMUX_MSPI_PIN_PSRAM_HOLD_PIN0_REG` (legacy HOLD).
-    /// In OPI/HEX DDR mode the controller does not treat this as a
-    /// hold/freeze input -- it is a plain data line.
-    Dq3  = 0x28,
-    Dq4  = 0x2C,
-    Dq5  = 0x30,
-    Dq6  = 0x34,
-    Dq7  = 0x38,
-    Dqs0 = 0x3C,
-    Dq8  = 0x40,
-    Dq9  = 0x44,
-    Dq10 = 0x48,
-    Dq11 = 0x4C,
-    Dq12 = 0x50,
-    Dq13 = 0x54,
-    Dq14 = 0x58,
-    Dq15 = 0x5C,
-    Ck   = 0x60,
-    Cs   = 0x64,
-    Dqs1 = 0x68,
-}
-
-impl PsramPad {
-    /// Iteration order matches IDF `mspi_timing_ll_pin_drv_set` (all
-    /// 20 DDR-ish pads in numeric offset order). Add a new variant above
-    /// and append it here; `set_drv_all` will then cover it
-    /// automatically.
-    const ALL: [Self; 20] = [
-        // DQ0 ~ DQ7
-        Self::Dq0,
-        Self::Dq1,
-        Self::Dq2,
-        Self::Dq3,
-        Self::Dq4,
-        Self::Dq5,
-        Self::Dq6,
-        Self::Dq7,
-        // Strobe0
-        Self::Dqs0,
-        // DQ8 ~ DQ15
-        Self::Dq8,
-        Self::Dq9,
-        Self::Dq10,
-        Self::Dq11,
-        Self::Dq12,
-        Self::Dq13,
-        Self::Dq14,
-        Self::Dq15,
-        // Ck and Cs
-        Self::Ck,
-        Self::Cs,
-        // Strobe1
-        Self::Dqs1,
-    ];
-
-    /// Absolute MMIO address of this pad's `~_PIN0_REG`.
-    fn reg_addr(self) -> u32 {
-        IOMUX_MSPI_BASE + self as u32
-    }
-
-    /// Set this pad's drive-strength field to `drv`,
-    /// preserving the other bits.
-    unsafe fn set_drv(self, drv: u32) {
-        unsafe { mmio_clrsetbits_32(self.reg_addr(), 0x3 << 12, (drv & 0x3) << 12) };
-    }
-
-    /// Set drive strength on every pad in `Self::ALL`.
-    unsafe fn set_drv_all(drv: u32) {
-        for pad in Self::ALL {
-            unsafe { pad.set_drv(drv) };
-        }
-    }
-
-    /// Set XPD power-up enable.
-    /// Used on strobe to power on the strobe input buffer needed.
-    unsafe fn enable_xpd(self) {
-        unsafe { mmio_setbits_32(self.reg_addr(), 1) };
-    }
+    MEMSPI2::regs()
+        .timing_cali()
+        .modify(|_, w| w.dll_timing_cali().set_bit());
+    MEMSPI2::regs()
+        .smem_timing_cali()
+        .modify(|_, w| w.dll_timing_cali().set_bit());
 }
 
 /// Configure PSRAM PHY pads.
@@ -378,32 +246,66 @@ impl PsramPad {
 /// Mirrors IDF `mspi_timing_ll_pin_drv_set(2)` +
 /// `mspi_timing_ll_enable_dqs(true)`.
 fn psram_pad_init() {
-    unsafe {
-        PsramPad::set_drv_all(2);
-        PsramPad::Dqs0.enable_xpd();
-        PsramPad::Dqs1.enable_xpd();
+    fn init_pin_drv(reg: &Reg<PSRAM_D_PIN0_SPEC>) {
+        reg.modify(|_, w| unsafe { w.drv().bits(2) });
     }
+
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_d_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_q_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_wp_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_hold_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq4_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq5_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq6_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq7_pin0());
+
+    IOMUX_MSPI_PIN::regs()
+        .psram_dqs_0_pin0()
+        .modify(|_, w| unsafe {
+            w.drv().bits(2);
+            w.xpd().set_bit()
+        });
+
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_ck_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_cs_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq8_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq9_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq10_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq11_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq12_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq13_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq14_pin0());
+    init_pin_drv(IOMUX_MSPI_PIN::regs().psram_dq15_pin0());
+
+    IOMUX_MSPI_PIN::regs()
+        .psram_dqs_1_pin0()
+        .modify(|_, w| unsafe {
+            w.drv().bits(2);
+            w.xpd().set_bit()
+        });
 }
 
 /// Set PSRAM CS timing on the AXI controller's SMEM_AC register.
 /// SMEM_CS_SETUP=1, SMEM_CS_HOLD=1, setup_time=N-1,
 /// hold_time=N-1, hold_delay=N-1, split_trans_en=1.
 fn set_cs_timing() {
-    const SMEM_AC: u32 = MSPI0_BASE + 0x1A0;
-    unsafe {
-        let mut val = mmio_read_32(SMEM_AC);
-        //   bit 0  SMEM_CS_SETUP
-        //   bit 1  SMEM_CS_HOLD
-        //   bit 31 SPLIT_TRANS_EN
-        val |= (1u32 << 31) | 0b11;
-        //   bits 6..2   SETUP_TIME (5-bit, N-1)
-        //   bits 11..7  HOLD_TIME  (5-bit, N-1)
-        //   bits 30..25 HOLD_DELAY (6-bit, N-1)
-        val = (val & !(0x1F << 2)) | ((AP_HEX_CS_SETUP_TIME - 1) << 2);
-        val = (val & !(0x1F << 7)) | ((AP_HEX_CS_HOLD_TIME - 1) << 7);
-        val = (val & !(0x3F << 25)) | ((AP_HEX_CS_HOLD_DELAY - 1) << 25);
-        mmio_write_32(SMEM_AC, val);
-    }
+    /// CS timing constants (matches IDF AP_HEX_PSRAM_CS_*). Independent of
+    /// `SpiRamFreq` -- IDF uses the same values across all speed branches.
+    const AP_HEX_CS_SETUP_TIME: u8 = 4;
+    const AP_HEX_CS_HOLD_TIME: u8 = 4;
+    const AP_HEX_CS_HOLD_DELAY: u8 = 3;
+
+    MEMSPI2::regs().smem_ac().modify(|_, w| unsafe {
+        w.cs_setup().set_bit();
+        w.cs_hold().set_bit();
+        w.split_trans_en().set_bit();
+
+        w.cs_setup_time().bits(AP_HEX_CS_SETUP_TIME - 1);
+        w.cs_hold_time().bits(AP_HEX_CS_HOLD_TIME - 1);
+        w.cs_hold_delay().bits(AP_HEX_CS_HOLD_DELAY - 1);
+
+        w
+    });
 }
 
 // MR (a.k.a Mode Register with single byte inside the AP HEX PSRAM chip.
@@ -506,21 +408,22 @@ unsafe extern "C" {
 /// bounded variant surfaces a real failure as a returned error. After
 /// the bit clears, copies MISO bytes from W0..W{N} into `rx_buf`.
 fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
-    const SPI_CMD: u32 = MSPI1_BASE;
-    const SPI_W0: u32 = MSPI1_BASE + 0x58;
     const SPI_USR_TRIGGER: u32 = 1 << 18;
     const MAX_ITERS: u32 = 1_000_000;
 
-    // Select CS1 (PSRAM); leave CS0 (flash) disabled.
-    //   bit 0  CS0_DIS = 1  (disable flash CS)
-    //   bit 1  CS1_DIS = 0  (enable PSRAM CS)
-    const MISC: u32 = MSPI1_BASE + 0x34;
-    unsafe { mmio_clrsetbits_32(MISC, 0b10, 0b01) };
+    // Select PSRAM; leave flash disabled.
+    MEMSPI3::regs().misc().modify(|_, w| {
+        w.cs1_dis().clear_bit();
+        w.cs0_dis().set_bit()
+    });
 
     // Kick.
-    unsafe { mmio_write_32(SPI_CMD, SPI_USR_TRIGGER) };
+    MEMSPI3::regs()
+        .cmd()
+        .write(|w| unsafe { w.bits(SPI_USR_TRIGGER) });
+
     let mut t = MAX_ITERS;
-    while unsafe { mmio_read_32(SPI_CMD) } & SPI_USR_TRIGGER != 0 {
+    while MEMSPI3::regs().cmd().read().bits() & SPI_USR_TRIGGER != 0 {
         t -= 1;
         if t == 0 {
             return Err(());
@@ -533,7 +436,7 @@ fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
         let n_bytes = rx.len();
         let n_words = n_bytes.div_ceil(4);
         for i in 0..n_words {
-            let word = unsafe { mmio_read_32(SPI_W0 + (i as u32) * 4) };
+            let word = MEMSPI3::regs().w(i).read().bits();
             for b in 0..4 {
                 let off = i * 4 + b;
                 if off >= n_bytes {
@@ -561,11 +464,11 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
     let mut conf = EspRomSpiCmd {
         cmd: REG_READ_CMD,
         cmd_bit_len: CMD_BITLEN,
-        addr: &mut addr_local as *mut u32,
+        addr: &raw mut addr_local,
         addr_bit_len: ADDR_BITLEN,
         tx_data: core::ptr::null_mut(),
         tx_data_bit_len: 0,
-        rx_data: rx.as_mut_ptr() as *mut u32,
+        rx_data: rx.as_mut_ptr().cast::<u32>(),
         rx_data_bit_len: DATA_BITLEN,
         dummy_bit_len: timing.reg_dummy_bits,
     };
@@ -592,9 +495,9 @@ fn mspi1_reg_write16(addr: u32, data: u16) {
     let mut conf = EspRomSpiCmd {
         cmd: REG_WRITE_CMD,
         cmd_bit_len: CMD_BITLEN,
-        addr: &mut addr_local as *mut u32,
+        addr: &raw mut addr_local,
         addr_bit_len: ADDR_BITLEN,
-        tx_data: tx.as_mut_ptr() as *mut u32,
+        tx_data: tx.as_mut_ptr().cast::<u32>(),
         tx_data_bit_len: DATA_BITLEN,
         rx_data: core::ptr::null_mut(),
         rx_data_bit_len: 0,
@@ -622,22 +525,12 @@ fn psram_detect_size(speed_params: &PsramTimingParams) -> usize {
     }
 }
 
-/// PSRAM_MSPI0 register block (same layout as `SPI0`, different base address).
-#[inline(always)]
-fn psram_mspi0() -> &'static PsramSpi0RegisterBlock {
-    unsafe { &*(MSPI0_BASE as *const PsramSpi0RegisterBlock) }
-}
-
-fn select_psram_mmu_entry(entry_id: u32) {
-    psram_mspi0()
+fn write_psram_mmu_entry(entry_id: u32, page: u16) {
+    MEMSPI2::regs()
         .mmu_item_index()
         .write(|w| unsafe { w.mmu_item_index().bits(entry_id) });
-}
-
-fn write_psram_mmu_entry(entry_id: u32, page: u16) {
-    select_psram_mmu_entry(entry_id);
-    psram_mspi0().mmu_item_content().write(|w| {
-        unsafe { w.paddr().bits(page) };
+    MEMSPI2::regs().mmu_item_content().write(|w| unsafe {
+        w.paddr().bits(page);
         w.access_spiram().set_bit();
         w.spiram_valid().set_bit()
     });
@@ -748,27 +641,18 @@ fn reset_psram_mspi() {
 /// Port of IDF `esp_psram_p4_rev3_workaround` (`esp_psram.c`). Must be called
 /// after `configure_psram_mspi` and before `mmu_map_psram`.
 fn p4_rev3_psram_workaround() {
-    /// MSPI0 registers touched by `configure_psram_mspi`, `set_bus_clock`,
-    /// `enable_dll`, and `set_cs_timing` that must survive the controller reset.
-    const BACKUP_ADDRS: [u32; 11] = [
-        MSPI0_BASE + 0x3C,  // CACHE_FCTRL
-        MSPI0_BASE + 0x40,  // CACHE_SCTRL
-        MSPI0_BASE + 0x44,  // SRAM_CMD
-        MSPI0_BASE + 0x48,  // SRAM_DRD_CMD
-        MSPI0_BASE + 0x4C,  // SRAM_DWR_CMD
-        MSPI0_BASE + 0x50,  // SRAM_CLK  (set_bus_clock)
-        MSPI0_BASE + 0x70,  // MEM_CTRL1
-        MSPI0_BASE + 0xD8,  // SMEM_DDR
-        MSPI0_BASE + 0x180, // MEM_TIMING_CALI  (enable_dll)
-        MSPI0_BASE + 0x190, // SMEM_TIMING_CALI (enable_dll)
-        MSPI0_BASE + 0x1A0, // SMEM_AC  (set_cs_timing)
-    ];
-
     // Snapshot the MSPI0 registers before the reset wipes them.
-    let mut backup = [0u32; 11];
-    for (i, &addr) in BACKUP_ADDRS.iter().enumerate() {
-        unsafe { backup[i] = mmio_read_32(addr) }
-    }
+    let cache_fctrl = MEMSPI2::regs().cache_fctrl().read().bits();
+    let cache_sctrl = MEMSPI2::regs().cache_sctrl().read().bits();
+    let sram_cmd = MEMSPI2::regs().sram_cmd().read().bits();
+    let sram_drd_cmd = MEMSPI2::regs().sram_drd_cmd().read().bits();
+    let sram_dwr_cmd = MEMSPI2::regs().sram_dwr_cmd().read().bits();
+    let sram_clk = MEMSPI2::regs().sram_clk().read().bits();
+    let ctrl1 = MEMSPI2::regs().ctrl1().read().bits();
+    let smem_ddr = MEMSPI2::regs().smem_ddr().read().bits();
+    let timing_cali = MEMSPI2::regs().timing_cali().read().bits();
+    let smem_timing_cali = MEMSPI2::regs().smem_timing_cali().read().bits();
+    let smem_ac = MEMSPI2::regs().smem_ac().read().bits();
 
     // Suppress CPU bus-error response so the dummy reads below don't trap.
     HP_SYS::regs()
@@ -798,8 +682,24 @@ fn p4_rev3_psram_workaround() {
         .write(|w| unsafe { w.bits(0) });
 
     // Restore the MSPI0 registers cleared by the reset.
-    for (i, &addr) in BACKUP_ADDRS.iter().enumerate() {
-        unsafe { mmio_write_32(addr, backup[i]) }
+    unsafe {
+        MEMSPI2::regs().cache_fctrl().write(|w| w.bits(cache_fctrl));
+        MEMSPI2::regs().cache_sctrl().write(|w| w.bits(cache_sctrl));
+        MEMSPI2::regs().sram_cmd().write(|w| w.bits(sram_cmd));
+        MEMSPI2::regs()
+            .sram_drd_cmd()
+            .write(|w| w.bits(sram_drd_cmd));
+        MEMSPI2::regs()
+            .sram_dwr_cmd()
+            .write(|w| w.bits(sram_dwr_cmd));
+        MEMSPI2::regs().sram_clk().write(|w| w.bits(sram_clk));
+        MEMSPI2::regs().ctrl1().write(|w| w.bits(ctrl1));
+        MEMSPI2::regs().smem_ddr().write(|w| w.bits(smem_ddr));
+        MEMSPI2::regs().timing_cali().write(|w| w.bits(timing_cali));
+        MEMSPI2::regs()
+            .smem_timing_cali()
+            .write(|w| w.bits(smem_timing_cali));
+        MEMSPI2::regs().smem_ac().write(|w| w.bits(smem_ac));
     }
 }
 
@@ -808,60 +708,64 @@ fn p4_rev3_psram_workaround() {
 /// Faithful port of IDF `s_config_mspi_for_psram` from
 /// `esp_psram_impl_ap_hex.c`. Each register field is named after its
 /// `psram_ctrlr_ll_*` setter so the mapping is straightforward to verify.
-fn configure_psram_mspi(timing: &PsramTimingParams, base: u32) {
+fn configure_psram_mspi_hex(timing: &PsramTimingParams) {
     // Dummy bit-counts come from the active speed parameter table.
-    let rd_dummy_n = timing.rd_dummy_bits;
-    let wr_dummy_n = timing.wr_dummy_bits;
+    MEMSPI2::regs().cache_sctrl().modify(|_, w| unsafe {
+        w.cache_usr_saddr_4byte().set_bit();
+        w.usr_wr_sram_dummy().set_bit();
+        w.usr_rd_sram_dummy().set_bit();
+        w.cache_sram_usr_rcmd().set_bit();
 
-    unsafe {
-        // CACHE_SCTRL.
-        //   bit 0   cache_usr_saddr_4byte
-        //   bit 3   usr_wr_sram_dummy
-        //   bit 4   usr_rd_sram_dummy
-        //   bit 5   cache_sram_usr_rcmd
-        let sctrl_addr = base + 0x40;
-        let mut val = mmio_read_32(sctrl_addr);
-        val |= 0b011_1001;
-        //   bits 11..6   sram_rdummy_cyclelen
-        //   bits 19..14  sram_addr_bitlen (N-1 form, here 32-bit addr)
-        //   bits 27..22  sram_wdummy_cyclelen
-        val = (val & !(0x3F << 6)) | ((rd_dummy_n - 1) << 6);
-        val = (val & !(0x3F << 14)) | ((32 - 1) << 14);
-        val = (val & !(0x3F << 22)) | ((wr_dummy_n - 1) << 22);
-        //   bit 20  cache_sram_usr_wcmd
-        //   bit 21  sram_oct (octal mode for cache transactions)
-        val |= 0b11 << 20;
-        mmio_write_32(sctrl_addr, val);
+        w.sram_rdummy_cyclelen().bits(timing.rd_dummy_bits);
+        w.sram_wdummy_cyclelen().bits(timing.wr_dummy_bits);
 
-        // SRAM_CMD: octal-line + hex-data + dummy-level control.
-        //   bit 18  sdin_oct
-        //   bit 19  sdout_oct
-        //   bit 20  saddr_oct
-        //   bit 21  scmd_oct
-        //   bit 23  sdummy_wout      (write-dummy level control enable)
-        //   bit 26  sdin_hex         (16-line read data)
-        //   bit 27  sdout_hex        (16-line write data)
-        mmio_setbits_32(base + 0x44, 0b1100_1011_1100 << 16); // bits 27, 26, 23, 21..18
+        w.sram_addr_bitlen().bits(31);
 
-        // SRAM_DRD_CMD / SRAM_DWR_CMD: 16-bit sync read/write commands.
-        mmio_write_32(base + 0x48, (16 - 1) << 28); // sync read  0x0000
-        mmio_write_32(base + 0x4C, ((16 - 1) << 28) | 0x8080); // sync write 0x8080
+        w.cache_sram_usr_wcmd().set_bit();
+        w.sram_oct().set_bit();
 
-        // MEM_CTRL1: splice enables (AXI burst optimization).
-        //   bit 25  ar_splice_en
-        //   bit 26  aw_splice_en
-        mmio_setbits_32(base + 0x70, 0b11 << 25);
+        w
+    });
 
-        // SMEM_DDR: DDR mode + variable dummy.
-        //   bit 0  smem_ddr_en       set
-        //   bit 1  smem_var_dummy    set
-        //   bit 2  smem_ddr_rdat_swp clear (default off)
-        //   bit 3  smem_ddr_wdat_swp clear (default off)
-        mmio_clrsetbits_32(base + 0xD8, 0b1100, 0b0011);
+    // SRAM_CMD: octal-line + hex-data + dummy-level control.
+    MEMSPI2::regs().sram_cmd().modify(|_, w| {
+        w.sdin_oct().set_bit();
+        w.sdout_oct().set_bit();
+        w.saddr_oct().set_bit();
+        w.scmd_oct().set_bit();
+        w.sdummy_wout().set_bit();
+        w.sdin_hex().set_bit();
+        w.sdout_hex().set_bit()
+    });
 
-        // CACHE_FCTRL: enable AXI access.
-        //   bit 0  : MEM_AXI_REQ_EN     = 1 (set)
-        //   bit 31 : CLOSE_AXI_INF_EN   = 0 (clear -> open the AXI iface)
-        mmio_clrsetbits_32(base + 0x3C, 1u32 << 31, 1);
-    }
+    // SRAM_DRD_CMD / SRAM_DWR_CMD: 16-bit sync read/write commands.
+    MEMSPI2::regs().sram_drd_cmd().write(|w| unsafe {
+        // sync read  0x0000
+        w.cache_sram_usr_rd_cmd_bitlen().bits(15);
+        w.cache_sram_usr_rd_cmd_value().bits(0)
+    });
+    MEMSPI2::regs().sram_dwr_cmd().write(|w| unsafe {
+        // sync write 0x8080
+        w.cache_sram_usr_wr_cmd_bitlen().bits(15);
+        w.cache_sram_usr_wr_cmd_value().bits(0x8080)
+    });
+
+    MEMSPI2::regs().ctrl1().modify(|_, w| {
+        w.ar_splice_en().set_bit();
+        w.aw_splice_en().set_bit()
+    });
+
+    // SMEM_DDR: DDR mode + variable dummy.
+    MEMSPI2::regs().smem_ddr().modify(|_, w| {
+        w.var_dummy().set_bit();
+        w.rdat_swp().clear_bit();
+        w.wdat_swp().clear_bit();
+        w.en().set_bit()
+    });
+
+    // CACHE_FCTRL: enable AXI access.
+    MEMSPI2::regs().cache_fctrl().modify(|_, w| {
+        w.axi_req_en().set_bit();
+        w.close_axi_inf_en().clear_bit()
+    });
 }
