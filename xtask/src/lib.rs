@@ -251,9 +251,10 @@ impl Package {
 
     /// Does the package need to be built with the standard library?
     pub fn needs_build_std(&self) -> bool {
-        use Package::*;
-
-        !matches!(self, EspConfig | EspMetadata)
+        self.toml()
+            .as_ref()
+            .and_then(|toml| toml.espressif_metadata_bool("needs-build-std"))
+            .unwrap_or(true)
     }
 
     /// Do the package's chip-specific cargo features affect the public API?
