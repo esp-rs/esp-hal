@@ -46,7 +46,6 @@ pub struct AccessPointConfig {
     /// The set of protocols supported by the access point.
     pub(crate) protocols: Protocols,
     /// The authentication method to be used by the access point.
-    #[builder_lite(reference)]
     pub(crate) authentication: AuthenticationMethodConfig,
     /// The maximum number of connections allowed on the access point.
     /// When set, this number can be clipped to a true upper limit because

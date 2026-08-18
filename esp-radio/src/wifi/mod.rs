@@ -48,7 +48,7 @@
 //! range [8, 84]. Note that values above roughly 65 (~16dBm) have been reported to cause
 //! authentication failures on some hardware, so setting it to the maximum is not always better.
 
-use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, string::String, vec::Vec};
+use alloc::{borrow::ToOwned, collections::vec_deque::VecDeque, str, vec::Vec};
 use core::{
     fmt::{Debug, Write},
     marker::PhantomData,
@@ -818,23 +818,23 @@ impl From<&[u8]> for Ssid {
 }
 
 /// Authentication Configuration for a Wi-Fi network.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum AuthenticationMethodConfig {
     /// Open authentication.
     Open,
 
     /// Wired Equivalent Privacy (WEP) authentication and password.
-    Wep(String),
+    Wep(Password),
 
     /// Wi-Fi Protected Access (WPA) authentication and password.
-    Wpa(String),
+    Wpa(Password),
 
     /// Wi-Fi Protected Access 2 (WPA2) Personal authentication and password.
-    Wpa2Personal(String),
+    Wpa2Personal(Password),
 
     /// WPA/WPA2 Personal authentication and password (supports both).
-    WpaWpa2Personal(String),
+    WpaWpa2Personal(Password),
 }
 
 impl AuthenticationMethodConfig {
@@ -846,9 +846,8 @@ impl AuthenticationMethodConfig {
             | AuthenticationMethodConfig::Wpa2Personal(password)
             | AuthenticationMethodConfig::WpaWpa2Personal(password) => {
                 if require_non_empty_password && password.is_empty() {
+                    warn!("The password is empty");
                     Err(WifiError::InvalidPassword)
-                } else if password.len() > 64 {
-                    Err(WifiError::InvalidArguments)
                 } else {
                     Ok(())
                 }
@@ -866,13 +865,13 @@ impl AuthenticationMethodConfig {
         }
     }
 
-    fn password(&self) -> &str {
+    fn password(&self) -> &[u8] {
         match self {
-            AuthenticationMethodConfig::Open => "",
+            AuthenticationMethodConfig::Open => &[],
             AuthenticationMethodConfig::Wep(password)
             | AuthenticationMethodConfig::Wpa(password)
             | AuthenticationMethodConfig::Wpa2Personal(password)
-            | AuthenticationMethodConfig::WpaWpa2Personal(password) => password.as_str(),
+            | AuthenticationMethodConfig::WpaWpa2Personal(password) => password.as_bytes(),
         }
     }
 }
@@ -905,6 +904,84 @@ impl defmt::Format for AuthenticationMethodConfig {
             Self::Wpa2Personal(_) => defmt::write!(fmt, "Wpa2Personal(**REDACTED**)"),
             Self::WpaWpa2Personal(_) => defmt::write!(fmt, "WpaWpa2Personal(**REDACTED**)"),
         }
+    }
+}
+
+/// A password.
+/// Can be up to 64 bytes long (i.e. not characters).
+/// Longer passwords will be truncated to 64 bytes.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Password {
+    password: [u8; 64],
+    len: u8,
+}
+
+impl Password {
+    pub(crate) fn new(password: &str) -> Self {
+        Self::from_raw(password.as_bytes())
+    }
+
+    pub(crate) fn from_raw(password: &[u8]) -> Self {
+        if password.len() > 64 {
+            warn!("Password is longer than 64 bytes, truncating");
+        }
+
+        let mut pwd_bytes = [0u8; 64];
+        let len = usize::min(64, password.len());
+        pwd_bytes[..len].copy_from_slice(&password[..len]);
+
+        Self {
+            password: pwd_bytes,
+            len: len as u8,
+        }
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        &self.password[..self.len as usize]
+    }
+
+    /// The length (in bytes) of the password.
+    pub fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    /// Returns true if the password is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
+
+impl Default for Password {
+    fn default() -> Self {
+        Self {
+            password: [0u8; 64],
+            len: 0,
+        }
+    }
+}
+
+impl Debug for Password {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Password( ** REDACTED **)")
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Password {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(fmt, "Password( ** REDACTED **)")
+    }
+}
+
+impl From<&str> for Password {
+    fn from(password: &str) -> Self {
+        Self::new(password)
+    }
+}
+
+impl From<&[u8]> for Password {
+    fn from(password: &[u8]) -> Self {
+        Self::from_raw(password)
     }
 }
 
@@ -3326,7 +3403,7 @@ ignored."
             cfg.ap.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
             cfg.ap.ssid_len = config.ssid.len() as u8;
             cfg.ap.password[0..(config.authentication.password().len())]
-                .copy_from_slice(config.authentication.password().as_bytes());
+                .copy_from_slice(config.authentication.password());
 
             // Compare the new ap config with the current. Only update if something is changing.
             // This avoids unnecessary connection issues.
@@ -3378,7 +3455,7 @@ ignored."
         unsafe {
             cfg.sta.ssid[0..(config.ssid.len())].copy_from_slice(config.ssid.as_bytes());
             cfg.sta.password[0..(config.authentication.password().len())]
-                .copy_from_slice(config.authentication.password().as_bytes());
+                .copy_from_slice(config.authentication.password());
 
             // Compare the new sta config with the current. Only update if something is changing.
             // This avoids unnecessary connection issues.

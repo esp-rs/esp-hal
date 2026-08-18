@@ -34,7 +34,6 @@ pub struct StationConfig {
     /// The BSSID (MAC address) of the station.
     pub(crate) bssid: Option<[u8; 6]>,
     /// The authentication method for the Wi-Fi connection.
-    #[builder_lite(reference)]
     pub(crate) authentication: AuthenticationMethodConfig,
     /// The Wi-Fi channel to connect to.
     pub(crate) channel: Option<u8>,
