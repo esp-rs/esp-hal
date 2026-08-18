@@ -44,40 +44,7 @@ globally instead of through [`Sdm`]. The available sources and the default for
 the selected target are listed by
 [`IomuxFunctionClockConfig`](crate::clock::ll::IomuxFunctionClockConfig).
 
-The source can be selected as part of the global clock configuration before initializing the HAL:
-
-```rust, no_run
-# {before_snippet}
-use esp_hal::{
-    Config,
-    clock::{ClockConfig, ll::IomuxFunctionClockConfig},
-};
-
-let clock_config = ClockConfig {
-    iomux_function_clock: Some(IomuxFunctionClockConfig::XtalClk),
-    ..ClockConfig::default()
-};
-let peripherals = esp_hal::init(Config::default().with_cpu_clock(clock_config));
-# {after_snippet}
-```
-
-The low-level clock-tree API can also change the source at runtime:
-
-```rust, no_run
-# {before_snippet}
-use esp_hal::clock::ll::{
-    ClockTree,
-    IomuxFunctionClockConfig,
-    configure_iomux_function_clock,
-};
-
-ClockTree::with(|clocks| {
-    configure_iomux_function_clock(clocks, IomuxFunctionClockConfig::XtalClk);
-});
-# {after_snippet}
-```
-
-Changing this global source affects every active consumer of `IOMUX_FUNCTION_CLOCK`. Existing peripheral dividers are not automatically recalculated.
+The source can be selected as part of the global clock configuration before initializing the HAL.
 "#
 )]
 //! Each channel's prescaler divides this function clock to produce its output

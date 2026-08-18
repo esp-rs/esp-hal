@@ -59,7 +59,10 @@ impl CpuClock {
         mem_clk: Some(MemClkConfig::new(1)), // /2 = 200 MHz
         sys_clk: Some(SysClkConfig::new(0)), // /1 = 200 MHz
         apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
-        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -76,7 +79,10 @@ impl CpuClock {
         mem_clk: Some(MemClkConfig::new(0)), // /1 = 200 MHz
         sys_clk: Some(SysClkConfig::new(0)), // /1 = 200 MHz
         apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
-        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -91,7 +97,10 @@ impl CpuClock {
         mem_clk: Some(MemClkConfig::new(0)), // /1 = 100 MHz
         sys_clk: Some(SysClkConfig::new(0)), // /1 = 100 MHz
         apb_clk: Some(ApbClkConfig::new(0)), // /1 = 100 MHz
-        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
         timg_calibration_clock: None,
@@ -421,10 +430,6 @@ fn configure_apb_clk_impl(
 
 // IOMUX_FUNCTION_CLOCK
 
-fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-    // The IO MUX gate is owned by the always-enabled IOMUX peripheral clock.
-}
-
 fn configure_iomux_function_clock_impl(
     _clocks: &mut ClockTree,
     _old_config: Option<IomuxFunctionClockConfig>,
@@ -432,9 +437,12 @@ fn configure_iomux_function_clock_impl(
 ) {
     HP_SYS_CLKRST::regs()
         .peri_clk_ctrl26()
-        .modify(|_, w| match new_config {
-            IomuxFunctionClockConfig::XtalClk => w.iomux_clk_src_sel().clear_bit(),
-            IomuxFunctionClockConfig::PllF80m => w.iomux_clk_src_sel().set_bit(),
+        .modify(|_, w| unsafe {
+            w.iomux_clk_src_sel().bit(matches!(
+                new_config.source,
+                IomuxFunctionClockSource::PllF80m
+            ));
+            w.iomux_clk_div_num().bits(new_config.div_num as u8)
         });
 }
 

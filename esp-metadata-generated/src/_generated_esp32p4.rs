@@ -484,9 +484,12 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(63)
     };
-    ("clock_tree.iomux_function_clock") => {
-        [crate ::soc::clocks::IomuxFunctionClockConfig::XtalClk, crate
-        ::soc::clocks::IomuxFunctionClockConfig::PllF80m]
+    ("clock_tree.iomux_function_clock.source") => {
+        [crate ::soc::clocks::IomuxFunctionClockSource::XtalClk, crate
+        ::soc::clocks::IomuxFunctionClockSource::PllF80m]
+    };
+    ("clock_tree.iomux_function_clock.div_num") => {
+        (0, 255)
     };
     ("clock_tree.cpu_root_clk") => {
         [crate ::soc::clocks::CpuRootClkConfig::Xtal, crate
@@ -1530,10 +1533,6 @@ macro_rules! for_each_sw_interrupt {
 ///
 /// // IOMUX_FUNCTION_CLOCK
 ///
-/// fn enable_iomux_function_clock_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
 /// fn configure_iomux_function_clock_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_config: Option<IomuxFunctionClockConfig>,
@@ -1922,15 +1921,44 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
-        /// The list of clock signals that the `IOMUX_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum IomuxFunctionClockConfig {
+        pub enum IomuxFunctionClockSource {
             /// Selects `XTAL_CLK`.
             XtalClk,
             #[default]
             /// Selects `PLL_F80M`.
             PllF80m,
+        }
+        /// Configures the `IOMUX_FUNCTION_CLOCK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = source / (div_num + 1)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct IomuxFunctionClockConfig {
+            source: IomuxFunctionClockSource,
+            div_num: u32,
+        }
+        impl IomuxFunctionClockConfig {
+            /// Creates a new configuration for the IOMUX_FUNCTION_CLOCK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the div_num value is outside the
+            /// valid range (0 ..= 255).
+            pub const fn new(source: IomuxFunctionClockSource, div_num: u32) -> Self {
+                ::core::assert!(
+                    div_num <= 255,
+                    "`IOMUX_FUNCTION_CLOCK` div_num must be between 0 and 255 (inclusive)."
+                );
+                Self { source, div_num }
+            }
+            pub(crate) fn source(self) -> IomuxFunctionClockSource {
+                self.source
+            }
+            pub(crate) fn div_num(self) -> u32 {
+                self.div_num as u32
+            }
         }
         /// The list of clock signals that the `CPU_ROOT_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2911,19 +2939,19 @@ macro_rules! define_clock_tree_types {
         }
         pub fn configure_iomux_function_clock(
             clocks: &mut ClockTree,
-            new_selector: IomuxFunctionClockConfig,
+            config: IomuxFunctionClockConfig,
         ) {
-            let old_selector = clocks.iomux_function_clock.replace(new_selector);
+            let old_config = clocks.iomux_function_clock.replace(config);
             refresh_iomux_function_clock_downstream(clocks);
-            match new_selector {
-                IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+            match config.source {
+                IomuxFunctionClockSource::XtalClk => request_xtal_clk(clocks),
+                IomuxFunctionClockSource::PllF80m => request_pll_f80m(clocks),
             }
-            configure_iomux_function_clock_impl(clocks, old_selector, new_selector);
-            if let Some(old_selector) = old_selector {
-                match old_selector {
-                    IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                    IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+            configure_iomux_function_clock_impl(clocks, old_config, config);
+            if let Some(old_config) = old_config {
+                match old_config.source {
+                    IomuxFunctionClockSource::XtalClk => release_xtal_clk(clocks),
+                    IomuxFunctionClockSource::PllF80m => release_pll_f80m(clocks),
                 }
             }
         }
@@ -2932,41 +2960,25 @@ macro_rules! define_clock_tree_types {
         ) -> Option<IomuxFunctionClockConfig> {
             clocks.iomux_function_clock
         }
-        pub fn request_iomux_function_clock(clocks: &mut ClockTree) {
-            trace!("Requesting IOMUX_FUNCTION_CLOCK");
-            trace!("Enabling IOMUX_FUNCTION_CLOCK");
-            match unwrap!(clocks.iomux_function_clock) {
-                IomuxFunctionClockConfig::XtalClk => request_xtal_clk(clocks),
-                IomuxFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
-            }
-            enable_iomux_function_clock_impl(clocks, true);
-        }
-        pub fn release_iomux_function_clock(clocks: &mut ClockTree) {
-            trace!("Releasing IOMUX_FUNCTION_CLOCK");
-            trace!("Disabling IOMUX_FUNCTION_CLOCK");
-            enable_iomux_function_clock_impl(clocks, false);
-            match unwrap!(clocks.iomux_function_clock) {
-                IomuxFunctionClockConfig::XtalClk => release_xtal_clk(clocks),
-                IomuxFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
-            }
-        }
+        fn request_iomux_function_clock(_clocks: &mut ClockTree) {}
+        fn release_iomux_function_clock(_clocks: &mut ClockTree) {}
         #[allow(unused_variables)]
         pub fn iomux_function_clock_config_frequency(
             clocks: &mut ClockTree,
             config: IomuxFunctionClockConfig,
         ) -> u32 {
-            match config {
-                IomuxFunctionClockConfig::XtalClk => xtal_clk_frequency(),
-                IomuxFunctionClockConfig::PllF80m => pll_f80m_frequency(),
-            }
+            (match config.source {
+                IomuxFunctionClockSource::XtalClk => xtal_clk_frequency(),
+                IomuxFunctionClockSource::PllF80m => pll_f80m_frequency(),
+            } / (config.div_num() + 1))
         }
         pub fn iomux_function_clock_frequency() -> u32 {
             IOMUX_FUNCTION_CLOCK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
-        pub fn iomux_function_clock_source_frequency(source: IomuxFunctionClockConfig) -> u32 {
+        pub fn iomux_function_clock_source_frequency(source: IomuxFunctionClockSource) -> u32 {
             match source {
-                IomuxFunctionClockConfig::XtalClk => xtal_clk_frequency(),
-                IomuxFunctionClockConfig::PllF80m => pll_f80m_frequency(),
+                IomuxFunctionClockSource::XtalClk => xtal_clk_frequency(),
+                IomuxFunctionClockSource::PllF80m => pll_f80m_frequency(),
             }
         }
         pub fn request_pll_f25m(clocks: &mut ClockTree) {
