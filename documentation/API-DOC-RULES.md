@@ -101,7 +101,7 @@ We apply STE **principles** to rustdoc, not a word-by-word check against ASD’s
 ### Point of view
 
 - **Reference (default):** Item summaries, `# Errors`, field docs, and module overview text use an **impersonal** voice — describe what the type or peripheral does, not who uses it.
-- **Procedures:** `# Examples` and module `## Examples` may use **second person** and the imperative mood (`Configure the pins.`, `Create a [`Uart`]`).
+- **Procedures:** `# Examples` and module `## Examples` may use **second person** and the imperative mood (`Configure the pins.`, ``Create a [`Uart`]``).
 - Do not address the reader as “users”, “the user”, or “you” outside examples.
 - Do not use “we” or “I” in rustdoc.
 - Do not switch point of view within one doc comment or module section.
