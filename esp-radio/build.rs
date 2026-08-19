@@ -11,9 +11,11 @@ use esp_metadata_generated::{Chip, assert_unique_features};
 
 fn main() -> Result<(), Box<dyn Error>> {
     // if using '"rust-analyzer.cargo.buildScripts.useRustcWrapper": true' we can detect this
+    // otherwise you can set ESP_RADIO_SUPPRESS_PANICS env var to suppress panics in your IDE
     let suppress_panics = std::env::var("RUSTC_WRAPPER")
         .unwrap_or_default()
-        .contains("rust-analyzer");
+        .contains("rust-analyzer")
+        || std::env::var("ESP_RADIO_SUPPRESS_PANICS").is_ok();
 
     // Load the configuration file for the configured device:
     let chip = Chip::from_cargo_feature()?;
@@ -117,10 +119,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
 
         #[cfg(not(feature = "wifi"))]
-        println!("cargo:warning=coex is enabled but wifi is not");
+        panic!(
+            r#"
+
+            COEX is enabled but Wi-Fi is not
+
+            "#
+        );
 
         #[cfg(not(feature = "ble"))]
-        println!("cargo:warning=coex is enabled but ble is not");
+        panic!(
+            r#"
+
+            COEX is enabled but BLE is not
+
+            "#
+        );
     }
 
     // emit config

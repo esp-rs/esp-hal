@@ -1,6 +1,4 @@
 //! Bluetooth Low Energy HCI interface
-//!
-//! The usage of BLE is currently incompatible with the usage of IEEE 802.15.4.
 
 #[cfg(bt_controller = "btdm")]
 pub(crate) mod btdm;
