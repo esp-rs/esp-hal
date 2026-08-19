@@ -12,8 +12,8 @@ Rustdoc in esp-hal is **reference material**. Follow [ASD-STE100](#simplified-te
   - Good: `Returns whether sampling is complete.`
   - Bad: `Returns whethersampling is complete.` / `Returns whetherthe interrupt is set.`
 - When a function returns a handle or transaction object, say what it is for:
-  - Good: `Returns a [`TxTransaction`] that can be used to wait for the transaction to complete.`
-  - Bad: `Returns a [`TxTransaction`] to wait for the transaction to complete.` (reads as if the type itself waits)
+  - Good: ``Returns a [`TxTransaction`] that can be used to wait for the transaction to complete.``
+  - Bad: ``Returns a [`TxTransaction`] to wait for the transaction to complete.`` (reads as if the type itself waits)
 - Use hyphens in compound modifiers where needed (`one-time sampling`, not `onetime sampling`).
 - Constructors should begin with `Creates a new …` (e.g. ``Creates a new UART instance in [`Blocking`] mode.``).
 - Use these section headings where applicable — as `#` headings, not `##`:
