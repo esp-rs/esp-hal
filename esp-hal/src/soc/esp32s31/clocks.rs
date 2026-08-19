@@ -180,12 +180,6 @@ fn enable_bbpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
-        // CPLL = XTAL * fb_div / ref_div = 40 MHz * 8 / 1.
-        LP_AON_CLK_RST::regs().cpll_div().modify(|_, w| unsafe {
-            w.cpll_fb_div().bits(8);
-            w.cpll_ref_div().bits(1)
-        });
-
         HP_SYS_CLKRST::regs()
             .ana_pll_ctrl0()
             .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
@@ -223,6 +217,30 @@ fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn enable_mpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
+        HP_SYS_CLKRST::regs()
+            .ana_pll_ctrl0()
+            .modify(|_, w| w.mspi_cal_stop().clear_bit());
+
+        // MPLL = XTAL * fb_div / ref_div = 40 MHz * 8 / 1.
+        LP_AON_CLK_RST::regs().mspi_div().modify(|_, w| unsafe {
+            let ref_div = 1;
+            let fb_div = 500 * (ref_div + 1) / 40 - 1;
+            w.mspi_fb_div().bits(fb_div as u8)
+        });
+
+        while HP_SYS_CLKRST::regs()
+            .ana_pll_ctrl0()
+            .read()
+            .mspi_cal_end()
+            .bit_is_clear()
+        {
+            core::hint::spin_loop();
+        }
+
+        HP_SYS_CLKRST::regs()
+            .ana_pll_ctrl0()
+            .modify(|_, w| w.mspi_cal_stop().set_bit());
+
         HP_SYS_CLKRST::regs()
             .ref_25m_ctrl0()
             .modify(|_, w| unsafe { w.clk_div_num().bits(19) });
