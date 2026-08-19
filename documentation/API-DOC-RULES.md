@@ -28,7 +28,7 @@ Rustdoc in esp-hal is **reference material**. Follow [ASD-STE100](#simplified-te
 - Prefer rustdoc intra-doc links (e.g. ``[`Type`]``) over raw URLs or markdown links to rustdoc items.
   - Format API names as code: ``[`DelayNs`]``, not `[DelayNs]`.
   - Leave a space before an intra-doc link when it follows a preposition or ordinary word:
-    - Good: `Used with [`Self::register_block`] to access the register block.`
+    - Good: ``Used with [`Self::register_block`] to access the register block.``
     - Bad: `Used with[Self::register_block] to access the register block.`
   - After bulk edits, check that words were not merged across boundaries (`whether` + `the`, `with` + ``[`Type`]``, `that` + `can`, etc.).
   - Don't merge regular comments and cfg-gated (cfg_attr) comments.
