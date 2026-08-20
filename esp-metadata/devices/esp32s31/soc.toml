@@ -46,7 +46,8 @@ peripherals = [
     { name = "ASSIST_DEBUG" },
     { name = "CACHE" },
     { name = "CLIC" },
-    { name = "CNNT_SYS" },
+    { name = "CNNT_SYS", hidden = true },
+    { name = "CNNT_IO_MUX", hidden = true },
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
@@ -90,6 +91,7 @@ peripherals = [
     { name = "SHA" },
     { name = "SYSTEM", pac = "HP_SYS" },
     { name = "SYSTIMER" },
+    { name = "SDHOST" },
     { name = "TEE" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
@@ -409,13 +411,30 @@ support_status = "not_supported"
 version = 1 # FIXME placeholder
 
 [device.sdmmc]
-support_status = "not_supported"
+support_status = "partial"
 delay_phase_num = 8 # FIXME: placeholder
-has_iomux = true # FIXME: placeholder
-has_gpio_matrix = true # FIXME: placeholder
+has_iomux = true
+has_gpio_matrix = false
 psram_dma = true # FIXME: placeholder
 uhs = false # FIXME: placeholder
-slot_config = []
+slot_config = [
+    {
+        iomux = true,
+        cd = "SDHOST_CARD_DETECT_N_1",
+        wp = "SDHOST_CARD_WRITE_PRT_1",
+        card_int = "SDHOST_CARD_INT_N_1",
+        data_strobe = "SDHOST_DATA_STROBE_1",
+        rst = "SD_RST_N_1",
+    },
+    {
+        iomux = true,
+        cd = "SDHOST_CARD_DETECT_N_2",
+        wp = "SDHOST_CARD_WRITE_PRT_2",
+        card_int = "SDHOST_CARD_INT_N_2",
+        data_strobe = "SDHOST_DATA_STROBE_2",
+        rst = "SD_RST_N_2",
+    }
+]
 
 ## Radio
 [device.wifi]

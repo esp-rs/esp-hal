@@ -9,14 +9,14 @@
 //!
 //! Pins:
 //!
-//! | Signal | ESP32-S3 (1-bit) | ESP32 (4-bit) | ESP32-P4 (4-bit, slot 0)
-//! | ------ | ---------------  | ------------- | ------------------------
-//! | CLK    | GPIO39           | GPIO14        | GPIO43
-//! | CMD    | GPIO38           | GPIO15        | GPIO44
-//! | DAT0   | GPIO40           | GPIO2         | GPIO39
-//! | DAT1   | -                | GPIO4         | GPIO40
-//! | DAT2   | -                | GPIO12        | GPIO41
-//! | DAT3   | -                | GPIO13        | GPIO42
+//! | Signal | ESP32-S3 (1-bit) | ESP32 (4-bit) | ESP32-S31 (4-bit) | ESP32-P4 (4-bit, slot 0)
+//! | ------ | ---------------  | ------------- | ----------------- | ------------------------
+//! | CLK    | GPIO39           | GPIO14        | GPIO24            | GPIO43
+//! | CMD    | GPIO38           | GPIO15        | GPIO25            | GPIO44
+//! | DAT0   | GPIO40           | GPIO2         | GPIO20            | GPIO39
+//! | DAT1   | -                | GPIO4         | GPIO21            | GPIO40
+//! | DAT2   | -                | GPIO12        | GPIO22            | GPIO41
+//! | DAT3   | -                | GPIO13        | GPIO23            | GPIO42
 
 //% CHIP_FILTER: sdmmc_driver_supported
 
@@ -69,8 +69,9 @@ const fn pattern_byte(i: usize) -> u8 {
 
 #[esp_hal::main]
 async fn main(_spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
+
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    esp_println::logger::init_logger(log::LevelFilter::Info);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
@@ -85,6 +86,16 @@ async fn main(_spawner: Spawner) {
                 .with_clk(peripherals.GPIO39)
                 .with_cmd(peripherals.GPIO38)
                 .with_data0(peripherals.GPIO40);
+        }
+        feature = "esp32s31" => {
+            let slot = controller.slot::<0>(slot_config).unwrap();
+            let slot = slot
+                .with_clk(peripherals.GPIO24)
+                .with_cmd(peripherals.GPIO25)
+                .with_data0(peripherals.GPIO20)
+                .with_data1(peripherals.GPIO21)
+                .with_data2(peripherals.GPIO22)
+                .with_data3(peripherals.GPIO23);
         }
         feature = "esp32" => {
             let slot = controller.slot::<1>(slot_config).unwrap();
@@ -120,6 +131,7 @@ async fn main(_spawner: Spawner) {
     let mut button = Input::new(
         cfg_select! {
             feature = "esp32p4" => peripherals.GPIO35,
+            feature = "esp32s31" => peripherals.GPIO61,
             _ => peripherals.GPIO0,
         },
         InputConfig::default().with_pull(Pull::Up),

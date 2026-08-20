@@ -2,6 +2,8 @@
 //! is programmed by `EngineSession` on engine acquire.
 use super::*;
 
+pub fn chip_setup() {}
+
 /// Programs the shared module clock register (divider, phases).
 pub fn set_module_clock(_source: ClockSource, div: u8) {
     // ESP32: h == period, l == high pulse, n == h; phase dout=din=180°. The

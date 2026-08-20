@@ -99,7 +99,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | LP I2S          |       |          |          |          |          |           |          | ❌       |          |          |           |
 | PARL_IO         |       |          |          | ⚒️      | ⚒️      |           | ⚒️      | ❌       |          |          | ❌        |
 | RMT             | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      | ❌        |
-| SDMMC/SDIO host | ⚒️   |          |          |          |          |           |          | ⚒️      |          | ⚒️      | ❌        |
+| SDMMC/SDIO host | ⚒️   |          |          |          |          |           |          | ⚒️      |          | ⚒️      | ⚒️       |
 | SDIO slave      | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          |          |          |          |           |
 | TWAI            | ⚒️   |          | ⚒️      |          | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |           |
 | CANFD           |       |          |          | [❌][5163] [^1] |          |           |          |          |          |          | ❌        |
