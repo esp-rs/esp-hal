@@ -167,7 +167,7 @@ impl Package {
     pub fn skip_doctests(&self) -> bool {
         let toml = self.toml();
         let Some(ref toml) = *toml else {
-            // No Cargo.toml in the package, must be the examples
+            // No Cargo.toml in the package; it is a directory of standalone projects.
             return true;
         };
         toml.espressif_metadata_bool("skip-doctests")
@@ -271,6 +271,11 @@ impl Package {
             .as_ref()
             .and_then(|toml| toml.espressif_metadata_bool("chip-features-matter"))
             .unwrap_or(false)
+    }
+
+    /// Is this "package" a directory of standalone projects rather than a single crate?
+    pub fn contains_standalone_projects(&self) -> bool {
+        matches!(self, Package::Examples | Package::CompileTests)
     }
 
     /// Should documentation be built for the package, and should the package be
@@ -528,7 +533,7 @@ impl Package {
     }
 
     fn targets_lp_core(&self) -> bool {
-        if *self == Package::Examples || *self == Package::CompileTests {
+        if self.contains_standalone_projects() {
             return false;
         }
 
@@ -862,7 +867,7 @@ pub fn format_package(
     log::info!("Formatting package: {}", package);
     let package_path = workspace.join(package.as_ref());
 
-    let paths = if package == Package::Examples || package == Package::CompileTests {
+    let paths = if package.contains_standalone_projects() {
         crate::find_packages(&package_path)?
     } else {
         vec![package_path]
@@ -1166,6 +1171,60 @@ impl ChipFilterEval<'_> {
             Err(err) => {
                 Err(anyhow::anyhow!("{err:?}").context("Failed to evaluate chip expression"))
             }
+        }
+    }
+}
+
+/// The repository root, for tests which need to inspect the real workspace.
+#[cfg(test)]
+pub(crate) fn repo_root_for_tests() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("xtask must live in a subdirectory of the repository")
+        .to_path_buf()
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator;
+
+    use super::*;
+
+    #[test]
+    fn packages_are_either_crates_or_collections_of_standalone_projects() {
+        let workspace = repo_root_for_tests();
+
+        for package in Package::iter() {
+            let package_path = workspace.join(package.to_string());
+            assert!(
+                package_path.is_dir(),
+                "package '{package}' has no directory at {}",
+                package_path.display()
+            );
+
+            let has_manifest = package_path.join("Cargo.toml").exists();
+            assert_eq!(
+                has_manifest,
+                !package.contains_standalone_projects(),
+                "package '{package}' has {} Cargo.toml, but contains_standalone_projects() is {}",
+                if has_manifest { "a" } else { "no" },
+                package.contains_standalone_projects(),
+            );
+        }
+    }
+
+    #[test]
+    fn collections_of_standalone_projects_are_not_empty() {
+        let workspace = repo_root_for_tests();
+
+        for package in Package::iter().filter(Package::contains_standalone_projects) {
+            let projects = find_packages(&workspace.join(package.to_string()))
+                .unwrap_or_else(|err| panic!("could not enumerate projects of '{package}': {err}"));
+
+            assert!(
+                !projects.is_empty(),
+                "package '{package}' contains no standalone projects"
+            );
         }
     }
 }
