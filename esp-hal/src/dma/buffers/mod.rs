@@ -1437,6 +1437,9 @@ impl DmaTxStreamBuf {
 
     /// Push the buffer with the given data before DMA transfer starts.
     ///
+    /// It's expected to pre-fill at least enough data to fill the first two descriptors' buffers.
+    /// The more data is pre-filled, the more head-room is left to push more data.
+    ///
     /// Returns the number of bytes filled.
     pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
         let start = self.pre_filled.unwrap_or(0);
