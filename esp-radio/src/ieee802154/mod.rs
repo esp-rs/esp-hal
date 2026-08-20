@@ -9,8 +9,7 @@
 //! Note that this module requires the `unstable` feature on both `esp-radio`
 //! and `esp-hal`.
 //!
-//! NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
-//! things will break.
+//! NOTE: Coexistence with Wi-Fi is currently not supported.
 //!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [openthread]: https://github.com/esp-rs/openthread
@@ -123,8 +122,7 @@ pub struct Ieee802154<'a> {
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
     ///
-    /// NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
-    /// things will break.
+    /// NOTE: Coexistence with Wi-Fi is currently not supported.
     #[instability::unstable]
     pub fn new(radio: IEEE802154<'a>) -> Self {
         let (_phy_clock_guard, _phy_init_guard, _radio_clock_guard) = esp_ieee802154_enable(radio);

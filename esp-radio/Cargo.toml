@@ -296,6 +296,7 @@ ble = ["esp-hal/__bluetooth", "dep:bt-hci", "dep:bt-hci-transport", "__has_unsta
 
 #DOC_IF has("bt_driver_supported") && has("wifi_driver_supported")
 ## Software controls Wi-Fi/Bluetooth coexistence.
+## Only valid if both Wi-Fi and BLE are enabled.
 ## See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/kconfig-reference.html#config-esp-coex-sw-coexist-enable) for details.
 ##
 ## ⚠️ This feature is considered unstable.
