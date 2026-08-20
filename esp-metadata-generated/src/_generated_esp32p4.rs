@@ -443,7 +443,10 @@ macro_rules! property {
         stringify!(512)
     };
     ("psram.octal_spi") => {
-        false
+        true
+    };
+    ("psram.hex_spi") => {
+        true
     };
     ("psram.extmem_origin") => {
         1207959552

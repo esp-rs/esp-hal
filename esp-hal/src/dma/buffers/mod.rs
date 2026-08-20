@@ -279,9 +279,11 @@ const fn max(a: usize, b: usize) -> usize {
 
 impl BurstConfig {
     delegate::delegate! {
-        #[cfg(dma_can_access_psram)]
         to self.internal_memory {
+            #[cfg(dma_can_access_psram)]
             pub(super) const fn min_dram_alignment(self, direction: TransferDirection) -> usize;
+
+            #[cfg(all(dma_can_access_psram, not(esp32s31)))] // Burst always enabled
             pub(super) fn is_burst_enabled(self) -> bool;
         }
     }

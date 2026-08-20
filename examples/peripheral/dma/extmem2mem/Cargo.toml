@@ -50,6 +50,12 @@ esp32s2 = [
     "esp-bootloader-esp-idf/esp32s2",
     "esp-hal/esp32s2",
 ]
+esp32s31 = [
+    "esp-alloc/esp32s31",
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+]
 
 [profile.release]
 debug            = true

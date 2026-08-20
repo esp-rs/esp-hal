@@ -62,6 +62,13 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
     ] },
 ], template_groups = [
+    { group = "PSRAM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL", outputs = "XTAL_CLK", default = true },
+            { name = "MPLL", outputs = "MPLL_CLK" },
+            { name = "CPLL", outputs = "CPLL_CLK" },
+        ] },
+    ] },
     { group = "UART", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "PLL_F80M", outputs = "PLL_F80M", default = true },

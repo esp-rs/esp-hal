@@ -94,3 +94,29 @@ fn write_pms_ctrl_range(base: usize, start: usize, end: usize) {
         offset += 4;
     }
 }
+
+const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
+
+/// Write back a specific range of data in the cache.
+#[doc(hidden)]
+#[crate::ram]
+pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_WriteBack_Addr(map: u32, addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_WriteBack_Addr(CACHE_MAP_L1_DCACHE, addr, size);
+    }
+}
+
+/// Invalidate a specific range of addresses in the cache.
+#[doc(hidden)]
+#[crate::ram]
+pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE, addr, size);
+    }
+}

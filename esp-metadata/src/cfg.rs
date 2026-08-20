@@ -983,6 +983,8 @@ driver_configs![
             properties: {
                 #[serde(default)]
                 octal_spi: bool,
+                #[serde(default)]
+                hex_spi: bool,
                 extmem_origin: u32,
             }
         },

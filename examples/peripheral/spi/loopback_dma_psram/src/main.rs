@@ -1,9 +1,12 @@
 //! SPI loopback test using DMA - send from PSRAM receive to internal RAM
 //!
 //! The following wiring is assumed:
-//! - SCLK => GPIO42 (esp32s3) / GPIO6 (esp32s2, esp32c5, c61)
-//! - MOSI/MISO => GPIO48 (esp32s3) / GPIO7 (esp32s2, esp32c5, c61)
-//! - CS => GPIO38 (esp32s3) / GPIO10 (esp32s2, esp32c5, c61)
+//!
+//! Signal    | ESP32-S3 | ESP32-S2 | ESP32-C5/C61/P4 | ESP32-S31 |
+//! --------- | -------- | -------- | --------------- | --------- |
+//! SCLK      | GPIO42   | GPIO6    | GPIO6           | GPIO11    |
+//! MOSI/MISO | GPIO48   | GPIO7    | GPIO7           | GPIO12    |
+//! CS        | GPIO38   | GPIO10   | GPIO10          | GPIO13    |
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
@@ -11,9 +14,7 @@
 //! This example requires a board with PSRAM. If no PSRAM is detected, the
 //! allocation will fail at runtime.
 //!
-//! This example transfers data via SPI.
-//! Connect MISO and MOSI pins to see the outgoing data is read as incoming
-//! data.
+//! This example transfers data via SPI. MISO/MOSI are connected together by the firmware.
 
 //% CHIP_FILTER: dma_can_access_psram
 
@@ -59,13 +60,15 @@ fn main() -> ! {
     let (sclk, mosi, cs) =
         cfg_select! {
             feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
+            feature = "esp32s31" => (peripherals.GPIO11, peripherals.GPIO12, peripherals.GPIO13),
             _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
         };
-    let miso = unsafe { mosi.clone_unchecked() };
+
+    let (miso, mosi) = unsafe { mosi.split() };
 
     let dma_channel = cfg_select! {
         feature = "esp32s2" => peripherals.DMA_SPI2,
-        feature = "esp32p4" => peripherals.DMA_AXI_CH0,
+        any(feature = "esp32p4", feature = "esp32s31") => peripherals.DMA_AXI_CH0,
         _ => peripherals.DMA_CH0,
     };
 
