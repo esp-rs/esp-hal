@@ -739,7 +739,6 @@ impl DisconnectReason {
 ///
 /// Can be up to 32 bytes long (i.e. not characters). Longer SSIDs are rejected.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Ssid {
     ssid: [u8; 32],
     len: u8,
@@ -813,6 +812,13 @@ impl Debug for Ssid {
         f.write_char('"')?;
         f.write_str(self.as_str())?;
         f.write_char('"')
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Ssid {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(fmt, "{}", self.as_str())
     }
 }
 
@@ -891,6 +897,11 @@ impl AuthenticationMethodConfig {
 /// A password.
 ///
 /// Can be up to 64 bytes long (i.e. not characters). Longer passwords are rejected.
+///
+/// Only the maximum length is checked here - further constraints depend on the
+/// authentication method (e.g. WPA requires at least 8 bytes, WEP requires
+/// exactly 5 or 13 bytes) and are rejected by the driver when applying the
+/// configuration.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Password {
     password: [u8; 64],
@@ -952,6 +963,14 @@ impl Debug for Password {
 impl defmt::Format for Password {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(fmt, "**REDACTED**")
+    }
+}
+
+impl TryFrom<alloc::string::String> for Password {
+    type Error = WifiError;
+
+    fn try_from(password: alloc::string::String) -> Result<Self, Self::Error> {
+        Self::new(&password)
     }
 }
 

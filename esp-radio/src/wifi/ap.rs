@@ -62,6 +62,13 @@ pub struct AccessPointConfig {
 
 impl AccessPointConfig {
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
+        // Soft-AP doesn't support WEP (nor WAPI/OWE, which
+        // `AuthenticationMethodConfig` doesn't include).
+        if matches!(self.authentication, AuthenticationMethodConfig::Wep(_)) {
+            warn!("WEP is not supported in access point mode.");
+            return Err(WifiError::Unsupported);
+        }
+
         if let Some(password) = self.authentication.password()
             && password.is_empty()
         {
@@ -133,11 +140,10 @@ pub enum EventInfo {
 
 #[allow(non_upper_case_globals)]
 pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
-    let str_len = record
-        .ssid
-        .iter()
-        .position(|&c| c == 0)
-        .unwrap_or(record.ssid.len());
+    // `record.ssid` is 33 bytes to always fit the NUL terminator of a
+    // maximum-length SSID - clamp to 32 in case the driver ever hands us one
+    // without it.
+    let str_len = record.ssid.iter().position(|&c| c == 0).unwrap_or(32);
     let ssid = Ssid::try_from(&record.ssid[..str_len]).expect("SSID length is valid");
 
     AccessPointInfo {

@@ -1070,8 +1070,12 @@ impl EventInfo {
             WifiEvent::StationConnected => {
                 let ev = unsafe { StationConnected::from_raw_event_data(payload) };
 
+                let Ok(ssid) = Ssid::from_raw(ev.ssid(), ev.ssid_len()) else {
+                    return None;
+                };
+
                 Some(EventInfo::StationConnected {
-                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()).expect("SSID length is valid"),
+                    ssid,
                     bssid: ev.bssid().try_into().unwrap(),
                     channel: ev.channel(),
                     authmode: ev.authmode(),
@@ -1080,8 +1084,13 @@ impl EventInfo {
             }
             WifiEvent::StationDisconnected => {
                 let ev = unsafe { StationDisconnected::from_raw_event_data(payload) };
+
+                let Ok(ssid) = Ssid::from_raw(ev.ssid(), ev.ssid_len()) else {
+                    return None;
+                };
+
                 Some(EventInfo::StationDisconnected {
-                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()).expect("SSID length is valid"),
+                    ssid,
                     bssid: ev.bssid().try_into().unwrap(),
                     reason: ev.reason() as u16,
                     rssi: ev.rssi(),

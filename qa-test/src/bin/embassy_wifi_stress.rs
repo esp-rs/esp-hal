@@ -98,8 +98,16 @@ async fn main(_spawner: Spawner) {
                     .with_ssid(best_one.ssid)
                     .with_bssid(best_one.bssid)
                     .with_authentication(match best_one.auth_method {
+                        Some(AuthenticationMethod::Wpa) => {
+                            AuthenticationMethodConfig::Wpa(PASSWORD.try_into().unwrap())
+                        }
                         Some(AuthenticationMethod::Wpa2Personal) => {
                             AuthenticationMethodConfig::Wpa2Personal(PASSWORD.try_into().unwrap())
+                        }
+                        Some(AuthenticationMethod::WpaWpa2Personal) => {
+                            AuthenticationMethodConfig::WpaWpa2Personal(
+                                PASSWORD.try_into().unwrap(),
+                            )
                         }
                         Some(AuthenticationMethod::None) => AuthenticationMethodConfig::Open,
                         _ => {
