@@ -223,7 +223,7 @@ version = "lp_i2c"
 fifo_size = 16
 
 [device.i2c_slave]
-support_status = "supported"
+support_status = "partial"
 instances = [
     { name = "i2c0" },
 ]

@@ -171,7 +171,7 @@ bus_timeout_is_exponential = true
 has_pd_en = true
 
 [device.i2c_slave]
-support_status = "supported"
+support_status = "partial"
 instances = [
     { name = "i2c0" },
 ]
