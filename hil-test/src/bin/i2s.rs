@@ -246,10 +246,12 @@ mod tests {
 
         let mut samples = SampleSource::new();
         tx_buffer.push_with(|buf| {
-            for b in buf.iter_mut() {
+            // test everything still works if the buffer is not completely pre-filled
+            let fill_up_to = BUFFER_SIZE * 2 + 100;
+            for b in buf[..fill_up_to].iter_mut() {
                 *b = samples.next().unwrap();
             }
-            buf.len()
+            fill_up_to
         });
 
         let mut rcv = [0u8; 11000];

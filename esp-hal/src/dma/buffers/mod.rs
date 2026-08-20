@@ -1425,8 +1425,8 @@ impl DmaTxStreamBuf {
 
     /// Push the buffer with the given data before DMA transfer starts.
     ///
-    /// Otherwise the streaming buffer will transfer garbage data to
-    /// DMA so that CPU has enough time to fill the buffer after transfer starts.
+    /// It's expected to pre-fill at least enough data to fill the first two descriptors' buffers.
+    /// The more data is pre-filled, the more head-room is left to push more data.
     pub fn push(&mut self, data: &[u8]) -> usize {
         self.push_with(|buf| {
             let len = buf.len().min(data.len());
@@ -1446,15 +1446,10 @@ impl DmaTxStreamBuf {
     }
 
     fn setup_view_state(&mut self) {
-        self.view_descriptor_idx = 0;
-        self.view_descriptor_offset = 0;
         let pre_filled = self.pre_filled.unwrap_or(self.buffer.len());
-        mark_tx_stream_descriptors_ready(
-            &mut self.descriptors,
-            &mut self.view_descriptor_idx,
-            &mut self.view_descriptor_offset,
-            pre_filled,
-        );
+        let (idx, offset) = mark_tx_stream_descriptors_ready(&mut self.descriptors, pre_filled);
+        self.view_descriptor_idx = idx;
+        self.view_descriptor_offset = offset;
         #[cfg(soc_internal_memory_cached)]
         if pre_filled != 0 {
             unsafe {
@@ -1465,51 +1460,71 @@ impl DmaTxStreamBuf {
 }
 
 /// Marks descriptors containing data that should be transmitted when the DMA
-/// channel starts. Unlike [advance_tx_stream_descriptors], this does not modify
-/// the `next` pointers because the linked list must remain intact until the
-/// transfer is running.
+/// channel starts.
 fn mark_tx_stream_descriptors_ready(
     descriptors: &mut DmaAlignedMut<'_, [DmaDescriptor]>,
-    descriptor_idx: &mut usize,
-    descriptor_offset: &mut usize,
     bytes_pushed: usize,
-) {
+) -> (usize, usize) {
     if bytes_pushed == 0 {
-        return;
+        return (0, 0);
     }
-
-    let mut bytes_filled = 0;
-    let num_descriptors = descriptors.len();
 
     #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
     descriptors.invalidate();
 
-    for i in 0..num_descriptors {
-        let d = (*descriptor_idx + i) % num_descriptors;
-        let desc = &mut descriptors[d];
-        let bytes_in_d = desc.size() - *descriptor_offset;
+    let num = descriptors.len();
+    let mut bytes_filled = 0;
+    let mut cursor = (0, 0);
 
-        if bytes_in_d + bytes_filled > bytes_pushed {
-            *descriptor_idx = d;
-            *descriptor_offset = *descriptor_offset + bytes_pushed - bytes_filled;
-            desc.set_owner(Owner::Dma);
-            desc.set_length(*descriptor_offset);
-            desc.set_suc_eof(true);
-            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
-            descriptors.writeback();
-            return;
+    for d in 0..num {
+        let remaining = bytes_pushed - bytes_filled;
+        let size = descriptors[d].size();
+
+        if remaining == 0 {
+            terminate_tx_stream_at(descriptors, d);
+            cursor = (d, 0);
+            break;
         }
 
-        bytes_filled += bytes_in_d;
-        *descriptor_offset = 0;
+        if remaining < size {
+            if d == 0 {
+                // The transfer needs at least one descriptor; send the partial chunk and
+                // continue filling from the next one.
+                descriptors[d].set_owner(Owner::Dma);
+                descriptors[d].set_length(remaining);
+                descriptors[d].set_suc_eof(true);
+                if num > 1 {
+                    terminate_tx_stream_at(descriptors, 1);
+                    cursor = (1, 0);
+                } else {
+                    descriptors[d].next = null_mut();
+                }
+            } else {
+                terminate_tx_stream_at(descriptors, d);
+                cursor = (d, remaining);
+            }
+            break;
+        }
 
-        desc.set_owner(Owner::Dma);
-        desc.set_length(desc.size());
-        desc.set_suc_eof(true);
+        bytes_filled += size;
+        descriptors[d].set_owner(Owner::Dma);
+        descriptors[d].set_length(size);
+        descriptors[d].set_suc_eof(true);
     }
 
     #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
     descriptors.writeback();
+
+    cursor
+}
+
+fn terminate_tx_stream_at(descriptors: &mut DmaAlignedMut<'_, [DmaDescriptor]>, start: usize) {
+    if start > 0 {
+        descriptors[start - 1].next = null_mut();
+    }
+    for desc in descriptors.iter_mut().skip(start) {
+        desc.set_owner(Owner::Cpu);
+    }
 }
 
 fn advance_tx_stream_descriptors(
@@ -1567,8 +1582,6 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
         let mut next = null_mut();
         for desc in self.descriptors.iter_mut().rev() {
             desc.next = next;
-            // set the owner for *all* descriptors - otherwise descriptors with pre-filled data
-            // might be owned by CPU
             desc.set_owner(Owner::Dma);
             next = desc;
         }
@@ -1601,7 +1614,14 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
     }
 
     fn from_view(view: Self::View) -> Self {
-        view.buf
+        let DmaTxStreamBufView {
+            mut buf,
+            descriptor_idx,
+            descriptor_offset,
+        } = view;
+        buf.view_descriptor_idx = descriptor_idx;
+        buf.view_descriptor_offset = descriptor_offset;
+        buf
     }
 }
 
@@ -1624,16 +1644,26 @@ impl DmaTxStreamBufView {
             .take_while(|d| d.owner() == Owner::Cpu)
             .map(|d| d.size())
             .sum::<usize>()
-            - self.descriptor_offset
+            .saturating_sub(self.descriptor_offset)
+    }
+
+    fn write_position(&self) -> usize {
+        let desc = &self.buf.descriptors[self.descriptor_idx];
+        desc.buffer
+            .addr()
+            .wrapping_sub(self.buf.buffer.as_ptr().addr())
+            + self.descriptor_offset
     }
 
     /// Pushes a buffer into the stream buffer.
     /// Returns the number of bytes pushed.
     pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
-        let chunk_size = self.buf.descriptors[0].size();
-        let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
-        let dma_end = (dma_start + self.available_bytes()).min(self.buf.buffer.len());
-        let bytes_pushed = f(&mut self.buf.buffer[dma_start..dma_end]);
+        let dma_start = self.write_position();
+        let dma_end = dma_start
+            .saturating_add(self.available_bytes())
+            .min(self.buf.buffer.len())
+            .max(dma_start);
+        let bytes_pushed = f(&mut self.buf.buffer[dma_start..dma_end]).min(dma_end - dma_start);
         #[cfg(soc_internal_memory_cached)]
         if bytes_pushed != 0 {
             unsafe {
