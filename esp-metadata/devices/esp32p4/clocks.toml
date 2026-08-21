@@ -2,7 +2,7 @@ system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
     { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "360, 400", output = "VALUE * 1_000_000" },
-    { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "240, 480", output = "VALUE * 1_000_000" },
+    { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "480 * 1_000_000" },
     { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "320, 400, 500", output = "VALUE * 1_000_000" },
     { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
 
@@ -232,8 +232,8 @@ peripheral_clocks = { templates = [
     { name = "AhbGdma", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "ahb_pdma", rst_group = "1", rst_field = "ahb_pdma" } },
     { name = "AxiGdma", template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "axi_pdma", rst_group = "1", rst_field = "axi_pdma" } },
     { name = "Vdma",    template_params = { clk_en_template = "{{sys_clk_template}}", clk_field = "gdma",     rst_group = "0", rst_field = "gdma" } },
-    # ADC.
-    { name = "Adc", template_params = { clk_en_template = "{{apb_clk_template}}", rst_group = "2" } },
+    # ADC -- the digital controller needs both the APB gate and the PERI_CLK_CTRL23 function clock.
+    { name = "ApbSarAdc", template_params = { clk_en_template = "{{apb_clk_template}} {{control}}::regs().peri_clk_ctrl23().modify(|_, w| w.adc_clk_en().bit(enable));", clk_field = "adc", rst_group = "2", rst_field = "adc" } },
     # Parallel IO -- reset asserts the parlio block plus its rx/tx subreset bits in one write.
     { name = "ParlIo", template_params = { clk_en_template = "{{sys_apb_clk_template}}", clk_field = "parlio", rst_template = "{{control}}::regs().hp_rst_en2().modify(|_, w| w.rst_en_parlio().bit(reset).rst_en_parlio_rx().bit(reset).rst_en_parlio_tx().bit(reset));" } },
     # LCD/CAM -- clock gate lives in SOC_CLK_CTRL3 (not modelled), only reset is wired up.
