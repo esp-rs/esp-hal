@@ -59,6 +59,18 @@ esp32c5 = [
     "esp-rtos/esp32c5",
     "esp-hal/esp32c5",
 ]
+esp32p4 = [
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-rtos/esp32p4",
+    "esp-hal/esp32p4",
+]
+esp32s31 = [
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-rtos/esp32s31",
+    "esp-hal/esp32s31",
+]
 
 [profile.release]
 debug            = true

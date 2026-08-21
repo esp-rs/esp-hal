@@ -5,13 +5,13 @@
     },
     "channel" => {
         cfg(any(esp32, esp32s2)) => "channel0",
-        cfg(esp32s3) => "channel7",
+        cfg(any(esp32s3, esp32s31, esp32p4)) => "channel7",
         _ => "channel2"
     },
     "channels_desc" => {
         cfg(esp32) => "8 channels, each of them can be either receiver or transmitter",
         cfg(esp32s2) => "4 channels, each of them can be either receiver or transmitter",
-        cfg(esp32s3) => "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals",
+        cfg(any(esp32s3, esp32s31, esp32p4)) => "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals",
         cfg(any(esp32c3, esp32c5, esp32c6, esp32h2)) => "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals",
     }
 ))]
@@ -2302,29 +2302,46 @@ mod chip_specific {
             clocks::RmtInstance::Rmt.configure_sclk(clocks, source);
         });
 
-        #[cfg(not(soc_has_pcr))]
-        RMT::regs().sys_conf().modify(|_, w| unsafe {
-            w.sclk_div_num().bits(div);
-            w.sclk_div_a().bits(0);
-            w.sclk_div_b().bits(0);
-            w.apb_fifo_mask().set_bit()
-        });
-
-        #[cfg(soc_has_pcr)]
-        {
-            use crate::peripherals::PCR;
-
-            PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
-                w.sclk_div_num().bits(div);
-                w.sclk_div_a().bits(0);
-                w.sclk_div_b().bits(0);
-                w
-            });
-
-            RMT::regs()
-                .sys_conf()
-                .modify(|_, w| w.apb_fifo_mask().set_bit());
+        // TODO: configure dividers through clock tree
+        cfg_select! {
+            esp32p4 => {
+                use crate::peripherals::HP_SYS_CLKRST;
+                HP_SYS_CLKRST::regs()
+                    .peri_clk_ctrl22()
+                    .modify(|_, w| unsafe {
+                        w.rmt_clk_div_num().bits(div);
+                        w.rmt_clk_div_numerator().bits(0);
+                        w.rmt_clk_div_denominator().bits(0)
+                    });
+            }
+            esp32s31 => {
+                use crate::peripherals::HP_SYS_CLKRST;
+                HP_SYS_CLKRST::regs().rmt_ctrl0().modify(|_, w| unsafe {
+                    w.clk_div_num().bits(div);
+                    w.clk_div_numerator().bits(0);
+                    w.clk_div_denominator().bits(0)
+                });
+            }
+            soc_has_pcr => {
+                use crate::peripherals::PCR;
+                PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
+                    w.sclk_div_num().bits(div);
+                    w.sclk_div_a().bits(0);
+                    w.sclk_div_b().bits(0)
+                });
+            }
+            _ => {
+                RMT::regs().sys_conf().modify(|_, w| unsafe {
+                    w.sclk_div_num().bits(div);
+                    w.sclk_div_a().bits(0);
+                    w.sclk_div_b().bits(0)
+                });
+            }
         }
+
+        RMT::regs()
+            .sys_conf()
+            .modify(|_, w| w.apb_fifo_mask().set_bit());
     }
 
     #[crate::handler]
@@ -2437,8 +2454,17 @@ mod chip_specific {
 
     // documented in re-export below
     #[allow(missing_docs)]
-    pub const MAX_TX_LOOPCOUNT: u16 =
-        max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_W);
+    pub const MAX_TX_LOOPCOUNT: u16 = {
+        // TODO: unify naming in PAC
+        cfg_select! {
+            any(esp32p4, esp32s31) => {
+                max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_CH_W)
+            }
+            _ => {
+                max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_W)
+            }
+        }
+    };
 
     impl DynChannelAccess<Tx> {
         #[inline(always)]
@@ -2629,8 +2655,18 @@ mod chip_specific {
 
     // documented in re-export below
     #[allow(missing_docs)]
-    pub const MAX_RX_IDLE_THRESHOLD: u16 =
-        max_from_register_spec!(u16, ch_rx_conf0, CH_RX_CONF0_SPEC, IDLE_THRES_W);
+    pub const MAX_RX_IDLE_THRESHOLD: u16 = {
+        // TODO: unify naming in PAC
+        cfg_select! {
+            any(esp32p4, esp32s31) => {
+                // 15-bit IDLE_THRES in RX CONF0 (PAC aliases that register to TX CONF0).
+                32767
+            }
+            _ => {
+                max_from_register_spec!(u16, ch_rx_conf0, CH_RX_CONF0_SPEC, IDLE_THRES_W)
+            }
+        }
+    };
 
     impl DynChannelAccess<Rx> {
         #[inline(always)]

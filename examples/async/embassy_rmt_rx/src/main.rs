@@ -61,7 +61,9 @@ async fn main(spawner: Spawner) {
         any(feature = "esp32", feature = "esp32s2") => {
             rmt.channel0.configure_rx(&rx_config).unwrap()
         }
-        feature = "esp32s3" => rmt.channel7.configure_rx(&rx_config).unwrap(),
+        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => {
+            rmt.channel7.configure_rx(&rx_config).unwrap()
+        }
         _ => rmt.channel2.configure_rx(&rx_config).unwrap(),
     };
 

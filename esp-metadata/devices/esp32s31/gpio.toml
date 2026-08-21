@@ -138,6 +138,11 @@ input_signals = [
     { name = "CPU_GPIO_13",         id = 227 },
     { name = "CPU_GPIO_14",         id = 228 },
     { name = "CPU_GPIO_15",         id = 229 },
+    # RMT
+    { name = "RMT_SIG_0",           id = 246 },
+    { name = "RMT_SIG_1",           id = 247 },
+    { name = "RMT_SIG_2",           id = 248 },
+    { name = "RMT_SIG_3",           id = 249 },
     # SDMMC
     { name = "SDHOST_CDATA_IN_41",      id = 0 },
     { name = "SDHOST_CDATA_IN_51",      id = 1 },
@@ -338,6 +343,11 @@ output_signals = [
     { name = "CPU_GPIO_13",         id = 227 },
     { name = "CPU_GPIO_14",         id = 228 },
     { name = "CPU_GPIO_15",         id = 229 },
+    # RMT
+    { name = "RMT_SIG_0",           id = 246 },
+    { name = "RMT_SIG_1",           id = 247 },
+    { name = "RMT_SIG_2",           id = 248 },
+    { name = "RMT_SIG_3",           id = 249 },
     # GPIO passthrough
     { name = "GPIO",                id = 256 },
 

@@ -115,9 +115,9 @@ peripherals = [
     { name = "MCPWM0", interrupts = { peri = "PWM0" } },
     { name = "MCPWM1", interrupts = { peri = "PWM1" } },
     { name = "PCNT", interrupts = { peri = "PCNT" } },
-    { name = "RMT", interrupts = { peri = "RMT" } },
     { name = "APB_SARADC", pac = "ADC" },
     { name = "LP_ADC" },
+    { name = "RMT", virtual = true, interrupts = { peri = "RMT" }, clock_group = "RMT" }, # PAC field names differ from ESP32-S3; overlay_rmt maps them.
     { name = "AES", interrupts = { peri = "AES" } },
     { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "RSA", interrupts = { peri = "RSA" } },
@@ -379,11 +379,17 @@ support_status = "not_supported"
 support_status = "not_supported"  # LCD path of LCD_CAM block
 
 [device.rmt]
-support_status = "not_supported"
+support_status = "partial"
 ram_start = 0x500A2800
 channel_ram_size = 48
 channels = ["Tx", "Tx", "Tx", "Tx", "Rx", "Rx", "Rx", "Rx"]
-# TODO capabilities
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
 
 [device.parl_io]
 support_status = "not_supported"

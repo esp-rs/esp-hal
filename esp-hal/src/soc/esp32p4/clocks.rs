@@ -479,6 +479,34 @@ impl TimgInstance {
     }
 }
 
+impl RmtInstance {
+    // RMT_SCLK
+
+    fn enable_sclk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl22()
+            .modify(|_, w| w.rmt_clk_en().bit(en));
+    }
+
+    fn configure_sclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<RmtSclkConfig>,
+        new_config: RmtSclkConfig,
+    ) {
+        // Register values: 0 = XTAL, 1 = RC_FAST, 2 = PLL_F80M.
+        HP_SYS_CLKRST::regs()
+            .peri_clk_ctrl22()
+            .modify(|_, w| unsafe {
+                w.rmt_clk_src_sel().bits(match new_config {
+                    RmtSclkConfig::XtalClk => 0,
+                    RmtSclkConfig::RcFastClk => 1,
+                    RmtSclkConfig::PllF80m => 2,
+                })
+            });
+    }
+}
+
 // System clock impl functions
 
 // Mux enable stubs (mux nodes need enable functions too)
