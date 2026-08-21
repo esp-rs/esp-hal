@@ -24,6 +24,7 @@ use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::wifi::{
+    AuthenticationMethodConfig,
     Config,
     ControllerConfig,
     Interface,
@@ -87,8 +88,10 @@ async fn main(spawner: Spawner) -> ! {
 
     let station_config = Config::Station(
         StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into()),
+            .with_ssid(SSID.try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                PASSWORD.try_into().unwrap(),
+            )),
     );
 
     println!("Starting wifi");

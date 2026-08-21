@@ -1070,8 +1070,13 @@ impl EventInfo {
             WifiEvent::StationConnected => {
                 let ev = unsafe { StationConnected::from_raw_event_data(payload) };
 
+                let Ok(ssid) = Ssid::from_raw(ev.ssid(), ev.ssid_len()) else {
+                    warn!("Dropping StationConnected event: invalid SSID length");
+                    return None;
+                };
+
                 Some(EventInfo::StationConnected {
-                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()),
+                    ssid,
                     bssid: ev.bssid().try_into().unwrap(),
                     channel: ev.channel(),
                     authmode: ev.authmode(),
@@ -1080,8 +1085,14 @@ impl EventInfo {
             }
             WifiEvent::StationDisconnected => {
                 let ev = unsafe { StationDisconnected::from_raw_event_data(payload) };
+
+                let Ok(ssid) = Ssid::from_raw(ev.ssid(), ev.ssid_len()) else {
+                    warn!("Dropping StationDisconnected event: invalid SSID length");
+                    return None;
+                };
+
                 Some(EventInfo::StationDisconnected {
-                    ssid: Ssid::from_raw(ev.ssid(), ev.ssid_len()),
+                    ssid,
                     bssid: ev.bssid().try_into().unwrap(),
                     reason: ev.reason() as u16,
                     rssi: ev.rssi(),
@@ -1118,13 +1129,22 @@ impl EventInfo {
                     StationWifiProtectedStatusEnrolleeSuccess::from_raw_event_data(payload)
                 };
                 Some(EventInfo::StationWifiProtectedStatusEnrolleeSuccess {
-                    credentials: Collection(ev
-                        .access_point_cred()[..ev.access_point_cred_cnt() as usize].iter()
-                        .map(|cred| CredentialsInfo {
-                            ssid: cred.ssid().into(),
-                            passphrase: cred.passphrase().try_into().unwrap(),
-                        })
-                        .collect()),
+                    credentials: Collection(
+                        ev.access_point_cred()[..ev.access_point_cred_cnt() as usize]
+                            .iter()
+                            .filter_map(|cred| {
+                                let Ok(ssid) = Ssid::try_from(cred.ssid()) else {
+                                    warn!("Dropping WPS credential: invalid SSID length");
+                                    return None;
+                                };
+                                let Ok(passphrase) = <[u8; 64]>::try_from(cred.passphrase()) else {
+                                    warn!("Dropping WPS credential: invalid passphrase length");
+                                    return None;
+                                };
+                                Some(CredentialsInfo { ssid, passphrase })
+                            })
+                            .collect(),
+                    ),
                 })
             }
             WifiEvent::StationWifiProtectedStatusEnrolleeFailed => {

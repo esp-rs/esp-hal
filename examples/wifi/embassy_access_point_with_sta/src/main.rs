@@ -44,6 +44,7 @@ use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::wifi::{
+    AuthenticationMethodConfig,
     Config,
     ControllerConfig,
     Interface,
@@ -84,9 +85,11 @@ async fn main(spawner: Spawner) -> ! {
 
     let access_point_station_config = Config::AccessPointStation(
         StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into()),
-        AccessPointConfig::default().with_ssid("esp-radio-apsta"),
+            .with_ssid(SSID.try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                PASSWORD.try_into().unwrap(),
+            )),
+        AccessPointConfig::default().with_ssid("esp-radio-apsta".try_into().unwrap()),
     );
 
     println!("Starting wifi");
