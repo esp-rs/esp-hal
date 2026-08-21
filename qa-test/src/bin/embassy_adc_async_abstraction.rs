@@ -2,9 +2,11 @@
 //! convert the raw value to a type-specific interpretation.
 //!
 //! PINS
-//! GPIO4 for ADC1
+//! GPIO4 for ADC1, GPIO20 on the ESP32-P4
 
-//% CHIP_FILTER: adc_driver_supported && !esp32 && !esp32s2 && !esp32s3
+// The ESP32-S31 is excluded because this example calibrates the pin, and no
+// calibration scheme is implemented for that chip.
+//% CHIP_FILTER: adc_driver_supported && !esp32 && !esp32s2 && !esp32s3 && !esp32s31
 
 #![no_std]
 #![no_main]
@@ -86,7 +88,10 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let mut adc1_config = AdcConfig::new();
-    let analog_pin1 = peripherals.GPIO4;
+    let analog_pin1 = cfg_select! {
+        feature = "esp32p4" => peripherals.GPIO20,
+        _ => peripherals.GPIO4,
+    };
     let pin1 = adc1_config
         .enable_pin_with_cal::<_, AdcCalBasic<esp_hal::peripherals::ADC1<'static>>>(
             analog_pin1,

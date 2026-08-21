@@ -43,6 +43,7 @@ memory_map = { ranges = [
 
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" } },
+    { name = "APB_SARADC", pac = "ADC" },
     { name = "ASSIST_DEBUG" },
     { name = "CACHE" },
     { name = "CLIC" },
@@ -103,6 +104,8 @@ peripherals = [
     { name = "USB_DEVICE" },
     { name = "USB_HS", pac = "USB_OTG_HS", interrupts = { peri = "USB_OTG_HS" } },
 
+    { name = "ADC1", virtual = true },
+    { name = "ADC2", virtual = true },
     { name = "FLASH", virtual = true },
     { name = "PSRAM", virtual = true, clock_group = "PSRAM" },
     { name = "GPIO_DEDICATED", virtual = true },
@@ -351,9 +354,14 @@ support_status = "not_supported"
 [device.ecdsa]
 support_status = "not_supported"
 
-# Peripherals the chip has, that no driver reaches yet.
 [device.adc]
-support_status = "not_supported"
+support_status = "partial"
+instances = [
+    { name = "adc1" },
+    { name = "adc2" },
+]
+
+# Peripherals the chip has, that no driver reaches yet.
 [device.avc]
 support_status = "not_supported"
 [device.bit_scrambler]

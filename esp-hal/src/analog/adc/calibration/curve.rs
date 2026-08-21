@@ -126,7 +126,7 @@ macro_rules! coeff_tables {
     };
 }
 
-#[cfg(any(esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3))]
+#[cfg(any(esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s3))]
 mod impls {
     use super::*;
 
@@ -139,7 +139,7 @@ mod impls {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
     }
 
-    #[cfg(esp32s3)]
+    #[cfg(any(esp32p4, esp32s3))]
     impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS2;
     }
@@ -268,6 +268,48 @@ mod impls {
                 -0.3637329628677273,
                 -0.0000196072597389,
                 0.0000007871689227,
+            ],
+        ];
+
+        /// Error curve coefficients for ADC1, derived from <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/esp_adc/esp32p4/curve_fitting_coefficients.c>
+        #[cfg(esp32p4)]
+        CURVES_COEFFS1 [
+            _0dB => [
+                -0.7170501832480995,
+                0.0010598497992115,
+            ],
+            _2p5dB => [
+                -0.9960085535084866,
+                0.0015840076608145,
+            ],
+            _6dB => [
+                -1.4711053224678996,
+                0.00001594266424857,
+            ],
+            _11dB => [
+                -2.8811493455181565,
+                0.0010082311568625,
+            ],
+        ];
+
+        /// Error curve coefficients for ADC2, derived from <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/esp_adc/esp32p4/curve_fitting_coefficients.c>
+        #[cfg(esp32p4)]
+        CURVES_COEFFS2 [
+            _0dB => [
+                -0.4900967548489932,
+                0.0005037402667913,
+            ],
+            _2p5dB => [
+                -0.7296214814536025,
+                0.0011021577596635,
+            ],
+            _6dB => [
+                -1.0991620450220592,
+                0.0011623930881896,
+            ],
+            _11dB => [
+                -2.442140102462673,
+                0.0009458501263393,
             ],
         ];
 
