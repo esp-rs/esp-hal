@@ -156,7 +156,6 @@ impl<ADCX> AdcConfig<ADCX> {
 
     /// Enable the specified pin with the given attenuation and calibration
     /// scheme
-    #[cfg(not(esp32))]
     #[cfg(feature = "unstable")]
     pub fn enable_pin_with_cal<PIN, CS>(
         &mut self,
@@ -164,17 +163,17 @@ impl<ADCX> AdcConfig<ADCX> {
         attenuation: Attenuation,
     ) -> AdcPin<PIN, ADCX, CS>
     where
-        ADCX: CalibrationAccess,
         PIN: AdcChannel + AnalogPin,
         CS: AdcCalScheme<ADCX>,
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[pin.adc_channel() as usize] = Some(attenuation);
+        let channel = pin.adc_channel();
+        self.attenuations[channel as usize] = Some(attenuation);
 
         AdcPin {
             pin,
-            cal_scheme: CS::new_cal(attenuation),
+            cal_scheme: CS::new_cal_with_channel(attenuation, channel),
             _phantom: PhantomData,
         }
     }
@@ -221,6 +220,14 @@ pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
     /// Create a new calibration scheme for the given attenuation.
     fn new_cal(atten: Attenuation) -> Self;
 
+    /// Create a new calibration scheme for the given attenuation and ADC
+    /// channel.
+    ///
+    /// The default implementation ignores `channel` and calls [`Self::new_cal`].
+    fn new_cal_with_channel(atten: Attenuation, _channel: u8) -> Self {
+        Self::new_cal(atten)
+    }
+
     /// Return the basic ADC bias value.
     fn adc_cal(&self) -> u16 {
         0
@@ -239,7 +246,7 @@ impl<ADCX> AdcCalScheme<ADCX> for () {
 }
 
 /// A helper trait to get access to ADC calibration efuses.
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(not(esp32))]
 trait AdcCalEfuse {
     /// Get ADC calibration init code
     ///
@@ -259,8 +266,8 @@ trait AdcCalEfuse {
     /// Get the ADC channel specific calibration
     ///
     /// Returns digital per channel offset from reference voltage
-    #[cfg(any(esp32c5, esp32c61))]
-    fn cal_chan_compens(atten: Attenuation, channel: u16) -> Option<i32>;
+    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+    fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32>;
 }
 
 for_each_analog_function! {

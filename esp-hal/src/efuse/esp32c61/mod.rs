@@ -133,7 +133,7 @@ pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u1
 #[instability::unstable]
 pub fn rtc_calib_get_chan_compens(
     _unit: AdcCalibUnit,
-    channel: u16,
+    channel: u8,
     atten: Attenuation,
 ) -> Option<i32> {
     let chan_diff: u32 = super::read_field_le(match channel {

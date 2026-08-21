@@ -24,7 +24,7 @@ pub struct AdcCalBasic<ADCX> {
     /// Calibration value to set to ADC unit
     cal_val: u16,
 
-    #[cfg(any(esp32c5, esp32c61))]
+    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
     chan_compens: i32,
 
     _phantom: PhantomData<ADCX>,
@@ -37,6 +37,10 @@ where
     ADCX: AdcCalEfuse + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
+        Self::new_cal_with_channel(atten, 0)
+    }
+
+    fn new_cal_with_channel(atten: Attenuation, _channel: u8) -> Self {
         // Try to get init code (Dout0) from efuse
         // Dout0 means mean raw ADC value when zero voltage applied to input.
         let cal_val = ADCX::init_code(atten).unwrap_or_else(|| {
@@ -44,12 +48,12 @@ where
             AdcConfig::<ADCX>::adc_calibrate(atten, AdcCalSource::Gnd)
         });
 
-        #[cfg(any(esp32c5, esp32c61))]
-        let chan_compens = ADCX::cal_chan_compens(atten, ADCX::ADC_CAL_CHANNEL).unwrap_or(0);
+        #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+        let chan_compens = ADCX::cal_chan_compens(atten, _channel).unwrap_or(0);
 
         Self {
             cal_val,
-            #[cfg(any(esp32c5, esp32c61))]
+            #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
             chan_compens,
             _phantom: PhantomData,
         }
@@ -59,10 +63,8 @@ where
         self.cal_val
     }
 
-    // This is default from the trait for other target than esp32c5 and esp32c61
-    #[cfg(any(esp32c5, esp32c61))]
+    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
     fn adc_val(&self, val: u16) -> u16 {
-        val.saturating_sub(self.chan_compens as u16)
-            .clamp(0, ADCX::ADC_VAL_MASK)
+        (val as i32 - self.chan_compens).clamp(0, ADCX::ADC_VAL_MASK as i32) as u16
     }
 }

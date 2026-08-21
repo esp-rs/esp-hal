@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
 
+use super::AdcHasLineCal;
 use crate::analog::adc::{
     AdcCalBasic,
     AdcCalEfuse,
@@ -9,12 +10,6 @@ use crate::analog::adc::{
     Attenuation,
     CalibrationAccess,
 };
-
-/// Marker trait for ADC units which support line fitting
-///
-/// Usually it means that reference points are stored in efuse.
-/// See also [`AdcCalLine`].
-pub trait AdcHasLineCal {}
 
 /// We store the gain as a u32, but it's really a fixed-point number.
 const GAIN_SCALE: u32 = 1 << 16;
@@ -55,7 +50,11 @@ where
     ADCX: AdcCalEfuse + AdcHasLineCal + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
-        let basic = AdcCalBasic::<ADCX>::new_cal(atten);
+        Self::new_cal_with_channel(atten, 0)
+    }
+
+    fn new_cal_with_channel(atten: Attenuation, channel: u8) -> Self {
+        let basic = AdcCalBasic::<ADCX>::new_cal_with_channel(atten, channel);
 
         // Try get the reference point (Dout, Vin) from efuse
         // Dout means mean raw ADC value when specified Vin applied to input.
@@ -96,9 +95,3 @@ where
         (val as u32 * self.gain / GAIN_SCALE) as u16
     }
 }
-
-#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3))]
-impl AdcHasLineCal for crate::peripherals::ADC1<'_> {}
-
-#[cfg(any(esp32c3, esp32s3))]
-impl AdcHasLineCal for crate::peripherals::ADC2<'_> {}
