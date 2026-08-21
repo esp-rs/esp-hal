@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
@@ -50,14 +50,20 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
     add_dependent_crates(workspace, &mut to_process)?;
 
     // don't process crates which are not published
-    let to_process: Vec<Package> = to_process
-        .iter()
-        .filter(|pkg| {
-            let cargo_toml = CargoToml::new(workspace, **pkg).unwrap();
-            cargo_toml.is_published()
-        })
-        .copied()
-        .collect();
+    let to_process = {
+        let mut published = Vec::new();
+        for pkg in to_process
+            .into_iter()
+            .filter(|pkg| !pkg.contains_standalone_projects())
+        {
+            let cargo_toml = CargoToml::new(workspace, pkg)
+                .with_context(|| format!("Could not load Cargo.toml of {pkg}"))?;
+            if cargo_toml.is_published() {
+                published.push(pkg);
+            }
+        }
+        published
+    };
 
     let adjust_ci = to_process.contains(&Package::EspHal);
 
@@ -103,9 +109,14 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
                 }
             }
 
-            if !args.dry_run {
-                if let Some(previous_rust_version) = previous_rust_version {
-                    check_mentions(&package_path, &previous_rust_version)?;
+            if !args.dry_run
+                && let Some(previous_rust_version) = previous_rust_version
+            {
+                for mention in find_mentions(&package_path, &previous_rust_version)? {
+                    println!(
+                        "⚠️ '{previous_rust_version}' found in file {} - might be a false positive, otherwise consider adjusting the xtask.",
+                        mention.display()
+                    );
                 }
             }
         }
@@ -141,13 +152,14 @@ fn add_dependent_crates(
 
             // iterate over ALL known crates
             for package in Package::iter() {
-                let mut cargo_toml =
-                    CargoToml::new(workspace, package.clone()).with_context(|| {
-                        format!(
-                            "Creating Cargo.toml in workspace {} for {package} failed!",
-                            workspace.display()
-                        )
-                    })?;
+                // Directories of standalone projects have no root Cargo.toml, so they cannot be
+                // inspected as crates.
+                if package.contains_standalone_projects() {
+                    continue;
+                }
+
+                let mut cargo_toml = CargoToml::new(workspace, package)
+                    .with_context(|| format!("Could not load Cargo.toml of {package}"))?;
 
                 // iterate the dependencies in the repo
                 for dep in cargo_toml.repo_dependencies() {
@@ -166,11 +178,13 @@ fn add_dependent_crates(
     )
 }
 
-/// Check files in the package and show if we find the version string in any
-/// file. Most probably it will report false positives but maybe not.
-fn check_mentions(package_path: &std::path::PathBuf, previous_rust_version: &str) -> Result<()> {
+/// Find files in the package which mention the version string.
+fn find_mentions(package_path: &Path, previous_rust_version: &str) -> Result<Vec<PathBuf>> {
     use std::ffi::OsStr;
     let disallowed_extensions = [OsStr::new("gz")];
+
+    let mut mentions = Vec::new();
+
     for entry in walkdir::WalkDir::new(package_path)
         .into_iter()
         .filter_map(|entry| {
@@ -193,15 +207,101 @@ fn check_mentions(package_path: &std::path::PathBuf, previous_rust_version: &str
             Some(path)
         })
     {
-        let contents = std::fs::read_to_string(&entry)
-            .with_context(|| format!("Failed to read {}", entry.as_path().display()))?;
+        let contents = match std::fs::read_to_string(&entry) {
+            Ok(contents) => contents,
+            Err(error) if error.kind() == std::io::ErrorKind::InvalidData => continue,
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("Failed to read {}", entry.as_path().display()));
+            }
+        };
         if contents.contains(previous_rust_version) {
-            println!(
-                "⚠️ '{previous_rust_version}' found in file {} - might be a false positive, otherwise consider adjusting the xtask.",
-                entry.display()
-            );
+            mentions.push(entry);
         }
     }
 
-    Ok(())
+    Ok(mentions)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write as _;
+
+    use tempfile::TempDir;
+
+    use super::*;
+
+    fn write(package: &TempDir, relative_path: &str, contents: impl AsRef<[u8]>) -> PathBuf {
+        let path = package.path().join(relative_path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::File::create(&path)
+            .unwrap()
+            .write_all(contents.as_ref())
+            .unwrap();
+        path
+    }
+
+    #[test]
+    fn mentions_of_the_previous_version_are_reported() {
+        let package = TempDir::new().unwrap();
+
+        let manifest = write(&package, "Cargo.toml", "rust-version = \"1.95.0\"\n");
+        write(&package, "src/lib.rs", "//! Needs Rust 1.94.0 or newer.\n");
+
+        let mentions = find_mentions(package.path(), "1.95.0").unwrap();
+
+        assert_eq!(mentions, vec![manifest]);
+    }
+
+    #[test]
+    fn files_which_are_not_utf8_are_skipped() {
+        let package = TempDir::new().unwrap();
+
+        write(&package, "testdata/firmware.bin", [0xE0, 0x80, 0x80, 0xFF]);
+        let readme = write(&package, "README.md", "MSRV-1.95.0-blue\n");
+
+        let mentions = find_mentions(package.path(), "1.95.0").unwrap();
+
+        assert_eq!(mentions, vec![readme]);
+    }
+
+    #[test]
+    fn files_with_a_binary_extension_are_skipped() {
+        let package = TempDir::new().unwrap();
+
+        // Valid UTF-8, so only the extension can rule this file out.
+        write(&package, "api-baseline/esp32.json.gz", "1.95.0\n");
+
+        let mentions = find_mentions(package.path(), "1.95.0").unwrap();
+
+        assert!(mentions.is_empty(), "{mentions:?}");
+    }
+
+    #[test]
+    fn the_target_directory_is_skipped() {
+        let package = TempDir::new().unwrap();
+
+        write(&package, "target/debug/build.log", "1.95.0\n");
+
+        let mentions = find_mentions(package.path(), "1.95.0").unwrap();
+
+        assert!(mentions.is_empty(), "{mentions:?}");
+    }
+
+    #[test]
+    fn dependent_crates_can_be_collected_from_the_real_workspace() {
+        let workspace = crate::repo_root_for_tests();
+
+        let mut packages = vec![Package::EspHal];
+        add_dependent_crates(&workspace, &mut packages).unwrap();
+
+        assert!(
+            packages.len() > 1,
+            "esp-hal should pull in at least one dependent crate, got {packages:?}"
+        );
+        assert!(
+            !packages.iter().any(Package::contains_standalone_projects),
+            "standalone-project collections must not be treated as crates: {packages:?}"
+        );
+    }
 }
