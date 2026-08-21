@@ -14,9 +14,9 @@ use esp_hal::{
     Blocking,
     delay::Delay,
     gpio::{AnyPin, Level, Output, OutputConfig, interconnect::PeripheralInput},
-    peripherals::{GPIO_SD, RMT},
+    peripherals::{RMT, SDM_CH0},
     rmt::{CHANNEL_RAM_SIZE, Channel, PulseCode, Rmt, Rx, RxChannelConfig, RxChannelCreator},
-    sdm::Sdm,
+    sdm::{Channel as SdmChannel, ChannelConfig},
     time::Rate,
 };
 use hil_test as _;
@@ -56,7 +56,7 @@ cfg_select! {
 }
 
 struct Context {
-    gpio_sd: GPIO_SD<'static>,
+    sdm_ch0: SDM_CH0<'static>,
     rmt: RMT<'static>,
     sdm_pin: AnyPin<'static>,
     rmt_pin: AnyPin<'static>,
@@ -209,13 +209,11 @@ fn expected_ratio_per_mille(duty: u8) -> u32 {
 }
 
 fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
-    let mut sdm = Sdm::new(ctx.gpio_sd.reborrow());
-    let config = sdm
-        .channel_config()
+    let config = ChannelConfig::new()
         .with_frequency(SDM_FREQUENCY)
         .unwrap()
         .with_duty(duty);
-    let channel = sdm.channel0.connect(ctx.sdm_pin.reborrow(), config);
+    let channel = SdmChannel::new(ctx.sdm_ch0.reborrow(), ctx.sdm_pin.reborrow(), config);
 
     Delay::new().delay_micros(SDM_WARM_UP_US);
 
@@ -248,7 +246,7 @@ mod tests {
         let (sdm_pin, rmt_pin) = hil_test::common_test_pins!(peripherals);
 
         Context {
-            gpio_sd: peripherals.GPIO_SD,
+            sdm_ch0: peripherals.SDM_CH0,
             rmt: peripherals.RMT,
             sdm_pin: AnyPin::from(sdm_pin),
             rmt_pin: AnyPin::from(rmt_pin),

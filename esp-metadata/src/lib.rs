@@ -833,6 +833,20 @@ This pin may be available with certain limitations. Check your hardware to make 
             }
         }
 
+        if let Some(sdm) = self.device.peri_config.sdm.as_ref()
+            && sdm.support_status.is_supported()
+        {
+            for channel in 0..sdm.channel_count.count {
+                let ch_name = format_ident!("SDM_CH{channel}");
+                let singleton_doc = format!("SDM_CH{channel} peripheral singleton");
+                let tokens = quote! {
+                    #[doc = #singleton_doc] #ch_name <= virtual ()
+                };
+                all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                singleton_peripherals.push(unstable_singleton(&quote! {}, &ch_name));
+            }
+        }
+
         for peri in self.peripherals().iter() {
             let hal = format_ident!("{}", peri.name);
             let pac = if peri.is_virtual {

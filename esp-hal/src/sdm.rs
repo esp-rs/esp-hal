@@ -3,8 +3,9 @@
 //! Sigma-delta modulation peripheral.
 //!
 //! The sigma-delta modulator produces a pulse-density modulated output on a
-//! GPIO matrix signal. Each channel can be configured with a carrier frequency
-//! and pulse density, then routed to one output pin.
+//! GPIO matrix signal. Each channel is a peripheral singleton (`SDM_CH0`,
+//! `SDM_CH1`, …). Configure a channel with a carrier frequency and pulse
+//! density, then connect it to one output pin.
 //!
 //! ## Examples
 //!
@@ -12,15 +13,16 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! use esp_hal::{sdm::Sdm, time::Rate};
+//! use esp_hal::{
+//!     sdm::{Channel, ChannelConfig},
+//!     time::Rate,
+//! };
 //!
-//! let mut sdm = Sdm::new(peripherals.GPIO_SD);
-//! let config = sdm
-//!     .channel_config()
+//! let config = ChannelConfig::new()
 //!     // Select the prescaler that produces the closest available frequency.
 //!     .with_frequency(Rate::from_khz(500))?
 //!     .with_duty(128);
-//! let mut channel = sdm.channel0.connect(peripherals.GPIO2, config);
+//! let mut channel = Channel::new(peripherals.SDM_CH0, peripherals.GPIO2, config);
 //!
 //! channel.set_duty(192); // duty ranges from 0 to 255
 //! channel.set_pulse_density(0); // pulse density ranges from -128 to 127
@@ -40,7 +42,7 @@ The SDM function clock is derived from the APB clock.
     doc = r#"
 The SDM function clock is derived from the global `IOMUX_FUNCTION_CLOCK`. Its
 source is shared by every consumer of that clock and is therefore configured
-globally instead of through [`Sdm`]. The available sources and the default for
+globally instead of through [`Channel`]. The available sources and the default for
 the selected target are listed by
 [`IomuxFunctionClockConfig`](crate::clock::ll::IomuxFunctionClockConfig).
 
@@ -50,7 +52,7 @@ The source can be selected as part of the global clock configuration before init
 //! Each channel's prescaler divides this function clock to produce its output
 //! frequency.
 
-use core::{fmt, marker::PhantomData};
+use core::fmt;
 
 use crate::{
     gpio::{
@@ -65,59 +67,52 @@ use crate::{
     time::Rate,
 };
 
-for_each_sdm_channel!(
-    (channels $(($ch:literal, $signal:ident)),*) => {
-        paste::paste! {
-            /// Sigma-delta peripheral.
-            ///
-            /// This type only owns the SDM peripheral token and exposes the hardware
-            /// channel creators. Moving individual channel creators out of this
-            /// collection is supported.
-            #[derive(Debug)]
-            #[non_exhaustive]
-            pub struct Sdm<'d> {
-                _instance: GPIO_SD<'d>,
+/// Immutable per-channel metadata owned by each `SDM_CH*` singleton.
+#[doc(hidden)]
+pub struct ChannelInfo {
+    /// Hardware channel index used to select the register bank.
+    channel: usize,
+    /// GPIO matrix output signal for this channel.
+    signal: OutputSignal,
+}
+
+/// A peripheral singleton compatible with the sigma-delta driver.
+#[doc(hidden)]
+pub trait Instance: crate::private::Sealed + any::Degrade {
+    /// Returns the metadata for this channel.
+    fn info(&self) -> &'static ChannelInfo;
+}
+
+impl Instance for AnySdmChannel<'_> {
+    fn info(&self) -> &'static ChannelInfo {
+        any::delegate!(self, channel => { channel.info() })
+    }
+}
+
+for_each_sdm_channel! {
+    (channels $(($num:literal, $peri:ident, $variant:ident, $signal:ident)),*) => {
+        crate::any_peripheral! {
+            /// Any SDM channel.
+            pub peripheral AnySdmChannel<'d> {
                 $(
-                    #[doc = concat!("Channel ", stringify!($ch), " creator.")]
-                    pub [<channel $ch>]: ChannelCreator<'d>,
+                    $variant(crate::peripherals::$peri<'d>),
                 )*
-            }
-
-            impl<'d> Sdm<'d> {
-                /// Creates a new sigma-delta peripheral driver.
-                pub fn new(instance: GPIO_SD<'d>) -> Self {
-                    Self {
-                        _instance: instance,
-                        $(
-                            [<channel $ch>]: ChannelCreator::new($ch),
-                        )*
-                    }
-                }
-
-                /// Creates a channel configuration builder.
-                pub const fn channel_config(&self) -> ChannelConfigBuilder {
-                    // This ensures that channel configs can only be created after SDM has
-                    // been initialized. `with_frequency` relies on the function clock that
-                    // was configured during system initialization.
-                    ChannelConfigBuilder::new()
-                }
             }
         }
     };
-);
 
-for_each_sdm_channel!(
-    (channels $(($ch:literal, $signal:ident)),*) => {
-        fn output_signal(channel: usize) -> OutputSignal {
-            match channel {
-                $(
-                    $ch => OutputSignal::$signal,
-                )*
-                _ => unreachable!("SDM channel index out of range"),
+    ($num:literal, $peri:ident, $variant:ident, $signal:ident) => {
+        impl crate::sdm::Instance for crate::peripherals::$peri<'_> {
+            fn info(&self) -> &'static ChannelInfo {
+                static INFO: ChannelInfo = ChannelInfo {
+                    channel: $num,
+                    signal: OutputSignal::$signal,
+                };
+                &INFO
             }
         }
     };
-);
+}
 
 /// Sigma-delta configuration or runtime error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,9 +154,37 @@ pub struct ChannelConfig {
 }
 
 impl ChannelConfig {
+    /// Creates a new channel configuration with the default prescaler and pulse
+    /// density.
+    pub const fn new() -> Self {
+        Self {
+            raw_prescaler: 0,
+            pulse_density: 0,
+        }
+    }
+
+    /// Sets the requested output frequency.
+    ///
+    /// Selects the prescaler that produces the closest output frequency using
+    /// the currently configured SDM clock source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnreachableTargetFrequency`] when no hardware
+    /// prescaler can represent the requested frequency.
+    pub fn with_frequency(mut self, frequency: Rate) -> Result<Self, Error> {
+        self.raw_prescaler = raw_prescaler(prescaler_from_frequency(frequency)?);
+        Ok(self)
+    }
+
     /// Sets the hardware prescaler.
     ///
     /// The hardware divider range is `1..=256`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PrescalerOutOfRange`] when `prescaler` is not in
+    /// `1..=256`.
     pub fn with_prescaler(mut self, prescaler: u16) -> Result<Self, Error> {
         check_prescaler(prescaler)?;
         self.raw_prescaler = raw_prescaler(prescaler);
@@ -176,110 +199,68 @@ impl ChannelConfig {
     }
 }
 
-/// Builds a sigma-delta channel configuration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct ChannelConfigBuilder {
-    config: ChannelConfig,
-}
-
-impl ChannelConfigBuilder {
-    const fn new() -> Self {
-        // see `Sdm::channel_config()` for why this is not public
-        Self {
-            config: ChannelConfig {
-                raw_prescaler: 0,
-                pulse_density: 0,
-            },
-        }
-    }
-
-    /// Sets the requested output frequency.
-    ///
-    /// Selects the prescaler that produces the closest output frequency using
-    /// the currently configured SDM clock source.
-    pub fn with_frequency(mut self, frequency: Rate) -> Result<ChannelConfig, Error> {
-        self.config.raw_prescaler = raw_prescaler(prescaler_from_frequency(frequency)?);
-        Ok(self.config)
-    }
-
-    /// Sets the hardware prescaler.
-    ///
-    /// The hardware divider range is `1..=256`.
-    pub fn with_prescaler(mut self, prescaler: u16) -> Result<ChannelConfig, Error> {
-        self.config = self.config.with_prescaler(prescaler)?;
-        Ok(self.config)
-    }
-
-    /// Returns the default channel configuration.
-    pub const fn build(self) -> ChannelConfig {
-        self.config
-    }
-}
-
-/// Creates a connected sigma-delta channel.
-///
-/// Channel creators are exposed by [`Sdm`]. Calling [`connect`](Self::connect)
-/// mutably borrows the creator for the lifetime of the active [`Channel`],
-/// which prevents accidentally connecting the same channel twice.
-#[derive(Debug)]
-pub struct ChannelCreator<'d> {
-    channel: usize,
-    // Conceptually retains the main driver even when this creator is moved out
-    // of it, preventing SDM from being reinitialized while the creator exists.
-    _sdm: PhantomData<Sdm<'d>>,
-}
-
-impl ChannelCreator<'_> {
-    const fn new(channel: usize) -> Self {
-        Self {
-            channel,
-            _sdm: PhantomData,
-        }
-    }
-
-    /// Configures this channel and connects it to an output pin.
-    pub fn connect<'a, 'd>(
-        &'a mut self,
-        pin: impl PeripheralOutput<'d>,
-        config: ChannelConfig,
-    ) -> Channel<'a> {
-        let clock_guard = SdmClockGuard::new();
-        write_config_raw(self.channel, config);
-
-        Channel {
-            channel: self.channel,
-            _creator: PhantomData,
-            _pin_guard: connect_pin(self.channel, pin),
-            _clock_guard: clock_guard,
-        }
-    }
-}
-
 /// A connected sigma-delta channel.
 ///
-/// Dropping a channel disconnects its output pin, releases the SDM clock guard,
-/// and makes its [`ChannelCreator`] available again.
+/// Dropping a channel disconnects its output pin and releases the SDM clock
+/// guard.
 #[derive(Debug)]
-pub struct Channel<'a> {
-    channel: usize,
-    _creator: PhantomData<&'a mut ChannelCreator<'a>>,
+pub struct Channel<'d> {
+    channel: AnySdmChannel<'d>,
     _pin_guard: PinGuard,
     _clock_guard: SdmClockGuard,
 }
 
-impl Channel<'_> {
+impl<'d> Channel<'d> {
+    /// Creates a connected sigma-delta channel.
+    pub fn new(
+        channel: impl Instance + 'd,
+        pin: impl PeripheralOutput<'d>,
+        config: ChannelConfig,
+    ) -> Self {
+        let info = channel.info();
+        let clock_guard = SdmClockGuard::new();
+
+        let mut this = Self {
+            channel: channel.degrade(),
+            _pin_guard: connect_pin(info.signal, pin),
+            _clock_guard: clock_guard,
+        };
+        this.apply_config(&config);
+        this
+    }
+
+    fn index(&self) -> usize {
+        self.channel.info().channel
+    }
+
     /// Applies a new channel configuration.
     pub fn apply_config(&mut self, config: &ChannelConfig) {
-        write_config_raw(self.channel, *config);
+        GPIO_SD::regs().sigmadelta(self.index()).write(|w| unsafe {
+            cfg_select! {
+                esp32c5 => {
+                    w.sd_in().bits(config.pulse_density as u8);
+                    w.sd_prescale().bits(config.raw_prescaler)
+                }
+                _ => {
+                    w.in_().bits(config.pulse_density as u8);
+                    w.prescale().bits(config.raw_prescaler)
+                }
+            }
+        });
     }
 
     /// Sets raw pulse density.
     ///
     /// The value ranges from `-128` to `127`.
     pub fn set_pulse_density(&mut self, density: i8) {
-        modify_pulse_density_raw(self.channel, density);
+        GPIO_SD::regs()
+            .sigmadelta(self.index())
+            .modify(|_, w| unsafe {
+                cfg_select! {
+                    esp32c5 => w.sd_in().bits(density as u8),
+                    _ => w.in_().bits(density as u8),
+                }
+            });
     }
 
     /// Sets duty cycle. `0` maps to the minimum density and `255` maps to the
@@ -292,22 +273,34 @@ impl Channel<'_> {
     ///
     /// The returned value is in the hardware divider range `1..=256`.
     pub fn prescaler(&self) -> u16 {
-        prescaler_raw(self.channel) + 1
+        let reg = GPIO_SD::regs().sigmadelta(self.index()).read();
+        let bits = cfg_select! {
+            esp32c5 => reg.sd_prescale().bits(),
+            _ => reg.prescale().bits(),
+        };
+
+        bits as u16 + 1
     }
 
     /// Reads the raw pulse density.
     ///
     /// The returned value is in the hardware range `-128..=127`.
     pub fn pulse_density(&self) -> i8 {
-        pulse_density_raw(self.channel)
+        let reg = GPIO_SD::regs().sigmadelta(self.index()).read();
+        let bits = cfg_select! {
+            esp32c5 => reg.sd_in().bits(),
+            _ => reg.in_().bits(),
+        };
+
+        bits as i8
     }
 }
 
-fn connect_pin<'d>(channel: usize, pin: impl PeripheralOutput<'d>) -> PinGuard {
+fn connect_pin<'d>(signal: OutputSignal, pin: impl PeripheralOutput<'d>) -> PinGuard {
     let pin: GpioOutputSignal<'d> = pin.into();
     pin.apply_output_config(&OutputConfig::default());
     pin.set_output_enable(true);
-    pin.connect_with_guard(output_signal(channel))
+    pin.connect_with_guard(signal)
 }
 
 #[derive(Debug)]
@@ -390,57 +383,4 @@ fn raw_prescaler(prescaler: u16) -> u8 {
 
 const fn duty_to_density(duty: u8) -> i8 {
     duty.wrapping_sub(128) as i8
-}
-
-fn write_config_raw(channel: usize, config: ChannelConfig) {
-    // ESP32-C5's PAC names these fields `sd_in`/`sd_prescale`; the other
-    // supported PACs name them `in`/`prescale`.
-    let prescaler = config.raw_prescaler as _;
-    let density = config.pulse_density as _;
-    let sd = GPIO_SD::regs();
-
-    #[cfg(esp32c5)]
-    sd.sigmadelta(channel)
-        .write(|w| unsafe { w.sd_in().bits(density).sd_prescale().bits(prescaler) });
-
-    #[cfg(not(esp32c5))]
-    sd.sigmadelta(channel)
-        .write(|w| unsafe { w.in_().bits(density).prescale().bits(prescaler) });
-}
-
-fn modify_pulse_density_raw(channel: usize, density: i8) {
-    // ESP32-C5's PAC names this field `sd_in`; the other supported PACs name it `in`.
-    let sd = GPIO_SD::regs();
-
-    #[cfg(esp32c5)]
-    sd.sigmadelta(channel)
-        .modify(|_, w| unsafe { w.sd_in().bits(density as _) });
-
-    #[cfg(not(esp32c5))]
-    sd.sigmadelta(channel)
-        .modify(|_, w| unsafe { w.in_().bits(density as _) });
-}
-
-fn prescaler_raw(channel: usize) -> u16 {
-    let sd = GPIO_SD::regs();
-
-    #[cfg(esp32c5)]
-    let bits = sd.sigmadelta(channel).read().sd_prescale().bits();
-
-    #[cfg(not(esp32c5))]
-    let bits = sd.sigmadelta(channel).read().prescale().bits();
-
-    bits as u16
-}
-
-fn pulse_density_raw(channel: usize) -> i8 {
-    let sd = GPIO_SD::regs();
-
-    #[cfg(esp32c5)]
-    let bits = sd.sigmadelta(channel).read().sd_in().bits();
-
-    #[cfg(not(esp32c5))]
-    let bits = sd.sigmadelta(channel).read().in_().bits();
-
-    bits as i8
 }
