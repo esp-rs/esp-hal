@@ -154,6 +154,13 @@ fn configure_cpll_clk_impl(
     _old_config: Option<CpllClkConfig>,
     new_config: CpllClkConfig,
 ) {
+    // Calibration starts before the analog configuration is written, and stops
+    // after the PLL reports that calibration ended.
+    // Ref: IDF rtc_clk_cpll_configure (esp32p4).
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
+
     // div7_0 = (freq_mhz / 40) - 1
     let div7_0: u8 = match new_config {
         CpllClkConfig::_360 => 9,
@@ -167,10 +174,6 @@ fn configure_cpll_clk_impl(
     regi2c::I2C_CPLL_OC_DIV_7_0.write_reg(div7_0);
     regi2c::I2C_CPLL_OC_DCUR.write_reg(dcur);
 
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
-
     // Wait for calibration to complete
     while !HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
@@ -181,13 +184,12 @@ fn configure_cpll_clk_impl(
         core::hint::spin_loop();
     }
 
-    // Stop calibration: set cpu_pll_cal_stop = 1
+    // Wait for true stop
+    crate::rom::ets_delay_us(10);
+
     HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
-
-    // Small delay for PLL to stabilize
-    crate::rom::ets_delay_us(10);
 }
 
 // SPLL_CLK
@@ -208,6 +210,13 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
         return;
     }
 
+    // Calibration starts before the analog configuration is written, and stops
+    // after the PLL reports that calibration ended.
+    // Ref: IDF clk_ll_mpll_set_config_v1 (esp32p4).
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.mspi_cal_stop().clear_bit());
+
     regi2c::I2C_MPLL_DHREF_DHREF.write_field(3);
 
     let rstb = regi2c::I2C_MPLL_IR_CAL_RSTB.read();
@@ -223,10 +232,6 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
     };
     let div_val: u8 = (div << 3) | ref_div;
     regi2c::I2C_MPLL_DIV_REG_ADDR.write_reg(div_val);
-
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.mspi_cal_stop().clear_bit());
 
     while HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()

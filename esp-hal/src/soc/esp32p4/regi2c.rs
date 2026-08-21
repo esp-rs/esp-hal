@@ -1,9 +1,6 @@
 use crate::{
-    peripherals::{LP_I2C_ANA_MST, LP_PERI, PMU},
-    rom::{
-        ets_delay_us,
-        regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c},
-    },
+    peripherals::{LP_I2C_ANA_MST, LP_PERI},
+    rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c},
 };
 
 define_regi2c! {
