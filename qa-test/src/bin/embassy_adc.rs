@@ -7,7 +7,7 @@
 //! Note that the S31 ADC is differential with a maximum raw value of 4393,
 //! so measuring GND will return about 2198.
 
-//% CHIP_FILTER: adc_driver_supported && !esp32 && !esp32s2 && !esp32s3
+//% CHIP_FILTER: adc_driver_supported && !esp32
 
 #![no_std]
 #![no_main]
