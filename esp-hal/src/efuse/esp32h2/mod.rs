@@ -37,10 +37,21 @@ pub fn block_version() -> (u8, u8) {
     )
 }
 
+/// Get a signed value from the raw data from eFuse.
+///
+/// `sign_bit` is the index of the sign bit, starting from 0.
+fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
+    let sign_mask = 1u32 << sign_bit;
+    if data & sign_mask != 0 {
+        -((data & !sign_mask) as i32)
+    } else {
+        data as i32
+    }
+}
+
 /// Get version of RTC calibration block
 ///
-/// See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L20>
-/// //esp_efuse_rtc_calib_get_ver
+/// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L20>
 #[instability::unstable]
 pub fn rtc_calib_version() -> u8 {
     let (_major, minor) = block_version();
@@ -49,16 +60,16 @@ pub fn rtc_calib_version() -> u8 {
 
 /// Get ADC initial code for specified attenuation from efuse
 ///
-/// See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L33>
+/// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L33>
 #[instability::unstable]
 pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
     let version = rtc_calib_version();
 
-    if version > 4 {
+    if version != 1 {
         return None;
     }
 
-    // See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_table.csv#L76-L79>
+    // See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_table.csv#L184-L187>
     let init_code: u16 = super::read_field_le(match atten {
         Attenuation::_0dB => ADC1_AVE_INITCODE_ATTEN0,
         Attenuation::_2p5dB => ADC1_AVE_INITCODE_ATTEN1,
@@ -66,51 +77,70 @@ pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u1
         Attenuation::_11dB => ADC1_AVE_INITCODE_ATTEN3,
     });
 
-    Some(init_code + 1600) // version 1 logic
+    Some(init_code + 1600)
+}
+
+/// Get the channel specific calibration compensation
+///
+/// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L58>
+#[instability::unstable]
+pub fn rtc_calib_get_chan_compens(
+    _unit: AdcCalibUnit,
+    channel: u8,
+    atten: Attenuation,
+) -> Option<i32> {
+    let chan_diff: u32 = super::read_field_le(match channel {
+        0 => ADC1_CH0_ATTEN0_INITCODE_DIFF,
+        1 => ADC1_CH1_ATTEN0_INITCODE_DIFF,
+        2 => ADC1_CH2_ATTEN0_INITCODE_DIFF,
+        3 => ADC1_CH3_ATTEN0_INITCODE_DIFF,
+        _ => ADC1_CH4_ATTEN0_INITCODE_DIFF,
+    });
+
+    Some(get_signed_val(chan_diff, 3) * (4 - atten as i32))
 }
 
 /// Get ADC reference point voltage for specified attenuation in millivolts
 ///
-/// See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
+/// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
 #[instability::unstable]
 pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
-    const INPUT_VOUT_MV: [[u16; 4]; 1] = [
-        [750, 1000, 1500, 2800], // Calibration V1 coefficients
-    ];
-
     let version = rtc_calib_version();
+    let input_vout_mv = match version {
+        1 => [750, 1000, 1500, 2800],
+        _ => {
+            // The required efuse bits for this chip are not burnt.
+            // 1100 is the middle of the reference voltage range.
+            return 1100;
+        }
+    };
 
-    // https://github.com/espressif/esp-idf/blob/master/components/efuse/esp32h2/include/esp_efuse_rtc_calib.h#L15C9-L17
-    // ESP_EFUSE_ADC_CALIB_VER1     1
-    // ESP_EFUSE_ADC_CALIB_VER_MIN  ESP_EFUSE_ADC_CALIB_VER1
-    // ESP_EFUSE_ADC_CALIB_VER_MAX  ESP_EFUSE_ADC_CALIB_VER1
-    if version != 1 {
-        // The required efuse bits for this chip are not burnt.
-        // 1100 is the middle of the reference voltage range.
-        // See: <https://github.com/espressif/esp-idf/blob/465b159cd8771ffab6be70c7675ecf6705b62649/docs/en/api-reference/peripherals/adc_calibration.rst?plain=1#L9>
-        return 1100;
-    }
-
-    INPUT_VOUT_MV[version as usize - 1][atten as usize]
+    input_vout_mv[atten as usize]
 }
 
-/// Returns the call code
+/// Returns the calibration code
 ///
-/// See: <https://github.com/espressif/esp-idf/blob/17a2461297076481858b7f76482676a521cc727a/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
+/// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
 #[instability::unstable]
 pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
-    let cal_code: u16 = super::read_field_le(match atten {
+    let version = rtc_calib_version();
+
+    if version != 1 {
+        return None;
+    }
+
+    let cal_vol: u16 = super::read_field_le(match atten {
         Attenuation::_0dB => ADC1_HI_DOUT_ATTEN0,
         Attenuation::_2p5dB => ADC1_HI_DOUT_ATTEN1,
         Attenuation::_6dB => ADC1_HI_DOUT_ATTEN2,
         Attenuation::_11dB => ADC1_HI_DOUT_ATTEN3,
     });
-    let cal_code: u16 = if atten == Attenuation::_6dB {
-        2970 + cal_code
+    let chk_offset = if atten == Attenuation::_6dB {
+        2970
     } else {
-        2900 + cal_code
+        2900
     };
-    Some(cal_code)
+    Some((chk_offset + get_signed_val(cal_vol as u32, 9)) as u16)
 }
 
 /// Returns the major hardware revision

@@ -15,7 +15,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 #[cfg(not(feature = "esp32s31"))]
-use esp_hal::analog::adc::AdcCalBasic;
+use esp_hal::analog::adc::AdcCalLine;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
     delay::Delay,
@@ -44,7 +44,7 @@ async fn main(_spawner: Spawner) {
     let mut pin1 = cfg_select! {
         feature = "esp32s31" => adc1_config.enable_pin(adc1_pin, Attenuation::_11dB),
         _ => adc1_config
-            .enable_pin_with_cal::<_, AdcCalBasic<esp_hal::peripherals::ADC1<'static>>>(
+            .enable_pin_with_cal::<_, AdcCalLine<esp_hal::peripherals::ADC1<'static>>>(
                 adc1_pin,
                 Attenuation::_11dB,
             ),
