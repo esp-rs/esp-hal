@@ -37,7 +37,7 @@
 //! let mut delay = Delay::new();
 //!
 //! loop {
-//!     let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut pin))?;
+//!     let pin_value = nb::block!(adc1.read_oneshot(&mut pin))?;
 //!
 //!     delay.delay_millis(1500);
 //! }
@@ -47,6 +47,14 @@
 //! ## Implementation State
 //!
 //!  - [ADC calibration is not implemented for all targets].
+//!  - The ESP32-S31 has no calibration scheme. ESP-IDF does not define the calibration eFuses or
+//!    the curve fitting coefficients for this chip yet.
+//!  - The ESP32-S31 SAR ADC has one attenuation setting, so the attenuation given to
+//!    [`AdcConfig::enable_pin`] has no effect.
+//!  - The ESP32-S31 SAR is differential and its result is the weighted sum of 17 redundant
+//!    comparator bits. Readings run from 0 to `FULL_SCALE` (4393), and an input tied to ground
+//!    reads about `ZERO_DIFF_CODE` (2198), so a single-ended measurement only uses the codes above
+//!    that point.
 //!
 //! [ADC calibration is not implemented for all targets]: https://github.com/esp-rs/esp-hal/issues/326
 use core::marker::PhantomData;
@@ -54,7 +62,9 @@ use core::marker::PhantomData;
 use crate::gpio::AnalogPin;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
-#[cfg_attr(riscv, path = "riscv.rs")]
+#[cfg_attr(esp32p4, path = "p4.rs")]
+#[cfg_attr(esp32s31, path = "s31.rs")]
+#[cfg_attr(all(riscv, not(any(esp32p4, esp32s31))), path = "riscv.rs")]
 #[cfg_attr(any(esp32s2, esp32s3), path = "xtensa.rs")]
 #[cfg(feature = "unstable")]
 mod implementation;
@@ -239,7 +249,7 @@ impl<ADCX> AdcCalScheme<ADCX> for () {
 }
 
 /// A helper trait to get access to ADC calibration efuses.
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(not(any(esp32, esp32s2, esp32s31)))]
 trait AdcCalEfuse {
     /// Get ADC calibration init code
     ///

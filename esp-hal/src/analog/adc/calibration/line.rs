@@ -97,8 +97,10 @@ where
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3))]
+#[cfg(any(
+    esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s3
+))]
 impl AdcHasLineCal for crate::peripherals::ADC1<'_> {}
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32p4, esp32s3))]
 impl AdcHasLineCal for crate::peripherals::ADC2<'_> {}

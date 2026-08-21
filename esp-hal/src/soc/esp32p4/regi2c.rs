@@ -22,7 +22,41 @@ define_regi2c! {
         reg: I2C_CPLL_OC_DIV_7_0(3) {}
         reg: I2C_CPLL_OC_DCUR(6) {}
     }
-    master: REGI2C_SAR_I2C(0x69, 0) {}
+    master: REGI2C_SAR_I2C(0x69, 0) {
+        reg: I2C_SAR_REG0(0) {
+            field: ADC_SAR1_INITIAL_CODE_LOW(7..0)
+        }
+        reg: I2C_SAR_REG1(1) {
+            field: ADC_SAR1_INITIAL_CODE_HIGH(3..0)
+        }
+        reg: I2C_SAR_REG2(2) {
+            field: ADC_SAR1_DREF(6..4),
+            field: ADC_SAR1_SAMPLE_CYCLE(2..0)
+        }
+        reg: I2C_SAR_REG3(3) {
+            field: ADC_SAR2_INITIAL_CODE_LOW(7..0)
+        }
+        reg: I2C_SAR_REG4(4) {
+            field: ADC_SAR2_INITIAL_CODE_HIGH(3..0)
+        }
+        reg: I2C_SAR_REG5(5) {
+            field: ADC_SAR2_DREF(6..4),
+            field: ADC_SAR2_SAMPLE_CYCLE(2..0)
+        }
+        reg: I2C_SAR_REG6(6) {
+            field: I2C_SARADC_TSENS_DAC(3..0)
+        }
+        reg: I2C_SAR_REG7(7) {
+            field: ADC_SAR2_ENCAL_GND(7..7),
+            field: ADC_SAR2_ENCAL_REF(6..6),
+            field: ADC_SAR1_ENCAL_GND(5..5),
+            field: ADC_SAR1_ENCAL_REF(4..4)
+        }
+        reg: I2C_SAR_REG9(9) {
+            field: I2C_SAR_ADC_ENT_VDD_GRP1(4..4),
+            field: I2C_SAR_ADC_DTEST_VDD_GRP1(3..0)
+        }
+    }
     master: REGI2C_BIAS(0x6a, 0) {}
     master: REGI2C_DIG_REG(0x6d, 0) {
         reg: I2C_DIG_REG9(9) {
