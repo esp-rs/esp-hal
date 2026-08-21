@@ -14,7 +14,7 @@ use strum::IntoEnumIterator;
 use crate::{
     Chip,
     Package,
-    cargo::{CargoArgsBuilder, CargoCommandBatcher},
+    cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
     metadata::Config,
     windows_safe_path,
 };
@@ -115,6 +115,7 @@ pub fn build_documentation(
                 None,
                 &version,
                 channel.as_deref(),
+                base_url.as_deref(),
                 &manifest,
             )?;
         } else {
@@ -125,6 +126,7 @@ pub fn build_documentation(
                     Some(chip),
                     &version,
                     channel.as_deref(),
+                    base_url.as_deref(),
                     &manifest,
                 )?;
             }
@@ -158,6 +160,7 @@ fn build_documentation_for_package(
     chip: Option<Chip>,
     version: &semver::Version,
     channel: Option<&str>,
+    base_url: Option<&str>,
     manifest: &Manifest,
 ) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
@@ -170,7 +173,7 @@ fn build_documentation_for_package(
 
     // Build the documentation for the specified package, targeting the
     // specified chip:
-    let docs_path = cargo_doc(workspace, *package, chip)?;
+    let docs_path = cargo_doc(workspace, *package, chip, channel, base_url)?;
 
     ensure!(
         docs_path.exists(),
@@ -310,7 +313,13 @@ fn latest_redirect_html(
     })
 }
 
-fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<PathBuf> {
+fn cargo_doc(
+    workspace: &Path,
+    package: Package,
+    chip: Option<Chip>,
+    channel: Option<&str>,
+    base_url: Option<&str>,
+) -> Result<PathBuf> {
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
@@ -318,7 +327,8 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let pre_process_res = pre_process_cargo_toml(chip, &package_path);
 
     if pre_process_res.is_ok() {
-        let cargo_doc_res = cargo_doc_without_pre_processing(workspace, package, chip);
+        let cargo_doc_res =
+            cargo_doc_without_pre_processing(workspace, package, chip, channel, base_url);
 
         // Restore the original Cargo.toml
         restore_cargo_toml(package_path)?;
@@ -334,6 +344,8 @@ fn cargo_doc_without_pre_processing(
     workspace: &Path,
     package: Package,
     chip: Option<Chip>,
+    channel: Option<&str>,
+    base_url: Option<&str>,
 ) -> Result<PathBuf> {
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
@@ -361,6 +373,34 @@ fn cargo_doc_without_pre_processing(
     } else {
         None
     };
+
+    // cleaning the docs isn't strictly necessary but otherwise rustdoc will pick up
+    // any docs which were built previously resulting in inconsistency regarding how esp-*
+    // inter-crate links are rendered
+    //
+    // however a real problem is that this could pick up e.g. esp-hal docs for the wrong target chip
+    // (rustdoc doesn't know about our chip features, it just knows about target triples!)
+    //
+    // this was never an issue when building via the GitHub workflow because of the way the job is
+    // setup but better safe than sorry
+    //
+    // ideally we could just use `cargo clean --doc` but for `+esp` this turned out to be not
+    // working as intended
+    let mut docs_target = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {
+        PathBuf::from(target_path)
+    } else {
+        workspace.join(package.to_string()).join("target")
+    };
+    if let Some(ref target) = target {
+        docs_target = docs_target.join(&target);
+    };
+    docs_target = docs_target.join("doc");
+
+    if docs_target.exists() {
+        log::info!("Removing directory {:?}", docs_target);
+        fs::remove_dir_all(&docs_target)
+            .with_context(|| format!("Unable to remove {:?}", docs_target))?;
+    }
 
     let mut features = vec![];
     let doc_config = if let Some(chip) = &chip {
@@ -392,17 +432,59 @@ fn cargo_doc_without_pre_processing(
         builder.add_arg("-Zbuild-std=alloc,core");
     }
 
-    let rustdocflags = [
-        "--cfg docsrs",
-        "--cfg not_really_docsrs",
-        // Activating this would redirect *all* rand_core version to 0.10.0, which is wrong.
-        // "--extern-html-root-takes-precedence",
-        // While we could use --extern-html-root-url to remap rand_core links, it doesn't seem to
-        // support multiple versions of the same crate. We could redirect everything to 0.10.0,
-        // which isn't ideal.
-        // "--extern-html-root-url rand_core-09=https://docs.rs/rand_core/0.9.5/",
-    ]
-    .join(" ");
+    // Make `esp-*` eco-system inter-crate links work
+    let docs_base = base_url
+        .unwrap_or("https://docs.espressif.com/projects/rust")
+        .trim_end_matches('/');
+    let mut repo_html_root_urls = Vec::new();
+    let mut manifest = CargoToml::new(workspace, package)
+        .with_context(|| format!("Unable to get TOML for {}", package_name))?;
+    let repo_deps = manifest.repo_dependencies();
+    for dep in repo_deps {
+        let chip_features_matter = dep.chip_features_matter();
+        let toml = dep.toml();
+        if let Some(ref toml) = *toml {
+            let version = if let Some(channel) = channel {
+                channel
+            } else {
+                toml.version()
+            };
+
+            let pkg = dep.to_string();
+
+            let normalized_pkg = pkg.replace('-', "_");
+
+            let chip = if let Some(chip) = chip
+                && chip_features_matter
+            {
+                format!("{chip}/")
+            } else {
+                String::new()
+            };
+
+            repo_html_root_urls.push(format!(
+                "--extern-html-root-url {normalized_pkg}={docs_base}/{pkg}/{version}/{chip}"
+            ));
+        }
+    }
+
+    let mut rustdocflags = Vec::from_iter(
+        [
+            "--cfg docsrs",
+            "--cfg not_really_docsrs",
+            "-Z unstable-options",
+            // fix-up broken documentation links for `rand_core`
+            "--extern-html-root-takes-precedence",
+            "--extern-html-root-url rand_core_06=https://docs.rs/rand_core/0.6.4/",
+            "--extern-html-root-url rand_core_09=https://docs.rs/rand_core/0.9.5/",
+        ]
+        .iter()
+        .map(|v| v.to_string()),
+    );
+
+    rustdocflags.extend_from_slice(&repo_html_root_urls);
+
+    let rustdocflags = rustdocflags.join(" ");
 
     if let Some(doc_config) = &doc_config {
         for (key, value) in &doc_config.env {
