@@ -143,7 +143,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 | Driver                    | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-P4 | ESP32-S2 | ESP32-S3 | ESP32-S31 |
 | ------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:---------:|:--------:|:--------:|:--------:|:--------:|:---------:|
-| ADC                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | [❌][5422] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      | ❌        |
+| ADC                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      | ❌        |
 | Analog Voltage Comparator |       |          |          | [❌][5168] [^1] |          | [❌][5423] [^1] | ❌       | ❌       |          |          | ❌        |
 | DAC                       | ⚒️   |          |          |          |          |           |          |          | ⚒️      |          | ❌        |
 | Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | [❌][5153] [^1] | ⚒️      | [❌][5421] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      | ❌        |
@@ -217,7 +217,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5418]: https://github.com/esp-rs/esp-hal/issues/5418
 [5419]: https://github.com/esp-rs/esp-hal/issues/5419
 [5421]: https://github.com/esp-rs/esp-hal/issues/5421
-[5422]: https://github.com/esp-rs/esp-hal/issues/5422
 [5423]: https://github.com/esp-rs/esp-hal/issues/5423
 [5444]: https://github.com/esp-rs/esp-hal/issues/5444
 [5972]: https://github.com/esp-rs/esp-hal/issues/5972

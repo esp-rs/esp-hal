@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 cfg_select! {
-    esp32c6 => {
+    any(esp32c6, esp32c61) => {
         use Interrupt::APB_SARADC as InterruptSource;
     }
     _ => {
@@ -21,7 +21,7 @@ use procmacros::handler;
 
 pub use self::calibration::*;
 use super::{AdcCalSource, AdcConfig, Attenuation};
-#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2))]
+#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2))]
 use crate::efuse::AdcCalibUnit;
 use crate::{
     Async,
@@ -58,6 +58,9 @@ cfg_select! {
     }
     esp32c5 => {
         pub(super) const NUM_ATTENS: usize = 6;
+    }
+    esp32c61 => {
+        pub(super) const NUM_ATTENS: usize = 4;
     }
     _ => {
         pub(super) const NUM_ATTENS: usize = 5;
@@ -181,7 +184,7 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     // Currently #[cfg] covers all supported RISC-V devices,
     // but, for example, esp32p4 uses the value 4 instead of 1,
     // so it is not standard across all RISC-V devices.
-    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2))]
+    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2))]
     fn calibration_init() {
         // e.g.
         // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32c3/include/hal/adc_ll.h#L702
@@ -469,7 +472,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
         crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 
-    #[cfg(esp32c5)]
+    #[cfg(any(esp32c5, esp32c61))]
     fn cal_chan_compens(atten: Attenuation, channel: u16) -> Option<i32> {
         crate::efuse::rtc_calib_get_chan_compens(AdcCalibUnit::ADC1, channel, atten)
     }
