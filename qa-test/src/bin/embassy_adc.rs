@@ -12,7 +12,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    analog::adc::{Adc, AdcCalBasic, AdcConfig, Attenuation},
+    analog::adc::{Adc, AdcCalLine, AdcConfig, Attenuation},
     delay::Delay,
     timer::timg::TimerGroup,
 };
@@ -30,7 +30,7 @@ async fn main(_spawner: Spawner) {
     let mut adc1_config = AdcConfig::new();
     let analog_pin1 = peripherals.GPIO4;
     let mut pin1 = adc1_config
-        .enable_pin_with_cal::<_, AdcCalBasic<esp_hal::peripherals::ADC1<'static>>>(
+        .enable_pin_with_cal::<_, AdcCalLine<esp_hal::peripherals::ADC1<'static>>>(
             analog_pin1,
             Attenuation::_11dB,
         );

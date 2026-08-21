@@ -472,8 +472,8 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
         crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 
-    #[cfg(any(esp32c5, esp32c61))]
-    fn cal_chan_compens(atten: Attenuation, channel: u16) -> Option<i32> {
+    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+    fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32> {
         crate::efuse::rtc_calib_get_chan_compens(AdcCalibUnit::ADC1, channel, atten)
     }
 }

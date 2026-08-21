@@ -1,11 +1,9 @@
 use core::marker::PhantomData;
 
-#[cfg(esp32s3)]
 pub use self::calibration::*;
 use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
-#[cfg(esp32s3)]
-use crate::efuse::AdcCalibUnit;
 use crate::{
+    efuse::AdcCalibUnit,
     peripherals::{APB_SARADC, SENS},
     soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
@@ -16,12 +14,16 @@ mod calibration;
 pub(super) const NUM_ATTENS: usize = 10;
 
 cfg_select! {
+    esp32s2 => {
+        const ADC_VAL_MASK: u16 = 0x1fff;
+        const ADC_CAL_CNT_MAX: u16 = 32;
+        const ADC_CAL_CHANNEL: u16 = 15;
+    }
     esp32s3 => {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
     }
-    _ => {}
 }
 
 impl<ADCX> AdcConfig<ADCX>
@@ -195,7 +197,6 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(esp32s3)]
 impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
@@ -303,7 +304,6 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
     }
 }
 
-#[cfg(esp32s3)]
 impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
@@ -486,7 +486,7 @@ where
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
@@ -501,7 +501,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)

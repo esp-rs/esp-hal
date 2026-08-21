@@ -3,13 +3,16 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use super::{AdcConfig, Attenuation};
+use super::{AdcCalScheme, AdcConfig, Attenuation};
 use crate::{
     peripherals::{ADC1, ADC2, SENS},
     private,
 };
 
 pub(super) const NUM_ATTENS: usize = 10;
+
+mod calibration;
+pub use self::calibration::*;
 
 // ADC2 cannot be used with `radio` functionality on `esp32`, this global helps us to track it's
 // state to prevent unexpected behaviour
@@ -236,6 +239,7 @@ pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: ADC,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
+    resolution_bits: u8,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
@@ -312,6 +316,12 @@ where
             _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
+            resolution_bits: match config.resolution {
+                Resolution::_9Bit => 9,
+                Resolution::_10Bit => 10,
+                Resolution::_11Bit => 11,
+                Resolution::_12Bit => 12,
+            },
             _phantom: PhantomData,
         }
     }
@@ -321,9 +331,13 @@ where
     /// This method takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
-    pub fn read_oneshot<PIN>(&mut self, pin: &mut super::AdcPin<PIN, ADCX>) -> nb::Result<u16, ()>
+    pub fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCX, CS>,
+    ) -> nb::Result<u16, ()>
     where
         PIN: super::AdcChannel,
+        CS: AdcCalScheme<ADCX>,
     {
         if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
             panic!(
@@ -355,13 +369,17 @@ where
             return Err(nb::Error::WouldBlock);
         }
 
-        // Get converted value
-        let converted_value = ADCX::read_data_sar();
+        // Get converted value and scale to 12 bits
+        let mut converted_value = ADCX::read_data_sar() as u32;
+        converted_value <<= 12 - self.resolution_bits;
+        if converted_value > 4095 {
+            converted_value = 4095;
+        }
 
         // Mark that no conversions are currently in progress
         self.active_channel = None;
 
-        Ok(converted_value)
+        Ok(pin.cal_scheme.adc_val(converted_value as u16))
     }
 }
 
