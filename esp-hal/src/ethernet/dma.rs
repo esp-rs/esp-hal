@@ -23,8 +23,9 @@ pub const TDES0_IC: u32 = 1 << 30;
 pub const TDES0_LS: u32 = 1 << 29;
 /// TX first-segment flag.
 pub const TDES0_FS: u32 = 1 << 28;
-/// TX checksum insertion control: 3 = IP Header checksum and payload checksum calculation
-/// and insertion are enabled, and pseudo-header checksum is calculated in hardware.
+/// TX checksum insertion control: 3 = IP header and payload checksum calculation
+/// and insertion are enabled, and the pseudo-header checksum is calculated in hardware.
+#[cfg(not(esp32))]
 pub const TDES0_CIC_FULL: u32 = 3 << 22;
 /// TX second-address-chained mode (next descriptor pointer in TDES3).
 pub const TDES0_CHAINED: u32 = 1 << 20;
@@ -139,9 +140,10 @@ impl TDes {
 
     fn set_len_and_flags(&mut self, len: usize) {
         self.tdes1.set(len as u32 & RDES1_BUF1_SIZE_MASK);
-        self.tdes0.set(
-            (self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC | TDES0_CIC_FULL,
-        );
+        // ESP32: leave CIC at 0; the GMAC TX checksum engine is incorrect.
+        let cic = if cfg!(esp32) { 0 } else { TDES0_CIC_FULL };
+        self.tdes0
+            .set((self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC | cic);
     }
 
     fn set_buffer_addr(&mut self, addr: *const u8) {

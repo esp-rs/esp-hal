@@ -153,13 +153,18 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
         let mut caps = Capabilities::default();
         caps.max_transmission_unit = MTU;
         caps.max_burst_size = Some(self.tx.len());
-        // Checksums are offloaded to hardware in both directions (RX COE + TX
-        // insertion via the descriptor CIC bits), so smoltcp does neither.
-        caps.checksum.ipv4 = Checksum::None;
-        caps.checksum.tcp = Checksum::None;
-        caps.checksum.udp = Checksum::None;
-        caps.checksum.icmpv4 = Checksum::None;
-        caps.checksum.icmpv6 = Checksum::None;
+        // RX checksum verification stays in hardware (MAC IPC / COE) on both chips.
+        // ESP32: the GMAC TX engine writes incorrect TCP/UDP checksums, so smoltcp fills them.
+        let tx_checksum = if cfg!(esp32) {
+            Checksum::Tx
+        } else {
+            Checksum::None
+        };
+        caps.checksum.ipv4 = tx_checksum;
+        caps.checksum.tcp = tx_checksum;
+        caps.checksum.udp = tx_checksum;
+        caps.checksum.icmpv4 = tx_checksum;
+        caps.checksum.icmpv6 = tx_checksum;
         caps
     }
 
