@@ -208,7 +208,7 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
         // frequency. In the future, we should turn the MCPWM config structs into
         // plain old data structures and remove this pre-configuration, otherwise we will not be
         // able to select a different clock source.
-        #[cfg(soc_has_clock_node_mcpwm_function_clock)]
+        #[cfg(soc_clock_node_mcpwm_function_clock_is_configurable)]
         {
             clocks::McpwmInstance::Mcpwm0.configure_function_clock(clocks, Default::default());
             #[cfg(soc_has_mcpwm1)]

@@ -739,30 +739,12 @@ impl McpwmInstance {
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
         // Nothing to do.
     }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<McpwmFunctionClockConfig>,
-        _new_config: McpwmFunctionClockConfig,
-    ) {
-        // Nothing to do.
-    }
 }
 
 impl SdmInstance {
     // SDM_FUNCTION_CLOCK
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<SdmFunctionClockConfig>,
-        _new_config: SdmFunctionClockConfig,
-    ) {
         // Nothing to do.
     }
 }

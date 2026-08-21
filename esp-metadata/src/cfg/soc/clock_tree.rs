@@ -32,7 +32,6 @@
 //       be simplified. (Probably the ones that only have one user, or those that are always on).
 // TODO: ClockConfig doc comment should be tailored to the specific chip
 // TODO: finalize public API
-// TODO: define clock IDs and maintain active clocks as a bitmap
 // TODO: classified clocks should be returned in a topological order
 // TODO: ClockConfig should configure clocks in topological order
 
@@ -591,6 +590,15 @@ impl ClockTreeItem {
             ClockTreeItem::Source(src) => Box::new(src.clone()),
             ClockTreeItem::Generic(div) => Box::new(div.clone()),
             ClockTreeItem::Derived(drv) => Box::new(drv.clone()),
+        }
+    }
+
+    pub(crate) fn is_configurable(&self) -> bool {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.is_configurable(),
+            ClockTreeItem::Source(src) => src.is_configurable(),
+            ClockTreeItem::Generic(div) => div.is_configurable(),
+            ClockTreeItem::Derived(drv) => drv.is_configurable(),
         }
     }
 

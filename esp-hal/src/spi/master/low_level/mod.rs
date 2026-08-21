@@ -217,6 +217,7 @@ impl Driver {
         version::enable_peripheral_clock(self);
 
         crate::soc::clocks::ClockTree::with(|clocks| {
+            #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
             self.info.clock_instance.configure_function_clock(
                 clocks,
                 crate::soc::clocks::SpiFunctionClockConfig::default(),
@@ -273,6 +274,7 @@ impl Driver {
 
         let raw = config.raw_clock_reg_value()?;
         crate::soc::clocks::ClockTree::with(|clocks| {
+            #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
             self.info
                 .clock_instance
                 .configure_function_clock(clocks, config.clock_source);

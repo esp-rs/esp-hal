@@ -5,7 +5,6 @@ use crate::{
         UartFunctionClockConfig,
         UartFunctionClockSclk,
         UartInstance,
-        UartMemClockConfig,
     },
     peripherals::{HP_SYS, HP_SYS_CLKRST},
 };
@@ -64,14 +63,6 @@ impl UartInstance {
             w.mem_lp_en().bit(!en);
             w.mem_force_ctrl().set_bit()
         });
-    }
-
-    pub(crate) fn configure_mem_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartMemClockConfig>,
-        _new_config: UartMemClockConfig,
-    ) {
     }
 
     pub(crate) fn configure_baud_rate_generator_impl(

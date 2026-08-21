@@ -161,7 +161,6 @@ pub(crate) struct ClockTreeNodeInstance {
     node: Box<dyn ClockTreeNodeType>,
 
     include_in_global_config: bool,
-    force_configurable: bool,
 
     /// Name of the instantiated clock tree node.
     ///
@@ -194,7 +193,7 @@ impl ClockTreeNodeInstance {
     }
 
     fn is_configurable(&self) -> bool {
-        self.node.is_configurable() || self.force_configurable
+        self.node.is_configurable()
     }
 
     fn config_type(&self) -> TokenStream {
@@ -1463,7 +1462,6 @@ impl DeviceClocks {
                 let node = ClockTreeNodeInstance {
                     node: node.boxed(),
                     include_in_global_config: true,
-                    force_configurable: false,
                     name: name.clone(),
                     group_instance: String::new(),
                     group_template: String::new(),
@@ -1518,9 +1516,6 @@ impl DeviceClocks {
                 let node = ClockTreeNodeInstance {
                     node: def.boxed(),
                     include_in_global_config: false,
-                    // FIXME peripherals force configurability because we don't have a way to
-                    // cfg them out. Decide if we can do better.
-                    force_configurable: true,
                     name: name.clone(),
                     group_instance: peri_name.clone(),
                     group_template: group_name.clone(),
@@ -1659,28 +1654,22 @@ impl DeviceClocks {
     fn cfgs(&self, config: &SocConfig) -> Vec<String> {
         let mut cfgs = vec![];
 
-        cfgs.extend(config.clocks.system_clocks.clock_tree.iter().map(|node| {
-            format!(
-                "soc_has_clock_node_{}",
-                node.name().from_case(Case::Constant).to_case(Case::Snake)
-            )
-        }));
-        cfgs.extend(
-            config
-                .clocks
-                .system_clocks
-                .template_groups
-                .iter()
-                .flat_map(|group| {
-                    group.clocks.iter().map(|node| {
-                        format!(
-                            "soc_has_clock_node_{}_{}",
-                            group.group.from_case(Case::Constant).to_case(Case::Snake),
-                            node.name().from_case(Case::Constant).to_case(Case::Snake)
-                        )
-                    })
-                }),
-        );
+        let mut push_node_cfgs = |name: String, node: &ClockTreeItem| {
+            let snake = name.from_case(Case::Constant).to_case(Case::Snake);
+            cfgs.push(format!("soc_has_clock_node_{snake}"));
+            if node.is_configurable() {
+                cfgs.push(format!("soc_clock_node_{snake}_is_configurable"));
+            }
+        };
+
+        for node in config.clocks.system_clocks.clock_tree.iter() {
+            push_node_cfgs(node.name().to_string(), node);
+        }
+        for group in config.clocks.system_clocks.template_groups.iter() {
+            for node in group.clocks.iter() {
+                push_node_cfgs(format!("{}_{}", group.group, node.name()), node);
+            }
+        }
 
         cfgs
     }
