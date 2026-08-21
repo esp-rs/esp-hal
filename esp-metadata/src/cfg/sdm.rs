@@ -5,7 +5,7 @@ use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 
 #[derive(Clone, Debug)]
 pub struct SdmChannels {
-    count: u32,
+    pub(crate) count: u32,
 }
 
 impl<'de> serde::Deserialize<'de> for SdmChannels {
@@ -20,12 +20,22 @@ impl<'de> serde::Deserialize<'de> for SdmChannels {
 }
 
 impl GenericProperty for SdmChannels {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        Some(
+            (0..self.count)
+                .map(|channel| format!("soc_has_sdm_ch{channel}"))
+                .collect(),
+        )
+    }
+
     fn macros(&self) -> Option<TokenStream> {
         let channels = (0..self.count)
             .map(|channel| {
-                let channel = number(channel);
+                let peri = format_ident!("SDM_CH{channel}");
+                let variant = format_ident!("SdmCh{channel}");
                 let signal = format_ident!("GPIO_SD{channel}");
-                quote::quote! { #channel, #signal }
+                let channel = number(channel);
+                quote::quote! { #channel, #peri, #variant, #signal }
             })
             .collect::<Vec<_>>();
 
