@@ -326,6 +326,15 @@ output_signals = [
     { name = "I2CEXT0_SDA",         id = 69 },
     { name = "I2CEXT1_SCL",         id = 70 },
     { name = "I2CEXT1_SDA",         id = 71 },
+    # SDM
+    { name = "GPIO_SD0",            id = 72 },
+    { name = "GPIO_SD1",            id = 73 },
+    { name = "GPIO_SD2",            id = 74 },
+    { name = "GPIO_SD3",            id = 75 },
+    { name = "GPIO_SD4",            id = 76 },
+    { name = "GPIO_SD5",            id = 77 },
+    { name = "GPIO_SD6",            id = 78 },
+    { name = "GPIO_SD7",            id = 79 },
     # CPU GPIO
     { name = "CPU_GPIO_0",          id = 214 },
     { name = "CPU_GPIO_1",          id = 215 },

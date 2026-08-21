@@ -610,3 +610,13 @@ impl PsramInstance {
         });
     }
 }
+
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.sigmadelta_clk_en().bit(en));
+    }
+}

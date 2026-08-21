@@ -52,7 +52,7 @@ peripherals = [
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
-    { name = "GPIO_SD", pac = "GPIO_EXT" },
+    { name = "GPIO_SD", pac = "GPIO_EXT", clock_group = "SDM" },
     { name = "HP_APM" },
     { name = "HP_MEM_APM" },
     { name = "HP_SYS" },
@@ -391,7 +391,7 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.sdm]
-support_status = "not_supported"
+support_status = "partial"
 channel_count = 8
 
 [device.temp_sensor]
