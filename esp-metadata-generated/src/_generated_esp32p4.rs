@@ -92,10 +92,10 @@ macro_rules! property {
         true
     };
     ("gpio.input_signal_max") => {
-        229
+        249
     };
     ("gpio.input_signal_max", str) => {
-        stringify!(229)
+        stringify!(249)
     };
     ("gpio.output_signal_max") => {
         256
@@ -285,6 +285,42 @@ macro_rules! property {
     };
     ("i2s.supports_pdm2pcm") => {
         true
+    };
+    ("rmt.ram_start") => {
+        1342842880
+    };
+    ("rmt.ram_start", str) => {
+        stringify!(1342842880)
+    };
+    ("rmt.channel_ram_size") => {
+        48
+    };
+    ("rmt.channel_ram_size", str) => {
+        stringify!(48)
+    };
+    ("rmt.has_tx_immediate_stop") => {
+        true
+    };
+    ("rmt.has_tx_loop_count") => {
+        true
+    };
+    ("rmt.has_tx_loop_auto_stop") => {
+        true
+    };
+    ("rmt.has_tx_carrier_data_only") => {
+        true
+    };
+    ("rmt.has_tx_sync") => {
+        true
+    };
+    ("rmt.has_rx_wrap") => {
+        true
+    };
+    ("rmt.has_rx_demodulation") => {
+        true
+    };
+    ("rmt.has_per_channel_clock") => {
+        false
     };
     ("sdmmc.delay_phase_num") => {
         8
@@ -565,6 +601,11 @@ macro_rules! property {
     ("clock_tree.i2c.function_clock.div_num") => {
         (0, 255)
     };
+    ("clock_tree.rmt.sclk") => {
+        [crate ::soc::clocks::RmtSclkConfig::PllF80m, crate
+        ::soc::clocks::RmtSclkConfig::RcFastClk, crate
+        ::soc::clocks::RmtSclkConfig::XtalClk]
+    };
     ("clock_tree.spi.function_clock") => {
         [crate ::soc::clocks::SpiFunctionClockConfig::Xtal, crate
         ::soc::clocks::SpiFunctionClockConfig::RcFast, crate
@@ -673,6 +714,45 @@ macro_rules! define_lp_io_signals {
             LP_I2S_O_BCK = 12,
             LP_I2S_O_WS  = 13,
         }
+    };
+}
+/// This macro can be used to generate code for each channel of the RMT peripheral.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has three options for its "Individual matcher" case:
+///
+/// - `all`: `($num:literal)`
+/// - `tx`: `($num:literal, $idx:literal)`
+/// - `rx`: `($num:literal, $idx:literal)`
+///
+/// Macro fragments:
+///
+/// - `$num`: number of the channel, e.g. `0`
+/// - `$idx`: index of the channel among channels of the same capability, e.g. `0`
+///
+/// Example data:
+///
+/// - `all`: `(0)`
+/// - `tx`: `(1, 1)`
+/// - `rx`: `(2, 0)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_channel {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_rmt_channel { $(($pattern) => $code;)* ($other : tt)
+        => {} } _for_each_inner_rmt_channel!((0)); _for_each_inner_rmt_channel!((1));
+        _for_each_inner_rmt_channel!((2)); _for_each_inner_rmt_channel!((3));
+        _for_each_inner_rmt_channel!((4)); _for_each_inner_rmt_channel!((5));
+        _for_each_inner_rmt_channel!((6)); _for_each_inner_rmt_channel!((7));
+        _for_each_inner_rmt_channel!((0, 0)); _for_each_inner_rmt_channel!((1, 1));
+        _for_each_inner_rmt_channel!((2, 2)); _for_each_inner_rmt_channel!((3, 3));
+        _for_each_inner_rmt_channel!((4, 0)); _for_each_inner_rmt_channel!((5, 1));
+        _for_each_inner_rmt_channel!((6, 2)); _for_each_inner_rmt_channel!((7, 3));
+        _for_each_inner_rmt_channel!((all(0), (1), (2), (3), (4), (5), (6), (7)));
+        _for_each_inner_rmt_channel!((tx(0, 0), (1, 1), (2, 2), (3, 3)));
+        _for_each_inner_rmt_channel!((rx(4, 0), (5, 1), (6, 2), (7, 3)));
     };
 }
 /// This macro can be used to generate code for each slot of the SDMMC/SDIO host driver.
@@ -1822,6 +1902,22 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl RmtInstance {
+///     // RMT_SCLK
+///
+///     fn enable_sclk_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_sclk_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<RmtSclkConfig>,
+///         _new_config: RmtSclkConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl PsramInstance {
 ///     // PSRAM_FUNCTION_CLOCK
 ///
@@ -1877,6 +1973,11 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum MipiDsiInstance {
             MipiDsi = 0,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum RmtInstance {
+            Rmt = 0,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2364,6 +2465,18 @@ macro_rules! define_clock_tree_types {
             /// Selects `PLL_F25M`.
             PllF25m,
         }
+        /// The list of clock signals that the `RMT_SCLK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum RmtSclkConfig {
+            #[default]
+            /// Selects `PLL_F80M`.
+            PllF80m,
+            /// Selects `RC_FAST_CLK`.
+            RcFastClk,
+            /// Selects `XTAL_CLK`.
+            XtalClk,
+        }
         /// The list of clock signals that the `PSRAM_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2400,6 +2513,7 @@ macro_rules! define_clock_tree_types {
             mipi_dsi_dpi_clk: [Option<MipiDsiDpiClkConfig>; 1],
             mipi_dsi_phy_pll_refclk: [Option<MipiDsiPhyPllRefclkConfig>; 1],
             mipi_dsi_phy_cfg_clk: [Option<MipiDsiPhyCfgClkConfig>; 1],
+            rmt_sclk: [Option<RmtSclkConfig>; 1],
             psram_function_clock: [Option<PsramFunctionClockConfig>; 1],
             cpll_clk_refcount: u32,
             spll_clk_refcount: u32,
@@ -2423,6 +2537,7 @@ macro_rules! define_clock_tree_types {
             mipi_dsi_dpi_clk_refcount: [u32; 1],
             mipi_dsi_phy_pll_refclk_refcount: [u32; 1],
             mipi_dsi_phy_cfg_clk_refcount: [u32; 1],
+            rmt_sclk_refcount: [u32; 1],
             psram_function_clock_refcount: [u32; 1],
         }
         impl ClockTree {
@@ -2558,6 +2673,10 @@ macro_rules! define_clock_tree_types {
             pub fn mipi_dsi_phy_cfg_clk(&self) -> Option<MipiDsiPhyCfgClkConfig> {
                 self.mipi_dsi_phy_cfg_clk[MipiDsiInstance::MipiDsi as usize]
             }
+            /// Returns the current configuration of the RMT_SCLK clock tree node
+            pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
+                self.rmt_sclk[RmtInstance::Rmt as usize]
+            }
             /// Returns the current configuration of the PSRAM_FUNCTION_CLOCK clock tree node
             pub fn psram_function_clock(&self) -> Option<PsramFunctionClockConfig> {
                 self.psram_function_clock[PsramInstance::Psram as usize]
@@ -2585,6 +2704,7 @@ macro_rules! define_clock_tree_types {
                 mipi_dsi_dpi_clk: [None; 1],
                 mipi_dsi_phy_pll_refclk: [None; 1],
                 mipi_dsi_phy_cfg_clk: [None; 1],
+                rmt_sclk: [None; 1],
                 psram_function_clock: [None; 1],
                 cpll_clk_refcount: 0,
                 spll_clk_refcount: 0,
@@ -2608,6 +2728,7 @@ macro_rules! define_clock_tree_types {
                 mipi_dsi_dpi_clk_refcount: [0; 1],
                 mipi_dsi_phy_pll_refclk_refcount: [0; 1],
                 mipi_dsi_phy_cfg_clk_refcount: [0; 1],
+                rmt_sclk_refcount: [0; 1],
                 psram_function_clock_refcount: [0; 1],
             });
         static CPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -2649,6 +2770,8 @@ macro_rules! define_clock_tree_types {
         static MIPI_DSI_PHY_PLL_REFCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static MIPI_DSI_PHY_CFG_CLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
+        static RMT_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static PSRAM_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
@@ -4137,6 +4260,76 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
+        impl RmtInstance {
+            pub fn configure_sclk(self, clocks: &mut ClockTree, new_selector: RmtSclkConfig) {
+                let old_selector = clocks.rmt_sclk[self as usize].replace(new_selector);
+                refresh_rmt_sclk_downstream(clocks, self);
+                if clocks.rmt_sclk_refcount[self as usize] > 0 {
+                    match new_selector {
+                        RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
+                        RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+                    }
+                    self.configure_sclk_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
+                            RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                            RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_sclk_impl(clocks, old_selector, new_selector);
+                }
+            }
+            pub fn sclk_config(self, clocks: &mut ClockTree) -> Option<RmtSclkConfig> {
+                clocks.rmt_sclk[self as usize]
+            }
+            pub fn request_sclk(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::SCLK", self);
+                if increment_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
+                    trace!("Enabling {:?}::SCLK", self);
+                    crate::rtc_cntl::WakeLock::acquire();
+                    match unwrap!(clocks.rmt_sclk[self as usize]) {
+                        RmtSclkConfig::PllF80m => request_pll_f80m(clocks),
+                        RmtSclkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        RmtSclkConfig::XtalClk => request_xtal_clk(clocks),
+                    }
+                    self.enable_sclk_impl(clocks, true);
+                }
+            }
+            pub fn release_sclk(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::SCLK", self);
+                if decrement_reference_count(&mut clocks.rmt_sclk_refcount[self as usize]) {
+                    trace!("Disabling {:?}::SCLK", self);
+                    crate::rtc_cntl::WakeLock::release();
+                    self.enable_sclk_impl(clocks, false);
+                    match unwrap!(clocks.rmt_sclk[self as usize]) {
+                        RmtSclkConfig::PllF80m => release_pll_f80m(clocks),
+                        RmtSclkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        RmtSclkConfig::XtalClk => release_xtal_clk(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn sclk_config_frequency(clocks: &mut ClockTree, config: RmtSclkConfig) -> u32 {
+                match config {
+                    RmtSclkConfig::PllF80m => pll_f80m_frequency(),
+                    RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(),
+                    RmtSclkConfig::XtalClk => xtal_clk_frequency(),
+                }
+            }
+            pub fn sclk_frequency(self) -> u32 {
+                RMT_SCLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn sclk_source_frequency(source: RmtSclkConfig) -> u32 {
+                match source {
+                    RmtSclkConfig::PllF80m => pll_f80m_frequency(),
+                    RmtSclkConfig::RcFastClk => rc_fast_clk_frequency(),
+                    RmtSclkConfig::XtalClk => xtal_clk_frequency(),
+                }
+            }
+        }
         impl PsramInstance {
             pub fn configure_function_clock(
                 self,
@@ -4494,6 +4687,14 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.mipi_dsi_phy_cfg_clk[instance as usize] {
                 MIPI_DSI_PHY_CFG_CLK_FREQ_CACHE[instance as usize].store(
                     MipiDsiInstance::phy_cfg_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_rmt_sclk_downstream(clocks: &mut ClockTree, instance: RmtInstance) {
+            if let Some(config) = clocks.rmt_sclk[instance as usize] {
+                RMT_SCLK_FREQ_CACHE[instance as usize].store(
+                    RmtInstance::sclk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
@@ -5715,28 +5916,28 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "PCNT peripheral singleton"]
         PCNT <= PCNT(PCNT : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "RMT peripheral singleton"] RMT <= RMT(RMT : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "APB_SARADC peripheral singleton"] APB_SARADC <= ADC() (unstable)));
+        #[doc = "APB_SARADC peripheral singleton"] APB_SARADC <= ADC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_ADC peripheral singleton"]
         LP_ADC <= LP_ADC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
+        "RMT peripheral singleton"] RMT <= virtual(RMT : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
-        <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        _for_each_inner_peripheral!((@ peri_type #[doc = "AES peripheral singleton"] AES
+        <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RSA peripheral singleton"] RSA <= RSA(RSA : { bind_peri_interrupt,
+        "SHA peripheral singleton"] SHA <= SHA(SHA : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "ECC peripheral singleton"] ECC
-        <= ECC(ECC : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RSA peripheral singleton"] RSA
+        <= RSA(RSA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "USB_FS peripheral singleton"] USB_FS <= USB_FS(USB_FS : { bind_peri_interrupt,
+        "ECC peripheral singleton"] ECC <= ECC(ECC : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "USB_HS peripheral singleton"]
-        USB_HS <= USB_HS(USB_HS : { bind_peri_interrupt, enable_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "USB_FS peripheral singleton"]
+        USB_FS <= USB_FS(USB_FS : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)));
+        #[doc = "USB_HS peripheral singleton"] USB_HS <= USB_HS(USB_HS : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "ADC1 peripheral singleton"]
         ADC1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "ADC2 peripheral singleton"] ADC2 <= virtual() (unstable)));
@@ -5847,9 +6048,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((MCPWM0(unstable)));
         _for_each_inner_peripheral!((MCPWM1(unstable)));
         _for_each_inner_peripheral!((PCNT(unstable)));
-        _for_each_inner_peripheral!((RMT(unstable)));
         _for_each_inner_peripheral!((APB_SARADC(unstable)));
         _for_each_inner_peripheral!((LP_ADC(unstable)));
+        _for_each_inner_peripheral!((RMT(unstable)));
         _for_each_inner_peripheral!((AES(unstable)));
         _for_each_inner_peripheral!((SHA(unstable)));
         _for_each_inner_peripheral!((RSA(unstable)));
@@ -6127,11 +6328,11 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "PCNT peripheral singleton"] PCNT <= PCNT(PCNT : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "RMT peripheral singleton"] RMT <= RMT(RMT : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "APB_SARADC peripheral singleton"] APB_SARADC <= ADC() (unstable)), (@
         peri_type #[doc = "LP_ADC peripheral singleton"] LP_ADC <= LP_ADC() (unstable)),
-        (@ peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
+        (@ peri_type #[doc = "RMT peripheral singleton"] RMT <= virtual(RMT : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "SHA peripheral singleton"] SHA <= SHA(SHA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
@@ -6183,8 +6384,8 @@ macro_rules! for_each_peripheral {
         (TWAI0(unstable)), (TWAI1(unstable)), (TWAI2(unstable)), (DMA(unstable)),
         (AXI_GDMA(unstable)), (ETH(unstable)), (MIPI_DSI(unstable)),
         (USB_DEVICE(unstable)), (SDHOST(unstable)), (LEDC(unstable)), (MCPWM0(unstable)),
-        (MCPWM1(unstable)), (PCNT(unstable)), (RMT(unstable)), (APB_SARADC(unstable)),
-        (LP_ADC(unstable)), (AES(unstable)), (SHA(unstable)), (RSA(unstable)),
+        (MCPWM1(unstable)), (PCNT(unstable)), (APB_SARADC(unstable)), (LP_ADC(unstable)),
+        (RMT(unstable)), (AES(unstable)), (SHA(unstable)), (RSA(unstable)),
         (ECC(unstable)), (USB_FS(unstable)), (USB_HS(unstable)), (ADC1(unstable)),
         (ADC2(unstable)), (FLASH(unstable)), (PSRAM(unstable)),
         (GPIO_DEDICATED(unstable)), (CPU_CTRL(unstable)), (FROM_CPU_INTR0(unstable)),
@@ -7341,6 +7542,10 @@ macro_rules! define_io_mux_signals {
             CPU_GPIO_13             = 227,
             CPU_GPIO_14             = 228,
             CPU_GPIO_15             = 229,
+            RMT_SIG_0               = 246,
+            RMT_SIG_1               = 247,
+            RMT_SIG_2               = 248,
+            RMT_SIG_3               = 249,
             MTCK,
             MTDI,
             MTMS,
@@ -7570,6 +7775,10 @@ macro_rules! define_io_mux_signals {
             EMAC_PTP_PPS               = 243,
             ANA_COMP0                  = 244,
             ANA_COMP1                  = 245,
+            RMT_SIG_0                  = 246,
+            RMT_SIG_1                  = 247,
+            RMT_SIG_2                  = 248,
+            RMT_SIG_3                  = 249,
             GPIO                       = 256,
             MTCK,
             MTDI,

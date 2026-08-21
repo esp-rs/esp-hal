@@ -13,7 +13,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
 
 use crate::{
-    peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, PMU},
+    peripherals::{HP_ALIVE_SYS, HP_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, PMU},
     soc::xtal32k,
 };
 
@@ -551,6 +551,37 @@ impl TimgInstance {
         _new: TimgWdtClockConfig,
     ) {
         // TODO: Configure the selected timer group's watchdog-clock source.
+    }
+}
+
+impl RmtInstance {
+    // RMT_SCLK
+
+    fn enable_sclk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS::regs().rmt_mem_lp_ctrl().modify(|_, w| {
+            w.rmt_mem_lp_force_ctrl().set_bit();
+            w.rmt_mem_lp_en().bit(!en)
+        });
+
+        HP_SYS_CLKRST::regs()
+            .rmt_ctrl0()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_sclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<RmtSclkConfig>,
+        new_config: RmtSclkConfig,
+    ) {
+        // Register values: 0 = XTAL, 1 = RC_FAST, 2 = REF_F80M (PLL_F80M).
+        HP_SYS_CLKRST::regs().rmt_ctrl0().modify(|_, w| unsafe {
+            w.clk_src_sel().bits(match new_config {
+                RmtSclkConfig::XtalClk => 0,
+                RmtSclkConfig::RcFastClk => 1,
+                RmtSclkConfig::PllF80m => 2,
+            })
+        });
     }
 }
 

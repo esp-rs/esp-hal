@@ -104,6 +104,13 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
     ] },
+    { group = "RMT", clocks = [
+        { name = "SCLK", type = "mux", wake_locking = true, variants = [
+            { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
+            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        ] },
+    ] },
 ] }
 
 peripheral_clocks = { templates = [
@@ -160,4 +167,5 @@ peripheral_clocks = { templates = [
         clk_en_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_clk_en().bit(enable));",
         rst_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_rst_en().bit(reset));"
     } },
+    { name = "Rmt", template_params = { clk_en = "{{sys_clk}}" } },
 ] }

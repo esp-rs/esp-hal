@@ -39,7 +39,7 @@ const DUTY_STEP: u8 = 20;
 const DUTY_RATIO_TOLERANCE_PER_MILLE: u32 = 20;
 
 cfg_select! {
-    any(esp32, esp32s3) => {
+    any(esp32, esp32s3, esp32s31, esp32p4) => {
         macro_rules! rx_channel_creator {
             ($rmt:expr) => {
                 $rmt.channel4

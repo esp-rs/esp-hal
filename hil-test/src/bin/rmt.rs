@@ -442,7 +442,7 @@ macro_rules! pins {
 }
 
 cfg_select! {
-    any(esp32, esp32s3) => {
+    any(esp32, esp32s3, esp32s31, esp32p4) => {
         macro_rules! rx_channel_creator {
             ($rmt:expr) => {
                 $rmt.channel4
@@ -906,7 +906,7 @@ mod tests {
         }
 
         // Chips with separate Rx and Tx channels
-        #[cfg(esp32s3)]
+        #[cfg(any(esp32s3, esp32s31, esp32p4))]
         {
             test_channel_pair!(ctx, channel0, channel4);
             test_channel_pair!(ctx, channel1, channel5);
@@ -914,7 +914,7 @@ mod tests {
             test_channel_pair!(ctx, channel3, channel7);
         }
 
-        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+        #[cfg(not(any(esp32, esp32s2, esp32s3, esp32s31, esp32p4)))]
         {
             test_channel_pair!(ctx, channel0, channel2);
             test_channel_pair!(ctx, channel1, channel3);
@@ -1124,7 +1124,7 @@ mod tests {
         for loopcount in 1..MAX_LOOP_COUNT {
             #[allow(unused_mut)]
             let mut loopmode = LoopMode::InfiniteWithInterrupt(loopcount as u16);
-            #[cfg(any(esp32c6, esp32h2, esp32s3))]
+            #[cfg(rmt_has_tx_loop_auto_stop)]
             if use_autostop {
                 loopmode = LoopMode::Finite(loopcount as u16);
             };
@@ -1185,14 +1185,14 @@ mod tests {
 
     // Test that continuous tx with a finite loopcount works as expected when using automatic
     // stopping (on devices that have the required hardware support).
-    #[cfg(any(esp32c6, esp32h2, esp32s3))]
+    #[cfg(rmt_has_tx_loop_auto_stop)]
     #[test]
     fn rmt_loopback_continuous_tx_auto_stop(ctx: Context) {
         rmt_loopback_continuous_tx_impl(ctx, true);
     }
 
     // Test that using loopcount 0 doesn't hang, but returns success immediately.
-    #[cfg(any(esp32c6, esp32h2, esp32s3))]
+    #[cfg(rmt_has_tx_loop_auto_stop)]
     #[test]
     fn rmt_continuous_tx_zero_loopcount(mut ctx: Context) {
         use esp_hal::time::Instant;

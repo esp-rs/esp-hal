@@ -80,6 +80,7 @@ peripherals = [
     { name = "PMU" },
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "RNG", pac = "TRNG" },
+    { name = "RMT", virtual = true, interrupts = { peri = "RMT" }, clock_group = "RMT" }, # PAC field names differ from ESP32-S3; overlay_rmt maps them.
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SPI0" },
     { name = "SPI1" },
@@ -408,11 +409,17 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.rmt]
-support_status = "not_supported"
+support_status = "partial"
 ram_start = 0x20355800
 channel_ram_size = 48
 channels = ["Tx", "Tx", "Tx", "Tx", "Rx", "Rx", "Rx", "Rx"]
-# TODO capabilities
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
 
 [device.parl_io]
 support_status = "not_supported"
