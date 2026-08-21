@@ -576,13 +576,25 @@ mod twai {
         }
 
         #[test]
-        fn test_send_receive(mut ctx: Context<Blocking>) {
-            let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3]).unwrap();
+        fn test_send_receive_data(mut ctx: Context<Blocking>) {
+            let frame = EspTwaiFrame::new_data(StandardId::ZERO, &[1, 2, 3], 0, true).unwrap();
             block!(ctx.twai.transmit(&frame)).unwrap();
 
             let frame = block!(ctx.twai.receive()).unwrap();
 
-            assert_eq!(frame.data(), &[1, 2, 3])
+            assert_eq!(frame.data(), &[1, 2, 3]);
+            assert_eq!(frame.data_length_code(), 3);
+        }
+
+        #[test]
+        fn test_send_receive_request(mut ctx: Context<Blocking>) {
+            let frame = EspTwaiFrame::new_request(StandardId::ZERO, 4, true).unwrap();
+            block!(ctx.twai.transmit(&frame)).unwrap();
+
+            let frame = block!(ctx.twai.receive()).unwrap();
+
+            assert_eq!(frame.data(), &[]);
+            assert_eq!(frame.data_length_code(), 4);
         }
 
         fn no_init() {}
@@ -676,8 +688,7 @@ mod twai {
 
         #[test]
         async fn test_async_transmit_and_receive(mut ctx: Context<Async>) {
-            let frame =
-                EspTwaiFrame::new_self_reception(StandardId::new(0).unwrap(), b"12345678").unwrap();
+            let frame = EspTwaiFrame::new_data(StandardId::ZERO, b"12345678", 0, true).unwrap();
             transmit_frames(&mut ctx, &frame, 31).await;
             receive_frames(&mut ctx, 31).await;
         }
@@ -685,8 +696,7 @@ mod twai {
         #[test]
         // regression test for https://github.com/esp-rs/esp-hal/issues/4235
         async fn test_buffer_overrun_on_empty_queue(mut ctx: Context<Async>) {
-            let frame =
-                EspTwaiFrame::new_self_reception(StandardId::new(0).unwrap(), b"12345678").unwrap();
+            let frame = EspTwaiFrame::new_data(StandardId::ZERO, b"12345678", 0, true).unwrap();
 
             interrupt::disable(Cpu::ProCpu, TWAI0);
 
@@ -728,7 +738,8 @@ mod twai {
 
             let mut twai = config.into_async().start();
 
-            let frame = EspTwaiFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
+            let frame =
+                EspTwaiFrame::new_data(StandardId::new(5).unwrap(), b"12345678", 0, false).unwrap();
 
             assert_eq!(
                 twai.transmit_async(&frame).await,
