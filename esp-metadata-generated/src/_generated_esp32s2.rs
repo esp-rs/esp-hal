@@ -1332,15 +1332,6 @@ macro_rules! for_each_sw_interrupt {
 ///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
 ///         todo!()
 ///     }
-///
-///     fn configure_function_clock_impl(
-///         self,
-///         _clocks: &mut ClockTree,
-///         _old_config: Option<SdmFunctionClockConfig>,
-///         _new_config: SdmFunctionClockConfig,
-///     ) {
-///         todo!()
-///     }
 /// }
 /// impl I2cInstance {
 ///     // I2C_FUNCTION_CLOCK
@@ -1378,15 +1369,6 @@ macro_rules! for_each_sw_interrupt {
 ///     // SPI_FUNCTION_CLOCK
 ///
 ///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-///         todo!()
-///     }
-///
-///     fn configure_function_clock_impl(
-///         self,
-///         _clocks: &mut ClockTree,
-///         _old_config: Option<SpiFunctionClockConfig>,
-///         _new_config: SpiFunctionClockConfig,
-///     ) {
 ///         todo!()
 ///     }
 /// }
@@ -1440,15 +1422,6 @@ macro_rules! for_each_sw_interrupt {
 ///     // UART_MEM_CLOCK
 ///
 ///     fn enable_mem_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-///         todo!()
-///     }
-///
-///     fn configure_mem_clock_impl(
-///         self,
-///         _clocks: &mut ClockTree,
-///         _old_config: Option<UartMemClockConfig>,
-///         _new_config: UartMemClockConfig,
-///     ) {
 ///         todo!()
 ///     }
 /// }
@@ -1760,18 +1733,6 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
-        /// Configures the `GPIO_SD_FUNCTION_CLOCK` clock node.
-        ///
-        /// The output is calculated as `OUTPUT = APB_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct SdmFunctionClockConfig {}
-        impl SdmFunctionClockConfig {
-            /// Creates a new configuration for the FUNCTION_CLOCK clock node.
-            pub const fn new() -> Self {
-                Self {}
-            }
-        }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum I2cFunctionClockSclk {
@@ -1894,18 +1855,6 @@ macro_rules! define_clock_tree_types {
                 self.integral as u32
             }
         }
-        /// Configures the `UART0_MEM_CLOCK` clock node.
-        ///
-        /// The output is calculated as `OUTPUT = UART_MEM_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct UartMemClockConfig {}
-        impl UartMemClockConfig {
-            /// Creates a new configuration for the MEM_CLOCK clock node.
-            pub const fn new() -> Self {
-                Self {}
-            }
-        }
         /// Represents the device's clock tree.
         pub struct ClockTree {
             xtal_clk: Option<XtalClkConfig>,
@@ -1923,14 +1872,11 @@ macro_rules! define_clock_tree_types {
             rtc_slow_clk: Option<RtcSlowClkConfig>,
             rtc_fast_clk: Option<RtcFastClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
-            sdm_function_clock: [Option<SdmFunctionClockConfig>; 1],
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 2],
             rmt_sclk: [Option<RmtSclkConfig>; 1],
-            spi_function_clock: [Option<SpiFunctionClockConfig>; 2],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 2],
-            uart_mem_clock: [Option<UartMemClockConfig>; 2],
             pll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
             apb_clk_refcount: u32,
@@ -2014,10 +1960,6 @@ macro_rules! define_clock_tree_types {
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
                 self.timg_calibration_clock
             }
-            /// Returns the current configuration of the GPIO_SD_FUNCTION_CLOCK clock tree node
-            pub fn gpio_sd_function_clock(&self) -> Option<SdmFunctionClockConfig> {
-                self.sdm_function_clock[SdmInstance::GpioSd as usize]
-            }
             /// Returns the current configuration of the I2C0_FUNCTION_CLOCK clock tree node
             pub fn i2c0_function_clock(&self) -> Option<I2cFunctionClockConfig> {
                 self.i2c_function_clock[I2cInstance::I2c0 as usize]
@@ -2029,14 +1971,6 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the RMT_SCLK clock tree node
             pub fn rmt_sclk(&self) -> Option<RmtSclkConfig> {
                 self.rmt_sclk[RmtInstance::Rmt as usize]
-            }
-            /// Returns the current configuration of the SPI2_FUNCTION_CLOCK clock tree node
-            pub fn spi2_function_clock(&self) -> Option<SpiFunctionClockConfig> {
-                self.spi_function_clock[SpiInstance::Spi2 as usize]
-            }
-            /// Returns the current configuration of the SPI3_FUNCTION_CLOCK clock tree node
-            pub fn spi3_function_clock(&self) -> Option<SpiFunctionClockConfig> {
-                self.spi_function_clock[SpiInstance::Spi3 as usize]
             }
             /// Returns the current configuration of the TIMG0_FUNCTION_CLOCK clock tree node
             pub fn timg0_function_clock(&self) -> Option<TimgFunctionClockConfig> {
@@ -2054,10 +1988,6 @@ macro_rules! define_clock_tree_types {
             pub fn uart0_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart0 as usize]
             }
-            /// Returns the current configuration of the UART0_MEM_CLOCK clock tree node
-            pub fn uart0_mem_clock(&self) -> Option<UartMemClockConfig> {
-                self.uart_mem_clock[UartInstance::Uart0 as usize]
-            }
             /// Returns the current configuration of the UART1_FUNCTION_CLOCK clock tree node
             pub fn uart1_function_clock(&self) -> Option<UartFunctionClockConfig> {
                 self.uart_function_clock[UartInstance::Uart1 as usize]
@@ -2065,10 +1995,6 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the UART1_BAUD_RATE_GENERATOR clock tree node
             pub fn uart1_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart1 as usize]
-            }
-            /// Returns the current configuration of the UART1_MEM_CLOCK clock tree node
-            pub fn uart1_mem_clock(&self) -> Option<UartMemClockConfig> {
-                self.uart_mem_clock[UartInstance::Uart1 as usize]
             }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
@@ -2088,14 +2014,11 @@ macro_rules! define_clock_tree_types {
                 rtc_slow_clk: None,
                 rtc_fast_clk: None,
                 timg_calibration_clock: None,
-                sdm_function_clock: [None; 1],
                 i2c_function_clock: [None; 2],
                 rmt_sclk: [None; 1],
-                spi_function_clock: [None; 2],
                 timg_function_clock: [None; 2],
                 uart_function_clock: [None; 2],
                 uart_baud_rate_generator: [None; 2],
-                uart_mem_clock: [None; 2],
                 pll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
                 apb_clk_refcount: 0,
@@ -3042,21 +2965,6 @@ macro_rules! define_clock_tree_types {
             }
         }
         impl SdmInstance {
-            pub fn configure_function_clock(
-                self,
-                clocks: &mut ClockTree,
-                config: SdmFunctionClockConfig,
-            ) {
-                let old_config = clocks.sdm_function_clock[self as usize].replace(config);
-                refresh_sdm_function_clock_downstream(clocks, self);
-                self.configure_function_clock_impl(clocks, old_config, config);
-            }
-            pub fn function_clock_config(
-                self,
-                clocks: &mut ClockTree,
-            ) -> Option<SdmFunctionClockConfig> {
-                clocks.sdm_function_clock[self as usize]
-            }
             pub fn request_function_clock(self, clocks: &mut ClockTree) {
                 trace!("Requesting {:?}::FUNCTION_CLOCK", self);
                 if increment_reference_count(&mut clocks.sdm_function_clock_refcount[self as usize])
@@ -3074,13 +2982,6 @@ macro_rules! define_clock_tree_types {
                     self.enable_function_clock_impl(clocks, false);
                     release_apb_clk(clocks);
                 }
-            }
-            #[allow(unused_variables)]
-            pub fn function_clock_config_frequency(
-                clocks: &mut ClockTree,
-                config: SdmFunctionClockConfig,
-            ) -> u32 {
-                apb_clk_frequency()
             }
             pub fn function_clock_frequency(self) -> u32 {
                 apb_clk_frequency()
@@ -3231,29 +3132,6 @@ macro_rules! define_clock_tree_types {
             }
         }
         impl SpiInstance {
-            pub fn configure_function_clock(
-                self,
-                clocks: &mut ClockTree,
-                new_selector: SpiFunctionClockConfig,
-            ) {
-                let old_selector = clocks.spi_function_clock[self as usize].replace(new_selector);
-                refresh_spi_function_clock_downstream(clocks, self);
-                if clocks.spi_function_clock_refcount[self as usize] > 0 {
-                    request_apb_clk(clocks);
-                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
-                    if let Some(old_selector) = old_selector {
-                        release_apb_clk(clocks);
-                    }
-                } else {
-                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
-                }
-            }
-            pub fn function_clock_config(
-                self,
-                clocks: &mut ClockTree,
-            ) -> Option<SpiFunctionClockConfig> {
-                clocks.spi_function_clock[self as usize]
-            }
             pub fn request_function_clock(self, clocks: &mut ClockTree) {
                 trace!("Requesting {:?}::FUNCTION_CLOCK", self);
                 if increment_reference_count(&mut clocks.spi_function_clock_refcount[self as usize])
@@ -3273,13 +3151,6 @@ macro_rules! define_clock_tree_types {
                     self.enable_function_clock_impl(clocks, false);
                     release_apb_clk(clocks);
                 }
-            }
-            #[allow(unused_variables)]
-            pub fn function_clock_config_frequency(
-                clocks: &mut ClockTree,
-                config: SpiFunctionClockConfig,
-            ) -> u32 {
-                apb_clk_frequency()
             }
             pub fn function_clock_frequency(self) -> u32 {
                 apb_clk_frequency()
@@ -3491,14 +3362,6 @@ macro_rules! define_clock_tree_types {
                 UART_BAUD_RATE_GENERATOR_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
-            pub fn configure_mem_clock(self, clocks: &mut ClockTree, config: UartMemClockConfig) {
-                let old_config = clocks.uart_mem_clock[self as usize].replace(config);
-                refresh_uart_mem_clock_downstream(clocks, self);
-                self.configure_mem_clock_impl(clocks, old_config, config);
-            }
-            pub fn mem_clock_config(self, clocks: &mut ClockTree) -> Option<UartMemClockConfig> {
-                clocks.uart_mem_clock[self as usize]
-            }
             pub fn request_mem_clock(self, clocks: &mut ClockTree) {
                 trace!("Requesting {:?}::MEM_CLOCK", self);
                 if increment_reference_count(&mut clocks.uart_mem_clock_refcount[self as usize]) {
@@ -3514,13 +3377,6 @@ macro_rules! define_clock_tree_types {
                     self.enable_mem_clock_impl(clocks, false);
                     release_uart_mem_clk(clocks);
                 }
-            }
-            #[allow(unused_variables)]
-            pub fn mem_clock_config_frequency(
-                clocks: &mut ClockTree,
-                config: UartMemClockConfig,
-            ) -> u32 {
-                uart_mem_clk_frequency()
             }
             pub fn mem_clock_frequency(self) -> u32 {
                 uart_mem_clk_frequency()
@@ -3611,9 +3467,6 @@ macro_rules! define_clock_tree_types {
             refresh_system_pre_div_in_downstream(clocks);
             refresh_ref_tick_xtal_downstream(clocks);
             refresh_rtc_fast_clk_downstream(clocks);
-            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
-                refresh_uart_mem_clock_downstream(clocks, child_instance);
-            }
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
             }
@@ -3725,7 +3578,6 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
-        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_apb_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.apb_clk {
                 APB_CLK_FREQ_CACHE.store(
@@ -3733,17 +3585,11 @@ macro_rules! define_clock_tree_types {
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
-            for child_instance in [SdmInstance::GpioSd] {
-                refresh_sdm_function_clock_downstream(clocks, child_instance);
-            }
             for child_instance in [I2cInstance::I2c0, I2cInstance::I2c1] {
                 refresh_i2c_function_clock_downstream(clocks, child_instance);
             }
             for child_instance in [RmtInstance::Rmt] {
                 refresh_rmt_sclk_downstream(clocks, child_instance);
-            }
-            for child_instance in [SpiInstance::Spi2, SpiInstance::Spi3] {
-                refresh_spi_function_clock_downstream(clocks, child_instance);
             }
             for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
                 refresh_timg_function_clock_downstream(clocks, child_instance);
@@ -3769,7 +3615,6 @@ macro_rules! define_clock_tree_types {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
             }
         }
-        fn refresh_sdm_function_clock_downstream(clocks: &mut ClockTree, instance: SdmInstance) {}
         fn refresh_i2c_function_clock_downstream(clocks: &mut ClockTree, instance: I2cInstance) {
             if let Some(config) = clocks.i2c_function_clock[instance as usize] {
                 I2C_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
@@ -3786,7 +3631,6 @@ macro_rules! define_clock_tree_types {
                 );
             }
         }
-        fn refresh_spi_function_clock_downstream(clocks: &mut ClockTree, instance: SpiInstance) {}
         fn refresh_timg_function_clock_downstream(clocks: &mut ClockTree, instance: TimgInstance) {
             if let Some(config) = clocks.timg_function_clock[instance as usize] {
                 TIMG_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(

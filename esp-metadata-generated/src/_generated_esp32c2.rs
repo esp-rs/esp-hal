@@ -1103,15 +1103,6 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 ///
-///     fn configure_mem_clock_impl(
-///         self,
-///         _clocks: &mut ClockTree,
-///         _old_config: Option<UartMemClockConfig>,
-///         _new_config: UartMemClockConfig,
-///     ) {
-///         todo!()
-///     }
-///
 ///     // UART_BAUD_RATE_GENERATOR
 ///
 ///     fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
@@ -1464,18 +1455,6 @@ macro_rules! define_clock_tree_types {
                 self.div_num as u32
             }
         }
-        /// Configures the `UART0_MEM_CLOCK` clock node.
-        ///
-        /// The output is calculated as `OUTPUT = UART_MEM_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub struct UartMemClockConfig {}
-        impl UartMemClockConfig {
-            /// Creates a new configuration for the MEM_CLOCK clock node.
-            pub const fn new() -> Self {
-                Self {}
-            }
-        }
         /// Configures the `UART0_BAUD_RATE_GENERATOR` clock node.
         ///
         /// The output is calculated as `OUTPUT = (FUNCTION_CLOCK * 16) / (integral * 16 +
@@ -1537,7 +1516,6 @@ macro_rules! define_clock_tree_types {
             timg_function_clock: [Option<TimgFunctionClockConfig>; 1],
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 1],
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
-            uart_mem_clock: [Option<UartMemClockConfig>; 2],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 2],
             rc_fast_clk_refcount: u32,
             osc_slow_clk_refcount: u32,
@@ -1637,10 +1615,6 @@ macro_rules! define_clock_tree_types {
             pub fn uart0_function_clock(&self) -> Option<UartFunctionClockConfig> {
                 self.uart_function_clock[UartInstance::Uart0 as usize]
             }
-            /// Returns the current configuration of the UART0_MEM_CLOCK clock tree node
-            pub fn uart0_mem_clock(&self) -> Option<UartMemClockConfig> {
-                self.uart_mem_clock[UartInstance::Uart0 as usize]
-            }
             /// Returns the current configuration of the UART0_BAUD_RATE_GENERATOR clock tree node
             pub fn uart0_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart0 as usize]
@@ -1648,10 +1622,6 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the UART1_FUNCTION_CLOCK clock tree node
             pub fn uart1_function_clock(&self) -> Option<UartFunctionClockConfig> {
                 self.uart_function_clock[UartInstance::Uart1 as usize]
-            }
-            /// Returns the current configuration of the UART1_MEM_CLOCK clock tree node
-            pub fn uart1_mem_clock(&self) -> Option<UartMemClockConfig> {
-                self.uart_mem_clock[UartInstance::Uart1 as usize]
             }
             /// Returns the current configuration of the UART1_BAUD_RATE_GENERATOR clock tree node
             pub fn uart1_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
@@ -1678,7 +1648,6 @@ macro_rules! define_clock_tree_types {
                 timg_function_clock: [None; 1],
                 timg_wdt_clock: [None; 1],
                 uart_function_clock: [None; 2],
-                uart_mem_clock: [None; 2],
                 uart_baud_rate_generator: [None; 2],
                 rc_fast_clk_refcount: 0,
                 osc_slow_clk_refcount: 0,
@@ -3014,14 +2983,6 @@ macro_rules! define_clock_tree_types {
                     UartFunctionClockSclk::Xtal => xtal_clk_frequency(),
                 }
             }
-            pub fn configure_mem_clock(self, clocks: &mut ClockTree, config: UartMemClockConfig) {
-                let old_config = clocks.uart_mem_clock[self as usize].replace(config);
-                refresh_uart_mem_clock_downstream(clocks, self);
-                self.configure_mem_clock_impl(clocks, old_config, config);
-            }
-            pub fn mem_clock_config(self, clocks: &mut ClockTree) -> Option<UartMemClockConfig> {
-                clocks.uart_mem_clock[self as usize]
-            }
             pub fn request_mem_clock(self, clocks: &mut ClockTree) {
                 trace!("Requesting {:?}::MEM_CLOCK", self);
                 if increment_reference_count(&mut clocks.uart_mem_clock_refcount[self as usize]) {
@@ -3037,13 +2998,6 @@ macro_rules! define_clock_tree_types {
                     self.enable_mem_clock_impl(clocks, false);
                     release_uart_mem_clk(clocks);
                 }
-            }
-            #[allow(unused_variables)]
-            pub fn mem_clock_config_frequency(
-                clocks: &mut ClockTree,
-                config: UartMemClockConfig,
-            ) -> u32 {
-                uart_mem_clk_frequency()
             }
             pub fn mem_clock_frequency(self) -> u32 {
                 uart_mem_clk_frequency()
@@ -3194,7 +3148,6 @@ macro_rules! define_clock_tree_types {
             }
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
-                refresh_uart_mem_clock_downstream(clocks, child_instance);
             }
         }
         fn refresh_system_pre_div_in_downstream(clocks: &mut ClockTree) {
@@ -3328,7 +3281,6 @@ macro_rules! define_clock_tree_types {
             }
             refresh_uart_baud_rate_generator_downstream(clocks, instance);
         }
-        fn refresh_uart_mem_clock_downstream(clocks: &mut ClockTree, instance: UartInstance) {}
         fn refresh_uart_baud_rate_generator_downstream(
             clocks: &mut ClockTree,
             instance: UartInstance,
