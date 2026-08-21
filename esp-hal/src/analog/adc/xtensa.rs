@@ -2,13 +2,12 @@ use core::marker::PhantomData;
 
 #[cfg(esp32s3)]
 pub use self::calibration::*;
-use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
+use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation, SarAdcGuard};
 #[cfg(esp32s3)]
 use crate::efuse::AdcCalibUnit;
 use crate::{
     peripherals::{APB_SARADC, SENS},
     soc::regi2c,
-    system::{GenericPeripheralGuard, Peripheral},
 };
 
 mod calibration;
@@ -326,7 +325,7 @@ pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: ADC,
     active_channel: Option<u8>,
     last_init_code: u16,
-    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
+    _guard: SarAdcGuard,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
@@ -337,7 +336,7 @@ where
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
-        let guard = GenericPeripheralGuard::new();
+        let guard = SarAdcGuard::new();
         let sensors = SENS::regs();
 
         // Set attenuation for pins
