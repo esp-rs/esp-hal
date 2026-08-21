@@ -1458,14 +1458,6 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
-/// fn configure_spll_clk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<SpllClkConfig>,
-///     _new_config: SpllClkConfig,
-/// ) {
-///     todo!()
-/// }
-///
 /// // MPLL_CLK
 ///
 /// fn enable_mpll_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1911,23 +1903,6 @@ macro_rules! define_clock_tree_types {
                 match self {
                     CpllClkConfig::_360 => 360000000,
                     CpllClkConfig::_400 => 400000000,
-                }
-            }
-        }
-        /// Selects the output frequency of `SPLL_CLK`. Depends on `XTAL_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum SpllClkConfig {
-            /// 240 MHz
-            _240,
-            /// 480 MHz
-            _480,
-        }
-        impl SpllClkConfig {
-            pub fn value(&self) -> u32 {
-                match self {
-                    SpllClkConfig::_240 => 240000000,
-                    SpllClkConfig::_480 => 480000000,
                 }
             }
         }
@@ -2424,7 +2399,6 @@ macro_rules! define_clock_tree_types {
         /// Represents the device's clock tree.
         pub struct ClockTree {
             cpll_clk: Option<CpllClkConfig>,
-            spll_clk: Option<SpllClkConfig>,
             mpll_clk: Option<MpllClkConfig>,
             iomux_function_clock: Option<IomuxFunctionClockConfig>,
             cpu_root_clk: Option<CpuRootClkConfig>,
@@ -2478,10 +2452,6 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the CPLL_CLK clock tree node
             pub fn cpll_clk(&self) -> Option<CpllClkConfig> {
                 self.cpll_clk
-            }
-            /// Returns the current configuration of the SPLL_CLK clock tree node
-            pub fn spll_clk(&self) -> Option<SpllClkConfig> {
-                self.spll_clk
             }
             /// Returns the current configuration of the MPLL_CLK clock tree node
             pub fn mpll_clk(&self) -> Option<MpllClkConfig> {
@@ -2619,7 +2589,6 @@ macro_rules! define_clock_tree_types {
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
                 cpll_clk: None,
-                spll_clk: None,
                 mpll_clk: None,
                 iomux_function_clock: None,
                 cpu_root_clk: None,
@@ -2666,8 +2635,6 @@ macro_rules! define_clock_tree_types {
                 psram_function_clock_refcount: [0; 1],
             });
         static CPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
-            ::core::sync::atomic::AtomicU32::new(0);
-        static SPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static MPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -2748,14 +2715,6 @@ macro_rules! define_clock_tree_types {
         pub fn cpll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
         }
-        pub fn configure_spll_clk(clocks: &mut ClockTree, config: SpllClkConfig) {
-            let old_config = clocks.spll_clk.replace(config);
-            refresh_spll_clk_downstream(clocks);
-            configure_spll_clk_impl(clocks, old_config, config);
-        }
-        pub fn spll_clk_config(clocks: &mut ClockTree) -> Option<SpllClkConfig> {
-            clocks.spll_clk
-        }
         pub fn request_spll_clk(clocks: &mut ClockTree) {
             trace!("Requesting SPLL_CLK");
             if increment_reference_count(&mut clocks.spll_clk_refcount) {
@@ -2772,12 +2731,8 @@ macro_rules! define_clock_tree_types {
                 release_xtal_clk(clocks);
             }
         }
-        #[allow(unused_variables)]
-        pub fn spll_clk_config_frequency(clocks: &mut ClockTree, config: SpllClkConfig) -> u32 {
-            config.value()
-        }
         pub fn spll_clk_frequency() -> u32 {
-            SPLL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+            (480 * 1000000)
         }
         pub fn spll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
@@ -4330,8 +4285,6 @@ macro_rules! define_clock_tree_types {
         pub struct ClockConfig {
             /// `CPLL_CLK` configuration.
             pub cpll_clk: Option<CpllClkConfig>,
-            /// `SPLL_CLK` configuration.
-            pub spll_clk: Option<SpllClkConfig>,
             /// `MPLL_CLK` configuration.
             pub mpll_clk: Option<MpllClkConfig>,
             /// `IOMUX_FUNCTION_CLOCK` configuration.
@@ -4357,9 +4310,6 @@ macro_rules! define_clock_tree_types {
             fn apply(&self, clocks: &mut ClockTree) {
                 if let Some(config) = self.cpll_clk {
                     configure_cpll_clk(clocks, config);
-                }
-                if let Some(config) = self.spll_clk {
-                    configure_spll_clk(clocks, config);
                 }
                 if let Some(config) = self.mpll_clk {
                     configure_mpll_clk(clocks, config);
@@ -4414,40 +4364,6 @@ macro_rules! define_clock_tree_types {
             refresh_timg_calibration_clock_downstream(clocks);
             for child_instance in [MipiDsiInstance::MipiDsi] {
                 refresh_mipi_dsi_phy_pll_refclk_downstream(clocks, child_instance);
-            }
-            for child_instance in [PsramInstance::Psram] {
-                refresh_psram_function_clock_downstream(clocks, child_instance);
-            }
-        }
-        fn refresh_spll_clk_downstream(clocks: &mut ClockTree) {
-            if let Some(config) = clocks.spll_clk {
-                SPLL_CLK_FREQ_CACHE.store(
-                    spll_clk_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-            refresh_iomux_function_clock_downstream(clocks);
-            refresh_timg_calibration_clock_downstream(clocks);
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                refresh_timg_function_clock_downstream(clocks, child_instance);
-                refresh_timg_wdt_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [
-                UartInstance::Uart0,
-                UartInstance::Uart1,
-                UartInstance::Uart2,
-                UartInstance::Uart3,
-                UartInstance::Uart4,
-            ] {
-                refresh_uart_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [SpiInstance::Spi2, SpiInstance::Spi3] {
-                refresh_spi_function_clock_downstream(clocks, child_instance);
-            }
-            for child_instance in [MipiDsiInstance::MipiDsi] {
-                refresh_mipi_dsi_dpi_clk_downstream(clocks, child_instance);
-                refresh_mipi_dsi_phy_pll_refclk_downstream(clocks, child_instance);
-                refresh_mipi_dsi_phy_cfg_clk_downstream(clocks, child_instance);
             }
             for child_instance in [PsramInstance::Psram] {
                 refresh_psram_function_clock_downstream(clocks, child_instance);
@@ -4657,12 +4573,12 @@ macro_rules! implement_peripheral_clocks {
         #[repr(u8)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum Peripheral {
-            /// ADC peripheral clock signal
-            Adc,
             /// AES peripheral clock signal
             Aes,
             /// AHB_GDMA peripheral clock signal
             AhbGdma,
+            /// APB_SAR_ADC peripheral clock signal
+            ApbSarAdc,
             /// AXI_GDMA peripheral clock signal
             AxiGdma,
             /// DS peripheral clock signal
@@ -4758,9 +4674,9 @@ macro_rules! implement_peripheral_clocks {
             ];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
-                Self::Adc,
                 Self::Aes,
                 Self::AhbGdma,
+                Self::ApbSarAdc,
                 Self::AxiGdma,
                 Self::Ds,
                 Self::Ecc,
@@ -4807,11 +4723,6 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
             match peripheral {
-                Peripheral::Adc => {
-                    crate::peripherals::HP_SYS_CLKRST::regs()
-                        .soc_clk_ctrl2()
-                        .modify(|_, w| w.adc_apb_clk_en().bit(enable));
-                }
                 Peripheral::Aes => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl1()
@@ -4821,6 +4732,14 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .soc_clk_ctrl1()
                         .modify(|_, w| w.ahb_pdma_sys_clk_en().bit(enable));
+                }
+                Peripheral::ApbSarAdc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .soc_clk_ctrl2()
+                        .modify(|_, w| w.adc_apb_clk_en().bit(enable));
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .peri_clk_ctrl23()
+                        .modify(|_, w| w.adc_clk_en().bit(enable));
                 }
                 Peripheral::AxiGdma => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -5062,11 +4981,6 @@ macro_rules! implement_peripheral_clocks {
         }
         unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
             match peripheral {
-                Peripheral::Adc => {
-                    crate::peripherals::HP_SYS_CLKRST::regs()
-                        .hp_rst_en2()
-                        .modify(|_, w| w.rst_en_adc().bit(reset));
-                }
                 Peripheral::Aes => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .hp_rst_en2()
@@ -5076,6 +4990,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .hp_rst_en1()
                         .modify(|_, w| w.rst_en_ahb_pdma().bit(reset));
+                }
+                Peripheral::ApbSarAdc => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .hp_rst_en2()
+                        .modify(|_, w| w.rst_en_adc().bit(reset));
                 }
                 Peripheral::AxiGdma => {
                     crate::peripherals::HP_SYS_CLKRST::regs()

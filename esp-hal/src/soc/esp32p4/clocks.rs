@@ -53,7 +53,6 @@ impl CpuClock {
     const PRESET_400: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpll_clk: Some(CpllClkConfig::_400),
-        spll_clk: Some(SpllClkConfig::_480),
         mpll_clk: Some(MpllClkConfig::_500),
         cpu_clk: Some(CpuClkConfig::new(0)), // /1 = 400 MHz
         mem_clk: Some(MemClkConfig::new(1)), // /2 = 200 MHz
@@ -73,7 +72,6 @@ impl CpuClock {
     const PRESET_200: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpll_clk: Some(CpllClkConfig::_400),
-        spll_clk: Some(SpllClkConfig::_480),
         mpll_clk: Some(MpllClkConfig::_500),
         cpu_clk: Some(CpuClkConfig::new(1)), // /2 = 200 MHz
         mem_clk: Some(MemClkConfig::new(0)), // /1 = 200 MHz
@@ -91,7 +89,6 @@ impl CpuClock {
     const PRESET_100: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpll_clk: Some(CpllClkConfig::_400),
-        spll_clk: Some(SpllClkConfig::_480),
         mpll_clk: Some(MpllClkConfig::_500),
         cpu_clk: Some(CpuClkConfig::new(3)), // /4 = 100 MHz
         mem_clk: Some(MemClkConfig::new(0)), // /1 = 100 MHz
@@ -157,6 +154,13 @@ fn configure_cpll_clk_impl(
     _old_config: Option<CpllClkConfig>,
     new_config: CpllClkConfig,
 ) {
+    // Calibration starts before the analog configuration is written, and stops
+    // after the PLL reports that calibration ended.
+    // Ref: IDF rtc_clk_cpll_configure (esp32p4).
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
+
     // div7_0 = (freq_mhz / 40) - 1
     let div7_0: u8 = match new_config {
         CpllClkConfig::_360 => 9,
@@ -170,10 +174,6 @@ fn configure_cpll_clk_impl(
     regi2c::I2C_CPLL_OC_DIV_7_0.write_reg(div7_0);
     regi2c::I2C_CPLL_OC_DCUR.write_reg(dcur);
 
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
-
     // Wait for calibration to complete
     while !HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
@@ -184,60 +184,18 @@ fn configure_cpll_clk_impl(
         core::hint::spin_loop();
     }
 
-    // Stop calibration: set cpu_pll_cal_stop = 1
+    // Wait for true stop
+    crate::rom::ets_delay_us(10);
+
     HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
-
-    // Small delay for PLL to stabilize
-    crate::rom::ets_delay_us(10);
 }
 
 // SPLL_CLK
 
 fn enable_spll_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // PLLs are always on, for now
-}
-
-fn configure_spll_clk_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<SpllClkConfig>,
-    new_config: SpllClkConfig,
-) {
-    // div7_0 = (freq_mhz / 40) - 1
-    let div7_0: u8 = match new_config {
-        SpllClkConfig::_480 => 11,
-        SpllClkConfig::_240 => 5,
-    };
-
-    // Same OC_REF_DIV and OC_DCUR values as CPLL
-    let lref: u8 = 0x50; // dchgp=5, div_ref=0, oc_enb_fcal=0
-    let dcur: u8 = 0x73; // dlref_sel=1, dhref_sel=3, dcur=3
-
-    regi2c::I2C_SPLL_OC_REF_DIV.write_reg(lref);
-    regi2c::I2C_SPLL_OC_DIV_7_0.write_reg(div7_0);
-    regi2c::I2C_SPLL_OC_DCUR.write_reg(dcur);
-
-    // Run SPLL calibration
-    //      HP_SYS_CLKRST.ana_pll_ctrl0.sys_pll_cal_stop
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.sys_pll_cal_stop().clear_bit());
-
-    while !HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .read()
-        .sys_pll_cal_end()
-        .bit_is_set()
-    {
-        core::hint::spin_loop();
-    }
-
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.sys_pll_cal_stop().set_bit());
-
-    crate::rom::ets_delay_us(10);
 }
 
 // MPLL_CLK
@@ -251,6 +209,13 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
     if !en {
         return;
     }
+
+    // Calibration starts before the analog configuration is written, and stops
+    // after the PLL reports that calibration ended.
+    // Ref: IDF clk_ll_mpll_set_config_v1 (esp32p4).
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.mspi_cal_stop().clear_bit());
 
     regi2c::I2C_MPLL_DHREF_DHREF.write_field(3);
 
@@ -267,10 +232,6 @@ fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
     };
     let div_val: u8 = (div << 3) | ref_div;
     regi2c::I2C_MPLL_DIV_REG_ADDR.write_reg(div_val);
-
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.mspi_cal_stop().clear_bit());
 
     while HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
