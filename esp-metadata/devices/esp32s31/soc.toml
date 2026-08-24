@@ -103,7 +103,7 @@ peripherals = [
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
     { name = "UART3", interrupts = { peri = "UART3" }, clock_group = "UART", stable = true },
     { name = "UHCI0" },
-    { name = "USB_DEVICE" },
+    { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "USB_HS", pac = "USB_OTG_HS", interrupts = { peri = "USB_OTG_HS" } },
 
     { name = "ADC1", virtual = true },
@@ -381,6 +381,9 @@ instances = [
     { name = "adc2" },
 ]
 
+[device.usb_serial_jtag]
+support_status = "partial"
+
 # Peripherals the chip has, that no driver reaches yet.
 [device.avc]
 support_status = "not_supported"
@@ -423,8 +426,6 @@ support_status = "not_supported"
 support_status = "partial"
 combined_uart_selector_field = true
 [device.ulp_riscv]
-support_status = "not_supported"
-[device.usb_serial_jtag]
 support_status = "not_supported"
 
 [device.rmt]

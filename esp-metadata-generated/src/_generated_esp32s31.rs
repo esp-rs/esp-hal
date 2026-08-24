@@ -3834,11 +3834,14 @@ macro_rules! implement_peripheral_clocks {
             Uart3,
             /// UHCI0 peripheral clock signal
             Uhci0,
+            /// USB_DEVICE peripheral clock signal
+            UsbDevice,
             /// USB_HS peripheral clock signal
             UsbHs,
         }
         impl Peripheral {
-            const KEEP_ENABLED: &[Peripheral] = &[Self::Systimer, Self::Timg0, Self::Uart0];
+            const KEEP_ENABLED: &[Peripheral] =
+                &[Self::Systimer, Self::Timg0, Self::Uart0, Self::UsbDevice];
             const COUNT: usize = Self::ALL.len();
             const ALL: &[Self] = &[
                 Self::Aes,
@@ -3863,6 +3866,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Uart2,
                 Self::Uart3,
                 Self::Uhci0,
+                Self::UsbDevice,
                 Self::UsbHs,
             ];
         }
@@ -3977,6 +3981,14 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .uhci_ctrl0()
                         .modify(|_, w| w.sys_clk_en().bit(enable).apb_clk_en().bit(enable));
+                }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .usb_device_ctrl0()
+                        .modify(|_, w| w.apb_clk_en().bit(enable));
+                    crate::peripherals::CNNT_SYS::regs()
+                        .sys_hp_usb_device_ctrl()
+                        .modify(|_, w| w.sys_usb_device_48m_clk_en().bit(enable));
                 }
                 Peripheral::UsbHs => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -4094,6 +4106,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .uhci_ctrl0()
                         .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::UsbDevice => {
+                    crate::peripherals::CNNT_SYS::regs()
+                        .sys_hp_usb_device_ctrl()
+                        .modify(|_, w| w.sys_usb_device_rst_en().bit(reset));
                 }
                 Peripheral::UsbHs => {
                     let _ = reset;
@@ -4666,11 +4683,13 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt })));
         _for_each_inner_peripheral!((@ peri_type #[doc = "UHCI0 peripheral singleton"]
         UHCI0 <= UHCI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "USB_HS peripheral singleton"]
-        USB_HS <= USB_OTG_HS(USB_OTG_HS : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)));
+        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "USB_HS peripheral singleton"] USB_HS <= USB_OTG_HS(USB_OTG_HS : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "ADC2 peripheral singleton"]
         ADC2 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
@@ -5089,23 +5108,24 @@ macro_rules! for_each_peripheral {
         peri_type #[doc = "UART3 peripheral singleton"] UART3 <= UART3(UART3 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
         peri_type #[doc = "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)), (@
-        peri_type #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE()
-        (unstable)), (@ peri_type #[doc = "USB_HS peripheral singleton"] USB_HS <=
-        USB_OTG_HS(USB_OTG_HS : { bind_peri_interrupt, enable_peri_interrupt,
+        peri_type #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE <=
+        USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
-        "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)), (@ peri_type #[doc =
-        "ADC2 peripheral singleton"] ADC2 <= virtual() (unstable)), (@ peri_type #[doc =
-        "FLASH peripheral singleton"] FLASH <= virtual() (unstable)), (@ peri_type #[doc
-        = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)), (@ peri_type
-        #[doc = "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual()
-        (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"] CPU_CTRL <=
+        "USB_HS peripheral singleton"] USB_HS <= USB_OTG_HS(USB_OTG_HS : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "ADC1 peripheral singleton"] ADC1 <= virtual()
+        (unstable)), (@ peri_type #[doc = "ADC2 peripheral singleton"] ADC2 <= virtual()
+        (unstable)), (@ peri_type #[doc = "FLASH peripheral singleton"] FLASH <=
+        virtual() (unstable)), (@ peri_type #[doc = "PSRAM peripheral singleton"] PSRAM
+        <= virtual() (unstable)), (@ peri_type #[doc =
+        "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)),
+        (@ peri_type #[doc = "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual()
+        (unstable)), (@ peri_type #[doc = "FROM_CPU_INTR0 peripheral singleton"]
+        FROM_CPU_INTR0 <= virtual() (unstable)), (@ peri_type #[doc =
+        "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)),
+        (@ peri_type #[doc = "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <=
         virtual() (unstable)), (@ peri_type #[doc =
-        "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual() (unstable)),
-        (@ peri_type #[doc = "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <=
-        virtual() (unstable)), (@ peri_type #[doc =
-        "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <= virtual() (unstable)),
-        (@ peri_type #[doc = "FROM_CPU_INTR3 peripheral singleton"] FROM_CPU_INTR3 <=
-        virtual() (unstable))));
+        "FROM_CPU_INTR3 peripheral singleton"] FROM_CPU_INTR3 <= virtual() (unstable))));
         _for_each_inner_peripheral!((singletons(#[cfg(not(use_xtal32k))] GPIO0),
         (#[cfg(not(use_xtal32k))] GPIO1), (GPIO2), (GPIO3), (GPIO4), (GPIO5), (GPIO6),
         (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14),

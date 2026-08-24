@@ -156,6 +156,12 @@ peripheral_clocks = { templates = [
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     # USB
     { name = "UsbHs", template_params = { peripheral = "usb_otghs", rst_template = "{{no_rst}}" } },
+    # APB gate in HP_SYS_CLKRST; 48 MHz PHY clock and reset in CNNT_SYS.
+    { name = "UsbDevice", template_params = {
+        clk_en = "{{apb_clk}}",
+        clk_en_template = "{{default_clk_template}} crate::peripherals::CNNT_SYS::regs().sys_hp_usb_device_ctrl().modify(|_, w| w.sys_usb_device_48m_clk_en().bit(enable));",
+        rst_template = "crate::peripherals::CNNT_SYS::regs().sys_hp_usb_device_ctrl().modify(|_, w| w.sys_usb_device_rst_en().bit(reset));"
+    }, keep_enabled = true },
     # Crypto - there is a crypto_clk_en bit as well, luckily it starts as 1
     { name = "Aes", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Ecc", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
