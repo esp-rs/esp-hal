@@ -486,7 +486,11 @@ fn head_spec(upstream_url: &str, branch_name: &str) -> Result<String> {
     }
 }
 
-fn gh_stdin(args: &[&str], stdin_data: &str) -> Result<String> {
+/// Spawn `gh` with `args`, feed `stdin_data` to its stdin, and return the raw
+/// output. A non-zero exit is *not* treated as an error here so callers can
+/// inspect stderr (e.g. to detect "a pull request already exists"). Callers
+/// that only care about success should use [`gh_stdin`].
+fn gh_run(args: &[&str], stdin_data: &str) -> Result<std::process::Output> {
     use std::io::Write;
 
     let mut child = Command::new("gh")
@@ -504,9 +508,13 @@ fn gh_stdin(args: &[&str], stdin_data: &str) -> Result<String> {
         .write_all(stdin_data.as_bytes())
         .context("Failed to write stdin to gh")?;
 
-    let out = child
+    child
         .wait_with_output()
-        .with_context(|| format!("`gh {}` failed", args.join(" ")))?;
+        .with_context(|| format!("`gh {}` failed", args.join(" ")))
+}
+
+fn gh_stdin(args: &[&str], stdin_data: &str) -> Result<String> {
+    let out = gh_run(args, stdin_data)?;
     if !out.status.success() {
         bail!(
             "`gh {}` failed: {}",
@@ -547,64 +555,100 @@ fn find_existing_pr(branch_name: &str) -> Result<Option<u64>> {
         .and_then(|n| n.as_u64()))
 }
 
-fn upsert_pull_request(branch: &Branch, plan: &Plan, body: &str) -> Result<u64> {
-    let title = release_subject(plan);
-    if let Some(num) = find_existing_pr(&branch.name)? {
-        log::info!("Updating existing release PR #{num}");
-        let num_str = num.to_string();
-        gh_stdin(
-            &[
-                "pr",
-                "edit",
-                &num_str,
-                "--repo",
-                UPSTREAM_REPO,
-                "--title",
-                &title,
-                "--body-file",
-                "-",
-            ],
-            body,
-        )?;
-        Ok(num)
-    } else {
-        let head = head_spec(&branch.upstream, &branch.name)?;
-        log::info!("Creating release PR (head: {head}, base: {})", plan.base);
-        let mut args: Vec<&str> = vec![
+/// Extract the numeric PR id from any text containing a `.../pull/<n>` URL.
+///
+/// Works for both the URL `gh pr create` prints on success and the
+/// "...already exists: <url>" message it prints on failure. A `/pull/new/...`
+/// URL (as produced by `git push`) has no number and yields `None`.
+fn parse_pr_number(text: &str) -> Option<u64> {
+    let start = text.rfind("/pull/")? + "/pull/".len();
+    let digits: String = text[start..]
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    digits.parse().ok()
+}
+
+/// Update the title and body of an existing release PR, leaving labels and
+/// reviewers untouched.
+fn edit_release_pr(number: u64, title: &str, body: &str) -> Result<()> {
+    let number = number.to_string();
+    gh_stdin(
+        &[
             "pr",
-            "create",
+            "edit",
+            &number,
             "--repo",
             UPSTREAM_REPO,
-            "--base",
-            &plan.base,
-            "--head",
-            &head,
             "--title",
-            &title,
-        ];
-        for l in PR_LABELS {
-            args.push("--label");
-            args.push(l);
-        }
-        args.push("--body-file");
-        args.push("-");
-        let stdout = gh_stdin(&args, body)?;
-        // `gh pr create` prints the PR URL as the last line of stdout.
-        let url = stdout
-            .lines()
-            .rev()
-            .map(str::trim)
-            .find(|l| !l.is_empty())
-            .unwrap_or("");
-        let num = url
-            .rsplit('/')
-            .next()
-            .and_then(|s| s.parse::<u64>().ok())
-            .with_context(|| {
-                format!("Failed to parse PR number from `gh pr create` output: {url}")
-            })?;
-        Ok(num)
+            title,
+            "--body-file",
+            "-",
+        ],
+        body,
+    )?;
+    Ok(())
+}
+
+fn upsert_pull_request(branch: &Branch, plan: &Plan, body: &str) -> Result<u64> {
+    let title = release_subject(plan);
+
+    // Reuse an existing open release PR when we can find one, so re-running the
+    // release edits the same PR instead of opening (and re-labelling) another.
+    if let Some(num) = find_existing_pr(&branch.name)? {
+        log::info!("Updating existing release PR #{num}");
+        edit_release_pr(num, &title, body)?;
+        return Ok(num);
     }
+
+    let head = head_spec(&branch.upstream, &branch.name)?;
+    log::info!("Creating release PR (head: {head}, base: {})", plan.base);
+    let mut args: Vec<&str> = vec![
+        "pr",
+        "create",
+        "--repo",
+        UPSTREAM_REPO,
+        "--base",
+        &plan.base,
+        "--head",
+        &head,
+        "--title",
+        &title,
+    ];
+    // Labels are applied only when the PR is first created. A maintainer may
+    // later remove one to skip its optional CI check, so the edit path above
+    // deliberately never re-applies them.
+    for l in PR_LABELS {
+        args.push("--label");
+        args.push(l);
+    }
+    args.push("--body-file");
+    args.push("-");
+
+    let out = gh_run(&args, body)?;
+    if out.status.success() {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        return parse_pr_number(&stdout).with_context(|| {
+            format!("Failed to parse PR number from `gh pr create` output: {stdout}")
+        });
+    }
+
+    // GitHub's PR listing lags for a moment after the branch is pushed, so
+    // `find_existing_pr` can miss a PR that actually exists and we land here on
+    // a re-run. `gh pr create` then fails with "a pull request ... already
+    // exists: <url>". Recover by editing that PR instead of bailing: letting
+    // `gh pr create` run a second time is what re-applied every release label
+    // and re-requested reviews, showing up as duplicated PR timeline entries.
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if stderr.contains("already exists")
+        && let Some(num) = parse_pr_number(&stderr)
+    {
+        log::info!("Release PR #{num} already exists - updating it instead of opening a duplicate");
+        edit_release_pr(num, &title, body)?;
+        return Ok(num);
+    }
+
+    bail!("`gh pr create` failed: {stderr}");
 }
 
 fn print_manual_instructions(branch: &Branch, plan: &Plan, body: &str) -> Result<()> {
@@ -667,6 +711,29 @@ branch 'foo' set up to track 'origin/foo'.
 
         let url = extract_url_from_push(message);
         assert_eq!(url, "https://github.com/bugadani/esp-hal/pull/new/foo");
+    }
+
+    #[test]
+    fn parse_pr_number_from_create_and_already_exists() {
+        // `gh pr create` success: bare PR URL on stdout.
+        assert_eq!(
+            parse_pr_number("https://github.com/esp-rs/esp-hal/pull/1234\n"),
+            Some(1234)
+        );
+
+        // `gh pr create` failure when the PR already exists: the number must be
+        // recovered from the message so we can edit instead of duplicating.
+        let stderr = "a pull request for branch \"release-branch-t9telr\" into branch \"main\" \
+             already exists:\nhttps://github.com/esp-rs/esp-hal/pull/6190\n";
+        assert_eq!(parse_pr_number(stderr), Some(6190));
+
+        // A `/pull/new/<branch>` URL (from `git push`) carries no PR number.
+        assert_eq!(
+            parse_pr_number("https://github.com/esp-rs/esp-hal/pull/new/release-branch-x"),
+            None
+        );
+
+        assert_eq!(parse_pr_number("no pull url here"), None);
     }
 
     #[test]
