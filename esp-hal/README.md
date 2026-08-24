@@ -105,7 +105,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | CANFD           |       |          |          | [❌][5163] [^1] |          |           |          |          |          |          | ❌        |
 | USB OTG FS      |       |          |          |          |          |           |          | ⚒️      | ⚒️      | ⚒️      |           |
 | USB OTG HS      |       |          |          |          |          |           |          | ⚒️      |          |          | ⚒️       |
-| USB Serial/JTAG |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          | ⚒️      | ❌        |
+| USB Serial/JTAG |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          | ⚒️      | ⚒️       |
 
 ### Wireless and networking
 
