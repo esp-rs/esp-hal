@@ -1,10 +1,22 @@
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use portable_atomic::{AtomicU32, Ordering};
+use procmacros::{handler, ram};
 
 pub use self::calibration::*;
 use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
 use crate::{
+    Async,
+    Blocking,
+    asynch::AtomicWaker,
     efuse::AdcCalibUnit,
-    peripherals::{APB_SARADC, SENS},
+    interrupt::{InterruptConfigurable, InterruptHandler},
+    peripherals::{APB_SARADC, Interrupt, LPWR, SENS},
+    rtc_cntl::WakeLock,
     soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
 };
@@ -150,6 +162,10 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 
     fn start_sample() {
+        // ADC1 must be idle before a new software trigger. See
+        // https://github.com/espressif/esp-idf/blob/v5.5/components/esp_hal_ana_conv/esp32s3/include/hal/adc_ll.h
+        while meas1_busy() {}
+
         SENS::regs()
             .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_sar().set_bit());
@@ -190,10 +206,21 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
         let sensors = SENS::regs();
 
         adc.int_clr().write(|w| w.adc1_done().clear_bit_by_one());
+        LPWR::regs()
+            .int_clr()
+            .write(|w| w.saradc1().clear_bit_by_one());
 
         sensors
             .sar_meas1_ctrl2()
             .modify(|_, w| w.meas1_start_sar().clear_bit());
+    }
+}
+
+fn meas1_busy() -> bool {
+    let status = SENS::regs().sar_slave_addr1().read();
+    cfg_select! {
+        esp32s3 => status.sar_saradc_meas_status().bits() != 0,
+        _ => status.meas_status().bits() != 0,
     }
 }
 
@@ -297,6 +324,9 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
         let sensors = SENS::regs();
 
         adc.int_clr().write(|w| w.adc2_done().clear_bit_by_one());
+        LPWR::regs()
+            .int_clr()
+            .write(|w| w.saradc2().clear_bit_by_one());
 
         sensors
             .sar_meas2_ctrl2()
@@ -330,7 +360,7 @@ pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
-impl<'d, ADCX> Adc<'d, ADCX, crate::Blocking>
+impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
@@ -400,6 +430,24 @@ where
         }
     }
 
+    /// Reconfigures the ADC driver to operate in asynchronous mode.
+    pub fn into_async(mut self) -> Adc<'d, ADCX, Async> {
+        acquire_async_adc();
+        self.set_interrupt_handler(adc_interrupt_handler);
+
+        // Reset interrupt flags and the start bit so both ADC units start from a
+        // known state in async mode.
+        ADCX::reset();
+
+        Adc {
+            _adc: self._adc,
+            active_channel: self.active_channel,
+            last_init_code: self.last_init_code,
+            _guard: self._guard,
+            _phantom: PhantomData,
+        }
+    }
+
     /// Start and wait for a conversion on the specified pin and return the
     /// result
     pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
@@ -465,7 +513,33 @@ where
 
         Ok(converted_value)
     }
+}
 
+fn adc_interrupt_sources() -> [Interrupt; 2] {
+    // Oneshot conversion uses the RTC SAR controller. Completion is signalled on
+    // RTC_CORE (`RTC_CNTL` SARADCn). APB_ADC is bound as well for the digital
+    // `APB_SARADC_ADCn_DONE` bits.
+    [Interrupt::APB_ADC, Interrupt::RTC_CORE]
+}
+
+impl<ADCX> crate::private::Sealed for Adc<'_, ADCX, Blocking> {}
+
+impl<ADCX> InterruptConfigurable for Adc<'_, ADCX, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        for interrupt in adc_interrupt_sources() {
+            for core in crate::system::Cpu::other() {
+                crate::interrupt::disable(core, interrupt);
+            }
+            crate::interrupt::bind_handler(interrupt, handler);
+        }
+    }
+}
+
+impl<'d, ADCX, Dm> Adc<'d, ADCX, Dm>
+where
+    ADCX: RegisterAccess + 'd,
+    Dm: crate::DriverMode,
+{
     fn start_sample<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>)
     where
         PIN: AdcChannel,
@@ -483,6 +557,230 @@ where
 
         ADCX::clear_start_sample();
         ADCX::start_sample();
+    }
+}
+
+impl<'d, ADCX> Adc<'d, ADCX, Async>
+where
+    ADCX: RegisterAccess + 'd,
+{
+    /// Creates a new instance in [`Blocking`] mode.
+    pub fn into_blocking(self) -> Adc<'d, ADCX, Blocking> {
+        if release_async_adc() {
+            // Disable ADC interrupt on all cores if the last async ADC instance is disabled
+            for interrupt in adc_interrupt_sources() {
+                for cpu in crate::system::Cpu::all() {
+                    crate::interrupt::disable(cpu, interrupt);
+                }
+            }
+        }
+        Adc {
+            _adc: self._adc,
+            active_channel: self.active_channel,
+            last_init_code: self.last_init_code,
+            _guard: self._guard,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Starts a conversion on the specified pin and waits until it completes.
+    ///
+    /// This method takes an [`AdcPin`] reference, as it is expected that the
+    /// ADC will be able to sample whatever channel underlies the pin.
+    pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
+    where
+        ADCX: Instance,
+        PIN: AdcChannel,
+        CS: AdcCalScheme<ADCX>,
+    {
+        self.start_sample(pin);
+
+        AdcFuture::new(self).await;
+
+        let converted_value = ADCX::read_data();
+        ADCX::reset();
+
+        pin.cal_scheme.adc_val(converted_value)
+    }
+}
+
+static ASYNC_ADC_COUNT: AtomicU32 = AtomicU32::new(0);
+
+fn acquire_async_adc() {
+    ASYNC_ADC_COUNT.fetch_add(1, Ordering::Relaxed);
+}
+
+fn release_async_adc() -> bool {
+    ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
+}
+
+#[handler]
+#[ram]
+fn adc_interrupt_handler() {
+    let apb_status = APB_SARADC::regs().int_st().read();
+    let rtc_status = LPWR::regs().int_st().read();
+
+    if apb_status.adc1_done().bit_is_set() || rtc_status.saradc1().bit_is_set() {
+        unsafe { handle_async(crate::peripherals::ADC1::steal()) }
+    }
+
+    if apb_status.adc2_done().bit_is_set() || rtc_status.saradc2().bit_is_set() {
+        unsafe { handle_async(crate::peripherals::ADC2::steal()) }
+    }
+}
+
+fn handle_async<ADCX: Instance>(_instance: ADCX) {
+    ADCX::clear_interrupt();
+    ADCX::unlisten();
+    ADCX::waker().wake();
+}
+
+/// Enable asynchronous access.
+pub trait Instance: crate::private::Sealed {
+    /// Enable the ADC interrupt
+    fn listen();
+
+    /// Disable the ADC interrupt
+    fn unlisten();
+
+    /// Clear the ADC interrupt
+    fn clear_interrupt();
+
+    /// Obtain the waker for the ADC interrupt
+    fn waker() -> &'static AtomicWaker;
+}
+
+impl Instance for crate::peripherals::ADC1<'_> {
+    fn listen() {
+        APB_SARADC::regs()
+            .int_ena()
+            .modify(|_, w| w.adc1_done().set_bit());
+
+        SENS::regs().sar_reader1_ctrl().modify(|_, w| {
+            cfg_select! {
+                esp32s3 => w.sar_sar1_int_en().set_bit(),
+                _ => w.sar1_int_en().set_bit(),
+            }
+        });
+
+        LPWR::regs().int_ena().modify(|_, w| w.saradc1().set_bit());
+    }
+
+    fn unlisten() {
+        APB_SARADC::regs()
+            .int_ena()
+            .modify(|_, w| w.adc1_done().clear_bit());
+
+        SENS::regs().sar_reader1_ctrl().modify(|_, w| {
+            cfg_select! {
+                esp32s3 => w.sar_sar1_int_en().clear_bit(),
+                _ => w.sar1_int_en().clear_bit(),
+            }
+        });
+
+        LPWR::regs()
+            .int_ena()
+            .modify(|_, w| w.saradc1().clear_bit());
+    }
+
+    fn clear_interrupt() {
+        APB_SARADC::regs()
+            .int_clr()
+            .write(|w| w.adc1_done().clear_bit_by_one());
+        LPWR::regs()
+            .int_clr()
+            .write(|w| w.saradc1().clear_bit_by_one());
+    }
+
+    fn waker() -> &'static AtomicWaker {
+        static WAKER: AtomicWaker = AtomicWaker::new();
+
+        &WAKER
+    }
+}
+
+impl Instance for crate::peripherals::ADC2<'_> {
+    fn listen() {
+        APB_SARADC::regs()
+            .int_ena()
+            .modify(|_, w| w.adc2_done().set_bit());
+
+        SENS::regs().sar_reader2_ctrl().modify(|_, w| {
+            cfg_select! {
+                esp32s3 => w.sar_sar2_int_en().set_bit(),
+                _ => w.sar2_int_en().set_bit(),
+            }
+        });
+
+        LPWR::regs().int_ena().modify(|_, w| w.saradc2().set_bit());
+    }
+
+    fn unlisten() {
+        APB_SARADC::regs()
+            .int_ena()
+            .modify(|_, w| w.adc2_done().clear_bit());
+
+        SENS::regs().sar_reader2_ctrl().modify(|_, w| {
+            cfg_select! {
+                esp32s3 => w.sar_sar2_int_en().clear_bit(),
+                _ => w.sar2_int_en().clear_bit(),
+            }
+        });
+
+        LPWR::regs()
+            .int_ena()
+            .modify(|_, w| w.saradc2().clear_bit());
+    }
+
+    fn clear_interrupt() {
+        APB_SARADC::regs()
+            .int_clr()
+            .write(|w| w.adc2_done().clear_bit_by_one());
+        LPWR::regs()
+            .int_clr()
+            .write(|w| w.saradc2().clear_bit_by_one());
+    }
+
+    fn waker() -> &'static AtomicWaker {
+        static WAKER: AtomicWaker = AtomicWaker::new();
+
+        &WAKER
+    }
+}
+
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+struct AdcFuture<ADCX: Instance> {
+    phantom: PhantomData<ADCX>,
+    _wake_lock: WakeLock,
+}
+
+impl<ADCX: Instance> AdcFuture<ADCX> {
+    fn new(_self: &Adc<'_, ADCX, Async>) -> Self {
+        ADCX::listen();
+        Self {
+            phantom: PhantomData,
+            _wake_lock: WakeLock::new(),
+        }
+    }
+}
+
+impl<ADCX: Instance + RegisterAccess> core::future::Future for AdcFuture<ADCX> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        ADCX::waker().register(cx.waker());
+        if ADCX::is_done() {
+            ADCX::clear_interrupt();
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+impl<ADCX: Instance> Drop for AdcFuture<ADCX> {
+    fn drop(&mut self) {
+        ADCX::unlisten();
     }
 }
 

@@ -6,7 +6,7 @@
 
 // The ESP32-S31 is excluded because this example calibrates the pin, and no
 // calibration scheme is implemented for that chip.
-//% CHIP_FILTER: adc_driver_supported && !esp32 && !esp32s2 && !esp32s3 && !esp32s31
+//% CHIP_FILTER: adc_driver_supported && !esp32 && !esp32s31
 
 #![no_std]
 #![no_main]
