@@ -66,6 +66,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
+    { name = "LCD_CAM", interrupts = { peri = "LCD_CAM" }, clock_group = "LCD_CAM" },
     { name = "IOMUX_MSPI_PIN", hidden = true },
     { name = "LP_AON_CLK_RST", pac = "LP_AON_CLKRST" },
     { name = "LP_APM" },
@@ -299,9 +300,9 @@ engines = [
         name = "AXI_GDMA",
         max_priority = 15,
         burst_sizes = [8, 16, 32, 64, 128],
-        drivers = ["spi_master", "spi_slave", "aes"],
+        drivers = ["spi_master", "spi_slave", "aes", "lcd_cam"],
         peripheral_instances = [
-            # LCD_CAM
+            { name = "LCD_CAM", dma_id = 0 },
             { name = "SPI2", dma_id = 1 },
             { name = "SPI3", dma_id = 2 },
             # PARL_IO
@@ -388,12 +389,13 @@ instances = [
 [device.usb_serial_jtag]
 support_status = "partial"
 
+[device.camera]
+support_status = "partial"
+
 # Peripherals the chip has, that no driver reaches yet.
 [device.avc]
 support_status = "not_supported"
 [device.bit_scrambler]
-support_status = "not_supported"
-[device.camera]
 support_status = "not_supported"
 [device.dac]
 support_status = "not_supported"
@@ -449,7 +451,8 @@ support_status = "not_supported"
 [device.pcnt]
 support_status = "not_supported"
 [device.rgb_display]
-support_status = "not_supported"
+support_status = "partial"
+output_lines = 24
 
 [device.sdm]
 support_status = "partial"
@@ -533,6 +536,7 @@ support_status = "not_supported"
 ram_size = 20 # FIXME: placeholder
 
 [device.psram]
+support_status = "partial"
 extmem_origin = 0x5000_0000
 octal_spi = true
 

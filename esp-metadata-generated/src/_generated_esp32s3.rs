@@ -361,6 +361,12 @@ macro_rules! property {
     ("phy.backed_up_digital_register_count", str) => {
         stringify!(21)
     };
+    ("rgb_display.output_lines") => {
+        16
+    };
+    ("rgb_display.output_lines", str) => {
+        stringify!(16)
+    };
     ("ledc.version") => {
         2
     };

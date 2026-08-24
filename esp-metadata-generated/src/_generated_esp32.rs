@@ -334,6 +334,12 @@ macro_rules! property {
     ("phy.combo_module") => {
         true
     };
+    ("rgb_display.output_lines") => {
+        24
+    };
+    ("rgb_display.output_lines", str) => {
+        stringify!(24)
+    };
     ("ledc.version") => {
         1
     };

@@ -671,3 +671,82 @@ impl SdmInstance {
             .modify(|_, w| w.sigmadelta_clk_en().bit(en));
     }
 }
+
+impl LcdCamInstance {
+    fn enable_shared_core_clock(self, clocks: &ClockTree, en: bool) {
+        let idx = self as usize;
+        let sibling_held = clocks.lcd_cam_lcd_clock_refcount[idx] > 0
+            || clocks.lcd_cam_cam_clock_refcount[idx] > 0;
+        if !en && sibling_held {
+            return;
+        }
+
+        HP_SYS::regs().lcdcam_mem_lp_ctrl().modify(|_, w| {
+            w.lcdcam_mem_lp_force_ctrl().set_bit();
+            w.lcdcam_mem_lp_en().bit(!en)
+        });
+        // Shared LCD/CAM core clock. Source 0 = XTAL. Divider stores N - 1.
+        HP_SYS_CLKRST::regs()
+            .lcdcam_lcdcam_ctrl0()
+            .modify(|_, w| unsafe {
+                w.clk_en().bit(en);
+                w.clk_src_sel().bits(0);
+                w.clk_div_num().bits(0)
+            });
+    }
+
+    fn enable_lcd_clock_impl(self, clocks: &mut ClockTree, en: bool) {
+        self.enable_shared_core_clock(clocks, en);
+        HP_SYS_CLKRST::regs()
+            .lcdcam_lcd_ctrl0()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_lcd_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamLcdClockConfig>,
+        new_config: LcdCamLcdClockConfig,
+    ) {
+        // Register stores N - 1. Source: 0 = XTAL, 1 = PLL_F160M, 2 = APLL.
+        let div_num = (new_config.div_num() - 1) as u8;
+        HP_SYS_CLKRST::regs()
+            .lcdcam_lcd_ctrl0()
+            .modify(|_, w| unsafe {
+                w.clk_src_sel().bits(match new_config.sclk() {
+                    LcdCamLcdClockSclk::XtalClk => 0,
+                    LcdCamLcdClockSclk::PllF160m => 1,
+                });
+                w.clk_div_num().bits(div_num);
+                w.clk_div_denominator().bits(new_config.div_a() as u8);
+                w.clk_div_numerator().bits(new_config.div_b() as u8)
+            });
+    }
+
+    fn enable_cam_clock_impl(self, clocks: &mut ClockTree, en: bool) {
+        self.enable_shared_core_clock(clocks, en);
+        HP_SYS_CLKRST::regs()
+            .lcdcam_cam_ctrl0()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_cam_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamCamClockConfig>,
+        new_config: LcdCamCamClockConfig,
+    ) {
+        let div_num = (new_config.div_num() - 1) as u8;
+        HP_SYS_CLKRST::regs()
+            .lcdcam_cam_ctrl0()
+            .modify(|_, w| unsafe {
+                w.clk_src_sel().bits(match new_config.sclk() {
+                    LcdCamCamClockSclk::XtalClk => 0,
+                    LcdCamCamClockSclk::PllF160m => 1,
+                });
+                w.clk_div_num().bits(div_num);
+                w.clk_div_denominator().bits(new_config.div_a() as u8);
+                w.clk_div_numerator().bits(new_config.div_b() as u8)
+            });
+    }
+}

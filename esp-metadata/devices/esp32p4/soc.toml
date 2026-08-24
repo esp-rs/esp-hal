@@ -376,7 +376,8 @@ support_status = "not_supported"  # 2 instances (MCPWM0/1)
 [device.pcnt]
 support_status = "partial"
 [device.rgb_display]
-support_status = "not_supported"  # LCD path of LCD_CAM block
+support_status = "not_supported"
+output_lines = 24
 
 [device.rmt]
 support_status = "partial"

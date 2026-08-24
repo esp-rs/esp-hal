@@ -1,43 +1,43 @@
-//! Drives the 16-bit parallel RGB display on ESP32-S3-LCD-EV-Board v1.5
+//! Drives a 16-bit parallel RGB display using the LCD_CAM peripheral.
 //!
 //! This example fills the screen with every color.
 //!
-//! The following wiring is assumed:
-//! - LCD_VSYNC  => GPIO3
-//! - LCD_HSYNC  => GPIO46
-//! - LCD_DE     => GPIO17
-//! - LCD_PCLK   => GPIO9
-//! - LCD_DATA0  => GPIO10
-//! - LCD_DATA1  => GPIO11
-//! - LCD_DATA2  => GPIO12
-//! - LCD_DATA3  => GPIO13
-//! - LCD_DATA4  => GPIO14
-//! - LCD_DATA5  => GPIO21
-//! - LCD_DATA6  => GPIO8
-//! - LCD_DATA7  => GPIO18
-//! - LCD_DATA8  => GPIO45
-//! - LCD_DATA9  => GPIO38
-//! - LCD_DATA10 => GPIO39
-//! - LCD_DATA11 => GPIO40
-//! - LCD_DATA12 => GPIO41
-//! - LCD_DATA13 => GPIO42
-//! - LCD_DATA14 => GPIO2
-//! - LCD_DATA15 => GPIO1
+//! Hardware setup:
+//!
+//! Signal     | ESP32-S3-LCD-EV-Board v1.5 | ESP32-S31-Korvo-1-V1.1
+//! ---------- | -------------------------- | ----------------------
+//! LCD_VSYNC  | GPIO3                      | GPIO45
+//! LCD_HSYNC  | GPIO46                     | GPIO44
+//! LCD_DE     | GPIO17                     | GPIO43
+//! LCD_PCLK   | GPIO9                      | GPIO40
+//! LCD_DATA0  | GPIO10                     | GPIO8
+//! LCD_DATA1  | GPIO11                     | GPIO9
+//! LCD_DATA2  | GPIO12                     | GPIO10
+//! LCD_DATA3  | GPIO13                     | GPIO11
+//! LCD_DATA4  | GPIO14                     | GPIO12
+//! LCD_DATA5  | GPIO21                     | GPIO13
+//! LCD_DATA6  | GPIO8                      | GPIO14
+//! LCD_DATA7  | GPIO18                     | GPIO15
+//! LCD_DATA8  | GPIO45                     | GPIO16
+//! LCD_DATA9  | GPIO38                     | GPIO17
+//! LCD_DATA10 | GPIO39                     | GPIO18
+//! LCD_DATA11 | GPIO40                     | GPIO19
+//! LCD_DATA12 | GPIO41                     | GPIO33
+//! LCD_DATA13 | GPIO42                     | GPIO34
+//! LCD_DATA14 | GPIO2                      | GPIO35
+//! LCD_DATA15 | GPIO1                      | GPIO36
 
 //% CHIP_FILTER: rgb_display_driver_supported && !esp32
 
 #![no_std]
 #![no_main]
 
-use core::iter::{empty, once};
+use core::iter::empty;
 
 use esp_backtrace as _;
 use esp_hal::{
-    Blocking,
-    delay::Delay,
     dma_loop_buffer,
-    gpio::{Level, Output, OutputConfig},
-    i2c::{self, master::I2c},
+    gpio::Level,
     lcd_cam::{
         LcdCam,
         lcd::{
@@ -53,6 +53,20 @@ use esp_hal::{
 };
 use esp_println::println;
 
+cfg_select! {
+    esp32s3 => {
+        use core::iter::once;
+
+        use esp_hal::{
+            Blocking,
+            delay::Delay,
+            gpio::{Output, OutputConfig},
+            i2c::{self, master::I2c},
+        };
+    }
+    _ => {}
+}
+
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
@@ -61,136 +75,216 @@ fn main() -> ! {
 
     let peripherals: Peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let i2c = I2c::new(
-        peripherals.I2C0,
-        i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
-    )
-    .unwrap()
-    .with_sda(peripherals.GPIO47)
-    .with_scl(peripherals.GPIO48);
-
-    let tx_channel = peripherals.DMA_CH2;
+    let tx_channel = cfg_select! {
+        lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH2,
+        lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+    };
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
 
-    let mut expander = Tca9554::new(i2c);
-    expander.write_output_reg(0b1111_0011).unwrap();
-    expander.write_direction_reg(0b1111_0001).unwrap();
+    cfg_select! {
+        esp32s3 => {
+            let i2c = I2c::new(
+                peripherals.I2C0,
+                i2c::master::Config::default().with_frequency(Rate::from_khz(400)),
+            )
+            .unwrap()
+            .with_sda(peripherals.GPIO47)
+            .with_scl(peripherals.GPIO48);
 
-    let delay = Delay::new();
+            let mut expander = Tca9554::new(i2c);
+            expander.write_output_reg(0b1111_0011).unwrap();
+            expander.write_direction_reg(0b1111_0001).unwrap();
 
-    println!("Initialising");
+            let delay = Delay::new();
 
-    let mut write_byte = |b: u8, is_cmd: bool| {
-        const SCS_BIT: u8 = 0b0000_0010;
-        const SCL_BIT: u8 = 0b0000_0100;
-        const SDA_BIT: u8 = 0b0000_1000;
+            println!("Initialising");
 
-        let mut output = 0b1111_0001 & !SCS_BIT;
-        expander.write_output_reg(output).unwrap();
+            let mut write_byte = |b: u8, is_cmd: bool| {
+                const SCS_BIT: u8 = 0b0000_0010;
+                const SCL_BIT: u8 = 0b0000_0100;
+                const SDA_BIT: u8 = 0b0000_1000;
 
-        for bit in once(!is_cmd).chain((0..8).map(|i| (b >> i) & 0b1 != 0).rev()) {
-            let prev = output;
-            if bit {
-                output |= SDA_BIT;
-            } else {
-                output &= !SDA_BIT;
-            }
-            if prev != output {
+                let mut output = 0b1111_0001 & !SCS_BIT;
                 expander.write_output_reg(output).unwrap();
-            }
 
-            output &= !SCL_BIT;
-            expander.write_output_reg(output).unwrap();
+                for bit in once(!is_cmd).chain((0..8).map(|i| (b >> i) & 0b1 != 0).rev()) {
+                    let prev = output;
+                    if bit {
+                        output |= SDA_BIT;
+                    } else {
+                        output &= !SDA_BIT;
+                    }
+                    if prev != output {
+                        expander.write_output_reg(output).unwrap();
+                    }
 
-            output |= SCL_BIT;
-            expander.write_output_reg(output).unwrap();
-        }
+                    output &= !SCL_BIT;
+                    expander.write_output_reg(output).unwrap();
 
-        output &= !SCL_BIT;
-        expander.write_output_reg(output).unwrap();
+                    output |= SCL_BIT;
+                    expander.write_output_reg(output).unwrap();
+                }
 
-        output &= !SDA_BIT;
-        expander.write_output_reg(output).unwrap();
+                output &= !SCL_BIT;
+                expander.write_output_reg(output).unwrap();
 
-        output |= SCS_BIT;
-        expander.write_output_reg(output).unwrap();
-    };
+                output &= !SDA_BIT;
+                expander.write_output_reg(output).unwrap();
 
-    let mut vsync_pin = peripherals.GPIO3;
+                output |= SCS_BIT;
+                expander.write_output_reg(output).unwrap();
+            };
 
-    let vsync_must_be_high_during_setup =
-        Output::new(vsync_pin.reborrow(), Level::High, OutputConfig::default());
-    for &init in INIT_CMDS.iter() {
-        match init {
-            InitCmd::Cmd(cmd, args) => {
-                write_byte(cmd, true);
-                for &arg in args {
-                    write_byte(arg, false);
+            let vsync_pin = peripherals.GPIO3;
+            let hsync_pin = peripherals.GPIO46;
+            let de_pin = peripherals.GPIO17;
+            let pclk_pin = peripherals.GPIO9;
+            let data0_pin = peripherals.GPIO10;
+            let data1_pin = peripherals.GPIO11;
+            let data2_pin = peripherals.GPIO12;
+            let data3_pin = peripherals.GPIO13;
+            let data4_pin = peripherals.GPIO14;
+            let data5_pin = peripherals.GPIO21;
+            let data6_pin = peripherals.GPIO8;
+            let data7_pin = peripherals.GPIO18;
+            let data8_pin = peripherals.GPIO45;
+            let data9_pin = peripherals.GPIO38;
+            let data10_pin = peripherals.GPIO39;
+            let data11_pin = peripherals.GPIO40;
+            let data12_pin = peripherals.GPIO41;
+            let data13_pin = peripherals.GPIO42;
+            let data14_pin = peripherals.GPIO2;
+            let data15_pin = peripherals.GPIO1;
+
+            let mut vsync_pin = vsync_pin;
+
+            let vsync_must_be_high_during_setup =
+                Output::new(vsync_pin.reborrow(), Level::High, OutputConfig::default());
+
+            for &init in INIT_CMDS.iter() {
+                match init {
+                    InitCmd::Cmd(cmd, args) => {
+                        write_byte(cmd, true);
+                        for &arg in args {
+                            write_byte(arg, false);
+                        }
+                    }
+                    InitCmd::Delay(ms) => {
+                        delay.delay_millis(ms as _);
+                    }
                 }
             }
-            InitCmd::Delay(ms) => {
-                delay.delay_millis(ms as _);
-            }
+            drop(vsync_must_be_high_during_setup);
+
+            let config = Config::default()
+                .with_clock_mode(ClockMode {
+                    polarity: Polarity::IdleLow,
+                    phase: Phase::ShiftLow,
+                })
+                .with_frequency(Rate::from_mhz(16))
+                .with_format(Format {
+                    enable_2byte_mode: true,
+                    ..Default::default()
+                })
+                .with_timing(FrameTiming {
+                    horizontal_active_width: 480,
+                    horizontal_total_width: 520,
+                    horizontal_blank_front_porch: 10,
+
+                    vertical_active_height: 480,
+                    vertical_total_height: 510,
+                    vertical_blank_front_porch: 10,
+
+                    hsync_width: 10,
+                    vsync_width: 10,
+
+                    hsync_position: 0,
+                })
+                .with_vsync_idle_level(Level::High)
+                .with_hsync_idle_level(Level::High)
+                .with_de_idle_level(Level::Low)
+                .with_disable_black_region(false);
+        }
+        esp32s31 => {
+            let vsync_pin = peripherals.GPIO45;
+            let hsync_pin = peripherals.GPIO44;
+            let de_pin = peripherals.GPIO43;
+            let pclk_pin = peripherals.GPIO40;
+            let data0_pin = peripherals.GPIO8;
+            let data1_pin = peripherals.GPIO9;
+            let data2_pin = peripherals.GPIO10;
+            let data3_pin = peripherals.GPIO11;
+            let data4_pin = peripherals.GPIO12;
+            let data5_pin = peripherals.GPIO13;
+            let data6_pin = peripherals.GPIO14;
+            let data7_pin = peripherals.GPIO15;
+            let data8_pin = peripherals.GPIO16;
+            let data9_pin = peripherals.GPIO17;
+            let data10_pin = peripherals.GPIO18;
+            let data11_pin = peripherals.GPIO19;
+            let data12_pin = peripherals.GPIO33;
+            let data13_pin = peripherals.GPIO34;
+            let data14_pin = peripherals.GPIO35;
+            let data15_pin = peripherals.GPIO36;
+
+            let config = Config::default()
+                .with_clock_mode(ClockMode {
+                    polarity: Polarity::IdleLow,
+                    phase: Phase::ShiftLow,
+                })
+                .with_frequency(Rate::from_mhz(40))
+                .with_format(Format {
+                    enable_2byte_mode: true,
+                    ..Default::default()
+                })
+                .with_timing(FrameTiming {
+                    horizontal_active_width: 800,
+                    horizontal_total_width: 840,
+                    horizontal_blank_front_porch: 10,
+
+                    vertical_active_height: 480,
+                    vertical_total_height: 510,
+                    vertical_blank_front_porch: 10,
+
+                    hsync_width: 10,
+                    vsync_width: 10,
+
+                    hsync_position: 0,
+                })
+                .with_vsync_idle_level(Level::High)
+                .with_hsync_idle_level(Level::High)
+                .with_de_idle_level(Level::Low)
+                .with_disable_black_region(false);
         }
     }
-    drop(vsync_must_be_high_during_setup);
 
     let mut dma_buf = dma_loop_buffer!(2 * 16);
-
-    let config = Config::default()
-        .with_clock_mode(ClockMode {
-            polarity: Polarity::IdleLow,
-            phase: Phase::ShiftLow,
-        })
-        .with_frequency(Rate::from_mhz(16))
-        .with_format(Format {
-            enable_2byte_mode: true,
-            ..Default::default()
-        })
-        .with_timing(FrameTiming {
-            horizontal_active_width: 480,
-            horizontal_total_width: 520,
-            horizontal_blank_front_porch: 10,
-
-            vertical_active_height: 480,
-            vertical_total_height: 510,
-            vertical_blank_front_porch: 10,
-
-            hsync_width: 10,
-            vsync_width: 10,
-
-            hsync_position: 0,
-        })
-        .with_vsync_idle_level(Level::High)
-        .with_hsync_idle_level(Level::High)
-        .with_de_idle_level(Level::Low)
-        .with_disable_black_region(false);
 
     let mut dpi = Dpi::new(lcd_cam.lcd, tx_channel, config)
         .unwrap()
         .with_vsync(vsync_pin)
-        .with_hsync(peripherals.GPIO46)
-        .with_de(peripherals.GPIO17)
-        .with_pclk(peripherals.GPIO9)
+        .with_hsync(hsync_pin)
+        .with_de(de_pin)
+        .with_pclk(pclk_pin)
         // Blue
-        .with_data0(peripherals.GPIO10)
-        .with_data1(peripherals.GPIO11)
-        .with_data2(peripherals.GPIO12)
-        .with_data3(peripherals.GPIO13)
-        .with_data4(peripherals.GPIO14)
+        .with_data0(data0_pin)
+        .with_data1(data1_pin)
+        .with_data2(data2_pin)
+        .with_data3(data3_pin)
+        .with_data4(data4_pin)
         // Green
-        .with_data5(peripherals.GPIO21)
-        .with_data6(peripherals.GPIO8)
-        .with_data7(peripherals.GPIO18)
-        .with_data8(peripherals.GPIO45)
-        .with_data9(peripherals.GPIO38)
-        .with_data10(peripherals.GPIO39)
+        .with_data5(data5_pin)
+        .with_data6(data6_pin)
+        .with_data7(data7_pin)
+        .with_data8(data8_pin)
+        .with_data9(data9_pin)
+        .with_data10(data10_pin)
         // Red
-        .with_data11(peripherals.GPIO40)
-        .with_data12(peripherals.GPIO41)
-        .with_data13(peripherals.GPIO42)
-        .with_data14(peripherals.GPIO2)
-        .with_data15(peripherals.GPIO1);
+        .with_data11(data11_pin)
+        .with_data12(data12_pin)
+        .with_data13(data13_pin)
+        .with_data14(data14_pin)
+        .with_data15(data15_pin);
 
     const MAX_RED: u16 = (1 << 5) - 1;
     const MAX_GREEN: u16 = (1 << 6) - 1;
@@ -229,11 +323,13 @@ fn main() -> ! {
     }
 }
 
+#[cfg(esp32s3)]
 struct Tca9554 {
     i2c: I2c<'static, Blocking>,
     address: u8,
 }
 
+#[cfg(esp32s3)]
 impl Tca9554 {
     pub fn new(i2c: I2c<'static, Blocking>) -> Self {
         Self { i2c, address: 0x20 }
@@ -248,12 +344,14 @@ impl Tca9554 {
     }
 }
 
+#[cfg(esp32s3)]
 #[derive(Copy, Clone)]
 enum InitCmd {
     Cmd(u8, &'static [u8]),
     Delay(u8),
 }
 
+#[cfg(esp32s3)]
 const INIT_CMDS: &[InitCmd] = &[
     InitCmd::Cmd(0xf0, &[0x55, 0xaa, 0x52, 0x08, 0x00]),
     InitCmd::Cmd(0xf6, &[0x5a, 0x87]),

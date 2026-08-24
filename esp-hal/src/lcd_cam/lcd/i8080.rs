@@ -65,6 +65,7 @@ use crate::{
         Lcd,
         LcdDmaTxChannel,
         lcd::{ClockConfig, ClockMode, DelayMode},
+        ll,
     },
     pac,
     time::Rate,
@@ -117,28 +118,27 @@ where
         self.lcd
             .configure_clocks(&ClockConfig {
                 clock_mode: config.clock_mode,
-                // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
-                // the LCD_PCLK divider must be at least 2. To make up for this the user
-                // provided frequency is doubled to match.
-                frequency: config.frequency * 2,
+                // ESP32-S3 errata requires LCD_PCLK to divide LCD_CLK by at least 2.
+                // Double the requested frequency so the extra divider still matches.
+                frequency: if cfg!(esp32s3) {
+                    config.frequency * 2
+                } else {
+                    config.frequency
+                },
             })
             .map_err(ConfigError::Clock)?;
 
-        self.regs()
-            .lcd_ctrl()
-            .write(|w| w.lcd_rgb_mode_en().clear_bit());
-        self.regs()
-            .lcd_rgb_yuv()
-            .write(|w| w.lcd_conv_bypass().clear_bit());
+        ll::set_rgb_mode_en(self.regs(), false);
+        ll::set_lcd_conv_bypass(self.regs());
 
         self.regs().lcd_user().modify(|_, w| {
-            w.lcd_8bits_order().bit(false);
             w.lcd_bit_order().bit(false);
-            w.lcd_byte_order().bit(false);
-            w.lcd_2byte_en().bit(false)
+            w.lcd_byte_order().bit(false)
         });
+        ll::set_8bits_order(self.regs(), false);
+        ll::set_2byte_mode(self.regs(), false);
         self.regs().lcd_misc().write(|w| unsafe {
-            // Set the threshold for Async Tx FIFO full event. (5 bits)
+            #[cfg(not(esp32s31))]
             w.lcd_afifo_threshold_num().bits(0);
             // Configure the setup cycles in LCD non-RGB mode. Setup cycles
             // expected = this value + 1. (6 bit)
@@ -168,27 +168,8 @@ where
             // The default value of LCD_CD
             w.lcd_cd_idle_edge().bit(config.cd_idle_edge)
         });
-        self.regs()
-            .lcd_dly_mode()
-            .write(|w| unsafe { w.lcd_cd_mode().bits(config.cd_mode as u8) });
-        self.regs().lcd_data_dout_mode().write(|w| unsafe {
-            w.dout0_mode().bits(config.output_bit_mode as u8);
-            w.dout1_mode().bits(config.output_bit_mode as u8);
-            w.dout2_mode().bits(config.output_bit_mode as u8);
-            w.dout3_mode().bits(config.output_bit_mode as u8);
-            w.dout4_mode().bits(config.output_bit_mode as u8);
-            w.dout5_mode().bits(config.output_bit_mode as u8);
-            w.dout6_mode().bits(config.output_bit_mode as u8);
-            w.dout7_mode().bits(config.output_bit_mode as u8);
-            w.dout8_mode().bits(config.output_bit_mode as u8);
-            w.dout9_mode().bits(config.output_bit_mode as u8);
-            w.dout10_mode().bits(config.output_bit_mode as u8);
-            w.dout11_mode().bits(config.output_bit_mode as u8);
-            w.dout12_mode().bits(config.output_bit_mode as u8);
-            w.dout13_mode().bits(config.output_bit_mode as u8);
-            w.dout14_mode().bits(config.output_bit_mode as u8);
-            w.dout15_mode().bits(config.output_bit_mode as u8)
-        });
+        ll::set_cd_delay(self.regs(), config.cd_mode as u8);
+        ll::set_data_bit_delay(self.regs(), config.output_bit_mode as u8);
 
         self.regs()
             .lcd_user()
@@ -213,9 +194,7 @@ where
     /// mode.
     pub fn set_8bits_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
-        self.regs()
-            .lcd_user()
-            .modify(|_, w| w.lcd_8bits_order().bit(is_inverted));
+        ll::set_8bits_order(self.regs(), is_inverted);
         self
     }
 
@@ -387,19 +366,14 @@ where
                     w.lcd_cmd().set_bit();
                     w.lcd_cmd_2_cycle_en().clear_bit()
                 });
-                self.regs()
-                    .lcd_cmd_val()
-                    .write(|w| unsafe { w.lcd_cmd_value().bits(value.into() as _) });
+                ll::write_command(self.regs(), value.into() as u32, None);
             }
             Command::Two(first, second) => {
                 self.regs().lcd_user().modify(|_, w| {
                     w.lcd_cmd().set_bit();
                     w.lcd_cmd_2_cycle_en().set_bit()
                 });
-                let cmd = first.into() as u32 | ((second.into() as u32) << 16);
-                self.regs()
-                    .lcd_cmd_val()
-                    .write(|w| unsafe { w.lcd_cmd_value().bits(cmd) });
+                ll::write_command(self.regs(), first.into() as u32, Some(second.into() as u32));
             }
         }
 
@@ -416,9 +390,8 @@ where
             } else {
                 w.lcd_dummy().clear_bit()
             }
-            .lcd_2byte_en()
-            .bit(is_2byte_mode)
         });
+        ll::set_2byte_mode(self.regs(), is_2byte_mode);
 
         // Use continous mode for DMA. FROM the S3 TRM:
         // > In a continuous output, LCD module keeps sending data till:

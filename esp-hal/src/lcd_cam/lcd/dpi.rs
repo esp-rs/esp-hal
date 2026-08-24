@@ -112,6 +112,7 @@ use crate::{
         ErasedTxChannel,
         LcdDmaTxChannel,
         lcd::{ClockConfig, ClockMode, DelayMode, Lcd},
+        ll,
     },
     pac,
     time::Rate,
@@ -164,10 +165,13 @@ where
         self.lcd
             .configure_clocks(&ClockConfig {
                 clock_mode: config.clock_mode,
-                // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
-                // the LCD_PCLK divider must be at least 2. To make up for this the user
-                // provided frequency is doubled to match.
-                frequency: config.frequency * 2,
+                // ESP32-S3 errata requires LCD_PCLK to divide LCD_CLK by at least 2.
+                // Double the requested frequency so the extra divider still matches.
+                frequency: if cfg!(esp32s3) {
+                    config.frequency * 2
+                } else {
+                    config.frequency
+                },
             })
             .map_err(ConfigError::Clock)?;
 
@@ -175,23 +179,17 @@ where
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
 
-        self.regs()
-            .lcd_rgb_yuv()
-            .write(|w| w.lcd_conv_bypass().clear_bit());
+        ll::set_lcd_conv_bypass(self.regs());
 
         self.regs().lcd_user().modify(|_, w| {
             if config.format.enable_2byte_mode {
-                w.lcd_8bits_order().bit(false);
                 w.lcd_byte_order()
                     .bit(config.format.byte_order == ByteOrder::Inverted);
             } else {
-                w.lcd_8bits_order()
-                    .bit(config.format.byte_order == ByteOrder::Inverted);
                 w.lcd_byte_order().bit(false);
             }
             w.lcd_bit_order()
                 .bit(config.format.bit_order == BitOrder::Inverted);
-            w.lcd_2byte_en().bit(config.format.enable_2byte_mode);
 
             // Only valid in Intel8080 mode.
             w.lcd_cmd().clear_bit();
@@ -200,42 +198,31 @@ where
             // This needs to be explicitly set for RGB mode.
             w.lcd_dout().set_bit()
         });
+        ll::set_8bits_order(
+            self.regs(),
+            !config.format.enable_2byte_mode && config.format.byte_order == ByteOrder::Inverted,
+        );
+        ll::set_2byte_mode(self.regs(), config.format.enable_2byte_mode);
 
         let timing = &config.timing;
-        self.regs().lcd_ctrl().modify(|_, w| unsafe {
-            // Enable RGB mode, and input VSYNC, HSYNC, and DE signals.
-            w.lcd_rgb_mode_en().set_bit();
-
-            w.lcd_hb_front()
-                .bits((timing.horizontal_blank_front_porch as u16).saturating_sub(1));
-            w.lcd_va_height()
-                .bits((timing.vertical_active_height as u16).saturating_sub(1));
-            w.lcd_vt_height()
-                .bits((timing.vertical_total_height as u16).saturating_sub(1))
-        });
-        self.regs().lcd_ctrl1().modify(|_, w| unsafe {
-            w.lcd_vb_front()
-                .bits((timing.vertical_blank_front_porch as u8).saturating_sub(1));
-            w.lcd_ha_width()
-                .bits((timing.horizontal_active_width as u16).saturating_sub(1));
-            w.lcd_ht_width()
-                .bits((timing.horizontal_total_width as u16).saturating_sub(1))
-        });
-        self.regs().lcd_ctrl2().modify(|_, w| unsafe {
-            w.lcd_vsync_width()
-                .bits((timing.vsync_width as u8).saturating_sub(1));
-            w.lcd_vsync_idle_pol().bit(config.vsync_idle_level.into());
-            w.lcd_de_idle_pol().bit(config.de_idle_level.into());
-            w.lcd_hs_blank_en().bit(config.hs_blank_en);
-            w.lcd_hsync_width()
-                .bits((timing.hsync_width as u8).saturating_sub(1));
-            w.lcd_hsync_idle_pol().bit(config.hsync_idle_level.into());
-            w.lcd_hsync_position().bits(timing.hsync_position as u8)
-        });
-
+        ll::configure_rgb_timing(
+            self.regs(),
+            (timing.horizontal_blank_front_porch as u16).saturating_sub(1),
+            (timing.vertical_active_height as u16).saturating_sub(1),
+            (timing.vertical_total_height as u16).saturating_sub(1),
+            (timing.vertical_blank_front_porch as u16).saturating_sub(1),
+            (timing.horizontal_active_width as u16).saturating_sub(1),
+            (timing.horizontal_total_width as u16).saturating_sub(1),
+            (timing.vsync_width as u16).saturating_sub(1),
+            config.vsync_idle_level.into(),
+            config.de_idle_level.into(),
+            config.hs_blank_en,
+            (timing.hsync_width as u8).saturating_sub(1),
+            config.hsync_idle_level.into(),
+            timing.hsync_position as u8,
+        );
         self.regs().lcd_misc().modify(|_, w| unsafe {
-            // TODO: Find out what this field actually does.
-            // Set the threshold for Async Tx FIFO full event. (5 bits)
+            #[cfg(not(esp32s31))]
             w.lcd_afifo_threshold_num().bits((1 << 5) - 1);
 
             // Doesn't matter for RGB mode.
@@ -249,30 +236,13 @@ where
             // Enable blank region when LCD sends data out.
             w.lcd_bk_en().bit(!config.disable_black_region)
         });
-        self.regs().lcd_dly_mode().modify(|_, w| unsafe {
-            w.lcd_de_mode().bits(config.de_mode as u8);
-            w.lcd_hsync_mode().bits(config.hsync_mode as u8);
-            w.lcd_vsync_mode().bits(config.vsync_mode as u8);
-            w
-        });
-        self.regs().lcd_data_dout_mode().modify(|_, w| unsafe {
-            w.dout0_mode().bits(config.output_bit_mode as u8);
-            w.dout1_mode().bits(config.output_bit_mode as u8);
-            w.dout2_mode().bits(config.output_bit_mode as u8);
-            w.dout3_mode().bits(config.output_bit_mode as u8);
-            w.dout4_mode().bits(config.output_bit_mode as u8);
-            w.dout5_mode().bits(config.output_bit_mode as u8);
-            w.dout6_mode().bits(config.output_bit_mode as u8);
-            w.dout7_mode().bits(config.output_bit_mode as u8);
-            w.dout8_mode().bits(config.output_bit_mode as u8);
-            w.dout9_mode().bits(config.output_bit_mode as u8);
-            w.dout10_mode().bits(config.output_bit_mode as u8);
-            w.dout11_mode().bits(config.output_bit_mode as u8);
-            w.dout12_mode().bits(config.output_bit_mode as u8);
-            w.dout13_mode().bits(config.output_bit_mode as u8);
-            w.dout14_mode().bits(config.output_bit_mode as u8);
-            w.dout15_mode().bits(config.output_bit_mode as u8)
-        });
+        ll::set_sync_delay(
+            self.regs(),
+            config.de_mode as u8,
+            config.hsync_mode as u8,
+            config.vsync_mode as u8,
+        );
+        ll::set_data_bit_delay(self.regs(), config.output_bit_mode as u8);
 
         self.regs()
             .lcd_user()
@@ -480,16 +450,8 @@ where
         next_frame_en: bool,
         mut buf: TX,
     ) -> Result<DpiTransfer<'d, TX, Dm>, (DmaError, Self, TX)> {
-        let result = unsafe {
-            self.tx_channel
-                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
-        }
-        .and_then(|_| self.tx_channel.start_transfer());
-        if let Err(err) = result {
-            return Err((err, self, buf));
-        }
-
-        // Reset LCD control unit and Async Tx FIFO
+        // Reset before DMA start. AXI-GDMA can fill the LCD AFIFO immediately; a later
+        // FIFO reset would drop the first pixels of the frame.
         self.regs()
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
@@ -502,6 +464,15 @@ where
             // 0: LCD stops when the current frame is sent out.
             w.lcd_next_frame_en().bit(next_frame_en)
         });
+
+        let result = unsafe {
+            self.tx_channel
+                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
+        }
+        .and_then(|_| self.tx_channel.start_transfer());
+        if let Err(err) = result {
+            return Err((err, self, buf));
+        }
 
         // Start the transfer.
         self.regs().lcd_user().modify(|_, w| {

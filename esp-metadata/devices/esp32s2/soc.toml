@@ -303,6 +303,7 @@ support_status = "not_supported"
 
 [device.rgb_display] # via I2S
 support_status = "not_supported"
+output_lines = 24
 
 [device.spi_lcd] # the LCD mode of GP-SPI2
 support_status = { status = "not_supported", issue = 5374 }

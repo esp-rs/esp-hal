@@ -64,7 +64,15 @@ use crate::{
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, ErasedRxChannel, calculate_clkm},
+    lcd_cam::{
+        BitOrder,
+        ByteOrder,
+        CamDmaRxChannel,
+        ClockError,
+        ErasedRxChannel,
+        calculate_clkm,
+        ll,
+    },
     pac,
     peripherals::LCD_CAM,
     soc::clocks::{ClockTree, LcdCamCamClockConfig, LcdCamInstance},
@@ -239,9 +247,7 @@ impl<'d> Camera<'d> {
             w.cam_vsync_inv().bit(config.invert_vsync)
         });
 
-        self.regs()
-            .cam_rgb_yuv()
-            .write(|w| w.cam_conv_bypass().clear_bit());
+        ll::set_cam_conv_bypass(self.regs());
 
         self.regs()
             .cam_ctrl()
