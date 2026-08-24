@@ -5332,22 +5332,23 @@ macro_rules! for_each_peripheral {
         MCPWM0 <= MCPWM0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "PCNT peripheral singleton"]
-        PCNT <= PCNT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "PERI_BACKUP peripheral singleton"] PERI_BACKUP <= PERI_BACKUP() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
-        <= RMT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RNG peripheral singleton"] RNG <= RNG() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "RSA peripheral singleton"] RSA
-        <= RSA(RSA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RTC_CNTL peripheral singleton"] RTC_CNTL <= RTC_CNTL() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_I2C0 peripheral singleton"]
-        LP_I2C0 <= RTC_I2C() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "RTC_IO peripheral singleton"] RTC_IO <= RTC_IO() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "SDHOST peripheral singleton"]
-        SDHOST <= SDHOST() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "SENS peripheral singleton"] SENS <= SENS() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        PCNT <= PCNT(PCNT : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "PERI_BACKUP peripheral singleton"] PERI_BACKUP <= PERI_BACKUP()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "RMT peripheral singleton"] RMT <= RMT() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RNG peripheral singleton"] RNG
+        <= RNG() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "RSA peripheral singleton"] RSA <= RSA(RSA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RTC_CNTL peripheral singleton"]
+        RTC_CNTL <= RTC_CNTL() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "LP_I2C0 peripheral singleton"] LP_I2C0 <= RTC_I2C() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "RTC_IO peripheral singleton"]
+        RTC_IO <= RTC_IO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "SENS peripheral singleton"]
+        SENS <= SENS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SENSITIVE peripheral singleton"] SENSITIVE <= SENSITIVE() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "SHA peripheral singleton"] SHA
         <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
@@ -5759,7 +5760,8 @@ macro_rules! for_each_peripheral {
         #[doc = "RTC_TIMER peripheral singleton"] RTC_TIMER <= RTC_CNTL() (unstable)), (@
         peri_type #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0() (unstable)),
         (@ peri_type #[doc = "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1()
-        (unstable)), (@ peri_type #[doc = "PCNT peripheral singleton"] PCNT <= PCNT()
+        (unstable)), (@ peri_type #[doc = "PCNT peripheral singleton"] PCNT <= PCNT(PCNT
+        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "PERI_BACKUP peripheral singleton"] PERI_BACKUP
         <= PERI_BACKUP() (unstable)), (@ peri_type #[doc = "RMT peripheral singleton"]
         RMT <= RMT() (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <=

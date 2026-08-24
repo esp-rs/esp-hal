@@ -59,7 +59,7 @@ peripherals = [
     { name = "MMU_TABLE", hidden = true },
     { name = "MCPWM1", clock_group = "MCPWM" },
     { name = "NRX" },
-    { name = "PCNT" },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },

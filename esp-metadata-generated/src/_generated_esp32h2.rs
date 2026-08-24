@@ -4640,8 +4640,9 @@ macro_rules! for_each_peripheral {
         disable_tx_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "PAU peripheral singleton"] PAU <= PAU() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "PCNT peripheral singleton"]
-        PCNT <= PCNT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "PCR peripheral singleton"] PCR <= PCR() (unstable)));
+        PCNT <= PCNT(PCNT : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "PCR peripheral singleton"] PCR <= PCR() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "PLIC_MX peripheral singleton"]
         PLIC_MX <= PLIC_MX() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
         = "PMU peripheral singleton"] PMU <= PMU() (unstable)));
@@ -4942,8 +4943,9 @@ macro_rules! for_each_peripheral {
         disable_rx_interrupt }, PARL_IO_TX : { bind_tx_interrupt, enable_tx_interrupt,
         disable_tx_interrupt }) (unstable)), (@ peri_type #[doc =
         "PAU peripheral singleton"] PAU <= PAU() (unstable)), (@ peri_type #[doc =
-        "PCNT peripheral singleton"] PCNT <= PCNT() (unstable)), (@ peri_type #[doc =
-        "PCR peripheral singleton"] PCR <= PCR() (unstable)), (@ peri_type #[doc =
+        "PCNT peripheral singleton"] PCNT <= PCNT(PCNT : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "PCR peripheral singleton"] PCR <= PCR() (unstable)), (@ peri_type #[doc =
         "PLIC_MX peripheral singleton"] PLIC_MX <= PLIC_MX() (unstable)), (@ peri_type
         #[doc = "PMU peripheral singleton"] PMU <= PMU() (unstable)), (@ peri_type #[doc
         = "RMT peripheral singleton"] RMT <= RMT() (unstable)), (@ peri_type #[doc =

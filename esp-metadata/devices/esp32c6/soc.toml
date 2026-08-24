@@ -81,7 +81,7 @@ peripherals = [
     { name = "OTP_DEBUG" },
     { name = "PARL_IO", interrupts = { peri = "PARL_IO" }, clock_group = "PARL_IO" },
     { name = "PAU" },
-    { name = "PCNT" },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PLIC_MX" },
     { name = "PMU" },

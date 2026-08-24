@@ -50,7 +50,7 @@ peripherals = [
     { name = "IO_MUX" },
     { name = "LEDC" },
     { name = "NRX" },
-    { name = "PCNT" },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PMS" },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },
