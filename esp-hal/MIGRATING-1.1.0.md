@@ -75,12 +75,12 @@ one trait covers every low-power pad. Name `LpPin` in a bound or a trait object 
 Use `Input` or `Flex` to set the pull resistors of a pad. A wake pad keeps the resistors that its
 driver configured.
 
-## sleep
+## Sleep
 
 ### Wakeup sources are enabled through the driver that owns the hardware
 
 A sleep call no longer takes wakeup sources. Each driver enables the source it owns, and the enable
-stands until the driver disables it — across a sleep, across a deep-sleep wake, and across the
+stands until the driver disables it - across a sleep, across a deep-sleep wake, and across the
 driver's `Drop`. A sleep that no enabled source could end is refused: `sleep_light` returns without
 sleeping and `sleep_deep` panics.
 
@@ -121,8 +121,8 @@ input.wakeup_enable(true, WakeEvent::LowLevel)?;
 input.listen(Event::LowLevel);
 ```
 
-Waking while the high-performance GPIO peripheral is powered down — which every deep sleep does, and a
-light sleep does when the caller asks for `pd_hp_periph` or `pd_top` — needs a low-power path, which
+Waking while the high-performance GPIO peripheral is powered down - which every deep sleep does, and a
+light sleep does when the caller asks for `pd_hp_periph` or `pd_top` - needs a low-power path, which
 only low-power pads have and which the pin has to ask for:
 
 ```rust
@@ -138,6 +138,10 @@ esp32c3, `RtcioWakeupSource` used to pull the pad for you.
 the choice between those paths is no longer the caller's: sleep entry sees every armed pin at once and
 allocates the paths for the whole set, which is both optimal and independent of the order the pins were
 configured in. It panics if the set cannot be served.
+
+`WakeupLevel` is gone with them: a level-triggered wake now takes its level from the `gpio::Event`
+you pass to `listen`, so `WakeupLevel::High` becomes `Event::HighLevel` and `WakeupLevel::Low`
+becomes `Event::LowLevel`.
 
 An edge trigger is armed as the level the edge ends on, so a pin listening for `RisingEdge` wakes the
 chip on a high level, and one listening for `FallingEdge` on a low level. `AnyEdge` samples the pin at
@@ -182,35 +186,6 @@ uart.enable_wakeup(&uart::WakeupConfig::default().with_rising_edges(3))?;
 lpwr.sleep_light(RtcSleepConfig::default());
 ```
 
-## Sleep
-
-### Replace `WakeupLevel` with `Level`
-
-```diff
--use esp_hal::rtc_cntl::sleep::WakeupLevel;
-+use esp_hal::gpio::Level;
-
--let source = Ext0WakeupSource::new(pin, WakeupLevel::High);
-+let source = Ext0WakeupSource::new(pin, Level::High);
-```
-
-For wakeup pin lists:
-
-```diff
--let pins = &mut [(&mut pin, WakeupLevel::Low)];
-+let pins = &mut [(&mut pin, Level::Low)];
-```
-
-### Remove unsupported wakeup-source variants
-
-Remove references to:
-
-- `Ext0` and `Ext1` on ESP32-C2 and ESP32-C3.
-- `Ext0` on ESP32-C6 and ESP32-H2.
-- `Ulp` on ESP32-S2 and ESP32-S3.
-
-## RTC sleep
-
 ### `WakeupReason` is now a set of `WakeupSource`
 
 `WakeupReason` is no longer a `bitflags` type. Wakeup causes are now modelled by the
@@ -228,15 +203,11 @@ Remove references to:
 +if wakeup_cause().contains(WakeupSource::Timer) { /* ... */ }
 ```
 
-### `WakeTriggers` uses `insert` instead of per-source setters
+### The `WakeSource` trait and `WakeTriggers` are removed
 
-`WakeTriggers` is now a set of `WakeupSource`. Custom `WakeSource` implementations that
-configured triggers via the generated setters must use `insert`:
-
-```diff
--triggers.set_gpio(true);
-+triggers.insert(WakeupSource::Gpio);
-```
+Custom wakeup sources are no longer part of the public API. Each driver arms the wake for the
+hardware it owns, so there is nothing to implement `WakeSource` for and no `WakeTriggers` to fill in.
+Drop any custom `WakeSource` implementation and arm the wake through the owning driver instead.
 
 ## I2S driver
 
