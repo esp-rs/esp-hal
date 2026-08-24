@@ -1,7 +1,8 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
         cfg(spi_slave_dma_engine = "SPI_DMA") => "DMA_SPI2",
-        _ => "DMA_CH0",
+        cfg(spi_slave_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(spi_slave_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
     },
 ))]
 //! # Serial Peripheral Interface - Slave Mode

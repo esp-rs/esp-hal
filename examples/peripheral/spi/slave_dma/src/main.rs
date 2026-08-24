@@ -61,9 +61,9 @@ fn main() -> ! {
     let slave_cs = peripherals.GPIO3;
 
     let dma_channel = cfg_select! {
-        spi_slave_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
-        spi_slave_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
-        spi_slave_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        feature = "esp32s2" => peripherals.DMA_SPI2,
+        any(feature = "esp32p4", feature = "esp32s31") => peripherals.DMA_AXI_CH0,
+        _ => peripherals.DMA_CH0,
     };
 
     let mut slave_receive = dma_rx_buffer!(32000).unwrap();
