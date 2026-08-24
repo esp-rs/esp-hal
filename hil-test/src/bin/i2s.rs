@@ -1283,7 +1283,7 @@ mod pdm_rx_tests {
 
 struct EdgeCounter<'a> {
     #[cfg(pcnt_driver_supported)]
-    unit: esp_hal::pcnt::unit::Unit<'a, 0>,
+    unit: esp_hal::pcnt::unit::Unit<'a>,
 
     phantom: core::marker::PhantomData<&'a ()>,
 }
@@ -1291,8 +1291,7 @@ struct EdgeCounter<'a> {
 #[cfg(pcnt_driver_supported)]
 impl<'a> EdgeCounter<'a> {
     fn new<'i>(input: impl esp_hal::gpio::interconnect::PeripheralInput<'i>) -> Self {
-        let pcnt = esp_hal::pcnt::Pcnt::new(unsafe { esp_hal::peripherals::PCNT::steal() });
-        let unit = pcnt.unit0;
+        let unit = esp_hal::pcnt::Unit::new(unsafe { esp_hal::peripherals::PCNT0_UNIT0::steal() });
         unit.channel0.set_edge_signal(input);
         unit.channel0.set_input_mode(
             esp_hal::pcnt::channel::EdgeMode::Hold,

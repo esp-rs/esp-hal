@@ -2,16 +2,17 @@
 //! # Pulse Counter (PCNT)
 //!
 //! ## Overview
-//! The PCNT module is designed to count the number of rising
-//! or falling edges of input signals. They may contain multiple pulse
-//! counter units in the module. Each unit is in effect an independent counter
-//! with multiple channels, where each channel can increment or decrement the
-//! counter on a rising or falling edge. Furthermore, each channel can be
-//! configured separately.
+//! The PCNT module counts rising and/or falling edges of input signals. Each
+//! unit is an independent counter with two channels. Channel edge and control
+//! inputs can be configured separately.
 //!
-//! It consists of two main modules:
-//!    * [channel]
-//!    * [unit]
+//! Units are peripheral singletons (`PCNT0_UNIT0`, `PCNT0_UNIT1`, …, and
+//! `PCNT1_UNIT0`, … when the chip has a second register block). Construct a
+//! [`Unit`] from a singleton; there is no hub driver.
+//!
+//! The hardware raises one interrupt per PCNT register block. [`Unit`] emulates
+//! per-unit interrupts by installing a shared dispatcher that calls the handler
+//! registered on each unit whose status bit is set.
 //!
 //! ## Examples
 //! ### Decoding a quadrature encoder
@@ -19,25 +20,21 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::gpio::{Input, InputConfig, Pull};
-//! # use esp_hal::interrupt::Priority;
-//! # use esp_hal::pcnt::{channel, unit, Pcnt};
+//! # use esp_hal::pcnt::{channel, Unit};
 //! # use core::{sync::atomic::Ordering, cell::RefCell, cmp::min};
 //! # use critical_section::Mutex;
 //! # use portable_atomic::AtomicI32;
 //!
-//! static UNIT0: Mutex<RefCell<Option<unit::Unit<'static, 1>>>> = Mutex::new(RefCell::new(None));
+//! static UNIT0: Mutex<RefCell<Option<Unit<'static>>>> = Mutex::new(RefCell::new(None));
 //! static VALUE: AtomicI32 = AtomicI32::new(0);
 //!
-//! // Initialize Pulse Counter (PCNT) unit with limits and filter settings
-//! let mut pcnt = Pcnt::new(peripherals.PCNT);
-//! pcnt.set_interrupt_handler(interrupt_handler);
-//! let u0 = pcnt.unit1;
+//! let mut u0 = Unit::new(peripherals.PCNT0_UNIT1);
+//! u0.set_interrupt_handler(interrupt_handler);
 //! u0.set_low_limit(Some(-100))?;
 //! u0.set_high_limit(Some(100))?;
 //! u0.set_filter(Some(min(10u16 * 80, 1023u16)))?;
 //! u0.clear();
 //!
-//! // Set up channels with control and edge signals
 //! let ch0 = &u0.channel0;
 //! let config = InputConfig::default().with_pull(Pull::Up);
 //! let pin_a = Input::new(peripherals.GPIO4, config);
@@ -55,14 +52,12 @@
 //! ch1.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
 //! ch1.set_input_mode(channel::EdgeMode::Decrement, channel::EdgeMode::Increment);
 //!
-//! // Enable interrupts and resume pulse counter unit
 //! u0.listen();
 //! u0.resume();
 //! let counter = u0.counter.clone();
 //!
 //! critical_section::with(|cs| UNIT0.borrow_ref_mut(cs).replace(u0));
 //!
-//! // Monitor counter value and print updates
 //! let mut last_value: i32 = 0;
 //! loop {
 //!     let value: i32 = counter.get() as i32 + VALUE.load(Ordering::SeqCst);
@@ -90,141 +85,180 @@
 //! }
 //! # }
 //! ```
-//!
-//! [channel]: channel/index.html
-//! [unit]: unit/index.html
 
-use self::unit::Unit;
-use crate::{interrupt::InterruptHandler, pac::pcnt::RegisterBlock, system::PeripheralGuard};
+use esp_sync::RawMutex;
+
+use crate::{
+    gpio::InputSignal,
+    handler,
+    interrupt::{InterruptHandler, Priority},
+    pac::pcnt::RegisterBlock,
+    peripherals::Interrupt,
+    private::CFnPtr,
+    system::Peripheral,
+};
 
 pub mod channel;
 pub mod unit;
 
-crate::any_peripheral! {
-    /// Any PCNT peripheral.
-    pub peripheral AnyPcnt<'d> {
-        #[cfg(soc_has_pcnt)]
-        Pcnt(crate::peripherals::PCNT<'d>),
-        #[cfg(soc_has_pcnt1)]
-        Pcnt1(crate::peripherals::PCNT1<'d>),
-    }
+pub use unit::Unit;
+
+/// Immutable per-unit metadata owned by each `PCNTn_UNITm` singleton.
+#[doc(hidden)]
+pub struct Info {
+    unit: usize,
+    peripheral: Peripheral,
+    interrupt: Interrupt,
+    dispatcher: InterruptHandler,
+    register_block: *const RegisterBlock,
+    /// Guards the registers shared by every unit of this register block.
+    lock: &'static RawMutex,
+    sig_ch: [InputSignal; 2],
+    ctrl_ch: [InputSignal; 2],
 }
 
-impl AnyPcnt<'_> {
-    #[cfg(soc_has_pcnt1)]
-    fn is_pcnt1(&self) -> bool {
-        matches!(&self.0, any::Inner::Pcnt1(_))
-    }
+unsafe impl Sync for Info {}
 
-    fn peripheral(&self) -> crate::system::Peripheral {
-        match &self.0 {
-            #[cfg(soc_has_pcnt)]
-            any::Inner::Pcnt(_) => crate::system::Peripheral::Pcnt,
-            #[cfg(soc_has_pcnt1)]
-            any::Inner::Pcnt1(_) => crate::system::Peripheral::Pcnt1,
+/// Mutable per-unit interrupt state.
+#[doc(hidden)]
+pub struct State {
+    handler: CFnPtr,
+}
+
+impl State {
+    const fn new() -> Self {
+        Self {
+            handler: CFnPtr::new(),
         }
     }
 
-    fn register_block(&self) -> &RegisterBlock {
-        any::delegate!(self, pcnt => { pcnt.register_block() })
+    fn store(&self, handler: extern "C" fn()) {
+        self.handler.store(handler);
     }
 
-    fn bind_peri_interrupt(&self, handler: InterruptHandler) {
-        any::delegate!(self, pcnt => { pcnt.bind_peri_interrupt(handler) })
+    fn clear(&self) {
+        self.handler.clear();
     }
 
-    fn disable_peri_interrupt_on_all_cores(&self) {
-        any::delegate!(self, pcnt => { pcnt.disable_peri_interrupt_on_all_cores() })
+    fn invoke(&self) -> bool {
+        self.handler.call()
     }
 }
 
-/// Pulse Counter (PCNT) peripheral driver.
-pub struct Pcnt<'d> {
-    pcnt: AnyPcnt<'d>,
+impl Info {
+    fn regs(&self) -> &'static RegisterBlock {
+        unsafe { &*self.register_block }
+    }
 
-    /// Unit 0
-    pub unit0: Unit<'d, 0>,
-    /// Unit 1
-    pub unit1: Unit<'d, 1>,
-    /// Unit 2
-    pub unit2: Unit<'d, 2>,
-    /// Unit 3
-    pub unit3: Unit<'d, 3>,
-    #[cfg(esp32)]
-    /// Unit 4
-    pub unit4: Unit<'d, 4>,
-    #[cfg(esp32)]
-    /// Unit 5
-    pub unit5: Unit<'d, 5>,
-    #[cfg(esp32)]
-    /// Unit 6
-    pub unit6: Unit<'d, 6>,
-    #[cfg(esp32)]
-    /// Unit 7
-    pub unit7: Unit<'d, 7>,
-
-    _guard: PeripheralGuard,
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.lock.lock(f)
+    }
 }
 
-impl<'d> Pcnt<'d> {
-    /// Returns a new PCNT.
-    pub fn new(pcnt: impl Into<AnyPcnt<'d>>) -> Self {
-        let pcnt = pcnt.into();
-        let guard = PeripheralGuard::new(pcnt.peripheral());
-        let regs = pcnt.register_block();
+/// A peripheral singleton compatible with the PCNT unit driver.
+#[doc(hidden)]
+pub trait Instance: crate::private::Sealed + any::Degrade {
+    fn parts(&self) -> (&'static Info, &'static State);
+}
 
-        let unit_count = regs.unit_iter().count() as u8;
+impl Instance for AnyPcntUnit<'_> {
+    fn parts(&self) -> (&'static Info, &'static State) {
+        any::delegate!(self, unit => { unit.parts() })
+    }
+}
 
-        // disable filter, all events, and channel settings
-        for unit in regs.unit_iter() {
-            unit.conf0().write(|w| unsafe {
-                // All bits are accounted for in the TRM.
-                w.bits(0)
-            });
-        }
+impl AnyPcntUnit<'_> {
+    fn info(&self) -> &'static Info {
+        self.parts().0
+    }
 
-        // Remove reset bit from units.
-        regs.ctrl().modify(|_, w| {
-            for i in 0..unit_count {
-                w.cnt_rst_u(i).clear_bit();
+    fn state(&self) -> &'static State {
+        self.parts().1
+    }
+
+    fn register_block(&self) -> &'static RegisterBlock {
+        self.info().regs()
+    }
+
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.info().lock(f)
+    }
+}
+
+fn dispatch(interrupt: Interrupt) {
+    for_each_pcnt_unit! {
+        ($peri:ident, $variant:ident, $sys:ident, $regs:ident, $unit:literal, $irq:ident, $sig_ch0:ident, $sig_ch1:ident, $ctrl_ch0:ident, $ctrl_ch1:ident) => {
+            if Interrupt::$irq == interrupt {
+                let (info, state) = Instance::parts(&unsafe { crate::peripherals::$peri::steal() });
+                if info
+                    .regs()
+                    .int_st()
+                    .read()
+                    .cnt_thr_event_u(info.unit as u8)
+                    .bit()
+                {
+                    if !state.invoke() {
+                        // Unhandled by the user, make sure the interrupt doesn't stay pending.
+                        info
+                            .regs()
+                            .int_clr()
+                            .write(|w| {
+                                w.cnt_thr_event_u(info.unit as u8).set_bit()
+                            });
+                    }
+                }
             }
-
-            w.clk_en().set_bit()
-        });
-
-        Pcnt {
-            unit0: Unit::new(unsafe { pcnt.clone_unchecked() }),
-            unit1: Unit::new(unsafe { pcnt.clone_unchecked() }),
-            unit2: Unit::new(unsafe { pcnt.clone_unchecked() }),
-            unit3: Unit::new(unsafe { pcnt.clone_unchecked() }),
-            #[cfg(esp32)]
-            unit4: Unit::new(unsafe { pcnt.clone_unchecked() }),
-            #[cfg(esp32)]
-            unit5: Unit::new(unsafe { pcnt.clone_unchecked() }),
-            #[cfg(esp32)]
-            unit6: Unit::new(unsafe { pcnt.clone_unchecked() }),
-            #[cfg(esp32)]
-            unit7: Unit::new(unsafe { pcnt.clone_unchecked() }),
-            pcnt,
-            _guard: guard,
-        }
-    }
-
-    /// Sets the interrupt handler for the PCNT peripheral.
-    ///
-    /// Replaces any previously registered interrupt handlers.
-    #[instability::unstable]
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.pcnt.disable_peri_interrupt_on_all_cores();
-        self.pcnt.bind_peri_interrupt(handler);
+        };
     }
 }
 
-impl crate::private::Sealed for Pcnt<'_> {}
+for_each_pcnt_unit! {
+    (interrupt $(($interrupt:ident)),*) => {
+        $(
+            paste::paste! {
+                #[handler(priority = Priority::max())]
+                fn [<pcnt_irq_ $interrupt>]() {
+                    dispatch(Interrupt::$interrupt);
+                }
+            }
+        )*
+    };
 
-#[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for Pcnt<'_> {
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.set_interrupt_handler(handler);
-    }
+    (regs $(($regs:ident)),*) => {
+        $(
+            paste::paste! {
+                static [<$regs _LOCK>]: RawMutex = RawMutex::new();
+            }
+        )*
+    };
+
+    ($peri:ident, $variant:ident, $sys:ident, $regs:ident, $unit:literal, $interrupt:ident, $sig_ch0:ident, $sig_ch1:ident, $ctrl_ch0:ident, $ctrl_ch1:ident) => {
+        impl crate::pcnt::Instance for crate::peripherals::$peri<'_> {
+            fn parts(&self) -> (&'static crate::pcnt::Info, &'static crate::pcnt::State) {
+                static INFO: crate::pcnt::Info = crate::pcnt::Info {
+                    unit: $unit,
+                    peripheral: crate::system::Peripheral::$sys,
+                    interrupt: crate::peripherals::Interrupt::$interrupt,
+                    dispatcher: paste::paste! { [<pcnt_irq_ $interrupt>] },
+                    register_block: crate::peripherals::$regs::ptr(),
+                    lock: paste::paste! { &crate::pcnt::[<$regs _LOCK>] },
+                    sig_ch: [crate::gpio::InputSignal::$sig_ch0, crate::gpio::InputSignal::$sig_ch1],
+                    ctrl_ch: [crate::gpio::InputSignal::$ctrl_ch0, crate::gpio::InputSignal::$ctrl_ch1],
+                };
+                static STATE: crate::pcnt::State = crate::pcnt::State::new();
+                (&INFO, &STATE)
+            }
+        }
+    };
+
+    (all $(($peri:ident, $variant:ident, $sys:ident, $regs:ident, $unit:literal, $interrupt:ident, $sig_ch0:ident, $sig_ch1:ident, $ctrl_ch0:ident, $ctrl_ch1:ident)),*) => {
+        crate::any_peripheral! {
+            /// Any PCNT unit.
+            pub peripheral AnyPcntUnit<'d> {
+                $(
+                    $variant(crate::peripherals::$peri<'d>),
+                )*
+            }
+        }
+    };
 }

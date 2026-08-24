@@ -733,6 +733,9 @@ impl Config {
         if let Some(peri) = self.device.peri_config.spi_slave.as_ref() {
             tokens.extend(cfg::generate_spi_slave_peripherals(peri));
         };
+        if let Some(peri) = self.device.peri_config.pcnt.as_ref() {
+            tokens.extend(cfg::generate_pcnt_peripherals(peri));
+        };
 
         tokens.extend(self.generate_peripherals_macro());
 
@@ -832,6 +835,22 @@ This pin may be available with certain limitations. Check your hardware to make 
                     };
                     all_peripherals.push(quote! { @peri_type #tokens (unstable) });
                     singleton_peripherals.push(unstable_singleton(&quote! {}, &ch_name));
+                }
+            }
+        }
+
+        if let Some(pcnt) = self.device.peri_config.pcnt.as_ref()
+            && pcnt.support_status.is_supported()
+        {
+            for instance in pcnt.instances.iter() {
+                for unit in 0..instance.instance_config.units.len() {
+                    let name = format_ident!("{}", cfg::singleton_name(&instance.name, unit));
+                    let singleton_doc = format!("{} peripheral singleton", name);
+                    let tokens = quote! {
+                        #[doc = #singleton_doc] #name <= virtual ()
+                    };
+                    all_peripherals.push(quote! { @peri_type #tokens (unstable) });
+                    singleton_peripherals.push(unstable_singleton(&quote! {}, &name));
                 }
             }
         }

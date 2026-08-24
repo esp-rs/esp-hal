@@ -451,6 +451,28 @@ support_status = "not_supported"
 [device.mcpwm]
 support_status = "not_supported"
 [device.pcnt]
+instances = {
+    PCNT = {
+        sys_instance = "Pcnt",
+        interrupt = "PCNT0",
+        units = [
+            { sig_ch0 = "PCNT0_SIG_CH0", sig_ch1 = "PCNT0_SIG_CH1", ctrl_ch0 = "PCNT0_CTRL_CH0", ctrl_ch1 = "PCNT0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_SIG_CH0", sig_ch1 = "PCNT1_SIG_CH1", ctrl_ch0 = "PCNT1_CTRL_CH0", ctrl_ch1 = "PCNT1_CTRL_CH1" },
+            { sig_ch0 = "PCNT2_SIG_CH0", sig_ch1 = "PCNT2_SIG_CH1", ctrl_ch0 = "PCNT2_CTRL_CH0", ctrl_ch1 = "PCNT2_CTRL_CH1" },
+            { sig_ch0 = "PCNT3_SIG_CH0", sig_ch1 = "PCNT3_SIG_CH1", ctrl_ch0 = "PCNT3_CTRL_CH0", ctrl_ch1 = "PCNT3_CTRL_CH1" },
+        ],
+    },
+    PCNT1 = {
+        sys_instance = "Pcnt1",
+        interrupt = "PCNT1",
+        units = [
+            { sig_ch0 = "PCNT1_U0_SIG_CH0", sig_ch1 = "PCNT1_U0_SIG_CH1", ctrl_ch0 = "PCNT1_U0_CTRL_CH0", ctrl_ch1 = "PCNT1_U0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_U1_SIG_CH0", sig_ch1 = "PCNT1_U1_SIG_CH1", ctrl_ch0 = "PCNT1_U1_CTRL_CH0", ctrl_ch1 = "PCNT1_U1_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_U2_SIG_CH0", sig_ch1 = "PCNT1_U2_SIG_CH1", ctrl_ch0 = "PCNT1_U2_CTRL_CH0", ctrl_ch1 = "PCNT1_U2_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_U3_SIG_CH0", sig_ch1 = "PCNT1_U3_SIG_CH1", ctrl_ch0 = "PCNT1_U3_CTRL_CH0", ctrl_ch1 = "PCNT1_U3_CTRL_CH1" },
+        ],
+    },
+}
 [device.rgb_display]
 support_status = "partial"
 output_lines = 24

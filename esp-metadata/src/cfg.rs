@@ -6,6 +6,7 @@ pub(crate) mod i2c_master;
 pub(crate) mod i2s;
 pub(crate) mod interrupt;
 pub(crate) mod lp_io;
+pub(crate) mod pcnt;
 pub(crate) mod rmt;
 pub(crate) mod rsa;
 pub(crate) mod sdm;
@@ -26,6 +27,7 @@ pub(crate) use i2c_master::*;
 pub(crate) use i2s::*;
 pub(crate) use interrupt::*;
 pub(crate) use lp_io::*;
+pub(crate) use pcnt::*;
 pub(crate) use rmt::*;
 pub(crate) use sdm::*;
 pub(crate) use sdmmc::*;
@@ -110,6 +112,52 @@ pub(crate) struct PeriInstance<I = EmptyInstanceConfig> {
     pub instance_config: I,
 }
 
+/// Accepts either a sequence of `{ name, ... }` tables or a map keyed by instance name.
+pub(crate) fn deserialize_peri_instances<'de, D, I>(
+    deserializer: D,
+) -> Result<Vec<PeriInstance<I>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    I: serde::Deserialize<'de>,
+{
+    struct InstancesVisitor<I>(core::marker::PhantomData<I>);
+
+    impl<'de, I: serde::Deserialize<'de>> serde::de::Visitor<'de> for InstancesVisitor<I> {
+        type Value = Vec<PeriInstance<I>>;
+
+        fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+            formatter.write_str("a sequence or a map of peripheral instances")
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::SeqAccess<'de>,
+        {
+            let mut instances = Vec::new();
+            while let Some(instance) = seq.next_element()? {
+                instances.push(instance);
+            }
+            Ok(instances)
+        }
+
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: serde::de::MapAccess<'de>,
+        {
+            let mut instances = Vec::new();
+            while let Some((name, instance_config)) = map.next_entry()? {
+                instances.push(PeriInstance {
+                    name,
+                    instance_config,
+                });
+            }
+            Ok(instances)
+        }
+    }
+
+    deserializer.deserialize_any(InstancesVisitor(core::marker::PhantomData))
+}
+
 /// A single cell in the peripheral support table.
 pub(crate) struct SupportItem {
     /// The human-readable name of the driver in the table (leftmost cell.)
@@ -159,6 +207,7 @@ macro_rules! driver_configs {
             // The list of peripherals for which this driver is implemented.
             // If empty, the driver supports a single instance only.
             #[serde(default)]
+            #[serde(deserialize_with = "deserialize_peri_instances")]
             pub instances: Vec<PeriInstance $(<$instance_config>)?>,
             $(
                 $(#[$meta])*
@@ -761,7 +810,7 @@ driver_configs![
             name: "MCPWM",
             properties: {}
         },
-        PcntProperties {
+        PcntProperties<PcntInstanceConfig> {
             driver: pcnt,
             name: "PCNT",
             properties: {}

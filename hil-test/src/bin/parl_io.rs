@@ -408,7 +408,6 @@ mod tx {
         },
         parl_io::{BitPackOrder, ClkOutPin, ParlIo, SampleEdge, TxConfig, TxEightBits},
         pcnt::{
-            Pcnt,
             channel::{CtrlMode, EdgeMode},
             unit::Unit,
         },
@@ -423,7 +422,7 @@ mod tx {
         valid: OutputSignal<'static>,
         clock_loopback: InputSignal<'static>,
         valid_loopback: InputSignal<'static>,
-        pcnt_unit: Unit<'static, 0>,
+        pcnt_unit: Unit<'static>,
     }
     #[init]
     fn init() -> Context {
@@ -433,8 +432,7 @@ mod tx {
         let valid = hil_test::unconnected_pin!(peripherals);
         let (clock_loopback, clock) = unsafe { clock.split() };
         let (valid_loopback, valid) = unsafe { valid.split() };
-        let pcnt = Pcnt::new(peripherals.PCNT);
-        let pcnt_unit = pcnt.unit0;
+        let pcnt_unit = Unit::new(peripherals.PCNT0_UNIT0);
         let dma_channel = peripherals.DMA_CH0;
 
         let parl_io = peripherals.PARL_IO;
@@ -582,7 +580,6 @@ mod async_tx {
         },
         parl_io::{BitPackOrder, ClkOutPin, ParlIo, SampleEdge, TxConfig, TxEightBits},
         pcnt::{
-            Pcnt,
             channel::{CtrlMode, EdgeMode},
             unit::Unit,
         },
@@ -597,7 +594,7 @@ mod async_tx {
         valid: OutputSignal<'static>,
         clock_loopback: InputSignal<'static>,
         valid_loopback: InputSignal<'static>,
-        pcnt_unit: Unit<'static, 0>,
+        pcnt_unit: Unit<'static>,
     }
     #[init]
     async fn init() -> Context {
@@ -607,8 +604,7 @@ mod async_tx {
         let valid = hil_test::unconnected_pin!(peripherals);
         let (clock_loopback, clock) = unsafe { clock.split() };
         let (valid_loopback, valid) = unsafe { valid.split() };
-        let pcnt = Pcnt::new(peripherals.PCNT);
-        let pcnt_unit = pcnt.unit0;
+        let pcnt_unit = Unit::new(peripherals.PCNT0_UNIT0);
         let dma_channel = peripherals.DMA_CH0;
 
         let parl_io = peripherals.PARL_IO;

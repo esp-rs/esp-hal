@@ -51,7 +51,7 @@
 //! (If the user were to clear the interrupt status, we would need to re-enable
 //! it, for PinFuture to detect the completion).
 
-use portable_atomic::{AtomicPtr, Ordering};
+use portable_atomic::Ordering;
 use strum::EnumCount;
 
 #[cfg(feature = "rt")]
@@ -64,29 +64,11 @@ use crate::{
 };
 use crate::{
     gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, low_level::set_int_enable},
+    private::CFnPtr,
     ram,
 };
 
-/// Convenience constant for `Option::None` pin
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
-
-pub(super) struct CFnPtr(AtomicPtr<()>);
-impl CFnPtr {
-    pub const fn new() -> Self {
-        Self(AtomicPtr::new(core::ptr::null_mut()))
-    }
-
-    pub fn store(&self, f: extern "C" fn()) {
-        self.0.store(f as *mut (), Ordering::Relaxed);
-    }
-
-    pub fn call(&self) {
-        let ptr = self.0.load(Ordering::Relaxed);
-        if !ptr.is_null() {
-            unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
-        }
-    }
-}
 
 #[cfg(feature = "rt")]
 pub(crate) fn bind_default_interrupt_handler() {
