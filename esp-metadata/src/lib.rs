@@ -418,6 +418,8 @@ struct Device {
     cores: usize,
     datasheet: String,
     trm: String,
+    #[serde(default)]
+    support_note: String,
 
     // Peripheral driver configuration:
     #[serde(flatten)]
@@ -470,6 +472,7 @@ impl Config {
                 datasheet: String::new(),
                 trm: String::new(),
                 peri_config: PeriConfig::default(),
+                support_note: String::new(),
             },
             all_symbols: OnceLock::new(),
         }
@@ -1623,20 +1626,21 @@ fn write_support_table(
 pub fn generate_supported_devices_table(output: &mut impl Write) -> std::fmt::Result {
     writeln!(
         output,
-        "| Chip | Datasheet | Technical Reference Manual | Target |"
+        "| Chip | Datasheet | Technical Reference Manual | Target | Note |"
     )?;
     writeln!(
         output,
-        "| :---: | :-------: | :------------------------: | :----: |"
+        "| :---: | :-------: | :------------------------: | :----: | :---: |"
     )?;
 
     for chip in Chip::iter() {
         let config = Config::for_chip(&chip);
         writeln!(
             output,
-            "| {pretty} | [{pretty}][{chip}-datasheet] | [{pretty}][{chip}-trm] | `{target}` |",
+            "| {pretty} | [{pretty}][{chip}-datasheet] | [{pretty}][{chip}-trm] | `{target}` | {note} |",
             pretty = chip.pretty_name(),
             target = config.device.target,
+            note = config.device.support_note,
         )?;
     }
 

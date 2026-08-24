@@ -12,6 +12,7 @@ target = "riscv32imafc-unknown-none-elf"
 cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_datasheet_en.pdf"
 trm       = "https://www.espressif.com/sites/default/files/documentation/esp32-s31_technical_reference_manual_en.pdf"
+support_note = "In early stages of development."
 
 [device.mmu]
 page_size = 0x10000
