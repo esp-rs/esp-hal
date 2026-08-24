@@ -205,6 +205,8 @@ options:
     default:
       - value: 300
         if: "esp32"
+      - value: 300
+        if: "esp32p4"
       - value: 0
 
   - name: use_rwdata_ld_hook
