@@ -6549,7 +6549,7 @@ macro_rules! for_each_peripheral {
         #[doc = "APB_SARADC peripheral singleton"] APB_SARADC <= ADC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_ADC peripheral singleton"]
         LP_ADC <= LP_ADC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "RMT peripheral singleton"] RMT <= virtual(RMT : { bind_peri_interrupt,
+        "RMT peripheral singleton"] RMT <= RMT(RMT : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "AES peripheral singleton"] AES
         <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
@@ -6960,7 +6960,7 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "APB_SARADC peripheral singleton"] APB_SARADC <= ADC() (unstable)), (@
         peri_type #[doc = "LP_ADC peripheral singleton"] LP_ADC <= LP_ADC() (unstable)),
-        (@ peri_type #[doc = "RMT peripheral singleton"] RMT <= virtual(RMT : {
+        (@ peri_type #[doc = "RMT peripheral singleton"] RMT <= RMT(RMT : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "AES peripheral singleton"] AES <= AES(AES : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })

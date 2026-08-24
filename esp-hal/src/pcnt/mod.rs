@@ -95,14 +95,52 @@
 //! [unit]: unit/index.html
 
 use self::unit::Unit;
-use crate::{interrupt::InterruptHandler, peripherals::PCNT, system::GenericPeripheralGuard};
+use crate::{interrupt::InterruptHandler, pac::pcnt::RegisterBlock, system::PeripheralGuard};
 
 pub mod channel;
 pub mod unit;
 
+crate::any_peripheral! {
+    /// Any PCNT peripheral.
+    pub peripheral AnyPcnt<'d> {
+        #[cfg(soc_has_pcnt)]
+        Pcnt(crate::peripherals::PCNT<'d>),
+        #[cfg(soc_has_pcnt1)]
+        Pcnt1(crate::peripherals::PCNT1<'d>),
+    }
+}
+
+impl AnyPcnt<'_> {
+    #[cfg(soc_has_pcnt1)]
+    fn is_pcnt1(&self) -> bool {
+        matches!(&self.0, any::Inner::Pcnt1(_))
+    }
+
+    fn peripheral(&self) -> crate::system::Peripheral {
+        match &self.0 {
+            #[cfg(soc_has_pcnt)]
+            any::Inner::Pcnt(_) => crate::system::Peripheral::Pcnt,
+            #[cfg(soc_has_pcnt1)]
+            any::Inner::Pcnt1(_) => crate::system::Peripheral::Pcnt1,
+        }
+    }
+
+    fn register_block(&self) -> &RegisterBlock {
+        any::delegate!(self, pcnt => { pcnt.register_block() })
+    }
+
+    fn bind_peri_interrupt(&self, handler: InterruptHandler) {
+        any::delegate!(self, pcnt => { pcnt.bind_peri_interrupt(handler) })
+    }
+
+    fn disable_peri_interrupt_on_all_cores(&self) {
+        any::delegate!(self, pcnt => { pcnt.disable_peri_interrupt_on_all_cores() })
+    }
+}
+
 /// Pulse Counter (PCNT) peripheral driver.
 pub struct Pcnt<'d> {
-    pcnt: PCNT<'d>,
+    pcnt: AnyPcnt<'d>,
 
     /// Unit 0
     pub unit0: Unit<'d, 0>,
@@ -125,13 +163,14 @@ pub struct Pcnt<'d> {
     /// Unit 7
     pub unit7: Unit<'d, 7>,
 
-    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Pcnt as u8 }>,
+    _guard: PeripheralGuard,
 }
 
 impl<'d> Pcnt<'d> {
     /// Returns a new PCNT.
-    pub fn new(pcnt: PCNT<'d>) -> Self {
-        let guard = GenericPeripheralGuard::new();
+    pub fn new(pcnt: impl Into<AnyPcnt<'d>>) -> Self {
+        let pcnt = pcnt.into();
+        let guard = PeripheralGuard::new(pcnt.peripheral());
         let regs = pcnt.register_block();
 
         let unit_count = regs.unit_iter().count() as u8;
@@ -154,19 +193,19 @@ impl<'d> Pcnt<'d> {
         });
 
         Pcnt {
+            unit0: Unit::new(unsafe { pcnt.clone_unchecked() }),
+            unit1: Unit::new(unsafe { pcnt.clone_unchecked() }),
+            unit2: Unit::new(unsafe { pcnt.clone_unchecked() }),
+            unit3: Unit::new(unsafe { pcnt.clone_unchecked() }),
+            #[cfg(esp32)]
+            unit4: Unit::new(unsafe { pcnt.clone_unchecked() }),
+            #[cfg(esp32)]
+            unit5: Unit::new(unsafe { pcnt.clone_unchecked() }),
+            #[cfg(esp32)]
+            unit6: Unit::new(unsafe { pcnt.clone_unchecked() }),
+            #[cfg(esp32)]
+            unit7: Unit::new(unsafe { pcnt.clone_unchecked() }),
             pcnt,
-            unit0: Unit::new(),
-            unit1: Unit::new(),
-            unit2: Unit::new(),
-            unit3: Unit::new(),
-            #[cfg(esp32)]
-            unit4: Unit::new(),
-            #[cfg(esp32)]
-            unit5: Unit::new(),
-            #[cfg(esp32)]
-            unit6: Unit::new(),
-            #[cfg(esp32)]
-            unit7: Unit::new(),
             _guard: guard,
         }
     }

@@ -9,11 +9,12 @@
 //! resuming, and clearing the counter, as well as enabling or disabling
 //! interrupts for specific events associated with the unit.
 
-use core::marker::PhantomData;
-
 use esp_sync::RawMutex;
 
-use crate::{pcnt::channel::Channel, peripherals::PCNT, system::GenericPeripheralGuard};
+use crate::{
+    pcnt::{AnyPcnt, channel::Channel},
+    system::PeripheralGuard,
+};
 
 /// Invalid filter threshold value
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -76,6 +77,7 @@ pub struct Events {
 /// Represents a pulse counter unit.
 #[non_exhaustive]
 pub struct Unit<'d, const NUM: usize> {
+    pcnt: AnyPcnt<'d>,
     /// The counter for PCNT unit.
     pub counter: Counter<'d, NUM>,
     /// The first channel in PCNT unit.
@@ -86,13 +88,14 @@ pub struct Unit<'d, const NUM: usize> {
 
 static MUTEX: RawMutex = RawMutex::new();
 
-impl<const NUM: usize> Unit<'_, NUM> {
+impl<'d, const NUM: usize> Unit<'d, NUM> {
     /// return a new Unit
-    pub(super) fn new() -> Self {
+    pub(super) fn new(pcnt: AnyPcnt<'d>) -> Self {
         Self {
-            counter: Counter::new(),
-            channel0: Channel::new(),
-            channel1: Channel::new(),
+            counter: Counter::new(unsafe { pcnt.clone_unchecked() }),
+            channel0: Channel::new(unsafe { pcnt.clone_unchecked() }),
+            channel1: Channel::new(unsafe { pcnt.clone_unchecked() }),
+            pcnt,
         }
     }
 
@@ -107,7 +110,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     ///
     /// The specified value must be negative.
     pub fn set_low_limit(&self, value: Option<i16>) -> Result<(), InvalidLowLimit> {
-        let pcnt = PCNT::regs();
+        let pcnt = self.pcnt.register_block();
         let unit = pcnt.unit(NUM);
 
         if let Some(value) = value {
@@ -138,7 +141,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     ///
     /// The specified value must be positive.
     pub fn set_high_limit(&self, value: Option<i16>) -> Result<(), InvalidHighLimit> {
-        let pcnt = PCNT::regs();
+        let pcnt = self.pcnt.register_block();
         let unit = pcnt.unit(NUM);
 
         if let Some(value) = value {
@@ -160,7 +163,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// When the count equals this value a threshold0 interrupt is triggered.
     /// If None is specified, then no interrupt is triggered.
     pub fn set_threshold0(&self, value: Option<i16>) {
-        let pcnt = PCNT::regs();
+        let pcnt = self.pcnt.register_block();
         let unit = pcnt.unit(NUM);
 
         if let Some(value) = value {
@@ -177,7 +180,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// When the count equals this value a threshold1 interrupt is triggered.
     /// If None is specified, then no interrupt is triggered.
     pub fn set_threshold1(&self, value: Option<i16>) {
-        let pcnt = PCNT::regs();
+        let pcnt = self.pcnt.register_block();
         let unit = pcnt.unit(NUM);
 
         if let Some(value) = value {
@@ -196,7 +199,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     ///
     /// The maximum possible threshold is 1023.
     pub fn set_filter(&self, threshold: Option<u16>) -> Result<(), InvalidFilterThreshold> {
-        let pcnt = PCNT::regs();
+        let pcnt = self.pcnt.register_block();
         let unit = pcnt.unit(NUM);
 
         match threshold {
@@ -219,12 +222,13 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Resets the counter value to zero.
     pub fn clear(&self) {
         MUTEX.lock(|| {
-            let bits = PCNT::regs().ctrl().read().bits();
-            PCNT::regs().ctrl().write(|w| {
+            let regs = self.pcnt.register_block();
+            let bits = regs.ctrl().read().bits();
+            regs.ctrl().write(|w| {
                 unsafe { w.bits(bits) };
                 w.cnt_rst_u(NUM as u8).set_bit()
             });
-            PCNT::regs().ctrl().write(|w| {
+            regs.ctrl().write(|w| {
                 unsafe { w.bits(bits) };
                 w.cnt_rst_u(NUM as u8).clear_bit()
             });
@@ -234,7 +238,8 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Pauses the counter.
     pub fn pause(&self) {
         MUTEX.lock(|| {
-            PCNT::regs()
+            self.pcnt
+                .register_block()
                 .ctrl()
                 .modify(|_, w| w.cnt_pause_u(NUM as u8).set_bit());
         });
@@ -243,7 +248,8 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Resumes the counter.
     pub fn resume(&self) {
         MUTEX.lock(|| {
-            PCNT::regs()
+            self.pcnt
+                .register_block()
                 .ctrl()
                 .modify(|_, w| w.cnt_pause_u(NUM as u8).clear_bit());
         });
@@ -251,7 +257,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Returns the latest events for this unit.
     pub fn events(&self) -> Events {
-        let status = PCNT::regs().u_status(NUM).read();
+        let status = self.pcnt.register_block().u_status(NUM).read();
 
         Events {
             low_limit: status.l_lim().bit(),
@@ -264,13 +270,20 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Returns the mode of the last zero crossing.
     pub fn zero_mode(&self) -> ZeroMode {
-        PCNT::regs().u_status(NUM).read().zero_mode().bits().into()
+        self.pcnt
+            .register_block()
+            .u_status(NUM)
+            .read()
+            .zero_mode()
+            .bits()
+            .into()
     }
 
     /// Enables interrupts for this unit.
     pub fn listen(&self) {
         MUTEX.lock(|| {
-            PCNT::regs()
+            self.pcnt
+                .register_block()
                 .int_ena()
                 .modify(|_, w| w.cnt_thr_event_u(NUM as u8).set_bit());
         });
@@ -279,7 +292,8 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Disables interrupts for this unit.
     pub fn unlisten(&self) {
         MUTEX.lock(|| {
-            PCNT::regs()
+            self.pcnt
+                .register_block()
                 .int_ena()
                 .modify(|_, w| w.cnt_thr_event_u(NUM as u8).clear_bit());
         });
@@ -287,7 +301,8 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Returns whether an interrupt is active for this unit.
     pub fn interrupt_is_set(&self) -> bool {
-        PCNT::regs()
+        self.pcnt
+            .register_block()
             .int_raw()
             .read()
             .cnt_thr_event_u(NUM as u8)
@@ -296,7 +311,8 @@ impl<const NUM: usize> Unit<'_, NUM> {
 
     /// Clears the interrupt bit for this unit.
     pub fn reset_interrupt(&self) {
-        PCNT::regs()
+        self.pcnt
+            .register_block()
             .int_clr()
             .write(|w| w.cnt_thr_event_u(NUM as u8).set_bit());
     }
@@ -317,26 +333,33 @@ impl<const NUM: usize> Drop for Unit<'_, NUM> {
 unsafe impl<const NUM: usize> Send for Unit<'_, NUM> {}
 
 /// Represents the counter within a pulse counter unit.
-#[derive(Clone)]
 pub struct Counter<'d, const NUM: usize> {
-    _phantom: PhantomData<&'d ()>,
-
-    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Pcnt as u8 }>,
+    pcnt: AnyPcnt<'d>,
+    _guard: PeripheralGuard,
 }
 
-impl<const NUM: usize> Counter<'_, NUM> {
-    fn new() -> Self {
-        let guard = GenericPeripheralGuard::new();
+impl<const NUM: usize> Clone for Counter<'_, NUM> {
+    fn clone(&self) -> Self {
+        Self {
+            pcnt: unsafe { self.pcnt.clone_unchecked() },
+            _guard: self._guard.clone(),
+        }
+    }
+}
+
+impl<'d, const NUM: usize> Counter<'d, NUM> {
+    fn new(pcnt: AnyPcnt<'d>) -> Self {
+        let guard = PeripheralGuard::new(pcnt.peripheral());
 
         Self {
-            _phantom: PhantomData,
+            pcnt,
             _guard: guard,
         }
     }
 
     /// Returns the current counter value.
     pub fn get(&self) -> i16 {
-        let pcnt = PCNT::regs();
+        let pcnt = self.pcnt.register_block();
         pcnt.u_cnt(NUM).read().cnt().bits() as i16
     }
 }

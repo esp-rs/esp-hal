@@ -81,10 +81,12 @@ peripherals = [
     { name = "MODEM_LPCON" },
     { name = "MODEM_SYSCON" },
     { name = "PAU" },
+    { name = "PCNT",  interrupts = { peri = "PCNT0" } },
+    { name = "PCNT1", interrupts = { peri = "PCNT1" } },
     { name = "PMU" },
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "RNG", pac = "TRNG" },
-    { name = "RMT", virtual = true, interrupts = { peri = "RMT" }, clock_group = "RMT" }, # PAC field names differ from ESP32-S3; overlay_rmt maps them.
+    { name = "RMT", interrupts = { peri = "RMT" }, clock_group = "RMT" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SPI0" },
     { name = "SPI1" },
@@ -449,7 +451,6 @@ support_status = "not_supported"
 [device.mcpwm]
 support_status = "not_supported"
 [device.pcnt]
-support_status = "not_supported"
 [device.rgb_display]
 support_status = "partial"
 output_lines = 24
