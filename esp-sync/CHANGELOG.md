@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial ESP32-P4 (chip revision v3.0+) support (#5400, #5523)
-- Add ESP32-S31 support (#5922)
 
 ### Changed
 
@@ -20,6 +18,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+
+## [v0.3.0] - 2026-08-24
+
+### Added
+
+- Initial ESP32-P4 (chip revision v3.0+) support (#5400, #5523)
+- Add ESP32-S31 support (#5922)
+
+### Changed
+
+- updated defmt to 1.1 (#5752)
 
 ## [v0.2.1] - 2026-04-16
 
@@ -44,4 +53,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-sync-v0.1.0
 [v0.1.1]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.1.0...esp-sync-v0.1.1
 [v0.2.1]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.1.1...esp-sync-v0.2.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.2.1...HEAD
+[v0.3.0]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.2.1...esp-sync-v0.3.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-sync-v0.3.0...HEAD

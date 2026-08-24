@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal"
-version       = "1.1.0"
+version       = "1.2.0-rc.0"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "Bare-metal HAL for Espressif devices"
@@ -71,10 +71,10 @@ fugit                    = "0.5.0"
 instability              = "0.3.12"
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 
-esp-config               = { version = "0.7.0", path = "../esp-config" }
-esp-metadata-generated   = { version = "0.4.0", path = "../esp-metadata-generated" }
-esp-sync                 = { version = "0.2.1", path = "../esp-sync" }
-procmacros               = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-config               = { version = "0.8.0", path = "../esp-config" }
+esp-metadata-generated   = { version = "0.5.0", path = "../esp-metadata-generated" }
+esp-sync                 = { version = "0.3.0", path = "../esp-sync" }
+procmacros               = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
 # Dependencies that are optional because they are used by unstable drivers.
 # They are needed when using the `unstable` feature.
@@ -125,15 +125,15 @@ esp32p4 = { version = "0.3",  features = ["critical-section"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
-esp-riscv-rt     = { version = "0.14.0", path = "../esp-riscv-rt", optional = true }
+esp-riscv-rt     = { version = "0.15.0", path = "../esp-riscv-rt", optional = true }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
 xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
-xtensa-lx-rt     = { version = "0.22.0", path = "../xtensa-lx-rt", optional = true }
+xtensa-lx-rt     = { version = "0.23.0", path = "../xtensa-lx-rt", optional = true }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
-esp-config   = { version = "0.7.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.8.0", path = "../esp-config", features = ["build"] }
 somni-template = "0.3.1"
 
 [dev-dependencies]

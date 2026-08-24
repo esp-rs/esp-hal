@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.1.5] - 2026-08-24
+
+### Added
+
 - Add ESP32-S31 support (#5922)
 
 ### Changed
@@ -18,9 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix `rtc_clk_xtal_freq_get` (#5407)
-
-### Removed
-
 
 ## [v0.1.4] - 2026-04-16
 
@@ -62,4 +73,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.2]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.1...esp-rom-sys-v0.1.2
 [v0.1.3]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.2...esp-rom-sys-v0.1.3
 [v0.1.4]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.3...esp-rom-sys-v0.1.4
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.4...HEAD
+[v0.1.5]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.4...esp-rom-sys-v0.1.5
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-rom-sys-v0.1.5...HEAD
