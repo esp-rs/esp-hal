@@ -1607,7 +1607,6 @@ mod half_duplex_write_psram {
     }
 }
 
-#[cfg(spi_slave_driver_supported)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod read {
     use esp_hal::{
