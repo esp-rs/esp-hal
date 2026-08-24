@@ -12,6 +12,7 @@ target = "xtensa-esp32-none-elf"
 cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
+support_note = "Revisions below v3.0 are not supported."
 
 [device.mmu]
 page_size = 0x10000

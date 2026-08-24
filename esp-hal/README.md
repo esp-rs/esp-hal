@@ -23,19 +23,19 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 <!-- The following table is machine generated. Do not edit the comments and the table by hand! -->
 <!-- start supported devices table -->
-| Chip | Datasheet | Technical Reference Manual | Target |
-| :---: | :-------: | :------------------------: | :----: |
-| ESP32 | [ESP32][esp32-datasheet] | [ESP32][esp32-trm] | `xtensa-esp32-none-elf` |
-| ESP32-C2 | [ESP32-C2][esp32c2-datasheet] | [ESP32-C2][esp32c2-trm] | `riscv32imc-unknown-none-elf` |
-| ESP32-C3 | [ESP32-C3][esp32c3-datasheet] | [ESP32-C3][esp32c3-trm] | `riscv32imc-unknown-none-elf` |
-| ESP32-C5 | [ESP32-C5][esp32c5-datasheet] | [ESP32-C5][esp32c5-trm] | `riscv32imac-unknown-none-elf` |
-| ESP32-C6 | [ESP32-C6][esp32c6-datasheet] | [ESP32-C6][esp32c6-trm] | `riscv32imac-unknown-none-elf` |
-| ESP32-C61 | [ESP32-C61][esp32c61-datasheet] | [ESP32-C61][esp32c61-trm] | `riscv32imac-unknown-none-elf` |
-| ESP32-H2 | [ESP32-H2][esp32h2-datasheet] | [ESP32-H2][esp32h2-trm] | `riscv32imac-unknown-none-elf` |
-| ESP32-P4 | [ESP32-P4][esp32p4-datasheet] | [ESP32-P4][esp32p4-trm] | `riscv32imafc-unknown-none-elf` |
-| ESP32-S2 | [ESP32-S2][esp32s2-datasheet] | [ESP32-S2][esp32s2-trm] | `xtensa-esp32s2-none-elf` |
-| ESP32-S3 | [ESP32-S3][esp32s3-datasheet] | [ESP32-S3][esp32s3-trm] | `xtensa-esp32s3-none-elf` |
-| ESP32-S31 | [ESP32-S31][esp32s31-datasheet] | [ESP32-S31][esp32s31-trm] | `riscv32imafc-unknown-none-elf` |
+| Chip  | Documentation | Target | Note  |
+| :---: | :-----------: | :----: | :---: |
+| ESP32 | [Datasheet][esp32-datasheet] [TRM][esp32-trm] | `xtensa-esp32-none-elf` | Revisions below v3.0 are not supported. |
+| ESP32-C2 | [Datasheet][esp32c2-datasheet] [TRM][esp32c2-trm] | `riscv32imc-unknown-none-elf` |  |
+| ESP32-C3 | [Datasheet][esp32c3-datasheet] [TRM][esp32c3-trm] | `riscv32imc-unknown-none-elf` |  |
+| ESP32-C5 | [Datasheet][esp32c5-datasheet] [TRM][esp32c5-trm] | `riscv32imac-unknown-none-elf` |  |
+| ESP32-C6 | [Datasheet][esp32c6-datasheet] [TRM][esp32c6-trm] | `riscv32imac-unknown-none-elf` |  |
+| ESP32-C61 | [Datasheet][esp32c61-datasheet] [TRM][esp32c61-trm] | `riscv32imac-unknown-none-elf` |  |
+| ESP32-H2 | [Datasheet][esp32h2-datasheet] [TRM][esp32h2-trm] | `riscv32imac-unknown-none-elf` |  |
+| ESP32-P4 | [Datasheet][esp32p4-datasheet] [TRM][esp32p4-trm] | `riscv32imafc-unknown-none-elf` | Revisions below v3.0 are not supported. |
+| ESP32-S2 | [Datasheet][esp32s2-datasheet] [TRM][esp32s2-trm] | `xtensa-esp32s2-none-elf` |  |
+| ESP32-S3 | [Datasheet][esp32s3-datasheet] [TRM][esp32s3-trm] | `xtensa-esp32s3-none-elf` |  |
+| ESP32-S31 | [Datasheet][esp32s31-datasheet] [TRM][esp32s31-trm] | `riscv32imafc-unknown-none-elf` | In early stages of development. |
 
 [esp32-datasheet]: https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf
 [esp32-trm]: https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf
