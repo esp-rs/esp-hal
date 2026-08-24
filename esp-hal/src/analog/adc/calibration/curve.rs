@@ -33,6 +33,11 @@ pub trait AdcHasCurveCal {
     ///
     /// A sets of coefficients for each attenuation.
     const CURVES_COEFFS: CurvesCoeffs;
+
+    /// Coefficients for the eFuse calibration version on this chip.
+    fn curves_coeffs() -> CurvesCoeffs {
+        Self::CURVES_COEFFS
+    }
 }
 
 /// Curve fitting ADC calibration scheme
@@ -67,9 +72,13 @@ where
     ADCX: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + CalibrationAccess,
 {
     fn new_cal(atten: Attenuation) -> Self {
-        let line = AdcCalLine::<ADCX>::new_cal(atten);
+        Self::new_cal_with_channel(atten, 0)
+    }
 
-        let coeff = ADCX::CURVES_COEFFS
+    fn new_cal_with_channel(atten: Attenuation, channel: u8) -> Self {
+        let line = AdcCalLine::<ADCX>::new_cal_with_channel(atten, channel);
+
+        let coeff = ADCX::curves_coeffs()
             .iter()
             .find(|item| item.atten == atten)
             .expect("No curve coefficients for given attenuation")
@@ -132,16 +141,24 @@ mod impls {
 
     impl AdcHasCurveCal for crate::peripherals::ADC1<'_> {
         const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
+
+        #[cfg(esp32c6)]
+        fn curves_coeffs() -> CurvesCoeffs {
+            if crate::efuse::rtc_calib_version() == 2 {
+                CURVES_COEFFS1_V2
+            } else {
+                CURVES_COEFFS1
+            }
+        }
     }
 
-    #[cfg(esp32c3)]
+    #[cfg(any(esp32c3, esp32p4, esp32s3))]
     impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
-    }
-
-    #[cfg(any(esp32p4, esp32s3))]
-    impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS2;
+        const CURVES_COEFFS: CurvesCoeffs = cfg_select! {
+            esp32c3 => CURVES_COEFFS1,
+            esp32p4 => CURVES_COEFFS2,
+            esp32s3 => CURVES_COEFFS2,
+        };
     }
 
     coeff_tables! {
@@ -197,8 +214,7 @@ mod impls {
             ],
         ];
 
-
-        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c6/curve_fitting_coefficients.c>
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/027613140/components/esp_adc/esp32c6/curve_fitting_coefficients.c#L29-L35>
         #[cfg(esp32c6)]
         CURVES_COEFFS1 [
             _0dB => [
@@ -223,7 +239,6 @@ mod impls {
             ],
         ];
 
-
         /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/1e76669a8b940f5dc25adc35065cb53de3c71423/components/esp_adc/esp32c61/curve_fitting_coefficients.c>
         #[cfg(esp32c61)]
         CURVES_COEFFS1 [
@@ -243,6 +258,25 @@ mod impls {
                 -1.3204544579940347,
                 -0.0011762579610906,
                 0.0000007639928529,
+            ],
+        ];
+
+        /// Error curve coefficients for calibration version 2 derived from <https://github.com/espressif/esp-idf/blob/027613140/components/esp_adc/esp32c6/curve_fitting_coefficients.c#L36-L42>
+        ///
+        /// Version 2 does not apply a second-step polynomial at 0 dB and 2.5 dB.
+        #[cfg(esp32c6)]
+        CURVES_COEFFS1_V2 [
+            _0dB => [],
+            _2p5dB => [],
+            _6dB => [
+                -1.2217864764388775,
+                -0.0001954123107752,
+                0.0000006409679727,
+            ],
+            _11dB => [
+                -0.3915910437042445,
+                -0.0031536470857564,
+                0.0000012493873014,
             ],
         ];
 
