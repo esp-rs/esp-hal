@@ -2179,6 +2179,9 @@ mod spi_slave {
         spi_slave_dma_engine = "AHB_GDMA" => {
             esp_hal::peripherals::DMA_CH0<'a>
         },
+        spi_slave_dma_engine = "AXI_GDMA" => {
+            esp_hal::peripherals::DMA_AXI_CH0<'a>
+        },
     };
 
     struct Context {
@@ -2258,6 +2261,7 @@ mod spi_slave {
         let dma_channel = cfg_select! {
             spi_slave_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
             spi_slave_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            spi_slave_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
         };
 
         let mut mosi_gpio = Flex::new(mosi_pin);

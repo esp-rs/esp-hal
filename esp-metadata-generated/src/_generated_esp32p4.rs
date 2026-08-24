@@ -1340,6 +1340,14 @@ macro_rules! with_spi_master_dma_engine {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_spi_slave_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_spi_slave_dma_engine { $(($pattern) => $code;)* ($other
+        : tt) => {} } _with_inner_spi_slave_dma_engine!(("AXI_GDMA", AxiGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! with_uhci_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_uhci_dma_engine { $(($pattern) => $code;)* ($other : tt)
@@ -5589,7 +5597,12 @@ macro_rules! for_each_spi_master {
 macro_rules! for_each_spi_slave {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_spi_slave { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_spi_slave!((names)); _for_each_inner_spi_slave!((all));
+        => {} } _for_each_inner_spi_slave!((SPI2)); _for_each_inner_spi_slave!((SPI3));
+        _for_each_inner_spi_slave!((SPI2, Spi2, SPI2_CK, SPI2_D, SPI2_Q, SPI2_CS));
+        _for_each_inner_spi_slave!((SPI3, Spi3, SPI3_CK, SPI3_D, SPI3_Q, SPI3_CS));
+        _for_each_inner_spi_slave!((names(SPI2), (SPI3)));
+        _for_each_inner_spi_slave!((all(SPI2, Spi2, SPI2_CK, SPI2_D, SPI2_Q, SPI2_CS),
+        (SPI3, Spi3, SPI3_CK, SPI3_D, SPI3_Q, SPI3_CS)));
     };
 }
 #[macro_export]
