@@ -47,6 +47,13 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
+      # Warm the chip-metadata cache while crates.io is still reachable. A cold
+      # cache makes the later `build` step regenerate `esp-metadata-generated`,
+      # which builds the `esp-metadata` tool - and that host tool cannot resolve
+      # its dependencies (e.g. `prettyplease`) against the local registry.
+      - name: warm-metadata-cache
+        run: cargo update-metadata
+
       - name: init-local-registry
         run: |
           cargo xrel-check init
