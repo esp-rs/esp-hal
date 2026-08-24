@@ -111,6 +111,9 @@ system_clocks = { clock_tree = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
         ] },
     ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
+    ] },
 ] }
 
 peripheral_clocks = { templates = [
@@ -168,4 +171,5 @@ peripheral_clocks = { templates = [
         rst_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_rst_en().bit(reset));"
     } },
     { name = "Rmt", template_params = { clk_en = "{{sys_clk}}" } },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "{{no_rst}}" } },
 ] }
