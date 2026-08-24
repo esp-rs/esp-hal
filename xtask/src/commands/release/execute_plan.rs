@@ -3,7 +3,6 @@ use std::{path::Path, process::Command};
 use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
 use strum::IntoEnumIterator;
-use toml_edit::{Item, Value};
 
 use crate::{
     cargo::CargoToml,
@@ -62,11 +61,16 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    // Preflight: load and validate every package up front, before touching any
-    // files, so a mismatched version or other plan error aborts without leaving
-    // the workspace half-edited. The parsed manifests are reused by the apply
-    // loop below, so each is read and validated exactly once.
-    let mut manifests = Vec::with_capacity(plan.packages.len());
+    // Preflight: validate every package up front, before touching any files, so
+    // a mismatched version or other plan error aborts without leaving the
+    // workspace half-edited.
+    //
+    // We deliberately do NOT reuse the manifests parsed here in the apply loop
+    // below. Bumping a package rewrites the on-disk manifests of its workspace
+    // dependents, so a package bumped after its dependencies must be re-read to
+    // observe those rewrites. Saving a snapshot taken here would write it back
+    // stale and silently revert every dependency bump an earlier step applied.
+    let mut bump_decisions = Vec::with_capacity(plan.packages.len());
     for step in plan.packages.iter() {
         let package = CargoToml::new(workspace, step.package).with_context(|| {
             format!(
@@ -76,13 +80,13 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         })?;
 
         match validate_package(&package, step)? {
-            Preflight::Bump => manifests.push(Some(package)),
+            Preflight::Bump => bump_decisions.push(true),
             Preflight::AlreadyReleased => {
                 println!(
                     "Package {} is already at version {}. Skipping.",
                     step.package, step.new_version
                 );
-                manifests.push(None);
+                bump_decisions.push(false);
             }
         }
     }
@@ -107,13 +111,22 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         println!("Dry run: would merge PR changelog entries into CHANGELOG.md / MIGRATING-*.md");
     }
 
-    // Make code changes, reusing the manifests validated above. Packages that
-    // were already at their target version are stored as `None` and skipped.
+    // Make code changes. Re-read each manifest from disk instead of reusing the
+    // preflight copies: earlier steps in this loop may have rewritten this
+    // package's dependency versions on disk, and saving a stale in-memory copy
+    // would revert them. Packages already at their target version are skipped.
     let skip_dependent_rewrites = plan.backport.is_some();
-    for (step, manifest) in plan.packages.iter_mut().zip(manifests) {
-        let Some(mut package) = manifest else {
+    for (step, should_bump) in plan.packages.iter_mut().zip(bump_decisions) {
+        if !should_bump {
             continue;
-        };
+        }
+
+        let mut package = CargoToml::new(workspace, step.package).with_context(|| {
+            format!(
+                "Couldn't create Cargo.toml in workspace {workspace:?} for {:?}",
+                step.package
+            )
+        })?;
 
         let new_version = update_package(
             &mut package,
