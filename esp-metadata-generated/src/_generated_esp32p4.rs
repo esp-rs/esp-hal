@@ -6578,8 +6578,8 @@ macro_rules! for_each_peripheral {
         AXI_GDMA <= AXI_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
-        EMAC_DMA <= EMAC_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)));
+        EMAC_DMA <= GMAC_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "MIPI_DSI peripheral singleton"]
         MIPI_DSI <= virtual(DSI_BRIDGE : { bind_bridge_interrupt,
         enable_bridge_interrupt, disable_bridge_interrupt }, DSI : { bind_dsi_interrupt,
@@ -7004,8 +7004,8 @@ macro_rules! for_each_peripheral {
         = "DMA peripheral singleton"] DMA <= AHB_DMA() (unstable)), (@ peri_type #[doc =
         "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)), (@ peri_type
         #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@ peri_type
-        #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)), (@
-        peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC()
+        #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)), (@
+        peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC()
         (unstable)), (@ peri_type #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <=
         virtual(DSI_BRIDGE : { bind_bridge_interrupt, enable_bridge_interrupt,
         disable_bridge_interrupt }, DSI : { bind_dsi_interrupt, enable_dsi_interrupt,

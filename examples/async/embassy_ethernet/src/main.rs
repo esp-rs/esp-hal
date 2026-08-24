@@ -1,29 +1,37 @@
 //! Ethernet DHCP Example
 //!
-//! Demonstrates RMII Ethernet: initialises the Ethernet peripheral, waits for a DHCP-assigned IP
+//! Demonstrates Ethernet: initialises the Ethernet peripheral, waits for a DHCP-assigned IP
 //! address, then periodically issues an HTTP GET request to httpbin.org and prints the response
 //! body.
 //!
-//! The example is configured for ESP32-Ethernet-Kit v1.2 and ESP32-P4-Function EV Board.
+//! The example is configured for ESP32-Ethernet-Kit v1.2 (RMII), ESP32-P4-Function EV Board
+//! (RMII), and ESP32-S31-Function-Coreboard (RGMII, YT8531 PHY).
 //!
-//! The dev kits use an IP101GRI PHY, which is compatible with `GenericPhy`, but this example
-//! showcases a more efficient wrapper using embassy-time.
+//! The ESP32 and ESP32-P4 kits use an IP101GRI PHY, the ESP32-S31 a Motorcomm
+//! YT8531. Both are driven by `GenericPhy`, which this example wraps to poll
+//! the link from embassy-time.
 //!
 //! # Board pin mapping
 //!
-//! | Signal       | ESP32-Ethernet-Kit v1.2 | ESP32-P4-Function EV Board |
-//! |--------------|-------------------------|----------------------------|
-//! | REF_CLK (in) |                    0    |                       50   |
-//! | MDC          |                    23   |                       31   |
-//! | MDIO         |                    18   |                       52   |
-//! | RXD0         |                    25   |                       29   |
-//! | RXD1         |                    26   |                       30   |
-//! | RX_DV / CRS  |                    27   |                       28   |
-//! | TXD0         |                    19   |                       34   |
-//! | TXD1         |                    22   |                       35   |
-//! | TX_EN        |                    21   |                       49   |
-//! | PHY Reset    |                    5    |                       51   |
-//! | PHY address  |                    1    |                        1   |
+//! | Signal       | ESP32-Ethernet-Kit v1.2 | ESP32-P4-Function EV Board | ESP32-S31-Function-Coreboard |
+//! |--------------|-------------------------|----------------------------|------------------------------|
+//! | REF_CLK (in) |                    0    |                       50   |                          —   |
+//! | RX_CLK       |                    —    |                        —   |                         14   |
+//! | TX_CLK (out) |                    —    |                        —   |                         13   |
+//! | MDC          |                    23   |                       31   |                          5   |
+//! | MDIO         |                    18   |                       52   |                          6   |
+//! | RXD0         |                    25   |                       29   |                         19   |
+//! | RXD1         |                    26   |                       30   |                         18   |
+//! | RXD2         |                    —    |                        —   |                         17   |
+//! | RXD3         |                    —    |                        —   |                         16   |
+//! | RX_DV / CTL  |                    27   |                       28   |                         15   |
+//! | TXD0         |                    19   |                       34   |                          8   |
+//! | TXD1         |                    22   |                       35   |                          9   |
+//! | TXD2         |                    —    |                        —   |                         10   |
+//! | TXD3         |                    —    |                        —   |                         11   |
+//! | TX_EN / CTL  |                    21   |                       49   |                         12   |
+//! | PHY Reset    |                    5    |                       51   |                          7   |
+//! | PHY address  |                    1    |                        1   |                      auto    |
 
 //% CHIP_FILTER: ethernet_driver_supported
 
@@ -42,13 +50,19 @@ use embassy_net::{
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
+cfg_select! {
+    feature = "esp32s31" => {
+        use esp_hal::ethernet::RgmiiPinBundle;
+    }
+    _ => {
+        use esp_hal::ethernet::{RmiiPinBundle, clock::ExternalRefClock};
+    }
+}
 use esp_hal::{
     clock::CpuClock,
     ethernet::{
         Ethernet,
         EthernetDmaStorage,
-        RmiiPinBundle,
-        clock::ExternalRefClock,
         mac::{Duplex, LinkState, Speed},
         phy::{MdioBus, Phy, PhyError, generic::GenericPhy},
     },
@@ -79,8 +93,7 @@ static TCP_CLIENT_STATE: ConstStaticCell<TcpClientState<1, 1500, 1500>> =
 
 type EthDriver = Ethernet<'static, esp_hal::Async, ExamplePhy>;
 
-/// A custom PHY implementation that wraps [`GenericPhy`], and uses embassy-time
-/// to implement polling instead of the busy looping done by GenericPhy.
+/// Wraps [`GenericPhy`] to poll it from embassy-time instead of busy-looping.
 struct ExamplePhy {
     phy: GenericPhy,
     timer: Timer,
@@ -106,8 +119,8 @@ impl Phy for ExamplePhy {
         self.phy.address()
     }
 
-    fn init<M: MdioBus>(&mut self, mdio: &mut M) -> Result<(), PhyError> {
-        self.phy.init(mdio)
+    fn init<M: MdioBus>(&mut self, mdio: &mut M, max_speed: Speed) -> Result<(), PhyError> {
+        self.phy.init(mdio, max_speed)
     }
 
     fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, cx: Option<&mut Context<'_>>) -> LinkState {
@@ -123,12 +136,13 @@ impl Phy for ExamplePhy {
             let _ = self.timer.poll_unpin(cx);
         }
 
-        // Poll the PHY for link state. Do not pass `cx`, we're handling the scheduling.
-        self.cached_link_state = self.phy.poll_link(mdio, None);
-
-        // Uncomment to observe how often the link state is polled
-        // println!("Polled link state: {:?}", self.cached_link_state);
-
+        let new_state = self.phy.poll_link(mdio, None);
+        if new_state.up != self.cached_link_state.up
+            || new_state.speed != self.cached_link_state.speed
+        {
+            println!("Link {:?}", new_state);
+        }
+        self.cached_link_state = new_state;
         self.cached_link_state
     }
 }
@@ -151,6 +165,9 @@ async fn main(spawner: Spawner) {
 
     #[cfg(feature = "esp32p4")]
     let mut phy_reset = Output::new(peripherals.GPIO51, Level::Low, OutputConfig::default());
+
+    #[cfg(feature = "esp32s31")]
+    let mut phy_reset = Output::new(peripherals.GPIO7, Level::Low, OutputConfig::default());
 
     Timer::after(Duration::from_millis(100)).await;
     phy_reset.set_high();
@@ -200,6 +217,32 @@ async fn main(spawner: Spawner) {
     .expect("Ethernet init failed")
     .into_async();
 
+    #[cfg(feature = "esp32s31")]
+    let eth: EthDriver = Ethernet::new(
+        peripherals.ETH,
+        STORAGE.take(),
+        MAC_ADDR,
+        ExamplePhy::new_auto(),
+        RgmiiPinBundle {
+            rx_clk: peripherals.GPIO14,
+            tx_clk: peripherals.GPIO13,
+            rx_ctl: peripherals.GPIO15,
+            tx_ctl: peripherals.GPIO12,
+            rxd0: peripherals.GPIO19,
+            rxd1: peripherals.GPIO18,
+            rxd2: peripherals.GPIO17,
+            rxd3: peripherals.GPIO16,
+            txd0: peripherals.GPIO8,
+            txd1: peripherals.GPIO9,
+            txd2: peripherals.GPIO10,
+            txd3: peripherals.GPIO11,
+            mdc: peripherals.GPIO5,
+            mdio: peripherals.GPIO6,
+        },
+    )
+    .expect("Ethernet init failed")
+    .into_async();
+
     // ── Network stack ─────────────────────────────────────────────────────────
 
     let config = embassy_net::Config::dhcpv4(Default::default());
@@ -216,7 +259,8 @@ async fn main(spawner: Spawner) {
 
     spawner.spawn(net_task(runner).unwrap());
 
-    // ── Wait for DHCP ─────────────────────────────────────────────────────────
+    // `wait_config_up` is DHCP, not PHY link, so wait for the link first.
+    stack.wait_link_up().await;
 
     println!("Waiting for DHCP lease…");
     stack.wait_config_up().await;

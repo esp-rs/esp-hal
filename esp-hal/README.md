@@ -114,7 +114,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Bluetooth     | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          |          | ⚒️      | ❌        |
 | WIFI          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |          |          | ⚒️      | ⚒️      | ❌        |
 | IEEE 802.15.4 |       |          |          | ⚒️      | ⚒️      |           | ⚒️      |          |          |          | ❌        |
-| Ethernet      | ⚒️   |          |          |          |          |           |          | ⚒️      |          |          | ❌        |
+| Ethernet      | ⚒️   |          |          |          |          |           |          | ⚒️      |          |          | ⚒️       |
 
 ### Display and camera
 

@@ -104,8 +104,8 @@ peripherals = [
     { name = "AXI_GDMA", pac = "AXI_DMA" },
 
     { name = "ETH", virtual = true },
-    { name = "EMAC_DMA", hidden = true },
-    { name = "EMAC_MAC", hidden = true },
+    { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
+    { name = "EMAC_MAC", pac = "GMAC", hidden = true },
     { name = "MIPI_DSI", virtual = true, interrupts = { dsi = "DSI", bridge = "DSI_BRIDGE" }, clock_group = "MIPI_DSI" },
     { name = "VDMA", pac = "DMA", hidden = true },
     { name = "MIPI_DSI_HOST", hidden = true },

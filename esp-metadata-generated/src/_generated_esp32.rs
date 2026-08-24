@@ -4713,10 +4713,10 @@ macro_rules! for_each_peripheral {
         "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "ETH peripheral singleton"] ETH
         <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)));
+        "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_EXT peripheral singleton"]
         EMAC_EXT <= EMAC_EXT() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)));
+        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "FLASH_ENCRYPTION peripheral singleton"] FLASH_ENCRYPTION <= FLASH_ENCRYPTION()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -5113,9 +5113,9 @@ macro_rules! for_each_peripheral {
         DPORT() (unstable)), (@ peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <=
         EFUSE() (unstable)), (@ peri_type #[doc = "ETH peripheral singleton"] ETH <=
         virtual() (unstable)), (@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
-        EMAC_DMA <= EMAC_DMA() (unstable)), (@ peri_type #[doc =
+        EMAC_DMA <= GMAC_DMA() (unstable)), (@ peri_type #[doc =
         "EMAC_EXT peripheral singleton"] EMAC_EXT <= EMAC_EXT() (unstable)), (@ peri_type
-        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)), (@
+        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC() (unstable)), (@
         peri_type #[doc = "FLASH_ENCRYPTION peripheral singleton"] FLASH_ENCRYPTION <=
         FLASH_ENCRYPTION() (unstable)), (@ peri_type #[doc =
         "FRC_TIMER peripheral singleton"] FRC_TIMER <= FRC_TIMER() (unstable)), (@

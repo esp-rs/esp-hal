@@ -112,8 +112,6 @@ impl MiiClock {
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 /// Configures the EMAC clock tree for RMII with an external clock input.
-///
-/// Matches `emac_ll_clock_enable_rmii_input()` in esp-idf.
 fn configure_rmii_input() {
     HP_SYS::regs()
         .gmac_ctrl0()
@@ -177,8 +175,7 @@ fn enable_mpll_50m_output() {
 
 /// Configures the EMAC clock tree for MII mode.
 ///
-/// Matches `emac_ll_clock_enable_mii()` in esp-idf. In MII mode the RX and TX
-/// clocks come from separate pads (not the combined RMII pad), so
+/// In MII mode the RX and TX clocks come from separate pads (not the combined RMII pad), so
 /// `emac_rx_clk_src_sel = 1` and `emac_tx_clk_src_sel = 1`.
 fn configure_mii() {
     HP_SYS::regs()
@@ -217,9 +214,8 @@ fn configure_mii() {
 
 /// Pulses the EMAC peripheral reset via `LP_AON_CLKRST` (assert then deassert).
 ///
-/// Matches `emac_ll_reset_register()` in esp-idf. The `GenericPeripheralGuard`
-/// for EMAC on P4 does not perform a hardware reset (the reset handler is a
-/// no-op), so this must be called explicitly during clock configuration.
+/// The `GenericPeripheralGuard` for EMAC on P4 does not perform a hardware reset (the reset handler
+/// is a no-op), so this must be called explicitly during clock configuration.
 fn deassert_reset() {
     LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_sdmmc_emac_rst_ctrl()

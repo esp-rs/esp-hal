@@ -46,13 +46,17 @@ impl<'d, Dm: DriverMode + 'static, P: Phy> Driver for Ethernet<'d, Dm, P> {
     fn capabilities(&self) -> Capabilities {
         let mut caps = Capabilities::default();
         caps.max_transmission_unit = MTU;
-        // Checksums are offloaded to hardware in both directions (RX COE + TX
-        // insertion via the descriptor CIC bits), so the stack does neither.
-        caps.checksum.ipv4 = ChecksumOffload::BOTH;
-        caps.checksum.tcp = ChecksumOffload::BOTH;
-        caps.checksum.udp = ChecksumOffload::BOTH;
-        caps.checksum.icmpv4 = ChecksumOffload::BOTH;
-        caps.checksum.icmpv6 = ChecksumOffload::BOTH;
+        // `Checksum` names the direction(s) computed in software. Hardware
+        // offload is advertised so the stack skips that side.
+        let checksum = ChecksumOffload {
+            tx: property!("ethernet.tx_checksum_offload"),
+            rx: property!("ethernet.rx_checksum_offload"),
+        };
+        caps.checksum.ipv4 = checksum;
+        caps.checksum.tcp = checksum;
+        caps.checksum.udp = checksum;
+        caps.checksum.icmpv4 = checksum;
+        caps.checksum.icmpv6 = checksum;
         caps
     }
 

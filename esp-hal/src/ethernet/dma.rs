@@ -1,7 +1,7 @@
 //! EMAC DMA descriptor rings.
 //!
 //! Implements the chained-ring descriptor layout for the Synopsys DesignWare
-//! GMAC as found on ESP32 and ESP32-P4. The driver always uses the **enhanced
+//! GMAC as found on ESP32, ESP32-P4, and ESP32-S31. The driver always uses the **enhanced
 //! 32-byte descriptor format** (`ALT_DESC_SIZE = 1` in `EMAC_DMA.dmabusmode`).
 
 use core::sync::atomic::{Ordering, fence};
@@ -23,9 +23,6 @@ pub const TDES0_IC: u32 = 1 << 30;
 pub const TDES0_LS: u32 = 1 << 29;
 /// TX first-segment flag.
 pub const TDES0_FS: u32 = 1 << 28;
-/// TX checksum insertion control: 3 = IP Header checksum and payload checksum calculation
-/// and insertion are enabled, and pseudo-header checksum is calculated in hardware.
-pub const TDES0_CIC_FULL: u32 = 3 << 22;
 /// TX second-address-chained mode (next descriptor pointer in TDES3).
 pub const TDES0_CHAINED: u32 = 1 << 20;
 
@@ -52,10 +49,11 @@ pub const RDES1_CHAINED: u32 = 1 << 14;
 // ── RDES4 extended-status bits (Type-2 checksum offload) ─────────────────────
 //
 // Only consumed on chips whose RX FIFO runs in cut-through mode and therefore
-// cannot rely on the DMA to auto-drop checksum-error frames (see `dma_start`).
+// cannot rely on the DMA to auto-drop checksum-error frames (see
+// `dma_init_op_mode`).
 
 cfg_select! {
-    esp32p4 => {
+    any(esp32p4, esp32s31) => {
         /// RDES0 extended-status-available bit: RDES4 holds valid COE status.
         pub const RDES0_ESA: u32 = 1 << 0;
         /// RDES4: IP header checksum error.
@@ -137,11 +135,16 @@ impl TDes {
         self.tdes0.set(self.tdes0.get() | TDES0_CHAINED);
     }
 
+    /// Marks the descriptor as a complete frame of `len` bytes.
+    ///
+    /// Checksum insertion (`CIC`) is deliberately left disabled: the MAC can
+    /// only insert a payload checksum with transmit store-and-forward enabled,
+    /// which the TX FIFO is too small for. Outgoing checksums are computed in
+    /// software instead, as esp-idf does.
     fn set_len_and_flags(&mut self, len: usize) {
         self.tdes1.set(len as u32 & RDES1_BUF1_SIZE_MASK);
-        self.tdes0.set(
-            (self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC | TDES0_CIC_FULL,
-        );
+        self.tdes0
+            .set((self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC);
     }
 
     fn set_buffer_addr(&mut self, addr: *const u8) {
@@ -164,8 +167,8 @@ pub struct RDes {
     pub(super) next_desc: VolatileCell<u32>,
     // Extended status; the GMAC writes IP checksum-offload results here.
     #[cfg_attr(
-        not(esp32p4),
-        allow(dead_code, reason = "only read for P4 RX checksum offload")
+        not(any(esp32p4, esp32s31)),
+        allow(dead_code, reason = "only read for cut-through RX checksum offload")
     )]
     rdes4: VolatileCell<u32>,
     _rdes5: VolatileCell<u32>,
@@ -225,7 +228,7 @@ impl RDes {
     /// `RDES0_ES`, so they must be inspected explicitly. Only meaningful on the
     /// last descriptor of a frame. Non-IP frames (e.g. ARP) and frames whose
     /// checksum the engine bypassed never report an error.
-    #[cfg(esp32p4)]
+    #[cfg(any(esp32p4, esp32s31))]
     fn checksum_error(&self) -> bool {
         // The extended status is only valid when RDES0[0] (ESA) is set.
         if self.rdes0.get() & RDES0_ESA == 0 {
@@ -515,7 +518,7 @@ impl<'a> RDesRing<'a> {
                 // checksum-error frames, so reject them here based on the
                 // extended-status COE bits.
                 let checksum_bad = cfg_select! {
-                    esp32p4 => desc.checksum_error(),
+                    any(esp32p4, esp32s31) => desc.checksum_error(),
                     _ => false,
                 };
 

@@ -50,6 +50,9 @@ peripherals = [
     { name = "CLIC" },
     { name = "CNNT_SYS", hidden = true },
     { name = "CNNT_IO_MUX", hidden = true },
+    { name = "ETH", virtual = true },
+    { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
+    { name = "EMAC_MAC", pac = "GMAC", hidden = true },
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
     { name = "GPIO" },
@@ -402,7 +405,8 @@ support_status = "not_supported"
 [device.dac]
 support_status = "not_supported"
 [device.ethernet]
-support_status = "not_supported"
+support_status = "partial"
+mii_via_gpio_matrix = true
 [device.etm]
 support_status = "not_supported"
 [device.i2c_slave]
