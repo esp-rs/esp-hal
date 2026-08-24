@@ -1624,20 +1624,14 @@ fn write_support_table(
 }
 
 pub fn generate_supported_devices_table(output: &mut impl Write) -> std::fmt::Result {
-    writeln!(
-        output,
-        "| Chip | Datasheet | Technical Reference Manual | Target | Note |"
-    )?;
-    writeln!(
-        output,
-        "| :---: | :-------: | :------------------------: | :----: | :---: |"
-    )?;
+    writeln!(output, "| Chip  | Documentation | Target | Note  |")?;
+    writeln!(output, "| :---: | :-----------: | :----: | :---: |")?;
 
     for chip in Chip::iter() {
         let config = Config::for_chip(&chip);
         writeln!(
             output,
-            "| {pretty} | [{pretty}][{chip}-datasheet] | [{pretty}][{chip}-trm] | `{target}` | {note} |",
+            "| {pretty} | [Datasheet][{chip}-datasheet] [TRM][{chip}-trm] | `{target}` | {note} |",
             pretty = chip.pretty_name(),
             target = config.device.target,
             note = config.device.support_note,
@@ -1648,8 +1642,8 @@ pub fn generate_supported_devices_table(output: &mut impl Write) -> std::fmt::Re
 
     for chip in Chip::iter() {
         let config = Config::for_chip(&chip);
-        writeln!(output, "[{chip}-datasheet]: {}", config.device.datasheet,)?;
-        writeln!(output, "[{chip}-trm]: {}", config.device.trm,)?;
+        writeln!(output, "[{chip}-datasheet]: {}", config.device.datasheet)?;
+        writeln!(output, "[{chip}-trm]: {}", config.device.trm)?;
     }
 
     Ok(())
