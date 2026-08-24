@@ -92,7 +92,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | I3C master      |       |          |          |          |          |           |          | ❌       |          |          |           |
 | I3C slave       |       |          |          |          |          |           |          | ❌       |          |          |           |
 | SPI master      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       |
-| SPI slave       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      | ❌        |
+| SPI slave       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | LP SPI master   |       |          |          |          |          |           |          | ❌       |          |          |           |
 | LP SPI slave    |       |          |          |          |          |           |          | ❌       |          |          |           |
 | I2S             | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
