@@ -19,11 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.8.0] - 2026-08-24
+
+### Changed
+
+- In `if` conditions, `chip` and `feature()` have been removed. Instead, chip symbols are used to generate boolean and string variables. For example, `chip == "esp32"` became `esp32`, and `feature("soc_has_foobar")` has become `soc_has_foobar`. (#5720)
+
 ## [v0.7.0] - 2026-04-16
 
 ### Changed
 
-- Update `esp-metadata-generated` dependency to 0.4.0 (#5306).
+- Update `esp-metadata-generated` dependency to 0.4.0 (#5306)
 
 ## [v0.6.1] - 2025-10-30
 
@@ -84,4 +90,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.6.0]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.5.0...esp-config-v0.6.0
 [v0.6.1]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.6.0...esp-config-v0.6.1
 [v0.7.0]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.6.1...esp-config-v0.7.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.7.0...HEAD
+[v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.7.0...esp-config-v0.8.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.8.0...HEAD

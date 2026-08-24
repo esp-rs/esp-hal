@@ -37,15 +37,15 @@ test = false
 allocator-api2        = { version = "0.3.0", default-features = false }
 defmt                 = { version = "1.1", optional = true }
 enumset               = "1"
-esp-sync              = { version = "0.2.1", path = "../esp-sync" }
+esp-sync              = { version = "0.3.0", path = "../esp-sync" }
 document-features     = "0.2"
 
 linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }
 rlsf = { version = "0.2", features = ["unstable"] }
 
 [build-dependencies]
-esp-config             = { version = "0.7.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config             = { version = "0.8.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["compat", "global-allocator"]
