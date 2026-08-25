@@ -37,9 +37,13 @@ jobs:
   # jobs and reusable workflows run.  Every other job/workflow in this file
   # gates on `calculate` outputs.
   # Draft PRs run no CI at all: every other job needs `calculate`, so skipping
-  # it skips them too.
+  # it skips them too. Closed and merged PRs are skipped the same way, since
+  # label events fire on them as well.
   calculate:
-    if: ${{ !github.event.pull_request.draft }}
+    if: >
+      !github.event.pull_request.draft &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.state != 'closed')
     runs-on: ubuntu-latest
     outputs:
       labels: ${{ steps.labels.outputs.labels }}
