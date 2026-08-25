@@ -1,0 +1,13 @@
+[
+  { "soc": "esp32",    "arch": "xtensa", "rust-target": "xtensa-esp32-none-elf"         },
+  { "soc": "esp32s2",  "arch": "xtensa", "rust-target": "xtensa-esp32s2-none-elf"       },
+  { "soc": "esp32s3",  "arch": "xtensa", "rust-target": "xtensa-esp32s3-none-elf",      "quick": true },
+  { "soc": "esp32c2",  "arch": "riscv",  "rust-target": "riscv32imc-unknown-none-elf"   },
+  { "soc": "esp32c3",  "arch": "riscv",  "rust-target": "riscv32imc-unknown-none-elf"   },
+  { "soc": "esp32c5",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf"  },
+  { "soc": "esp32c6",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf", "quick": true },
+  { "soc": "esp32c61", "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf"  },
+  { "soc": "esp32h2",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf"  },
+  { "soc": "esp32p4",  "arch": "riscv",  "rust-target": "riscv32imafc-unknown-none-elf" },
+  { "soc": "esp32s31", "arch": "riscv",  "rust-target": "riscv32imafc-unknown-none-elf" }
+]

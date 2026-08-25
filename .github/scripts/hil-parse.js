@@ -1,26 +1,15 @@
-const DEFAULT_ALLOWED = [
-  "esp32c2",
-  "esp32c3",
-  "esp32c5",
-  "esp32c6",
-  "esp32c61",
-  "esp32h2",
-  "esp32p4",
-  "esp32s31",
-  "esp32",
-  "esp32s2",
-  "esp32s3",
-];
+const DEFAULT_ALLOWED = require("../chips.json").map((c) => c.soc);
+
+// Longest first, because "hil-test" is a prefix of "hil-test-radio".
+const PACKAGES = ["hil-test-radio", "hil-test"];
+
+// What an ELF basename can look like, plus `::` for the `test::filter` form
+// xtask accepts.
+const TEST_NAME = /^[A-Za-z0-9_:-]+$/;
 
 function parsePackage(body) {
   const text = String(body || "").trim().toLowerCase();
-  if (text.includes("hil-test-radio")) {
-    return "hil-test-radio";
-  }
-  if (text.includes("hil-test")) {
-    return "hil-test";
-  }
-  return "hil-test";
+  return PACKAGES.find((pkg) => text.includes(pkg)) || "hil-test";
 }
 
 function parseTests(body) {
@@ -32,6 +21,10 @@ function parseTests(body) {
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean)
+    // `--tests` runs to the end of the line, so a package selector written
+    // after it would otherwise be picked up as a test name.
+    .filter((s) => !PACKAGES.includes(s.toLowerCase()))
+    .filter((s) => TEST_NAME.test(s))
     .join(",");
 }
 

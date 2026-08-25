@@ -29,8 +29,9 @@ pub struct BumpMsrvArgs {
 /// This will process
 /// - `Cargo.toml` for the packages (adjust (or add if not present) the "rust-version")
 /// - `README.md` for the packages if it exists (adjusts the MSRV badge)
-/// - IF the esp-hal package was touched: .github/workflows/ci.yml (adapts the `MSRV: "<msrv>"`
-///   entry)
+///
+/// CI needs no changes: `.github/actions/setup-toolchains` reads the MSRV from
+/// esp-hal's "rust-version".
 ///
 /// Non-published packages are not touched.
 ///
@@ -64,8 +65,6 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
         }
         published
     };
-
-    let adjust_ci = to_process.contains(&Package::EspHal);
 
     // process packages
     let badge_re = Regex::new(
@@ -119,21 +118,6 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
                     );
                 }
             }
-        }
-    }
-
-    if adjust_ci {
-        // process ".github/workflows/ci.yml"
-        println!("Processing .github/workflows/ci.yml");
-        let ci_yml_path = workspace.join(".github/workflows/ci.yml");
-
-        let ci_yml = std::fs::read_to_string(&ci_yml_path)?;
-        let ci_yml = Regex::new("(MSRV:.*\\\")([0123456789.]*)(\\\")")?
-            .replace(&ci_yml, |caps: &Captures| {
-                format!("{}{new_msrv}{}", &caps[1], &caps[3])
-            });
-        if !args.dry_run {
-            std::fs::write(ci_yml_path, ci_yml.as_bytes())?;
         }
     }
 

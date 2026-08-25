@@ -109,10 +109,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: esp-rs/xtensa-toolchain@v1.6
+      - uses: ./.github/actions/setup-toolchains
         with:
-          default: true
-          version: 1.97.0.0
+          xtensa: "true"
+          xtensa-default: "true"
 
       # xtensa-toolchain installs rustup and a basic toolchain, but doesn't install rust-src
       - name: rust-src

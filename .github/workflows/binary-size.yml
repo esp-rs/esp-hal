@@ -51,45 +51,31 @@ jobs:
         soc: ${{ fromJSON(inputs.chips) }}
 
     steps:
-      # Install the Rust toolchain for RISC-V devices:
+      # Checked out first so the chip metadata is available to the step below.
+      - name: Checkout Repo (Initial)
+        uses: actions/checkout@v6
+
       - name: Resolve Rust target
         id: target
         run: |
-          case "${{ matrix.soc }}" in
-            esp32|esp32s2|esp32s3)
-              echo "rust-target=xtensa-${{ matrix.soc }}-none-elf" >> $GITHUB_OUTPUT
-              ;;
-            esp32c2|esp32c3)
-              echo "rust-target=riscv32imc-unknown-none-elf" >> $GITHUB_OUTPUT
-              ;;
-            esp32c5|esp32c6|esp32c61|esp32h2)
-              echo "rust-target=riscv32imac-unknown-none-elf" >> $GITHUB_OUTPUT
-              ;;
-            esp32p4|esp32s31)
-              echo "rust-target=riscv32imafc-unknown-none-elf" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "Error: Unknown SoC: ${{ matrix.soc }}"
-              exit 1
-              ;;
-          esac
+          ENTRY=$(jq -c --arg s "${{ matrix.soc }}" '.[] | select(.soc == $s)' .github/chips.json)
+          if [ -z "$ENTRY" ]; then
+            echo "Error: Unknown SoC: ${{ matrix.soc }}"
+            exit 1
+          fi
+          echo "rust-target=$(echo "$ENTRY" | jq -r '."rust-target"')" >> $GITHUB_OUTPUT
+          echo "arch=$(echo "$ENTRY" | jq -r '.arch')" >> $GITHUB_OUTPUT
 
-      - name: Setup Rust (RISC-V)
-        if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.soc) }}
-        uses: dtolnay/rust-toolchain@v1
+      # Only the toolchain for this leg's architecture is installed.
+      - name: Setup Rust
+        uses: ./.github/actions/setup-toolchains
         with:
-          target: ${{ steps.target.outputs.rust-target }}
-          toolchain: stable
-          components: rust-src, llvm-tools
-
-      # Install the Rust toolchain for Xtensa devices:
-      - name: Setup Rust (Xtensa)
-        if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.soc)
-        uses: esp-rs/xtensa-toolchain@v1.6
-        with:
-          buildtargets: ${{ matrix.soc }}
-          default: true
-          version: 1.97.0.0
+          xtensa: ${{ steps.target.outputs.arch == 'xtensa' }}
+          xtensa-buildtargets: ${{ matrix.soc }}
+          xtensa-default: "true"
+          riscv: ${{ steps.target.outputs.arch == 'riscv' }}
+          riscv-targets: ${{ steps.target.outputs.rust-target }}
+          riscv-components: rust-src, llvm-tools
 
       - name: Install Binutils and Hub
         run: |
@@ -97,10 +83,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y hub
 
-      # Checkout repo & PR
-      - name: Checkout Repo (Initial)
-        uses: actions/checkout@v6
-
+      # Checkout the PR on top of the initial checkout above.
       # context https://github.com/actions/checkout/issues/331
       - name: Checkout Pull Request (PR Code at Root)
         run: hub pr checkout ${{ github.event.inputs.pr_number }}

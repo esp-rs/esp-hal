@@ -12,8 +12,26 @@ env:
   DEFMT_LOG: trace
 
 jobs:
+  chips:
+    runs-on: ubuntu-latest
+    outputs:
+      riscv: ${{ steps.resolve.outputs.riscv }}
+      xtensa: ${{ steps.resolve.outputs.xtensa }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - id: resolve
+        run: |
+          for arch in riscv xtensa; do
+            echo "$arch=$(jq -c --arg a "$arch" \
+              '[.[] | select(.arch == $a) | .soc]' .github/chips.json)" >> "$GITHUB_OUTPUT"
+          done
+
   esp-hal-riscv-nightly:
     name: esp-hal | nightly (${{ matrix.device }})
+    needs: chips
     runs-on: ubuntu-latest
     env:
       CI: 1
@@ -26,24 +44,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device:
-          [
-            "esp32c2",
-            "esp32c3",
-            "esp32c5",
-            "esp32c6",
-            "esp32c61",
-            "esp32h2",
-            "esp32p4",
-            "esp32s31",
-          ]
+        device: ${{ fromJSON(needs.chips.outputs.riscv) }}
     steps:
       - uses: actions/checkout@v6
 
       # Install the Rust nightly toolchain for RISC-V devices:
       - uses: ./.github/actions/setup-nightly
         with:
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          targets: all
           components: rust-src, clippy, rustfmt
           alias: "true"
 
@@ -53,6 +61,7 @@ jobs:
 
   esp-hal-xtensa-clippy:
     name: esp-hal | xtensa clippy (${{ matrix.device }})
+    needs: chips
     runs-on: ubuntu-latest
     env:
       CI: 1
@@ -64,14 +73,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: ["esp32", "esp32s2", "esp32s3"]
+        device: ${{ fromJSON(needs.chips.outputs.xtensa) }}
     steps:
       - uses: actions/checkout@v6
 
-      # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.6
+      - uses: ./.github/actions/setup-toolchains
         with:
-          version: 1.97.0.0
+          xtensa: "true"
 
       - name: Lint esp-hal on Xtensa chip
         run: cargo xtask lint-packages --chips ${{ matrix.device }} --toolchain esp
@@ -82,10 +90,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-        # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.6
+      - uses: ./.github/actions/setup-toolchains
         with:
-          version: 1.97.0.0
+          xtensa: "true"
 
       # Check all chips at once only for esp-hal
       - name: Run check-global-symbols
@@ -94,7 +101,13 @@ jobs:
   create-issue:
     name: Create GitHub Issue if any job failed
     runs-on: ubuntu-latest
-    needs: [esp-hal-riscv-nightly, esp-hal-xtensa-clippy, check-global-symbols]
+    needs:
+      [
+        chips,
+        esp-hal-riscv-nightly,
+        esp-hal-xtensa-clippy,
+        check-global-symbols,
+      ]
     if: ${{ failure() }}
     steps:
       - uses: actions/checkout@v6
