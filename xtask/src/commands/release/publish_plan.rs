@@ -5,7 +5,10 @@ use clap::Args;
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoToml},
-    commands::Plan,
+    commands::{
+        Plan,
+        release::registry::{RegistrySnapshot, Slot},
+    },
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
@@ -47,6 +50,8 @@ pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
         })
         .collect::<Result<Vec<_>>>()?;
 
+    let snapshot = RegistrySnapshot::fetch(plan.packages.iter().map(|step| step.package))?;
+
     // Check that all packages are updated and ready to go. This is meant to prevent
     // publishing unupdated packages.
     for (step, toml) in plan.packages.iter().zip(tomls.iter()) {
@@ -65,6 +70,19 @@ pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
             bail!(
                 "The version of package {} has changed in an unexpected way. Cannot continue.",
                 step.package
+            );
+        }
+
+        let slot = snapshot.slot(step.package, &step.new_version);
+        if slot != Slot::Free {
+            let yanked = match slot {
+                Slot::Yanked => " and yanked",
+                _ => "",
+            };
+            bail!(
+                "{} {} is already published on crates.io{yanked}.",
+                step.package,
+                step.new_version,
             );
         }
     }
