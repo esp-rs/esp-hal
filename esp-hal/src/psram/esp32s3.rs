@@ -39,9 +39,9 @@ pub enum FlashFreq {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiRamFreq {
     /// PSRAM frequency 40 MHz
-    #[default]
     Freq40m  = 40,
-    /// PSRAM frequency 80 MHz
+    /// PSRAM frequency 80 MHz. Default.
+    #[default]
     Freq80m  = 80,
     /// PSRAM frequency 120 MHz
     /// This is not recommended, see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>
@@ -406,8 +406,12 @@ pub(crate) mod quad_spi_impl {
         let psram_div: u32 = psram_clock_divider(config);
 
         info!(
-            "PSRAM core_clock {:?}, flash_div = {}, psram_div = {}",
-            core_clock, flash_div, psram_div
+            "PSRAM {} MHz, flash {} MHz, core_clock {:?}, flash_div = {}, psram_div = {}",
+            config.ram_frequency as u32,
+            config.flash_frequency as u32,
+            core_clock,
+            flash_div,
+            psram_div
         );
 
         // Set SPI01 core clock
