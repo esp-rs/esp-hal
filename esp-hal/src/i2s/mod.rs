@@ -2,11 +2,9 @@
 
 pub mod master;
 
-#[cfg(all(i2s_clock_configured_by_hp_sys_clkrst, esp32p4))]
-#[path = "hp_sys_clkrst_p4.rs"]
-mod hp_sys_clkrst;
-#[cfg(all(i2s_clock_configured_by_hp_sys_clkrst, esp32s31))]
-#[path = "hp_sys_clkrst_s31.rs"]
+#[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
+#[cfg_attr(esp32p4, path = "hp_sys_clkrst_p4.rs")]
+#[cfg_attr(esp32s31, path = "hp_sys_clkrst_s31.rs")]
 mod hp_sys_clkrst;
 
 #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]

@@ -406,7 +406,7 @@ support_status = "not_supported"
 [device.i2s]
 support_status = "partial"
 version = 3
-# 0 = XTAL. Prefer APLL (1) once the clock tree can configure it.
+# 0 = XTAL. Prefer APLL (1) once it's modelled in the clock tree.
 default_clock_source = 0
 clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 8

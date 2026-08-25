@@ -17,7 +17,7 @@ pub(crate) use esp32s31 as pac;
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) fn i2s_sclk_frequency() -> u32 {
     // XTAL matches `i2s.default_clock_source` (mux 0). Mux 1 is APLL, which has
-    // less MCLK jitter; switch both to APLL once the clock tree can configure it.
+    // less MCLK jitter; switch both to APLL once it's modelled in the clock tree.
     clocks::xtal_clk_frequency()
 }
 
