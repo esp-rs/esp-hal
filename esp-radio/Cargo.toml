@@ -58,14 +58,14 @@ portable-atomic = { version = "1.11", default-features = false }
 enumset = { version = "1.1", default-features = false, optional = true }
 
 # ⚠️ Unstable dependencies
-esp-radio-rtos-driver = { version = "0.3.0", path = "../esp-radio-rtos-driver" }
+esp-radio-rtos-driver = { version = "0.4.0", path = "../esp-radio-rtos-driver" }
 instability = "0.3.12"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 docsplay = { version = "0.1", default-features = false }
 document-features  = "0.2"
-esp-alloc = { version = "0.10.0", path = "../esp-alloc", optional = true, default-features = false }
+esp-alloc = { version = "0.11.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.8.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "=0.1.5", path = "../esp-rom-sys" }
@@ -119,7 +119,7 @@ esp-config = { version = "0.8.0", path = "../esp-config", features = ["build"] }
 esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
-esp-rtos = { version = "0.3.0", path = "../esp-rtos" }
+esp-rtos = { version = "0.4.0", path = "../esp-rtos" }
 
 [features]
 default = ["esp-alloc"]

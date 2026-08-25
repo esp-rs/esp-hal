@@ -9,17 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for ESP32-P4 (#5523)
 
 ### Changed
 
 
 ### Fixed
 
-- Fixed `realloc_with_caps` over-reading issue (#5502)
 
 ### Removed
 
+
+## [v0.11.0] - 2026-08-25
+
+### Added
+
+- Support for ESP32-P4 (#5523)
+- `DmaCompatibleInternalMemory` and `DmaCompatibleExternalMemory` allocators that ensure the returned variable is properly aligned as a DMA buffer. (#6068)
+- ESP32-S31 support (#5959)
+
+### Changed
+
+- The chip selector feature(s) are now mandatory. (#6068)
+- updated defmt to 1.1 (#5752)
+
+### Fixed
+
+- Fixed `realloc_with_caps` over-reading issue (#5502)
+- Memory allocated from a secondary heap region could not always be freed, causing a silent leak. (#6018)
+- Freeing memory could affect the wrong heap when using multiple adjacent memory regions (#6018)
 
 ## [v0.10.0] - 2026-04-16
 
@@ -110,4 +127,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.7.0...esp-alloc-v0.8.0
 [v0.9.0]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.8.0...esp-alloc-v0.9.0
 [v0.10.0]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.9.0...esp-alloc-v0.10.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.10.0...HEAD
+[v0.11.0]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.10.0...esp-alloc-v0.11.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.11.0...HEAD
