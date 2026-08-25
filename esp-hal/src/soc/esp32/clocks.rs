@@ -136,20 +136,11 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
     // imprecise for reliable detection.
     const CALIBRATION_CYCLES: u32 = 10;
 
-    // The digital path for RC_FAST_D256 must be enabled for TIMG calibration to work.
-    LPWR::regs()
-        .clk_conf()
-        .modify(|_, w| w.dig_clk8m_d256_en().set_bit());
-
     let (xtal_cycles, calibration_clock_frequency) = RtcClock::measure_rtc_clock(
         clocks,
         TimgCalibrationClockConfig::RcFastDivClk,
         CALIBRATION_CYCLES,
     );
-
-    LPWR::regs()
-        .clk_conf()
-        .modify(|_, w| w.dig_clk8m_d256_en().clear_bit());
 
     let mhz = (calibration_clock_frequency * xtal_cycles / CALIBRATION_CYCLES).as_mhz();
 
@@ -648,7 +639,9 @@ fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, en: bool) {
     LPWR::regs().clk_conf().modify(|_, w| {
         // Active-low: clear to enable, set to disable.
         w.enb_ck8m_div().bit(!en);
-        w.ck8m_div().div256()
+        w.ck8m_div().div256();
+        // TIMG calibration uses the digital RC_FAST_D256 path, not the analog divider output.
+        w.dig_clk8m_d256_en().bit(en)
     });
 }
 
