@@ -95,8 +95,6 @@ pub(crate) fn map_psram(mut config: PsramConfig) -> Range<usize> {
 }
 
 pub(crate) mod utils {
-    use core::ptr::addr_of_mut;
-
     use procmacros::ram;
 
     use super::*;
@@ -169,10 +167,6 @@ pub(crate) mod utils {
     const PSRAM_HSPI_SPID_SD1_IO: u8 = 13;
     const PSRAM_HSPI_SPIWP_SD3_IO: u8 = 2;
     const PSRAM_HSPI_SPIHD_SD2_IO: u8 = 4;
-
-    const DR_REG_SPI1_BASE: u32 = 0x3ff42000;
-    const SPI1_USER_REG: u32 = DR_REG_SPI1_BASE + 0x1C;
-    const SPI1_W0_REG: u32 = DR_REG_SPI1_BASE + 0x80;
 
     const fn psram_cs_hold_time_from_psram_speed(speed: PsramCacheSpeed) -> u32 {
         match speed {
@@ -466,7 +460,6 @@ pub(crate) mod utils {
         }
 
         // Update cs timing according to psram driving method.
-        psram_set_cs_timing_spi1(mode, clk_mode);
         psram_set_cs_timing_spi0(mode, clk_mode); // SPI_CACHE_PORT
         psram_enable_qio_mode_spi1(clk_mode, mode);
 
@@ -504,11 +497,13 @@ pub(crate) mod utils {
                     // 2+SRAM DIV4
                 }
                 PsramCacheSpeed::PsramCacheF80mS40m => {
-                    spi.clock().modify(|_, w| w.clk_equ_sysclk().clear_bit());
-                    spi.clock().modify(|_, w| w.clkdiv_pre().bits(0));
-                    spi.clock().modify(|_, w| w.clkcnt_n().bits(1));
-                    spi.clock().modify(|_, w| w.clkcnt_h().bits(0));
-                    spi.clock().modify(|_, w| w.clkcnt_l().bits(1));
+                    spi.clock().modify(|_, w| {
+                        w.clk_equ_sysclk().clear_bit();
+                        w.clkdiv_pre().bits(0);
+                        w.clkcnt_n().bits(1);
+                        w.clkcnt_h().bits(0);
+                        w.clkcnt_l().bits(1)
+                    });
 
                     spi.date().modify(|r, w| {
                         let current_bits = r.bits();
@@ -525,60 +520,44 @@ pub(crate) mod utils {
                 }
             }
 
-            spi.cache_sctrl()
-                .modify(|_, w| w.usr_sram_dio().clear_bit()); // disable dio mode for cache command
-            spi.cache_sctrl().modify(|_, w| w.usr_sram_qio().set_bit()); // enable qio mode for cache command
-            spi.cache_sctrl()
-                .modify(|_, w| w.cache_sram_usr_rcmd().set_bit()); // enable cache read command
-            spi.cache_sctrl()
-                .modify(|_, w| w.cache_sram_usr_wcmd().set_bit()); // enable cache write command
-            spi.cache_sctrl()
-                .modify(|_, w| w.sram_addr_bitlen().bits(23)); // write address for cache command.
-            spi.cache_sctrl()
-                .modify(|_, w| w.usr_rd_sram_dummy().set_bit()); // enable cache read dummy
+            // QIO cache command, 24-bit address, dummy. Dummy: 40 MHz +1, 80 MHz +2.
+            spi.cache_sctrl().modify(|_, w| {
+                w.usr_sram_dio().clear_bit();
+                w.usr_sram_qio().set_bit();
+                w.cache_sram_usr_rcmd().set_bit();
+                w.cache_sram_usr_wcmd().set_bit();
+                w.sram_addr_bitlen().bits(23);
+                w.usr_rd_sram_dummy().set_bit();
+                w.sram_dummy_cyclelen()
+                    .bits((PSRAM_FAST_READ_QUAD_DUMMY + extra_dummy) as u8)
+            });
 
-            // config sram cache r/w command
-            spi.sram_drd_cmd()
-                .modify(|_, w| w.cache_sram_usr_rd_cmd_bitlen().bits(7));
             spi.sram_drd_cmd().modify(|_, w| {
+                w.cache_sram_usr_rd_cmd_bitlen().bits(7);
                 w.cache_sram_usr_rd_cmd_value()
                     .bits(PSRAM_FAST_READ_QUAD as u16)
             });
-            spi.sram_dwr_cmd()
-                .modify(|_, w| w.cache_sram_usr_wr_cmd_bitlen().bits(7));
             spi.sram_dwr_cmd().modify(|_, w| {
+                w.cache_sram_usr_wr_cmd_bitlen().bits(7);
                 w.cache_sram_usr_wr_cmd_value()
                     .bits(PSRAM_QUAD_WRITE as u16)
-            });
-
-            // dummy, psram cache : 40m--+1dummy; 80m--+2dummy
-            spi.cache_sctrl().modify(|_, w| {
-                w.sram_dummy_cyclelen()
-                    .bits((PSRAM_FAST_READ_QUAD_DUMMY + extra_dummy) as u8)
             });
 
             match psram_cache_mode {
                 PsramCacheSpeed::PsramCacheF80mS80m => (), // in this mode , no delay is needed
                 _ => {
                     if clk_mode == PsramClkMode::PsramClkModeDclk {
-                        spi.sram_drd_cmd()
-                            .modify(|_, w| w.cache_sram_usr_rd_cmd_bitlen().bits(15)); // read command length, 2 bytes(1byte for delay),sending in qio mode in
-                        // cache
+                        // Extra command byte (0x00) delays the QIO command in DCLK mode.
                         spi.sram_drd_cmd().modify(|_, w| {
+                            w.cache_sram_usr_rd_cmd_bitlen().bits(15);
                             w.cache_sram_usr_rd_cmd_value()
                                 .bits((PSRAM_FAST_READ_QUAD << 8) as u16)
-                        }); // read command value,(0x00 for delay,0xeb for cmd)
-
-                        spi.sram_dwr_cmd()
-                            .modify(|_, w| w.cache_sram_usr_wr_cmd_bitlen().bits(15)); // write command length,2 bytes(1byte for delay,send in qio mode in cache)
+                        });
                         spi.sram_dwr_cmd().modify(|_, w| {
+                            w.cache_sram_usr_wr_cmd_bitlen().bits(15);
                             w.cache_sram_usr_wr_cmd_value()
                                 .bits((PSRAM_QUAD_WRITE << 8) as u16)
-                        }); // write command value,(0x00 for delay)
-                        spi.cache_sctrl().modify(|_, w| {
-                            w.sram_dummy_cyclelen()
-                                .bits((PSRAM_FAST_READ_QUAD_DUMMY + extra_dummy) as u8)
-                        }); // dummy, psram cache : 40m--+1dummy; 80m--+2dummy
+                        });
                     }
                 }
             }
@@ -609,27 +588,17 @@ pub(crate) mod utils {
 
             // use Dram1 to visit ext sram. cache page mode : 1 -->16k  4 -->2k
             // 0-->32k,(accord with the settings in cache_sram_mmu_set)
+            // Dram1 visits ext SRAM. Cache page mode 0 = 32 k (matches cache_sram_mmu_set).
             dport.pro_cache_ctrl1().modify(|_, w| {
-                w.pro_cache_mask_dram1()
-                    .clear_bit()
-                    .pro_cache_mask_opsdram()
-                    .clear_bit()
+                w.pro_cache_mask_dram1().clear_bit();
+                w.pro_cache_mask_opsdram().clear_bit();
+                w.pro_cmmu_sram_page_mode().bits(0)
             });
-            dport
-                .pro_cache_ctrl1()
-                .modify(|_, w| w.pro_cmmu_sram_page_mode().bits(0));
-
-            // use Dram1 to visit ext sram. cache page mode : 1 -->16k  4 -->2k
-            // 0-->32k,(accord with the settings in cache_sram_mmu_set)
             dport.app_cache_ctrl1().modify(|_, w| {
-                w.app_cache_mask_dram1()
-                    .clear_bit()
-                    .app_cache_mask_opsdram()
-                    .clear_bit()
+                w.app_cache_mask_dram1().clear_bit();
+                w.app_cache_mask_opsdram().clear_bit();
+                w.app_cmmu_sram_page_mode().bits(0)
             });
-            dport
-                .app_cache_ctrl1()
-                .modify(|_, w| w.app_cmmu_sram_page_mode().bits(0));
 
             // ENABLE SPI0 CS1 TO PSRAM(CS0--FLASH; CS1--SRAM)
             spi.pin().modify(|_, w| w.cs1_dis().clear_bit());
@@ -643,84 +612,72 @@ pub(crate) mod utils {
         mode: PsramCacheSpeed,
         clk_mode: PsramClkMode,
     ) {
-        unsafe {
-            let spi = SPI1::regs();
-            // We need to clear last bit of INT_EN field here.
-            spi.slave().modify(|_, w| w.trans_inten().clear_bit());
-            // SPI_CPOL & SPI_CPHA
-            spi.pin().modify(|_, w| w.ck_idle_edge().clear_bit());
-            spi.user().modify(|_, w| w.ck_out_edge().clear_bit());
-            // SPI bit order
-            spi.ctrl().modify(|_, w| w.wr_bit_order().clear_bit());
-            spi.ctrl().modify(|_, w| w.rd_bit_order().clear_bit());
-            // SPI bit order
-            spi.user().modify(|_, w| w.doutdin().clear_bit());
-            // May be not must to do.
-            spi.user1().modify(|_, w| w.bits(0));
-            // SPI mode type
-            spi.slave().modify(|_, w| w.mode().clear_bit());
+        SPI1::regs().slave().modify(|_, w| {
+            w.trans_inten().clear_bit();
+            w.mode().clear_bit()
+        });
+        SPI1::regs()
+            .pin()
+            .modify(|_, w| w.ck_idle_edge().clear_bit());
+        SPI1::regs().user().modify(|_, w| {
+            w.ck_out_edge().clear_bit();
+            w.doutdin().clear_bit()
+        });
+        SPI1::regs().ctrl().modify(|_, w| {
+            w.wr_bit_order().clear_bit();
+            w.rd_bit_order().clear_bit()
+        });
+        SPI1::regs().user1().modify(|_, w| unsafe { w.bits(0) });
 
-            let ptr = SPI1_W0_REG as *mut u32;
-            for i in 0..16 {
-                ptr.offset(i).write_volatile(0);
-            }
+        SPI1::regs().w_iter().for_each(|w| {
+            w.write(|w| unsafe { w.bits(0) });
+        });
 
-            psram_set_cs_timing_spi1(mode, clk_mode);
-        }
+        psram_set_cs_timing_spi1(mode, clk_mode);
     }
 
     fn psram_set_cs_timing_spi1(psram_cache_mode: PsramCacheSpeed, clk_mode: PsramClkMode) {
-        unsafe {
-            let spi = SPI1::regs();
-            if clk_mode == PsramClkMode::PsramClkModeNorm {
-                spi.user().modify(|_, w| w.cs_hold().set_bit());
-                spi.user().modify(|_, w| w.cs_setup().set_bit());
-
-                spi.ctrl2().modify(|_, w| {
-                    w.hold_time()
-                        .bits(psram_cs_hold_time_from_psram_speed(psram_cache_mode) as u8)
-                });
-
-                // Set cs time.
-                spi.ctrl2().modify(|_, w| w.setup_time().bits(0));
-            } else {
-                spi.user().modify(|_, w| w.cs_hold().clear_bit());
-                spi.user().modify(|_, w| w.cs_setup().clear_bit());
-            }
+        let spi = SPI1::regs();
+        let normal_mode = clk_mode == PsramClkMode::PsramClkModeNorm;
+        spi.user().modify(|_, w| {
+            w.cs_hold().bit(normal_mode);
+            w.cs_setup().bit(normal_mode)
+        });
+        if normal_mode {
+            spi.ctrl2().modify(|_, w| unsafe {
+                w.hold_time()
+                    .bits(psram_cs_hold_time_from_psram_speed(psram_cache_mode) as u8);
+                w.setup_time().bits(0)
+            });
         }
     }
 
     fn psram_set_cs_timing_spi0(psram_cache_mode: PsramCacheSpeed, clk_mode: PsramClkMode) {
-        unsafe {
-            let spi = SPI0::regs();
-            if clk_mode == PsramClkMode::PsramClkModeNorm {
-                spi.user().modify(|_, w| w.cs_hold().set_bit());
-                spi.user().modify(|_, w| w.cs_setup().set_bit());
-
-                spi.ctrl2().modify(|_, w| {
-                    w.hold_time()
-                        .bits(psram_cs_hold_time_from_psram_speed(psram_cache_mode) as u8)
-                });
-
-                // Set cs time.
-                spi.ctrl2().modify(|_, w| w.setup_time().bits(0));
-            } else {
-                spi.user().modify(|_, w| w.cs_hold().clear_bit());
-                spi.user().modify(|_, w| w.cs_setup().clear_bit());
-            }
+        let spi = SPI0::regs();
+        let normal_mode = clk_mode == PsramClkMode::PsramClkModeNorm;
+        spi.user().modify(|_, w| {
+            w.cs_hold().bit(normal_mode);
+            w.cs_setup().bit(normal_mode)
+        });
+        if normal_mode {
+            spi.ctrl2().modify(|_, w| unsafe {
+                w.hold_time()
+                    .bits(psram_cs_hold_time_from_psram_speed(psram_cache_mode) as u8);
+                w.setup_time().bits(0)
+            });
         }
     }
 
-    #[derive(Default, Debug, Copy, Clone, PartialEq)]
-    struct PsramCmd {
-        cmd: u16,             // Command value
-        cmd_bit_len: u16,     // Command byte length
-        addr: u32,            // Address value
-        addr_bit_len: u16,    // Address byte length
-        tx_data: *const u32,  // Point to send data buffer
-        tx_data_bit_len: u16, // Send data byte length.
-        rx_data: *mut u32,    // Point to recevie data buffer
-        rx_data_bit_len: u16, // Recevie Data byte length.
+    #[derive(Default, Debug, PartialEq)]
+    struct PsramCmd<'a> {
+        cmd: u16,           // Command value
+        cmd_bit_len: u16,   // Command byte length
+        addr: u32,          // Address value
+        addr_bit_len: u16,  // Address byte length
+        tx_data: &'a [u32], // Point to send data buffer
+        tx_data_bit_len: u16,
+        rx_data: &'a mut [u32], // Point to recevie data buffer
+        rx_data_bit_len: u16,
         dummy_bit_len: u32,
     }
 
@@ -729,211 +686,182 @@ pub(crate) mod utils {
     // enter QPI mode
     #[ram]
     fn psram_enable_qio_mode_spi1(clk_mode: PsramClkMode, psram_mode: PsramCacheSpeed) {
-        let mut ps_cmd: PsramCmd = PsramCmd::default();
-        let addr: u32 = PSRAM_ENTER_QMODE << 24;
+        let ps_cmd = PsramCmd {
+            cmd_bit_len: if clk_mode == PsramClkMode::PsramClkModeDclk
+                && psram_mode != PsramCacheSpeed::PsramCacheF80mS80m
+            {
+                2
+            } else {
+                0
+            },
+            cmd: 0,
+            addr: PSRAM_ENTER_QMODE << 24,
+            addr_bit_len: 8,
+            tx_data: &[],
+            tx_data_bit_len: 0,
+            rx_data: &mut [],
+            rx_data_bit_len: 0,
+            dummy_bit_len: 0,
+        };
 
-        ps_cmd.cmd_bit_len = 0;
-        if clk_mode == PsramClkMode::PsramClkModeDclk {
-            match psram_mode {
-                PsramCacheSpeed::PsramCacheF80mS80m => (),
-                _ => {
-                    ps_cmd.cmd_bit_len = 2;
-                }
-            }
-        }
-        ps_cmd.cmd = 0;
-        ps_cmd.addr = addr;
-        ps_cmd.addr_bit_len = 8;
-        ps_cmd.tx_data = core::ptr::null();
-        ps_cmd.tx_data_bit_len = 0;
-        ps_cmd.rx_data = core::ptr::null_mut();
-        ps_cmd.rx_data_bit_len = 0;
-        ps_cmd.dummy_bit_len = 0;
         let (backup_usr, backup_usr1, backup_usr2) = psram_cmd_config_spi1(&ps_cmd);
-        psram_cmd_recv_start_spi1(core::ptr::null_mut(), 0, PsramCmdMode::PsramCmdQpi);
+        psram_cmd_recv_start_spi1(&mut [], PsramCmdMode::PsramCmdQpi);
         psram_cmd_end_spi1(backup_usr, backup_usr1, backup_usr2);
     }
 
     #[ram]
     fn psram_cmd_end_spi1(backup_usr: u32, backup_usr1: u32, backup_usr2: u32) {
+        while SPI1::regs().cmd().read().usr().bit_is_set() {}
         unsafe {
-            let spi = SPI1::regs();
-            while spi.cmd().read().usr().bit_is_set() {}
-
-            spi.user().write(|w| w.bits(backup_usr));
-            spi.user1().write(|w| w.bits(backup_usr1));
-            spi.user2().write(|w| w.bits(backup_usr2));
+            SPI1::regs().user().write(|w| w.bits(backup_usr));
+            SPI1::regs().user1().write(|w| w.bits(backup_usr1));
+            SPI1::regs().user2().write(|w| w.bits(backup_usr2));
         }
     }
 
     // setup spi command/addr/data/dummy in user mode
     #[ram]
-    fn psram_cmd_config_spi1(p_in_data: &PsramCmd) -> (u32, u32, u32) {
-        unsafe {
-            let spi = SPI1::regs();
-            while spi.cmd().read().usr().bit_is_set() {}
+    fn psram_cmd_config_spi1(cmd: &PsramCmd<'_>) -> (u32, u32, u32) {
+        debug_assert_eq!(cmd.tx_data.len(), cmd.tx_data_bit_len.div_ceil(32) as usize);
+        debug_assert_eq!(cmd.rx_data.len(), cmd.rx_data_bit_len.div_ceil(32) as usize);
+        debug_assert!(cmd.tx_data_bit_len <= 64);
+        debug_assert!(cmd.rx_data_bit_len <= 64);
 
-            let backup_usr = spi.user().read().bits();
-            let backup_usr1 = spi.user1().read().bits();
-            let backup_usr2 = spi.user2().read().bits();
+        while SPI1::regs().cmd().read().usr().bit_is_set() {}
 
-            // Set command by user.
-            if p_in_data.cmd_bit_len != 0 {
-                // Max command length 16 bits.
-                spi.user2().modify(|_, w| {
-                    w.usr_command_bitlen()
-                        .bits((p_in_data.cmd_bit_len - 1) as u8)
-                });
-                // Enable command
-                spi.user().modify(|_, w| w.usr_command().set_bit());
-                // Load command,bit15-0 is cmd value.
-                spi.user2()
-                    .modify(|_, w| w.usr_command_value().bits(p_in_data.cmd));
-            } else {
-                spi.user().modify(|_, w| w.usr_command().clear_bit());
-                spi.user2().modify(|_, w| w.usr_command_bitlen().bits(0));
-            }
-            // Set Address by user.
-            if p_in_data.addr_bit_len != 0 {
-                spi.user1()
-                    .modify(|_, w| w.usr_addr_bitlen().bits((p_in_data.addr_bit_len - 1) as u8));
-                // Enable address
-                spi.user().modify(|_, w| w.usr_addr().set_bit());
-                // Set address
-                spi.addr().modify(|_, w| w.bits(p_in_data.addr));
-            } else {
-                spi.user().modify(|_, w| w.usr_addr().clear_bit());
-                spi.user1().modify(|_, w| w.usr_addr_bitlen().bits(0));
-            }
-            // Set data by user.
-            let p_tx_val = p_in_data.tx_data;
-            if p_in_data.tx_data_bit_len != 0 {
-                // Enable MOSI
-                spi.user().modify(|_, w| w.usr_mosi().set_bit());
-                // Load send buffer
-                let len = p_in_data.tx_data_bit_len.div_ceil(32);
-                if !p_tx_val.is_null() {
-                    for i in 0..len {
-                        spi.w(i as usize)
-                            .write(|w| w.bits(p_tx_val.offset(i as isize).read_volatile()));
-                    }
-                }
-                // Set data send buffer length.Max data length 64 bytes.
-                spi.mosi_dlen().modify(|_, w| {
-                    w.usr_mosi_dbitlen()
-                        .bits((p_in_data.tx_data_bit_len - 1) as u32)
-                });
-            } else {
-                spi.user().modify(|_, w| w.usr_mosi().clear_bit());
-                spi.mosi_dlen().modify(|_, w| w.usr_mosi_dbitlen().bits(0));
-            }
-            // Set rx data by user.
-            if p_in_data.rx_data_bit_len != 0 {
-                // Enable MISO
-                spi.user().modify(|_, w| w.usr_miso().set_bit());
-                // Set data send buffer length.Max data length 64 bytes.
-                spi.miso_dlen().modify(|_, w| {
-                    w.usr_miso_dbitlen()
-                        .bits((p_in_data.rx_data_bit_len - 1) as u32)
-                });
-            } else {
-                spi.user().modify(|_, w| w.usr_miso().clear_bit());
-                spi.miso_dlen().modify(|_, w| w.usr_miso_dbitlen().bits(0));
-            }
-            if p_in_data.dummy_bit_len != 0 {
-                spi.user().modify(|_, w| w.usr_dummy().set_bit()); // dummy en
-                spi.user1().modify(|_, w| {
-                    w.usr_dummy_cyclelen()
-                        .bits((p_in_data.dummy_bit_len - 1) as u8)
-                }); // DUMMY
-            } else {
-                spi.user().modify(|_, w| w.usr_dummy().clear_bit()); // dummy dis
-                spi.user1().modify(|_, w| w.usr_dummy_cyclelen().bits(0)); // DUMMY
-            }
+        let backup_usr = SPI1::regs().user().read().bits();
+        let backup_usr1 = SPI1::regs().user1().read().bits();
+        let backup_usr2 = SPI1::regs().user2().read().bits();
 
-            (backup_usr, backup_usr1, backup_usr2)
+        // Set command by user.
+        //
+        SPI1::regs().user().modify(|_, w| {
+            w.usr_command().bit(cmd.cmd_bit_len != 0);
+            w.usr_addr().bit(cmd.addr_bit_len != 0);
+            w.usr_mosi().bit(cmd.tx_data_bit_len != 0);
+            w.usr_miso().bit(cmd.rx_data_bit_len != 0);
+            w.usr_dummy().bit(cmd.dummy_bit_len != 0)
+        });
+        SPI1::regs().user1().modify(|_, w| unsafe {
+            w.usr_addr_bitlen()
+                .bits(cmd.addr_bit_len.saturating_sub(1) as u8);
+            w.usr_dummy_cyclelen()
+                .bits(cmd.dummy_bit_len.saturating_sub(1) as u8)
+        });
+        SPI1::regs().user2().modify(|_, w| unsafe {
+            w.usr_command_value().bits(cmd.cmd);
+            w.usr_command_bitlen()
+                .bits(cmd.cmd_bit_len.saturating_sub(1) as u8)
+        });
+
+        // Set data send buffer length. Max data length 64 bytes.
+        SPI1::regs().mosi_dlen().write(|w| unsafe {
+            w.usr_mosi_dbitlen()
+                .bits(cmd.tx_data_bit_len.saturating_sub(1) as u32)
+        });
+
+        // Set data send buffer length. Max data length 64 bytes.
+        SPI1::regs().miso_dlen().write(|w| unsafe {
+            w.usr_miso_dbitlen()
+                .bits(cmd.rx_data_bit_len.saturating_sub(1) as u32)
+        });
+
+        // Set address.
+        if cmd.addr_bit_len != 0 {
+            SPI1::regs().addr().write(|w| unsafe { w.bits(cmd.addr) });
         }
+
+        // Load TX data.
+        for (i, tx) in cmd.tx_data.iter().enumerate() {
+            SPI1::regs().w(i).write(|w| unsafe { w.bits(*tx) });
+        }
+
+        (backup_usr, backup_usr1, backup_usr2)
     }
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     enum PsramCmdMode {
         PsramCmdQpi,
+        #[expect(unused)]
         PsramCmdSpi,
     }
 
     // start sending cmd/addr and optionally, receiving data
     #[ram]
-    fn psram_cmd_recv_start_spi1(
-        p_rx_data: *mut u32,
-        rx_data_len_words: usize,
-        cmd_mode: PsramCmdMode,
-    ) {
-        unsafe {
-            let spi = SPI1::regs();
-            // get cs1
-            spi.pin().modify(|_, w| w.cs1_dis().clear_bit());
-            spi.pin().modify(|_, w| w.cs0_dis().set_bit());
+    fn psram_cmd_recv_start_spi1(rx_data: &mut [u32], cmd_mode: PsramCmdMode) {
+        // get cs1
+        SPI1::regs().pin().modify(|_, w| {
+            w.cs1_dis().clear_bit();
+            w.cs0_dis().set_bit()
+        });
 
-            let mode_backup: u32 = (spi.user().read().bits() >> SPI_FWRITE_DUAL_S) & 0xf;
-            let rd_mode_backup: u32 = spi.ctrl().read().bits()
-                & (SPI_FREAD_DIO_M | SPI_FREAD_DUAL_M | SPI_FREAD_QUAD_M | SPI_FREAD_QIO_M);
+        let mode_backup: u32 = (SPI1::regs().user().read().bits() >> SPI_FWRITE_DUAL_S) & 0xf;
+        let rd_mode_backup: u32 = SPI1::regs().ctrl().read().bits()
+            & (SPI_FREAD_DIO_M | SPI_FREAD_DUAL_M | SPI_FREAD_QUAD_M | SPI_FREAD_QIO_M);
 
-            if cmd_mode == PsramCmdMode::PsramCmdSpi {
+        match cmd_mode {
+            PsramCmdMode::PsramCmdSpi => {
                 psram_set_basic_write_mode_spi1();
                 psram_set_basic_read_mode_spi1();
-            } else if cmd_mode == PsramCmdMode::PsramCmdQpi {
+            }
+            PsramCmdMode::PsramCmdQpi => {
                 psram_set_qio_write_mode_spi1();
                 psram_set_qio_read_mode_spi1();
             }
+        }
 
-            // Wait for SPI0 to idle
-            while SPI1::regs().ext2().read().bits() != 0 {}
+        // Wait for **SPI0** to idle
+        while SPI0::regs().ext2().read().bits() != 0 {}
 
-            // DPORT_SET_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
-            DPORT::regs()
-                .host_inf_sel()
-                .modify(|r, w| w.bits(r.bits() | (1 << 14)));
+        // DPORT_SET_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
+        DPORT::regs()
+            .host_inf_sel()
+            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << 14)) });
 
-            // Start send data
-            spi.cmd().modify(|_, w| w.usr().set_bit());
-            while spi.cmd().read().usr().bit_is_set() {}
+        // Start send data
+        SPI1::regs().cmd().modify(|_, w| w.usr().set_bit());
+        while SPI1::regs().cmd().read().usr().bit_is_set() {}
 
-            // DPORT_CLEAR_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
-            DPORT::regs()
-                .host_inf_sel()
-                .modify(|r, w| w.bits(r.bits() & !(1 << 14)));
+        // DPORT_CLEAR_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
+        DPORT::regs()
+            .host_inf_sel()
+            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 14)) });
 
-            // recover spi mode
-            // TODO: get back to this, why writing on `0xf` address?
-            set_peri_reg_bits(
-                SPI1_USER_REG,
-                if !p_rx_data.is_null() {
-                    SPI_FWRITE_DUAL_M
-                } else {
-                    0xf
-                },
-                mode_backup,
-                SPI_FWRITE_DUAL_S,
-            );
+        // recover spi mode
+        SPI1::regs().user().modify(|r, w| unsafe {
+            let bits = r.bits();
 
-            spi.ctrl().modify(|_, w| {
-                w.fread_dio().clear_bit();
-                w.fread_dual().clear_bit();
-                w.fread_quad().clear_bit();
-                w.fread_qio().clear_bit()
-            });
-            spi.ctrl().modify(|r, w| w.bits(r.bits() | rd_mode_backup));
+            // TODO: mirrors esp-idf, but looks like a bug
+            let bit_map = if !rx_data.is_empty() {
+                SPI_FWRITE_DUAL_M
+            } else {
+                0xf
+            };
+            let shift = SPI_FWRITE_DUAL_S;
 
-            // return cs to cs0
-            spi.pin().modify(|_, w| w.cs1_dis().set_bit());
-            spi.pin().modify(|_, w| w.cs0_dis().clear_bit());
+            w.bits((bits & (!bit_map << shift)) | (mode_backup & bit_map) << shift)
+        });
 
-            if !p_rx_data.is_null() {
-                // Read data out
-                for i in 0..rx_data_len_words {
-                    p_rx_data.add(i).write_volatile(spi.w(i).read().bits());
-                }
-            }
+        SPI1::regs().ctrl().modify(|_, w| {
+            w.fread_dio().clear_bit();
+            w.fread_dual().clear_bit();
+            w.fread_quad().clear_bit();
+            w.fread_qio().clear_bit()
+        });
+
+        SPI1::regs()
+            .ctrl()
+            .modify(|r, w| unsafe { w.bits(r.bits() | rd_mode_backup) });
+
+        // return cs to cs0
+        SPI1::regs().pin().modify(|_, w| {
+            w.cs1_dis().set_bit();
+            w.cs0_dis().clear_bit()
+        });
+
+        // Read data out
+        for (i, rx) in rx_data.iter_mut().enumerate() {
+            *rx = SPI1::regs().w(i).read().bits();
         }
     }
 
@@ -980,8 +908,7 @@ pub(crate) mod utils {
     // psram gpio init , different working frequency we have different solutions
     fn psram_gpio_config(psram_io: &PsramIo, mode: PsramCacheSpeed) -> u32 {
         unsafe {
-            let spi = SPI0::regs();
-            let g_rom_spiflash_dummy_len_plus_ptr = addr_of_mut!(g_rom_spiflash_dummy_len_plus);
+            let g_rom_spiflash_dummy_len_plus_ptr = &raw mut g_rom_spiflash_dummy_len_plus;
 
             #[derive(Debug, Clone, Copy)]
             enum Field {
@@ -1006,17 +933,17 @@ pub(crate) mod utils {
                 }
             }
 
-            let spi_cache_dummy;
-            let rd_mode_reg = spi.ctrl().read().bits();
-            if (rd_mode_reg & SPI_FREAD_QIO_M) != 0 {
-                spi_cache_dummy = SPI0_R_QIO_DUMMY_CYCLELEN;
-            } else if (rd_mode_reg & SPI_FREAD_DIO_M) != 0 {
-                spi_cache_dummy = SPI0_R_DIO_DUMMY_CYCLELEN;
-                spi.user1()
+            let rd_mode_reg = SPI0::regs().ctrl().read();
+            let spi_cache_dummy = if rd_mode_reg.fread_qio().bit_is_set() {
+                SPI0_R_QIO_DUMMY_CYCLELEN
+            } else if rd_mode_reg.fread_dio().bit_is_set() {
+                SPI0::regs()
+                    .user1()
                     .modify(|_, w| w.usr_addr_bitlen().bits(SPI0_R_DIO_ADDR_BITSLEN as u8));
+                SPI0_R_DIO_DUMMY_CYCLELEN
             } else {
-                spi_cache_dummy = SPI0_R_FAST_DUMMY_CYCLELEN;
-            }
+                SPI0_R_FAST_DUMMY_CYCLELEN
+            };
 
             let extra_dummy;
 
@@ -1031,7 +958,7 @@ pub(crate) mod utils {
                         .offset(_SPI_FLASH_PORT as isize)
                         .write_volatile(PSRAM_IO_MATRIX_DUMMY_40M);
 
-                    spi.user1().modify(|_, w| {
+                    SPI0::regs().user1().modify(|_, w| {
                         w.usr_dummy_cyclelen()
                             .bits(spi_cache_dummy as u8 + PSRAM_IO_MATRIX_DUMMY_80M)
                     }); // DUMMY
@@ -1053,7 +980,7 @@ pub(crate) mod utils {
                         .offset(_SPI_FLASH_PORT as isize)
                         .write_volatile(PSRAM_IO_MATRIX_DUMMY_80M);
 
-                    spi.user1().modify(|_, w| {
+                    SPI0::regs().user1().modify(|_, w| {
                         w.usr_dummy_cyclelen()
                             .bits(spi_cache_dummy as u8 + PSRAM_IO_MATRIX_DUMMY_80M)
                     }); // DUMMY
@@ -1075,7 +1002,7 @@ pub(crate) mod utils {
                         .offset(_SPI_FLASH_PORT as isize)
                         .write_volatile(PSRAM_IO_MATRIX_DUMMY_40M);
 
-                    spi.user1().modify(|_, w| {
+                    SPI0::regs().user1().modify(|_, w| {
                         w.usr_dummy_cyclelen()
                             .bits(spi_cache_dummy as u8 + PSRAM_IO_MATRIX_DUMMY_40M)
                     }); // DUMMY
@@ -1089,7 +1016,7 @@ pub(crate) mod utils {
                 }
             }
 
-            spi.user().modify(|_, w| w.usr_dummy().set_bit()); // dummy enable
+            SPI0::regs().user().modify(|_, w| w.usr_dummy().set_bit()); // dummy enable
 
             // In bootloader, all the signals are already configured,
             // We keep the following code in case the bootloader is some older version.
@@ -1190,15 +1117,6 @@ pub(crate) mod utils {
             }
 
             extra_dummy as u32
-        }
-    }
-
-    fn set_peri_reg_bits(reg: u32, bitmap: u32, value: u32, shift: u32) {
-        unsafe {
-            (reg as *mut u32).write_volatile(
-                ((reg as *mut u32).read_volatile() & !(bitmap << shift))
-                    | ((value & bitmap) << shift),
-            );
         }
     }
 }
