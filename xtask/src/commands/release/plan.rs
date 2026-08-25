@@ -21,7 +21,7 @@ use crate::{
         VersionBump,
         checker::min_package_update,
         do_version_bump,
-        release::changelog_preview,
+        release::{changelog_preview, registry},
     },
     git::{BackportInfo, current_branch, parse_backport_branch},
     metadata::Chip,
@@ -44,6 +44,13 @@ pub struct PlanArgs {
     /// names the conflict.
     #[arg(long, value_enum)]
     exclude: Vec<Package>,
+
+    /// Do not ask crates.io which version numbers are already taken.
+    ///
+    /// The check needs network access. Skipping it means the plan may pick a
+    /// version that `cargo publish` will reject at the very end of the release.
+    #[arg(long)]
+    skip_registry_check: bool,
 }
 
 /// A package in the release plan.
@@ -325,12 +332,25 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         .collect::<HashMap<_, _>>();
     validate_release_closure(workspace, &releasing)?;
 
-    let plan = Plan {
+    let mut plan = Plan {
         base: current_branch,
         slug,
         backport: backport.clone(),
         packages: plan_packages,
     };
+
+    if args.skip_registry_check {
+        println!("Skipping the crates.io version check.");
+    } else {
+        let snapshot =
+            registry::RegistrySnapshot::fetch(plan.packages.iter().map(|step| step.package))?;
+
+        for step in plan.packages.iter_mut() {
+            step.new_version =
+                snapshot.next_free_version(step.package, &step.new_version, &step.bump)?;
+            step.tag_name = step.package.tag(&step.new_version);
+        }
+    }
 
     log::debug!("Writing release plan to {}", plan_path.display());
 
