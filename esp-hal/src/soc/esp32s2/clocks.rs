@@ -502,6 +502,7 @@ fn enable_apb_clk_80m_impl(_clocks: &mut ClockTree, _en: bool) {
 
 // XTAL32K_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // This bit only enables the clock for the digital core, what about RTC? Should we split the
     // clock node in two?
@@ -583,6 +584,7 @@ fn configure_rtc_slow_clk_impl(
     LPWR::regs().clk_conf().modify(|_, w| unsafe {
         w.ana_clk_rtc_sel().bits(match new_config {
             RtcSlowClkConfig::RcSlow => 0,
+            #[cfg(use_xtal32k)]
             RtcSlowClkConfig::Xtal32k => 1,
             RtcSlowClkConfig::RcFast => 2,
         })
@@ -644,6 +646,7 @@ fn configure_timg_calibration_clock_impl(
         w.rtc_cali_clk_sel().bits(match new_config {
             TimgCalibrationClockConfig::RtcClk => 0,
             TimgCalibrationClockConfig::RcFastDivClk => 1,
+            #[cfg(use_xtal32k)]
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });

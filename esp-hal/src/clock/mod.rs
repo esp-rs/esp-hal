@@ -155,7 +155,7 @@ impl RtcClock {
     /// issue, or lack of 32 XTAL on board).
     #[cfg(soc_has_clock_node_timg_calibration_clock)]
     pub(crate) fn calibrate(cal_clk: TimgCalibrationClockConfig, slowclk_cycles: u32) -> u32 {
-        #[cfg(not(esp32c2))]
+        #[cfg(use_xtal32k)]
         if cal_clk == TimgCalibrationClockConfig::Xtal32kClk {
             debug!("Assuming Xtal32k has precisely 32.768kHz instead of calibrating");
             let freq_hz: u64 = 32_768;
@@ -462,7 +462,7 @@ pub(crate) fn calibrate_rtc_slow_clock() {
             let slow_clk = match unwrap!(ClockTree::with(clocks::rtc_slow_clk_config)) {
                 RtcSlowClkConfig::RcFast => TimgCalibrationClockConfig::RcFastDivClk,
                 RtcSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
-                #[cfg(not(esp32c2))]
+                #[cfg(use_xtal32k)]
                 RtcSlowClkConfig::Xtal32k => TimgCalibrationClockConfig::Xtal32kClk,
                 #[cfg(esp32c2)]
                 RtcSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Osc32kClk,
@@ -471,8 +471,11 @@ pub(crate) fn calibrate_rtc_slow_clock() {
         soc_has_clock_node_lp_slow_clk => {
             let slow_clk = match unwrap!(ClockTree::with(clocks::lp_slow_clk_config)) {
                 // on S31, clock can not be calibrated to get OSC_SLOW actual frequency
-                #[cfg(not(esp32s31))]
+                #[cfg(all(not(esp32s31), use_xtal32k))]
                 LpSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Xtal32kClk, //?
+                #[cfg(all(not(esp32s31), not(use_xtal32k)))]
+                LpSlowClkConfig::OscSlow => TimgCalibrationClockConfig::RcSlowClk,
+                #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => TimgCalibrationClockConfig::Xtal32kClk,
                 LpSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
             };

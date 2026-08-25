@@ -114,6 +114,7 @@ impl From<LpSlowClkConfig> for ModemClockLpclkSource {
     fn from(src: LpSlowClkConfig) -> Self {
         match src {
             LpSlowClkConfig::RcSlow => Self::RcSlow,
+            #[cfg(use_xtal32k)]
             LpSlowClkConfig::Xtal32k => Self::XTAL32K,
             LpSlowClkConfig::OscSlow => Self::EXT32K,
         }

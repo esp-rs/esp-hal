@@ -5,7 +5,7 @@ system_clocks = { clock_tree = [
     { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
 
     # Low-speed clocks
-    { name = "XTAL32K_CLK",  type = "source", output = "32768"   },
+    { name = "XTAL32K_CLK",  type = "source", output = "32768", cfg = "use_xtal32k" },
     { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
     { name = "RC_SLOW_CLK",  type = "source", output = "130_000" },
     # { name = "EXT32K_CLK",   type = "source", output = "32768" }, # currently unimplemented
@@ -46,7 +46,7 @@ system_clocks = { clock_tree = [
     ] },
     { name = "LP_SLOW_CLK", type = "mux", variants = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
-        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
         #{ name = "EXT32K",   outputs = "EXT32K_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
@@ -67,7 +67,7 @@ system_clocks = { clock_tree = [
         { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
         # EXT32K not modeled
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" },
-        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
     { group = "UART", clocks = [

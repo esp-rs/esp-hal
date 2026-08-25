@@ -48,13 +48,13 @@ system_clocks = { clock_tree = [
     ] },
 
     # Low-speed clocks
-    { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
+    { name = "XTAL32K_CLK",     type = "source",  output = "32768", cfg = "use_xtal32k" },
     { name = "RC_SLOW_CLK",     type = "source",  output = "90_000" },
     { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" },
     { name = "XTAL_DIV_CLK",    type = "generic", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
 
     { name = "RTC_SLOW_CLK", type = "mux", variants = [
-        { name = "XTAL32K",    outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K",    outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
         { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_DIV_CLK" },
     ] },
@@ -74,7 +74,7 @@ system_clocks = { clock_tree = [
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
         { name = "RTC_CLK",         outputs = "RTC_SLOW_CLK" },
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
-        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
     { group = "TIMG", clocks = [

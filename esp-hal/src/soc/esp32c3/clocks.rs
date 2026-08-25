@@ -252,6 +252,7 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 // XTAL32K_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // RTCIO could be configured to allow an external oscillator to be used. We could model this
     // with a MUX, probably, but this is omitted for now for simplicity.
@@ -487,6 +488,7 @@ fn configure_rtc_slow_clk_impl(
     LPWR::regs().clk_conf().modify(|_, w| unsafe {
         // TODO: variants should be in PAC
         w.ana_clk_rtc_sel().bits(match new_config {
+            #[cfg(use_xtal32k)]
             RtcSlowClkConfig::Xtal32k => 1,
             RtcSlowClkConfig::RcSlow => 0,
             RtcSlowClkConfig::RcFast => 2,
@@ -535,8 +537,12 @@ fn configure_low_power_clk_impl(
             .bit(new_config == LowPowerClkConfig::RtcSlow);
         w.lpclk_sel_xtal()
             .bit(new_config == LowPowerClkConfig::Xtal);
-        w.lpclk_sel_xtal32k()
-            .bit(new_config == LowPowerClkConfig::Xtal32k)
+        w.lpclk_sel_xtal32k().bit({
+            cfg_select! {
+                use_xtal32k => new_config == LowPowerClkConfig::Xtal32k,
+                _ => false,
+            }
+        })
     });
 }
 
@@ -575,6 +581,7 @@ fn configure_timg_calibration_clock_impl(
         w.rtc_cali_clk_sel().bits(match new_config {
             TimgCalibrationClockConfig::RcSlowClk => 0,
             TimgCalibrationClockConfig::RcFastDivClk => 1,
+            #[cfg(use_xtal32k)]
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });

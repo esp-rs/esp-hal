@@ -552,7 +552,7 @@ macro_rules! property {
         ::soc::clocks::LpFastClkConfig::XtalD2]
     };
     ("clock_tree.lp_slow_clk") => {
-        [crate ::soc::clocks::LpSlowClkConfig::RcSlow, crate
+        [crate ::soc::clocks::LpSlowClkConfig::RcSlow, #[cfg(use_xtal32k)] crate
         ::soc::clocks::LpSlowClkConfig::Xtal32k, crate
         ::soc::clocks::LpSlowClkConfig::OscSlow]
     };
@@ -561,7 +561,7 @@ macro_rules! property {
         ::soc::clocks::TimgCalibrationClockConfig::SpllClk, crate
         ::soc::clocks::TimgCalibrationClockConfig::CpllClk, crate
         ::soc::clocks::TimgCalibrationClockConfig::RcFastDivClk, crate
-        ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
+        ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, #[cfg(use_xtal32k)] crate
         ::soc::clocks::TimgCalibrationClockConfig::Xtal32kClk]
     };
     ("clock_tree.psram.function_clock") => {
@@ -1571,6 +1571,7 @@ macro_rules! for_each_sw_interrupt {
 ///
 /// // XTAL32K_CLK
 ///
+/// #[cfg(use_xtal32k)]
 /// fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 ///     todo!()
 /// }
@@ -2198,6 +2199,7 @@ macro_rules! define_clock_tree_types {
         pub enum LpSlowClkConfig {
             /// Selects `RC_SLOW_CLK`.
             RcSlow,
+            #[cfg(use_xtal32k)]
             /// Selects `XTAL32K_CLK`.
             Xtal32k,
             /// Selects `OSC_SLOW_CLK`.
@@ -2217,6 +2219,7 @@ macro_rules! define_clock_tree_types {
             RcFastDivClk,
             /// Selects `LP_SLOW_CLK`.
             RcSlowClk,
+            #[cfg(use_xtal32k)]
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
@@ -2527,6 +2530,7 @@ macro_rules! define_clock_tree_types {
             spll_clk_refcount: u32,
             mpll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
+            #[cfg(use_xtal32k)]
             xtal32k_clk_refcount: u32,
             rc32k_clk_refcount: u32,
             pll_f80m_refcount: u32,
@@ -2718,6 +2722,7 @@ macro_rules! define_clock_tree_types {
                 spll_clk_refcount: 0,
                 mpll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
+                #[cfg(use_xtal32k)]
                 xtal32k_clk_refcount: 0,
                 rc32k_clk_refcount: 0,
                 pll_f80m_refcount: 0,
@@ -2895,6 +2900,7 @@ macro_rules! define_clock_tree_types {
         pub fn rc_fast_clk_frequency() -> u32 {
             20000000
         }
+        #[cfg(use_xtal32k)]
         pub fn request_xtal32k_clk(clocks: &mut ClockTree) {
             trace!("Requesting XTAL32K_CLK");
             if increment_reference_count(&mut clocks.xtal32k_clk_refcount) {
@@ -2902,6 +2908,7 @@ macro_rules! define_clock_tree_types {
                 enable_xtal32k_clk_impl(clocks, true);
             }
         }
+        #[cfg(use_xtal32k)]
         pub fn release_xtal32k_clk(clocks: &mut ClockTree) {
             trace!("Releasing XTAL32K_CLK");
             if decrement_reference_count(&mut clocks.xtal32k_clk_refcount) {
@@ -2909,6 +2916,7 @@ macro_rules! define_clock_tree_types {
                 enable_xtal32k_clk_impl(clocks, false);
             }
         }
+        #[cfg(use_xtal32k)]
         pub fn xtal32k_clk_frequency() -> u32 {
             32768
         }
@@ -3408,6 +3416,7 @@ macro_rules! define_clock_tree_types {
             refresh_lp_slow_clk_downstream(clocks);
             match new_selector {
                 LpSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => request_xtal32k_clk(clocks),
                 LpSlowClkConfig::OscSlow => request_osc_slow_clk(clocks),
             }
@@ -3415,6 +3424,7 @@ macro_rules! define_clock_tree_types {
             if let Some(old_selector) = old_selector {
                 match old_selector {
                     LpSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
+                    #[cfg(use_xtal32k)]
                     LpSlowClkConfig::Xtal32k => release_xtal32k_clk(clocks),
                     LpSlowClkConfig::OscSlow => release_osc_slow_clk(clocks),
                 }
@@ -3428,6 +3438,7 @@ macro_rules! define_clock_tree_types {
             trace!("Enabling LP_SLOW_CLK");
             match unwrap!(clocks.lp_slow_clk) {
                 LpSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => request_xtal32k_clk(clocks),
                 LpSlowClkConfig::OscSlow => request_osc_slow_clk(clocks),
             }
@@ -3439,6 +3450,7 @@ macro_rules! define_clock_tree_types {
             enable_lp_slow_clk_impl(clocks, false);
             match unwrap!(clocks.lp_slow_clk) {
                 LpSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
+                #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => release_xtal32k_clk(clocks),
                 LpSlowClkConfig::OscSlow => release_osc_slow_clk(clocks),
             }
@@ -3450,6 +3462,7 @@ macro_rules! define_clock_tree_types {
         ) -> u32 {
             match config {
                 LpSlowClkConfig::RcSlow => rc_slow_clk_frequency(),
+                #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => xtal32k_clk_frequency(),
                 LpSlowClkConfig::OscSlow => osc_slow_clk_frequency(),
             }
@@ -3460,6 +3473,7 @@ macro_rules! define_clock_tree_types {
         pub fn lp_slow_clk_source_frequency(source: LpSlowClkConfig) -> u32 {
             match source {
                 LpSlowClkConfig::RcSlow => rc_slow_clk_frequency(),
+                #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => xtal32k_clk_frequency(),
                 LpSlowClkConfig::OscSlow => osc_slow_clk_frequency(),
             }
@@ -3477,6 +3491,7 @@ macro_rules! define_clock_tree_types {
                     TimgCalibrationClockConfig::CpllClk => request_cpll_clk(clocks),
                     TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
                     TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
+                    #[cfg(use_xtal32k)]
                     TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
                 }
                 configure_timg_calibration_clock_impl(clocks, old_selector, new_selector);
@@ -3487,6 +3502,7 @@ macro_rules! define_clock_tree_types {
                         TimgCalibrationClockConfig::CpllClk => release_cpll_clk(clocks),
                         TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
                         TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
+                        #[cfg(use_xtal32k)]
                         TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
                     }
                 }
@@ -3510,6 +3526,7 @@ macro_rules! define_clock_tree_types {
                     TimgCalibrationClockConfig::CpllClk => request_cpll_clk(clocks),
                     TimgCalibrationClockConfig::RcFastDivClk => request_rc_fast_clk(clocks),
                     TimgCalibrationClockConfig::RcSlowClk => request_lp_slow_clk(clocks),
+                    #[cfg(use_xtal32k)]
                     TimgCalibrationClockConfig::Xtal32kClk => request_xtal32k_clk(clocks),
                 }
                 enable_timg_calibration_clock_impl(clocks, true);
@@ -3527,6 +3544,7 @@ macro_rules! define_clock_tree_types {
                     TimgCalibrationClockConfig::CpllClk => release_cpll_clk(clocks),
                     TimgCalibrationClockConfig::RcFastDivClk => release_rc_fast_clk(clocks),
                     TimgCalibrationClockConfig::RcSlowClk => release_lp_slow_clk(clocks),
+                    #[cfg(use_xtal32k)]
                     TimgCalibrationClockConfig::Xtal32kClk => release_xtal32k_clk(clocks),
                 }
             }
@@ -3542,6 +3560,7 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::CpllClk => cpll_clk_frequency(),
                 TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(),
                 TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(),
+                #[cfg(use_xtal32k)]
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
             }
         }
@@ -3555,6 +3574,7 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::CpllClk => cpll_clk_frequency(),
                 TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_frequency(),
                 TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_frequency(),
+                #[cfg(use_xtal32k)]
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
             }
         }

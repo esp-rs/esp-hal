@@ -16,6 +16,7 @@ use crate::cfg::{
         SourceFrequencySignature,
         ValidationContext,
         config_type_name,
+        rustc_cfg_attr,
     },
     soc::ProcessedClockData,
 };
@@ -31,6 +32,10 @@ pub struct Multiplexer {
 
     #[serde(default)]
     wake_locking: bool,
+
+    /// Optional `#[cfg(...)]` expression. The node is omitted when the condition is false.
+    #[serde(default)]
+    cfg: Option<String>,
 
     // reject: Option<RejectExpression>,
     pub variants: Vec<MultiplexerVariant>,
@@ -51,6 +56,10 @@ impl ClockTreeNodeType for Multiplexer {
 
     fn wake_locking(&self) -> bool {
         self.wake_locking
+    }
+
+    fn rustc_cfg(&self) -> Option<&str> {
+        self.cfg.as_deref()
     }
 
     fn input_clocks(
@@ -173,12 +182,13 @@ impl ClockTreeNodeType for Multiplexer {
         let mut variant_frequencies = Vec::with_capacity(self.variants.len());
         let mut variants = Vec::with_capacity(self.variants.len());
         for variant in &self.variants {
+            let cfg_attr = variant.cfg_attr();
             let name = variant.config_enum_variant_name();
             let upstream_node = instance.resolve_node(tree, &variant.outputs);
             let Some(frequency) = upstream_node.try_frequency_call() else {
                 return SourceFrequencySignature::Skip;
             };
-            variants.push(quote! { #ty_name::#name });
+            variants.push(quote! { #cfg_attr #ty_name::#name });
             variant_frequencies.push(frequency);
         }
 
@@ -212,8 +222,9 @@ impl ClockTreeNodeType for Multiplexer {
             .variants
             .iter()
             .map(|variant| {
+                let cfg_attr = variant.cfg_attr();
                 let name = variant.config_enum_variant_name();
-                quote! { #ty_name::#name }
+                quote! { #cfg_attr #ty_name::#name }
             })
             .collect::<Vec<_>>();
 
@@ -249,11 +260,13 @@ impl ClockTreeNodeType for Multiplexer {
         } else {
             quote! {}
         };
+        let cfg_attr = instance.rustc_cfg_attr();
         let variants = self.variants.iter().map(|v| v.config_enum_variant());
 
         let docline =
             format!("The list of clock signals that the `{clock_name}` multiplexer can output.");
         quote! {
+            #cfg_attr
             #[doc = #docline]
             #[derive(Debug, #derive_default Clone, Copy, PartialEq, Eq, Hash)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -292,8 +305,9 @@ impl ClockTreeNodeType for Multiplexer {
 
         let ty = config_type_name(group, &self.name);
         let options = self.variants.iter().map(|variant| {
+            let cfg_attr = variant.cfg_attr();
             let variant = variant.config_enum_variant_name();
-            quote! { crate::soc::clocks::#ty::#variant }
+            quote! { #cfg_attr crate::soc::clocks::#ty::#variant }
         });
 
         quote! {
@@ -362,8 +376,10 @@ impl Multiplexer {
                 }
 
                 let name = variant.config_enum_variant_name();
+                let cfg_attr = variant.cfg_attr();
 
                 Some(quote! {
+                    #cfg_attr
                     #ty_name::#name => {
                         #variant_configures
                     }
@@ -422,12 +438,14 @@ impl Multiplexer {
         if self.variants.len() > 1 {
             let ty_name = instance.config_type_name();
             let request_upstream_branches = self.variants.iter().map(|variant| {
+                let cfg_attr = variant.cfg_attr();
                 let match_arm = variant.config_enum_variant_name();
 
                 let upstream_node = instance.resolve_node(tree, &variant.outputs);
                 let receiver = upstream_node.properties.receiver();
                 let func = upstream_node.request_fn_name();
                 quote! {
+                    #cfg_attr
                     #ty_name::#match_arm => #(#receiver.)*#func(clocks)
                 }
             });
@@ -464,11 +482,13 @@ impl Multiplexer {
         if self.variants.len() > 1 {
             let ty_name = instance.config_type_name();
             let release_upstream_branches = self.variants.iter().map(|variant| {
+                let cfg_attr = variant.cfg_attr();
                 let match_arm = variant.config_enum_variant_name();
                 let upstream_node = instance.resolve_node(tree, &variant.outputs);
                 let receiver = upstream_node.properties.receiver();
                 let func = upstream_node.release_fn_name();
                 quote! {
+                    #cfg_attr
                     #ty_name::#match_arm => #(#receiver.)*#func(clocks)
                 }
             });
@@ -522,8 +542,15 @@ pub struct MultiplexerVariant {
     pub configures: Vec<ConfiguresExpression>,
     #[serde(default)]
     pub default: bool,
+    /// Optional `#[cfg(...)]` expression. The variant is omitted when the condition is false.
+    #[serde(default)]
+    pub cfg: Option<String>,
 }
 impl MultiplexerVariant {
+    pub fn cfg_attr(&self) -> TokenStream {
+        rustc_cfg_attr(self.cfg.as_deref())
+    }
+
     pub fn config_enum_variant_name(&self) -> Ident {
         format_ident!(
             "{}",
@@ -540,6 +567,7 @@ impl MultiplexerVariant {
     pub fn config_enum_variant(&self) -> TokenStream {
         let docline = format!(" Selects `{}`.", self.outputs);
         let name = self.config_enum_variant_name();
+        let cfg_attr = self.cfg_attr();
 
         let default = if self.default {
             quote! {
@@ -550,6 +578,7 @@ impl MultiplexerVariant {
         };
 
         quote! {
+            #cfg_attr
             #default
             #[doc = #docline]
             #name,

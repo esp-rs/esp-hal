@@ -434,6 +434,7 @@ fn configure_lp_slow_clk_impl(
         .modify(|_, w| unsafe {
             w.lp_aonclkrst_slow_clk_sel().bits(match new_selector {
                 LpSlowClkConfig::RcSlow => 0,
+                #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => 1,
                 // LpSlowClkConfig::Rc32k => 2,
                 LpSlowClkConfig::OscSlow => 3,
@@ -516,6 +517,7 @@ fn enable_lp_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 
 // Source clock enable/disable stubs (PLLs, oscillators)
 fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_osc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
@@ -638,6 +640,7 @@ fn configure_timg_calibration_clock_impl(
                 TimgCalibrationClockConfig::CpllClk => 2,
                 TimgCalibrationClockConfig::RcFastDivClk => 7,
                 TimgCalibrationClockConfig::RcSlowClk => 8,
+                #[cfg(use_xtal32k)]
                 TimgCalibrationClockConfig::Xtal32kClk => 10,
             })
         });

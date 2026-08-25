@@ -183,6 +183,7 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 // XTAL32K_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     PMU::regs()
         .hp_sleep_lp_ck_power()
@@ -222,6 +223,7 @@ fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 // PLL_LP_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_pll_lp_clk_impl(_clocks: &mut ClockTree, en: bool) {
     PMU::regs()
         .hp_sleep_lp_ck_power()
@@ -344,6 +346,7 @@ fn configure_lp_fast_clk_impl(
         w.fast_clk_sel().bits(match new_config {
             LpFastClkConfig::RcFastClk => 0,
             LpFastClkConfig::XtalD2Clk => 1,
+            #[cfg(use_xtal32k)]
             LpFastClkConfig::PllLpClk => 2,
         })
     });
@@ -363,6 +366,7 @@ fn configure_lp_slow_clk_impl(
     LP_CLKRST::regs().lp_clk_conf().modify(|_, w| unsafe {
         w.slow_clk_sel().bits(match new_config {
             LpSlowClkConfig::RcSlow => 0,
+            #[cfg(use_xtal32k)]
             LpSlowClkConfig::Xtal32k => 1,
             LpSlowClkConfig::OscSlow => 2,
         })
@@ -385,6 +389,7 @@ fn configure_timg_calibration_clock_impl(
         w.rtc_cali_clk_sel().bits(match new_config {
             TimgCalibrationClockConfig::RcSlowClk => 0,
             TimgCalibrationClockConfig::RcFastDivClk => 1,
+            #[cfg(use_xtal32k)]
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });

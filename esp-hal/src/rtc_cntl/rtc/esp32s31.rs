@@ -616,10 +616,14 @@ pub(crate) fn configure_wifi_lp_clock(config: &ClockConfig) {
         w.clk_wifipwr_lp_sel_xtal32k().clear_bit();
         match source {
             LpSlowClkConfig::RcSlow => w.clk_wifipwr_lp_sel_osc_slow().set_bit(),
+            #[cfg(use_xtal32k)]
             LpSlowClkConfig::Xtal32k => w.clk_wifipwr_lp_sel_xtal32k().set_bit(),
         }
     });
-    if source == LpSlowClkConfig::Xtal32k {
+    if cfg_select! {
+        use_xtal32k => source == LpSlowClkConfig::Xtal32k,
+        _ => false,
+    } {
         // The WiFi 32 kHz selector feeds from the shared modem 32 kHz mux.
         // MODEM_CLOCK_XTAL32K_CODE is 0 on S31.
         lpcon

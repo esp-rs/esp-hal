@@ -329,6 +329,7 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
     }
 }
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
         LP_AON_CLK_RST::regs().xtal32k().modify(|_, w| unsafe {
@@ -483,6 +484,7 @@ fn configure_lp_slow_clk_impl(
         .modify(|_, w| unsafe {
             w.slow_clk_sel().bits(match new {
                 LpSlowClkConfig::RcSlow => 0,
+                #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => 1,
             })
         });
@@ -502,6 +504,7 @@ fn configure_timg_calibration_clock_impl(
     let (source, divider): (u8, u16) = match new {
         TimgCalibrationClockConfig::RcFastDivClk => (7, 50),
         TimgCalibrationClockConfig::RcSlowClk => (8, 1),
+        #[cfg(use_xtal32k)]
         TimgCalibrationClockConfig::Xtal32kClk => (10, 1),
     };
     HP_SYS_CLKRST::regs()

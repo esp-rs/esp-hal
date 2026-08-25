@@ -64,6 +64,17 @@ mod generic;
 mod mux;
 mod source;
 
+/// Builds `#[cfg(...)]` from a metadata `cfg` property, or an empty token stream.
+pub(crate) fn rustc_cfg_attr(cfg: Option<&str>) -> TokenStream {
+    let Some(cfg) = cfg.filter(|cfg| !cfg.is_empty()) else {
+        return quote! {};
+    };
+    let cfg = TokenStream::from_str(cfg).unwrap_or_else(|err| {
+        panic!("Invalid clock-tree `cfg` expression `{cfg}`: {err}");
+    });
+    quote! { #[cfg(#cfg)] }
+}
+
 /// Returns the name of the config type generated for a node.
 ///
 /// `group` is the template group the node belongs to, or an empty string for standalone nodes.
@@ -99,6 +110,7 @@ pub(crate) enum SourceFrequencySignature {
 
 pub(crate) struct ClockNodeFunctions {
     pub impl_type: Option<Ident>,
+    pub cfg: Option<String>,
 
     pub request: Function,
     pub release: Function,
@@ -112,12 +124,24 @@ pub(crate) struct ClockNodeFunctions {
 
 impl ClockNodeFunctions {
     pub fn implement_functions(&self) -> TokenStream {
-        let request_impl = &self.request.implementation;
-        let release_impl = &self.release.implementation;
-        let apply_impl = &self.apply_config.implementation;
-        let current_config_impl = &self.current_config.implementation;
-        let frequency_impl = &self.frequency.implementation;
-        let source_frequency_impl = &self.source_frequency.implementation;
+        let cfg_attr = rustc_cfg_attr(self.cfg.as_deref());
+        let wrap = |implementation: &TokenStream| {
+            if implementation.is_empty() {
+                quote! {}
+            } else {
+                quote! {
+                    #cfg_attr
+                    #implementation
+                }
+            }
+        };
+
+        let apply_impl = wrap(&self.apply_config.implementation);
+        let current_config_impl = wrap(&self.current_config.implementation);
+        let request_impl = wrap(&self.request.implementation);
+        let release_impl = wrap(&self.release.implementation);
+        let frequency_impl = wrap(&self.frequency.implementation);
+        let source_frequency_impl = wrap(&self.source_frequency.implementation);
 
         quote! {
             #apply_impl
@@ -554,6 +578,11 @@ pub(crate) trait ClockTreeNodeType: Any {
     /// standalone nodes. It is needed to reconstruct the names of the generated config types.
     fn property_macro_branches(&self, _path: &str, _group: &str) -> TokenStream {
         quote! {}
+    }
+
+    /// Optional `#[cfg(...)]` expression that disables this node when false.
+    fn rustc_cfg(&self) -> Option<&str> {
+        None
     }
 }
 

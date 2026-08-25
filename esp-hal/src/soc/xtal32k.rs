@@ -17,6 +17,10 @@
 
 /// Whether esp-hal should power and use the external 32 kHz crystal.
 #[inline(always)]
+#[allow(
+    dead_code,
+    reason = "Sleep and RTC code uses this on chips that power-gate XTAL32K."
+)]
 pub(crate) const fn use_xtal32k() -> bool {
     cfg!(use_xtal32k)
 }
@@ -24,19 +28,17 @@ pub(crate) const fn use_xtal32k() -> bool {
 /// The LP slow clock source to select by default.
 #[cfg(soc_has_clock_node_lp_slow_clk)]
 pub(crate) const fn default_lp_slow_clk() -> crate::soc::clocks::LpSlowClkConfig {
-    if use_xtal32k() {
-        crate::soc::clocks::LpSlowClkConfig::Xtal32k
-    } else {
-        crate::soc::clocks::LpSlowClkConfig::RcSlow
+    cfg_select! {
+        use_xtal32k => crate::soc::clocks::LpSlowClkConfig::Xtal32k,
+        _ => crate::soc::clocks::LpSlowClkConfig::RcSlow,
     }
 }
 
 /// The RTC slow clock source to select by default.
 #[cfg(soc_has_clock_node_rtc_slow_clk)]
 pub(crate) const fn default_rtc_slow_clk() -> crate::soc::clocks::RtcSlowClkConfig {
-    if use_xtal32k() {
-        crate::soc::clocks::RtcSlowClkConfig::Xtal32k
-    } else {
-        crate::soc::clocks::RtcSlowClkConfig::RcSlow
+    cfg_select! {
+        use_xtal32k => crate::soc::clocks::RtcSlowClkConfig::Xtal32k,
+        _ => crate::soc::clocks::RtcSlowClkConfig::RcSlow,
     }
 }
