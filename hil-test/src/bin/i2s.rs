@@ -996,7 +996,8 @@ mod pdm_tx_tests {
         let tx_cfg = if info.pcm2pdm {
             PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
         } else {
-            PdmTxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono)
+            // 1.024 MHz: raw MCLK is sample_rate * 16; 2.048 MHz exceeds S31's 40 MHz XTAL.
+            PdmTxConfig::new_raw_default(Rate::from_hz(1_024_000), PdmSlotMode::Mono)
         };
         assert!(tx_cfg.validate(info).is_ok());
     }
@@ -1011,7 +1012,7 @@ mod pdm_tx_tests {
         let tx_cfg = if info.pcm2pdm {
             PdmTxConfig::new_codec_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
         } else {
-            PdmTxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono)
+            PdmTxConfig::new_raw_default(Rate::from_hz(1_024_000), PdmSlotMode::Mono)
         };
         let pdm_cfg = PdmConfig::tx_only(tx_cfg);
 
@@ -1095,7 +1096,8 @@ mod pdm_rx_tests {
         let rx_cfg = if info.pdm2pcm {
             PdmRxConfig::new_pcm_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
         } else {
-            PdmRxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono)
+            // 1.024 MHz: raw MCLK is sample_rate * 16; 2.048 MHz exceeds S31's 40 MHz XTAL.
+            PdmRxConfig::new_raw_default(Rate::from_hz(1_024_000), PdmSlotMode::Mono)
         };
         assert!(rx_cfg.validate(info).is_ok());
     }
@@ -1110,7 +1112,7 @@ mod pdm_rx_tests {
         let rx_cfg = if info.pdm2pcm {
             PdmRxConfig::new_pcm_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
         } else {
-            PdmRxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono)
+            PdmRxConfig::new_raw_default(Rate::from_hz(1_024_000), PdmSlotMode::Mono)
         };
         let pdm_cfg = PdmConfig::rx_only(rx_cfg);
 
