@@ -1,0 +1,41 @@
+# Required status check enforcing the merge freeze.
+#
+# The job must never be skipped: a skipped required check stays pending forever
+# and wedges the merge queue.
+
+name: Merge freeze gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  merge_group:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+
+jobs:
+  merge-freeze-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Base branch, not the pull request's merge ref: otherwise a pull request
+      # could edit the gate script and wave itself through.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref || github.ref }}
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { run } = require('./.github/scripts/merge-freeze-gate.js');
+            await run({ github, context, core });
