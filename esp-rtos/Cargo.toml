@@ -1,6 +1,6 @@
 [package]
 name          = "esp-rtos"
-version       = "0.3.0"
+version       = "0.4.0"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "A task scheduler for Espressif devices"
@@ -48,10 +48,10 @@ rtos-trace = { version = "0.2.0", optional = true }
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"], optional = true }
 document-features  = "0.2"
 embassy-sync = "0.8"
-esp-alloc = { version = "0.10.0", path = "../esp-alloc", optional = true, default-features = false }
+esp-alloc = { version = "0.11.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.8.0", path = "../esp-config" }
 esp-sync = { version = "0.3.0", path = "../esp-sync" }
-esp-radio-rtos-driver = { version = "0.3.0", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
+esp-radio-rtos-driver = { version = "0.4.0", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
 macros = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
 

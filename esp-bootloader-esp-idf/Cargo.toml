@@ -1,6 +1,6 @@
 [package]
 name = "esp-bootloader-esp-idf"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.95.0"
 description = "Functionality related to the esp-idf bootloader"
@@ -37,7 +37,7 @@ esp-hal-procmacros = { version = "0.23.0", path = "../esp-hal-procmacros", featu
 esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "~0.1", path = "../esp-rom-sys", optional = true }
 embedded-storage = { version = "0.3.1", optional = true }
-esp-storage = { path = "../esp-storage", default-features = false, optional = true }
+esp-storage = { version = "0.10.0", path = "../esp-storage", default-features = false, optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 

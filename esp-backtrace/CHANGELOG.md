@@ -9,8 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial ESP32-P4 (chip revision v3.0+) support (#5400)
-- Add ESP32-S31 support (#5922)
 
 ### Changed
 
@@ -20,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+
+## [v0.20.0] - 2026-08-25
+
+### Added
+
+- Initial ESP32-P4 (chip revision v3.0+) support (#5400)
+- Add ESP32-S31 support (#5922)
+
+### Changed
+
+- updated defmt to 1.1 (#5752)
+
+### Fixed
+
+- Xtensa: Fixed an issue that could corrupt a register value (#6027)
 
 ## [v0.19.0] - 2026-04-16
 
@@ -123,4 +136,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.17.0...esp-backtrace-v0.18.0
 [v0.18.1]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.0...esp-backtrace-v0.18.1
 [v0.19.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.18.1...esp-backtrace-v0.19.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.19.0...HEAD
+[v0.20.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.19.0...esp-backtrace-v0.20.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.20.0...HEAD
