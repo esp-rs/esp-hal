@@ -725,12 +725,9 @@ pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
 #[inline]
 #[cfg(multi_core)]
 pub(crate) fn schedule_other_core() {
-    use esp_hal::{
-        interrupt::software::SoftwareInterrupt,
-        peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1},
+    let other = match Cpu::current() {
+        Cpu::ProCpu => Cpu::AppCpu,
+        Cpu::AppCpu => Cpu::ProCpu,
     };
-    match Cpu::current() {
-        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).raise(),
-        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise(),
-    }
+    arch_specific::schedule_on_core(other);
 }

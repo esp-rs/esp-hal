@@ -67,6 +67,9 @@ use crate::pac;
 
 unstable_driver! {
     pub mod software;
+
+    #[cfg(feature = "rt")]
+    pub mod ipc;
 }
 
 #[cfg(feature = "rt")]
@@ -379,13 +382,16 @@ pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
 /// Only one interrupt handler can be bound to a peripheral interrupt.
 #[instability::unstable]
 pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
+    bind_vector(interrupt, handler);
+    enable(interrupt, handler.priority());
+}
+
+/// Binds `handler` to `interrupt` without enabling the peripheral interrupt.
+pub(crate) fn bind_vector(interrupt: Interrupt, handler: InterruptHandler) {
     unsafe {
         let vector = vector_entry(interrupt);
-
         let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
 
-        // On RISC-V MCUs we may be protecting the trap section using a watchpoint.
-        // If we do, we need to temporarily disable this protection.
         #[cfg(all(riscv, write_vec_table_monitoring))]
         if crate::soc::trap_section_protected() {
             crate::debugger::DEBUGGER_LOCK.lock(|| {
@@ -393,13 +399,11 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
                 ptr.write_volatile(handler.handler().address());
                 crate::debugger::restore_watchpoint(1, wp);
             });
-            enable(interrupt, handler.priority());
             return;
         }
 
         ptr.write_volatile(handler.handler().address());
     }
-    enable(interrupt, handler.priority());
 }
 
 /// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.

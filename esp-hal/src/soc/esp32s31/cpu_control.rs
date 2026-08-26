@@ -147,6 +147,8 @@ where
             crate::debugger::set_stack_watchpoint(guard as usize);
         }
         crate::interrupt::init_vectoring();
+        #[cfg(all(feature = "rt", feature = "unstable"))]
+        crate::interrupt::ipc::install_app();
     }
 
     unsafe { multi_core::CpuControl::start_core1_run::<F>() }

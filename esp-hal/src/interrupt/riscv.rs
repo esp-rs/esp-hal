@@ -303,6 +303,10 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
 /// - The handler must be declared as a naked function. The compiler does not insert a function
 ///   prologue or epilogue; a normal Rust `fn` results in an error
 ///
+/// After [`crate::init`], [`DirectBindableCpuInterrupt::Interrupt0`] is reserved for IPC.
+/// Do not call [`enable_direct`] with that CPU interrupt. A later call overwrites the IPC
+/// handler, including the scheduler yield path.
+///
 /// Unless low-level control is required for the lowest possible latency,
 /// [`enable`][crate::interrupt::enable] is usually preferable
 #[instability::unstable]

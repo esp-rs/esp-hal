@@ -10,7 +10,7 @@ use esp_hal::{
     delay::Delay,
     interrupt::software::SoftwareInterrupt,
     main,
-    peripherals::FROM_CPU_INTR0,
+    peripherals::FROM_CPU_INTR2,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -20,7 +20,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut sw_int = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
+    let mut sw_int = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR2);
 
     sw_int.set_interrupt_handler(sw_int_handler);
 
@@ -34,6 +34,6 @@ fn main() -> ! {
 
 #[esp_hal::handler]
 fn sw_int_handler() {
-    unsafe { SoftwareInterrupt::new(FROM_CPU_INTR0::steal()) }.reset();
+    unsafe { SoftwareInterrupt::new(FROM_CPU_INTR2::steal()) }.reset();
     log::info!("Triggered");
 }

@@ -60,7 +60,7 @@ async fn main(_spawner: Spawner) {
     let app_core_stack = APP_CORE_STACK.init(Stack::new());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
@@ -71,18 +71,13 @@ async fn main(_spawner: Spawner) {
     };
     let led = Output::new(gpio, Level::Low, OutputConfig::default());
 
-    esp_rtos::start_second_core(
-        peripherals.CPU_CTRL,
-        peripherals.FROM_CPU_INTR1,
-        app_core_stack,
-        move || {
-            static EXECUTOR: StaticCell<Executor> = StaticCell::new();
-            let executor = EXECUTOR.init(Executor::new());
-            executor.run(|spawner| {
-                spawner.spawn(control_led(led, led_ctrl_signal).unwrap());
-            });
-        },
-    );
+    esp_rtos::start_second_core(peripherals.CPU_CTRL, app_core_stack, move || {
+        static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+        let executor = EXECUTOR.init(Executor::new());
+        executor.run(|spawner| {
+            spawner.spawn(control_led(led, led_ctrl_signal).unwrap());
+        });
+    });
 
     // Sends periodic messages to control_led, enabling or disabling it.
     println!(
