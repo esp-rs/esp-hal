@@ -5,12 +5,6 @@ function isHilRunMatrixJob(name) {
   return /(?:^|\/\s*)hil-run \(/i.test(String(name || ""));
 }
 
-function hasFailedStep(steps) {
-  return steps.some(
-    (s) => s.conclusion === "failure" || s.conclusion === "cancelled",
-  );
-}
-
 function classifyMatrixJob(job) {
   const steps = job.steps || [];
   const runTests = steps.find((s) => s.name === RUN_TESTS_STEP);
@@ -20,12 +14,13 @@ function classifyMatrixJob(job) {
 
   const conclusion = runTests.conclusion;
   if (conclusion === "skipped") {
-    // A cancelled job leaves every step skipped, so hasFailedStep alone would
-    // misread it as a chip that simply had no ELFs.
-    if (job.conclusion === "cancelled" || hasFailedStep(steps)) {
-      return { kind: "failed" };
+    // The guard step skips a chip that produced no ELFs. A job that failed, was
+    // cancelled or timed out leaves the same skipped step behind, so only a
+    // successful job means "not tested".
+    if (job.conclusion === "success") {
+      return { kind: "skipped" };
     }
-    return { kind: "skipped" };
+    return { kind: "failed" };
   }
   if (conclusion === "success") {
     return { kind: "passed" };
