@@ -40,7 +40,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     // The sniffer borrows the controller, so we only need the controller here —
     // no station/AP `Interface` is required for raw 802.11 transmit.

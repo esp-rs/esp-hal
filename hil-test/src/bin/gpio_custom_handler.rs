@@ -161,7 +161,7 @@ mod tests {
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -178,7 +178,7 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -199,11 +199,11 @@ mod tests {
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let interrupt_executor = mk_static!(
-            InterruptExecutor<1>,
-            InterruptExecutor::new(peripherals.FROM_CPU_INTR1)
+            InterruptExecutor<2>,
+            InterruptExecutor::new(peripherals.FROM_CPU_INTR2)
         );
         // Run the executor at interrupt priority 1, which is the same as the default
         // interrupt priority of the GPIO interrupt handler.
@@ -231,7 +231,7 @@ mod tests {
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -257,7 +257,7 @@ mod tests {
         HANDLER_MODE.store(HandlerMode::WakeSpecificPin as u8, Ordering::Relaxed);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -283,7 +283,7 @@ mod tests {
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         static IO_SET_UP: ConstStaticCell<Signal<CriticalSectionRawMutex, ()>> =
             ConstStaticCell::new(Signal::<CriticalSectionRawMutex, ()>::new());
@@ -293,7 +293,6 @@ mod tests {
         let mut io = Io::new(peripherals.IO_MUX);
         esp_rtos::start_second_core(
             peripherals.CPU_CTRL,
-            peripherals.FROM_CPU_INTR1,
             mk_static!(Stack<4096>, Stack::new()),
             move || {
                 // Set the interrupt handler for GPIO.

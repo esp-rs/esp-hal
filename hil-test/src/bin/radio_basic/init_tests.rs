@@ -58,7 +58,7 @@ mod init_tests {
     #[cfg(soc_has_wifi)]
     fn test_init_fails_cs(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let _ = critical_section::with(|_| {
             esp_radio::wifi::WifiController::new(p.WIFI, Default::default())
@@ -70,7 +70,7 @@ mod init_tests {
     #[cfg(soc_has_wifi)]
     fn test_init_fails_interrupt_free(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let _ = interrupt_free(|| esp_radio::wifi::WifiController::new(p.WIFI, Default::default()));
     }
@@ -79,14 +79,14 @@ mod init_tests {
     #[should_panic]
     #[cfg(soc_has_wifi)]
     async fn test_init_fails_in_interrupt_executor_task(p: Peripherals) {
-        static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-        let executor_core0 = InterruptExecutor::new(p.FROM_CPU_INTR1);
+        static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<2>> = StaticCell::new();
+        let executor_core0 = InterruptExecutor::new(p.FROM_CPU_INTR2);
         let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
         let spawner = executor_core0.start(Priority::Priority1);
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let signal = mk_static!(Signal<CriticalSectionRawMutex, Option<WifiError>>, Signal::new());
 
@@ -99,7 +99,7 @@ mod init_tests {
     #[cfg(soc_has_wifi)]
     fn test_wifi_can_be_initialized(mut p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         // Initialize, then de-initialize wifi
         let wifi =
@@ -116,7 +116,7 @@ mod init_tests {
     #[cfg(all(bt_driver_supported, feature = "esp-radio-unstable"))]
     fn test_init_and_drop(mut p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         // Initialize BLE and WiFi then drop BLE
         let connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
@@ -135,7 +135,7 @@ mod init_tests {
     #[cfg(all(bt_driver_supported, feature = "esp-radio-unstable"))]
     fn test_create_ble_wifi_drop_ble_wifi_create_wifi_ble(mut p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         // Initialize WiFi and BLE then drop BLE and WiFi
         let wifi =
