@@ -58,7 +58,7 @@ struct Context {
     dedicated_gpio: DedicatedGpio<'static>,
 
     #[cfg(feature = "unstable")]
-    int1: esp_hal::peripherals::FROM_CPU_INTR1<'static>,
+    int1: esp_hal::peripherals::FROM_CPU_INTR2<'static>,
     #[cfg(all(multi_core, feature = "unstable"))]
     cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
     #[cfg(all(multi_core, feature = "unstable"))]
@@ -161,8 +161,8 @@ mod tests {
         let int1 = {
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
-            peripherals.FROM_CPU_INTR1
+            esp_rtos::start(timg0.timer0);
+            peripherals.FROM_CPU_INTR2
         };
 
         Context {
@@ -374,7 +374,7 @@ mod tests {
     async fn gpio_interrupt_enabled_on_other_core(mut ctx: Context) {
         let io_set_up = &*mk_static!(Signal::<CriticalSectionRawMutex, ()>, Signal::new());
 
-        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.int1, ctx.app_core_stack, move || {
+        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.app_core_stack, move || {
             // Set the interrupt handler for GPIO.
             ctx.io.set_interrupt_handler(interrupt_handler);
             io_set_up.signal(());
@@ -616,7 +616,7 @@ mod tests {
         use esp_rtos::embassy::InterruptExecutor;
         use static_cell::StaticCell;
 
-        static INTERRUPT_EXECUTOR: StaticCell<InterruptExecutor<1>> = StaticCell::new();
+        static INTERRUPT_EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
         let interrupt_executor = INTERRUPT_EXECUTOR.init(InterruptExecutor::new(ctx.int1));
 
         let spawner = interrupt_executor.start(Priority::max());
@@ -690,17 +690,12 @@ mod tests {
         const CORE1_STACK_SIZE: usize = 8192;
         let app_core_stack = mk_static!(Stack<CORE1_STACK_SIZE>, Stack::new());
 
-        esp_rtos::start_second_core(
-            unsafe { CPU_CTRL::steal() },
-            ctx.int1,
-            app_core_stack,
-            move || {
-                let executor = mk_static!(Executor, Executor::new());
-                executor.run(|spawner| {
-                    spawner.spawn(edge_counter_task(in_pin, input_pin_listening).unwrap());
-                });
-            },
-        );
+        esp_rtos::start_second_core(unsafe { CPU_CTRL::steal() }, app_core_stack, move || {
+            let executor = mk_static!(Executor, Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(edge_counter_task(in_pin, input_pin_listening).unwrap());
+            });
+        });
 
         // Now drive the OutputPin and assert that the other core saw exactly as many
         // edges as we generated here.
@@ -789,7 +784,7 @@ mod tests {
 
         // creating the driver at core1, and then use it at core
         // this should panic
-        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.int1, ctx.app_core_stack, move || {
+        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.app_core_stack, move || {
             let input = Input::new(pin1, InputConfig::default().with_pull(Pull::Down));
             let driver = DedicatedGpioInput::new(ctx.dedicated_gpio.channel1.input, input);
 

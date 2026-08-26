@@ -44,7 +44,7 @@
 //!
 //! // THIS IS IMPORTANT FOR WIFI AND BLE: You MUST start the scheduler
 //! // before initializing the radio!
-//! esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+//! esp_rtos::start(timg0.timer0);
 #![cfg_attr(
     wifi_driver_supported,
     doc = r#"

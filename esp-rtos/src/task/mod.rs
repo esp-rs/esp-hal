@@ -8,6 +8,7 @@ use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 use allocator_api2::boxed::Box;
 pub(crate) use arch_specific::*;
 use esp_hal::{
+    interrupt::__rtos_implementation::request_context_switch,
     system::Cpu,
     time::{Duration, Instant},
 };
@@ -663,30 +664,30 @@ pub(super) fn schedule_task_deletion(task: Option<NonNull<Task>>) {
 pub(crate) fn trigger_scheduler(run_scheduler: RunSchedulerOn) {
     match run_scheduler {
         RunSchedulerOn::DontRun => {}
-        RunSchedulerOn::RunOnCore(_core) => {
-            cfg_select! {
-                multi_core => {
-                    if _core == Cpu::current() {
-                        yield_task()
-                    } else {
-                        schedule_other_core()
-                    }
-                }
-                _ => yield_task(),
-            }
-        }
+        RunSchedulerOn::RunOnCore(core) => request_context_switch(core),
     }
 }
 
+/// Asks the other CPU to run its context-switch handler.
 #[inline]
 #[cfg(multi_core)]
 pub(crate) fn schedule_other_core() {
-    use esp_hal::{
-        interrupt::software::SoftwareInterrupt,
-        peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1},
+    let other = match Cpu::current() {
+        Cpu::ProCpu => Cpu::AppCpu,
+        Cpu::AppCpu => Cpu::ProCpu,
     };
-    match Cpu::current() {
-        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).raise(),
-        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise(),
+    request_context_switch(other);
+}
+
+/// Asks the current CPU to run its context-switch handler.
+#[inline]
+pub(crate) fn yield_task() {
+    #[cfg(feature = "rtos-trace")]
+    {
+        use crate::TraceEvents;
+
+        rtos_trace::trace::marker_begin(TraceEvents::YieldTask as u32);
+        rtos_trace::trace::marker_end(TraceEvents::YieldTask as u32);
     }
+    request_context_switch(Cpu::current())
 }

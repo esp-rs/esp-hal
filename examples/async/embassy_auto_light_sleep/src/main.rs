@@ -110,7 +110,7 @@ async fn main(spawner: Spawner) {
     let timg0 = TimerGroup::new(p.TIMG0);
 
     let sleep = esp_rtos::sleep::configure(p.LPWR);
-    esp_rtos::start_with_idle_hook(timg0.timer0, p.FROM_CPU_INTR0, sleep.light_sleep_hook);
+    esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
 
     let boot_btn = cfg_select! {
         any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => p.GPIO0,
@@ -133,7 +133,7 @@ async fn main(spawner: Spawner) {
         static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
         let app_core_stack = APP_CORE_STACK.init(Stack::new());
 
-        esp_rtos::start_second_core(p.CPU_CTRL, p.FROM_CPU_INTR1, app_core_stack, move || {
+        esp_rtos::start_second_core(p.CPU_CTRL, app_core_stack, move || {
             static EXECUTOR: StaticCell<Executor> = StaticCell::new();
             let executor = EXECUTOR.init(Executor::new());
             executor.run(|spawner| {

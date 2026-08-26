@@ -7,15 +7,12 @@ mod tests {
     use esp_hal::{
         clock::CpuClock,
         interrupt::{Priority, software::SoftwareInterrupt},
-        peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR2, TIMG0},
+        peripherals::{FROM_CPU_INTR2, TIMG0},
         time::{Duration, Instant},
         timer::timg::TimerGroup,
     };
     #[cfg(multi_core)]
-    use esp_hal::{
-        peripherals::{CPU_CTRL, FROM_CPU_INTR1},
-        system::Cpu,
-    };
+    use esp_hal::{peripherals::CPU_CTRL, system::Cpu};
     use esp_radio_rtos_driver::{
         self as preempt,
         queue::QueueHandle,
@@ -30,8 +27,6 @@ mod tests {
     use static_cell::{ConstStaticCell, StaticCell};
 
     struct Context {
-        #[cfg(multi_core)]
-        sw_int1: FROM_CPU_INTR1<'static>,
         sw_int2: FROM_CPU_INTR2<'static>,
         #[cfg(multi_core)]
         cpu_cntl: CPU_CTRL<'static>,
@@ -40,9 +35,8 @@ mod tests {
     #[allow(unused)] // compile test
     fn baremetal_preempt_can_be_initialized_with_any_timer(
         timer: esp_hal::timer::AnyTimer<'static>,
-        int: FROM_CPU_INTR0<'static>,
     ) {
-        esp_rtos::start(timer, int);
+        esp_rtos::start(timer);
     }
 
     #[init]
@@ -53,11 +47,9 @@ mod tests {
         let p = esp_hal::init(config);
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         Context {
-            #[cfg(multi_core)]
-            sw_int1: p.FROM_CPU_INTR1,
             sw_int2: p.FROM_CPU_INTR2,
             #[cfg(multi_core)]
             cpu_cntl: p.CPU_CTRL,
@@ -70,9 +62,9 @@ mod tests {
     #[should_panic]
     fn panics_in_interrupt_context() {
         #[embassy_executor::task]
-        async fn try_init(timer: TIMG0<'static>, sw_int0: FROM_CPU_INTR0<'static>) {
+        async fn try_init(timer: TIMG0<'static>) {
             let timg0 = TimerGroup::new(timer);
-            esp_rtos::start(timg0.timer0, sw_int0);
+            esp_rtos::start(timg0.timer0);
         }
 
         crate::init_heap();
@@ -80,13 +72,13 @@ mod tests {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
 
-        static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-        let executor_core0 = InterruptExecutor::new(p.FROM_CPU_INTR1);
+        static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<2>> = StaticCell::new();
+        let executor_core0 = InterruptExecutor::new(p.FROM_CPU_INTR2);
         let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
         let spawner = executor_core0.start(Priority::Priority1);
 
-        spawner.spawn(try_init(p.TIMG0, p.FROM_CPU_INTR0).unwrap());
+        spawner.spawn(try_init(p.TIMG0).unwrap());
     }
 
     #[test]
@@ -570,7 +562,6 @@ mod tests {
 
         esp_rtos::start_second_core(
             unsafe { ctx.cpu_cntl.clone_unchecked() },
-            ctx.sw_int1,
             #[allow(static_mut_refs)]
             unsafe {
                 &mut crate::APP_CORE_STACK
@@ -646,7 +637,6 @@ mod tests {
 
         esp_rtos::start_second_core(
             unsafe { ctx.cpu_cntl.clone_unchecked() },
-            ctx.sw_int1,
             #[allow(static_mut_refs)]
             unsafe {
                 &mut crate::APP_CORE_STACK
@@ -712,7 +702,6 @@ mod tests {
 
         esp_rtos::start_second_core(
             unsafe { ctx.cpu_cntl.clone_unchecked() },
-            ctx.sw_int1,
             #[allow(static_mut_refs)]
             unsafe {
                 &mut crate::APP_CORE_STACK
@@ -760,7 +749,6 @@ mod tests {
 
         esp_rtos::start_second_core(
             unsafe { ctx.cpu_cntl.clone_unchecked() },
-            ctx.sw_int1,
             #[allow(static_mut_refs)]
             unsafe {
                 &mut crate::APP_CORE_STACK
@@ -987,7 +975,7 @@ mod second_core_only {
 
     use esp_hal::{
         clock::CpuClock,
-        peripherals::{CPU_CTRL, FROM_CPU_INTR1},
+        peripherals::CPU_CTRL,
         system::Cpu,
         time::Duration,
         timer::timg::{Timer, TimerGroup},
@@ -998,7 +986,6 @@ mod second_core_only {
 
     struct Context {
         cpu_control: CPU_CTRL<'static>,
-        sw_int1: FROM_CPU_INTR1<'static>,
         timer: Timer<'static>,
     }
 
@@ -1013,7 +1000,6 @@ mod second_core_only {
 
         Context {
             cpu_control: p.CPU_CTRL,
-            sw_int1: p.FROM_CPU_INTR1,
             timer: timg0.timer0,
         }
     }
@@ -1021,7 +1007,6 @@ mod second_core_only {
     fn start_on_second_core(ctx: Context, func: impl FnOnce() + Send + 'static) {
         esp_rtos::start_on_second_core_only(
             ctx.cpu_control,
-            ctx.sw_int1,
             ctx.timer,
             #[allow(static_mut_refs)]
             unsafe {

@@ -33,7 +33,7 @@ async fn main(_s: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     let bluetooth = peripherals.BT;
     let connector = BleConnector::new(bluetooth, esp_radio::ble::Config::default()).unwrap();
