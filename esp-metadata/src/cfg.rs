@@ -1026,6 +1026,11 @@ driver_configs![
                 entry_num: u32,
             }
         },
+        FlashProperties {
+            driver: flash,
+            name: "Flash",
+            properties: {}
+        },
         PsramProperties {
             driver: psram,
             name: "PSRAM",
