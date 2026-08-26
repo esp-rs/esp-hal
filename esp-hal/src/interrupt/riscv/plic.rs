@@ -64,6 +64,13 @@ pub(super) fn current_runlevel() -> u8 {
 pub(crate) fn change_current_runlevel(level: RunLevel) -> u8 {
     let prev_interrupt_priority = current_runlevel();
 
+    // The threshold does not mask the machine software interrupt, which carries the context
+    // switch. That switch runs below every elevated run level, so `mie` masks it here instead.
+    match level {
+        RunLevel::Interrupt(_) => unsafe { core::arch::asm!("csrci mie, 0b1000") },
+        RunLevel::ThreadMode => unsafe { core::arch::asm!("csrsi mie, 0b1000") },
+    }
+
     // The CPU responds to interrupts `>= level`, but we want to also disable
     // interrupts at `level` so we set the threshold to `level + 1`.
     PLIC_MX::regs()

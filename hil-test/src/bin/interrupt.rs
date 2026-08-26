@@ -21,7 +21,7 @@ use esp_hal::{
 };
 use hil_test as _;
 
-static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
+static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<2>>>> = Mutex::new(RefCell::new(None));
 
 #[unsafe(no_mangle)]
 static mut LAST_PERF: u32 = 0;
@@ -79,7 +79,7 @@ mod tests {
             _ => &peripherals.SYSTEM,
         };
 
-        let sw0_trigger_addr = cpu_intr.register_block().cpu_intr_from_cpu(0) as *const _ as u32;
+        let sw0_trigger_addr = cpu_intr.register_block().cpu_intr_from_cpu(2) as *const _ as u32;
         unsafe {
             SW_TRIGGER_ADDR = sw0_trigger_addr as *mut u32;
         }
@@ -87,13 +87,13 @@ mod tests {
         critical_section::with(|cs| {
             SWINT0
                 .borrow_ref_mut(cs)
-                .replace(SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0))
+                .replace(SoftwareInterrupt::new(peripherals.FROM_CPU_INTR2))
         });
 
         interrupt::enable_direct(
-            Interrupt::FROM_CPU_INTR0,
+            Interrupt::FROM_CPU_INTR2,
             Priority::Priority3,
-            interrupt::DirectBindableCpuInterrupt::Interrupt0,
+            interrupt::DirectBindableCpuInterrupt::Interrupt1,
             interrupt_handler,
         );
 
@@ -121,7 +121,7 @@ mod tests {
                 "
                     li {bit}, 1                   # Flip flag (bit 0)
                     csrrwi x0, 0x7e1, 1           # enable timer
-                    sw {bit}, 0({addr})           # trigger FROM_CPU_INTR0
+                    sw {bit}, 0({addr})           # trigger FROM_CPU_INTR2
                 ",
                 options(nostack),
                 addr = in(reg) ctx.sw0_trigger_addr,
