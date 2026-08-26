@@ -129,5 +129,5 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 - `documentation/CONTRIBUTING.md` — contribution workflow
 - `xtask/README.md` — metadata annotations and xtask usage
 - `.github/workflows/ci.yml` — CI steps
-- `.github/chips.json` — chip list CI builds from (arch, rust target); HIL runner labels live in `.github/workflows/hil.yml`
+- `.github/chips.json` — chip list CI builds from (arch, rust target, CI build group, HIL runner labels)
 - `esp-metadata/devices/*.toml` — per-chip peripheral definitions

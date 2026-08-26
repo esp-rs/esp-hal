@@ -91,104 +91,83 @@ jobs:
       radio_matrix: ${{ steps.chips.outputs.radio_matrix }}
       has_radio: ${{ steps.chips.outputs.has_radio }}
     steps:
+      # Unconditional and first, because the chip table below has to come from
+      # the tree this workflow file came from.
+      - uses: actions/checkout@v6
+
       - name: Resolve chip matrix
         id: chips
         env:
           REQUESTED_CHIPS: ${{ inputs.chips }}
           PKG: ${{ inputs.package }}
         run: |
-          # Runner labels live here, not in .github/chips.json: this step runs
-          # before the checkout, and on the dispatch path the checked-out ref is
-          # not the tree this workflow came from. chips.json owns the build-side
-          # chip metadata (arch, rust target). Adding a chip means editing both.
-          ALL_CHIPS='[
-            {"soc":"esp32",   "rust-target":"xtensa-esp32-none-elf",        "runner":"esp32-jtag",    "host":"aarch64"},
-            {"soc":"esp32s2", "rust-target":"xtensa-esp32s2-none-elf",      "runner":"esp32s2-jtag",  "host":"aarch64"},
-            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-usb",   "host":"aarch64"},
-            {"soc":"esp32c2", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c2-jtag",  "host":"aarch64"},
-            {"soc":"esp32c3", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c3-usb",   "host":"aarch64"},
-            {"soc":"esp32c5", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c5-usb",   "host":"aarch64"},
-            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-usb",   "host":"aarch64"},
-            {"soc":"esp32c61","rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c61-usb",  "host":"aarch64"},
-            {"soc":"esp32h2", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32h2-usb",   "host":"aarch64"},
-            {"soc":"esp32p4", "rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32p4",       "host":"aarch64"},
-            {"soc":"esp32s31","rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32s31-jtag", "host":"aarch64"}
-          ]'
-
-          # Chips that have a dedicated radio HIL runner.
-          RADIO_CHIPS='[
-            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-radio", "host":"aarch64"},
-            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-radio", "host":"aarch64"}
-          ]'
-
           REQUESTED="$REQUESTED_CHIPS"
-          # `all` saves callers from restating the chip list.
+          # `all` saves callers from restating the chip list. Chips without a
+          # `hil-runner` have no board on the rack, so they stay out of the
+          # matrix: a null runner label would queue forever.
           if [ "$REQUESTED" = "all" ]; then
-            REQUESTED=$(echo "$ALL_CHIPS" | jq -r '[.[].soc] | join(" ")')
+            REQUESTED=$(jq -r '[.[] | select(has("hil-runner")) | .soc] | join(" ")' \
+              .github/chips.json)
             echo "Expanded 'all' to: $REQUESTED"
           fi
 
-          MATRIX=$(echo "$ALL_CHIPS" | jq -c --arg chips "$REQUESTED" \
-            '[.[] | select(.soc as $s | $chips | split(" ") | index($s))]')
+          MATRIX=$(jq -c --arg chips "$REQUESTED" '
+            [ .[]
+              | select(has("hil-runner"))
+              | select(.soc as $s | $chips | split(" ") | index($s))
+              | { soc, arch, runner: ."hil-runner" } ]' .github/chips.json)
 
           if [ "$(echo "$MATRIX" | jq 'length')" -eq 0 ]; then
             echo "::error::No valid chips selected from input: '$REQUESTED'"
             exit 1
           fi
 
-          RADIO_MATRIX=$(echo "$RADIO_CHIPS" | jq -c --arg chips "$REQUESTED" \
-            '[.[] | select(.soc as $s | $chips | split(" ") | index($s))]')
+          RADIO_MATRIX=$(jq -c --arg chips "$REQUESTED" '
+            [ .[]
+              | select(has("hil-radio-runner"))
+              | select(.soc as $s | $chips | split(" ") | index($s))
+              | { soc, runner: ."hil-radio-runner" } ]' .github/chips.json)
 
           # `package: hil-test` disables the radio HIL run entirely.
           if [ "$PKG" = "hil-test" ]; then
             RADIO_MATRIX='[]'
           fi
 
-          echo "matrix={\"target\":$(echo "$MATRIX" | jq -c .)}" >> "$GITHUB_OUTPUT"
-          echo "radio_matrix={\"target\":$(echo "$RADIO_MATRIX" | jq -c .)}" >> "$GITHUB_OUTPUT"
+          echo "matrix={\"target\":$MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "radio_matrix={\"target\":$RADIO_MATRIX}" >> "$GITHUB_OUTPUT"
           # A plain flag for the hil-run-radio `if`, so that job condition does
           # not have to string-match the serialized matrix.
           echo "has_radio=$(echo "$RADIO_MATRIX" | jq -r 'length > 0')" >> "$GITHUB_OUTPUT"
+
+          # Which toolchains the build below needs.
+          echo "xtensa=$(echo "$MATRIX" | jq 'any(.[]; .arch == "xtensa")')" >> "$GITHUB_OUTPUT"
+          echo "riscv=$(echo "$MATRIX" | jq 'any(.[]; .arch == "riscv")')" >> "$GITHUB_OUTPUT"
+
           echo "Selected chips: $(echo "$MATRIX" | jq -r '.[].soc' | tr '\n' ' ')"
           echo "Selected radio chips: $(echo "$RADIO_MATRIX" | jq -r '.[].soc' | tr '\n' ' ')"
 
-      - name: Determine required architectures
-        id: arch
-        run: |
-          NEED_XTENSA=false
-          NEED_RISCV=false
-          # Read the resolved matrix rather than inputs.chips, so the `all`
-          # sentinel expands instead of falling into the catch-all below.
-          for chip in $(echo '${{ steps.chips.outputs.matrix }}' | jq -r '.target[].soc'); do
-            case $chip in
-              esp32|esp32s2|esp32s3) NEED_XTENSA=true ;;
-              *) NEED_RISCV=true ;;
-            esac
-          done
-          echo "xtensa=$NEED_XTENSA" >> "$GITHUB_OUTPUT"
-          echo "riscv=$NEED_RISCV" >> "$GITHUB_OUTPUT"
+      # Xtensa before RISC-V, because dtolnay/rust-toolchain makes the toolchain
+      # it installs the rustup default.
+      - uses: ./.github/actions/setup-toolchains
+        if: steps.chips.outputs.xtensa == 'true'
+        with:
+          xtensa: "true"
+          xtensa-default: "true"
 
-      - uses: actions/checkout@v6
-        if: inputs.branch == ''
+      - uses: ./.github/actions/setup-nightly
+        if: steps.chips.outputs.riscv == 'true'
+        with:
+          targets: all
+          components: rust-src
+          alias: "true"
+
+      # Only the code under test comes from the dispatched ref. The chip table
+      # and the toolchains above come from the tree this workflow came from.
       - uses: actions/checkout@v6
         if: inputs.branch != ''
         with:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.branch }}
-
-      - uses: esp-rs/xtensa-toolchain@v1.6
-        if: steps.arch.outputs.xtensa == 'true'
-        with:
-          buildtargets: esp32,esp32s2,esp32s3
-          default: true
-          version: 1.97.0.0
-
-      - uses: ./.github/actions/setup-nightly
-        if: steps.arch.outputs.riscv == 'true'
-        with:
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          components: rust-src
-          alias: "true"
 
       # Build hil-test ELFs for each requested chip (unless the dispatch
       # asked for radio-only via package=hil-test-radio).
@@ -346,7 +325,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: xtask-${{ matrix.target.host }}
+          name: xtask-aarch64
 
       - name: Skip if this target wasn't built
         id: guard
@@ -406,7 +385,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: xtask-${{ matrix.target.host }}
+          name: xtask-aarch64
 
       - name: Skip if this target wasn't built
         id: guard

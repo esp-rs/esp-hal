@@ -1,13 +1,13 @@
 # NOTE:
 #
-# Adding support for a new chip to `esp-hal` needs two updates here:
+# Adding support for a new chip to `esp-hal` only needs `.github/chips.json`,
+# which feeds the 'esp-hal', 'docs' and 'msrv' jobs, the toolchain setup
+# actions, ci-nightly, binary-size and the HIL matrix.
 #
-# 1.) Add the chip to `.github/chips.json`. It feeds the 'docs' and 'msrv'
-#     jobs, the toolchain setup actions, ci-nightly and binary-size.
-# 2.) Add it to one of the 'esp-hal' job's matrix groups below. Those still
-#     list their chips by hand, to balance the load across the runners.
-#
-# HIL runner labels are a separate table; see `.github/workflows/hil.yml`.
+# `ci-toolchain` picks the 'esp-hal' build group the chip lands in, which is
+# also how the load is balanced across the runners. Give the chip a
+# `hil-runner` (and `hil-radio-runner`) once it has a board on the rack;
+# without one it is built but not HIL tested.
 
 name: CI
 
@@ -136,19 +136,16 @@ jobs:
 
     strategy:
       matrix:
-        # load-blance runners a bit
-        group:
-          - chips: [esp32, esp32s2, esp32s3, esp32c2, esp32c3]
-            toolchain: esp
-          - chips: [esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31]
-            toolchain: stable
+        # Which chips each toolchain builds comes from `ci-toolchain` in
+        # .github/chips.json, which is also how the runner load is balanced.
+        toolchain: [esp, stable]
 
     steps:
       - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup-toolchains
         with:
-          xtensa: ${{ matrix.group.toolchain == 'esp' }}
+          xtensa: ${{ matrix.toolchain == 'esp' }}
           riscv: "true"
 
       - name: Setup cargo-batch
@@ -157,11 +154,18 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
+      - name: Resolve chips for this toolchain
+        id: chips
+        shell: bash
+        run: |
+          echo "chips=$(jq -r --arg t '${{ matrix.toolchain }}' \
+            '[.[] | select(."ci-toolchain" == $t) | .soc] | join(" ")' .github/chips.json)" >> "$GITHUB_OUTPUT"
+
       - name: Build and Check
         shell: bash
         env:
-          CHIPS: ${{ join(matrix.group.chips, ' ') }}
-          TOOLCHAIN: ${{ matrix.group.toolchain }}
+          CHIPS: ${{ steps.chips.outputs.chips }}
+          TOOLCHAIN: ${{ matrix.toolchain }}
         run: |
           # lints and docs are checked separately
           for chip in $CHIPS; do

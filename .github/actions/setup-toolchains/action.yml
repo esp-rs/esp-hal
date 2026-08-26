@@ -52,9 +52,9 @@ outputs:
 runs:
   using: composite
   steps:
-    # Pins for the two channels CI exercises. hil.yml and
-    # api-baseline-generation.yml pin the current Xtensa version inline as well,
-    # since they run against trees that may not contain this action.
+    # Pins for the two channels CI exercises. api-baseline-generation.yml pins
+    # the current Xtensa version inline as well, since it runs against trees
+    # that may not contain this action.
     - id: pins
       shell: bash
       run: |

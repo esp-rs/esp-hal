@@ -1,13 +1,13 @@
 [
-  { "soc": "esp32",    "arch": "xtensa", "rust-target": "xtensa-esp32-none-elf"         },
-  { "soc": "esp32s2",  "arch": "xtensa", "rust-target": "xtensa-esp32s2-none-elf"       },
-  { "soc": "esp32s3",  "arch": "xtensa", "rust-target": "xtensa-esp32s3-none-elf",      "quick": true },
-  { "soc": "esp32c2",  "arch": "riscv",  "rust-target": "riscv32imc-unknown-none-elf"   },
-  { "soc": "esp32c3",  "arch": "riscv",  "rust-target": "riscv32imc-unknown-none-elf"   },
-  { "soc": "esp32c5",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf"  },
-  { "soc": "esp32c6",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf", "quick": true },
-  { "soc": "esp32c61", "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf"  },
-  { "soc": "esp32h2",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf"  },
-  { "soc": "esp32p4",  "arch": "riscv",  "rust-target": "riscv32imafc-unknown-none-elf" },
-  { "soc": "esp32s31", "arch": "riscv",  "rust-target": "riscv32imafc-unknown-none-elf" }
+  { "soc": "esp32",    "arch": "xtensa", "rust-target": "xtensa-esp32-none-elf",         "ci-toolchain": "esp",                    "hil-runner": "esp32-jtag"    },
+  { "soc": "esp32s2",  "arch": "xtensa", "rust-target": "xtensa-esp32s2-none-elf",       "ci-toolchain": "esp",                    "hil-runner": "esp32s2-jtag"  },
+  { "soc": "esp32s3",  "arch": "xtensa", "rust-target": "xtensa-esp32s3-none-elf",       "ci-toolchain": "esp",    "quick": true,  "hil-runner": "esp32s3-usb",  "hil-radio-runner": "esp32s3-radio" },
+  { "soc": "esp32c2",  "arch": "riscv",  "rust-target": "riscv32imc-unknown-none-elf",   "ci-toolchain": "esp",                    "hil-runner": "esp32c2-jtag"  },
+  { "soc": "esp32c3",  "arch": "riscv",  "rust-target": "riscv32imc-unknown-none-elf",   "ci-toolchain": "esp",                    "hil-runner": "esp32c3-usb"   },
+  { "soc": "esp32c5",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf",  "ci-toolchain": "stable",                 "hil-runner": "esp32c5-usb"   },
+  { "soc": "esp32c6",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf",  "ci-toolchain": "stable", "quick": true,  "hil-runner": "esp32c6-usb",  "hil-radio-runner": "esp32c6-radio" },
+  { "soc": "esp32c61", "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf",  "ci-toolchain": "stable",                 "hil-runner": "esp32c61-usb"  },
+  { "soc": "esp32h2",  "arch": "riscv",  "rust-target": "riscv32imac-unknown-none-elf",  "ci-toolchain": "stable",                 "hil-runner": "esp32h2-usb"   },
+  { "soc": "esp32p4",  "arch": "riscv",  "rust-target": "riscv32imafc-unknown-none-elf", "ci-toolchain": "stable",                 "hil-runner": "esp32p4"       },
+  { "soc": "esp32s31", "arch": "riscv",  "rust-target": "riscv32imafc-unknown-none-elf", "ci-toolchain": "stable",                 "hil-runner": "esp32s31-jtag" }
 ]
