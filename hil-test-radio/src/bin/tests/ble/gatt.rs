@@ -17,7 +17,7 @@ mod tests {
     #[test]
     async fn ble_central_connects_to_peripheral(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let connector = BleConnector::new(p.BT, Default::default()).unwrap();
         let controller: ExternalController<_, 1> = ExternalController::new(connector);

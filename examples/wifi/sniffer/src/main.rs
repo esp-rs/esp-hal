@@ -34,7 +34,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     // Wi-Fi stays initialized while the sniffer is alive — no station/AP
     // `Interface` is required for promiscuous capture.

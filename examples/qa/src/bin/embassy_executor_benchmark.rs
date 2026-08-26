@@ -88,7 +88,7 @@ async fn main(spawner: Spawner) {
     Hooks::init();
 
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    esp_rtos::start(systimer.alarm0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(systimer.alarm0);
     println!("Embassy initialized!");
 
     spawner.spawn(TASK1.spawn(|| Task1 {}).unwrap());

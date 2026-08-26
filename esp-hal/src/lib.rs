@@ -796,5 +796,8 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(all(riscv, write_vec_table_monitoring))]
     crate::soc::setup_trap_section_protection();
 
+    #[cfg(all(feature = "unstable", multi_core))]
+    crate::interrupt::ipc::install();
+
     peripherals
 }

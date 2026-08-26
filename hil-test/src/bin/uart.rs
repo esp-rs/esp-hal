@@ -380,7 +380,7 @@ mod async_tests {
         Async,
         Blocking,
         interrupt::Priority,
-        peripherals::FROM_CPU_INTR1,
+        peripherals::FROM_CPU_INTR2,
         timer::timg::TimerGroup,
         uart::{self, Uart, UartRx},
     };
@@ -388,7 +388,7 @@ mod async_tests {
     use hil_test::mk_static;
 
     struct Context {
-        interrupt: FROM_CPU_INTR1<'static>,
+        interrupt: FROM_CPU_INTR2<'static>,
         uart: Uart<'static, Async>,
     }
 
@@ -426,10 +426,10 @@ mod async_tests {
             .into_async();
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         Context {
-            interrupt: peripherals.FROM_CPU_INTR1,
+            interrupt: peripherals.FROM_CPU_INTR2,
             uart,
         }
     }
@@ -458,7 +458,7 @@ mod async_tests {
         let (rx, mut tx) = ctx.uart.into_blocking().split();
 
         let interrupt_executor =
-            mk_static!(InterruptExecutor<1>, InterruptExecutor::new(ctx.interrupt));
+            mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.interrupt));
 
         let signal = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
@@ -542,7 +542,7 @@ mod async_tx_rx {
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let tx = UartTx::new(peripherals.UART0, uart::Config::default())
             .unwrap()
@@ -876,7 +876,7 @@ mod async_tx_rx_split {
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let (rx, tx) = Uart::new(peripherals.UART0, uart::Config::default())
             .unwrap()
@@ -976,7 +976,7 @@ mod uhci {
     #[test]
     fn test_send_receive(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, ctx.peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1033,7 +1033,7 @@ mod uhci {
     #[test]
     fn test_long_strings(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, ctx.peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1090,7 +1090,7 @@ mod uhci {
     #[test]
     async fn test_send_receive_async(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, ctx.peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1149,7 +1149,7 @@ mod uhci {
     #[test]
     async fn test_long_strings_async(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, ctx.peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let (rx, tx) = hil_test::common_test_pins!(ctx.peripherals);
         let uart = Uart::new(ctx.peripherals.UART0, uart::Config::default())
@@ -1297,7 +1297,7 @@ mod new_tests {
         );
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let (rx, tx) = hil_test::common_test_pins!(p);
 
