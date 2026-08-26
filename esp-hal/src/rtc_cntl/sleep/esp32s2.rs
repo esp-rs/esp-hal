@@ -42,7 +42,7 @@ pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_DEFAULT: u8 = 15;
 /// Power-up setting for other blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
-/// Wait cycles for other blocks.
+/// Waits cycles for other blocks.
 pub const OTHER_BLOCKS_WAIT: u16 = 1;
 /// WiFi power-up cycles.
 pub const WIFI_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
@@ -82,7 +82,7 @@ bitfield::bitfield! {
     pub rtc_peri_pd_en, set_rtc_peri_pd_en: 4;
     /// power down Wifi
     pub wifi_pd_en, set_wifi_pd_en: 5;
-    /// Power down Internal 8M oscillator
+    /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 6;
     /// power down digital domain
     pub deep_slp, set_deep_slp: 8;

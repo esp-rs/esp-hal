@@ -10,7 +10,7 @@
 //!
 //! - **[`InternalRefClock`]** — the ESP32-P4 MPLL generates a 50 MHz clock and drives it out on a
 //!   `REF_50M_CLK` pad (GPIO23 or GPIO39). This signal must be looped back externally into one of
-//!   the `EMAC_RMII_CLK` input pads.
+//!   the `EMAC_RMII_CLK` input pads
 //!
 //! # MII clock source
 //!
@@ -69,7 +69,7 @@ impl<POut, PIn> InternalRefClock<POut, PIn> {
     ///
     /// - `ref_clk_out` — the pad that will output the 50 MHz `REF_50M_CLK` signal (GPIO23 or
     ///   GPIO39).
-    /// - `ref_clk_in` — the pad that receives the looped-back signal (GPIO32, GPIO44, or GPIO50).
+    /// - `ref_clk_in` — the pad that receives the looped-back signal (GPIO32, GPIO44, or GPIO50)
     pub fn new(ref_clk_out: POut, ref_clk_in: PIn) -> Self {
         Self {
             ref_clk_out,
@@ -113,7 +113,7 @@ impl MiiClock {
 
 /// Configures the EMAC clock tree for RMII with an external clock input.
 ///
-/// Matches `emac_ll_clock_enable_rmii_input()` in esp-idf.
+/// Matches `emac_ll_clock_enable_rmii_input()` in esp-idf
 fn configure_rmii_input() {
     HP_SYS::regs()
         .gmac_ctrl0()
@@ -179,7 +179,7 @@ fn enable_mpll_50m_output() {
 ///
 /// Matches `emac_ll_clock_enable_mii()` in esp-idf. In MII mode the RX and TX
 /// clocks come from separate pads (not the combined RMII pad), so
-/// `emac_rx_clk_src_sel = 1` and `emac_tx_clk_src_sel = 1`.
+/// `emac_rx_clk_src_sel = 1` and `emac_tx_clk_src_sel = 1`
 fn configure_mii() {
     HP_SYS::regs()
         .gmac_ctrl0()

@@ -130,7 +130,7 @@ impl Default for PsramConfig {
     }
 }
 
-/// Initialize PSRAM to be used for data.
+/// Initializes PSRAM to be used for data.
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     quad::psram_init(config);
@@ -239,7 +239,7 @@ mod ctrlr_ll {
         });
     }
 
-    /// Set PSRAM write cmd
+    /// Sets PSRAM write cmd.
     #[inline(always)]
     pub(crate) fn psram_ctrlr_ll_set_wr_cmd(_mspi_id: u32, cmd_bitlen: u32, cmd_val: u32) {
         assert!(cmd_bitlen > 0);
@@ -254,7 +254,7 @@ mod ctrlr_ll {
         });
     }
 
-    /// Set PSRAM read cmd
+    /// Sets PSRAM read cmd.
     #[inline(always)]
     pub(crate) fn psram_ctrlr_ll_set_rd_cmd(_mspi_id: u32, cmd_bitlen: u32, cmd_val: u32) {
         assert!(cmd_bitlen > 0);
@@ -270,7 +270,7 @@ mod ctrlr_ll {
         });
     }
 
-    /// Set PSRAM addr bitlen
+    /// Sets PSRAM addr bitlen.
     #[inline(always)]
     pub(crate) fn psram_ctrlr_ll_set_addr_bitlen(_mspi_id: u32, addr_bitlen: u32) {
         assert!(addr_bitlen > 0);
@@ -280,7 +280,7 @@ mod ctrlr_ll {
             .modify(|_, w| unsafe { w.sram_addr_bitlen().bits(addr_bitlen as u8 - 1) });
     }
 
-    /// Set PSRAM read dummy
+    /// Sets PSRAM read dummy.
     #[inline(always)]
     pub(crate) fn psram_ctrlr_ll_set_rd_dummy(_mspi_id: u32, dummy_n: u32) {
         assert!(dummy_n > 0);
@@ -292,7 +292,7 @@ mod ctrlr_ll {
         });
     }
 
-    /// Select which pin to use for the psram
+    /// Selects which pin to use for the psram.
     #[inline(always)]
     pub(crate) fn psram_ctrlr_ll_set_cs_pin(_mspi_id: u32, cs_id: PsramLlCsIdT) {
         SPI1::regs().misc().modify(|_, w| {
@@ -317,7 +317,7 @@ fn mspi_timing_config_set_flash_clock(flash_freq_mhz: u32, speed_mode: quad::Msp
     mspi_timing_ll_set_flash_clock(1, reg_val);
 }
 
-/// Set MSPI_FAST_CLK's high-speed divider (valid when SOC_ROOT clock source is PLL)
+/// Sets MSPI_FAST_CLK's high-speed divider (valid when SOC_ROOT clock source is PLL).
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_core_clock(core_clk_mhz: u32) {
     let divider = match core_clk_mhz {
@@ -330,7 +330,7 @@ pub(crate) fn mspi_timing_ll_set_core_clock(core_clk_mhz: u32) {
         .modify(|_, w| unsafe { w.mspi_fast_div_num().bits(divider - 1) });
 }
 
-/// Calculate spi_flash clock frequency division parameters for register.
+/// Calculates spi_flash clock frequency division parameters for register.
 #[inline(always)]
 fn mspi_timing_ll_calculate_clock_reg(clkdiv: u32) -> u32 {
     if clkdiv == 1 {
@@ -340,7 +340,7 @@ fn mspi_timing_ll_calculate_clock_reg(clkdiv: u32) -> u32 {
     }
 }
 
-/// Set Flash clock
+/// Sets Flash clock.
 #[inline(always)]
 fn mspi_timing_ll_set_flash_clock(mspi_id: u32, clock_conf: u32) {
     if mspi_id == 0 {
@@ -369,7 +369,7 @@ fn mspi_timing_config_set_psram_clock(psram_freq_mhz: u32, speed_mode: quad::Msp
     mspi_timing_ll_set_psram_clock(reg_val);
 }
 
-/// Set PSRAM clock
+/// Sets PSRAM clock.
 #[inline(always)]
 fn mspi_timing_ll_set_psram_clock(clock_conf: u32) {
     SPI0::regs()
@@ -377,7 +377,7 @@ fn mspi_timing_ll_set_psram_clock(clock_conf: u32) {
         .write(|w| unsafe { w.bits(clock_conf) });
 }
 
-/// Set MSPI Flash din mode
+/// Sets MSPI Flash din mode.
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_flash_din_mode(mspi_id: u8, din_mode: u8) {
     assert!(mspi_id == 0);
@@ -404,7 +404,7 @@ pub(crate) fn mspi_timing_ll_set_flash_din_mode(mspi_id: u8, din_mode: u8) {
         .modify(|_, w| w.update().set_bit());
 }
 
-/// Set MSPI Flash din num
+/// Sets MSPI Flash din num.
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_flash_din_num(mspi_id: u8, din_num: u8) {
     assert!(mspi_id == 0);
@@ -431,7 +431,7 @@ pub(crate) fn mspi_timing_ll_set_flash_din_num(mspi_id: u8, din_num: u8) {
         .modify(|_, w| w.update().set_bit());
 }
 
-/// Set MSPI Flash extra dummy
+/// Sets MSPI Flash extra dummy.
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8) {
     if mspi_id == 0 {
@@ -453,7 +453,7 @@ pub(crate) fn mspi_timing_ll_set_flash_extra_dummy(mspi_id: u8, extra_dummy: u8)
         .modify(|_, w| w.update().set_bit());
 }
 
-/// Set MSPI PSRAM din mode
+/// Sets MSPI PSRAM din mode.
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_psram_din_mode(mspi_id: u8, din_mode: u8) {
     assert!(mspi_id == 0);
@@ -480,7 +480,7 @@ pub(crate) fn mspi_timing_ll_set_psram_din_mode(mspi_id: u8, din_mode: u8) {
         .modify(|_, w| w.update().set_bit());
 }
 
-/// Set MSPI PSRAM din num
+/// Sets MSPI PSRAM din num.
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_psram_din_num(mspi_id: u8, din_num: u8) {
     assert!(mspi_id == 0);
@@ -507,7 +507,7 @@ pub(crate) fn mspi_timing_ll_set_psram_din_num(mspi_id: u8, din_num: u8) {
         .modify(|_, w| w.update().set_bit());
 }
 
-/// Set MSPI PSRAM extra dummy
+/// Sets MSPI PSRAM extra dummy.
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_set_psram_extra_dummy(mspi_id: u8, extra_dummy: u8) {
     assert!(mspi_id == 0);
@@ -523,7 +523,7 @@ pub(crate) fn mspi_timing_ll_set_psram_extra_dummy(mspi_id: u8, extra_dummy: u8)
         .modify(|_, w| w.update().set_bit());
 }
 
-/// Get MSPI flash dummy info
+/// Returns the MSPI flash dummy info.
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_get_flash_dummy(mspi_id: u8) -> (u8, u8) {
     assert!(mspi_id <= 1);
@@ -547,7 +547,7 @@ pub(crate) fn mspi_timing_ll_get_flash_dummy(mspi_id: u8) -> (u8, u8) {
     }
 }
 
-/// Get MSPI PSRAM dummy info
+/// Returns the MSPI PSRAM dummy info.
 #[inline(always)]
 pub(crate) fn mspi_timing_ll_get_psram_dummy(mspi_id: u8) -> (u8, u8) {
     assert!(mspi_id == 0);

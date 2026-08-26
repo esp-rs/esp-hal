@@ -26,7 +26,7 @@ pub struct PsramConfig {
     pub speed: PsramCacheSpeed,
 }
 
-/// Initialize PSRAM to be used for data.
+/// Initializes PSRAM to be used for data.
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     utils::psram_init(config)
@@ -37,14 +37,14 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 16;
 
     unsafe extern "C" {
-        /// Set DCache mmu mapping.
+        /// Sets DCache mmu mapping.
         ///
-        /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid.
-        /// [`vaddr`]: u32 Virtual address in CPU address space.
+        /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid
+        /// [`vaddr`]: u32 Virtual address in CPU address space
         /// [`paddr`]: u32 Physical address in external memory. Should be aligned by psize.
         /// [`psize`]: u32 Page size of DCache, in kilobytes. Should be 64 here.
-        /// [`num`]: u32 Pages to be set.
-        /// [`fixes`]: u32 0 for physical pages grow with virtual pages, other for virtual pages map to same physical page.
+        /// [`num`]: u32 Pages to be set
+        /// [`fixes`]: u32 0 for physical pages grow with virtual pages, other for virtual pages map to same physical page
         fn cache_dbus_mmu_set(
             ext_ram: u32,
             vaddr: u32,
@@ -94,7 +94,7 @@ pub(crate) mod utils {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     #[allow(unused)]
     pub enum PsramVaddrMode {
-        /// App and pro CPU use their own flash cache for external RAM access
+        /// App and pro CPU use their own flash cache for external RAM access.
         #[default]
         Normal = 0,
         /// App and pro CPU share external RAM caches: pro CPU has low2M, app
@@ -204,7 +204,7 @@ pub(crate) mod utils {
         ); // whether is program/erase operation
     }
 
-    /// Enter QPI mode
+    /// Enters QPI mode.
     fn psram_enable_qio_mode() {
         const PSRAM_ENTER_QMODE: u16 = 0x35;
         const CS_PSRAM_SEL: u8 = 1 << 1;
@@ -225,7 +225,7 @@ pub(crate) mod utils {
         );
     }
 
-    /// Exit QPI mode
+    /// Exits QPI mode.
     fn psram_disable_qio_mode() {
         const PSRAM_EXIT_QMODE: u16 = 0xF5;
         const CS_PSRAM_SEL: u8 = 1 << 1;
@@ -270,13 +270,13 @@ pub(crate) mod utils {
         is_write_erase_operation: bool,
     ) {
         unsafe extern "C" {
-            ///  Start a spi user command sequence
+            ///  Starts a SPI user command sequence.
             ///  [`spi_num`] spi port
             ///  [`rx_buf`] buffer pointer to receive data
             ///  [`rx_len`] receive data length in byte
             ///  [`cs_en_mask`] decide which cs to use, 0 for cs0, 1 for cs1
             ///  [`is_write_erase`] to indicate whether this is a write or erase
-            /// operation, since the CPU would check permission
+            /// operation, since the CPU would check permission.
             fn esp_rom_spi_cmd_start(
                 spi_num: u32,
                 rx_buf: *const u8,
@@ -407,13 +407,13 @@ pub(crate) mod utils {
         unsafe extern "C" {
             fn esp_rom_efuse_get_flash_gpio_info() -> u32;
 
-            /// Enable Quad I/O pin functions
+            /// Enables Quad I/O pin functions.
             ///
             /// Sets the HD & WP pin functions for Quad I/O modes, based on the
             /// efuse SPI pin configuration.
             ///
             /// [`wp_gpio_num`]: u8 Number of the WP pin to reconfigure for quad I/O
-            /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig().
+            /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig()
             /// - If this parameter is 0, default SPI pins are used and wp_gpio_num parameter is
             ///   ignored.
             /// - If this parameter is 1, default HSPI pins are used and wp_gpio_num parameter is
@@ -471,7 +471,7 @@ pub(crate) mod utils {
     const PSRAM_IO_MATRIX_DUMMY_40M: u32 = 0;
     const PSRAM_IO_MATRIX_DUMMY_80M: u32 = 0;
 
-    /// Register initialization for sram cache params and r/w commands
+    /// Registers initialization for sram cache params and r/w commands.
     fn psram_cache_init(psram_cache_mode: PsramCacheSpeed, _vaddrmode: PsramVaddrMode) {
         let mut extra_dummy = 0;
         match psram_cache_mode {

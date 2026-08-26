@@ -7,7 +7,7 @@ use crate::peripherals::{EXTMEM, IO_MUX, MMU_TABLE, SPI0, SPI1};
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PsramMode {
-    /// Try to detect the PSRAM mode. While convenient, not entirely reliable.
+    /// Tries to detect the PSRAM mode. While convenient, not entirely reliable.
     #[default]
     Auto,
 
@@ -79,7 +79,7 @@ pub struct PsramConfig {
     pub ram_frequency: SpiRamFreq,
 }
 
-/// Initialize PSRAM to be used for data.
+/// Initializes PSRAM to be used for data.
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     let success = match config.mode {
@@ -115,14 +115,14 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
 
         fn Cache_Resume_DCache(param: u32);
 
-        /// Set DCache mmu mapping.
+        /// Sets DCache mmu mapping.
         ///
-        /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid.
-        /// [`vaddr`]: u32 Virtual address in CPU address space.
+        /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid
+        /// [`vaddr`]: u32 Virtual address in CPU address space
         /// [`paddr`]: u32 Physical address in external memory. Should be aligned by psize.
         /// [`psize`]: u32 Page size of DCache, in kilobytes. Should be 64 here.
-        /// [`num`]: u32 Pages to be set.
-        /// [`fixes`]: u32 0 for physical pages grow with virtual pages, other for virtual pages map to same physical page.
+        /// [`num`]: u32 Pages to be set
+        /// [`fixes`]: u32 0 for physical pages grow with virtual pages, other for virtual pages map to same physical page
         fn cache_dbus_mmu_set(
             ext_ram: u32,
             vaddr: u32,
@@ -312,13 +312,13 @@ pub(crate) mod quad_spi_impl {
             oen_inv: bool,
         );
 
-        /// Enable Quad I/O pin functions
+        /// Enables Quad I/O pin functions.
         ///
         /// Sets the HD & WP pin functions for Quad I/O modes, based on the
         /// efuse SPI pin configuration.
         ///
         /// [`wp_gpio_num`]: u8 Number of the WP pin to reconfigure for quad I/O
-        /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig().
+        /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig()
         /// - If this parameter is 0, default SPI pins are used and wp_gpio_num parameter is
         ///   ignored.
         /// - If this parameter is 1, default HSPI pins are used and wp_gpio_num parameter is
@@ -391,14 +391,14 @@ pub(crate) mod quad_spi_impl {
         // see https://github.com/espressif/esp-idf/blob/4e24516ee2731eb55687182d4e061b5b93a9e33f/components/esp_hw_support/mspi_timing_tuning.c#L391-L415
     }
 
-    /// Set SPI0 FLASH and PSRAM module clock, din_num, din_mode and extra
+    /// Sets SPI0 FLASH and PSRAM module clock, din_num, din_mode and extra
     /// dummy, according to the configuration got from timing tuning
     /// function (`calculate_best_flash_tuning_config`). iF control_spi1 ==
     /// 1, will also update SPI1 timing registers. Should only be set to 1 when
     /// do tuning.
     ///
-    /// This function should always be called after `mspi_timing_flash_tuning`
-    /// or `calculate_best_flash_tuning_config`
+    /// Must always be called after `mspi_timing_flash_tuning` or
+    /// `calculate_best_flash_tuning_config`
     #[ram]
     fn mspi_timing_enter_high_speed_mode(control_spi1: bool, config: &PsramConfig) {
         let core_clock: SpiTimingConfigCoreClock = mspi_core_clock(config);
@@ -562,13 +562,13 @@ pub(crate) mod quad_spi_impl {
         is_write_erase_operation: bool,
     ) {
         unsafe extern "C" {
-            ///  Start a spi user command sequence
+            ///  Starts a SPI user command sequence.
             ///  [`spi_num`] spi port
             ///  [`rx_buf`] buffer pointer to receive data
             ///  [`rx_len`] receive data length in byte
             ///  [`cs_en_mask`] decide which cs to use, 0 for cs0, 1 for cs1
             ///  [`is_write_erase`] to indicate whether this is a write or erase
-            /// operation, since the CPU would check permission
+            /// operation, since the CPU would check permission.
             fn esp_rom_spi_cmd_start(
                 spi_num: u32,
                 rx_buf: *const u8,
@@ -683,7 +683,7 @@ pub(crate) mod quad_spi_impl {
         }
     }
 
-    /// Exit QPI mode
+    /// Exits QPI mode.
     #[ram]
     fn psram_disable_qio_mode_spi1() {
         const PSRAM_EXIT_QMODE: u16 = 0xF5;
@@ -705,7 +705,7 @@ pub(crate) mod quad_spi_impl {
         );
     }
 
-    /// Enter QPI mode
+    /// Enters QPI mode.
     #[ram]
     fn psram_enable_qio_mode_spi1() {
         const PSRAM_ENTER_QMODE: u16 = 0x35;

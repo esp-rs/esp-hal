@@ -32,7 +32,7 @@ pub struct PsramConfig {
     /// PSRAM interface mode.
     pub mode: PsramMode,
 
-    /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density.
+    /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density
     pub size: PsramSize,
 
     /// PSRAM timing parameters. Default: 250 MHz.
@@ -61,14 +61,14 @@ pub struct PsramTimingParams {
     /// MR4.wr_latency field value.
     pub mr4_wl: u8,
 
-    /// Read dummy length in bits for sync data reads (cache path).
+    /// Reads dummy length in bits for sync data reads (cache path).
     ///
-    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
+    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`
     pub rd_dummy_bits: u8,
 
-    /// Write dummy length in bits for sync data writes (cache path).
+    /// Writes dummy length in bits for sync data writes (cache path).
     ///
-    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
+    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`
     pub wr_dummy_bits: u8,
 
     /// Register-read dummy length for direct command path (MSPI3).
@@ -138,7 +138,7 @@ impl PsramTimingParams {
     };
 }
 
-/// Initialize PSRAM.
+/// Initializes PSRAM.
 #[crate::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     psram_phy_ldo_init();
@@ -189,7 +189,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
     start..start + config.size.get()
 }
 
-/// Program the PMU external LDO regulators for the MSPI PHY
+/// Programs the PMU external LDO regulators for the MSPI PHY.
 fn psram_phy_ldo_init() {
     PMU::regs()
         .ext_ldo_p0_0p1a()
@@ -257,7 +257,7 @@ fn reset_psram_mspi() {
 /// ESP32-P4 silicon revision 3.0 workaround.
 ///
 /// Port of IDF `esp_psram_p4_rev3_workaround` (`esp_psram.c`). Must be called
-/// after `configure_psram_mspi` and before `mmu_map_psram`.
+/// after `configure_psram_mspi` and before `mmu_map_psram`
 fn p4_rev3_psram_workaround() {
     // Snapshot the MSPI0 registers before the reset wipes them.
     let cache_fctrl = MEMSPI2::regs().cache_fctrl().read().bits();

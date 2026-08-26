@@ -104,7 +104,7 @@ pub const FLASH_ECC_MODE: EfuseField = EfuseField::new(0, 4, 131, 1);
 pub const DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 132, 1);
 /// Set this bit to enable secure UART download mode
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 133, 1);
-/// Set the default UARTboot message output mode
+/// Set the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 134, 2);
 /// GPIO33-GPIO37 power supply selection in ROM code
 pub const PIN_POWER_SELECTION: EfuseField = EfuseField::new(0, 4, 136, 1);

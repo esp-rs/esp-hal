@@ -13,7 +13,7 @@ mod oct_hex;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PsramConfig {
-    /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density.
+    /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density
     pub size: PsramSize,
 
     /// PSRAM timing parameters. Default: 250 MHz.
@@ -42,14 +42,14 @@ pub struct PsramTimingParams {
     /// MR4.wr_latency field value.
     pub mr4_wl: u8,
 
-    /// Read dummy length in bits for sync data reads (cache path).
+    /// Reads dummy length in bits for sync data reads (cache path).
     ///
-    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
+    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`
     pub rd_dummy_bits: u8,
 
-    /// Write dummy length in bits for sync data writes (cache path).
+    /// Writes dummy length in bits for sync data writes (cache path).
     ///
-    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
+    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`
     pub wr_dummy_bits: u8,
 
     /// Register-read dummy length for direct command path (MSPI3).
@@ -119,7 +119,7 @@ impl PsramTimingParams {
     };
 }
 
-/// Initialize PSRAM.
+/// Initializes PSRAM.
 #[crate::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     // Module clock + clock source

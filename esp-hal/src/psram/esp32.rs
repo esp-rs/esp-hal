@@ -48,7 +48,7 @@ pub struct PsramConfig {
     pub psram_vaddr_mode: PsramVaddrMode,
 }
 
-/// Initialize PSRAM to be used for data.
+/// Initializes PSRAM to be used for data.
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     utils::psram_init(config);

@@ -12,7 +12,7 @@
 //!
 //! ## Configuration
 //!
-//! [`SdHostController::new`] takes a [`Config`] for the shared module clock.
+//! [`SdHostController::new`] takes a [`Config`] for the shared module clock
 //! Each slot is obtained via [`SdHostController::slot`] with a [`SlotConfig`],
 //! then wired with `with_clk`, `with_cmd`, `with_data*`, and optional
 //! card-detect / write-protect pins.
@@ -21,7 +21,7 @@
 //!
 //! Blocking commands and block transfers are available on [`Slot`] in
 //! [`Blocking`] mode. [`Slot::into_async`] enables interrupt-driven operation
-//! and implements [`sdio::MmcBus`] for the `sdio` crate stack.
+//! and implements [`sdio::MmcBus`] for the `sdio` crate stack
 //!
 //! ## Implementation State
 //!
@@ -90,7 +90,7 @@ pub enum ClockSource {
     Xtal,
 }
 
-/// Clock input sampling phase used for high-speed tuning.
+/// Clocks input sampling phase used for high-speed tuning.
 #[cfg(sdmmc_delay_phase_num_is_set)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -130,7 +130,7 @@ pub struct Config {
     /// The clock source for the module clock.
     clock_source: ClockSource,
 
-    /// The module-clock divider (valid range `2..=16`).
+    /// The module-clock divider (valid range `2..=16`)
     module_div: u8,
 }
 
@@ -182,9 +182,9 @@ pub struct SlotConfig {
 pub enum ResponseLen {
     /// No response.
     None,
-    /// Short 48-bit response (`resp[0]`).
+    /// Short 48-bit response (`resp[0]`)
     Short,
-    /// Long 136-bit response (`resp[0..4]`).
+    /// Long 136-bit response (`resp[0..4]`)
     Long,
 }
 
@@ -192,11 +192,11 @@ pub enum ResponseLen {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CommandFlags {
-    /// Wait for the data line to be free before issuing.
+    /// Waits for the data line to be free before issuing.
     pub wait_complete: bool,
     /// Stop/abort command (CMD12, CMD52 abort).
     pub stop_abort: bool,
-    /// Poll DAT0 until the card releases busy (R1b).
+    /// Polls DAT0 until the card releases busy (R1b).
     pub busy: bool,
 }
 
@@ -258,12 +258,12 @@ impl core::fmt::Display for Error {
     }
 }
 
-/// Error returned when applying a [`Config`].
+/// Error returned when applying a [`Config`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
-    /// Module-clock divider is outside `2..=16`.
+    /// Module-clock divider is outside `2..=16`
     InvalidModuleDivider,
     /// The slot is already in use.
     SlotInUse,
@@ -378,7 +378,7 @@ const CTRL_USE_INTERNAL_DMA: u32 = 1 << 25;
 
 /// IDMAC descriptor count in the driver-owned ring.
 const RING_LEN: usize = 4;
-/// Maximum bytes per descriptor (`SDMMC_DMA_MAX_BUF_LEN`).
+/// Maximum bytes per descriptor (`SDMMC_DMA_MAX_BUF_LEN`)
 const DMA_MAX_BUF_LEN: usize = 4096;
 
 // `Desc.flags` bits (see `sdmmc_desc_t`).
@@ -406,7 +406,7 @@ impl Desc {
     };
 }
 
-/// One contiguous DMA segment: `(buffer address, remaining bytes)`.
+/// One contiguous DMA segment: `(buffer address, remaining bytes)`
 type Seg = (u32, usize);
 
 /// Tracks progress while filling the descriptor ring.
@@ -415,7 +415,7 @@ type Seg = (u32, usize);
 /// cache-unaligned caller buffer can still be DMA'd: the aligned middle is
 /// transferred in place, while the unaligned head and tail are bounced
 /// through an aligned scratch buffer. A fully aligned buffer uses a single
-/// segment ([`Transfer::single`]) and the other two are left empty.
+/// segment ([`Transfer::single`]) and the other two are left empty
 #[derive(Clone, Copy)]
 struct Transfer {
     segs: [Seg; 3],
@@ -901,7 +901,7 @@ const INTMASK_DATA: u32 = INTMASK_CMD
 // `idinten` bits: TX/RX done, fatal/unavailable, normal/abnormal summaries.
 const IDINTEN_ALL: u32 = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 4) | (1 << 8) | (1 << 9);
 
-/// ISR/task transfer handshake (distinct from CIU access via `EngineSession`).
+/// ISR/task transfer handshake (distinct from CIU access via `EngineSession`)
 struct TransferState {
     transfer: Option<Transfer>,
     result: Option<Result<(), Error>>,
@@ -1059,9 +1059,9 @@ fn slot_pins(id: SlotId) -> &'static mut SlotPins {
 /// Signals a slot does not route through the matrix (IO_MUX-routed bus
 /// signals, or chips without a GPIO matrix at all) are `None`/empty, so one
 /// table shape serves every chip. On IO_MUX-only chips none of the signal
-/// fields are read, hence the conditional `allow(dead_code)`.
+/// fields are read, hence the conditional `allow(dead_code)`
 ///
-/// Populated from chip metadata by the `for_each_sdmmc!` invocation below.
+/// Populated from chip metadata by the `for_each_sdmmc!` invocation below
 struct SlotInfo {
     io_event: u32,
     #[cfg(sdmmc_has_gpio_matrix)]
@@ -1343,7 +1343,7 @@ impl<'d> SdHostController<'d> {
     /// Both slots can be taken (once each); the shared engine serializes their
     /// transactions. Requesting the same slot twice returns
     /// [`ConfigError::SlotInUse`]. Blocking engine ops return
-    /// [`BlockingError::Busy`] on contention.
+    /// [`BlockingError::Busy`] on contention
     ///
     /// The returned slot borrows the controller, so the controller cannot be
     /// dropped while any of its slots are alive.
@@ -1375,19 +1375,19 @@ impl<'d> SdHostController<'d> {
     }
 }
 
-/// Card-clock output pin for slot `S`.
+/// Card-clock output pin for slot `S`
 pub trait SlotClk<'d, const S: u8> {
     #[doc(hidden)]
     fn configure(self);
 }
 
-/// Command (bidirectional) pin for slot `S`.
+/// Command (bidirectional) pin for slot `S`
 pub trait SlotCmd<'d, const S: u8> {
     #[doc(hidden)]
     fn configure(self);
 }
 
-/// Data line `L` (bidirectional) for slot `S`.
+/// Data line `L` (bidirectional) for slot `S`
 pub trait SlotData<'d, const S: u8, const L: u8> {
     #[doc(hidden)]
     fn configure(self);
@@ -1637,8 +1637,8 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         self
     }
 
-    /// Returns `true` if a card is detected, or if no card-detect pin is
-    /// wired (assume present).
+    /// Returns whether a card is detected. If no card-detect pin is wired,
+    /// assumes the card is present.
     pub fn is_card_present(&self) -> bool {
         if !self.cd_connected {
             return true;
@@ -1646,7 +1646,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         (SDHOST::regs().cdetect().read().card_detect_n().bits() & (1 << S)) == 0
     }
 
-    /// Returns `true` if the card reports write protection. Returns `false`
+    /// Returns whether the card reports write protection. Returns `false`
     /// if no write-protect pin is wired. Polarity follows
     /// [`SlotConfig::with_wp_active_high`].
     pub fn is_write_protected(&self) -> bool {
@@ -2105,7 +2105,7 @@ async fn wait_busy_async() -> Result<(), Error> {
 ///
 /// Used after no-data commands (e.g. `CMD7`, `MMC_SWITCH`): the controller
 /// does not generate a Busy Clear Interrupt for those, so polling is the
-/// only option, mirroring ESP-IDF's `wait_for_busy_cleared`.
+/// only option, mirroring ESP-IDF's `wait_for_busy_cleared`
 async fn wait_busy_poll() -> Result<(), Error> {
     for _ in 0..POLL_LIMIT {
         if !SDHOST::regs().status().read().data_busy().bit_is_set() {
@@ -2167,14 +2167,14 @@ fn wait_busy_cleared() -> Result<(), Error> {
 
 /// Validates a buffer address for the SDMMC IDMAC and returns its DMA pointer.
 ///
-/// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`.
+/// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`
 fn dma_ptr(buf: DmaAlignedMut<'_, [u8]>) -> Result<u32, Error> {
     dma_ptr_from_raw(buf.as_ptr())
 }
 
 /// Validates a buffer address for the SDMMC IDMAC and returns its DMA pointer.
 ///
-/// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`.
+/// The IDMAC reaches PSRAM only on chips with `sdmmc_psram_dma`
 fn dma_ptr_ref(buf: DmaAlignedRef<'_, [u8]>) -> Result<u32, Error> {
     dma_ptr_from_raw(buf.as_ptr())
 }
@@ -2325,7 +2325,7 @@ fn reset_transfer() -> Result<(), Error> {
 ///
 /// `BMOD.SWR` resets the IDMAC's internal registers (including `DBADDR`) on
 /// this IP, so the descriptor base must be written *after* the reset,
-/// matching the ordering ESP-IDF uses in `sdmmc_host_dma_prepare`.
+/// matching the ordering ESP-IDF uses in `sdmmc_host_dma_prepare`
 fn enable_idmac(dbaddr: u32) {
     let r = SDHOST::regs();
     r.ctrl()
@@ -2368,7 +2368,7 @@ fn module_hz(source: ClockSource, div: u8) -> u32 {
 
 /// Computes the per-card divider for a target frequency.
 ///
-/// `card_clk = module / (2 * div)`; `div == 0` bypasses the divider.
+/// `card_clk = module / (2 * div)`; `div == 0` bypasses the divider
 fn freq_to_card_div(module_hz: u32, target_hz: u32) -> u8 {
     if target_hz == 0 || module_hz <= target_hz {
         return 0;

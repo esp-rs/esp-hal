@@ -83,7 +83,7 @@ pub struct TouchConfig {
     pub sleep_cycles: Option<u16>,
 }
 
-/// This struct marks a successfully initialized touch peripheral
+/// Marks a successfully initialized touch peripheral.
 pub struct Touch<'d, Tm: TouchMode, Dm: DriverMode> {
     _inner: TOUCH<'d>,
     _touch_mode: PhantomData<Tm>,
@@ -183,7 +183,7 @@ impl<'d> Touch<'d, OneShot, Blocking> {
     /// Initializes the touch peripheral and returns this marker struct.
     /// Optionally accepts configuration options.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -240,7 +240,7 @@ impl<'d> Touch<'d, Continuous, Blocking> {
     /// Initializes the touch peripheral in continuous mode and returns this
     /// marker struct. Optionally accepts configuration options.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -267,20 +267,18 @@ impl<'d> Touch<'d, Continuous, Async> {
     /// Initializes the touch peripheral in continuous async mode and returns
     /// this marker struct.
     ///
-    /// ## Warning:
-    ///
-    /// This uses [`RTC_CORE`](crate::peripherals::Interrupt::RTC_CORE)
-    /// interrupts under the hood. So the whole async part breaks if you install
-    /// an interrupt handler with [`Rtc::set_interrupt_handler()`][1].
+    /// This uses [`RTC_CORE`](crate::peripherals::Interrupt::RTC_CORE) interrupts under the hood.
+    /// The async API stops working if an interrupt handler is installed with
+    /// [`Rtc::set_interrupt_handler()`][1]
     ///
     /// [1]: ../rtc_cntl/struct.Rtc.html#method.set_interrupt_handler
     ///
     /// ## Parameters:
     ///
-    /// - `rtc`: The RTC peripheral is needed to configure the required interrupts.
-    /// - `config`: Optional configuration options.
+    /// - `rtc`: The RTC peripheral is needed to configure the required interrupts
+    /// - `config`: Optional configuration options
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -314,8 +312,9 @@ pub struct TouchPad<P: TouchPin, Tm: TouchMode, Dm: DriverMode> {
     _mode: PhantomData<Dm>,
 }
 impl<P: TouchPin> TouchPad<P, OneShot, Blocking> {
-    /// (Re-)Start a touch measurement on the pin. You can get the result by
-    /// calling [`read`](Self::read) once it is finished.
+    /// Starts a touch measurement on the pin.
+    ///
+    /// Call [`read`](Self::read) once the measurement is finished to get the result.
     pub fn start_measurement(&mut self) {
         crate::peripherals::RTC_IO::regs()
             .touch_pad2()
@@ -344,11 +343,11 @@ impl<P: TouchPin> TouchPad<P, OneShot, Blocking> {
     }
 }
 impl<P: TouchPin, Tm: TouchMode, Dm: DriverMode> TouchPad<P, Tm, Dm> {
-    /// Construct a new instance of [`TouchPad`].
+    /// Creates a new instance of [`TouchPad`].
     ///
     /// ## Parameters:
     /// - `pin`: The pin that gets configured as touch pad
-    /// - `touch`: The [`Touch`] struct indicating that touch is configured.
+    /// - `touch`: The [`Touch`] struct indicating that touch is configured
     pub fn new(pin: P, _touch: &Touch<'_, Tm, Dm>) -> Self {
         // TODO revert this on drop
         pin.set_touch(Internal);
@@ -360,14 +359,14 @@ impl<P: TouchPin, Tm: TouchMode, Dm: DriverMode> TouchPad<P, Tm, Dm> {
         }
     }
 
-    /// Read the current touch pad capacitance counter.
+    /// Reads the current touch pad capacitance counter.
     ///
     /// Usually a lower value means higher capacitance, thus indicating touch
     /// event.
     ///
-    /// Returns `None` if the value is not yet ready. (Note: Measurement must be
+    /// Returns `None` if the value is not yet ready. Measurement must be
     /// started manually with [`start_measurement`](Self::start_measurement) if
-    /// the touch peripheral is in [`OneShot`] mode).
+    /// the touch peripheral is in [`OneShot`] mode.
     pub fn try_read(&mut self) -> Option<u16> {
         if unsafe { &*crate::peripherals::SENS::ptr() }
             .sar_touch_ctrl2()
@@ -387,13 +386,10 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     /// Usually a lower value means higher capacitance, thus indicating touch
     /// event.
     ///
-    /// ## Note for [`OneShot`] mode:
-    ///
-    /// This function might block forever, if
+    /// In [`OneShot`] mode, may block indefinitely if
     /// [`start_measurement`](Self::start_measurement) was not called before. As
-    /// measurements are not cleared, the touch values might also be
-    /// outdated, if it has been some time since the last call to that
-    /// function.
+    /// measurements are not cleared, the touch values might also be outdated if
+    /// it has been some time since the last call to that function.
     pub fn read(&mut self) -> u16 {
         while unsafe { &*crate::peripherals::SENS::ptr() }
             .sar_touch_ctrl2()
@@ -408,21 +404,19 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     ///
     /// The raised interrupt is actually
     /// [`RTC_CORE`](crate::peripherals::Interrupt::RTC_CORE). A handler can
-    /// be installed with [`Rtc::set_interrupt_handler()`][1].
+    /// be installed with [`Rtc::set_interrupt_handler()`][1]
     ///
     /// [1]: ../rtc_cntl/struct.Rtc.html#method.set_interrupt_handler
     ///
     /// ## Parameters:
     /// - `threshold`: The threshold above/below which the pin is considered touched. Above/below
-    ///   depends on the configuration of `touch` in [`new`](Self::new) (defaults to below).
-    ///
-    /// ## Example
+    ///   depends on the configuration of `touch` in [`new`](Self::new) (defaults to below)
     pub fn listen(&mut self, threshold: u16) {
         self.pin.set_threshold(threshold, Internal);
         listen(self.pin.touch_nr(Internal))
     }
 
-    /// Unlisten for the touch pad's interrupt.
+    /// Unlistens for the touch pad's interrupt.
     ///
     /// If no other touch pad interrupts are active, the touch interrupt is
     /// disabled completely.
@@ -432,17 +426,15 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
 
     /// Clears a pending touch interrupt.
     ///
-    /// ## Note on interrupt clearing behaviour:
-    ///
     /// There is only a single interrupt for the touch pad.
     /// [`is_interrupt_set`](Self::is_interrupt_set) can be used to check
-    /// which pins are touchted. However, this function clears the interrupt
+    /// which pins are touched. However, this function clears the interrupt
     /// status for all pins. So only call it when all pins are handled.
     pub fn clear_interrupt(&mut self) {
         internal_clear_interrupt()
     }
 
-    /// Checks if the pad is touched, based on the configured threshold value.
+    /// Returns whether the pad is touched, based on the configured threshold value.
     pub fn is_interrupt_set(&mut self) -> bool {
         internal_is_interrupt_set(self.pin.touch_nr(Internal))
     }
@@ -569,7 +561,7 @@ mod asynch {
     }
 
     impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Async> {
-        /// Wait for the pad to be touched.
+        /// Waits for the pad to be touched.
         pub async fn wait_for_touch(&mut self, threshold: u16) {
             self.pin.set_threshold(threshold, Internal);
             let touch_nr = self.pin.touch_nr(Internal);

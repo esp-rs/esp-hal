@@ -3,7 +3,7 @@ use crate::{
     soc::regi2c,
 };
 
-/// Enable true randomness by enabling the entropy source.
+/// Enables true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     // Enable 8M clock source for RNG (this is actually enough to produce strong
@@ -84,7 +84,7 @@ pub(crate) fn ensure_randomness() {
         .modify(|_, w| w.timer_en().set_bit());
 }
 
-/// Disable true randomness. Unlocks `ADC` peripheral.
+/// Disables true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
     unsafe {
         // Restore internal I2C bus state

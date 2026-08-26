@@ -71,14 +71,14 @@ pub trait RegisterAccess: Sealed {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard>;
 
-    /// Reset the state machine of the channel and FIFO pointer.
+    /// Resets the state machine of the channel and FIFO pointer.
     fn reset(&self);
 
-    /// Enable/Disable INCR burst transfer for channel reading
+    /// Enables or disables INCR burst transfer for channel reading
     /// accessing data in internal RAM.
     fn set_burst_mode(&self, burst_mode: BurstConfig);
 
-    /// Enable/Disable burst transfer for channel reading
+    /// Enables or disables burst transfer for channel reading
     /// descriptors in internal RAM.
     fn set_descr_burst_mode(&self, burst_mode: bool);
 
@@ -87,22 +87,22 @@ pub trait RegisterAccess: Sealed {
     #[cfg(dma_max_priority_is_set)]
     fn set_priority(&self, priority: crate::dma::DmaPriority);
 
-    /// Select a peripheral for the channel.
+    /// Selects a peripheral for the channel.
     fn set_peripheral(&self, _peripheral: u8) {}
 
-    /// Set the address of the first descriptor.
+    /// Sets the address of the first descriptor.
     fn set_link_addr(&self, address: u32);
 
-    /// Enable the channel for data transfer.
+    /// Enables the channel for data transfer.
     fn start(&self);
 
-    /// Stop the channel from transferring data.
+    /// Stops the channel from transferring data.
     fn stop(&self);
 
-    /// Mount a new descriptor.
+    /// Mounts a new descriptor.
     fn restart(&self);
 
-    /// Configure the bit to enable checking the owner attribute of the
+    /// Configures the bit to enable checking the owner attribute of the
     /// descriptor.
     fn set_check_owner(&self, check_owner: Option<bool>);
 
@@ -138,7 +138,7 @@ pub trait TxRegisterAccess: RegisterAccess {
     /// Returns whether the DMA's FIFO is empty.
     fn is_fifo_empty(&self) -> bool;
 
-    /// Enable/disable outlink-writeback
+    /// Enables or disables outlink-writeback.
     fn set_auto_write_back(&self, enable: bool);
 
     /// Outlink descriptor address when EOF occurs of Tx channel.
@@ -198,8 +198,7 @@ pub trait DmaChannel: Sized + crate::private::Sealed {
     ///
     /// # Safety
     ///
-    /// This function must only be used if the separate halves are used by the
-    /// same peripheral.
+    /// Must only be used if the separate halves are used by the same peripheral.
     unsafe fn split_internal(self, _: Internal) -> (Self::Rx, Self::Tx);
 }
 

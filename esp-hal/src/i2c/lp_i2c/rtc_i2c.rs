@@ -485,7 +485,7 @@ fn nanos_to_clock(nanos: u64) -> u32 {
     ((nanos as u128 * crate::soc::clocks::rc_fast_clk_frequency() as u128) / 1_000_000_000) as u32
 }
 
-/// A generic I2C Command
+/// A generic I2C Command.
 enum Command {
     Start,
     Stop,

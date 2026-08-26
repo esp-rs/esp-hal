@@ -2,7 +2,7 @@
 //!
 //! ## Overview
 //! The `operator` is responsible for generating `PWM (Pulse Width Modulation)`
-//! signals and handling various aspects related to `PWM` signal generation.
+//! signals and handling various aspects related to `PWM` signal generation
 //!
 //! ## Configuration
 //! This module provides flexibility in configuring the PWM outputs. Its
@@ -28,8 +28,9 @@ pub enum PWMStream {
     PWMB,
 }
 
-/// Configuration for MCPWM Operator DeadTime
-/// It's recommended to reference the technical manual for configuration
+/// Configuration for MCPWM Operator DeadTime.
+///
+/// It is recommended to reference the technical manual for configuration.
 #[derive(Copy, Clone)]
 pub struct DeadTimeCfg {
     cfg_reg: u32,
@@ -59,7 +60,7 @@ impl DeadTimeCfg {
     const S7: u32 = 0b00_0000_0100_0000_0000;
     /// DEB_MODE
     const _S8: u32 = 0b00_0000_0001_0000_0000;
-    /// Use PT_clk instead of PWM_clk
+    /// Selects PT_clk instead of PWM_clk.
     const CLK_SEL: u32 = 0b10_0000_0000_0000_0000;
 
     /// Uses the following configuration:
@@ -97,8 +98,8 @@ impl DeadTimeCfg {
         self
     }
 
-    /// Sets FED/RED output inverter
-    /// Inverts the output of the FED/RED module (excl DEB mode feedback)
+    /// Sets FED/RED output inverter.
+    /// Inverts the output of the FED/RED module (excl DEB mode feedback).
     #[must_use]
     pub const fn invert_output(self, fed: bool, red: bool) -> Self {
         self.set_flag(Self::S3, fed).set_flag(Self::S2, red)
@@ -119,8 +120,8 @@ impl DeadTimeCfg {
         )
     }
 
-    /// Set PWMA/PWMB stream to bypass everything except output_swap
-    /// This means no deadtime is applied when enabled
+    /// Sets PWMA/PWMB stream to bypass everything except output_swap.
+    /// This means no deadtime is applied when enabled.
     #[must_use]
     pub const fn set_bypass(self, stream: PWMStream, enable: bool) -> Self {
         self.set_flag(
@@ -132,13 +133,13 @@ impl DeadTimeCfg {
         )
     }
 
-    /// Select Between PWMClk & PT_Clk
+    /// Selects Between PWMClk & PT_Clk.
     #[must_use]
     pub const fn select_clock(self, pwm_clock: bool) -> Self {
         self.set_flag(Self::CLK_SEL, pwm_clock)
     }
 
-    /// Select which stream is used for the input of FED/RED
+    /// Selects which stream is used for the input of FED/RED.
     #[must_use]
     pub const fn select_input(self, fed: PWMStream, red: PWMStream) -> Self {
         self.set_flag(
@@ -158,7 +159,7 @@ impl DeadTimeCfg {
     }
 }
 
-/// A MCPWM operator
+/// A MCPWM operator.
 ///
 /// The PWM Operator submodule has the following functions:
 /// * Generates a PWM signal pair, based on timing references obtained from the corresponding PWM
@@ -188,10 +189,9 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         }
     }
 
-    /// Select a [`Timer`] to be the timing reference for this operator
+    /// Selects a [`Timer`] to be the timing reference for this operator.
     ///
-    /// ### Note:
-    /// By default TIMER0 is used
+    /// By default TIMER0 is used.
     pub fn set_timer<const TIM: u8>(&mut self, timer: &Timer<TIM, PWM>) {
         let _ = timer;
         // SAFETY:
@@ -207,7 +207,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         });
     }
 
-    /// Use the A output with the given pin and configuration
+    /// Configures the A output with the given pin and configuration.
     pub fn with_pin_a(
         self,
         pin: impl PeripheralOutput<'d>,
@@ -216,7 +216,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         PwmPin::new(pin, config)
     }
 
-    /// Use the B output with the given pin and configuration
+    /// Configures the B output with the given pin and configuration.
     pub fn with_pin_b(
         self,
         pin: impl PeripheralOutput<'d>,
@@ -225,7 +225,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         PwmPin::new(pin, config)
     }
 
-    /// Use both the A and the B output with the given pins and configurations
+    /// Configures both the A and B outputs with the given pins and configurations.
     pub fn with_pins(
         self,
         pin_a: impl PeripheralOutput<'d>,
@@ -236,7 +236,7 @@ impl<'d, const OP: u8, PWM: PwmPeripheral> Operator<'d, OP, PWM> {
         (PwmPin::new(pin_a, config_a), PwmPin::new(pin_b, config_b))
     }
 
-    /// Link two pins using the deadtime generator
+    /// Links two pins using the deadtime generator.
     ///
     /// This is useful for complementary or mirrored signals with or without
     /// configured deadtime
@@ -274,7 +274,7 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
     /// [`PwmUpdateMethod::empty`]
     pub const EMPTY: Self = Self::new(PwmActions::empty(), PwmUpdateMethod::empty());
 
-    /// Get a configuration using the given `PwmActions` and `PwmUpdateMethod`
+    /// Returns a configuration using the given `PwmActions` and `PwmUpdateMethod`.
     pub const fn new(actions: PwmActions<IS_A>, update_method: PwmUpdateMethod) -> Self {
         PwmPinConfig {
             actions,
@@ -283,7 +283,7 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
     }
 }
 
-/// A pin driven by an MCPWM operator
+/// A pin driven by an MCPWM operator.
 pub struct PwmPin<'d, PWM, const OP: u8, const IS_A: bool> {
     pin: OutputSignal<'d>,
     phantom: PhantomData<PWM>,
@@ -310,7 +310,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin
     }
 
-    /// Configure what actions should be taken on timing events
+    /// Configures what actions should be taken on timing events.
     pub fn set_actions(&mut self, value: PwmActions<IS_A>) {
         // SAFETY:
         // We only write to our GENx_x register
@@ -322,7 +322,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         ch.gen_((!IS_A) as usize).write(|w| unsafe { w.bits(bits) });
     }
 
-    /// Set how a new timestamp syncs with the timer
+    /// Sets how a new timestamp syncs with the timer.
     pub fn set_update_method(&mut self, update_method: PwmUpdateMethod) {
         // SAFETY:
         // We only write to our GENx_x_UPMETHOD register
@@ -343,7 +343,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         });
     }
 
-    /// Write a new timestamp.
+    /// Writes a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn set_timestamp(&mut self, value: u16) {
@@ -366,7 +366,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         }
     }
 
-    /// Get the old timestamp.
+    /// Returns the old timestamp.
     /// The value of the timestamp will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn timestamp(&self) -> u16 {
@@ -389,7 +389,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         }
     }
 
-    /// Get the period of the timer.
+    /// Returns the period of the timer.
     pub fn period(&self) -> u16 {
         // SAFETY:
         // We only grant access to our CFG0 register with the lifetime of &mut self
@@ -417,23 +417,23 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
     }
 }
 
-/// Implement no error type for the PwmPin because the method are infallible
+/// Implements no error type for the PwmPin because the method are infallible.
 impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::ErrorType
     for PwmPin<'_, PWM, OP, IS_A>
 {
     type Error = core::convert::Infallible;
 }
 
-/// Implement the trait SetDutyCycle for PwmPin
+/// Implements the trait SetDutyCycle for PwmPin.
 impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetDutyCycle
     for PwmPin<'_, PWM, OP, IS_A>
 {
-    /// Get the max duty of the PwmPin
+    /// Returns the max duty of the PwmPin.
     fn max_duty_cycle(&self) -> u16 {
         self.period()
     }
 
-    /// Set the max duty of the PwmPin
+    /// Sets the max duty of the PwmPin.
     fn set_duty_cycle(&mut self, duty: u16) -> Result<(), core::convert::Infallible> {
         self.set_timestamp(duty);
         Ok(())
@@ -512,38 +512,38 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         LinkedPins { pin_a, pin_b }
     }
 
-    /// Configure what actions should be taken on timing events
+    /// Configures what actions should be taken on timing events.
     pub fn set_actions_a(&mut self, value: PwmActions<true>) {
         self.pin_a.set_actions(value)
     }
-    /// Configure what actions should be taken on timing events
+    /// Configures what actions should be taken on timing events.
     pub fn set_actions_b(&mut self, value: PwmActions<false>) {
         self.pin_b.set_actions(value)
     }
 
-    /// Set how a new timestamp syncs with the timer
+    /// Sets how a new timestamp syncs with the timer.
     pub fn set_update_method_a(&mut self, update_method: PwmUpdateMethod) {
         self.pin_a.set_update_method(update_method)
     }
-    /// Set how a new timestamp syncs with the timer
+    /// Sets how a new timestamp syncs with the timer.
     pub fn set_update_method_b(&mut self, update_method: PwmUpdateMethod) {
         self.pin_b.set_update_method(update_method)
     }
 
-    /// Write a new timestamp.
+    /// Writes a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn set_timestamp_a(&mut self, value: u16) {
         self.pin_a.set_timestamp(value)
     }
-    /// Write a new timestamp.
+    /// Writes a new timestamp.
     /// The written value will take effect according to the set
     /// [`PwmUpdateMethod`].
     pub fn set_timestamp_b(&mut self, value: u16) {
         self.pin_b.set_timestamp(value)
     }
 
-    /// Configure the deadtime generator
+    /// Configures the deadtime generator.
     pub fn set_deadtime_cfg(&mut self, config: DeadTimeCfg) {
         #[cfg(esp32s3)]
         let dt_cfg = unsafe { Self::ch() }.db_cfg();
@@ -552,7 +552,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         dt_cfg.write(|w| unsafe { w.bits(config.cfg_reg) });
     }
 
-    /// Set the deadtime generator rising edge delay
+    /// Sets the deadtime generator rising edge delay.
     pub fn set_rising_edge_deadtime(&mut self, dead_time: u16) {
         #[cfg(esp32s3)]
         let dt_red = unsafe { Self::ch() }.db_red_cfg();
@@ -560,7 +560,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
         let dt_red = unsafe { Self::ch() }.dt_red_cfg();
         dt_red.write(|w| unsafe { w.red().bits(dead_time) });
     }
-    /// Set the deadtime generator falling edge delay
+    /// Sets the deadtime generator falling edge delay.
     pub fn set_falling_edge_deadtime(&mut self, dead_time: u16) {
         #[cfg(esp32s3)]
         let dt_fed = unsafe { Self::ch() }.db_fed_cfg();
@@ -575,22 +575,21 @@ impl<'d, PWM: PwmPeripheral, const OP: u8> LinkedPins<'d, PWM, OP> {
     }
 }
 
-/// An action the operator applies to an output
+/// An action the operator applies to an output.
 #[non_exhaustive]
 #[repr(u32)]
 pub enum UpdateAction {
-    /// Clear the output by setting it to a low level.
+    /// Clears the output by setting it to a low level.
     SetLow  = 1,
-    /// Set the output to a high level.
+    /// Sets the output to a high level.
     SetHigh = 2,
-    /// Change the current output level to the opposite value.
+    /// Changes the current output level to the opposite value.
     /// If it is currently pulled high, pull it low, or vice versa.
     Toggle  = 3,
 }
 
-/// Settings for what actions should be taken on timing events
+/// Settings for what actions should be taken on timing events.
 ///
-/// ### Note:
 /// The hardware supports using a timestamp A event to trigger an action on
 /// output B or vice versa. For clearer ownership semantics this HAL does not
 /// support such configurations.
@@ -618,17 +617,17 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         PwmActions(0)
     }
 
-    /// Choose an `UpdateAction` for an `UTEZ` event
+    /// Chooses an `UpdateAction` for an `UTEZ` event.
     pub const fn on_up_counting_timer_equals_zero(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 0)
     }
 
-    /// Choose an `UpdateAction` for an `UTEP` event
+    /// Chooses an `UpdateAction` for an `UTEP` event.
     pub const fn on_up_counting_timer_equals_period(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 2)
     }
 
-    /// Choose an `UpdateAction` for an `UTEA`/`UTEB` event
+    /// Chooses an `UpdateAction` for an `UTEA`/`UTEB` event.
     pub const fn on_up_counting_timer_equals_timestamp(self, action: UpdateAction) -> Self {
         match IS_A {
             true => self.with_value_at_offset(action as u32, 4),
@@ -636,8 +635,8 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         }
     }
 
-    /// Choose an `UpdateAction` for an `UTEA`/`UTEB` event where you can
-    /// specify which of the A/B to use
+    /// Chooses an `UpdateAction` for an `UTEA`/`UTEB` event, specifying which
+    /// of the A/B timestamps to use.
     pub const fn on_up_counting_timer_equals_ch_timestamp<const CH_A: bool>(
         self,
         action: UpdateAction,
@@ -648,17 +647,17 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         }
     }
 
-    /// Choose an `UpdateAction` for an `DTEZ` event
+    /// Chooses an `UpdateAction` for an `DTEZ` event.
     pub const fn on_down_counting_timer_equals_zero(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 12)
     }
 
-    /// Choose an `UpdateAction` for an `DTEP` event
+    /// Chooses an `UpdateAction` for an `DTEP` event.
     pub const fn on_down_counting_timer_equals_period(self, action: UpdateAction) -> Self {
         self.with_value_at_offset(action as u32, 14)
     }
 
-    /// Choose an `UpdateAction` for an `DTEA`/`DTEB` event
+    /// Chooses an `UpdateAction` for an `DTEA`/`DTEB` event.
     pub const fn on_down_counting_timer_equals_timestamp(self, action: UpdateAction) -> Self {
         match IS_A {
             true => self.with_value_at_offset(action as u32, 16),
@@ -666,8 +665,8 @@ impl<const IS_A: bool> PwmActions<IS_A> {
         }
     }
 
-    /// Choose an `UpdateAction` for an `DTEA`/`DTEB` event where you can
-    /// specify which of the A/B to use
+    /// Chooses an `UpdateAction` for an `DTEA`/`DTEB` event, specifying which
+    /// of the A/B timestamps to use.
     pub const fn on_down_counting_timer_equals_ch_timestamp<const CH_A: bool>(
         self,
         action: UpdateAction,
@@ -691,26 +690,26 @@ impl<const IS_A: bool> PwmActions<IS_A> {
 pub struct PwmUpdateMethod(u8);
 
 impl PwmUpdateMethod {
-    /// New timestamp will be applied immediately
+    /// New timestamp will be applied immediately.
     pub const SYNC_IMMEDIATLY: Self = Self::empty();
-    /// New timestamp will be applied when timer is equal to zero
+    /// New timestamp will be applied when timer is equal to zero.
     pub const SYNC_ON_ZERO: Self = Self::empty().sync_on_timer_equals_zero();
-    /// New timestamp will be applied when timer is equal to period
+    /// New timestamp will be applied when timer is equal to period.
     pub const SYNC_ON_PERIOD: Self = Self::empty().sync_on_timer_equals_period();
 
-    /// `PwmUpdateMethod` with no sync triggers.
+    /// `PwmUpdateMethod` with no sync triggers
     /// Corresponds to syncing immediately
     pub const fn empty() -> Self {
         PwmUpdateMethod(0)
     }
 
-    /// Enable syncing new timestamp values when timer is equal to zero
+    /// Enables syncing new timestamp values when timer is equal to zero.
     pub const fn sync_on_timer_equals_zero(mut self) -> Self {
         self.0 |= 0b0001;
         self
     }
 
-    /// Enable syncing new timestamp values when timer is equal to period
+    /// Enables syncing new timestamp values when timer is equal to period.
     pub const fn sync_on_timer_equals_period(mut self) -> Self {
         self.0 |= 0b0010;
         self

@@ -13,16 +13,16 @@ pub trait Sealed {}
 pub struct Internal;
 
 impl Internal {
-    /// Obtain magical powers to access internal APIs.
+    /// Obtains magical powers to access internal APIs.
     ///
     /// # Safety
     ///
-    /// By calling this function, you accept that you are using an internal
-    /// API that is not guaranteed to be documented, stable, working
+    /// Calling this method accepts that this is an internal
+    /// API that is not guaranteed to be documented, stable, or working,
     /// and may change at any time.
     ///
-    /// You declare that you have tried to look for other solutions, that
-    /// you have opened a feature request or an issue to discuss the
+    /// Calling this method also declares that other solutions have been tried, and that
+    /// a feature request or an issue has been opened to discuss the
     /// need for this function.
     pub unsafe fn conjure() -> Self {
         Self

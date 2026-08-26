@@ -3,10 +3,10 @@
 //!
 //! ## Overview
 //! The PCNT module is designed to count the number of rising
-//! and/or falling edges of input signals. They may contain multiple pulse
+//! or falling edges of input signals. They may contain multiple pulse
 //! counter units in the module. Each unit is in effect an independent counter
-//! with multiple channels, where each channel can increment/decrement the
-//! counter on a rising/falling edge. Furthermore, each channel can be
+//! with multiple channels, where each channel can increment or decrement the
+//! counter on a rising or falling edge. Furthermore, each channel can be
 //! configured separately.
 //!
 //! It consists of two main modules:
@@ -133,7 +133,7 @@ pub struct Pcnt<'d> {
 }
 
 impl<'d> Pcnt<'d> {
-    /// Return a new PCNT
+    /// Returns a new PCNT.
     pub fn new(_instance: PCNT<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
         let pcnt = PCNT::regs();
@@ -175,10 +175,9 @@ impl<'d> Pcnt<'d> {
         }
     }
 
-    /// Set the interrupt handler for the PCNT peripheral.
+    /// Sets the interrupt handler for the PCNT peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::system::Cpu::other() {

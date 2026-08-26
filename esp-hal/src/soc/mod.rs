@@ -101,9 +101,8 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
 mod xtensa {
     use core::arch::{global_asm, naked_asm};
 
-    /// The ESP32 has a first stage bootloader that handles loading program data
-    /// into the right place therefore we skip loading it again. This function
-    /// is called by xtensa-lx-rt in Reset.
+    /// The ESP32 has a first stage bootloader that handles loading program data into the right
+    /// place, so loading is skipped here. Called by xtensa-lx-rt in Reset.
     #[unsafe(export_name = "__init_data")]
     extern "C" fn __init_data() -> bool {
         false
@@ -406,7 +405,7 @@ pub(crate) fn enable_pmp() {
         Ok(())
     }
 
-    /// Returns true if a PMP entry is unlocked and disabled (address matching OFF).
+    /// Returns whether a PMP entry is unlocked and disabled (address matching OFF).
     unsafe fn is_pmp_entry_free(idx: usize) -> bool {
         let cfg_reg = idx / 4;
         let byte_offset = idx % 4;
@@ -594,13 +593,13 @@ fn chip_revision_in_range(range: Range<ChipRevision>) -> bool {
     range.start <= chip_revision && chip_revision < range.end
 }
 
-/// Returns true if the chip revision is at least the given revision.
+/// Returns whether the chip revision is at least the given revision.
 #[allow(dead_code)]
 pub(crate) fn chip_revision_above(revision: ChipRevision) -> bool {
     chip_revision_in_range(revision..MAX_REVISION)
 }
 
-/// Returns true if the chip is at least the given revision, in the same major version.
+/// Returns whether the chip is at least the given revision, in the same major version.
 #[allow(dead_code)]
 pub(crate) fn chip_minor_revision_above(revision: ChipRevision) -> bool {
     let next_major = ChipRevision {

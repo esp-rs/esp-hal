@@ -32,7 +32,7 @@ pub(super) enum MspiTimingSpeedMode {
     ///
     /// As a tradeoff, the performance of the MSPI (devices) are switched to a very low speed
     MspiTimingSpeedModeLowPerf,
-    /// Normal performance speed mode, MSPI speed is the same as you configured
+    /// Normal performance speed mode. MSPI speed matches the configured speed.
     MspiTimingSpeedModeNormalPerf,
 }
 
@@ -109,13 +109,13 @@ pub(crate) fn psram_init(config: &mut super::PsramConfig) {
 unsafe extern "C" {
     fn esp_rom_gpio_connect_out_signal(gpio_num: u8, signal_idx: u8, out_inv: bool, oen_inv: bool);
 
-    /// Enable Quad I/O pin functions
+    /// Enables Quad I/O pin functions.
     ///
     /// Sets the HD & WP pin functions for Quad I/O modes, based on the
     /// efuse SPI pin configuration.
     ///
     /// [`wp_gpio_num`]: u8 Number of the WP pin to reconfigure for quad I/O
-    /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig().
+    /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig()
     /// - If this parameter is 0, default SPI pins are used and wp_gpio_num parameter is ignored.
     /// - If this parameter is 1, default HSPI pins are used and wp_gpio_num parameter is ignored.
     /// - For other values, this parameter encodes the HD pin number and also the CLK pin number.
@@ -155,14 +155,14 @@ fn mspi_timing_psram_tuning() {
     // for now we just use the user provided setting (which might be default settings)
 }
 
-/// Set SPI0 FLASH and PSRAM module clock, din_num, din_mode and extra
+/// Sets SPI0 FLASH and PSRAM module clock, din_num, din_mode and extra
 /// dummy, according to the configuration got from timing tuning
 /// function (`calculate_best_flash_tuning_config`). iF control_spi1 ==
 /// 1, will also update SPI1 timing registers. Should only be set to 1 when
 /// do tuning.
 ///
-/// This function should always be called after `mspi_timing_flash_tuning`
-/// or `calculate_best_flash_tuning_config`
+/// Must always be called after `mspi_timing_flash_tuning` or
+/// `calculate_best_flash_tuning_config`
 #[ram]
 fn mspi_timing_enter_high_speed_mode(config: &PsramConfig) {
     super::mspi_timing_config_set_flash_clock(
@@ -231,13 +231,13 @@ fn psram_exec_cmd(
     is_write_erase_operation: bool,
 ) {
     unsafe extern "C" {
-        ///  Start a spi user command sequence
+        ///  Starts a SPI user command sequence.
         ///  [`spi_num`] spi port
         ///  [`rx_buf`] buffer pointer to receive data
         ///  [`rx_len`] receive data length in byte
         ///  [`cs_en_mask`] decide which cs to use, 0 for cs0, 1 for cs1
         ///  [`is_write_erase`] to indicate whether this is a write or erase
-        /// operation, since the CPU would check permission
+        /// operation, since the CPU would check permission.
         fn esp_rom_spi_cmd_start(
             spi_num: u32,
             rx_buf: *const u8,
@@ -352,7 +352,7 @@ fn psram_set_op_mode(mode: CommandMode) {
     }
 }
 
-/// Exit QPI mode
+/// Exits QPI mode.
 #[ram]
 fn psram_disable_qio_mode_spi1() {
     const PSRAM_EXIT_QMODE: u16 = 0xF5;
@@ -374,7 +374,7 @@ fn psram_disable_qio_mode_spi1() {
     );
 }
 
-/// Enter QPI mode
+/// Enters QPI mode.
 #[ram]
 fn psram_enable_qio_mode_spi1() {
     const PSRAM_ENTER_QMODE: u16 = 0x35;

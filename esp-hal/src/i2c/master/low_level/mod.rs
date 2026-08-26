@@ -141,7 +141,7 @@ pub(super) fn async_handler(info: &Info, state: &State) {
 }
 
 /// Sets the filter with a supplied threshold in clock cycles for which a
-/// pulse must be present to pass the filter
+/// pulse must be present to pass the filter.
 fn set_filter(
     register_block: &RegisterBlock,
     sda_threshold: Option<u8>,
@@ -265,7 +265,7 @@ pub struct Info {
 
     /// Pointer to the register block for this I2C instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with [`Self::register_block`] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// System peripheral marker.
@@ -296,7 +296,7 @@ impl Info {
         unsafe { &*self.register_block }
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts.
     pub(super) fn enable_listen(&self, interrupts: EnumSet<Event>, enable: bool) {
         let reg_block = self.regs();
 
@@ -499,7 +499,7 @@ impl Driver<'_> {
         }
     }
 
-    /// Resets the I2C controller (FIFO + FSM + command list)
+    /// Resets the I2C controller (FIFO + FSM + command list).
     // This function implements esp-idf's `s_i2c_hw_fsm_reset`
     // https://github.com/espressif/esp-idf/blob/27d68f57e6bdd3842cd263585c2c352698a9eda2/components/esp_driver_i2c/i2c_master.c#L115
     //
@@ -543,11 +543,10 @@ impl Driver<'_> {
         self.reset_command_list();
     }
 
-    /// Implements s_i2c_master_clear_bus
+    /// Implements s_i2c_master_clear_bus.
     ///
-    /// If a transaction ended incorrectly for some reason, the slave may drive
-    /// SDA indefinitely. This function forces the slave to release the
-    /// bus by sending 9 clock pulses.
+    /// If a transaction ended incorrectly for some reason, the slave may drive SDA
+    /// indefinitely. Forces the slave to release the bus by sending 9 clock pulses.
     fn clear_bus_blocking(&self, reset_fsm: bool) {
         let mut future = ClearBusFuture::new(*self, reset_fsm);
         let start = Instant::now();
@@ -666,11 +665,11 @@ impl Driver<'_> {
     }
 
     /// Configures the I2C peripheral for a write operation.
-    /// - `addr` is the address of the slave device.
-    /// - `bytes` is the data two be sent.
+    /// - `addr` is the address of the slave device
+    /// - `bytes` is the data to be sent
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation will end with a STOP condition.
+    /// - `stop` indicates whether the operation will end with a STOP condition
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_write<'a, I>(
         &self,
@@ -755,13 +754,13 @@ impl Driver<'_> {
     }
 
     /// Configures the I2C peripheral for a read operation.
-    /// - `addr` is the address of the slave device.
-    /// - `buffer` is the buffer to store the read data.
+    /// - `addr` is the address of the slave device
+    /// - `buffer` is the buffer to store the read data
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation will end with a STOP condition.
+    /// - `stop` indicates whether the operation will end with a STOP condition
     /// - `will_continue` indicates whether there is another read operation following this one and
-    ///   we should not nack the last byte.
+    ///   the last byte must not be nacked.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_read<'a, I>(
         &self,
@@ -945,7 +944,7 @@ impl Driver<'_> {
         Ok(true)
     }
 
-    /// Checks whether all I2C commands have completed execution.
+    /// Returns whether all I2C commands have completed execution.
     fn check_all_commands_done_blocking(&self, deadline: Option<Instant>) -> Result<(), Error> {
         // loop until commands are actually done
         while !self.all_commands_done(deadline)? {}
@@ -954,7 +953,7 @@ impl Driver<'_> {
         Ok(())
     }
 
-    /// Checks whether all I2C commands have completed execution.
+    /// Returns whether all I2C commands have completed execution.
     async fn check_all_commands_done(&self, deadline: Option<Instant>) -> Result<(), Error> {
         // loop until commands are actually done
         while !self.all_commands_done(deadline)? {
@@ -967,11 +966,10 @@ impl Driver<'_> {
 
     /// Checks for I2C transmission errors and handles them.
     ///
-    /// This function inspects specific I2C-related interrupts to detect errors
-    /// during communication, such as timeouts, failed acknowledgments, or
-    /// arbitration loss. If an error is detected, the function handles it
-    /// by resetting the I2C peripheral to clear the error condition and then
-    /// returns an appropriate error.
+    /// Inspects specific I2C-related interrupts to detect errors during
+    /// communication, such as timeouts, failed acknowledgments, or arbitration loss.
+    /// If an error is detected, resets the I2C peripheral to clear the error condition
+    /// and returns an appropriate error.
     fn check_errors(&self) -> Result<(), Error> {
         let r = self.regs().int_raw().read();
 
@@ -1010,13 +1008,10 @@ impl Driver<'_> {
 
     /// Updates the configuration of the I2C peripheral.
     ///
-    /// This function ensures that the configuration values, such as clock
-    /// settings, SDA/SCL filtering, timeouts, and other operational
-    /// parameters, which are configured in other functions, are properly
-    /// propagated to the I2C hardware. This step is necessary to synchronize
-    /// the software-configured settings with the peripheral's internal
-    /// registers, ensuring that the hardware behaves according to the
-    /// current configuration.
+    /// Ensures that configuration values, such as clock settings, SDA/SCL filtering,
+    /// timeouts, and other operational parameters configured in other methods, are
+    /// propagated to the I2C hardware. This step synchronizes the software-configured
+    /// settings with the peripheral's internal registers.
     fn update_registers(&self) {
         // Ensure that the configuration of the peripheral is correctly propagated
         // (only necessary for C2, C3, C6, H2 and S3 variant)
@@ -1074,14 +1069,14 @@ impl Driver<'_> {
     }
 
     /// Executes an I2C read operation.
-    /// - `addr` is the address of the slave device.
-    /// - `buffer` is the buffer to store the read data.
+    /// - `addr` is the address of the slave device
+    /// - `buffer` is the buffer to store the read data
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition.
+    /// - `stop` indicates whether the operation should end with a STOP condition
     /// - `will_continue` indicates whether there is another read operation following this one and
-    ///   we should not nack the last byte.
-    /// - `cmd_iterator` is an iterator over the command registers.
+    ///   the last byte must not be nacked.
+    /// - `cmd_iterator` is an iterator over the command registers
     fn start_read_operation(
         &self,
         address: I2cAddress,
@@ -1114,12 +1109,12 @@ impl Driver<'_> {
     }
 
     /// Executes an I2C write operation.
-    /// - `addr` is the address of the slave device.
-    /// - `bytes` is the data two be sent.
+    /// - `addr` is the address of the slave device
+    /// - `bytes` is the data to be sent
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition.
-    /// - `cmd_iterator` is an iterator over the command registers.
+    /// - `stop` indicates whether the operation should end with a STOP condition
+    /// - `cmd_iterator` is an iterator over the command registers
     fn write_operation_blocking(
         &self,
         address: I2cAddress,
@@ -1145,14 +1140,14 @@ impl Driver<'_> {
     }
 
     /// Executes an I2C read operation.
-    /// - `addr` is the address of the slave device.
-    /// - `buffer` is the buffer to store the read data.
+    /// - `addr` is the address of the slave device
+    /// - `buffer` is the buffer to store the read data
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition.
+    /// - `stop` indicates whether the operation should end with a STOP condition
     /// - `will_continue` indicates whether there is another read operation following this one and
-    ///   we should not nack the last byte.
-    /// - `cmd_iterator` is an iterator over the command registers.
+    ///   the last byte must not be nacked.
+    /// - `cmd_iterator` is an iterator over the command registers
     fn read_operation_blocking(
         &self,
         address: I2cAddress,
@@ -1180,12 +1175,12 @@ impl Driver<'_> {
     }
 
     /// Executes an async I2C write operation.
-    /// - `addr` is the address of the slave device.
-    /// - `bytes` is the data two be sent.
+    /// - `addr` is the address of the slave device
+    /// - `bytes` is the data to be sent
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition.
-    /// - `cmd_iterator` is an iterator over the command registers.
+    /// - `stop` indicates whether the operation should end with a STOP condition
+    /// - `cmd_iterator` is an iterator over the command registers
     async fn write_operation(
         &self,
         address: I2cAddress,
@@ -1210,14 +1205,14 @@ impl Driver<'_> {
     }
 
     /// Executes an async I2C read operation.
-    /// - `addr` is the address of the slave device.
-    /// - `buffer` is the buffer to store the read data.
+    /// - `addr` is the address of the slave device
+    /// - `buffer` is the buffer to store the read data
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition.
+    /// - `stop` indicates whether the operation should end with a STOP condition
     /// - `will_continue` indicates whether there is another read operation following this one and
-    ///   we should not nack the last byte.
-    /// - `cmd_iterator` is an iterator over the command registers.
+    ///   the last byte must not be nacked.
+    /// - `cmd_iterator` is an iterator over the command registers
     async fn read_operation(
         &self,
         address: I2cAddress,
@@ -1870,7 +1865,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 
 /// Adds a command to the I2C command sequence.
 ///
-/// Make sure the first command after a FSM reset is a START, otherwise
+/// The first command after a FSM reset must be a START, otherwise
 /// the hardware will hang with no timeouts.
 fn add_cmd<'a, I>(cmd_iterator: &mut I, command: Command) -> Result<(), Error>
 where

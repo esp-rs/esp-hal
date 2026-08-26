@@ -1,7 +1,7 @@
 //! Placeholder pins/signals.
 //!
-//! These are useful to pass them into peripheral drivers where you don't want
-//! an actual pin but one is required.
+//! These are useful to pass into peripheral drivers when a pin is required but
+//! no actual pin should be used.
 // This module also contains peripheral signal impls for `Level` to avoid
 // polluting the main module.
 
@@ -9,7 +9,7 @@ use super::*;
 
 /// Placeholder pin, used when no pin is required when using a peripheral.
 ///
-/// When used as a peripheral signal, `NoPin` is equivalent to [`Level::Low`].
+/// When used as a peripheral signal, `NoPin` is equivalent to [`Level::Low`]
 #[derive(Default, Clone, Copy)]
 pub struct NoPin;
 

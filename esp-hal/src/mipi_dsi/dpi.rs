@@ -25,9 +25,9 @@ use crate::{
 
 /// Channel index used by the static VDMA block-done ISR.
 ///
-/// Set before the channel is started; read by the ISR which cannot capture
-/// runtime state.  A single MIPI-DSI instance is the only VDMA user, so
-/// this value is stable for the lifetime of `DsiDpi`.
+/// Must be set before the channel is started. The ISR reads this value and cannot
+/// capture runtime state. A single MIPI-DSI instance is the only VDMA user, so
+/// this value is stable for the lifetime of `DsiDpi`
 static VDMA_ISR_CHANNEL: atomic::AtomicU8 = atomic::AtomicU8::new(0);
 
 const MAX_FBS: usize = 3;
@@ -84,7 +84,7 @@ impl ColorFormat {
         }
     }
 
-    /// `dpi_color_coding` register value (DSI host).
+    /// `dpi_color_coding` register value (DSI host)
     fn host_color_coding(self) -> u8 {
         match self {
             Self::Rgb888 => 5, // 24-bit
@@ -433,13 +433,13 @@ impl<'d> DsiDpi<'d> {
     /// Returns a mutable slice to the back (not-currently-displayed) frame buffer.
     ///
     /// With a single frame buffer this is the same buffer the DMA may be
-    /// reading — the caller is responsible for synchronisation in that case.
+    /// reading — the caller is responsible for synchronization in that case.
     pub fn framebuffer_mut(&mut self) -> &mut [u8] {
         let back = (self.current_fb + 1) % self.num_fbs;
         unsafe { core::slice::from_raw_parts_mut(self.fb_ptrs[back], self.fb_size) }
     }
 
-    /// Flip the back buffer to the display.
+    /// Flips the back buffer to the display.
     ///
     /// Flushes the rendered back buffer from CPU cache to PSRAM, then updates
     /// the source address in every LLI so the DMA switches to the new pixels
@@ -472,11 +472,11 @@ impl<'d> DsiDpi<'d> {
         self.current_fb = back;
     }
 
-    /// Block until the DSI bridge signals the start of the next vertical blank.
+    /// Blocks until the DSI bridge signals the start of the next vertical blank.
     ///
-    /// Use this to pace rendering to the display refresh rate.  Any vsync event
+    /// Use this to pace rendering to the display refresh rate. Any vsync event
     /// that is already pending (i.e. fired while the CPU was busy rendering)
-    /// will be returned immediately.
+    /// returns immediately.
     pub fn wait_for_vsync(&mut self) {
         let bridge = MIPI_DSI_BRIDGE::regs();
         while !bridge.int_raw().read().vsync().bit_is_set() {}

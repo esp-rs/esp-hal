@@ -51,7 +51,7 @@ impl I2sClockDividers {
 ///
 /// All the per-instance data (register block pointer, system peripheral marker and the
 /// GPIO matrix signals) is stored here, so that the driver can operate on a single
-/// type-erased `&'static Info` regardless of which concrete I2S peripheral is used.
+/// type-erased `&'static Info` regardless of which concrete I2S peripheral is used
 #[doc(hidden)]
 #[non_exhaustive]
 pub struct Info {

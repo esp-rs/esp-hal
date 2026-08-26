@@ -17,7 +17,7 @@ use core::{future::poll_fn, marker::PhantomData, ptr::NonNull, task::Context};
 use embassy_sync::waitqueue::WakerRegistration;
 use esp_sync::NonReentrantMutex;
 
-/// Queue driver operations.
+/// Queues driver operations.
 ///
 /// Functions in this VTable are provided by drivers that consume work items.
 /// These functions may be called both in the context of the queue frontends and drivers.
@@ -28,25 +28,25 @@ pub(crate) struct VTable<T: Sync + Send> {
     /// accepted. If there is no driver currently processing the queue, this function will
     /// return None to prevent removing the work item from the queue.
     ///
-    /// This function should be as short as possible.
+    /// Should be as short as possible.
     pub(crate) post: fn(NonNull<()>, &mut T) -> Option<Poll>,
 
     /// Polls the status of the current work item.
     ///
     /// The work queue ensures that the item passed here has been first passed to the driver by
-    /// `post`.
+    /// `post`
     ///
-    /// This function should be as short as possible.
+    /// Should be as short as possible.
     pub(crate) poll: fn(NonNull<()>, &mut T) -> Poll,
 
     /// Attempts to abort processing a work item.
     ///
-    /// This function should be as short as possible.
+    /// Should be as short as possible.
     pub(crate) cancel: fn(NonNull<()>, &mut T),
 
     /// Called when the driver may be stopped.
     ///
-    /// This function should be as short as possible.
+    /// Should be as short as possible.
     pub(crate) stop: fn(NonNull<()>),
 }
 
@@ -112,7 +112,7 @@ impl<T: Sync + Send> Inner<T> {
 
     /// Runs one processing iteration.
     ///
-    /// This function enqueues a new work item or polls the status of the currently processed one.
+    /// Enqueues a new work item or polls the status of the currently processed one.
     /// Returns whether the function should be re-called by the caller.
     fn process(&mut self) -> bool {
         if let Some(mut current) = self.current {
@@ -142,7 +142,7 @@ impl<T: Sync + Send> Inner<T> {
 
     /// Retrieves the next work queue item and sends it to the driver.
     ///
-    /// Returns true if the queue needs to be polled again.
+    /// Returns whether the queue needs to be polled again.
     // Note: even if the queue itself may be implemented lock-free, dequeuing and posting to the
     // driver must be done atomically to ensure that the queue can be processed fully by any of
     // the frontends polling it.
@@ -202,10 +202,10 @@ impl<T: Sync + Send> Inner<T> {
     /// If the work item is currently being processed, this function notifies the driver. Otherwise,
     /// it tries to remove the pointer from the work queue.
     ///
-    /// The function returns true when the item was immediately cancelled.
+    /// Returns whether the item was immediately cancelled.
     ///
-    /// This function is not `unsafe` because it only dereferences `work_item` if the function has
-    /// determined that the item belongs to this queue.
+    /// Not `unsafe` because it only dereferences `work_item` if the item belongs
+    /// to this queue.
     fn cancel(&mut self, mut work_item: NonNull<WorkItem<T>>) -> bool {
         if self.current == Some(work_item) {
             // Cancelling an in-progress item is more complicated than plucking it from the
@@ -241,11 +241,12 @@ impl<T: Sync + Send> Inner<T> {
 
     /// Removes the item from the queue.
     ///
-    /// Returns `true` if the work item was successfully removed, `false` if the work item was not
-    /// found in the queue.
+    /// Returns whether the work item was successfully removed.
     ///
-    /// This function is not `unsafe` because it does not dereference `ptr`, so it does not matter
-    /// that `ptr` may belong to a different work queue.
+    /// Returns `false` if the work item was not found in the queue.
+    ///
+    /// Not `unsafe` because it does not dereference `ptr`, so it does not matter
+    /// that `ptr` may belong to a different work queue
     fn remove(&mut self, ptr: NonNull<WorkItem<T>>) -> bool {
         // Walk the queue to find `ptr`.
         let mut prev = None;
@@ -298,7 +299,7 @@ impl<T: Sync + Send> Inner<T> {
     /// Decreases the suspend counter.
     ///
     /// When it reaches 0, this function wakes async tasks that poll the queue. They need to be
-    /// waken to ensure that their items don't end up stuck. Blocking pollers will eventually end up
+    /// waken to ensure that their items do not end up stuck. Blocking pollers eventually end up
     /// looping when their turn comes.
     fn resume(&mut self) {
         self.suspend_count -= 1;
@@ -397,7 +398,7 @@ impl<T: Sync + Send> WorkQueue<T> {
 
     /// Polls the queue once.
     ///
-    /// Returns true if the queue needs to be polled again.
+    /// Returns whether the queue needs to be polled again.
     #[allow(unused)]
     pub fn process(&self) -> bool {
         self.inner.with(|inner| inner.process())
@@ -405,7 +406,7 @@ impl<T: Sync + Send> WorkQueue<T> {
 
     /// Polls the queue once and returns the status of the given work item.
     ///
-    /// ## Safety
+    /// # Safety
     ///
     /// The caller must ensure that `item` belongs to the polled queue. An item belongs to the
     /// **last queue it was enqueued in**, even if the item is no longer in the queue's linked
@@ -424,8 +425,8 @@ impl<T: Sync + Send> WorkQueue<T> {
 
     /// Schedules the work item to be cancelled.
     ///
-    /// The function returns true when the item was immediately cancelled. If the function returns
-    /// `false`, the item will need to be polled until its status becomes [`Poll::Ready`].
+    /// Returns whether the item was immediately cancelled. If it returns
+    /// `false`, the item will need to be polled until its status becomes [`Poll::Ready`]
     ///
     /// The work item should not be assumed to be immediately cancelled. Polling its handle
     /// is necessary to ensure it is no longer being processed by the underlying driver.
@@ -468,7 +469,7 @@ impl<T: Sync + Send + Clone> Clone for WorkItem<T> {
 impl<T: Sync + Send> WorkItem<T> {
     /// Completes the work item.
     ///
-    /// This function is intended to be called from the underlying drivers.
+    /// Intended to be called from the underlying drivers.
     pub fn complete(&mut self, status: Status) {
         self.status = Poll::Ready(status);
         self.waker.wake();
@@ -476,7 +477,7 @@ impl<T: Sync + Send> WorkItem<T> {
 
     /// Prepares a work item to be enqueued.
     ///
-    /// # Safety:
+    /// # Safety
     ///
     /// The caller must ensure the reference is not used again while the pointer returned by this
     /// function is in use.
@@ -513,9 +514,9 @@ impl Poll {
     }
 }
 
-/// A reference to a posted [`WorkItem`].
+/// A reference to a posted [`WorkItem`]
 ///
-/// This struct ensures that the work item is valid until the item is processed or is removed from
+/// Ensures that the work item is valid until the item is processed or is removed from
 /// the work queue.
 ///
 /// Dropping the handle cancels the work item, but may block for some time if the work item is
@@ -555,7 +556,7 @@ impl<'t, T: Sync + Send> Handle<'t, T> {
 
     /// Polls the work item to completion, by busy-looping.
     ///
-    /// This function returns immediately if `poll` returns `true`.
+    /// Returns immediately if `poll` returns `true`.
     #[inline]
     pub fn wait_blocking(mut self) -> Status {
         loop {
@@ -738,7 +739,7 @@ impl<T: Sync + Send> WorkQueueFrontend<T> {
         queue.post_work(&mut self.work_item)
     }
 
-    /// Creates a Handle for a work item that does not need to be put into the queue.
+    /// Creates a new [`Handle`] for a work item that does not need to be put into the queue.
     #[cfg(sha_driver_supported)]
     pub fn post_completed<'t>(&'t mut self, queue: &'t WorkQueue<T>) -> Handle<'t, T> {
         Handle::from_completed_work_item(queue, &mut self.work_item)

@@ -76,7 +76,7 @@ pub(crate) fn init(_config: &ClockConfig) {
 /// SOC Reset Reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ///
     /// In ESP-IDF this value (0x01) can *also* be `ChipBrownOut` or
     /// `ChipSuperWdt`, however that is not really compatible with Rust-style
@@ -98,7 +98,7 @@ pub enum SocResetReason {
     Cpu0Sw        = 0x0C,
     /// RTC watch dog resets CPU 0
     Cpu0RtcWdt    = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,
@@ -119,7 +119,7 @@ pub enum SocResetReason {
 }
 
 bitfield::bitfield! {
-    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_DIG_POWER_REG` registers.
+    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_DIG_POWER_REG` registers
     #[derive(Clone, Copy, Default)]
     pub struct HpDigPower(u32);
 
@@ -131,7 +131,7 @@ bitfield::bitfield! {
 }
 
 bitfield::bitfield! {
-    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_HP_CK_POWER_REG` registers.
+    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_HP_CK_POWER_REG` registers
     #[derive(Clone, Copy, Default)]
     pub struct HpClkPower(u32);
 
@@ -139,7 +139,7 @@ bitfield::bitfield! {
 }
 
 bitfield::bitfield! {
-    /// Representation of `PMU_{HP_ACTIVE,HP_SLEEP,LP_SLEEP}_XTAL_REG` register.
+    /// Representation of `PMU_{HP_ACTIVE,HP_SLEEP,LP_SLEEP}_XTAL_REG` register
     #[derive(Clone, Copy, Default)]
     pub struct XtalPower(u32);
 
@@ -155,7 +155,7 @@ pub struct HpSysPower {
 }
 
 bitfield::bitfield! {
-    /// Representation of `PMU_{HP,LP}_SLEEP_LP_DIG_POWER_REG`.
+    /// Representation of `PMU_{HP,LP}_SLEEP_LP_DIG_POWER_REG`
     #[derive(Clone, Copy, Default)]
     pub struct LpDigPower(u32);
 
@@ -166,7 +166,7 @@ bitfield::bitfield! {
 }
 
 bitfield::bitfield! {
-    /// Representation of `PMU_{HP,LP}_SLEEP_LP_CK_POWER_REG`.
+    /// Representation of `PMU_{HP,LP}_SLEEP_LP_CK_POWER_REG`
     #[derive(Clone, Copy, Default)]
     pub struct LpClkPower(u32);
 
@@ -183,7 +183,7 @@ pub struct LpSysPower {
 }
 
 bitfield::bitfield! {
-    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_HP_SYS_CNTL_REG` register.
+    /// Representation of `PMU_HP_{ACTIVE,SLEEP}_HP_SYS_CNTL_REG` register
     #[derive(Clone, Copy, Default)]
     pub struct HpSysCntlReg(u32);
 

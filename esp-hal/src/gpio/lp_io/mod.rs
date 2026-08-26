@@ -218,7 +218,7 @@ mod ulp_tokens {
         ///
         /// # Errors
         ///
-        /// Returns the driver unchanged if the pad is not the low-power pin numbered `PIN`.
+        /// The original driver when the pad is not the low-power pin numbered `PIN`.
         #[instability::unstable]
         pub fn into_lp<const PIN: u8>(self) -> Result<LowPowerInput<'d, PIN>, Self> {
             if lp_number(self.pin.pin.number()) != Some(PIN) {
@@ -237,7 +237,7 @@ mod ulp_tokens {
         ///
         /// # Errors
         ///
-        /// Returns the driver unchanged if the pad is not the low-power pin numbered `PIN`.
+        /// The original driver when the pad is not the low-power pin numbered `PIN`.
         #[instability::unstable]
         pub fn into_lp<const PIN: u8>(self) -> Result<LowPowerOutput<'d, PIN>, Self> {
             if lp_number(self.pin.pin.number()) != Some(PIN) {
@@ -254,7 +254,7 @@ mod ulp_tokens {
         ///
         /// # Errors
         ///
-        /// Returns the driver unchanged if the pad is not the low-power pin numbered `PIN`.
+        /// The original driver when the pad is not the low-power pin numbered `PIN`.
         #[instability::unstable]
         pub fn into_open_drain_lp<const PIN: u8>(
             self,

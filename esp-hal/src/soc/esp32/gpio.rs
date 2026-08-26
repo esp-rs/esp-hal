@@ -3,8 +3,8 @@
 //! ## Overview
 //!
 //! The `GPIO` module provides functions and configurations for controlling the
-//! `General Purpose Input/Output` pins on the `ESP32` chip. It allows you to
-//! configure pins as inputs or outputs, set their state and read their state.
+//! `General Purpose Input/Output` pins on the `ESP32` chip. It configures pins
+//! as inputs or outputs, sets their state, and reads their state.
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
@@ -26,7 +26,7 @@
 //!
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
-//! `gpio` peripheral to access the appropriate registers.
+//! `gpio` peripheral to access the appropriate registers
 
 #[rustfmt::skip]
 macro_rules! touch_out_reg {

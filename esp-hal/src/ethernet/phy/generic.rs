@@ -20,17 +20,17 @@ const RESET_POLL_LIMIT: u32 = 500_000; // us
 /// responding PHY address is adopted.
 #[derive(Clone, Copy, Debug)]
 pub struct GenericPhy {
-    /// `Some(addr)` for a fixed address; `None` until auto-discovery runs.
+    /// `Some(addr)` for a fixed address; `None` until auto-discovery runs
     addr: Option<u8>,
 }
 
 impl GenericPhy {
-    /// Creates a driver instance for the given MDIO bus address.
+    /// Creates a new driver instance for the given MDIO bus address.
     pub const fn new(addr: u8) -> Self {
         Self { addr: Some(addr) }
     }
 
-    /// Creates a driver instance that discovers the PHY address automatically
+    /// Creates a new driver instance that discovers the PHY address automatically
     /// by scanning the MDIO bus during [`Phy::init`].
     ///
     /// Returns [`PhyError::NotFound`] from `init` if no PHY responds.

@@ -69,17 +69,17 @@ impl<'a> ScopedDmaTxBuf<'a> {
         self.configure(burst, len)
     }
 
-    /// Consume the buf, returning the descriptors and buffer.
+    /// Consumes the buf, returning the descriptors and buffer.
     pub fn split(self) -> (DmaAlignedMut<'a, [DmaDescriptor]>, DmaAlignedMut<'a, [u8]>) {
         (self.descriptors.descriptors, self.buffer)
     }
 
-    /// Returns the size of the underlying buffer
+    /// Returns the size of the underlying buffer.
     pub fn capacity(&self) -> usize {
         self.buffer.len()
     }
 
-    /// Return the number of bytes that would be transmitted by this buf.
+    /// Returns the number of bytes that would be transmitted by this buf.
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.descriptors
@@ -108,7 +108,7 @@ impl<'a> ScopedDmaTxBuf<'a> {
         Ok(())
     }
 
-    /// Reset the descriptors to only transmit `len` amount of bytes from this
+    /// Resets the descriptors to only transmit `len` amount of bytes from this
     /// buf.
     ///
     /// The number of bytes in data must be less than or equal to the buffer
@@ -127,12 +127,12 @@ impl<'a> ScopedDmaTxBuf<'a> {
         self.as_mut_slice()[..data.len()].copy_from_slice(data);
     }
 
-    /// Returns the buf as a mutable slice than can be written.
+    /// Returns the buf as a mutable slice that can be written.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         &mut self.buffer
     }
 
-    /// Returns the buf as a slice than can be read.
+    /// Returns the buf as a slice that can be read.
     pub fn as_slice(&self) -> &[u8] {
         &self.buffer
     }
@@ -239,12 +239,12 @@ impl<'a> ScopedDmaRxBuf<'a> {
         self.configure(burst, len)
     }
 
-    /// Consume the buf, returning the descriptors and buffer.
+    /// Consumes the buf, returning the descriptors and buffer.
     pub fn split(self) -> (DmaAlignedMut<'a, [DmaDescriptor]>, DmaAlignedMut<'a, [u8]>) {
         (self.descriptors.descriptors, self.buffer)
     }
 
-    /// Returns the size of the underlying buffer
+    /// Returns the size of the underlying buffer.
     pub fn capacity(&self) -> usize {
         self.buffer.len()
     }
@@ -271,7 +271,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
         )
     }
 
-    /// Reset the descriptors to only receive `len` amount of bytes into this
+    /// Resets the descriptors to only receive `len` amount of bytes into this
     /// buf.
     ///
     /// The number of bytes in data must be less than or equal to the buffer
@@ -280,17 +280,17 @@ impl<'a> ScopedDmaRxBuf<'a> {
         unwrap!(self.set_length_fallible(len, self.burst));
     }
 
-    /// Returns the entire underlying buffer as a slice than can be read.
+    /// Returns the entire underlying buffer as a slice that can be read.
     pub fn as_slice(&self) -> &[u8] {
         &self.buffer
     }
 
-    /// Returns the entire underlying buffer as a slice than can be written.
+    /// Returns the entire underlying buffer as a slice that can be written.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         &mut self.buffer
     }
 
-    /// Return the number of bytes that was received by this buf.
+    /// Returns the number of bytes that was received by this buf.
     pub fn number_of_received_bytes(&self) -> usize {
         self.sync_received_from_dma();
         self.descriptors
@@ -302,9 +302,9 @@ impl<'a> ScopedDmaRxBuf<'a> {
     /// Reads the received data into the provided `buf`.
     ///
     /// If `buf.len()` is less than the amount of received data then only the
-    /// first `buf.len()` bytes of received data is written into `buf`.
+    /// first `buf.len()` bytes of received data is written into `buf`
     ///
-    /// Returns the number of bytes in written to `buf`.
+    /// Returns the number of bytes written to `buf`.
     pub fn read_received_data(&self, mut buf: &mut [u8]) -> usize {
         // Note that due to an ESP32 quirk, the last received descriptor may not get
         // updated.
@@ -333,7 +333,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
         })
     }
 
-    /// Read DMA-written RX data from memory on cached SoCs.
+    /// Reads DMA-written RX data from memory on cached SoCs.
     fn sync_received_from_dma(&self) {
         #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
         {

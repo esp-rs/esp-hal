@@ -1,4 +1,4 @@
-//! I2S clock programming via `HP_SYS_CLKRST`.
+//! I2S clock programming via `HP_SYS_CLKRST`
 
 use super::master::private::I2sClockDividers;
 use crate::{peripherals::HP_SYS_CLKRST, system::Peripheral};

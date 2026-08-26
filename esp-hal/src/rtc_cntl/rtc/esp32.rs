@@ -15,7 +15,7 @@ pub(crate) fn init(_config: &ClockConfig) {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 /// SOC Reset Reason.
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ChipPowerOn   = 0x01,
     /// Software resets the digital core
     CoreSw        = 0x03,
@@ -46,7 +46,7 @@ pub enum SocResetReason {
     Cpu0RtcWdt    = 0x0D,
     /// CPU0 resets CPU1 by DPORT_APPCPU_RESETTING
     Cpu1Cpu0      = 0x0E,
-    /// Reset when the VDD voltage is not stable
+    /// Resets when the VDD voltage is not stable.
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,

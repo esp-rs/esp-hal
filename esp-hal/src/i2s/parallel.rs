@@ -11,12 +11,12 @@
 //! ## Notes
 //!
 //! Data output is interleaved:
-//! - 8bit: [A, B, C, D] is output as [C, D, A, B]  (i.e., swapped as 16bit words)
-//! - 16bit: [A, B, C, D] is output as [B, A, D, C] (i.e., 16bit words are swapped)
+//! - 8-bit: [A, B, C, D] is output as [C, D, A, B]  (i.e., swapped as 16-bit words)
+//! - 16-bit: [A, B, C, D] is output as [B, A, D, C] (i.e., 16-bit words are swapped)
 #![cfg_attr(esp32, doc = "")]
 #![cfg_attr(
     esp32,
-    doc = "I2S0 does not support true 8bit parallel output, so if you want to do 8bit"
+    doc = "I2S0 does not support true 8-bit parallel output, so if you want to do 8-bit"
 )]
 #![cfg_attr(
     esp32,
@@ -284,7 +284,7 @@ impl<'d> I2sParallel<'d, Blocking> {
 }
 
 impl<'d> I2sParallel<'d, Async> {
-    /// Converts the I2S instance into async mode.
+    /// Converts the I2S instance into blocking mode.
     pub fn into_blocking(self) -> I2sParallel<'d, Blocking> {
         I2sParallel {
             instance: self.instance,
@@ -298,7 +298,7 @@ impl<'d, Dm> I2sParallel<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Write data to the I2S peripheral
+    /// Writes data to the I2S peripheral.
     pub fn send<BUF: DmaTxBuffer>(
         mut self,
         mut data: BUF,
@@ -337,12 +337,12 @@ where
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.i2s.instance.is_tx_done()
     }
 
-    /// Wait for the transfer to finish
+    /// Waits for the transfer to finish.
     pub fn wait(mut self) -> (I2sParallel<'d, Dm>, BUF::Final) {
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
@@ -361,7 +361,7 @@ impl<BUF> I2sParallelTransfer<'_, BUF, Async>
 where
     BUF: DmaTxBuffer,
 {
-    /// Wait for the transfer to finish
+    /// Waits for the transfer to finish.
     pub async fn wait_for_done(&mut self) -> Result<(), DmaError> {
         DmaTxFuture::new(&mut self.i2s.tx_channel).await
     }
@@ -768,7 +768,7 @@ for_each_i2s! {
 }
 
 impl<'d> I2sParallel<'d, crate::Blocking> {
-    /// Create a new I2S Parallel Interface
+    /// Creates a new I2S Parallel Interface.
     pub fn new<I: Instance + 'd>(
         i2s: I,
         channel: impl I2sParallelDmaChannel<'d, I>,

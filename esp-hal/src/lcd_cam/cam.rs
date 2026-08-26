@@ -76,11 +76,11 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EofMode {
-    /// Generate GDMA SUC EOF by data byte length.
+    /// Generates GDMA SUC EOF by data byte length.
     ///
     /// When the length of received data reaches this value + 1, GDMA in_suc_eof is triggered.
     ByteLen(u16),
-    /// Generate GDMA SUC EOF by the vsync signal
+    /// Generates GDMA SUC EOF by the vsync signal.
     VsyncSignal,
 }
 
@@ -112,7 +112,7 @@ pub enum VsyncFilterThreshold {
 pub enum VhdeMode {
     /// VSYNC + HSYNC mode is selected, in this mode,
     /// the signals of VSYNC, HSYNC and DE are used to control the data.
-    /// For this case, users need to wire the three signal lines.
+    /// For this case, the VSYNC, HSYNC, and DE signal lines must be wired.
     VsyncHsync,
 
     /// DE mode is selected, the signals of VSYNC and
@@ -180,8 +180,7 @@ impl<'d> Camera<'d> {
     ///
     /// # Errors
     ///
-    /// [`ConfigError::Clock`] will be returned if the frequency passed in
-    /// `Config` is too low.
+    /// [`ConfigError::Clock`] when the frequency passed in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let sources = property!("clock_tree.lcd_cam.cam_clock.sclk");
         let (i, divider) = calculate_clkm(
@@ -457,7 +456,7 @@ pub struct CameraTransfer<'d, BUF: DmaRxBuffer> {
 }
 
 impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         // This peripheral doesn't really "complete". As long the camera (or anything
         // pretending to be :D) sends data, it will receive it and pass it to the DMA.
@@ -492,9 +491,9 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
     ///
-    /// Note: The camera doesn't really "finish" its transfer, so what you're
-    /// really waiting for here is a DMA Error. You typically just want to
-    /// call [Self::stop] once you have the data you need.
+    /// The camera does not really "finish" its transfer, so this typically
+    /// waits for a DMA error. Call [`Self::stop`] once the needed data is
+    /// available.
     pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d>, BUF::Final) {
         while !self.is_done() {}
 
@@ -572,7 +571,7 @@ pub struct Config {
     /// The pixel clock frequency for the camera interface.
     frequency: Rate,
 
-    /// Enable 16 bit mode (instead of 8 bit).
+    /// Enables 16 bit mode (instead of 8 bit).
     enable_2byte_mode: bool,
 
     /// The byte order for the camera data.
@@ -596,16 +595,16 @@ pub struct Config {
     /// This is a 7 bit value which means a max of 128 lines.
     line_interrupt: Option<u8>,
 
-    /// Invert VSYNC signal, valid in high level.
+    /// Inverts VSYNC signal, valid in high level.
     invert_vsync: bool,
 
-    /// Invert HSYNC signal, valid in high level.
+    /// Inverts HSYNC signal, valid in high level.
     invert_hsync: bool,
 
-    /// Invert H_ENABLE signal (Also known as "Data Enable"), valid in high level.
+    /// Inverts H_ENABLE signal (Also known as "Data Enable"), valid in high level.
     invert_h_enable: bool,
 
-    /// Invert PCLK signal.
+    /// Inverts PCLK signal.
     invert_pixel_clock: bool,
 }
 

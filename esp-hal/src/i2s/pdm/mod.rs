@@ -142,7 +142,7 @@ impl PdmSlotMask {
     /// Line 3, right slot.
     pub const LINE3_RIGHT: Self = Self(1 << 6);
 
-    /// Create a mask from raw slot bits.
+    /// Creates a new mask from raw slot bits.
     pub const fn from_bits(bits: u16) -> Self {
         Self(bits)
     }
@@ -176,7 +176,7 @@ pub enum PdmDownsampleRate {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PdmSigScaling {
-    /// Divide input by 2.
+    /// Divides input by 2.
     Div2,
     /// Multiply input by 1.
     #[default]
@@ -217,9 +217,9 @@ pub enum PdmTxLineMode {
 pub struct PdmTxClockConfig {
     /// Target PCM sample rate.
     pub sample_rate: Rate,
-    /// Upsampling factor numerator (`fp`).
+    /// Upsampling factor numerator (`fp`)
     pub up_sample_fp: u32,
-    /// Upsampling factor denominator (`fs`).
+    /// Upsampling factor denominator (`fs`)
     pub up_sample_fs: u32,
     /// Bit clock divider.
     pub bclk_div: u32,
@@ -247,7 +247,7 @@ pub struct PdmTxSlotConfig {
     #[cfg(not(i2s_version = "1"))]
     /// Output line routing mode.
     pub line_mode: PdmTxLineMode,
-    /// Enable the TX high-pass filter.
+    /// Enables the TX high-pass filter.
     pub hp_en: bool,
     /// High-pass filter cut-off frequency in Hz.
     pub hp_cut_off_freq_hz: f32,
@@ -339,7 +339,7 @@ pub struct PdmRxSlotConfig {
     pub data_format: PdmDataFormat,
 
     #[cfg(i2s_supports_pdm_rx_hp_filter)]
-    /// Enable the RX high-pass filter.
+    /// Enables the RX high-pass filter.
     pub hp_en: bool,
 
     #[cfg(i2s_supports_pdm_rx_hp_filter)]
@@ -389,7 +389,7 @@ pub struct PdmTxConfig {
 }
 
 impl PdmTxConfig {
-    /// Codec-line defaults (`I2S_PDM_TX_*_DEFAULT_CONFIG`).
+    /// Codec-line defaults (`I2S_PDM_TX_*_DEFAULT_CONFIG`)
     pub fn new_codec_default(sample_rate: Rate, mode: PdmSlotMode) -> Self {
         Self {
             clock: PdmTxClockConfig::codec_default(sample_rate),
@@ -405,7 +405,7 @@ impl PdmTxConfig {
         }
     }
 
-    /// DAC-line defaults (`I2S_PDM_TX_*_DAC_DEFAULT_CONFIG`, HW v2+).
+    /// DAC-line defaults (`I2S_PDM_TX_*_DAC_DEFAULT_CONFIG`, HW v2+)
     #[cfg(not(i2s_version = "1"))]
     pub fn new_dac_default(sample_rate: Rate, mode: PdmSlotMode) -> Self {
         Self {
@@ -414,7 +414,7 @@ impl PdmTxConfig {
         }
     }
 
-    /// Validate TX configuration against hardware capabilities.
+    /// Validates TX configuration against hardware capabilities.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.slot.data_format == PdmDataFormat::Pcm && !info.pcm2pdm {
             return Err(PdmError::PcmFormatUnsupported);
@@ -468,7 +468,7 @@ impl PdmRxConfig {
         }
     }
 
-    /// Validate RX configuration against hardware capabilities.
+    /// Validates RX configuration against hardware capabilities.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.slot.data_format == PdmDataFormat::Pcm && !info.pdm2pcm {
             return Err(PdmError::PcmFormatUnsupported);
@@ -487,7 +487,7 @@ fn default_rx_slot(mode: PdmSlotMode) -> PdmRxSlotConfig {
     }
 }
 
-/// PDM mode configuration (simplex TX and/or RX).
+/// PDM mode configuration (simplex TX, RX, or both).
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PdmConfig {
@@ -516,7 +516,7 @@ impl PdmConfig {
         }
     }
 
-    /// Validate that exactly one direction is configured and that the settings
+    /// Validates that exactly one direction is configured and that the settings
     /// are valid for the given I2S instance.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.tx.is_none() && self.rx.is_none() {

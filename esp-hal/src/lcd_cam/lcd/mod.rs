@@ -25,7 +25,7 @@ pub mod dpi;
 pub mod i8080;
 
 pub(super) struct Inner<'d> {
-    /// The `LCD_CAM` peripheral reference for managing the LCD functionality.
+    /// The `LCD_CAM` peripheral reference for managing the LCD functionality
     pub lcd_cam: LCD_CAM<'d>,
 
     pub _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,

@@ -40,7 +40,7 @@ fn calibrate_ocode() {}
 
 fn set_rtc_dig_dbias() {}
 
-/// Perform clock control related initialization
+/// Performs clock control related initialization.
 fn clock_control_init() {
     let extmem = EXTMEM::regs();
     let spi_mem_0 = SPI0::regs();
@@ -61,7 +61,7 @@ fn clock_control_init() {
     spi_mem_1.clock_gate().modify(|_, w| w.clk_en().clear_bit());
 }
 
-/// Perform power control related initialization
+/// Performs power control related initialization.
 fn power_control_init() {
     let rtc_cntl = LPWR::regs();
     let system = SYSTEM::regs();
@@ -126,7 +126,7 @@ fn power_control_init() {
     });
 }
 
-/// Configure whether certain peripherals are powered down in deep sleep
+/// Configures whether certain peripherals are powered down in deep sleep.
 fn rtc_sleep_pu() {
     LPWR::regs()
         .dig_pwc()
@@ -154,7 +154,7 @@ fn rtc_sleep_pu() {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 /// SOC Reset Reason.
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ChipPowerOn   = 0x01,
     /// Software resets the digital core by RTC_CNTL_SW_SYS_RST
     CoreSw        = 0x03,
@@ -170,7 +170,7 @@ pub enum SocResetReason {
     Cpu0Sw        = 0x0C,
     /// RTC watch dog resets CPU 0
     Cpu0RtcWdt    = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,

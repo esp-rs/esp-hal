@@ -10,9 +10,9 @@
 //! together. The low-power paths are `ext0`, `ext1` and the per-pin low-power path. These paths
 //! continue to work when the peripheral is powered down. Deep sleep always powers the peripheral
 //! down, and light sleep powers it down on request, so such a sleep needs a low-power path. Only
-//! low-power pads have one, and a pin must request it with [`WakeupConfig`].
+//! low-power pads have one, and a pin must request it with [`WakeupConfig`]
 //!
-//! The [`path`] module holds the low-power paths of the chip, and divides the pins between them.
+//! The [`path`] module holds the low-power paths of the chip, and divides the pins between them
 //! This module collects the pins and requests the power domains that they need.
 //!
 //! This module also isolates the digital pads before a deep sleep, because it holds the pad tables.
@@ -68,7 +68,7 @@ use crate::{
 /// [`Pull::None`][crate::gpio::Pull::None] and no external resistor therefore floats during the
 /// sleep, and a floating pad wakes the chip immediately and every time.
 ///
-/// Give a level-triggered wake pin a pull against the level that wakes the chip, or an external
+/// A level-triggered wake pin needs a pull against the level that wakes the chip, or an external
 /// resistor. For a pin that wakes the chip on a low level, use an external pull-up.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -269,7 +269,7 @@ fn low_power_numbers() -> impl Iterator<Item = u8> {
 ///
 /// Call this before the initialization clears the mask. The result tells the initialization whether
 /// it must release the pads that the previous run armed. ESP-IDF uses the same condition for
-/// `esp_deep_sleep_wakeup_io_reset`.
+/// `esp_deep_sleep_wakeup_io_reset`
 pub(crate) fn wake_enabled() -> bool {
     let sources = crate::rtc_cntl::sleep::enabled_sources();
 
@@ -393,7 +393,7 @@ fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
 /// Returns the level that wakes the chip through this pad, or `None` if the trigger sets no level.
 ///
 /// The wake paths accept a level only, so an edge trigger becomes the level at the end of the edge.
-/// This keeps the request of the user. `AnyEdge` ends at the level that the pin is not at now,
+/// This keeps the configured request. `AnyEdge` ends at the level that the pin is not at now,
 /// which is the meaning of "wake when the pin changes". This read of the pin can race with the pin,
 /// but the result is safe. If the pin changes before the sleep starts, the path arms a level that
 /// is already present, and the sleep is rejected or ends immediately.

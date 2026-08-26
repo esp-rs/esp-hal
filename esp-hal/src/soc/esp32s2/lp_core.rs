@@ -11,7 +11,7 @@
 //! The `UlpCore` struct provides an interface to interact with the `ULP`
 //! peripheral. It allows starting and configuring the ULP core for operation.
 //! The `UlpCore` struct is initialized with a peripheral reference to the `ULP
-//! CORE` instance.
+//! CORE` instance
 //!
 //! ## Examples
 //!
@@ -59,14 +59,14 @@ pub enum UlpCoreWakeupSource {
     Timer(UlpCoreTimerCycles),
 }
 
-/// ULP Timer cycles are clocked at a rate of approximately 8MHz / 32768  = ~244 Hz.
+/// ULP Timer cycles are clocked at a rate of approximately 8 MHz / 32768  = ~244 Hz.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UlpCoreTimerCycles {
     cycles: u32,
 }
 impl UlpCoreTimerCycles {
     /// Creates a new Ulp Timer cycle count configuration.
-    /// ## Panics
+    /// # Panics
     ///
     /// Panics if the cycles value is outside of the value range (0 ..= 0xFFFFFF).
     pub const fn new(cycles: u32) -> Self {
@@ -118,9 +118,9 @@ impl<'d> UlpCore<'d> {
 
     /// Lets the ULP core wake the chip from sleep.
     ///
-    /// The request stays until you call [`Self::disable_wakeup`]. It stays through a sleep, through
-    /// a deep-sleep wake, and after a drop of this driver. While the chip is awake, it does
-    /// nothing.
+    /// The request stays until [`Self::disable_wakeup`] is called. It stays through a sleep,
+    /// through a deep-sleep wake, and after a drop of this driver. While the chip is awake, it
+    /// does nothing.
     pub fn enable_wakeup(&mut self, config: WakeupConfig) {
         enable_wakeup(config);
     }

@@ -3,7 +3,7 @@
 //!
 //! ## Overview
 //!
-//! This module provides support to interface with `PSRAM` devices connected to the MCU.
+//! This module provides support to interface with `PSRAM` devices connected to the MCU
 //! PSRAM provides additional external memory to supplement the internal memory of the MCU,
 //! allowing for increased storage capacity and improved performance in certain applications.
 #![doc = ""]
@@ -56,9 +56,9 @@ use portable_atomic::{AtomicUsize, Ordering};
 
 use crate::peripherals::PSRAM;
 
-/// Size of PSRAM
+/// Size of PSRAM.
 ///
-/// [PsramSize::AutoDetect] will try to detect the size of PSRAM
+/// [`PsramSize::AutoDetect`] tries to detect the size of PSRAM.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -66,7 +66,7 @@ pub enum PsramSize {
     /// Detect PSRAM size
     #[default]
     AutoDetect,
-    /// A fixed PSRAM size
+    /// A fixed PSRAM size.
     Size(usize),
 }
 
@@ -96,7 +96,7 @@ pub(crate) fn psram_range() -> Range<usize> {
 
 /// # Safety
 ///
-/// This function must only be called once.
+/// Must only be called once.
 unsafe fn set_psram_range(range: Range<usize>) {
     MAPPED_PSRAM_START.store(range.start, Ordering::Relaxed);
     MAPPED_PSRAM_END.store(range.end, Ordering::Release);

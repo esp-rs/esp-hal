@@ -1,5 +1,5 @@
 //! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
-//! is programmed by `EngineSession` on engine acquire.
+//! is programmed by `EngineSession` on engine acquire
 
 use esp_rom_sys::rom::ets_delay_us;
 
@@ -29,7 +29,7 @@ pub fn chip_setup() {
 
 /// Programs the shared module clock register (divider, source, phases).
 ///
-/// Field encodings differ per chip (see each chip's `sdmmc_ll`).
+/// Field encodings differ per chip (see each chip's `sdmmc_ll`)
 pub fn set_module_clock(_source: ClockSource, div: u8) {
     // sdmmc_ll_select_clk_source
     HP_SYS_CLKRST::regs().sdio_host_ctrl0().modify(|_, w| {

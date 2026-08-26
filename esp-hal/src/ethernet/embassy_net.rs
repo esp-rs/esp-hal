@@ -1,14 +1,14 @@
-//! `embassy-net` driver integration for the EMAC Ethernet peripheral.
+//! `embassy-net` driver integration for the EMAC Ethernet peripheral
 //!
 //! This module provides an [`embassy_net_driver_02::Driver`] implementation
 //! for [`Ethernet`] operating in async mode, enabling the
 //! Ethernet peripheral to be used as a network interface with
 //! [`embassy-net`](https://crates.io/crates/embassy-net).
 //!
-//! # Usage
+//! ## Usage
 //!
 //! After obtaining an `Ethernet<'_, Async, P>` instance, pass it directly to
-//! `embassy_net::new()` — the [`Driver`] impl is inherent on the type.
+//! `embassy_net::new()` — the [`Driver`] impl is inherent on the type
 
 use core::task::Context;
 

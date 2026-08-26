@@ -1,6 +1,6 @@
 //! Debugger utilities
 
-/// Checks if a debugger is connected.
+/// Returns whether a debugger is connected.
 pub fn debugger_connected() -> bool {
     cfg_select! {
         xtensa => xtensa_lx::is_debugger_attached(),
@@ -14,7 +14,7 @@ pub fn debugger_connected() -> bool {
     }
 }
 
-/// Set a word-sized data breakpoint at the given address.
+/// Sets a word-sized data breakpoint at the given address.
 /// No breakpoint will be set when a debugger is currently attached if
 /// the `stack_guard_monitoring_with_debugger_connected` option is false.
 ///
@@ -63,22 +63,22 @@ bitfield::bitfield! {
     #[derive(Clone, Copy, Default)]
     pub(crate) struct Tdata1(u32);
 
-    /// Set this for configuring the selected trigger to fire right before a load operation with matching
+    /// Sets this for configuring the selected trigger to fire right before a load operation with matching
     /// data address is executed by the CPU.
     pub bool, load, set_load: 0;
 
-    /// Set this for configuring the selected trigger to fire right before a store operation with matching
+    /// Sets this for configuring the selected trigger to fire right before a store operation with matching
     /// data address is executed by the CPU.
     pub bool, store, set_store: 1;
 
-    /// Set this for configuring the selected trigger to fire right before an instruction with matching
+    /// Sets this for configuring the selected trigger to fire right before an instruction with matching
     /// virtual address is executed by the CPU.
     pub bool, execute, set_execute: 2;
 
-    /// Set this for enabling selected trigger to operate in user mode.
+    /// Sets this for enabling selected trigger to operate in user mode.
     pub bool, u, set_u: 3;
 
-    /// Set this for enabling selected trigger to operate in machine mode.
+    /// Sets this for enabling selected trigger to operate in machine mode.
     pub bool, m, set_m: 6;
 
     /// Configures the selected trigger to perform one of the available matching operations on a
@@ -87,14 +87,14 @@ bitfield::bitfield! {
     /// the value of maddress exactly.
     /// 0x1: NAPOT match, i.e. at least one of the bytes of an access must lie in the NAPOT region
     /// specified in maddress.
-    /// Note: Writing a larger value will clip it to the largest possible value 0x1.
+    /// Writing a larger value clips it to the largest possible value 0x1.
     pub u8, _match, set_match: 10, 7;
 
     /// Configures the selected trigger to perform one of the available actions when firing. Valid
     /// options are:
     /// 0x0: cause breakpoint exception.
     /// 0x1: enter debug mode (only valid when dmode = 1)
-    /// Note: Writing an invalid value will set this to the default value 0x0.
+    /// Writing an invalid value sets this to the default value 0x0.
     pub u8, action, set_action: 15, 12;
 
     /// This is found to be 1 if the selected trigger had fired previously. This bit is to be cleared manually.
@@ -103,7 +103,7 @@ bitfield::bitfield! {
     /// 0: Both Debug and M mode can write the tdata1 and tdata2 registers at the selected tselect.
     /// 1: Only Debug Mode can write the tdata1 and tdata2 registers at the selected tselect. Writes from
     /// other modes are ignored.
-    /// Note: Only writable from debug mode.
+    /// Only writable from debug mode.
     pub bool, dmode, set_dmode: 27;
 }
 
@@ -127,7 +127,7 @@ pub(crate) struct WatchPoint {
     tdata2: u32,
 }
 
-/// Clear the watchpoint
+/// Clears the watchpoint.
 #[cfg(riscv)]
 pub(crate) unsafe fn clear_watchpoint(id: u8) -> WatchPoint {
     assert!(id < 4);
@@ -151,7 +151,7 @@ pub(crate) unsafe fn clear_watchpoint(id: u8) -> WatchPoint {
     WatchPoint { tdata1, tdata2 }
 }
 
-/// Clear the watchpoint
+/// Clears the watchpoint.
 #[cfg(riscv)]
 pub(crate) unsafe fn restore_watchpoint(id: u8, watchpoint: WatchPoint) {
     DEBUGGER_LOCK.lock(|| unsafe {
@@ -167,7 +167,7 @@ pub(crate) unsafe fn restore_watchpoint(id: u8, watchpoint: WatchPoint) {
     });
 }
 
-/// Clear the watchpoint
+/// Clears the watchpoint.
 #[cfg(all(riscv, feature = "exception-handler"))]
 pub(crate) unsafe fn watchpoint_hit(id: u8) -> bool {
     assert!(id < 4);
@@ -186,7 +186,7 @@ pub(crate) unsafe fn watchpoint_hit(id: u8) -> bool {
     tdata.hit()
 }
 
-/// Set watchpoint and enable triggers.
+/// Sets the watchpoint and enables triggers.
 #[cfg(riscv)]
 pub(crate) unsafe fn set_watchpoint(id: u8, addr: usize, len: usize) {
     assert!(id < 4);

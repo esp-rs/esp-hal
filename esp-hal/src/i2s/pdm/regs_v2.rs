@@ -1,6 +1,6 @@
 //! PDM register programming for I2S hardware after ESP32 (v2+).
 //!
-//! Chip-specific differences are handled via `#[cfg(i2s_version = "...")]`.
+//! Chip-specific differences are handled via `#[cfg(i2s_version = "...")]`
 
 use super::{
     PdmConfig,
@@ -125,7 +125,7 @@ fn configure_tx(i2s: &Info, config: &super::PdmTxConfig) -> Result<(), PdmError>
     Ok(())
 }
 
-/// Expand a stereo slot mask to include both slots on every active PDM line.
+/// Expands a stereo slot mask to include both slots on every active PDM line.
 fn stereo_pdm_rx_slot_mask(slot_mask: u16) -> u16 {
     let mut stereo_mask = 0u16;
     for i in 0..8 {

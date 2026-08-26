@@ -29,11 +29,11 @@ impl<'d> TrngSource<'d> {
     ///
     /// # Panics
     ///
-    /// This function panics if the internal counter overflows.
+    /// Panics if the internal counter overflows.
     ///
     /// # Safety
     ///
-    /// This function must only be called after a new entropy source has been enabled.
+    /// Must only be called after a new entropy source has been enabled.
     #[instability::unstable]
     pub unsafe fn increase_entropy_source_counter() {
         if TRNG_ENABLED.fetch_add(1, Ordering::Relaxed) == usize::MAX {
@@ -43,17 +43,17 @@ impl<'d> TrngSource<'d> {
 
     /// Decreases the internal entropy source counter.
     ///
-    /// This function should only be called **before** disabling an entropy source (such as the
+    /// Should only be called **before** disabling an entropy source (such as the
     /// radio).
     ///
-    /// This function should only be called as many times as
-    /// [`TrngSource::increase_entropy_source_counter`] was called.
+    /// Should only be called as many times as
+    /// [`TrngSource::increase_entropy_source_counter`] was called
     ///
     /// # Panics
     ///
-    /// This function panics if the internal counter underflows. Dropping the `TrngSource` will
-    /// panic if this function is called more times than
-    /// [`TrngSource::increase_entropy_source_counter`].
+    /// Panics if the internal counter underflows. Dropping the `TrngSource` panics
+    /// if this method is called more times than
+    /// [`TrngSource::increase_entropy_source_counter`]
     #[instability::unstable]
     pub fn decrease_entropy_source_counter(_private: crate::private::Internal) {
         match TRNG_ENABLED.fetch_sub(1, Ordering::Relaxed) {
@@ -70,7 +70,7 @@ impl<'d> TrngSource<'d> {
 
     /// Returns whether the TRNG is currently enabled.
     ///
-    /// Note that entropy sources can be disabled at any time.
+    /// Entropy sources can be disabled at any time.
     #[instability::unstable]
     pub fn is_enabled() -> bool {
         TRNG_ENABLED.load(Ordering::Relaxed) > 0
@@ -78,12 +78,14 @@ impl<'d> TrngSource<'d> {
 
     /// Attempts to disable the TRNG.
     ///
-    /// This function returns `Err(TrngSource)` if there are TRNG users.
-    ///
     /// # Panics
     ///
-    /// This function panics if the TRNG is not enabled (i.e. it has been disabled by calling
+    /// Panics if the TRNG is not enabled (i.e. it has been disabled by calling
     /// [`TrngSource::decrease_entropy_source_counter`] incorrectly).
+    ///
+    /// # Errors
+    ///
+    /// [`TrngSource`] when there are TRNG users.
     #[instability::unstable]
     pub fn try_disable(self) -> Result<(), Self> {
         if TRNG_ENABLED
@@ -113,16 +115,16 @@ impl Drop for TrngSource<'_> {
     }
 }
 
-/// Errors returned when constructing a [`Trng`].
+/// Errors returned when constructing a [`Trng`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[instability::unstable]
 pub enum TrngError {
-    /// The [`TrngSource`] is not enabled.
+    /// The [`TrngSource`] is not enabled
     ///
-    /// This error is returned by [`Trng::try_new`] when the RNG is not configured
-    /// to generate true random numbers.
+    /// Returned by [`Trng::try_new`] when the RNG is not configured to generate
+    /// true random numbers.
     TrngSourceNotEnabled,
 }
 
@@ -131,16 +133,15 @@ pub enum TrngError {
 ))]
 /// True Random Number Generator (TRNG)
 ///
-/// The `Trng` struct represents a true random number generator that combines
-/// the randomness from the hardware RNG and an ADC. This struct provides
-/// methods to generate random numbers and fill buffers with random bytes.
-/// Due to pulling the entropy source from the ADC, it uses the associated
-/// registers, so to use TRNG we need to "occupy" the ADC peripheral.
+/// The `Trng` struct represents a true random number generator that combines randomness from the
+/// hardware RNG and an ADC. Provides methods to generate random numbers and fill buffers with
+/// random bytes. Because entropy is sourced from the ADC, the associated registers are used and
+/// the ADC peripheral must be occupied.
 ///
-/// To generate true random numbers, an instance of [`TrngSource`] is required. Once created, you
-/// can create [`Trng`] instances at any time, as long as the [`TrngSource`] is alive.
+/// To generate true random numbers, an instance of [`TrngSource`] is required. Once created,
+/// [`Trng`] instances can be created at any time, as long as the [`TrngSource`] is alive
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -196,10 +197,11 @@ impl Clone for Trng {
 }
 
 impl Trng {
-    /// Attempts to create a new True Random Number Generator (TRNG) instance.
+    /// Creates a new True Random Number Generator (TRNG) instance.
     ///
-    /// This function returns a new `Trng` instance on success, or an error if the
-    /// [`TrngSource`] is not active.
+    /// # Errors
+    ///
+    /// [`TrngError::TrngSourceNotEnabled`] when the [`TrngSource`] is not active.
     #[inline]
     #[instability::unstable]
     pub fn try_new() -> Result<Self, TrngError> {

@@ -5,14 +5,14 @@ mod fields;
 #[instability::unstable]
 pub use fields::*;
 
-/// Selects which ADC we are interested in the efuse calibration data for
+/// Selects which ADC the eFuse calibration data applies to.
 #[instability::unstable]
 pub enum AdcCalibUnit {
-    /// Select efuse calibration data for ADC1
+    /// Selects efuse calibration data for ADC1.
     ADC1,
 }
 
-/// Get status of SPI boot encryption.
+/// Returns whether SPI boot encryption is enabled.
 #[instability::unstable]
 pub fn flash_encryption() -> bool {
     !super::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
@@ -20,13 +20,13 @@ pub fn flash_encryption() -> bool {
         .is_multiple_of(2)
 }
 
-/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+/// Returns the multiplier for the timeout value of the RWDT STAGE 0 register.
 #[instability::unstable]
 pub fn rwdt_multiplier() -> u8 {
     super::read_field_le::<u8>(WDT_DELAY_SEL)
 }
 
-/// Get efuse block version
+/// Returns the eFuse block version.
 ///
 /// See: <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
 #[instability::unstable]
@@ -37,9 +37,9 @@ pub fn block_version() -> (u8, u8) {
     )
 }
 
-/// Get a signed value from the raw data from eFuse.
+/// Returns a signed value from the raw data from eFuse.
 ///
-/// `sign_bit` is the index of the sign bit, starting from 0.
+/// `sign_bit` is the index of the sign bit, starting from 0
 fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
     let sign_mask = 1u32 << sign_bit;
     if data & sign_mask != 0 {
@@ -49,7 +49,7 @@ fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
     }
 }
 
-/// Get version of RTC calibration block
+/// Returns the version of RTC calibration block.
 ///
 /// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L20>
 #[instability::unstable]
@@ -58,7 +58,7 @@ pub fn rtc_calib_version() -> u8 {
     if minor >= 2 { 1 } else { 0 }
 }
 
-/// Get ADC initial code for specified attenuation from efuse
+/// Returns the ADC initial code for specified attenuation from efuse.
 ///
 /// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L33>
 #[instability::unstable]
@@ -80,7 +80,7 @@ pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u1
     Some(init_code + 1600)
 }
 
-/// Get the channel specific calibration compensation
+/// Returns the channel specific calibration compensation.
 ///
 /// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L58>
 #[instability::unstable]
@@ -100,7 +100,7 @@ pub fn rtc_calib_get_chan_compens(
     Some(get_signed_val(chan_diff, 3) * (4 - atten as i32))
 }
 
-/// Get ADC reference point voltage for specified attenuation in millivolts
+/// Returns the ADC reference point voltage for specified attenuation in millivolts.
 ///
 /// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
 #[instability::unstable]
@@ -118,7 +118,7 @@ pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
     input_vout_mv[atten as usize]
 }
 
-/// Returns the calibration code
+/// Returns the calibration code.
 ///
 /// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
 #[instability::unstable]
@@ -143,13 +143,13 @@ pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
     Some((chk_offset + get_signed_val(cal_vol as u32, 9)) as u16)
 }
 
-/// Returns the major hardware revision
+/// Returns the major hardware revision.
 #[instability::unstable]
 pub fn major_chip_version() -> u8 {
     super::read_field_le(WAFER_VERSION_MAJOR)
 }
 
-/// Returns the minor hardware revision
+/// Returns the minor hardware revision.
 #[instability::unstable]
 pub fn minor_chip_version() -> u8 {
     super::read_field_le(WAFER_VERSION_MINOR)

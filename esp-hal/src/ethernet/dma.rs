@@ -2,7 +2,7 @@
 //!
 //! Implements the chained-ring descriptor layout for the Synopsys DesignWare
 //! GMAC as found on ESP32 and ESP32-P4. The driver always uses the **enhanced
-//! 32-byte descriptor format** (`ALT_DESC_SIZE = 1` in `EMAC_DMA.dmabusmode`).
+//! 32-byte descriptor format** (`ALT_DESC_SIZE = 1` in `EMAC_DMA.dmabusmode`)
 
 use core::sync::atomic::{Ordering, fence};
 
@@ -83,7 +83,7 @@ pub enum OwnedBy {
     Dma,
 }
 
-/// TX DMA descriptor (enhanced 32-byte format, `ALT_DESC_SIZE = 1`).
+/// TX DMA descriptor (enhanced 32-byte format, `ALT_DESC_SIZE = 1`)
 ///
 /// Layout matches the Synopsys DesignWare GMAC databook for enhanced mode.
 /// Words 4–7 are reserved for hardware use (TX timestamp, etc.).
@@ -101,7 +101,7 @@ pub struct TDes {
 }
 
 impl TDes {
-    /// Zero-initialized descriptor, suitable for `static` initializers.
+    /// Zero-initialized descriptor, suitable for `static` initializers
     pub const fn new_zeroed() -> Self {
         Self {
             tdes0: VolatileCell::new(0),
@@ -153,7 +153,7 @@ impl TDes {
     }
 }
 
-/// RX DMA descriptor (enhanced 32-byte format, `ALT_DESC_SIZE = 1`).
+/// RX DMA descriptor (enhanced 32-byte format, `ALT_DESC_SIZE = 1`)
 ///
 /// Words 4–7 are reserved for hardware use (RX timestamp, VLAN, etc.).
 #[repr(C)]
@@ -174,7 +174,7 @@ pub struct RDes {
 }
 
 impl RDes {
-    /// Zero-initialized descriptor, suitable for `static` initializers.
+    /// Zero-initialized descriptor, suitable for `static` initializers
     pub const fn new_zeroed() -> Self {
         Self {
             rdes0: VolatileCell::new(0),
@@ -218,7 +218,7 @@ impl RDes {
         ((self.rdes0.get() & RDES0_FL_MASK) >> RDES0_FL_SHIFT) as usize
     }
 
-    /// Returns `true` if the hardware IP checksum-offload engine flagged a
+    /// Returns whether the hardware IP checksum-offload engine flagged a
     /// header or payload checksum error for this frame.
     ///
     /// These results live in the extended-status word (RDES4) rather than in
@@ -263,8 +263,8 @@ impl RDes {
 
 /// Static backing storage for all DMA descriptor rings and packet buffers.
 ///
-/// `TX` is the number of transmit slots; `RX` is the number of receive slots.
-/// Pass a mutable reference to [`Ethernet::new`][super::Ethernet::new].
+/// `TX` is the number of transmit slots; `RX` is the number of receive slots
+/// Pass a mutable reference to [`Ethernet::new`][super::Ethernet::new]
 pub struct EthernetDmaStorage<const RX: usize, const TX: usize> {
     pub(super) rx_descs: [InternalMemory<RDes>; RX],
     pub(super) tx_descs: [InternalMemory<TDes>; TX],
@@ -279,7 +279,7 @@ impl<const RX: usize, const TX: usize> Default for EthernetDmaStorage<RX, TX> {
 }
 
 impl<const RX: usize, const TX: usize> EthernetDmaStorage<RX, TX> {
-    /// Creates a zero-initialized storage block, suitable for `static` placement.
+    /// Creates a new zero-initialized storage block, suitable for `static` placement.
     pub const fn new() -> Self {
         Self {
             rx_descs: [const { InternalMemory::new(RDes::new_zeroed()) }; RX],
@@ -297,7 +297,7 @@ unsafe impl<const RX: usize, const TX: usize> Sync for EthernetDmaStorage<RX, TX
 
 // ── TX ring ─────────────────────────────────────────────────────────────────
 
-/// TX descriptor ring backed by references into `EthernetDmaStorage`.
+/// TX descriptor ring backed by references into `EthernetDmaStorage`
 pub struct TDesRing<'a> {
     descriptors: &'a mut [InternalMemory<TDes>],
     buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
@@ -328,7 +328,7 @@ impl<'a> TDesRing<'a> {
 
     /// Rebuilds ring links and returns all descriptors to CPU ownership.
     ///
-    /// Call once after `EMAC_DMA` soft-reset completes and before starting TX.
+    /// Call once after `EMAC_DMA` soft-reset completes and before starting TX
     pub fn reset(&mut self) {
         let n = self.descriptors.len();
         for i in 0..n {
@@ -356,8 +356,8 @@ impl<'a> TDesRing<'a> {
 
     /// Copies `frame` into the next available TX buffer and hands it to DMA.
     ///
-    /// Returns `Err(DescriptorError::RingFull)` if no CPU-owned slot is available
-    /// and `Err(DescriptorError::FrameTooLarge)` if the frame exceeds [`MAX_FRAME_SIZE`].
+    /// Returns `Err(DescriptorError::RingFull)` if no CPU-owned slot is available.
+    /// and `Err(DescriptorError::FrameTooLarge)` if the frame exceeds [`MAX_FRAME_SIZE`]
     pub fn transmit(&mut self, frame: &[u8]) -> Result<(), TxError> {
         if frame.len() > MAX_FRAME_SIZE {
             return Err(TxError::FrameTooLarge);
@@ -372,7 +372,7 @@ impl<'a> TDesRing<'a> {
         }
     }
 
-    /// Returns `true` if the current slot is CPU-owned (ready to accept a frame).
+    /// Returns whether the current slot is CPU-owned (ready to accept a frame).
     pub fn has_capacity(&self) -> bool {
         let desc = self.descriptors[self.index].get_ref();
         #[cfg(soc_internal_memory_cached)]
@@ -381,10 +381,11 @@ impl<'a> TDesRing<'a> {
         desc.owned_by() == OwnedBy::Cpu
     }
 
-    /// Returns a mutable reference to the current TX DMA buffer if the slot is
-    /// CPU-owned, enabling zero-copy frame construction.
+    /// Returns a mutable reference to the current TX DMA buffer when the slot is
+    /// CPU-owned, which enables zero-copy frame construction.
     ///
     /// After writing the frame, call [`TDesRing::commit`] to hand it to DMA.
+    /// Returns `None` when the slot is not CPU-owned.
     pub fn available_buf(&mut self) -> Option<&mut [u8; MAX_FRAME_SIZE]> {
         if self.has_capacity() {
             let idx = self.index;
@@ -398,7 +399,7 @@ impl<'a> TDesRing<'a> {
     ///
     /// Sets the frame length, hands the descriptor to DMA, and advances the
     /// ring index.  The caller must trigger a TX poll demand after this call
-    /// (see `EmacRegs::demand_tx_poll`).
+    /// (see `EmacRegs::demand_tx_poll`)
     pub fn commit(&mut self, len: usize) {
         let idx = self.index;
         let n = self.descriptors.len();
@@ -418,18 +419,18 @@ impl<'a> TDesRing<'a> {
     }
 }
 
-/// Error returned by [`TDesRing::transmit`].
+/// Error returned by [`TDesRing::transmit`]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum TxError {
     /// No CPU-owned descriptor is available right now.
     RingFull,
-    /// Frame is larger than `MAX_FRAME_SIZE`.
+    /// Frame is larger than `MAX_FRAME_SIZE`
     FrameTooLarge,
 }
 
 // ── RX ring ─────────────────────────────────────────────────────────────────
 
-/// RX descriptor ring backed by references into `EthernetDmaStorage`.
+/// RX descriptor ring backed by references into `EthernetDmaStorage`
 pub struct RDesRing<'a> {
     descriptors: &'a mut [InternalMemory<RDes>],
     buffers: &'a mut [InternalMemory<[u8; MAX_FRAME_SIZE]>],
@@ -456,7 +457,7 @@ impl<'a> RDesRing<'a> {
 
     /// Rebuilds ring links and returns all descriptors to DMA ownership.
     ///
-    /// Call once after `EMAC_DMA` soft-reset completes and before starting RX.
+    /// Call once after `EMAC_DMA` soft-reset completes and before starting RX
     pub fn reset(&mut self) {
         let n = self.descriptors.len();
         for i in 0..n {
@@ -484,7 +485,7 @@ impl<'a> RDesRing<'a> {
         self.descriptors[0].as_ptr()
     }
 
-    /// Returns a mutable data slice if a frame is ready.
+    /// Returns a mutable data slice for a ready frame, or `None` when no frame is ready.
     ///
     /// Loops past error/incomplete/oversized frames, recycling them back to DMA
     /// automatically. Returns `None` only when no CPU-owned descriptor remains.
@@ -545,7 +546,7 @@ impl<'a> RDesRing<'a> {
 
     /// Releases the current RX descriptor back to DMA ownership.
     ///
-    /// Must be called after every successful [`RDesRing::receive`] call.
+    /// Must be called after every successful [`RDesRing::receive`] call
     pub fn pop(&mut self) {
         self.recycle_current();
     }

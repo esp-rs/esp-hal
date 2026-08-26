@@ -46,13 +46,13 @@ const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 const CACHE_MAP_L2_CACHE: u32 = 1 << 5;
 
-/// Cache buses that back the value at `addr`.
+/// Cache buses that back the value at `addr`
 fn cache_l2_bus(addr: u32) -> u32 {
     let internal = memory_range!("DRAM").contains(&addr);
     if internal { 0 } else { CACHE_MAP_L2_CACHE }
 }
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 pub(crate) unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(bus: u32, addr: u32, size: u32);

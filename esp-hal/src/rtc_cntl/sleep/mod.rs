@@ -87,9 +87,9 @@ impl<'d> LowPower<'d> {
     ///
     /// The deadline is absolute, so the time between this call and the sleep does not make the
     /// sleep shorter. The deadline is a standing request. The wake that it causes does not
-    /// disarm it, a later call replaces it, and [`Self::clear_wakeup_deadline`] removes it.
+    /// disarm it, a later call replaces it, and [`Self::clear_wakeup_deadline`] removes it
     ///
-    /// A deadline in the past ends a light sleep immediately, and makes [`Self::sleep_deep`] panic.
+    /// A deadline in the past ends a light sleep immediately, and makes [`Self::sleep_deep`] panic
     #[cfg(sleep_has_wakeup_source_timer)]
     pub fn set_wakeup_deadline(&mut self, deadline: crate::time::Instant) {
         timer::set_deadline(deadline);
@@ -109,7 +109,7 @@ impl<'d> LowPower<'d> {
     /// sleep.
     ///
     /// The hardware cannot reject this sleep, because the function cannot return to report the
-    /// rejection. Use [`Self::sleep_deep_with_rejection`] for that.
+    /// rejection. Use [`Self::sleep_deep_with_rejection`] for that
     ///
     /// # Panics
     ///
@@ -141,7 +141,7 @@ impl<'d> LowPower<'d> {
     /// Sleep entry disconnects the pads that no hold keeps, on the chips that need that step to
     /// reach the deep-sleep current, and it cannot know their earlier configuration. Configure
     /// those pads again if this function returns. ESP-IDF has the same limit in
-    /// `esp_deep_sleep_try_to_start`.
+    /// `esp_deep_sleep_try_to_start`
     ///
     /// # Panics
     ///
@@ -264,7 +264,7 @@ impl<'d> LowPower<'d> {
 /// A deep sleep powers the CPU down inside this loop, and a light sleep stops the CPU here until a
 /// wakeup source ends the sleep. A rejected request does neither, so the reject interrupt is the
 /// only report of that case. ESP-IDF waits in the same place, in `rtc_sleep_start` and in
-/// `pmu_sleep_start`.
+/// `pmu_sleep_start`
 #[cfg(sleep_driver_supported)]
 fn wait_for_sleep_result() -> bool {
     loop {

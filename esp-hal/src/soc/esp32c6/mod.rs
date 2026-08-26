@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The `SOC` module provides access, functions and structures that are useful
-//! for interacting with various system-related peripherals on `ESP32-C6` chip.
+//! for interacting with various system-related peripherals on `ESP32-C6` chip
 //!
 //! Also few constants are defined in this module for `ESP32-C6` chip:
 //!    * TIMG_DEFAULT_CLK_SRC: 1 - Timer clock source

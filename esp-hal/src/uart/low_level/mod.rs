@@ -255,7 +255,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 pub struct Info {
     /// Pointer to the register block for this UART instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with [`Self::register_block`] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// The system peripheral marker.
@@ -279,7 +279,7 @@ pub struct Info {
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
 
-    /// The wakeup source of this instance, or `None` if the instance cannot wake the chip.
+    /// The wakeup source of this instance, or `None` if the instance cannot wake the chip
     #[cfg(sleep_driver_supported)]
     pub wakeup_source: Option<crate::rtc_cntl::WakeupSource>,
 }
@@ -313,7 +313,7 @@ impl Info {
         unsafe { &*self.register_block }
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts.
     pub(super) fn enable_listen(&self, interrupts: EnumSet<UartInterrupt>, enable: bool) {
         let reg_block = self.regs();
 
@@ -497,12 +497,12 @@ impl Info {
         });
     }
 
-    /// Configures the RX-FIFO threshold
+    /// Configures the RX-FIFO threshold.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::RxFifoThresholdNotSupported`] if the provided value is zero
-    /// or exceeds [`Info::RX_FIFO_MAX_THRHD`].
+    /// or exceeds [`Info::RX_FIFO_MAX_THRHD`]
     pub(super) fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold == 0 || threshold > Self::RX_FIFO_MAX_THRHD {
             return Err(ConfigError::RxFifoThresholdNotSupported);
@@ -515,18 +515,18 @@ impl Info {
         Ok(())
     }
 
-    /// Reads the RX-FIFO threshold
+    /// Reads the RX-FIFO threshold.
     #[allow(clippy::useless_conversion)]
     pub(super) fn rx_fifo_full_threshold(&self) -> u16 {
         self.regs().conf1().read().rxfifo_full_thrhd().bits().into()
     }
 
-    /// Configures the TX-FIFO threshold
+    /// Configures the TX-FIFO threshold.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::TxFifoThresholdNotSupported`] if the provided value exceeds
-    /// [`Info::TX_FIFO_MAX_THRHD`].
+    /// [`Info::TX_FIFO_MAX_THRHD`]
     pub(super) fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold > Self::TX_FIFO_MAX_THRHD {
             return Err(ConfigError::TxFifoThresholdNotSupported);
@@ -552,14 +552,14 @@ impl Info {
             _ => "- The value you pass times the symbol size must be <= **0x3FF**.",
         }
     )]
-    /// Configures the Receive Timeout detection setting
+    /// Configures the Receive Timeout detection setting.
     ///
     /// ## Arguments
     ///
     /// `timeout` - the number of symbols ("bytes") to wait for before
     /// triggering a timeout. Pass None to disable the timeout.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::TimeoutTooLong`] if the provided value exceeds
     /// the maximum value for SOC:

@@ -71,7 +71,7 @@ where
     T: Instance + 'd,
     T::Pin: AnalogPin + 'd,
 {
-    /// Construct a new instance of [`Dac`].
+    /// Creates a new instance of [`Dac`].
     pub fn new(dac: T, pin: T::Pin) -> Self {
         // TODO: Revert on drop.
         pin.set_analog(crate::private::Internal);

@@ -70,11 +70,11 @@ macro_rules! trm_markdown_link {
 ///
 /// This macro generates the following:
 ///
-/// - An `AnyPeripheral` struct, name provided by the macro call.
-/// - An `any::Degrade` trait which is supposed to be used as a supertrait of a relevant Instance.
-/// - An `any::Inner` enum, with the same variants as the original peripheral.
-/// - A `From` implementation for each peripheral variant.
-/// - A `degrade` method for each peripheral variant using the `any::Degrade` trait.
+/// - An `AnyPeripheral` struct, name provided by the macro call
+/// - An `any::Degrade` trait which is supposed to be used as a supertrait of a relevant Instance
+/// - An `any::Inner` enum, with the same variants as the original peripheral
+/// - A `From` implementation for each peripheral variant
+/// - A `degrade` method for each peripheral variant using the `any::Degrade` trait
 #[macro_export]
 macro_rules! any_peripheral {
     ($(#[$meta:meta])* $vis:vis peripheral $name:ident<'d> {
@@ -139,9 +139,9 @@ macro_rules! any_peripheral {
 
         $(#[$meta])*
         ///
-        /// This struct is a type-erased version of a peripheral singleton. It is useful
+        /// A type-erased version of a peripheral singleton. Useful
         /// for creating arrays of peripherals, or avoiding generics. Peripheral singletons
-        /// can be type erased by using their `From` implementation.
+        /// can be type erased by using their `From` implementation
         ///
         /// ```rust,ignore
         #[doc = concat!("let any_peripheral = ", stringify!($name), "::from(peripheral);")]
@@ -155,7 +155,7 @@ macro_rules! any_peripheral {
             ///
             /// # Safety
             ///
-            /// You must ensure that you're only using one instance of this type at a time.
+            /// The caller must ensure that only one instance of this type is used at a time.
             #[inline]
             #[allow(unused)]
             pub unsafe fn clone_unchecked(&self) -> Self { unsafe {
@@ -164,8 +164,8 @@ macro_rules! any_peripheral {
 
             /// Creates a new peripheral reference with a shorter lifetime.
             ///
-            /// Use this method if you would like to keep working with the peripheral after
-            /// you dropped the driver that consumes this.
+            /// Use this method to keep working with the peripheral after
+            /// dropping the driver that consumes this.
             ///
             /// See [Peripheral singleton] section for more information.
             ///
@@ -275,7 +275,7 @@ let uart0 = any_peri1
 }
 
 /// Macro to choose between two expressions. Useful for implementing "else" for
-/// `$()?` macro syntax.
+/// `$()?` macro syntax
 #[macro_export]
 #[doc(hidden)]
 macro_rules! if_set {
@@ -299,7 +299,7 @@ include!(concat!(env!("OUT_DIR"), "/version_macro.rs"));
 ///
 /// Version branches should be listed in descending order.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust,no_run
 /// # {before_snippet}
@@ -323,18 +323,18 @@ macro_rules! at_least_version {
 
 /// Macro to ignore tokens.
 ///
-/// This is useful when we need existence of a metavariable (to expand a
-/// repetition), but we don't need to use it.
+/// This is useful when a metavariable must exist (to expand a
+/// repetition), but need not be used.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! ignore {
     ($($item:tt)*) => {};
 }
 
-/// Define a piece of (Espressif-specific) metadata that external tools may
+/// Defines a piece of (Espressif-specific) metadata that external tools may
 /// parse.
 ///
-/// The symbol name be formatted as `_ESP_METADATA_<category>_<name>`.
+/// The symbol name be formatted as `_ESP_METADATA_<category>_<name>`
 ///
 /// This metadata is zero cost, i.e. the value will not be flashed to the
 /// device.
@@ -360,7 +360,7 @@ macro_rules! metadata {
 }
 
 #[procmacros::doc_replace]
-/// Extract fields from [`Peripherals`][crate::peripherals::Peripherals] into named groups.
+/// Extract fields from [`Peripherals`][crate::peripherals::Peripherals] into named groups
 #[cfg_attr(
     // Feature-gated so that this doesn't prevent gradual device bringup. Any
     // stable driver would serve the purpose here, so this block will be part
@@ -447,11 +447,11 @@ macro_rules! assign_resources {
             }
 
             impl<$group_lt> $group_struct<$group_lt> {
-                /// Unsafely create an instance of the assigned peripherals out of thin air.
+                /// Unsafely creates an instance of the assigned peripherals out of thin air.
                 ///
                 /// # Safety
                 ///
-                /// You must ensure that you're only using one instance of the contained peripherals at a time.
+                /// The caller must ensure that only one instance of the contained peripherals is used at a time.
                 pub unsafe fn steal() -> Self {
                     unsafe {
                         Self {
@@ -462,8 +462,8 @@ macro_rules! assign_resources {
 
                 /// Creates a new reference to the peripheral group with a shorter lifetime.
                 ///
-                /// Use this method if you would like to keep working with the peripherals after
-                /// you dropped the drivers that consume this.
+                /// Use this method to keep working with the peripherals after
+                /// dropping the drivers that consume this.
                 pub fn reborrow(&mut self) -> $group_struct<'_> {
                     $group_struct {
                         $($resource_name: self.$resource_name.reborrow()),*
@@ -480,11 +480,11 @@ macro_rules! assign_resources {
         }
 
         impl<$struct_lt> $struct_name<$struct_lt> {
-            /// Unsafely create an instance of the assigned peripherals out of thin air.
+            /// Unsafely creates an instance of the assigned peripherals out of thin air.
             ///
             /// # Safety
             ///
-            /// You must ensure that you're only using one instance of the contained peripherals at a time.
+            /// The caller must ensure that only one instance of the contained peripherals is used at a time.
             pub unsafe fn steal() -> Self {
                 unsafe {
                     Self {
@@ -495,8 +495,8 @@ macro_rules! assign_resources {
 
             /// Creates a new reference to the assigned peripherals with a shorter lifetime.
             ///
-            /// Use this method if you would like to keep working with the peripherals after
-            /// you dropped the drivers that consume this.
+            /// Use this method to keep working with the peripherals after
+            /// dropping the drivers that consume this.
             pub fn reborrow(&mut self) -> $struct_name<'_> {
                 $struct_name {
                     $($group_name: self.$group_name.reborrow()),*
@@ -504,7 +504,7 @@ macro_rules! assign_resources {
             }
         }
 
-        /// Extracts resources from the `Peripherals` struct.
+        /// Extracts resources from the `Peripherals` struct
         #[macro_export]
         macro_rules! split_resources {
             ($peris:ident) => {

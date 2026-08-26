@@ -3,7 +3,7 @@
 //! This file was automatically generated, please do not edit it manually!
 //!
 //! For information on how to regenerate these files, please refer to the
-//! `xtask` package's `README.md` file.
+//! `xtask` package's `README.md` file
 //!
 //! Generated on:   2024-03-11
 //! ESP-IDF Commit: 0de2912f

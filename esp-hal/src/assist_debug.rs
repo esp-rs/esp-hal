@@ -8,7 +8,7 @@
 //!
 //!
 //! ## Configuration
-//! While all the targets support program counter (PC) logging it's API is not
+//! While all the targets support program counter (PC) logging, its API is not
 //! exposed here. Instead the ROM bootloader will always enable it and print the
 //! last seen PC (e.g. _Saved PC:0x42002ff2_). Make sure the reset was triggered
 //! by a TIMG watchdog. Not an RTC or SWD watchdog.
@@ -35,7 +35,7 @@ pub struct DebugAssist<'d> {
 }
 
 impl<'d> DebugAssist<'d> {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Creates a new instance in [crate::Blocking] mode.
     pub fn new(debug_assist: ASSIST_DEBUG<'d>) -> Self {
         // NOTE: We should enable the debug assist, however, it's always enabled in ROM
         //       code already.
@@ -43,10 +43,9 @@ impl<'d> DebugAssist<'d> {
         DebugAssist { debug_assist }
     }
 
-    /// Register an interrupt handler for the Debug Assist module.
+    /// Registers an interrupt handler for the Debug Assist module.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::system::Cpu::other() {
@@ -71,9 +70,9 @@ impl crate::interrupt::InterruptConfigurable for DebugAssist<'_> {
 
 #[cfg(assist_debug_has_sp_monitor)]
 impl DebugAssist<'_> {
-    /// Enable SP monitoring on main core. When the SP exceeds the
-    /// `lower_bound` or `upper_bound` threshold, the module will record the PC
-    /// pointer and generate an interrupt.
+    /// Enables SP monitoring on the given CPU. When the SP exceeds the
+    /// `lower_bound` or `upper_bound` threshold, the module records the PC
+    /// pointer and generates an interrupt.
     pub fn internal_sp_monitor(&mut self, cpu: usize, lower_bound: u32, upper_bound: u32) {
         let regs = self.regs().cpu(cpu);
 
@@ -131,29 +130,29 @@ impl DebugAssist<'_> {
         self.regs().cpu(cpu).sp_pc().read().sp_pc().bits()
     }
 
-    /// Enable SP monitoring on main core. When the SP exceeds the
-    /// `lower_bound` or `upper_bound` threshold, the module will record the PC
-    /// pointer and generate an interrupt.
+    /// Enables SP monitoring on main core. When the SP exceeds the
+    /// `lower_bound` or `upper_bound` threshold, the module records the PC
+    /// pointer and generates an interrupt.
     pub fn enable_sp_monitor(&mut self, lower_bound: u32, upper_bound: u32) {
         self.internal_sp_monitor(0, lower_bound, upper_bound);
     }
 
-    /// Disable SP monitoring on main core.
+    /// Disables SP monitoring on main core.
     pub fn disable_sp_monitor(&mut self) {
         self.internal_disable_sp_monitor(0)
     }
 
-    /// Clear SP monitoring interrupt on main core.
+    /// Clears SP monitoring interrupt on main core.
     pub fn clear_sp_monitor_interrupt(&mut self) {
         self.internal_clear_sp_monitor_interrupt(0)
     }
 
-    /// Check, if SP monitoring interrupt is set on main core.
+    /// Returns whether SP monitoring interrupt is set on main core.
     pub fn is_sp_monitor_interrupt_set(&self) -> bool {
         self.internal_is_sp_monitor_interrupt_set(0)
     }
 
-    /// Get SP monitoring PC value on main core.
+    /// Returns SP monitoring PC value on main core.
     pub fn sp_monitor_pc(&self) -> u32 {
         self.internal_sp_monitor_pc(0)
     }
@@ -161,29 +160,29 @@ impl DebugAssist<'_> {
 
 #[cfg(all(assist_debug_has_sp_monitor, multi_core))]
 impl<'d> DebugAssist<'d> {
-    /// Enable SP monitoring on secondary core. When the SP exceeds the
-    /// `lower_bound` or `upper_bound` threshold, the module will record the PC
-    /// pointer and generate an interrupt.
+    /// Enables SP monitoring on secondary core. When the SP exceeds the
+    /// `lower_bound` or `upper_bound` threshold, the module records the PC
+    /// pointer and generates an interrupt.
     pub fn enable_core1_sp_monitor(&mut self, lower_bound: u32, upper_bound: u32) {
         self.internal_sp_monitor(1, lower_bound, upper_bound);
     }
 
-    /// Disable SP monitoring on secondary core.
+    /// Disables SP monitoring on secondary core.
     pub fn disable_core1_sp_monitor(&mut self) {
         self.internal_disable_sp_monitor(1)
     }
 
-    /// Clear SP monitoring interrupt on secondary core.
+    /// Clears SP monitoring interrupt on secondary core.
     pub fn clear_core1_sp_monitor_interrupt(&mut self) {
         self.internal_clear_sp_monitor_interrupt(1)
     }
 
-    /// Check, if SP monitoring interrupt is set on secondary core.
+    /// Returns whether SP monitoring interrupt is set on secondary core.
     pub fn is_core1_sp_monitor_interrupt_set(&self) -> bool {
         self.internal_is_sp_monitor_interrupt_set(1)
     }
 
-    /// Get SP monitoring PC value on secondary core.
+    /// Returns SP monitoring PC value on secondary core.
     pub fn core1_sp_monitor_pc(&self) -> u32 {
         self.internal_sp_monitor_pc(1)
     }
@@ -315,7 +314,7 @@ impl DebugAssist<'_> {
         self.regs().cpu(cpu).area_pc().read().area_pc().bits()
     }
 
-    /// Enable region monitoring of read/write performed by the main CPU in a
+    /// Enables region monitoring of read/write performed by the main CPU in a
     /// certain memory region0. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered. Two memory
     /// regions (region0, region1) can be monitored at the same time.
@@ -329,22 +328,22 @@ impl DebugAssist<'_> {
         self.internal_enable_region0_monitor(0, lower_bound, upper_bound, reads, writes)
     }
 
-    /// Disable region0 monitoring on main core.
+    /// Disables region0 monitoring on main core.
     pub fn disable_region0_monitor(&mut self) {
         self.internal_disable_region0_monitor(0)
     }
 
-    /// Clear region0 monitoring interrupt on main core.
+    /// Clears region0 monitoring interrupt on main core.
     pub fn clear_region0_monitor_interrupt(&mut self) {
         self.internal_clear_region0_monitor_interrupt(0)
     }
 
-    /// Check, if region0 monitoring interrupt is set on main core.
+    /// Returns whether region0 monitoring interrupt is set on main core.
     pub fn is_region0_monitor_interrupt_set(&self) -> bool {
         self.internal_is_region0_monitor_interrupt_set(0)
     }
 
-    /// Enable region monitoring of read/write performed by the main CPU in a
+    /// Enables region monitoring of read/write performed by the main CPU in a
     /// certain memory region1. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered.
     pub fn enable_region1_monitor(
@@ -357,22 +356,22 @@ impl DebugAssist<'_> {
         self.internal_enable_region1_monitor(0, lower_bound, upper_bound, reads, writes)
     }
 
-    /// Disable region1 monitoring on main core.
+    /// Disables region1 monitoring on main core.
     pub fn disable_region1_monitor(&mut self) {
         self.internal_disable_region1_monitor(0)
     }
 
-    /// Clear region1 monitoring interrupt on main core.
+    /// Clears region1 monitoring interrupt on main core.
     pub fn clear_region1_monitor_interrupt(&mut self) {
         self.internal_clear_region1_monitor_interrupt(0)
     }
 
-    /// Check, if region1 monitoring interrupt is set on main core.
+    /// Returns whether region1 monitoring interrupt is set on main core.
     pub fn is_region1_monitor_interrupt_set(&self) -> bool {
         self.internal_is_region1_monitor_interrupt_set(0)
     }
 
-    /// Get region monitoring PC value on main core.
+    /// Returns the region monitoring PC value on main core.
     pub fn region_monitor_pc(&self) -> u32 {
         self.internal_region_monitor_pc(0)
     }
@@ -380,7 +379,7 @@ impl DebugAssist<'_> {
 
 #[cfg(all(assist_debug_has_region_monitor, multi_core))]
 impl DebugAssist<'_> {
-    /// Enable region monitoring of read/write performed by the secondary CPU in
+    /// Enables region monitoring of read/write performed by the secondary CPU in
     /// a certain memory region0. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered.
     pub fn enable_core1_region0_monitor(
@@ -393,22 +392,22 @@ impl DebugAssist<'_> {
         self.internal_enable_region0_monitor(1, lower_bound, upper_bound, reads, writes)
     }
 
-    /// Disable region0 monitoring on secondary core.
+    /// Disables region0 monitoring on secondary core.
     pub fn disable_core1_region0_monitor(&mut self) {
         self.internal_disable_region0_monitor(1)
     }
 
-    /// Clear region0 monitoring interrupt on secondary core.
+    /// Clears region0 monitoring interrupt on secondary core.
     pub fn clear_core1_region0_monitor_interrupt(&mut self) {
         self.internal_clear_region0_monitor_interrupt(1)
     }
 
-    /// Check, if region0 monitoring interrupt is set on secondary core.
+    /// Returns whether region0 monitoring interrupt is set on secondary core.
     pub fn is_core1_region0_monitor_interrupt_set(&self) -> bool {
         self.internal_is_region0_monitor_interrupt_set(1)
     }
 
-    /// Enable region monitoring of read/write performed by the secondary CPU in
+    /// Enables region monitoring of read/write performed by the secondary CPU in
     /// a certain memory region1. Whenever the bus reads or writes in the
     /// specified memory region, an interrupt will be triggered.
     pub fn enable_core1_region1_monitor(
@@ -421,22 +420,22 @@ impl DebugAssist<'_> {
         self.internal_enable_region1_monitor(1, lower_bound, upper_bound, reads, writes)
     }
 
-    /// Disable region1 monitoring on secondary core.
+    /// Disables region1 monitoring on secondary core.
     pub fn disable_core1_region1_monitor(&mut self) {
         self.internal_disable_region1_monitor(1)
     }
 
-    /// Clear region1 monitoring interrupt on secondary core.
+    /// Clears region1 monitoring interrupt on secondary core.
     pub fn clear_core1_region1_monitor_interrupt(&mut self) {
         self.internal_clear_region1_monitor_interrupt(1)
     }
 
-    /// Check, if region1 monitoring interrupt is set on secondary core.
+    /// Returns whether region1 monitoring interrupt is set on secondary core.
     pub fn is_core1_region1_monitor_interrupt_set(&self) -> bool {
         self.internal_is_region1_monitor_interrupt_set(1)
     }
 
-    /// Get region monitoring PC value on secondary core.
+    /// Returns the region monitoring PC value on secondary core.
     pub fn core1_region_monitor_pc(&self) -> u32 {
         self.internal_region_monitor_pc(1)
     }

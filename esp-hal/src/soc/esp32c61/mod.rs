@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The `SOC` module provides access, functions and structures that are useful
-//! for interacting with various system-related peripherals on `ESP32-C61` chip.
+//! for interacting with various system-related peripherals on `ESP32-C61` chip
 
 crate::unstable_module! {
     pub mod clocks;
@@ -52,7 +52,7 @@ pub(crate) fn enable_branch_predictor() {
     }
 }
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {

@@ -112,8 +112,7 @@ where
     ///
     /// # Errors
     ///
-    /// [`ConfigError::Clock`] variant will be returned if the frequency passed
-    /// in `Config` is too low.
+    /// [`ConfigError::Clock`] when the frequency passed in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.lcd
             .configure_clocks(&ClockConfig {
@@ -272,82 +271,82 @@ where
         self
     }
 
-    /// Associate a DATA 0 pin with the I8080 interface.
+    /// Associates a DATA 0 pin with the I8080 interface.
     pub fn with_data0(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_0, pin)
     }
 
-    /// Associate a DATA 1 pin with the I8080 interface.
+    /// Associates a DATA 1 pin with the I8080 interface.
     pub fn with_data1(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_1, pin)
     }
 
-    /// Associate a DATA 2 pin with the I8080 interface.
+    /// Associates a DATA 2 pin with the I8080 interface.
     pub fn with_data2(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_2, pin)
     }
 
-    /// Associate a DATA 3 pin with the I8080 interface.
+    /// Associates a DATA 3 pin with the I8080 interface.
     pub fn with_data3(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_3, pin)
     }
 
-    /// Associate a DATA 4 pin with the I8080 interface.
+    /// Associates a DATA 4 pin with the I8080 interface.
     pub fn with_data4(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_4, pin)
     }
 
-    /// Associate a DATA 5 pin with the I8080 interface.
+    /// Associates a DATA 5 pin with the I8080 interface.
     pub fn with_data5(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_5, pin)
     }
 
-    /// Associate a DATA 6 pin with the I8080 interface.
+    /// Associates a DATA 6 pin with the I8080 interface.
     pub fn with_data6(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_6, pin)
     }
 
-    /// Associate a DATA 7 pin with the I8080 interface.
+    /// Associates a DATA 7 pin with the I8080 interface.
     pub fn with_data7(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_7, pin)
     }
 
-    /// Associate a DATA 8 pin with the I8080 interface.
+    /// Associates a DATA 8 pin with the I8080 interface.
     pub fn with_data8(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_8, pin)
     }
 
-    /// Associate a DATA 9 pin with the I8080 interface.
+    /// Associates a DATA 9 pin with the I8080 interface.
     pub fn with_data9(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_9, pin)
     }
 
-    /// Associate a DATA 10 pin with the I8080 interface.
+    /// Associates a DATA 10 pin with the I8080 interface.
     pub fn with_data10(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_10, pin)
     }
 
-    /// Associate a DATA 11 pin with the I8080 interface.
+    /// Associates a DATA 11 pin with the I8080 interface.
     pub fn with_data11(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_11, pin)
     }
 
-    /// Associate a DATA 12 pin with the I8080 interface.
+    /// Associates a DATA 12 pin with the I8080 interface.
     pub fn with_data12(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_12, pin)
     }
 
-    /// Associate a DATA 13 pin with the I8080 interface.
+    /// Associates a DATA 13 pin with the I8080 interface.
     pub fn with_data13(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_13, pin)
     }
 
-    /// Associate a DATA 14 pin with the I8080 interface.
+    /// Associates a DATA 14 pin with the I8080 interface.
     pub fn with_data14(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_14, pin)
     }
 
-    /// Associate a DATA 15 pin with the I8080 interface.
+    /// Associates a DATA 15 pin with the I8080 interface.
     pub fn with_data15(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_15, pin)
     }
@@ -355,10 +354,10 @@ where
     /// Sends a command and data to the LCD using DMA.
     ///
     /// Passing a `Command<u8>` will make this an 8-bit transfer and a
-    /// `Command<u16>` will make this a 16-bit transfer.
+    /// `Command<u16>` will make this a 16-bit transfer
     ///
-    /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
-    /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
+    /// A 16-bit transfer on an 8-bit bus silently truncates the 2nd
+    /// byte and an 8-bit transfer on a 16-bit bus silently pads each
     /// byte to 2 bytes.
     pub fn send<W: Into<u16> + Copy, BUF: DmaTxBuffer>(
         mut self,
@@ -470,7 +469,7 @@ pub struct I8080Transfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.i8080
             .regs()
@@ -489,8 +488,8 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     ///
-    /// Note: This also clears the transfer interrupt so it can be used in
-    /// interrupt handlers to "handle" the interrupt.
+    /// Also clears the transfer interrupt so it can be used in
+    /// interrupt handlers to handle the interrupt.
     pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
@@ -545,7 +544,7 @@ impl<BUF: DmaTxBuffer, Dm: DriverMode> DerefMut for I8080Transfer<'_, BUF, Dm> {
 }
 
 impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
-    /// Waits for [Self::is_done] to return true.
+    /// Waits for [`Self::is_done`] to return true.
     pub async fn wait_for_done(&mut self) {
         use core::{
             future::Future,
@@ -611,7 +610,7 @@ pub struct Config {
     /// Setup cycles expected, must be at least 1. (6 bits)
     setup_cycles: usize,
 
-    /// Hold cycles expected, must be at least 1. (13 bits)
+    /// Holds cycles expected, must be at least 1. (13 bits)
     hold_cycles: usize,
 
     /// The default value of LCD_CD.

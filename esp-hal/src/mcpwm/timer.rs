@@ -2,7 +2,7 @@
 //!
 //! ## Overview
 //! The `timer` module provides an interface to configure and use timers for
-//! generating `PWM` signals used in motor control and other applications.
+//! generating `PWM` signals used in motor control and other applications
 
 use core::marker::PhantomData;
 
@@ -13,7 +13,7 @@ use crate::{
     time::Rate,
 };
 
-/// A MCPWM timer
+/// A MCPWM timer.
 ///
 /// Every timer of a particular [`MCPWM`](super::McPwm) peripheral can be used
 /// as a timing reference for every
@@ -33,13 +33,12 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         }
     }
 
-    /// Apply the given timer configuration.
+    /// Applies the given timer configuration.
     ///
-    /// ### Note:
     /// The prescaler and period configuration will be applied immediately by
     /// default and before setting the [`PwmWorkingMode`].
-    /// If the timer is already running you might want to call [`Timer::stop`]
-    /// and/or [`Timer::set_counter`] first
+    /// If the timer is already running, call [`Timer::stop`]
+    /// or [`Timer::set_counter`] first
     /// (if the new period is larger than the current counter value this will
     /// cause weird behavior).
     ///
@@ -67,13 +66,13 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         });
     }
 
-    /// Stop the timer in its current state
+    /// Stops the timer in its current state.
     pub fn stop(&mut self) {
         // freeze the timer
         self.cfg1().write(|w| unsafe { w.mod_().bits(0) });
     }
 
-    /// Set the timer counter to the provided value
+    /// Sets the timer counter to the provided value.
     pub fn set_counter(&mut self, phase: u16, direction: CounterDirection) {
         // SAFETY:
         // We only write to our TIMERx_SYNC register
@@ -88,7 +87,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
         });
     }
 
-    /// Read the counter value and counter direction of the timer
+    /// Reads the counter value and counter direction of the timer.
     pub fn status(&self) -> (u16, CounterDirection) {
         // SAFETY:
         // We only read from our TIMERx_STATUS register
@@ -114,10 +113,10 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
     }
 }
 
-/// Clock configuration of a MCPWM timer
+/// Clocks configuration of a MCPWM timer.
 ///
 /// Use [`PeripheralClockConfig::timer_clock_with_prescaler`](super::PeripheralClockConfig::timer_clock_with_prescaler) or
-/// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency) to it.
+/// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency) to it
 #[derive(Copy, Clone)]
 pub struct TimerClockConfig {
     frequency: Rate,
@@ -185,7 +184,7 @@ impl TimerClockConfig {
         })
     }
 
-    /// Set the method for updating the PWM period
+    /// Sets the method for updating the PWM period.
     pub fn with_period_updating_method(self, method: PeriodUpdatingMethod) -> Self {
         Self {
             period_updating_method: method,
@@ -193,10 +192,9 @@ impl TimerClockConfig {
         }
     }
 
-    /// Get the timer clock frequency.
+    /// Returns the timer clock frequency.
     ///
-    /// ### Note:
-    /// The actual value is rounded down to the nearest `u32` value
+    /// The actual value is rounded down to the nearest `u32` value.
     pub fn frequency(&self) -> Rate {
         self.frequency
     }
@@ -238,13 +236,13 @@ pub enum PwmWorkingMode {
     UpDown   = 3,
 }
 
-/// The direction the timer counter is changing
+/// The direction the timer counter is changing.
 #[derive(Debug)]
 #[repr(u8)]
 pub enum CounterDirection {
-    /// The timer counter is increasing
+    /// The timer counter is increasing.
     Increasing = 0,
-    /// The timer counter is decreasing
+    /// The timer counter is decreasing.
     Decreasing = 1,
 }
 

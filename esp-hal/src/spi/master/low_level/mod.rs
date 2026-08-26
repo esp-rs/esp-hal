@@ -151,7 +151,7 @@ pub trait QspiInstance: Instance {}
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with [`Self::register_block`] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// The system peripheral marker.
@@ -169,7 +169,7 @@ pub struct Info {
     pub sio_inputs: &'static [InputSignal],
     pub sio_outputs: &'static [OutputSignal],
 
-    /// Clock tree instance for this SPI peripheral.
+    /// Clocks tree instance for this SPI peripheral.
     pub clock_instance: crate::soc::clocks::SpiInstance,
 }
 
@@ -212,7 +212,7 @@ impl Driver {
         self.update();
     }
 
-    /// Initialize for full-duplex 1 bit mode
+    /// Initializes for full-duplex 1 bit mode.
     pub(super) fn init(&self) {
         version::enable_peripheral_clock(self);
 
@@ -252,19 +252,19 @@ impl Driver {
         version::init_spi_data_mode(self, cmd_mode, address_mode, data_mode)
     }
 
-    /// Enable or disable listening for the given interrupts.
+    /// Enables or disables listening for the given interrupts.
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     pub(super) fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
         version::enable_listen(self, interrupts, enable);
     }
 
-    /// Gets asserted interrupts
+    /// Returns the asserted interrupts.
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     pub(super) fn interrupts(&self) -> EnumSet<SpiInterrupt> {
         version::interrupts(self)
     }
 
-    /// Resets asserted interrupts
+    /// Resets asserted interrupts.
     pub(super) fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
         version::clear_interrupts(self, interrupts);
     }
@@ -357,7 +357,7 @@ impl Driver {
         }
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn write_one(&self, words: &[u8]) -> Result<(), Error> {
         if words.len() > FIFO_SIZE {
@@ -369,7 +369,7 @@ impl Driver {
         Ok(())
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn write(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
@@ -379,7 +379,7 @@ impl Driver {
         Ok(())
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
@@ -389,11 +389,11 @@ impl Driver {
         Ok(())
     }
 
-    /// Read bytes from SPI.
+    /// Reads bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't
-    /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`Self::transfer`] instead.
+    /// Sends out a stuffing byte for every byte to read. Does not perform
+    /// flushing. To read the response to a prior write, use [`Self::transfer`]
+    /// instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn read(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
@@ -406,11 +406,10 @@ impl Driver {
         Ok(())
     }
 
-    /// Read bytes from SPI.
+    /// Reads bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. If you want to read
-    /// the response to something you have written before, consider using
-    /// [`Self::transfer`] instead.
+    /// Sends out a stuffing byte for every byte to read. To read the response to a
+    /// prior write, use [`Self::transfer`] instead
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) async fn read_async(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
@@ -423,12 +422,11 @@ impl Driver {
         Ok(())
     }
 
-    /// Read received bytes from SPI FIFO.
+    /// Reads received bytes from SPI FIFO.
     ///
-    /// Copies the contents of the SPI receive FIFO into `words`. This function
-    /// doesn't perform any data transfer. If you want to read the response to
-    /// something you have written before, consider using [`Self::transfer`]
-    /// instead.
+    /// Copies the contents of the SPI receive FIFO into `words`. Does not perform
+    /// any data transfer. To read the response to a prior write, use
+    /// [`Self::transfer`] instead
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn read_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
         if words.len() > FIFO_SIZE {

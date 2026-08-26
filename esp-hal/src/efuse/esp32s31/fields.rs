@@ -4,7 +4,7 @@
 //! (via espflash/espflash/src/target/efuse/esp32s31.rs).
 //!
 //! For information on how to regenerate these files, please refer to the
-//! `xtask` package's `README.md` file.
+//! `xtask` package's `README.md` file
 use crate::efuse::EfuseField;
 
 /// Disable programming of individual eFuses

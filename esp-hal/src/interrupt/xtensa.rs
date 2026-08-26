@@ -10,8 +10,8 @@ use crate::{
 
 /// Enumeration of available CPU interrupts
 ///
-/// It's possible to create one handler per priority level. (e.g
-/// `level1_interrupt`)
+/// It is possible to create one handler per priority level (e.g.
+/// `level1_interrupt`).
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
@@ -107,21 +107,21 @@ impl CpuInterrupt {
         true
     }
 
-    /// Enable the CPU interrupt
+    /// Enables the CPU interrupt.
     #[inline]
     #[instability::unstable]
     pub fn enable(self) {
         enable_cpu_interrupt_raw(self as u32);
     }
 
-    /// Clear the CPU interrupt status bit
+    /// Clears the CPU interrupt status bit.
     #[inline]
     #[instability::unstable]
     pub fn clear(self) {
         unsafe { xtensa_lx::interrupt::clear(1 << self as u32) };
     }
 
-    /// Get interrupt priority for the CPU
+    /// Returns the interrupt priority for the CPU.
     #[inline]
     #[instability::unstable]
     pub fn priority(self) -> Priority {
@@ -165,7 +165,7 @@ impl CpuInterrupt {
 /// Interrupt priority levels.
 ///
 /// A higher numeric value means higher priority. Interrupt requests at higher priority levels will
-/// be able to preempt code running at a lower [`RunLevel`][super::RunLevel].
+/// be able to preempt code running at a lower [`RunLevel`][super::RunLevel]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
@@ -287,7 +287,7 @@ pub(crate) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
 
 // Runlevel APIs
 
-/// Get the current run level (the level below which interrupts are masked).
+/// Returns the current run level (the level below which interrupts are masked).
 pub(crate) fn current_raw_runlevel() -> u32 {
     xtensa_lx::interrupt::get_level()
 }
@@ -297,9 +297,8 @@ pub(crate) fn current_raw_runlevel() -> u32 {
 ///
 /// # Safety
 ///
-/// This function must only be used to raise the runlevel and to restore it
-/// to a previous value. It must not be used to arbitrarily lower the
-/// runlevel.
+/// Must only be used to raise the runlevel and to restore it to a previous
+/// value. Must not be used to arbitrarily lower the runlevel.
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let token: u32;
     unsafe {
@@ -332,11 +331,11 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     unwrap!(RunLevel::try_from_u32(token & 0x0F))
 }
 
-/// Wait for an interrupt to occur.
+/// Waits for an interrupt to occur.
 ///
-/// This function causes the current CPU core to execute its Wait For Interrupt
-/// (WFI or equivalent) instruction. After executing this function, the CPU core
-/// will stop execution until an interrupt occurs.
+/// Causes the current CPU core to execute its Wait For Interrupt (WFI or
+/// equivalent) instruction. After this call, the CPU core stops execution until
+/// an interrupt occurs.
 #[inline(always)]
 #[instability::unstable]
 pub fn wait_for_interrupt() {
@@ -398,11 +397,11 @@ cfg_select! {
     }
 }
 
-/// Setup interrupts ready for vectoring
+/// Sets up interrupts ready for vectoring.
 ///
 /// # Safety
 ///
-/// This function must be called only during core startup.
+/// Must be called only during core startup.
 #[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
 pub(crate) unsafe fn init_vectoring() {
     // Enable vectored interrupts. No configuration is needed because these interrupts have

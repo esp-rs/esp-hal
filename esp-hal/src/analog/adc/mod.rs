@@ -50,7 +50,7 @@
 //!  - The ESP32-S31 has no calibration scheme. ESP-IDF does not define the calibration eFuses or
 //!    the curve fitting coefficients for this chip yet.
 //!  - The ESP32-S31 SAR ADC has one attenuation setting, so the attenuation given to
-//!    [`AdcConfig::enable_pin`] has no effect.
+//!    [`AdcConfig::enable_pin`] has no effect
 //!  - The ESP32-S31 SAR is differential and its result is the weighted sum of 17 redundant
 //!    comparator bits. Readings run from 0 to `FULL_SCALE` (4393), and an input tied to ground
 //!    reads about `ZERO_DIFF_CODE` (2198), so a single-ended measurement only uses the codes above
@@ -75,8 +75,8 @@ pub use self::implementation::*;
 /// The approximate attenuation of the ADC pin.
 ///
 /// The effective measurement range for a given attenuation is dependent on the
-/// device being targeted. Please refer to "ADC Characteristics" section of your
-/// device's datasheet for more information.
+/// device being targeted. Refer to the "ADC Characteristics" section of the
+/// device datasheet for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(clippy::enum_variant_names, reason = "unit of measurement")]
@@ -104,7 +104,7 @@ pub enum AdcCalSource {
 
 /// An I/O pin which can be read using the ADC.
 pub struct AdcPin<PIN, ADCX, CS = ()> {
-    /// The underlying GPIO pin
+    /// The underlying GPIO pin.
     pub pin: PIN,
     /// Calibration scheme used for the configured ADC pin
     pub cal_scheme: CS,
@@ -143,12 +143,12 @@ pub struct AdcConfig<ADCX> {
 
 #[cfg(feature = "unstable")]
 impl<ADCX> AdcConfig<ADCX> {
-    /// Create a new configuration struct with its default values
+    /// Creates a new configuration struct with its default values.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Enable the specified pin with the given attenuation
+    /// Enables the specified pin with the given attenuation.
     pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCX>
     where
         PIN: AdcChannel + AnalogPin,
@@ -164,8 +164,8 @@ impl<ADCX> AdcConfig<ADCX> {
         }
     }
 
-    /// Enable the specified pin with the given attenuation and calibration
-    /// scheme
+    /// Enables the specified pin with the given attenuation and calibration
+    /// scheme.
     #[cfg(feature = "unstable")]
     pub fn enable_pin_with_cal<PIN, CS>(
         &mut self,
@@ -211,7 +211,7 @@ pub trait CalibrationAccess: RegisterAccess {
 
     fn enable_vdef(enable: bool);
 
-    /// Enable internal calibration voltage source
+    /// Enables internal calibration voltage source.
     fn connect_cal(source: AdcCalSource, enable: bool);
 }
 
@@ -223,14 +223,14 @@ pub trait AdcChannel {
 
 /// A trait abstracting over calibration methods.
 ///
-/// The methods in this trait are mostly for internal use. To get
-/// calibrated ADC reads, all you need to do is call `enable_pin_with_cal`
-/// and specify some implementor of this trait.
+/// The methods in this trait are mostly for internal use. Call
+/// `enable_pin_with_cal` with an implementor of this trait to get calibrated
+/// ADC reads.
 pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
-    /// Create a new calibration scheme for the given attenuation.
+    /// Creates a new calibration scheme for the given attenuation.
     fn new_cal(atten: Attenuation) -> Self;
 
-    /// Create a new calibration scheme for the given attenuation and ADC
+    /// Creates a new calibration scheme for the given attenuation and ADC
     /// channel.
     ///
     /// The default implementation ignores `channel` and calls [`Self::new_cal`].
@@ -238,12 +238,12 @@ pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
         Self::new_cal(atten)
     }
 
-    /// Return the basic ADC bias value.
+    /// Returns the basic ADC bias value.
     fn adc_cal(&self) -> u16 {
         0
     }
 
-    /// Convert ADC value.
+    /// Converts ADC value.
     fn adc_val(&self, val: u16) -> u16 {
         val
     }
@@ -258,24 +258,24 @@ impl<ADCX> AdcCalScheme<ADCX> for () {
 /// A helper trait to get access to ADC calibration efuses.
 #[cfg(not(any(esp32, esp32s31)))]
 trait AdcCalEfuse {
-    /// Get ADC calibration init code
+    /// Returns the ADC calibration init code.
     ///
-    /// Returns digital value for zero voltage for a given attenuation
+    /// Returns digital value for zero voltage for a given attenuation.
     fn init_code(atten: Attenuation) -> Option<u16>;
 
-    /// Get ADC calibration reference point voltage
+    /// Returns the ADC calibration reference point voltage.
     ///
-    /// Returns reference voltage (millivolts) for a given attenuation
+    /// Returns reference voltage (millivolts) for a given attenuation.
     fn cal_mv(atten: Attenuation) -> u16;
 
-    /// Get ADC calibration reference point digital value
+    /// Returns the ADC calibration reference point digital value.
     ///
-    /// Returns digital value for reference voltage for a given attenuation
+    /// Returns digital value for reference voltage for a given attenuation.
     fn cal_code(atten: Attenuation) -> Option<u16>;
 
-    /// Get the ADC channel specific calibration
+    /// Returns the ADC channel specific calibration.
     ///
-    /// Returns digital per channel offset from reference voltage
+    /// Returns digital per channel offset from reference voltage.
     #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
     fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32>;
 }

@@ -2,7 +2,7 @@
 //!
 //! v1 scope: timer wakeup only, single core. Ported from the ESP32-C6 PMU sleep
 //! driver and adapted to the P4 PMU (DCDC, no wireless modem, no regdma
-//! retention) using the esp-idf `pmu_sleep.c` / `pmu_param.h` references.
+//! retention) using the esp-idf `pmu_sleep.c` / `pmu_param.h` references
 
 use core::{
     ops::Not,
@@ -83,7 +83,7 @@ fn usj_pad_is_enabled() -> bool {
 }
 
 /// Backup and disable the USJ pad on light-sleep entry. esp-idf
-/// `sleep_console_usj_pad_backup_and_disable`.
+/// `sleep_console_usj_pad_backup_and_disable`
 fn usj_pad_backup_and_disable() {
     let clock_enabled = usj_module_is_enabled();
     let pad_enabled = if clock_enabled {
@@ -101,7 +101,7 @@ fn usj_pad_backup_and_disable() {
     USJ_PAD_WAS_ENABLED.store(pad_enabled, Ordering::Relaxed);
 }
 
-/// Restore the USJ pad on wake. esp-idf `sleep_console_usj_pad_restore`.
+/// Restores the USJ pad on wake. esp-idf `sleep_console_usj_pad_restore`.
 fn usj_pad_restore() {
     usj_enable_bus_clock(true);
     usj_set_pad_enable(USJ_PAD_WAS_ENABLED.load(Ordering::Relaxed));
@@ -111,7 +111,7 @@ fn usj_pad_restore() {
 }
 
 /// LP SPM RAM base. On rev-3.0 the deep-sleep wake reset vector can be
-/// redirected here (see [`install_mspi_workaround_stub`]).
+/// redirected here (see [`install_mspi_workaround_stub`])
 const P4_LP_RAM_BOOT_ADDR: usize = 0x5010_8000;
 
 /// Returns whether this silicon is ESP32-P4 rev 3.0 (ECO5), the only revision
@@ -799,16 +799,16 @@ bitfield::bitfield! {
     pub u32, pd_xtal     , set_pd_xtal     : 10;
     /// Controls the power-down status of the fast RC oscillator.
     pub u32, pd_rc_fast  , set_pd_rc_fast  : 11;
-    /// Controls the power-down status of the 32kHz crystal oscillator.
+    /// Controls the power-down status of the 32 kHz crystal oscillator.
     pub u32, pd_xtal32k  , set_pd_xtal32k  : 12;
-    /// Controls the power-down status of the 32kHz RC oscillator.
+    /// Controls the power-down status of the 32 kHz RC oscillator.
     pub u32, pd_rc32k    , set_pd_rc32k    : 13;
     /// Controls the power-down status of the low-power peripheral domain.
     pub u32, pd_lp_periph, set_pd_lp_periph: 14;
 }
 
 impl PowerDownFlags {
-    /// Checks whether all memory groups are powered down.
+    /// Returns whether all memory groups are powered down.
     pub fn pd_mem(self) -> bool {
         self.pd_mem_g0() && self.pd_mem_g1() && self.pd_mem_g2() && self.pd_mem_g3()
     }

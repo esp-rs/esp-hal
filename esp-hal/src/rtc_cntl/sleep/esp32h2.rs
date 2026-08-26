@@ -410,7 +410,7 @@ impl SleepTimeConfig {
 pub struct RtcSleepConfig {
     /// Deep Sleep flag
     pub deep: bool,
-    /// Power Down flags
+    /// Powers Down flags.
     pub pd_flags: PowerDownFlags,
     /// Indicates whether the top power domain should remain enabled during sleep.
     need_pd_top: bool,
@@ -431,7 +431,7 @@ impl Default for RtcSleepConfig {
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
-    /// Power domains to be powered down during sleep
+    /// Power domains to be powered down during sleep.
     pub struct PowerDownFlags(u32);
 
     /// Controls the power-down status of the top power domain.
@@ -446,7 +446,7 @@ bitfield::bitfield! {
     pub u32, pd_xtal     , set_pd_xtal     : 4;
     /// Controls the power-down status of the fast RC oscillator.
     pub u32, pd_rc_fast  , set_pd_rc_fast  : 5;
-    /// Controls the power-down status of the 32kHz crystal oscillator.
+    /// Controls the power-down status of the 32 kHz crystal oscillator.
     pub u32, pd_xtal32k  , set_pd_xtal32k  : 6;
 }
 
@@ -617,7 +617,7 @@ impl RtcSleepConfig {
         restore_clock_config
     }
 
-    /// Cleans up after sleep
+    /// Cleans up after sleep.
     pub(crate) fn finish_sleep(&self) {
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.

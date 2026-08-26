@@ -98,7 +98,7 @@ impl PdmDownsampleRate {
 }
 
 impl PdmTxClockConfig {
-    /// Default codec-line PDM TX clock (`I2S_PDM_TX_CLK_DEFAULT_CONFIG`).
+    /// Default codec-line PDM TX clock (`I2S_PDM_TX_CLK_DEFAULT_CONFIG`)
     pub fn codec_default(sample_rate: Rate) -> Self {
         Self {
             sample_rate,
@@ -108,7 +108,7 @@ impl PdmTxClockConfig {
         }
     }
 
-    /// Default DAC-line PDM TX clock (`I2S_PDM_TX_CLK_DAC_DEFAULT_CONFIG`).
+    /// Default DAC-line PDM TX clock (`I2S_PDM_TX_CLK_DAC_DEFAULT_CONFIG`)
     pub fn dac_default(sample_rate: Rate) -> Self {
         Self {
             sample_rate,
@@ -120,7 +120,7 @@ impl PdmTxClockConfig {
 }
 
 impl PdmRxClockConfig {
-    /// Default PDM RX clock (`I2S_PDM_RX_CLK_DEFAULT_CONFIG`).
+    /// Default PDM RX clock (`I2S_PDM_RX_CLK_DEFAULT_CONFIG`)
     pub fn default(sample_rate: Rate) -> Self {
         Self {
             sample_rate,

@@ -71,7 +71,7 @@ impl<ADCX> AdcConfig<ADCX>
 where
     ADCX: RegisterAccess,
 {
-    /// Calibrate ADC with specified attenuation and voltage source
+    /// Calibrates ADC with specified attenuation and voltage source.
     pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16
     where
         ADCX: super::CalibrationAccess,
@@ -118,25 +118,25 @@ where
 
 #[doc(hidden)]
 pub trait RegisterAccess {
-    /// Configure onetime sampling parameters
+    /// Configures one-time sampling parameters.
     fn config_onetime_sample(channel: u8, attenuation: u8);
 
-    /// Start onetime sampling
+    /// Starts one-time sampling.
     fn start_onetime_sample();
 
-    /// Check if sampling is done
+    /// Returns whether sampling is done.
     fn is_done() -> bool;
 
-    /// Read sample data
+    /// Reads sample data.
     fn read_data() -> u16;
 
-    /// Reset flags
+    /// Resets flags.
     fn reset();
 
-    /// Set up ADC hardware for calibration
+    /// Sets up ADC hardware for calibration.
     fn calibration_init();
 
-    /// Set calibration parameter to ADC hardware
+    /// Sets calibration parameter to ADC hardware.
     fn set_init_code(data: u16);
 }
 
@@ -302,8 +302,8 @@ impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configure a given ADC instance using the provided configuration, and
-    /// initialize the ADC for use
+    /// Configures a given ADC instance using the provided configuration, and
+    /// initializes the ADC for use.
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
@@ -342,9 +342,9 @@ where
         }
     }
 
-    /// Request that the ADC begin a conversion on the specified pin
+    /// Requests that the ADC begin a conversion on the specified pin.
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     pub fn read_oneshot<PIN, CS>(
@@ -471,7 +471,7 @@ impl<'d, ADCX> Adc<'d, ADCX, Async>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Reconfigures the ADC driver to operate in [`Blocking`] mode.
     pub fn into_blocking(self) -> Adc<'d, ADCX, Blocking> {
         if release_async_adc() {
             // Disable ADC interrupt on all cores if the last async ADC instance is disabled
@@ -488,9 +488,9 @@ where
         }
     }
 
-    /// Request that the ADC begin a conversion on the specified pin
+    /// Requests that the ADC begin a conversion on the specified pin.
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
@@ -570,18 +570,18 @@ fn handle_async<ADCX: Instance>(_instance: ADCX) {
     ADCX::unlisten();
 }
 
-/// Enable asynchronous access.
+/// Enables asynchronous access.
 pub trait Instance: crate::private::Sealed {
-    /// Enable the ADC interrupt
+    /// Enables the ADC interrupt.
     fn listen();
 
-    /// Disable the ADC interrupt
+    /// Disables the ADC interrupt.
     fn unlisten();
 
-    /// Clear the ADC interrupt
+    /// Clears the ADC interrupt.
     fn clear_interrupt();
 
-    /// Obtain the waker for the ADC interrupt
+    /// Obtains the waker for the ADC interrupt.
     fn waker() -> &'static AtomicWaker;
 }
 

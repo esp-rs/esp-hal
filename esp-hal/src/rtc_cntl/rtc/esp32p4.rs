@@ -13,7 +13,7 @@ const HP_SYSCLK_XTAL: u8 = 0;
 #[repr(usize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ChipPowerOn   = 0x01,
     /// Software resets the digital core
     CoreSw        = 0x03,
@@ -33,7 +33,7 @@ pub enum SocResetReason {
     Cpu0Sw        = 0x0C,
     /// RTC watch dog resets CPU 0
     Cpu0RtcWdt    = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,
@@ -51,7 +51,7 @@ pub enum SocResetReason {
     Cpu0JtagCpu   = 0x18,
 }
 
-/// Clear all force flags on PMU power domains to allow normal power management.
+/// Clears all force flags on PMU power domains to allow normal power management.
 ///
 /// eco5 power domains (verified against PAC):
 ///   - TOP: power_pd_top_cntl (system top-level)
@@ -419,7 +419,7 @@ fn pmu_hp_system_init() {
 }
 
 /// Configures the default per-mode LP system PMU registers (LP_ACTIVE which
-/// lives in the `hp_sleep_lp_*` group, and LP_SLEEP in the `lp_sleep_*` group).
+/// lives in the `hp_sleep_lp_*` group, and LP_SLEEP in the `lp_sleep_*` group)
 /// Mirrors `pmu_lp_system_init()` in esp-idf.
 fn pmu_lp_system_init() {
     let pmu = PMU::regs();

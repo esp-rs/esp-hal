@@ -221,7 +221,7 @@ with_i2s_dma_engine! {
     ($engine:tt, $any_channel:ident) => {
         /// DMA channel trait for I2S master peripherals.
         ///
-        /// Implemented for each channel type that can serve a particular I2S instance `S`.
+        /// Implemented for each channel type that can serve a particular I2S instance `S`
         #[instability::unstable]
         #[diagnostic::on_unimplemented(
             message = "The DMA channel cannot be used with this I2S peripheral",
@@ -245,7 +245,7 @@ with_i2s_dma_engine! {
 }
 
 impl<'d> I2s<'d, crate::Blocking> {
-    /// Construct a new I2S instance in TDM mode.
+    /// Creates a new I2S instance in TDM mode.
     pub fn new<I: Instance + 'd>(
         i2s: I,
         channel: impl I2sMasterDmaChannel<'d, I>,
@@ -254,7 +254,7 @@ impl<'d> I2s<'d, crate::Blocking> {
         Self::new_internal(i2s, channel.into(), Config::Tdm(config))
     }
 
-    /// Construct a new I2S instance in PDM mode.
+    /// Creates a new I2S instance in PDM mode.
     #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
     pub fn new_pdm<I: Instance + PdmInstance + 'd>(
         i2s: I,
@@ -271,8 +271,7 @@ pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_
 
 /// A structure representing a DMA transfer.
 ///
-/// This structure holds references to the driver instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the driver instance, DMA buffers, and transfer status.
 #[instability::unstable]
 pub struct I2sTxDmaTransfer<'d, Dm, Buf>
 where
@@ -289,7 +288,7 @@ where
     Dm: DriverMode,
     Buf: DmaTxBuffer,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.completed || self.i2s_tx.i2s.info().is_tx_done()
     }
@@ -306,7 +305,7 @@ where
         }
     }
 
-    /// Immediately stop the transfer and return the peripheral and buffer.
+    /// Immediately stops the transfer and returns the peripheral and buffer.
     pub fn stop(mut self) -> (I2sTx<'d, Dm>, Buf::Final) {
         self.i2s_tx.tx_channel.stop_transfer();
         self.i2s_tx.i2s.info().tx_stop();
@@ -406,8 +405,7 @@ impl<Dm: DriverMode, BUF: DmaTxBuffer> Drop for I2sTxDmaTransfer<'_, Dm, BUF> {
 
 /// A structure representing a DMA transfer.
 ///
-/// This structure holds references to the driver instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the driver instance, DMA buffers, and transfer status.
 #[instability::unstable]
 pub struct I2sRxDmaTransfer<'d, Dm, Buf>
 where
@@ -424,7 +422,7 @@ where
     Dm: DriverMode,
     Buf: DmaRxBuffer,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.completed || self.i2s_rx.i2s.info().is_rx_done()
     }
@@ -442,7 +440,7 @@ where
         }
     }
 
-    /// Immediately stop the transfer and return the peripheral and buffer.
+    /// Immediately stops the transfer and returns the peripheral and buffer.
     pub fn stop(mut self) -> (I2sRx<'d, Dm>, Buf::Final) {
         self.i2s_rx.i2s.info().rx_stop();
         self.i2s_rx.rx_channel.stop_transfer();
@@ -718,7 +716,7 @@ pub enum Endianness {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WsWidth {
-    /// Word select signal will be kept active for half of the frame
+    /// Word select signal will be kept active for half of the frame.
     #[default]
     HalfFrame,
     /// Word select signal will be kept active for the length of the first channel (PCM long frame
@@ -732,14 +730,14 @@ pub enum WsWidth {
     Bits(u16),
 }
 
-/// Represents the polarity of a signal
+/// Represents the polarity of a signal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Polarity {
-    /// The signal is high when active
+    /// The signal is high when active.
     #[default]
     ActiveHigh,
-    /// The signal is low when active
+    /// The signal is low when active.
     ActiveLow,
 }
 
@@ -753,9 +751,9 @@ pub struct Channels {
 }
 
 impl Channels {
-    /// Two channels will use different data
+    /// Two channels will use different data.
     pub const STEREO: Channels = Channels::new_impl(2, 0b11, None);
-    /// Two channels will use the same data
+    /// Two channels will use the same data.
     pub const MONO: Channels = Channels::new_impl(2, 0b01, None);
     /// Two channels. Left(first) channel will contain data. Right(second) channel will contain
     /// zeros.
@@ -776,7 +774,7 @@ impl Channels {
     ///   disabled channels repeat the data from the last active channel. This field is ignored in
     ///   the receiver unit.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// The following example prepares configuration for 6 channels. Only 1st and 4th channels
     /// are active. Channels 2-3 will use the same data as the 1st, and channels 5-6 will use the
@@ -824,20 +822,20 @@ pub(crate) enum Config {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct TdmConfig {
-    /// Receiver unit config
+    /// Receiver unit config.
     rx_config: TdmUnitConfig,
 
-    /// Transmitter unit config
+    /// Transmitter unit config.
     tx_config: TdmUnitConfig,
 
-    /// Sets `I2S_SIG_LOOPBACK`: TX and RX share the same WS and BCK.
+    /// Sets `I2S_SIG_LOOPBACK`: TX and RX share the same WS and BCK
     signal_loopback: bool,
 
-    /// The target sample rate
+    /// The target sample rate.
     #[cfg(i2s_version = "1")]
     sample_rate: Rate,
 
-    /// Format of the data
+    /// Formats of the data.
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
 }
@@ -910,7 +908,7 @@ impl TdmConfig {
         I2sClockDividers::new(self.sample_rate, 2, self.data_format.data_bits())
     }
 
-    /// Assign the given value to the `sample_rate` field in both units.
+    /// Assigns the given value to the `sample_rate` field in both units.
     #[must_use]
     #[cfg(not(i2s_version = "1"))]
     pub fn with_sample_rate(self, sample_rate: Rate) -> Self {
@@ -921,7 +919,7 @@ impl TdmConfig {
         }
     }
 
-    /// Assign the given value to the `channels` field in both units.
+    /// Assigns the given value to the `channels` field in both units.
     #[must_use]
     pub fn with_channels(self, channels: Channels) -> Self {
         Self {
@@ -931,7 +929,7 @@ impl TdmConfig {
         }
     }
 
-    /// Assign the given value to the `data_format` field in both units.
+    /// Assigns the given value to the `data_format` field in both units.
     #[must_use]
     #[cfg(not(i2s_version = "1"))]
     pub fn with_data_format(self, data_format: DataFormat) -> Self {
@@ -942,7 +940,7 @@ impl TdmConfig {
         }
     }
 
-    /// Assign the given value to the `ws_width` field in both units.
+    /// Assigns the given value to the `ws_width` field in both units.
     #[must_use]
     pub fn with_ws_width(self, ws_width: WsWidth) -> Self {
         Self {
@@ -952,7 +950,7 @@ impl TdmConfig {
         }
     }
 
-    /// Assign the given value to the `ws_polarity` field in both units.
+    /// Assigns the given value to the `ws_polarity` field in both units.
     #[must_use]
     pub fn with_ws_polarity(self, ws_polarity: Polarity) -> Self {
         Self {
@@ -962,7 +960,7 @@ impl TdmConfig {
         }
     }
 
-    /// Assign the given value to the `msb_shift` field in both units.
+    /// Assigns the given value to the `msb_shift` field in both units.
     #[must_use]
     pub fn with_msb_shift(self, msb_shift: bool) -> Self {
         Self {
@@ -972,7 +970,7 @@ impl TdmConfig {
         }
     }
 
-    /// Assign the given value to the `endianness` field in both units.
+    /// Assigns the given value to the `endianness` field in both units.
     #[cfg(not(esp32))]
     #[must_use]
     pub fn with_endianness(self, endianness: Endianness) -> Self {
@@ -983,7 +981,7 @@ impl TdmConfig {
         }
     }
 
-    /// Assign the given value to the `bit_order` field in both units.
+    /// Assigns the given value to the `bit_order` field in both units.
     #[cfg(not(i2s_version = "1"))]
     #[must_use]
     pub fn with_bit_order(self, bit_order: BitOrder) -> Self {
@@ -1015,40 +1013,40 @@ impl Default for TdmConfig {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct TdmUnitConfig {
-    /// The target sample rate
+    /// The target sample rate.
     #[cfg(not(i2s_version = "1"))]
     sample_rate: Rate,
 
-    /// I2S channels configuration
+    /// I2S channels configuration.
     channels: Channels,
 
-    /// Format of the data
+    /// Formats of the data.
     #[cfg(not(i2s_version = "1"))]
     data_format: DataFormat,
 
-    /// Duration for which WS signal is kept active
+    /// Duration for which WS signal is kept active.
     ws_width: WsWidth,
 
-    /// Polarity of WS signal
+    /// Polarity of WS signal.
     ws_polarity: Polarity,
 
-    /// Data signal will lag by one bit relative to the WS signal
+    /// Data signal will lag by one bit relative to the WS signal.
     msb_shift: bool,
 
-    /// Byte order of the data
+    /// Byte order of the data.
     #[cfg(not(esp32))]
     endianness: Endianness,
 
-    /// Bit order of the data
+    /// Bit order of the data.
     #[cfg(not(i2s_version = "1"))]
     bit_order: BitOrder,
 }
 
-/// Alias for [`TdmUnitConfig`] (TDM mode unit configuration).
+/// Alias for [`TdmUnitConfig`] (TDM mode unit configuration)
 pub type UnitConfig = TdmUnitConfig;
 
 impl TdmUnitConfig {
-    /// TDM Philips standard configuration with two 16-bit active channels
+    /// TDM Philips standard configuration with two 16-bit active channels.
     pub fn new_tdm_philips() -> Self {
         Self {
             #[cfg(not(i2s_version = "1"))]
@@ -1066,19 +1064,19 @@ impl TdmUnitConfig {
         }
     }
 
-    /// TDM MSB standard configuration with two 16-bit active channels
+    /// TDM MSB standard configuration with two 16-bit active channels.
     pub fn new_tdm_msb() -> Self {
         Self::new_tdm_philips().with_msb_shift(false)
     }
 
-    /// TDM PCM short frame standard configuration with two 16-bit active channels
+    /// TDM PCM short frame standard configuration with two 16-bit active channels.
     pub fn new_tdm_pcm_short() -> Self {
         Self::new_tdm_philips()
             .with_ws_width(WsWidth::Bit)
             .with_ws_polarity(Polarity::ActiveHigh)
     }
 
-    /// TDM PCM long frame standard configuration with two 16-bit active channels
+    /// TDM PCM long frame standard configuration with two 16-bit active channels.
     #[cfg(not(i2s_version = "1"))]
     pub fn new_tdm_pcm_long() -> Self {
         Self::new_tdm_philips()
@@ -1138,13 +1136,13 @@ impl Default for TdmUnitConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConfigError {
-    /// Provided [Channels] configuration has no active channels or has over 16 total channels
+    /// Provided [Channels] configuration has no active channels or has over 16 total channels.
     #[cfg(not(i2s_version = "1"))]
     ChannelsOutOfRange,
-    /// Requested WS signal width is out of range
+    /// Requested WS signal width is out of range.
     #[cfg(not(i2s_version = "1"))]
     WsWidthOutOfRange,
-    /// PDM configuration error
+    /// PDM configuration error.
     #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
     Pdm(PdmError),
 }
@@ -1182,7 +1180,7 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
-/// Instance of the I2S peripheral driver
+/// Instance of the I2S peripheral driver.
 #[non_exhaustive]
 pub struct I2s<'d, Dm>
 where
@@ -1207,10 +1205,9 @@ where
         doc = "Registers an interrupt handler for the peripheral on the current core."
     )]
     #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
+    /// The default/unhandled interrupt handler can be restored with
     /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -1218,7 +1215,7 @@ where
         self.i2s_tx.i2s.set_interrupt_handler(handler);
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts.
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
@@ -1228,7 +1225,7 @@ where
             .enable_listen(interrupts.into(), true);
     }
 
-    /// Unlisten the given interrupts
+    /// Unlistens from the given interrupts.
     #[instability::unstable]
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
@@ -1238,14 +1235,14 @@ where
             .enable_listen(interrupts.into(), false);
     }
 
-    /// Gets asserted interrupts
+    /// Returns the asserted interrupts.
     #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<I2sInterrupt> {
         // tx.i2s and rx.i2s is the same, we could use either one
         self.i2s_tx.i2s.info().interrupts()
     }
 
-    /// Resets asserted interrupts
+    /// Resets asserted interrupts.
     #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sInterrupt>>) {
         // tx.i2s and rx.i2s is the same, we could use either one
@@ -1442,7 +1439,7 @@ where
     }
 }
 
-/// I2S TX channel
+/// I2S TX channel.
 pub struct I2sTx<'d, Dm>
 where
     Dm: DriverMode,
@@ -1467,7 +1464,7 @@ impl<'d, Dm> I2sTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Perform a DMA write.
+    /// Performs a DMA write.
     #[allow(clippy::type_complexity)]
     #[instability::unstable]
     pub fn write<TX: DmaTxBuffer>(
@@ -1493,7 +1490,7 @@ where
         })
     }
 
-    /// Change the I2S Tx unit configuration.
+    /// Changes the I2S Tx unit configuration.
     pub fn apply_config(&mut self, tx_config: &UnitConfig) -> Result<(), ConfigError> {
         tx_config.validate()?;
         self.i2s.info().configure_tx(
@@ -1504,7 +1501,7 @@ where
     }
 }
 
-/// I2S RX channel
+/// I2S RX channel.
 pub struct I2sRx<'d, Dm>
 where
     Dm: DriverMode,
@@ -1529,12 +1526,12 @@ impl<'d, Dm> I2sRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Perform a DMA read.
+    /// Performs a DMA read.
     ///
     /// The number of read bytes might be less than the capacity of the provided buffer since the
     /// peripheral might not completely fill each descriptor's buffer.
     ///
-    /// This will return a [I2sRxDmaTransfer]
+    /// Returns an [`I2sRxDmaTransfer`].
     pub fn read<BUF>(
         mut self,
         mut buffer: BUF,
@@ -1564,7 +1561,7 @@ where
         })
     }
 
-    /// Change the I2S Rx unit configuration.
+    /// Changes the I2S Rx unit configuration.
     pub fn apply_config(&mut self, rx_config: &UnitConfig) -> Result<(), ConfigError> {
         rx_config.validate()?;
         self.i2s.info().configure_rx(
@@ -1710,12 +1707,12 @@ pub(crate) mod private {
             self
         }
 
-        /// Connect the PDM clock pin (maps to the WS output signal).
+        /// Connects the PDM clock pin (maps to the WS output signal).
         pub fn with_clk(self, clk: impl PeripheralOutput<'d>) -> Self {
             self.with_ws(clk)
         }
 
-        /// Connect a second PDM TX data line (line 1, two-line DAC mode, HW v2+).
+        /// Connects a second PDM TX data line (line 1, two-line DAC mode, HW v2+).
         #[cfg(all(i2s_supports_pdm_tx, not(i2s_version = "1")))]
         pub fn with_dout2(self, dout: impl PeripheralOutput<'d>) -> Result<Self, ConfigError> {
             let dout = dout.into();
@@ -1789,12 +1786,12 @@ pub(crate) mod private {
             self
         }
 
-        /// Connect the PDM clock pin (maps to the WS output signal).
+        /// Connects the PDM clock pin (maps to the WS output signal).
         pub fn with_clk(self, clk: impl PeripheralOutput<'d>) -> Self {
             self.with_ws(clk)
         }
 
-        /// Connect a PDM RX data line (`line` 0..=`pdm_max_rx_lines`-1).
+        /// Connects a PDM RX data line (`line` 0..=`pdm_max_rx_lines`-1).
         #[cfg(i2s_supports_pdm_rx)]
         pub fn with_din_line(
             self,

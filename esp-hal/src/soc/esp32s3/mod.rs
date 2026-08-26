@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The `SOC` module provides access, functions and structures that are useful
-//! for interacting with various system-related peripherals on `ESP32-S3` chip.
+//! for interacting with various system-related peripherals on `ESP32-S3` chip
 
 crate::unstable_module! {
     pub mod clocks;
@@ -106,7 +106,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
     }
 }
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {

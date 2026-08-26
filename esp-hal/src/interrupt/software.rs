@@ -3,7 +3,7 @@
 //!
 //! The [`SoftwareInterrupt`] struct allows raising or resetting software
 //! interrupts using the [`raise()`][SoftwareInterrupt::raise] and
-//! [`reset()`][SoftwareInterrupt::reset] methods.
+//! [`reset()`][SoftwareInterrupt::reset] methods
 //!
 //! ## Examples
 //!
@@ -57,7 +57,7 @@ pub struct SoftwareInterrupt<'d, const NUM: u8> {
 }
 
 impl<'d, const NUM: u8> SoftwareInterrupt<'d, NUM> {
-    /// Create a software interrupt driver.
+    /// Creates a new software interrupt driver.
     #[inline]
     pub const fn new(instance: impl Instance<NUM> + 'd) -> Self {
         core::mem::forget(instance); // needed to make `new` const
@@ -66,7 +66,7 @@ impl<'d, const NUM: u8> SoftwareInterrupt<'d, NUM> {
         }
     }
 
-    /// Sets the interrupt handler for this software-interrupt
+    /// Sets the interrupt handler for this software-interrupt.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         let interrupt;
@@ -86,7 +86,7 @@ impl<'d, const NUM: u8> SoftwareInterrupt<'d, NUM> {
         interrupt::bind_handler(interrupt, handler);
     }
 
-    /// Trigger this software-interrupt
+    /// Triggers this software-interrupt.
     #[crate::ram]
     pub fn raise(&self) {
         let regs = cfg_select! {
@@ -125,7 +125,7 @@ impl<'d, const NUM: u8> SoftwareInterrupt<'d, NUM> {
         crate::interrupt::InterruptStatus::is_pending(interrupt)
     }
 
-    /// Resets this software-interrupt
+    /// Resets this software-interrupt.
     pub fn reset(&self) {
         cfg_select! {
             soc_has_intpri => {

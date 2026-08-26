@@ -1,5 +1,5 @@
 //! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
-//! is programmed by `EngineSession` on engine acquire.
+//! is programmed by `EngineSession` on engine acquire
 use super::*;
 
 /// Powers the SD card / SD IO domain from on-chip LDO channel 4 at 3.3 V.
@@ -16,7 +16,7 @@ use super::*;
 /// hands control to software (`tieh_sel`), `tieh_sel = 0` selects the `tieh`
 /// bit, and `tieh = 1` ties the output to the 3.3 V rail directly, so the
 /// `dref`/`mul` reference is irrelevant. `target0`/`target1` keep their
-/// reset (power-on delay) defaults via `modify`.
+/// reset (power-on delay) defaults via `modify`
 pub fn chip_setup() {
     let pmu = crate::peripherals::PMU::regs();
 

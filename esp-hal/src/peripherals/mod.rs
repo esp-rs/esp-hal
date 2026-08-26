@@ -36,11 +36,11 @@ macro_rules! create_peripheral {
         }
 
         impl $name<'_> {
-            /// Unsafely create an instance of this peripheral out of thin air.
+            /// Unsafely creates an instance of this peripheral out of thin air.
             ///
             /// # Safety
             ///
-            /// You must ensure that you're only using one instance of this type at a time.
+            /// The caller must ensure that only one instance of this type is used at a time.
             #[inline]
             pub unsafe fn steal() -> Self {
                 Self {
@@ -52,7 +52,7 @@ macro_rules! create_peripheral {
             ///
             /// # Safety
             ///
-            /// You must ensure that you're only using one instance of this type at a time.
+            /// The caller must ensure that only one instance of this type is used at a time.
             #[inline]
             #[allow(dead_code)]
             pub unsafe fn clone_unchecked(&self) -> Self {
@@ -61,8 +61,8 @@ macro_rules! create_peripheral {
 
             /// Creates a new peripheral reference with a shorter lifetime.
             ///
-            /// Use this method if you would like to keep working with the peripheral after
-            /// you dropped the driver that consumes this.
+            /// Use this method to keep working with the peripheral after the driver
+            /// that consumes it is dropped.
             #[inline]
             #[allow(dead_code)]
             pub fn reborrow(&mut self) -> $name<'_> {
@@ -73,7 +73,7 @@ macro_rules! create_peripheral {
                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral, and enables the interrupt.
                 ///
                 /// <section class="warning">
-                /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                /// Very low-level interrupt API. Unless writing drivers, this is probably not the interrupt API to use.
                 /// </section>
                 ///
                 #[instability::unstable]
@@ -85,16 +85,16 @@ macro_rules! create_peripheral {
                 #[doc = concat!("Enables the ", stringify!($interrupt), " peripheral interrupt on the given priority level.")]
                 ///
                 /// <section class="warning">
-                /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                /// Very low-level interrupt API. Unless writing drivers, this is probably not the interrupt API to use.
                 /// </section>
                 #[cfg_attr(multi_core, doc = "The interrupt handler will be enabled on the core that calls this function.")]
                 ///
-                /// Note that a suitable interrupt handler needs to be set up before the first interrupt
-                /// is triggered, otherwise the default handler will panic.
-                #[cfg_attr(not(feature = "unstable"), doc = "To set up an interrupt handler, create a function that has the same (non-mangled) name as the interrupt you want to handle.")]
-                #[cfg_attr(feature = "unstable", doc = concat!("To set up an interrupt handler, use [`Self::", stringify!($bind), "`] or create a function that has the same (non-mangled) name as the interrupt you want to handle."))]
+                /// A suitable interrupt handler must be set up before the first interrupt
+                /// is triggered; otherwise the default handler panics.
+                #[cfg_attr(not(feature = "unstable"), doc = "To set up an interrupt handler, create a function that has the same (non-mangled) name as the interrupt to handle.")]
+                #[cfg_attr(feature = "unstable", doc = concat!("To set up an interrupt handler, use [`Self::", stringify!($bind), "`] or create a function that has the same (non-mangled) name as the interrupt to handle."))]
                 ///
-                /// ## Examples
+                /// # Examples
                 ///
                 /// ```rust, no_run
                 /// # {before_snippet}
@@ -119,7 +119,7 @@ macro_rules! create_peripheral {
                     #[doc = concat!("Disables the ",  stringify!($interrupt), " peripheral interrupt handler on the current CPU core.")]
                     ///
                     /// <section class="warning">
-                    /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                    /// Very low-level interrupt API. Unless writing drivers, this is probably not the interrupt API to use.
                     /// </section>
                     #[instability::unstable]
                     pub fn $disable(&self) {
@@ -130,7 +130,7 @@ macro_rules! create_peripheral {
                     #[doc = concat!("Disables the ",  stringify!($interrupt), " peripheral interrupt handler on all cores.")]
                     ///
                     /// <section class="warning">
-                    /// This function is a very low-level way to work with interrupts. Unless you're writing drivers, this is probably not the interrupt API you want to use.
+                    /// Very low-level interrupt API. Unless writing drivers, this is probably not the interrupt API to use.
                     /// </section>
                     #[allow(dead_code, reason = "Peripheral may be unstable")]
                     pub fn [<$disable _on_all_cores>](&self) {
@@ -194,7 +194,7 @@ for_each_peripheral! {
         // The solution is printing an empty doc comment.
         macro_rules! ignore { ($any:tt) => {""} }
 
-        /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
+        /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip
         #[allow(non_snake_case)]
         #[non_exhaustive]
         pub struct Peripherals {
@@ -265,11 +265,11 @@ for_each_peripheral! {
                 })
             }
 
-            /// Unsafely create an instance of this peripheral out of thin air.
+            /// Unsafely creates an instance of this peripheral out of thin air.
             ///
             /// # Safety
             ///
-            /// You must ensure that you're only using one instance of this type at a time.
+            /// The caller must ensure that only one instance of this type is used at a time.
             #[inline]
             pub unsafe fn steal() -> Self {
                 unsafe {

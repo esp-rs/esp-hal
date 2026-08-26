@@ -6,7 +6,7 @@
 //! significantly, compared to a SHA algorithm implemented solely in software
 //!
 //! ## Configuration
-//! This driver allows you to perform cryptographic hash operations using
+//! This driver performs cryptographic hash operations using
 //! various hash algorithms supported by the SHA peripheral, such as:
 //! * SHA-1
 //! * SHA-224
@@ -112,33 +112,33 @@ use crate::{
 // - Each algorithm has its own register cluster
 // - No support for interleaved operation
 
-/// The SHA Accelerator driver instance
+/// The SHA Accelerator driver instance.
 pub struct Sha<'d> {
     sha: SHA<'d>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Sha as u8 }>,
 }
 
 impl<'d> Sha<'d> {
-    /// Create a new instance of the SHA Accelerator driver.
+    /// Creates a new instance of the SHA Accelerator driver.
     pub fn new(sha: SHA<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self { sha, _guard: guard }
     }
 
-    /// Start a new digest.
+    /// Starts a new digest.
     pub fn start<'a, A: ShaAlgorithm>(&'a mut self) -> ShaDigest<'d, A, &'a mut Self> {
         ShaDigest::new(self)
     }
 
-    /// Start a new digest and take ownership of the driver.
+    /// Starts a new digest and take ownership of the driver.
     /// This is useful for storage outside a function body. i.e. in static or
     /// struct.
     pub fn start_owned<A: ShaAlgorithm>(self) -> ShaDigest<'d, A, Self> {
         ShaDigest::new(self)
     }
 
-    /// Returns true if the hardware is processing the next message.
+    /// Returns whether the hardware is processing the next message.
     fn is_busy(&self, algo: ShaAlgorithmKind) -> bool {
         algo.is_busy(&self.sha)
     }
@@ -343,10 +343,10 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 // - Registers need to be written one u32 at a time, no u8 access
 // - This means that we need to buffer bytes coming in up to 4 u8's in order to create a full u32
 
-/// An active digest
+/// An active digest.
 ///
-/// This implementation might fail after u32::MAX/8 bytes, to increase please
-/// see ::finish() length/self.cursor usage
+/// This implementation might fail after u32::MAX/8 bytes. See `finish()`
+/// length/`self.cursor` usage to increase the limit.
 pub struct ShaDigest<'d, A, S: BorrowMut<Sha<'d>>> {
     sha: S,
     state: DigestState,
@@ -389,7 +389,7 @@ impl DigestState {
 }
 
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
-    /// Creates a new digest
+    /// Creates a new digest.
     #[allow(unused_mut)]
     pub fn new(mut sha: S) -> Self {
         #[cfg(not(esp32))]
@@ -440,7 +440,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         }
     }
 
-    /// Returns true if the hardware is processing the next message.
+    /// Returns whether the hardware is processing the next message.
     pub fn is_busy(&self) -> bool {
         A::ALGORITHM_KIND.is_busy(&self.sha.borrow().sha)
     }
@@ -450,18 +450,19 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         self.sha.borrow_mut().update(&mut self.state, incoming)
     }
 
-    /// Finish of the calculation (if not already) and copy result to output
-    /// After `finish()` is called `update()`s will contribute to a new hash
-    /// which can be calculated again with `finish()`.
+    /// Finishes the calculation (if not already finished) and copies the result to output.
+    ///
+    /// After `finish()` is called, `update()`s contribute to a new hash which can be
+    /// calculated again with `finish()`
     ///
     /// Typically, output is expected to be the size of
-    /// [ShaAlgorithm::DIGEST_LENGTH], but smaller inputs can be given to
+    /// [`ShaAlgorithm::DIGEST_LENGTH`], but smaller inputs can be given to
     /// get a "short hash"
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
         self.sha.borrow_mut().finish(&mut self.state, output)
     }
 
-    /// Save the current state of the digest for later continuation.
+    /// Saves the current state of the digest for later continuation.
     #[cfg(not(esp32))]
     pub fn save(&mut self, context: &mut Context<A>) -> nb::Result<(), Infallible> {
         if self.is_busy() {
@@ -489,7 +490,7 @@ impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
         Ok(())
     }
 
-    /// Discard the current digest and return the peripheral.
+    /// Discards the current digest and returns the peripheral.
     pub fn cancel(self) -> S {
         self.sha
     }
@@ -509,7 +510,7 @@ pub struct Context<A: ShaAlgorithm> {
 
 #[cfg(not(esp32))]
 impl<A: ShaAlgorithm> Context<A> {
-    /// Create a new empty context
+    /// Creates a new empty context.
     pub fn new() -> Self {
         Self {
             state: DigestState::new(A::ALGORITHM_KIND),
@@ -521,8 +522,8 @@ impl<A: ShaAlgorithm> Context<A> {
 
     /// Indicates if the SHA context is in the first run.
     ///
-    /// Returns `true` if this is the first time processing data with the SHA
-    /// instance, otherwise returns `false`.
+    /// Returns whether this is the first time processing data with the SHA
+    /// instance.
     pub fn first_run(&self) -> bool {
         self.state.first_run
     }
@@ -535,7 +536,7 @@ impl<A: ShaAlgorithm> Default for Context<A> {
     }
 }
 
-/// This trait encapsulates the configuration for a specific SHA algorithm.
+/// Encapsulates the configuration for a specific SHA algorithm.
 pub trait ShaAlgorithm: crate::private::Sealed {
     /// Constant containing the name of the algorithm as a string.
     const ALGORITHM: &'static str;
@@ -559,8 +560,8 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     type Digest011OutputSize: digest_011::array::ArraySize;
 }
 
-/// Note: digest has a blanket trait implementation for Digest for any
-/// element that implements FixedOutput + Default + Update + HashMarker
+/// `digest` has a blanket trait implementation for `Digest` for any
+/// element that implements FixedOutput + Default + Update + HashMarker.
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_010::HashMarker for ShaDigest<'d, A, S> {}
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> digest_011::HashMarker for ShaDigest<'d, A, S> {}
 
@@ -754,7 +755,7 @@ for_each_sha_algorithm! {
     ( $name:ident, $full_name:literal (sizes: $block_size:literal, $digest_len:literal, $message_length_bytes:literal) (insecure_against: $($attack_kind:literal),*), $mode_bits:literal ) => {
         #[doc = concat!("Hardware-accelerated ", $full_name, " implementation")]
         ///
-        /// This struct manages the context and state required for processing data using the selected hashing algorithm.
+        /// Manages the context and state required for processing data using the selected hashing algorithm.
 
         ///
         /// The struct provides various functionalities such as initializing the hashing
@@ -762,7 +763,7 @@ for_each_sha_algorithm! {
         /// hashing operation to generate the final digest.
         $(
             #[doc = ""]
-            #[doc = concat!(" > ⚠️ Note that this algorithm is known to be insecure against ", $attack_kind, " attacks.")]
+            #[doc = concat!(" > ⚠️ This algorithm is known to be insecure against ", $attack_kind, " attacks.")]
         )*
         #[non_exhaustive]
         pub struct $name;
@@ -878,7 +879,7 @@ enum ShaOperationKind {
 #[procmacros::doc_replace]
 /// CPU-driven SHA processing backend.
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -897,8 +898,6 @@ enum ShaOperationKind {
 /// // Process data. The `update` function returns a handle which can be used to wait
 /// // for the operation to finish.
 /// sha1_ctx.update(b"input data").wait_blocking();
-/// sha1_ctx.update(b"input data").wait_blocking();
-/// sha1_ctx.update(b"input data").wait_blocking();
 ///
 /// // Extract the final hash. This resets the context.
 /// sha1_ctx.finalize(&mut digest).wait_blocking();
@@ -914,7 +913,7 @@ pub struct ShaBackend<'d> {
 impl<'d> ShaBackend<'d> {
     /// Creates a new SHA backend.
     ///
-    /// The backend needs to be [`start`][Self::start]ed before it can execute SHA operations.
+    /// The backend must be started with [`Self::start`] before it can execute SHA operations.
     pub fn new(sha: SHA<'d>) -> Self {
         Self {
             driver: DriverState::Uninitialized(sha),
@@ -1345,13 +1344,13 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> Drop
 }
 
 /// A handle for an in-progress operation, returned by [`update`](Sha1Context::update) or
-/// [`finalize`](Sha1Context::finalize).
+/// [`finalize`](Sha1Context::finalize)
 pub struct ShaHandle<'t>(Handle<'t, ShaOperation>);
 
 impl ShaHandle<'_> {
     /// Polls the status of the work item.
     ///
-    /// This function returns `true` if the item has been processed.
+    /// Returns whether the item has been processed.
     #[inline]
     pub fn poll(&mut self) -> bool {
         self.0.poll()
@@ -1359,7 +1358,7 @@ impl ShaHandle<'_> {
 
     /// Polls the work item to completion, by busy-looping.
     ///
-    /// This function returns immediately if `poll` returns `true`.
+    /// Returns immediately if `poll` returns `true`.
     #[inline]
     pub fn wait_blocking(self) -> Status {
         self.0.wait_blocking()
@@ -1378,7 +1377,7 @@ impl ShaHandle<'_> {
     }
 }
 
-/// Error type returned by [`finalize_into_slice`](Sha1Context::finalize_into_slice).
+/// Error type returned by [`finalize_into_slice`](Sha1Context::finalize_into_slice)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -1398,8 +1397,8 @@ macro_rules! impl_worker_context {
         impl $name {
             /// Creates a new context.
             ///
-            /// The context represents the in-progress processing of a single message. You need to
-            /// feed message bytes to [`Self::update`], then finalize the process using
+            /// The context represents the in-progress processing of a single message.
+            /// Feed message bytes to [`Self::update`], then finalize the process using
             /// [`Self::finalize`].
             ///
             /// Any number of contexts can be created, to hash any number of messages concurrently.

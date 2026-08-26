@@ -16,7 +16,7 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
-/// Immutable per-channel metadata owned by each `AXI_DMA_CH*` singleton.
+/// Immutable per-channel metadata owned by each `AXI_DMA_CH*` singleton
 pub(crate) struct ChannelInfo {
     pub(crate) channel: u8,
     pub(crate) handler_in: Option<InterruptHandler>,
