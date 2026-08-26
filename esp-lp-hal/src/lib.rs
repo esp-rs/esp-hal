@@ -130,6 +130,33 @@ pub fn gpio_wakeup_clear() {
         .write(|w| unsafe { w.status_w1tc().bits(0xff) });
 }
 
+/// Stop the ULP Timer
+pub fn ulp_riscv_timer_stop() {
+    let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::PTR };
+    rtc_cntl
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_slp_timer_en().clear_bit());
+}
+
+/// Resume the ULP Timer
+pub fn ulp_riscv_timer_resume() {
+    let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::PTR };
+    rtc_cntl
+        .rtc_ulp_cp_timer()
+        .write(|w| w.ulp_cp_slp_timer_en().set_bit());
+}
+
+/// Change the ULP Timer period
+pub fn ulp_timer_period(cycles: u32) {
+    let rtc_cntl = unsafe { &*crate::pac::RTC_CNTL::PTR };
+    rtc_cntl
+        .rtc_ulp_cp_timer_1()
+        .write(|w| unsafe { w.ulp_cp_timer_slp_cycle().bits(cycles << 8) });
+    rtc_cntl
+        .rtc_ulp_cp_ctrl()
+        .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());
+}
+
 /// Entry point to the ULP program
 #[unsafe(link_section = ".init.rust")]
 #[unsafe(export_name = "rust_main")]
@@ -184,7 +211,7 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 /// Stops the ULP core, called from itself.
 #[unsafe(link_section = ".init.rust")]
 #[unsafe(no_mangle)]
-unsafe extern "C" fn ulp_riscv_halt() -> ! {
+pub unsafe extern "C" fn ulp_riscv_halt() -> ! {
     #[cfg(any(esp32s2, esp32s3))]
     {
         unsafe { &*pac::RTC_CNTL::PTR }

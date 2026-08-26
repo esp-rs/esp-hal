@@ -151,26 +151,6 @@ fn ulp_halt() {
         .modify(|_, w| w.cocpu_shut_reset_en().set_bit());
 }
 
-fn ulp_reset() {
-    let rtc_cntl = LPWR::regs();
-
-    rtc_cntl.cocpu_ctrl().write(|w| {
-        w.cocpu_shut().clear_bit();
-        w.cocpu_done().clear_bit();
-        w.cocpu_shut_reset_en().clear_bit()
-    });
-
-    crate::rom::ets_delay_us(20);
-
-    rtc_cntl.cocpu_ctrl().write(|w| {
-        w.cocpu_shut().set_bit();
-        w.cocpu_done().set_bit();
-        w.cocpu_shut_reset_en().set_bit()
-    });
-
-    crate::rom::ets_delay_us(20);
-}
-
 fn ulp_run(wakeup_src: UlpCoreWakeupSource) {
     let rtc_cntl = LPWR::regs();
 
