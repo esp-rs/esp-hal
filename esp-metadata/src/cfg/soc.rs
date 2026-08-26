@@ -342,6 +342,10 @@ impl ClockTreeNodeInstance {
         self.suffix_function("frequency")
     }
 
+    fn rustc_cfg_attr(&self) -> TokenStream {
+        clock_tree::rustc_cfg_attr(self.node.rustc_cfg())
+    }
+
     fn config_frequency_function_name(&self) -> Ident {
         self.suffix_function("config_frequency")
     }
@@ -489,6 +493,7 @@ impl ClockTreeNodeInstance {
             } else {
                 None
             },
+            cfg: self.node.rustc_cfg().map(str::to_string),
             request: Function {
                 _name: request_fn_name.to_string(),
                 implementation: if always_on {
@@ -752,8 +757,13 @@ impl SystemClocks {
                 clock_item.node.name()
             ));
             if is_first_instance {
+                let cfg_attr = clock_item.rustc_cfg_attr();
                 if clock_item.emits_config_type(tree) {
-                    clock_tree_node_defs.push(clock_item.config_type());
+                    let config_type = clock_item.config_type();
+                    clock_tree_node_defs.push(quote! {
+                        #cfg_attr
+                        #config_type
+                    });
                 }
 
                 let instance_count =
@@ -765,13 +775,23 @@ impl SystemClocks {
 
                 if let Some(refcount_field) = clock_item.properties.refcount_field() {
                     if let Some(instance_count) = instance_count.as_ref() {
-                        clock_tree_refcount_field_decls
-                            .push(quote! { #refcount_field: [u32; #instance_count] });
-                        clock_tree_refcount_field_inits
-                            .push(quote! { #refcount_field: [0; #instance_count] });
+                        clock_tree_refcount_field_decls.push(quote! {
+                            #cfg_attr
+                            #refcount_field: [u32; #instance_count]
+                        });
+                        clock_tree_refcount_field_inits.push(quote! {
+                            #cfg_attr
+                            #refcount_field: [0; #instance_count]
+                        });
                     } else {
-                        clock_tree_refcount_field_decls.push(quote! { #refcount_field: u32 });
-                        clock_tree_refcount_field_inits.push(quote! { #refcount_field: 0 });
+                        clock_tree_refcount_field_decls.push(quote! {
+                            #cfg_attr
+                            #refcount_field: u32
+                        });
+                        clock_tree_refcount_field_inits.push(quote! {
+                            #cfg_attr
+                            #refcount_field: 0
+                        });
                     }
                 }
 
@@ -827,6 +847,12 @@ impl SystemClocks {
                     if func.is_empty() {
                         continue;
                     }
+                    if let Some(cfg) = clock_item.node.rustc_cfg() {
+                        let cfg_doc = format!(" #[cfg({cfg})]");
+                        doclines.push(quote! {
+                            #[doc = #cfg_doc]
+                        });
+                    }
                     let func = func.to_string();
                     doclines.push(quote! {
                         #[doc = #func]
@@ -861,7 +887,10 @@ impl SystemClocks {
                     quote! { #(#[doc = #doc])* }
                 });
 
+                let cfg_attr = clock_item.rustc_cfg_attr();
+
                 configurables.push(quote! {
+                    #cfg_attr
                     #docline
                     pub #name: Option<#config_type_name>,
                 });
@@ -869,6 +898,7 @@ impl SystemClocks {
                 system_config_steps.insert(
                     clock_item.name_str(),
                     quote! {
+                        #cfg_attr
                         if let Some(config) = self.#name {
                             #config_apply_function_name(clocks, config);
                         }
@@ -942,6 +972,7 @@ impl SystemClocks {
 
             let cache_name = node.freq_cache_static_name();
             let config_freq_fn = node.config_frequency_function_name();
+            let cfg_attr = node.rustc_cfg_attr();
 
             if node.properties.receiver.is_some() {
                 let instances = tree.group_instances.get(&node.group_template).unwrap();
@@ -955,6 +986,7 @@ impl SystemClocks {
                 );
 
                 freq_cache_statics.push(quote! {
+                    #cfg_attr
                     static #cache_name: [::core::sync::atomic::AtomicU32; #instance_count] =
                         [const { ::core::sync::atomic::AtomicU32::new(0) }; #instance_count];
                 });
@@ -979,6 +1011,7 @@ impl SystemClocks {
                 let config_field = node.properties.indexed_config_accessor();
 
                 freq_cache_statics.push(quote! {
+                    #cfg_attr
                     static #cache_name: ::core::sync::atomic::AtomicU32 =
                         ::core::sync::atomic::AtomicU32::new(0);
                 });
@@ -1037,6 +1070,7 @@ impl SystemClocks {
 
             let fn_name = node.refresh_downstream_function_name();
             let self_stmt = refresh_stmt_by_key.get(&template_key).cloned();
+            let cfg_attr = node.rustc_cfg_attr();
 
             // Build calls to direct configurable children's refresh functions.
             let children = tree
@@ -1077,6 +1111,7 @@ impl SystemClocks {
                     child_calls.push(template_group_loop(tree, group, &fns));
                 }
                 downstream_refresh_fns.push(quote! {
+                    #cfg_attr
                     fn #fn_name(clocks: &mut ClockTree, instance: #enum_name) {
                         #self_stmt
                         #(#child_calls)*
@@ -1107,6 +1142,7 @@ impl SystemClocks {
                     child_calls.push(template_group_loop(tree, group, &fns));
                 }
                 downstream_refresh_fns.push(quote! {
+                    #cfg_attr
                     fn #fn_name(clocks: &mut ClockTree) {
                         #self_stmt
                         #(#child_calls)*

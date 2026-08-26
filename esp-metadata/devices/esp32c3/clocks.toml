@@ -5,7 +5,7 @@ system_clocks = { clock_tree = [
     { name = "RC_FAST_CLK", type = "source",                                          output = "17_500_000" },
 
     # Low-speed clocks
-    { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
+    { name = "XTAL32K_CLK",     type = "source",  output = "32768", cfg = "use_xtal32k" },
     { name = "RC_SLOW_CLK",     type = "source",  output = "136_000" },
     { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" },
 
@@ -43,7 +43,7 @@ system_clocks = { clock_tree = [
     { name = "RC_FAST_CLK_DIV_N", type = "generic", params = { divisor = "0 ..= 3" }, output = "RC_FAST_CLK / (divisor + 1)" },
     { name = "XTAL_DIV_CLK",      type = "generic", output = "XTAL_CLK / 2" },
     { name = "RTC_SLOW_CLK", type = "mux", variants = [
-        { name = "XTAL32K", outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K", outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
         { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_DIV_CLK" },
     ] },
@@ -56,7 +56,7 @@ system_clocks = { clock_tree = [
     { name = "LOW_POWER_CLK", type = "mux", variants = [
         { name = "XTAL",     outputs = "XTAL_CLK" },
         { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
-        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
         { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
     ] },
 
@@ -70,7 +70,7 @@ system_clocks = { clock_tree = [
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
         { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_DIV_CLK" },
-        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
     { group = "TIMG", clocks = [

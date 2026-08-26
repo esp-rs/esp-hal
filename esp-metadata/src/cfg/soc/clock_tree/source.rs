@@ -66,6 +66,10 @@ pub struct Source {
     #[serde(default)]
     wake_locking: bool,
 
+    /// Optional `#[cfg(...)]` expression. The node is omitted when the condition is false.
+    #[serde(default)]
+    cfg: Option<String>,
+
     /// If set, this expression will be used to validate the clock configuration.
     ///
     /// The expression may refer to clock sources, or any of the clock tree item's properties (e.g.
@@ -100,6 +104,10 @@ impl ClockTreeNodeType for Source {
 
     fn wake_locking(&self) -> bool {
         self.wake_locking
+    }
+
+    fn rustc_cfg(&self) -> Option<&str> {
+        self.cfg.as_deref()
     }
 
     fn validate_source_data(
@@ -369,6 +377,10 @@ impl ClockTreeNodeType for DerivedClockSource {
         self.source_options.is_configurable()
     }
 
+    fn rustc_cfg(&self) -> Option<&str> {
+        self.source_options.rustc_cfg()
+    }
+
     fn config_apply_function(
         &self,
         instance: &ClockTreeNodeInstance,
@@ -401,8 +413,14 @@ impl ClockTreeNodeType for DerivedClockSource {
 
     fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
         let extra_docs = format!("Depends on `{}`.", self.from);
-        self.source_options
-            .impl_config_type(instance, Some(&extra_docs))
+        let cfg_attr = instance.rustc_cfg_attr();
+        let ty = self
+            .source_options
+            .impl_config_type(instance, Some(&extra_docs));
+        quote! {
+            #cfg_attr
+            #ty
+        }
     }
 
     fn request_direct_dependencies(

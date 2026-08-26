@@ -107,6 +107,10 @@ pub struct Generic {
     #[serde(default)]
     wake_locking: bool,
 
+    /// Optional `#[cfg(...)]` expression. The node is omitted when the condition is false.
+    #[serde(default)]
+    cfg: Option<String>,
+
     /// The expression that calculates the clock node's output frequency.
     output: Expression,
 
@@ -159,6 +163,10 @@ impl ClockTreeNodeType for Generic {
 
     fn wake_locking(&self) -> bool {
         self.wake_locking
+    }
+
+    fn rustc_cfg(&self) -> Option<&str> {
+        self.cfg.as_deref()
     }
 
     fn validate_source_data(
@@ -287,6 +295,7 @@ impl ClockTreeNodeType for Generic {
                 let mux_param_field = format_ident!("{mux_param}");
                 let param_ty_name = self.param_type_name(instance, mux_param);
                 let branches = mux_inputs.iter().filter_map(|variant| {
+                    let cfg_attr = variant.cfg_attr();
                     let name = variant.config_enum_variant_name();
                     let variant_configures = variant.configures.iter().map(|cfg_expr| {
                         let affected_node = instance.resolve_node(tree, &cfg_expr.effect().node);
@@ -294,6 +303,7 @@ impl ClockTreeNodeType for Generic {
                     });
 
                     Some(quote! {
+                        #cfg_attr
                         #param_ty_name::#name => {
                             #(#variant_configures)*
                         }
@@ -529,12 +539,13 @@ impl ClockTreeNodeType for Generic {
                 let mut variants = Vec::with_capacity(inputs.len());
                 let mut variant_frequencies = Vec::with_capacity(inputs.len());
                 for variant in inputs {
+                    let cfg_attr = variant.cfg_attr();
                     let name = variant.config_enum_variant_name();
                     let source_node = instance.resolve_node(tree, &variant.outputs);
                     let Some(frequency) = source_node.try_frequency_call() else {
                         return SourceFrequencySignature::Skip;
                     };
-                    variants.push(quote! { #ty_name::#name });
+                    variants.push(quote! { #cfg_attr #ty_name::#name });
                     variant_frequencies.push(frequency);
                 }
 
@@ -619,11 +630,12 @@ impl ClockTreeNodeType for Generic {
                 let (variants, variant_frequencies) = inputs
                     .iter()
                     .map(|variant| {
+                        let cfg_attr = variant.cfg_attr();
                         let name = variant.config_enum_variant_name();
                         let source_node = instance.resolve_node(tree, &variant.outputs);
 
                         (
-                            quote! { #ty_name::#name },
+                            quote! { #cfg_attr #ty_name::#name },
                             source_node.frequency_call_with_receiver(frequency_receiver),
                         )
                     })
@@ -825,8 +837,9 @@ impl ClockTreeNodeType for Generic {
                 NodeParameter::Source(variants) => {
                     let ty = param_type_name(group, &self.name, param_name);
                     let options = variants.iter().map(|variant| {
+                        let cfg_attr = variant.cfg_attr();
                         let variant = variant.config_enum_variant_name();
-                        quote! { crate::soc::clocks::#ty::#variant }
+                        quote! { #cfg_attr crate::soc::clocks::#ty::#variant }
                     });
                     branches.extend(quote! {
                         (#path) => {
@@ -926,11 +939,13 @@ impl Generic {
                 let param = self.clock_source_parameter();
                 let ty_name = self.param_type_name(instance, param);
                 let request_upstream_branches = mux_inputs.iter().map(|variant| {
+                    let cfg_attr = variant.cfg_attr();
                     let match_arm = variant.config_enum_variant_name();
                     let upstream_node = instance.resolve_node(tree, &variant.outputs);
                     let upstream_receiver = upstream_node.properties.receiver();
                     let function = op(upstream_node);
                     quote! {
+                        #cfg_attr
                         #ty_name::#match_arm => #(#upstream_receiver.)*#function(clocks)
                     }
                 });

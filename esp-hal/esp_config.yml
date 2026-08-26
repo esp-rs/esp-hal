@@ -235,7 +235,7 @@ options:
       When disabled (default), XTAL32K stays off so those pins can be used as hi-Z GPIO."
     default:
       - value: false
-    active: "soc_has_xtal32k_pads"
+    active: "soc_has_clock_node_xtal32k_clk"
 
   - name: enable-pmp
     description: "Protects additional memory regions via Physical Memory Protection (PMP). (Only RISC-V other than ESP32-C2/C3)"

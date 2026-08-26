@@ -9,7 +9,7 @@ use crate::{
         sleep::{SleepKind, pmu_common::SleepTimeConfig},
     },
     soc::{
-        clocks::{self, ClockTree, LpSlowClkConfig, SocRootClkConfig},
+        clocks::{self, ClockTree, SocRootClkConfig},
         xtal32k,
     },
 };
@@ -703,12 +703,15 @@ impl RtcSleepConfig {
 
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
-        let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
-            matches!(
-                clocks::lp_slow_clk_config(clocks),
-                Some(LpSlowClkConfig::Xtal32k)
-            )
-        });
+        let lp_slow_uses_xtal32k = cfg_select! {
+            use_xtal32k => ClockTree::with(|clocks| {
+                matches!(
+                    clocks::lp_slow_clk_config(clocks),
+                    Some(clocks::LpSlowClkConfig::Xtal32k)
+                )
+            }),
+            _ => false,
+        };
 
         if self.deep {
             // force-disable certain power domains
