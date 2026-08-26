@@ -145,11 +145,8 @@ impl OtaSelectEntry {
             }
 
             let calculated_crc = crate::crypto::Crc32::new().crc(&ota_seq.to_le_bytes());
-            if crc != calculated_crc {
-                return false;
-            }
 
-            true
+            crc == calculated_crc
         }
 
         let mut buffer = [0u8; 32];

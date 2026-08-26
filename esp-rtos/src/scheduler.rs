@@ -194,8 +194,8 @@ impl SchedulerState {
         );
         self.time_driver = Some(time_driver);
         self.active_cores = ActiveCores::Single(Cpu::current());
-        for cpu in 0..Cpu::COUNT {
-            task::set_idle_hook_entry(&mut self.per_cpu[cpu].idle_context, idle_hook);
+        for per_cpu in &mut self.per_cpu {
+            task::set_idle_hook_entry(&mut per_cpu.idle_context, idle_hook);
         }
     }
 
