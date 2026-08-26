@@ -60,6 +60,30 @@ function evaluateHilRunResults(classifications) {
   return { pass, executed: executed.length, failures: failures.length };
 }
 
+function isNewerJob(candidate, current) {
+  const candidateAttempt = candidate.run_attempt ?? 0;
+  const currentAttempt = current.run_attempt ?? 0;
+  if (candidateAttempt !== currentAttempt) {
+    return candidateAttempt > currentAttempt;
+  }
+  return (candidate.id ?? 0) > (current.id ?? 0);
+}
+
+// Keep the newest attempt of each job name. Re-run failed jobs leaves
+// untouched legs on earlier attempts, without this the gate would either
+// miss them or double-count them.
+function latestJobsByName(jobs) {
+  const byName = new Map();
+  for (const job of jobs) {
+    const name = String(job.name || "");
+    const current = byName.get(name);
+    if (!current || isNewerJob(job, current)) {
+      byName.set(name, job);
+    }
+  }
+  return [...byName.values()];
+}
+
 async function listWorkflowRunJobs(github, context) {
   const { owner, repo } = context.repo;
   const run_id = context.runId;
@@ -71,6 +95,7 @@ async function listWorkflowRunJobs(github, context) {
       owner,
       repo,
       run_id,
+      filter: "all",
       per_page: 100,
       page,
     });
@@ -87,7 +112,9 @@ async function listWorkflowRunJobs(github, context) {
 
 async function evaluateHilGate({ github, context, core }) {
   const jobs = await listWorkflowRunJobs(github, context);
-  const matrixJobs = jobs.filter((job) => isHilRunMatrixJob(job.name));
+  const matrixJobs = latestJobsByName(
+    jobs.filter((job) => isHilRunMatrixJob(job.name)),
+  );
 
   if (matrixJobs.length === 0) {
     core.setFailed("HIL gate failed: could not find hil-run matrix jobs");
@@ -124,5 +151,6 @@ module.exports = {
   isHilRunMatrixJob,
   classifyMatrixJob,
   evaluateHilRunResults,
+  latestJobsByName,
   evaluateHilGate,
 };
