@@ -56,15 +56,10 @@ pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
 
 #[allow(unused)]
 pub(crate) fn is_valid_memory_address(address: usize) -> bool {
-    if is_valid_ram_address(address) {
-        return true;
+    cfg_select! {
+        soc_has_psram => is_valid_ram_address(address) || is_valid_psram_address(address),
+        _ => is_valid_ram_address(address),
     }
-    #[cfg(soc_has_psram)]
-    if is_valid_psram_address(address) {
-        return true;
-    }
-
-    false
 }
 
 fn slice_in_range<T>(slice: &[T], range: Range<usize>) -> bool {
