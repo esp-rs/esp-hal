@@ -74,7 +74,7 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
@@ -83,8 +83,8 @@ fn main() -> ! {
 
     let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
 
-    static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-    let executor_core1 = InterruptExecutor::new(peripherals.FROM_CPU_INTR1);
+    static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<3>> = StaticCell::new();
+    let executor_core1 = InterruptExecutor::new(peripherals.FROM_CPU_INTR3);
     let executor_core1 = EXECUTOR_CORE_1.init(executor_core1);
 
     static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();

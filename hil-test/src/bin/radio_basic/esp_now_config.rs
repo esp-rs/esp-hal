@@ -30,7 +30,7 @@ mod tests {
     #[test]
     fn espnow_max_encrypt_num_is_honored(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let controller = WifiController::new(
             p.WIFI,
@@ -58,7 +58,7 @@ mod tests {
     #[test]
     fn espnow_max_encrypt_num_raises_the_limit(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let controller = WifiController::new(
             p.WIFI,
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn sta_disconnected_pm_can_be_configured(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let mut wifi = p.WIFI;
         for enabled in [true, false] {

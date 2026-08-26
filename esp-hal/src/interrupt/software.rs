@@ -1,16 +1,23 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Software Interrupts
 //!
-//! The [`SoftwareInterrupt`] struct allows raising or resetting software
-//! interrupts using the [`raise()`][SoftwareInterrupt::raise] and
-//! [`reset()`][SoftwareInterrupt::reset] methods.
+//! [`SoftwareInterrupt`] raises or resets software interrupts with
+//! [`raise()`][SoftwareInterrupt::raise] and [`reset()`][SoftwareInterrupt::reset].
+#![cfg_attr(
+    feature = "rt",
+    doc = "The HAL reserves `FROM_CPU_INTR0` for inter-processor call (IPC)."
+)]
+#![cfg_attr(
+    all(feature = "rt", multi_core),
+    doc = "On dual-core chips, the HAL also reserves `FROM_CPU_INTR1`."
+)]
 //!
 //! ## Examples
 //!
 //! ```rust, no_run
 //! # {before_snippet}
 //! // Take the interrupt you want to use.
-//! let mut int0 = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
+//! let mut int0 = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR2);
 //!
 //! // Set up the interrupt handler. Do this in a critical section so the global
 //! // contains the interrupt object before the interrupt is triggered.
@@ -26,7 +33,7 @@
 //! // ... somewhere outside of your main function
 //!
 //! // Define a shared handle to the software interrupt.
-//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
+//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<2>>>> = Mutex::new(RefCell::new(None));
 //!
 //! #[esp_hal::handler]
 //! fn swint0_handler() {

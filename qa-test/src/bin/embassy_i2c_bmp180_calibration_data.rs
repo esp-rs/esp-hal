@@ -31,7 +31,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     let mut i2c = I2c::new(
         peripherals.I2C0,

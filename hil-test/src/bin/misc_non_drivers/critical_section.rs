@@ -3,7 +3,7 @@ mod tests {
     use esp_hal::{
         clock::CpuClock,
         interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
-        peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, Peripherals},
+        peripherals::{FROM_CPU_INTR2, FROM_CPU_INTR3, Peripherals},
         sync::RawPriorityLimitedMutex,
     };
     use esp_sync::NonReentrantMutex;
@@ -13,12 +13,12 @@ mod tests {
         static LOCK: RawPriorityLimitedMutex = RawPriorityLimitedMutex::new(Priority::Priority1);
 
         extern "C" fn access() {
-            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset();
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR3::steal() }).reset();
             LOCK.lock(|| {});
             embedded_test::export::check_outcome(());
         }
 
-        let mut prio_2_interrupt = SoftwareInterrupt::new(p.FROM_CPU_INTR1);
+        let mut prio_2_interrupt = SoftwareInterrupt::new(p.FROM_CPU_INTR3);
 
         prio_2_interrupt.set_interrupt_handler(InterruptHandler::new(access, priority));
 
@@ -30,11 +30,11 @@ mod tests {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment() {
-            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset();
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).reset();
             COUNTER.fetch_add(1, Ordering::AcqRel);
         }
 
-        let mut interrupt = SoftwareInterrupt::new(p.FROM_CPU_INTR0);
+        let mut interrupt = SoftwareInterrupt::new(p.FROM_CPU_INTR2);
         interrupt.set_interrupt_handler(InterruptHandler::new(increment, Priority::Priority1));
 
         const ITERATIONS: u32 = 100;
@@ -99,20 +99,20 @@ mod tests {
 
         extern "C" fn increment<const INT: u8>() {
             match INT {
-                0 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
-                1 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
+                2 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).reset(),
+                3 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR3::steal() }).reset(),
                 _ => unreachable!(),
             }
             COUNTER.fetch_add(1, Ordering::AcqRel);
         }
 
-        let mut prio_1_interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
-        let mut prio_2_interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR1);
+        let mut prio_1_interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR2);
+        let mut prio_2_interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR3);
 
         prio_1_interrupt
-            .set_interrupt_handler(InterruptHandler::new(increment::<0>, Priority::Priority1));
+            .set_interrupt_handler(InterruptHandler::new(increment::<2>, Priority::Priority1));
         prio_2_interrupt
-            .set_interrupt_handler(InterruptHandler::new(increment::<1>, Priority::Priority2));
+            .set_interrupt_handler(InterruptHandler::new(increment::<3>, Priority::Priority2));
 
         let lock = RawPriorityLimitedMutex::new(Priority::Priority1);
 
@@ -152,15 +152,15 @@ mod tests {
 
         extern "C" fn increment<const INT: u8>() {
             match INT {
-                0 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
-                1 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
+                2 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).reset(),
+                3 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR3::steal() }).reset(),
                 _ => unreachable!(),
             }
             COUNTER.fetch_add(1, Ordering::AcqRel);
         }
 
-        let mut interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
-        interrupt.set_interrupt_handler(InterruptHandler::new(increment::<0>, Priority::Priority1));
+        let mut interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR2);
+        interrupt.set_interrupt_handler(InterruptHandler::new(increment::<2>, Priority::Priority1));
 
         let lock = RawPriorityLimitedMutex::new(Priority::max());
 

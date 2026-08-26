@@ -4,26 +4,18 @@
 //! saves context to the stack. The OS copies the state to memory, replaces it with the new task's
 //! state, then returns from the interrupt handler.
 //!
-//! To trigger a context switch on the same core, we (where possible) use the Software0 CPU
-//! interrupt. To trigger a cross-core context switch, we use the FROM_CPUn CPU interrupts. On
-//! ESP32, Software0 is not available, so we use FROM_CPUn there, as well.
-//!
-//! Context switching must happen at the lower interrupt priority level. This ensures that context
-//! switching does not interfere with other interrupts, so we don't leave an interrupt handler only
-//! partially executed.
+//! Same-core yields and cross-core yields both use inter-processor call (IPC). Context switching
+//! must happen at the lowest interrupt priority. This ensures that context switching does not
+//! interfere with other interrupts, so an interrupt handler is not left only partially executed.
 
 #[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 use core::sync::atomic::Ordering;
 
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
-#[cfg(not(esp32))]
-use esp_hal::xtensa_lx::interrupt;
-use esp_hal::{interrupt::software::Instance, ram};
-#[cfg(multi_core)]
 use esp_hal::{
-    interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
-    peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1},
+    interrupt::ipc::__rtos_implementation::set_context_switch_handler,
+    ram,
     system::Cpu,
 };
 use portable_atomic::AtomicPtr;
@@ -119,6 +111,7 @@ pub(crate) fn new_task_context(
     }
 }
 
+#[inline]
 pub(crate) fn task_switch(
     current_context: *mut CpuContext,
     next_context: *mut CpuContext,
@@ -130,85 +123,15 @@ pub(crate) fn task_switch(
     unsafe { core::ptr::copy_nonoverlapping(next_context, trap_frame, 1) };
 }
 
-// S2 and S3 use Software0 (priority 1) for same-core task switching. This is slightly faster than
-// the FROM_CPU0 interrupt.
-#[cfg(not(esp32))]
-const SW_INTERRUPT: u32 = 1 << 7;
-
-pub(crate) fn setup_multitasking<const IRQ: u8>(mut _irq: impl Instance<IRQ> + 'static) {
-    #[cfg(not(esp32))]
+pub(crate) fn setup_multitasking() {
+    // The IPC interrupt is the lowest-priority interrupt of this CPU, and runs its context
+    // switch. Same-core yields and cross-core yields both use it.
     unsafe {
-        // Set up a CPU-internal interrupt, which will be used to trigger a context switch on the
-        // same core.
-        interrupt::enable_mask(SW_INTERRUPT);
-    }
-
-    #[cfg(multi_core)]
-    {
-        let mut irq = SoftwareInterrupt::new(_irq);
-        irq.set_interrupt_handler(InterruptHandler::new(
-            unsafe {
-                core::mem::transmute::<*const (), extern "C" fn()>(
-                    cross_core_yield_handler as *const (),
-                )
-            },
-            Priority::min(),
-        ));
+        set_context_switch_handler(Cpu::current(), trigger_task_switch);
     }
 }
 
-#[cfg(multi_core)]
-pub(crate) fn setup_smp<const IRQ: u8>(irq: impl Instance<IRQ> + 'static) {
-    setup_multitasking(irq);
-}
-
-// Non-ESP32 can use Software0 (priority 1) for same-core task switching. This is slightly faster
-// than the FROM_CPU0 interrupt. On ESP32, this is not available because the bluetooth driver uses
-// Software0.
-#[allow(non_snake_case)]
 #[ram]
-#[cfg(not(esp32))]
-#[unsafe(export_name = "Software0")]
-fn task_switch_interrupt(context: &mut CpuContext) {
-    unsafe { interrupt::clear(SW_INTERRUPT) };
-
-    trigger_task_switch(context);
-}
-
-#[inline]
-pub(crate) fn yield_task() {
-    #[cfg(feature = "rtos-trace")]
-    {
-        rtos_trace::trace::marker_begin(TraceEvents::YieldTask as u32);
-        rtos_trace::trace::marker_end(TraceEvents::YieldTask as u32);
-    }
-
-    #[cfg(not(esp32))]
-    unsafe {
-        interrupt::set(SW_INTERRUPT);
-    }
-
-    #[cfg(esp32)]
-    match Cpu::current() {
-        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise(),
-        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).raise(),
-    }
-}
-
-#[cfg(multi_core)]
-#[ram]
-extern "C" fn cross_core_yield_handler(context: &mut CpuContext) {
-    match Cpu::current() {
-        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
-        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
-    }
-
-    trigger_task_switch(context);
-}
-
-// Having this function separate ensures there is a single un-inlined copy of the task switch logic
-// living in RAM. `ram` is conditional to ensure the function is inlined on ESP32 and S2.
-#[cfg_attr(esp32s3, ram)]
-fn trigger_task_switch(context: &mut CpuContext) {
+extern "C" fn trigger_task_switch(context: &mut CpuContext) {
     SCHEDULER.with(|scheduler| scheduler.switch_task(context));
 }

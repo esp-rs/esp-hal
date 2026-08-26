@@ -6289,8 +6289,10 @@ macro_rules! for_each_peripheral {
         bind_modem_peri_timeout_interrupt, enable_modem_peri_timeout_interrupt,
         disable_modem_peri_timeout_interrupt }, WIFI_PWR : { bind_pwr_interrupt,
         enable_pwr_interrupt, disable_pwr_interrupt }))); _for_each_inner_peripheral!((@
-        peri_type #[doc = "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <=
-        virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        peri_type #[doc = "IPC peripheral singleton"] IPC <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <= virtual() (unstable)));
@@ -6398,7 +6400,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((LP_CORE(unstable)));
         _for_each_inner_peripheral!((TSENS(unstable)));
         _for_each_inner_peripheral!((WIFI));
-        _for_each_inner_peripheral!((FROM_CPU_INTR0(unstable)));
+        _for_each_inner_peripheral!((IPC(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR1(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR2(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR3(unstable)));
@@ -6660,7 +6662,8 @@ macro_rules! for_each_peripheral {
         }, MODEM_PERI_TIMEOUT : { bind_modem_peri_timeout_interrupt,
         enable_modem_peri_timeout_interrupt, disable_modem_peri_timeout_interrupt },
         WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt })),
-        (@ peri_type #[doc = "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <=
+        (@ peri_type #[doc = "IPC peripheral singleton"] IPC <= virtual() (unstable)), (@
+        peri_type #[doc = "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <=
         virtual() (unstable)), (@ peri_type #[doc =
         "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)),
         (@ peri_type #[doc = "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <=
@@ -6695,12 +6698,12 @@ macro_rules! for_each_peripheral {
         (TWAI0(unstable)), (TWAI1(unstable)), (UART0), (UART1), (UHCI0(unstable)),
         (USB_DEVICE(unstable)), (ADC1(unstable)), (BT(unstable)), (FLASH(unstable)),
         (GPIO_DEDICATED(unstable)), (LP_CORE(unstable)), (TSENS(unstable)), (WIFI),
-        (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
-        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, AhbGdmaChannel), (UHCI0,
-        Uhci0, 2, AhbGdmaChannel), (I2S0, I2s0, 3, AhbGdmaChannel), (AES, Aes, 6,
-        AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel), (APB_SARADC, ApbSaradc, 8,
-        AhbGdmaChannel), (PARL_IO, ParlIo, 9, AhbGdmaChannel)));
+        (IPC(unstable)), (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
+        Spi2, 0, AhbGdmaChannel), (UHCI0, Uhci0, 2, AhbGdmaChannel), (I2S0, I2s0, 3,
+        AhbGdmaChannel), (AES, Aes, 6, AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel),
+        (APB_SARADC, ApbSaradc, 8, AhbGdmaChannel), (PARL_IO, ParlIo, 9,
+        AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

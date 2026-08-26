@@ -1,16 +1,7 @@
 #[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 
-#[cfg(multi_core)]
-use esp_hal::peripherals::FROM_CPU_INTR1;
-use esp_hal::{
-    interrupt::{
-        self,
-        software::{Instance, SoftwareInterrupt},
-    },
-    peripherals::FROM_CPU_INTR0,
-    system::Cpu,
-};
+use esp_hal::{interrupt::ipc::__rtos_implementation::set_context_switch_handler, system::Cpu};
 
 #[cfg(feature = "rtos-trace")]
 use crate::TraceEvents;
@@ -150,43 +141,25 @@ pub(crate) fn new_task_context(
 ///
 /// Task switching happens when exiting the interrupt handler. The handler detects that `tp` has
 /// changed, and saves/restores registers accordingly.
-pub fn task_switch(_old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
+#[inline]
+pub(crate) fn task_switch(_old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
     unsafe {
         core::arch::asm!("mv tp, {}", in(reg) new_ctx as *const CpuContext as usize);
     }
 }
 
-pub(crate) fn setup_multitasking<const IRQ: u8>(_irq: impl Instance<IRQ> + 'static) {
-    // Register a direct-bound interrupt handler, so that we don't have to worry about other
-    // interrupt handlers interfering.
-
-    let interrupt = match IRQ {
-        0 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR0,
-        1 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR1,
-        2 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR2,
-        3 => esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
-        _ => panic!("Invalid IRQ number"),
-    };
-
-    interrupt::enable_direct(
-        interrupt,
-        interrupt::Priority::min(),
-        interrupt::DirectBindableCpuInterrupt::Interrupt0,
-        swint_handler_trampoline,
-    );
+pub(crate) fn setup_multitasking() {
+    // The IPC interrupt is the lowest-priority interrupt of this CPU, and runs its context
+    // switch. Same-core yields and cross-core yields both use it.
+    unsafe {
+        set_context_switch_handler(Cpu::current(), swint_handler_trampoline);
+    }
 }
 
-#[cfg(multi_core)]
-pub(crate) fn setup_smp<const IRQ: u8>(irq: impl Instance<IRQ> + 'static) {
-    setup_multitasking(irq);
-}
-
-// We need to place this close to the trap handler for the jump to be resolved properly
-/// Task switch wrapper
+/// Direct-bound interrupt handler for the IPC context switch.
 ///
-/// This function is the direct interrupt handler for the context switch software interrupt.
-/// It stores context into the Context behind the current thread pointer, calls the scheduler,
-/// and restores context from the Context behind the next thread pointer.
+/// Stores context into the `CpuContext` behind the current thread pointer, calls the scheduler,
+/// and restores context from the `CpuContext` behind the next thread pointer.
 ///
 /// The scheduler itself only changes the thread pointer. The new thread pointer is guaranteed to be non-zero.
 ///
@@ -204,6 +177,9 @@ pub(crate) fn setup_smp<const IRQ: u8>(irq: impl Instance<IRQ> + 'static) {
 unsafe extern "C" fn swint_handler_trampoline() {
     core::arch::naked_asm! {"
         .cfi_startproc
+        # Restore t0. The IPC stub stored the interrupted t0 in mscratch.
+        csrr t0, mscratch
+
         # https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/139d8d8e1d8ee8c0c3ee150de709ceaab5c08417/riscv-dwarf.adoc
         # .cfi_register ra, 0x1341 # Unwind with MEPC as return address, crashes probe-rs
 
@@ -372,26 +348,5 @@ unsafe extern "C" fn swint_handler_trampoline() {
 
 #[esp_hal::ram]
 extern "C" fn swint_handler() {
-    match Cpu::current() {
-        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
-        #[cfg(multi_core)]
-        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
-    }
-
     SCHEDULER.with(|scheduler| scheduler.switch_task());
-}
-
-#[inline]
-pub(crate) fn yield_task() {
-    #[cfg(feature = "rtos-trace")]
-    {
-        rtos_trace::trace::marker_begin(TraceEvents::YieldTask as u32);
-        rtos_trace::trace::marker_end(TraceEvents::YieldTask as u32);
-    }
-
-    match Cpu::current() {
-        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise(),
-        #[cfg(multi_core)]
-        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).raise(),
-    }
 }
