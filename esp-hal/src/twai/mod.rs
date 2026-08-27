@@ -3,22 +3,21 @@
 //!
 //! ## Overview
 //!
-//! The TWAI is a multi-master, multi-cast communication protocol with error
-//! detection and signaling and inbuilt message priorities and arbitration. The
-//! TWAI protocol is suited for automotive and industrial applications.
+//! The TWAI is a multi-master, multi-cast communication protocol with error detection and signaling
+//! and inbuilt message priorities and arbitration. The TWAI protocol is suited for automotive and
+//! industrial applications.
 //!
 //! See ESP-IDF's
 #![doc = concat!("[TWAI documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/twai.html#twai-protocol-summary)")]
 //! for a summary on the protocol.
 //!
 //! ## Configuration
-//! The driver  offers functions for initializing the TWAI peripheral, setting
-//! up the timing parameters, configuring acceptance filters, handling
-//! interrupts, and transmitting/receiving messages on the TWAI bus.
+//! The driver  offers functions for initializing the TWAI peripheral, setting up the timing
+//! parameters, configuring acceptance filters, handling interrupts, and transmitting/receiving
+//! messages on the TWAI bus in a blocking or non-blocking manner.
 //!
-//! This driver manages the ISO 11898-1 compatible TWAI
-//! controllers. It supports Standard Frame Format (11-bit) and Extended Frame
-//! Format (29-bit) frame identifiers.
+//! This driver manages the ISO 11898-1 compatible TWAI controllers. It supports Standard Frame
+//! Format (11-bit) and Extended Frame Format (29-bit) frame identifiers.
 //!
 //! ## Examples
 //!
@@ -33,16 +32,15 @@
 //! # use esp_hal::twai::BaudRate;
 //! # use esp_hal::twai::TwaiMode;
 //! # use nb::block;
-//! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI
-//! // transceiver.
+//! // Use GPIO pins 2 and 3 to connect to the respective pins on the TWAI transceiver.
 //! let twai_rx_pin = peripherals.GPIO3;
 //! let twai_tx_pin = peripherals.GPIO2;
 //!
 //! // The speed of the TWAI bus.
 //! const TWAI_BAUDRATE: twai::BaudRate = BaudRate::B1000K;
 //!
-//! // Begin configuring the TWAI peripheral. The peripheral is in a reset like
-//! // state that prevents transmission but allows configuration.
+//! // Begin configuring the TWAI peripheral. The peripheral is in a reset like state
+//! // that prevents transmission but allows configuration.
 //! let mut twai_config = twai::TwaiConfiguration::new(
 //!     peripherals.TWAI0,
 //!     twai_rx_pin,
@@ -52,7 +50,7 @@
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
-//! // undesired messages
+//! // undesired messages (optional)
 //! twai_config.set_filter(
 //!     const { SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
 //! );
@@ -80,7 +78,7 @@
 //! # use esp_hal::twai::filter::SingleStandardFilter;
 //! # use esp_hal::twai::TwaiConfiguration;
 //! # use esp_hal::twai::BaudRate;
-//! # use esp_hal::twai::EspTwaiFrame;
+//! # use esp_hal::twai::DataFrame;
 //! # use esp_hal::twai::StandardId;
 //! # use esp_hal::twai::TwaiMode;
 //! # use nb::block;
@@ -98,22 +96,25 @@
 //!     can_rx_pin,
 //!     can_tx_pin,
 //!     TWAI_BAUDRATE,
-//!     TwaiMode::SelfTest
+//!     TwaiMode::SelfTest,
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
 //! // undesired messages
-//! can_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
-//! b"x", [b"xxxxxxxx", b"xxxxxxxx"]) });
+//! can_config.set_filter(
+//!     const { SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
+//! );
 //!
 //! // Start the peripheral. This locks the configuration settings of the
 //! // peripheral and puts it into operation mode, allowing packets to be sent
 //! // and received.
 //! let mut can = can_config.start();
 //!
-//! # // TODO: `new_*` should return Result not Option
-//! let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO,
-//!     &[1, 2, 3]).unwrap(); // Wait for a frame to be received.
+//! // Create a new Data Frame and transmit it.
+//! let frame = DataFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3], 3).unwrap();
+//! let _result = block!(can.transmit(&frame))?;
+//!
+//! // Wait for a frame to be received.
 //! let frame = block!(can.receive())?;
 //!
 //! # loop {}
@@ -126,6 +127,7 @@ use enumset::{EnumSet, EnumSetType};
 use procmacros::handler;
 
 use self::filter::{Filter, FilterType};
+pub use self::frame::{DataFrame, Frame, RequestFrame, TwaiFrame};
 use crate::{
     Async,
     Blocking,
@@ -145,6 +147,7 @@ use crate::{
     twai::filter::SingleStandardFilter,
 };
 pub mod filter;
+pub mod frame;
 
 /// TWAI error kind
 ///
@@ -403,280 +406,6 @@ impl From<embedded_can::Id> for Id {
             embedded_can::Id::Standard(id) => Id::Standard(id.into()),
             embedded_can::Id::Extended(id) => Id::Extended(id.into()),
         }
-    }
-}
-
-#[instability::unstable]
-impl embedded_can::Frame for EspTwaiFrame {
-    fn new(id: impl Into<embedded_can::Id>, data: &[u8]) -> Option<Self> {
-        Self::new(id.into(), data)
-    }
-
-    fn new_remote(id: impl Into<embedded_can::Id>, dlc: usize) -> Option<Self> {
-        Self::new_remote(id.into(), dlc)
-    }
-
-    fn is_extended(&self) -> bool {
-        self.is_extended_format()
-    }
-
-    fn is_remote_frame(&self) -> bool {
-        self.is_remote_request()
-    }
-
-    fn id(&self) -> embedded_can::Id {
-        self.identifier().into()
-    }
-
-    fn dlc(&self) -> usize {
-        self.data_length_code()
-    }
-
-    fn data(&self) -> &[u8] {
-        self.data()
-    }
-}
-
-/// A RAM buffer for a TWAI frame.
-///
-/// Mirror image of the 13 TWAI_DATA_x_REG registers.
-#[derive(Clone, Copy)]
-pub struct EspTwaiFrame {
-    bytes: [u8; 13],
-}
-
-impl EspTwaiFrame {
-    /// Frame Information: specifies a frame's type, format, data length, etc.
-    ///
-    /// | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
-    /// |--------|-------|-------|-------|-------|-------|-------|-------|-------|
-    /// |  0x0   |  FF   |  RTR  |  ---  |  SR   | DLC.3 | DLC.2 | DLC.1 | DLC.0 |
-    #[inline(always)]
-    fn info(&self) -> u8 {
-        self.bytes[0]
-    }
-
-    /// Frame Format (FF): specifies whether content is Extended Frame Format (EFF) or Standard
-    /// Frame Format (SFF).
-    ///
-    /// This method is private: interested clients should deduce the frame format from
-    /// [`Self::id()`].
-    #[inline(always)]
-    fn is_extended_format(&self) -> bool {
-        self.info() & (0b1 << 7) != 0
-    }
-
-    /// Remote Transmission Request (RTR): specifies whether content is a data frame or a remote
-    /// request frame (on-demand polling).
-    ///
-    /// Note: Remote request frames do not have a data payload, no matter their DLC.
-    pub fn is_remote_request(&self) -> bool {
-        self.info() & (0b1 << 6) != 0
-    }
-
-    /// Self Reception (SR): indicates whether content was sent by us (using the TWAI_SELF_RX_SEQ
-    /// command) or received from the bus.
-    pub fn is_self_reception(&self) -> bool {
-        self.info() & (0b1 << 4) != 0
-    }
-
-    /// Data Length Code (DLC): specifies the number of data bytes for a data frame, or the number
-    /// of data bytes requested by a remote frame.
-    ///
-    /// Note: although no frame can have a payload longer than 8, the DLC can be greater than 8 in
-    /// rare cases (payload length then is still 8).
-    pub fn data_length_code(&self) -> usize {
-        (self.info() & 0b1111) as usize
-    }
-
-    /// Length of the data payload: 0 for a RTR frame, 8 if DLC > 8.
-    pub fn data_length(&self) -> usize {
-        match self.is_remote_request() {
-            true => 0,
-            false => core::cmp::min(self.data_length_code(), 8),
-        }
-    }
-
-    /// Frame Identifier: 11-bit long for a SFF frame, 29-bit long for an EFF frame.
-    #[inline]
-    pub fn identifier(&self) -> Id {
-        let bytes = self.bytes;
-        match self.is_extended_format() {
-            false => {
-                // Standard Format: 11-bit Identifier, 2 bytes long
-                //
-                // | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
-                // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
-                // |  0x1   | ID.10 | ID.9  | ID.8  | ID.7  | ID.6  | ID.5  | ID.4  | ID.3  |
-                // |  0x2   | ID.2  | ID.1  | ID.0  |  ---  |  ---  |  ---  |  ---  |  ---  |
-                let raw_id: u16 = ((bytes[1] as u16) << 3) | ((bytes[2] as u16) >> 5);
-                // SAFETY: safe because raw_id is 11 bits long (it cannot exceed StandardId::MAX).
-                unsafe { StandardId::new_unchecked(raw_id).into() }
-            }
-            true => {
-                // Extended Format: 29-bit Identifier, 4 bytes long
-                //
-                // | Offset | Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
-                // |--------|-------|-------|-------|-------|-------|-------|-------|-------|
-                // |  0x1   | ID.28 | ID.27 | ID.26 | ID.25 | ID.24 | ID.23 | ID.22 | ID.21 |
-                // |  0x2   | ID.20 | ID.19 | ID.18 | ID.17 | ID.16 | ID.15 | ID.14 | ID.13 |
-                // |  0x3   | ID.12 | ID.11 | ID.10 | ID.9  | ID.8  | ID.7  | ID.6  | ID.5  |
-                // |  0x4   | ID.4  | ID.3  | ID.2  | ID.1  | ID.0  |  ---  |  ---  |  ---  |
-                let raw_id: u32 = ((bytes[1] as u32) << 21)
-                    | ((bytes[2] as u32) << 13)
-                    | ((bytes[3] as u32) << 5)
-                    | ((bytes[4] as u32) >> 3);
-                // SAFETY: safe because raw_id is 29 bits long (it cannot exceed ExtendedId::MAX)
-                unsafe { ExtendedId::new_unchecked(raw_id).into() }
-            }
-        }
-    }
-
-    /// Offset at which frame data starts: 0x3 for a SFF, 0x5 for an EFF.
-    #[inline(always)]
-    fn data_offset(&self) -> usize {
-        match self.is_extended_format() {
-            false => 0x3,
-            true => 0x5,
-        }
-    }
-
-    /// Frame Data: data payload, 0 to 8 bytes long.
-    ///
-    /// Returns a reference to a slice:
-    /// * empty in case of a Remote Transmission Request
-    /// * 8 bytes long in case DLC > 8
-    #[inline]
-    pub fn data(&self) -> &[u8] {
-        let data_start = self.data_offset();
-        let data_end = data_start + self.data_length();
-        &self.bytes[data_start..data_end]
-    }
-
-    /// Returns a slice reference to the relevant frame bytes.
-    fn as_slice(&self) -> &[u8] {
-        let len = self.data_offset() + self.data_length();
-        &self.bytes[0..len]
-    }
-
-    /// Make a new [`EspTwaiFrame`] from TWAI_DATA_x_REG registers.
-    pub(super) fn new_from_registers(register_block: &RegisterBlock) -> Self {
-        let mut bytes: [u8; 13] = [0; 13];
-        // SAFETY: Safe because it is a constant-size, read-only access to the 13 data registers
-        unsafe {
-            copy_from_data_register(&mut bytes, register_block.data(0).as_ptr());
-        }
-        Self { bytes }
-    }
-
-    /// Make a new [`EspTwaiFrame`] from parameters.
-    fn new_from_parameters(
-        id: impl Into<Id>,
-        remote_request: bool,
-        self_reception: bool,
-        dlc: usize,
-        data: &[u8],
-    ) -> Result<Self, EspTwaiError> {
-        let data_len = data.len();
-
-        // Assert that:
-        // - Max data length is 8
-        // - remote request frames have no data payload
-        if data_len > 8 || (remote_request & (data_len > 0)) {
-            return Err(EspTwaiError::InvalidDataLength(data_len as u8));
-        }
-        // Assert that:
-        // - Max DLC is 15
-        // - Data length smaller than 8 must have equal DLC
-        // - Data length equal to 8 hmust ave DLC >= 8
-        if dlc > 15 || ((data_len < 8) & (dlc != data_len)) || ((data_len == 8) & (dlc < 8)) {
-            return Err(EspTwaiError::NonCompliantDlc(dlc as u8));
-        }
-
-        let mut bytes = [0u8; 13];
-
-        // Id
-        let (extended_format, data_start): (u8, usize) = match id.into() {
-            Id::Standard(id) => {
-                let raw = id.as_raw();
-                bytes[1] = (raw >> 3) as u8;
-                bytes[2] = (raw << 5) as u8;
-                (0, 3)
-            }
-            Id::Extended(id) => {
-                let raw = id.as_raw();
-                bytes[1] = (raw >> 21) as u8;
-                bytes[2] = (raw >> 13) as u8;
-                bytes[3] = (raw >> 5) as u8;
-                bytes[4] = (raw << 3) as u8;
-                (1, 5)
-            }
-        };
-        // Frame Info
-        let ff = extended_format << 7;
-        let rtr = (remote_request as u8) << 6;
-        let sr = (self_reception as u8) << 4;
-        let dlc = (dlc as u8) & 0b1111;
-        bytes[0] = ff | rtr | sr | dlc;
-        // Data
-        let data_end = data_start + data_len;
-        bytes[data_start..data_end].copy_from_slice(data);
-
-        Ok(Self { bytes })
-    }
-
-    /// Create a new `EspTwaiFrame` with the specified ID and data payload.
-    pub fn new(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
-        Self::new_from_parameters(id.into(), false, false, data.len(), data).ok()
-    }
-
-    /// Create a new `EspTwaiFrame` for a transmission request with the
-    /// specified ID and data length (DLC).
-    pub fn new_remote(id: impl Into<Id>, dlc: usize) -> Option<Self> {
-        Self::new_from_parameters(id.into(), true, false, dlc, &[]).ok()
-    }
-
-    /// Create a new `EspTwaiFrame` ready for self-reception with the specified
-    /// ID and data payload.
-    pub fn new_self_reception(id: impl Into<Id>, data: &[u8]) -> Option<Self> {
-        Self::new_from_parameters(id.into(), false, true, data.len(), data).ok()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for EspTwaiFrame {
-    fn format(&self, f: defmt::Formatter<'_>) {
-        defmt::write!(
-            f,
-            "EspTwaiFrame {{ id: {1=u32}, EFF: {0=7..8}, RTR: {0=6..7}, SR: {0=4..5}, DLC: {0=0..4}, data: {2=[u8]:#x}, raw: {3=[u8]:#x} }}",
-            self.info(),
-            match self.identifier() {
-                Id::Standard(id) => id.as_raw() as u32,
-                Id::Extended(id) => id.as_raw(),
-            },
-            self.data(),
-            self.as_slice(),
-        );
-    }
-}
-
-impl core::fmt::Debug for EspTwaiFrame {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("EspTwaiFrame")
-            .field(
-                "id",
-                &match self.identifier() {
-                    Id::Standard(id) => id.as_raw() as u32,
-                    Id::Extended(id) => id.as_raw(),
-                },
-            )
-            .field("EFF", &(self.is_extended_format() as u8))
-            .field("RTR", &(self.is_remote_request() as u8))
-            .field("SR", &(self.is_self_reception() as u8))
-            .field("DLC", &self.data_length_code())
-            .field("data", &format_args!("{:02x?}", self.data()))
-            .field("raw", &format_args!("{:02x?}", self.as_slice()))
-            .finish()
     }
 }
 
@@ -1263,13 +992,13 @@ where
         }
     }
 
-    /// Sends the specified `EspTwaiFrame` over the TWAI bus.
-    pub fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
+    /// Sends the specified `TwaiFrame` over the TWAI bus.
+    pub fn transmit(&mut self, frame: &TwaiFrame) -> nb::Result<(), EspTwaiError> {
         self.tx.transmit(frame)
     }
 
     /// Receives a TWAI frame from the TWAI bus.
-    pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
+    pub fn receive(&mut self) -> nb::Result<Frame, EspTwaiError> {
         self.rx.receive()
     }
 
@@ -1315,7 +1044,7 @@ where
     /// transmitter's error counter does not increase past the error-passive
     /// threshold, so without giving up the transmission would be retried
     /// forever.
-    pub fn transmit(&mut self, frame: &EspTwaiFrame) -> nb::Result<(), EspTwaiError> {
+    pub fn transmit(&mut self, frame: &TwaiFrame) -> nb::Result<(), EspTwaiError> {
         let status = self.regs().status().read();
 
         // Check that the peripheral is not in a bus off state.
@@ -1333,7 +1062,7 @@ where
             return nb::Result::Err(nb::Error::WouldBlock);
         }
 
-        write_frame(self.regs(), frame);
+        transmit_frame(self.regs(), frame);
 
         Ok(())
     }
@@ -1355,7 +1084,7 @@ where
     }
 
     /// Receive a frame
-    pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
+    pub fn receive(&mut self) -> nb::Result<Frame, EspTwaiError> {
         let status = self.regs().status().read();
 
         // Check that the peripheral is not in a bus off state.
@@ -1375,9 +1104,9 @@ where
             )));
         }
 
-        let frame = EspTwaiFrame::new_from_registers(self.regs());
+        let frame = TwaiFrame::new_from_registers(self.regs());
         release_receive_fifo(self.regs());
-        Ok(frame)
+        Ok(frame.into())
     }
 }
 
@@ -1434,24 +1163,6 @@ impl embedded_can::Error for EspTwaiError {
     }
 }
 
-/// Copy data from multiple TWAI_DATA_x_REG registers, packing the source into
-/// the destination.
-///
-/// # Safety
-/// This function is marked unsafe because it reads arbitrarily from
-/// memory-mapped registers. Specifically, this function is used with the
-/// TWAI_DATA_x_REG registers which has different results based on the mode of
-/// the peripheral.
-#[inline(always)]
-unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
-    for (i, dest) in dest.iter_mut().enumerate() {
-        // Perform a volatile read to avoid compiler optimizations.
-        unsafe {
-            *dest = src.add(i).read_volatile() as u8;
-        }
-    }
-}
-
 /// Copy data to multiple TWAI_DATA_x_REG registers, unpacking the source into
 /// the destination.
 ///
@@ -1475,7 +1186,7 @@ impl<Dm> embedded_can::nb::Can for Twai<'_, Dm>
 where
     Dm: DriverMode,
 {
-    type Frame = EspTwaiFrame;
+    type Frame = TwaiFrame;
     type Error = EspTwaiError;
 
     /// Transmit a frame.
@@ -1490,7 +1201,7 @@ where
 
     /// Return a received frame if there are any available.
     fn receive(&mut self) -> nb::Result<Self::Frame, Self::Error> {
-        self.rx.receive()
+        self.rx.receive().map(|frame| frame.into())
     }
 }
 
@@ -1557,13 +1268,12 @@ fn is_error_passive(register_block: &RegisterBlock) -> bool {
         || register_block.rx_err_cnt().read().rx_err_cnt().bits() >= 128
 }
 
-/// Write a frame to the peripheral.
-fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
+/// Write a raw `TwaiFrame` to the peripheral and transmit it.
+fn transmit_frame(register_block: &RegisterBlock, frame: &TwaiFrame) {
     // SAFETY: safe because there are 13 data registers and the slice is 13 bytes long max
     unsafe {
         copy_to_data_register(register_block.data(0).as_ptr(), frame.as_slice());
     }
-
     // Trigger the appropriate transmission request based on self_reception flag
     match frame.is_self_reception() {
         // Set the transmit request command, this will lock the transmit buffer until
@@ -1706,7 +1416,7 @@ mod asynch {
     pub struct TwaiAsyncState {
         pub tx_waker: AtomicWaker,
         pub err_waker: AtomicWaker,
-        pub rx_queue: Channel<RawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
+        pub rx_queue: Channel<RawMutex, Result<TwaiFrame, EspTwaiError>, 32>,
     }
 
     impl Default for TwaiAsyncState {
@@ -1726,7 +1436,7 @@ mod asynch {
     }
 
     impl Twai<'_, Async> {
-        /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
+        /// Transmits a `TwaiFrame` asynchronously over the TWAI bus.
         ///
         /// The transmission is aborted if the future is dropped. The technical
         /// reference manual does not specifiy if aborting the transmission also
@@ -1739,11 +1449,11 @@ mod asynch {
         /// error-passive or bus-off state and the future resolves to
         /// [`EspTwaiError::TransmissionAborted`] or [`EspTwaiError::BusOff`],
         /// respectively.
-        pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
+        pub async fn transmit_async(&mut self, frame: &TwaiFrame) -> Result<(), EspTwaiError> {
             self.tx.transmit_async(frame).await
         }
         /// Receives an `EspTwaiFrame` asynchronously over the TWAI bus.
-        pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
+        pub async fn receive_async(&mut self) -> Result<Frame, EspTwaiError> {
             self.rx.receive_async().await
         }
     }
@@ -1751,13 +1461,13 @@ mod asynch {
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct TransmitFuture<'d, 'f> {
         twai: AnyTwai<'d>,
-        frame: &'f EspTwaiFrame,
+        frame: &'f TwaiFrame,
         in_flight: bool,
         _wake_lock: WakeLock,
     }
 
     impl<'d, 'f> TransmitFuture<'d, 'f> {
-        pub fn new(twai: AnyTwai<'d>, frame: &'f EspTwaiFrame) -> Self {
+        pub fn new(twai: AnyTwai<'d>, frame: &'f TwaiFrame) -> Self {
             Self {
                 twai,
                 frame,
@@ -1805,7 +1515,7 @@ mod asynch {
             }
 
             if !self.in_flight {
-                write_frame(regs, self.frame);
+                transmit_frame(regs, self.frame);
                 self.in_flight = true;
                 return Poll::Pending;
             }
@@ -1824,7 +1534,7 @@ mod asynch {
     }
 
     impl TwaiTx<'_, Async> {
-        /// Transmits an `EspTwaiFrame` asynchronously over the TWAI bus.
+        /// Transmits a `TwaiFrame` asynchronously over the TWAI bus.
         ///
         /// The transmission is aborted if the future is dropped. The technical
         /// reference manual does not specifiy if aborting the transmission also
@@ -1837,20 +1547,20 @@ mod asynch {
         /// error-passive or bus-off state and the future resolves to
         /// [`EspTwaiError::TransmissionAborted`] or [`EspTwaiError::BusOff`],
         /// respectively.
-        pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
+        pub async fn transmit_async(&mut self, frame: &TwaiFrame) -> Result<(), EspTwaiError> {
             TransmitFuture::new(self.twai.reborrow(), frame).await
         }
     }
 
     impl TwaiRx<'_, Async> {
-        /// Receives an `EspTwaiFrame` asynchronously over the TWAI bus.
-        pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
+        /// Receives a `Frame` asynchronously over the TWAI bus.
+        pub async fn receive_async(&mut self) -> Result<Frame, EspTwaiError> {
             poll_fn(|cx| {
                 self.twai.async_state().err_waker.register(cx.waker());
                 self.twai.listen(EnumSet::all());
 
                 if let Poll::Ready(result) = self.twai.async_state().rx_queue.poll_receive(cx) {
-                    return Poll::Ready(result);
+                    return Poll::Ready(result.map(|raw| raw.into()));
                 }
 
                 let status = self.regs().status().read();
@@ -1909,7 +1619,7 @@ mod asynch {
                     Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun))
                 } else {
                     // Current frame is complete
-                    let frame = EspTwaiFrame::new_from_registers(register_block);
+                    let frame = TwaiFrame::new_from_registers(register_block);
                     release_receive_fifo(register_block);
                     Ok(frame)
                 };
