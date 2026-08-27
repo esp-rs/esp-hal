@@ -107,7 +107,7 @@ impl Drop for RsaGuard {
 }
 
 impl<'d> Rsa<'d, Blocking> {
-    /// Create a new instance in [Blocking] mode.
+    /// Creates a new instance in [Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rsa: RSA<'d>) -> Self {
@@ -134,7 +134,7 @@ impl<'d> Rsa<'d, Blocking> {
         }
     }
 
-    /// Enables/disables rsa interrupt.
+    /// Enables or disables the RSA interrupt.
     ///
     /// When enabled rsa peripheral would generate an interrupt when a operation
     /// is finished.
@@ -144,8 +144,7 @@ impl<'d> Rsa<'d, Blocking> {
 
     /// Registers an interrupt handler for the RSA peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.rsa.disable_peri_interrupt_on_all_cores();
@@ -163,7 +162,7 @@ impl crate::interrupt::InterruptConfigurable for Rsa<'_, Blocking> {
 }
 
 impl<'d> Rsa<'d, Async> {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Reconfigures the RSA driver to operate in [`Blocking`] mode.
     pub fn into_blocking(self) -> Rsa<'d, Blocking> {
         self.internal_enable_disable_interrupt(false);
         self.rsa.disable_peri_interrupt_on_all_cores();
@@ -185,10 +184,7 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
         self.rsa.register_block()
     }
 
-    /// After the RSA accelerator is released from reset, the memory blocks
-    /// needs to be initialized, only after that peripheral should be used.
-    /// This function would return without an error if the memory is
-    /// initialized.
+    /// Returns whether RSA memory blocks are initialized after reset.
     fn ready(&self) -> bool {
         low_level::ready(self.regs())
     }
@@ -213,7 +209,7 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
         low_level::clear_interrupt(self.regs());
     }
 
-    /// Checks if the RSA peripheral is idle.
+    /// Returns whether the RSA peripheral is idle.
     fn is_idle(&self) -> bool {
         low_level::is_idle(self.regs())
     }
@@ -303,14 +299,14 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
         self.read_out(outbuf);
     }
 
-    /// Enables/disables constant time operation.
+    /// Enables or disables constant time operation.
     ///
     /// Disabling constant time operation increases the performance of modular
     /// exponentiation by simplifying the calculation concerning the 0 bits
     /// of the exponent. I.e. the less the Hamming weight, the greater the
     /// performance.
     ///
-    /// Note: this compromises security by enabling timing-based side-channel attacks.
+    /// Compromises security by enabling timing-based side-channel attacks.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -321,13 +317,13 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
             .write(|w| w.constant_time().bit(disable));
     }
 
-    /// Enables/disables search acceleration.
+    /// Enables or disables search acceleration.
     ///
     /// When enabled it would increase the performance of modular
     /// exponentiation by discarding the exponent's bits before the most
     /// significant set bit.
     ///
-    /// Note: this compromises security by effectively decreasing the key length.
+    /// Compromises security by effectively decreasing the key length.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -338,7 +334,7 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
             .write(|w| w.search_enable().bit(enable));
     }
 
-    /// Checks if the search functionality is enabled in the RSA hardware.
+    /// Returns whether the search functionality is enabled in the RSA hardware.
     #[cfg(not(rsa_version = "1"))]
     fn is_search_enabled(&mut self) -> bool {
         self.regs()
@@ -394,10 +390,10 @@ pub mod operand_sizes {
     );
 }
 
-/// Support for RSA peripheral's modular exponentiation feature that could be
+/// Support for the RSA peripheral's modular exponentiation feature that could be
 /// used to find the `(base ^ exponent) mod modulus`.
 ///
-/// Each operand is a little endian byte array of the same size
+/// Each operand is a little endian byte array of the same size.
 pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, Dm: DriverMode> {
     rsa: &'a mut Rsa<'d, Dm>,
     phantom: PhantomData<T>,
@@ -478,10 +474,10 @@ where
     }
 }
 
-/// Support for RSA peripheral's modular multiplication feature that could be
+/// Support for the RSA peripheral's modular multiplication feature that could be
 /// used to find the `(operand a * operand b) mod modulus`.
 ///
-/// Each operand is a little endian byte array of the same size
+/// Each operand is a little endian byte array of the same size.
 pub struct RsaModularMultiplication<'a, 'd, T, Dm>
 where
     T: RsaMode,
@@ -553,10 +549,10 @@ where
     }
 }
 
-/// Support for RSA peripheral's large number multiplication feature that could
+/// Support for the RSA peripheral's large number multiplication feature that could
 /// be used to find the `operand a * operand b`.
 ///
-/// Each operand is a little endian byte array of the same size
+/// Each operand is a little endian byte array of the same size.
 pub struct RsaMultiplication<'a, 'd, T, Dm>
 where
     T: RsaMode + Multi,
@@ -776,12 +772,12 @@ enum RsaBackendState<'d> {
 /// RSA processing backend.
 ///
 /// The backend processes work items placed in the RSA work queue. The backend needs to be created
-/// and started for operations to be processed. This allows you to perform operations on the RSA
-/// accelerator without carrying around the peripheral singleton, or the driver.
+/// and started for operations to be processed. Operations can be performed on the RSA accelerator
+/// without carrying around the peripheral singleton, or the driver.
 ///
 /// The [`RsaContext`] struct can enqueue work items that this backend will process.
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -811,7 +807,7 @@ impl<'d> RsaBackend<'d> {
     #[procmacros::doc_replace]
     /// Creates a new RSA backend.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -832,7 +828,7 @@ impl<'d> RsaBackend<'d> {
     ///
     /// The driver stops operating when the returned object is dropped.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1129,7 +1125,7 @@ impl RsaContext {
     /// exponentiation by discarding the exponent's bits before the most
     /// significant set bit.
     ///
-    /// > ⚠️ Note: this compromises security by effectively decreasing the key length.
+    /// Compromises security by effectively decreasing the key length.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -1145,7 +1141,7 @@ impl RsaContext {
     /// of the exponent. I.e. the less the Hamming weight, the greater the
     /// performance.
     ///
-    /// > ⚠️ Note: this compromises security by enabling timing-based side-channel attacks.
+    /// Compromises security by enabling timing-based side-channel attacks.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -1220,11 +1216,11 @@ impl RsaContext {
     /// # {after_snippet}
     /// ```
     ///
-    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
-    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
-    /// operation (by dropping the handle).
+    /// Returns an [`RsaHandle`] for the asynchronous calculation that can be used to poll the
+    /// status of the calculation, to wait for it to finish, or to cancel the operation (by
+    /// dropping the handle).
     ///
-    /// When the operation is completed, the result will be stored in `result`.
+    /// When the operation is completed, the result is stored in `result`
     pub fn modular_exponentiate<'t, OP>(
         &'t mut self,
         x: &'t OP::InputType,
@@ -1258,11 +1254,11 @@ impl RsaContext {
     /// For an example how these values can be calculated and used, see
     /// [Self::modular_exponentiate].
     ///
-    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
-    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
-    /// operation (by dropping the handle).
+    /// Returns an [`RsaHandle`] for the asynchronous calculation that can be used to poll the
+    /// status of the calculation, to wait for it to finish, or to cancel the operation (by
+    /// dropping the handle).
     ///
-    /// When the operation is completed, the result will be stored in `result`.
+    /// When the operation is completed, the result is stored in `result`
     pub fn modular_multiply<'t, OP>(
         &'t mut self,
         x: &'t OP::InputType,
@@ -1289,14 +1285,14 @@ impl RsaContext {
     #[procmacros::doc_replace]
     /// Starts a multiplication operation, performing `Z = X * Y`.
     ///
-    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
-    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
-    /// operation (by dropping the handle).
+    /// Returns an [`RsaHandle`] for the asynchronous calculation that can be used to poll the
+    /// status of the calculation, to wait for it to finish, or to cancel the operation (by
+    /// dropping the handle).
     ///
-    /// When the operation is completed, the result will be stored in `result`. The `result` is
-    /// twice as wide as the inputs.
+    /// When the operation is completed, the result is stored in `result`. The `result` is twice as
+    /// wide as the inputs.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust,no_run
     /// # {before_snippet}

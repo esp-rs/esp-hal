@@ -236,18 +236,18 @@ use reader::{ReaderState, RmtReader};
 mod writer;
 use writer::{RmtWriter, WriterState};
 
-/// A configuration error
+/// A configuration error.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
-    /// The desired frequency is impossible to reach
+    /// The desired frequency is impossible to reach.
     UnreachableTargetFrequency,
-    /// The idle threshold exceeds [`MAX_RX_IDLE_THRESHOLD`]
+    /// The idle threshold exceeds [`MAX_RX_IDLE_THRESHOLD`].
     IdleThresholdOutOfRange,
-    /// The memsize is 0 or larger than what the channel can support
+    /// The memsize is 0 or larger than what the channel can support.
     MemsizeOutOfRange,
-    /// (Part of) the requested channel memory is in use by another channel
+    /// (Part of) the requested channel memory is in use by another channel.
     MemoryBlockNotAvailable,
 }
 
@@ -274,17 +274,17 @@ impl core::fmt::Display for ConfigError {
 #[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 #[non_exhaustive]
 pub enum Error {
-    /// The amount of pulses exceeds the size of the FIFO
+    /// The amount of pulses exceeds the size of the FIFO.
     Overflow,
-    /// An argument is invalid
+    /// An argument is invalid.
     InvalidArgument,
-    /// An error occurred during transmission
+    /// An error occurred during transmission.
     TransmissionError,
-    /// No transmission end marker found
+    /// No transmission end marker found.
     EndMarkerMissing,
-    /// The data length is invalid
+    /// The data length is invalid.
     InvalidDataLength,
-    /// Receiver error most likely RMT memory overflow
+    /// Receiver error most likely RMT memory overflow.
     ReceiverError,
 }
 
@@ -338,7 +338,7 @@ impl PulseCode {
     /// Maximum value for the `length1` and `length2` fields.
     pub const MAX_LEN: u16 = 0x7FFF;
 
-    /// Create a new instance.
+    /// Creates a new instance.
     ///
     /// Panics if `length1` or `length2` exceed the maximum representable range.
     #[inline]
@@ -353,7 +353,7 @@ impl PulseCode {
         unsafe { Self::new_unchecked(level1, length1, level2, length2) }
     }
 
-    /// Create a new instance.
+    /// Creates a new instance.
     ///
     /// If `length1` or `length2` exceed the maximum representable range, they
     /// will be clamped to `Self::MAX_LEN`.
@@ -376,7 +376,7 @@ impl PulseCode {
         unsafe { Self::new_unchecked(level1, length1, level2, length2) }
     }
 
-    /// Create a new instance, attempting to convert lengths to `u16` first.
+    /// Creates a new instance, attempting to convert lengths to `u16` first.
     ///
     /// This is slightly more convenient when passing in longer integers (e.g. `u32`) resulting from
     /// a preceding calculation.
@@ -402,7 +402,7 @@ impl PulseCode {
         Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
     }
 
-    /// Create a new instance without checking that code lengths are in range.
+    /// Creates a new instance without checking that code lengths are in range.
     ///
     /// # Safety
     ///
@@ -422,7 +422,7 @@ impl PulseCode {
         )
     }
 
-    /// Create a new instance that is an end marker with `Level::Low`.
+    /// Creates a new instance that is an end marker with `Level::Low`.
     ///
     /// This corresponds to the all-zero [`PulseCode`], i.e. with both level and
     /// length fields set to zero, equivalent to (but more semantic than)
@@ -435,7 +435,7 @@ impl PulseCode {
         Self(0)
     }
 
-    /// Set all levels and lengths to 0.
+    /// Sets all levels and lengths to 0.
     ///
     /// In other words, assigns the value of [`PulseCode::end_marker()`] to `self`.
     #[inline]
@@ -469,7 +469,7 @@ impl PulseCode {
         ((self.0 >> LENGTH2_SHIFT) & LENGTH_MASK) as u16
     }
 
-    /// Set `level1` and return the modified [`PulseCode`].
+    /// Sets `level1` and returns the modified [`PulseCode`].
     #[inline]
     pub const fn with_level1(mut self, level: Level) -> Self {
         self.0 &= !LEVEL1_MASK;
@@ -477,7 +477,7 @@ impl PulseCode {
         self
     }
 
-    /// Set `level2` and return the modified [`PulseCode`].
+    /// Sets `level2` and returns the modified [`PulseCode`].
     #[inline]
     pub const fn with_level2(mut self, level: Level) -> Self {
         self.0 &= !LEVEL2_MASK;
@@ -485,7 +485,7 @@ impl PulseCode {
         self
     }
 
-    /// Set `length1` and return the modified [`PulseCode`].
+    /// Sets `length1` and returns the modified [`PulseCode`].
     ///
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
@@ -499,7 +499,7 @@ impl PulseCode {
         Some(self)
     }
 
-    /// Set `length2` and return the modified [`PulseCode`].
+    /// Sets `length2` and returns the modified [`PulseCode`].
     ///
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
@@ -513,7 +513,7 @@ impl PulseCode {
         Some(self)
     }
 
-    /// Return whether this pulse code contains an end marker.
+    /// Returns whether this pulse code contains an end marker.
     ///
     /// Equivalent to `self.length1() == 0 || self.length2() == 0`.
     #[inline]
@@ -583,31 +583,31 @@ impl From<PulseCode> for u32 {
 struct MemSize(u8);
 
 impl MemSize {
-    /// Create from the given number of RMT RAM blocks.
+    /// Creates from the given number of RMT RAM blocks.
     #[inline]
     const fn from_blocks(blocks: u8) -> Self {
         Self(blocks)
     }
 
-    /// Return the number of RMT RAM blocks specified by this `MemSize`.
+    /// Returns the number of RMT RAM blocks specified by this `MemSize`.
     #[inline]
     const fn blocks(self) -> u8 {
         self.0
     }
 
-    /// Return the number of RMT pulse codes specified by this `MemSize`.
+    /// Returns the number of RMT pulse codes specified by this `MemSize`.
     #[inline]
     const fn codes(self) -> usize {
         self.0 as usize * property!("rmt.channel_ram_size")
     }
 }
 
-/// Marker for a channel capable of/configured for transmit operations
+/// Marker for a channel capable of or configured for transmit operations.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Tx;
 
-/// Marker for a channel capable of/configured for receive operations
+/// Marker for a channel capable of or configured for receive operations.
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Rx;
@@ -655,11 +655,11 @@ impl<Dir: Direction> DynChannelAccess<Dir> {
 pub struct TxChannelConfig {
     /// Channel's clock divider
     clk_divider: u8,
-    /// Whether the idle output level is low/high
+    /// Whether the idle output level is low/high.
     idle_output_level: Level,
-    /// Whether idle output is enabled
+    /// Whether idle output is enabled.
     idle_output: bool,
-    /// Whether carrier modulation is enabled
+    /// Whether carrier modulation is enabled.
     carrier_modulation: bool,
     /// Carrier high phase in ticks
     carrier_high: u16,
@@ -667,7 +667,7 @@ pub struct TxChannelConfig {
     carrier_low: u16,
     /// Level of the carrier
     carrier_level: Level,
-    /// The amount of memory blocks allocated to this channel
+    /// The amount of memory blocks allocated to this channel.
     memsize: u8,
 }
 
@@ -692,7 +692,7 @@ impl Default for TxChannelConfig {
 pub struct RxChannelConfig {
     /// Channel's clock divider
     clk_divider: u8,
-    /// Whether carrier demodulation is enabled
+    /// Whether carrier demodulation is enabled.
     carrier_modulation: bool,
     /// Carrier high phase in ticks
     carrier_high: u16,
@@ -702,9 +702,9 @@ pub struct RxChannelConfig {
     carrier_level: Level,
     /// Filter threshold in ticks
     filter_threshold: u8,
-    /// Idle threshold in ticks, must not exceed [`MAX_RX_IDLE_THRESHOLD`]
+    /// Idle threshold in ticks, must not exceed [`MAX_RX_IDLE_THRESHOLD`].
     idle_threshold: u16,
-    /// The amount of memory blocks allocted to this channel
+    /// The amount of memory blocks allocated to this channel.
     memsize: u8,
 }
 
@@ -914,17 +914,16 @@ impl ChannelIndex {
 }
 
 impl<'rmt> Rmt<'rmt, Blocking> {
-    /// Create a new RMT instance.
+    /// Creates a new RMT instance.
     ///
     /// The `frequency` parameter configures the global RMT counter clock. Use
     /// [`Rmt::frequency`] to retrieve the actual configured frequency when
     /// converting real-time pulse durations to [`PulseCode`] lengths; this is
     /// not necessarily the APB clock frequency.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function can return
-    /// - [`ConfigError::UnreachableTargetFrequency`].
+    /// [`ConfigError::UnreachableTargetFrequency`] when the target frequency cannot be reached.
     pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, ConfigError> {
         let clk_src = ClockSource::default();
         let (div, counter_frequency) = self::chip_specific::validate_clock(clk_src, frequency)?;
@@ -939,8 +938,7 @@ impl<'rmt> Rmt<'rmt, Blocking> {
 
     /// Registers an interrupt handler for the RMT peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         for core in crate::system::Cpu::other() {
@@ -1049,7 +1047,7 @@ mod state {
     }
 
     impl RmtState {
-        /// Check whether this state corresponds to a rx, tx, or other configuration.
+        /// Returns whether this state corresponds to a rx, tx, or other configuration.
         #[allow(unused)]
         #[inline]
         pub(super) fn is_tx(&self) -> Option<bool> {
@@ -1060,20 +1058,20 @@ mod state {
             }
         }
 
-        /// Convert a `u8` to `Self` without checking that it has a valid value for the enum.
+        /// Converts a `u8` to `Self` without checking that it has a valid value for the enum.
         ///
         /// # Safety
         ///
-        /// - Must only be called with valid values of the RmtState discrimiant
+        /// - Must only be called with valid values of the RmtState discriminant
         #[allow(unused)]
         #[inline]
         unsafe fn from_u8_unchecked(value: u8) -> Self {
             unsafe { core::mem::transmute::<_, Self>(value) }
         }
 
-        /// Load channel state from the global `STATE` by channel index.
+        /// Loads channel state from the global `STATE` by channel index.
         ///
-        /// # Safety:
+        /// # Safety
         ///
         /// - the `channel` number must be in 0..NUM_CHANNELS
         #[allow(unused)]
@@ -1082,7 +1080,7 @@ mod state {
             unsafe { Self::from_u8_unchecked(STATE[channel as usize].load(ordering)) }
         }
 
-        /// Store the given state to all channel states for an index range in reverse order.
+        /// Stores the given state to all channel states for an index range in reverse order.
         #[inline]
         pub(super) fn store_range_rev(self, range: Range<u8>, ordering: Ordering) {
             for ch_num in range.rev() {
@@ -1090,14 +1088,14 @@ mod state {
             }
         }
 
-        /// Store channel state to the global `STATE` given a `DynChannelAccess`.
+        /// Stores channel state to the global `STATE` given a `DynChannelAccess`.
         #[allow(unused)]
         #[inline]
         pub(super) fn store<Dir: Direction>(self, raw: DynChannelAccess<Dir>, ordering: Ordering) {
             STATE[raw.channel() as usize].store(self as u8, ordering);
         }
 
-        /// Load channel state from the global `STATE` given a `DynChannelAccess`.
+        /// Loads channel state from the global `STATE` given a `DynChannelAccess`.
         #[allow(unused)]
         #[inline]
         pub(super) fn load<Dir: Direction>(raw: DynChannelAccess<Dir>, ordering: Ordering) -> Self {
@@ -1106,7 +1104,7 @@ mod state {
             unsafe { Self::load_by_channel_number(raw.channel(), ordering) }
         }
 
-        /// Perform a compare_exchange on the global `STATE` by channel index.
+        /// Performs a compare_exchange on the global `STATE` by channel index.
         #[inline]
         pub(super) fn compare_exchange(
             ch_num: u8,
@@ -1167,7 +1165,7 @@ impl ChannelGuards {
     }
 }
 
-/// RMT Channel
+/// RMT Channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -1295,7 +1293,7 @@ where
     Dm: crate::DriverMode,
     Dir: Direction,
 {
-    /// Reborrow this channel for a shorter lifetime `'a`.
+    /// Reborrows this channel for a shorter lifetime `'a`.
     pub fn reborrow<'a>(&'a mut self) -> Channel<'a, Dm, Dir> {
         Channel {
             raw: self.raw,
@@ -1312,7 +1310,7 @@ impl<'ch, Dm> Channel<'ch, Dm, Tx>
 where
     Dm: crate::DriverMode,
 {
-    /// Connect a pin to the channel's output signal.
+    /// Connects a pin to the channel's output signal.
     ///
     /// This will replace previous pin assignments for this signal.
     pub fn with_pin(mut self, pin: impl PeripheralOutput<'ch>) -> Self {
@@ -1329,13 +1327,11 @@ where
         self
     }
 
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function can return
-    /// - [`ConfigError::MemoryBlockNotAvailable`],
-    /// - [`ConfigError::MemsizeOutOfRange`].
+    /// [`ConfigError::MemoryBlockNotAvailable`] or [`ConfigError::MemsizeOutOfRange`].
     pub fn apply_config(&mut self, config: &TxChannelConfig) -> Result<(), ConfigError> {
         apply_tx_config(self.raw, config, true)
     }
@@ -1345,7 +1341,7 @@ impl<'ch, Dm> Channel<'ch, Dm, Rx>
 where
     Dm: crate::DriverMode,
 {
-    /// Connect a pin to the channel's input signal.
+    /// Connects a pin to the channel's input signal.
     ///
     /// This will replace previous pin assignments for this signal.
     pub fn with_pin(self, pin: impl PeripheralInput<'ch>) -> Self {
@@ -1358,44 +1354,45 @@ where
         self
     }
 
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// This function can return
-    /// - [`ConfigError::MemoryBlockNotAvailable`],
-    /// - [`ConfigError::MemsizeOutOfRange`],
-    /// - [`ConfigError::IdleThresholdOutOfRange`].
+    /// [`ConfigError::MemoryBlockNotAvailable`], [`ConfigError::MemsizeOutOfRange`], or
+    /// [`ConfigError::IdleThresholdOutOfRange`].
     pub fn apply_config(&mut self, config: &RxChannelConfig) -> Result<(), ConfigError> {
         apply_rx_config(self.raw, config, true)
     }
 }
 
-/// Creates a TX channel
+/// TX channel creator for the RMT peripheral.
 pub trait TxChannelCreator<'ch, Dm>
 where
     Dm: crate::DriverMode,
 {
-    /// Configure the TX channel
+    /// Configures the TX channel.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Returns errors under the same conditions as [`Channel<Tx>::apply_config`].
+    /// [`ConfigError::MemoryBlockNotAvailable`] or [`ConfigError::MemsizeOutOfRange`] under the
+    /// same conditions as [`Channel<Tx>::apply_config`].
     fn configure_tx(self, config: &TxChannelConfig) -> Result<Channel<'ch, Dm, Tx>, ConfigError>
     where
         Self: Sized;
 }
 
-/// Creates a RX channel
+/// RX channel creator for the RMT peripheral.
 pub trait RxChannelCreator<'ch, Dm>
 where
     Dm: crate::DriverMode,
 {
-    /// Configure the RX channel
+    /// Configures the RX channel.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Returns errors under the same conditions as [`Channel<Rx>::apply_config`].
+    /// [`ConfigError::MemoryBlockNotAvailable`], [`ConfigError::MemsizeOutOfRange`], or
+    /// [`ConfigError::IdleThresholdOutOfRange`] under the same conditions as
+    /// [`Channel<Rx>::apply_config`].
     fn configure_rx(self, config: &RxChannelConfig) -> Result<Channel<'ch, Dm, Rx>, ConfigError>
     where
         Self: Sized;
@@ -1416,7 +1413,7 @@ impl TxGuard {
         Self { raw: None }
     }
 
-    /// Indicate that the transaction has completed (or was never started) and does not require
+    /// Indicates that the transaction has completed (or was never started) and does not require
     /// explicit stopping on drop.
     fn set_completed(&mut self) {
         self.raw = None;
@@ -1459,7 +1456,7 @@ impl RxGuard {
         Self { raw: None }
     }
 
-    /// Indicate that the transaction has completed (or was never started) and does not require
+    /// Indicates that the transaction has completed (or was never started) and does not require
     /// explicit stopping on drop.
     fn set_completed(&mut self) {
         self.raw = None;
@@ -1515,7 +1512,7 @@ impl<'ch> TxTransaction<'ch, '_> {
         status
     }
 
-    /// Check transmission status and write new data to the hardware if
+    /// Checks transmission status and writes new data to the hardware if
     /// necessary.
     ///
     /// Returns whether transmission has ended (whether successfully or with an
@@ -1525,7 +1522,7 @@ impl<'ch> TxTransaction<'ch, '_> {
         matches!(self.poll_internal(), Some(Event::Error | Event::End))
     }
 
-    /// Wait for the transaction to complete
+    /// Waits for the transaction to complete.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn wait(
         mut self,
@@ -1549,7 +1546,7 @@ impl<'ch> TxTransaction<'ch, '_> {
     }
 }
 
-/// An in-progress continuous TX transaction
+/// An in-progress continuous TX transaction.
 #[must_use = "transactions will be aborted when dropped"]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1564,7 +1561,7 @@ pub struct ContinuousTxTransaction<'ch> {
 impl<'ch> ContinuousTxTransaction<'ch> {
     // FIXME: This interface isn't great, since one cannot use the waiting time until tx is stopped
     // for other things! Implement a poll-like interface similar to TxTransaction!
-    /// Stop transaction when the current iteration ends.
+    /// Stops transaction when the current iteration ends.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn stop_next(
         self,
@@ -1572,7 +1569,7 @@ impl<'ch> ContinuousTxTransaction<'ch> {
         self.stop_impl(false)
     }
 
-    /// Stop transaction as soon as possible.
+    /// Stops transaction as soon as possible.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn stop(self) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         self.stop_impl(true)
@@ -1619,7 +1616,7 @@ impl<'ch> ContinuousTxTransaction<'ch> {
         }
     }
 
-    /// Check if the `loopcount` interrupt bit is set.
+    /// Returns whether the `loopcount` interrupt bit is set.
     ///
     /// Whether this implies that the transmission has stopped depends on the [`LoopMode`] value
     /// provided when starting it.
@@ -1629,7 +1626,7 @@ impl<'ch> ContinuousTxTransaction<'ch> {
     }
 }
 
-/// RMT Channel Creator
+/// RMT Channel Creator.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ChannelCreator<'ch, Dm, const CHANNEL: u8>
@@ -1676,7 +1673,7 @@ where
         }
     }
 
-    /// Reborrow this channel creator for a shorter lifetime `'a`.
+    /// Reborrows this channel creator for a shorter lifetime `'a`.
     pub fn reborrow<'a>(&'a mut self) -> ChannelCreator<'a, Dm, CHANNEL> {
         Self {
             _rmt: PhantomData,
@@ -1700,26 +1697,26 @@ where
     }
 }
 
-/// Loop mode for continuous transmission
+/// Loop mode for continuous transmission.
 ///
 /// Depending on hardware support, the `loopcount` interrupt and automatic stopping of the
 /// transmission upon reaching a specified loop count may not be available.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum LoopMode {
-    /// Repeat until explicitly stopped.
+    /// Repeats until explicitly stopped.
     Infinite,
 
     // FIXME: Does continuous tx trigger the End interrupt on each repetition such that it could
     // be used to emulate the LoopCount interrupt on devices that lack it?
-    /// Repeat until explicitly stopped, and assert the loop count interrupt upon completing the
+    /// Repeats until explicitly stopped, and asserts the loop count interrupt upon completing the
     /// given number of iterations.
     ///
     /// Loop counts larger than [`MAX_TX_LOOPCOUNT`] will result in an error.
     #[cfg(rmt_has_tx_loop_count)]
     InfiniteWithInterrupt(u16),
 
-    /// Repeat for the given number of iterations, and also set the loop count interrupt flag upon
+    /// Repeats for the given number of iterations, and also sets the loop count interrupt flag upon
     /// completion.
     ///
     /// If the iteration count is 0, the transaction will complete immediately without
@@ -1743,12 +1740,11 @@ impl LoopMode {
     }
 }
 
-/// Channel in TX mode
+/// Channel in TX mode.
 impl<'ch> Channel<'ch, Blocking, Tx> {
-    /// Start transmitting the given pulse code sequence.
-    /// This returns a [`TxTransaction`] which can be used to wait for
-    /// the transaction to complete and get back the channel for further
-    /// use.
+    /// Starts transmitting the given pulse code sequence.
+    /// Returns a [`TxTransaction`] that can be used to wait for the transaction to
+    /// complete and get back the channel for further use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit<'data>(
         self,
@@ -1775,10 +1771,10 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         })
     }
 
-    /// Start transmitting the given pulse code continuously.
+    /// Starts transmitting the given pulse code continuously.
     ///
-    /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
-    /// ongoing transmission and get back the channel for further use.
+    /// Returns a [`ContinuousTxTransaction`] that can be used to stop the ongoing
+    /// transmission and get back the channel for further use.
     ///
     /// The `mode` argument determines whether transmission will continue until explicitly stopped
     /// or for a fixed number of iterations; see [`LoopMode`] for more details.
@@ -1828,7 +1824,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     }
 }
 
-/// RX transaction instance
+/// RX transaction instance.
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1881,7 +1877,7 @@ impl<'ch> RxTransaction<'ch, '_> {
         status
     }
 
-    /// Check receive status
+    /// Checks receive status.
     ///
     /// Returns whether reception has ended (whether successfully or with an
     /// error). In that case, a subsequent call to `wait()` returns immediately.
@@ -1890,7 +1886,7 @@ impl<'ch> RxTransaction<'ch, '_> {
         matches!(self.poll_internal(), Some(Event::Error | Event::End))
     }
 
-    /// Wait for the transaction to complete
+    /// Waits for the transaction to complete.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     // The return type isn't nice, but the blocking API needs a broader redesign anyway.
     #[allow(clippy::type_complexity)]
@@ -1914,7 +1910,7 @@ impl<'ch> RxTransaction<'ch, '_> {
     }
 }
 
-/// Channel is RX mode
+/// Channel is RX mode.
 impl<'ch> Channel<'ch, Blocking, Rx> {
     #[procmacros::doc_replace(
         "rx_size_limit" => {
@@ -1922,9 +1918,9 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
             _ => ""
         }
     )]
-    /// Start receiving pulse codes into the given buffer.
-    /// This returns a [RxTransaction] which can be used to wait for receive to
-    /// complete and get back the channel for further use.
+    /// Starts receiving pulse codes into the given buffer.
+    /// Returns a [`RxTransaction`] that can be used to wait for receive to complete
+    /// and get back the channel for further use.
     ///
     /// # {rx_size_limit}
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
@@ -2007,9 +2003,9 @@ impl core::future::Future for TxFuture<'_> {
     }
 }
 
-/// TX channel in async mode
+/// TX channel in async mode.
 impl Channel<'_, Async, Tx> {
-    /// Start transmitting the given pulse code sequence.
+    /// Starts transmitting the given pulse code sequence.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit(&mut self, mut data: &[PulseCode]) -> impl Future<Output = Result<(), Error>> {
         let raw = self.raw;
@@ -2109,7 +2105,7 @@ impl core::future::Future for RxFuture<'_> {
     }
 }
 
-/// RX channel in async mode
+/// RX channel in async mode.
 impl Channel<'_, Async, Rx> {
     #[procmacros::doc_replace(
         "rx_size_limit" => {
@@ -2117,7 +2113,7 @@ impl Channel<'_, Async, Rx> {
             _ => ""
         }
     )]
-    /// Start receiving a pulse code sequence.
+    /// Starts receiving a pulse code sequence.
     ///
     /// # {rx_size_limit}
     #[cfg_attr(place_rmt_driver_in_ram, ram)]

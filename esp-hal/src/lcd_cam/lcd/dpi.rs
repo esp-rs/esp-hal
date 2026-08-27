@@ -135,7 +135,7 @@ impl<'d, Dm> Dpi<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Create a new instance of the RGB/DPI driver.
+    /// Creates a new instance of the RGB/DPI driver.
     pub fn new(
         lcd: Lcd<'d, Dm>,
         channel: impl LcdDmaTxChannel<'d>,
@@ -159,8 +159,7 @@ where
     ///
     /// # Errors
     ///
-    /// [`ConfigError::Clock`] variant will be returned if the frequency passed
-    /// in `Config` is too low.
+    /// [`ConfigError::Clock`] when the frequency passed in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.lcd
             .configure_clocks(&ClockConfig {
@@ -282,7 +281,7 @@ where
         Ok(())
     }
 
-    /// Assign the VSYNC pin for the LCD_CAM.
+    /// Assigns the VSYNC pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the VSYNC
     /// signal.
@@ -295,7 +294,7 @@ where
         self
     }
 
-    /// Assign the HSYNC pin for the LCD_CAM.
+    /// Assigns the HSYNC pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the HSYNC
     /// signal.
@@ -308,7 +307,7 @@ where
         self
     }
 
-    /// Assign the DE pin for the LCD_CAM.
+    /// Assigns the DE pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DE
     /// signal.
@@ -321,7 +320,7 @@ where
         self
     }
 
-    /// Assign the PCLK pin for the LCD_CAM.
+    /// Assigns the PCLK pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the PCLK
     /// signal.
@@ -344,7 +343,7 @@ where
         self
     }
 
-    /// Assign the DATA_0 pin for the LCD_CAM.
+    /// Assigns the DATA_0 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_0
     /// signal.
@@ -352,7 +351,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_0, pin)
     }
 
-    /// Assign the DATA_1 pin for the LCD_CAM.
+    /// Assigns the DATA_1 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_1
     /// signal.
@@ -360,7 +359,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_1, pin)
     }
 
-    /// Assign the DATA_2 pin for the LCD_CAM.
+    /// Assigns the DATA_2 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_2
     /// signal.
@@ -368,7 +367,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_2, pin)
     }
 
-    /// Assign the DATA_3 pin for the LCD_CAM.
+    /// Assigns the DATA_3 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_3
     /// signal.
@@ -376,7 +375,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_3, pin)
     }
 
-    /// Assign the DATA_4 pin for the LCD_CAM.
+    /// Assigns the DATA_4 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_4
     /// signal.
@@ -384,7 +383,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_4, pin)
     }
 
-    /// Assign the DATA_5 pin for the LCD_CAM.
+    /// Assigns the DATA_5 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_5
     /// signal.
@@ -392,7 +391,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_5, pin)
     }
 
-    /// Assign the DATA_6 pin for the LCD_CAM.
+    /// Assigns the DATA_6 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_6
     /// signal.
@@ -400,7 +399,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_6, pin)
     }
 
-    /// Assign the DATA_7 pin for the LCD_CAM.
+    /// Assigns the DATA_7 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_7
     /// signal.
@@ -408,7 +407,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_7, pin)
     }
 
-    /// Assign the DATA_8 pin for the LCD_CAM.
+    /// Assigns the DATA_8 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_8
     /// signal.
@@ -416,7 +415,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_8, pin)
     }
 
-    /// Assign the DATA_9 pin for the LCD_CAM.
+    /// Assigns the DATA_9 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_9
     /// signal.
@@ -424,7 +423,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_9, pin)
     }
 
-    /// Assign the DATA_10 pin for the LCD_CAM.
+    /// Assigns the DATA_10 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_10 signal.
@@ -432,7 +431,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_10, pin)
     }
 
-    /// Assign the DATA_11 pin for the LCD_CAM.
+    /// Assigns the DATA_11 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_11 signal.
@@ -440,7 +439,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_11, pin)
     }
 
-    /// Assign the DATA_12 pin for the LCD_CAM.
+    /// Assigns the DATA_12 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_12 signal.
@@ -448,7 +447,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_12, pin)
     }
 
-    /// Assign the DATA_13 pin for the LCD_CAM.
+    /// Assigns the DATA_13 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_13 signal.
@@ -456,7 +455,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_13, pin)
     }
 
-    /// Assign the DATA_14 pin for the LCD_CAM.
+    /// Assigns the DATA_14 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_14 signal.
@@ -464,7 +463,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_14, pin)
     }
 
-    /// Assign the DATA_15 pin for the LCD_CAM.
+    /// Assigns the DATA_15 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_15 signal.
@@ -525,7 +524,7 @@ pub struct DpiTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.dpi.regs().lcd_user().read().lcd_start().bit_is_clear()
     }
@@ -539,8 +538,8 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     ///
-    /// Note: If you specified `next_frame_en` as true in [Dpi::send], you're
-    /// just waiting for a DMA error when you call this.
+    /// If `next_frame_en` was specified as true in [`Dpi::send`], this waits
+    /// for a DMA error.
     pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF::Final) {
         while !self.is_done() {
             core::hint::spin_loop();
@@ -700,9 +699,9 @@ pub struct Format {
 
 /// The timing numbers for the driver to follow.
 ///
-/// Note: The names of the fields in this struct don't match what you
-/// would typically find in an LCD's datasheet. Carefully read the doc on each
-/// field to understand what to set it to.
+/// The names of the fields in this struct do not match what is typically found
+/// in an LCD datasheet. Carefully read the doc on each field to understand what
+/// to set it to.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FrameTiming {
@@ -719,7 +718,7 @@ pub struct FrameTiming {
     /// This is the number of PCLKs between the start of the line and the start
     /// of active data in the line.
     ///
-    /// Note: This includes `hsync_width`.
+    /// Includes `hsync_width`.
     ///
     /// Max is 2048 (11 bits).
     pub horizontal_blank_front_porch: usize,
@@ -743,7 +742,7 @@ pub struct FrameTiming {
     /// This is the number of (blank/invalid) lines before the start of the
     /// frame.
     ///
-    /// Note: This includes `vsync_width`.
+    /// Includes `vsync_width`.
     ///
     /// Max is 256 (8 bits).
     pub vertical_blank_front_porch: usize,

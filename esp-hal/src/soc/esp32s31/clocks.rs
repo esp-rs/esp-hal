@@ -253,7 +253,7 @@ fn enable_mpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     });
 }
 
-/// Program the PMU external LDO regulators for the MSPI PHY
+/// Programs the PMU external LDO regulators for the MSPI PHY.
 fn psram_phy_ldo_init() {
     // Limit inrush current while the output cap charges; keep ripple
     // suppression (voltage detector) enabled.

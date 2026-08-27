@@ -90,7 +90,7 @@ pub enum ClockSource {
     Xtal,
 }
 
-/// Clock input sampling phase used for high-speed tuning.
+/// Clocks input sampling phase used for high-speed tuning.
 #[cfg(sdmmc_delay_phase_num_is_set)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -192,11 +192,11 @@ pub enum ResponseLen {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CommandFlags {
-    /// Wait for the data line to be free before issuing.
+    /// Waits for the data line to be free before issuing.
     pub wait_complete: bool,
     /// Stop/abort command (CMD12, CMD52 abort).
     pub stop_abort: bool,
-    /// Poll DAT0 until the card releases busy (R1b).
+    /// Polls DAT0 until the card releases busy (R1b).
     pub busy: bool,
 }
 
@@ -1637,8 +1637,8 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         self
     }
 
-    /// Returns `true` if a card is detected, or if no card-detect pin is
-    /// wired (assume present).
+    /// Returns whether a card is detected. If no card-detect pin is wired,
+    /// assumes the card is present.
     pub fn is_card_present(&self) -> bool {
         if !self.cd_connected {
             return true;
@@ -1646,7 +1646,7 @@ impl<'d, const S: u8, Dm: DriverMode> Slot<'d, S, Dm> {
         (SDHOST::regs().cdetect().read().card_detect_n().bits() & (1 << S)) == 0
     }
 
-    /// Returns `true` if the card reports write protection. Returns `false`
+    /// Returns whether the card reports write protection. Returns `false`
     /// if no write-protect pin is wired. Polarity follows
     /// [`SlotConfig::with_wp_active_high`].
     pub fn is_write_protected(&self) -> bool {

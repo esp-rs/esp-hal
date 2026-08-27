@@ -100,8 +100,8 @@ pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 /// Represents a pin-peripheral connection that, when dropped, disconnects the
 /// peripheral from the pin.
 ///
-/// This only needs to be applied to output signals, as it's not possible to
-/// connect multiple inputs to the same peripheral signal.
+/// This only needs to be applied to output signals, as it is not possible to connect multiple
+/// inputs to the same peripheral signal.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct PinGuard {
@@ -189,7 +189,7 @@ impl core::ops::Not for Level {
 }
 
 impl Level {
-    /// Create a [`Level`] from [`bool`].
+    /// Creates a new [`Level`] from [`bool`].
     ///
     /// Like `<Level as From<bool>>::from(val)`, but `const`.
     pub(crate) const fn const_from(val: bool) -> Self {
@@ -199,7 +199,7 @@ impl Level {
         }
     }
 
-    /// Convert a [`Level`] to [`bool`].
+    /// Converts a [`Level`] to [`bool`].
     ///
     /// Like `<bool as From<Level>>::from(self)`, but `const`.
     pub(crate) const fn const_into(self) -> bool {
@@ -280,7 +280,7 @@ pub enum DriveStrength {
 /// output.
 ///
 /// The different variants correspond to different functionality depending on
-/// the chip and the specific pin. For more information, refer to your chip's
+/// the chip and the specific pin. For more information, refer to the chip's
 #[doc(hidden)]
 #[doc = crate::trm_markdown_link!("iomuxgpio")]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
@@ -346,13 +346,13 @@ pub trait Pin: Sealed {
     fn number(&self) -> u8;
 
     #[procmacros::doc_replace]
-    /// Type-erase this pin into an [`AnyPin`].
+    /// Type-erases this pin into an [`AnyPin`].
     ///
-    /// This function converts pin singletons (`GPIO0<'_>`, …), which are all
-    /// different types, into the same type. It is useful for creating
-    /// arrays of pins, or avoiding generics.
+    /// Converts pin singletons (`GPIO0<'_>`, …), which are all different types,
+    /// into the same type. Useful for creating arrays of pins, or avoiding
+    /// generics.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -402,31 +402,31 @@ pub trait InputPin: Pin {
 /// Trait implemented by pins which can be used as outputs.
 pub trait OutputPin: Pin {}
 
-/// Trait implemented by pins which can be used as analog pins
+/// Trait implemented by pins which can be used as analog pins.
 #[instability::unstable]
 pub trait AnalogPin: Pin {
-    /// Configure the pin for analog operation
+    /// Configures the pin for analog operation.
     #[doc(hidden)]
     fn set_analog(&self, _: private::Internal);
 }
 
-/// Trait implemented by pins which can be used as Touchpad pins
+/// Trait implemented by pins which can be used as Touchpad pins.
 #[cfg(touch_driver_supported)]
 #[instability::unstable]
 pub trait TouchPin: Pin {
-    /// Configure the pin for analog operation
+    /// Configures the pin for analog operation.
     #[doc(hidden)]
     fn set_touch(&self, _: private::Internal);
 
-    /// Reads the pin's touch measurement register
+    /// Reads the pin's touch measurement register.
     #[doc(hidden)]
     fn touch_measurement(&self, _: private::Internal) -> u16;
 
-    /// Maps the pin nr to the touch pad nr
+    /// Maps the pin nr to the touch pad nr.
     #[doc(hidden)]
     fn touch_nr(&self, _: private::Internal) -> u8;
 
-    /// Set a pins touch threshold for interrupts.
+    /// Sets a pins touch threshold for interrupts.
     #[doc(hidden)]
     fn set_threshold(&self, threshold: u16, _: private::Internal);
 }
@@ -439,7 +439,7 @@ pub struct AnyPin<'lt> {
     pub(crate) _lifetime: core::marker::PhantomData<&'lt mut ()>,
 }
 
-/// General Purpose Input/Output driver
+/// General Purpose Input/Output driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -448,14 +448,14 @@ pub struct Io<'d> {
 }
 
 impl<'d> Io<'d> {
-    /// Initialize the I/O driver.
+    /// Initializes the I/O driver.
     #[instability::unstable]
     pub fn new(_io_mux: IO_MUX<'d>) -> Self {
         Io { _io_mux }
     }
 
     #[doc = cfg_select!{
-        any(single_core, esp32s3) => "Sets the the interrupt priority and enables GPIO interrupts.",
+        any(single_core, esp32s3) => "Sets the interrupt priority and enables GPIO interrupts.",
         _ => "Sets the interrupt priority and enables GPIO interrupts on all cores.",
     }]
     #[instability::unstable]
@@ -468,18 +468,17 @@ impl<'d> Io<'d> {
         _ => "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores.",
     }]
     #[doc = ""]
-    /// Note that when using interrupt handlers registered by this function, or
-    /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
-    /// **not** clear the interrupt status register or the interrupt enable
-    /// setting for you. Based on your use case, you need to do one of this
-    /// yourself:
+    /// When using interrupt handlers registered by this method, or by defining a
+    /// `#[no_mangle] unsafe extern "C" fn GPIO()` function, the interrupt status
+    /// register and the interrupt enable setting for the GPIO pin are **not**
+    /// cleared automatically. Based on the use case, do one of the following:
     ///
-    /// - Disabling the interrupt enable setting for the GPIO pin allows you to handle an event once
-    ///   per call to [`listen()`]. Using this method, the [`is_interrupt_set()`] method will return
-    ///   `true` if the interrupt is set even after your handler has finished running.
-    /// - Clearing the interrupt status register allows you to handle an event repeatedly after
-    ///   [`listen()`] is called. Using this method, [`is_interrupt_set()`] will return `false`
-    ///   after your handler has finished running.
+    /// - Disabling the interrupt enable setting for the GPIO pin lets an event be handled once per
+    ///   call to [`listen()`]. Using this method, the [`is_interrupt_set()`] method returns `true`
+    ///   if the interrupt is set even after the handler has finished running.
+    /// - Clearing the interrupt status register lets an event be handled repeatedly after
+    ///   [`listen()`] is called. Using this method, [`is_interrupt_set()`] returns `false` after
+    ///   the handler has finished running.
     ///
     /// [`listen()`]: Input::listen
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
@@ -502,12 +501,12 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
     }
 }
 
-/// Drive the GPIO async API from a user-installed raw GPIO interrupt handler.
+/// Drives the GPIO async API from a user-installed raw GPIO interrupt handler.
 ///
-/// This is the entry point that lets users who bypass esp-hal's GPIO ISR
-/// dispatch (typically by defining their own `#[unsafe(no_mangle)]
-/// unsafe extern "C" fn GPIO()`, or by registering their own handler via
-/// [`crate::interrupt::bind_handler`]) keep the GPIO async API working.
+/// Entry point for code that bypasses esp-hal's GPIO ISR dispatch (typically
+/// by defining a custom `#[unsafe(no_mangle)] unsafe extern "C" fn GPIO()`, or
+/// by registering a handler via [`crate::interrupt::bind_handler`]) and needs
+/// the GPIO async API to keep working.
 ///
 /// # Safety
 ///
@@ -517,7 +516,7 @@ pub unsafe fn handle_gpio_interrupt() {
     unsafe { interrupt::handle_gpio_interrupt_impl() }
 }
 
-/// Complete any in-flight async wait on a single GPIO pin.
+/// Completes any in-flight async wait on a single GPIO pin.
 ///
 /// Per-pin counterpart of [`handle_gpio_interrupt`].
 ///
@@ -580,8 +579,8 @@ pub enum DriveMode {
 
 /// Output pin configuration.
 ///
-/// This struct is used to configure the drive mode, drive strength, and pull
-/// direction of an output pin. By default, the configuration is set to:
+/// Configures the drive mode, drive strength, and pull direction of an output
+/// pin. By default, the configuration is set to:
 /// - Drive mode: [`DriveMode::PushPull`]
 /// - Drive strength: [`DriveStrength::_20mA`]
 /// - Pull direction: [`Pull::None`] (no pull resistors connected)
@@ -629,7 +628,7 @@ impl<'d> Output<'d> {
     /// The `config` parameter sets the drive mode, drive strength, and pull
     /// direction of the pin.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// The following example configures `GPIO5` to pulse a LED once. The
     /// example assumes that the LED is connected such that it is on when
@@ -675,10 +674,9 @@ impl<'d> Output<'d> {
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::OutputSignal::freeze).
+    /// The returned signal is [frozen](interconnect::OutputSignal::freeze).
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -695,9 +693,9 @@ impl<'d> Output<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -713,9 +711,9 @@ impl<'d> Output<'d> {
         self.pin.apply_output_config(config)
     }
     #[procmacros::doc_replace]
-    /// Set the output as high.
+    /// Sets the output as high.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -731,9 +729,9 @@ impl<'d> Output<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Set the output as low.
+    /// Sets the output as low.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -749,9 +747,9 @@ impl<'d> Output<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Set the output level.ç
+    /// Sets the output level.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -769,10 +767,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns whether the pin is set to high level.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
-    /// `set_low`. It does not need the input stage to be enabled.
+    /// Reads back the value set using `set_level`, `set_high` or `set_low`. Does
+    /// not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -790,10 +788,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns whether the pin is set to low level.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
-    /// `set_low`. It does not need the input stage to be enabled.
+    /// Reads back the value set using `set_level`, `set_high` or `set_low`. Does
+    /// not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -811,10 +809,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns which level the pin is set to.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
-    /// `set_low`. It does not need the input stage to be enabled.
+    /// Reads back the value set using `set_level`, `set_high` or `set_low`. Does
+    /// not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -835,7 +833,7 @@ impl<'d> Output<'d> {
     /// If the pin was previously set to high, it will be set to low, and vice
     /// versa.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -951,7 +949,7 @@ impl<'d> Input<'d> {
     /// The `pull` parameter configures internal pull-up or pull-down
     /// resistors.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// The following example configures `GPIO5` to read a button press. The
     /// example assumes that the button is connected such that the pin is low
@@ -1000,10 +998,9 @@ impl<'d> Input<'d> {
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::InputSignal::freeze).
+    /// The returned signal is [frozen](interconnect::InputSignal::freeze).
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1022,9 +1019,9 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Get whether the pin input level is high.
+    /// Returns whether the pin input level is high.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1040,9 +1037,9 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Get whether the pin input level is low.
+    /// Returns whether the pin input level is low.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1058,9 +1055,9 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Get the current pin input level.
+    /// Returns the current pin input level.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1076,9 +1073,9 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1093,17 +1090,16 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Listen for interrupts.
+    /// Listens for interrupts.
     ///
     /// The interrupts will be handled by the handler set using
     /// [`Io::set_interrupt_handler`]. All GPIO pins share the same
     /// interrupt handler.
     ///
-    /// Note that [`Event::LowLevel`] and [`Event::HighLevel`] are fired
-    /// continuously when the pin is low or high, respectively. You must use
-    /// a custom interrupt handler to stop listening for these events,
-    /// otherwise your program will be stuck in a loop as long as the pin is
-    /// reading the corresponding level.
+    /// [`Event::LowLevel`] and [`Event::HighLevel`] are fired continuously when
+    /// the pin is low or high, respectively. A custom interrupt handler is
+    /// required to stop listening for these events; otherwise the program can
+    /// remain in a loop as long as the pin reads the corresponding level.
     ///
     /// A listening pin also ends a light sleep. On most chips, sleep entry must give the trigger as
     /// a level, so an edge trigger becomes the level at the end of the edge. A rising edge becomes
@@ -1112,7 +1108,7 @@ impl<'d> Input<'d> {
     /// that is already high therefore ends each light sleep immediately, and without an
     /// interrupt, because no edge occurred. Automatic light sleep then makes no sleep at all.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// ### Print something when a button is pressed.
     /// ```rust, no_run
@@ -1176,21 +1172,21 @@ impl<'d> Input<'d> {
         self.pin.listen(event);
     }
 
-    /// Stop listening for interrupts
+    /// Stops listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
     }
 
-    /// Clear the interrupt status bit for this Pin
+    /// Clears the interrupt status bit for this Pin.
     #[inline]
     #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
         self.pin.clear_interrupt();
     }
 
-    /// Checks if the interrupt status bit for this Pin is set
+    /// Returns whether the interrupt status bit for this Pin is set.
     #[inline]
     #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
@@ -1204,7 +1200,7 @@ impl<'d> Input<'d> {
     ///
     /// # Errors
     ///
-    /// Returns [`WakeConfigError::NoLowPowerPath`] if the configuration requests the low-power path
+    /// [`WakeConfigError::NoLowPowerPath`] when the configuration requests the low-power path
     /// for a pad that has no such path.
     #[cfg(sleep_driver_supported)]
     #[instability::unstable]
@@ -1256,7 +1252,7 @@ impl<'d> Input<'d> {
 /// separately configurable, and they have independent enable states.
 ///
 /// Enabling the input stage does not change the output stage, and vice versa.
-/// Disabling the input or output stages don't forget their configuration.
+/// Disabling the input or output stages do not forget their configuration.
 /// Disabling the output stage will not change the output level, but it will
 /// disable the driver.
 #[derive(Debug)]
@@ -1270,7 +1266,7 @@ impl private::Sealed for Flex<'_> {}
 impl private::Sealed for &mut Flex<'_> {}
 
 impl<'d> Flex<'d> {
-    /// Create flexible pin driver for a [Pin].
+    /// Creates flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
     #[instability::unstable]
@@ -1287,16 +1283,15 @@ impl<'d> Flex<'d> {
 
     /// Applies the given input configuration to the pin.
     ///
-    /// This function does not set the pin as input (i.e. it does not enable the
-    /// input buffer). Note that the pull direction is common between the
-    /// input and output configuration.
+    /// Does not set the pin as input (does not enable the input buffer). The pull
+    /// direction is common between the input and output configuration.
     #[inline]
     #[instability::unstable]
     pub fn apply_input_config(&mut self, config: &InputConfig) {
         self.pin.apply_input_config(config);
     }
 
-    /// Enable or disable the GPIO pin input buffer.
+    /// Enables or disables the GPIO pin input buffer.
     #[inline]
     #[instability::unstable]
     pub fn set_input_enable(&mut self, enable_input: bool) {
@@ -1321,28 +1316,28 @@ impl<'d> Flex<'d> {
         self.pin.is_pad_held()
     }
 
-    /// Get whether the pin input level is high.
+    /// Returns whether the pin input level is high.
     #[inline]
     #[instability::unstable]
     pub fn is_high(&self) -> bool {
         self.level() == Level::High
     }
 
-    /// Get whether the pin input level is low.
+    /// Returns whether the pin input level is low.
     #[inline]
     #[instability::unstable]
     pub fn is_low(&self) -> bool {
         self.level() == Level::Low
     }
 
-    /// Get the current pin input level.
+    /// Returns the current pin input level.
     #[inline]
     #[instability::unstable]
     pub fn level(&self) -> Level {
         self.pin.is_input_high().into()
     }
 
-    /// Listen for interrupts.
+    /// Listens for interrupts.
     ///
     /// See [`Input::listen`] for more information and an example.
     #[inline]
@@ -1351,7 +1346,7 @@ impl<'d> Flex<'d> {
         self.pin.listen(event);
     }
 
-    /// Stop listening for interrupts.
+    /// Stops listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn unlisten(&mut self) {
@@ -1367,14 +1362,14 @@ impl<'d> Flex<'d> {
         });
     }
 
-    /// Check if the pin is listening for interrupts.
+    /// Returns whether the pin is listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn is_listening(&self) -> bool {
         is_int_enabled(self.pin.number())
     }
 
-    /// Clear the interrupt status bit for this Pin
+    /// Clears the interrupt status bit for this Pin.
     #[inline]
     #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
@@ -1383,7 +1378,7 @@ impl<'d> Flex<'d> {
             .write_interrupt_status_clear(self.pin.mask());
     }
 
-    /// Checks if the interrupt status bit for this Pin is set
+    /// Returns whether the interrupt status bit for this Pin is set.
     #[inline]
     #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
@@ -1403,7 +1398,7 @@ impl<'d> Flex<'d> {
     ///
     /// # Errors
     ///
-    /// Returns [`WakeConfigError::NoLowPowerPath`] if the configuration requests the low-power path
+    /// [`WakeConfigError::NoLowPowerPath`] when the configuration requests the low-power path
     /// for a pad that has no such path.
     #[cfg(sleep_driver_supported)]
     #[inline]
@@ -1434,43 +1429,42 @@ impl<'d> Flex<'d> {
 
     /// Applies the given output configuration to the pin.
     ///
-    /// This function does not set the pin to output (i.e. it does not enable
-    /// the output driver). Note that the pull direction is common between
-    /// the input and output configuration.
+    /// Does not set the pin to output (does not enable the output driver). The
+    /// pull direction is common between the input and output configuration.
     #[inline]
     #[instability::unstable]
     pub fn apply_output_config(&mut self, config: &OutputConfig) {
         self.pin.apply_output_config(config);
     }
 
-    /// Enable or disable the GPIO pin output driver.
+    /// Enables or disables the GPIO pin output driver.
     ///
     /// The output level will be set to the last value. Use [`Self::set_high`],
     /// [`Self::set_low`] or [`Self::set_level`] to set the output level before
     /// enabling the output.
     ///
-    /// This function does not disable the input buffer.
+    /// Does not disable the input buffer.
     #[inline]
     #[instability::unstable]
     pub fn set_output_enable(&mut self, enable_output: bool) {
         self.pin.set_output_enable(enable_output);
     }
 
-    /// Set the output as high.
+    /// Sets the output as high.
     #[inline]
     #[instability::unstable]
     pub fn set_high(&mut self) {
         self.set_level(Level::High)
     }
 
-    /// Set the output as low.
+    /// Sets the output as low.
     #[inline]
     #[instability::unstable]
     pub fn set_low(&mut self) {
         self.set_level(Level::Low)
     }
 
-    /// Set the output level.
+    /// Sets the output level.
     #[inline]
     #[instability::unstable]
     pub fn set_level(&mut self, level: Level) {
@@ -1491,14 +1485,14 @@ impl<'d> Flex<'d> {
         self.output_level() == Level::Low
     }
 
-    /// What level output is set to
+    /// What level output is set to.
     #[inline]
     #[instability::unstable]
     pub fn output_level(&self) -> Level {
         self.pin.is_set_high().into()
     }
 
-    /// Toggle pin output
+    /// Toggles pin output.
     #[inline]
     #[instability::unstable]
     pub fn toggle(&mut self) {
@@ -1514,8 +1508,7 @@ impl<'d> Flex<'d> {
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::InputSignal::freeze).
+    /// The returned signal is [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1538,13 +1531,12 @@ impl<'d> Flex<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Split the pin into an input and output signal pair.
+    /// Splits the pin into an input and output signal pair.
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
     ///
-    /// Note that the signals returned by this function is
-    /// [frozen](interconnect::InputSignal::freeze).
+    /// The returned signals are [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1567,16 +1559,14 @@ impl<'d> Flex<'d> {
         (input, output)
     }
 
-    /// Split the pin into an [Input] and an [Output] driver pair.
+    /// Splits the pin into an [Input] and an [Output] driver pair.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::InputSignal::freeze). On the other hand,
-    /// the pin driver is free to change settings.
+    /// The returned input signal is [frozen](interconnect::InputSignal::freeze). The
+    /// pin driver is free to change settings.
     ///
-    /// This function allows you to configure an input-output pin, then keep
-    /// working with the output half. This is mainly intended for testing,
-    /// allowing you to drive a peripheral from a signal generated by
-    /// software.
+    /// Lets an input-output pin be configured, then keeps working with the output
+    /// half. Mainly intended for testing, to drive a peripheral from a signal
+    /// generated by software.
     ///
     /// # Safety
     ///
@@ -1608,8 +1598,7 @@ impl<'d> Flex<'d> {
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::OutputSignal::freeze).
+    /// The returned signal is [frozen](interconnect::OutputSignal::freeze).
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1733,7 +1722,7 @@ impl<'lt> AnyPin<'lt> {
     #[inline]
     /// Resets the GPIO to a known state.
     ///
-    /// This function needs to be called before using the GPIO pin:
+    /// Must be called before using the GPIO pin:
     /// - Before converting it into signals
     /// - Before using it as an input or output
     pub(crate) fn init_gpio(&self) {
@@ -1768,24 +1757,14 @@ impl<'lt> AnyPin<'lt> {
     }
 
     #[procmacros::doc_replace]
-    /// Split the pin into an input and output signal.
+    /// Splits the pin into an input and output signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
     ///
     /// Creating an input signal enables the pin's input buffer.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure that peripheral drivers don't configure the same
-    /// GPIO at the same time in multiple places. This includes clones of the
-    /// `InputSignal` struct, as well as the `OutputSignal` struct.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the pin is not an output pin.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1794,6 +1773,16 @@ impl<'lt> AnyPin<'lt> {
     /// let (input, output) = unsafe { pin1.split() };
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the pin is not an output pin.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that peripheral drivers do not configure the same
+    /// GPIO at the same time in multiple places. This includes clones of the
+    /// `InputSignal` struct, as well as the `OutputSignal` struct
     #[inline]
     #[instability::unstable]
     pub unsafe fn split(
@@ -1818,7 +1807,7 @@ impl<'lt> AnyPin<'lt> {
         (input, output)
     }
 
-    /// Convert the pin into an input signal.
+    /// Converts the pin into an input signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
@@ -1827,7 +1816,7 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that peripheral drivers don't configure the same
+    /// The caller must ensure that peripheral drivers do not configure the same
     /// GPIO at the same time in multiple places. This includes clones of the
     /// `InputSignal` struct.
     #[inline]
@@ -1842,14 +1831,14 @@ impl<'lt> AnyPin<'lt> {
         input
     }
 
-    /// Convert the pin into an output signal.
+    /// Converts the pin into an output signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
     ///
     /// # Panics
     ///
-    /// This function panics if the pin is not an output pin.
+    /// Panics if the pin is not an output pin.
     #[inline]
     #[instability::unstable]
     pub fn into_output_signal(self) -> interconnect::OutputSignal<'lt> {
@@ -1894,14 +1883,14 @@ impl<'lt> AnyPin<'lt> {
     //     io_mux_reg(self.number()).modify(|_, w| w.slp_sel().bit(on));
     // }
 
-    /// Enable or disable the GPIO pin output buffer.
+    /// Enables or disables the GPIO pin output buffer.
     #[inline]
     pub(crate) fn set_output_enable(&self, enable: bool) {
         assert!(self.is_output() || !enable);
         self.bank().write_out_en(self.mask(), enable);
     }
 
-    /// Enable input for the pin
+    /// Enables input for the pin.
     #[inline]
     pub(crate) fn set_input_enable(&self, on: bool) {
         io_mux_reg(self.number()).modify(|_, w| w.fun_ie().bit(on));
@@ -1999,19 +1988,19 @@ impl<'lt> AnyPin<'lt> {
         1 << (self.number() % 32)
     }
 
-    /// The current state of the input
+    /// The current state of the input.
     #[inline]
     pub(crate) fn is_input_high(&self) -> bool {
         self.bank().read_input() & self.mask() != 0
     }
 
-    /// Set the pin's level to high or low
+    /// Sets the pin's level to high or low.
     #[inline]
     pub(crate) fn set_output_high(&self, high: bool) {
         self.bank().write_output(self.mask(), high);
     }
 
-    /// Is the output set to high
+    /// Is the output set to high.
     #[inline]
     pub(crate) fn is_set_high(&self) -> bool {
         self.bank().read_output() & self.mask() != 0
@@ -2105,7 +2094,7 @@ impl AnyPin<'_> {
     #[procmacros::doc_replace]
     /// Attempts to downcast the pin into the underlying GPIO instance.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust,no_run
     /// # {before_snippet}
@@ -2138,15 +2127,7 @@ impl AnyPin<'_> {
     #[procmacros::doc_replace]
     /// Conjure a new GPIO pin out of thin air.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure that only one instance of a pin is in use at one time.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the pin with the given number does not exist.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2156,6 +2137,14 @@ impl AnyPin<'_> {
     /// #
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the pin with the given number does not exist.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that only one instance of a pin is in use at one time.
     pub unsafe fn steal(pin: u8) -> Self {
         for_each_gpio! {
             (all $( ($n:literal $($any:tt)*) ),*) => { const PINS: &[u8] = &[ $($n),* ]; };
@@ -2170,11 +2159,7 @@ impl AnyPin<'_> {
     #[procmacros::doc_replace]
     /// Unsafely clone the pin.
     ///
-    /// # Safety
-    ///
-    /// Ensure that only one instance of a pin is in use at one time.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2185,6 +2170,10 @@ impl AnyPin<'_> {
     /// #
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that only one instance of a pin is in use at one time.
     pub unsafe fn clone_unchecked(&self) -> Self {
         Self {
             pin: self.pin,
@@ -2193,10 +2182,10 @@ impl AnyPin<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Create a new AnyPin object that is limited to the lifetime of the
+    /// Creates a new AnyPin object that is limited to the lifetime of the
     /// passed reference.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2253,14 +2242,14 @@ for_each_gpio! {
             pub(crate) const NUMBER: u8 = $n;
 
             #[procmacros::doc_replace]
-            /// Split the pin into an input and output signal.
+            /// Splits the pin into an input and output signal.
             ///
             /// Peripheral signals allow connecting peripherals together without using
             /// external hardware.
             ///
             /// # Safety
             ///
-            /// The caller must ensure that peripheral drivers don't configure the same
+            /// The caller must ensure that peripheral drivers do not configure the same
             /// GPIO at the same time in multiple places. This includes clones of the
             /// `InputSignal` struct, as well as the `OutputSignal` struct.
             ///

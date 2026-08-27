@@ -52,7 +52,7 @@ fn cache_l2_bus(addr: u32) -> u32 {
     if internal { 0 } else { CACHE_MAP_L2_CACHE }
 }
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 pub(crate) unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(bus: u32, addr: u32, size: u32);

@@ -6,9 +6,9 @@
 //! ## Overview
 //!
 //! The Random Number Generator (RNG) module provides an interface to generate
-//! random numbers using the RNG peripheral on ESP chips. This driver allows you
-//! to generate random numbers that can be used for various cryptographic,
-//! security, or general-purpose applications.
+//! random numbers using the RNG peripheral on ESP chips. The driver generates
+//! random numbers that can be used for various cryptographic, security, or
+//! general-purpose applications.
 //!
 //! There are certain pre-conditions which must be met in order for the RNG to
 //! produce *true* random numbers.
@@ -82,7 +82,7 @@ pub use trng::*;
 
 /// (Pseudo-)Random Number Generator.
 ///
-/// To generate pseudo-random numbers, you can create [`Rng`] at any time.
+/// [`Rng`] can be created at any time to generate pseudo-random numbers
 #[cfg_attr(
     rng_trng_supported,
     doc = r"To generate true random numbers, see [`Trng`]."
@@ -102,7 +102,7 @@ impl Rng {
     #[procmacros::doc_replace]
     /// Reads currently available `u32` integer from `RNG`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -123,7 +123,7 @@ impl Rng {
     /// Reads enough bytes from hardware random number generator to fill
     /// `buffer`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

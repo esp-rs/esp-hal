@@ -59,9 +59,8 @@ pub(super) fn current_runlevel() -> u8 {
 ///
 /// # Safety
 ///
-/// This function must only be used to raise the runlevel and to restore it
-/// to a previous value. It must not be used to arbitrarily lower the
-/// runlevel.
+/// Must only be used to raise the runlevel and to restore it to a previous
+/// value. Must not be used to arbitrarily lower the runlevel.
 pub(crate) fn change_current_runlevel(level: RunLevel) -> u8 {
     let prev_interrupt_priority = current_runlevel();
 

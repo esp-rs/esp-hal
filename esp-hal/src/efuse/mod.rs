@@ -58,13 +58,13 @@ pub(crate) mod implem;
 pub use implem::*;
 use procmacros::doc_replace;
 
-/// The bit field for get access to efuse data
+/// The bit field for get access to efuse data.
 #[derive(Debug, Clone, Copy)]
 #[instability::unstable]
 pub struct EfuseField {
-    /// The block
+    /// The block.
     pub(crate) block: EfuseBlock,
-    /// Word number - this is just informational
+    /// Word number - this is just informational.
     pub(crate) _word: u32,
     /// Starting bit in the efuse block
     pub(crate) bit_start: u32,
@@ -83,7 +83,7 @@ impl EfuseField {
     }
 }
 
-/// Read field value in a little-endian order
+/// Reads field value in a little-endian order.
 #[inline(always)]
 #[instability::unstable]
 pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
@@ -151,9 +151,9 @@ pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
     unsafe { output.assume_init() }
 }
 
-/// Read bit value.
+/// Reads bit value.
 ///
-/// This function panics if the field's bit length is not equal to 1.
+/// Panics if the field's bit length is not equal to 1.
 #[inline(always)]
 #[instability::unstable]
 pub fn read_bit(field: EfuseField) -> bool {
@@ -196,7 +196,7 @@ pub fn override_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
 /// effective MAC for a specific radio interface (which may be overridden via
 /// [`override_mac_address`]), use [`interface_mac_address`] instead.
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -245,7 +245,7 @@ pub fn base_mac_address() -> MacAddress {
 /// interfaces (such as Bluetooth) additionally adjust the last octet to
 /// obtain a distinct address.
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -285,7 +285,7 @@ pub fn interface_mac_address(kind: InterfaceMacAddress) -> MacAddress {
 #[doc_replace]
 /// Returns the hardware revision.
 ///
-/// ## Examples
+/// # Examples
 ///
 /// ```rust,no_run
 /// # {before_snippet}
@@ -307,12 +307,12 @@ pub fn chip_revision() -> ChipRevision {
 /// The type supports converting between two separate u16-based representations:
 ///
 /// - Combined: a `u16` calculated as `major * 100 + minor`. The combined representation is more
-///   often used by ESP-IDF, and working with it involves integer division. Note that the combined
+///   often used by ESP-IDF, and working with it involves integer division. The combined
 ///   representation assumes minor is less than 100.
 /// - Packed: a `u16` with the major revision in the high byte and the minor revision in the low
 ///   byte.
 ///
-/// ## Examples
+/// # Examples
 ///
 /// ```rust,no_run
 /// # {before_snippet}

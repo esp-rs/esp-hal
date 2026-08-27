@@ -31,11 +31,11 @@ pub const ANER: u8 = 0x06;
 pub mod bmcr {
     /// Software reset.
     pub const RESET: u16 = 1 << 15;
-    /// Select 100 Mbps (when auto-neg disabled).
+    /// Selects 100 Mbps (when auto-neg disabled).
     pub const SPEED_100: u16 = 1 << 13;
-    /// Enable auto-negotiation.
+    /// Enables auto-negotiation.
     pub const ANEN: u16 = 1 << 12;
-    /// Restart auto-negotiation.
+    /// Restarts auto-negotiation.
     pub const RESTART_AN: u16 = 1 << 9;
     /// Full-duplex (when auto-neg disabled).
     pub const FULL_DUPLEX: u16 = 1 << 8;
@@ -71,10 +71,10 @@ pub mod an {
 /// crates without depending on the concrete [`MdioDriver`]. PHY and
 /// register addresses are 5-bit Clause 22 fields (0-31).
 pub trait MdioBus {
-    /// Read a 16-bit PHY register.
+    /// Reads a 16-bit PHY register.
     fn read(&mut self, phy_addr: u8, reg_addr: u8) -> u16;
 
-    /// Write a 16-bit PHY register.
+    /// Writes a 16-bit PHY register.
     fn write(&mut self, phy_addr: u8, reg_addr: u8, value: u16);
 }
 
@@ -138,7 +138,7 @@ pub enum PhyError {
 pub trait Phy {
     /// One-time hardware initialization.
     ///
-    /// Should reset the PHY, configure auto-negotiation, and wait until the
+    /// Must reset the PHY, configure auto-negotiation, and wait until the
     /// hardware is ready to respond to further MDIO transactions.
     fn init<M: MdioBus>(&mut self, mdio: &mut M) -> Result<(), PhyError>;
 

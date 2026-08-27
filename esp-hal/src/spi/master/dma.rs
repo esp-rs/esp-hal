@@ -99,16 +99,16 @@ impl<'d> Spi<'d, Blocking> {
 ///   passing them to [`with_buffers`](SpiDma::with_buffers) before the first transfer begins. For
 ///   more details on when copying is necessary, see the documentation of the
 ///   [`with_buffers`](SpiDma::with_buffers) method.
-/// - The buffer API allows transferring externally managed buffers. In this mode, you provide the
-///   buffers to be transferred. The buffer objects ensure that data is located in appropriate
-///   memory regions. The buffers and the driver object are moved into transfer objects for the
-///   duration of the transfer. These functions take [`DmaRxBuf`] and [`DmaTxBuf`] objects as
-///   arguments as well as the number of bytes to transfer, and their names end with `_buffer`.
+/// - The buffer API allows transferring externally managed buffers. In this mode, the buffers to be
+///   transferred are provided by the caller. The buffer objects ensure that data is located in
+///   appropriate memory regions. The buffers and the driver object are moved into transfer objects
+///   for the duration of the transfer. These functions take [`DmaRxBuf`] and [`DmaTxBuf`] objects
+///   as arguments as well as the number of bytes to transfer, and their names end with `_buffer`
 ///
 /// These approaches provide different trade-offs between memory usage / CPU overhead and ease of
 /// use. `embedded-hal` traits are implemented by the slice-based API's functions.
 ///
-/// ## Examples
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -301,25 +301,25 @@ impl<'d> SpiDma<'d, Blocking> {
         Self::new_inner(spi, channel)
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts.
     #[instability::unstable]
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
         self.driver().enable_listen(interrupts.into(), true);
     }
 
-    /// Unlisten the given interrupts
+    /// Unlistens from the given interrupts.
     #[instability::unstable]
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
         self.driver().enable_listen(interrupts.into(), false);
     }
 
-    /// Gets asserted interrupts
+    /// Returns the asserted interrupts.
     #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<SpiInterrupt> {
         self.driver().interrupts()
     }
 
-    /// Resets asserted interrupts
+    /// Resets asserted interrupts.
     #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<SpiInterrupt>>) {
         self.driver().clear_interrupts(interrupts.into());
@@ -334,10 +334,9 @@ impl<'d> SpiDma<'d, Blocking> {
         doc = "Registers an interrupt handler for the peripheral on the current core."
     )]
     #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
+    /// The default/unhandled interrupt handler can be restored with
     /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
     ///
     /// # Panics
@@ -412,7 +411,7 @@ impl<'d> SpiDma<'d, Async> {
         }
     }
 
-    /// Fill the given buffer with data from the bus.
+    /// Fills the given buffer with data from the bus.
     #[instability::unstable]
     pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         if words.is_empty() {
@@ -458,7 +457,7 @@ impl<'d> SpiDma<'d, Async> {
         Ok(())
     }
 
-    /// Transmit the given buffer to the bus.
+    /// Transmits the given buffer to the bus.
     #[instability::unstable]
     pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         if words.is_empty() {
@@ -498,7 +497,7 @@ impl<'d> SpiDma<'d, Async> {
         Ok(())
     }
 
-    /// Transfer by writing out a buffer and reading the response from
+    /// Transfers by writing out a buffer and reading the response from
     /// the bus into another buffer.
     #[instability::unstable]
     pub async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
@@ -579,7 +578,7 @@ impl<'d> SpiDma<'d, Async> {
         }
     }
 
-    /// Transfer by writing out a buffer and reading the response from
+    /// Transfers by writing out a buffer and reading the response from
     /// the bus into the same buffer.
     #[instability::unstable]
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
@@ -929,10 +928,10 @@ impl<'a> MaybeCopyRxBuf<'a> {
 
 #[derive(Clone, Copy)]
 enum DmaOperationKind {
-    /// The entire slice must be copied into the internal buffer first
+    /// The entire slice must be copied into the internal buffer first.
     Copied,
 
-    /// The slice can be transferred directly, with minimal copying done for alignment
+    /// The slice can be transferred directly, with minimal copying done for alignment.
     InPlace,
 }
 
@@ -1045,7 +1044,7 @@ where
         fence(Ordering::Acquire);
     }
 
-    /// # Safety:
+    /// # Safety
     ///
     /// The caller must ensure to not access the buffer contents while the
     /// transfer is in progress. Moving the buffer itself is allowed.
@@ -1082,7 +1081,7 @@ where
         }
     }
 
-    /// # Safety:
+    /// # Safety
     ///
     /// The caller must ensure that the buffers are not accessed while the
     /// transfer is in progress. Moving the buffers is allowed.
@@ -1140,7 +1139,7 @@ where
         }
     }
 
-    /// # Safety:
+    /// # Safety
     ///
     /// The caller must ensure that the buffers are not accessed while the
     /// transfer is in progress. Moving the buffers is allowed.
@@ -1191,9 +1190,9 @@ aligned, otherwise the driver requires copying the entire buffer."
         self
     }
 
-    /// Perform a DMA write.
+    /// Performs a DMA write.
     ///
-    /// This will return a [SpiDmaTransfer] owning the buffer and the
+    /// Returns a [`SpiDmaTransfer`] that owns the buffer and the
     /// SPI instance. The maximum amount of data to be sent is 32736
     /// bytes.
     #[allow(clippy::type_complexity)]
@@ -1215,7 +1214,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         }
     }
 
-    /// # Safety:
+    /// # Safety
     ///
     /// The caller must ensure that the buffers are not accessed while the
     /// transfer is in progress. Moving the buffers is allowed.
@@ -1230,9 +1229,9 @@ aligned, otherwise the driver requires copying the entire buffer."
         unsafe { self.start_dma_transfer(bytes_to_read, 0, buffer, tx_buffer) }
     }
 
-    /// Perform a DMA read.
+    /// Performs a DMA read.
     ///
-    /// This will return a [SpiDmaTransfer] owning the buffer and
+    /// Returns a [`SpiDmaTransfer`] that owns the buffer and
     /// the SPI instance. The maximum amount of data to be
     /// received is 32736 bytes.
     #[allow(clippy::type_complexity)]
@@ -1254,7 +1253,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         }
     }
 
-    /// # Safety:
+    /// # Safety
     ///
     /// The caller must ensure that the buffers are not accessed while the
     /// transfer is in progress. Moving the buffers is allowed.
@@ -1271,9 +1270,9 @@ aligned, otherwise the driver requires copying the entire buffer."
         }
     }
 
-    /// Perform a DMA transfer
+    /// Performs a DMA transfer.
     ///
-    /// This will return a [SpiDmaTransfer] owning the buffers and
+    /// Returns a [`SpiDmaTransfer`] that owns the buffers and
     /// the SPI instance. The maximum amount of data to be
     /// sent/received is 32736 bytes.
     #[allow(clippy::type_complexity)]
@@ -1304,7 +1303,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         }
     }
 
-    /// # Safety:
+    /// # Safety
     ///
     /// The caller must ensure that the buffers are not accessed while the
     /// transfer is in progress. Moving the buffers is allowed.
@@ -1333,7 +1332,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         unsafe { self.start_transfer_dma(false, bytes_to_read, 0, buffer, tx_buffer) }
     }
 
-    /// Perform a half-duplex read operation using DMA.
+    /// Performs a half-duplex read operation using DMA.
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
@@ -1356,7 +1355,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         }
     }
 
-    /// # Safety:
+    /// # Safety
     ///
     /// The caller must ensure that the buffers are not accessed while the
     /// transfer is in progress. Moving the buffers is allowed.
@@ -1394,7 +1393,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         unsafe { self.start_transfer_dma(false, 0, bytes_to_write, rx_buffer, buffer) }
     }
 
-    /// Perform a half-duplex write operation using DMA.
+    /// Performs a half-duplex write operation using DMA.
     #[allow(clippy::type_complexity)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     #[instability::unstable]
@@ -1430,12 +1429,12 @@ aligned, otherwise the driver requires copying the entire buffer."
             _ => "80MHz",
         }
     )]
-    /// Change the bus configuration.
+    /// Changes the bus configuration.
     ///
     /// # Errors
     ///
-    /// If frequency passed in config exceeds __max_frequency__ or is below 70kHz,
-    /// [`ConfigError::UnsupportedFrequency`] error will be returned.
+    /// [`ConfigError::FrequencyOutOfRange`] when frequency passed in config exceeds
+    /// __max_frequency__ or is below 70 kHz.
     #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
@@ -1724,8 +1723,7 @@ aligned, otherwise the driver requires copying the entire buffer."
 
 /// A structure representing a DMA transfer for SPI.
 ///
-/// This structure holds references to the SPI instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the SPI instance, DMA buffers, and transfer status.
 #[instability::unstable]
 pub struct SpiDmaTransfer<'d, Dm, Buf>
 where
@@ -1739,7 +1737,7 @@ where
 impl<Buf> SpiDmaTransfer<'_, Async, Buf> {
     /// Waits for the DMA transfer to complete asynchronously.
     ///
-    /// This method awaits the completion of both RX and TX operations.
+    /// Awaits the completion of both RX and TX operations.
     #[instability::unstable]
     pub async fn wait_for_done(&mut self) {
         self.spi_dma.wait_for_idle_async().await;
@@ -1758,10 +1756,10 @@ where
         }
     }
 
-    /// Checks if the transfer is complete.
+    /// Returns whether the transfer is complete.
     ///
-    /// This method returns `true` if both RX and TX operations are done,
-    /// and the SPI instance is no longer busy.
+    /// Both RX and TX operations are done, and the SPI instance is no longer
+    /// busy.
     #[instability::unstable]
     pub fn is_done(&self) -> bool {
         self.spi_dma.is_done()
@@ -1769,7 +1767,7 @@ where
 
     /// Waits for the DMA transfer to complete.
     ///
-    /// This method blocks until the transfer is finished and returns the
+    /// Blocks until the transfer is finished and returns the
     /// `SpiDma` instance and the associated buffer.
     #[instability::unstable]
     pub fn wait(mut self) -> (SpiDma<'d, Dm>, Buf) {

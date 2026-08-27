@@ -61,12 +61,12 @@ pub struct PsramTimingParams {
     /// MR4.wr_latency field value.
     pub mr4_wl: u8,
 
-    /// Read dummy length in bits for sync data reads (cache path).
+    /// Reads dummy length in bits for sync data reads (cache path).
     ///
     /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
     pub rd_dummy_bits: u8,
 
-    /// Write dummy length in bits for sync data writes (cache path).
+    /// Writes dummy length in bits for sync data writes (cache path).
     ///
     /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
     pub wr_dummy_bits: u8,
@@ -138,7 +138,7 @@ impl PsramTimingParams {
     };
 }
 
-/// Initialize PSRAM.
+/// Initializes PSRAM.
 #[crate::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     psram_phy_ldo_init();
@@ -189,7 +189,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
     start..start + config.size.get()
 }
 
-/// Program the PMU external LDO regulators for the MSPI PHY
+/// Programs the PMU external LDO regulators for the MSPI PHY.
 fn psram_phy_ldo_init() {
     PMU::regs()
         .ext_ldo_p0_0p1a()

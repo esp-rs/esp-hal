@@ -97,7 +97,7 @@ fn write_pms_ctrl_range(base: usize, start: usize, end: usize) {
 
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {

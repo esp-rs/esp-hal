@@ -26,7 +26,7 @@ pub enum Error {
 }
 
 #[doc(hidden)]
-/// Tries to "claim" `ADC2` peripheral and set its status
+/// Tries to "claim" `ADC2` peripheral and sets its status.
 pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
     if ADC2_IN_USE.fetch_or(true, Ordering::Relaxed) {
         Err(Error::Adc2InUse)
@@ -36,7 +36,7 @@ pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
 }
 
 #[doc(hidden)]
-/// Resets `ADC2` usage status to `Unused`
+/// Resets `ADC2` usage status to `Unused`.
 pub fn release_adc2(_: private::Internal) {
     ADC2_IN_USE.store(false, Ordering::Relaxed);
 }
@@ -247,8 +247,8 @@ impl<'d, ADCX> Adc<'d, ADCX, crate::Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configure a given ADC instance using the provided configuration, and
-    /// initialize the ADC for use
+    /// Configures a given ADC instance using the provided configuration, and
+    /// initializes the ADC for use.
     ///
     /// # Panics
     ///
@@ -326,9 +326,9 @@ where
         }
     }
 
-    /// Request that the ADC begin a conversion on the specified pin
+    /// Requests that the ADC begin a conversion on the specified pin.
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     pub fn read_oneshot<PIN, CS>(

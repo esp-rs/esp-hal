@@ -10,14 +10,14 @@ use super::*;
 use crate::soc::pac::rmt;
 
 impl RMT<'_> {
-    /// Return a reference to the register block.
+    /// Returns a reference to the register block.
     #[inline(always)]
     #[instability::unstable]
     pub const fn regs<'a>() -> &'a RmtRegisterBlock {
         &RmtRegisterBlock
     }
 
-    /// Return a reference to the register block.
+    /// Returns a reference to the register block.
     #[inline(always)]
     #[instability::unstable]
     pub fn register_block(&self) -> &RmtRegisterBlock {
@@ -25,7 +25,7 @@ impl RMT<'_> {
     }
 }
 
-/// Register block overlay for the RMT peripheral.
+/// Registers block overlay for the RMT peripheral.
 #[instability::unstable]
 pub struct RmtRegisterBlock;
 
@@ -242,13 +242,13 @@ pub struct TxConf0R(u32);
 pub struct TxConf0W(rmt::chconf0::W);
 
 impl TxConf0<'_> {
-    /// Read the register.
+    /// Reads the register.
     #[inline]
     pub fn read(&self) -> TxConf0R {
         TxConf0R(self.0.read().bits())
     }
 
-    /// Modify the register.
+    /// Modifies the register.
     #[inline]
     pub fn modify<F>(&self, f: F)
     where

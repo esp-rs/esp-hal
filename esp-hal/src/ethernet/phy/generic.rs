@@ -25,12 +25,12 @@ pub struct GenericPhy {
 }
 
 impl GenericPhy {
-    /// Creates a driver instance for the given MDIO bus address.
+    /// Creates a new driver instance for the given MDIO bus address.
     pub const fn new(addr: u8) -> Self {
         Self { addr: Some(addr) }
     }
 
-    /// Creates a driver instance that discovers the PHY address automatically
+    /// Creates a new driver instance that discovers the PHY address automatically
     /// by scanning the MDIO bus during [`Phy::init`].
     ///
     /// Returns [`PhyError::NotFound`] from `init` if no PHY responds.

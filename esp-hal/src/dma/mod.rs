@@ -188,12 +188,12 @@ impl DmaDescriptor {
         self.set_suc_eof(set_eof);
     }
 
-    /// Set the size of the buffer. See [DmaDescriptorFlags::size].
+    /// Sets the size of the buffer. See [DmaDescriptorFlags::size].
     pub fn set_size(&mut self, len: usize) {
         self.flags.set_size(len as u16)
     }
 
-    /// Set the length of the descriptor. See [DmaDescriptorFlags::length].
+    /// Sets the length of the descriptor. See [DmaDescriptorFlags::length].
     pub fn set_length(&mut self, len: usize) {
         self.flags.set_length(len as u16)
     }
@@ -209,12 +209,12 @@ impl DmaDescriptor {
         self.flags.length() as usize
     }
 
-    /// Set the suc_eof bit. See [DmaDescriptorFlags::suc_eof].
+    /// Sets the suc_eof bit. See [DmaDescriptorFlags::suc_eof].
     pub fn set_suc_eof(&mut self, suc_eof: bool) {
         self.flags.set_suc_eof(suc_eof)
     }
 
-    /// Set the owner. See [DmaDescriptorFlags::owner].
+    /// Sets the owner. See [DmaDescriptorFlags::owner].
     pub fn set_owner(&mut self, owner: Owner) {
         let owner = match owner {
             Owner::Cpu => false,
@@ -241,9 +241,9 @@ unsafe impl Send for DmaDescriptor {}
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaInterrupt {
-    /// RX is done
+    /// RX is done.
     RxDone,
-    /// TX is done
+    /// TX is done.
     TxDone,
 }
 
@@ -302,7 +302,8 @@ pub const CHUNK_SIZE: usize = 4092;
 #[procmacros::doc_replace]
 /// Convenience macro to create DMA buffers and descriptors.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_buffers;
@@ -327,7 +328,8 @@ macro_rules! dma_buffers {
 #[procmacros::doc_replace]
 /// Convenience macro to create DMA descriptors.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_descriptors;
@@ -354,7 +356,8 @@ macro_rules! dma_descriptors {
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
 /// size.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_buffers_chunk_size;
@@ -386,9 +389,10 @@ macro_rules! dma_buffers_chunk_size {
 }
 
 #[procmacros::doc_replace]
-/// Convenience macro to create DMA descriptors with specific chunk size
+/// Convenience macro to create DMA descriptors with specific chunk size.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_descriptors_chunk_size;
@@ -499,7 +503,8 @@ macro_rules! dma_descriptor_count {
 /// Convenience macro to create a DmaRxBuf from buffer size. The buffer and
 /// descriptors are statically allocated and used to create the `DmaRxBuf`.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_rx_buffer;
@@ -523,7 +528,8 @@ macro_rules! dma_rx_buffer {
 /// Convenience macro to create a DmaTxBuf from buffer size. The buffer and
 /// descriptors are statically allocated and used to create the `DmaTxBuf`.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_tx_buffer;
@@ -551,7 +557,8 @@ macro_rules! dma_tx_buffer {
 ///
 /// Smaller chunk sizes are recommended for lower latency.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_rx_stream_buffer;
@@ -582,7 +589,8 @@ macro_rules! dma_rx_stream_buffer {
 ///
 /// Smaller chunk sizes are recommended for lower latency.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_tx_stream_buffer;
@@ -608,7 +616,8 @@ macro_rules! dma_tx_stream_buffer {
 #[procmacros::doc_replace]
 /// Convenience macro to create a [DmaLoopBuf] from a buffer size.
 ///
-/// ## Usage
+/// # Examples
+///
 /// ```rust,no_run
 /// # {before_snippet}
 /// use esp_hal::dma_loop_buffer;
@@ -632,25 +641,25 @@ macro_rules! dma_loop_buffer {
     }};
 }
 
-/// DMA Errors
+/// DMA Errors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaError {
-    /// The alignment of data is invalid
+    /// The alignment of data is invalid.
     InvalidAlignment(DmaAlignmentError),
-    /// More descriptors are needed for the buffer size
+    /// More descriptors are needed for the buffer size.
     OutOfDescriptors,
     /// DescriptorError the DMA rejected the descriptor configuration. This
     /// could be because the source address of the data is not in RAM. Ensure
-    /// your source data is in a valid address space.
+    /// the source data is in a valid address space.
     DescriptorError,
-    /// The available free buffer is less than the amount of data to push
+    /// The available free buffer is less than the amount of data to push.
     Overflow,
-    /// The given buffer is too small
+    /// The given buffer is too small.
     BufferTooSmall,
-    /// Descriptors or buffers are not located in a supported memory region
+    /// Descriptors or buffers are not located in a supported memory region.
     UnsupportedMemoryRegion,
-    /// Invalid DMA chunk size
+    /// Invalid DMA chunk size.
     InvalidChunkSize,
 }
 
@@ -667,7 +676,7 @@ impl From<DmaBufError> for DmaError {
     }
 }
 
-/// DMA Priorities
+/// DMA Priorities.
 #[cfg(dma_max_priority_is_set)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -719,9 +728,9 @@ pub enum DmaPriority {
 /// The owner bit of a DMA descriptor.
 #[derive(PartialEq, PartialOrd)]
 pub enum Owner {
-    /// Owned by CPU
+    /// Owned by CPU.
     Cpu = 0,
-    /// Owned by DMA
+    /// Owned by DMA.
     Dma = 1,
 }
 
@@ -815,9 +824,9 @@ impl<'a> DescriptorSet<'a> {
         })
     }
 
-    /// Associate each descriptor with a chunk of the buffer.
+    /// Associates each descriptor with a chunk of the buffer.
     ///
-    /// This function checks the alignment and location of the buffer.
+    /// Checks the alignment and location of the buffer.
     ///
     /// See [`Self::set_up_buffer_ptrs`] for more details.
     fn link_with_buffer(
@@ -906,16 +915,15 @@ impl<'a> DescriptorSet<'a> {
         Ok(())
     }
 
-    /// Associate each descriptor with a chunk of the buffer.
+    /// Associates each descriptor with a chunk of the buffer.
     ///
-    /// This function does not check the alignment and location of the buffer,
-    /// because some callers may not have enough information currently.
+    /// Does not check the alignment and location of the buffer, because some
+    /// callers may not have enough information currently.
     ///
-    /// This function does not set up descriptor lengths or states.
+    /// Does not set up descriptor lengths or states.
     ///
-    /// This function also does not link descriptors into a linked list. This is
-    /// intentional, because it is done in `set_up_descriptors` to support
-    /// changing length without requiring buffer pointers to be set
+    /// Does not link descriptors into a linked list. This is intentional, because it is done in
+    /// `set_up_descriptors` to support changing length without requiring buffer pointers to be set
     /// repeatedly.
     fn set_up_buffer_ptrs(
         buffer: &mut [u8],
@@ -934,7 +942,7 @@ impl<'a> DescriptorSet<'a> {
     }
 }
 
-/// Block size for transfers to/from PSRAM
+/// Blocks size for transfers to/from PSRAM.
 #[cfg(dma_ext_mem_configurable_block_size)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DmaExtMemBKSize {
@@ -1048,7 +1056,7 @@ where
     Dm: DriverMode,
     CH: DmaRxChannel,
 {
-    /// Configure the channel.
+    /// Configures the channel.
     #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.rx_impl.set_priority(priority);
@@ -1184,7 +1192,7 @@ where
     }
 }
 
-/// DMA transmit channel
+/// DMA transmit channel.
 #[doc(hidden)]
 pub struct ChannelTx<Dm, CH>
 where
@@ -1272,7 +1280,7 @@ where
         self.tx_impl.runtime_ensure_compatible(peripheral);
     }
 
-    /// Configure the channel priority.
+    /// Configures the channel priority.
     #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx_impl.set_priority(priority);
@@ -1395,16 +1403,16 @@ where
     }
 }
 
-/// DMA Channel
+/// DMA Channel.
 #[non_exhaustive]
 pub struct Channel<Dm, CH>
 where
     Dm: DriverMode,
     CH: DmaChannel,
 {
-    /// RX half of the channel
+    /// RX half of the channel.
     pub rx: ChannelRx<Dm, CH::Rx>,
-    /// TX half of the channel
+    /// TX half of the channel.
     pub tx: ChannelTx<Dm, CH::Tx>,
 }
 
@@ -1431,7 +1439,7 @@ where
         self.tx.set_interrupt_handler(handler);
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts.
     pub fn listen(&mut self, interrupts: impl Into<EnumSet<DmaInterrupt>>) {
         for interrupt in interrupts.into() {
             match interrupt {
@@ -1441,7 +1449,7 @@ where
         }
     }
 
-    /// Unlisten the given interrupts
+    /// Unlistens from the given interrupts.
     pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<DmaInterrupt>>) {
         for interrupt in interrupts.into() {
             match interrupt {
@@ -1451,7 +1459,7 @@ where
         }
     }
 
-    /// Gets asserted interrupts
+    /// Returns the asserted interrupts.
     pub fn interrupts(&mut self) -> EnumSet<DmaInterrupt> {
         let mut res = EnumSet::new();
         if self.rx.is_done() {
@@ -1463,7 +1471,7 @@ where
         res
     }
 
-    /// Resets asserted interrupts
+    /// Resets asserted interrupts.
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<DmaInterrupt>>) {
         for interrupt in interrupts.into() {
             match interrupt {
@@ -1473,7 +1481,7 @@ where
         }
     }
 
-    /// Configure the channel priorities.
+    /// Configures the channel priorities.
     #[cfg(dma_max_priority_is_set)]
     pub fn set_priority(&mut self, priority: DmaPriority) {
         self.tx.set_priority(priority);

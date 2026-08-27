@@ -218,7 +218,7 @@ impl RDes {
         ((self.rdes0.get() & RDES0_FL_MASK) >> RDES0_FL_SHIFT) as usize
     }
 
-    /// Returns `true` if the hardware IP checksum-offload engine flagged a
+    /// Returns whether the hardware IP checksum-offload engine flagged a
     /// header or payload checksum error for this frame.
     ///
     /// These results live in the extended-status word (RDES4) rather than in
@@ -279,7 +279,7 @@ impl<const RX: usize, const TX: usize> Default for EthernetDmaStorage<RX, TX> {
 }
 
 impl<const RX: usize, const TX: usize> EthernetDmaStorage<RX, TX> {
-    /// Creates a zero-initialized storage block, suitable for `static` placement.
+    /// Creates a new zero-initialized storage block, suitable for `static` placement.
     pub const fn new() -> Self {
         Self {
             rx_descs: [const { InternalMemory::new(RDes::new_zeroed()) }; RX],
@@ -356,7 +356,7 @@ impl<'a> TDesRing<'a> {
 
     /// Copies `frame` into the next available TX buffer and hands it to DMA.
     ///
-    /// Returns `Err(DescriptorError::RingFull)` if no CPU-owned slot is available
+    /// Returns `Err(DescriptorError::RingFull)` if no CPU-owned slot is available.
     /// and `Err(DescriptorError::FrameTooLarge)` if the frame exceeds [`MAX_FRAME_SIZE`].
     pub fn transmit(&mut self, frame: &[u8]) -> Result<(), TxError> {
         if frame.len() > MAX_FRAME_SIZE {
@@ -372,7 +372,7 @@ impl<'a> TDesRing<'a> {
         }
     }
 
-    /// Returns `true` if the current slot is CPU-owned (ready to accept a frame).
+    /// Returns whether the current slot is CPU-owned (ready to accept a frame).
     pub fn has_capacity(&self) -> bool {
         let desc = self.descriptors[self.index].get_ref();
         #[cfg(soc_internal_memory_cached)]
@@ -381,10 +381,11 @@ impl<'a> TDesRing<'a> {
         desc.owned_by() == OwnedBy::Cpu
     }
 
-    /// Returns a mutable reference to the current TX DMA buffer if the slot is
-    /// CPU-owned, enabling zero-copy frame construction.
+    /// Returns a mutable reference to the current TX DMA buffer when the slot is
+    /// CPU-owned, which enables zero-copy frame construction.
     ///
     /// After writing the frame, call [`TDesRing::commit`] to hand it to DMA.
+    /// Returns `None` when the slot is not CPU-owned.
     pub fn available_buf(&mut self) -> Option<&mut [u8; MAX_FRAME_SIZE]> {
         if self.has_capacity() {
             let idx = self.index;
@@ -484,7 +485,7 @@ impl<'a> RDesRing<'a> {
         self.descriptors[0].as_ptr()
     }
 
-    /// Returns a mutable data slice if a frame is ready.
+    /// Returns a mutable data slice for a ready frame, or `None` when no frame is ready.
     ///
     /// Loops past error/incomplete/oversized frames, recycling them back to DMA
     /// automatically. Returns `None` only when no CPU-owned descriptor remains.

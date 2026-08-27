@@ -94,7 +94,7 @@ pub enum SpiInterrupt {
     App1,
 }
 
-/// The size of the FIFO buffer for SPI
+/// The size of the FIFO buffer for SPI.
 const FIFO_SIZE: usize = property!("spi_master.fifo_size");
 
 /// Padding byte for empty write transfers
@@ -428,19 +428,19 @@ pub struct Config {
     /// Clock divider calculations are relatively expensive, and the SPI
     /// peripheral is commonly expected to be used in a shared bus
     /// configuration, where different devices may need different bus clock
-    /// frequencies. To reduce the time required to reconfigure the bus, we
-    /// cache clock register's value here, for each configuration.
+    /// frequencies. To reduce the time required to reconfigure the bus, the
+    /// clock register value is cached here for each configuration.
     ///
-    /// This field is not intended to be set by the user, and is only used
+    /// This field is not intended to be set from application code, and is only used
     /// internally.
     #[builder_lite(skip)]
     reg: Result<u32, ConfigError>,
 
-    /// The target frequency
+    /// The target frequency.
     #[builder_lite(skip_setter)]
     frequency: Rate,
 
-    /// The clock source
+    /// The clock source.
     #[builder_lite(unstable)]
     #[builder_lite(skip_setter)]
     clock_source: ClockSource,
@@ -489,7 +489,7 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Set the frequency of the SPI bus clock.
+    /// Sets the frequency of the SPI bus clock.
     ///
     /// The closest available frequency that does not exceed `frequency` is used,
     /// so the bus never runs faster than requested.
@@ -500,7 +500,7 @@ impl Config {
         self
     }
 
-    /// Set the clock source of the SPI bus.
+    /// Sets the clock source of the SPI bus.
     #[instability::unstable]
     pub fn with_clock_source(mut self, clock_source: ClockSource) -> Self {
         self.clock_source = clock_source;
@@ -549,8 +549,8 @@ impl Config {
     ///
     /// The peripheral divides the source clock by `pre * n`, so this is the
     /// smallest divider that does not overshoot. `n` also determines the duty
-    /// cycle resolution, so out of pairs forming that divider we want the one
-    /// with the largest `n`.
+    /// cycle resolution, so among pairs forming that divider the one with the
+    /// largest `n` is preferred.
     ///
     /// Out-of-range frequencies (see [`Config::validate`]) yield the slowest pair
     /// available rather than an error.
@@ -673,7 +673,7 @@ impl core::fmt::Display for ConfigError {
 #[procmacros::doc_replace]
 /// SPI peripheral driver
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -703,13 +703,9 @@ impl<Dm: DriverMode> Sealed for Spi<'_, Dm> {}
 
 impl<'d> Spi<'d, Blocking> {
     #[procmacros::doc_replace]
-    /// Constructs an SPI instance in 8bit dataframe mode.
+    /// Creates a new SPI instance in 8-bit data-frame mode.
     ///
-    /// ## Errors
-    ///
-    /// See [`Spi::apply_config`].
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -723,6 +719,10 @@ impl<'d> Spi<'d, Blocking> {
     ///     .with_miso(peripherals.GPIO2);
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// See [`Spi::apply_config`]
     pub fn new(spi: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let mut this = Spi {
             _mode: PhantomData,
@@ -764,12 +764,11 @@ impl<'d> Spi<'d, Blocking> {
             _ => "peripheral",
         }
     )]
-    /// # Registers an interrupt handler for the __peripheral_on__.
+    /// Registers an interrupt handler for the __peripheral_on__.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
+    /// The default/unhandled interrupt handler can be restored with
     /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
     ///
     /// # Panics
@@ -784,7 +783,7 @@ impl<'d> Spi<'d, Blocking> {
 
 #[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for Spi<'_, Blocking> {
-    /// Sets the interrupt handler
+    /// Sets the interrupt handler.
     ///
     /// Interrupts are not enabled at the peripheral level here.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -808,7 +807,7 @@ impl<'d> Spi<'d, Async> {
     #[procmacros::doc_replace]
     /// Waits for the completion of previous operations.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -835,12 +834,11 @@ impl<'d> Spi<'d, Async> {
     #[procmacros::doc_replace]
     /// Sends `words` to the slave. Returns the `words` received from the slave.
     ///
-    /// This function aborts the transfer when its Future is dropped. Some
-    /// amount of data may have been transferred before the Future is
-    /// dropped. Dropping the future may block for a short while to ensure
-    /// the transfer is aborted.
+    /// Aborts the transfer when its Future is dropped. Some amount of data may have
+    /// been transferred before the Future is dropped. Dropping the future may block
+    /// for a short while to ensure the transfer is aborted.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -876,15 +874,15 @@ impl<'d> Spi<'d, Async> {
     /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
     /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
     ///
-    /// This function aborts the transfer when its Future is dropped. Some amount of data may have
-    /// been transferred before the Future is dropped. Dropping the future may block for a short
-    /// while to ensure the transfer is aborted.
+    /// Aborts the transfer when its Future is dropped. Some amount of data may have
+    /// been transferred before the Future is dropped. Dropping the future may block
+    /// for a short while to ensure the transfer is aborted.
     ///
     /// # Errors
     ///
-    /// [`Error::Unsupported`] will be returned if the buffer is empty (currently unsupported).
+    /// [`Error::Unsupported`] when the buffer is empty (currently unsupported).
     /// `DataMode::Single` cannot be combined with any other [`DataMode`], otherwise
-    /// [`Error::Unsupported`] will be returned.
+    /// [`Error::Unsupported`].
     #[instability::unstable]
     pub async fn half_duplex_read_async(
         &mut self,
@@ -912,13 +910,13 @@ impl<'d> Spi<'d, Async> {
     /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
     /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
     ///
-    /// This function aborts the transfer when its Future is dropped. Some amount of data may have
-    /// been transferred before the Future is dropped. Dropping the future may block for a short
-    /// while to ensure the transfer is aborted.
+    /// Aborts the transfer when its Future is dropped. Some amount of data may have
+    /// been transferred before the Future is dropped. Dropping the future may block
+    /// for a short while to ensure the transfer is aborted.
     ///
     /// # Errors
     ///
-    /// [`Error::Unsupported`] will be returned for unsupported combinations of command, address,
+    /// [`Error::Unsupported`] for unsupported combinations of command, address,
     /// dummy, and data modes.
     #[cfg_attr(
         esp32,
@@ -1024,14 +1022,14 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    /// Assigns the SCK (Serial Clock) pin for the SPI instance.
     ///
     /// Configures the specified pin to push-pull output and connects it to the
     /// SPI clock signal.
     ///
     /// Disconnects the previous pin that was assigned with `with_sck`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1051,16 +1049,16 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    /// Assigns the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
     /// Enables output functionality for the pin, and connects it as the MOSI
-    /// signal. You want to use this for full-duplex SPI or
-    /// if you intend to use [DataMode::SingleTwoDataLines].
+    /// signal. Use this for full-duplex SPI or
+    /// when using [DataMode::SingleTwoDataLines].
     ///
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1078,15 +1076,15 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    /// Assigns the MISO (Master In Slave Out) pin for the SPI instance.
     ///
     /// Enables input functionality for the pin, and connects it to the MISO
     /// signal.
     ///
-    /// You want to use this for full-duplex SPI or
+    /// Use this for full-duplex SPI or
     /// [DataMode::SingleTwoDataLines]
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1109,7 +1107,7 @@ where
         self
     }
 
-    /// Assign the SIO0 pin for the SPI instance.
+    /// Assigns the SIO0 pin for the SPI instance.
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI output signal and SIO0 input signal.
@@ -1119,7 +1117,7 @@ where
     ///
     /// Use this if any of the devices on the bus use half-duplex SPI.
     ///
-    /// See also [Self::with_mosi] when you only need a one-directional MOSI
+    /// See also [Self::with_mosi] for a one-directional MOSI
     /// signal.
     #[instability::unstable]
     pub fn with_sio0(mut self, mosi: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
@@ -1128,7 +1126,7 @@ where
         self
     }
 
-    /// Assign the SIO1/MISO pin for the SPI instance.
+    /// Assigns the SIO1/MISO pin for the SPI instance.
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO input signal and SIO1 output signal.
@@ -1137,7 +1135,7 @@ where
     ///
     /// Use this if any of the devices on the bus use half-duplex SPI.
     ///
-    /// See also [Self::with_miso] when you only need a one-directional MISO
+    /// See also [Self::with_miso] for a one-directional MISO
     /// signal.
     #[instability::unstable]
     pub fn with_sio1(mut self, sio1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
@@ -1161,7 +1159,7 @@ where
     #[cfg(spi_master_has_octal)]
     def_with_sio_pin!(with_sio7, 7);
 
-    /// Assign the CS (Chip Select) pin for the SPI instance.
+    /// Assigns the CS (Chip Select) pin for the SPI instance.
     ///
     /// Configures the specified pin to push-pull output and connects it to the
     /// SPI CS signal.
@@ -1186,14 +1184,9 @@ where
             _ => "80MHz",
         }
     )]
-    /// Change the bus configuration.
+    /// Changes the bus configuration.
     ///
-    /// # Errors
-    ///
-    /// If frequency passed in config exceeds __max_frequency__ or is below 70kHz,
-    /// [`ConfigError::FrequencyOutOfRange`] error will be returned.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1207,15 +1200,20 @@ where
     /// #
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::FrequencyOutOfRange`] when frequency passed in config exceeds
+    /// __max_frequency__ or is below 70 kHz.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
 
     #[procmacros::doc_replace]
-    /// Write bytes to SPI. After writing, flush is called to ensure all data
+    /// Writes bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1242,10 +1240,10 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Read bytes from SPI. The provided slice is filled with data received
+    /// Reads bytes from SPI. The provided slice is filled with data received
     /// from the slave.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1274,7 +1272,7 @@ where
     /// Sends `words` to the slave. The received data will be written to
     /// `words`, overwriting its contents.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1306,9 +1304,9 @@ where
     ///
     /// # Errors
     ///
-    /// [`Error::Unsupported`] will be returned if the buffer is empty (currently unsupported).
+    /// [`Error::Unsupported`] when the buffer is empty (currently unsupported).
     /// `DataMode::Single` cannot be combined with any other [`DataMode`], otherwise
-    /// [`Error::Unsupported`] will be returned.
+    /// [`Error::Unsupported`].
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
@@ -1330,7 +1328,7 @@ where
     ///
     /// # Errors
     ///
-    /// [`Error::Unsupported`] will be returned for unsupported combinations of command, address,
+    /// [`Error::Unsupported`] for unsupported combinations of command, address,
     /// dummy, and data modes.
     #[cfg_attr(
         esp32,
@@ -1465,7 +1463,7 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 }
 
-/// SPI data mode
+/// SPI data mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]

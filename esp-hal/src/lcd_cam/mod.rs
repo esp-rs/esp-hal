@@ -103,8 +103,7 @@ impl<'d> LcdCam<'d, Blocking> {
 
     /// Registers an interrupt handler for the LCD_CAM peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::system::Cpu::other() {
@@ -142,7 +141,7 @@ pub enum BitOrder {
     /// Do not change bit order.
     #[default]
     Native   = 0,
-    /// Invert bit order.
+    /// Inverts bit order.
     Inverted = 1,
 }
 
@@ -153,7 +152,7 @@ pub enum ByteOrder {
     /// Do not change byte order.
     #[default]
     Native   = 0,
-    /// Invert byte order.
+    /// Inverts byte order.
     Inverted = 1,
 }
 
@@ -223,7 +222,7 @@ impl ClockDivider {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockError {
-    /// Desired frequency was too low for the dividers to divide to
+    /// Desired frequency was too low for the dividers to divide to.
     FrequencyTooLow,
 }
 

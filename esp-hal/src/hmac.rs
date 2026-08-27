@@ -42,8 +42,7 @@ use crate::{
 };
 
 /// Provides an interface for interacting with the HMAC hardware peripheral.
-/// It allows users to compute HMACs for cryptographic purposes, ensuring data
-/// integrity and authenticity.
+/// Computes HMACs for cryptographic purposes and ensures data integrity and authenticity.
 pub struct Hmac<'d> {
     hmac: HMAC<'d>,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
@@ -56,13 +55,12 @@ pub struct Hmac<'d> {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
-    /// It means the purpose of the selected block does not match the
-    /// configured key purpose and the calculation will not proceed.
+    /// Purpose of the selected block does not match the configured key purpose.
     KeyPurposeMismatch,
 }
 
-/// The peripheral can be configured to deliver its output directly to the
-/// user. It can also deliver to other peripherals.
+/// The peripheral can be configured to deliver its output directly to
+/// software. It can also deliver to other peripherals.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
@@ -72,9 +70,9 @@ pub enum HmacPurpose {
     /// HMAC is provided to the digital signature peripheral to decrypt the
     /// private key.
     ToDs       = 7,
-    /// Let the user provide a message and read the result.
+    /// Provides a message and reads the result.
     ToUser     = 8,
-    /// HMAC is used for both the digital signature or JTAG.
+    /// HMAC is used for both the digital signature and JTAG.
     ToDsOrJtag = 5,
 }
 
@@ -120,11 +118,11 @@ impl<'d> Hmac<'d> {
         self.hmac.register_block()
     }
 
-    /// Step 1. Enable HMAC module.
+    /// Enables the HMAC module.
     ///
-    /// Before these steps, the user shall set the peripheral clocks bits for
-    /// HMAC and SHA peripherals and clear the corresponding peripheral
-    /// reset bits.
+    /// Before these steps, the peripheral clock bits for
+    /// HMAC and SHA must be set and the corresponding peripheral
+    /// reset bits must be cleared.
     pub fn init(&mut self) {
         self.regs().set_start().write(|w| w.set_start().set_bit());
         self.alignment_helper.reset();
@@ -132,7 +130,7 @@ impl<'d> Hmac<'d> {
         self.next_command = NextCommand::None;
     }
 
-    /// Step 2. Configure HMAC keys and key purposes.
+    /// Configures HMAC keys and key purposes.
     pub fn configure(&mut self, m: HmacPurpose, key_id: KeyId) -> nb::Result<(), Error> {
         self.regs()
             .set_para_purpose()
@@ -151,9 +149,9 @@ impl<'d> Hmac<'d> {
         Ok(())
     }
 
-    /// Process the msg block after block
+    /// Processes the message block by block.
     ///
-    /// Call this function as many times as necessary (msg.len() > 0)
+    /// Must be called as many times as necessary while `msg.len() > 0`.
     pub fn update<'a>(&mut self, msg: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
         if self.is_busy() {
             return Err(nb::Error::WouldBlock);

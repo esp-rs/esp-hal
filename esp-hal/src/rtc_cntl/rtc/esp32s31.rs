@@ -603,7 +603,7 @@ fn modem_clock_domain_power_state_icg_map_init() {
         });
 }
 
-/// Select the WiFi LP clock after `ClockConfig::configure` has applied and
+/// Selects the WiFi LP clock after `ClockConfig::configure` has applied and
 /// acquired the configured LP clock source.
 pub(crate) fn configure_wifi_lp_clock(config: &ClockConfig) {
     let lpcon = MODEM_LPCON::regs();
@@ -665,7 +665,7 @@ pub(crate) fn init(_config: &ClockConfig) {
 /// SOC Reset Reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ///
     /// In ESP-IDF this value (0x01) can *also* be `ChipBrownOut` or
     /// `ChipSuperWdt`, however that is not really compatible with Rust-style
@@ -689,7 +689,7 @@ pub enum SocResetReason {
     CpuSw         = 0x0C,
     /// RWDT resets digital core
     CpuRwdt       = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RWDT system reset
     SysRwdt       = 0x10,

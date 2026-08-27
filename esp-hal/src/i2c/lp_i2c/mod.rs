@@ -156,7 +156,7 @@ pub enum Error {
 )]
 /// Low-power I2C driver
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -193,12 +193,7 @@ impl<'d> LpI2c<'d> {
     )]
     /// Creates a new instance of the `LpI2c` peripheral.
     ///
-    /// ## Errors
-    ///
-    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if the provided config is
-    /// invalid.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -211,6 +206,10 @@ impl<'d> LpI2c<'d> {
     /// )?;
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`crate::i2c::lp_i2c::ConfigError`] when the provided config is invalid.
     pub fn new(
         i2c: LP_I2C0<'d>,
         config: Config,
@@ -248,12 +247,7 @@ impl<'d> LpI2c<'d> {
     )]
     /// Applies a new configuration.
     ///
-    /// ## Errors
-    ///
-    /// A [`crate::i2c::lp_i2c::ConfigError`] variant will be returned if the provided config is
-    /// invalid.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -268,6 +262,10 @@ impl<'d> LpI2c<'d> {
     /// i2c.apply_config(&Config::default())?;
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`crate::i2c::lp_i2c::ConfigError`] when the provided config is invalid.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.configure(config)
     }
@@ -287,12 +285,7 @@ impl<'d> LpI2c<'d> {
     /// The transfer consists of a single write transaction that sends the device address, the
     /// register address, then `data`.
     ///
-    /// ## Errors
-    ///
-    /// [`Error::TransactionSizeLimitExceeded`] is returned if `data` is longer than the driver
-    /// can transfer in a single transaction.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -308,6 +301,11 @@ impl<'d> LpI2c<'d> {
     /// i2c.write(DEVICE_ADDR, 2, &[0xaa])?;
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
+    /// can transfer in a single transaction.
     pub fn write(&mut self, address: u8, register: u8, data: &[u8]) -> Result<(), Error> {
         self.write_bytes(address, register, data)
     }
@@ -328,12 +326,7 @@ impl<'d> LpI2c<'d> {
     /// The transfer writes the device address and the register address, then repeats the start
     /// condition to read `data` back.
     ///
-    /// ## Errors
-    ///
-    /// [`Error::TransactionSizeLimitExceeded`] is returned if `data` is longer than the driver
-    /// can transfer in a single transaction.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -350,6 +343,11 @@ impl<'d> LpI2c<'d> {
     /// i2c.read(DEVICE_ADDR, 7, &mut data)?;
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`Error::TransactionSizeLimitExceeded`] when `data` is longer than the driver
+    /// can transfer in a single transaction.
     pub fn read(&mut self, address: u8, register: u8, data: &mut [u8]) -> Result<(), Error> {
         self.read_bytes(address, register, data)
     }

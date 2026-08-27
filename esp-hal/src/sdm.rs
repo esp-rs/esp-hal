@@ -170,7 +170,7 @@ impl ChannelConfig {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnreachableTargetFrequency`] when no hardware
+    /// [`Error::UnreachableTargetFrequency`] when no hardware
     /// prescaler can represent the requested frequency.
     pub fn with_frequency(mut self, frequency: Rate) -> Result<Self, Error> {
         self.raw_prescaler = raw_prescaler(prescaler_from_frequency(frequency)?);
@@ -183,7 +183,7 @@ impl ChannelConfig {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::PrescalerOutOfRange`] when `prescaler` is not in
+    /// [`Error::PrescalerOutOfRange`] when `prescaler` is not in
     /// `1..=256`.
     pub fn with_prescaler(mut self, prescaler: u16) -> Result<Self, Error> {
         check_prescaler(prescaler)?;
@@ -211,7 +211,7 @@ pub struct Channel<'d> {
 }
 
 impl<'d> Channel<'d> {
-    /// Creates a connected sigma-delta channel.
+    /// Creates a new connected sigma-delta channel.
     pub fn new(
         channel: impl Instance + 'd,
         pin: impl PeripheralOutput<'d>,

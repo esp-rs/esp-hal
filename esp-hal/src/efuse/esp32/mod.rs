@@ -41,8 +41,8 @@ pub fn core_count() -> u32 {
 
 /// Returns the maximum rated clock of the CPU in MHz.
 ///
-/// Note that the actual clock may be lower, depending on the current power
-/// configuration of the chip, clock source, and other settings.
+/// The actual clock may be lower, depending on the current power configuration of the chip, clock
+/// source, and other settings.
 #[instability::unstable]
 pub fn max_cpu_frequency() -> Rate {
     let has_rating = super::read_bit(CHIP_CPU_FREQ_RATED);
@@ -78,7 +78,7 @@ pub fn chip_type() -> ChipType {
     }
 }
 
-/// Get status of SPI boot encryption.
+/// Returns whether SPI boot encryption is enabled.
 #[instability::unstable]
 pub fn flash_encryption() -> bool {
     !super::read_field_le::<u8>(FLASH_CRYPT_CNT)
@@ -86,7 +86,7 @@ pub fn flash_encryption() -> bool {
         .is_multiple_of(2)
 }
 
-/// Returns the major hardware revision
+/// Returns the major hardware revision.
 #[instability::unstable]
 pub fn major_chip_version() -> u8 {
     let eco_bit0 = super::read_field_le::<u32>(CHIP_VER_REV1);
@@ -101,7 +101,7 @@ pub fn major_chip_version() -> u8 {
     }
 }
 
-/// Returns the minor hardware revision
+/// Returns the minor hardware revision.
 #[instability::unstable]
 pub fn minor_chip_version() -> u8 {
     super::read_field_le(WAFER_VERSION_MINOR)

@@ -41,7 +41,7 @@
 //!
 //! ## Signaling async completion
 //!
-//! The completion is signalled by clearing a flag in an AtomicU32. This flag is
+//! The completion is signaled by clearing a flag in an AtomicU32. This flag is
 //! set at the start of the async operation, and cleared when the interrupt
 //! handler is called. The flag is not accessible by the user, so they can't
 //! force-complete an async operation accidentally from the interrupt handler.
@@ -117,9 +117,9 @@ pub(crate) fn bind_default_interrupt_handler() {
     super::low_level::enable_interrupt(default_gpio_interrupt_handler);
 }
 
-/// The default GPIO interrupt handler, when the user has not set one.
+/// The default GPIO interrupt handler, used when no custom handler is set.
 ///
-/// This handler will disable all pending interrupts and leave the interrupt
+/// This handler disables all pending interrupts and leaves the interrupt
 /// status bits unchanged. This enables functions like `is_interrupt_set` to
 /// work correctly.
 #[ram]
@@ -154,9 +154,9 @@ fn default_gpio_interrupt_handler() {
     });
 }
 
-/// The user GPIO interrupt handler, when the user has set one.
+/// The custom GPIO interrupt handler, used when one is set.
 ///
-/// This handler only disables interrupts associated with async pins. The user
+/// This handler only disables interrupts associated with async pins. The custom
 /// handler is responsible for clearing the interrupt status bits or disabling
 /// the interrupts.
 #[ram]

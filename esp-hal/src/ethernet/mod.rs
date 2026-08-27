@@ -764,7 +764,7 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
         }
     }
 
-    /// Returns `true` if there is at least one free TX descriptor slot.
+    /// Returns whether there is at least one free TX descriptor slot.
     pub fn tx_has_capacity(&self) -> bool {
         self.tx.has_capacity()
     }

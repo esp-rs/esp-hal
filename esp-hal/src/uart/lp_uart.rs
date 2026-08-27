@@ -119,7 +119,7 @@ pub struct LpUart {
 }
 
 impl LpUart {
-    /// Initialize the UART driver using the provided configuration
+    /// Initializes the UART driver using the provided configuration.
     // TODO: CTS and RTS pins
     pub fn new(
         uart: LP_UART<'static>,
@@ -243,7 +243,7 @@ impl LpUart {
         self.update();
     }
 
-    /// Modify UART baud rate and reset TX/RX fifo.
+    /// Modifies UART baud rate and reset TX/RX fifo.
     pub fn change_baud(&mut self, config: &Config) {
         self.change_baud_internal(config);
         self.txfifo_reset();

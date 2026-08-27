@@ -7,7 +7,7 @@ mod fields;
 #[instability::unstable]
 pub use fields::*;
 
-/// Get status of SPI boot encryption.
+/// Returns whether SPI boot encryption is enabled.
 #[instability::unstable]
 pub fn flash_encryption() -> bool {
     !super::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
@@ -15,13 +15,13 @@ pub fn flash_encryption() -> bool {
         .is_multiple_of(2)
 }
 
-/// Get the multiplier for the timeout value of the RWDT STAGE 0 register.
+/// Returns the multiplier for the timeout value of the RWDT STAGE 0 register.
 #[instability::unstable]
 pub fn rwdt_multiplier() -> u8 {
     super::read_field_le::<u8>(WDT_DELAY_SEL)
 }
 
-/// Get efuse block version
+/// Returns the eFuse block version.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/dc016f5987/components/hal/efuse_hal.c#L27-L30>
 #[instability::unstable]
@@ -32,7 +32,7 @@ pub fn block_version() -> (u8, u8) {
     )
 }
 
-/// Get version of RTC calibration block
+/// Returns the version of RTC calibration block.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L21>
 #[instability::unstable]
@@ -43,12 +43,12 @@ pub fn rtc_calib_version() -> u8 {
     if major > 0 || minor > 0 { 1 } else { 0 }
 }
 
-/// Returns the major hardware revision
+/// Returns the major hardware revision.
 pub(crate) fn major_chip_version() -> u8 {
     super::read_field_le(WAFER_VERSION_MAJOR)
 }
 
-/// Returns the minor hardware revision
+/// Returns the minor hardware revision.
 pub(crate) fn minor_chip_version() -> u8 {
     super::read_field_le(WAFER_VERSION_MINOR)
 }
@@ -89,17 +89,17 @@ impl EfuseBlock {
     }
 }
 
-/// Selects which ADC we are interested in the efuse calibration data for
+/// Selects which ADC the eFuse calibration data applies to.
 #[instability::unstable]
 pub enum AdcCalibUnit {
-    /// Select efuse calibration data for ADC1
+    /// Selects efuse calibration data for ADC1.
     ADC1,
-    /// Select efuse calibration data for ADC2
+    /// Selects efuse calibration data for ADC2.
     ADC2,
 }
 
-/// Get a signed value from the raw data from eFuse. Sign bit is the index of the sign bit, starting
-/// from 0. see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L19>
+/// Returns a signed value from the raw data from eFuse. Sign bit is the index of the sign bit,
+/// starting from 0. see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L19>.
 fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
     let sign_mask = 1u32 << sign_bit;
     if data & sign_mask != 0 {
@@ -109,7 +109,7 @@ fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
     }
 }
 
-/// Get ADC initial code for specified attenuation from efuse
+/// Returns the ADC initial code for specified attenuation from efuse.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L34>
 #[instability::unstable]
@@ -132,7 +132,7 @@ pub fn rtc_calib_init_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
     Some(init_code + 1400) // version 1 logic
 }
 
-/// Get the channel specific calibration compensation
+/// Returns the channel specific calibration compensation.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L131>
 #[instability::unstable]
@@ -162,7 +162,7 @@ pub fn rtc_calib_get_chan_compens(
     Some(get_signed_val(chan_diff, 3) * (4 - atten as i32))
 }
 
-/// Get ADC calibration reference point voltage
+/// Returns the ADC calibration reference point voltage.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L88>
 #[instability::unstable]
@@ -175,7 +175,7 @@ pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
     }
 }
 
-/// Get ADC calibration code
+/// Returns the ADC calibration code.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L71>
 #[instability::unstable]

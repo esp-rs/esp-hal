@@ -68,7 +68,7 @@ use crate::{
 /// [`Pull::None`][crate::gpio::Pull::None] and no external resistor therefore floats during the
 /// sleep, and a floating pad wakes the chip immediately and every time.
 ///
-/// Give a level-triggered wake pin a pull against the level that wakes the chip, or an external
+/// A level-triggered wake pin needs a pull against the level that wakes the chip, or an external
 /// resistor. For a pin that wakes the chip on a low level, use an external pull-up.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -393,7 +393,7 @@ fn collect(buffer: &mut [Armed; MAX_ARMED]) -> (&[Armed], bool) {
 /// Returns the level that wakes the chip through this pad, or `None` if the trigger sets no level.
 ///
 /// The wake paths accept a level only, so an edge trigger becomes the level at the end of the edge.
-/// This keeps the request of the user. `AnyEdge` ends at the level that the pin is not at now,
+/// This keeps the configured request. `AnyEdge` ends at the level that the pin is not at now,
 /// which is the meaning of "wake when the pin changes". This read of the pin can race with the pin,
 /// but the result is safe. If the pin changes before the sleep starts, the path arms a level that
 /// is already present, and the sleep is rejected or ends immediately.

@@ -600,7 +600,7 @@ impl<'d> LpI2c<'d> {
         self.regs().data().read().fifo_rdata().bits()
     }
 
-    /// Update I2C configuration
+    /// Updates I2C configuration.
     fn lp_i2c_update(&self) {
         self.i2c
             .register_block()

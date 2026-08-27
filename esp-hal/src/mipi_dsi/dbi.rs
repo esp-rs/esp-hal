@@ -59,7 +59,7 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
         self.virtual_channel
     }
 
-    /// Send a DCS write command with zero or more parameters.
+    /// Sends a DCS write command with zero or more parameters.
     ///
     /// Uses a short-write packet for 0 or 1 parameters, a long-write packet
     /// otherwise.
@@ -130,7 +130,7 @@ impl<'bus, 'd> DsiDbi<'bus, 'd> {
         Ok(())
     }
 
-    /// Issue a DCS read command (BTA) and drain the response into `out`.
+    /// Issues a DCS read command (BTA) and drains the response into `out`.
     ///
     /// Returns the number of bytes placed into `out`.
     pub fn read_cmd(&mut self, cmd: u8, out: &mut [u8]) -> Result<usize, Error> {

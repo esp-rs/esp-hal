@@ -76,7 +76,7 @@ impl<T> InternalMemory<T> {
 /// `addr` is not in a DMA-capable region.
 ///
 /// Both the address and size of a DMA buffer must be a multiple of this value
-/// so that cache maintenance on the buffer cannot corrupt neighbouring data.
+/// so that cache maintenance on the buffer cannot corrupt neighboring data.
 pub(crate) fn region_dma_alignment(addr: usize) -> Option<usize> {
     if is_valid_ram_address(addr) {
         return Some(core::mem::align_of::<InternalMemory<()>>());
@@ -122,7 +122,7 @@ fn validate_dma_alignment(addr: usize, size: usize) -> Result<(), DmaBufError> {
     Ok(())
 }
 
-/// Returns `true` if the value at `addr` spanning `size` bytes occupies a
+/// Returns whether the value at `addr` spanning `size` bytes occupies a
 /// cached memory region and therefore needs explicit cache maintenance.
 #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
 fn region_needs_cache_op(addr: usize, size: usize) -> bool {
@@ -158,7 +158,7 @@ impl<'a, T: ?Sized> DmaAlignedMut<'a, T> {
         cfg(soc_internal_memory_cached) => "64",
         _ => "4"
     })]
-    /// Creates a new [`DmaAlignedMut`] from a mutable variable, if it's
+    /// Creates a new [`DmaAlignedMut`] from a mutable variable, if it is
     /// provably compatible.
     ///
     /// In internal memory, the address and size of the variable
@@ -276,7 +276,7 @@ impl<'a, T: ?Sized> DmaAlignedRef<'a, T> {
         cfg(soc_internal_memory_cached) => "64",
         _ => "4"
     })]
-    /// Creates a new [`DmaAlignedRef`] from a shared reference, if it's
+    /// Creates a new [`DmaAlignedRef`] from a shared reference, if it is
     /// provably compatible.
     ///
     /// In internal memory, the address and size of the value

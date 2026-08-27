@@ -6,14 +6,14 @@ use core::{
 use crate::gpio::{Event, Flex, GpioBank, Input, InputPin};
 
 impl Flex<'_> {
-    /// Wait until the pin experiences a particular [`Event`].
+    /// Waits until the pin experiences a particular [`Event`].
     ///
     /// The GPIO driver will disable listening for the event once it occurs,
     /// or if the `Future` is dropped - which also means this method is **not**
     /// cancellation-safe, it will always wait for a future event.
     ///
-    /// Note that calling this function will overwrite previous
-    /// [`listen`][Self::listen] operations for this pin.
+    /// Calling this method overwrites previous [`listen`][Self::listen] operations
+    /// for this pin.
     ///
     /// A wait continues through a light sleep, and a pin that waits also ends the sleep, like a
     /// listening pin. There is one exception: a wait for an edge on a pin that is already at the
@@ -49,7 +49,7 @@ impl Flex<'_> {
         PinFuture { pin: self }.await;
     }
 
-    /// Wait until the pin is high.
+    /// Waits until the pin is high.
     ///
     /// See [Self::wait_for] for more information.
     #[inline]
@@ -58,7 +58,7 @@ impl Flex<'_> {
         self.wait_for(Event::HighLevel).await
     }
 
-    /// Wait until the pin is low.
+    /// Waits until the pin is low.
     ///
     /// See [Self::wait_for] for more information.
     #[inline]
@@ -67,7 +67,7 @@ impl Flex<'_> {
         self.wait_for(Event::LowLevel).await
     }
 
-    /// Wait for the pin to undergo a transition from low to high.
+    /// Waits for the pin to undergo a transition from low to high.
     ///
     /// See [Self::wait_for] for more information.
     #[inline]
@@ -76,7 +76,7 @@ impl Flex<'_> {
         self.wait_for(Event::RisingEdge).await
     }
 
-    /// Wait for the pin to undergo a transition from high to low.
+    /// Waits for the pin to undergo a transition from high to low.
     ///
     /// See [Self::wait_for] for more information.
     #[inline]
@@ -85,7 +85,7 @@ impl Flex<'_> {
         self.wait_for(Event::FallingEdge).await
     }
 
-    /// Wait for the pin to undergo any transition, i.e low to high OR high
+    /// Waits for the pin to undergo any transition, i.e. low to high or high
     /// to low.
     ///
     /// See [Self::wait_for] for more information.
@@ -98,9 +98,9 @@ impl Flex<'_> {
 
 impl Input<'_> {
     #[procmacros::doc_replace]
-    /// Wait until the pin experiences a particular [`Event`].
+    /// Waits until the pin experiences a particular [`Event`].
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -111,15 +111,14 @@ impl Input<'_> {
     /// # {after_snippet}
     /// ```
     ///
-    /// ## Cancellation
+    /// # Cancellation Safety
     ///
-    /// This function is not cancellation-safe.
+    /// Not cancellation-safe.
     ///
-    /// - Calling this function will overwrite previous [`listen`][Self::listen] operations for this
-    ///   pin, making it side-effectful.
-    /// - Dropping the [`Future`] returned by this function will cancel the wait operation. If the
-    ///   event occurs after the future is dropped, a consequent wait operation will ignore the
-    ///   event.
+    /// - Calling this method overwrites previous [`listen`][Self::listen] operations for this pin,
+    ///   making it side-effectful.
+    /// - Dropping the [`Future`] returned by this method cancels the wait operation. If the event
+    ///   occurs after the future is dropped, a subsequent wait operation ignores the event.
     ///
     /// A wait continues through a light sleep, and a pin that waits also ends the sleep, like a
     /// listening pin. There is one exception: a wait for an edge on a pin that is already at the
@@ -131,11 +130,11 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait until the pin is high.
+    /// Waits until the pin is high.
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -151,11 +150,11 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait until the pin is low.
+    /// Waits until the pin is low.
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -171,11 +170,11 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait for the pin to undergo a transition from low to high.
+    /// Waits for the pin to undergo a transition from low to high.
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -191,11 +190,11 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait for the pin to undergo a transition from high to low.
+    /// Waits for the pin to undergo a transition from high to low.
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -211,12 +210,12 @@ impl Input<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Wait for the pin to undergo any transition, i.e low to high OR high
+    /// Waits for the pin to undergo any transition, i.e. low to high or high
     /// to low.
     ///
     /// See [Self::wait_for] for more information.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}

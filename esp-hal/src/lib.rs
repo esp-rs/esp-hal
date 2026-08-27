@@ -18,7 +18,7 @@
 //!
 //! The HAL implements both [`Blocking`] _and_ [`Async`] APIs for all applicable peripherals.
 //! Where applicable, driver implement the [embedded-hal] and
-//! [embedded-hal-async] traits. Drivers that don't currently have a stable API
+//! [embedded-hal-async] traits. Drivers that do not currently have a stable API
 //! are marked as `unstable` in the documentation.
 //!
 //! ### Peripheral singletons
@@ -31,9 +31,9 @@
 //! These singletons, by default, represent peripherals for the entire lifetime
 //! of the program. To allow for reusing peripherals, the HAL provides a
 //! `reborrow` method on each peripheral singleton. This method creates a new
-//! handle to the peripheral with a shorter lifetime. This allows you to pass
-//! the handle to a driver, while still keeping the original handle alive. Once
-//! you drop the driver, you will be able to reborrow the peripheral again.
+//! handle to the peripheral with a shorter lifetime. This lets the handle be
+//! passed to a driver while keeping the original handle alive. Once the driver
+//! is dropped, the peripheral can be reborrowed again.
 #![cfg_attr(
     // Feature-gated so that this doesn't prevent gradual device bringup. Any
     // stable driver would serve the purpose here, so this block will be part
@@ -41,7 +41,7 @@
     i2c_master_driver_supported,
     doc = r#"
 For example, if you want to use the [`I2c`](i2c::master::I2c) driver and you
-don't intend to drop the driver, you can pass the peripheral singleton to
+do not intend to drop the driver, you can pass the peripheral singleton to
 the driver by value:
 
 ```rust, ignore
@@ -89,7 +89,7 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //! ## Creating a Project
 //!
 //! We have a [book] that explains the full esp-hal ecosystem
-//! and how to get started, it's advisable to give that a read
+//! and how to get started, it is advisable to give that a read
 //! before proceeding. We also have a [training] that covers some common
 //! scenarios with examples.
 //!
@@ -149,9 +149,9 @@ fn main() -> ! {
 )]
 //! ## Additional configuration
 //!
-//! We've exposed some configuration options that don't fit into cargo
+//! Some configuration options do not fit into cargo
 //! features. These can be set via environment variables, or via cargo's `[env]`
-//! section inside `.cargo/config.toml`. Note that unstable options can only be
+//! section inside `.cargo/config.toml`. Unstable options can only be
 //! enabled when the `unstable` feature is enabled for the crate. Below is a
 //! table of tunable parameters for this crate:
 #![doc = ""]
@@ -161,7 +161,7 @@ fn main() -> ! {
 //!
 //! You should never use `core::mem::forget` on any type defined in [esp crates].
 //! Many types heavily rely on their `Drop` implementation to not leave the
-//! hardware in undefined state which can cause undefined behaviour in your program.
+//! hardware in undefined state which can cause undefined behavior in your program.
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
 //!
@@ -439,7 +439,7 @@ trait RegisterToggle {
 
     /// Toggles bits in the register, applying the given operation to set and clear them.
     ///
-    /// This method is more efficient than two modify calls, as it will not read the register
+    /// More efficient than two modify calls, because it does not read the register
     /// value twice.
     fn toggle(&self, op: impl Fn(&mut W<Self::Reg>, bool) -> &mut W<Self::Reg>);
 }
@@ -466,7 +466,7 @@ WARNING: use --release
   We *strongly* recommend using release profile when building esp-hal.
   The dev profile can potentially be one or more orders of magnitude
   slower than release, and may cause issues with timing-sensitive
-  peripherals and/or devices.
+  peripherals or devices.
 "}
 
 /// A marker trait for driver modes.
@@ -477,7 +477,7 @@ WARNING: use --release
 pub trait DriverMode: crate::private::Sealed {}
 
 #[procmacros::doc_replace]
-/// Marker type signalling that a driver is initialized in blocking mode.
+/// Marker type signaling that a driver is initialized in blocking mode.
 ///
 /// Drivers are constructed in blocking mode by default. To learn about the
 /// differences between blocking and async drivers, see the [`Async`] mode
@@ -508,7 +508,7 @@ let blocking_uart = uart.into_blocking();
 pub struct Blocking;
 
 #[procmacros::doc_replace]
-/// Marker type signalling that a driver is initialized in async mode.
+/// Marker type signaling that a driver is initialized in async mode.
 ///
 /// Drivers are constructed in blocking mode by default. To set up an async
 /// driver, a [`Blocking`] driver must be converted to an `Async` driver using
@@ -539,12 +539,11 @@ let uart = Uart::new(peripherals.UART0, Config::default())?
 /// available in async mode, as they are handled by the driver's interrupt
 /// handlers.
 ///
-/// Note that async functions usually take up more space than their blocking
-/// counterparts, and they are generally slower. This is because async functions
-/// are implemented using a state machine that is driven by interrupts and is
-/// polled by a runtime. For short operations, the overhead of the state machine
-/// can be significant. Consider using the blocking functions on the async
-/// driver for small transfers.
+/// Async functions usually take up more space than their blocking counterparts,
+/// and they are generally slower. This is because async functions are implemented
+/// using a state machine that is driven by interrupts and is polled by a runtime.
+/// For short operations, the overhead of the state machine can be significant.
+/// Consider using the blocking functions on the async driver for small transfers.
 ///
 /// When initializing an async driver, the driver disables user-specified
 /// interrupt handlers, and sets up internal interrupt handlers that drive the
@@ -638,12 +637,12 @@ pub(crate) static ESP_HAL_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 #[procmacros::doc_replace]
 /// System configuration.
 ///
-/// This `struct` is marked with `#[non_exhaustive]` and can't be instantiated
+/// This `struct` is marked with `#[non_exhaustive]` and cannot be instantiated
 /// directly. This is done to prevent breaking changes when new fields are added
 /// to the `struct`. Instead, use the [`Config::default()`] method to create a
 /// new instance.
 ///
-/// ## Examples
+/// # Examples
 ///
 /// ### Default initialization
 ///
@@ -670,7 +669,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Apply a clock configuration.
+    /// Applies a clock configuration.
     #[cfg_attr(
         feature = "unstable",
         doc = r"
@@ -686,7 +685,7 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
         }
     }
 
-    /// Apply a clock configuration.
+    /// Applies a clock configuration.
     #[cfg(not(feature = "unstable"))]
     pub fn with_cpu_clock(self, cpu_clock: CpuClock) -> Self {
         Self {
@@ -699,8 +698,7 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
     ///
     /// # Panics
     ///
-    /// This function will panic if the CPU clock configuration is not **exactly** one of the
-    /// [`CpuClock`] presets.
+    /// Panics if the CPU clock configuration is not **exactly** one of the [`CpuClock`] presets
     #[cfg_attr(feature = "unstable", deprecated(note = "Use `clock_config` instead."))] // TODO: mention ClockTree APIs once they are exposed to the user.
     pub fn cpu_clock(&self) -> CpuClock {
         unwrap!(
@@ -717,12 +715,11 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 }
 
 #[procmacros::doc_replace]
-/// Initialize the system.
+/// Initializes the system.
 ///
-/// This function sets up the CPU clock and watchdog, then, returns the
-/// peripherals and clocks.
+/// Sets up the CPU clock and watchdog, then returns the peripherals and clocks.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}

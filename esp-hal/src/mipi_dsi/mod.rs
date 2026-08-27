@@ -85,7 +85,7 @@ pub struct Config {
     /// APLL is not yet modelled in the clock tree and cannot be selected here.
     phy_pll_refclk: MipiDsiPhyPllRefclkConfig,
 
-    /// Keep the clock lane continuously in HS mode (`true`) or use auto mode
+    /// Keeps the clock lane continuously in HS mode (`true`) or uses auto mode
     /// where the DSI host manages HS↔LP transitions (`false`).
     force_clock_lane_hs: bool,
 }
@@ -146,7 +146,7 @@ pub struct MipiDsi<'d> {
 }
 
 impl<'d> MipiDsi<'d> {
-    /// Initialise the MIPI DSI bus.
+    /// Initializes the MIPI DSI bus.
     ///
     /// Enables APB clock, resets the bridge, powers up the D-PHY LDO,
     /// configures D-PHY PLL, and polls for PLL lock + lane-stopped status
@@ -312,12 +312,12 @@ impl<'d> MipiDsi<'d> {
         })
     }
 
-    /// Attach a command-mode (DBI) interface for panel init sequences.
+    /// Attaches a command-mode (DBI) interface for panel init sequences.
     pub fn dbi(&mut self, virtual_channel: u8) -> dbi::DsiDbi<'_, 'd> {
         dbi::DsiDbi::new(self, virtual_channel)
     }
 
-    /// Enter video-mode (DPI) streaming.
+    /// Enters video-mode (DPI) streaming.
     ///
     /// Consumes `self`; the returned [`DsiDpi`] keeps clocks enabled for the
     /// lifetime of the streaming session.
@@ -336,7 +336,7 @@ impl<'d> MipiDsi<'d> {
 
 // ── D-PHY power ───────────────────────────────────────────────────────────────
 
-/// Power up the internal LDO that supplies VDD_MIPI_DPHY at 2.5 V.
+/// Powers up the internal LDO that supplies VDD_MIPI_DPHY at 2.5 V.
 ///
 /// On ESP32-P4 the DPHY power rail (VDD_MIPI_DPHY) is driven by PMU
 /// internal LDO channel 3 (VO3), which maps to the `ext_ldo_p0_0p2a`
@@ -359,7 +359,7 @@ pub(crate) fn dphy_ldo_power_on() {
     rom::ets_delay_us(500);
 }
 
-/// Shut down the D-PHY and disable its LDO.
+/// Shuts down the D-PHY and disables its LDO.
 ///
 /// Mirrors `dphy_ldo_power_on` in reverse: reset the PHY digital and
 /// analog sections, power off the DSI host, then clear the LDO `xpd` bit
@@ -431,10 +431,10 @@ fn hs_freq_range(lane_mbps: f32) -> u8 {
         .map_or(0x00, |&(_, sel)| sel)
 }
 
-/// Compute PLL M and N divisors.
+/// Computes PLL M and N divisors.
 ///
 /// Constraint: 5 MHz ≤ f_ref/N ≤ 40 MHz, M must be even.
-/// Returns `(M, N, actual_lane_rate_mbps)` or `None` if no solution found.
+/// Returns `(M, N, actual_lane_rate_mbps)` or `None` if no solution is found.
 fn compute_pll(ref_freq_mhz: f32, target_mbps: f32) -> Option<(u16, u8, f32)> {
     let min_n = ((ref_freq_mhz / 40.0) as u8).max(1);
     let max_n = (ref_freq_mhz / 5.0) as u8;
@@ -470,7 +470,7 @@ fn compute_pll(ref_freq_mhz: f32, target_mbps: f32) -> Option<(u16, u8, f32)> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Round a positive f32 to the nearest u8 without using `f32::round()`.
+/// Rounds a positive f32 to the nearest u8 without using `f32::round()`.
 #[inline]
 fn fround_u8(x: f32) -> u8 {
     (x + 0.5) as u8

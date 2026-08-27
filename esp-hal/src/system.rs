@@ -40,7 +40,7 @@ impl RefCounts {
 static PERIPHERAL_REF_COUNT: NonReentrantMutex<RefCounts> =
     NonReentrantMutex::new(RefCounts::new());
 
-/// Disable all peripherals.
+/// Disables all peripherals.
 ///
 /// Peripherals listed in [KEEP_ENABLED] are NOT disabled.
 #[cfg_attr(not(feature = "rt"), expect(dead_code))]
@@ -147,7 +147,7 @@ impl PeripheralClockControl {
     /// This keeps track of enabling a peripheral - i.e. a peripheral
     /// is only enabled with the first call attempt to enable it.
     ///
-    /// Returns `true` if it actually enabled the peripheral.
+    /// Returns whether it actually enabled the peripheral.
     pub(crate) fn enable(peripheral: Peripheral) -> bool {
         PERIPHERAL_REF_COUNT.with(|ref_counts| Self::enable_with_counts(peripheral, ref_counts))
     }
@@ -157,7 +157,7 @@ impl PeripheralClockControl {
     /// This keeps track of enabling a peripheral - i.e. a peripheral
     /// is only enabled with the first call attempt to enable it.
     ///
-    /// Returns `true` if it actually enabled the peripheral.
+    /// Returns whether it actually enabled the peripheral.
     fn enable_with_counts(peripheral: Peripheral, ref_counts: &mut RefCounts) -> bool {
         Self::enable_forced_with_counts(peripheral, true, false, ref_counts)
     }
@@ -167,7 +167,7 @@ impl PeripheralClockControl {
     /// This keeps track of disabling a peripheral - i.e. it only
     /// gets disabled when the number of enable/disable attempts is balanced.
     ///
-    /// Returns `true` if it actually disabled the peripheral.
+    /// Returns whether it actually disabled the peripheral.
     pub(crate) fn disable(peripheral: Peripheral) -> bool {
         PERIPHERAL_REF_COUNT.with(|ref_counts| {
             Self::enable_forced_with_counts(peripheral, false, false, ref_counts)
@@ -207,7 +207,7 @@ impl PeripheralClockControl {
         true
     }
 
-    /// Resets the given peripheral
+    /// Resets the given peripheral.
     pub(crate) unsafe fn reset_racey(peripheral: Peripheral) {
         debug!("Reset {:?}", peripheral);
 
@@ -217,7 +217,7 @@ impl PeripheralClockControl {
         }
     }
 
-    /// Resets the given peripheral
+    /// Resets the given peripheral.
     pub(crate) fn reset(peripheral: Peripheral) {
         PERIPHERAL_REF_COUNT.with(|_| unsafe { Self::reset_racey(peripheral) })
     }
@@ -230,9 +230,9 @@ impl PeripheralClockControl {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
 pub enum Cpu {
-    /// The first core
+    /// The first core.
     ProCpu = 0,
-    /// The second core
+    /// The second core.
     #[cfg(multi_core)]
     AppCpu = 1,
 }
@@ -242,7 +242,7 @@ impl Cpu {
     pub const COUNT: usize = 1 + cfg!(multi_core) as usize;
 
     #[procmacros::doc_replace]
-    /// Returns the core the application is currently executing on
+    /// Returns the core the application is currently executing on.
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -316,7 +316,7 @@ use crate::rtc_cntl::SocResetReason;
 #[procmacros::doc_replace]
 /// Performs a software reset on the chip.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -356,7 +356,7 @@ impl Drop for Uart0SclkGuard {
     }
 }
 
-/// Ensure UART0's source clock stays enabled for boot ROM compatibility.
+/// Ensures UART0's source clock stays enabled for boot ROM compatibility.
 ///
 /// On some chips, resetting or waking up while UART0's source clock is disabled
 /// can prevent the boot ROM from starting correctly. This only requests the
