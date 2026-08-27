@@ -1,7 +1,5 @@
 //! ROM SPI flash wrappers and JEDEC capacity decode.
 
-use procmacros::ram;
-
 use super::{ConfigError, Error};
 
 /// Direct-read chunk limit (ESP-IDF `MAX_READ_CHUNK`), not a ROM hard limit.
@@ -119,8 +117,8 @@ pub(super) fn capacity_from_cached_id(raw: u32) -> Result<usize, ConfigError> {
     Ok(size as usize)
 }
 
-#[ram]
-pub(super) fn check_rc(rc: i32) -> Result<(), Error> {
+#[inline(always)]
+fn check_rc(rc: i32) -> Result<(), Error> {
     match rc {
         0 => Ok(()),
         1 => Err(Error::IoError),
@@ -132,27 +130,39 @@ pub(super) fn check_rc(rc: i32) -> Result<(), Error> {
     }
 }
 
-#[ram]
-pub(super) fn spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 {
-    unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_read(src_addr, data, len) }
+#[inline(always)]
+pub(super) fn read(src_addr: u32, data: &mut [u8]) -> Result<(), Error> {
+    check_rc(unsafe {
+        esp_rom_sys::rom::spiflash::esp_rom_spiflash_read(
+            src_addr,
+            data.as_mut_ptr().cast(),
+            data.len() as u32,
+        )
+    })
 }
 
-#[ram]
-pub(super) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 {
-    unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_write(dest_addr, data, len) }
+#[inline(always)]
+pub(super) fn write(dest_addr: u32, data: &[u8]) -> Result<(), Error> {
+    check_rc(unsafe {
+        esp_rom_sys::rom::spiflash::esp_rom_spiflash_write(
+            dest_addr,
+            data.as_ptr().cast(),
+            data.len() as u32,
+        )
+    })
 }
 
-#[ram]
-pub(super) fn spiflash_unlock() -> i32 {
-    unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_unlock() }
+#[inline(always)]
+pub(super) fn unlock() -> Result<(), Error> {
+    check_rc(unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_unlock() })
 }
 
-#[ram]
-pub(super) fn spiflash_erase_sector(sector_number: u32) -> i32 {
-    unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_erase_sector(sector_number) }
+#[inline(always)]
+pub(super) fn erase_sector(sector_number: u32) -> Result<(), Error> {
+    check_rc(unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_erase_sector(sector_number) })
 }
 
-#[ram]
-pub(super) fn spiflash_erase_block(block_number: u32) -> i32 {
-    unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_erase_block(block_number) }
+#[inline(always)]
+pub(super) fn erase_block(block_number: u32) -> Result<(), Error> {
+    check_rc(unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_erase_block(block_number) })
 }

@@ -1,9 +1,9 @@
 //! Writes and reads internal SPI flash via [`esp_hal::flash`].
 //!
 //! Assumes the default factory layout (app at `0x1_0000`, NVS at `0x9000`).
-//! Write and erase are NOR operations: there is no auto-erase, and they can
-//! overwrite the running application. This example only mutates the first NVS
-//! sector.
+//! Write and erase are unsafe NOR operations: there is no auto-erase, and they
+//! can overwrite the running application. This example only mutates the first
+//! NVS sector. Buffers must be 4-byte-aligned and in internal RAM.
 
 //% CHIP_FILTER: flash_driver_supported
 
@@ -25,6 +25,9 @@ const APP_DESC_OFFSET: u32 = 0x10_020;
 /// Default NVS data partition.
 const NVS_OFFSET: u32 = 0x9000;
 
+#[repr(align(4))]
+struct Aligned<const N: usize>([u8; N]);
+
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
@@ -38,38 +41,44 @@ fn main() -> ! {
     );
     println!("Flash capacity  = {}", flash.capacity());
     println!();
-
     // The app descriptor sits in the first 256 bytes of an app image, after the
     // 24-byte image header and the 8-byte first section header.
-    let mut app_desc = [0u8; 256];
-    flash.read(APP_DESC_OFFSET, &mut app_desc).unwrap();
-    println!("App descriptor dump {:02x?}", app_desc);
+    let mut app_desc = Aligned([0u8; 256]);
+    flash.read(APP_DESC_OFFSET, &mut app_desc.0).unwrap();
+    println!("App descriptor dump {:02x?}", app_desc.0);
     println!();
 
-    let mut bytes = [0u8; 32];
-    flash.read(NVS_OFFSET, &mut bytes).unwrap();
-    println!("Read from {:x}:  {:02x?}", NVS_OFFSET, &bytes[..32]);
+    let mut bytes = Aligned([0u8; 32]);
+    flash.read(NVS_OFFSET, &mut bytes.0).unwrap();
+    println!("Read from {:x}:  {:02x?}", NVS_OFFSET, &bytes.0[..32]);
 
-    bytes[0x00] = bytes[0x00].wrapping_add(1);
-    bytes[0x01] = bytes[0x01].wrapping_add(2);
-    bytes[0x02] = bytes[0x02].wrapping_add(3);
-    bytes[0x03] = bytes[0x03].wrapping_add(4);
-    bytes[0x04] = bytes[0x04].wrapping_add(1);
-    bytes[0x05] = bytes[0x05].wrapping_add(2);
-    bytes[0x06] = bytes[0x06].wrapping_add(3);
-    bytes[0x07] = bytes[0x07].wrapping_add(4);
+    bytes.0[0x00] = bytes.0[0x00].wrapping_add(1);
+    bytes.0[0x01] = bytes.0[0x01].wrapping_add(2);
+    bytes.0[0x02] = bytes.0[0x02].wrapping_add(3);
+    bytes.0[0x03] = bytes.0[0x03].wrapping_add(4);
+    bytes.0[0x04] = bytes.0[0x04].wrapping_add(1);
+    bytes.0[0x05] = bytes.0[0x05].wrapping_add(2);
+    bytes.0[0x06] = bytes.0[0x06].wrapping_add(3);
+    bytes.0[0x07] = bytes.0[0x07].wrapping_add(4);
 
     // NOR flash can only program 1→0; erase the sector first so the new pattern
     // can include 1-bits.
-    flash
-        .erase(NVS_OFFSET, NVS_OFFSET + info.sector_size)
-        .unwrap();
-    flash.write(NVS_OFFSET, &bytes).unwrap();
-    println!("Written to {:x}: {:02x?}", NVS_OFFSET, &bytes[..32]);
+    // SAFETY: NVS is a data partition, not mapped firmware.
+    unsafe {
+        flash
+            .erase(NVS_OFFSET, NVS_OFFSET + info.sector_size)
+            .unwrap();
+        flash.write(NVS_OFFSET, &bytes.0).unwrap();
+    }
+    println!("Written to {:x}: {:02x?}", NVS_OFFSET, &bytes.0[..32]);
 
-    let mut reread_bytes = [0u8; 32];
-    flash.read(NVS_OFFSET, &mut reread_bytes).unwrap();
-    println!("Read from {:x}:  {:02x?}", NVS_OFFSET, &reread_bytes[..32]);
+    let mut reread_bytes = Aligned([0u8; 32]);
+    flash.read(NVS_OFFSET, &mut reread_bytes.0).unwrap();
+    println!(
+        "Read from {:x}:  {:02x?}",
+        NVS_OFFSET,
+        &reread_bytes.0[..32]
+    );
 
     println!();
     println!("Reset (CTRL-R in espflash) to re-read the persisted data.");

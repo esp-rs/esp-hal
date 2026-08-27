@@ -7,10 +7,9 @@
 //! virtual [`FLASH`] peripheral.
 //!
 //! Write and erase are NOR-flash operations: bits can only change from 1 to 0
-//! without an erase. There is no read-modify-write. [`Flash::read`] accepts any
-//! offset and length. [`Flash::write`] requires a 4-byte-aligned flash offset
-//! and length. [`Flash::erase`] requires 4096-byte alignment. Buffers do not
-//! need to be in internal RAM or word-aligned.
+//! without an erase. There is no read-modify-write. [`Flash::read`] and
+//! [`Flash::write`] require a 4-byte-aligned flash offset, length, and buffer
+//! in internal RAM. [`Flash::erase`] requires 4096-byte alignment.
 //!
 //! ## Configuration
 //!
@@ -30,34 +29,33 @@
 //! ```
 //!
 //! ## Limitations
-//!
-//! - On ESP32, a second-stage bootloader must identify the flash chip; the ROM does not.
-//!   [`Flash::new`] fails with [`ConfigError::UnknownFlashChip`] if identification is missing.
-//! - [`Flash::write`] and [`Flash::erase`] do not refuse currently mapped flash. Programming a
-//!   mapped `.text` or `.rodata` page can destroy the running image or change memory the compiler
-//!   treats as immutable. Only pass ranges that are not the bootloader, partition table, or
-//!   currently mapped firmware.
+#![cfg_attr(
+    esp32,
+    doc = "- On ESP32, a second-stage bootloader must identify the flash chip; the ROM does not.
+  [`Flash::new`] fails with [`ConfigError::UnknownFlashChip`] if identification is missing."
+)]
+//! - [`Flash::write`] and [`Flash::erase`] do not refuse currently mapped flash.
+//! - Programming a mapped `.text` or `.rodata` page can destroy the running image or change memory
+//!   the compiler treats as immutable. Only pass ranges that are not the bootloader, partition
+//!   table, or currently mapped firmware.
 //! - On dual-core chips, the default strategy stalls the other CPU around every operation,
 //!   including reads. The other core may be frozen while holding a lock or inside an interrupt
 //!   handler.
-//!
-//! ## Implementation State
-//!
-//! - Only [`Blocking`] mode is implemented.
-//! - Encrypted read/write and MMU mapping are not provided.
-//! - `embedded-storage` traits are not implemented.
 
 use core::marker::PhantomData;
 
-use esp_sync::RawMutex;
 use procmacros::{BuilderLite, ram};
+#[cfg(xtensa)]
+use xtensa_lx::interrupt::free;
 
+#[cfg(not(xtensa))]
+use crate::interrupt::free;
 use crate::{Blocking, DriverMode, peripherals::FLASH, soc::is_slice_in_dram};
 
 mod cache;
 mod rom;
 
-/// Word size required by the write path, in bytes.
+/// Word size required by the read and write paths, in bytes.
 const WORD_SIZE: u32 = 4;
 /// Program page size in bytes.
 const PAGE_SIZE: u32 = 256;
@@ -65,30 +63,6 @@ const PAGE_SIZE: u32 = 256;
 const SECTOR_SIZE: u32 = 4096;
 /// Erase block size in bytes.
 const BLOCK_SIZE: u32 = 65536;
-
-const BOUNCE_SIZE: usize = 256;
-
-static FLASH_LOCK: RawMutex = RawMutex::new();
-
-/// Staging buffer for flash-resident, PSRAM, and unaligned callers.
-///
-/// Lives in internal RAM (`.bss`). Exclusive `&mut Flash` and the `FLASH`
-/// singleton prevent concurrent use; moving `Flash` does not move this buffer.
-#[repr(C, align(4))]
-struct Bounce([u8; BOUNCE_SIZE]);
-
-static mut BOUNCE: Bounce = Bounce([0; BOUNCE_SIZE]);
-
-#[ram]
-fn bounce_buf() -> &'static mut [u8; BOUNCE_SIZE] {
-    // SAFETY: callers hold `&mut Flash`. Copies to or from the user buffer
-    // happen with the cache enabled; only the ROM call uses this while the
-    // cache is off.
-    #[allow(static_mut_refs)]
-    unsafe {
-        &mut BOUNCE.0
-    }
-}
 
 /// Flash driver configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, BuilderLite)]
@@ -191,15 +165,17 @@ pub enum Error {
     IoTimeout,
     /// The chip status bits still protect the target range.
     Locked,
-    /// Address or length is not aligned for this operation.
+    /// Address, length, or buffer pointer is not aligned for this operation.
     ///
-    /// [`Flash::write`] requires a 4-byte flash offset and length.
-    /// [`Flash::erase`] requires a 4096-byte range. [`Flash::read`] does not
-    /// return this error.
+    /// [`Flash::read`] and [`Flash::write`] require a 4-byte-aligned flash
+    /// offset, length, and buffer pointer. [`Flash::erase`] requires a
+    /// 4096-byte range.
     NotAligned,
     /// The range exceeds the detected flash capacity, or `from` > `to`.
     OutOfBounds,
     /// Not supported in the current environment.
+    ///
+    /// Returned when the buffer is not in internal RAM.
     NotSupported,
     /// The other core is running and the configured strategy is
     /// [`MultiCoreStrategy::Error`].
@@ -218,7 +194,7 @@ impl core::fmt::Display for Error {
             Self::IoError => write!(f, "Flash I/O error"),
             Self::IoTimeout => write!(f, "Flash I/O timed out"),
             Self::Locked => write!(f, "Flash is locked for writing"),
-            Self::NotAligned => write!(f, "Flash address or length is not aligned"),
+            Self::NotAligned => write!(f, "Flash address, length, or buffer is not aligned"),
             Self::OutOfBounds => write!(f, "Flash range is out of bounds"),
             Self::NotSupported => write!(f, "Flash operation is not supported"),
             #[cfg(all(multi_core, feature = "unstable"))]
@@ -264,16 +240,17 @@ pub struct Flash<'d, Dm: DriverMode> {
 }
 
 impl<'d> Flash<'d, Blocking> {
-    /// Create a flash driver from the `FLASH` peripheral.
+    /// Creates a new flash driver from the `FLASH` peripheral.
     ///
     /// Capacity is the detected chip size, not the size field in the image
     /// header.
-    ///
-    /// # Limitations
-    ///
-    /// On ESP32, a second-stage bootloader must identify the flash chip; the
-    /// ROM does not. Without that, this method returns
-    /// [`ConfigError::UnknownFlashChip`].
+    #[cfg_attr(esp32, doc = "# Limitations")]
+    #[cfg_attr(
+        esp32,
+        doc = "On ESP32, a second-stage bootloader must identify the flash chip; the
+ROM does not. Without that, this method returns
+[`ConfigError::UnknownFlashChip`]."
+    )]
     pub fn new(flash: FLASH<'d>, config: Config) -> Result<Self, ConfigError> {
         let raw_id = rom::cached_device_id();
         let capacity = rom::capacity_from_cached_id(raw_id)?;
@@ -292,7 +269,7 @@ impl<'d> Flash<'d, Blocking> {
         Ok(this)
     }
 
-    /// Apply a new configuration.
+    /// Applies a new configuration.
     ///
     /// On dual-core chips this updates the multi-core strategy. On single-core
     /// chips it is a no-op.
@@ -305,7 +282,7 @@ impl<'d> Flash<'d, Blocking> {
         Ok(())
     }
 
-    /// Detected physical flash capacity in bytes.
+    /// Returns the detected physical flash capacity in bytes.
     ///
     /// This is the chip size identified at construction, not the size field in
     /// the image header.
@@ -313,7 +290,7 @@ impl<'d> Flash<'d, Blocking> {
         self.capacity
     }
 
-    /// Chip identification and fixed geometry.
+    /// Returns chip identification and fixed geometry.
     ///
     /// `chip_id` is manufacturer-first. Geometry is always 256-byte pages,
     /// 4096-byte sectors and 64 KiB blocks; it is not probed from the chip.
@@ -328,66 +305,61 @@ impl<'d> Flash<'d, Blocking> {
         }
     }
 
-    /// Read `data.len()` bytes starting at `offset`.
+    /// Reads `data.len()` bytes starting at `offset`.
     ///
-    /// Any in-range offset and length are accepted. The destination slice does
-    /// not need to be in internal RAM or word-aligned.
+    /// `offset` and `data.len()` must be multiples of 4. `data` must be in
+    /// internal RAM and word-aligned.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::OutOfBounds`] if the range exceeds [`Self::capacity`].
+    /// Returns [`Error::NotAligned`] if `offset`, `data.len()`, or the buffer
+    /// pointer is not a multiple of 4, [`Error::OutOfBounds`] if the range
+    /// exceeds [`Self::capacity`], or [`Error::NotSupported`] if `data` is not
+    /// in internal RAM.
     #[ram]
     pub fn read(&mut self, offset: u32, data: &mut [u8]) -> Result<(), Error> {
-        self.check_bounds(offset, data.len())?;
         if data.is_empty() {
-            return Ok(());
+            return self.check_bounds(offset, 0);
         }
 
-        if is_direct_read(offset, data) {
-            self.read_direct_chunked(offset, data)
-        } else {
-            self.read_bounced(offset, data)
-        }
+        self.check_alignment(WORD_SIZE, offset, data.len())?;
+        self.check_bounds(offset, data.len())?;
+        check_buffer(data)?;
+        self.read_chunked(offset, data)
     }
 
-    /// Write `data` starting at `offset` using NOR flash semantics.
+    /// Writes `data` starting at `offset` using NOR flash semantics.
     ///
     /// The target must already be erased. `offset` and `data.len()` must be
-    /// multiples of 4. The source slice does not need to be in internal RAM or
-    /// word-aligned.
+    /// multiples of 4. `data` must be in internal RAM and word-aligned.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NotAligned`] if `offset` or `data.len()` is not a
-    /// multiple of 4, or [`Error::OutOfBounds`] if the range exceeds
-    /// [`Self::capacity`].
+    /// Returns [`Error::NotAligned`] if `offset`, `data.len()`, or the buffer
+    /// pointer is not a multiple of 4, [`Error::OutOfBounds`] if the range
+    /// exceeds [`Self::capacity`], or [`Error::NotSupported`] if `data` is not
+    /// in internal RAM.
     ///
-    /// <section class="warning">
-    /// This does not check whether the range is currently mapped for execution
-    /// or as read-only data. Programming a mapped page overwrites the running
-    /// image, or mutates <code>static</code> / <code>.rodata</code> the
+    /// # Safety
+    ///
+    /// `offset` must not refer to the bootloader, the partition table, or
+    /// currently mapped firmware. Programming a mapped `.text` or `.rodata`
+    /// page overwrites the running image, or mutates `static` / `.rodata` the
     /// compiler treats as immutable.
-    ///
-    /// Pass a range that is not the bootloader, partition table, or currently
-    /// mapped firmware.
-    /// </section>
     #[ram]
-    pub fn write(&mut self, offset: u32, data: &[u8]) -> Result<(), Error> {
+    pub unsafe fn write(&mut self, offset: u32, data: &[u8]) -> Result<(), Error> {
+        if data.is_empty() {
+            return self.check_bounds(offset, 0);
+        }
+
         self.check_alignment(WORD_SIZE, offset, data.len())?;
         self.check_bounds(offset, data.len())?;
-        if data.is_empty() {
-            return Ok(());
-        }
-
+        check_buffer(data)?;
         self.ensure_unlocked()?;
-        if is_direct_buf(data) {
-            self.write_direct_chunked(offset, data)
-        } else {
-            self.write_bounced(offset, data)
-        }
+        self.write_chunked(offset, data)
     }
 
-    /// Erase flash in `[from, to)`.
+    /// Erases flash in `[from, to)`.
     ///
     /// `from` and `to` must be multiples of 4096 bytes ([`ChipInfo::sector_size`]).
     /// `to == capacity` is allowed. There is no byte-granular erase.
@@ -398,45 +370,37 @@ impl<'d> Flash<'d, Blocking> {
     /// 4096, [`Error::OutOfBounds`] if `from > to` or the range exceeds
     /// [`Self::capacity`].
     ///
-    /// <section class="warning">
-    /// This does not check whether the range is currently mapped for execution
-    /// or as read-only data. Erasing a mapped page destroys the running image,
-    /// or mutates <code>static</code> / <code>.rodata</code> the compiler
-    /// treats as immutable.
+    /// # Safety
     ///
-    /// Pass a range that is not the bootloader, partition table, or currently
-    /// mapped firmware.
-    /// </section>
+    /// `from..to` must not cover the bootloader, the partition table, or
+    /// currently mapped firmware. Erasing a mapped page destroys the running
+    /// image, or mutates `static` / `.rodata` the compiler treats as immutable.
     #[ram]
-    pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
+    pub unsafe fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
         if from > to {
             return Err(Error::OutOfBounds);
         }
         let len = (to - from) as usize;
-        self.check_alignment(SECTOR_SIZE, from, len)?;
-        self.check_bounds(from, len)?;
         if len == 0 {
-            return Ok(());
+            return self.check_bounds(from, 0);
         }
 
+        self.check_alignment(SECTOR_SIZE, from, len)?;
+        self.check_bounds(from, len)?;
         self.ensure_unlocked()?;
         self.erase_chunked(from, to)
     }
 }
 
-/// Direct ROM destination: internal RAM, word-aligned pointer, and a
-/// word-aligned offset and length so the ROM cannot round a tail up past the
-/// slice.
 #[ram]
-fn is_direct_read(offset: u32, buf: &[u8]) -> bool {
-    is_direct_buf(buf)
-        && offset.is_multiple_of(WORD_SIZE)
-        && buf.len().is_multiple_of(WORD_SIZE as usize)
-}
-
-#[ram]
-fn is_direct_buf(buf: &[u8]) -> bool {
-    is_slice_in_dram(buf) && (buf.as_ptr() as usize).is_multiple_of(WORD_SIZE as usize)
+fn check_buffer(buf: &[u8]) -> Result<(), Error> {
+    if !is_slice_in_dram(buf) {
+        return Err(Error::NotSupported);
+    }
+    if !(buf.as_ptr() as usize).is_multiple_of(WORD_SIZE as usize) {
+        return Err(Error::NotAligned);
+    }
+    Ok(())
 }
 
 impl Flash<'_, Blocking> {
@@ -463,7 +427,7 @@ impl Flash<'_, Blocking> {
         invalidate: Option<(u32, u32)>,
         f: impl FnOnce(&mut Self) -> Result<R, Error>,
     ) -> Result<R, Error> {
-        FLASH_LOCK.lock(|| {
+        free(|| {
             let _park = ParkGuard::enter(self)?;
             let cache = cache::CacheGuard::suspend();
             let result = f(self);
@@ -488,23 +452,17 @@ impl Flash<'_, Blocking> {
         if self.unlocked {
             return Ok(());
         }
-        rom::check_rc(rom::spiflash_unlock())?;
+        rom::unlock()?;
         self.unlocked = true;
         Ok(())
     }
 
     #[ram]
-    fn read_direct_chunked(&mut self, mut offset: u32, mut data: &mut [u8]) -> Result<(), Error> {
+    fn read_chunked(&mut self, mut offset: u32, mut data: &mut [u8]) -> Result<(), Error> {
         while !data.is_empty() {
             let n = data.len().min(rom::ROM_READ_CHUNK);
             let dest = &mut data[..n];
-            self.with_guard(None, |_| {
-                rom::check_rc(rom::spiflash_read(
-                    offset,
-                    dest.as_mut_ptr() as *const u32,
-                    n as u32,
-                ))
-            })?;
+            self.with_guard(None, |_| rom::read(offset, dest))?;
             offset += n as u32;
             data = &mut data[n..];
         }
@@ -512,62 +470,11 @@ impl Flash<'_, Blocking> {
     }
 
     #[ram]
-    fn write_direct_chunked(&mut self, mut offset: u32, mut data: &[u8]) -> Result<(), Error> {
+    fn write_chunked(&mut self, mut offset: u32, mut data: &[u8]) -> Result<(), Error> {
         while !data.is_empty() {
             let n = data.len().min(rom::ROM_WRITE_CHUNK);
             let src = &data[..n];
-            self.with_guard(Some((offset, n as u32)), |_| {
-                rom::check_rc(rom::spiflash_write(
-                    offset,
-                    src.as_ptr() as *const u32,
-                    n as u32,
-                ))
-            })?;
-            offset += n as u32;
-            data = &data[n..];
-        }
-        Ok(())
-    }
-
-    #[ram]
-    fn read_bounced(&mut self, mut offset: u32, mut data: &mut [u8]) -> Result<(), Error> {
-        while !data.is_empty() {
-            let aligned = offset & !3;
-            let head = (offset - aligned) as usize;
-            // ROM writes whole words and rounds a partial tail up, so the
-            // usable payload is up to three bytes less than the bounce buffer.
-            let n = data.len().min(BOUNCE_SIZE - head);
-            let rom_len = (head + n).next_multiple_of(WORD_SIZE as usize);
-
-            let bounce = bounce_buf();
-            self.with_guard(None, |_| {
-                rom::check_rc(rom::spiflash_read(
-                    aligned,
-                    bounce.as_mut_ptr() as *const u32,
-                    rom_len as u32,
-                ))
-            })?;
-            data[..n].copy_from_slice(&bounce[head..head + n]);
-
-            offset += n as u32;
-            data = &mut data[n..];
-        }
-        Ok(())
-    }
-
-    #[ram]
-    fn write_bounced(&mut self, mut offset: u32, mut data: &[u8]) -> Result<(), Error> {
-        while !data.is_empty() {
-            let n = data.len().min(BOUNCE_SIZE);
-            let bounce = bounce_buf();
-            bounce[..n].copy_from_slice(&data[..n]);
-            self.with_guard(Some((offset, n as u32)), |_| {
-                rom::check_rc(rom::spiflash_write(
-                    offset,
-                    bounce.as_ptr() as *const u32,
-                    n as u32,
-                ))
-            })?;
+            self.with_guard(Some((offset, n as u32)), |_| rom::write(offset, src))?;
             offset += n as u32;
             data = &data[n..];
         }
@@ -579,21 +486,21 @@ impl Flash<'_, Blocking> {
         let mut address = from;
         while address < to && !address.is_multiple_of(BLOCK_SIZE) {
             self.with_guard(Some((address, SECTOR_SIZE)), |_| {
-                rom::check_rc(rom::spiflash_erase_sector(address / SECTOR_SIZE))
+                rom::erase_sector(address / SECTOR_SIZE)
             })?;
             address += SECTOR_SIZE;
         }
 
         while (to - address) >= BLOCK_SIZE {
             self.with_guard(Some((address, BLOCK_SIZE)), |_| {
-                rom::check_rc(rom::spiflash_erase_block(address / BLOCK_SIZE))
+                rom::erase_block(address / BLOCK_SIZE)
             })?;
             address += BLOCK_SIZE;
         }
 
         while address < to {
             self.with_guard(Some((address, SECTOR_SIZE)), |_| {
-                rom::check_rc(rom::spiflash_erase_sector(address / SECTOR_SIZE))
+                rom::erase_sector(address / SECTOR_SIZE)
             })?;
             address += SECTOR_SIZE;
         }
