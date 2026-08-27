@@ -1,7 +1,7 @@
 # Starts and lifts the repository-wide merge freeze.
 #
-# `freeze` pins the freeze issue that `merge-freeze-gate` reads. Re-running it
-# during a freeze updates that issue, which is how the settings are adjusted.
+# `freeze` pins the freeze issue that `merge-freeze-gate` reads; open pull
+# requests are not touched.
 
 name: Merge freeze
 
@@ -24,25 +24,14 @@ on:
         type: string
         default: ""
       reason:
-        description: "Shown to everyone whose pull request is blocked"
+        description: "Shown to everyone whose merge is blocked"
         required: false
         type: string
         default: "pre-release merge freeze"
-      scope:
-        description: "Base branches to freeze (space or comma separated)"
-        required: false
-        type: string
-        default: "main"
-      min_approvals:
-        description: "Approvals required to merge an exempted pull request"
-        required: false
-        type: number
-        default: 2
 
 permissions:
   contents: read
   issues: write
-  pull-requests: write
 
 concurrency:
   cancel-in-progress: false
@@ -61,20 +50,16 @@ jobs:
       - uses: actions/github-script@v8
         with:
           script: |
-            const { run } = require('./.github/scripts/merge-freeze.js');
-            await run({
+            const { toggle } = require('./.github/scripts/merge-freeze.js');
+            await toggle({
               github,
               context,
               core,
               state: process.env.FREEZE_STATE,
               version: process.env.FREEZE_VERSION,
               reason: process.env.FREEZE_REASON,
-              scope: process.env.FREEZE_SCOPE,
-              minApprovals: process.env.FREEZE_MIN_APPROVALS,
             });
         env:
           FREEZE_STATE: ${{ inputs.state }}
           FREEZE_VERSION: ${{ inputs.version }}
           FREEZE_REASON: ${{ inputs.reason }}
-          FREEZE_SCOPE: ${{ inputs.scope }}
-          FREEZE_MIN_APPROVALS: ${{ inputs.min_approvals }}

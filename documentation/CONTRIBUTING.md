@@ -144,43 +144,27 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 ## Merge Freezes
 
 Around a release we stop merging into `main` for a while, so that what gets
-published is tested isolated from new changes. While a freeze is on:
+published is tested isolated from new changes. A freeze is announced by a pinned
+issue labelled `merge-freeze`, which names the release it leads up to. Other
+branches are never affected.
 
-*   a pinned issue labelled `merge-freeze` describes the freeze, the release it
-    leads up to and the branches it covers;
-*   affected open pull requests carry the `merge-freeze` label;
-*   the required `merge-freeze-gate` check fails on them, and the merge queue
-    rejects them.
-
-Nothing is lost — review continues as usual, the pull requests simply land once
-the freeze is lifted.
-
-Pull requests that were already in the merge queue when the freeze started are
-allowed to finish rather than being thrown out, so a freeze never wastes a queue
-run that was already in progress. The freeze applies to everything queued after
-that moment.
+Open pull requests are left untouched: nothing is labelled, no CI is re-run, and
+review carries on as usual. The freeze is enforced only when a pull request is
+added to the merge queue — the required `merge-freeze-gate` check fails there and
+the queue drops the entry, with a comment on the pull request explaining why.
 
 ### Landing something urgent during a freeze
 
-Regressions and release blockers still need to get in. Such a pull request needs:
-
-1.  the `merge-freeze-exempt` label, and
-2.  **two approving reviews from different people with write access**, submitted
-    against the pull request's current head commit. Pushing new commits
-    invalidates those approvals, on purpose: the exemption covers the change that
-    was actually reviewed.
-
-The number of approvals is configurable per freeze in the freeze issue, so it may
-be higher in the final days before a release. Every exempted merge is recorded as
-a comment on the freeze issue.
+Regressions and release blockers still need to get in. Add the
+`merge-freeze-exempt` label to the pull request and it can go through the queue
+as usual. Every exempted merge is recorded as a comment on the freeze issue, so
+it stays visible what landed during the freeze.
 
 ### Starting and lifting a freeze
 
 Anyone with write access runs the `Merge freeze` workflow from the Actions tab,
-picking `freeze` or `thaw` and, for a freeze, the upcoming version. Re-running
-`freeze` while a freeze is active updates the existing issue rather than opening
-a second one, which is also how the scope or the approval threshold is changed
-mid-freeze — the gate re-reads the issue on every run.
+picking `freeze` or `thaw` and, for a freeze, the upcoming version. Closing the
+freeze issue by hand lifts the freeze just as well.
 
 
 ## Changelog and Migration Guide Entries
