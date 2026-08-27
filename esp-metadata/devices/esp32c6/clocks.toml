@@ -146,7 +146,7 @@ system_clocks = { clock_tree = [
               { name = "PLL_F240M", outputs = "PLL_F240M" },
               { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
             ],
-            div_num = "1 ..= 256",
+            div_num = "1 ..= 255",
             div_a   = "1 ..= 511",
             div_b   = "0 ..= 511",
           },

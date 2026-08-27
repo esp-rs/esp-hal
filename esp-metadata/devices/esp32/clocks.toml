@@ -10,6 +10,7 @@ system_clocks = { clock_tree = [
     { name = "APLL_CLK",      type = "derived", from = "PLL_CLK",  values = "16_000_000 ..= 128_000_000", output = "VALUE" },
     { name = "RC_FAST_CLK",   type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
     { name = "PLL_F160M_CLK", type = "derived", from = "PLL_CLK", output = "160_000_000" },
+    { name = "PLL_D2_CLK",    type = "generic", output = "PLL_CLK / 2" },
 
     # CPU and related clocks
     #
@@ -175,7 +176,7 @@ system_clocks = { clock_tree = [
         { name = "MCLK", type = "generic", wake_locking = true, output = "(sclk * div_a) / (div_num * div_a + div_b)", params = { sclk = [
             { name = "PLL_F160M", outputs = "PLL_F160M_CLK", default = true },
             { name = "APLL",      outputs = "APLL_CLK" },
-        ], div_num = "1 ..= 256", div_a = "1 ..= 63", div_b = "0 ..= 63" } },
+        ], div_num = "1 ..= 255", div_a = "1 ..= 63", div_b = "0 ..= 63" } },
     ] },
 ] }
 

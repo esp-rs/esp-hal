@@ -30,6 +30,10 @@ macro_rules! configure_clk {
     ) => {{
         let clkrst = HP_SYS_CLKRST::regs();
 
+        clkrst
+            .$sel_reg()
+            .modify(|_, w| unsafe { w.$sel().bits(clk_sel($config.sclk())) });
+
         clkrst.$n_reg().modify(|_, w| unsafe { w.$n().bits(2) });
         clkrst.$yn1_reg().modify(|_, w| w.$yn1().clear_bit());
         clkrst.$y_reg().modify(|_, w| unsafe { w.$y().bits(1) });
@@ -50,9 +54,6 @@ macro_rules! configure_clk {
         clkrst
             .$n_reg()
             .modify(|_, w| unsafe { w.$n().bits($config.div_num() as u8) });
-        clkrst
-            .$sel_reg()
-            .modify(|_, w| unsafe { w.$sel().bits(clk_sel($config.sclk())) });
     }};
 }
 

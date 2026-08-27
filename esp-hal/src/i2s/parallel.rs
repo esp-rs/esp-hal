@@ -618,11 +618,7 @@ fn calculate_clock(
     let mclk = sample_rate.as_hz() * 2;
     let bclk_divider: u32 = if data_bits == 8 { 2 } else { 1 };
 
-    let divider = FractionalDivider::new(
-        sclk,
-        mclk,
-        crate::i2s::master::I2S_LL_MCLK_DIVIDER_MAX as u32,
-    );
+    let divider = FractionalDivider::new(sclk, mclk, crate::i2s::master::mclk_max_denominator());
 
     I2sClockDividers {
         mclk_divider: divider.integer,

@@ -50,8 +50,8 @@ struct MclkFraction {
 impl MclkFraction {
     fn new(div_a: u32, div_b: u32) -> Self {
         let (x, y, z, yn1) = if div_a == 0 || div_b == 0 {
-            // The divider is an integer one.
-            (0, 0, 0, true)
+            // The divider is an integer one. All coefficients are zero, YN1 included.
+            (0, 0, 0, false)
         } else if div_b > div_a / 2 {
             // Fractions over one half are encoded as the complement.
             let z = div_a - div_b;

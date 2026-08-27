@@ -26,8 +26,8 @@ impl I2sInstance {
         self.regs().clkm_conf().modify(|_, w| {
             cfg_select! {
                 esp32 => {
-                    // The ESP32 has no source selector. The peripheral uses PLL_D2_CLK, unless
-                    // the APLL is routed to it.
+                    // The ESP32 has no source selector. The peripheral uses PLL_F160M_CLK,
+                    // unless the APLL is routed to it.
                     w.clka_ena()
                         .bit(matches!(new_config.sclk(), I2sMclkSclk::Apll))
                 }

@@ -218,6 +218,20 @@ pub(crate) fn source_frequency(source: I2sClockSource) -> u32 {
     }
 }
 
+/// Returns the largest A coefficient the module-clock divider can hold.
+pub(crate) fn mclk_max_denominator() -> u32 {
+    cfg_select! {
+        i2s_version = "1" => {
+            let (_, max) = property!("clock_tree.i2s.mclk.div_a");
+            max
+        }
+        _ => {
+            let (_, max) = property!("clock_tree.i2s.tx_clk.div_a");
+            max
+        }
+    }
+}
+
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Represents the various interrupt types for the I2S peripheral.
@@ -284,10 +298,6 @@ impl<'d> I2s<'d, crate::Blocking> {
         Self::new_internal(i2s, channel.into(), Config::Pdm(config))
     }
 }
-
-pub(crate) const I2S_LL_MCLK_DIVIDER_BIT_WIDTH: usize = property!("i2s.mclk_divider_bit_width");
-
-pub(crate) const I2S_LL_MCLK_DIVIDER_MAX: usize = (1 << I2S_LL_MCLK_DIVIDER_BIT_WIDTH) - 1;
 
 /// A structure representing a DMA transfer.
 ///
@@ -2021,7 +2031,7 @@ pub(crate) mod private {
         }
 
         pub(crate) fn from_frequencies(sclk: u32, mclk: u32, bclk_divider: u32) -> Self {
-            let divider = FractionalDivider::new(sclk, mclk, I2S_LL_MCLK_DIVIDER_MAX as u32);
+            let divider = FractionalDivider::new(sclk, mclk, super::mclk_max_denominator());
 
             I2sClockDividers {
                 mclk_divider: divider.integer,

@@ -566,7 +566,7 @@ macro_rules! property {
         ::soc::clocks::I2sMclkSclk::Apll]
     };
     ("clock_tree.i2s.mclk.div_num") => {
-        (1, 256)
+        (1, 255)
     };
     ("clock_tree.i2s.mclk.div_a") => {
         (1, 63)
@@ -914,6 +914,12 @@ macro_rules! for_each_sw_interrupt {
 /// // PLL_F160M_CLK
 ///
 /// fn enable_pll_f160m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// // PLL_D2_CLK
+///
+/// fn enable_pll_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {
 ///     todo!()
 /// }
 ///
@@ -1672,7 +1678,7 @@ macro_rules! define_clock_tree_types {
             /// ## Panics
             ///
             /// Panics if the div_num value is outside the
-            /// valid range (1 ..= 256).
+            /// valid range (1 ..= 255).
             ///
             /// Panics if the div_a value is outside the
             /// valid range (1 ..= 63).
@@ -1681,8 +1687,8 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 63).
             pub const fn new(sclk: I2sMclkSclk, div_num: u32, div_a: u32, div_b: u32) -> Self {
                 ::core::assert!(
-                    div_num >= 1 && div_num <= 256,
-                    "`I2S0_MCLK` div_num must be between 1 and 256 (inclusive)."
+                    div_num >= 1 && div_num <= 255,
+                    "`I2S0_MCLK` div_num must be between 1 and 255 (inclusive)."
                 );
                 ::core::assert!(
                     div_a >= 1 && div_a <= 63,
@@ -1834,6 +1840,7 @@ macro_rules! define_clock_tree_types {
             apll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
             pll_f160m_clk_refcount: u32,
+            pll_d2_clk_refcount: u32,
             apb_clk_refcount: u32,
             ref_tick_refcount: u32,
             #[cfg(use_xtal32k)]
@@ -2000,6 +2007,7 @@ macro_rules! define_clock_tree_types {
                 apll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
                 pll_f160m_clk_refcount: 0,
+                pll_d2_clk_refcount: 0,
                 apb_clk_refcount: 0,
                 ref_tick_refcount: 0,
                 #[cfg(use_xtal32k)]
@@ -2190,6 +2198,28 @@ macro_rules! define_clock_tree_types {
             160000000
         }
         pub fn pll_f160m_clk_source_frequency() -> u32 {
+            pll_clk_frequency()
+        }
+        pub fn request_pll_d2_clk(clocks: &mut ClockTree) {
+            trace!("Requesting PLL_D2_CLK");
+            if increment_reference_count(&mut clocks.pll_d2_clk_refcount) {
+                trace!("Enabling PLL_D2_CLK");
+                request_pll_clk(clocks);
+                enable_pll_d2_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_pll_d2_clk(clocks: &mut ClockTree) {
+            trace!("Releasing PLL_D2_CLK");
+            if decrement_reference_count(&mut clocks.pll_d2_clk_refcount) {
+                trace!("Disabling PLL_D2_CLK");
+                enable_pll_d2_clk_impl(clocks, false);
+                release_pll_clk(clocks);
+            }
+        }
+        pub fn pll_d2_clk_frequency() -> u32 {
+            (pll_clk_frequency() / 2)
+        }
+        pub fn pll_d2_clk_source_frequency() -> u32 {
             pll_clk_frequency()
         }
         pub fn configure_cpu_pll_div_in(clocks: &mut ClockTree, new_selector: CpuPllDivInConfig) {

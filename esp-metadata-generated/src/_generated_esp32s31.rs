@@ -575,10 +575,10 @@ macro_rules! property {
         (1, 256)
     };
     ("clock_tree.i2s.tx_clk.div_a") => {
-        (1, 63)
+        (1, 511)
     };
     ("clock_tree.i2s.tx_clk.div_b") => {
-        (0, 63)
+        (0, 511)
     };
     ("clock_tree.i2s.rx_clk.sclk") => {
         [crate ::soc::clocks::I2sClkSclk::Xtal]
@@ -587,10 +587,10 @@ macro_rules! property {
         (1, 256)
     };
     ("clock_tree.i2s.rx_clk.div_a") => {
-        (1, 63)
+        (1, 511)
     };
     ("clock_tree.i2s.rx_clk.div_b") => {
-        (0, 63)
+        (0, 511)
     };
     ("clock_tree.i2s.mclk_out") => {
         [crate ::soc::clocks::I2sMclkOutConfig::Tx, crate
@@ -2121,22 +2121,22 @@ macro_rules! define_clock_tree_types {
             /// valid range (1 ..= 256).
             ///
             /// Panics if the div_a value is outside the
-            /// valid range (1 ..= 63).
+            /// valid range (1 ..= 511).
             ///
             /// Panics if the div_b value is outside the
-            /// valid range (0 ..= 63).
+            /// valid range (0 ..= 511).
             pub const fn new(sclk: I2sClkSclk, div_num: u32, div_a: u32, div_b: u32) -> Self {
                 ::core::assert!(
                     div_num >= 1 && div_num <= 256,
                     "`I2S0_TX_CLK` div_num must be between 1 and 256 (inclusive)."
                 );
                 ::core::assert!(
-                    div_a >= 1 && div_a <= 63,
-                    "`I2S0_TX_CLK` div_a must be between 1 and 63 (inclusive)."
+                    div_a >= 1 && div_a <= 511,
+                    "`I2S0_TX_CLK` div_a must be between 1 and 511 (inclusive)."
                 );
                 ::core::assert!(
-                    div_b <= 63,
-                    "`I2S0_TX_CLK` div_b must be between 0 and 63 (inclusive)."
+                    div_b <= 511,
+                    "`I2S0_TX_CLK` div_b must be between 0 and 511 (inclusive)."
                 );
                 Self {
                     sclk,
@@ -3578,8 +3578,9 @@ macro_rules! define_clock_tree_types {
             }
             #[allow(unused_variables)]
             pub fn tx_clk_config_frequency(clocks: &mut ClockTree, config: I2sClkConfig) -> u32 {
-                ((xtal_clk_frequency() * config.div_a())
-                    / ((config.div_num() * config.div_a()) + config.div_b()))
+                (((xtal_clk_frequency() as u64) * (config.div_a() as u64))
+                    / (((config.div_num() * config.div_a()) + config.div_b()) as u64))
+                    as u32
             }
             pub fn tx_clk_frequency(self) -> u32 {
                 I2S_TX_CLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)
@@ -3621,8 +3622,9 @@ macro_rules! define_clock_tree_types {
             }
             #[allow(unused_variables)]
             pub fn rx_clk_config_frequency(clocks: &mut ClockTree, config: I2sClkConfig) -> u32 {
-                ((xtal_clk_frequency() * config.div_a())
-                    / ((config.div_num() * config.div_a()) + config.div_b()))
+                (((xtal_clk_frequency() as u64) * (config.div_a() as u64))
+                    / (((config.div_num() * config.div_a()) + config.div_b()) as u64))
+                    as u32
             }
             pub fn rx_clk_frequency(self) -> u32 {
                 I2S_RX_CLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)

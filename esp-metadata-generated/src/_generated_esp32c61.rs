@@ -524,7 +524,7 @@ macro_rules! property {
         ::soc::clocks::I2sClkSclk::PllF120m, crate ::soc::clocks::I2sClkSclk::PllF160m]
     };
     ("clock_tree.i2s.tx_clk.div_num") => {
-        (1, 256)
+        (1, 255)
     };
     ("clock_tree.i2s.tx_clk.div_a") => {
         (1, 511)
@@ -537,7 +537,7 @@ macro_rules! property {
         ::soc::clocks::I2sClkSclk::PllF120m, crate ::soc::clocks::I2sClkSclk::PllF160m]
     };
     ("clock_tree.i2s.rx_clk.div_num") => {
-        (1, 256)
+        (1, 255)
     };
     ("clock_tree.i2s.rx_clk.div_a") => {
         (1, 511)
@@ -1481,7 +1481,7 @@ macro_rules! define_clock_tree_types {
             /// ## Panics
             ///
             /// Panics if the div_num value is outside the
-            /// valid range (1 ..= 256).
+            /// valid range (1 ..= 255).
             ///
             /// Panics if the div_a value is outside the
             /// valid range (1 ..= 511).
@@ -1490,8 +1490,8 @@ macro_rules! define_clock_tree_types {
             /// valid range (0 ..= 511).
             pub const fn new(sclk: I2sClkSclk, div_num: u32, div_a: u32, div_b: u32) -> Self {
                 ::core::assert!(
-                    div_num >= 1 && div_num <= 256,
-                    "`I2S0_TX_CLK` div_num must be between 1 and 256 (inclusive)."
+                    div_num >= 1 && div_num <= 255,
+                    "`I2S0_TX_CLK` div_num must be between 1 and 255 (inclusive)."
                 );
                 ::core::assert!(
                     div_a >= 1 && div_a <= 511,

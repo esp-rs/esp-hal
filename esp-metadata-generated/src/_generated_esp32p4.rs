@@ -248,10 +248,10 @@ macro_rules! property {
         stringify!(3)
     };
     ("i2s.mclk_divider_bit_width") => {
-        6
+        9
     };
     ("i2s.mclk_divider_bit_width", str) => {
-        stringify!(6)
+        stringify!(9)
     };
     ("i2s.max_ws_width") => {
         128
@@ -616,26 +616,26 @@ macro_rules! property {
         ::soc::clocks::I2sClkSclk::PllF160m]
     };
     ("clock_tree.i2s.tx_clk.div_num") => {
-        (1, 256)
+        (1, 255)
     };
     ("clock_tree.i2s.tx_clk.div_a") => {
-        (1, 63)
+        (1, 511)
     };
     ("clock_tree.i2s.tx_clk.div_b") => {
-        (0, 63)
+        (0, 511)
     };
     ("clock_tree.i2s.rx_clk.sclk") => {
         [crate ::soc::clocks::I2sClkSclk::Xtal, crate
         ::soc::clocks::I2sClkSclk::PllF160m]
     };
     ("clock_tree.i2s.rx_clk.div_num") => {
-        (1, 256)
+        (1, 255)
     };
     ("clock_tree.i2s.rx_clk.div_a") => {
-        (1, 63)
+        (1, 511)
     };
     ("clock_tree.i2s.rx_clk.div_b") => {
-        (0, 63)
+        (0, 511)
     };
     ("clock_tree.i2s.mclk_out") => {
         [crate ::soc::clocks::I2sMclkOutConfig::Tx, crate
@@ -2522,25 +2522,25 @@ macro_rules! define_clock_tree_types {
             /// ## Panics
             ///
             /// Panics if the div_num value is outside the
-            /// valid range (1 ..= 256).
+            /// valid range (1 ..= 255).
             ///
             /// Panics if the div_a value is outside the
-            /// valid range (1 ..= 63).
+            /// valid range (1 ..= 511).
             ///
             /// Panics if the div_b value is outside the
-            /// valid range (0 ..= 63).
+            /// valid range (0 ..= 511).
             pub const fn new(sclk: I2sClkSclk, div_num: u32, div_a: u32, div_b: u32) -> Self {
                 ::core::assert!(
-                    div_num >= 1 && div_num <= 256,
-                    "`I2S0_TX_CLK` div_num must be between 1 and 256 (inclusive)."
+                    div_num >= 1 && div_num <= 255,
+                    "`I2S0_TX_CLK` div_num must be between 1 and 255 (inclusive)."
                 );
                 ::core::assert!(
-                    div_a >= 1 && div_a <= 63,
-                    "`I2S0_TX_CLK` div_a must be between 1 and 63 (inclusive)."
+                    div_a >= 1 && div_a <= 511,
+                    "`I2S0_TX_CLK` div_a must be between 1 and 511 (inclusive)."
                 );
                 ::core::assert!(
-                    div_b <= 63,
-                    "`I2S0_TX_CLK` div_b must be between 0 and 63 (inclusive)."
+                    div_b <= 511,
+                    "`I2S0_TX_CLK` div_b must be between 0 and 511 (inclusive)."
                 );
                 Self {
                     sclk,
