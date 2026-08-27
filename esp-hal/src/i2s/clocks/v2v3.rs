@@ -1,5 +1,8 @@
 use super::MclkFraction;
-use crate::clock::ll::{ClockTree, I2sClkConfig, I2sClkSclk, I2sInstance, I2sMclkOutConfig};
+use crate::{
+    clock::ll::{ClockTree, I2sClkConfig, I2sClkSclk, I2sInstance, I2sMclkOutConfig},
+    pac::i2s0::RegisterBlock,
+};
 
 fn clk_sel(sclk: I2sClkSclk) -> u8 {
     cfg_select! {
@@ -16,13 +19,11 @@ fn clk_sel(sclk: I2sClkSclk) -> u8 {
 }
 
 impl I2sInstance {
-    fn regs(self) -> &'static crate::pac::i2s0::RegisterBlock {
+    fn regs(self) -> &'static RegisterBlock {
         match self {
             Self::I2s0 => crate::peripherals::I2S0::regs(),
             #[cfg(soc_has_i2s1)]
-            Self::I2s1 => unsafe {
-                &*crate::peripherals::I2S1::PTR.cast::<crate::pac::i2s0::RegisterBlock>()
-            },
+            Self::I2s1 => unsafe { &*crate::peripherals::I2S1::PTR.cast::<RegisterBlock>() },
         }
     }
 
