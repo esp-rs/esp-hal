@@ -22,9 +22,12 @@
 //! # {before_snippet}
 //! use esp_hal::flash::{Config, Flash};
 //!
+//! #[repr(align(4))]
+//! struct Aligned([u8; 32]);
+//!
 //! let mut flash = Flash::new(peripherals.FLASH, Config::default())?;
-//! let mut buf = [0u8; 32];
-//! flash.read(0x10_020, &mut buf)?;
+//! let mut buf = Aligned([0u8; 32]);
+//! flash.read(0x10_020, &mut buf.0)?;
 //! # {after_snippet}
 //! ```
 //!
@@ -36,8 +39,7 @@
 )]
 //! - [`Flash::write`] and [`Flash::erase`] do not refuse currently mapped flash.
 //! - Programming a mapped `.text` or `.rodata` page can destroy the running image or change memory
-//!   the compiler treats as immutable. Only pass ranges that are not the bootloader, partition
-//!   table, or currently mapped firmware.
+//!   the compiler treats as immutable.
 //! - On dual-core chips, the default strategy stalls the other CPU around every operation,
 //!   including reads. The other core may be frozen while holding a lock or inside an interrupt
 //!   handler.
@@ -342,10 +344,10 @@ ROM does not. Without that, this method returns
     ///
     /// # Safety
     ///
-    /// `offset` must not refer to the bootloader, the partition table, or
-    /// currently mapped firmware. Programming a mapped `.text` or `.rodata`
-    /// page overwrites the running image, or mutates `static` / `.rodata` the
-    /// compiler treats as immutable.
+    /// The programmed range must not be mapped for instruction fetch or as
+    /// immutable data. Writing a mapped `.text` or `.rodata` page overwrites
+    /// the running image, or mutates `static` / `.rodata` the compiler treats
+    /// as immutable.
     #[ram]
     pub unsafe fn write(&mut self, offset: u32, data: &[u8]) -> Result<(), Error> {
         if data.is_empty() {
@@ -372,9 +374,10 @@ ROM does not. Without that, this method returns
     ///
     /// # Safety
     ///
-    /// `from..to` must not cover the bootloader, the partition table, or
-    /// currently mapped firmware. Erasing a mapped page destroys the running
-    /// image, or mutates `static` / `.rodata` the compiler treats as immutable.
+    /// The erased range must not be mapped for instruction fetch or as
+    /// immutable data. Erasing a mapped `.text` or `.rodata` page destroys the
+    /// running image, or mutates `static` / `.rodata` the compiler treats as
+    /// immutable.
     #[ram]
     pub unsafe fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
         if from > to {
