@@ -17,12 +17,6 @@ pub(crate) mod regi2c;
 
 pub use esp32s3 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    clocks::pll_160m_frequency()
-}
-
 pub(crate) const CONFIG_INSTRUCTION_CACHE_SIZE: usize = cfg_select! {
     instruction_cache_size_32kb => 0x8000,
     instruction_cache_size_16kb => 0x4000,

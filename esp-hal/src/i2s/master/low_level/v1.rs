@@ -3,39 +3,14 @@ use super::Info;
 use crate::i2s::master::Endianness;
 use crate::{
     RegisterToggle,
-    i2s::master::{
-        Channels,
-        Config,
-        ConfigError,
-        DataFormat,
-        UnitConfig,
-        WsWidth,
-        private::I2sClockDividers,
-    },
+    i2s::master::{Channels, Config, ConfigError, DataFormat, UnitConfig, WsWidth},
 };
 
 impl Info {
-    pub(crate) fn set_clock(&self, clock_settings: I2sClockDividers) {
-        self.regs().clkm_conf().modify(|r, w| unsafe {
-            // select PLL_160M
-            w.bits(r.bits() | (property!("i2s.default_clock_source") << 21))
-        });
-
-        #[cfg(esp32)]
-        self.regs()
-            .clkm_conf()
-            .modify(|_, w| w.clka_ena().clear_bit());
-
-        self.regs().clkm_conf().modify(|_, w| unsafe {
-            w.clk_en().set_bit();
-            w.clkm_div_num().bits(clock_settings.mclk_divider as u8);
-            w.clkm_div_a().bits(clock_settings.denominator as u8);
-            w.clkm_div_b().bits(clock_settings.numerator as u8)
-        });
-
+    pub(crate) fn set_bclk(&self, bclk_divider: u32) {
         self.regs().sample_rate_conf().modify(|_, w| unsafe {
-            w.tx_bck_div_num().bits(clock_settings.bclk_divider as u8);
-            w.rx_bck_div_num().bits(clock_settings.bclk_divider as u8)
+            w.tx_bck_div_num().bits(bclk_divider as u8);
+            w.rx_bck_div_num().bits(bclk_divider as u8)
         });
     }
 
@@ -55,7 +30,9 @@ impl Info {
                 self.configure_tx(&c.tx_config, c.data_format)?;
                 self.configure_rx(&c.rx_config, c.data_format)?;
 
-                self.set_clock(config.calculate_clock());
+                let clocks = c.calculate_clock();
+                self.configure_mclk(c.clock_source, &clocks);
+                self.set_bclk(clocks.bclk_divider);
 
                 self.regs().sample_rate_conf().modify(|_, w| unsafe {
                     // Having different data formats for each direction would make clock

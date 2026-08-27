@@ -29,6 +29,7 @@ system_clocks = { clock_tree = [
     # CPU-dependent clock signals
     { name = "PLL_D2",   type = "generic",                   output = "PLL_CLK / 2" },
     { name = "PLL_160M", type = "derived", from = "CPU_CLK", output = "160_000_000" },
+    { name = "PLL_240M", type = "derived", from = "CPU_CLK", output = "240_000_000" },
 
     { name = "APB_80M", type = "derived", from = "CPU_CLK", output = "80_000_000" },
     { name = "APB_CLK", type = "mux", variants = [
@@ -133,6 +134,33 @@ system_clocks = { clock_tree = [
             { name = "APB",  outputs = "APB_CLK", default = true }, # PLL_F80M?
         ] },
     ] },
+    { group = "I2S",
+      presets = {
+        CLK = {
+          type = "generic",
+          wake_locking = true,
+          output = "(sclk * div_a) / (div_num * div_a + div_b)",
+          params = {
+            sclk = [
+              { name = "XTAL",     outputs = "XTAL_CLK" },
+              { name = "PLL_240M", outputs = "PLL_240M" },
+              { name = "PLL_160M", outputs = "PLL_160M", default = true },
+            ],
+            div_num = "1 ..= 256",
+            div_a   = "1 ..= 63",
+            div_b   = "0 ..= 63",
+          },
+        },
+      },
+      clocks = [
+        { name = "TX_CLK",   preset = "CLK" },
+        { name = "RX_CLK",   preset = "CLK" },
+        { name = "MCLK_OUT", type = "mux", variants = [
+          { name = "TX", outputs = "TX_CLK" },
+          { name = "RX", outputs = "RX_CLK", default = true },
+        ] },
+      ],
+    },
 ] }
 
 peripheral_clocks = { templates = [

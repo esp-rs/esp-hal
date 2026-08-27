@@ -630,6 +630,12 @@ fn enable_pll_160m_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
+// PLL_240M
+
+fn enable_pll_240m_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
 // APB_80M
 
 fn enable_apb_80m_impl(_clocks: &mut ClockTree, _en: bool) {

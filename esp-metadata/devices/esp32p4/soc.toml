@@ -92,9 +92,9 @@ peripherals = [
     { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true, clock_group = "SPI" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
-    { name = "I2S1", interrupts = { peri = "I2S1" } },
-    { name = "I2S2", interrupts = { peri = "I2S2" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
+    { name = "I2S1", interrupts = { peri = "I2S1" }, clock_group = "I2S" },
+    { name = "I2S2", interrupts = { peri = "I2S2" }, clock_group = "I2S" },
     { name = "TWAI0", interrupts = { peri = "TWAI0" } },
     { name = "TWAI1", interrupts = { peri = "TWAI1" } },
     { name = "TWAI2", interrupts = { peri = "TWAI2" } },
@@ -307,7 +307,6 @@ support_status = "not_supported"
 [device.i2s]
 support_status = "partial"
 version = 3
-default_clock_source = 3
 clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 6
 max_ws_width = 128

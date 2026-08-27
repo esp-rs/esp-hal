@@ -166,6 +166,15 @@ pub use super::pdm::{
     PdmSlotMode,
     PdmTxConfig,
 };
+/// Clock source for the I2S TX/RX module clocks (after the source mux and MCLK divider).
+#[cfg(not(i2s_version = "1"))]
+pub use crate::clock::ll::I2sClkSclk as I2sClockSource;
+/// Selects whether the MCLK pad outputs the TX or RX module clock.
+#[cfg(not(i2s_version = "1"))]
+pub use crate::clock::ll::I2sMclkOutConfig as MclkOut;
+/// Clock source for the I2S module clock (after the source mux and MCLK divider).
+#[cfg(i2s_version = "1")]
+pub use crate::clock::ll::I2sMclkSclk as I2sClockSource;
 use crate::{
     Async,
     Blocking,
@@ -197,6 +206,17 @@ use crate::{
     system::PeripheralGuard,
     time::Rate,
 };
+
+/// Returns the frequency of a module clock source, in Hz.
+///
+/// The transmitter and the receiver select their source from the same set of clocks, so one
+/// lookup describes both directions.
+pub(crate) fn source_frequency(source: I2sClockSource) -> u32 {
+    cfg_select! {
+        i2s_version = "1" => crate::clock::ll::I2sInstance::mclk_source_frequency(source),
+        _ => crate::clock::ll::I2sInstance::tx_clk_source_frequency(source),
+    }
+}
 
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -835,6 +855,14 @@ pub struct TdmConfig {
     #[cfg(i2s_version = "1")]
     sample_rate: Rate,
 
+    /// Source clock for the shared module clock.
+    #[cfg(i2s_version = "1")]
+    clock_source: I2sClockSource,
+
+    /// Selects which module clock is routed to the MCLK pad.
+    #[cfg(not(i2s_version = "1"))]
+    mclk_out: MclkOut,
+
     /// Formats of the data.
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
@@ -846,15 +874,6 @@ impl Config {
             Self::Tdm(c) => c.validate(),
             #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
             Self::Pdm(c) => c.validate(_info).map_err(ConfigError::Pdm),
-        }
-    }
-
-    #[cfg(i2s_version = "1")]
-    fn calculate_clock(&self) -> I2sClockDividers {
-        match self {
-            Self::Tdm(c) => c.calculate_clock(),
-            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            Self::Pdm(_) => unreachable!(),
         }
     }
 }
@@ -905,7 +924,12 @@ impl TdmConfig {
 
     #[cfg(i2s_version = "1")]
     fn calculate_clock(&self) -> I2sClockDividers {
-        I2sClockDividers::new(self.sample_rate, 2, self.data_format.data_bits())
+        I2sClockDividers::new(
+            self.sample_rate,
+            2,
+            self.data_format.data_bits(),
+            self.clock_source,
+        )
     }
 
     /// Assigns the given value to the `sample_rate` field in both units.
@@ -1003,6 +1027,10 @@ impl Default for TdmConfig {
             #[cfg(i2s_version = "1")]
             sample_rate: Rate::from_hz(44100),
             #[cfg(i2s_version = "1")]
+            clock_source: I2sClockSource::default(),
+            #[cfg(not(i2s_version = "1"))]
+            mclk_out: MclkOut::default(),
+            #[cfg(i2s_version = "1")]
             data_format: DataFormat::Data16Channel16,
         }
     }
@@ -1016,6 +1044,10 @@ pub struct TdmUnitConfig {
     /// The target sample rate.
     #[cfg(not(i2s_version = "1"))]
     sample_rate: Rate,
+
+    /// Source clock for this unit's module clock.
+    #[cfg(not(i2s_version = "1"))]
+    clock_source: I2sClockSource,
 
     /// I2S channels configuration.
     channels: Channels,
@@ -1051,6 +1083,8 @@ impl TdmUnitConfig {
         Self {
             #[cfg(not(i2s_version = "1"))]
             sample_rate: Rate::from_hz(44100),
+            #[cfg(not(i2s_version = "1"))]
+            clock_source: I2sClockSource::default(),
             channels: Channels::STEREO,
             #[cfg(not(i2s_version = "1"))]
             data_format: DataFormat::Data16Channel16,
@@ -1121,6 +1155,7 @@ impl TdmUnitConfig {
             self.sample_rate,
             self.channels.count,
             self.data_format.data_bits(),
+            self.clock_source,
         )
     }
 }
@@ -1299,11 +1334,21 @@ impl<'d> I2s<'d, Blocking> {
             }
         }
 
+        let clock = i2s.info().clock_instance;
+        let (req_tx, req_rx) = match &config {
+            Config::Tdm(_) => (true, true),
+            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+            Config::Pdm(c) => (c.tx.is_some(), c.rx.is_some()),
+        };
+
         Ok(Self {
             i2s_rx: RxCreator {
                 i2s: unsafe { i2s.clone_unchecked() },
                 rx_channel: channel.rx,
                 guard: rx_guard,
+                clk_guard: req_rx.then(|| I2sDirClkGuard::request_rx(clock)),
+                #[cfg(not(i2s_version = "1"))]
+                mclk_out_guard: None,
                 #[cfg(i2s_version = "1")]
                 data_format: match config {
                     Config::Tdm(c) => c.data_format,
@@ -1315,6 +1360,9 @@ impl<'d> I2s<'d, Blocking> {
                 i2s,
                 tx_channel: channel.tx,
                 guard: tx_guard,
+                clk_guard: req_tx.then(|| I2sDirClkGuard::request_tx(clock)),
+                #[cfg(not(i2s_version = "1"))]
+                mclk_out_guard: None,
                 #[cfg(i2s_version = "1")]
                 data_format: match config {
                     Config::Tdm(c) => c.data_format,
@@ -1332,6 +1380,9 @@ impl<'d> I2s<'d, Blocking> {
                 i2s: self.i2s_rx.i2s,
                 rx_channel: self.i2s_rx.rx_channel.into_async(),
                 guard: self.i2s_rx.guard,
+                clk_guard: self.i2s_rx.clk_guard,
+                #[cfg(not(i2s_version = "1"))]
+                mclk_out_guard: self.i2s_rx.mclk_out_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.i2s_rx.data_format,
             },
@@ -1339,6 +1390,9 @@ impl<'d> I2s<'d, Blocking> {
                 i2s: self.i2s_tx.i2s,
                 tx_channel: self.i2s_tx.tx_channel.into_async(),
                 guard: self.i2s_tx.guard,
+                clk_guard: self.i2s_tx.clk_guard,
+                #[cfg(not(i2s_version = "1"))]
+                mclk_out_guard: self.i2s_tx.mclk_out_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.i2s_tx.data_format,
             },
@@ -1394,6 +1448,21 @@ where
 
         self.i2s_tx.i2s.info().mclk.connect_to(&mclk);
 
+        self.request_mclk_out()
+    }
+
+    /// Requests the MCLK pad output, on the chips that gate it as a separate clock.
+    #[cfg(all(not(esp32), i2s_version = "1"))]
+    fn request_mclk_out(self) -> Self {
+        self
+    }
+
+    /// Requests the MCLK pad output, on the chips that gate it as a separate clock.
+    #[cfg(all(not(esp32), not(i2s_version = "1")))]
+    fn request_mclk_out(mut self) -> Self {
+        let guard = I2sMclkOutGuard::request(self.i2s_tx.i2s.info().clock_instance);
+        self.i2s_tx.mclk_out_guard = Some(guard.clone());
+        self.i2s_rx.mclk_out_guard = Some(guard);
         self
     }
 
@@ -1447,6 +1516,9 @@ where
     i2s: AnyI2s<'d>,
     tx_channel: ChannelTx<Dm, <I2sMasterErased<'d> as DmaChannel>::Tx>,
     _guard: PeripheralGuard,
+    _clk_guard: Option<I2sDirClkGuard>,
+    #[cfg(not(i2s_version = "1"))]
+    _mclk_out_guard: Option<I2sMclkOutGuard>,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
 }
@@ -1509,6 +1581,9 @@ where
     i2s: AnyI2s<'d>,
     rx_channel: ChannelRx<Dm, <I2sMasterErased<'d> as DmaChannel>::Rx>,
     _guard: PeripheralGuard,
+    _clk_guard: Option<I2sDirClkGuard>,
+    #[cfg(not(i2s_version = "1"))]
+    _mclk_out_guard: Option<I2sMclkOutGuard>,
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
 }
@@ -1604,6 +1679,7 @@ for_each_i2s! {
                     pdm_rx: $pdm_rx,
                     pcm2pdm: $pcm2pdm,
                     pdm2pcm: $pdm2pcm,
+                    clock_instance: crate::clock::ll::I2sInstance::$sys,
                 };
                 &INFO
             }
@@ -1645,6 +1721,95 @@ impl AnyI2s<'_> {
     }
 }
 
+/// Keeps the module clock of one direction enabled.
+///
+/// Both directions share a single module clock on `i2s_version = "1"`, and the clock tree counts
+/// the requests, so a guard per direction is correct on every chip.
+pub(crate) struct I2sDirClkGuard {
+    clock: crate::clock::ll::I2sInstance,
+    #[cfg(not(i2s_version = "1"))]
+    tx: bool,
+}
+
+impl I2sDirClkGuard {
+    pub(crate) fn request_tx(clock: crate::clock::ll::I2sInstance) -> Self {
+        Self::request(clock, true)
+    }
+
+    fn request_rx(clock: crate::clock::ll::I2sInstance) -> Self {
+        Self::request(clock, false)
+    }
+
+    fn request(clock: crate::clock::ll::I2sInstance, tx: bool) -> Self {
+        crate::clock::ll::ClockTree::with(|clocks| {
+            cfg_select! {
+                i2s_version = "1" => {
+                    let _ = tx;
+                    clock.request_mclk(clocks);
+                }
+                _ => {
+                    if tx {
+                        clock.request_tx_clk(clocks);
+                    } else {
+                        clock.request_rx_clk(clocks);
+                    }
+                }
+            }
+        });
+
+        Self {
+            clock,
+            #[cfg(not(i2s_version = "1"))]
+            tx,
+        }
+    }
+}
+
+impl Drop for I2sDirClkGuard {
+    fn drop(&mut self) {
+        crate::clock::ll::ClockTree::with(|clocks| {
+            cfg_select! {
+                i2s_version = "1" => self.clock.release_mclk(clocks),
+                _ => {
+                    if self.tx {
+                        self.clock.release_tx_clk(clocks);
+                    } else {
+                        self.clock.release_rx_clk(clocks);
+                    }
+                }
+            }
+        });
+    }
+}
+
+/// Keeps the MCLK pad output enabled.
+#[cfg(not(i2s_version = "1"))]
+pub(crate) struct I2sMclkOutGuard {
+    clock: crate::clock::ll::I2sInstance,
+}
+
+#[cfg(not(i2s_version = "1"))]
+impl I2sMclkOutGuard {
+    fn request(clock: crate::clock::ll::I2sInstance) -> Self {
+        crate::clock::ll::ClockTree::with(|clocks| clock.request_mclk_out(clocks));
+        Self { clock }
+    }
+}
+
+#[cfg(not(i2s_version = "1"))]
+impl Clone for I2sMclkOutGuard {
+    fn clone(&self) -> Self {
+        Self::request(self.clock)
+    }
+}
+
+#[cfg(not(i2s_version = "1"))]
+impl Drop for I2sMclkOutGuard {
+    fn drop(&mut self) {
+        crate::clock::ll::ClockTree::with(|clocks| self.clock.release_mclk_out(clocks));
+    }
+}
+
 pub(crate) mod private {
     use super::*;
 
@@ -1655,6 +1820,9 @@ pub(crate) mod private {
         pub i2s: AnyI2s<'d>,
         pub tx_channel: ChannelTx<Dm, <I2sMasterErased<'d> as DmaChannel>::Tx>,
         pub(crate) guard: PeripheralGuard,
+        pub(crate) clk_guard: Option<I2sDirClkGuard>,
+        #[cfg(not(i2s_version = "1"))]
+        pub(crate) mclk_out_guard: Option<I2sMclkOutGuard>,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
     }
@@ -1669,6 +1837,9 @@ pub(crate) mod private {
                 i2s: self.i2s,
                 tx_channel: self.tx_channel,
                 _guard: PeripheralGuard::new(peripheral),
+                _clk_guard: self.clk_guard,
+                #[cfg(not(i2s_version = "1"))]
+                _mclk_out_guard: self.mclk_out_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
             }
@@ -1734,6 +1905,9 @@ pub(crate) mod private {
         pub i2s: AnyI2s<'d>,
         pub rx_channel: ChannelRx<Dm, <I2sMasterErased<'d> as DmaChannel>::Rx>,
         pub(crate) guard: PeripheralGuard,
+        pub(crate) clk_guard: Option<I2sDirClkGuard>,
+        #[cfg(not(i2s_version = "1"))]
+        pub(crate) mclk_out_guard: Option<I2sMclkOutGuard>,
         #[cfg(i2s_version = "1")]
         pub(crate) data_format: DataFormat,
     }
@@ -1748,6 +1922,9 @@ pub(crate) mod private {
                 i2s: self.i2s,
                 rx_channel: self.rx_channel,
                 _guard: PeripheralGuard::new(peripheral),
+                _clk_guard: self.clk_guard,
+                #[cfg(not(i2s_version = "1"))]
+                _mclk_out_guard: self.mclk_out_guard,
                 #[cfg(i2s_version = "1")]
                 data_format: self.data_format,
             }
@@ -1810,6 +1987,10 @@ pub(crate) mod private {
         }
     }
 
+    /// The divider from the module clock source to MCLK and BCLK.
+    ///
+    /// MCLK is `sclk / (mclk_divider + numerator / denominator)`, and BCLK is
+    /// `MCLK / bclk_divider`.
     pub struct I2sClockDividers {
         pub(crate) mclk_divider: u32,
         pub(crate) bclk_divider: u32,
@@ -1818,21 +1999,25 @@ pub(crate) mod private {
     }
 
     impl I2sClockDividers {
-        pub fn new(sample_rate: Rate, channels: u8, data_bits: u8) -> I2sClockDividers {
+        pub fn new(
+            sample_rate: Rate,
+            channels: u8,
+            data_bits: u8,
+            source: I2sClockSource,
+        ) -> I2sClockDividers {
             // this loosely corresponds to `i2s_std_calculate_clock` and
             // `i2s_ll_tx_set_mclk` in esp-idf
 
             // If data_bits is a power of two, use 256 as the mclk_multiple
             // If data_bits is 24, use 192 (24 * 8) as the mclk_multiple
             let mclk_multiple = if data_bits == 24 { 192 } else { 256 };
-            let sclk = crate::soc::i2s_sclk_frequency();
 
             let rate = sample_rate.as_hz();
 
             let bclk = rate * channels as u32 * data_bits as u32;
             let mclk = rate * mclk_multiple;
 
-            I2sClockDividers::from_frequencies(sclk, mclk, mclk / bclk)
+            I2sClockDividers::from_frequencies(source_frequency(source), mclk, mclk / bclk)
         }
 
         pub(crate) fn from_frequencies(sclk: u32, mclk: u32, bclk_divider: u32) -> Self {
@@ -1841,7 +2026,8 @@ pub(crate) mod private {
             I2sClockDividers {
                 mclk_divider: divider.integer,
                 bclk_divider,
-                denominator: divider.denominator,
+                // An integer divider is described as `0 / 1`, not as `0 / 0`.
+                denominator: divider.denominator.max(1),
                 numerator: divider.numerator,
             }
         }
