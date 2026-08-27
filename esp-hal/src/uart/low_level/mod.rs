@@ -41,10 +41,7 @@ use crate::{
 #[cfg_attr(uart_version = "2", path = "v2.rs")]
 mod version;
 
-#[inline(always)]
-pub(super) fn sync_regs(register_block: &RegisterBlock) {
-    version::sync_regs(register_block);
-}
+pub(super) use version::{enable_register_sync, sync_regs};
 
 #[derive(Debug, EnumSetType)]
 pub(super) enum TxEvent {
