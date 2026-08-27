@@ -421,6 +421,49 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
+/// PCR value that selects the clock from the GPIO pad.
+const PCR_PAD_CLK_SEL: u8 = 3;
+
+fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> {
+    let pcr = PCR::regs();
+    let using_pad_clock = if is_tx {
+        pcr.parl_clk_tx_conf().read().parl_clk_tx_sel().bits() == PCR_PAD_CLK_SEL
+    } else {
+        pcr.parl_clk_rx_conf().read().parl_clk_rx_sel().bits() == PCR_PAD_CLK_SEL
+    };
+
+    if using_pad_clock {
+        // The GPIO pad supplies the unit clock. `TxConfig`/`RxConfig` frequency is the
+        // internal divider target and must not be applied to the pad clock.
+        return Ok(());
+    }
+
+    if frequency.as_hz() > 40_000_000 {
+        return Err(ConfigError::UnreachableClockRate);
+    }
+
+    let source_hz = if is_tx {
+        ParlIoInstance::ParlIo.tx_clock_frequency()
+    } else {
+        ParlIoInstance::ParlIo.rx_clock_frequency()
+    };
+    let divider = source_hz / frequency.as_hz();
+    if divider > 0xFFFF {
+        return Err(ConfigError::UnreachableClockRate);
+    }
+    let divider = divider as u16;
+
+    if is_tx {
+        pcr.parl_clk_tx_conf()
+            .modify(|_, w| unsafe { w.parl_clk_tx_div_num().bits(divider) });
+    } else {
+        pcr.parl_clk_rx_conf()
+            .modify(|_, w| unsafe { w.parl_clk_rx_div_num().bits(divider) });
+    }
+
+    Ok(())
+}
+
 /// Used to configure no pin as clock output
 impl TxClkPin for NoPin {
     fn configure(&mut self) {
@@ -911,12 +954,15 @@ where
         CP: TxClkPin + 'd,
     {
         tx_pins.configure();
-        clk_pin.configure();
 
         let mut this = ParlIoTx {
             tx_channel: self.tx_channel,
             _guard: ParlIoTxGuard::new(self._guard),
         };
+        // Configure the clock pin after the clock tree enables the TX clock. The guard
+        // selects an internal source. `ClkInPin` then switches the source to the GPIO
+        // pad, and that selection must remain in effect.
+        clk_pin.configure();
         this.apply_config(&config)?;
 
         Ok(this)
@@ -961,12 +1007,15 @@ where
         Instance::set_rx_sample_mode(SampleMode::InternalSoftwareEnable);
 
         rx_pins.configure();
-        clk_pin.configure();
 
         let mut this = ParlIoRx {
             rx_channel: self.rx_channel,
             _guard: ParlIoRxGuard::new(self._guard),
         };
+        // Configure the clock pin after the clock tree enables the RX clock. The guard
+        // selects an internal source. `RxClkInPin` then switches the source to the GPIO
+        // pad, and that selection must remain in effect.
+        clk_pin.configure();
         this.apply_config(&config)?;
 
         Ok(this)
@@ -1216,20 +1265,7 @@ where
 
     /// Changes the bus configuration.
     pub fn apply_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
-        if config.frequency.as_hz() > 40_000_000 {
-            return Err(ConfigError::UnreachableClockRate);
-        }
-
-        let frequency = ParlIoInstance::ParlIo.tx_clock_frequency();
-        let divider = frequency / config.frequency.as_hz();
-        if divider > 0xFFFF {
-            return Err(ConfigError::UnreachableClockRate);
-        }
-        let divider = divider as u16;
-
-        PCR::regs()
-            .parl_clk_tx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_tx_div_num().bits(divider) });
+        apply_clock_divider(true, config.frequency)?;
 
         Instance::set_tx_idle_value(config.idle_value);
         Instance::set_tx_sample_edge(config.sample_edge);
@@ -1379,20 +1415,7 @@ where
 
     /// Changes the bus configuration.
     pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
-        if config.frequency.as_hz() > 40_000_000 {
-            return Err(ConfigError::UnreachableClockRate);
-        }
-
-        let frequency = ParlIoInstance::ParlIo.rx_clock_frequency();
-        let divider = frequency / config.frequency.as_hz();
-        if divider > 0xffff {
-            return Err(ConfigError::UnreachableClockRate);
-        }
-        let divider = divider as u16;
-
-        PCR::regs()
-            .parl_clk_rx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_rx_div_num().bits(divider) });
+        apply_clock_divider(false, config.frequency)?;
 
         Instance::set_rx_bit_order(config.bit_order);
         Instance::set_rx_timeout_ticks(config.timeout_ticks);
