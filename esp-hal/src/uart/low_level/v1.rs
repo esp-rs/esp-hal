@@ -102,53 +102,45 @@ pub(super) fn change_flow_control(
     sw_flow_ctrl: SwFlowControl,
     hw_flow_ctrl: HwFlowControl,
 ) {
-    match sw_flow_ctrl {
-        SwFlowControl::Enabled {
-            xon_char,
-            xoff_char,
-            xon_threshold,
-            xoff_threshold,
-        } => {
-            info.regs().flow_conf().modify(|_, w| {
-                w.xonoff_del().set_bit();
-                w.sw_flow_con_en().set_bit()
-            });
-
-            cfg_select! {
-                esp32 => {
-                    info.regs().swfc_conf().modify(|_, w| unsafe {
-                        w.xon_threshold()
-                            .bits(xon_threshold)
-                            .xoff_threshold()
-                            .bits(xoff_threshold)
-                    });
-                    info.regs().swfc_conf().modify(|_, w| unsafe {
-                        w.xon_char().bits(xon_char).xoff_char().bits(xoff_char)
-                    });
-                }
-                _ => {
-                    info.regs()
-                        .swfc_conf1()
-                        .modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold as u16) });
-                    info.regs()
-                        .swfc_conf0()
-                        .modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold as u16) });
-                    info.regs()
-                        .swfc_conf1()
-                        .modify(|_, w| unsafe { w.xon_char().bits(xon_char) });
-                    info.regs()
-                        .swfc_conf0()
-                        .modify(|_, w| unsafe { w.xoff_char().bits(xoff_char) });
-                }
+    if let SwFlowControl::Enabled {
+        xon_char,
+        xoff_char,
+        xon_threshold,
+        xoff_threshold,
+    } = sw_flow_ctrl
+    {
+        cfg_select! {
+            esp32 => {
+                info.regs().swfc_conf().modify(|_, w| unsafe {
+                    w.xon_threshold().bits(xon_threshold);
+                    w.xoff_threshold().bits(xoff_threshold);
+                    w.xon_char().bits(xon_char);
+                    w.xoff_char().bits(xoff_char)
+                });
             }
-        }
-        SwFlowControl::Disabled => {
-            let reg = info.regs().flow_conf();
-            reg.modify(|_, w| w.sw_flow_con_en().clear_bit());
-            reg.modify(|_, w| w.xonoff_del().clear_bit());
+            _ => {
+                info.regs()
+                    .swfc_conf1()
+                    .modify(|_, w| unsafe {
+                        w.xon_threshold().bits(xon_threshold as u16);
+                        w.xon_char().bits(xon_char)
+                    });
+                info.regs()
+                    .swfc_conf0()
+                    .modify(|_, w| unsafe {
+                        w.xoff_threshold().bits(xoff_threshold as u16);
+                        w.xoff_char().bits(xoff_char)
+                    });
+            }
         }
     }
 
+    info.regs().flow_conf().modify(|_, w| {
+        w.xonoff_del()
+            .bit(matches!(sw_flow_ctrl, SwFlowControl::Enabled { .. }));
+        w.sw_flow_con_en()
+            .bit(matches!(sw_flow_ctrl, SwFlowControl::Enabled { .. }))
+    });
     info.regs().conf0().modify(|_, w| {
         w.tx_flow_en()
             .bit(matches!(hw_flow_ctrl.cts, CtsConfig::Enabled))
