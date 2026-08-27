@@ -10,10 +10,13 @@ use crate::uart::{
 };
 
 #[inline(always)]
-pub(super) fn sync_regs(register_block: &RegisterBlock) {
+pub(crate) fn enable_register_sync(_register_block: &RegisterBlock) {}
+
+#[inline(always)]
+pub(crate) fn sync_regs(register_block: &RegisterBlock) {
     let update_reg = register_block.reg_update();
 
-    update_reg.modify(|_, w| w.reg_update().set_bit());
+    update_reg.write(|w| w.reg_update().set_bit());
 
     while update_reg.read().reg_update().bit_is_set() {
         core::hint::spin_loop();

@@ -71,6 +71,7 @@ use low_level::{
     UartClockGuard,
     UartRxFuture,
     UartTxFuture,
+    enable_register_sync,
     rx_event_check_for_error,
     sync_regs,
 };
@@ -2321,6 +2322,8 @@ where
     fn init(&mut self, config: Config) -> Result<(), ConfigError> {
         self.rx.disable_rx_interrupts();
         self.tx.disable_tx_interrupts();
+
+        enable_register_sync(self.regs());
 
         // Applying config also resets Tx/Rx FIFOs
         self.apply_config(&config)?;

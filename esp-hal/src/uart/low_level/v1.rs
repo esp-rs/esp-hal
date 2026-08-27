@@ -10,12 +10,28 @@ use crate::uart::{
 };
 
 #[inline(always)]
-pub(super) fn sync_regs(_register_block: &RegisterBlock) {
+pub(crate) fn enable_register_sync(_register_block: &RegisterBlock) {
+    #[cfg(not(any(esp32, esp32s2)))]
+    {
+        // We need to clear "high_speed" (UART_UPDATE_CTRL) for UART_REG_UPDATE
+        // to actually do anything. It's unclear if we have to clear this bit
+        // separately from using `reg_update` but this is cheap and for sure works.
+        _register_block
+            .id()
+            .modify(|_, w| w.high_speed().clear_bit());
+    }
+}
+
+#[inline(always)]
+pub(crate) fn sync_regs(_register_block: &RegisterBlock) {
     #[cfg(not(any(esp32, esp32s2)))]
     {
         let update_reg = _register_block.id();
 
-        update_reg.modify(|_, w| w.reg_update().set_bit());
+        update_reg.write(|w| {
+            w.high_speed().clear_bit();
+            w.reg_update().set_bit()
+        });
 
         while update_reg.read().reg_update().bit_is_set() {
             core::hint::spin_loop();
@@ -119,18 +135,14 @@ pub(super) fn change_flow_control(
                 });
             }
             _ => {
-                info.regs()
-                    .swfc_conf1()
-                    .modify(|_, w| unsafe {
-                        w.xon_threshold().bits(xon_threshold as u16);
-                        w.xon_char().bits(xon_char)
-                    });
-                info.regs()
-                    .swfc_conf0()
-                    .modify(|_, w| unsafe {
-                        w.xoff_threshold().bits(xoff_threshold as u16);
-                        w.xoff_char().bits(xoff_char)
-                    });
+                info.regs().swfc_conf1().modify(|_, w| unsafe {
+                    w.xon_threshold().bits(xon_threshold as u16);
+                    w.xon_char().bits(xon_char)
+                });
+                info.regs().swfc_conf0().modify(|_, w| unsafe {
+                    w.xoff_threshold().bits(xoff_threshold as u16);
+                    w.xoff_char().bits(xoff_char)
+                });
             }
         }
     }
