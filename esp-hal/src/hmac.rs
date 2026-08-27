@@ -38,7 +38,7 @@ use crate::{
     pac,
     peripherals::HMAC,
     reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
+    system::{CryptoClockGuard, GenericPeripheralGuard, Peripheral as PeripheralEnable},
 };
 
 /// Provides an interface for interacting with the HMAC hardware peripheral.
@@ -49,6 +49,7 @@ pub struct Hmac<'d> {
     byte_written: usize,
     next_command: NextCommand,
     _guard: GenericPeripheralGuard<{ PeripheralEnable::Hmac as u8 }>,
+    _clock_guard: CryptoClockGuard,
 }
 
 /// HMAC interface error
@@ -103,6 +104,7 @@ enum NextCommand {
 impl<'d> Hmac<'d> {
     /// Creates a new instance of the HMAC peripheral.
     pub fn new(hmac: HMAC<'d>) -> Self {
+        let clock_guard = CryptoClockGuard::new();
         let guard = GenericPeripheralGuard::new();
 
         Self {
@@ -111,6 +113,7 @@ impl<'d> Hmac<'d> {
             byte_written: 64,
             next_command: NextCommand::None,
             _guard: guard,
+            _clock_guard: clock_guard,
         }
     }
 

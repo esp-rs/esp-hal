@@ -46,6 +46,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
             0,
@@ -60,6 +61,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
             0,
@@ -74,6 +76,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
             0,
@@ -535,6 +538,29 @@ fn configure_timg_calibration_clock_impl(
             w.clk_src_sel().bits(source);
             w.clk_div_num().bits(divider - 1)
         });
+}
+
+// CRYPTO_CLK
+
+fn enable_crypto_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    HP_SYS_CLKRST::regs().crypto_ctrl0().modify(|_, w| {
+        w.crypto_sys_clk_en().bit(en);
+        w.crypto_sec_clk_en().bit(en)
+    });
+}
+
+fn configure_crypto_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<CryptoClkConfig>,
+    new: CryptoClkConfig,
+) {
+    HP_SYS_CLKRST::regs().crypto_ctrl0().modify(|_, w| unsafe {
+        w.crypto_clk_src_sel().bits(match new {
+            CryptoClkConfig::Xtal => 0,
+            CryptoClkConfig::RcFast => 1,
+            CryptoClkConfig::PllF240m => 2,
+        })
+    });
 }
 
 // IOMUX_FUNCTION_CLOCK
