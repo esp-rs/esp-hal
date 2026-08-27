@@ -1,6 +1,6 @@
 //! PDM register programming for I2S hardware after ESP32 (v2+).
 //!
-//! Chip-specific differences are handled via `#[cfg(i2s_version = "...")]`
+//! Chip-specific differences are handled via `#[cfg(i2s_version = "...")]`.
 
 use super::{
     PdmConfig,

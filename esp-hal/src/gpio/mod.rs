@@ -19,18 +19,18 @@
 //! into peripheral signals for advanced use.
 //!
 //! Pin drivers can be created using [`Flex::new`], [`Input::new`] and
-//! [`Output::new`]
+//! [`Output::new`].
 //!
 //! Output pins can be configured to either push-pull or open-drain (active low)
 //! mode, with configurable drive strength and pull-up/pull-down resistors.
 //!
 //! Each pin is a different type initially. Internally, `esp-hal` will erase
 //! their types automatically, but they can also be converted into [`AnyPin`]
-//! manually by calling [`Pin::degrade`]
+//! manually by calling [`Pin::degrade`].
 //!
 //! The [`Io`] struct can also be used to configure the interrupt handler for
 //! GPIO interrupts. For more information, see the
-//! [`InterruptConfigurable::set_interrupt_handler`](crate::interrupt::InterruptConfigurable::set_interrupt_handler)
+//! [`InterruptConfigurable::set_interrupt_handler`](crate::interrupt::InterruptConfigurable::set_interrupt_handler).
 //!
 //! This driver also implements pin-related traits from [embedded-hal] and
 //! [Wait](embedded_hal_async::digital::Wait) trait from [embedded-hal-async].
@@ -518,7 +518,7 @@ pub unsafe fn handle_gpio_interrupt() {
 
 /// Completes any in-flight async wait on a single GPIO pin.
 ///
-/// Per-pin counterpart of [`handle_gpio_interrupt`]
+/// Per-pin counterpart of [`handle_gpio_interrupt`].
 ///
 /// # Safety
 ///
@@ -561,7 +561,7 @@ pub enum DriveMode {
     /// Push-pull output.
     ///
     /// The driver actively sets the output voltage level for both high and low
-    /// logical [`Level`]s
+    /// logical [`Level`]s.
     PushPull,
 
     /// Open drain output.
@@ -878,7 +878,7 @@ impl<'d> Output<'d> {
 /// GPIO input signal to the system clock, reducing metastability.
 ///
 /// See [`InputConfig::with_input_sync_stage1`] and
-/// [`InputConfig::with_input_sync_stage2`]
+/// [`InputConfig::with_input_sync_stage2`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -904,14 +904,14 @@ pub struct InputConfig {
 
     /// First input synchronization stage.
     ///
-    /// Default value: [`InputSync::Disabled`]
+    /// Default value: [`InputSync::Disabled`].
     #[cfg(gpio_has_input_sync)]
     #[builder_lite(unstable)]
     input_sync_stage1: InputSync,
 
     /// Second input synchronization stage.
     ///
-    /// Default value: [`InputSync::Disabled`]
+    /// Default value: [`InputSync::Disabled`].
     #[cfg(gpio_has_input_sync)]
     #[builder_lite(unstable)]
     input_sync_stage2: InputSync,
@@ -932,7 +932,7 @@ impl Default for InputConfig {
 /// Digital input.
 ///
 /// This driver configures the GPIO pin to be an input. Input drivers read the
-/// voltage of their pins and convert it to a logical [`Level`]
+/// voltage of their pins and convert it to a logical [`Level`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Input<'d> {
@@ -1127,7 +1127,7 @@ impl<'d> Input<'d> {
     /// critical_section::with(|cs| {
     ///     // Here we are listening for a low level to demonstrate
     ///     // that you need to stop listening for level interrupts,
-    ///     // but usually you'd probably use `FallingEdge`
+    ///     // but usually you'd probably use `FallingEdge`.
     ///     button.listen(Event::LowLevel);
     ///     BUTTON.borrow_ref_mut(cs).replace(button);
     /// });
@@ -1211,7 +1211,7 @@ impl<'d> Input<'d> {
 
     /// Returns whether this pin ended the most recent sleep.
     ///
-    /// See [`Flex::caused_wakeup`]
+    /// See [`Flex::caused_wakeup`].
     #[cfg(sleep_driver_supported)]
     #[instability::unstable]
     #[inline]
@@ -1339,7 +1339,7 @@ impl<'d> Flex<'d> {
 
     /// Listens for interrupts.
     ///
-    /// See [`Input::listen`] for more information and an example
+    /// See [`Input::listen`] for more information and an example.
     #[inline]
     #[instability::unstable]
     pub fn listen(&mut self, event: Event) {
@@ -1390,11 +1390,11 @@ impl<'d> Flex<'d> {
     /// The configuration selects the hardware paths that the pin can use. The wake condition is the
     /// interrupt trigger, so **a pin that does not listen is not a wakeup source**. A pin that
     /// listens already wakes the chip from light sleep through the digital path. See
-    /// [`WakeupConfig`]
+    /// [`WakeupConfig`].
     ///
     /// The configuration stays after the driver is dropped, because a pad that wakes the chip from
     /// deep sleep must continue to do so while no driver owns it. To remove the configuration, call
-    /// this function again with [`WakeupConfig::default()`]
+    /// this function again with [`WakeupConfig::default()`].
     ///
     /// # Errors
     ///
@@ -1416,7 +1416,7 @@ impl<'d> Flex<'d> {
     /// esp-hal reads the result while the sleep ends, so a later clear of the interrupt of the pin
     /// does not change it. One case depends on the interrupt status: a pin that ends a light sleep
     /// without [`WakeupConfig::low_power_path`]. The interrupt handler of that pin clears the
-    /// status, so the pin reports `false` if the handler runs before the sleep call returns
+    /// status, so the pin reports `false` if the handler runs before the sleep call returns.
     /// This can only occur if interrupts were enabled during the sleep.
     #[cfg(sleep_driver_supported)]
     #[inline]
@@ -1629,7 +1629,7 @@ impl<'lt> AnyPin<'lt> {
         #[cfg(soc_has_usb_device)]
         {
             /// Workaround to make D+ and D- work when the pin is assigned to
-            /// the `USB_SERIAL_JTAG` peripheral by default
+            /// the `USB_SERIAL_JTAG` peripheral by default.
             fn disable_usb_pads(_gpionum: u8) {
                 crate::peripherals::USB_DEVICE::regs()
                     .conf0()
@@ -1818,7 +1818,7 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// The caller must ensure that peripheral drivers do not configure the same
     /// GPIO at the same time in multiple places. This includes clones of the
-    /// `InputSignal` struct
+    /// `InputSignal` struct.
     #[inline]
     #[instability::unstable]
     pub unsafe fn into_input_signal(self) -> interconnect::InputSignal<'lt> {
@@ -2251,7 +2251,7 @@ for_each_gpio! {
             ///
             /// The caller must ensure that peripheral drivers do not configure the same
             /// GPIO at the same time in multiple places. This includes clones of the
-            /// `InputSignal` struct, as well as the `OutputSignal` struct
+            /// `InputSignal` struct, as well as the `OutputSignal` struct.
             ///
             /// ```rust, no_run
             /// # {before_snippet}

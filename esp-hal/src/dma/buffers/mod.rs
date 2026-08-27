@@ -411,7 +411,7 @@ pub struct Preparation {
     /// The descriptor the DMA will start from.
     pub start: *mut DmaDescriptor,
 
-    /// Must be `true` if any of the DMA descriptors contain data in PSRAM
+    /// Must be `true` if any of the DMA descriptors contain data in PSRAM.
     #[cfg(dma_can_access_psram)]
     pub accesses_psram: bool,
 
@@ -434,9 +434,9 @@ pub struct Preparation {
     /// [DmaRxInterrupt::DescriptorError]/[DmaTxInterrupt::DescriptorError].
     ///
     /// This field allows buffer implementation to configure this behavior.
-    /// - `Some(true)`: DMA channel must check the owner bit
-    /// - `Some(false)`: DMA channel must NOT check the owner bit
-    /// - `None`: DMA channel should check the owner bit if it is supported
+    /// - `Some(true)`: DMA channel must check the owner bit.
+    /// - `Some(false)`: DMA channel must NOT check the owner bit.
+    /// - `None`: DMA channel should check the owner bit if it is supported.
     ///
     /// Some buffer implementations may require that the DMA channel performs
     /// this check before consuming the descriptor to ensure correct
@@ -734,7 +734,7 @@ impl DmaRxBuf {
     /// Reads the received data into the provided `buf`.
     ///
     /// If `buf.len()` is less than the amount of received data then only the
-    /// first `buf.len()` bytes of received data is written into `buf`
+    /// first `buf.len()` bytes of received data is written into `buf`.
     ///
     /// Returns the number of bytes written to `buf`.
     pub fn read_received_data(&self, buf: &mut [u8]) -> usize {
@@ -889,7 +889,7 @@ impl DmaRxTxBuf {
     /// Resets the descriptors to only transmit/receive `len` amount of bytes
     /// with this buf.
     ///
-    /// `len` must be less than or equal to the buffer size
+    /// `len` must be less than or equal to the buffer size.
     pub fn set_length(&mut self, len: usize) {
         unwrap!(self.set_length_fallible(len, self.burst));
     }
@@ -986,7 +986,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 /// [DmaRxStreamBufView::consume] is called.
 ///
 /// The list starts out like so `A (empty) -> B (empty) -> C (empty) -> D
-/// (empty) -> NULL`
+/// (empty) -> NULL`.
 ///
 /// As the DMA writes to the buffers the list progresses like so:
 /// - `A (empty) -> B (empty) -> C (empty) -> D (empty) -> NULL`
@@ -1341,7 +1341,7 @@ impl DmaRxStreamBufView {
 /// This is symmetric implementation to [DmaRxStreamBuf], used for continuously
 /// streaming data to a peripheral's FIFO.
 ///
-/// The list starts out like so `A(full) -> B(full) -> C(full) -> D(full) -> NULL`
+/// The list starts out like so `A(full) -> B(full) -> C(full) -> D(full) -> NULL`.
 ///
 /// As the DMA writes to FIFO, the list progresses like so:
 /// - `A(full)  -> B(full)  -> C(full)  -> D(full) -> NULL`

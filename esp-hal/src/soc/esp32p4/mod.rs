@@ -46,7 +46,7 @@ const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 const CACHE_MAP_L2_CACHE: u32 = 1 << 5;
 
-/// Cache buses that back the value at `addr`
+/// Cache buses that back the value at `addr`.
 fn cache_l2_bus(addr: u32) -> u32 {
     let internal = memory_range!("DRAM").contains(&addr);
     if internal { 0 } else { CACHE_MAP_L2_CACHE }

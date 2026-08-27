@@ -3,7 +3,7 @@
 //!
 //! ## Overview
 //!
-//! This module provides support to interface with `PSRAM` devices connected to the MCU
+//! This module provides support to interface with `PSRAM` devices connected to the MCU.
 //! PSRAM provides additional external memory to supplement the internal memory of the MCU,
 //! allowing for increased storage capacity and improved performance in certain applications.
 #![doc = ""]

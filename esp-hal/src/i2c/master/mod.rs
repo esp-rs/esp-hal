@@ -12,7 +12,7 @@
 //! The driver can be configured using the [`Config`] struct. To create a
 //! configuration, you can use the [`Config::default()`] method, and then modify
 //! the individual settings as needed, by calling `with_*` methods on the
-//! [`Config`] struct
+//! [`Config`] struct.
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -23,7 +23,7 @@
 //! ```
 //!
 //! You will then need to pass the configuration to [`I2c::new`], and you can
-//! also change the configuration later by calling [`I2c::apply_config`]
+//! also change the configuration later by calling [`I2c::apply_config`].
 //!
 //! You will also need to specify the SDA and SCL pins when you create the
 //! driver instance.
@@ -209,7 +209,7 @@ impl From<u8> for I2cAddress {
 /// When the level of SCL remains unchanged for more than `timeout` bus
 /// clock cycles, the bus goes to idle state.
 ///
-/// Default value is `BusCycles(10)`
+/// Default value is `BusCycles(10)`.
 #[doc = ""]
 #[cfg_attr(
     i2c_master_bus_timeout_is_exponential,
@@ -285,7 +285,7 @@ pub enum SoftwareTimeout {
 
     /// Defines a data length dependent timeout for I2C operations.
     ///
-    /// The applied timeout is calculated as `data_length * duration_per_byte`
+    /// The applied timeout is calculated as `data_length * duration_per_byte`.
     /// In [`I2c::transaction`] and [`I2c::transaction_async`], the timeout is
     /// applied separately for each operation.
     PerByte(Duration),
@@ -606,7 +606,7 @@ pub struct Config {
 
     /// The clock source for the I2C peripheral.
     ///
-    /// Default value: [`ClockSource::default()`]
+    /// Default value: [`ClockSource::default()`].
     #[builder_lite(unstable)]
     clock_source: ClockSource,
 
@@ -615,13 +615,13 @@ pub struct Config {
     ///
     /// Standard I2C devices change SDA while SCL is low and hold it stable while
     /// SCL is high, so the line is sampled while SCL is high by default
-    /// ([`Level::High`])
+    /// ([`Level::High`]).
     #[builder_lite(unstable)]
     scl_sample_level: Level,
 
     /// Enables I2C bus arbitration detection.
     ///
-    /// Default value: `false`
+    /// Default value: `false`.
     #[cfg(i2c_master_has_arbitration_en)]
     #[builder_lite(unstable)]
     bus_arbitration: bool,
@@ -1064,7 +1064,7 @@ where
     ///
     /// let mut sda = Flex::new(peripherals.GPIO2);
     ///
-    /// // The default pullup setting is `Pull::None`
+    /// // The default pullup setting is `Pull::None`.
     /// sda.apply_output_config(&OutputConfig::default().with_drive_mode(DriveMode::OpenDrain));
     /// sda.set_input_enable(true);
     /// sda.set_output_enable(true);
@@ -1116,7 +1116,7 @@ where
     ///
     /// let mut scl = Flex::new(peripherals.GPIO2);
     ///
-    /// // The default pullup setting is `Pull::None`
+    /// // The default pullup setting is `Pull::None`.
     /// scl.apply_output_config(&OutputConfig::default().with_drive_mode(DriveMode::OpenDrain));
     /// scl.set_input_enable(true);
     /// scl.set_output_enable(true);

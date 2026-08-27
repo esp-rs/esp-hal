@@ -2,7 +2,7 @@
 //!
 //! Provides higher-level helpers for MAC/DMA initialization and runtime
 //! control, all accessing the three EMAC register blocks via their
-//! `::regs()` static accessors
+//! `::regs()` static accessors.
 
 use crate::peripherals::{EMAC_DMA, EMAC_MAC};
 
@@ -74,9 +74,9 @@ pub enum Duplex {
 pub struct LinkState {
     /// Whether the link is established.
     pub up: bool,
-    /// Link speed (valid if `up` is true)
+    /// Link speed (valid if `up` is true).
     pub speed: Speed,
-    /// Link duplex mode (valid if `up` is true)
+    /// Link duplex mode (valid if `up` is true).
     pub duplex: Duplex,
 }
 
@@ -84,7 +84,7 @@ pub struct LinkState {
 /// blocks.
 ///
 /// All methods use `EMAC_MAC::regs()` / `EMAC_DMA::regs()` static accessors; the singleton
-/// ownership is tracked by the `Ethernet` struct
+/// ownership is tracked by the `Ethernet` struct.
 #[derive(Clone, Copy)]
 pub(super) struct EmacRegs;
 

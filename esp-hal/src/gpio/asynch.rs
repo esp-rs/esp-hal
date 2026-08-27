@@ -17,7 +17,7 @@ impl Flex<'_> {
     ///
     /// A wait continues through a light sleep, and a pin that waits also ends the sleep, like a
     /// listening pin. There is one exception: a wait for an edge on a pin that is already at the
-    /// level at the end of that edge. See [`listen`][Self::listen]
+    /// level at the end of that edge. See [`listen`][Self::listen].
     #[inline]
     #[instability::unstable]
     pub async fn wait_for(&mut self, event: Event) {
@@ -122,7 +122,7 @@ impl Input<'_> {
     ///
     /// A wait continues through a light sleep, and a pin that waits also ends the sleep, like a
     /// listening pin. There is one exception: a wait for an edge on a pin that is already at the
-    /// level at the end of that edge. See [`listen`][Self::listen]
+    /// level at the end of that edge. See [`listen`][Self::listen].
     #[inline]
     #[instability::unstable]
     pub async fn wait_for(&mut self, event: Event) {

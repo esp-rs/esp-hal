@@ -61,7 +61,7 @@ pub(super) fn caused_wakeup(gpio: u8, cause: WakeupReason) -> bool {
 
 /// Releases the pads that the previous run armed for a deep sleep.
 ///
-/// `ext1` selects the pads by low-power number, and it keeps the selection through the wake
+/// `ext1` selects the pads by low-power number, and it keeps the selection through the wake.
 pub(super) fn wake_io_reset() {
     let armed = LP_AON::regs()
         .ext_wakeup_cntl()

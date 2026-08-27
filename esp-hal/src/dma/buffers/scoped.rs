@@ -302,7 +302,7 @@ impl<'a> ScopedDmaRxBuf<'a> {
     /// Reads the received data into the provided `buf`.
     ///
     /// If `buf.len()` is less than the amount of received data then only the
-    /// first `buf.len()` bytes of received data is written into `buf`
+    /// first `buf.len()` bytes of received data is written into `buf`.
     ///
     /// Returns the number of bytes written to `buf`.
     pub fn read_received_data(&self, mut buf: &mut [u8]) -> usize {

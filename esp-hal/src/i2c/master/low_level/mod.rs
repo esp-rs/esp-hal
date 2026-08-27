@@ -665,11 +665,11 @@ impl Driver<'_> {
     }
 
     /// Configures the I2C peripheral for a write operation.
-    /// - `addr` is the address of the slave device
+    /// - `addr` is the address of the slave device.
     /// - `bytes` is the data to be sent
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation will end with a STOP condition
+    /// - `stop` indicates whether the operation will end with a STOP condition.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_write<'a, I>(
         &self,
@@ -754,11 +754,11 @@ impl Driver<'_> {
     }
 
     /// Configures the I2C peripheral for a read operation.
-    /// - `addr` is the address of the slave device
-    /// - `buffer` is the buffer to store the read data
+    /// - `addr` is the address of the slave device.
+    /// - `buffer` is the buffer to store the read data.
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation will end with a STOP condition
+    /// - `stop` indicates whether the operation will end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
     ///   the last byte must not be nacked.
     /// - `cmd_iterator` is an iterator over the command registers.
@@ -1069,14 +1069,14 @@ impl Driver<'_> {
     }
 
     /// Executes an I2C read operation.
-    /// - `addr` is the address of the slave device
-    /// - `buffer` is the buffer to store the read data
+    /// - `addr` is the address of the slave device.
+    /// - `buffer` is the buffer to store the read data.
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition
+    /// - `stop` indicates whether the operation should end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
     ///   the last byte must not be nacked.
-    /// - `cmd_iterator` is an iterator over the command registers
+    /// - `cmd_iterator` is an iterator over the command registers.
     fn start_read_operation(
         &self,
         address: I2cAddress,
@@ -1109,12 +1109,12 @@ impl Driver<'_> {
     }
 
     /// Executes an I2C write operation.
-    /// - `addr` is the address of the slave device
+    /// - `addr` is the address of the slave device.
     /// - `bytes` is the data to be sent
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition
-    /// - `cmd_iterator` is an iterator over the command registers
+    /// - `stop` indicates whether the operation should end with a STOP condition.
+    /// - `cmd_iterator` is an iterator over the command registers.
     fn write_operation_blocking(
         &self,
         address: I2cAddress,
@@ -1140,14 +1140,14 @@ impl Driver<'_> {
     }
 
     /// Executes an I2C read operation.
-    /// - `addr` is the address of the slave device
-    /// - `buffer` is the buffer to store the read data
+    /// - `addr` is the address of the slave device.
+    /// - `buffer` is the buffer to store the read data.
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition
+    /// - `stop` indicates whether the operation should end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
     ///   the last byte must not be nacked.
-    /// - `cmd_iterator` is an iterator over the command registers
+    /// - `cmd_iterator` is an iterator over the command registers.
     fn read_operation_blocking(
         &self,
         address: I2cAddress,
@@ -1175,12 +1175,12 @@ impl Driver<'_> {
     }
 
     /// Executes an async I2C write operation.
-    /// - `addr` is the address of the slave device
+    /// - `addr` is the address of the slave device.
     /// - `bytes` is the data to be sent
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition
-    /// - `cmd_iterator` is an iterator over the command registers
+    /// - `stop` indicates whether the operation should end with a STOP condition.
+    /// - `cmd_iterator` is an iterator over the command registers.
     async fn write_operation(
         &self,
         address: I2cAddress,
@@ -1205,14 +1205,14 @@ impl Driver<'_> {
     }
 
     /// Executes an async I2C read operation.
-    /// - `addr` is the address of the slave device
-    /// - `buffer` is the buffer to store the read data
+    /// - `addr` is the address of the slave device.
+    /// - `buffer` is the buffer to store the read data.
     /// - `start` indicates whether the operation should start by a START condition and sending the
     ///   address.
-    /// - `stop` indicates whether the operation should end with a STOP condition
+    /// - `stop` indicates whether the operation should end with a STOP condition.
     /// - `will_continue` indicates whether there is another read operation following this one and
     ///   the last byte must not be nacked.
-    /// - `cmd_iterator` is an iterator over the command registers
+    /// - `cmd_iterator` is an iterator over the command registers.
     async fn read_operation(
         &self,
         address: I2cAddress,

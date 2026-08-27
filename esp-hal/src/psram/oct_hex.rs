@@ -38,7 +38,7 @@ pub(super) fn write_psram_mmu_entry(entry_id: u32, page: u16) {
 /// ESP32-P4 has TWO independent MMUs:
 ///   - Flash MMU (id 0): registers in `SPI_MEM_C` (FLASH_SPI0)
 ///   - PSRAM MMU (id 1): registers in `SPI_MEM_S` (PSRAM_MSPI0) at the `MMU_ITEM_INDEX_REG` /
-///     `MMU_ITEM_CONTENT_REG` offsets we use here
+///     `MMU_ITEM_CONTENT_REG` offsets we use here.
 ///
 /// Each PSRAM MMU entry is a 32-bit word:
 ///   - bits [9:0] : physical page number (`SOC_MMU_PSRAM_VALID_VAL_MASK = 0x3FF`)
@@ -67,7 +67,7 @@ pub(super) fn mmu_map_psram(size: usize) {
 ///
 /// Faithful port of IDF `s_config_mspi_for_psram` from
 /// `esp_psram_impl_ap_oct.c`. Each register field is named after its
-/// `psram_ctrlr_ll_*` setter so the mapping is straightforward to verify
+/// `psram_ctrlr_ll_*` setter so the mapping is straightforward to verify.
 pub(super) fn configure_psram_mspi(timing: &PsramTimingParams, is_hex: bool) {
     // Dummy bit-counts come from the active speed parameter table.
     MEMSPI2::regs().cache_sctrl().modify(|_, w| unsafe {
@@ -185,7 +185,7 @@ pub(super) fn enable_dll() {
 /// Configures PSRAM PHY pads.
 ///
 /// Mirrors IDF `mspi_timing_ll_pin_drv_set(2)` +
-/// `mspi_timing_ll_enable_dqs(true)`
+/// `mspi_timing_ll_enable_dqs(true)`.
 pub(super) fn psram_pad_init(_is_hex: bool) {
     fn init_pin_drv(reg: &Reg<PSRAM_D_PIN0_SPEC>) {
         reg.modify(|_, w| unsafe { w.drv().bits(2) });
@@ -235,7 +235,7 @@ pub(super) fn psram_pad_init(_is_hex: bool) {
 /// hold_time=N-1, hold_delay=N-1, split_trans_en=1.
 pub(super) fn set_cs_timing() {
     /// CS timing constants (matches IDF AP_OCT_PSRAM_CS_*). Independent of
-    /// `SpiRamFreq` -- IDF uses the same values across all speed branches
+    /// `SpiRamFreq` -- IDF uses the same values across all speed branches.
     const AP_CS_SETUP_TIME: u8 = 4;
     const AP_CS_HOLD_TIME: u8 = 4;
     const AP_CS_HOLD_DELAY: u8 = 3;
@@ -286,7 +286,7 @@ fn psram_mr_write(mr_addr: u32, low: u8, high: u8) {
 }
 
 /// Initializes AP OCT PSRAM mode registers via PSRAM_MSPI1 OPI DTR
-/// referenced IDF `oct_psram_mode_reg_t`)
+/// referenced IDF `oct_psram_mode_reg_t`).
 /// MR0: drive_str[1:0], read_latency[4:2], lt[5]
 /// MR4: wr_latency[7:5]
 /// MR8: bl[1:0], bt[2], rbx[3], x16[6].
@@ -399,7 +399,7 @@ fn mspi1_kick_and_collect(rx: &mut [u8]) -> Result<(), ()> {
 /// Issue an AP OCT PSRAM register-read command (0x4040, 16-bit cmd,
 /// 32-bit address, 16-bit MISO) through `PSRAM_MSPI1`. Setup via ROM
 /// helpers (`set_op_mode` + `cmd_config`); kick + poll done manually
-/// with a timeout (avoids ROM `cmd_start` poll-forever pitfall)
+/// with a timeout (avoids ROM `cmd_start` poll-forever pitfall).
 fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
     const REG_READ_CMD: u16 = 0x4040;
     const CMD_BITLEN: u16 = 16;
@@ -430,7 +430,7 @@ fn mspi1_reg_read16(timing: &PsramTimingParams, addr: u32) -> u16 {
 
 /// Issue an AP OCT PSRAM register-write command (0xC0C0) with 16-bit
 /// data through `PSRAM_MSPI1`. Same setup-via-ROM + manual-kick pattern
-/// as `mspi1_reg_read16`
+/// as `mspi1_reg_read16`.
 fn mspi1_reg_write16(addr: u32, data: u16) {
     const REG_WRITE_CMD: u16 = 0xC0C0;
     const CMD_BITLEN: u16 = 16;

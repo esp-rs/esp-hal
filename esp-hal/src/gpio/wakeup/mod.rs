@@ -10,9 +10,9 @@
 //! together. The low-power paths are `ext0`, `ext1` and the per-pin low-power path. These paths
 //! continue to work when the peripheral is powered down. Deep sleep always powers the peripheral
 //! down, and light sleep powers it down on request, so such a sleep needs a low-power path. Only
-//! low-power pads have one, and a pin must request it with [`WakeupConfig`]
+//! low-power pads have one, and a pin must request it with [`WakeupConfig`].
 //!
-//! The [`path`] module holds the low-power paths of the chip, and divides the pins between them
+//! The [`path`] module holds the low-power paths of the chip, and divides the pins between them.
 //! This module collects the pins and requests the power domains that they need.
 //!
 //! This module also isolates the digital pads before a deep sleep, because it holds the pad tables.
@@ -269,7 +269,7 @@ fn low_power_numbers() -> impl Iterator<Item = u8> {
 ///
 /// Call this before the initialization clears the mask. The result tells the initialization whether
 /// it must release the pads that the previous run armed. ESP-IDF uses the same condition for
-/// `esp_deep_sleep_wakeup_io_reset`
+/// `esp_deep_sleep_wakeup_io_reset`.
 pub(crate) fn wake_enabled() -> bool {
     let sources = crate::rtc_cntl::sleep::enabled_sources();
 

@@ -17,14 +17,14 @@
 //!
 //! The driver always sends a slave sub-register address along with the device address. This makes
 //! it incompatible with I2C devices or sensors that do not expose sub-registers, and it also means
-//! an `embedded_hal::i2c::I2c` implementation cannot be provided
+//! an `embedded_hal::i2c::I2c` implementation cannot be provided.
 //!
 //! ## Configuration
 //!
 //! The driver can be configured using the [`Config`] struct. To create a
 //! configuration, you can use the [`Config::default()`] method, and then modify
 //! the individual settings as needed, by calling `with_*` methods on the
-//! [`Config`] struct
+//! [`Config`] struct.
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -35,7 +35,7 @@
 //! ```
 //!
 //! You will then need to pass the configuration to [`LpI2c::new`], and you can
-//! also change the configuration later by calling [`LpI2c::apply_config`]
+//! also change the configuration later by calling [`LpI2c::apply_config`].
 //!
 //! You will also need to specify the SDA and SCL pins when you create the
 //! driver instance.
@@ -283,7 +283,7 @@ impl<'d> LpI2c<'d> {
     /// Writes `data` to the `register` of the slave with the given `address`.
     ///
     /// The transfer consists of a single write transaction that sends the device address, the
-    /// register address, then `data`
+    /// register address, then `data`.
     ///
     /// # Examples
     ///
@@ -324,7 +324,7 @@ impl<'d> LpI2c<'d> {
     /// `data`.
     ///
     /// The transfer writes the device address and the register address, then repeats the start
-    /// condition to read `data` back
+    /// condition to read `data` back.
     ///
     /// # Examples
     ///

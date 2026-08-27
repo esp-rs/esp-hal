@@ -35,7 +35,7 @@ const ADC_DATA_MASK: u32 = 0x1_ffff;
 /// number: it spans a little more than 12 bits.
 ///
 /// See `adc_digi_output_data_t` for the ESP32-S31 in
-/// `components/esp_hal_ana_conv/include/hal/adc_types.h`
+/// `components/esp_hal_ana_conv/include/hal/adc_types.h`.
 #[instability::unstable]
 pub const FULL_SCALE: u16 = 4393;
 
@@ -46,7 +46,7 @@ pub const FULL_SCALE: u16 = 4393;
 /// measurement.
 ///
 /// See `ADC_LL_ZERO_DIFF_CODE` in
-/// `components/esp_hal_ana_conv/esp32s31/include/hal/adc_ll.h`
+/// `components/esp_hal_ana_conv/esp32s31/include/hal/adc_ll.h`.
 #[instability::unstable]
 pub const ZERO_DIFF_CODE: u16 = 2198;
 
@@ -58,10 +58,10 @@ const TRIGGER_MODE_OFF: u8 = 0;
 /// Powers the SAR up by software, instead of leaving it to the FSM.
 const FORCE_XPD_SAR_PU: u8 = 3;
 
-/// Clock divider for the digital controller. The divider is `CLK_DIV_NUM + 1`
+/// Clock divider for the digital controller. The divider is `CLK_DIV_NUM + 1`.
 ///
 /// See `ADC_LL_CLKM_DIV_NUM_DEFAULT` in
-/// `components/esp_hal_ana_conv/esp32s31/include/hal/adc_ll.h`
+/// `components/esp_hal_ana_conv/esp32s31/include/hal/adc_ll.h`.
 const CLK_DIV_NUM: u8 = 4;
 
 /// Digital controller clock source select value for XTAL.
@@ -292,7 +292,7 @@ where
     /// result.
     ///
     /// The result is in the range 0..=[`FULL_SCALE`], and an input tied to
-    /// ground reads about [`ZERO_DIFF_CODE`]
+    /// ground reads about [`ZERO_DIFF_CODE`].
     pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
     where
         PIN: AdcChannel,
@@ -316,7 +316,7 @@ where
     /// underlies the pin.
     ///
     /// The result is in the range 0..=[`FULL_SCALE`], and an input tied to
-    /// ground reads about [`ZERO_DIFF_CODE`]
+    /// ground reads about [`ZERO_DIFF_CODE`].
     pub fn read_oneshot<PIN, CS>(
         &mut self,
         pin: &mut super::AdcPin<PIN, ADCX, CS>,
@@ -392,7 +392,7 @@ where
     /// underlies the pin.
     ///
     /// The result is in the range 0..=[`FULL_SCALE`], and an input tied to
-    /// ground reads about [`ZERO_DIFF_CODE`]
+    /// ground reads about [`ZERO_DIFF_CODE`].
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
     where
         ADCX: Instance,

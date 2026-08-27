@@ -194,7 +194,7 @@ pub fn override_mac_address(mac: MacAddress) -> Result<(), SetMacError> {
 ///
 /// This always reads directly from the hardware eFuse storage. To get the
 /// effective MAC for a specific radio interface (which may be overridden via
-/// [`override_mac_address`]), use [`interface_mac_address`] instead
+/// [`override_mac_address`]), use [`interface_mac_address`] instead.
 ///
 /// # Examples
 ///
@@ -378,9 +378,9 @@ impl ChipRevision {
         }
     }
 
-    /// Returns the combined revision value as a `u16`
+    /// Returns the combined revision value as a `u16`.
     ///
-    /// The combined revision value is a `u16` calculated as `major * 100 + minor`
+    /// The combined revision value is a `u16` calculated as `major * 100 + minor`.
     #[inline]
     pub const fn combined(self) -> u16 {
         ::core::assert!(
@@ -402,7 +402,7 @@ impl ChipRevision {
         }
     }
 
-    /// Returns the packed revision value as a `u16`
+    /// Returns the packed revision value as a `u16`.
     ///
     /// The packed revision value is a `u16` with the major revision in the high byte and the minor
     /// revision in the low byte.
@@ -459,17 +459,17 @@ fn derive_local_mac(mac: &mut MacAddress) {
     }
 }
 
-/// Interface selection for [`interface_mac_address`]
+/// Interface selection for [`interface_mac_address`].
 ///
 /// Each interface uses a distinct MAC address derived from either the base MAC or the overridden
-/// MAC if [`override_mac_address`] has been called
+/// MAC if [`override_mac_address`] has been called.
 #[derive(PartialEq, Eq, Hash, Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(any(soc_has_wifi, soc_has_bt))]
 #[non_exhaustive]
 pub enum InterfaceMacAddress {
     /// Wi-Fi station. Equivalent to the base MAC address or overridden via
-    /// [`override_mac_address`]
+    /// [`override_mac_address`].
     #[cfg(soc_has_wifi)]
     #[cfg_attr(soc_has_wifi, default)]
     Station,
@@ -486,7 +486,7 @@ pub enum InterfaceMacAddress {
 ///
 /// Use [`as_bytes`](Self::as_bytes) for raw access, or the
 /// [`Display`](core::fmt::Display) impl for colon-separated hex
-/// (e.g. `aa:bb:cc:dd:ee:ff`)
+/// (e.g. `aa:bb:cc:dd:ee:ff`).
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MacAddress([u8; 6]);

@@ -52,7 +52,7 @@
 //! GPIO pin types such as [`GPIO0`] or [`AnyPin`] can be **unsafely**
 //! [split](AnyPin::split) into signals. In that case, carefully
 //! ensure that only a single driver configures the split pin, by selectively
-//! [freezing](`InputSignal::freeze`) the signals
+//! [freezing](`InputSignal::freeze`) the signals.
 #![cfg_attr(
     uart_driver_supported,
     doc = "\n\nFor example, if you want to route GPIO3 to both a Pulse Counter
@@ -128,7 +128,7 @@ pub trait PeripheralSignal<'d>: Sealed {
 /// A signal that can be connected to a peripheral input.
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
-/// [`PeripheralOutput`] as arguments instead of pin types
+/// [`PeripheralOutput`] as arguments instead of pin types.
 #[allow(
     private_bounds,
     reason = "InputSignal is unstable, but the trait needs to be public"
@@ -138,7 +138,7 @@ pub trait PeripheralInput<'d>: Into<InputSignal<'d>> + PeripheralSignal<'d> {}
 /// A signal that can be connected to a peripheral input or output.
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
-/// [`PeripheralInput`] as arguments instead of pin types
+/// [`PeripheralInput`] as arguments instead of pin types.
 #[allow(
     private_bounds,
     reason = "OutputSignal is unstable, but the trait needs to be public"
@@ -909,7 +909,7 @@ impl NoOp {
 /// // 34 | |     Default::default()),
 /// //    | |_______________________^ the trait `InputPin` is not implemented for `Output<'_>`
 /// // FIXME: due to <https://github.com/rust-lang/rust/issues/139924> this test may be ineffective.
-/// //        It can be manually verified by changing it to `no_run` for a `run-doc-tests` run
+/// //        It can be manually verified by changing it to `no_run` for a `run-doc-tests` run.
 /// # {before_snippet}
 /// use esp_hal::gpio::{Output, Level, interconnect::PeripheralInput};
 ///

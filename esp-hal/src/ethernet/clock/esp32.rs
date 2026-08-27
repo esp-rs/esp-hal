@@ -7,7 +7,7 @@
 //!
 //! - **[`ExternalRefClock`]** — the PHY drives `EMAC_TX_CLK`. Set
 //!   [`RmiiPinBundle::clock`][crate::ethernet::RmiiPinBundle::clock] when calling
-//!   [`Ethernet::new`][crate::ethernet::Ethernet::new]; use this when the PHY has an oscillator
+//!   [`Ethernet::new`][crate::ethernet::Ethernet::new]; use this when the PHY has an oscillator.
 //!
 //! - **[`ApllClock`]** — the ESP32 APLL is tuned to 50 MHz and the output is routed through
 //!   `EMAC_CLK_OUT` or `EMAC_CLK_180`. The EMAC_EXT block feeds this clock back into the MAC. Use
@@ -35,9 +35,9 @@ use crate::{
     soc::regi2c,
 };
 
-/// PHY interface selection for RMII mode in `EMAC_EXT.ex_phyinf_conf`
+/// PHY interface selection for RMII mode in `EMAC_EXT.ex_phyinf_conf`.
 pub(super) const PHY_INTF_RMII: u8 = 4;
-/// PHY interface selection for MII mode in `EMAC_EXT.ex_phyinf_conf`
+/// PHY interface selection for MII mode in `EMAC_EXT.ex_phyinf_conf`.
 pub(super) const PHY_INTF_MII: u8 = 0;
 
 /// RMII reference clock provided externally by the PHY.
@@ -183,7 +183,7 @@ impl<P: RmiiClkOut> RmiiClockConfig for ApllClock<P> {
 
 /// MII clock configuration.
 ///
-/// In MII mode the PHY drives both `TX_CLK` (GPIO0) and `RX_CLK` (GPIO5)
+/// In MII mode the PHY drives both `TX_CLK` (GPIO0) and `RX_CLK` (GPIO5).
 /// The EMAC_EXT block only needs the MII clock buffers enabled;
 /// no internal clock source is required.
 pub(crate) struct MiiClock;

@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The `SOC` module provides access, functions and structures that are useful
-//! for interacting with various system-related peripherals on `ESP32-C3` chip
+//! for interacting with various system-related peripherals on `ESP32-C3` chip.
 
 crate::unstable_module! {
     pub mod clocks;

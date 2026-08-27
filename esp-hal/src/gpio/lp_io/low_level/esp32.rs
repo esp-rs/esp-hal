@@ -89,7 +89,7 @@ macro_rules! lp_io_analog {
 
         /// Returns whether something holds the pad.
         ///
-        /// Either bit of [`pad_hold`] alone keeps the pad frozen
+        /// Either bit of [`pad_hold`] alone keeps the pad frozen.
         pub(crate) fn is_pad_held(lp: u8) -> bool {
             paste::paste! {
                 match lp {

@@ -2,7 +2,7 @@
     all(docsrs, not(not_really_docsrs)),
     doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.espressif.com/projects/rust/'>browse the <code>esp-hal</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C6, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
-//! # Bare-metal (`no_std`) HAL for all Espressif ESP32 devices
+//! # Bare-metal (`no_std`) HAL for all Espressif ESP32 devices.
 //!
 //! This documentation is built for the
 #![doc = concat!("**", chip_pretty!(), "**")]
@@ -16,7 +16,7 @@
 //!
 //! ### Peripheral drivers
 //!
-//! The HAL implements both [`Blocking`] _and_ [`Async`] APIs for all applicable peripherals
+//! The HAL implements both [`Blocking`] _and_ [`Async`] APIs for all applicable peripherals.
 //! Where applicable, driver implement the [embedded-hal] and
 //! [embedded-hal-async] traits. Drivers that do not currently have a stable API
 //! are marked as `unstable` in the documentation.
@@ -26,7 +26,7 @@
 //! Each peripheral driver needs a peripheral singleton that tells the driver
 //! which hardware block to use. The peripheral singletons are created by the
 //! HAL initialization, and are returned from [`init`] as fields of the
-//! [`Peripherals`] struct
+//! [`Peripherals`] struct.
 //!
 //! These singletons, by default, represent peripherals for the entire lifetime
 //! of the program. To allow for reusing peripherals, the HAL provides a
@@ -58,7 +58,7 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //! reference:
 //!
 //! ```rust, ignore
-//! // Note that in this case, `peripherals` needs to be mutable
+//! // Note that in this case, `peripherals` needs to be mutable.
 //! let mut peripherals = esp_hal::init(esp_hal::Config::default());
 //!
 //! let i2c = I2C::new(peripherals.I2C0.reborrow(), /* ... */);
@@ -159,7 +159,7 @@ fn main() -> ! {
 #![doc = ""]
 //! ## Don't use `core::mem::forget`
 //!
-//! You should never use `core::mem::forget` on any type defined in [esp crates]
+//! You should never use `core::mem::forget` on any type defined in [esp crates].
 //! Many types heavily rely on their `Drop` implementation to not leave the
 //! hardware in undefined state which can cause undefined behavior in your program.
 //!
@@ -176,7 +176,7 @@ fn main() -> ! {
 //!
 //! This ensures that the `rt` feature is not enabled, nor any chip features. The application that
 //! uses your library will then be able to choose the chip feature it needs and enable `rt` such
-//! that only the final user application calls [`init`]
+//! that only the final user application calls [`init`].
 //!
 //! If your library depends on `unstable` features, you *must* use the `requires-unstable` feature,
 //! and *not* the unstable feature itself. Doing so, improves the quality of the error messages if a
@@ -532,7 +532,7 @@ let uart = Uart::new(peripherals.UART0, Config::default())?
 "#
 )]
 /// Drivers can be converted back to blocking mode using the `into_blocking`
-/// method, see [`Blocking`] documentation for more details
+/// method, see [`Blocking`] documentation for more details.
 ///
 /// Async mode drivers offer most of the same features as blocking drivers, but
 /// with the addition of async APIs. Interrupt-related functions are not
@@ -567,7 +567,7 @@ impl crate::private::Sealed for Async {}
 #[doc(hidden)]
 pub use private::Internal;
 
-/// Marker trait for types that can be safely used in `#[ram(unstable(persistent))]`
+/// Marker trait for types that can be safely used in `#[ram(unstable(persistent))]`.
 ///
 /// # Safety
 ///
@@ -578,7 +578,7 @@ pub use private::Internal;
 #[instability::unstable]
 pub unsafe trait Persistable: Sized {}
 
-/// Marker trait for types that can be safely used in `#[ram(reclaimed)]`
+/// Marker trait for types that can be safely used in `#[ram(reclaimed)]`.
 ///
 /// # Safety
 ///

@@ -1,5 +1,5 @@
 //! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
-//! is programmed by `EngineSession` on engine acquire
+//! is programmed by `EngineSession` on engine acquire.
 use super::*;
 
 pub fn chip_setup() {}

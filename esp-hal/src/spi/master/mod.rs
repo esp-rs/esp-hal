@@ -17,19 +17,19 @@
 //! - Use the [`SpiBus`] or [`SpiBusAsync`] trait and its associated functions to initiate
 //!   transactions with simultaneous reads and writes, or
 //! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice` from
-//!   [`embassy-embedded-hal`]
+//!   [`embassy-embedded-hal`].
 //!
 //! ### Shared SPI access
 //!
 //! If you have multiple devices on the same SPI bus that each have their own CS
 //! line (and optionally, configuration), you may want to have a look at the
 //! implementations provided by [`embedded-hal-bus`] and
-//! [`embassy-embedded-hal`]
+//! [`embassy-embedded-hal`].
 //!
 //! ## Usage
 //!
 //! The module implements several third-party traits from embedded-hal@1.x.x
-//! and [`embassy-embedded-hal`]
+//! and [`embassy-embedded-hal`].
 //!
 //! [`embedded-hal-bus`]: https://docs.rs/embedded-hal-bus/latest/embedded_hal_bus/spi/index.html
 //! [`embassy-embedded-hal`]: embassy_embedded_hal::shared_bus
@@ -1027,7 +1027,7 @@ where
     /// Configures the specified pin to push-pull output and connects it to the
     /// SPI clock signal.
     ///
-    /// Disconnects the previous pin that was assigned with `with_sck`
+    /// Disconnects the previous pin that was assigned with `with_sck`.
     ///
     /// # Examples
     ///
@@ -1056,7 +1056,7 @@ where
     /// when using [DataMode::SingleTwoDataLines].
     ///
     /// Disconnects the previous pin that was assigned with `with_mosi` or
-    /// `with_sio0`
+    /// `with_sio0`.
     ///
     /// # Examples
     ///
@@ -1113,7 +1113,7 @@ where
     /// to the MOSI output signal and SIO0 input signal.
     ///
     /// Disconnects the previous pin that was assigned with `with_sio0` or
-    /// `with_mosi`
+    /// `with_mosi`.
     ///
     /// Use this if any of the devices on the bus use half-duplex SPI.
     ///
@@ -1131,7 +1131,7 @@ where
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO input signal and SIO1 output signal.
     ///
-    /// Disconnects the previous pin that was assigned with `with_sio1`
+    /// Disconnects the previous pin that was assigned with `with_sio1`.
     ///
     /// Use this if any of the devices on the bus use half-duplex SPI.
     ///
@@ -1164,7 +1164,7 @@ where
     /// Configures the specified pin to push-pull output and connects it to the
     /// SPI CS signal.
     ///
-    /// Disconnects the previous pin that was assigned with `with_cs`
+    /// Disconnects the previous pin that was assigned with `with_cs`.
     ///
     /// # Current Stability Limitations
     /// The hardware chip select functionality is limited; only one CS line can

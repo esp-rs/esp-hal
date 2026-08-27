@@ -48,7 +48,7 @@ impl Candidate {
 /// A denominator only admits one closest numerator, so the closest fraction overall is whichever
 /// of these is closest.
 ///
-/// `target` must be between 0 and 1
+/// `target` must be between 0 and 1.
 fn candidates(target: Fraction, max_denominator: u32) -> impl Iterator<Item = Candidate> {
     let Fraction {
         numerator: n,
@@ -101,10 +101,10 @@ fn candidates(target: Fraction, max_denominator: u32) -> impl Iterator<Item = Ca
     })
 }
 
-/// A clock divider of the form `N + B/A`
+/// A clock divider of the form `N + B/A`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct FractionalDivider {
-    /// The integral part of the divider, `N`
+    /// The integral part of the divider, `N`.
     pub integer: u32,
 
     /// The numerator of the fractional part, `B`. Zero if the divider is integral.
@@ -120,10 +120,10 @@ impl FractionalDivider {
     /// `max_denominator` is the largest value the hardware's `A` field can hold. Callers are
     /// responsible for checking [`Self::integer`] against the range of the hardware's `N`
     /// field: the divider is rounded up to the next integer when the fractional part cannot
-    /// be represented, so the result may be one larger than `source / target`
+    /// be represented, so the result may be one larger than `source / target`.
     ///
     /// `target` must not be 0, and `max_denominator` must be between 1 and
-    /// [`MAX_DENOMINATOR`]
+    /// [`MAX_DENOMINATOR`].
     pub(crate) fn new(source: u32, target: u32, max_denominator: u32) -> Self {
         debug_assert!(target != 0);
         debug_assert!((1..=MAX_DENOMINATOR).contains(&max_denominator));

@@ -70,11 +70,11 @@ macro_rules! trm_markdown_link {
 ///
 /// This macro generates the following:
 ///
-/// - An `AnyPeripheral` struct, name provided by the macro call
-/// - An `any::Degrade` trait which is supposed to be used as a supertrait of a relevant Instance
-/// - An `any::Inner` enum, with the same variants as the original peripheral
-/// - A `From` implementation for each peripheral variant
-/// - A `degrade` method for each peripheral variant using the `any::Degrade` trait
+/// - An `AnyPeripheral` struct, name provided by the macro call.
+/// - An `any::Degrade` trait which is supposed to be used as a supertrait of a relevant Instance.
+/// - An `any::Inner` enum, with the same variants as the original peripheral.
+/// - A `From` implementation for each peripheral variant.
+/// - A `degrade` method for each peripheral variant using the `any::Degrade` trait.
 #[macro_export]
 macro_rules! any_peripheral {
     ($(#[$meta:meta])* $vis:vis peripheral $name:ident<'d> {
@@ -141,7 +141,7 @@ macro_rules! any_peripheral {
         ///
         /// A type-erased version of a peripheral singleton. Useful
         /// for creating arrays of peripherals, or avoiding generics. Peripheral singletons
-        /// can be type erased by using their `From` implementation
+        /// can be type erased by using their `From` implementation.
         ///
         /// ```rust,ignore
         #[doc = concat!("let any_peripheral = ", stringify!($name), "::from(peripheral);")]
@@ -275,7 +275,7 @@ let uart0 = any_peri1
 }
 
 /// Macro to choose between two expressions. Useful for implementing "else" for
-/// `$()?` macro syntax
+/// `$()?` macro syntax.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! if_set {
@@ -334,7 +334,7 @@ macro_rules! ignore {
 /// Defines a piece of (Espressif-specific) metadata that external tools may
 /// parse.
 ///
-/// The symbol name be formatted as `_ESP_METADATA_<category>_<name>`
+/// The symbol name be formatted as `_ESP_METADATA_<category>_<name>`.
 ///
 /// This metadata is zero cost, i.e. the value will not be flashed to the
 /// device.
@@ -360,7 +360,7 @@ macro_rules! metadata {
 }
 
 #[procmacros::doc_replace]
-/// Extract fields from [`Peripherals`][crate::peripherals::Peripherals] into named groups
+/// Extract fields from [`Peripherals`][crate::peripherals::Peripherals] into named groups.
 #[cfg_attr(
     // Feature-gated so that this doesn't prevent gradual device bringup. Any
     // stable driver would serve the purpose here, so this block will be part
@@ -504,7 +504,7 @@ macro_rules! assign_resources {
             }
         }
 
-        /// Extracts resources from the `Peripherals` struct
+        /// Extracts resources from the `Peripherals` struct.
         #[macro_export]
         macro_rules! split_resources {
             ($peris:ident) => {

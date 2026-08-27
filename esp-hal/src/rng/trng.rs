@@ -47,13 +47,13 @@ impl<'d> TrngSource<'d> {
     /// radio).
     ///
     /// Should only be called as many times as
-    /// [`TrngSource::increase_entropy_source_counter`] was called
+    /// [`TrngSource::increase_entropy_source_counter`] was called.
     ///
     /// # Panics
     ///
     /// Panics if the internal counter underflows. Dropping the `TrngSource` panics
     /// if this method is called more times than
-    /// [`TrngSource::increase_entropy_source_counter`]
+    /// [`TrngSource::increase_entropy_source_counter`].
     #[instability::unstable]
     pub fn decrease_entropy_source_counter(_private: crate::private::Internal) {
         match TRNG_ENABLED.fetch_sub(1, Ordering::Relaxed) {
@@ -115,13 +115,13 @@ impl Drop for TrngSource<'_> {
     }
 }
 
-/// Errors returned when constructing a [`Trng`]
+/// Errors returned when constructing a [`Trng`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[instability::unstable]
 pub enum TrngError {
-    /// The [`TrngSource`] is not enabled
+    /// The [`TrngSource`] is not enabled.
     ///
     /// Returned by [`Trng::try_new`] when the RNG is not configured to generate
     /// true random numbers.

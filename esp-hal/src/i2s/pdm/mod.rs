@@ -217,9 +217,9 @@ pub enum PdmTxLineMode {
 pub struct PdmTxClockConfig {
     /// Target PCM sample rate.
     pub sample_rate: Rate,
-    /// Upsampling factor numerator (`fp`)
+    /// Upsampling factor numerator (`fp`).
     pub up_sample_fp: u32,
-    /// Upsampling factor denominator (`fs`)
+    /// Upsampling factor denominator (`fs`).
     pub up_sample_fs: u32,
     /// Bit clock divider.
     pub bclk_div: u32,
@@ -389,7 +389,7 @@ pub struct PdmTxConfig {
 }
 
 impl PdmTxConfig {
-    /// Codec-line defaults (`I2S_PDM_TX_*_DEFAULT_CONFIG`)
+    /// Codec-line defaults (`I2S_PDM_TX_*_DEFAULT_CONFIG`).
     pub fn new_codec_default(sample_rate: Rate, mode: PdmSlotMode) -> Self {
         Self {
             clock: PdmTxClockConfig::codec_default(sample_rate),
@@ -405,7 +405,7 @@ impl PdmTxConfig {
         }
     }
 
-    /// DAC-line defaults (`I2S_PDM_TX_*_DAC_DEFAULT_CONFIG`, HW v2+)
+    /// DAC-line defaults (`I2S_PDM_TX_*_DAC_DEFAULT_CONFIG`, HW v2+).
     #[cfg(not(i2s_version = "1"))]
     pub fn new_dac_default(sample_rate: Rate, mode: PdmSlotMode) -> Self {
         Self {

@@ -20,7 +20,7 @@ const RESET_POLL_LIMIT: u32 = 500_000; // us
 /// responding PHY address is adopted.
 #[derive(Clone, Copy, Debug)]
 pub struct GenericPhy {
-    /// `Some(addr)` for a fixed address; `None` until auto-discovery runs
+    /// `Some(addr)` for a fixed address; `None` until auto-discovery runs.
     addr: Option<u8>,
 }
 

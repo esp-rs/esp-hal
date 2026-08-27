@@ -134,7 +134,7 @@ impl<'a> WrappedSleepConfig<'a> {
 /// Runs at sleep entry, before the sleep configuration reaches hardware.
 ///
 /// The configuration already holds the kind of the sleep, so a hook that needs it asks
-/// [`WrappedSleepConfig::is_deep_sleep`]
+/// [`WrappedSleepConfig::is_deep_sleep`].
 pub(crate) type SleepEntryHook = fn(&mut WrappedSleepConfig<'_>);
 
 /// Runs after a light sleep. A deep sleep resets the chip, which runs the initialization again.
@@ -187,7 +187,7 @@ impl WakeupSource {
     /// Both hooks run with the flash accessible. The entry hook runs before esp-hal writes the
     /// sleep configuration to hardware, and the exit hook runs after the wake sequence restores
     /// it. Both hooks are part of sleep entry, so keep them short. Give them the
-    /// [`ram`][crate::ram] attribute, to keep the flash out of the sleep path
+    /// [`ram`][crate::ram] attribute, to keep the flash out of the sleep path.
     pub(crate) fn enable_with_hooks(
         self,
         entry: Option<SleepEntryHook>,
@@ -270,7 +270,7 @@ pub(crate) fn mask() -> u32 {
 /// Writes the wakeup-enable mask.
 ///
 /// The function writes the field and not the register, because on esp32 the mask shares its
-/// register with `gpio_wakeup_filter` and with the read-only `wakeup_cause`
+/// register with `gpio_wakeup_filter` and with the read-only `wakeup_cause`.
 pub(crate) fn set_mask(mask: u32) {
     let reg = cfg_select! {
         soc_has_pmu => crate::peripherals::PMU::regs().slp_wakeup_cntl2(),

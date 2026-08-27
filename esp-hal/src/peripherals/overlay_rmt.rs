@@ -145,7 +145,7 @@ impl RmtRegisterBlock {
     }
 }
 
-/// Bit flag reader with a PAC-like [`bit`](BitFlag::bit) method
+/// Bit flag reader with a PAC-like [`bit`](BitFlag::bit) method.
 pub struct BitFlag(bool);
 
 impl BitFlag {
@@ -155,7 +155,7 @@ impl BitFlag {
     }
 }
 
-/// Field reader with a PAC-like [`bits`](FieldVal::bits) method
+/// Field reader with a PAC-like [`bits`](FieldVal::bits) method.
 pub struct FieldVal<T>(T);
 
 impl<T> FieldVal<T> {
@@ -165,7 +165,7 @@ impl<T> FieldVal<T> {
     }
 }
 
-/// Bit field writer with PAC-like `bit` / `set_bit` / `clear_bit` methods
+/// Bit field writer with PAC-like `bit` / `set_bit` / `clear_bit` methods.
 pub struct BitProxy<'a, W>(&'a mut W, fn(&mut W, bool));
 
 impl<'a, W> BitProxy<'a, W> {
@@ -186,7 +186,7 @@ impl<'a, W> BitProxy<'a, W> {
     }
 }
 
-/// Multi-bit field writer with a PAC-like `bits` method
+/// Multi-bit field writer with a PAC-like `bits` method.
 pub struct FieldProxy<'a, W, T>(&'a mut W, fn(&mut W, T));
 
 impl<'a, W, T> FieldProxy<'a, W, T> {
@@ -234,10 +234,10 @@ macro_rules! field_proxy {
 /// Channel TX configure register 0.
 pub struct TxConf0<'a>(&'a rmt::CHCONF0);
 
-/// Reader for [`TxConf0`]
+/// Reader for [`TxConf0`].
 pub struct TxConf0R(u32);
 
-/// Writer for [`TxConf0`]
+/// Writer for [`TxConf0`].
 #[repr(transparent)]
 pub struct TxConf0W(rmt::chconf0::W);
 
@@ -356,19 +356,19 @@ pub struct ChRxConf0 {
     ptr: *mut u32,
 }
 
-/// Reader for [`ChRxConf0`]
+/// Reader for [`ChRxConf0`].
 pub struct ChRxConf0R(u32);
 
-/// Writer for [`ChRxConf0`]
+/// Writer for [`ChRxConf0`].
 pub struct ChRxConf0W(u32);
 
-/// Bit writer for [`ChRxConf0`]
+/// Bit writer for [`ChRxConf0`].
 pub struct RxBit<'a> {
     w: &'a mut ChRxConf0W,
     bit: u8,
 }
 
-/// Field writer for [`ChRxConf0`]
+/// Field writer for [`ChRxConf0`].
 pub struct RxField<'a> {
     w: &'a mut ChRxConf0W,
     offset: u8,
@@ -465,7 +465,7 @@ impl ChRxConf0 {
 /// Channel RX configure register 1.
 pub struct RxConf1<'a>(&'a rmt::CHCONF1);
 
-/// Writer for [`RxConf1`]
+/// Writer for [`RxConf1`].
 #[repr(transparent)]
 pub struct RxConf1W(rmt::chconf1::W);
 
@@ -527,7 +527,7 @@ impl RxConf1W {
 /// Channel TX/RX status register.
 pub struct ChStatus<'a>(&'a rmt::CHSTATUS);
 
-/// Reader for [`ChStatus`]
+/// Reader for [`ChStatus`].
 pub struct StatusR(u32);
 
 impl ChStatus<'_> {
@@ -552,7 +552,7 @@ impl StatusR {
 /// Channel TX limit register.
 pub struct TxLim<'a>(&'a rmt::CH_TX_LIM);
 
-/// Writer for [`TxLim`]
+/// Writer for [`TxLim`].
 #[repr(transparent)]
 pub struct TxLimW(rmt::ch_tx_lim::W);
 
@@ -609,7 +609,7 @@ impl TxLimW {
 /// Channel RX limit register.
 pub struct RxLim<'a>(&'a rmt::CH_RX_LIM);
 
-/// Writer for [`RxLim`]
+/// Writer for [`RxLim`].
 #[repr(transparent)]
 pub struct RxLimW(rmt::ch_rx_lim::W);
 
@@ -636,7 +636,7 @@ impl RxLimW {
 /// Channel carrier duty register.
 pub struct CarrierDuty<'a>(&'a rmt::CHCARRIER_DUTY);
 
-/// Writer for [`CarrierDuty`]
+/// Writer for [`CarrierDuty`].
 #[repr(transparent)]
 pub struct CarrierDutyW(rmt::chcarrier_duty::W);
 
@@ -672,7 +672,7 @@ impl CarrierDutyW {
 /// Channel RX carrier remove register.
 pub struct RxCarrierRm<'a>(&'a rmt::CH_RX_CARRIER_RM);
 
-/// Writer for [`RxCarrierRm`]
+/// Writer for [`RxCarrierRm`].
 #[repr(transparent)]
 pub struct RxCarrierRmW(rmt::ch_rx_carrier_rm::W);
 
@@ -768,14 +768,14 @@ impl IntR {
 /// Interrupt enable register.
 pub struct IntEna<'a>(&'a rmt::INT_ENA);
 
-/// Writer for [`IntEna`]
+/// Writer for [`IntEna`].
 #[repr(transparent)]
 pub struct IntEnaW(rmt::int_ena::W);
 
 /// Interrupt clear register.
 pub struct IntClr<'a>(&'a rmt::INT_CLR);
 
-/// Writer for [`IntClr`]
+/// Writer for [`IntClr`].
 #[repr(transparent)]
 pub struct IntClrW(rmt::int_clr::W);
 

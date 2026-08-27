@@ -24,4 +24,4 @@
 //!
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
-//! `gpio` peripheral to access the appropriate registers
+//! `gpio` peripheral to access the appropriate registers.

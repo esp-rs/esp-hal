@@ -27,7 +27,7 @@ type CurvesCoeffs = &'static [CurveCoeffs];
 
 /// Marker trait for ADC which support curve fitting
 ///
-/// See also [`AdcCalCurve`]
+/// See also [`AdcCalCurve`].
 pub trait AdcHasCurveCal {
     /// Coefficients for calculating the reading voltage error.
     ///
@@ -46,7 +46,7 @@ pub trait AdcHasCurveCal {
 /// coefficient sets for each attenuation. It returns readings in mV.
 ///
 /// This scheme also includes basic calibration ([`super::AdcCalBasic`]) and
-/// line fitting ([`AdcCalLine`])
+/// line fitting ([`AdcCalLine`]).
 #[derive(Clone, Copy)]
 pub struct AdcCalCurve<ADCX> {
     line: AdcCalLine<ADCX>,
@@ -54,7 +54,7 @@ pub struct AdcCalCurve<ADCX> {
     /// Coefficients of the error estimation polynomial.
     ///
     /// The constant coefficient comes first; the error polynomial is
-    /// `coeff[0] + coeff[1] * x + ... + coeff[n] * x^n`
+    /// `coeff[0] + coeff[1] * x + ... + coeff[n] * x^n`.
     ///
     /// This calibration works by first applying linear calibration. Then
     /// the error polynomial is applied to the output of linear calibration.

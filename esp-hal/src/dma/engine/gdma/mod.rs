@@ -24,7 +24,7 @@ use crate::{
 #[cfg_attr(dma_gdma_version = "3", path = "ahb_v3.rs")]
 mod implementation;
 
-/// Immutable per-channel metadata owned by each `DMA_CH*` singleton
+/// Immutable per-channel metadata owned by each `DMA_CH*` singleton.
 pub(crate) struct ChannelInfo {
     /// Hardware channel index used to select the register bank.
     pub(crate) channel: u8,

@@ -224,7 +224,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
 /// number plus two.
 ///
 /// See `ADC_LL_UNIT2_CHANNEL_SUBSTRATION` in
-/// `components/esp_hal_ana_conv/esp32p4/include/hal/adc_ll.h`
+/// `components/esp_hal_ana_conv/esp32p4/include/hal/adc_ll.h`.
 #[cfg(adc_adc2)]
 const ADC2_PAD_OFFSET: u8 = 2;
 

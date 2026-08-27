@@ -16,7 +16,7 @@
 //!
 //! Notice, that this module is a common version of the DMA driver, `ESP32` and
 //! `ESP32-S2` are using older `PDMA` controller, whenever other chips are using
-//! newer `GDMA` controller
+//! newer `GDMA` controller.
 //!
 //! ## Examples
 //!
@@ -45,8 +45,8 @@
 //! # {after_snippet}
 //! ```
 //!
-//! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`
-//! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor
+//! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
+//! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
 //! ⚠️ Note: For chips that support DMA to/from PSRAM DMA transfers to/from PSRAM
 //! have extra alignment requirements. The address and size of the buffer pointed to by
@@ -501,7 +501,7 @@ macro_rules! dma_descriptor_count {
 
 #[procmacros::doc_replace]
 /// Convenience macro to create a DmaRxBuf from buffer size. The buffer and
-/// descriptors are statically allocated and used to create the `DmaRxBuf`
+/// descriptors are statically allocated and used to create the `DmaRxBuf`.
 ///
 /// # Examples
 ///
@@ -526,7 +526,7 @@ macro_rules! dma_rx_buffer {
 
 #[procmacros::doc_replace]
 /// Convenience macro to create a DmaTxBuf from buffer size. The buffer and
-/// descriptors are statically allocated and used to create the `DmaTxBuf`
+/// descriptors are statically allocated and used to create the `DmaTxBuf`.
 ///
 /// # Examples
 ///
@@ -828,7 +828,7 @@ impl<'a> DescriptorSet<'a> {
     ///
     /// Checks the alignment and location of the buffer.
     ///
-    /// See [`Self::set_up_buffer_ptrs`] for more details
+    /// See [`Self::set_up_buffer_ptrs`] for more details.
     fn link_with_buffer(
         &mut self,
         buffer: &mut [u8],
@@ -839,7 +839,7 @@ impl<'a> DescriptorSet<'a> {
 
     /// Prepares descriptors for transferring `len` bytes of data.
     ///
-    /// See [`Self::set_up_descriptors`] for more details
+    /// See [`Self::set_up_descriptors`] for more details.
     fn set_length(
         &mut self,
         len: usize,
@@ -851,7 +851,7 @@ impl<'a> DescriptorSet<'a> {
 
     /// Prepares descriptors for reading `len` bytes of data.
     ///
-    /// See [`Self::set_up_descriptors`] for more details
+    /// See [`Self::set_up_descriptors`] for more details.
     fn set_rx_length(&mut self, len: usize, chunk_size: usize) -> Result<(), DmaBufError> {
         self.set_length(len, chunk_size, |desc, chunk_size| {
             desc.set_size(chunk_size);
@@ -860,7 +860,7 @@ impl<'a> DescriptorSet<'a> {
 
     /// Prepares descriptors for writing `len` bytes of data.
     ///
-    /// See [`Self::set_up_descriptors`] for more details
+    /// See [`Self::set_up_descriptors`] for more details.
     fn set_tx_length(&mut self, len: usize, chunk_size: usize) -> Result<(), DmaBufError> {
         self.set_length(len, chunk_size, |desc, chunk_size| {
             desc.set_length(chunk_size);

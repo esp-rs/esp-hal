@@ -2,7 +2,7 @@
 
 use crate::{peripherals::VDMA, private::Sealed, reg_access::VolatileCell};
 
-/// Implemented by VDMA channel singletons (`VDMA_CH0`–`VDMA_CH3`)
+/// Implemented by VDMA channel singletons (`VDMA_CH0`–`VDMA_CH3`).
 ///
 /// Provides the hardware channel index without exposing the full DMA trait
 /// surface, since VDMA uses DW-GDMA linked-list mode which is incompatible
@@ -90,7 +90,7 @@ impl VdmaLinkItem {
 
     /// Populate this LLI for a circular frame-buffer transfer.
     ///
-    /// `next` must point to the next LLI in the chain
+    /// `next` must point to the next LLI in the chain.
     /// `LLI_LAST` is deliberately **not** set; the DMA always follows the LLP
     /// pointer to continue the linked-list ring.
     pub(super) fn configure(&self, src_addr: u32, fb_size: usize, next: *const VdmaLinkItem) {

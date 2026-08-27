@@ -67,7 +67,7 @@ use crate::{
     time::Rate,
 };
 
-/// Immutable per-channel metadata owned by each `SDM_CH*` singleton
+/// Immutable per-channel metadata owned by each `SDM_CH*` singleton.
 #[doc(hidden)]
 pub struct ChannelInfo {
     /// Hardware channel index used to select the register bank.
@@ -149,7 +149,7 @@ pub struct ChannelConfig {
     #[builder_lite(skip)]
     raw_prescaler: u8,
 
-    /// Pulse density in the hardware range `-128..=127`
+    /// Pulse density in the hardware range `-128..=127`.
     pulse_density: i8,
 }
 
@@ -179,7 +179,7 @@ impl ChannelConfig {
 
     /// Sets the hardware prescaler.
     ///
-    /// The hardware divider range is `1..=256`
+    /// The hardware divider range is `1..=256`.
     ///
     /// # Errors
     ///
@@ -251,7 +251,7 @@ impl<'d> Channel<'d> {
 
     /// Sets raw pulse density.
     ///
-    /// The value ranges from `-128` to `127`
+    /// The value ranges from `-128` to `127`.
     pub fn set_pulse_density(&mut self, density: i8) {
         GPIO_SD::regs()
             .sigmadelta(self.index())
@@ -271,7 +271,7 @@ impl<'d> Channel<'d> {
 
     /// Reads the hardware prescaler.
     ///
-    /// The returned value is in the hardware divider range `1..=256`
+    /// The returned value is in the hardware divider range `1..=256`.
     pub fn prescaler(&self) -> u16 {
         let reg = GPIO_SD::regs().sigmadelta(self.index()).read();
         let bits = cfg_select! {
@@ -284,7 +284,7 @@ impl<'d> Channel<'d> {
 
     /// Reads the raw pulse density.
     ///
-    /// The returned value is in the hardware range `-128..=127`
+    /// The returned value is in the hardware range `-128..=127`.
     pub fn pulse_density(&self) -> i8 {
         let reg = GPIO_SD::regs().sigmadelta(self.index()).read();
         let bits = cfg_select! {

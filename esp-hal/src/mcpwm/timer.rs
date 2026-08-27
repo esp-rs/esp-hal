@@ -2,7 +2,7 @@
 //!
 //! ## Overview
 //! The `timer` module provides an interface to configure and use timers for
-//! generating `PWM` signals used in motor control and other applications
+//! generating `PWM` signals used in motor control and other applications.
 
 use core::marker::PhantomData;
 
@@ -116,7 +116,7 @@ impl<const TIM: u8, PWM: PwmPeripheral> Timer<TIM, PWM> {
 /// Clocks configuration of a MCPWM timer.
 ///
 /// Use [`PeripheralClockConfig::timer_clock_with_prescaler`](super::PeripheralClockConfig::timer_clock_with_prescaler) or
-/// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency) to it
+/// [`PeripheralClockConfig::timer_clock_with_frequency`](super::PeripheralClockConfig::timer_clock_with_frequency) to it.
 #[derive(Copy, Clone)]
 pub struct TimerClockConfig {
     frequency: Rate,

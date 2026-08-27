@@ -221,7 +221,7 @@ with_i2s_dma_engine! {
     ($engine:tt, $any_channel:ident) => {
         /// DMA channel trait for I2S master peripherals.
         ///
-        /// Implemented for each channel type that can serve a particular I2S instance `S`
+        /// Implemented for each channel type that can serve a particular I2S instance `S`.
         #[instability::unstable]
         #[diagnostic::on_unimplemented(
             message = "The DMA channel cannot be used with this I2S peripheral",
@@ -828,7 +828,7 @@ pub struct TdmConfig {
     /// Transmitter unit config.
     tx_config: TdmUnitConfig,
 
-    /// Sets `I2S_SIG_LOOPBACK`: TX and RX share the same WS and BCK
+    /// Sets `I2S_SIG_LOOPBACK`: TX and RX share the same WS and BCK.
     signal_loopback: bool,
 
     /// The target sample rate.
@@ -1042,7 +1042,7 @@ pub struct TdmUnitConfig {
     bit_order: BitOrder,
 }
 
-/// Alias for [`TdmUnitConfig`] (TDM mode unit configuration)
+/// Alias for [`TdmUnitConfig`] (TDM mode unit configuration).
 pub type UnitConfig = TdmUnitConfig;
 
 impl TdmUnitConfig {

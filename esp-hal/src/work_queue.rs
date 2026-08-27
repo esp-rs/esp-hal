@@ -34,7 +34,7 @@ pub(crate) struct VTable<T: Sync + Send> {
     /// Polls the status of the current work item.
     ///
     /// The work queue ensures that the item passed here has been first passed to the driver by
-    /// `post`
+    /// `post`.
     ///
     /// Should be as short as possible.
     pub(crate) poll: fn(NonNull<()>, &mut T) -> Poll,
@@ -426,7 +426,7 @@ impl<T: Sync + Send> WorkQueue<T> {
     /// Schedules the work item to be cancelled.
     ///
     /// Returns whether the item was immediately cancelled. If it returns
-    /// `false`, the item will need to be polled until its status becomes [`Poll::Ready`]
+    /// `false`, the item will need to be polled until its status becomes [`Poll::Ready`].
     ///
     /// The work item should not be assumed to be immediately cancelled. Polling its handle
     /// is necessary to ensure it is no longer being processed by the underlying driver.
@@ -514,7 +514,7 @@ impl Poll {
     }
 }
 
-/// A reference to a posted [`WorkItem`]
+/// A reference to a posted [`WorkItem`].
 ///
 /// Ensures that the work item is valid until the item is processed or is removed from
 /// the work queue.

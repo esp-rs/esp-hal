@@ -50,7 +50,7 @@
 //!  - The ESP32-S31 has no calibration scheme. ESP-IDF does not define the calibration eFuses or
 //!    the curve fitting coefficients for this chip yet.
 //!  - The ESP32-S31 SAR ADC has one attenuation setting, so the attenuation given to
-//!    [`AdcConfig::enable_pin`] has no effect
+//!    [`AdcConfig::enable_pin`] has no effect.
 //!  - The ESP32-S31 SAR is differential and its result is the weighted sum of 17 redundant
 //!    comparator bits. Readings run from 0 to `FULL_SCALE` (4393), and an input tied to ground
 //!    reads about `ZERO_DIFF_CODE` (2198), so a single-ended measurement only uses the codes above

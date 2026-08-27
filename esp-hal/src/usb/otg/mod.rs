@@ -4,7 +4,7 @@
 ))]
 //! USB On-The-Go
 //!
-//! `embassy-usb` / `embassy-usb-host` integration: [`embassy_usb_device`], [`embassy_usb_host`]
+//! `embassy-usb` / `embassy-usb-host` integration: [`embassy_usb_device`], [`embassy_usb_host`].
 #![cfg_attr(
     usb_otg_driver_supported,
     doc = r#"

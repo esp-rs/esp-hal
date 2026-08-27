@@ -525,9 +525,9 @@ pub fn xtal_clock() -> Rate {
 /// Reads the calibrated RTC slow clock period from the STORE1 register.
 ///
 /// The period is in unit of microseconds, represented as a fixed-point number
-/// with `RtcClock::CAL_FRACT` fractional bits
+/// with `RtcClock::CAL_FRACT` fractional bits.
 ///
-/// Written by [`calibrate_rtc_slow_clock`] during clock initialization
+/// Written by [`calibrate_rtc_slow_clock`] during clock initialization.
 pub(crate) fn rtc_slow_cal_period() -> u32 {
     let reg = cfg_select! {
         esp32s31 => LP_AON::regs().lp_store(1),

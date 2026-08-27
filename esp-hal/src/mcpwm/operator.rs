@@ -2,7 +2,7 @@
 //!
 //! ## Overview
 //! The `operator` is responsible for generating `PWM (Pulse Width Modulation)`
-//! signals and handling various aspects related to `PWM` signal generation
+//! signals and handling various aspects related to `PWM` signal generation.
 //!
 //! ## Configuration
 //! This module provides flexibility in configuring the PWM outputs. Its
@@ -697,7 +697,7 @@ impl PwmUpdateMethod {
     /// New timestamp will be applied when timer is equal to period.
     pub const SYNC_ON_PERIOD: Self = Self::empty().sync_on_timer_equals_period();
 
-    /// `PwmUpdateMethod` with no sync triggers
+    /// `PwmUpdateMethod` with no sync triggers.
     /// Corresponds to syncing immediately
     pub const fn empty() -> Self {
         PwmUpdateMethod(0)

@@ -1,12 +1,12 @@
 //! Module clock is engine-wide (`SdHostController::new`); per-slot card clock
-//! is programmed by `EngineSession` on engine acquire
+//! is programmed by `EngineSession` on engine acquire.
 use super::*;
 
 pub fn chip_setup() {}
 
 /// Programs the shared module clock register (divider, source, phases).
 ///
-/// Field encodings differ per chip (see each chip's `sdmmc_ll`)
+/// Field encodings differ per chip (see each chip's `sdmmc_ll`).
 pub fn set_module_clock(source: ClockSource, div: u8) {
     // S3: l == period, h == high pulse, n == l; phase dout=90°, din=0°.
     let l = div - 1;

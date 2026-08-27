@@ -115,7 +115,7 @@ use phy::{MdioDriver, Phy};
 
 // ── Driver error ─────────────────────────────────────────────────────────────
 
-/// Error type returned by `Ethernet` operations
+/// Error type returned by `Ethernet` operations.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
@@ -337,14 +337,14 @@ for_each_iomux_function! {
     };
 }
 
-/// RMII or MII pad wiring for [`Ethernet::new`]
+/// RMII or MII pad wiring for [`Ethernet::new`].
 pub trait EthernetPinBundle: crate::private::Sealed {
     /// Applies the required configuration. Intended to be
     /// called by the Ethernet driver internally.
     fn apply(self);
 }
 
-/// Wired RMII pads and RMII clock (pass to [`Ethernet::new`])
+/// Wired RMII pads and RMII clock (pass to [`Ethernet::new`]).
 #[allow(
     missing_docs,
     reason = "The field names are indicative of their function."
@@ -392,7 +392,7 @@ where
     }
 }
 
-/// Wired MII pads (pass to [`Ethernet::new`])
+/// Wired MII pads (pass to [`Ethernet::new`]).
 #[allow(
     missing_docs,
     reason = "The field names are indicative of their function."
@@ -595,7 +595,7 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
 
     /// Returns the received frame data if one is ready.
     ///
-    /// Call [`pop_rx`][Self::pop_rx] after processing the frame
+    /// Call [`pop_rx`][Self::pop_rx] after processing the frame.
     pub fn receive(&mut self) -> Result<&mut [u8], Error> {
         match self.rx.receive() {
             Some(frame) => Ok(frame),

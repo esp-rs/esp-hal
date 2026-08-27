@@ -25,7 +25,7 @@
 //! The drivers can take channels and pins by value or by reference. Pass these objects by reference
 //! if you plan on reusing them again, after dropping the dedicated driver.
 //!
-//! Due to how the hardware works, [`DedicatedGpioOutput`] can drive any number of GPIO pins
+//! Due to how the hardware works, [`DedicatedGpioOutput`] can drive any number of GPIO pins.
 //!
 //! ## Bundles
 //!
@@ -100,7 +100,7 @@ Do not send the drivers to another core, either directly, or indirectly via a th
 //!     .enable_input(&in2);
 //!
 //! // Bundle B reads channels 0, 2, 4.
-//! // Note: `in0` and `in2` are *shared* with bundle A
+//! // Note: `in0` and `in2` are *shared* with bundle A.
 //! let mut bundle_b = DedicatedGpioInputBundle::new();
 //! bundle_b
 //!     .enable_input(&in0)
@@ -1027,12 +1027,12 @@ pub struct DedicatedGpioOutputBundle<'lt> {
 impl<'lt> DedicatedGpioOutputBundle<'lt> {
     /// Creates a new, empty dedicated GPIO output bundle.
     ///
-    /// A bundle is a *logical* grouping of one or more [`DedicatedGpioOutput`] drivers
+    /// A bundle is a *logical* grouping of one or more [`DedicatedGpioOutput`] drivers.
     /// Internally, it stores a precomputed channel mask (see [`Self::mask`]) which allows
     /// writing multiple dedicated GPIO channels efficiently.
     ///
     /// The returned bundle initially contains no channels. Add outputs using
-    /// [`Self::enable_output`]
+    /// [`Self::enable_output`].
     ///
     /// Creating a bundle does **not** configure any hardware by itself.
     pub fn new() -> Self {
@@ -1151,17 +1151,17 @@ Dedicated GPIO drivers must only be disabled if configured on the same core as t
     ///
     /// # Examples
     ///
-    /// `bundle.set_high(0b1011_0001)` sets channels 0, 4, 5, and 7 high
+    /// `bundle.set_high(0b1011_0001)` sets channels 0, 4, 5, and 7 high.
     ///
     /// <section class="warning">
     ///
     /// The caller must ensure that `bits` only contains channels included in this bundle,
-    /// i.e. `bits & !self.mask() == 0`
+    /// i.e. `bits & !self.mask() == 0`.
     ///
     /// For example, if the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then `bits`
     /// must not set bit 2 (e.g. `0b0000_0100`), or channel 2 outside the bundle would be modified
     ///
-    /// When compiled with `debug-assertions`, this condition is checked at runtime
+    /// When compiled with `debug-assertions`, this condition is checked at runtime.
     /// </section>
     #[inline(always)]
     pub fn set_high(&mut self, bits: u32) {
@@ -1186,17 +1186,17 @@ Dedicated GPIO drivers must only be disabled if configured on the same core as t
     ///
     /// # Examples
     ///
-    /// `bundle.set_low(0b1011_0001)` sets channels 0, 4, 5, and 7 low
+    /// `bundle.set_low(0b1011_0001)` sets channels 0, 4, 5, and 7 low.
     ///
     /// <section class="warning">
     ///
     /// The caller must ensure that `bits` only contains channels included in this bundle,
-    /// i.e. `bits & !self.mask() == 0`
+    /// i.e. `bits & !self.mask() == 0`.
     ///
     /// For example, if the bundle mask is `0b0000_1011` (channels 0, 1, and 3), then `bits`
     /// must not set bit 7 (e.g. `0b1000_0000`), or channel 7 outside the bundle would be cleared
     ///
-    /// When compiled with `debug-assertions`, this condition is checked at runtime
+    /// When compiled with `debug-assertions`, this condition is checked at runtime.
     /// </section>
     #[inline(always)]
     pub fn set_low(&mut self, bits: u32) {
@@ -1347,12 +1347,12 @@ pub struct DedicatedGpioInputBundle<'lt> {
 impl<'lt> DedicatedGpioInputBundle<'lt> {
     /// Creates a new, empty dedicated GPIO input bundle.
     ///
-    /// A bundle is a *logical* grouping of one or more [`DedicatedGpioInput`] drivers
+    /// A bundle is a *logical* grouping of one or more [`DedicatedGpioInput`] drivers.
     /// Internally, it stores a precomputed channel mask which allows reading multiple
     /// dedicated input channels efficiently.
     ///
     /// The returned bundle initially contains no channels. Add inputs using
-    /// [`Self::enable_input`]
+    /// [`Self::enable_input`].
     ///
     /// Creating a bundle does **not** configure any hardware by itself.
     pub fn new() -> Self {
@@ -1592,12 +1592,12 @@ pub struct DedicatedGpioFlexBundle<'lt> {
 impl<'lt> DedicatedGpioFlexBundle<'lt> {
     /// Creates a new, empty dedicated GPIO flex bundle.
     ///
-    /// A bundle is a *logical* grouping of one or more [`DedicatedGpioFlex`] drivers
+    /// A bundle is a *logical* grouping of one or more [`DedicatedGpioFlex`] drivers.
     /// Internally, it stores a precomputed channel mask (see [`Self::mask`]) which allows
     /// writing multiple dedicated GPIO channels efficiently.
     ///
     /// The returned bundle initially contains no channels. Add flex drivers using
-    /// [`Self::enable_flex`]
+    /// [`Self::enable_flex`].
     ///
     /// Creating a bundle does **not** configure any hardware by itself.
     pub fn new() -> Self {
@@ -1702,7 +1702,7 @@ Dedicated GPIO drivers must only be disabled if configured on the same core as t
 
     /// Sets selected channels **high**.
     ///
-    /// For every bit set to 1 in `bits`, the corresponding channel is driven high
+    /// For every bit set to 1 in `bits`, the corresponding channel is driven high.
     /// Bits set to 0 are left unchanged.
     ///
     /// # Examples
@@ -1713,12 +1713,12 @@ Dedicated GPIO drivers must only be disabled if configured on the same core as t
     /// <section class="warning">
     ///
     /// The caller must ensure that `bits` only contains channels included in this bundle,
-    /// i.e. `bits & !self.mask() == 0`
+    /// i.e. `bits & !self.mask() == 0`.
     ///
     /// For example, if the bundle mask is `0b0000_0011` (channels 0 and 1), then `bits` must not
     /// set bit 2 (e.g. `0b0000_0100`), or channel 2 outside the bundle would be modified
     ///
-    /// When compiled with `debug-assertions`, this condition is checked at runtime
+    /// When compiled with `debug-assertions`, this condition is checked at runtime.
     /// </section>
     #[inline(always)]
     pub fn set_high(&mut self, bits: u32) {
@@ -1738,7 +1738,7 @@ Dedicated GPIO drivers must only be disabled if configured on the same core as t
 
     /// Sets selected channels **low**.
     ///
-    /// For every bit set to 1 in `bits`, the corresponding channel is driven low
+    /// For every bit set to 1 in `bits`, the corresponding channel is driven low.
     /// Bits set to 0 are left unchanged.
     ///
     /// # Examples
@@ -1749,12 +1749,12 @@ Dedicated GPIO drivers must only be disabled if configured on the same core as t
     /// <section class="warning">
     ///
     /// The caller must ensure that `bits` only contains channels included in this bundle,
-    /// i.e. `bits & !self.mask() == 0`
+    /// i.e. `bits & !self.mask() == 0`.
     ///
     /// For example, if the bundle mask is `0b0000_0011` (channels 0 and 1), then `bits` must not
     /// set bit 7 (e.g. `0b1000_0000`), or channel 7 outside the bundle would be modified
     ///
-    /// When compiled with `debug-assertions`, this condition is checked at runtime
+    /// When compiled with `debug-assertions`, this condition is checked at runtime.
     /// </section>
     #[inline(always)]
     pub fn set_low(&mut self, bits: u32) {

@@ -419,7 +419,7 @@ fn pmu_hp_system_init() {
 }
 
 /// Configures the default per-mode LP system PMU registers (LP_ACTIVE which
-/// lives in the `hp_sleep_lp_*` group, and LP_SLEEP in the `lp_sleep_*` group)
+/// lives in the `hp_sleep_lp_*` group, and LP_SLEEP in the `lp_sleep_*` group).
 /// Mirrors `pmu_lp_system_init()` in esp-idf.
 fn pmu_lp_system_init() {
     let pmu = PMU::regs();

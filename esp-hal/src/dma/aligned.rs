@@ -17,7 +17,7 @@ use crate::{
 /// as a DMA buffer or descriptor array, meaning DMA or cache management
 /// operations will not corrupt surrounding data.
 ///
-/// [`DmaAlignedMut`] is a reference type that carries this guarantee
+/// [`DmaAlignedMut`] is a reference type that carries this guarantee.
 // ESP32-P4 internal memory is cached, enforce alignment to avoid memory
 // corruption. Technically only needed for IN buffers and descriptor lists.
 #[derive(Debug)]
@@ -145,7 +145,7 @@ fn region_needs_cache_op(addr: usize, size: usize) -> bool {
     in_cached_region
 }
 
-/// A mutable reference to an [`InternalMemory`] object
+/// A mutable reference to an [`InternalMemory`] object.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -256,7 +256,7 @@ impl<'a, T: ?Sized> DerefMut for DmaAlignedMut<'a, T> {
     }
 }
 
-/// A shared reference to an [`InternalMemory`] object
+/// A shared reference to an [`InternalMemory`] object.
 ///
 /// Unlike [`DmaAlignedMut`], a [`DmaAlignedRef`] only allows *reading* the
 /// value and *invalidating* its cache lines (discarding the CPU-cached copy so

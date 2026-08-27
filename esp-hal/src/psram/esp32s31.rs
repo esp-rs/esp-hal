@@ -13,7 +13,7 @@ mod oct_hex;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub struct PsramConfig {
-    /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density
+    /// Size of PSRAM to map. Default: `AutoDetect` via MR2 density.
     pub size: PsramSize,
 
     /// PSRAM timing parameters. Default: 250 MHz.
@@ -44,12 +44,12 @@ pub struct PsramTimingParams {
 
     /// Reads dummy length in bits for sync data reads (cache path).
     ///
-    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`
+    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
     pub rd_dummy_bits: u8,
 
     /// Writes dummy length in bits for sync data writes (cache path).
     ///
-    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`
+    /// For `N` dummy bits, configure `reg_dummy_bits` to `N - 1`.
     pub wr_dummy_bits: u8,
 
     /// Register-read dummy length for direct command path (MSPI3).

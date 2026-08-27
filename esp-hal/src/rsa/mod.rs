@@ -391,7 +391,7 @@ pub mod operand_sizes {
 }
 
 /// Support for the RSA peripheral's modular exponentiation feature that could be
-/// used to find the `(base ^ exponent) mod modulus`
+/// used to find the `(base ^ exponent) mod modulus`.
 ///
 /// Each operand is a little endian byte array of the same size.
 pub struct RsaModularExponentiation<'a, 'd, T: RsaMode, Dm: DriverMode> {
@@ -439,7 +439,7 @@ where
 
     /// Starts the modular exponentiation operation.
     ///
-    /// `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`
+    /// `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -475,7 +475,7 @@ where
 }
 
 /// Support for the RSA peripheral's modular multiplication feature that could be
-/// used to find the `(operand a * operand b) mod modulus`
+/// used to find the `(operand a * operand b) mod modulus`.
 ///
 /// Each operand is a little endian byte array of the same size.
 pub struct RsaModularMultiplication<'a, 'd, T, Dm>
@@ -494,8 +494,8 @@ where
 {
     /// Creates an instance of `RsaModularMultiplication`.
     ///
-    /// - `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`
-    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of modulus) mod 2^32`
+    /// - `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
+    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of modulus) mod 2^32`.
     ///
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
@@ -550,7 +550,7 @@ where
 }
 
 /// Support for the RSA peripheral's large number multiplication feature that could
-/// be used to find the `operand a * operand b`
+/// be used to find the `operand a * operand b`.
 ///
 /// Each operand is a little endian byte array of the same size.
 pub struct RsaMultiplication<'a, 'd, T, Dm>
@@ -607,7 +607,7 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 #[cfg(rsa_version = "1")]
 static SIGNALED: AtomicBool = AtomicBool::new(false);
 
-/// `Future` that waits for the RSA operation to complete
+/// `Future` that waits for the RSA operation to complete.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct RsaFuture<'a, 'd> {
     driver: &'a Rsa<'d, Async>,
@@ -775,7 +775,7 @@ enum RsaBackendState<'d> {
 /// and started for operations to be processed. Operations can be performed on the RSA accelerator
 /// without carrying around the peripheral singleton, or the driver.
 ///
-/// The [`RsaContext`] struct can enqueue work items that this backend will process
+/// The [`RsaContext`] struct can enqueue work items that this backend will process.
 ///
 /// # Examples
 ///
@@ -1013,7 +1013,7 @@ impl<'d> RsaBackend<'d> {
 ///
 /// This object must be kept around, otherwise RSA operations will never complete.
 ///
-/// For a usage example, see [`RsaBackend`]
+/// For a usage example, see [`RsaBackend`].
 pub struct RsaWorkQueueDriver<'t, 'd> {
     inner: WorkQueueDriver<'t, RsaBackend<'d>, RsaWorkItem>,
 }
@@ -1082,7 +1082,7 @@ fn rsa_work_queue_handler() {
 /// This object allows performing [big number multiplication][Self::multiply], [big number modular
 /// multiplication][Self::modular_multiply] and [big number modular
 /// exponentiation][Self::modular_exponentiate] with hardware acceleration. To perform these
-/// operations, the [`RsaBackend`] must be started, otherwise these operations will never complete
+/// operations, the [`RsaBackend`] must be started, otherwise these operations will never complete.
 #[cfg_attr(
     not(rsa_version = "1"),
     doc = " \nThe context is created with a secure configuration by default. You can enable hardware acceleration
@@ -1158,8 +1158,8 @@ impl RsaContext {
     ///
     /// Software needs to pre-calculate the following values:
     ///
-    /// - `r`: `2 ^ ( bitlength * 2 ) mod M`
-    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of M) mod 2^32`
+    /// - `r`: `2 ^ ( bitlength * 2 ) mod M`.
+    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of M) mod 2^32`.
     ///
     /// It is relatively easy to calculate these values using the `crypto-bigint` crate:
     ///
@@ -1248,8 +1248,8 @@ impl RsaContext {
     ///
     /// Software needs to pre-calculate the following values:
     ///
-    /// - `r`: `2 ^ ( bitlength * 2 ) mod M`
-    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of M) mod 2^32`
+    /// - `r`: `2 ^ ( bitlength * 2 ) mod M`.
+    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of M) mod 2^32`.
     ///
     /// For an example how these values can be calculated and used, see
     /// [Self::modular_exponentiate].

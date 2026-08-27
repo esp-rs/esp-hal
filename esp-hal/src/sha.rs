@@ -1344,7 +1344,7 @@ impl<const CHUNK_BYTES: usize, const DIGEST_WORDS: usize> Drop
 }
 
 /// A handle for an in-progress operation, returned by [`update`](Sha1Context::update) or
-/// [`finalize`](Sha1Context::finalize)
+/// [`finalize`](Sha1Context::finalize).
 pub struct ShaHandle<'t>(Handle<'t, ShaOperation>);
 
 impl ShaHandle<'_> {
@@ -1377,7 +1377,7 @@ impl ShaHandle<'_> {
     }
 }
 
-/// Error type returned by [`finalize_into_slice`](Sha1Context::finalize_into_slice)
+/// Error type returned by [`finalize_into_slice`](Sha1Context::finalize_into_slice).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]

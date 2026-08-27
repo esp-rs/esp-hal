@@ -7,11 +7,11 @@
 //! responsible for executing low power tasks while the high power core is in
 //! sleep mode.
 //!
-//! The `LpCore` struct provides methods to stop and run the low power core
+//! The `LpCore` struct provides methods to stop and run the low power core.
 //!
-//! The `stop` method stops the low power core, putting it into a sleep state
+//! The `stop` method stops the low power core, putting it into a sleep state.
 //!
-//! The `run` method starts the low power core and specifies the wakeup source
+//! The `run` method starts the low power core and specifies the wakeup source.
 //!
 //! ⚠️: The examples for LP Core are quite extensive, so for a more
 //! detailed study of how to use this LP Core please visit [the repository

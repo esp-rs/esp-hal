@@ -2,7 +2,7 @@
 //!
 //! This module provides types for representing frequency and duration, as well
 //! as an instant in time. Time is measured since boot, and can be accessed
-//! by the [`Instant::now`] function
+//! by the [`Instant::now`] function.
 
 use core::fmt::{Debug, Display, Formatter, Result as FmtResult};
 

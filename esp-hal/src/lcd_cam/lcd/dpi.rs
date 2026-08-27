@@ -708,7 +708,7 @@ pub struct FrameTiming {
     /// The horizontal total width of a frame (in units of PCLK).
     ///
     /// This should be greater than `horizontal_blank_front_porch` +
-    /// `horizontal_active_width`
+    /// `horizontal_active_width`.
     ///
     /// Max is 4096 (12 bits).
     pub horizontal_total_width: usize,
@@ -732,7 +732,7 @@ pub struct FrameTiming {
     /// The vertical total height of a frame (in units of lines).
     ///
     /// This should be greater than `vertical_blank_front_porch` +
-    /// `vertical_active_height`
+    /// `vertical_active_height`.
     ///
     /// Max is 1024 (10 bits).
     pub vertical_total_height: usize,

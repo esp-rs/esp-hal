@@ -239,7 +239,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
     /// Listens for a request from the master.
     ///
     /// If the master writes to the slave, this method reads data into the provided
-    /// `buffer` and returns `Command::Write(len)`
+    /// `buffer` and returns `Command::Write(len)`.
     /// If the master is requesting a read, it returns `Command::Read` with the SCL line
     /// stretched (held low).
     pub fn listen(&mut self, buffer: &mut [u8]) -> Result<Command, Error> {

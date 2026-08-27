@@ -11,7 +11,7 @@
 //! The `UlpCore` struct provides an interface to interact with the `ULP
 //! CORE` peripheral. It allows starting and configuring the ULP core for
 //! operation. The `UlpCore` struct is initialized with a peripheral reference
-//! to the `ULP CORE` instance
+//! to the `ULP CORE` instance.
 //!
 //! ## Examples
 //!

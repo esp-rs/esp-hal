@@ -21,7 +21,7 @@ static ADC2_IN_USE: AtomicBool = AtomicBool::new(false);
 /// ADC Error
 #[derive(Debug)]
 pub enum Error {
-    /// `ADC2` is used together with `radio`
+    /// `ADC2` is used together with `radio`.
     Adc2InUse,
 }
 

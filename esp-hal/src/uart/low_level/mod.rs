@@ -279,7 +279,7 @@ pub struct Info {
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
 
-    /// The wakeup source of this instance, or `None` if the instance cannot wake the chip
+    /// The wakeup source of this instance, or `None` if the instance cannot wake the chip.
     #[cfg(sleep_driver_supported)]
     pub wakeup_source: Option<crate::rtc_cntl::WakeupSource>,
 }
@@ -502,7 +502,7 @@ impl Info {
     /// # Errors
     ///
     /// [`ConfigError::RxFifoThresholdNotSupported`] if the provided value is zero
-    /// or exceeds [`Info::RX_FIFO_MAX_THRHD`]
+    /// or exceeds [`Info::RX_FIFO_MAX_THRHD`].
     pub(super) fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold == 0 || threshold > Self::RX_FIFO_MAX_THRHD {
             return Err(ConfigError::RxFifoThresholdNotSupported);
@@ -526,7 +526,7 @@ impl Info {
     /// # Errors
     ///
     /// [`ConfigError::TxFifoThresholdNotSupported`] if the provided value exceeds
-    /// [`Info::TX_FIFO_MAX_THRHD`]
+    /// [`Info::TX_FIFO_MAX_THRHD`].
     pub(super) fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold > Self::TX_FIFO_MAX_THRHD {
             return Err(ConfigError::TxFifoThresholdNotSupported);

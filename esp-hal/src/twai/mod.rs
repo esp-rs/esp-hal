@@ -259,7 +259,7 @@ impl StandardId {
     /// Tries to create a `StandardId` from a raw 16-bit integer.
     ///
     /// Returns `None` if `raw` is out of range of an 11-bit integer.
-    /// (`> 0x7FF`)
+    /// (`> 0x7FF`).
     #[inline]
     pub fn new(raw: u16) -> Option<Self> {
         if raw <= 0x7FF {
@@ -315,7 +315,7 @@ impl ExtendedId {
     /// Tries to create a `ExtendedId` from a raw 32-bit integer.
     ///
     /// Returns `None` if `raw` is out of range of an 29-bit integer.
-    /// (`> 0x1FFF_FFFF`)
+    /// (`> 0x1FFF_FFFF`).
     #[inline]
     pub fn new(raw: u32) -> Option<Self> {
         if raw <= 0x1FFF_FFFF {
@@ -460,7 +460,7 @@ impl EspTwaiFrame {
     /// Frame Format (SFF).
     ///
     /// Private: interested clients should deduce the frame format from
-    /// [`Self::id()`]
+    /// [`Self::id()`].
     #[inline(always)]
     fn is_extended_format(&self) -> bool {
         self.info() & (0b1 << 7) != 0

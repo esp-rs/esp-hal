@@ -43,7 +43,7 @@ pub fn block_version() -> (u8, u8) {
 
 /// Returns a signed value from the raw data from eFuse.
 ///
-/// `sign_bit` is the index of the sign bit, starting from 0
+/// `sign_bit` is the index of the sign bit, starting from 0.
 fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
     let sign_mask = 1u32 << sign_bit;
     if data & sign_mask != 0 {

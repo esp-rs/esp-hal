@@ -461,7 +461,7 @@ for_each_ecc_curve! {
     (all $(( $id:literal, $name:ident, $bits:literal )),*) => {
         /// Represents supported elliptic curves for cryptographic operations.
         ///
-        /// The methods that represent operations require the `EccBackend` to be started before use
+        /// The methods that represent operations require the `EccBackend` to be started before use.
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum EllipticCurve {
@@ -792,11 +792,11 @@ pub trait EccOperation: Sealed {
 /// Scalar result location.
 #[doc(hidden)]
 pub enum ScalarResultLocation {
-    /// The scalar value is stored in the `Px` memory location
+    /// The scalar value is stored in the `Px` memory location.
     Px,
-    /// The scalar value is stored in the `Py` memory location
+    /// The scalar value is stored in the `Py` memory location.
     Py,
-    /// The scalar value is stored in the `k` memory location
+    /// The scalar value is stored in the `k` memory location.
     K,
 }
 

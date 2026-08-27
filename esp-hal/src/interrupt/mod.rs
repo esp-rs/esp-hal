@@ -28,14 +28,14 @@
 //! handlers using the [peripheral singletons'] `bind_X_interrupt` functions. You can use the
 //! matching `enable` and `disable` functions to control the peripheral interrupt in the interrupt
 //! matrix, or you can, depending on the peripheral, set or clear the appropriate enable bits in the
-//! `int_ena` register
+//! `int_ena` register.
 //!
 //! [`#[handler]`]: crate::handler
 //! [peripheral singletons']: crate::peripherals::I2C0
 //!
 //! ## Software interrupts
 //!
-//! The [`software`] module implements software interrupts using peripheral interrupt signals
+//! The [`software`] module implements software interrupts using peripheral interrupt signals.
 #![cfg_attr(
     multi_core,
     doc = "This mechanism can be used to implement efficient cross-core communication."

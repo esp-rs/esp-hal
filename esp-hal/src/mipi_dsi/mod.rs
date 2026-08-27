@@ -2,7 +2,7 @@
 //! MIPI DSI bus driver (ESP32-P4).
 //!
 //! Wraps `MIPI_DSI_HOST` and `MIPI_DSI_BRIDGE` register blocks behind two
-//! virtual-peripheral ownership tokens (`MIPI_DSI` + one `VDMA_CH*` channel)
+//! virtual-peripheral ownership tokens (`MIPI_DSI` + one `VDMA_CH*` channel).
 //!
 //! # Example
 //!
@@ -86,7 +86,7 @@ pub struct Config {
     phy_pll_refclk: MipiDsiPhyPllRefclkConfig,
 
     /// Keeps the clock lane continuously in HS mode (`true`) or uses auto mode
-    /// where the DSI host manages HS↔LP transitions (`false`)
+    /// where the DSI host manages HS↔LP transitions (`false`).
     force_clock_lane_hs: bool,
 }
 
@@ -380,7 +380,7 @@ pub(crate) fn dphy_power_down() {
 
 // ── PLL helpers ───────────────────────────────────────────────────────────────
 
-/// PLL frequency range table: half-open Mbps range → `hs_freq_range_sel`
+/// PLL frequency range table: half-open Mbps range → `hs_freq_range_sel`.
 const PHY_PLL_RANGES: &[(core::ops::Range<u16>, u8)] = &[
     (80..90, 0x00),
     (90..100, 0x10),

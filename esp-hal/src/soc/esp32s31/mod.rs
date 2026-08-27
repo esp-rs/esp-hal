@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The `SOC` module provides access, functions and structures that are useful
-//! for interacting with various system-related peripherals on `ESP32-S31` chip
+//! for interacting with various system-related peripherals on `ESP32-S31` chip.
 
 crate::unstable_module! {
     pub mod clocks;
@@ -75,7 +75,7 @@ pub(crate) fn pre_init() {
 
 /// Opens LP/HP peripheral PMS regions for all security modes.
 ///
-/// Offsets match `bootloader_init_mem` in ESP-IDF's `bootloader_mem.c`
+/// Offsets match `bootloader_init_mem` in ESP-IDF's `bootloader_mem.c`.
 fn open_peri_pms() {
     write_pms_ctrl_range(pac::LP_PERI_PMS::PTR as usize, 0x00, 0x70);
     write_pms_ctrl_range(pac::HP_PERI0_PMS::PTR as usize, 0x00, 0x78);

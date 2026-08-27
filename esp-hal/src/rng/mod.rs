@@ -22,7 +22,7 @@
 //! When any of these conditions are true, samples of physical noise are
 //! continuously mixed into the internal hardware RNG state to provide entropy.
 //! If none of the above conditions are true, the output of the RNG should be
-//! considered pseudo-random only. See [`Rng`]
+//! considered pseudo-random only. See [`Rng`].
 //!
 //! For more information, please refer to the
 //! # {documentation}
@@ -146,7 +146,7 @@ impl Rng {
     ///
     /// # Safety
     ///
-    /// `ptr` must not be `null` and valid for writes for `len` bytes
+    /// `ptr` must not be `null` and valid for writes for `len` bytes.
     #[inline]
     #[instability::unstable]
     pub unsafe fn read_into_raw(&self, ptr: *mut u8, len: usize) {

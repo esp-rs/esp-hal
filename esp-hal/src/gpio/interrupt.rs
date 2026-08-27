@@ -29,7 +29,7 @@
 //! handler will only disable the async interrupts. The user handler is
 //! responsible for clearing the interrupt status bits or disabling the
 //! interrupts, based on their needs. This is communicated to the user in the
-//! documentation of the `Io::set_interrupt_handler` function
+//! documentation of the `Io::set_interrupt_handler` function.
 //!
 //! ## Critical sections
 //!
@@ -175,7 +175,7 @@ pub(super) extern "C" fn user_gpio_interrupt_handler() {
     });
 }
 
-/// Internal entry point for [`crate::gpio::handle_gpio_interrupt`]
+/// Internal entry point for [`crate::gpio::handle_gpio_interrupt`].
 ///
 /// Kept here (rather than at the public callsite) because this module owns
 /// the GPIO ISR critical section and the per-bank dispatch routine, both of
@@ -201,7 +201,7 @@ pub(super) fn process_async_banks(banks: [(GpioBank, u32); GpioBank::COUNT]) {
     }
 }
 
-/// Internal entry point for [`crate::gpio::wake_pin`]
+/// Internal entry point for [`crate::gpio::wake_pin`].
 ///
 /// # Safety
 ///

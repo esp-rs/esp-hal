@@ -2,7 +2,7 @@
 //!
 //! v1 scope: timer wakeup only, single core. Ported from the ESP32-C6 PMU sleep
 //! driver and adapted to the P4 PMU (DCDC, no wireless modem, no regdma
-//! retention) using the esp-idf `pmu_sleep.c` / `pmu_param.h` references
+//! retention) using the esp-idf `pmu_sleep.c` / `pmu_param.h` references.
 
 use core::{
     ops::Not,
@@ -83,7 +83,7 @@ fn usj_pad_is_enabled() -> bool {
 }
 
 /// Backup and disable the USJ pad on light-sleep entry. esp-idf
-/// `sleep_console_usj_pad_backup_and_disable`
+/// `sleep_console_usj_pad_backup_and_disable`.
 fn usj_pad_backup_and_disable() {
     let clock_enabled = usj_module_is_enabled();
     let pad_enabled = if clock_enabled {
@@ -111,7 +111,7 @@ fn usj_pad_restore() {
 }
 
 /// LP SPM RAM base. On rev-3.0 the deep-sleep wake reset vector can be
-/// redirected here (see [`install_mspi_workaround_stub`])
+/// redirected here (see [`install_mspi_workaround_stub`]).
 const P4_LP_RAM_BOOT_ADDR: usize = 0x5010_8000;
 
 /// Returns whether this silicon is ESP32-P4 rev 3.0 (ECO5), the only revision

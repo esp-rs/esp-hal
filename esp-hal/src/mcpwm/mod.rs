@@ -54,7 +54,7 @@
 //!
 //! This example uses timer0 and operator0 of the MCPWM0 peripheral to output a
 //! 50% duty signal at 20 kHz. The signal will be output to the pin assigned to
-//! `pin`
+//! `pin`.
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -187,7 +187,7 @@ impl PeripheralClockConfig {
     /// Returns a clock configuration with the given prescaler.
     ///
     /// With standard system clock configurations the input clock to the MCPWM
-    /// peripheral is `160 MHz`
+    /// peripheral is `160 MHz`.
     ///
     /// The peripheral clock frequency is calculated as:
     /// `peripheral_clock = input_clock / (prescaler + 1)`
@@ -207,7 +207,7 @@ impl PeripheralClockConfig {
     /// [`FrequencyError`] when the calculated prescaler is not in the range `0..u8::MAX`.
     ///
     /// With standard system clock configurations the input clock to the MCPWM
-    /// peripheral is `160 MHz`
+    /// peripheral is `160 MHz`.
     ///
     /// Only divisors of the input clock (`160 Mhz / 1`, `160 Mhz / 2`, ...,
     /// `160 Mhz / 256`) are representable exactly. Other target frequencies
@@ -237,7 +237,7 @@ impl PeripheralClockConfig {
     /// Returns a timer clock configuration with the given prescaler.
     ///
     /// The resulting timer frequency depends on the chosen
-    /// [`timer::PwmWorkingMode`]
+    /// [`timer::PwmWorkingMode`].
     ///
     /// #### `PwmWorkingMode::Increase` or `PwmWorkingMode::Decrease`
     /// `timer_frequency = peripheral_clock / (prescaler + 1) / (period + 1)`

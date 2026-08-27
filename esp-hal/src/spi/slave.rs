@@ -62,7 +62,7 @@ transfer.wait();
 //! It also does not support blocking operations, as the actual
 //! transfer is controlled by the SPI master; if these are necessary,
 //! then the `SpiDmaTransfer` object can be `wait()`ed on or polled for
-//! `is_done()`
+//! `is_done()`.
 //!
 //! See [tracking issue](https://github.com/esp-rs/esp-hal/issues/469) for more information.
 

@@ -115,7 +115,7 @@ unsafe extern "C" {
     /// efuse SPI pin configuration.
     ///
     /// [`wp_gpio_num`]: u8 Number of the WP pin to reconfigure for quad I/O
-    /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig()
+    /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig().
     /// - If this parameter is 0, default SPI pins are used and wp_gpio_num parameter is ignored.
     /// - If this parameter is 1, default HSPI pins are used and wp_gpio_num parameter is ignored.
     /// - For other values, this parameter encodes the HD pin number and also the CLK pin number.

@@ -42,15 +42,15 @@ pub fn is_running(core: Cpu) -> bool {
 ///
 /// Mirrors IDF's `esp_restart_noos()` pre-reset sequence for ESP32-P4:
 /// 1. Briefly reset Core 1's CPU (LP AON domain, so it takes effect even with global reset still
-///    cleared from a previous `start_core1` call)
+///    cleared from a previous `start_core1` call).
 /// 2. Stall Core 1 via PMU (LP AON domain — this value **persists** through the system software
 ///    reset, keeping Core 1 stalled during the ROM bootloader phase and preventing it from
 ///    interfering with USB Serial/JTAG).
 /// 3. Clear the AppCpu boot address so that, even if Core 1 is somehow allowed to run during the
 ///    next ROM bootloader phase, it will spin in the ROM polling loop instead of jumping to a stale
-///    `start_core1_init` from this image
+///    `start_core1_init` from this image.
 ///
-/// Must be called before any `software_reset()` when Core 1 is running
+/// Must be called before any `software_reset()` when Core 1 is running.
 pub(crate) fn pre_system_reset() {
     // Assert a brief CPU reset pulse for Core 1 (LP AON → persists, self-clears).
     LP_AON_CLKRST::regs()

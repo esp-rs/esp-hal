@@ -10,7 +10,7 @@
 //! electrically conflict with the oscillator (GPIO, ADC, LP, and similar).
 //!
 //! This module only exists for chips with dedicated crystal pads (`soc_has_xtal32k_pads`), the
-//! same set the `use-xtal32k` option is active for
+//! same set the `use-xtal32k` option is active for.
 //!
 //! [`Peripherals`]: crate::peripherals::Peripherals
 //! [`AnyPin`]: crate::gpio::AnyPin

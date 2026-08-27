@@ -27,7 +27,7 @@ pub const ANLPAR: u8 = 0x05;
 /// Auto-Negotiation Expansion Register.
 pub const ANER: u8 = 0x06;
 
-/// Bit definitions for [`BMCR`]
+/// Bit definitions for [`BMCR`].
 pub mod bmcr {
     /// Software reset.
     pub const RESET: u16 = 1 << 15;
@@ -41,7 +41,7 @@ pub mod bmcr {
     pub const FULL_DUPLEX: u16 = 1 << 8;
 }
 
-/// Bit definitions for [`BMSR`]
+/// Bit definitions for [`BMSR`].
 pub mod bmsr {
     /// Link status (latch-low on many PHYs — read twice to get current value).
     pub const LINK_STATUS: u16 = 1 << 2;
@@ -51,7 +51,7 @@ pub mod bmsr {
     pub const AN_ABILITY: u16 = 1 << 3;
 }
 
-/// Bit definitions for [`ANAR`] and [`ANLPAR`]
+/// Bit definitions for [`ANAR`] and [`ANLPAR`].
 pub mod an {
     /// 10BASE-T half-duplex.
     pub const BASE_10_HALF: u16 = 1 << 5;

@@ -15,7 +15,7 @@
 //! It is recommended to pass the [`Alarm`]s into a high level driver like
 //! [`OneShotTimer`](super::OneShotTimer) and
 //! [`PeriodicTimer`](super::PeriodicTimer). Using the System timer directly is
-//! only possible through the low level [`Timer`](crate::timer::Timer) trait
+//! only possible through the low level [`Timer`](crate::timer::Timer) trait.
 
 use core::{fmt::Debug, marker::PhantomData, num::NonZeroU32};
 
@@ -250,7 +250,7 @@ impl<'d> SystemTimer<'d> {
     /// # Safety
     ///
     /// - Disabling a `Unit` while [`Alarm`]s are using it will affect the [`Alarm`]s operation
-    /// - Disabling Unit0 will affect [`Instant::now`]
+    /// - Disabling Unit0 will affect [`Instant::now`].
     pub unsafe fn configure_unit(unit: Unit, config: UnitConfig) {
         unit.configure(config)
     }

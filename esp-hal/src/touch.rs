@@ -275,8 +275,8 @@ impl<'d> Touch<'d, Continuous, Async> {
     ///
     /// ## Parameters:
     ///
-    /// - `rtc`: The RTC peripheral is needed to configure the required interrupts
-    /// - `config`: Optional configuration options
+    /// - `rtc`: The RTC peripheral is needed to configure the required interrupts.
+    /// - `config`: Optional configuration options.
     ///
     /// # Examples
     ///
@@ -347,7 +347,7 @@ impl<P: TouchPin, Tm: TouchMode, Dm: DriverMode> TouchPad<P, Tm, Dm> {
     ///
     /// ## Parameters:
     /// - `pin`: The pin that gets configured as touch pad
-    /// - `touch`: The [`Touch`] struct indicating that touch is configured
+    /// - `touch`: The [`Touch`] struct indicating that touch is configured.
     pub fn new(pin: P, _touch: &Touch<'_, Tm, Dm>) -> Self {
         // TODO revert this on drop
         pin.set_touch(Internal);
@@ -404,13 +404,13 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     ///
     /// The raised interrupt is actually
     /// [`RTC_CORE`](crate::peripherals::Interrupt::RTC_CORE). A handler can
-    /// be installed with [`Rtc::set_interrupt_handler()`][1]
+    /// be installed with [`Rtc::set_interrupt_handler()`][1].
     ///
     /// [1]: ../rtc_cntl/struct.Rtc.html#method.set_interrupt_handler
     ///
     /// ## Parameters:
     /// - `threshold`: The threshold above/below which the pin is considered touched. Above/below
-    ///   depends on the configuration of `touch` in [`new`](Self::new) (defaults to below)
+    ///   depends on the configuration of `touch` in [`new`](Self::new) (defaults to below).
     pub fn listen(&mut self, threshold: u16) {
         self.pin.set_threshold(threshold, Internal);
         listen(self.pin.touch_nr(Internal))

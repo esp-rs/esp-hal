@@ -27,7 +27,7 @@ use crate::{
 ///
 /// Must be set before the channel is started. The ISR reads this value and cannot
 /// capture runtime state. A single MIPI-DSI instance is the only VDMA user, so
-/// this value is stable for the lifetime of `DsiDpi`
+/// this value is stable for the lifetime of `DsiDpi`.
 static VDMA_ISR_CHANNEL: atomic::AtomicU8 = atomic::AtomicU8::new(0);
 
 const MAX_FBS: usize = 3;
@@ -84,7 +84,7 @@ impl ColorFormat {
         }
     }
 
-    /// `dpi_color_coding` register value (DSI host)
+    /// `dpi_color_coding` register value (DSI host).
     fn host_color_coding(self) -> u8 {
         match self {
             Self::Rgb888 => 5, // 24-bit

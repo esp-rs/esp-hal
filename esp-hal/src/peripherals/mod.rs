@@ -194,7 +194,7 @@ for_each_peripheral! {
         // The solution is printing an empty doc comment.
         macro_rules! ignore { ($any:tt) => {""} }
 
-        /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip
+        /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
         #[allow(non_snake_case)]
         #[non_exhaustive]
         pub struct Peripherals {

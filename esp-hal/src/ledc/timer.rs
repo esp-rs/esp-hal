@@ -2,7 +2,7 @@
 //!
 //! ## Overview
 //! The LEDC Timer provides a high-level interface to configure and control
-//! individual timers of the `LEDC` peripheral
+//! individual timers of the `LEDC` peripheral.
 //!
 //! ## Configuration
 //! The module allows precise and flexible control over timer configurations,

@@ -192,7 +192,7 @@ impl<'d> OneShotTimer<'d, Async> {
     /// Waits for *at least* the time interval `timeout`.
     ///
     /// Once the time period elapses, the underlying timer hardware does not automatically schedule
-    /// the next timeout. The next timeout is scheduled only when `delay_async` is called again
+    /// the next timeout. The next timeout is scheduled only when `delay_async` is called again.
     async fn delay_async(&mut self, timeout: Duration) {
         unwrap!(self.schedule(timeout));
 

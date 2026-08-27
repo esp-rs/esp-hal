@@ -312,7 +312,7 @@ impl core::fmt::Display for Error {
 /// | `level2` | `length2`  | `level1` | `length1` |
 ///
 /// Here, `level1` / `length1` correspond to the signal that is send/received first,
-/// and the signal with `level2` / `length2` is send/received afterwards
+/// and the signal with `level2` / `length2` is send/received afterwards.
 ///
 /// If `length1` or `length2` are zero, this implies an end marker and transmission will
 /// stop with the corresponding signal.
@@ -382,7 +382,7 @@ impl PulseCode {
     /// a preceding calculation.
     ///
     /// If `length1` or `length2` fail to convert to `u16` or exceed the maximum representable
-    /// range, this will return `None`
+    /// range, this will return `None`.
     #[inline]
     pub fn try_new(
         level1: Level,
@@ -612,7 +612,7 @@ pub struct Tx;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Rx;
 
-/// A trait implemented by the `Rx` and `Tx` marker structs
+/// A trait implemented by the `Rx` and `Tx` marker structs.
 ///
 /// For internal use by the driver.
 pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed + Unpin {
@@ -763,7 +763,7 @@ for_each_rmt_channel!(
                 /// This is the actual frequency after the global RMT clock divider has been
                 /// configured. Pulse code lengths are expressed in cycles of
                 /// this clock divided by the channel divider configured with
-                /// [`TxChannelConfig::with_clk_divider`] or [`RxChannelConfig::with_clk_divider`]
+                /// [`TxChannelConfig::with_clk_divider`] or [`RxChannelConfig::with_clk_divider`].
                 pub fn frequency(&self) -> Rate {
                     self.frequency
                 }
@@ -1195,7 +1195,7 @@ const _: () = if core::mem::size_of::<Channel<'static, Blocking, Tx>>() > 4 {
     core::panic!("Channel growing too large!");
 };
 
-/// Per-channel size of the RMT hardware buffer (number of `PulseCode`s)
+/// Per-channel size of the RMT hardware buffer (number of `PulseCode`s).
 pub const CHANNEL_RAM_SIZE: usize = property!("rmt.channel_ram_size");
 
 /// Whether the channel supports wrapping rx (wrapping tx is supported on all devices)
@@ -1516,7 +1516,7 @@ impl<'ch> TxTransaction<'ch, '_> {
     /// necessary.
     ///
     /// Returns whether transmission has ended (whether successfully or with an
-    /// error). In that case, a subsequent call to `wait()` returns immediately
+    /// error). In that case, a subsequent call to `wait()` returns immediately.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn poll(&mut self) -> bool {
         matches!(self.poll_internal(), Some(Event::Error | Event::End))
@@ -1777,12 +1777,12 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
     /// transmission and get back the channel for further use.
     ///
     /// The `mode` argument determines whether transmission will continue until explicitly stopped
-    /// or for a fixed number of iterations; see [`LoopMode`] for more details
+    /// or for a fixed number of iterations; see [`LoopMode`] for more details.
     #[cfg_attr(
         rmt_has_tx_loop_count,
         doc = "When using a loop `mode` other than [`LoopMode::Infinite`], [`ContinuousTxTransaction::is_loopcount_interrupt_set`] can be used to check if the loop count is reached."
     )]
-    /// The length of `data` cannot exceed the size of the allocated RMT RAM
+    /// The length of `data` cannot exceed the size of the allocated RMT RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit_continuously(
         self,
@@ -1880,7 +1880,7 @@ impl<'ch> RxTransaction<'ch, '_> {
     /// Checks receive status.
     ///
     /// Returns whether reception has ended (whether successfully or with an
-    /// error). In that case, a subsequent call to `wait()` returns immediately
+    /// error). In that case, a subsequent call to `wait()` returns immediately.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn poll(&mut self) -> bool {
         matches!(self.poll_internal(), Some(Event::Error | Event::End))
@@ -3346,8 +3346,8 @@ mod chip_specific {
     }
 }
 
-/// The largest valid value for [`RxChannelConfig::with_idle_threshold`]
+/// The largest valid value for [`RxChannelConfig::with_idle_threshold`].
 pub use chip_specific::MAX_RX_IDLE_THRESHOLD;
-/// The largest valid value for loopcounts in [`LoopMode`]
+/// The largest valid value for loopcounts in [`LoopMode`].
 #[cfg(rmt_has_tx_loop_count)]
 pub use chip_specific::MAX_TX_LOOPCOUNT;

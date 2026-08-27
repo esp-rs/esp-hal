@@ -3,7 +3,7 @@
 //!
 //! The [`SoftwareInterrupt`] struct allows raising or resetting software
 //! interrupts using the [`raise()`][SoftwareInterrupt::raise] and
-//! [`reset()`][SoftwareInterrupt::reset] methods
+//! [`reset()`][SoftwareInterrupt::reset] methods.
 //!
 //! ## Examples
 //!

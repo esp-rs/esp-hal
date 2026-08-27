@@ -39,12 +39,12 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     unsafe extern "C" {
         /// Sets DCache mmu mapping.
         ///
-        /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid
-        /// [`vaddr`]: u32 Virtual address in CPU address space
+        /// [`ext_ram`]: u32 DPORT_MMU_ACCESS_FLASH for flash, DPORT_MMU_ACCESS_SPIRAM for spiram, DPORT_MMU_INVALID for invalid.
+        /// [`vaddr`]: u32 Virtual address in CPU address space.
         /// [`paddr`]: u32 Physical address in external memory. Should be aligned by psize.
         /// [`psize`]: u32 Page size of DCache, in kilobytes. Should be 64 here.
-        /// [`num`]: u32 Pages to be set
-        /// [`fixes`]: u32 0 for physical pages grow with virtual pages, other for virtual pages map to same physical page
+        /// [`num`]: u32 Pages to be set.
+        /// [`fixes`]: u32 0 for physical pages grow with virtual pages, other for virtual pages map to same physical page.
         fn cache_dbus_mmu_set(
             ext_ram: u32,
             vaddr: u32,
@@ -413,7 +413,7 @@ pub(crate) mod utils {
             /// efuse SPI pin configuration.
             ///
             /// [`wp_gpio_num`]: u8 Number of the WP pin to reconfigure for quad I/O
-            /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig()
+            /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig().
             /// - If this parameter is 0, default SPI pins are used and wp_gpio_num parameter is
             ///   ignored.
             /// - If this parameter is 1, default HSPI pins are used and wp_gpio_num parameter is

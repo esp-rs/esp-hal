@@ -9,7 +9,7 @@ use super::*;
 
 /// Placeholder pin, used when no pin is required when using a peripheral.
 ///
-/// When used as a peripheral signal, `NoPin` is equivalent to [`Level::Low`]
+/// When used as a peripheral signal, `NoPin` is equivalent to [`Level::Low`].
 #[derive(Default, Clone, Copy)]
 pub struct NoPin;
 

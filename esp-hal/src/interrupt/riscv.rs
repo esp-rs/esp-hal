@@ -156,7 +156,7 @@ for_each_interrupt_priority!(
         /// Interrupt priority levels.
         ///
         /// A higher numeric value means higher priority. Interrupt requests at higher priority
-        /// levels will be able to preempt code running at a lower [`RunLevel`][super::RunLevel]
+        /// levels will be able to preempt code running at a lower [`RunLevel`][super::RunLevel].
         #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[repr(u8)]
@@ -299,7 +299,7 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
 /// - The caller must:
 ///   - Save and restore all used registers.
 ///   - Clear the interrupt source if necessary.
-///   - Return using the `mret` instruction
+///   - Return using the `mret` instruction.
 /// - The handler must be declared as a naked function. The compiler does not insert a function
 ///   prologue or epilogue; a normal Rust `fn` results in an error
 ///

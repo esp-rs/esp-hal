@@ -32,8 +32,8 @@ use crate::{
 
 /// A DMA channel singleton that supports memory-to-memory transfers on this chip.
 ///
-/// Only channels listed in device metadata (`mem2mem = true`) implement this trait
-/// Use [`Mem2Mem::new`] to construct a transfer engine from such a channel
+/// Only channels listed in device metadata (`mem2mem = true`) implement this trait.
+/// Use [`Mem2Mem::new`] to construct a transfer engine from such a channel.
 #[diagnostic::on_unimplemented(
     message = "this DMA channel does not support memory-to-memory transfers",
     note = "Use a channel with `mem2mem = true` in device metadata. See `Mem2Mem::new`."

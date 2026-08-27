@@ -1554,7 +1554,7 @@ impl AesContext {
     /// The returned Handle must be polled until it returns `true`. Dropping the handle
     /// before the operation finishes will cancel the operation.
     ///
-    /// For an example, see the documentation of [`AesBackend`]
+    /// For an example, see the documentation of [`AesBackend`].
     ///
     /// # Errors
     ///
@@ -1645,7 +1645,7 @@ impl AesContext {
 ///
 /// Dropping this handle before the operation finishes will cancel the operation.
 ///
-/// For an example, see the documentation of [`AesBackend`]
+/// For an example, see the documentation of [`AesBackend`].
 pub struct AesHandle<'t>(Handle<'t, AesOperation>);
 
 impl AesHandle<'_> {

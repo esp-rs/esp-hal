@@ -4,7 +4,7 @@
 //! ## Overview
 //!
 //! The Delay driver provides blocking delay functionalities using the
-//! [`Instant`] struct
+//! [`Instant`] struct.
 //!
 //! ## Configuration
 //!

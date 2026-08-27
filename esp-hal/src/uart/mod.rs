@@ -531,7 +531,7 @@ const MAX_WAKEUP_EDGES: u16 = WAKEUP_EDGE_OFFSET + 0x3FF;
 
 /// Configures how the UART wakes the chip from light sleep.
 ///
-/// See [`UartRx::enable_wakeup`]
+/// See [`UartRx::enable_wakeup`].
 #[cfg(sleep_driver_supported)]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -931,7 +931,7 @@ where
     /// Sets the specified pin to push-pull output and connects it to the UART
     /// TX signal.
     ///
-    /// Disconnects the previous pin that was assigned with `with_tx`
+    /// Disconnects the previous pin that was assigned with `with_tx`.
     #[instability::unstable]
     pub fn with_tx(mut self, tx: impl PeripheralOutput<'d>) -> Self {
         let tx = tx.into();
@@ -1368,7 +1368,7 @@ where
     ///
     /// The returned status is sticky and remains set until
     /// [`Self::clear_break_detected`] is called, or until one of the
-    /// `wait_for_break` methods observes and clears it
+    /// `wait_for_break` methods observes and clears it.
     #[instability::unstable]
     pub fn is_break_detected(&self) -> bool {
         self.uart.info().check_rx_break_detected()
@@ -1418,7 +1418,7 @@ where
     /// peripherals powered instead of powering them down. This increases the sleep current.
     ///
     /// The configuration stays after the driver is dropped, so that the UART continues to wake the
-    /// chip while no driver owns it. Call [`Self::disable_wakeup`] to remove it
+    /// chip while no driver owns it. Call [`Self::disable_wakeup`] to remove it.
     ///
     /// # Errors
     ///
@@ -1875,11 +1875,11 @@ pub enum UartInterrupt {
     RxBreakDetected,
 
     /// The receiver has received more data than what
-    /// [`RxConfig::fifo_full_threshold`] specifies
+    /// [`RxConfig::fifo_full_threshold`] specifies.
     RxFifoFull,
 
     /// The receiver has not received any data for the time
-    /// [`RxConfig::with_timeout`] specifies
+    /// [`RxConfig::with_timeout`] specifies.
     RxTimeout,
 }
 
@@ -2088,7 +2088,7 @@ where
     ///
     /// The returned status is sticky and remains set until
     /// [`Self::clear_break_detected`] is called, or until one of the
-    /// `wait_for_break` methods observes and clears it
+    /// `wait_for_break` methods observes and clears it.
     #[instability::unstable]
     pub fn is_break_detected(&self) -> bool {
         self.rx.is_break_detected()
@@ -2169,7 +2169,7 @@ where
 
     /// Lets activity on the RX line wake the chip from light sleep.
     ///
-    /// See [`UartRx::enable_wakeup`]
+    /// See [`UartRx::enable_wakeup`].
     ///
     /// # Errors
     ///

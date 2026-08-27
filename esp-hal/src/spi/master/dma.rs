@@ -98,7 +98,7 @@ impl<'d> Spi<'d, Blocking> {
 ///   into an internal buffer before the transfer begins. A pair of copy buffers can be set up by
 ///   passing them to [`with_buffers`](SpiDma::with_buffers) before the first transfer begins. For
 ///   more details on when copying is necessary, see the documentation of the
-///   [`with_buffers`](SpiDma::with_buffers) method
+///   [`with_buffers`](SpiDma::with_buffers) method.
 /// - The buffer API allows transferring externally managed buffers. In this mode, the buffers to be
 ///   transferred are provided by the caller. The buffer objects ensure that data is located in
 ///   appropriate memory regions. The buffers and the driver object are moved into transfer objects
@@ -106,7 +106,7 @@ impl<'d> Spi<'d, Blocking> {
 ///   as arguments as well as the number of bytes to transfer, and their names end with `_buffer`
 ///
 /// These approaches provide different trade-offs between memory usage / CPU overhead and ease of
-/// use. `embedded-hal` traits are implemented by the slice-based API's functions
+/// use. `embedded-hal` traits are implemented by the slice-based API's functions.
 ///
 /// # Examples
 ///
@@ -1180,7 +1180,7 @@ aligned, otherwise the driver requires copying the entire buffer."
     /// The maximum useful size for these buffers is 32736 bytes, any additional memory will
     /// be wasted.
     ///
-    /// For an example of how to create these buffers, see the [`SpiDma`] documentation
+    /// For an example of how to create these buffers, see the [`SpiDma`] documentation.
     #[instability::unstable]
     pub fn with_buffers(self, dma_rx_buf: DmaRxBuf, dma_tx_buf: DmaTxBuf) -> SpiDma<'d, Dm> {
         unsafe {
@@ -2059,7 +2059,7 @@ with_spi_master_dma_engine! {
     ($engine:tt, $any_channel:ident) => {
         /// DMA channel trait for SPI peripherals.
         ///
-        /// Implemented for each channel type that can serve a particular SPI instance `S`
+        /// Implemented for each channel type that can serve a particular SPI instance `S`.
         #[instability::unstable]
         #[diagnostic::on_unimplemented(
             message = "The DMA channel cannot be used with this SPI peripheral",
