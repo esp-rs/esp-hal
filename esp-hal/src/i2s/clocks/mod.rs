@@ -10,7 +10,7 @@
 //! - `v2v3`: separate `TX_CLK` and `RX_CLK` nodes, and the `MCLK_OUT` selector, in the I2S register
 //!   block.
 //! - `v2v3_pcr`: the same nodes, in the PCR register block.
-//! - `v2v3_esp32p4`: the same nodes, in the HP_SYS_CLKRST register block.
+//! - `esp32p4`: the same nodes, in the HP_SYS_CLKRST register block.
 //! - `v2v3_esp32s31`: the same nodes, in the HP_SYS_CLKRST register block, but with a per-instance
 //!   register layout.
 
@@ -18,11 +18,11 @@
 #[cfg_attr(i2s_clock_configured_by_pcr, path = "v2v3_pcr.rs")]
 #[cfg_attr(
     all(i2s_clock_configured_by_hp_sys_clkrst, esp32p4),
-    path = "v2v3_esp32p4.rs"
+    path = "esp32p4.rs"
 )]
 #[cfg_attr(
     all(i2s_clock_configured_by_hp_sys_clkrst, esp32s31),
-    path = "v2v3_esp32s31.rs"
+    path = "esp32s31.rs"
 )]
 #[cfg_attr(
     all(
