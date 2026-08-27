@@ -58,6 +58,7 @@ use crate::{
 #[derive(Debug, Clone, Deserialize)]
 pub struct Source {
     /// The unique name of the clock tree item.
+    #[serde(default)]
     pub name: String,
 
     #[serde(default)]
@@ -82,6 +83,16 @@ pub struct Source {
     values: Option<ValuesExpression>,
 
     output: OutputExpression,
+}
+
+impl Source {
+    pub(crate) fn set_wake_locking(&mut self, wake_locking: bool) {
+        self.wake_locking = wake_locking;
+    }
+
+    pub(crate) fn set_always_on(&mut self, always_on: bool) {
+        self.always_on = always_on;
+    }
 }
 
 impl ClockTreeNodeType for Source {

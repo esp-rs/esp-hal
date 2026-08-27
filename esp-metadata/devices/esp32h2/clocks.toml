@@ -90,19 +90,24 @@ system_clocks = { clock_tree = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
         ] },
     ] },
-    { group = "PARL_IO", clocks = [
-        { name = "RX_CLOCK", type = "mux", wake_locking = true, variants = [
+    { group = "PARL_IO",
+      presets = {
+        CLK = {
+          type = "mux",
+          wake_locking = true,
+          variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
             { name = "PLL_F96M",    outputs = "PLL_F96M_CLK", default = true },
-            # TODO: external clock
-        ] },
-        { name = "TX_CLOCK", type = "mux", wake_locking = true, variants = [
-            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
-            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F96M",    outputs = "PLL_F96M_CLK", default = true },
-        ] },
-    ] },
+            # TODO: external clock (TX and RX may differ)
+          ],
+        },
+      },
+      clocks = [
+        { name = "RX_CLOCK", preset = "CLK" },
+        { name = "TX_CLOCK", preset = "CLK" },
+      ],
+    },
     { group = "I2C", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",    outputs = "XTAL_CLK", default = true },

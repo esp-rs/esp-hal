@@ -141,7 +141,69 @@ pub struct SystemClocks {
 #[serde(deny_unknown_fields)]
 struct ClockGroup {
     group: String,
-    clocks: Vec<ClockTreeItem>,
+    /// Reusable node definitions for this group. Map keys are preset names (TOML 1.1).
+    #[serde(default)]
+    presets: IndexMap<String, ClockTreeItem>,
+    clocks: Vec<GroupClock>,
+}
+
+/// A clock in a template group: a full node, or an instantiation of a group preset.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum GroupClock {
+    Inline(ClockTreeItem),
+    Preset(PresetClockRef),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PresetClockRef {
+    name: String,
+    preset: String,
+    #[serde(default)]
+    wake_locking: Option<bool>,
+    #[serde(default)]
+    always_on: Option<bool>,
+}
+
+struct ResolvedGroupClock {
+    item: ClockTreeItem,
+    /// Name used to generate `*Config` types (`CLK` → `ParlIoClkConfig`).
+    config_type_stem: String,
+}
+
+impl ClockGroup {
+    fn resolved_clocks(&self) -> Result<Vec<ResolvedGroupClock>> {
+        self.clocks
+            .iter()
+            .map(|clock| match clock {
+                GroupClock::Inline(item) => Ok(ResolvedGroupClock {
+                    config_type_stem: item.name().to_string(),
+                    item: item.clone(),
+                }),
+                GroupClock::Preset(inst) => {
+                    let mut item = self.presets.get(&inst.preset).cloned().ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "Clock group `{}` has no preset `{}`",
+                            self.group,
+                            inst.preset
+                        )
+                    })?;
+                    item.set_name(inst.name.clone());
+                    if let Some(wake_locking) = inst.wake_locking {
+                        item.set_wake_locking(wake_locking);
+                    }
+                    if let Some(always_on) = inst.always_on {
+                        item.set_always_on(always_on);
+                    }
+                    Ok(ResolvedGroupClock {
+                        item,
+                        config_type_stem: inst.preset.clone(),
+                    })
+                }
+            })
+            .collect()
+    }
 }
 
 pub(crate) struct ProcessedClockData {
@@ -176,6 +238,10 @@ pub(crate) struct ClockTreeNodeInstance {
     ///
     /// Must be in CONSTANT_CASE, e.g. UART.
     group_template: String,
+
+    /// Stem for the generated config type. For a preset instantiation this is the preset name
+    /// (e.g. `CLK` → `ParlIoClkConfig`), otherwise the template node name.
+    config_type_stem: String,
 
     properties: ManagementProperties,
 }
@@ -277,7 +343,11 @@ impl ClockTreeNodeInstance {
     /// Returns the name of the clock configuration type. The corresponding field in the
     /// `ClockConfig` struct will have this type.
     fn config_type_name(&self) -> Ident {
-        clock_tree::config_type_name(&self.group_template, self.node.name())
+        clock_tree::config_type_name(&self.group_template, &self.config_type_stem)
+    }
+
+    pub(crate) fn config_type_stem(&self) -> &str {
+        &self.config_type_stem
     }
 
     fn apply_configuration(
@@ -727,6 +797,7 @@ impl SystemClocks {
         let mut system_config_steps = HashMap::new();
 
         let mut first_instances = HashSet::new();
+        let mut emitted_config_types = HashSet::new();
         let mut instance_enums = Vec::new();
 
         for (group_template, instances) in tree.group_instances.iter() {
@@ -759,11 +830,14 @@ impl SystemClocks {
             if is_first_instance {
                 let cfg_attr = clock_item.rustc_cfg_attr();
                 if clock_item.emits_config_type(tree) {
-                    let config_type = clock_item.config_type();
-                    clock_tree_node_defs.push(quote! {
-                        #cfg_attr
-                        #config_type
-                    });
+                    let type_key = clock_item.config_type_name().to_string();
+                    if emitted_config_types.insert(type_key) {
+                        let config_type = clock_item.config_type();
+                        clock_tree_node_defs.push(quote! {
+                            #cfg_attr
+                            #config_type
+                        });
+                    }
                 }
 
                 let instance_count =
@@ -1238,17 +1312,29 @@ impl SystemClocks {
                 "{path}.{}",
                 node.name().from_case(Case::Constant).to_case(Case::Snake)
             );
-            node.property_macro_branches(&path, "")
+            node.property_macro_branches(&path, "", node.name())
         }));
         branches.extend(self.template_groups.iter().flat_map(|group| {
-            group.clocks.iter().map(|node| {
-                let path = format!(
-                    "{path}.{}.{}",
-                    group.group.from_case(Case::Constant).to_case(Case::Snake),
-                    node.name().from_case(Case::Constant).to_case(Case::Snake)
-                );
-                node.property_macro_branches(&path, &group.group)
-            })
+            group
+                .resolved_clocks()
+                .unwrap_or_else(|err| panic!("{err}"))
+                .into_iter()
+                .map(|resolved| {
+                    let path = format!(
+                        "{path}.{}.{}",
+                        group.group.from_case(Case::Constant).to_case(Case::Snake),
+                        resolved
+                            .item
+                            .name()
+                            .from_case(Case::Constant)
+                            .to_case(Case::Snake)
+                    );
+                    resolved.item.property_macro_branches(
+                        &path,
+                        &group.group,
+                        &resolved.config_type_stem,
+                    )
+                })
         }));
         branches
     }
@@ -1501,6 +1587,7 @@ impl DeviceClocks {
                     name: name.clone(),
                     group_instance: String::new(),
                     group_template: String::new(),
+                    config_type_stem: name.clone(),
                     properties: ManagementProperties {
                         name: format_ident!(
                             "{}",
@@ -1531,15 +1618,15 @@ impl DeviceClocks {
 
             // A peripheral can have any number of clock sources. We'll turn them into clock tree
             // nodes here.
-            for def in self
+            for resolved in self
                 .system_clocks
                 .template_groups
                 .iter()
                 .find(|g| g.group == *group_name)
                 .ok_or_else(|| anyhow::anyhow!("Clock group {group_name} not found"))?
-                .clocks
-                .iter()
+                .resolved_clocks()?
             {
+                let def = &resolved.item;
                 let name = format!("{peri_name}_{}", def.name());
                 let instance_ty = format_ident!(
                     "{}Instance",
@@ -1555,6 +1642,7 @@ impl DeviceClocks {
                     name: name.clone(),
                     group_instance: peri_name.clone(),
                     group_template: group_name.clone(),
+                    config_type_stem: resolved.config_type_stem.clone(),
                     properties: ManagementProperties {
                         name: format_ident!(
                             "{}",
@@ -1702,8 +1790,14 @@ impl DeviceClocks {
             push_node_cfgs(node.name().to_string(), node);
         }
         for group in config.clocks.system_clocks.template_groups.iter() {
-            for node in group.clocks.iter() {
-                push_node_cfgs(format!("{}_{}", group.group, node.name()), node);
+            for resolved in group
+                .resolved_clocks()
+                .unwrap_or_else(|err| panic!("{err}"))
+            {
+                push_node_cfgs(
+                    format!("{}_{}", group.group, resolved.item.name()),
+                    &resolved.item,
+                );
             }
         }
 

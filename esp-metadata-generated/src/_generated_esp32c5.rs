@@ -609,14 +609,14 @@ macro_rules! property {
         ::soc::clocks::RmtSclkConfig::PllF80m]
     };
     ("clock_tree.parl_io.rx_clock") => {
-        [crate ::soc::clocks::ParlIoRxClockConfig::XtalClk, crate
-        ::soc::clocks::ParlIoRxClockConfig::RcFastClk, crate
-        ::soc::clocks::ParlIoRxClockConfig::PllF240m]
+        [crate ::soc::clocks::ParlIoClkConfig::XtalClk, crate
+        ::soc::clocks::ParlIoClkConfig::RcFastClk, crate
+        ::soc::clocks::ParlIoClkConfig::PllF240m]
     };
     ("clock_tree.parl_io.tx_clock") => {
-        [crate ::soc::clocks::ParlIoTxClockConfig::XtalClk, crate
-        ::soc::clocks::ParlIoTxClockConfig::RcFastClk, crate
-        ::soc::clocks::ParlIoTxClockConfig::PllF240m]
+        [crate ::soc::clocks::ParlIoClkConfig::XtalClk, crate
+        ::soc::clocks::ParlIoClkConfig::RcFastClk, crate
+        ::soc::clocks::ParlIoClkConfig::PllF240m]
     };
     ("clock_tree.i2c.function_clock.sclk") => {
         [crate ::soc::clocks::I2cFunctionClockSclk::Xtal, crate
@@ -1562,8 +1562,8 @@ macro_rules! for_each_sw_interrupt {
 ///     fn configure_rx_clock_impl(
 ///         self,
 ///         _clocks: &mut ClockTree,
-///         _old_config: Option<ParlIoRxClockConfig>,
-///         _new_config: ParlIoRxClockConfig,
+///         _old_config: Option<ParlIoClkConfig>,
+///         _new_config: ParlIoClkConfig,
 ///     ) {
 ///         todo!()
 ///     }
@@ -1577,8 +1577,8 @@ macro_rules! for_each_sw_interrupt {
 ///     fn configure_tx_clock_impl(
 ///         self,
 ///         _clocks: &mut ClockTree,
-///         _old_config: Option<ParlIoTxClockConfig>,
-///         _new_config: ParlIoTxClockConfig,
+///         _old_config: Option<ParlIoClkConfig>,
+///         _new_config: ParlIoClkConfig,
 ///     ) {
 ///         todo!()
 ///     }
@@ -1927,19 +1927,7 @@ macro_rules! define_clock_tree_types {
         /// The list of clock signals that the `PARL_IO_RX_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum ParlIoRxClockConfig {
-            /// Selects `XTAL_CLK`.
-            XtalClk,
-            /// Selects `RC_FAST_CLK`.
-            RcFastClk,
-            #[default]
-            /// Selects `PLL_F240M`.
-            PllF240m,
-        }
-        /// The list of clock signals that the `PARL_IO_TX_CLOCK` multiplexer can output.
-        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum ParlIoTxClockConfig {
+        pub enum ParlIoClkConfig {
             /// Selects `XTAL_CLK`.
             XtalClk,
             /// Selects `RC_FAST_CLK`.
@@ -2093,8 +2081,8 @@ macro_rules! define_clock_tree_types {
             iomux_function_clock: Option<IomuxFunctionClockConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 1],
-            parl_io_rx_clock: [Option<ParlIoRxClockConfig>; 1],
-            parl_io_tx_clock: [Option<ParlIoTxClockConfig>; 1],
+            parl_io_rx_clock: [Option<ParlIoClkConfig>; 1],
+            parl_io_tx_clock: [Option<ParlIoClkConfig>; 1],
             rmt_sclk: [Option<RmtSclkConfig>; 1],
             spi_function_clock: [Option<SpiFunctionClockConfig>; 1],
             timg_function_clock: [Option<TimgFunctionClockConfig>; 2],
@@ -2183,11 +2171,11 @@ macro_rules! define_clock_tree_types {
                 self.i2c_function_clock[I2cInstance::I2c0 as usize]
             }
             /// Returns the current configuration of the PARL_IO_RX_CLOCK clock tree node
-            pub fn parl_io_rx_clock(&self) -> Option<ParlIoRxClockConfig> {
+            pub fn parl_io_rx_clock(&self) -> Option<ParlIoClkConfig> {
                 self.parl_io_rx_clock[ParlIoInstance::ParlIo as usize]
             }
             /// Returns the current configuration of the PARL_IO_TX_CLOCK clock tree node
-            pub fn parl_io_tx_clock(&self) -> Option<ParlIoTxClockConfig> {
+            pub fn parl_io_tx_clock(&self) -> Option<ParlIoClkConfig> {
                 self.parl_io_tx_clock[ParlIoInstance::ParlIo as usize]
             }
             /// Returns the current configuration of the RMT_SCLK clock tree node
@@ -3265,32 +3253,28 @@ macro_rules! define_clock_tree_types {
             }
         }
         impl ParlIoInstance {
-            pub fn configure_rx_clock(
-                self,
-                clocks: &mut ClockTree,
-                new_selector: ParlIoRxClockConfig,
-            ) {
+            pub fn configure_rx_clock(self, clocks: &mut ClockTree, new_selector: ParlIoClkConfig) {
                 let old_selector = clocks.parl_io_rx_clock[self as usize].replace(new_selector);
                 refresh_parl_io_rx_clock_downstream(clocks, self);
                 if clocks.parl_io_rx_clock_refcount[self as usize] > 0 {
                     match new_selector {
-                        ParlIoRxClockConfig::XtalClk => request_xtal_clk(clocks),
-                        ParlIoRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                        ParlIoRxClockConfig::PllF240m => request_pll_f240m(clocks),
+                        ParlIoClkConfig::XtalClk => request_xtal_clk(clocks),
+                        ParlIoClkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        ParlIoClkConfig::PllF240m => request_pll_f240m(clocks),
                     }
                     self.configure_rx_clock_impl(clocks, old_selector, new_selector);
                     if let Some(old_selector) = old_selector {
                         match old_selector {
-                            ParlIoRxClockConfig::XtalClk => release_xtal_clk(clocks),
-                            ParlIoRxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                            ParlIoRxClockConfig::PllF240m => release_pll_f240m(clocks),
+                            ParlIoClkConfig::XtalClk => release_xtal_clk(clocks),
+                            ParlIoClkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                            ParlIoClkConfig::PllF240m => release_pll_f240m(clocks),
                         }
                     }
                 } else {
                     self.configure_rx_clock_impl(clocks, old_selector, new_selector);
                 }
             }
-            pub fn rx_clock_config(self, clocks: &mut ClockTree) -> Option<ParlIoRxClockConfig> {
+            pub fn rx_clock_config(self, clocks: &mut ClockTree) -> Option<ParlIoClkConfig> {
                 clocks.parl_io_rx_clock[self as usize]
             }
             pub fn request_rx_clock(self, clocks: &mut ClockTree) {
@@ -3298,9 +3282,9 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.parl_io_rx_clock_refcount[self as usize]) {
                     trace!("Enabling {:?}::RX_CLOCK", self);
                     match unwrap!(clocks.parl_io_rx_clock[self as usize]) {
-                        ParlIoRxClockConfig::XtalClk => request_xtal_clk(clocks),
-                        ParlIoRxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                        ParlIoRxClockConfig::PllF240m => request_pll_f240m(clocks),
+                        ParlIoClkConfig::XtalClk => request_xtal_clk(clocks),
+                        ParlIoClkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        ParlIoClkConfig::PllF240m => request_pll_f240m(clocks),
                     }
                     self.enable_rx_clock_impl(clocks, true);
                 }
@@ -3311,60 +3295,56 @@ macro_rules! define_clock_tree_types {
                     trace!("Disabling {:?}::RX_CLOCK", self);
                     self.enable_rx_clock_impl(clocks, false);
                     match unwrap!(clocks.parl_io_rx_clock[self as usize]) {
-                        ParlIoRxClockConfig::XtalClk => release_xtal_clk(clocks),
-                        ParlIoRxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                        ParlIoRxClockConfig::PllF240m => release_pll_f240m(clocks),
+                        ParlIoClkConfig::XtalClk => release_xtal_clk(clocks),
+                        ParlIoClkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        ParlIoClkConfig::PllF240m => release_pll_f240m(clocks),
                     }
                 }
             }
             #[allow(unused_variables)]
             pub fn rx_clock_config_frequency(
                 clocks: &mut ClockTree,
-                config: ParlIoRxClockConfig,
+                config: ParlIoClkConfig,
             ) -> u32 {
                 match config {
-                    ParlIoRxClockConfig::XtalClk => xtal_clk_frequency(),
-                    ParlIoRxClockConfig::RcFastClk => rc_fast_clk_frequency(),
-                    ParlIoRxClockConfig::PllF240m => pll_f240m_frequency(),
+                    ParlIoClkConfig::XtalClk => xtal_clk_frequency(),
+                    ParlIoClkConfig::RcFastClk => rc_fast_clk_frequency(),
+                    ParlIoClkConfig::PllF240m => pll_f240m_frequency(),
                 }
             }
             pub fn rx_clock_frequency(self) -> u32 {
                 PARL_IO_RX_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
-            pub fn rx_clock_source_frequency(source: ParlIoRxClockConfig) -> u32 {
+            pub fn rx_clock_source_frequency(source: ParlIoClkConfig) -> u32 {
                 match source {
-                    ParlIoRxClockConfig::XtalClk => xtal_clk_frequency(),
-                    ParlIoRxClockConfig::RcFastClk => rc_fast_clk_frequency(),
-                    ParlIoRxClockConfig::PllF240m => pll_f240m_frequency(),
+                    ParlIoClkConfig::XtalClk => xtal_clk_frequency(),
+                    ParlIoClkConfig::RcFastClk => rc_fast_clk_frequency(),
+                    ParlIoClkConfig::PllF240m => pll_f240m_frequency(),
                 }
             }
-            pub fn configure_tx_clock(
-                self,
-                clocks: &mut ClockTree,
-                new_selector: ParlIoTxClockConfig,
-            ) {
+            pub fn configure_tx_clock(self, clocks: &mut ClockTree, new_selector: ParlIoClkConfig) {
                 let old_selector = clocks.parl_io_tx_clock[self as usize].replace(new_selector);
                 refresh_parl_io_tx_clock_downstream(clocks, self);
                 if clocks.parl_io_tx_clock_refcount[self as usize] > 0 {
                     match new_selector {
-                        ParlIoTxClockConfig::XtalClk => request_xtal_clk(clocks),
-                        ParlIoTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                        ParlIoTxClockConfig::PllF240m => request_pll_f240m(clocks),
+                        ParlIoClkConfig::XtalClk => request_xtal_clk(clocks),
+                        ParlIoClkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        ParlIoClkConfig::PllF240m => request_pll_f240m(clocks),
                     }
                     self.configure_tx_clock_impl(clocks, old_selector, new_selector);
                     if let Some(old_selector) = old_selector {
                         match old_selector {
-                            ParlIoTxClockConfig::XtalClk => release_xtal_clk(clocks),
-                            ParlIoTxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                            ParlIoTxClockConfig::PllF240m => release_pll_f240m(clocks),
+                            ParlIoClkConfig::XtalClk => release_xtal_clk(clocks),
+                            ParlIoClkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                            ParlIoClkConfig::PllF240m => release_pll_f240m(clocks),
                         }
                     }
                 } else {
                     self.configure_tx_clock_impl(clocks, old_selector, new_selector);
                 }
             }
-            pub fn tx_clock_config(self, clocks: &mut ClockTree) -> Option<ParlIoTxClockConfig> {
+            pub fn tx_clock_config(self, clocks: &mut ClockTree) -> Option<ParlIoClkConfig> {
                 clocks.parl_io_tx_clock[self as usize]
             }
             pub fn request_tx_clock(self, clocks: &mut ClockTree) {
@@ -3372,9 +3352,9 @@ macro_rules! define_clock_tree_types {
                 if increment_reference_count(&mut clocks.parl_io_tx_clock_refcount[self as usize]) {
                     trace!("Enabling {:?}::TX_CLOCK", self);
                     match unwrap!(clocks.parl_io_tx_clock[self as usize]) {
-                        ParlIoTxClockConfig::XtalClk => request_xtal_clk(clocks),
-                        ParlIoTxClockConfig::RcFastClk => request_rc_fast_clk(clocks),
-                        ParlIoTxClockConfig::PllF240m => request_pll_f240m(clocks),
+                        ParlIoClkConfig::XtalClk => request_xtal_clk(clocks),
+                        ParlIoClkConfig::RcFastClk => request_rc_fast_clk(clocks),
+                        ParlIoClkConfig::PllF240m => request_pll_f240m(clocks),
                     }
                     self.enable_tx_clock_impl(clocks, true);
                 }
@@ -3385,32 +3365,32 @@ macro_rules! define_clock_tree_types {
                     trace!("Disabling {:?}::TX_CLOCK", self);
                     self.enable_tx_clock_impl(clocks, false);
                     match unwrap!(clocks.parl_io_tx_clock[self as usize]) {
-                        ParlIoTxClockConfig::XtalClk => release_xtal_clk(clocks),
-                        ParlIoTxClockConfig::RcFastClk => release_rc_fast_clk(clocks),
-                        ParlIoTxClockConfig::PllF240m => release_pll_f240m(clocks),
+                        ParlIoClkConfig::XtalClk => release_xtal_clk(clocks),
+                        ParlIoClkConfig::RcFastClk => release_rc_fast_clk(clocks),
+                        ParlIoClkConfig::PllF240m => release_pll_f240m(clocks),
                     }
                 }
             }
             #[allow(unused_variables)]
             pub fn tx_clock_config_frequency(
                 clocks: &mut ClockTree,
-                config: ParlIoTxClockConfig,
+                config: ParlIoClkConfig,
             ) -> u32 {
                 match config {
-                    ParlIoTxClockConfig::XtalClk => xtal_clk_frequency(),
-                    ParlIoTxClockConfig::RcFastClk => rc_fast_clk_frequency(),
-                    ParlIoTxClockConfig::PllF240m => pll_f240m_frequency(),
+                    ParlIoClkConfig::XtalClk => xtal_clk_frequency(),
+                    ParlIoClkConfig::RcFastClk => rc_fast_clk_frequency(),
+                    ParlIoClkConfig::PllF240m => pll_f240m_frequency(),
                 }
             }
             pub fn tx_clock_frequency(self) -> u32 {
                 PARL_IO_TX_CLOCK_FREQ_CACHE[self as usize]
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
-            pub fn tx_clock_source_frequency(source: ParlIoTxClockConfig) -> u32 {
+            pub fn tx_clock_source_frequency(source: ParlIoClkConfig) -> u32 {
                 match source {
-                    ParlIoTxClockConfig::XtalClk => xtal_clk_frequency(),
-                    ParlIoTxClockConfig::RcFastClk => rc_fast_clk_frequency(),
-                    ParlIoTxClockConfig::PllF240m => pll_f240m_frequency(),
+                    ParlIoClkConfig::XtalClk => xtal_clk_frequency(),
+                    ParlIoClkConfig::RcFastClk => rc_fast_clk_frequency(),
+                    ParlIoClkConfig::PllF240m => pll_f240m_frequency(),
                 }
             }
         }

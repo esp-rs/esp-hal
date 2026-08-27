@@ -25,6 +25,10 @@ use crate::cfg::{
 #[serde(deny_unknown_fields)]
 pub struct Multiplexer {
     /// The unique name of the clock tree item.
+    ///
+    /// Empty when this multiplexer is a group preset; the map key / instantiating clock supplies
+    /// the name.
+    #[serde(default)]
     pub name: String,
 
     #[serde(default)]
@@ -39,6 +43,16 @@ pub struct Multiplexer {
 
     // reject: Option<RejectExpression>,
     pub variants: Vec<MultiplexerVariant>,
+}
+
+impl Multiplexer {
+    pub(crate) fn set_wake_locking(&mut self, wake_locking: bool) {
+        self.wake_locking = wake_locking;
+    }
+
+    pub(crate) fn set_always_on(&mut self, always_on: bool) {
+        self.always_on = always_on;
+    }
 }
 
 impl ClockTreeNodeType for Multiplexer {
@@ -298,12 +312,17 @@ impl ClockTreeNodeType for Multiplexer {
         self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 
-    fn property_macro_branches(&self, path: &str, group: &str) -> TokenStream {
+    fn property_macro_branches(
+        &self,
+        path: &str,
+        group: &str,
+        config_type_stem: &str,
+    ) -> TokenStream {
         if !self.is_configurable() {
             return quote! {};
         }
 
-        let ty = config_type_name(group, &self.name);
+        let ty = config_type_name(group, config_type_stem);
         let options = self.variants.iter().map(|variant| {
             let cfg_attr = variant.cfg_attr();
             let variant = variant.config_enum_variant_name();
