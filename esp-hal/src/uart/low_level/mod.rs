@@ -708,6 +708,9 @@ impl Info {
 
         txfifo_rst(self.regs(), true);
         txfifo_rst(self.regs(), false);
+
+        // The reset can drive the state machine. Wait for it to settle.
+        while !self.is_tx_idle() {}
     }
 
     pub(super) fn current_symbol_length(&self) -> u8 {

@@ -1345,6 +1345,77 @@ mod new_tests {
 
     #[test]
     #[timeout(10)]
+    fn applying_config_does_not_cause_a_pulse(mut ctx: Context) {
+        fn inner(
+            tx_instance: usize,
+            rx: AnyUart<'_>,
+            rx_pin: AnyPin<'_>,
+            tx: AnyUart<'_>,
+            tx_pin: AnyPin<'_>,
+        ) {
+            info!("Testing UART{}", tx_instance);
+
+            let config = uart::Config::default();
+            let mut rx = Uart::new(rx, config).unwrap().with_rx(rx_pin);
+            let mut uart = Uart::new(tx, config).unwrap().with_tx(tx_pin);
+
+            // Applying the configuration must keep the TX line at the idle level. A low
+            // pulse on it would look like a glitch to the receiver.
+            for i in 0..20 {
+                uart.apply_config(&config).unwrap();
+
+                uart.write(b"a").unwrap();
+                uart.flush().unwrap();
+
+                let mut buf = [0u8; 1];
+                let read = rx.read(&mut buf).unwrap();
+
+                assert_eq!(
+                    &buf[..read],
+                    b"a",
+                    "UART{}: failed in iteration #{}",
+                    tx_instance,
+                    i
+                );
+            }
+
+            let (_, mut tx) = uart.split();
+
+            for i in 0..20 {
+                tx.apply_config(&config).unwrap();
+
+                tx.write(b"a").unwrap();
+                tx.flush().unwrap();
+
+                let mut buf = [0u8; 1];
+                let read = rx.read(&mut buf).unwrap();
+
+                assert_eq!(
+                    &buf[..read],
+                    b"a",
+                    "UART{}: failed in iteration #{} (transmitter only)",
+                    tx_instance,
+                    i
+                );
+            }
+
+            info!("UART{} test passed", tx_instance);
+        }
+
+        // Run the test for each UART instance
+        for_each_uart_pair(|tx_num, rx_num| {
+            inner(
+                tx_num,
+                unsafe { ctx.uart[rx_num].clone_unchecked() },
+                ctx.rx.reborrow(),
+                unsafe { ctx.uart[tx_num].clone_unchecked() },
+                ctx.tx.reborrow(),
+            );
+        });
+    }
+
+    #[test]
+    #[timeout(10)]
     fn creating_uart_clears_fifo(mut ctx: Context) {
         fn inner(
             tx_instance: usize,
@@ -1381,9 +1452,7 @@ mod new_tests {
         }
 
         // Run the test for each UART instance
-        // https://github.com/esp-rs/esp-hal/issues/6138
-        let uart_count = if cfg!(esp32) { 2 } else { UART_COUNT };
-        for (tx_num, rx_num) in (0..uart_count).map(|i| (i, (i + 1) % uart_count)) {
+        for_each_uart_pair(|tx_num, rx_num| {
             inner(
                 tx_num,
                 unsafe { ctx.uart[rx_num].clone_unchecked() },
@@ -1391,6 +1460,14 @@ mod new_tests {
                 unsafe { ctx.uart[tx_num].clone_unchecked() },
                 ctx.tx.reborrow(),
             );
+        });
+    }
+
+    fn for_each_uart_pair(mut f: impl FnMut(usize, usize)) {
+        // https://github.com/esp-rs/esp-hal/issues/6138
+        let uart_count = if cfg!(esp32) { 2 } else { UART_COUNT };
+        for (tx_num, rx_num) in (0..uart_count).map(|i| (i, (i + 1) % uart_count)) {
+            f(tx_num, rx_num);
         }
     }
 
