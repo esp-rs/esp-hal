@@ -114,22 +114,61 @@ fn enable_branch_predictor() {
     }
 }
 
-#[cfg(esp32)]
-unsafe extern "C" {
-    fn Cache_Flush_rom(cpu: u32);
-}
-
-/// ROM `Cache_Suspend_I/DCache` on ESP32-S3 does not wait until the cache FSM
-/// is idle (`ESP_ROM_HAS_CACHE_SUSPEND_WAITI_BUG`).
-#[cfg(esp32s3)]
-#[ram]
-fn s3_wait_cache_idle(icache: bool) {
-    use crate::peripherals::EXTMEM;
-    let extmem = EXTMEM::regs();
-    if icache {
-        while extmem.cache_state().read().icache_state().bits() != 1 {}
-    } else {
-        while extmem.cache_state().read().dcache_state().bits() != 1 {}
+cfg_select! {
+    esp32 => {
+        unsafe extern "C" {
+            fn Cache_Flush_rom(cpu: u32);
+        }
+    }
+    esp32s2 => {
+        unsafe extern "C" {
+            fn Cache_Suspend_ICache() -> u32;
+            fn Cache_Suspend_DCache() -> u32;
+            fn Cache_Resume_ICache(autoload: u32);
+            fn Cache_Resume_DCache(autoload: u32);
+            fn Cache_Invalidate_Addr(addr: u32, size: u32);
+        }
+    }
+    esp32s3 => {
+        unsafe extern "C" {
+            fn rom_Cache_Suspend_ICache() -> u32;
+            fn rom_Cache_Suspend_DCache() -> u32;
+            fn Cache_Resume_ICache(autoload: u32);
+            fn Cache_Resume_DCache(autoload: u32);
+            fn Cache_Invalidate_Addr(addr: u32, size: u32);
+        }
+    }
+    esp32p4 => {
+        unsafe extern "C" {
+            fn Cache_Suspend_L2_Cache() -> u32;
+            fn Cache_Resume_L2_Cache(autoload: u32);
+            fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
+        }
+    }
+    esp32s31 => {
+        unsafe extern "C" {
+            fn Cache_Suspend_L1_CORE0_ICache() -> u32;
+            fn Cache_Suspend_L1_CORE1_ICache() -> u32;
+            fn Cache_Suspend_L1_DCache() -> u32;
+            fn Cache_Resume_L1_DCache(autoload: u32);
+            fn Cache_Resume_L1_CORE1_ICache(autoload: u32);
+            fn Cache_Resume_L1_CORE0_ICache(autoload: u32);
+            fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
+        }
+    }
+    any(esp32c5, esp32c61) => {
+        unsafe extern "C" {
+            fn Cache_Suspend_Cache() -> u32;
+            fn Cache_Resume_Cache(autoload: u32);
+            fn Cache_Invalidate_Addr(addr: u32, size: u32);
+        }
+    }
+    _ => {
+        unsafe extern "C" {
+            fn Cache_Suspend_ICache() -> u32;
+            fn Cache_Resume_ICache(autoload: u32);
+            fn Cache_Invalidate_Addr(addr: u32, size: u32);
+        }
     }
 }
 
@@ -156,77 +195,47 @@ fn suspend_caches() -> Inner {
             let _ = dport.pro_cache_ctrl().read();
             Inner { pro, app }
         }
-        esp32s2 => {
-            unsafe extern "C" {
-                fn Cache_Suspend_ICache() -> u32;
-                fn Cache_Suspend_DCache() -> u32;
+        esp32s2 => unsafe {
+            Inner {
+                icache: Cache_Suspend_ICache(),
+                dcache: Cache_Suspend_DCache(),
             }
-            unsafe {
-                Inner {
-                    icache: Cache_Suspend_ICache(),
-                    dcache: Cache_Suspend_DCache(),
-                }
-            }
-        }
+        },
         esp32s3 => {
-            // The ROM exports `rom_Cache_Suspend_*`; IDF patches them to wait
-            // until the cache FSM is idle (WAITI bug).
-            unsafe extern "C" {
-                fn rom_Cache_Suspend_ICache() -> u32;
-                fn rom_Cache_Suspend_DCache() -> u32;
-            }
+            // ROM `Cache_Suspend_I/DCache` does not wait until the cache FSM is
+            // idle (`ESP_ROM_HAS_CACHE_SUSPEND_WAITI_BUG`).
+            use crate::peripherals::EXTMEM;
+            let extmem = EXTMEM::regs();
             unsafe {
                 let icache = rom_Cache_Suspend_ICache();
-                s3_wait_cache_idle(true);
+                while extmem.cache_state().read().icache_state().bits() != 1 {}
                 let dcache = rom_Cache_Suspend_DCache();
-                s3_wait_cache_idle(false);
+                while extmem.cache_state().read().dcache_state().bits() != 1 {}
                 Inner { icache, dcache }
             }
         }
-        esp32p4 => {
-            unsafe extern "C" {
-                fn Cache_Suspend_L2_Cache() -> u32;
+        esp32p4 => unsafe {
+            Inner {
+                l2: Cache_Suspend_L2_Cache(),
             }
-            unsafe {
-                Inner {
-                    l2: Cache_Suspend_L2_Cache(),
-                }
+        },
+        esp32s31 => unsafe {
+            Inner {
+                i0: Cache_Suspend_L1_CORE0_ICache(),
+                i1: Cache_Suspend_L1_CORE1_ICache(),
+                d: Cache_Suspend_L1_DCache(),
             }
-        }
-        esp32s31 => {
-            unsafe extern "C" {
-                fn Cache_Suspend_L1_CORE0_ICache() -> u32;
-                fn Cache_Suspend_L1_CORE1_ICache() -> u32;
-                fn Cache_Suspend_L1_DCache() -> u32;
+        },
+        any(esp32c5, esp32c61) => unsafe {
+            Inner {
+                autoload: Cache_Suspend_Cache(),
             }
-            unsafe {
-                Inner {
-                    i0: Cache_Suspend_L1_CORE0_ICache(),
-                    i1: Cache_Suspend_L1_CORE1_ICache(),
-                    d: Cache_Suspend_L1_DCache(),
-                }
+        },
+        _ => unsafe {
+            Inner {
+                autoload: Cache_Suspend_ICache(),
             }
-        }
-        any(esp32c5, esp32c61) => {
-            unsafe extern "C" {
-                fn Cache_Suspend_Cache() -> u32;
-            }
-            unsafe {
-                Inner {
-                    autoload: Cache_Suspend_Cache(),
-                }
-            }
-        }
-        _ => {
-            unsafe extern "C" {
-                fn Cache_Suspend_ICache() -> u32;
-            }
-            unsafe {
-                Inner {
-                    autoload: Cache_Suspend_ICache(),
-                }
-            }
-        }
+        },
     }
 }
 
@@ -248,46 +257,18 @@ fn resume_caches(inner: &Inner) {
             }
             let _ = dport.pro_cache_ctrl().read();
         }
-        any(esp32s2, esp32s3) => {
-            unsafe extern "C" {
-                fn Cache_Resume_ICache(autoload: u32);
-                fn Cache_Resume_DCache(autoload: u32);
-            }
-            unsafe {
-                Cache_Resume_DCache(inner.dcache);
-                Cache_Resume_ICache(inner.icache);
-            }
-        }
-        esp32p4 => {
-            unsafe extern "C" {
-                fn Cache_Resume_L2_Cache(autoload: u32);
-            }
-            unsafe { Cache_Resume_L2_Cache(inner.l2) }
-        }
-        esp32s31 => {
-            unsafe extern "C" {
-                fn Cache_Resume_L1_DCache(autoload: u32);
-                fn Cache_Resume_L1_CORE1_ICache(autoload: u32);
-                fn Cache_Resume_L1_CORE0_ICache(autoload: u32);
-            }
-            unsafe {
-                Cache_Resume_L1_DCache(inner.d);
-                Cache_Resume_L1_CORE1_ICache(inner.i1);
-                Cache_Resume_L1_CORE0_ICache(inner.i0);
-            }
-        }
-        any(esp32c5, esp32c61) => {
-            unsafe extern "C" {
-                fn Cache_Resume_Cache(autoload: u32);
-            }
-            unsafe { Cache_Resume_Cache(inner.autoload) }
-        }
-        _ => {
-            unsafe extern "C" {
-                fn Cache_Resume_ICache(autoload: u32);
-            }
-            unsafe { Cache_Resume_ICache(inner.autoload) }
-        }
+        any(esp32s2, esp32s3) => unsafe {
+            Cache_Resume_DCache(inner.dcache);
+            Cache_Resume_ICache(inner.icache);
+        },
+        esp32p4 => unsafe { Cache_Resume_L2_Cache(inner.l2) },
+        esp32s31 => unsafe {
+            Cache_Resume_L1_DCache(inner.d);
+            Cache_Resume_L1_CORE1_ICache(inner.i1);
+            Cache_Resume_L1_CORE0_ICache(inner.i0);
+        },
+        any(esp32c5, esp32c61) => unsafe { Cache_Resume_Cache(inner.autoload) },
+        _ => unsafe { Cache_Resume_ICache(inner.autoload) },
     }
 }
 
@@ -318,9 +299,6 @@ fn invalidate_cache_addr(vaddr: u32, size: u32) {
             const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;
             const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
             const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
-            unsafe extern "C" {
-                fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
-            }
             unsafe {
                 Cache_Invalidate_Addr(
                     CACHE_MAP_L1_ICACHE_0 | CACHE_MAP_L1_ICACHE_1 | CACHE_MAP_L1_DCACHE,
@@ -332,18 +310,10 @@ fn invalidate_cache_addr(vaddr: u32, size: u32) {
         esp32p4 => {
             const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
             const CACHE_MAP_L2_CACHE: u32 = 1 << 5;
-            unsafe extern "C" {
-                fn Cache_Invalidate_Addr(map: u32, addr: u32, size: u32);
-            }
             // Flash is L2; L1 DCache may still hold a copy of a mapped line.
             unsafe { Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE | CACHE_MAP_L2_CACHE, vaddr, size) }
         }
-        _ => {
-            unsafe extern "C" {
-                fn Cache_Invalidate_Addr(addr: u32, size: u32);
-            }
-            unsafe { Cache_Invalidate_Addr(vaddr, size) }
-        }
+        _ => unsafe { Cache_Invalidate_Addr(vaddr, size) },
     }
 }
 

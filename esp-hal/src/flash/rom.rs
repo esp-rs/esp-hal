@@ -1,5 +1,7 @@
 //! ROM SPI flash wrappers and JEDEC capacity decode.
 
+use procmacros::ram;
+
 use super::{ConfigError, Error};
 
 /// Direct-read chunk limit (ESP-IDF `MAX_READ_CHUNK`), not a ROM hard limit.
@@ -54,6 +56,7 @@ fn is_unusable_id(id: u32) -> bool {
     )
 }
 
+#[inline(never)]
 fn unknown_flash_chip(raw: u32) -> ConfigError {
     warn!("unknown cached flash id {:#010x}", raw);
     ConfigError::UnknownFlashChip
@@ -119,8 +122,17 @@ pub(super) fn capacity_from_cached_id(raw: u32) -> Result<usize, ConfigError> {
 
 #[inline(always)]
 fn check_rc(rc: i32) -> Result<(), Error> {
+    if rc == 0 {
+        Ok(())
+    } else {
+        decode_rom_error(rc)
+    }
+}
+
+/// Must live in RAM: callers run with the flash cache suspended.
+#[ram]
+fn decode_rom_error(rc: i32) -> Result<(), Error> {
     match rc {
-        0 => Ok(()),
         1 => Err(Error::IoError),
         2 => Err(Error::IoTimeout),
         other => {

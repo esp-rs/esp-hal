@@ -257,7 +257,10 @@ ROM does not. Without that, this method returns
         let raw_id = rom::cached_device_id();
         let capacity = rom::capacity_from_cached_id(raw_id)?;
         let chip_id = raw_id & 0x00FF_FFFF;
-        let mut this = Self {
+        #[cfg(not(multi_core))]
+        let _ = config;
+
+        Ok(Self {
             _flash: flash,
             capacity,
             chip_id,
@@ -265,10 +268,7 @@ ROM does not. Without that, this method returns
             #[cfg(multi_core)]
             multi_core_strategy: config.multi_core_strategy,
             _mode: PhantomData,
-        };
-        let _ = config;
-        this.apply_config(&config)?;
-        Ok(this)
+        })
     }
 
     /// Applies a new configuration.
@@ -380,10 +380,10 @@ ROM does not. Without that, this method returns
     /// immutable.
     #[ram]
     pub unsafe fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
-        if from > to {
+        let Some(len) = to.checked_sub(from) else {
             return Err(Error::OutOfBounds);
-        }
-        let len = (to - from) as usize;
+        };
+        let len = len as usize;
         if len == 0 {
             return self.check_bounds(from, 0);
         }
