@@ -245,36 +245,12 @@ mod tests {
     }
 
     #[test]
-    fn test_break_detection(ctx: Context) {
-        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
-        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        tx.send_break(100);
-        assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
-    }
-
-    #[test]
-    fn test_break_detection_no_break(ctx: Context) {
-        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
-    }
-
-    #[test]
-    fn test_break_detection_multiple(ctx: Context) {
-        let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
-        let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
-
-        for _ in 0..3 {
-            tx.send_break(100);
-            assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
-        }
-    }
-
-    #[test]
     fn test_break_detection_interleaved(ctx: Context) {
         let mut tx = ctx.uart0.split().1.with_tx(ctx.tx);
         let mut rx = ctx.uart1.split().0.with_rx(ctx.rx);
+
+        // Initially, there is no break
+        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
 
         // Test 1: Send break, expect detection
         tx.send_break(100);
@@ -287,10 +263,7 @@ mod tests {
         tx.send_break(100);
         assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
 
-        // Test 4: Don't send break, expect timeout again
-        assert!(!rx.wait_for_break_with_timeout(Duration::from_millis(100)));
-
-        // Test 5: Final break detection, expect detection
+        // Test 4: Repeat sending break, expect detection
         tx.send_break(100);
         assert!(rx.wait_for_break_with_timeout(Duration::from_secs(1)));
     }
