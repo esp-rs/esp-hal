@@ -1099,10 +1099,6 @@ macro_rules! for_each_sw_interrupt {
 ///
 /// // RTC_SLOW_CLK
 ///
-/// fn enable_rtc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-///     todo!()
-/// }
-///
 /// fn configure_rtc_slow_clk_impl(
 ///     _clocks: &mut ClockTree,
 ///     _old_config: Option<RtcSlowClkConfig>,
@@ -1743,7 +1739,6 @@ macro_rules! define_clock_tree_types {
             xtal32k_clk_refcount: u32,
             rc_slow_clk_refcount: u32,
             rc_fast_div_clk_refcount: u32,
-            rtc_slow_clk_refcount: u32,
             rtc_fast_clk_refcount: u32,
             uart_mem_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
@@ -1898,7 +1893,6 @@ macro_rules! define_clock_tree_types {
                 xtal32k_clk_refcount: 0,
                 rc_slow_clk_refcount: 0,
                 rc_fast_div_clk_refcount: 0,
-                rtc_slow_clk_refcount: 0,
                 rtc_fast_clk_refcount: 0,
                 uart_mem_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
@@ -2714,48 +2708,15 @@ macro_rules! define_clock_tree_types {
         pub fn configure_rtc_slow_clk(clocks: &mut ClockTree, new_selector: RtcSlowClkConfig) {
             let old_selector = clocks.rtc_slow_clk.replace(new_selector);
             refresh_rtc_slow_clk_downstream(clocks);
-            if clocks.rtc_slow_clk_refcount > 0 {
-                match new_selector {
-                    #[cfg(use_xtal32k)]
-                    RtcSlowClkConfig::Xtal32k => request_xtal32k_clk(clocks),
-                    RtcSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
-                    RtcSlowClkConfig::RcFast => request_rc_fast_div_clk(clocks),
-                }
-                configure_rtc_slow_clk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        #[cfg(use_xtal32k)]
-                        RtcSlowClkConfig::Xtal32k => release_xtal32k_clk(clocks),
-                        RtcSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
-                        RtcSlowClkConfig::RcFast => release_rc_fast_div_clk(clocks),
-                    }
-                }
-            } else {
-                configure_rtc_slow_clk_impl(clocks, old_selector, new_selector);
+            match new_selector {
+                #[cfg(use_xtal32k)]
+                RtcSlowClkConfig::Xtal32k => request_xtal32k_clk(clocks),
+                RtcSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                RtcSlowClkConfig::RcFast => request_rc_fast_div_clk(clocks),
             }
-        }
-        pub fn rtc_slow_clk_config(clocks: &mut ClockTree) -> Option<RtcSlowClkConfig> {
-            clocks.rtc_slow_clk
-        }
-        pub fn request_rtc_slow_clk(clocks: &mut ClockTree) {
-            trace!("Requesting RTC_SLOW_CLK");
-            if increment_reference_count(&mut clocks.rtc_slow_clk_refcount) {
-                trace!("Enabling RTC_SLOW_CLK");
-                match unwrap!(clocks.rtc_slow_clk) {
-                    #[cfg(use_xtal32k)]
-                    RtcSlowClkConfig::Xtal32k => request_xtal32k_clk(clocks),
-                    RtcSlowClkConfig::RcSlow => request_rc_slow_clk(clocks),
-                    RtcSlowClkConfig::RcFast => request_rc_fast_div_clk(clocks),
-                }
-                enable_rtc_slow_clk_impl(clocks, true);
-            }
-        }
-        pub fn release_rtc_slow_clk(clocks: &mut ClockTree) {
-            trace!("Releasing RTC_SLOW_CLK");
-            if decrement_reference_count(&mut clocks.rtc_slow_clk_refcount) {
-                trace!("Disabling RTC_SLOW_CLK");
-                enable_rtc_slow_clk_impl(clocks, false);
-                match unwrap!(clocks.rtc_slow_clk) {
+            configure_rtc_slow_clk_impl(clocks, old_selector, new_selector);
+            if let Some(old_selector) = old_selector {
+                match old_selector {
                     #[cfg(use_xtal32k)]
                     RtcSlowClkConfig::Xtal32k => release_xtal32k_clk(clocks),
                     RtcSlowClkConfig::RcSlow => release_rc_slow_clk(clocks),
@@ -2763,6 +2724,11 @@ macro_rules! define_clock_tree_types {
                 }
             }
         }
+        pub fn rtc_slow_clk_config(clocks: &mut ClockTree) -> Option<RtcSlowClkConfig> {
+            clocks.rtc_slow_clk
+        }
+        fn request_rtc_slow_clk(_clocks: &mut ClockTree) {}
+        fn release_rtc_slow_clk(_clocks: &mut ClockTree) {}
         #[allow(unused_variables)]
         pub fn rtc_slow_clk_config_frequency(
             clocks: &mut ClockTree,
