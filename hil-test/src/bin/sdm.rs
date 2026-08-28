@@ -13,7 +13,7 @@
 use esp_hal::{
     Blocking,
     delay::Delay,
-    gpio::{AnyPin, Level, Output, OutputConfig, interconnect::PeripheralInput},
+    gpio::{AnyPin, Level, interconnect::PeripheralInput},
     peripherals::{RMT, SDM_CH0},
     rmt::{CHANNEL_RAM_SIZE, Channel, PulseCode, Rmt, Rx, RxChannelConfig, RxChannelCreator},
     sdm::{Channel as SdmChannel, ChannelConfig},
@@ -168,11 +168,14 @@ fn high_ratio_per_mille(data: &[PulseCode], count: usize) -> u32 {
     let mut low = 0_u32;
     let mut remaining = SAMPLE_TIME_US;
 
-    for code in data.iter().take(count) {
-        if code.length1() != 0 {
-            let length = u32::from(code.length1()).min(remaining);
+    'pulses: for code in data.iter().take(count) {
+        for (level, length) in [
+            (code.level1(), code.length1()),
+            (code.level2(), code.length2()),
+        ] {
+            let length = u32::from(length).min(remaining);
 
-            if code.level1() == Level::High {
+            if level == Level::High {
                 high += length;
             } else {
                 low += length;
@@ -180,22 +183,7 @@ fn high_ratio_per_mille(data: &[PulseCode], count: usize) -> u32 {
 
             remaining -= length;
             if remaining == 0 {
-                break;
-            }
-        }
-
-        if code.length2() != 0 {
-            let length = u32::from(code.length2()).min(remaining);
-
-            if code.level2() == Level::High {
-                high += length;
-            } else {
-                low += length;
-            }
-
-            remaining -= length;
-            if remaining == 0 {
-                break;
+                break 'pulses;
             }
         }
     }
@@ -213,7 +201,7 @@ fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
         .with_frequency(SDM_FREQUENCY)
         .unwrap()
         .with_duty(duty);
-    let channel = SdmChannel::new(ctx.sdm_ch0.reborrow(), ctx.sdm_pin.reborrow(), config);
+    let mut channel = SdmChannel::new(ctx.sdm_ch0.reborrow(), ctx.sdm_pin.reborrow(), config);
 
     Delay::new().delay_micros(SDM_WARM_UP_US);
 
@@ -224,11 +212,8 @@ fn measure_high_ratio(ctx: &mut Context, duty: u8) -> Measurement {
 
     Delay::new().delay_micros(SAMPLE_TIME_US);
 
-    drop(channel);
-    let mut output = Output::new(ctx.sdm_pin.reborrow(), Level::Low, OutputConfig::default());
-    output.set_low();
     // send idle signal so that RMT will stop recording pulses
-
+    channel.set_duty(0);
     let (count, _rx_channel) = rx_transaction.wait().unwrap();
 
     Measurement::new(&rx_data, count)
