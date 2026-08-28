@@ -230,6 +230,8 @@ pub(crate) fn init(cpu_clock_config: ClockConfig) {
         clocks::request_pll_f240m(clocks);
         #[cfg(soc_has_clock_node_rc_fast_div_clk)]
         clocks::request_rc_fast_div_clk(clocks);
+        #[cfg(soc_has_clock_node_rtc_slow_clk)]
+        clocks::request_rtc_slow_clk(clocks);
     });
 
     calibrate_rtc_slow_clock();
