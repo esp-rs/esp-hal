@@ -312,6 +312,9 @@ ROM does not. Without that, this method returns
     /// `offset` and `data.len()` must be multiples of 4. `data` must be in
     /// internal RAM and word-aligned.
     ///
+    /// Transfers larger than 16 KiB are split into multiple ROM calls (ESP-IDF
+    /// `MAX_READ_CHUNK`). Flash-backed caches are resumed between chunks.
+    ///
     /// # Errors
     ///
     /// Returns [`Error::NotAligned`] if `offset`, `data.len()`, or the buffer
@@ -334,6 +337,9 @@ ROM does not. Without that, this method returns
     ///
     /// The target must already be erased. `offset` and `data.len()` must be
     /// multiples of 4. `data` must be in internal RAM and word-aligned.
+    ///
+    /// Transfers larger than 8 KiB are split into multiple ROM calls (ESP-IDF
+    /// `MAX_WRITE_CHUNK`). Flash-backed caches are resumed between chunks.
     ///
     /// # Errors
     ///
