@@ -25,7 +25,8 @@
 //! The drivers can take channels and pins by value or by reference. Pass these objects by reference
 //! if you plan on reusing them again, after dropping the dedicated driver.
 //!
-//! Due to how the hardware works, [`DedicatedGpioOutput`] can drive any number of GPIO pins.
+//! [`DedicatedGpioOutput`] can drive any number of GPIO pins. Each connected pin follows the
+//! current dedicated GPIO channel level immediately.
 //!
 //! ## Bundles
 //!
@@ -633,10 +634,13 @@ impl<'lt> DedicatedGpioOutput<'lt> {
         }
     }
 
-    /// Adds a new output driver to the GPIO pins.
+    /// Adds a GPIO output pin to this dedicated GPIO output.
     ///
-    /// A dedicated GPIO output driver can control any number of GPIO pins. The pins will be
-    /// released when the driver is dropped. Does not change the state of the newly added GPIO pin.
+    /// A dedicated GPIO output can drive any number of GPIO pins. The driver releases the pins when
+    /// it is dropped.
+    ///
+    /// The GPIO matrix routes the current output of the dedicated GPIO channel to the pin. The pin
+    /// follows the channel level immediately. The GPIO output register of the pin does not change.
     pub fn with_pin(mut self, pin: impl OutputDriver + 'lt) -> Self {
         pin.set_output_connection(self.signal);
 

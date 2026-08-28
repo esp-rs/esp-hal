@@ -723,36 +723,38 @@ mod tests {
     #[test]
     #[cfg(all(dedicated_gpio_driver_supported, feature = "unstable"))]
     fn dedicated_gpios(ctx: Context) {
+        fn settle() {
+            #[cfg(esp32s2)]
+            unsafe {
+                core::arch::asm!("nop");
+                core::arch::asm!("nop");
+                core::arch::asm!("nop");
+                core::arch::asm!("nop");
+            }
+        }
         let input = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         let output = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
 
         let input_dedicated = DedicatedGpioInput::new(ctx.dedicated_gpio.channel0.input, input);
-        let mut output_dedicated =
-            DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output).with_pin(output);
+        let mut output_dedicated = DedicatedGpioOutput::new(ctx.dedicated_gpio.channel0.output);
 
-        // output_dedicated.set_level(Level::Low);
+        // There is no pin connected. We can change the output level, but it only sets some internal
+        // state.
         assert_eq!(input_dedicated.level(), Level::Low);
         assert_eq!(output_dedicated.output_level(), Level::Low);
         output_dedicated.set_level(Level::High);
-        #[cfg(esp32s2)]
-        unsafe {
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-        }
+        settle();
+        assert_eq!(output_dedicated.output_level(), Level::High);
+        assert_eq!(input_dedicated.level(), Level::Low);
+
+        // Connect pin and observe its state changing without calling `set_level`.
+        let mut output_dedicated = output_dedicated.with_pin(output);
+        settle();
         assert_eq!(input_dedicated.level(), Level::High);
         assert_eq!(output_dedicated.output_level(), Level::High);
-        // It used to only be possible for dedicated gpio to drive the pin High, not back to Low
-        // again on the esp32s2 and esp32s3, this makes sure that is not the case
+
         output_dedicated.set_level(Level::Low);
-        #[cfg(esp32s2)]
-        unsafe {
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-            core::arch::asm!("nop");
-        }
+        settle();
         assert_eq!(input_dedicated.level(), Level::Low);
         assert_eq!(output_dedicated.output_level(), Level::Low);
     }
