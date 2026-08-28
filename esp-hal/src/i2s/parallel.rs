@@ -92,6 +92,8 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use enumset::{EnumSet, EnumSetType};
+
 use crate::{
     Async,
     Blocking,
@@ -105,6 +107,7 @@ use crate::{
         interconnect::{self, PeripheralOutput},
     },
     i2s::AnyI2s,
+    interrupt::InterruptHandler,
     pac::i2s0::RegisterBlock,
     peripherals::{I2S0, I2S1},
     system::PeripheralGuard,
@@ -231,6 +234,80 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
     }
 }
 
+/// Interrupts from the I2S parallel peripheral.
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum I2sParallelInterrupt {
+    /// The DMA finishes the out descriptor chain (OUT_DONE).
+    Done,
+
+    /// The DMA uses a descriptor with the suc_eof flag set (OUT_EOF).
+    ///
+    /// The peripheral sets the OUT_EOF flag for every descriptor with suc_eof
+    /// set. This interrupt also works on a circular DMA chain. On a circular
+    /// chain, the transfer does not end. The peripheral does not set
+    /// OUT_TOTAL_EOF on a circular chain.
+    Eof,
+
+    /// The DMA gets a descriptor with an error (OUT_DSCR_ERR).
+    DescriptorError,
+
+    /// The DMA sends all the data of the transfer (OUT_TOTAL_EOF).
+    ///
+    /// On a circular DMA chain, the transfer does not end. The peripheral does
+    /// not set OUT_TOTAL_EOF on a circular chain. Use [`Self::Eof`] with a
+    /// circular chain.
+    TotalEof,
+}
+
+fn internal_listen(regs: &RegisterBlock, interrupts: EnumSet<I2sParallelInterrupt>, enable: bool) {
+    regs.int_ena().modify(|_, w| {
+        for interrupt in interrupts {
+            match interrupt {
+                I2sParallelInterrupt::Done => w.out_done().bit(enable),
+                I2sParallelInterrupt::Eof => w.out_eof().bit(enable),
+                I2sParallelInterrupt::DescriptorError => w.out_dscr_err().bit(enable),
+                I2sParallelInterrupt::TotalEof => w.out_total_eof().bit(enable),
+            };
+        }
+        w
+    });
+}
+
+fn internal_interrupts(regs: &RegisterBlock) -> EnumSet<I2sParallelInterrupt> {
+    let mut result = EnumSet::new();
+    let ints = regs.int_st().read();
+
+    if ints.out_done().bit() {
+        result.insert(I2sParallelInterrupt::Done);
+    }
+    if ints.out_eof().bit() {
+        result.insert(I2sParallelInterrupt::Eof);
+    }
+    if ints.out_dscr_err().bit() {
+        result.insert(I2sParallelInterrupt::DescriptorError);
+    }
+    if ints.out_total_eof().bit() {
+        result.insert(I2sParallelInterrupt::TotalEof);
+    }
+
+    result
+}
+
+fn internal_clear_interrupts(regs: &RegisterBlock, interrupts: EnumSet<I2sParallelInterrupt>) {
+    regs.int_clr().write(|w| {
+        for interrupt in interrupts {
+            match interrupt {
+                I2sParallelInterrupt::Done => w.out_done().clear_bit_by_one(),
+                I2sParallelInterrupt::Eof => w.out_eof().clear_bit_by_one(),
+                I2sParallelInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
+                I2sParallelInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
+            };
+        }
+        w
+    });
+}
+
 /// I2S Parallel Interface
 pub struct I2sParallel<'d, Dm>
 where
@@ -280,6 +357,49 @@ impl<'d> I2sParallel<'d, Blocking> {
             tx_channel: self.tx_channel.into_async(),
             _guard: self._guard,
         }
+    }
+
+    /// Sets the interrupt handler for the I2S parallel peripheral.
+    ///
+    /// The new handler removes the old handler. This method does not turn on
+    /// the interrupt sources. Use [`Self::listen`] to turn on interrupt
+    /// sources.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.instance.set_interrupt_handler(handler);
+    }
+
+    /// Turns on the given interrupt sources.
+    #[instability::unstable]
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_listen(self.instance.regs(), interrupts.into(), true);
+    }
+
+    /// Turns off the given interrupt sources.
+    #[instability::unstable]
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_listen(self.instance.regs(), interrupts.into(), false);
+    }
+
+    /// Tells you the interrupt sources that are set.
+    #[instability::unstable]
+    pub fn interrupts(&mut self) -> EnumSet<I2sParallelInterrupt> {
+        internal_interrupts(self.instance.regs())
+    }
+
+    /// Clears the interrupt flags of the given interrupt sources.
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_clear_interrupts(self.instance.regs(), interrupts.into());
+    }
+}
+
+impl crate::private::Sealed for I2sParallel<'_, Blocking> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for I2sParallel<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        I2sParallel::set_interrupt_handler(self, handler);
     }
 }
 
@@ -349,6 +469,12 @@ where
         let view = unsafe { ManuallyDrop::take(&mut self.buf_view) };
         core::mem::forget(self);
         (i2s, BUF::from_view(view))
+    }
+
+    /// Clears the interrupt flags of the given interrupt sources.
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_clear_interrupts(self.i2s.instance.regs(), interrupts.into());
     }
 
     fn stop_peripherals(&mut self) {
@@ -443,6 +569,8 @@ pub trait PrivateInstance: crate::private::Sealed {
     fn peripheral(&self) -> crate::system::Peripheral;
     fn ws_signal(&self) -> OutputSignal;
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
+
+    fn set_interrupt_handler(&self, handler: crate::interrupt::InterruptHandler);
 
     fn rx_reset(&self) {
         self.regs().conf().toggle(|w, bit| w.rx_reset().bit(bit));
@@ -655,6 +783,11 @@ impl PrivateInstance for I2S0<'_> {
             other => panic!("Invalid I2S0 Dout pin {}", other),
         }
     }
+
+    fn set_interrupt_handler(&self, handler: crate::interrupt::InterruptHandler) {
+        self.disable_peri_interrupt_on_all_cores();
+        self.bind_peri_interrupt(handler);
+    }
 }
 
 impl PrivateInstance for I2S1<'_> {
@@ -707,6 +840,11 @@ impl PrivateInstance for I2S1<'_> {
             other => panic!("Invalid I2S1 Dout pin {}", other),
         }
     }
+
+    fn set_interrupt_handler(&self, handler: crate::interrupt::InterruptHandler) {
+        self.disable_peri_interrupt_on_all_cores();
+        self.bind_peri_interrupt(handler);
+    }
 }
 
 impl PrivateInstance for AnyI2s<'_> {
@@ -719,6 +857,7 @@ impl PrivateInstance for AnyI2s<'_> {
             fn peripheral(&self) -> crate::system::Peripheral;
             fn ws_signal(&self) -> OutputSignal;
             fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal ;
+            fn set_interrupt_handler(&self, handler: crate::interrupt::InterruptHandler);
         }
     }
 }
