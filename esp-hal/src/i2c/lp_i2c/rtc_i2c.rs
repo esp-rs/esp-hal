@@ -183,23 +183,20 @@ impl<'d> LpI2c<'d> {
 
         for &byte in data.iter().skip(1) {
             match self.wait_for_tx_interrupt() {
-                Ok(is_tx) => {
-                    if is_tx {
-                        sens.sar_i2c_ctrl().modify(|r, w| {
-                            let mut value = r.sar_i2c_ctrl().bits();
-                            value &= !(0xFF << 19);
-                            value |= (byte as u32) << 19;
-                            value |= 1 << 27;
-                            unsafe { w.sar_i2c_ctrl().bits(value) }
-                        });
-                        self.i2c
-                            .register_block()
-                            .int_clr()
-                            .write(|w| w.tx_data().clear_bit_by_one());
-                    } else {
-                        core::panic!("Peripheral didn't wait for data");
-                    }
+                Ok(true) => {
+                    sens.sar_i2c_ctrl().modify(|r, w| {
+                        let mut value = r.sar_i2c_ctrl().bits();
+                        value &= !(0xFF << 19);
+                        value |= (byte as u32) << 19;
+                        value |= 1 << 27;
+                        unsafe { w.sar_i2c_ctrl().bits(value) }
+                    });
+                    self.i2c
+                        .register_block()
+                        .int_clr()
+                        .write(|w| w.tx_data().clear_bit_by_one());
                 }
+                Ok(false) => panic!("Peripheral didn't wait for data"),
                 Err(err) => {
                     // Stop transmission.
                     sens.sar_i2c_ctrl().modify(|_, w| {
@@ -300,17 +297,14 @@ impl<'d> LpI2c<'d> {
 
         for byte in data {
             match self.wait_for_rx_interrupt() {
-                Ok(is_rx) => {
-                    if is_rx {
-                        *byte = self.i2c.register_block().data().read().i2c_rdata().bits();
-                        self.i2c
-                            .register_block()
-                            .int_clr()
-                            .write(|w| w.rx_data().clear_bit_by_one());
-                    } else {
-                        core::panic!("Peripheral didn't wait for data to be read");
-                    }
+                Ok(true) => {
+                    *byte = self.i2c.register_block().data().read().i2c_rdata().bits();
+                    self.i2c
+                        .register_block()
+                        .int_clr()
+                        .write(|w| w.rx_data().clear_bit_by_one());
                 }
+                Ok(false) => panic!("Peripheral didn't wait for data to be read"),
                 Err(err) => {
                     // Stop transmission.
                     sens.sar_i2c_ctrl().modify(|_, w| {
