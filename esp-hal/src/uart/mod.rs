@@ -949,6 +949,11 @@ where
 
     /// Changes the configuration.
     ///
+    /// Do not call this function while a transmission is in progress. The function discards
+    /// the data that the transmitter did not send yet, and the TX line goes low for a short
+    /// time. A receiver reports that pulse as an error. Call [`Self::flush`] first, to let
+    /// the transmitter send the remaining data.
+    ///
     /// # Errors
     ///
     /// [`ConfigError`] when the configuration is not supported by the hardware
@@ -2143,6 +2148,11 @@ where
 
     #[procmacros::doc_replace]
     /// Changes the configuration.
+    ///
+    /// Do not call this function while a transmission is in progress. The function discards
+    /// the data that the transmitter did not send yet, and the TX line goes low for a short
+    /// time. A receiver reports that pulse as an error. Call [`Self::flush`] first, to let
+    /// the transmitter send the remaining data.
     ///
     /// # Examples
     ///
