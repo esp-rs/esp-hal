@@ -1,7 +1,7 @@
 # Starts and lifts the repository-wide merge freeze.
 #
-# `freeze` pins the freeze issue that `merge-freeze-gate` reads; open pull
-# requests are not touched.
+# `freeze` pins the freeze issue that CI's `merge-freeze-gate` job reads. Open
+# pull requests are not touched.
 
 name: Merge freeze
 

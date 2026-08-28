@@ -150,21 +150,26 @@ branches are never affected.
 
 Open pull requests are left untouched: nothing is labelled, no CI is re-run, and
 review carries on as usual. The freeze is enforced only when a pull request is
-added to the merge queue — the required `merge-freeze-gate` check fails there and
-the queue drops the entry, with a comment on the pull request explaining why.
+added to the merge queue — CI's `merge-freeze-gate` job fails there, which fails
+`ci-result` and makes the queue drop the entry, with a comment on the pull
+request explaining why. HIL waits for that job, so a frozen-out entry never
+reaches the device runners.
 
 ### Landing something urgent during a freeze
 
 Regressions and release blockers still need to get in. Add the
 `merge-freeze-exempt` label to the pull request and it can go through the queue
-as usual. Every exempted merge is recorded as a comment on the freeze issue, so
-it stays visible what landed during the freeze.
+as usual. Once it is merged, that is recorded as a comment on the freeze issue,
+so it stays visible what landed during the freeze. The label is not removed
+automatically, so drop it after the merge, otherwise the pull request carries an
+exemption into the next freeze.
 
 ### Starting and lifting a freeze
 
 Anyone with write access runs the `Merge freeze` workflow from the Actions tab,
 picking `freeze` or `thaw` and, for a freeze, the upcoming version. Closing the
-freeze issue by hand lifts the freeze just as well.
+freeze issue by hand lifts the freeze just as well, but leaves it pinned and
+unannounced, so prefer `thaw`.
 
 
 ## Changelog and Migration Guide Entries

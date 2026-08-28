@@ -1,4 +1,5 @@
-// Merge freeze: `toggle` starts and lifts it, `gate` enforces it.
+// Merge freeze: `toggle` starts and lifts it, `gate` enforces it, and
+// `recordExemptMerge` notes what slipped through.
 //
 // The state is an open issue labelled `merge-freeze`. While it is open, merges
 // into `main` are rejected unless the pull request carries
@@ -14,13 +15,17 @@ const NOTICE_MARKER = "<!-- merge-freeze-notice -->";
 const auditMarker = (prNumber) => `<!-- merge-freeze-audit:${prNumber} -->`;
 
 // The gate is required for every merge, so a transient API error would block all
-// merging. Retry before giving up; a failure still fails closed.
+// merging. Retry before giving up. A failure still fails closed.
 async function withRetries({ core, attempts = 3, delayMs = 2000 }, action) {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await action();
     } catch (error) {
-      if (attempt >= attempts) throw error;
+      // A 404 or a 422 will not become a different answer on the second ask.
+      const permanent =
+        error.status >= 400 && error.status < 500 && error.status !== 429;
+      if (permanent || attempt >= attempts) throw error;
+
       core.warning(
         `${error.message} - retrying (attempt ${attempt} of ${attempts}).`,
       );
@@ -63,8 +68,9 @@ function freezeBody({ reason, startedBy }) {
 ${reason}
 
 While this issue is open, the merge queue rejects pull requests targeting
-\`${FROZEN_BRANCH}\`: the \`merge-freeze-gate\` check fails on them. Review
-carries on as usual — nothing is blocked until an actual merge attempt.
+\`${FROZEN_BRANCH}\`: CI's \`merge-freeze-gate\` job fails on them, which fails
+\`ci-result\`. Review carries on as usual — nothing is blocked until an actual
+merge attempt.
 
 If a change is urgent enough to land during the freeze, add the
 \`${EXEMPT_LABEL}\` label to it. Exempted merges are recorded below.
@@ -114,23 +120,44 @@ async function upsertComment({
   }
 }
 
-function pullRequestNumberFromMergeGroup(mergeGroup) {
-  if (!mergeGroup) return 0;
+// A merge group can batch several pull requests, and its ref names only one of
+// them, so walk the commits the group adds on top of the base as well.
+async function pullRequestNumbersFromMergeGroup({ github, context, core }) {
+  const { owner, repo } = context.repo;
+  const mergeGroup = (context.payload || {}).merge_group;
+  if (!mergeGroup) return [];
 
-  // `gh-readonly-queue/main/pr-1234-<sha>`: the queue's own naming is more
-  // dependable than the commit message.
+  const numbers = new Set();
+
+  // `gh-readonly-queue/main/pr-1234-<sha>`.
   const fromRef = String(mergeGroup.head_ref || "").match(/\/pr-(\d+)-/);
-  if (fromRef) return Number(fromRef[1]);
+  if (fromRef) numbers.add(Number(fromRef[1]));
 
-  const firstLine = String(
-    (mergeGroup.head_commit && mergeGroup.head_commit.message) || "",
-  ).split("\n")[0];
-  const fromMessage = firstLine.match(/#(\d+)/g);
-  if (fromMessage && fromMessage.length > 0) {
-    return Number(fromMessage[fromMessage.length - 1].slice(1));
+  if (mergeGroup.base_sha && mergeGroup.head_sha) {
+    try {
+      const { data } = await withRetries({ core }, () =>
+        github.rest.repos.compareCommitsWithBasehead({
+          owner,
+          repo,
+          basehead: `${mergeGroup.base_sha}...${mergeGroup.head_sha}`,
+        }),
+      );
+
+      for (const commit of data.commits || []) {
+        // Only the `(#1234)` suffix of a merge or squash subject: a bare
+        // `#1234` anywhere else is as likely to be an issue reference.
+        const subject = String(commit.commit.message || "").split("\n")[0];
+        const suffix = subject.match(/\(#(\d+)\)\s*$/);
+        if (suffix) numbers.add(Number(suffix[1]));
+      }
+    } catch (error) {
+      core.warning(
+        `Could not list the commits of this merge queue entry: ${error.message}`,
+      );
+    }
   }
 
-  return 0;
+  return [...numbers].sort((a, b) => a - b);
 }
 
 async function setPinned({ github, core, nodeId, pinned }) {
@@ -171,7 +198,7 @@ async function gate({ github, context, core }) {
   const mergeGroup = (context.payload || {}).merge_group;
   if (!mergeGroup) {
     core.info(
-      `Merge freeze (#${issue.number}) is active; it is enforced when a pull request enters the merge queue.`,
+      `Merge freeze (#${issue.number}) is active, and it is enforced when a pull request enters the merge queue.`,
     );
     return;
   }
@@ -184,59 +211,65 @@ async function gate({ github, context, core }) {
     return;
   }
 
-  const number = pullRequestNumberFromMergeGroup(mergeGroup);
-  if (!number) {
+  const numbers = await pullRequestNumbersFromMergeGroup({
+    github,
+    context,
+    core,
+  });
+
+  const pulls = [];
+  for (const number of numbers) {
+    try {
+      const response = await withRetries({ core }, () =>
+        github.rest.pulls.get({ owner, repo, pull_number: number }),
+      );
+      pulls.push(response.data);
+    } catch (error) {
+      // A number scraped from a commit subject need not be a pull request at
+      // all. As long as the entry yields one, the freeze can still be judged.
+      core.warning(`Could not read #${number}: ${error.message}`);
+    }
+  }
+
+  if (pulls.length === 0) {
     core.setFailed(
-      `Merge freeze (#${issue.number}) is active and the pull request behind this merge queue entry could not be identified.`,
+      `Merge freeze (#${issue.number}) is active and the pull requests behind this merge queue entry could not be identified.`,
     );
     return;
   }
 
-  let pull;
-  try {
-    const response = await withRetries({ core }, () =>
-      github.rest.pulls.get({ owner, repo, pull_number: number }),
-    );
-    pull = response.data;
-  } catch (error) {
-    core.setFailed(`Could not read #${number}: ${error.message}`);
-    return;
-  }
-
-  const exempt = (pull.labels || []).some((label) => label.name === EXEMPT_LABEL);
+  const exempt = (pull) =>
+    (pull.labels || []).some((label) => label.name === EXEMPT_LABEL);
+  const blocked = pulls.filter((pull) => !exempt(pull));
+  const list = (items) => items.map((pull) => `#${pull.number}`).join(", ");
 
   await core.summary
     .addHeading("Merge freeze", 3)
     .addRaw(
-      exempt
-        ? `#${number} carries \`${EXEMPT_LABEL}\` and may merge during the freeze.`
-        : `#${number} is blocked by the merge freeze.`,
+      blocked.length === 0
+        ? `${list(pulls)} carries \`${EXEMPT_LABEL}\` and may merge during the freeze.`
+        : `${list(blocked)} is blocked by the merge freeze.`,
     )
     .addBreak()
     .addLink(`Freeze issue #${issue.number}`, issue.html_url)
     .write();
 
-  if (exempt) {
-    core.info(`#${number} is exempt from merge freeze (#${issue.number}).`);
+  // Clear earlier "blocked" notices so an exempted pull request does not keep
+  // claiming it cannot be merged.
+  for (const pull of pulls.filter(exempt)) {
     await upsertComment({
       github,
       context,
       core,
-      issueNumber: issue.number,
-      marker: auditMarker(number),
-      body: `#${number} merged during the freeze (\`${EXEMPT_LABEL}\`).`,
-    });
-    // Clear an earlier "blocked" notice so the pull request does not keep
-    // claiming it cannot be merged.
-    await upsertComment({
-      github,
-      context,
-      core,
-      issueNumber: number,
+      issueNumber: pull.number,
       marker: NOTICE_MARKER,
       body: `\`${EXEMPT_LABEL}\` is set, so merge freeze (#${issue.number}) no longer blocks this pull request.`,
       updateOnly: true,
     });
+  }
+
+  if (blocked.length === 0) {
+    core.info(`${list(pulls)} is exempt from merge freeze (#${issue.number}).`);
     return;
   }
 
@@ -244,15 +277,51 @@ async function gate({ github, context, core }) {
 
   // The merge attempt is the first time the author hears about the freeze, so
   // spell out the way forward on the pull request itself.
+  for (const pull of blocked) {
+    await upsertComment({
+      github,
+      context,
+      core,
+      issueNumber: pull.number,
+      marker: NOTICE_MARKER,
+      body: `${message}\n\nSee ${issue.html_url} for the details of this freeze.`,
+    });
+  }
+
+  // A batched entry is only as mergeable as its least mergeable member.
+  core.setFailed(
+    pulls.length === 1
+      ? message
+      : `${list(blocked)} of this merge group is blocked by merge freeze (#${issue.number}).`,
+  );
+}
+
+// The gate runs before the rest of CI, so it cannot claim anything was merged.
+// This runs once the merge has actually happened.
+async function recordExemptMerge({ github, context, core }) {
+  const pull = (context.payload || {}).pull_request;
+  if (!pull || !pull.merged) return;
+
+  if (String((pull.base || {}).ref || "") !== FROZEN_BRANCH) return;
+  if (!(pull.labels || []).some((label) => label.name === EXEMPT_LABEL)) return;
+
+  const issue = await findFreezeIssue({ github, context });
+  if (!issue) {
+    core.info(
+      `#${pull.number} was merged with \`${EXEMPT_LABEL}\`, but no freeze is active - nothing to record.`,
+    );
+    return;
+  }
+
   await upsertComment({
     github,
     context,
     core,
-    issueNumber: number,
-    marker: NOTICE_MARKER,
-    body: `${message}\n\nSee ${issue.html_url} for the details of this freeze.`,
+    issueNumber: issue.number,
+    marker: auditMarker(pull.number),
+    body: `#${pull.number} (${pull.title}) was merged during the freeze, exempted by \`${EXEMPT_LABEL}\`.`,
   });
-  core.setFailed(message);
+  core.info(`Recorded #${pull.number} on freeze issue #${issue.number}.`);
 }
 
 async function freeze({ github, context, core, version, reason }) {
@@ -305,7 +374,7 @@ async function thaw({ github, context, core }) {
   const open = await findFreezeIssues({ github, context });
 
   if (open.length === 0) {
-    core.info("No merge freeze is active; nothing to lift.");
+    core.info("No merge freeze is active, so there is nothing to lift.");
     return;
   }
 
@@ -360,4 +429,4 @@ async function toggle({ github, context, core, state, version, reason }) {
   });
 }
 
-module.exports = { gate, toggle };
+module.exports = { gate, toggle, recordExemptMerge };
