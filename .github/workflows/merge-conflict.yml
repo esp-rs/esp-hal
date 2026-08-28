@@ -5,6 +5,10 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
 
+permissions:
+  actions: write
+  pull-requests: write
+
 jobs:
   conflict-monitor:
     runs-on: ubuntu-latest
@@ -15,4 +19,55 @@ jobs:
           repoToken: "${{ secrets.GITHUB_TOKEN }}"
           dirtyLabel: "merge-conflict"
           removeOnDirtyLabel: true
+          retryAfter: 15
+          retryMax: 40
           commentOnDirty: "New commits in main have made this PR unmergeable. Please resolve the conflicts."
+
+      # Cancel in-flight runs when the PR becomes conflicted.
+      - name: Cancel CI on conflicted PRs
+        if: github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const DIRTY_LABEL = 'merge-conflict';
+
+            const inFlight = [];
+            for (const status of ['queued', 'in_progress']) {
+              inFlight.push(...await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner,
+                repo,
+                workflow_id: 'ci.yml',
+                event: 'pull_request',
+                status,
+                per_page: 100,
+              }));
+            }
+            if (inFlight.length === 0) return;
+
+            // Labels are read back from the step above rather than checking
+            // `mergeable` here: the action retries until GitHub resolves the
+            // mergeable state, which is null while it is still being computed.
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const dirtyShas = new Set(
+              prs
+                .filter((pr) => pr.labels.some((label) => label.name === DIRTY_LABEL))
+                .map((pr) => pr.head.sha),
+            );
+
+            for (const run of inFlight) {
+              if (!dirtyShas.has(run.head_sha)) continue;
+
+              try {
+                await github.rest.actions.cancelWorkflowRun({ owner, repo, run_id: run.id });
+                core.info(`Cancelled CI run ${run.id} (${run.head_sha})`);
+              } catch (error) {
+                // 409: the run finished or another monitor run cancelled it first.
+                if (error.status !== 409) throw error;
+              }
+            }
