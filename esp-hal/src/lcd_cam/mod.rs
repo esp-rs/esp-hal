@@ -172,8 +172,7 @@ fn interrupt_handler() {
 
 pub(crate) struct Instance;
 
-/// The interrupt sources of the LCD_CAM DMA interrupt registers that belong to
-/// the LCD half of the peripheral.
+/// The interrupt sources of the LCD_CAM DMA interrupt registers.
 ///
 /// This type is `pub(crate)` today. If the Camera driver ever needs its own
 /// listen API, it can be promoted to a public `LcdCamInterrupt` without
@@ -185,11 +184,17 @@ pub(crate) enum LcdCamInterrupt {
 
     /// A DMA transfer to the LCD has finished.
     LcdTransDone,
+
+    /// The camera has received a VSYNC pulse.
+    CamVsync,
+
+    /// The camera has received an HSYNC pulse.
+    CamHs,
 }
 
-// NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera and
-// this is only implemented for the LCD side, when the Camera is implemented a
-// CriticalSection will be needed to protect these shared registers.
+// NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera, so
+// concurrent use of both halves needs a CriticalSection to protect these
+// shared registers.
 impl Instance {
     fn enable_listen(sources: EnumSet<LcdCamInterrupt>, en: bool) {
         LCD_CAM::regs().lc_dma_int_ena().modify(|_, w| {
@@ -200,6 +205,12 @@ impl Instance {
                     }
                     LcdCamInterrupt::LcdTransDone => {
                         w.lcd_trans_done_int_ena().bit(en);
+                    }
+                    LcdCamInterrupt::CamVsync => {
+                        w.cam_vsync_int_ena().bit(en);
+                    }
+                    LcdCamInterrupt::CamHs => {
+                        w.cam_hs_int_ena().bit(en);
                     }
                 }
             }
@@ -224,6 +235,12 @@ impl Instance {
         if raw.lcd_trans_done_int_raw().bit() {
             sources.insert(LcdCamInterrupt::LcdTransDone);
         }
+        if raw.cam_vsync_int_raw().bit() {
+            sources.insert(LcdCamInterrupt::CamVsync);
+        }
+        if raw.cam_hs_int_raw().bit() {
+            sources.insert(LcdCamInterrupt::CamHs);
+        }
         sources
     }
 
@@ -239,6 +256,12 @@ impl Instance {
                     }
                     LcdCamInterrupt::LcdTransDone => {
                         w.lcd_trans_done_int_clr().set_bit();
+                    }
+                    LcdCamInterrupt::CamVsync => {
+                        w.cam_vsync_int_clr().set_bit();
+                    }
+                    LcdCamInterrupt::CamHs => {
+                        w.cam_hs_int_clr().set_bit();
                     }
                 }
             }

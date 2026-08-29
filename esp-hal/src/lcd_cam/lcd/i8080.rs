@@ -162,10 +162,10 @@ pub enum ConfigError {
 #[instability::unstable]
 pub enum I8080Interrupt {
     /// The LCD has started outputting a new frame.
-    LcdVsync,
+    Vsync,
 
     /// A DMA transfer to the LCD has finished.
-    LcdTransDone,
+    TransDone,
 }
 
 /// Represents the I8080 LCD interface.
@@ -537,9 +537,7 @@ impl I8080<'_, Blocking> {
     /// [`I8080Interrupt`].
     ///
     /// The mapping is lossy by design: Camera-only [`LcdCamInterrupt`]
-    /// variants have no `I8080Interrupt` counterpart and are dropped. In
-    /// practice they cannot occur here, since the peripheral interrupt
-    /// helpers only read the `lcd_*` raw bits.
+    /// variants have no `I8080Interrupt` counterpart and are dropped.
     fn map_lcdcam_to_i8080(
         sources: enumset::EnumSet<crate::lcd_cam::LcdCamInterrupt>,
     ) -> enumset::EnumSet<I8080Interrupt> {
@@ -636,13 +634,13 @@ impl I8080<'_, Blocking> {
 /// Variant-for-variant mapping onto the peripheral's interrupt sources.
 ///
 /// This is total: every [`I8080Interrupt`] source has an
-/// [`LcdCamInterrupt`] counterpart. Future Camera-only `LcdCamInterrupt`
+/// [`LcdCamInterrupt`] counterpart. Camera-only [`LcdCamInterrupt`]
 /// variants are simply not reachable from [`I8080Interrupt`].
 impl From<I8080Interrupt> for crate::lcd_cam::LcdCamInterrupt {
     fn from(value: I8080Interrupt) -> Self {
         match value {
-            I8080Interrupt::LcdVsync => crate::lcd_cam::LcdCamInterrupt::LcdVsync,
-            I8080Interrupt::LcdTransDone => crate::lcd_cam::LcdCamInterrupt::LcdTransDone,
+            I8080Interrupt::Vsync => crate::lcd_cam::LcdCamInterrupt::LcdVsync,
+            I8080Interrupt::TransDone => crate::lcd_cam::LcdCamInterrupt::LcdTransDone,
         }
     }
 }
@@ -654,8 +652,10 @@ impl TryFrom<crate::lcd_cam::LcdCamInterrupt> for I8080Interrupt {
 
     fn try_from(value: crate::lcd_cam::LcdCamInterrupt) -> Result<Self, ()> {
         match value {
-            crate::lcd_cam::LcdCamInterrupt::LcdVsync => Ok(I8080Interrupt::LcdVsync),
-            crate::lcd_cam::LcdCamInterrupt::LcdTransDone => Ok(I8080Interrupt::LcdTransDone),
+            crate::lcd_cam::LcdCamInterrupt::LcdVsync => Ok(I8080Interrupt::Vsync),
+            crate::lcd_cam::LcdCamInterrupt::LcdTransDone => Ok(I8080Interrupt::TransDone),
+            crate::lcd_cam::LcdCamInterrupt::CamVsync => Err(()),
+            crate::lcd_cam::LcdCamInterrupt::CamHs => Err(()),
         }
     }
 }
