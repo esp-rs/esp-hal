@@ -58,12 +58,68 @@
 //! transfer.wait();
 //! # {after_snippet}
 //! ```
+//!
+//! ## Interrupts
+//!
+//! The I8080 driver owns two interrupt domains: the LCD half of the LCD_CAM
+//! peripheral, and the DMA TX channel it was created with. The LCD sources
+//! fire on the `LCD_CAM` interrupt, while the DMA sources fire on the DMA
+//! channel's own interrupt, so each domain binds its own handler and controls
+//! its sources separately. Handlers are registered with
+//! [`I8080::set_interrupt_handler`] and [`I8080::set_dma_interrupt_handler`],
+//! and sources are enabled with [`I8080::listen`] and [`I8080::listen_dma`].
+//!
+//! ### Notifying on descriptor completion
+//!
+//! In continuous output mode the transfer does not finish, but every
+//! descriptor with the `suc_eof` bit set raises the DMA channel's
+//! [`DmaTxInterrupt::Eof`](crate::dma::DmaTxInterrupt::Eof) source once its
+//! data has been sent:
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! # use esp_hal::dma::{DmaTxBuf, DmaTxInterrupt};
+//! # use esp_hal::dma_tx_buffer;
+//! # use esp_hal::handler;
+//! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080}};
+//! # use esp_hal::time::Rate;
+//! #
+//! # static EOF_COUNT: core::sync::atomic::AtomicUsize =
+//! #     core::sync::atomic::AtomicUsize::new(0);
+//! # let mut dma_buf = dma_tx_buffer!(32678)?;
+//! # let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+//! # let config = Config::default().with_frequency(Rate::from_mhz(20));
+//! # let mut i8080 = I8080::new(lcd_cam.lcd, peripherals.DMA_CH0, config)?
+//! #     .with_dc(peripherals.GPIO0)
+//! #     .with_wrx(peripherals.GPIO47);
+//! # dma_buf.fill(&[0x55]);
+//!
+//! #[handler]
+//! fn dma_handler() {
+//!     EOF_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+//!     // The source is cleared through the transfer, see below.
+//! }
+//!
+//! // Binding the handler must happen before listening for DMA sources, and
+//! // before `send` consumes the driver.
+//! i8080.set_dma_interrupt_handler(dma_handler);
+//! i8080.listen_dma(DmaTxInterrupt::Eof);
+//!
+//! let transfer = i8080.send(0x3Au8, 0, dma_buf)?; // RGB565
+//!
+//! // In `dma_handler`, clear the source through the transfer:
+//! // transfer.clear_interrupts_dma(DmaTxInterrupt::Eof);
+//! transfer.wait();
+//! # {after_snippet}
+//! ```
 
 use core::{
     fmt::Formatter,
     mem::{ManuallyDrop, size_of},
     ops::{Deref, DerefMut},
 };
+
+use enumset::EnumSetType;
 
 use crate::{
     Blocking,
@@ -92,6 +148,24 @@ use crate::{
 pub enum ConfigError {
     /// Clock configuration error.
     Clock(ClockError),
+}
+
+/// Interrupt sources of the LCD half of the LCD_CAM peripheral, as exposed by
+/// the [`I8080`] driver.
+///
+/// These sources fire on the `LCD_CAM` interrupt, which is bound via
+/// [`I8080::set_interrupt_handler`]. The DMA TX channel's sources fire on the
+/// channel's own interrupt instead; see [`I8080::set_dma_interrupt_handler`]
+/// and [`DmaTxInterrupt`](crate::dma::DmaTxInterrupt).
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum I8080Interrupt {
+    /// The LCD has started outputting a new frame.
+    LcdVsync,
+
+    /// A DMA transfer to the LCD has finished.
+    LcdTransDone,
 }
 
 /// Represents the I8080 LCD interface.
@@ -443,6 +517,149 @@ where
     }
 }
 
+#[instability::unstable]
+impl I8080<'_, Blocking> {
+    /// Maps the LCD sources of the given set onto the peripheral's interrupt
+    /// sources.
+    fn map_i8080_to_lcdcam(
+        interrupts: enumset::EnumSet<I8080Interrupt>,
+    ) -> enumset::EnumSet<crate::lcd_cam::LcdCamInterrupt> {
+        use crate::lcd_cam::LcdCamInterrupt;
+
+        let mut sources = enumset::EnumSet::new();
+        for interrupt in interrupts {
+            sources.insert(LcdCamInterrupt::from(interrupt));
+        }
+        sources
+    }
+
+    /// Maps the peripheral's asserted LCD interrupt sources back to
+    /// [`I8080Interrupt`].
+    ///
+    /// The mapping is lossy by design: Camera-only [`LcdCamInterrupt`]
+    /// variants have no `I8080Interrupt` counterpart and are dropped. In
+    /// practice they cannot occur here, since the peripheral interrupt
+    /// helpers only read the `lcd_*` raw bits.
+    fn map_lcdcam_to_i8080(
+        sources: enumset::EnumSet<crate::lcd_cam::LcdCamInterrupt>,
+    ) -> enumset::EnumSet<I8080Interrupt> {
+        let mut interrupts = enumset::EnumSet::new();
+        for source in sources {
+            if let Ok(interrupt) = I8080Interrupt::try_from(source) {
+                interrupts.insert(interrupt);
+            }
+        }
+        interrupts
+    }
+
+    /// Registers an interrupt handler for the `LCD_CAM` interrupt.
+    ///
+    /// The handler services the sources enabled via [`Self::listen`].
+    ///
+    /// Note that this replaces any previously registered handler for the
+    /// `LCD_CAM` interrupt, including the one the async driver binds.
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        for core in crate::system::Cpu::other() {
+            crate::interrupt::disable(core, crate::peripherals::Interrupt::LCD_CAM);
+        }
+        crate::interrupt::bind_handler(crate::peripherals::Interrupt::LCD_CAM, handler);
+    }
+
+    /// Registers an interrupt handler for the DMA TX channel used by this
+    /// driver.
+    ///
+    /// The handler services the sources enabled via [`Self::listen_dma`]. It
+    /// fires on the channel's own interrupt, which is separate from the
+    /// `LCD_CAM` interrupt used by [`Self::set_interrupt_handler`].
+    ///
+    /// Binding the handler unlistens from and clears all DMA TX interrupt
+    /// sources, so this function must be called before
+    /// [`Self::listen_dma`]. It must also be called before [`Self::send`],
+    /// which consumes the driver.
+    pub fn set_dma_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.tx_channel.set_interrupt_handler(handler);
+    }
+
+    /// Listens for the given LCD interrupt sources.
+    pub fn listen(&mut self, interrupts: impl Into<enumset::EnumSet<I8080Interrupt>>) {
+        Instance::listen(Self::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Stops listening for the given LCD interrupt sources.
+    pub fn unlisten(&mut self, interrupts: impl Into<enumset::EnumSet<I8080Interrupt>>) {
+        Instance::unlisten(Self::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Returns the asserted LCD interrupt sources.
+    pub fn interrupts(&mut self) -> enumset::EnumSet<I8080Interrupt> {
+        Self::map_lcdcam_to_i8080(Instance::interrupts())
+    }
+
+    /// Clears the given asserted LCD interrupt sources.
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<enumset::EnumSet<I8080Interrupt>>) {
+        Instance::clear_interrupts(Self::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Listens for the given DMA TX interrupt sources.
+    ///
+    /// A handler must have been registered via
+    /// [`Self::set_dma_interrupt_handler`] first.
+    pub fn listen_dma(
+        &mut self,
+        interrupts: impl Into<enumset::EnumSet<crate::dma::DmaTxInterrupt>>,
+    ) {
+        self.tx_channel.listen_out(interrupts.into());
+    }
+
+    /// Stops listening for the given DMA TX interrupt sources.
+    pub fn unlisten_dma(
+        &mut self,
+        interrupts: impl Into<enumset::EnumSet<crate::dma::DmaTxInterrupt>>,
+    ) {
+        self.tx_channel.unlisten_out(interrupts.into());
+    }
+
+    /// Returns the asserted DMA TX interrupt sources.
+    pub fn interrupts_dma(&mut self) -> enumset::EnumSet<crate::dma::DmaTxInterrupt> {
+        self.tx_channel.pending_out_interrupts()
+    }
+
+    /// Clears the given asserted DMA TX interrupt sources.
+    pub fn clear_interrupts_dma(
+        &mut self,
+        interrupts: impl Into<enumset::EnumSet<crate::dma::DmaTxInterrupt>>,
+    ) {
+        self.tx_channel.clear_out(interrupts.into());
+    }
+}
+
+/// Variant-for-variant mapping onto the peripheral's interrupt sources.
+///
+/// This is total: every [`I8080Interrupt`] source has an
+/// [`LcdCamInterrupt`] counterpart. Future Camera-only `LcdCamInterrupt`
+/// variants are simply not reachable from [`I8080Interrupt`].
+impl From<I8080Interrupt> for crate::lcd_cam::LcdCamInterrupt {
+    fn from(value: I8080Interrupt) -> Self {
+        match value {
+            I8080Interrupt::LcdVsync => crate::lcd_cam::LcdCamInterrupt::LcdVsync,
+            I8080Interrupt::LcdTransDone => crate::lcd_cam::LcdCamInterrupt::LcdTransDone,
+        }
+    }
+}
+
+/// Lossy reverse mapping: Camera-only [`LcdCamInterrupt`] variants have no
+/// [`I8080Interrupt`] counterpart and are dropped.
+impl TryFrom<crate::lcd_cam::LcdCamInterrupt> for I8080Interrupt {
+    type Error = ();
+
+    fn try_from(value: crate::lcd_cam::LcdCamInterrupt) -> Result<Self, ()> {
+        match value {
+            crate::lcd_cam::LcdCamInterrupt::LcdVsync => Ok(I8080Interrupt::LcdVsync),
+            crate::lcd_cam::LcdCamInterrupt::LcdTransDone => Ok(I8080Interrupt::LcdTransDone),
+        }
+    }
+}
+
 impl<Dm: DriverMode> core::fmt::Debug for I8080<'_, Dm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
@@ -568,6 +785,60 @@ impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
         }
 
         LcdDoneFuture {}.await
+    }
+}
+
+/// Interrupt management for an ongoing transfer.
+///
+/// The driver itself has been consumed by [`I8080::send`], so these methods
+/// take `&self` and allow an interrupt handler to manage the interrupt
+/// sources through the transfer object.
+#[instability::unstable]
+impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, Blocking> {
+    /// Listens for the given LCD interrupt sources.
+    pub fn listen(&self, interrupts: impl Into<enumset::EnumSet<I8080Interrupt>>) {
+        Instance::listen(I8080::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Stops listening for the given LCD interrupt sources.
+    pub fn unlisten(&self, interrupts: impl Into<enumset::EnumSet<I8080Interrupt>>) {
+        Instance::unlisten(I8080::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Returns the asserted LCD interrupt sources.
+    pub fn interrupts(&self) -> enumset::EnumSet<I8080Interrupt> {
+        I8080::map_lcdcam_to_i8080(Instance::interrupts())
+    }
+
+    /// Clears the given asserted LCD interrupt sources.
+    pub fn clear_interrupts(&self, interrupts: impl Into<enumset::EnumSet<I8080Interrupt>>) {
+        Instance::clear_interrupts(I8080::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Listens for the given DMA TX interrupt sources.
+    pub fn listen_dma(&self, interrupts: impl Into<enumset::EnumSet<crate::dma::DmaTxInterrupt>>) {
+        self.i8080.tx_channel.listen_out(interrupts.into());
+    }
+
+    /// Stops listening for the given DMA TX interrupt sources.
+    pub fn unlisten_dma(
+        &self,
+        interrupts: impl Into<enumset::EnumSet<crate::dma::DmaTxInterrupt>>,
+    ) {
+        self.i8080.tx_channel.unlisten_out(interrupts.into());
+    }
+
+    /// Returns the asserted DMA TX interrupt sources.
+    pub fn interrupts_dma(&self) -> enumset::EnumSet<crate::dma::DmaTxInterrupt> {
+        self.i8080.tx_channel.pending_out_interrupts()
+    }
+
+    /// Clears the given asserted DMA TX interrupt sources.
+    pub fn clear_interrupts_dma(
+        &self,
+        interrupts: impl Into<enumset::EnumSet<crate::dma::DmaTxInterrupt>>,
+    ) {
+        self.i8080.tx_channel.clear_out(interrupts.into());
     }
 }
 

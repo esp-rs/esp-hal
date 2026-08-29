@@ -7,6 +7,8 @@
 
 use core::marker::PhantomData;
 
+use enumset::{EnumSet, EnumSetType};
+
 use crate::{
     Async,
     Blocking,
@@ -170,30 +172,90 @@ fn interrupt_handler() {
 
 pub(crate) struct Instance;
 
+/// The interrupt sources of the LCD_CAM DMA interrupt registers that belong to
+/// the LCD half of the peripheral.
+///
+/// This type is `pub(crate)` today. If the Camera driver ever needs its own
+/// listen API, it can be promoted to a public `LcdCamInterrupt` without
+/// renaming.
+#[derive(Debug, EnumSetType)]
+pub(crate) enum LcdCamInterrupt {
+    /// The LCD has started outputting a new frame.
+    LcdVsync,
+
+    /// A DMA transfer to the LCD has finished.
+    LcdTransDone,
+}
+
 // NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera and
 // this is only implemented for the LCD side, when the Camera is implemented a
 // CriticalSection will be needed to protect these shared registers.
 impl Instance {
-    fn enable_listenlcd_done(en: bool) {
-        LCD_CAM::regs()
-            .lc_dma_int_ena()
-            .modify(|_, w| w.lcd_trans_done_int_ena().bit(en));
+    fn enable_listen(sources: EnumSet<LcdCamInterrupt>, en: bool) {
+        LCD_CAM::regs().lc_dma_int_ena().modify(|_, w| {
+            for source in sources {
+                match source {
+                    LcdCamInterrupt::LcdVsync => {
+                        w.lcd_vsync_int_ena().bit(en);
+                    }
+                    LcdCamInterrupt::LcdTransDone => {
+                        w.lcd_trans_done_int_ena().bit(en);
+                    }
+                }
+            }
+            w
+        });
+    }
+
+    pub(crate) fn listen(sources: EnumSet<LcdCamInterrupt>) {
+        Self::enable_listen(sources, true);
+    }
+
+    pub(crate) fn unlisten(sources: EnumSet<LcdCamInterrupt>) {
+        Self::enable_listen(sources, false);
+    }
+
+    pub(crate) fn interrupts() -> EnumSet<LcdCamInterrupt> {
+        let raw = LCD_CAM::regs().lc_dma_int_raw().read();
+        let mut sources = EnumSet::new();
+        if raw.lcd_vsync_int_raw().bit() {
+            sources.insert(LcdCamInterrupt::LcdVsync);
+        }
+        if raw.lcd_trans_done_int_raw().bit() {
+            sources.insert(LcdCamInterrupt::LcdTransDone);
+        }
+        sources
+    }
+
+    /// Only reachable through the unstable `I8080` interrupt API, hence the
+    /// `dead_code` allowance when the `unstable` feature is disabled.
+    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
+    pub(crate) fn clear_interrupts(sources: EnumSet<LcdCamInterrupt>) {
+        LCD_CAM::regs().lc_dma_int_clr().write(|w| {
+            for source in sources {
+                match source {
+                    LcdCamInterrupt::LcdVsync => {
+                        w.lcd_vsync_int_clr().set_bit();
+                    }
+                    LcdCamInterrupt::LcdTransDone => {
+                        w.lcd_trans_done_int_clr().set_bit();
+                    }
+                }
+            }
+            w
+        });
     }
 
     pub(crate) fn listen_lcd_done() {
-        Self::enable_listenlcd_done(true);
+        Self::listen(LcdCamInterrupt::LcdTransDone.into());
     }
 
     pub(crate) fn unlisten_lcd_done() {
-        Self::enable_listenlcd_done(false);
+        Self::unlisten(LcdCamInterrupt::LcdTransDone.into());
     }
 
     pub(crate) fn is_lcd_done_set() -> bool {
-        LCD_CAM::regs()
-            .lc_dma_int_raw()
-            .read()
-            .lcd_trans_done_int_raw()
-            .bit()
+        Self::interrupts().contains(LcdCamInterrupt::LcdTransDone)
     }
 }
 pub(crate) struct ClockDivider {
