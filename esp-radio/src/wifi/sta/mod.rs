@@ -61,6 +61,19 @@ pub struct StationConfig {
     /// Scan method.
     #[builder_lite(unstable)]
     pub(crate) scan_method: ScanMethod,
+    /// Enable 802.11k (Radio Resource Measurement) support.
+    ///
+    /// When enabled, the station can request Neighbor Reports
+    /// from the associated AP, enabling faster roaming decisions
+    /// without a full channel scan.
+    #[builder_lite(unstable)]
+    pub(crate) rm_enabled: bool,
+    /// Enable 802.11v (BSS Transition Management) support.
+    ///
+    /// When enabled, the AP can request or recommend the station
+    /// to roam to a better BSS, enabling AP-initiated roaming.
+    #[builder_lite(unstable)]
+    pub(crate) btm_enabled: bool,
 }
 
 impl StationConfig {
@@ -87,6 +100,8 @@ impl Default for StationConfig {
             beacon_timeout: 6,
             failure_retry_cnt: 1,
             scan_method: ScanMethod::Fast,
+            rm_enabled: false,
+            btm_enabled: false,
         }
     }
 }
