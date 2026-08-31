@@ -1010,7 +1010,10 @@ const WRITE_ATTEMPTS: usize = 5;
 /// Writing files can transiently fail if another process (an editor, a virus
 /// scanner, ...) holds a lock on them, so give the lock a chance to disappear
 /// before propagating the error.
-fn retry_on_failure<T>(what: &str, mut operation: impl FnMut() -> Result<T>) -> Result<T> {
+pub(crate) fn retry_on_failure<T>(
+    what: &str,
+    mut operation: impl FnMut() -> Result<T>,
+) -> Result<T> {
     for attempt in 1..=WRITE_ATTEMPTS {
         match operation() {
             Ok(value) => return Ok(value),

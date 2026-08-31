@@ -13,7 +13,6 @@ pub mod post_release;
 pub mod publish;
 #[cfg(feature = "release")]
 pub mod publish_plan;
-#[cfg(feature = "release")]
 pub mod registry;
 pub mod semver_check;
 pub mod tag_releases;
