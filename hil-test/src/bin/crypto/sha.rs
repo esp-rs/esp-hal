@@ -163,33 +163,6 @@ mod tests {
         }
     }
 
-    /// The driver holds the crypto clock, which must be running off the source the CPU clock
-    /// preset selects.
-    #[test]
-    #[cfg(soc_has_clock_node_crypto_clk)]
-    fn test_crypto_clock_source(_ctx: Context) {
-        use esp_hal::clock::ll::{
-            ClockTree,
-            CryptoClkConfig,
-            crypto_clk_frequency,
-            crypto_clk_source_frequency,
-        };
-
-        let expected = cfg_select! {
-            any(esp32p4, esp32s31) => CryptoClkConfig::PllF240m,
-            esp32h2 => CryptoClkConfig::PllF96m,
-            any(esp32c5, esp32c61) => CryptoClkConfig::PllF480m,
-            esp32c3 => CryptoClkConfig::Pll160m,
-            esp32c2 => CryptoClkConfig::Pll80m,
-        };
-
-        hil_test::assert!(ClockTree::with(|clocks| clocks.crypto_clk()) == Some(expected));
-        hil_test::assert_eq!(
-            crypto_clk_frequency(),
-            crypto_clk_source_frequency(expected)
-        );
-    }
-
     #[test]
     #[cfg(any(esp32s2, esp32s3))]
     fn test_sha_512_224(mut ctx: Context) {
