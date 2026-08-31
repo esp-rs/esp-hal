@@ -381,38 +381,7 @@ mod uart_printer {
     }
 }
 
-#[cfg(all(any(feature = "uart", feature = "auto"), feature = "esp32s2"))]
-mod uart_printer {
-    use super::LockToken;
-    pub struct Printer;
-    impl Printer {
-        pub fn write_bytes_in_cs(bytes: &[u8], _token: LockToken<'_>) {
-            // On ESP32-S2 the UART_TX_ONE_CHAR ROM-function seems to have some issues.
-            for chunk in bytes.chunks(64) {
-                for &b in chunk {
-                    unsafe {
-                        // write FIFO
-                        (0x3f400000 as *mut u32).write_volatile(b as u32);
-                    };
-                }
-
-                // wait for TX_DONE
-                while unsafe { (0x3f400004 as *const u32).read_volatile() } & (1 << 14) == 0 {}
-                unsafe {
-                    // reset TX_DONE
-                    (0x3f400010 as *mut u32).write_volatile(1 << 14);
-                }
-            }
-        }
-
-        pub fn flush(_token: LockToken<'_>) {}
-    }
-}
-
-#[cfg(all(
-    any(feature = "uart", feature = "auto"),
-    not(any(feature = "esp32", feature = "esp32s2"))
-))]
+#[cfg(all(any(feature = "uart", feature = "auto"), not(feature = "esp32")))]
 mod uart_printer {
     use super::LockToken;
     trait Functions {
@@ -452,6 +421,16 @@ mod uart_printer {
 
         fn flush() {
             // tx_one_char waits for TX FIFO space
+        }
+    }
+
+    #[cfg(feature = "esp32s2")]
+    impl Functions for Device {
+        const TX_ONE_CHAR: usize = 0x4001_2B10;
+
+        fn flush() {
+            // tx_one_char waits for FIFO space. The ESP32-S2 has no USB Serial/JTAG
+            // peripheral, so there is no buffer that needs an explicit flush.
         }
     }
 
