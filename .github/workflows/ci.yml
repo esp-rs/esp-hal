@@ -145,7 +145,23 @@ jobs:
           sparse-checkout: .github/scripts
           persist-credentials: false
 
+      # A base branch without the script is a base branch without merge
+      # freezes, so there is nothing to enforce. This is not only for
+      # bootstrapping, backport pull requests target `esp-hal-x.y.x` branches
+      # that were cut before the gate existed, and CI runs on those too.
+      - name: Look for the gate
+        id: gate
+        env:
+          BASE_REF: ${{ github.event.merge_group.base_ref || github.base_ref }}
+        run: |
+          if [ -f .github/scripts/merge-freeze.js ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No merge freeze gate on $BASE_REF, nothing to enforce."
+          fi
+
       - uses: actions/github-script@v8
+        if: steps.gate.outputs.present == 'true'
         with:
           script: |
             const { gate } = require('./.github/scripts/merge-freeze.js');
