@@ -166,11 +166,9 @@ exemption into the next freeze.
 
 ### Starting and lifting a freeze
 
-Anyone with write access runs the `Merge freeze` workflow from the Actions tab,
-picking `freeze` or `thaw` and, for a freeze, the upcoming version. Closing the
-freeze issue by hand lifts the freeze just as well, but leaves it pinned and
-unannounced, so prefer `thaw`.
-
+Anyone with write access opens an issue from the `Merge freeze` template, which
+applies the `merge-freeze` label, and pins it. That is all there is to it: the
+freeze holds while the issue is open, and closing the issue lifts it.
 
 ## Changelog and Migration Guide Entries
 
