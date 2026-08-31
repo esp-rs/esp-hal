@@ -371,6 +371,10 @@ pll_gate!(enable_pll_f120m_impl, ref_120m_ctrl0);
 pll_gate!(enable_pll_f160m_impl, ref_160m_ctrl0);
 pll_gate!(enable_pll_f240m_impl, ref_240m_ctrl0);
 
+fn enable_bbpll_d3_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
 fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do here
 }

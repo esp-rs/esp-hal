@@ -543,17 +543,14 @@ pub(super) fn generate_changelog_draft(workspace: &Path, plan: &Plan) -> Vec<std
     // from (`main`, or a backport branch like `esp-hal-1.1.x`). Without this,
     // backport PRs would leak into the next `main` release and every `main` PR
     // would leak into a patch release.
-    let (changelogs, migrations) = match changelog_preview::collect_changelogs(
-        workspace, &since_ref, 500, &plan.base,
-    ) {
-        Ok(r) => r,
-        Err(e) => {
-            log::warn!(
-                "Could not collect changelog entries (is `gh` installed and authenticated?): {e}"
-            );
-            return vec![];
-        }
-    };
+    let (changelogs, migrations) =
+        match changelog_preview::collect_changelogs(workspace, &since_ref, 500, &plan.base) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("Could not collect changelog entries: {e}");
+                return vec![];
+            }
+        };
 
     let mut modified: Vec<std::path::PathBuf> = Vec::new();
 

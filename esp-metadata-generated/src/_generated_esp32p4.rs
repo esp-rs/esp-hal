@@ -1624,6 +1624,12 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // SPLL_D3_CLOCK
+///
+/// fn enable_spll_d3_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // IOMUX_FUNCTION_CLOCK
 ///
 /// fn configure_iomux_function_clock_impl(
@@ -2333,12 +2339,12 @@ macro_rules! define_clock_tree_types {
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum SpiFunctionClockConfig {
-            #[default]
             /// Selects `XTAL_CLK`.
             Xtal,
             /// Selects `RC_FAST_CLK`.
             RcFast,
-            /// Selects `SPLL_CLK`.
+            #[default]
+            /// Selects `SPLL_D3_CLOCK`.
             Spll,
         }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2535,6 +2541,7 @@ macro_rules! define_clock_tree_types {
             rc32k_clk_refcount: u32,
             pll_f80m_refcount: u32,
             pll_f120m_refcount: u32,
+            spll_d3_clock_refcount: u32,
             pll_f50m_refcount: u32,
             apb_clk_refcount: u32,
             lp_fast_clk_refcount: u32,
@@ -2727,6 +2734,7 @@ macro_rules! define_clock_tree_types {
                 rc32k_clk_refcount: 0,
                 pll_f80m_refcount: 0,
                 pll_f120m_refcount: 0,
+                spll_d3_clock_refcount: 0,
                 pll_f50m_refcount: 0,
                 apb_clk_refcount: 0,
                 lp_fast_clk_refcount: 0,
@@ -3059,6 +3067,28 @@ macro_rules! define_clock_tree_types {
             (spll_clk_frequency() / 2)
         }
         pub fn pll_f240m_source_frequency() -> u32 {
+            spll_clk_frequency()
+        }
+        pub fn request_spll_d3_clock(clocks: &mut ClockTree) {
+            trace!("Requesting SPLL_D3_CLOCK");
+            if increment_reference_count(&mut clocks.spll_d3_clock_refcount) {
+                trace!("Enabling SPLL_D3_CLOCK");
+                request_spll_clk(clocks);
+                enable_spll_d3_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_spll_d3_clock(clocks: &mut ClockTree) {
+            trace!("Releasing SPLL_D3_CLOCK");
+            if decrement_reference_count(&mut clocks.spll_d3_clock_refcount) {
+                trace!("Disabling SPLL_D3_CLOCK");
+                enable_spll_d3_clock_impl(clocks, false);
+                release_spll_clk(clocks);
+            }
+        }
+        pub fn spll_d3_clock_frequency() -> u32 {
+            (spll_clk_frequency() / 3)
+        }
+        pub fn spll_d3_clock_source_frequency() -> u32 {
             spll_clk_frequency()
         }
         pub fn configure_iomux_function_clock(
@@ -3904,14 +3934,14 @@ macro_rules! define_clock_tree_types {
                     match new_selector {
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
-                        SpiFunctionClockConfig::Spll => request_spll_clk(clocks),
+                        SpiFunctionClockConfig::Spll => request_spll_d3_clock(clocks),
                     }
                     self.configure_function_clock_impl(clocks, old_selector, new_selector);
                     if let Some(old_selector) = old_selector {
                         match old_selector {
                             SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
                             SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
-                            SpiFunctionClockConfig::Spll => release_spll_clk(clocks),
+                            SpiFunctionClockConfig::Spll => release_spll_d3_clock(clocks),
                         }
                     }
                 } else {
@@ -3932,7 +3962,7 @@ macro_rules! define_clock_tree_types {
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
-                        SpiFunctionClockConfig::Spll => request_spll_clk(clocks),
+                        SpiFunctionClockConfig::Spll => request_spll_d3_clock(clocks),
                     }
                     self.enable_function_clock_impl(clocks, true);
                 }
@@ -3946,7 +3976,7 @@ macro_rules! define_clock_tree_types {
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
-                        SpiFunctionClockConfig::Spll => release_spll_clk(clocks),
+                        SpiFunctionClockConfig::Spll => release_spll_d3_clock(clocks),
                     }
                 }
             }
@@ -3958,7 +3988,7 @@ macro_rules! define_clock_tree_types {
                 match config {
                     SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
                     SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
-                    SpiFunctionClockConfig::Spll => spll_clk_frequency(),
+                    SpiFunctionClockConfig::Spll => spll_d3_clock_frequency(),
                 }
             }
             pub fn function_clock_frequency(self) -> u32 {
@@ -3969,7 +3999,7 @@ macro_rules! define_clock_tree_types {
                 match source {
                     SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
                     SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
-                    SpiFunctionClockConfig::Spll => spll_clk_frequency(),
+                    SpiFunctionClockConfig::Spll => spll_d3_clock_frequency(),
                 }
             }
         }
