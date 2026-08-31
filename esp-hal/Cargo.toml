@@ -83,6 +83,7 @@ digest-011               = { package = "digest", version = "0.11",   default-fea
 embassy-usb-driver       = { version = "0.2", optional = true }
 embassy-usb-synopsys-otg = { version = "0.4.0", optional = true, features = ["host"] }
 embassy-net-driver-02    = { package = "embassy-net-driver", version = "0.2", optional = true }
+xarxa-driver             = { version = "0.1.0", features = ["async"], optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
 nb                       = { version = "1.1", optional = true }
 sdio                     = { version = "0.5", optional = true }
@@ -205,6 +206,7 @@ esp32   = [
     "dep:sha1",
     "dep:sha2",
     "dep:embassy-net-driver-02",
+    "dep:xarxa-driver",
 ]
 ##
 esp32c2 = [
@@ -260,6 +262,7 @@ esp32p4 = [
     "esp-sync/esp32p4",
     "esp-metadata-generated/esp32p4",
     "dep:embassy-net-driver-02",
+    "dep:xarxa-driver",
 ]
 ##
 esp32c61 = [
@@ -342,7 +345,8 @@ defmt = [
     "fugit/defmt",
     "esp-riscv-rt?/defmt",
     "xtensa-lx-rt?/defmt",
-    "esp-sync/defmt"
+    "esp-sync/defmt",
+    "xarxa-driver?/defmt"
 ]
 
 #! ### Unstable APIs

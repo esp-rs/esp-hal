@@ -105,6 +105,7 @@ pub(crate) mod dma;
 pub(crate) mod embassy_net;
 pub mod mac;
 pub mod phy;
+pub(crate) mod xarxa;
 
 use core::task::Poll;
 

@@ -1458,18 +1458,18 @@ impl InterfaceType {
         }
     }
 
-    fn register_transmit_waker(&self, cx: &mut core::task::Context<'_>) {
-        TRANSMIT_WAKER.register(cx.waker())
+    fn register_transmit_waker(&self, waker: &core::task::Waker) {
+        TRANSMIT_WAKER.register(waker)
     }
 
-    fn register_receive_waker(&self, cx: &mut core::task::Context<'_>) {
-        self.data_queue_rx().with(|q| q.register_waker(cx.waker()));
+    fn register_receive_waker(&self, waker: &core::task::Waker) {
+        self.data_queue_rx().with(|q| q.register_waker(waker));
     }
 
-    fn register_link_state_waker(&self, cx: &mut core::task::Context<'_>) {
+    fn register_link_state_waker(&self, waker: &core::task::Waker) {
         match self {
-            InterfaceType::Station => STA_LINK_STATE_WAKER.register(cx.waker()),
-            InterfaceType::AccessPoint => AP_LINK_STATE_WAKER.register(cx.waker()),
+            InterfaceType::Station => STA_LINK_STATE_WAKER.register(waker),
+            InterfaceType::AccessPoint => AP_LINK_STATE_WAKER.register(waker),
         }
     }
 
@@ -1508,8 +1508,9 @@ pub(super) fn release(bit: u8) {
 
 /// Wi-Fi interface.
 ///
-/// This implements the `embassy-net-driver` trait for up to three latest versions of that crate.
-/// While that crate isn't stable we make an exception here from the [API Guidelines](https://rust-lang.github.io/api-guidelines/necessities.html#c-stable)
+/// This implements the `embassy-net-driver` trait for up to three latest versions of that crate,
+/// and the `xarxa-driver` trait.
+/// While those crates aren't stable we make an exception here from the [API Guidelines](https://rust-lang.github.io/api-guidelines/necessities.html#c-stable)
 /// in exposing unstable dependencies.
 ///
 /// Each interface mode (station, access point) is a singleton — only one
@@ -2111,18 +2112,18 @@ pub(crate) mod embassy_02 {
             &mut self,
             cx: &mut core::task::Context<'_>,
         ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
-            self.mode.register_receive_waker(cx);
-            self.mode.register_transmit_waker(cx);
+            self.mode.register_receive_waker(cx.waker());
+            self.mode.register_transmit_waker(cx.waker());
             self.mode.rx_token()
         }
 
         fn transmit(&mut self, cx: &mut core::task::Context<'_>) -> Option<Self::TxToken<'_>> {
-            self.mode.register_transmit_waker(cx);
+            self.mode.register_transmit_waker(cx.waker());
             self.mode.tx_token()
         }
 
         fn link_state(&mut self, cx: &mut core::task::Context<'_>) -> LinkState {
-            self.mode.register_link_state_waker(cx);
+            self.mode.register_link_state_waker(cx.waker());
             match self.mode.link_state() {
                 super::LinkState::Down => LinkState::Down,
                 super::LinkState::Up => LinkState::Up,
@@ -2146,6 +2147,100 @@ pub(crate) mod embassy_02 {
 
         fn hardware_address(&self) -> HardwareAddress {
             HardwareAddress::Ethernet(self.mac_address())
+        }
+    }
+}
+
+pub(crate) mod xarxa {
+    use xarxa_driver::{
+        Capabilities,
+        Driver,
+        HardwareAddress,
+        LinkState,
+        NotSupported,
+        PacketBuf,
+        config::PACKET_BUF_SIZE,
+    };
+
+    use super::*;
+
+    /// The largest frame this driver can pass on to the stack.
+    ///
+    /// The packet pool has a fixed buffer size, so a larger configured MTU cannot be used.
+    const XARXA_MTU: usize = if MTU < PACKET_BUF_SIZE {
+        MTU
+    } else {
+        PACKET_BUF_SIZE
+    };
+
+    impl Driver for Interface {
+        fn capabilities(&self) -> Capabilities {
+            let mut caps = Capabilities::default();
+            caps.max_transmission_unit = XARXA_MTU;
+            caps
+        }
+
+        fn hardware_address(&self) -> HardwareAddress {
+            HardwareAddress::Ethernet(self.mac_address())
+        }
+
+        fn link_state(&mut self) -> LinkState {
+            match self.mode.link_state() {
+                super::LinkState::Down => LinkState::Down,
+                super::LinkState::Up => LinkState::Up,
+            }
+        }
+
+        fn register_waker(&mut self, waker: &core::task::Waker) -> Result<(), NotSupported> {
+            // The driver has one waker per event, the stack has one waker for all of them.
+            self.mode.register_receive_waker(waker);
+            self.mode.register_transmit_waker(waker);
+            self.mode.register_link_state_waker(waker);
+            Ok(())
+        }
+
+        fn receive(&mut self) -> Option<PacketBuf> {
+            // We handle the received data outside of the lock because PacketBuffer::drop must
+            // not be called in a critical section. Dropping a PacketBuffer calls
+            // `esp_wifi_internal_free_rx_buffer` which will try to lock an internal mutex. If
+            // the mutex is already taken, the function will try to trigger a context switch,
+            // which will fail if we are in an interrupt-free context.
+            let mut packet = self.mode.data_queue_rx().with(|queue| queue.pop_front())?;
+
+            let data = packet.as_slice_mut();
+            dump_packet_info(data);
+
+            if data.len() > PACKET_BUF_SIZE {
+                warn!(
+                    "Dropping a {} byte frame, the packet buffer holds {} bytes",
+                    data.len(),
+                    PACKET_BUF_SIZE
+                );
+                return None;
+            }
+
+            // The pool is shared with the rest of the stack and can be empty. Dropping the
+            // packet is the only option, the hardware does not hold it for us.
+            let mut buffer = PacketBuf::try_new()?;
+            buffer.set_len(data.len());
+            buffer.copy_from_slice(data);
+
+            Some(buffer)
+        }
+
+        fn can_transmit(&mut self) -> bool {
+            self.mode.can_send() && self.mode.link_state() == super::LinkState::Up
+        }
+
+        fn transmit(&mut self, mut buffer: PacketBuf) -> Result<(), PacketBuf> {
+            if !self.can_transmit() {
+                return Err(buffer);
+            }
+
+            self.mode.increase_in_flight_counter();
+            esp_wifi_send_data(self.mode.interface(), &mut buffer);
+
+            Ok(())
         }
     }
 }
