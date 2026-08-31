@@ -23,7 +23,7 @@ const MAX_STEPS: usize = 64;
 
 /// Whether crates.io will accept a given version number for a crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Slot {
+enum Slot {
     /// Never used. The version is available.
     Free,
     /// Published and then withdrawn. crates.io keeps the number reserved
@@ -58,12 +58,6 @@ pub struct RegistrySnapshot {
 }
 
 impl RegistrySnapshot {
-    /// A snapshot that knows nothing, so every version looks free. Used when
-    /// the caller opts out of the registry lookup.
-    pub fn skipped() -> Self {
-        Self::default()
-    }
-
     /// Look up every package in one batch.
     pub fn fetch(packages: impl IntoIterator<Item = Package>) -> Result<Self> {
         let by_name = packages
@@ -105,7 +99,7 @@ impl RegistrySnapshot {
     }
 
     /// What crates.io holds for this exact version number.
-    pub fn slot(&self, package: Package, version: &semver::Version) -> Slot {
+    fn slot(&self, package: Package, version: &semver::Version) -> Slot {
         let Some((_, yanked)) = self
             .taken
             .get(&package)
@@ -225,11 +219,11 @@ mod tests {
     }
 
     #[test]
-    fn a_skipped_snapshot_never_moves_the_version() {
+    fn an_empty_snapshot_never_moves_the_version() {
         assert_free(
             "0.2.0",
             VersionBump::minor(),
-            &RegistrySnapshot::skipped(),
+            &RegistrySnapshot::default(),
             "0.2.0",
         );
     }
