@@ -368,7 +368,7 @@ where
     pub async fn wait_for_available_async(&mut self) -> Result<(), DmaError> {
         DmaTxFuture::new_with_config(
             &mut self.i2s_tx.tx_channel,
-            enum_set!(DmaTxInterrupt::Eof),
+            enum_set!(DmaTxInterrupt::Done),
             enum_set!(DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof),
         )
         .await
