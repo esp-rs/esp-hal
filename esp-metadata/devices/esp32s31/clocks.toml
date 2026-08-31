@@ -17,6 +17,9 @@ system_clocks = { clock_tree = [
     { name = "PLL_F160M", type = "generic", output = "BBPLL_CLK / 3"  },
     { name = "PLL_F240M", type = "generic", output = "BBPLL_CLK / 2"  },
 
+    # Virtual clock node for peripherals that can be sourced from BBPLL but have a 160MHz max constraint.
+    { name = "BBPLL_D3_CLOCK", type = "generic", output = "BBPLL_CLK / 3" },
+
     { name = "PLL_F25M", type = "generic", output = "MPLL_CLK / 20" },
     { name = "PLL_F50M", type = "generic", output = "MPLL_CLK / 10" },
 
@@ -92,9 +95,8 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SPI", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "BBPLL",   outputs = "BBPLL_CLK" },
-            # the TRM/HW default is BBPLL - but won't achieve < ~500KHz SCLK
-            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "BBPLL",   outputs = "BBPLL_D3_CLOCK", default = true },
+            { name = "XTAL",    outputs = "XTAL_CLK" },
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ] },
     ] },

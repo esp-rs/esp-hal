@@ -1364,6 +1364,12 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // BBPLL_D3_CLOCK
+///
+/// fn enable_bbpll_d3_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // PLL_F25M
 ///
 /// fn enable_pll_f25m_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1885,9 +1891,9 @@ macro_rules! define_clock_tree_types {
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum SpiFunctionClockConfig {
-            /// Selects `BBPLL_CLK`.
-            Bbpll,
             #[default]
+            /// Selects `BBPLL_D3_CLOCK`.
+            Bbpll,
             /// Selects `XTAL_CLK`.
             Xtal,
             /// Selects `RC_FAST_CLK`.
@@ -2040,6 +2046,7 @@ macro_rules! define_clock_tree_types {
             pll_f80m_refcount: u32,
             pll_f120m_refcount: u32,
             pll_f160m_refcount: u32,
+            bbpll_d3_clock_refcount: u32,
             pll_f25m_refcount: u32,
             pll_f50m_refcount: u32,
             xtal_d2_clk_refcount: u32,
@@ -2196,6 +2203,7 @@ macro_rules! define_clock_tree_types {
                 pll_f80m_refcount: 0,
                 pll_f120m_refcount: 0,
                 pll_f160m_refcount: 0,
+                bbpll_d3_clock_refcount: 0,
                 pll_f25m_refcount: 0,
                 pll_f50m_refcount: 0,
                 xtal_d2_clk_refcount: 0,
@@ -2474,6 +2482,28 @@ macro_rules! define_clock_tree_types {
             (bbpll_clk_frequency() / 2)
         }
         pub fn pll_f240m_source_frequency() -> u32 {
+            bbpll_clk_frequency()
+        }
+        pub fn request_bbpll_d3_clock(clocks: &mut ClockTree) {
+            trace!("Requesting BBPLL_D3_CLOCK");
+            if increment_reference_count(&mut clocks.bbpll_d3_clock_refcount) {
+                trace!("Enabling BBPLL_D3_CLOCK");
+                request_bbpll_clk(clocks);
+                enable_bbpll_d3_clock_impl(clocks, true);
+            }
+        }
+        pub fn release_bbpll_d3_clock(clocks: &mut ClockTree) {
+            trace!("Releasing BBPLL_D3_CLOCK");
+            if decrement_reference_count(&mut clocks.bbpll_d3_clock_refcount) {
+                trace!("Disabling BBPLL_D3_CLOCK");
+                enable_bbpll_d3_clock_impl(clocks, false);
+                release_bbpll_clk(clocks);
+            }
+        }
+        pub fn bbpll_d3_clock_frequency() -> u32 {
+            (bbpll_clk_frequency() / 3)
+        }
+        pub fn bbpll_d3_clock_source_frequency() -> u32 {
             bbpll_clk_frequency()
         }
         pub fn request_pll_f25m(clocks: &mut ClockTree) {
@@ -3128,14 +3158,14 @@ macro_rules! define_clock_tree_types {
                 refresh_spi_function_clock_downstream(clocks, self);
                 if clocks.spi_function_clock_refcount[self as usize] > 0 {
                     match new_selector {
-                        SpiFunctionClockConfig::Bbpll => request_bbpll_clk(clocks),
+                        SpiFunctionClockConfig::Bbpll => request_bbpll_d3_clock(clocks),
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
                     }
                     self.configure_function_clock_impl(clocks, old_selector, new_selector);
                     if let Some(old_selector) = old_selector {
                         match old_selector {
-                            SpiFunctionClockConfig::Bbpll => release_bbpll_clk(clocks),
+                            SpiFunctionClockConfig::Bbpll => release_bbpll_d3_clock(clocks),
                             SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
                             SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
                         }
@@ -3156,7 +3186,7 @@ macro_rules! define_clock_tree_types {
                 {
                     trace!("Enabling {:?}::FUNCTION_CLOCK", self);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
-                        SpiFunctionClockConfig::Bbpll => request_bbpll_clk(clocks),
+                        SpiFunctionClockConfig::Bbpll => request_bbpll_d3_clock(clocks),
                         SpiFunctionClockConfig::Xtal => request_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
                     }
@@ -3170,7 +3200,7 @@ macro_rules! define_clock_tree_types {
                     trace!("Disabling {:?}::FUNCTION_CLOCK", self);
                     self.enable_function_clock_impl(clocks, false);
                     match unwrap!(clocks.spi_function_clock[self as usize]) {
-                        SpiFunctionClockConfig::Bbpll => release_bbpll_clk(clocks),
+                        SpiFunctionClockConfig::Bbpll => release_bbpll_d3_clock(clocks),
                         SpiFunctionClockConfig::Xtal => release_xtal_clk(clocks),
                         SpiFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
                     }
@@ -3182,7 +3212,7 @@ macro_rules! define_clock_tree_types {
                 config: SpiFunctionClockConfig,
             ) -> u32 {
                 match config {
-                    SpiFunctionClockConfig::Bbpll => bbpll_clk_frequency(),
+                    SpiFunctionClockConfig::Bbpll => bbpll_d3_clock_frequency(),
                     SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
                     SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
                 }
@@ -3193,7 +3223,7 @@ macro_rules! define_clock_tree_types {
             }
             pub fn function_clock_source_frequency(source: SpiFunctionClockConfig) -> u32 {
                 match source {
-                    SpiFunctionClockConfig::Bbpll => bbpll_clk_frequency(),
+                    SpiFunctionClockConfig::Bbpll => bbpll_d3_clock_frequency(),
                     SpiFunctionClockConfig::Xtal => xtal_clk_frequency(),
                     SpiFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
                 }
