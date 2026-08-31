@@ -378,6 +378,18 @@ mod tests {
     }
 
     #[test]
+    fn max_output_frequency_is_attainable_by_default(mut ctx: Context) {
+        let max_mhz = cfg_select! {
+            any(esp32, esp32c2) => 40,
+            esp32h2 => 48, // and H21, H4
+            any(esp32c3, esp32c5, esp32c6, esp32c61, esp32p4, esp32s2, esp32s3, esp32s31) => 80,
+        };
+        ctx.spi
+            .apply_config(&Config::default().with_frequency(Rate::from_mhz(max_mhz)))
+            .unwrap();
+    }
+
+    #[test]
     fn test_symmetric_transfer(mut ctx: Context) {
         let write = [0xde, 0xad, 0xbe, 0xef];
         let mut read: [u8; 4] = [0x00u8; 4];
