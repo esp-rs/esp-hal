@@ -121,8 +121,8 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SPI", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "XTAL",      outputs = "XTAL_CLK", default = true },
-            { name = "PLL_F160M", outputs = "PLL_F160M" },
+            { name = "XTAL",      outputs = "XTAL_CLK" },
+            { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
             { name = "PLL_F120M", outputs = "PLL_F120M" },
             { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
         ] },

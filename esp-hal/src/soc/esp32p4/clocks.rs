@@ -530,6 +530,7 @@ fn enable_pll_f240m_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_pll_f25m_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_pll_f50m_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+fn enable_spll_d3_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
 
 // TIMG_CALIBRATION_CLOCK
 

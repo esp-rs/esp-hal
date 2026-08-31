@@ -262,6 +262,21 @@ impl ClockTreeNodeInstance {
         }
     }
 
+    /// Frequency of this node when it can be evaluated without an instance receiver.
+    ///
+    /// Non-configurable per-instance nodes still have a closed-form formula (for example a
+    /// fixed divider from a system clock), so their frequency can be inlined even though
+    /// `try_frequency_call` rejects the method form that takes `self`.
+    fn try_frequency_expr(&self, tree: &ProcessedClockData) -> Option<TokenStream> {
+        if let Some(freq) = self.try_frequency_call() {
+            return Some(freq);
+        }
+        if !self.is_configurable() {
+            return Some(self.node_frequency_impl(tree, &[]));
+        }
+        None
+    }
+
     fn always_on(&self) -> bool {
         self.node.always_on()
     }
