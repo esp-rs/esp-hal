@@ -9,11 +9,7 @@ use crate::{
     commands::{
         VersionBump,
         checker::generate_baseline,
-        do_version_bump,
-        release::{
-            plan::{PackagePlan, Plan},
-            registry::RegistrySnapshot,
-        },
+        release::plan::{PackagePlan, Plan},
         update_package,
     },
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
@@ -31,13 +27,6 @@ pub struct ApplyPlanArgs {
     /// Instead of opening the pull request, just print base URL and body.
     #[arg(long)]
     manual_pull_request: bool,
-
-    /// Do not ask crates.io which version numbers are already taken.
-    ///
-    /// The check needs network access. Skipping it means the release may be
-    /// prepared with a version that `cargo publish` will reject at the very end.
-    #[arg(long)]
-    skip_registry_check: bool,
 }
 
 /// Execute the release plan by making code changes, committing them to a new
@@ -122,15 +111,10 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         println!("Dry run: would merge PR changelog entries into CHANGELOG.md / MIGRATING-*.md");
     }
 
-    let snapshot = if args.skip_registry_check {
-        println!("Skipping the crates.io version check.");
-        RegistrySnapshot::skipped()
-    } else {
-        RegistrySnapshot::fetch(plan.packages.iter().map(|step| step.package))?
-    };
-
-    // Make code changes, reusing the manifests validated above. Packages that
-    // were already at their target version are stored as `None` and skipped.
+    // Make code changes. Re-read each manifest from disk instead of reusing the
+    // preflight copies: earlier steps in this loop may have rewritten this
+    // package's dependency versions on disk, and saving a stale in-memory copy
+    // would revert them. Packages already at their target version are skipped.
     let skip_dependent_rewrites = plan.backport.is_some();
     for (step, should_bump) in plan.packages.iter_mut().zip(bump_decisions) {
         if !should_bump {
@@ -144,26 +128,15 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             )
         })?;
 
-        let planned = do_version_bump(&package.package_version(), &step.bump)
-            .with_context(|| format!("Failed to bump version of {}", step.package))?;
-        let new_version = snapshot.next_free_version(step.package, &planned, &step.bump)?;
-
-        if new_version != planned {
-            println!(
-                "{}: {planned} is reserved on crates.io, releasing {new_version} instead.",
-                step.package
-            );
-        }
-
         update_package(
             &mut package,
-            &new_version,
+            &step.new_version,
             !args.no_dry_run,
             skip_dependent_rewrites,
         )?;
 
-        step.tag_name = package.package.tag(&new_version);
-        step.new_version = new_version;
+        // Re-derived because `new_version` may have been hand-edited in the plan.
+        step.tag_name = step.package.tag(&step.new_version);
 
         if step.package.is_semver_checked() {
             if args.no_dry_run {
