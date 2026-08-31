@@ -127,11 +127,11 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SPI", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "XTAL",    outputs = "XTAL_CLK" },
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
             # { name = "SDIO_PLL0", outputs = "SDIO_PLL0_CLK" },
             # { name = "APLL", outputs = "APLL_CLK" },
-            { name = "SPLL",    outputs = "SPLL_CLK" },
+            { name = "SPLL",    outputs = "SPLL_CLK", default = true },
         ] },
     ] },
     # APLL (register value 1 on PHY_PLL_REFCLK) is intentionally omitted
