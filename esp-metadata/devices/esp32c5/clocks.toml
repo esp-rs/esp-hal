@@ -52,10 +52,12 @@ system_clocks = { clock_tree = [
     ] },
     
     # Global peripheral-related clocks
+    { name = "CRYPTO_PLL_DIV", type = "generic", output = "PLL_CLK / 3" },
+
     { name = "CRYPTO_CLK", type = "mux", variants = [ # PCR_SEC_CONF
         { name = "XTAL",      outputs = "XTAL_CLK" },
         { name = "FOSC",      outputs = "RC_FAST_CLK" },
-        { name = "PLL_F480M", outputs = "PLL_CLK" },
+        { name = "PLL_F480M", outputs = "CRYPTO_PLL_DIV" },
     ] },
     { name = "IOMUX_FUNCTION_CLOCK", type = "mux", always_on = true, variants = [
         { name = "XTAL_CLK",    outputs = "XTAL_CLK" },

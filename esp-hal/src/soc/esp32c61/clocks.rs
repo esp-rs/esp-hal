@@ -386,6 +386,12 @@ fn configure_lp_slow_clk_impl(
     });
 }
 
+// CRYPTO_PLL_DIV
+
+fn enable_crypto_pll_div_impl(_clocks: &mut ClockTree, _en: bool) {
+    // The divider is fixed in hardware, there is nothing to gate.
+}
+
 // CRYPTO_CLK
 
 fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
