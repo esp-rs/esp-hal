@@ -527,7 +527,7 @@ impl ClockTreeNodeType for Generic {
         match self.upstream_clocks() {
             ClockSource::Fixed(input) => {
                 let source_node = instance.resolve_node(tree, input);
-                let Some(body) = source_node.try_frequency_call() else {
+                let Some(body) = source_node.try_frequency_expr(tree) else {
                     return SourceFrequencySignature::Skip;
                 };
                 SourceFrequencySignature::Parameterless(body)
@@ -542,7 +542,7 @@ impl ClockTreeNodeType for Generic {
                     let cfg_attr = variant.cfg_attr();
                     let name = variant.config_enum_variant_name();
                     let source_node = instance.resolve_node(tree, &variant.outputs);
-                    let Some(frequency) = source_node.try_frequency_call() else {
+                    let Some(frequency) = source_node.try_frequency_expr(tree) else {
                         return SourceFrequencySignature::Skip;
                     };
                     variants.push(quote! { #cfg_attr #ty_name::#name });

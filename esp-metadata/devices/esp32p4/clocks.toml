@@ -19,6 +19,9 @@ system_clocks = { clock_tree = [
     { name = "PLL_F160M", type = "generic", output = "SPLL_CLK / 3"  },
     { name = "PLL_F240M", type = "generic", output = "SPLL_CLK / 2"  },
 
+    # Virtual clock node for peripherals that can be sourced from SPLL but have a 160MHz max constraint.
+    { name = "SPLL_D3_CLOCK", type = "generic", output = "SPLL_CLK / 3" },
+
     {
         name = "IOMUX_FUNCTION_CLOCK", type = "generic", output = "source / (div_num + 1)", always_on = true,
         params = {
@@ -131,7 +134,7 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
             # { name = "SDIO_PLL0", outputs = "SDIO_PLL0_CLK" },
             # { name = "APLL", outputs = "APLL_CLK" },
-            { name = "SPLL",    outputs = "SPLL_CLK", default = true },
+            { name = "SPLL",    outputs = "SPLL_D3_CLOCK", default = true },
         ] },
     ] },
     # APLL (register value 1 on PHY_PLL_REFCLK) is intentionally omitted
