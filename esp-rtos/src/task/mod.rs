@@ -2,15 +2,10 @@
 #[cfg_attr(xtensa, path = "xtensa.rs")]
 pub(crate) mod arch_specific;
 
-#[cfg(feature = "esp-radio")]
-use core::ffi::c_void;
-use core::{marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
+use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 #[cfg(feature = "alloc")]
-use allocator_api2::{
-    alloc::{Allocator, Layout},
-    boxed::Box,
-};
+use allocator_api2::boxed::Box;
 pub(crate) use arch_specific::*;
 use esp_hal::{
     system::Cpu,
@@ -21,14 +16,12 @@ use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 #[cfg(feature = "rtos-trace")]
 use rtos_trace::TaskInfo;
 
-#[cfg(feature = "alloc")]
-use crate::InternalMemory;
-#[cfg(feature = "esp-radio")]
-use crate::wait_queue::WaitQueue;
 use crate::{
     SCHEDULER,
     run_queue::{Priority, RunQueue, RunSchedulerOn},
     scheduler::SchedulerState,
+    thread::{ThreadOptions, ThreadPtr},
+    wait_queue::WaitQueue,
 };
 
 pub type IdleFn = extern "C" fn() -> !;
@@ -130,7 +123,7 @@ impl TaskExt for TaskPtr {
     #[cfg(feature = "rtos-trace")]
     fn rtos_trace_info(self, run_queue: &mut RunQueue) -> TaskInfo {
         TaskInfo {
-            name: "<todo>",
+            name: unsafe { self.as_ref().name.unwrap_or("<unnamed>") },
             priority: self.priority(run_queue).get() as u32,
             stack_base: unsafe { self.as_ref().stack.addr() },
             stack_size: unsafe { self.as_ref().stack.len() },
@@ -201,7 +194,6 @@ impl<E: TaskListElement> TaskList<E> {
         popped
     }
 
-    #[cfg(feature = "esp-radio")]
     pub fn remove(&mut self, task: TaskPtr) {
         if E::is_in_queue(task) == Some(false) {
             return;
@@ -349,6 +341,8 @@ pub(crate) struct Task {
 
     pub thread_local: ThreadLocalData,
 
+    pub name: Option<&'static str>,
+
     pub state: TaskState,
     pub stack: *mut [MaybeUninit<u32>],
 
@@ -369,7 +363,6 @@ pub(crate) struct Task {
     pub timer_queued: bool,
 
     /// The current wait queue this task is in.
-    #[cfg(feature = "esp-radio")]
     pub(crate) current_wait_queue: Option<NonNull<WaitQueue>>,
 
     // Lists a task can be in:
@@ -385,9 +378,9 @@ pub(crate) struct Task {
     /// The list of tasks scheduled for deletion
     pub delete_list_item: TaskListItem,
 
-    /// Whether the task was allocated on the heap.
-    #[cfg(feature = "alloc")]
-    pub(crate) heap_allocated: bool,
+    /// The memory block this task lives in, for tasks that were not statically allocated by the
+    /// scheduler. The main tasks have no such block.
+    pub(crate) thread: Option<ThreadPtr>,
 }
 
 pub(crate) trait ContextExt {
@@ -430,75 +423,48 @@ impl ContextExt for CpuContext {
     }
 }
 
-#[cfg(feature = "esp-radio")]
 extern "C" fn task_wrapper(task_fn: extern "C" fn(*mut c_void), param: *mut c_void) {
     task_fn(param);
     schedule_task_deletion(None);
 }
 
 impl Task {
-    #[cfg(feature = "esp-radio")]
+    /// Creates a task that runs `entry(param)` on a caller-provided stack.
+    ///
+    /// The stack guard is placed at the low end of `stack`, so the region must be larger than the
+    /// stack guard offset. `thread` is the memory block the task lives in.
     pub(crate) fn new(
-        name: &str,
-        task_fn: extern "C" fn(*mut c_void),
+        options: &ThreadOptions,
+        entry: extern "C" fn(*mut c_void),
         param: *mut c_void,
-        task_stack_size: usize,
-        priority: usize,
-        pinned_to: Option<Cpu>,
+        stack: *mut [MaybeUninit<u32>],
+        thread: ThreadPtr,
     ) -> Self {
         debug!(
-            "task_create {} {:?}({:?}) stack_size = {} priority = {} pinned_to = {:?}",
-            name, task_fn, param, task_stack_size, priority, pinned_to
+            "task_create {:?} {:?}({:?}) stack = {:?} priority = {} pinned_to = {:?}",
+            options.name, entry, param, stack, options.priority, options.pinned_to
         );
-
-        // Make sure the stack guard doesn't eat into the stack size.
-        let extra_stack = if cfg!(any(hw_task_overflow_detection, sw_task_overflow_detection)) {
-            4 + esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET")
-        } else {
-            0
-        };
-
-        #[cfg(debug_build)]
-        // This is a lot, but debug builds fail in different ways without.
-        let extra_stack = extra_stack.max(6 * 1024);
-
-        let task_stack_size = task_stack_size + extra_stack;
-
-        // Make sure stack size is also aligned to 16 bytes.
-        const MIN_STACK_ALIGNMENT: usize = 16;
-        let task_stack_size = (task_stack_size & !(MIN_STACK_ALIGNMENT - 1)) + MIN_STACK_ALIGNMENT;
-
-        let stack = unwrap!(
-            Layout::from_size_align(task_stack_size, MIN_STACK_ALIGNMENT)
-                .ok()
-                .and_then(|layout| InternalMemory.allocate(layout).ok()),
-            "Failed to allocate stack",
-        )
-        .as_ptr();
-
-        let stack_bottom = stack.cast::<MaybeUninit<u32>>();
-        let stack_len_bytes = stack.len();
 
         let stack_guard_offset =
             esp_config::esp_config_int!(usize, "ESP_HAL_CONFIG_STACK_GUARD_OFFSET");
 
-        let stack_words = core::ptr::slice_from_raw_parts_mut(stack_bottom, stack_len_bytes / 4);
-        let stack_top = unsafe { stack_bottom.add(stack_words.len()).cast() };
+        let stack_bottom = stack.cast::<MaybeUninit<u32>>();
+        let stack_top = unsafe { stack_bottom.add(stack.len()).cast() };
 
         let mut task = Task {
-            cpu_context: new_task_context(task_fn, param, stack_top),
+            cpu_context: new_task_context(entry, param, stack_top),
             thread_local: ThreadLocalData::new(),
+            name: options.name,
             state: TaskState::Ready,
-            stack: stack_words,
+            stack,
             #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
-            stack_guard: stack_words.cast(),
+            stack_guard: stack.cast(),
             #[cfg(sw_task_overflow_detection)]
             stack_guard_value: 0,
-            #[cfg(feature = "esp-radio")]
             current_wait_queue: None,
-            priority: Priority::new(priority),
+            priority: Priority::new(options.priority),
             #[cfg(multi_core)]
-            pinned_to,
+            pinned_to: options.pinned_to,
 
             wakeup_at: 0,
             timer_queued: false,
@@ -509,8 +475,7 @@ impl Task {
             timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
 
-            #[cfg(feature = "alloc")]
-            heap_allocated: false,
+            thread: Some(thread),
         };
 
         task.set_up_stack_guard(stack_guard_offset, 0xDEED_BAAD);
@@ -578,21 +543,6 @@ impl Task {
         #[cfg(hw_task_overflow_detection)]
         unsafe {
             esp_hal::debugger::set_stack_watchpoint(self.stack_guard as usize);
-        }
-    }
-}
-
-impl Drop for Task {
-    fn drop(&mut self) {
-        debug!("Dropping task: {:?}", self as *mut Task);
-
-        #[cfg(feature = "alloc")]
-        if self.heap_allocated {
-            let layout = unwrap!(
-                Layout::from_size_align(self.stack.len() * 4, 16).ok(),
-                "Cannot compute Layout for stack"
-            );
-            unsafe { InternalMemory.deallocate(unwrap!(NonNull::new(self.stack.cast())), layout) };
         }
     }
 }
@@ -668,6 +618,13 @@ impl CurrentThreadHandle {
         }
     }
 
+    /// Returns the name of the current thread.
+    ///
+    /// The main threads and the threads created by `esp-radio` have no name.
+    pub fn name(self) -> Option<&'static str> {
+        unsafe { self.task.as_ref().name }
+    }
+
     /// Delays the current task for the specified duration.
     pub fn delay(self, duration: Duration) {
         self.delay_until(Instant::now() + duration);
@@ -694,7 +651,6 @@ impl CurrentThreadHandle {
     }
 }
 
-#[cfg(feature = "esp-radio")]
 pub(super) fn schedule_task_deletion(task: Option<NonNull<Task>>) {
     trace!("schedule_task_deletion {:?}", task);
     if SCHEDULER.with(|scheduler| scheduler.schedule_task_deletion(task)) {
