@@ -288,5 +288,3 @@ let erased = channel.into();
 `PeripheralDmaChannel`/`PeripheralRxChannel`/`PeripheralTxChannel` type aliases have been removed.
 Driver channel bounds are now expressed directly as the driver-specific trait (e.g.
 `SpiDmaChannel`, `I2sDmaChannel`). Update any channel bounds accordingly.
-
-</details>
