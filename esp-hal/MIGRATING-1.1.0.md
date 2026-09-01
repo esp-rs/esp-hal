@@ -241,6 +241,73 @@ I2s::new(
 PDM is I2S0-only and simplex (TX **or** RX). Use `I2s::new_pdm` with `PdmConfig::tx_only(...)` or `PdmConfig::rx_only(...)`, and connect pins via `with_clk` plus `with_dout` / `with_din` (or `with_din_line` on multi-line chips).
 PDM validation errors are returned as `ConfigError::Pdm(PdmError)` (e.g. `PdmError::InvalidLine` for invalid data line indices).
 
+### I2S DMA now uses the DmaBuffer API
+
+I2S no longer uses manually passed DMA descriptors or the generic `DmaTransfer*` types. Buffers are
+created with the DMA buffer macros, channels are built without descriptors, and transfers are started
+by consuming the channel.
+
+```diff
+-use esp_hal::dma_buffers;
+-let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers!(4 * 4092, 0);
++use esp_hal::dma_rx_stream_buffer;
++let rx_buffer = dma_rx_stream_buffer!(4 * 4092, 1024);
+ let i2s_rx = i2s
+     .i2s_rx
+     .with_bclk(peripherals.GPIO1)
+     .with_ws(peripherals.GPIO2)
+     .with_din(peripherals.GPIO5)
+-    .build(rx_descriptors);
++    .build();
+```
+
+Use `dma_rx_buffer!` / `dma_tx_buffer!` instead of the `*_stream_buffer!` macros when you need a
+finite, one-shot transfer rather than continuous streaming.
+
+#### Starting transfers
+
+`read` / `write` take ownership of the channel. For async code, call `.into_async()` on `I2s` before
+building the RX/TX channel.
+
+```diff
+-let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer)?;
++let mut transfer = i2s_rx.read(rx_buffer)?;
+```
+
+On failure, `read` / `write` return `Err((Error, I2sRx, BUF))` (or the TX equivalents), so you can
+recover both the channel and the buffer.
+
+#### Transfer handles and streaming I/O
+
+The generic `DmaTransferRxCircular` / `DmaTransferTxCircular` (and the old `I2sReadDmaTransferAsync` /
+`I2sWriteDmaTransferAsync`) are replaced by `I2sRxDmaTransfer` / `I2sTxDmaTransfer`. These deref to the
+buffer view, exposing `available_bytes()`, `pop()`, `push()`, and `push_with()`.
+
+```diff
+ loop {
+-    transfer.wait_for_data().await?;
+-    let avail = transfer.available()?;
++    transfer.wait_for_available_async().await?;
++    let avail = transfer.available_bytes();
+     if avail > 0 {
+-        transfer.pop(&mut rcv[..avail])?;
++        transfer.pop(&mut rcv[..avail]);
+     }
+ }
+```
+
+#### Finishing a one-shot transfer
+
+`wait` (and `wait_async` in async code) returns the completion result together with the recovered
+peripheral and buffer.
+
+```rust
+let transfer = i2s_rx.read(buffer)?;
+let (result, i2s_rx, buffer) = transfer.wait();
+// or, in async code:
+let (result, i2s_rx, buffer) = transfer.wait_async().await;
+```
+
 ## DMA memory-to-memory
 
 ### `MEM2MEM*` peripherals removed
