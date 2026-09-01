@@ -66,6 +66,7 @@ pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction
     LP_IO_MUX::regs().gpio(lp as usize).modify(|_, w| unsafe {
         w.slp_sel().bit(false);
         w.fun_ie().bit(input_enable);
+        w.mcu_ie().bit(input_enable);
         w.mcu_sel().bits(func as u8)
     });
 }
@@ -95,9 +96,10 @@ pub(crate) fn output_enable(lp: u8, enable: bool) {
 
 #[cfg(any(ulp_riscv_driver_supported, lp_io_has_gpio_matrix))]
 pub(crate) fn input_enable(lp: u8, enable: bool) {
-    LP_IO_MUX::regs()
-        .gpio(lp as usize)
-        .modify(|_, w| w.fun_ie().bit(enable));
+    LP_IO_MUX::regs().gpio(lp as usize).modify(|_, w| {
+        w.fun_ie().bit(enable);
+        w.mcu_ie().bit(enable)
+    });
 }
 
 pub(crate) fn pullup_enable(lp: u8, enable: bool) {

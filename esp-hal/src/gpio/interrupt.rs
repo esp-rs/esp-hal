@@ -54,16 +54,17 @@
 use portable_atomic::{AtomicPtr, Ordering};
 use strum::EnumCount;
 
-use crate::{
-    gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, low_level::set_int_enable},
-    ram,
-};
 #[cfg(feature = "rt")]
 use crate::{
+    gpio::low_level::disable_cpu_interrupt,
     handler,
     interrupt::{self, DEFAULT_INTERRUPT_HANDLER},
     peripherals::Interrupt,
     system::Cpu,
+};
+use crate::{
+    gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, low_level::set_int_enable},
+    ram,
 };
 
 /// Convenience constant for `Option::None` pin
@@ -148,7 +149,7 @@ fn default_gpio_interrupt_handler() {
                 let pin_nr = pin_pos as u8 + bank.offset();
 
                 // The remaining interrupts are not async, we treat them as single-shot.
-                set_int_enable(pin_nr, Some(0), 0, false);
+                disable_cpu_interrupt(pin_nr);
             }
         }
     });

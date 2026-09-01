@@ -919,3 +919,25 @@ mod tests {
         }
     }
 }
+
+#[allow(unused, reason = "Compile tests")]
+#[cfg(spi_master_driver_supported)] // unimportant, one device is enough to check the API
+mod compile_regression_tests {
+    use esp_hal::{
+        Blocking,
+        gpio::{InputPin, OutputPin},
+        spi::master::Spi,
+    };
+
+    fn pin_traits_imply_peripheral_signals() {
+        // The interconnect module is not stable, meaning users can't name `PeripheralInput`.
+        // `InputPin` must therefore imply `PeripheralInput` to allow generic code. This is done by
+        // a blanket implementation, which must be preserved despite the subpar documentation.
+        fn input_pin_generic_user_function(spi: Spi<'_, Blocking>, p: impl InputPin) {
+            spi.with_miso(p);
+        }
+        fn output_pin_generic_user_function(spi: Spi<'_, Blocking>, p: impl OutputPin) {
+            spi.with_mosi(p);
+        }
+    }
+}

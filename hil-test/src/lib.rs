@@ -169,3 +169,23 @@ mod executor {
 pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
+
+#[embedded_test::setup]
+fn disable_watchdogs_before_semihosting() {
+    use esp_hal::peripherals;
+
+    // This prevents the firmware reset loop if no debugger is attached.
+    let mut rtc = esp_hal::rtc_cntl::Rtc::new(unsafe { peripherals::RTC_TIMER::steal() });
+
+    // Disable watchdog timers
+    #[cfg(soc_has_swd_watchdog)]
+    rtc.swd.disable();
+
+    rtc.rwdt.disable();
+
+    #[cfg(timergroup_timg0)]
+    esp_hal::timer::timg::Wdt::<peripherals::TIMG0<'static>>::new().disable();
+
+    #[cfg(timergroup_timg1)]
+    esp_hal::timer::timg::Wdt::<peripherals::TIMG1<'static>>::new().disable();
+}
