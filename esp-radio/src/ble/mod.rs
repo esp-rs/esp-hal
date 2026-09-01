@@ -6,7 +6,7 @@ pub(crate) mod btdm;
 #[cfg(bt_controller = "npl")]
 pub(crate) mod npl;
 
-use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
+use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::mem::MaybeUninit;
 
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
@@ -48,12 +48,14 @@ pub(crate) unsafe extern "C" fn free(ptr: *mut crate::sys::c_types::c_void) {
 
 struct BleState {
     pub rx_queue: VecDeque<ReceivedPacket>,
-    pub hci_read_data: Vec<u8>,
+    /// The packet that the byte-stream reader is part-way through, and the number of bytes the
+    /// host already took from it.
+    pub partial_read: Option<(Box<[u8]>, usize)>,
 }
 
 static BT_STATE: NonReentrantMutex<BleState> = NonReentrantMutex::new(BleState {
     rx_queue: VecDeque::new(),
-    hci_read_data: Vec::new(),
+    partial_read: None,
 });
 
 static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
@@ -142,20 +144,30 @@ impl defmt::Format for ReceivedPacket {
 pub(crate) fn clear_bt_state() {
     BT_STATE.with(|state| {
         state.rx_queue.clear();
-        state.hci_read_data.clear();
+        state.partial_read = None;
     });
 }
 
 /// Checks if there is any HCI data available to read.
 #[instability::unstable]
 pub fn have_hci_read_data() -> bool {
-    BT_STATE.with(|state| !state.rx_queue.is_empty() || !state.hci_read_data.is_empty())
+    BT_STATE.with(|state| !state.rx_queue.is_empty() || state.partial_read.is_some())
+}
+
+/// Checks if the receive queue holds a complete packet.
+pub(crate) fn have_hci_packet() -> bool {
+    BT_STATE.with(|state| !state.rx_queue.is_empty())
+}
+
+/// Removes the next packet from the receive queue, without copying it.
+pub(crate) fn take_next() -> Option<Box<[u8]>> {
+    BT_STATE.with(|state| state.rx_queue.pop_front().map(|packet| packet.data))
 }
 
 pub(crate) fn read_next(data: &mut [u8]) -> usize {
-    if let Some(packet) = BT_STATE.with(|state| state.rx_queue.pop_front()) {
-        data[..packet.data.len()].copy_from_slice(&packet.data[..packet.data.len()]);
-        packet.data.len()
+    if let Some(packet) = take_next() {
+        data[..packet.len()].copy_from_slice(&packet);
+        packet.len()
     } else {
         0
     }
@@ -165,15 +177,26 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
 #[instability::unstable]
 pub fn read_hci(data: &mut [u8]) -> usize {
     BT_STATE.with(|state| {
-        if state.hci_read_data.is_empty()
+        if state.partial_read.is_none()
             && let Some(packet) = state.rx_queue.pop_front()
         {
-            state.hci_read_data.extend_from_slice(&packet.data);
+            state.partial_read = Some((packet.data, 0));
         }
 
-        let l = usize::min(state.hci_read_data.len(), data.len());
-        data[..l].copy_from_slice(&state.hci_read_data[..l]);
-        state.hci_read_data.drain(..l);
+        let Some((packet, read)) = state.partial_read.as_mut() else {
+            return 0;
+        };
+
+        let remaining = &packet[*read..];
+        let l = usize::min(remaining.len(), data.len());
+        data[..l].copy_from_slice(&remaining[..l]);
+        *read += l;
+
+        let drained = *read == packet.len();
+        if drained {
+            state.partial_read = None;
+        }
+
         l
     })
 }

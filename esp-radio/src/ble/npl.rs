@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::{
     mem::transmute,
     ptr::{NonNull, addr_of, addr_of_mut},
@@ -1458,19 +1458,18 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
     let payload = unsafe { core::slice::from_raw_parts(cmd.offset(2), len) };
     trace!("$ pld = {:?}", payload);
 
+    let mut data = Vec::with_capacity(len + 3);
+    data.push(0x04); // this is an event
+    data.push(event);
+    data.push(len as u8);
+    data.extend_from_slice(payload);
+
+    dump_packet_info(&data);
+
     super::BT_STATE.with(|state| {
-        let mut data = [0u8; 256];
-
-        data[0] = 0x04; // this is an event
-        data[1] = event;
-        data[2] = len as u8;
-        data[3..][..len].copy_from_slice(payload);
-
         state.rx_queue.push_back(ReceivedPacket {
-            data: Box::from(&data[..len + 3]),
+            data: data.into_boxed_slice(),
         });
-
-        dump_packet_info(&data[..(len + 3)]);
     });
 
     unsafe {
@@ -1489,17 +1488,16 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     let len = unsafe { (*om).om_len };
     let data_slice = unsafe { core::slice::from_raw_parts(data_ptr, len as usize) };
 
+    let mut data = Vec::with_capacity(data_slice.len() + 1);
+    data.push(0x02); // ACL
+    data.extend_from_slice(data_slice);
+
+    super::dump_packet_info(&data);
+
     super::BT_STATE.with(|state| {
-        let mut data = [0u8; 256];
-
-        data[0] = 0x02; // ACL
-        data[1..][..data_slice.len()].copy_from_slice(data_slice);
-
         state.rx_queue.push_back(ReceivedPacket {
-            data: Box::from(&data[..data_slice.len() + 1]),
+            data: data.into_boxed_slice(),
         });
-
-        super::dump_packet_info(&data[..(len + 1) as usize]);
     });
 
     unsafe {
