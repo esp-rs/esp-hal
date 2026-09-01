@@ -22,7 +22,7 @@ use crate::{
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
 
-static PACKET_SENT: AtomicBool = AtomicBool::new(true);
+static PACKET_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 #[repr(C)]
 struct VhciHostCallbacks {
@@ -66,7 +66,7 @@ static VHCI_HOST_CALLBACK: VhciHostCallbacks = VhciHostCallbacks {
 extern "C" fn notify_host_send_available() {
     trace!("notify_host_send_available");
 
-    PACKET_SENT.store(true, Ordering::Relaxed);
+    PACKET_IN_FLIGHT.store(false, Ordering::Relaxed);
 }
 
 extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
@@ -405,7 +405,7 @@ pub fn send_hci(data: &[u8]) -> usize {
                 trace!("can_send is false");
             }
 
-            PACKET_SENT.store(false, Ordering::Relaxed);
+            PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
 
             #[cfg(all(esp32, feature = "coex"))]
             ble_os_adapter_chip_specific::async_wakeup_request(
@@ -425,6 +425,6 @@ pub fn send_hci(data: &[u8]) -> usize {
         super::dump_packet_info(packet);
 
         // make sure the packet buffer doesn't get touched until sent
-        while !PACKET_SENT.load(Ordering::Relaxed) {}
+        while PACKET_IN_FLIGHT.load(Ordering::Relaxed) {}
     })
 }
