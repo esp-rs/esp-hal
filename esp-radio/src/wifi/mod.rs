@@ -1074,6 +1074,12 @@ pub enum WifiError {
     /// Out of memory.
     OutOfMemory,
 
+    /// The Wi-Fi driver is in a state that does not allow the requested operation.
+    InvalidState,
+
+    /// The operation timed out.
+    Timeout,
+
     /// SSID is invalid.
     InvalidSsid,
 
@@ -1093,6 +1099,12 @@ impl WifiError {
         match code as u32 {
             crate::sys::include::ESP_ERR_NO_MEM => WifiError::OutOfMemory,
             crate::sys::include::ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
+            crate::sys::include::ESP_ERR_WIFI_NOT_INIT
+            | crate::sys::include::ESP_ERR_WIFI_NOT_STARTED
+            | crate::sys::include::ESP_ERR_WIFI_STATE
+            | crate::sys::include::ESP_ERR_WIFI_CONN
+            | crate::sys::include::ESP_ERR_WIFI_STOP_STATE => WifiError::InvalidState,
+            crate::sys::include::ESP_ERR_WIFI_TIMEOUT => WifiError::Timeout,
             crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
             crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
