@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v1.2.0] - 2026-09-01
+
+### Fixed
+
+- GPIO: Fixed a breaking change introduced in 1.2.0-rc.0, which prevented writing generic functions for GPIOs. (#6252)
+- A pad that is already at its wake level no longer loses its wake configuration. This fixes a regression in 1.2.0-rc.0. (#6250)
+- SPI: the maximum bus frequency can be configured using the default clock source. (#6245)
+- Power the 32 kHz crystal on ESP32 when it is selected as the RTC slow clock (#6234)
+- UART: Fixed an issue that caused UART TX to send a short low pulse when transmitting shorty after changing configuration. (#6233)
+- PARL_IO: esp-hal now correctly uses pad clock inputs to sample the received signal. (#6227)
+- UART: C2, C3 and S3 now properly synchronize UART register accesses between clock domains. (#6226)
+- XTAL32K can no longer be configured without enabling `ESP_HAL_CONFIG_USE_XTAL32K` (#6194)
+- ESP32, ESP32-C2: fixed RcFastDivClk calibration on startup (#6193)
+
 ## [v1.2.0-rc.0] - 2026-08-24
 
 ### Added
@@ -1875,4 +1889,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.0.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.1...esp-hal-v1.0.0
 [v1.1.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0
 [v1.2.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...esp-hal-v1.2.0-rc.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0-rc.0...HEAD
+[v1.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0-rc.0...esp-hal-v1.2.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0...HEAD

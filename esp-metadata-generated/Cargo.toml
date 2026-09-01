@@ -1,6 +1,6 @@
 [package]
 name          = "esp-metadata-generated"
-version       = "0.5.0"
+version       = "0.5.1"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "Generated metadata for Espressif devices"
