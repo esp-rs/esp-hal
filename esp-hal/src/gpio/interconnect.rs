@@ -129,6 +129,9 @@ pub trait PeripheralSignal<'d>: Sealed {
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
 /// [`PeripheralOutput`] as arguments instead of pin types.
+///
+/// To allow writing functions that are generic over GPIOs, this trait is
+/// blanket-implemented for [`InputPin`][gpio::InputPin] types.
 #[allow(
     private_bounds,
     reason = "InputSignal is unstable, but the trait needs to be public"
@@ -139,6 +142,9 @@ pub trait PeripheralInput<'d>: Into<InputSignal<'d>> + PeripheralSignal<'d> {}
 ///
 /// Peripheral drivers are encouraged to accept types that implement this and
 /// [`PeripheralInput`] as arguments instead of pin types.
+///
+/// To allow writing functions that are generic over GPIOs, this trait is
+/// blanket-implemented for [`OutputPin`] types.
 #[allow(
     private_bounds,
     reason = "OutputSignal is unstable, but the trait needs to be public"
