@@ -7,6 +7,7 @@ use portable_atomic::{AtomicBool, Ordering};
 
 use super::{Config, ReceivedPacket};
 use crate::{
+    asynch::AtomicWaker,
     ble::{
         HCI_OUT_COLLECTOR,
         HciOutCollector,
@@ -23,6 +24,7 @@ use crate::{
 pub(crate) mod ble_os_adapter_chip_specific;
 
 static PACKET_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+static PACKET_SENT_WAKER: AtomicWaker = AtomicWaker::new();
 
 #[repr(C)]
 struct VhciHostCallbacks {
@@ -66,7 +68,8 @@ static VHCI_HOST_CALLBACK: VhciHostCallbacks = VhciHostCallbacks {
 extern "C" fn notify_host_send_available() {
     trace!("notify_host_send_available");
 
-    PACKET_IN_FLIGHT.store(false, Ordering::Relaxed);
+    PACKET_IN_FLIGHT.store(false, Ordering::Release);
+    PACKET_SENT_WAKER.wake();
 }
 
 extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
@@ -393,38 +396,56 @@ pub(crate) fn ble_deinit() {
     }
     // Disabling the PHY happens automatically, when the BLEController gets dropped.
 }
+
 /// Sends HCI data to the BLE controller.
 ///
 /// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
 /// caller must offer the remaining bytes again.
-#[instability::unstable]
-pub fn send_hci(data: &[u8]) -> usize {
+pub(crate) fn send_hci(data: &[u8]) -> usize {
     // make sure the packet buffer doesn't get touched until sent
-    while PACKET_IN_FLIGHT.load(Ordering::Relaxed) {}
+    while PACKET_IN_FLIGHT.load(Ordering::Acquire) {}
+    while unsafe { !API_vhci_host_check_send_available() } {
+        trace!("can_send is false");
+    }
 
-    super::collect_and_send(data, |packet| {
-        unsafe {
-            while !API_vhci_host_check_send_available() {
-                trace!("can_send is false");
-            }
+    super::collect_and_send(data, send_packet)
+}
 
-            PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
-
-            #[cfg(all(esp32, feature = "coex"))]
-            ble_os_adapter_chip_specific::async_wakeup_request(
-                ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-            );
-
-            API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
-
-            #[cfg(all(esp32, feature = "coex"))]
-            ble_os_adapter_chip_specific::async_wakeup_request_end(
-                ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-            );
+pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
+    // make sure the packet buffer doesn't get touched until sent
+    core::future::poll_fn(|cx| {
+        PACKET_SENT_WAKER.register(cx.waker());
+        if PACKET_IN_FLIGHT.load(Ordering::Acquire)
+            || unsafe { !API_vhci_host_check_send_available() }
+        {
+            core::task::Poll::Pending
+        } else {
+            core::task::Poll::Ready(())
         }
-
-        trace!("sent vhci host packet");
-
-        super::dump_packet_info(packet);
     })
+    .await;
+
+    super::collect_and_send(data, send_packet)
+}
+
+fn send_packet(packet: &[u8]) {
+    unsafe {
+        PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
+
+        #[cfg(all(esp32, feature = "coex"))]
+        ble_os_adapter_chip_specific::async_wakeup_request(
+            ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+        );
+
+        API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
+
+        #[cfg(all(esp32, feature = "coex"))]
+        ble_os_adapter_chip_specific::async_wakeup_request_end(
+            ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+        );
+    }
+
+    trace!("sent vhci host packet");
+
+    super::dump_packet_info(packet);
 }

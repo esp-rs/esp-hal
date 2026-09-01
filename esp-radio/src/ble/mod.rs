@@ -9,7 +9,7 @@ pub(crate) mod npl;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::mem::MaybeUninit;
 
-pub(crate) use ble::{ble_deinit, ble_init, send_hci};
+pub(crate) use ble::{ble_deinit, ble_init, send_hci, send_hci_async};
 use docsplay::Display;
 use esp_sync::NonReentrantMutex;
 

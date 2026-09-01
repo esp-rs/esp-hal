@@ -24,6 +24,7 @@ use crate::{
         read_hci,
         read_next,
         send_hci,
+        send_hci_async,
         take_next,
     },
 };
@@ -118,6 +119,14 @@ impl<'d> BleConnector<'d> {
     pub fn write(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
         Ok(send_hci(buf))
     }
+
+    /// Write to HCI asynchronously.
+    ///
+    /// Returns the number of bytes written, which is at most one packet.
+    #[instability::unstable]
+    pub async fn write_async(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
+        Ok(send_hci_async(buf).await)
+    }
 }
 
 #[derive(Display, Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -199,7 +208,7 @@ impl embedded_io_async_06::Read for BleConnector<'_> {
 
 impl embedded_io_async_06::Write for BleConnector<'_> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        Ok(send_hci(buf))
+        self.write_async(buf).await
     }
 
     async fn flush(&mut self) -> Result<(), BleConnectorError> {
@@ -216,7 +225,7 @@ impl embedded_io_async_07::Read for BleConnector<'_> {
 
 impl embedded_io_async_07::Write for BleConnector<'_> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        Ok(send_hci(buf))
+        self.write_async(buf).await
     }
 
     async fn flush(&mut self) -> Result<(), BleConnectorError> {
@@ -283,7 +292,7 @@ impl embedded_io_07::ErrorType for HciWriter {
 
 impl embedded_io_async_07::Write for HciWriter {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        Ok(send_hci(buf))
+        Ok(send_hci_async(buf).await)
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
