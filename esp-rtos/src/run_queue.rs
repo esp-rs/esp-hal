@@ -167,7 +167,6 @@ impl RunQueue {
         let priority_n = priority.get();
 
         ready_task.set_state(TaskState::Ready);
-        #[cfg(feature = "esp-radio")]
         {
             let mut ready_task = ready_task;
             if let Some(mut containing_queue) =

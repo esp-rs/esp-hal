@@ -21,9 +21,13 @@ mod tests {
         queue::QueueHandle,
         semaphore::{SemaphoreHandle, SemaphoreKind},
     };
-    use esp_rtos::{CurrentThreadHandle, embassy::InterruptExecutor};
+    use esp_rtos::{
+        CurrentThreadHandle,
+        embassy::InterruptExecutor,
+        thread::{Stack as ThreadStack, ThreadSpawner},
+    };
     use portable_atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering};
-    use static_cell::StaticCell;
+    use static_cell::{ConstStaticCell, StaticCell};
 
     struct Context {
         #[cfg(multi_core)]
@@ -92,6 +96,111 @@ mod tests {
         CurrentThreadHandle::get().delay(Duration::from_millis(10));
 
         hil_test::assert!(now.elapsed() >= Duration::from_millis(10));
+    }
+
+    #[test]
+    fn thread_runs_a_function_and_returns_its_value() {
+        fn worker() -> u32 {
+            42
+        }
+
+        let handle = ThreadSpawner::new(4096).with_name("worker").spawn(worker);
+
+        hil_test::assert_eq!(handle.name(), Some("worker"));
+
+        let (value, _spawner) = handle.join();
+        hil_test::assert_eq!(value, 42);
+    }
+
+    #[test]
+    fn thread_returns_a_value_that_is_not_copy() {
+        let captured = Box::new(3_u32);
+
+        let handle = ThreadSpawner::new(4096).spawn(move || {
+            let mut items = alloc::vec::Vec::new();
+            items.push(*captured);
+            items.push(*captured);
+            items
+        });
+
+        let (value, _spawner) = handle.join();
+        hil_test::assert_eq!(value.len(), 2);
+        hil_test::assert_eq!(value[0], 3);
+        hil_test::assert_eq!(value[1], 3);
+    }
+
+    #[test]
+    fn a_static_stack_can_be_reused_after_a_join() {
+        static STACK: ConstStaticCell<ThreadStack<4096>> = ConstStaticCell::new(ThreadStack::new());
+
+        let spawner = ThreadSpawner::from_static(STACK.take()).with_priority(2);
+
+        let (first, spawner) = spawner.spawn(|| 1_u32).join();
+        let (second, _spawner) = spawner.spawn(|| 2_u32).join();
+
+        hil_test::assert_eq!(first, 1);
+        hil_test::assert_eq!(second, 2);
+    }
+
+    #[test]
+    fn a_detached_thread_keeps_running() {
+        static FINISHED: AtomicBool = AtomicBool::new(false);
+
+        ThreadSpawner::new(4096)
+            .spawn(|| {
+                CurrentThreadHandle::get().delay(Duration::from_millis(10));
+                FINISHED.store(true, Ordering::SeqCst);
+            })
+            .detach();
+
+        while !FINISHED.load(Ordering::SeqCst) {
+            CurrentThreadHandle::get().delay(Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    fn a_detached_thread_drops_its_return_value() {
+        static DROPPED: AtomicBool = AtomicBool::new(false);
+
+        struct Observed;
+        impl Drop for Observed {
+            fn drop(&mut self) {
+                DROPPED.store(true, Ordering::SeqCst);
+            }
+        }
+
+        ThreadSpawner::new(4096).spawn(|| Observed).detach();
+
+        while !DROPPED.load(Ordering::SeqCst) {
+            CurrentThreadHandle::get().delay(Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    fn a_thread_can_be_pinned_to_the_second_core(ctx: Context) {
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            ctx.sw_int1,
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        let (cpu, _spawner) = ThreadSpawner::new(4096)
+            .with_pinned_to(Cpu::AppCpu)
+            .with_priority(2)
+            .spawn(Cpu::current)
+            .join();
+
+        hil_test::assert!(cpu == Cpu::AppCpu);
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
     }
 
     #[test]

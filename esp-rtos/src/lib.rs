@@ -51,6 +51,11 @@ esp_rtos::start_second_core(
 #![doc = esp_hal::after_snippet!()]
 //! ```
 //! 
+//! ## Threads
+//!
+//! Use the [`thread`] module to run code on a separate stack. See its documentation for the
+//! details.
+//!
 //! To write `async` code, enable the `embassy` feature, and make the main function `async`.
 //! This will create a thread-mode executor on the main thread. Note that, to create async tasks, you will need
 //! the `task` macro from the `embassy-executor` crate. Do NOT enable any of the `arch-*` features on `embassy-executor`.
@@ -157,9 +162,8 @@ mod scheduler;
 pub mod sleep;
 mod syscall;
 mod task;
+pub mod thread;
 mod timer;
-// TODO: these esp-radio gates will need to be cleaned up once we re-introduce IPC objects.
-#[cfg(feature = "esp-radio")]
 mod wait_queue;
 
 #[cfg(feature = "embassy")]
