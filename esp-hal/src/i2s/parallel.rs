@@ -2,11 +2,11 @@
 //! # Parallel Interface (via I2S)
 //!
 //! ## Overview
-//! The I2S parallel interface allows for high-speed data transfer between the
-//! ESP32 and external devices. It is commonly used to external devices such as
-//! LED matrix, LCD display, and Printer. Only TX is implemented. Each
-//! unit can have up to 8 or 16 data signals (depending on your target hardware)
-//! plus 1 clock signal.
+//! The I2S parallel interface provides high-speed data transfer between the
+//! ESP32 and external devices. It is commonly used with devices such as LED
+//! matrices, LCD displays, and printers. Only TX is implemented. Each
+//! unit can have up to 8 or 16 data signals (depending on the target hardware)
+//! plus one clock signal.
 //!
 //! ## Notes
 //!
@@ -20,13 +20,13 @@
 )]
 #![cfg_attr(
     esp32,
-    doc = "you should use I2S1.  If you have to use I2S0, it will only output the even"
+    doc = "you should use I2S1.  If you have to use I2S0, it only outputs the even"
 )]
-#![cfg_attr(esp32, doc = "bytes! so [A, B, C, D] will be output as [A, C]!!!!")]
+#![cfg_attr(esp32, doc = "bytes! so [A, B, C, D] is output as [A, C]!")]
 #![cfg_attr(esp32, doc = "")]
 //! ## Configuration
 //!
-//! The driver uses DMA (Direct Memory Access) for efficient data transfer and
+//! The driver uses DMA for efficient data transfer and
 //! supports various configurations, such as different data formats, standards
 //! (e.g., Philips) and pin configurations. It relies on other peripheral
 //! modules, such as
@@ -67,7 +67,7 @@
 //! let mut tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 //! for (i, data) in tx_buf.as_mut_slice().chunks_mut(4).enumerate() {
 //!     let offset = i * 4;
-//!     // i2s parallel driver expects the buffer to be interleaved
+//!     // I2S parallel driver expects the buffer to be interleaved
 //!     data[0] = (offset + 2) as u8;
 //!     data[1] = (offset + 3) as u8;
 //!     data[2] = offset as u8;
@@ -195,7 +195,7 @@ pub struct TxEightBits<'d> {
 
 impl<'d> TxEightBits<'d> {
     #[expect(clippy::too_many_arguments)]
-    /// Creates a new `TxSEightBits` instance with the provided output pins.
+    /// Creates a new [`TxEightBits`] instance with the provided output pins.
     pub fn new(
         pin_0: impl PeripheralOutput<'d>,
         pin_1: impl PeripheralOutput<'d>,
@@ -312,7 +312,7 @@ fn internal_clear_interrupts(regs: &RegisterBlock, interrupts: EnumSet<I2sParall
     });
 }
 
-/// I2S Parallel Interface
+/// I2S parallel interface
 #[instability::unstable]
 pub struct I2sParallel<'d, Dm>
 where
@@ -355,7 +355,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         }
     }
 
-    /// Converts the I2S instance into async mode.
+    /// Converts the I2S parallel instance into [`Async`] mode.
     pub fn into_async(self) -> I2sParallel<'d, Async> {
         I2sParallel {
             instance: self.instance,
@@ -386,7 +386,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         internal_listen(self.instance.regs(), interrupts.into(), false);
     }
 
-    /// Tells you the interrupt sources that are set.
+    /// Returns the interrupt sources that are set.
     #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<I2sParallelInterrupt> {
         internal_interrupts(self.instance.regs())
@@ -409,7 +409,7 @@ impl crate::interrupt::InterruptConfigurable for I2sParallel<'_, Blocking> {
 }
 
 impl<'d> I2sParallel<'d, Async> {
-    /// Converts the I2S instance into blocking mode.
+    /// Converts the I2S parallel instance into [`Blocking`] mode.
     pub fn into_blocking(self) -> I2sParallel<'d, Blocking> {
         I2sParallel {
             instance: self.instance,
@@ -423,7 +423,15 @@ impl<'d, Dm> I2sParallel<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Writes data to the I2S peripheral.
+    /// Starts a DMA transfer that writes the buffer to the I2S parallel
+    /// interface and returns an [`I2sParallelTransfer`] that can be used to
+    /// wait for the transfer to complete.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`DmaError`] when the buffer cannot be prepared for the
+    /// transfer or the transfer cannot be started. On error, the driver and
+    /// the buffer are returned together with the error.
     pub fn send<BUF: DmaTxBuffer>(
         mut self,
         mut data: BUF,
@@ -446,8 +454,8 @@ where
     }
 }
 
-/// Represents an ongoing (or potentially finished) transfer using the i2s
-/// parallel interface
+/// Represents an ongoing (or potentially finished) transfer using the I2S
+/// parallel interface.
 #[instability::unstable]
 pub struct I2sParallelTransfer<'d, BUF, Dm>
 where
@@ -463,12 +471,13 @@ where
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
-    /// Returns whether [`Self::wait`] will not block.
+    /// Returns whether the transfer is complete.
     pub fn is_done(&self) -> bool {
         self.i2s.instance.is_tx_done()
     }
 
-    /// Waits for the transfer to finish.
+    /// Waits for the transfer to finish and returns the driver and the
+    /// buffer.
     pub fn wait(mut self) -> (I2sParallel<'d, Dm>, BUF::Final) {
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
@@ -505,7 +514,7 @@ where
         internal_clear_interrupts(self.i2s.instance.regs(), interrupts.into());
     }
 
-    /// Tells you the interrupt sources that are set.
+    /// Returns the interrupt sources that are set.
     #[instability::unstable]
     pub fn interrupts(&mut self) -> EnumSet<I2sParallelInterrupt> {
         internal_interrupts(self.i2s.instance.regs())
@@ -521,7 +530,17 @@ impl<BUF> I2sParallelTransfer<'_, BUF, Async>
 where
     BUF: DmaTxBuffer,
 {
-    /// Waits for the transfer to finish.
+    /// Waits for [`Self::is_done`] to return true.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`DmaError`] when the transfer ends with a descriptor error.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// This method is cancellation safe. Dropping the future does not stop
+    /// the transfer, and the method can be called again to wait for the
+    /// transfer to complete.
     pub async fn wait_for_done(&mut self) -> Result<(), DmaError> {
         DmaTxFuture::new(&mut self.i2s.tx_channel).await
     }
@@ -941,7 +960,11 @@ for_each_i2s! {
 }
 
 impl<'d> I2sParallel<'d, crate::Blocking> {
-    /// Creates a new I2S Parallel Interface.
+    /// Creates a new [`I2sParallel`] instance.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the DMA channel is not compatible with the I2S instance.
     pub fn new<I: Instance + 'd>(
         i2s: I,
         channel: impl I2sParallelDmaChannel<'d, I>,
