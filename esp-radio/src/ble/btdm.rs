@@ -399,6 +399,9 @@ pub(crate) fn ble_deinit() {
 /// caller must offer the remaining bytes again.
 #[instability::unstable]
 pub fn send_hci(data: &[u8]) -> usize {
+    // make sure the packet buffer doesn't get touched until sent
+    while PACKET_IN_FLIGHT.load(Ordering::Relaxed) {}
+
     super::collect_and_send(data, |packet| {
         unsafe {
             while !API_vhci_host_check_send_available() {
@@ -423,8 +426,5 @@ pub fn send_hci(data: &[u8]) -> usize {
         trace!("sent vhci host packet");
 
         super::dump_packet_info(packet);
-
-        // make sure the packet buffer doesn't get touched until sent
-        while PACKET_IN_FLIGHT.load(Ordering::Relaxed) {}
     })
 }
