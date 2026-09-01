@@ -122,6 +122,7 @@ pub trait TxPins<'d> {
 
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
+#[instability::unstable]
 pub struct TxSixteenBits<'d> {
     pins: [interconnect::OutputSignal<'d>; 16],
 }
@@ -187,6 +188,7 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
 
 /// Represents a group of 8 output pins configured for 8-bit parallel data
 /// transmission.
+#[instability::unstable]
 pub struct TxEightBits<'d> {
     pins: [interconnect::OutputSignal<'d>; 8],
 }
@@ -237,6 +239,8 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
 /// Interrupts from the I2S parallel peripheral.
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
 pub enum I2sParallelInterrupt {
     /// The DMA finishes the out descriptor chain (OUT_DONE).
     Done,
@@ -309,6 +313,7 @@ fn internal_clear_interrupts(regs: &RegisterBlock, interrupts: EnumSet<I2sParall
 }
 
 /// I2S Parallel Interface
+#[instability::unstable]
 pub struct I2sParallel<'d, Dm>
 where
     Dm: DriverMode,
@@ -443,6 +448,7 @@ where
 
 /// Represents an ongoing (or potentially finished) transfer using the i2s
 /// parallel interface
+#[instability::unstable]
 pub struct I2sParallelTransfer<'d, BUF, Dm>
 where
     BUF: DmaTxBuffer,
@@ -471,10 +477,38 @@ where
         (i2s, BUF::from_view(view))
     }
 
+    /// Sets the interrupt handler for the I2S parallel peripheral.
+    ///
+    /// The new handler removes the old handler. This method does not turn on
+    /// the interrupt sources. Use [`Self::listen`] to turn on interrupt
+    /// sources.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.i2s.instance.set_interrupt_handler(handler);
+    }
+
+    /// Turns on the given interrupt sources.
+    #[instability::unstable]
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_listen(self.i2s.instance.regs(), interrupts.into(), true);
+    }
+
+    /// Turns off the given interrupt sources.
+    #[instability::unstable]
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_listen(self.i2s.instance.regs(), interrupts.into(), false);
+    }
+
     /// Clears the interrupt flags of the given interrupt sources.
     #[instability::unstable]
     pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
         internal_clear_interrupts(self.i2s.instance.regs(), interrupts.into());
+    }
+
+    /// Tells you the interrupt sources that are set.
+    #[instability::unstable]
+    pub fn interrupts(&mut self) -> EnumSet<I2sParallelInterrupt> {
+        internal_interrupts(self.i2s.instance.regs())
     }
 
     fn stop_peripherals(&mut self) {
