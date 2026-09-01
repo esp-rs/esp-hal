@@ -394,48 +394,37 @@ pub(crate) fn ble_deinit() {
     // Disabling the PHY happens automatically, when the BLEController gets dropped.
 }
 /// Sends HCI data to the BLE controller.
+///
+/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
+/// caller must offer the remaining bytes again.
 #[instability::unstable]
-pub fn send_hci(data: &[u8]) {
-    let hci_out = unsafe { (*addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
-    hci_out.push(data);
-
-    if hci_out.is_ready() {
-        let packet = hci_out.packet();
-
+pub fn send_hci(data: &[u8]) -> usize {
+    super::collect_and_send(data, |packet| {
         unsafe {
-            loop {
-                let can_send = API_vhci_host_check_send_available();
-
-                if !can_send {
-                    trace!("can_send is false");
-                    continue;
-                }
-
-                PACKET_SENT.store(false, Ordering::Relaxed);
-
-                #[cfg(all(esp32, feature = "coex"))]
-                ble_os_adapter_chip_specific::async_wakeup_request(
-                    ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-                );
-
-                API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
-
-                #[cfg(all(esp32, feature = "coex"))]
-                ble_os_adapter_chip_specific::async_wakeup_request_end(
-                    ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-                );
-
-                trace!("sent vhci host packet");
-
-                super::dump_packet_info(packet);
-
-                break;
+            while !API_vhci_host_check_send_available() {
+                trace!("can_send is false");
             }
 
-            // make sure the packet buffer doesn't get touched until sent
-            while !PACKET_SENT.load(Ordering::Relaxed) {}
+            PACKET_SENT.store(false, Ordering::Relaxed);
+
+            #[cfg(all(esp32, feature = "coex"))]
+            ble_os_adapter_chip_specific::async_wakeup_request(
+                ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+            );
+
+            API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
+
+            #[cfg(all(esp32, feature = "coex"))]
+            ble_os_adapter_chip_specific::async_wakeup_request_end(
+                ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+            );
         }
 
-        hci_out.reset();
-    }
+        trace!("sent vhci host packet");
+
+        super::dump_packet_info(packet);
+
+        // make sure the packet buffer doesn't get touched until sent
+        while !PACKET_SENT.load(Ordering::Relaxed) {}
+    })
 }

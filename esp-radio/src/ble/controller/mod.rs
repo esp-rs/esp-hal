@@ -112,10 +112,11 @@ impl<'d> BleConnector<'d> {
     }
 
     /// Write to HCI.
+    ///
+    /// Returns the number of bytes written, which is at most one packet.
     #[instability::unstable]
     pub fn write(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        send_hci(buf);
-        Ok(buf.len())
+        Ok(send_hci(buf))
     }
 }
 
@@ -198,8 +199,7 @@ impl embedded_io_async_06::Read for BleConnector<'_> {
 
 impl embedded_io_async_06::Write for BleConnector<'_> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        send_hci(buf);
-        Ok(buf.len())
+        Ok(send_hci(buf))
     }
 
     async fn flush(&mut self) -> Result<(), BleConnectorError> {
@@ -216,8 +216,7 @@ impl embedded_io_async_07::Read for BleConnector<'_> {
 
 impl embedded_io_async_07::Write for BleConnector<'_> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        send_hci(buf);
-        Ok(buf.len())
+        Ok(send_hci(buf))
     }
 
     async fn flush(&mut self) -> Result<(), BleConnectorError> {
@@ -284,8 +283,7 @@ impl embedded_io_07::ErrorType for HciWriter {
 
 impl embedded_io_async_07::Write for HciWriter {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        send_hci(buf);
-        Ok(buf.len())
+        Ok(send_hci(buf))
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
