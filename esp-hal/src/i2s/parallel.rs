@@ -486,43 +486,49 @@ where
         (i2s, BUF::from_view(view))
     }
 
+    fn stop_peripherals(&mut self) {
+        self.i2s.instance.tx_stop();
+        self.i2s.tx_channel.stop_transfer();
+    }
+}
+
+/// Interrupt management for an ongoing transfer.
+///
+/// The driver itself has been consumed by [`I2sParallel::send`], so these
+/// methods take `&self` and allow an interrupt handler to manage the
+/// interrupt sources through the transfer object.
+#[instability::unstable]
+impl<'d, BUF> I2sParallelTransfer<'d, BUF, Blocking>
+where
+    BUF: DmaTxBuffer,
+{
     /// Sets the interrupt handler for the I2S parallel peripheral.
     ///
     /// The new handler removes the old handler. This method does not turn on
     /// the interrupt sources. Use [`Self::listen`] to turn on interrupt
     /// sources.
-    #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.i2s.instance.set_interrupt_handler(handler);
     }
 
     /// Turns on the given interrupt sources.
-    #[instability::unstable]
-    pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+    pub fn listen(&self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
         internal_listen(self.i2s.instance.regs(), interrupts.into(), true);
     }
 
     /// Turns off the given interrupt sources.
-    #[instability::unstable]
-    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+    pub fn unlisten(&self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
         internal_listen(self.i2s.instance.regs(), interrupts.into(), false);
     }
 
     /// Clears the interrupt flags of the given interrupt sources.
-    #[instability::unstable]
-    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+    pub fn clear_interrupts(&self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
         internal_clear_interrupts(self.i2s.instance.regs(), interrupts.into());
     }
 
     /// Returns the interrupt sources that are set.
-    #[instability::unstable]
-    pub fn interrupts(&mut self) -> EnumSet<I2sParallelInterrupt> {
+    pub fn interrupts(&self) -> EnumSet<I2sParallelInterrupt> {
         internal_interrupts(self.i2s.instance.regs())
-    }
-
-    fn stop_peripherals(&mut self) {
-        self.i2s.instance.tx_stop();
-        self.i2s.tx_channel.stop_transfer();
     }
 }
 
