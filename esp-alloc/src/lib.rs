@@ -161,9 +161,14 @@ pub mod export {
 
 pub use allocators::*;
 use enumset::{EnumSet, EnumSetType};
+use esp_config::esp_config_int;
 use esp_sync::NonReentrantMutex;
 
 use crate::heap::Heap;
+
+/// Maximum number of memory regions that can be added to a heap allocator,
+/// configurable via `ESP_ALLOC_CONFIG_MAX_REGIONS`.
+const MAX_REGIONS: usize = esp_config_int!(usize, "ESP_ALLOC_CONFIG_MAX_REGIONS");
 
 /// The global allocator instance
 #[cfg_attr(feature = "global-allocator", global_allocator)]
@@ -333,7 +338,7 @@ impl HeapRegion {
 #[derive(Debug)]
 pub struct HeapStats {
     /// Granular stats for all the configured memory regions.
-    pub region_stats: [Option<RegionStats>; 3],
+    pub region_stats: [Option<RegionStats>; MAX_REGIONS],
 
     /// Total size of all combined heap regions in bytes.
     pub size: usize,
@@ -406,7 +411,7 @@ struct InternalHeapStats {
 }
 
 struct EspHeapInner {
-    heap: [Option<HeapRegion>; 3],
+    heap: [Option<HeapRegion>; MAX_REGIONS],
     #[cfg(feature = "internal-heap-stats")]
     internal_heap_stats: InternalHeapStats,
 }
@@ -415,7 +420,7 @@ impl EspHeapInner {
     /// Crate a new UNINITIALIZED heap allocator
     pub const fn empty() -> Self {
         EspHeapInner {
-            heap: [const { None }; 3],
+            heap: [const { None }; MAX_REGIONS],
             #[cfg(feature = "internal-heap-stats")]
             internal_heap_stats: InternalHeapStats {
                 max_usage: 0,
@@ -461,7 +466,7 @@ impl EspHeapInner {
     /// called from within `println!()` to pretty-print the usage of the
     /// heap.
     pub fn stats(&self) -> HeapStats {
-        let mut region_stats: [Option<RegionStats>; 3] = [const { None }; 3];
+        let mut region_stats: [Option<RegionStats>; MAX_REGIONS] = [const { None }; MAX_REGIONS];
 
         let mut used = 0;
         let mut free = 0;
@@ -588,7 +593,8 @@ impl EspHeap {
     ///
     /// `size` is the size of the heap in bytes.
     ///
-    /// You can add up to three regions per allocator.
+    /// You can add up to three regions per allocator by default. The limit is
+    /// configurable via `ESP_ALLOC_CONFIG_MAX_REGIONS`.
     ///
     /// Note that:
     ///

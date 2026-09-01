@@ -37,6 +37,7 @@ test = false
 allocator-api2        = { version = "0.3.0", default-features = false }
 defmt                 = { version = "1.1", optional = true }
 enumset               = "1"
+esp-config            = { version = "0.8.0", path = "../esp-config" }
 esp-sync              = { version = "0.3.0", path = "../esp-sync" }
 document-features     = "0.2"
 
