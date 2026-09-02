@@ -1,10 +1,11 @@
 //! Chip inference from a connected device.
 //!
-//! `build` / `run` / `check` / `test` omit `--chip` when a supported target is attached.
-//! Detection uses CLI tools already on `PATH`, this crate does not link them.
+//! When the chip is omitted, `run` uses [`with_espflash`] and `build` / `check` / `test` use
+//! [`with_probe_rs`]. Bare `check` has nothing to flash, so it infers nothing and checks every
+//! chip.
 //!
-//! Examples use [`with_espflash`], tests use [`with_probe_rs`]. Several devices:
-//! pick one in a terminal. Scripts pass `--chip`.
+//! Detection shells out to tools already on `PATH`, this crate does not link them. With several
+//! devices attached, a terminal gets a prompt and everything else gets an error.
 
 use std::{fmt, io::IsTerminal, process::Command, str::FromStr, time::Duration};
 
@@ -16,12 +17,12 @@ use crate::metadata::Chip;
 const SHORT_TIMEOUT: Duration = Duration::from_secs(10);
 const ESPFLASH_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Infer the chip via `espflash` (examples; resets the board).
+/// Infer the chip via `espflash`, used by `run` because it resets the board anyway.
 pub fn with_espflash() -> Option<Chip> {
     pick_connected(detect_via_espflash())
 }
 
-/// Infer the chip via `probe-rs` (HIL tests / compile; no UART reset).
+/// Infer the chip via `probe-rs`, used where nothing should be reset.
 pub fn with_probe_rs() -> Option<Chip> {
     pick_connected(detect_via_probe_rs())
 }
@@ -45,7 +46,7 @@ fn pick_device(devices: Vec<ConnectedDevice>) -> Option<ConnectedDevice> {
         .join(", ");
     if !std::io::stdin().is_terminal() {
         log::info!(
-            "Multiple ESP devices connected ({summary}). Pass `--chip`, or run from a terminal to pick one."
+            "Multiple ESP devices connected ({summary}). Pass the chip name, or run from a terminal to pick one."
         );
         return None;
     }

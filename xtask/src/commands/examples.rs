@@ -5,12 +5,8 @@ use anyhow::{Context, Result};
 use super::{build::build_examples, run::run_examples, select};
 use crate::{Package, cargo::CargoAction, metadata::Chip};
 
-fn standalone_example_projects(package: Package) -> bool {
-    matches!(package, Package::Examples | Package::CompileTests)
-}
-
 const EXAMPLE_ARGUMENT_HINT: &str =
-    "the example name as the first argument, or `all` to act on every example of the package";
+    "the example name as a token, or `all` to act on every example of the package";
 
 /// Execute the given action on the specified examples.
 pub fn examples(
@@ -36,7 +32,7 @@ pub fn examples(
     // Directories might contain a number of individual projects, and don't not rely on
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
-    let examples = if standalone_example_projects(package) {
+    let examples = if package.contains_standalone_projects() {
         crate::firmware::load_cargo_toml(&package_path).with_context(|| {
             format!(
                 "Failed to load specified examples from {}",

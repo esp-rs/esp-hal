@@ -114,7 +114,7 @@ jobs:
             PKG_ARGS="--package $PACKAGE"
           fi
 
-          cargo xtask build $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
+          cargo xtask build $RAW_INPUT $PKG_ARGS "${{ matrix.soc }}"
 
           EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
           MANIFEST=$(find examples -path "*/${EXAMPLE_NAME}/Cargo.toml" -print -quit 2>/dev/null || true)
@@ -157,7 +157,7 @@ jobs:
             PKG_ARGS="--package $PACKAGE"
           fi
 
-          cargo xtask build $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
+          cargo xtask build $RAW_INPUT $PKG_ARGS "${{ matrix.soc }}"
 
           EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
           MANIFEST=$(find examples -path "*/${EXAMPLE_NAME}/Cargo.toml" -print -quit 2>/dev/null || true)

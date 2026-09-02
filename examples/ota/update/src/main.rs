@@ -9,14 +9,14 @@
 //! chip used!
 //!
 //! ```ignore,bash
-//! cargo xtask build gpio --chip=esp32
+//! cargo xtask build gpio esp32
 //! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt target/ota_image
-//! cargo xtask build ota/update --chip=esp32
+//! cargo xtask build ota/update esp32
 //! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
-//! cargo xtask build ota/update --chip=esp32
+//! cargo xtask build ota/update esp32
 //! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
 //! espflash erase-flash
-//! cargo xtask run ota/update --chip=esp32
+//! cargo xtask run ota/update esp32
 //! ```
 //!
 //! On first boot notice the firmware partition gets booted ("Loaded app from

@@ -13,13 +13,13 @@ For more information regarding the examples, refer to the `README.md` file in an
 Build all examples for a given device:
 
 ```shell
-cargo xtask build examples all --chip esp32
+cargo xtask build examples all esp32
 ```
 
 Or build a single example:
 
 ```shell
-cargo xtask build hello_world --chip esp32c6
+cargo xtask build hello_world esp32c6
 ```
 
 ## Running Examples
@@ -30,7 +30,7 @@ With a target device connected, chip is inferred when possible:
 cargo xtask run embassy_hello_world
 ```
 
-Pass `--chip` when inference is unavailable.
+Pass the chip name when inference is unavailable.
 
 QA binaries live in `examples/qa` and run the same way (`cargo xtask run sleep_timer`).
 

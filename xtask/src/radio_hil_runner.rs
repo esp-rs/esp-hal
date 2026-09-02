@@ -88,7 +88,7 @@ pub fn run_radio_test(
 
 /// Run a radio HIL test directly from prebuilt ELFs.
 ///
-/// Used by `run elfs`, where there is no `cargo run` command to delegate to.
+/// Used by `elfs`, where there is no `cargo run` command to delegate to.
 pub fn run_radio_test_elf(
     dut_binary_path: &Path,
     harness_binary_path: Option<&Path>,

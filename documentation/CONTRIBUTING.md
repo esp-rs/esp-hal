@@ -88,8 +88,8 @@ Ensuring the quality and reliability of `esp-hal` is a shared responsibility, an
 
 Further steps that can (or should) be taken in testing:
 
-* Using [xtask], build examples for the specified chip (`cargo xtask build <name> --chip <chip>`, or `cargo xtask build examples all --chip <chip>`).
-* When documentation or doctests change, run `cargo xtask documentation` and `cargo xtask doc-tests <CHIP>` to build the documentation and run the doctests. To reduce build/test time, use `--packages` to specify the package(s) and `--chips` (for documentation builds) to specify the target chip(s).
+* Using [xtask], build examples for the specified chip (`cargo xtask build <name> <chip>`, or `cargo xtask build examples all <chip>`).
+* When documentation or doctests change, run `cargo xtask documentation` and `cargo xtask doc-tests <CHIP>` to build the documentation and run the doctests. To reduce build/test time, use `--packages` to specify the package(s) and pass chip names to `documentation`.
 * Run the [HIL] tests locally if changes have been made to them.
 * Run host-side unit tests with `cargo xtask host-tests` (or `cargo xtask host-tests <package>`). When adding `#[test]` functions to a package for the first time, also add a match arm for that package in `run_host_tests` in `xtask/src/lib.rs` — see [xtask/README.md#host-tests].
 

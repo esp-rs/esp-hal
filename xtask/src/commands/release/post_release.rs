@@ -50,7 +50,7 @@ pub fn post_release(workspace: &std::path::Path, args: PostReleaseArgs) -> Resul
         }
 
         // Get the package's directory path
-        let package_path = workspace.join(package.to_string());
+        let package_path = workspace.join(package.directory());
         let cargo_toml_path = package_path.join("Cargo.toml");
 
         // Read and parse Cargo.toml

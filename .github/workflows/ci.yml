@@ -227,7 +227,7 @@ jobs:
 
       - name: Build docs
         shell: bash
-        run: cargo xtask build documentation --chips ${{ steps.chips.outputs.chips }}
+        run: cargo xtask documentation ${{ steps.chips.outputs.chips }}
 
       - name: Run doc tests
         shell: bash
@@ -235,7 +235,7 @@ jobs:
           CHIPS: ${{ steps.chips.outputs.chips }}
         run: |
           for chip in ${CHIPS//,/ }; do
-            cargo xtask run doc-tests "$chip"
+            cargo xtask doc-tests "$chip"
           done
 
   # --------------------------------------------------------------------------
@@ -287,8 +287,10 @@ jobs:
             '[.[] | select(.arch == $a) | .soc] | join(",")' .github/chips.json)" >> "$GITHUB_OUTPUT"
 
       - name: msrv lint (esp-hal)
+        env:
+          CHIPS: ${{ steps.chips.outputs.chips }}
         run: |
-          cargo xtask lint-packages --chips ${{ steps.chips.outputs.chips }} \
+          cargo xtask lint ${CHIPS//,/ } \
             --toolchain ${{ matrix.group == 'xtensa' && 'esp' || steps.toolchains.outputs.riscv-toolchain }}
 
   # --------------------------------------------------------------------------

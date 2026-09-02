@@ -207,7 +207,7 @@ pub fn tests(
     }
 
     // Ensure required harness firmware is built so the artifact is
-    // self-contained for `run elfs` on the HIL runner. Not needed on Run:
+    // self-contained for `elfs` on the HIL runner. Not needed on Run:
     // `build_radio_harness` builds harnesses lazily per test.
     if is_radio_package && matches!(action, CargoAction::Build(_)) {
         use std::collections::HashSet;
