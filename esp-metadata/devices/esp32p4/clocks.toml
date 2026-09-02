@@ -48,7 +48,7 @@ system_clocks = { clock_tree = [
     ] },
 
     # TODO: model fractional divider parameters
-    # CPU_CLK divider (HP_SYS_CLKRST.root_clk_ctrl0.cpu_clk_div_num)
+    # CPU_CLK divider
     { name = "CPU_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_ROOT_CLK / (divisor + 1)" },
     # MEM_CLK divider
     { name = "MEM_CLK", type = "generic", params = { divisor = "0..256" }, output = "CPU_CLK / (divisor + 1)" },

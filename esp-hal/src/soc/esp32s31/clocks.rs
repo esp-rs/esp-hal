@@ -41,8 +41,9 @@ impl CpuClock {
     const PRESET_160: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpu_clk: Some(CpuClkConfig::new(1)),
-        ahb_clk: Some(AhbClkConfig::new(1)),
-        apb_clk: Some(ApbClkConfig::new(1)),
+        mem_clk: Some(MemClkConfig::new(0)), // Max 160 MHz
+        sys_clk: Some(SysClkConfig::new(1)), // Max ~320/3 MHz
+        apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -54,8 +55,9 @@ impl CpuClock {
     const PRESET_240: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::PllF240m),
         cpu_clk: Some(CpuClkConfig::new(0)),
-        ahb_clk: Some(AhbClkConfig::new(2)),
-        apb_clk: Some(ApbClkConfig::new(1)),
+        mem_clk: Some(MemClkConfig::new(1)), // Max 160 MHz
+        sys_clk: Some(SysClkConfig::new(2)), // Max ~320/3 MHz
+        apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -67,8 +69,9 @@ impl CpuClock {
     const PRESET_320: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
         cpu_clk: Some(CpuClkConfig::new(0)),
-        ahb_clk: Some(AhbClkConfig::new(2)),
-        apb_clk: Some(ApbClkConfig::new(1)),
+        mem_clk: Some(MemClkConfig::new(1)), // Max 160 MHz
+        sys_clk: Some(SysClkConfig::new(2)), // Max ~320/3 MHz
+        apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
@@ -425,11 +428,26 @@ fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, n
     }
 }
 
-fn enable_ahb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+// MEM_CLK
+
+fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do here
 }
 
-fn configure_ahb_clk_impl(_clocks: &mut ClockTree, _old: Option<AhbClkConfig>, new: AhbClkConfig) {
+fn configure_mem_clk_impl(_clocks: &mut ClockTree, _old: Option<MemClkConfig>, new: MemClkConfig) {
+    HP_SYS_CLKRST::regs()
+        .mem_freq_ctrl0()
+        .modify(|_, w| w.mem_clk_div_num().bit(new.divisor() == 1));
+    update_bus_clocks();
+}
+
+// SYS_CLK
+
+fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn configure_sys_clk_impl(_clocks: &mut ClockTree, _old: Option<SysClkConfig>, new: SysClkConfig) {
     HP_SYS_CLKRST::regs()
         .sys_freq_ctrl0()
         .modify(|_, w| unsafe {
