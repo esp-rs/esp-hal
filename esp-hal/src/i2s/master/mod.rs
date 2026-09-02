@@ -1328,21 +1328,6 @@ impl<'d> I2s<'d, Blocking> {
 
         i2s.info().set_master();
         i2s.info().configure(&config)?;
-        match &config {
-            Config::Tdm(_) => {
-                i2s.info().update_tx();
-                i2s.info().update_rx();
-            }
-            #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
-            Config::Pdm(c) => {
-                if c.tx.is_some() {
-                    i2s.info().update_tx();
-                }
-                if c.rx.is_some() {
-                    i2s.info().update_rx();
-                }
-            }
-        }
 
         let clock = i2s.info().clock_instance;
         let (req_tx, req_rx) = match &config {
@@ -1351,12 +1336,25 @@ impl<'d> I2s<'d, Blocking> {
             Config::Pdm(c) => (c.tx.is_some(), c.rx.is_some()),
         };
 
+        // `tx_update` / `rx_update` copy APB registers into the I2S clock domain. The
+        // module clock of that direction must run, or the self-clearing bit never
+        // clears.
+        let rx_clk_guard = req_rx.then(|| I2sDirClkGuard::request_rx(clock));
+        let tx_clk_guard = req_tx.then(|| I2sDirClkGuard::request_tx(clock));
+
+        if req_tx {
+            i2s.info().update_tx();
+        }
+        if req_rx {
+            i2s.info().update_rx();
+        }
+
         Ok(Self {
             i2s_rx: RxCreator {
                 i2s: unsafe { i2s.clone_unchecked() },
                 rx_channel: channel.rx,
                 guard: rx_guard,
-                clk_guard: req_rx.then(|| I2sDirClkGuard::request_rx(clock)),
+                clk_guard: rx_clk_guard,
                 #[cfg(not(i2s_version = "1"))]
                 mclk_out_guard: None,
                 #[cfg(i2s_version = "1")]
@@ -1370,7 +1368,7 @@ impl<'d> I2s<'d, Blocking> {
                 i2s,
                 tx_channel: channel.tx,
                 guard: tx_guard,
-                clk_guard: req_tx.then(|| I2sDirClkGuard::request_tx(clock)),
+                clk_guard: tx_clk_guard,
                 #[cfg(not(i2s_version = "1"))]
                 mclk_out_guard: None,
                 #[cfg(i2s_version = "1")]
