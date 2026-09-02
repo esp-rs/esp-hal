@@ -52,11 +52,13 @@ cargo xtask run hello_world
 `examples` / `qa` / `tests` are package aliases, so `build examples uart` still selects the examples
 crate. Omitting the name is not a shortcut for `all`. The command asks which example to act on, so a
 caller with no terminal — a script, a CI job, an agent — gets an error naming this argument instead
-of a build. The chip name behaves the same way when it cannot be inferred.
+of a build. The chip name behaves the same way when it is missing.
 
-`check` with no example or test name checks every published crate on every chip and does not infer
-a board. To build every HIL test for a chip, write `all` or omit the test name: `build tests
-esp32c6`.
+Only `run` and `test` infer the chip from a connected device, because they are the ones that talk to
+it. `build` and `check` compile for whatever chip you name and never look at hardware.
+
+`check` with no example or test name checks every published crate on every chip. To build every HIL
+test for a chip, write `all` or omit the test name: `build tests esp32c6`.
 
 ## `cargo xtask` vs `esp-devtool`
 

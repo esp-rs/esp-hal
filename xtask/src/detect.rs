@@ -1,8 +1,7 @@
 //! Chip inference from a connected device.
 //!
-//! When the chip is omitted, `run` uses [`with_espflash`] and `build` / `check` / `test` use
-//! [`with_probe_rs`]. Bare `check` has nothing to flash, so it infers nothing and checks every
-//! chip.
+//! When the chip is omitted, `run` uses [`with_espflash`] and `test` uses [`with_probe_rs`], so
+//! that detection picks the port or probe the command is about to drive.
 //!
 //! Detection shells out to tools already on `PATH`, this crate does not link them. With several
 //! devices attached, a terminal gets a prompt and everything else gets an error.
@@ -22,7 +21,7 @@ pub fn with_espflash() -> Option<Chip> {
     pick_connected(detect_via_espflash())
 }
 
-/// Infer the chip via `probe-rs`, used where nothing should be reset.
+/// Infer the chip via `probe-rs`, used by `test` because it runs through the probe anyway.
 pub fn with_probe_rs() -> Option<Chip> {
     pick_connected(detect_via_probe_rs())
 }

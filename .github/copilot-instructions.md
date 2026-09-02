@@ -42,8 +42,8 @@ free-form tokens (chip, crate, example, test, or package alias) in any order. Pa
 
 **Name the example, always.** `build` and `run` take the example name as a token, and `all` means
 every example of the package. Leaving it out is not a shortcut for `all`: the command asks which
-example to act on, and an agent or a script gets an error instead of a build. The same holds for
-the chip name when it cannot be inferred.
+example to act on, and an agent or a script gets an error instead of a build. Name the chip too:
+only `run` and `test` read it off a connected device, `build` and `check` never do.
 
 **Prefer targeted commands** (`lint esp-hal esp32c6`, `build <name> esp32c6`) during development. Only run `ci` as a final validation pass.
 
