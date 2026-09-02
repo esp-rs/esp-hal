@@ -52,6 +52,14 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 
+    # Global peripheral-related clocks
+    # HP_SYS_CLKRST.crypto_ctrl0.crypto_clk_src_sel
+    { name = "CRYPTO_CLK", type = "mux", variants = [
+        { name = "XTAL",      outputs = "XTAL_CLK"    },
+        { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
+        { name = "PLL_F240M", outputs = "PLL_F240M"   },
+    ] },
+
     {
         name = "IOMUX_FUNCTION_CLOCK", type = "generic", output = "source / (div_num + 1)", always_on = true,
         params = {
@@ -179,7 +187,7 @@ peripheral_clocks = { templates = [
         clk_en_template = "{{default_clk_template}} crate::peripherals::CNNT_SYS::regs().sys_hp_usb_device_ctrl().modify(|_, w| w.sys_usb_device_48m_clk_en().bit(enable));",
         rst_template = "crate::peripherals::CNNT_SYS::regs().sys_hp_usb_device_ctrl().modify(|_, w| w.sys_usb_device_rst_en().bit(reset));"
     }, keep_enabled = true },
-    # Crypto - there is a crypto_clk_en bit as well, luckily it starts as 1
+    # Crypto - crypto_sys_clk_en and crypto_sec_clk_en gate the whole domain, CRYPTO_CLK drives those
     { name = "Aes", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Ecc", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Sha", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },

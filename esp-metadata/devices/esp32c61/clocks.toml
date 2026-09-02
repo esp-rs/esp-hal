@@ -44,6 +44,16 @@ system_clocks = { clock_tree = [
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
 
+    # Global peripheral-related clocks
+    { name = "CRYPTO_PLL_DIV", type = "generic", output = "PLL_CLK / 3" },
+
+    # PCR.sec_conf.sec_clk_sel: external memory encryption and decryption
+    { name = "CRYPTO_CLK", type = "mux", variants = [
+        { name = "XTAL",      outputs = "XTAL_CLK"       },
+        { name = "RC_FAST",   outputs = "RC_FAST_CLK"    },
+        { name = "PLL_F480M", outputs = "CRYPTO_PLL_DIV" },
+    ] },
+
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
         { name = "OSC_SLOW_CLK",    outputs = "OSC_SLOW_CLK" },
         { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },

@@ -101,7 +101,7 @@ pub use digest_011::Digest as Digest011;
 use crate::{
     peripherals::SHA,
     reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::GenericPeripheralGuard,
+    system::{CryptoClockGuard, GenericPeripheralGuard},
     work_queue::{Handle, Poll, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
 
@@ -116,14 +116,20 @@ use crate::{
 pub struct Sha<'d> {
     sha: SHA<'d>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Sha as u8 }>,
+    _clock_guard: CryptoClockGuard,
 }
 
 impl<'d> Sha<'d> {
     /// Creates a new instance of the SHA Accelerator driver.
     pub fn new(sha: SHA<'d>) -> Self {
+        let clock_guard = CryptoClockGuard::new();
         let guard = GenericPeripheralGuard::new();
 
-        Self { sha, _guard: guard }
+        Self {
+            sha,
+            _guard: guard,
+            _clock_guard: clock_guard,
+        }
     }
 
     /// Starts a new digest.

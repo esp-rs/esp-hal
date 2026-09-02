@@ -1491,6 +1491,12 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // CRYPTO_PLL_DIV
+///
+/// fn enable_crypto_pll_div_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // CRYPTO_CLK
 ///
 /// fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1856,7 +1862,7 @@ macro_rules! define_clock_tree_types {
             Xtal,
             /// Selects `RC_FAST_CLK`.
             Fosc,
-            /// Selects `PLL_CLK`.
+            /// Selects `CRYPTO_PLL_DIV`.
             PllF480m,
         }
         /// The list of clock signals that the `IOMUX_FUNCTION_CLOCK` multiplexer can output.
@@ -2949,6 +2955,24 @@ macro_rules! define_clock_tree_types {
                 LpSlowClkConfig::OscSlow => osc_slow_clk_frequency(),
             }
         }
+        pub fn request_crypto_pll_div(clocks: &mut ClockTree) {
+            trace!("Requesting CRYPTO_PLL_DIV");
+            trace!("Enabling CRYPTO_PLL_DIV");
+            request_pll_clk(clocks);
+            enable_crypto_pll_div_impl(clocks, true);
+        }
+        pub fn release_crypto_pll_div(clocks: &mut ClockTree) {
+            trace!("Releasing CRYPTO_PLL_DIV");
+            trace!("Disabling CRYPTO_PLL_DIV");
+            enable_crypto_pll_div_impl(clocks, false);
+            release_pll_clk(clocks);
+        }
+        pub fn crypto_pll_div_frequency() -> u32 {
+            (pll_clk_frequency() / 3)
+        }
+        pub fn crypto_pll_div_source_frequency() -> u32 {
+            pll_clk_frequency()
+        }
         pub fn configure_crypto_clk(clocks: &mut ClockTree, new_selector: CryptoClkConfig) {
             let old_selector = clocks.crypto_clk.replace(new_selector);
             refresh_crypto_clk_downstream(clocks);
@@ -2956,14 +2980,14 @@ macro_rules! define_clock_tree_types {
                 match new_selector {
                     CryptoClkConfig::Xtal => request_xtal_clk(clocks),
                     CryptoClkConfig::Fosc => request_rc_fast_clk(clocks),
-                    CryptoClkConfig::PllF480m => request_pll_clk(clocks),
+                    CryptoClkConfig::PllF480m => request_crypto_pll_div(clocks),
                 }
                 configure_crypto_clk_impl(clocks, old_selector, new_selector);
                 if let Some(old_selector) = old_selector {
                     match old_selector {
                         CryptoClkConfig::Xtal => release_xtal_clk(clocks),
                         CryptoClkConfig::Fosc => release_rc_fast_clk(clocks),
-                        CryptoClkConfig::PllF480m => release_pll_clk(clocks),
+                        CryptoClkConfig::PllF480m => release_crypto_pll_div(clocks),
                     }
                 }
             } else {
@@ -2980,7 +3004,7 @@ macro_rules! define_clock_tree_types {
                 match unwrap!(clocks.crypto_clk) {
                     CryptoClkConfig::Xtal => request_xtal_clk(clocks),
                     CryptoClkConfig::Fosc => request_rc_fast_clk(clocks),
-                    CryptoClkConfig::PllF480m => request_pll_clk(clocks),
+                    CryptoClkConfig::PllF480m => request_crypto_pll_div(clocks),
                 }
                 enable_crypto_clk_impl(clocks, true);
             }
@@ -2993,7 +3017,7 @@ macro_rules! define_clock_tree_types {
                 match unwrap!(clocks.crypto_clk) {
                     CryptoClkConfig::Xtal => release_xtal_clk(clocks),
                     CryptoClkConfig::Fosc => release_rc_fast_clk(clocks),
-                    CryptoClkConfig::PllF480m => release_pll_clk(clocks),
+                    CryptoClkConfig::PllF480m => release_crypto_pll_div(clocks),
                 }
             }
         }
@@ -3002,7 +3026,7 @@ macro_rules! define_clock_tree_types {
             match config {
                 CryptoClkConfig::Xtal => xtal_clk_frequency(),
                 CryptoClkConfig::Fosc => rc_fast_clk_frequency(),
-                CryptoClkConfig::PllF480m => pll_clk_frequency(),
+                CryptoClkConfig::PllF480m => crypto_pll_div_frequency(),
             }
         }
         pub fn crypto_clk_frequency() -> u32 {
@@ -3012,7 +3036,7 @@ macro_rules! define_clock_tree_types {
             match source {
                 CryptoClkConfig::Xtal => xtal_clk_frequency(),
                 CryptoClkConfig::Fosc => rc_fast_clk_frequency(),
-                CryptoClkConfig::PllF480m => pll_clk_frequency(),
+                CryptoClkConfig::PllF480m => crypto_pll_div_frequency(),
             }
         }
         pub fn configure_iomux_function_clock(

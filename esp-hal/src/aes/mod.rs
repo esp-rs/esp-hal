@@ -50,7 +50,7 @@ use crate::{
     aes::cipher_modes::{CryptoBuffers, UnsafeCryptoBuffers},
     pac,
     peripherals::AES,
-    system::GenericPeripheralGuard,
+    system::{CryptoClockGuard, GenericPeripheralGuard},
 };
 
 pub mod cipher_modes;
@@ -149,15 +149,21 @@ pub enum Operation {
 pub struct Aes<'d> {
     aes: AES<'d>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Aes as u8 }>,
+    _clock_guard: CryptoClockGuard,
 }
 
 impl<'d> Aes<'d> {
     /// Creates a new `Aes` instance.
     pub fn new(aes: AES<'d>) -> Self {
+        let clock_guard = CryptoClockGuard::new();
         let guard = GenericPeripheralGuard::new();
 
         #[cfg_attr(not(aes_supports_dma), expect(unused_mut))]
-        let mut this = Self { aes, _guard: guard };
+        let mut this = Self {
+            aes,
+            _guard: guard,
+            _clock_guard: clock_guard,
+        };
 
         #[cfg(aes_supports_dma)]
         this.write_dma(false);

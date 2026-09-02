@@ -42,6 +42,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::new(0)),
         ahb_clk: Some(AhbClkConfig::new(0)),
         apb_clk: Some(ApbClkConfig::new(0)),
+        crypto_clk: Some(CryptoClkConfig::PllF96m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::PllF48m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
@@ -369,6 +370,27 @@ fn configure_lp_slow_clk_impl(
             #[cfg(use_xtal32k)]
             LpSlowClkConfig::Xtal32k => 1,
             LpSlowClkConfig::OscSlow => 2,
+        })
+    });
+}
+
+// CRYPTO_CLK
+
+fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here.
+}
+
+fn configure_crypto_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<CryptoClkConfig>,
+    new_config: CryptoClkConfig,
+) {
+    PCR::regs().sec_conf().modify(|_, w| unsafe {
+        w.sec_clk_sel().bits(match new_config {
+            CryptoClkConfig::Xtal => 0,
+            CryptoClkConfig::RcFast => 1,
+            CryptoClkConfig::PllF64m => 2,
+            CryptoClkConfig::PllF96m => 3,
         })
     });
 }

@@ -33,7 +33,7 @@ use crate::{
     pac,
     peripherals::RSA,
     rtc_cntl::WakeLock,
-    system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
+    system::{CryptoClockGuard, GenericPeripheralGuard, Peripheral as PeripheralEnable},
     trm_markdown_link,
     work_queue::{self, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
@@ -57,10 +57,12 @@ const WORDS_PER_INCREMENT: u32 = property!("rsa.size_increment") / 32;
 
 struct RsaGuard {
     _guard: GenericPeripheralGuard<{ PeripheralEnable::Rsa as u8 }>,
+    _clock_guard: CryptoClockGuard,
 }
 
 impl RsaGuard {
     fn new() -> Self {
+        let _clock_guard = CryptoClockGuard::new();
         let _guard = GenericPeripheralGuard::new();
         cfg_select! {
             rsa_version = "1" => {}
@@ -76,7 +78,10 @@ impl RsaGuard {
             }
         }
 
-        Self { _guard }
+        Self {
+            _guard,
+            _clock_guard,
+        }
     }
 }
 
