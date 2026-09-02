@@ -24,7 +24,13 @@ Commands:
 ```
 
 `build` / `run` / `check` / `test` take free-form tokens (chip, crate, example, test, or a package
-alias like `examples` / `qa` / `tests`) in any order. `--chip` / `--package` are optional flags:
+alias like `examples` / `qa` / `tests`) in any order. There is no `--chip` flag: write `esp32c6`.
+`--package` exists for callers that want to be explicit and accepts the same names and aliases the
+tokens do, so `build qa all esp32c6` and `build all --package qa-test esp32c6` are the same command.
+
+`lint`, `ci`, `documentation`, `doc-tests` and `check-global-symbols` take the chip the same way,
+as a bare name. The one exception is `semver-check`, which takes `--chips`, it has a subcommand of
+its own, and clap cannot tell a trailing chip name from it.
 
 ```text
 cargo xtask build --help
@@ -37,16 +43,20 @@ Usage: esp-devtool build [OPTIONS] [TOKENS]...
 ### Selecting examples
 
 ```text
-cargo xtask build uart --chip esp32c6
-cargo xtask build examples all --chip esp32c6
-cargo xtask build qa all --chip esp32c6
+cargo xtask build uart esp32c6
+cargo xtask build examples all esp32c6
+cargo xtask build qa all esp32c6
 cargo xtask run hello_world
 ```
 
 `examples` / `qa` / `tests` are package aliases, so `build examples uart` still selects the examples
 crate. Omitting the name is not a shortcut for `all`. The command asks which example to act on, so a
 caller with no terminal — a script, a CI job, an agent — gets an error naming this argument instead
-of a build. `--chip` behaves the same way when it cannot be inferred.
+of a build. The chip name behaves the same way when it cannot be inferred.
+
+`check` with no example or test name checks every published crate on every chip and does not infer
+a board. To build every HIL test for a chip, write `all` or omit the test name: `build tests
+esp32c6`.
 
 ## `cargo xtask` vs `esp-devtool`
 

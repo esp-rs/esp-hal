@@ -106,9 +106,12 @@ pub enum Package {
     EspRadio,
     EspRadioRtosDriver,
     EspRtos,
+    #[value(alias = "example")]
     Examples,
+    #[value(alias = "test", alias = "tests")]
     HilTest,
     HilTestRadio,
+    #[value(alias = "qa")]
     QaTest,
     XtensaLx,
     XtensaLxRt,
@@ -199,7 +202,7 @@ impl Package {
             return true;
         }
 
-        let lib_rs_path = workspace.join(self.to_string()).join("src").join("lib.rs");
+        let lib_rs_path = workspace.join(self.directory()).join("src").join("lib.rs");
         let Ok(source) = std::fs::read_to_string(&lib_rs_path) else {
             return false;
         };
@@ -260,7 +263,7 @@ impl Package {
         if *self == Package::HilTest || *self == Package::HilTestRadio {
             return false;
         }
-        let package_path = workspace.join(self.to_string()).join("src");
+        let package_path = workspace.join(self.directory()).join("src");
 
         walkdir::WalkDir::new(package_path)
             .into_iter()
@@ -723,7 +726,11 @@ pub fn generate_build_command(
     }
     features.push(chip.to_string());
 
-    let cwd = if package_path.ends_with("examples") || package_path.ends_with("compile-tests") {
+    // A standalone project is a directory with its own manifest, anything else is a source file
+    // inside the package.
+    let standalone_project = package.extension().is_none();
+
+    let cwd = if standalone_project {
         package_path.join(package).to_path_buf()
     } else {
         package_path.to_path_buf()
@@ -744,7 +751,7 @@ pub fn generate_build_command(
 
     let bin_arg = if package.starts_with("src/bin") {
         Some(format!("--bin={}", app.binary_name()))
-    } else if !package_path.ends_with("examples") && !package_path.ends_with("compile-tests") {
+    } else if !standalone_project {
         Some(format!("--example={}", app.binary_name()))
     } else {
         None

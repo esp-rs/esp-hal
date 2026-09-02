@@ -26,10 +26,10 @@ use crate::{
 #[derive(Debug, Default, Args)]
 pub struct BuildDocumentationArgs {
     /// Package(s) to document.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',', default_values_t = Package::iter())]
     pub packages: Vec<Package>,
-    /// Chip(s) to build documentation for.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    /// Chip(s) to build documentation for. Omitted means every chip.
+    #[arg(value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
     pub chips: Vec<Chip>,
     /// Base URL of the deployed documentation.
     #[arg(long)]
@@ -164,7 +164,7 @@ pub fn build_examples(
 
 /// Build the specified package.
 pub fn build_package(workspace: &Path, package: Package, toolchain: Option<&str>) -> Result<()> {
-    let package_path = crate::windows_safe_path(&workspace.join(package.to_string()));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
     log::info!("Building package '{}'", package_path.display());
 

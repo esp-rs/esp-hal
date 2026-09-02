@@ -12,8 +12,17 @@ use crate::{
     cargo::CargoAction,
     firmware,
     metadata::Chip,
-    resolve::{ResolveInput, Verb, resolve},
+    resolve::{ResolveInput, resolve},
 };
+
+/// The verb being dispatched.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verb {
+    Build,
+    Run,
+    Check,
+    Test,
+}
 
 /// Flags and free-form tokens shared by `build` / `run` / `check` / `test`.
 #[cfg_attr(
@@ -27,12 +36,8 @@ use crate::{
 )]
 #[derive(Debug, Args)]
 pub struct DispatchArgs {
-    /// Chip(s) to target. Inferred from a connected device when omitted.
-    #[arg(long, value_enum, value_delimiter = ',')]
-    pub chip: Vec<Chip>,
-
     /// Package(s) to act on.
-    #[arg(long, value_enum, value_delimiter = ',')]
+    #[arg(long, alias = "packages", value_enum, value_delimiter = ',')]
     pub package: Vec<Package>,
 
     /// Build examples in debug mode.
@@ -47,11 +52,12 @@ pub struct DispatchArgs {
     #[arg(long)]
     pub timings: bool,
 
-    /// Repeat HIL tests this many times.
+    /// Repeat HIL tests this many times. Used by `test`, ignored by `run`.
     #[arg(long, default_value_t = 1)]
     pub repeat: usize,
 
-    /// HIL test selector(s). Also accepted as free-form tokens.
+    /// HIL test selector(s). Also accepted as free-form tokens. Used by `test` / `build` /
+    /// `check`, `run --test` is an error.
     #[arg(long, short = 't', alias = "tests", value_delimiter = ',', num_args = 1..)]
     pub test: Option<Vec<String>>,
 
@@ -67,11 +73,9 @@ pub fn dispatch(
     check_libs: impl FnOnce(CheckPackagesArgs) -> Result<()>,
 ) -> Result<()> {
     let mut input = ResolveInput::from_tokens(args.tokens.iter().cloned());
-    input.chips = args.chip.clone();
     input.packages = args.package.clone();
-    input.infer_chip = true;
 
-    let mut resolution = resolve(verb, input);
+    let mut resolution = resolve(input);
     match verb {
         Verb::Run => {
             if args.test.is_some() {
@@ -240,7 +244,7 @@ fn source_package(workspace: &Path, name: &str) -> Package {
         return Package::Examples;
     }
 
-    let examples = firmware::load_cargo_toml(&workspace.join(Package::Examples.to_string()));
+    let examples = firmware::load_cargo_toml(&workspace.join(Package::Examples.directory()));
     if examples.is_ok_and(|examples| examples.iter().any(|example| example.matches_name(name))) {
         return Package::Examples;
     }
@@ -323,13 +327,14 @@ fn dispatch_tests(
     args: &DispatchArgs,
 ) -> Result<()> {
     let action = match verb {
-        Verb::Build | Verb::Check => {
-            CargoAction::Build(Some(workspace.join("target").join("tests")))
-        }
+        Verb::Build => CargoAction::Build(Some(workspace.join("target").join("tests"))),
+        // A check only has to compile, collecting ELFs would clobber what `build` left there.
+        Verb::Check => CargoAction::Build(None),
         Verb::Test => CargoAction::Run,
         Verb::Run => unreachable!("`run` does not dispatch HIL tests, use `test` instead"),
     };
-    let test = if names.is_empty() {
+    // `tests` builds every test when given no selector, which is what `all` asks for.
+    let test = if names.is_empty() || names.iter().any(|name| name.eq_ignore_ascii_case("all")) {
         None
     } else {
         Some(names.to_vec())
@@ -367,6 +372,6 @@ fn required_chips(verb: Verb, chips: &[Chip]) -> Result<Vec<Chip>> {
     Ok(vec![super::select(
         "Select your target chip:",
         Chip::iter().collect(),
-        "`--chip <CHIP>`",
+        "a chip name",
     )?])
 }

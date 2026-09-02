@@ -2,7 +2,11 @@ use anyhow::{Context, Result};
 use clap::{Args, Parser};
 use esp_devtool as xtask;
 use strum::IntoEnumIterator;
-use xtask::{Package, commands::*, resolve::Verb};
+use xtask::{
+    Package,
+    commands::{dispatch::Verb, *},
+    metadata::Chip,
+};
 
 // ----------------------------------------------------------------------------
 // Command-line Interface
@@ -51,9 +55,12 @@ enum Cli {
     CheckPrChangelog(CheckPrChangelogArgs),
     /// Run host-tests in the workspace with `cargo test`
     HostTests(HostTestsArgs),
-    /// Check global symbols in the compiled `.rlib` of the specified packages for the specified
-    /// chips.
-    CheckGlobalSymbols(CheckPackagesArgs),
+    /// Check global symbols in the compiled `.rlib` of esp-hal for the given chips.
+    CheckGlobalSymbols {
+        /// Chip(s) to check. Omitted means every chip.
+        #[arg(value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+        chips: Vec<Chip>,
+    },
     #[cfg(feature = "report")]
     /// Generate reports from CI data.
     GenerateReport(generate_report::ReportArgs),
@@ -79,7 +86,7 @@ struct CheckPrChangelogArgs {
 #[derive(Debug, Args)]
 struct CheckChangelogArgs {
     /// Package(s) to tag.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',', default_values_t = Package::iter())]
     packages: Vec<Package>,
 
     /// Re-generate the changelog with consistent formatting.
@@ -161,7 +168,7 @@ fn main() -> Result<()> {
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
         Cli::CheckPrChangelog(args) => check_pr_changelog(&workspace, args.pr),
         Cli::HostTests(args) => host_tests(&workspace, args),
-        Cli::CheckGlobalSymbols(args) => check_global_symbols(&args.chips),
+        Cli::CheckGlobalSymbols { chips } => check_global_symbols(&chips),
         #[cfg(feature = "report")]
         Cli::GenerateReport(args) => generate_report::generate_report(&workspace, args),
         #[cfg(feature = "rel-check")]

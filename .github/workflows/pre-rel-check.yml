@@ -60,17 +60,17 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:compile-test') }}
         shell: bash
         run: |
-          cargo xtask build compile-tests all --toolchain esp --chip=esp32
-          cargo xtask build compile-tests all --toolchain esp --chip=esp32s2
-          cargo xtask build compile-tests all --toolchain esp --chip=esp32s3
-          cargo xtask build compile-tests all --toolchain stable --chip=esp32s31
-          cargo xtask build compile-tests all --toolchain stable --chip=esp32c2
-          cargo xtask build compile-tests all --toolchain stable --chip=esp32c3
-          cargo xtask build compile-tests all --toolchain stable --chip=esp32c5
-          cargo xtask build compile-tests all --toolchain stable --chip=esp32c6
-          cargo xtask build compile-tests all --toolchain stable --chip=esp32c61
-          cargo xtask build compile-tests all --toolchain stable --chip=esp32p4
-          cargo xtask build compile-tests all --toolchain stable --chip=esp32h2
+          cargo xtask build compile-tests all esp32 --toolchain esp
+          cargo xtask build compile-tests all esp32s2 --toolchain esp
+          cargo xtask build compile-tests all esp32s3 --toolchain esp
+          cargo xtask build compile-tests all esp32s31 --toolchain stable
+          cargo xtask build compile-tests all esp32c2 --toolchain stable
+          cargo xtask build compile-tests all esp32c3 --toolchain stable
+          cargo xtask build compile-tests all esp32c5 --toolchain stable
+          cargo xtask build compile-tests all esp32c6 --toolchain stable
+          cargo xtask build compile-tests all esp32c61 --toolchain stable
+          cargo xtask build compile-tests all esp32p4 --toolchain stable
+          cargo xtask build compile-tests all esp32h2 --toolchain stable
 
       # Build the examples/qa/tests against the local registry. Gated on
       # `release:registry:ci` so a release can opt out of this heavy check.

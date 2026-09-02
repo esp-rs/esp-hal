@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Args;
 use strum::IntoEnumIterator;
 
@@ -8,6 +8,7 @@ use crate::{
     Package,
     cargo::{CargoArgsBuilder, CargoCommandBatcher},
     metadata::{Chip, Config},
+    resolve::{ResolveInput, resolve},
 };
 
 /// Arguments for the `lint` subcommand.
@@ -20,13 +21,8 @@ use crate::{
 )]
 #[derive(Debug, Args)]
 pub struct LintPackagesArgs {
-    /// Package(s) to target.
-    #[arg(value_enum, default_values_t = Package::iter())]
-    pub packages: Vec<Package>,
-
-    /// Lint for a specific chip
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
-    pub chips: Vec<Chip>,
+    /// Chip and/or package, in any order. Omitted means every published crate on every chip.
+    pub tokens: Vec<String>,
 
     /// Automatically apply fixes
     #[arg(long)]
@@ -39,15 +35,29 @@ pub struct LintPackagesArgs {
 
 /// Lint published packages with clippy.
 pub fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
-    log::debug!("Linting packages: {:?}", args.packages);
-    let mut packages = args.packages;
+    let resolution = resolve(ResolveInput::from_tokens(args.tokens));
+    if !resolution.names.is_empty() {
+        bail!("Unknown argument: {}", resolution.names.join(", "));
+    }
+    let mut packages = if resolution.packages.is_empty() {
+        Package::iter().collect()
+    } else {
+        resolution.packages
+    };
+    let chips = if resolution.chips.is_empty() {
+        Chip::iter().collect()
+    } else {
+        resolution.chips
+    };
+
+    log::debug!("Linting packages: {packages:?}");
     packages.sort();
 
     for package in packages.iter().filter(|p| p.is_published()) {
         // Unfortunately each package has its own unique requirements for
         // building, so we need to handle each individually (though there
         // is *some* overlap)
-        for chip in &args.chips {
+        for chip in &chips {
             log::debug!("  for chip: {}", chip);
             let device = Config::for_chip(chip);
 

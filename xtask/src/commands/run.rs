@@ -32,7 +32,7 @@ use crate::{
 #[derive(Debug, Args)]
 pub struct DocTestArgs {
     /// Package(s) where we wish to run doc tests.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',', default_values_t = Package::iter())]
     pub packages: Vec<Package>,
     /// Chip to target.
     #[arg(value_enum)]
@@ -95,8 +95,7 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
         return Ok(true);
     };
 
-    let package_name = package.to_string();
-    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
     if package.has_chip_features() {
         doc_config.features.push(chip.to_string());

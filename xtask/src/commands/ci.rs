@@ -147,7 +147,7 @@ pub fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     log::info!("Running CI checks for chip: {}", args.chip);
     println!("::add-matcher::.github/rust-matchers.json");
 
-    let run_locally = !std::env::var("CI").is_ok();
+    let run_locally = std::env::var("CI").is_err();
 
     let mut runner = Runner::new(&args);
 
@@ -174,8 +174,7 @@ pub fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         lint_packages(
             workspace,
             LintPackagesArgs {
-                packages: Package::iter().collect(),
-                chips: vec![args.chip],
+                tokens: vec![args.chip.to_string()],
                 fix: false,
                 toolchain: args.toolchain.clone(),
             },

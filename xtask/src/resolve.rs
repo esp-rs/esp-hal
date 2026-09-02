@@ -4,20 +4,9 @@
 //! a package alias (`example`, `tests`, `qa`), in any order. Wired via
 //! [`crate::commands::dispatch`].
 
-use std::str::FromStr;
+use clap::ValueEnum as _;
 
-use strum::IntoEnumIterator as _;
-
-use crate::{Package, detect, metadata::Chip};
-
-/// The verb that requested resolution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Verb {
-    Build,
-    Run,
-    Check,
-    Test,
-}
+use crate::{Package, metadata::Chip};
 
 /// Tokens and any chips/packages already known (e.g. from flags).
 #[derive(Debug, Clone, Default)]
@@ -25,8 +14,6 @@ pub struct ResolveInput {
     pub tokens: Vec<String>,
     pub chips: Vec<Chip>,
     pub packages: Vec<Package>,
-    /// Infer a connected chip when none was given.
-    pub infer_chip: bool,
 }
 
 impl ResolveInput {
@@ -41,14 +28,13 @@ impl ResolveInput {
 /// Classified tokens.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Resolution {
-    pub verb: Verb,
     pub chips: Vec<Chip>,
     pub packages: Vec<Package>,
     pub names: Vec<String>,
 }
 
 /// Classify `input.tokens`. Does not look up examples on disk.
-pub fn resolve(verb: Verb, mut input: ResolveInput) -> Resolution {
+pub fn resolve(mut input: ResolveInput) -> Resolution {
     let mut chips = input.chips;
     let mut packages = input.packages;
     let mut names = Vec::new();
@@ -58,7 +44,7 @@ pub fn resolve(verb: Verb, mut input: ResolveInput) -> Resolution {
             if !chips.contains(&chip) {
                 chips.push(chip);
             }
-        } else if let Some(package) = package_from_token(&token) {
+        } else if let Ok(package) = Package::from_str(token.trim(), true) {
             if !packages.contains(&package) {
                 packages.push(package);
             }
@@ -67,43 +53,32 @@ pub fn resolve(verb: Verb, mut input: ResolveInput) -> Resolution {
         }
     }
 
-    if chips.is_empty() && input.infer_chip {
-        let tests = packages
-            .iter()
-            .any(|package| matches!(package, Package::HilTest | Package::HilTestRadio));
-        let chip = if verb == Verb::Test || tests {
-            detect::with_probe_rs()
-        } else if verb == Verb::Run {
-            detect::with_espflash()
-        } else {
-            detect::with_probe_rs()
-        };
-        if let Some(chip) = chip {
-            chips.push(chip);
-        }
-    }
-
     Resolution {
-        verb,
         chips,
         packages,
         names,
     }
 }
 
+/// `esp32-c6` and `ESP32C6` name the same chip as `esp32c6`.
 fn chip_from_token(token: &str) -> Option<Chip> {
-    let mut normalized = token.trim().to_ascii_lowercase();
+    let mut normalized = token.trim().to_owned();
     normalized.retain(|c| c != '-');
-    Chip::from_str(&normalized).ok()
+    Chip::from_str(&normalized, true).ok()
 }
 
-fn package_from_token(token: &str) -> Option<Package> {
-    match token.trim().to_ascii_lowercase().as_str() {
-        "example" | "examples" => return Some(Package::Examples),
-        "test" | "tests" => return Some(Package::HilTest),
-        "qa" | "qa-test" => return Some(Package::QaTest),
-        _ => {}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn package_aliases_and_names_both_work() {
+        let packages = resolve(ResolveInput::from_tokens(["qa", "hil-test-radio"])).packages;
+        assert_eq!(packages, vec![Package::QaTest, Package::HilTestRadio]);
     }
 
-    Package::iter().find(|package| package.to_string().eq_ignore_ascii_case(token.trim()))
+    #[test]
+    fn everything_else_is_a_name() {
+        let names = resolve(ResolveInput::from_tokens(["sleep_timer"])).names;
+        assert_eq!(names, vec!["sleep_timer"]);
+    }
 }

@@ -4,10 +4,8 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use clap::Args;
 use object::{Object, ObjectSymbol, SymbolKind, read::archive::ArchiveFile};
 use rustc_demangle::try_demangle;
-use strum::IntoEnumIterator;
 
 use crate::{
     Package,
@@ -15,20 +13,18 @@ use crate::{
     metadata::{Chip, Config},
 };
 
-/// Arguments for checking packages (`check` without an example/test name, and
-/// `check-global-symbols`).
-#[derive(Debug, Args)]
+/// Arguments for checking packages with `cargo check`.
+///
+/// Not a clap `Args`, the packages and chips come from the tokens `check` resolved.
+#[derive(Debug)]
 pub struct CheckPackagesArgs {
     /// Package(s) to target.
-    #[arg(value_enum, default_values_t = Package::iter())]
     pub packages: Vec<Package>,
 
-    /// Check for a specific chip
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    /// Chip(s) to check for.
     pub chips: Vec<Chip>,
 
-    /// The toolchain used to run the checks
-    #[arg(long)]
+    /// The toolchain used to run the checks.
     pub toolchain: Option<String>,
 }
 
