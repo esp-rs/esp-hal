@@ -18,6 +18,7 @@ enum Cli {
     /// Run an example or qa binary.
     Run(DispatchArgs),
     /// Check crates, or try-build examples and tests.
+    #[clap(alias = "check-packages")]
     Check(DispatchArgs),
     /// Run HIL tests.
     Test(DispatchArgs),
