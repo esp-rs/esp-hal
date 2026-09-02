@@ -612,12 +612,16 @@ mod interrupt_spi_dma {
             let dma_rx_buf = dma_rx_buffer!(3200).unwrap();
             let dma_tx_buf = dma_tx_buffer!(3200).unwrap();
 
-            let mut spi = Spi::new(
-                peripherals.spi,
-                Config::default()
+            let mut spi = Spi::new(peripherals.spi, {
+                let config = Config::default()
                     .with_frequency(Rate::from_khz(100))
-                    .with_mode(Mode::_0),
-            )
+                    .with_mode(Mode::_0);
+
+                #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
+                let config = config.with_clock_source(esp_hal::spi::master::ClockSource::Xtal);
+
+                config
+            })
             .unwrap()
             .with_dma(peripherals.dma_channel)
             .with_buffers(dma_rx_buf, dma_tx_buf)
