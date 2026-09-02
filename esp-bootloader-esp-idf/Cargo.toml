@@ -34,7 +34,7 @@ defmt = { version = "1.1", optional = true }
 document-features = "0.2"
 esp-config = { version = "0.8.0", path = "../esp-config" }
 esp-hal-procmacros = { version = "0.23.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
-esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated" }
+esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "~0.1", path = "../esp-rom-sys", optional = true }
 embedded-storage = { version = "0.3.1", optional = true }
 esp-storage = { version = "0.10.0", path = "../esp-storage", default-features = false, optional = true }
@@ -48,11 +48,11 @@ sha2 = { version = "0.11", default-features = false }
 [build-dependencies]
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
 esp-config = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
 
 # Make doctests & host-tests work together:
 [target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dev-dependencies]
-esp-hal = { version = "~1.2.0-rc.0", path = "../esp-hal" }
+esp-hal = { version = "~1.2.0", path = "../esp-hal" }
 
 [features]
 default = ["validation"]

@@ -35,7 +35,7 @@ features       = ["esp32c6", "embassy", "esp-radio"]
 bench = false
 
 [dependencies]
-esp-hal = { version = "~1.2.0-rc.0", path = "../esp-hal", default-features = false, features = [
+esp-hal = { version = "~1.2.0", path = "../esp-hal", default-features = false, features = [
     # FIXME: rt technically shouldn't be enabled, but rtos requires `TrapFrame`
     # and uses reexported riscv/xtensa-lx from esp-hal
     "requires-unstable", "rt"
@@ -51,7 +51,7 @@ embassy-sync = "0.8"
 esp-alloc = { version = "0.11.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.8.0", path = "../esp-config" }
 esp-sync = { version = "0.3.0", path = "../esp-sync" }
-esp-radio-rtos-driver = { version = "0.4.0", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
+esp-radio-rtos-driver = { version = "0.4.1", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
 macros = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
 
@@ -72,10 +72,10 @@ xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
 esp-config             = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
-esp-hal = { version = "~1.2.0-rc.0", path = "../esp-hal", features = ["unstable"] }
+esp-hal = { version = "~1.2.0", path = "../esp-hal", features = ["unstable"] }
 static_cell = "2"
 
 [features]

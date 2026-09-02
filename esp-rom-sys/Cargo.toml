@@ -42,7 +42,7 @@ esp32s31 = { version = "0.2", features = ["critical-section"], optional = true }
 esp32p4 = { version = "0.3",  features = ["critical-section"], optional = true }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 __internal_rom_symbols = []

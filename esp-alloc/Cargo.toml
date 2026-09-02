@@ -45,7 +45,7 @@ rlsf = { version = "0.2", features = ["unstable"] }
 
 [build-dependencies]
 esp-config             = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.5.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["compat", "global-allocator"]
