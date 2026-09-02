@@ -105,8 +105,7 @@ use crate::{
         Pin,
         interconnect::{self, PeripheralInput, PeripheralOutput},
     },
-    interrupt,
-    peripherals::{EMAC_DMA, ETH, Interrupt},
+    peripherals::{EMAC_DMA, ETH},
     private::Sealed,
     system::{GenericPeripheralGuard, Peripheral},
 };
@@ -643,8 +642,8 @@ where
 /// Wired RGMII pads (pass to [`Ethernet::new`]).
 ///
 /// RGMII data and clock pads use IOMUX only. Do not route them through the GPIO
-/// matrix (`MiiTxd*` / `MiiRxd*` on ESP32-S31).
-#[cfg(esp32s31)]
+/// matrix (`MiiTxd*` / `MiiRxd*`).
+#[cfg(ethernet_has_rgmii)]
 #[allow(
     missing_docs,
     reason = "The field names are indicative of their function."
@@ -681,7 +680,7 @@ pub struct RgmiiPinBundle<
     pub mdio: Mdio,
 }
 
-#[cfg(esp32s31)]
+#[cfg(ethernet_has_rgmii)]
 impl<RxClk, TxClk, RxCtl, TxCtl, Rxd0, Rxd1, Rxd2, Rxd3, Txd0, Txd1, Txd2, Txd3, Mdc, Mdio>
     crate::private::Sealed
     for RgmiiPinBundle<
@@ -703,7 +702,7 @@ impl<RxClk, TxClk, RxCtl, TxCtl, Rxd0, Rxd1, Rxd2, Rxd3, Txd0, Txd1, Txd2, Txd3,
 {
 }
 
-#[cfg(esp32s31)]
+#[cfg(ethernet_has_rgmii)]
 impl<'d, RxClk, TxClk, RxCtl, TxCtl, Rxd0, Rxd1, Rxd2, Rxd3, Txd0, Txd1, Txd2, Txd3, Mdc, Mdio>
     EthernetPinBundle
     for RgmiiPinBundle<
@@ -767,13 +766,6 @@ where
 
 // ── Async wakers ──────────────────────────────────────────────────────────────
 
-fn eth_mac_interrupt() -> Interrupt {
-    cfg_select! {
-        esp32s31 => Interrupt::SBD,
-        _ => Interrupt::ETH_MAC,
-    }
-}
-
 pub(super) static RX_WAKER: AtomicWaker = AtomicWaker::new();
 pub(super) static TX_WAKER: AtomicWaker = AtomicWaker::new();
 /// DMASTATUS bit mask for the RX-complete interrupt.
@@ -785,11 +777,13 @@ static ISR_BOUND: AtomicBool = AtomicBool::new(false);
 
 /// Binds the DMA ISR on first use.
 ///
-/// `bind_handler` also enables the interrupt, so this must not run before the
-/// peripheral is ready to have its interrupt line unmasked.
+/// `bind_peri_interrupt` also enables the interrupt, so this must not run before
+/// the peripheral is ready to have its interrupt line unmasked.
 pub(super) fn bind_eth_isr() {
     if !ISR_BOUND.swap(true, Ordering::Relaxed) {
-        interrupt::bind_handler(eth_mac_interrupt(), eth_mac_isr);
+        // Safety: the ISR only touches DMA status registers; ETH ownership is
+        // tracked by `Ethernet`.
+        unsafe { ETH::steal() }.bind_peri_interrupt(eth_mac_isr);
     }
 }
 
@@ -829,7 +823,10 @@ pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
 
 impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
     /// Creates an Ethernet driver using RMII ([`RmiiPinBundle`]) or MII ([`MiiPinBundle`]).
-    #[cfg_attr(esp32s31, doc = "On ESP32-S31, RGMII uses [`RgmiiPinBundle`].")]
+    #[cfg_attr(
+        ethernet_has_rgmii,
+        doc = "On chips with RGMII, use [`RgmiiPinBundle`]."
+    )]
     pub fn new<B: EthernetPinBundle + 'd, const RX: usize, const TX: usize>(
         eth: ETH<'d>,
         storage: &'d mut EthernetDmaStorage<RX, TX>,

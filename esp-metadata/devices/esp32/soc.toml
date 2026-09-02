@@ -40,7 +40,7 @@ peripherals = [
     { name = "DPORT" },
     { name = "SYSTEM", pac = "DPORT" },
     { name = "EFUSE", hidden = true },
-    { name = "ETH", virtual = true },
+    { name = "ETH", virtual = true, interrupts = { peri = "ETH_MAC" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
     { name = "EMAC_EXT", hidden = true },
     { name = "EMAC_MAC", pac = "GMAC", hidden = true },
@@ -274,6 +274,12 @@ support_status = "not_supported"
 
 [device.ethernet]
 support_status = "partial"
+rx_store_and_forward = true
+# Type-2 COE can mark valid frames as checksum errors (and CIC insertion
+# is also unreliable), so both directions stay in software.
+rx_checksum_offload = false
+tx_checksum_offload = false
+dma_burst_len = 32
 
 [device.camera]
 support_status = "not_supported"

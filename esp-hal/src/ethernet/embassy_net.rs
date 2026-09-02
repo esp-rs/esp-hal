@@ -156,14 +156,21 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
         let mut caps = Capabilities::default();
         caps.max_transmission_unit = MTU;
         caps.max_burst_size = Some(self.tx.len());
-        // The MAC verifies received checksums in hardware (RX COE), but cannot
-        // insert them on transmit without store-and-forward, so smoltcp
-        // computes outgoing checksums and skips verifying incoming ones.
-        caps.checksum.ipv4 = Checksum::Tx;
-        caps.checksum.tcp = Checksum::Tx;
-        caps.checksum.udp = Checksum::Tx;
-        caps.checksum.icmpv4 = Checksum::Tx;
-        caps.checksum.icmpv6 = Checksum::Tx;
+        // `Checksum` names the direction(s) computed in software. Hardware
+        // offload is advertised so the stack skips that side.
+        const RX_COE: bool = property!("ethernet.rx_checksum_offload");
+        const TX_COE: bool = property!("ethernet.tx_checksum_offload");
+        let checksum = match (RX_COE, TX_COE) {
+            (true, true) => Checksum::None,
+            (true, false) => Checksum::Tx,
+            (false, true) => Checksum::Rx,
+            (false, false) => Checksum::Both,
+        };
+        caps.checksum.ipv4 = checksum;
+        caps.checksum.tcp = checksum;
+        caps.checksum.udp = checksum;
+        caps.checksum.icmpv4 = checksum;
+        caps.checksum.icmpv6 = checksum;
         caps
     }
 

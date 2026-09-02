@@ -7,12 +7,8 @@
 use crate::peripherals::{EMAC_DMA, EMAC_MAC};
 
 /// Programmable DMA burst length, matching the esp-idf per-target defaults.
-///
-/// A 32-beat burst overflows the AXI bus on ESP32-S31.
-const DMA_BURST_LEN: u8 = cfg_select! {
-    esp32s31 => 16,
-    _ => 32,
-};
+const DMA_BURST_LEN: u8 = property!("ethernet.dma_burst_len");
+const TX_CHECKSUM_OFFLOAD: bool = property!("ethernet.tx_checksum_offload");
 
 /// Returns the `miicsrclk` value for the MDIO management clock divider.
 ///
@@ -36,7 +32,7 @@ fn mdc_csr_clock_range() -> u8 {
     //   encoding 5 → /124 (≥ 250 MHz, slightly over 2.5 MHz spec at high SYS clocks)
     let hz = cfg_select! {
         soc_has_clock_node_sys_clk => crate::clock::ll::sys_clk_frequency(),
-        esp32 => 40_000_000,
+        _ => 40_000_000,
     };
     match hz {
         hz if hz >= 250_000_000 => 5, // /124
@@ -123,9 +119,10 @@ impl EmacRegs {
     /// Configures the DMA operation mode, matching esp-idf
     /// `emac_hal_init_dma_default`.
     ///
-    /// Store-and-forward is off in both directions with 64-byte thresholds: the
-    /// FIFOs cannot hold a full frame on every chip, and enabling it there
-    /// stalls the affected direction.
+    /// RX store-and-forward follows `ethernet.rx_store_and_forward`. TX
+    /// store-and-forward is enabled only with TX checksum offload, which
+    /// needs the whole frame in the FIFO. Thresholds stay at 64 bytes for
+    /// cut-through.
     pub fn dma_init_op_mode(&self) {
         // The TX FIFO flush must complete before any other write to this
         // register, so it is issued on its own first.
@@ -144,20 +141,15 @@ impl EmacRegs {
         }
 
         EMAC_DMA::regs().dmaoperation_mode().modify(|_, w| unsafe {
-            // Drop frames with a checksum error instead of forwarding them.
-            w.dis_drop_tcpip_err_fram().clear_bit();
+            // With RSF, drop FCS/length (and TCP/IP, if RX COE is on) error frames.
+            w.dis_drop_tcpip_err_fram()
+                .bit(!cfg!(ethernet_rx_store_and_forward));
             // Flush received frames when descriptors or buffers run out.
             w.dis_flush_recv_frames().clear_bit();
-            cfg_select! {
-                esp32 => {
-                    w.rx_store_forward().set_bit();
-                }
-                _ => {
-                    // RX FIFO is only 256 B, too small for a full frame.
-                    w.rx_store_forward().clear_bit();
-                }
-            }
-            w.tx_str_fwd().clear_bit();
+            w.rx_store_forward()
+                .bit(cfg!(ethernet_rx_store_and_forward));
+            // Payload checksum insertion (TDES0.CIC) requires TX store-and-forward.
+            w.tx_str_fwd().bit(TX_CHECKSUM_OFFLOAD);
             w.tx_thresh_ctrl().bits(0); // 64 bytes
             w.rx_thresh_ctrl().bits(0); // 64 bytes
             w.fwd_err_frame().clear_bit();
@@ -289,7 +281,7 @@ impl EmacRegs {
             }
             w.duplex().bit(duplex == Duplex::Full);
             w.padcrcstrip().clear_bit();
-            w.rxipcoffload().set_bit();
+            w.rxipcoffload().bit(cfg!(ethernet_rx_checksum_offload));
             w.retry().set_bit();
             w.watchdog().set_bit();
             w.rxown().set_bit();

@@ -13,6 +13,8 @@ pub const MAX_FRAME_SIZE: usize = 1524;
 /// Minimum accepted RX frame length.
 pub const MIN_RX_FRAME_SIZE: usize = 14;
 
+const TX_CHECKSUM_OFFLOAD: bool = property!("ethernet.tx_checksum_offload");
+
 // ── TDES bits ──────────────────────────────────────────────────────────────
 
 /// TX descriptor ownership bit: 1 = owned by DMA.
@@ -25,6 +27,11 @@ pub const TDES0_LS: u32 = 1 << 29;
 pub const TDES0_FS: u32 = 1 << 28;
 /// TX second-address-chained mode (next descriptor pointer in TDES3).
 pub const TDES0_CHAINED: u32 = 1 << 20;
+/// TX checksum insertion control (`CIC`) shift. `0b11` inserts IPv4 header and
+/// TCP/UDP/ICMP payload checksums including the pseudo-header.
+pub const TDES0_CIC_SHIFT: u32 = 22;
+/// Full Type-2 TX checksum insertion (`CIC = 0b11`).
+pub const TDES0_CIC_FULL: u32 = 0b11 << TDES0_CIC_SHIFT;
 
 // ── RDES bits ──────────────────────────────────────────────────────────────
 
@@ -48,12 +55,10 @@ pub const RDES1_CHAINED: u32 = 1 << 14;
 
 // ── RDES4 extended-status bits (Type-2 checksum offload) ─────────────────────
 //
-// Only consumed on chips whose RX FIFO runs in cut-through mode and therefore
-// cannot rely on the DMA to auto-drop checksum-error frames (see
-// `dma_init_op_mode`).
+// Only consumed when RX COE is enabled (`ethernet.rx_checksum_offload`).
 
 cfg_select! {
-    any(esp32p4, esp32s31) => {
+    ethernet_rx_checksum_offload => {
         /// RDES0 extended-status-available bit: RDES4 holds valid COE status.
         pub const RDES0_ESA: u32 = 1 << 0;
         /// RDES4: IP header checksum error.
@@ -137,14 +142,18 @@ impl TDes {
 
     /// Marks the descriptor as a complete frame of `len` bytes.
     ///
-    /// Checksum insertion (`CIC`) is deliberately left disabled: the MAC can
-    /// only insert a payload checksum with transmit store-and-forward enabled,
-    /// which the TX FIFO is too small for. Outgoing checksums are computed in
-    /// software instead, as esp-idf does.
+    /// Checksum insertion (`CIC`) follows `ethernet.tx_checksum_offload`. The
+    /// MAC can only insert a payload checksum with transmit store-and-forward,
+    /// which is enabled together with that property.
     fn set_len_and_flags(&mut self, len: usize) {
         self.tdes1.set(len as u32 & RDES1_BUF1_SIZE_MASK);
+        let cic = if TX_CHECKSUM_OFFLOAD {
+            TDES0_CIC_FULL
+        } else {
+            0
+        };
         self.tdes0
-            .set((self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC);
+            .set((self.tdes0.get() & TDES0_CHAINED) | TDES0_FS | TDES0_LS | TDES0_IC | cic);
     }
 
     fn set_buffer_addr(&mut self, addr: *const u8) {
@@ -167,8 +176,8 @@ pub struct RDes {
     pub(super) next_desc: VolatileCell<u32>,
     // Extended status; the GMAC writes IP checksum-offload results here.
     #[cfg_attr(
-        not(any(esp32p4, esp32s31)),
-        allow(dead_code, reason = "only read for cut-through RX checksum offload")
+        not(ethernet_rx_checksum_offload),
+        allow(dead_code, reason = "only read when RX checksum offload is enabled")
     )]
     rdes4: VolatileCell<u32>,
     _rdes5: VolatileCell<u32>,
@@ -228,7 +237,7 @@ impl RDes {
     /// `RDES0_ES`, so they must be inspected explicitly. Only meaningful on the
     /// last descriptor of a frame. Non-IP frames (e.g. ARP) and frames whose
     /// checksum the engine bypassed never report an error.
-    #[cfg(any(esp32p4, esp32s31))]
+    #[cfg(ethernet_rx_checksum_offload)]
     fn checksum_error(&self) -> bool {
         // The extended status is only valid when RDES0[0] (ESA) is set.
         if self.rdes0.get() & RDES0_ESA == 0 {
@@ -514,11 +523,10 @@ impl<'a> RDesRing<'a> {
                 let is_complete = desc.is_complete_frame();
                 let frame_len = desc.frame_len();
 
-                // On chips with cut-through RX the DMA can't auto-drop
-                // checksum-error frames, so reject them here based on the
-                // extended-status COE bits.
+                // When RX COE is on, checksum errors are reported in RDES4
+                // rather than `RDES0_ES`.
                 let checksum_bad = cfg_select! {
-                    any(esp32p4, esp32s31) => desc.checksum_error(),
+                    ethernet_rx_checksum_offload => desc.checksum_error(),
                     _ => false,
                 };
 

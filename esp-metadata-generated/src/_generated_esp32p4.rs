@@ -349,6 +349,24 @@ macro_rules! property {
     ("ethernet.mii_via_gpio_matrix") => {
         true
     };
+    ("ethernet.rx_store_and_forward") => {
+        false
+    };
+    ("ethernet.rx_checksum_offload") => {
+        true
+    };
+    ("ethernet.tx_checksum_offload") => {
+        false
+    };
+    ("ethernet.dma_burst_len") => {
+        32
+    };
+    ("ethernet.dma_burst_len", str) => {
+        stringify!(32)
+    };
+    ("ethernet.has_rgmii") => {
+        false
+    };
     ("sdm.channel_count") => {
         8
     };
@@ -6576,16 +6594,18 @@ macro_rules! for_each_peripheral {
         #[doc = "DMA peripheral singleton"] DMA <= AHB_DMA() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "AXI_GDMA peripheral singleton"]
         AXI_GDMA <= AXI_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
-        EMAC_DMA <= GMAC_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "MIPI_DSI peripheral singleton"]
-        MIPI_DSI <= virtual(DSI_BRIDGE : { bind_bridge_interrupt,
-        enable_bridge_interrupt, disable_bridge_interrupt }, DSI : { bind_dsi_interrupt,
-        enable_dsi_interrupt, disable_dsi_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "VDMA peripheral singleton"]
-        VDMA <= DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        #[doc = "ETH peripheral singleton"] ETH <= virtual(ETH_MAC : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
+        EMAC_MAC <= GMAC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MIPI_DSI peripheral singleton"] MIPI_DSI <= virtual(DSI_BRIDGE : {
+        bind_bridge_interrupt, enable_bridge_interrupt, disable_bridge_interrupt }, DSI :
+        { bind_dsi_interrupt, enable_dsi_interrupt, disable_dsi_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "VDMA peripheral singleton"] VDMA <= DMA() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MIPI_DSI_BRIDGE peripheral singleton"] MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE()
@@ -7003,26 +7023,27 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "DMA peripheral singleton"] DMA <= AHB_DMA() (unstable)), (@ peri_type #[doc =
         "AXI_GDMA peripheral singleton"] AXI_GDMA <= AXI_DMA() (unstable)), (@ peri_type
-        #[doc = "ETH peripheral singleton"] ETH <= virtual() (unstable)), (@ peri_type
-        #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)), (@
-        peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC()
-        (unstable)), (@ peri_type #[doc = "MIPI_DSI peripheral singleton"] MIPI_DSI <=
-        virtual(DSI_BRIDGE : { bind_bridge_interrupt, enable_bridge_interrupt,
-        disable_bridge_interrupt }, DSI : { bind_dsi_interrupt, enable_dsi_interrupt,
-        disable_dsi_interrupt }) (unstable)), (@ peri_type #[doc =
-        "VDMA peripheral singleton"] VDMA <= DMA() (unstable)), (@ peri_type #[doc =
-        "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <= MIPI_DSI_HOST()
-        (unstable)), (@ peri_type #[doc = "MIPI_DSI_BRIDGE peripheral singleton"]
-        MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE() (unstable)), (@ peri_type #[doc =
-        "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        #[doc = "ETH peripheral singleton"] ETH <= virtual(ETH_MAC : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "SDHOST peripheral singleton"] SDHOST <=
-        SDHOST() (unstable)), (@ peri_type #[doc = "LEDC peripheral singleton"] LEDC <=
-        LEDC(LEDC : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        }) (unstable)), (@ peri_type #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <=
-        MCPWM0(PWM0 : { bind_peri_interrupt, enable_peri_interrupt,
+        (unstable)), (@ peri_type #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <=
+        GMAC_DMA() (unstable)), (@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
+        EMAC_MAC <= GMAC() (unstable)), (@ peri_type #[doc =
+        "MIPI_DSI peripheral singleton"] MIPI_DSI <= virtual(DSI_BRIDGE : {
+        bind_bridge_interrupt, enable_bridge_interrupt, disable_bridge_interrupt }, DSI :
+        { bind_dsi_interrupt, enable_dsi_interrupt, disable_dsi_interrupt }) (unstable)),
+        (@ peri_type #[doc = "VDMA peripheral singleton"] VDMA <= DMA() (unstable)), (@
+        peri_type #[doc = "MIPI_DSI_HOST peripheral singleton"] MIPI_DSI_HOST <=
+        MIPI_DSI_HOST() (unstable)), (@ peri_type #[doc =
+        "MIPI_DSI_BRIDGE peripheral singleton"] MIPI_DSI_BRIDGE <= MIPI_DSI_BRIDGE()
+        (unstable)), (@ peri_type #[doc = "USB_DEVICE peripheral singleton"] USB_DEVICE
+        <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
-        "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1(PWM1 : { bind_peri_interrupt,
+        "SDHOST peripheral singleton"] SDHOST <= SDHOST() (unstable)), (@ peri_type #[doc
+        = "LEDC peripheral singleton"] LEDC <= LEDC(LEDC : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0(PWM0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "MCPWM1 peripheral singleton"] MCPWM1 <= MCPWM1(PWM1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "PCNT peripheral singleton"] PCNT <= PCNT(PCNT : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc

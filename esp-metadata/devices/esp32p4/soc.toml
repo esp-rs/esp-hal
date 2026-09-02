@@ -103,7 +103,7 @@ peripherals = [
     { name = "DMA", pac = "AHB_DMA" },
     { name = "AXI_GDMA", pac = "AXI_DMA" },
 
-    { name = "ETH", virtual = true },
+    { name = "ETH", virtual = true, interrupts = { peri = "ETH_MAC" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
     { name = "EMAC_MAC", pac = "GMAC", hidden = true },
     { name = "MIPI_DSI", virtual = true, interrupts = { dsi = "DSI", bridge = "DSI_BRIDGE" }, clock_group = "MIPI_DSI" },
@@ -290,6 +290,10 @@ support_status = "not_supported"
 [device.ethernet]
 support_status = "partial"
 mii_via_gpio_matrix = true
+dma_burst_len = 32
+rx_store_and_forward = false # RX FIFO is only 256B, too small for a full frame
+rx_checksum_offload = true
+tx_checksum_offload = false # TX FIFO is too small for store-and-forward insertion
 
 [device.mipi_csi]
 support_status = "not_supported"

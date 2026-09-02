@@ -679,6 +679,26 @@ driver_configs![
             properties: {
                 #[serde(default)]
                 mii_via_gpio_matrix: bool,
+                /// When true, the RX FIFO can hold a full frame and DMAOMR.RSF is
+                /// enabled so the DMA can drop FCS/length errors as complete frames.
+                #[serde(default)]
+                rx_store_and_forward: bool,
+                /// When true, Type-2 RX IP checksum offload (`MAC.config.IPC`) is
+                /// enabled and the driver inspects RDES4. False on chips whose COE
+                /// mis-flags valid frames.
+                #[serde(default)]
+                rx_checksum_offload: bool,
+                /// When true, TX IP/TCP/UDP checksum insertion (`TDES0.CIC`) is
+                /// enabled and DMAOMR.TSF is set so the MAC sees the whole frame.
+                /// Requires a TX FIFO that can hold a full frame.
+                #[serde(default)]
+                tx_checksum_offload: bool,
+                /// Programmable DMA burst length (`DMABUSMODE.PBL`). A 32-beat burst
+                /// overflows the AXI bus on some chips.
+                dma_burst_len: u32,
+                /// When true, the MAC exposes RGMII (1000 Mbps) pads in addition to RMII/MII.
+                #[serde(default)]
+                has_rgmii: bool,
             }
         },
         PhyProperties {
