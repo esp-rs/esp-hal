@@ -576,7 +576,15 @@ pub(crate) trait ClockTreeNodeType: Any {
     ///
     /// `group` is the name of the template group the node belongs to, or an empty string for
     /// standalone nodes. It is needed to reconstruct the names of the generated config types.
-    fn property_macro_branches(&self, _path: &str, _group: &str) -> TokenStream {
+    ///
+    /// `config_type_stem` is the clock name used in the generated config type (`PARL_IO` + `CLK` →
+    /// `ParlIoClkConfig`). For a preset instantiation this is the preset name, not the node name.
+    fn property_macro_branches(
+        &self,
+        _path: &str,
+        _group: &str,
+        _config_type_stem: &str,
+    ) -> TokenStream {
         quote! {}
     }
 
@@ -631,12 +639,52 @@ impl ClockTreeItem {
         }
     }
 
-    pub(crate) fn property_macro_branches(&self, path: &str, group: &str) -> TokenStream {
+    pub(crate) fn property_macro_branches(
+        &self,
+        path: &str,
+        group: &str,
+        config_type_stem: &str,
+    ) -> TokenStream {
         match self {
-            ClockTreeItem::Multiplexer(mux) => mux.property_macro_branches(path, group),
-            ClockTreeItem::Source(src) => src.property_macro_branches(path, group),
-            ClockTreeItem::Generic(div) => div.property_macro_branches(path, group),
-            ClockTreeItem::Derived(drv) => drv.property_macro_branches(path, group),
+            ClockTreeItem::Multiplexer(mux) => {
+                mux.property_macro_branches(path, group, config_type_stem)
+            }
+            ClockTreeItem::Source(src) => {
+                src.property_macro_branches(path, group, config_type_stem)
+            }
+            ClockTreeItem::Generic(div) => {
+                div.property_macro_branches(path, group, config_type_stem)
+            }
+            ClockTreeItem::Derived(drv) => {
+                drv.property_macro_branches(path, group, config_type_stem)
+            }
+        }
+    }
+
+    pub(crate) fn set_name(&mut self, name: String) {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.name = name,
+            ClockTreeItem::Source(src) => src.name = name,
+            ClockTreeItem::Generic(div) => div.name = name,
+            ClockTreeItem::Derived(drv) => drv.source_options.name = name,
+        }
+    }
+
+    pub(crate) fn set_wake_locking(&mut self, wake_locking: bool) {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.set_wake_locking(wake_locking),
+            ClockTreeItem::Source(src) => src.set_wake_locking(wake_locking),
+            ClockTreeItem::Generic(div) => div.set_wake_locking(wake_locking),
+            ClockTreeItem::Derived(drv) => drv.source_options.set_wake_locking(wake_locking),
+        }
+    }
+
+    pub(crate) fn set_always_on(&mut self, always_on: bool) {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.set_always_on(always_on),
+            ClockTreeItem::Source(src) => src.set_always_on(always_on),
+            ClockTreeItem::Generic(div) => div.set_always_on(always_on),
+            ClockTreeItem::Derived(drv) => drv.source_options.set_always_on(always_on),
         }
     }
 }

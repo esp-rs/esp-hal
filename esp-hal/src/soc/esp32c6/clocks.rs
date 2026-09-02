@@ -607,14 +607,14 @@ impl ParlIoInstance {
     fn configure_rx_clock_impl(
         self,
         _clocks: &mut ClockTree,
-        _old_config: Option<ParlIoRxClockConfig>,
-        new_config: ParlIoRxClockConfig,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
     ) {
         PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
             w.parl_clk_rx_sel().bits(match new_config {
-                ParlIoRxClockConfig::XtalClk => 0,
-                ParlIoRxClockConfig::RcFastClk => 2,
-                ParlIoRxClockConfig::PllF240m => 1,
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 2,
+                ParlIoClkConfig::PllF240m => 1,
             })
         });
     }
@@ -630,14 +630,14 @@ impl ParlIoInstance {
     fn configure_tx_clock_impl(
         self,
         _clocks: &mut ClockTree,
-        _old_config: Option<ParlIoTxClockConfig>,
-        new_config: ParlIoTxClockConfig,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
     ) {
         PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
             w.parl_clk_tx_sel().bits(match new_config {
-                ParlIoTxClockConfig::XtalClk => 0,
-                ParlIoTxClockConfig::RcFastClk => 2,
-                ParlIoTxClockConfig::PllF240m => 1,
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 2,
+                ParlIoClkConfig::PllF240m => 1,
             })
         });
     }

@@ -99,6 +99,10 @@ impl<'de> Deserialize<'de> for NodeParameter {
 #[serde(deny_unknown_fields)]
 pub struct Generic {
     /// The unique name of the clock tree item.
+    ///
+    /// Empty when this node is a group preset; the map key / instantiating clock supplies the
+    /// name.
+    #[serde(default)]
     pub name: String,
 
     #[serde(default)]
@@ -124,6 +128,16 @@ pub struct Generic {
     /// Variables in the output expression.
     #[serde(default)]
     params: IndexMap<String, NodeParameter>,
+}
+
+impl Generic {
+    pub(crate) fn set_wake_locking(&mut self, wake_locking: bool) {
+        self.wake_locking = wake_locking;
+    }
+
+    pub(crate) fn set_always_on(&mut self, always_on: bool) {
+        self.always_on = always_on;
+    }
 }
 
 impl ClockTreeNodeType for Generic {
@@ -810,7 +824,12 @@ impl ClockTreeNodeType for Generic {
         self.impl_release_upstream(instance, tree, quote! { unwrap!(#config_field) })
     }
 
-    fn property_macro_branches(&self, path: &str, group: &str) -> TokenStream {
+    fn property_macro_branches(
+        &self,
+        path: &str,
+        group: &str,
+        config_type_stem: &str,
+    ) -> TokenStream {
         let mut branches = quote! {};
         for (param_name, param) in self.params.iter() {
             let path = format!("{path}.{param_name}");
@@ -835,7 +854,7 @@ impl ClockTreeNodeType for Generic {
                     }
                 }
                 NodeParameter::Source(variants) => {
-                    let ty = param_type_name(group, &self.name, param_name);
+                    let ty = param_type_name(group, config_type_stem, param_name);
                     let options = variants.iter().map(|variant| {
                         let cfg_attr = variant.cfg_attr();
                         let variant = variant.config_enum_variant_name();
@@ -996,7 +1015,11 @@ impl Generic {
         }
 
         // Enum parameter
-        param_type_name(&instance.group_template, &self.name, param_name)
+        param_type_name(
+            &instance.group_template,
+            instance.config_type_stem(),
+            param_name,
+        )
     }
 
     fn parameter_config_type_impl(
