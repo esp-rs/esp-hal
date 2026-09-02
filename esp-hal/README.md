@@ -95,7 +95,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SPI slave       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | LP SPI master   |       |          |          |          |          |           |          | ❌       |          |          |           |
 | LP SPI slave    |       |          |          |          |          |           |          | ❌       |          |          |           |
-| I2S             | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ❌        |
+| I2S             | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | LP I2S          |       |          |          |          |          |           |          | ❌       |          |          |           |
 | PARL_IO         |       |          |          | ⚒️      | ⚒️      |           | ⚒️      | ❌       |          |          | ❌        |
 | RMT             | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |

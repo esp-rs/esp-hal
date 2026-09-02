@@ -207,7 +207,7 @@ fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError>
 
     i2s.set_rx_clock(clock.dividers);
 
-    #[cfg(all(i2s_supports_pdm2pcm, esp32p4))]
+    #[cfg(all(i2s_supports_pdm2pcm, i2s_supports_pdm_rx_hp_filter))]
     {
         let dsr16 = config.clock.downsample_rate == super::PdmDownsampleRate::Dsr16s;
         let freq_x10 = (config.slot.hp_cut_off_freq_hz * 10.0) as u32;
@@ -228,7 +228,7 @@ fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError>
     i2s.regs().rx_conf().modify(|_, w| {
         w.rx_pdm_en().set_bit();
         w.rx_tdm_en().clear_bit();
-        #[cfg(all(i2s_supports_pdm2pcm, not(esp32p4)))]
+        #[cfg(all(i2s_supports_pdm2pcm, not(i2s_supports_pdm_rx_hp_filter)))]
         {
             w.rx_pdm2pcm_en().bit(pcm);
             w.rx_pdm_sinc_dsr_16_en()

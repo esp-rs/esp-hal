@@ -154,6 +154,18 @@ peripheral_clocks = { templates = [
     { name = "Spi3", template_params = { peripheral = "gpspi3" } },
     { name = "I2c0", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}", ctrl_reg = "i2c_ctrl0(0)" } },
     { name = "I2c1", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}", ctrl_reg = "i2c_ctrl0(1)" } },
+    { name = "I2s0", template_params = {
+        clk_en = "{{apb_clk}}",
+        rst_en = ".apb_rst_en().bit(reset)",
+        ctrl_reg = "i2s0_ctrl0()",
+        clk_en_template = "{{default_clk_template}} crate::peripherals::HP_ALIVE_SYS::regs().hp_pad_i2s0_ctrl().modify(|_, w| w.hp_pad_i2s0_mclk_en().bit(enable));"
+    } },
+    { name = "I2s1", template_params = {
+        clk_en = "{{apb_clk}}",
+        rst_en = ".apb_rst_en().bit(reset)",
+        ctrl_reg = "i2s1_ctrl0()",
+        clk_en_template = "{{default_clk_template}} crate::peripherals::HP_ALIVE_SYS::regs().hp_pad_i2s1_ctrl().modify(|_, w| w.hp_pad_i2s1_mclk_en().bit(enable));"
+    } },
     { name = "SdioHost", template_params = { clk_en = "{{sys_clk}}", rst_template = "crate::peripherals::CNNT_SYS::regs().sys_hp_sdmmc_ctrl().modify(|_, w| w.sys_sdmmc_rst_en().bit(reset));" } },
     # DMA engines
     { name = "AxiGdma", template_params = { peripheral = "axi_pdma", clk_en = "{{sys_clk}}" } },

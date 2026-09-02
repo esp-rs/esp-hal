@@ -226,6 +226,51 @@ macro_rules! property {
     ("spi_master.dma_can_access_flash") => {
         false
     };
+    ("i2s.version") => {
+        3
+    };
+    ("i2s.version", str) => {
+        stringify!(3)
+    };
+    ("i2s.default_clock_source") => {
+        0
+    };
+    ("i2s.default_clock_source", str) => {
+        stringify!(0)
+    };
+    ("i2s.mclk_divider_bit_width") => {
+        8
+    };
+    ("i2s.mclk_divider_bit_width", str) => {
+        stringify!(8)
+    };
+    ("i2s.max_ws_width") => {
+        512
+    };
+    ("i2s.max_ws_width", str) => {
+        stringify!(512)
+    };
+    ("i2s.clock_configured_by_pcr") => {
+        false
+    };
+    ("i2s.clock_configured_by_hp_sys_clkrst") => {
+        true
+    };
+    ("i2s.supports_pdm_rx_hp_filter") => {
+        true
+    };
+    ("i2s.supports_pdm_tx") => {
+        true
+    };
+    ("i2s.supports_pdm_rx") => {
+        true
+    };
+    ("i2s.supports_pcm2pdm") => {
+        true
+    };
+    ("i2s.supports_pdm2pcm") => {
+        true
+    };
     ("rmt.ram_start") => {
         540366848
     };
@@ -989,16 +1034,16 @@ macro_rules! for_each_dma_channel {
         _for_each_inner_dma_channel!(("AHB_GDMA", any_channel = AhbGdmaChannel));
         _for_each_inner_dma_channel!(("AXI_GDMA", any_channel = AxiGdmaChannel));
         _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH0, 0, interrupt_in =
-        AHB_PDMA_IN_CH0, interrupt_out = AHB_PDMA_OUT_CH0, compatible = [UHCI0]));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt_in =
-        AHB_PDMA_IN_CH1, interrupt_out = AHB_PDMA_OUT_CH1, compatible = [UHCI0]));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt_in =
-        AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible = [UHCI0]));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3, 3, interrupt_in =
-        AHB_PDMA_IN_CH3, interrupt_out = AHB_PDMA_OUT_CH3, compatible = [UHCI0]));
-        _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4, 4, interrupt_in =
-        AHB_PDMA_IN_CH4, interrupt_out = AHB_PDMA_OUT_CH4, compatible = [UHCI0]));
-        _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH0, 0, interrupt_in =
+        AHB_PDMA_IN_CH0, interrupt_out = AHB_PDMA_OUT_CH0, compatible = [UHCI0, I2S0,
+        I2S1])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH1, 1, interrupt_in =
+        AHB_PDMA_IN_CH1, interrupt_out = AHB_PDMA_OUT_CH1, compatible = [UHCI0, I2S0,
+        I2S1])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH2, 2, interrupt_in =
+        AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible = [UHCI0, I2S0,
+        I2S1])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH3, 3, interrupt_in =
+        AHB_PDMA_IN_CH3, interrupt_out = AHB_PDMA_OUT_CH3, compatible = [UHCI0, I2S0,
+        I2S1])); _for_each_inner_dma_channel!(("AHB_GDMA", DMA_CH4, 4, interrupt_in =
+        AHB_PDMA_IN_CH4, interrupt_out = AHB_PDMA_OUT_CH4, compatible = [UHCI0, I2S0,
+        I2S1])); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH0, 0, interrupt_in =
         AXI_PDMA_IN_CH0, interrupt_out = AXI_PDMA_OUT_CH0, compatible = [SPI2, SPI3, AES,
         SHA])); _for_each_inner_dma_channel!(("AXI_GDMA", DMA_AXI_CH1, 1, interrupt_in =
         AXI_PDMA_IN_CH1, interrupt_out = AXI_PDMA_OUT_CH1, compatible = [SPI2, SPI3, AES,
@@ -1011,19 +1056,20 @@ macro_rules! for_each_dma_channel {
         any_channel = AhbGdmaChannel), ("AXI_GDMA", any_channel = AxiGdmaChannel)));
         _for_each_inner_dma_channel!((shared));
         _for_each_inner_dma_channel!((split("AHB_GDMA", DMA_CH0, 0, interrupt_in =
-        AHB_PDMA_IN_CH0, interrupt_out = AHB_PDMA_OUT_CH0, compatible = [UHCI0]),
-        ("AHB_GDMA", DMA_CH1, 1, interrupt_in = AHB_PDMA_IN_CH1, interrupt_out =
-        AHB_PDMA_OUT_CH1, compatible = [UHCI0]), ("AHB_GDMA", DMA_CH2, 2, interrupt_in =
-        AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible = [UHCI0]),
-        ("AHB_GDMA", DMA_CH3, 3, interrupt_in = AHB_PDMA_IN_CH3, interrupt_out =
-        AHB_PDMA_OUT_CH3, compatible = [UHCI0]), ("AHB_GDMA", DMA_CH4, 4, interrupt_in =
-        AHB_PDMA_IN_CH4, interrupt_out = AHB_PDMA_OUT_CH4, compatible = [UHCI0]),
-        ("AXI_GDMA", DMA_AXI_CH0, 0, interrupt_in = AXI_PDMA_IN_CH0, interrupt_out =
-        AXI_PDMA_OUT_CH0, compatible = [SPI2, SPI3, AES, SHA]), ("AXI_GDMA", DMA_AXI_CH1,
-        1, interrupt_in = AXI_PDMA_IN_CH1, interrupt_out = AXI_PDMA_OUT_CH1, compatible =
-        [SPI2, SPI3, AES, SHA]), ("AXI_GDMA", DMA_AXI_CH2, 2, interrupt_in =
-        AXI_PDMA_IN_CH2, interrupt_out = AXI_PDMA_OUT_CH2, compatible = [SPI2, SPI3, AES,
-        SHA]))); _for_each_inner_dma_channel!((no_own_interrupt));
+        AHB_PDMA_IN_CH0, interrupt_out = AHB_PDMA_OUT_CH0, compatible = [UHCI0, I2S0,
+        I2S1]), ("AHB_GDMA", DMA_CH1, 1, interrupt_in = AHB_PDMA_IN_CH1, interrupt_out =
+        AHB_PDMA_OUT_CH1, compatible = [UHCI0, I2S0, I2S1]), ("AHB_GDMA", DMA_CH2, 2,
+        interrupt_in = AHB_PDMA_IN_CH2, interrupt_out = AHB_PDMA_OUT_CH2, compatible =
+        [UHCI0, I2S0, I2S1]), ("AHB_GDMA", DMA_CH3, 3, interrupt_in = AHB_PDMA_IN_CH3,
+        interrupt_out = AHB_PDMA_OUT_CH3, compatible = [UHCI0, I2S0, I2S1]), ("AHB_GDMA",
+        DMA_CH4, 4, interrupt_in = AHB_PDMA_IN_CH4, interrupt_out = AHB_PDMA_OUT_CH4,
+        compatible = [UHCI0, I2S0, I2S1]), ("AXI_GDMA", DMA_AXI_CH0, 0, interrupt_in =
+        AXI_PDMA_IN_CH0, interrupt_out = AXI_PDMA_OUT_CH0, compatible = [SPI2, SPI3, AES,
+        SHA]), ("AXI_GDMA", DMA_AXI_CH1, 1, interrupt_in = AXI_PDMA_IN_CH1, interrupt_out
+        = AXI_PDMA_OUT_CH1, compatible = [SPI2, SPI3, AES, SHA]), ("AXI_GDMA",
+        DMA_AXI_CH2, 2, interrupt_in = AXI_PDMA_IN_CH2, interrupt_out = AXI_PDMA_OUT_CH2,
+        compatible = [SPI2, SPI3, AES, SHA])));
+        _for_each_inner_dma_channel!((no_own_interrupt));
     };
 }
 #[macro_export]
@@ -1032,10 +1078,20 @@ macro_rules! for_each_dma_channel_peri_pair {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_dma_channel_peri_pair { $(($pattern) => $code;)*
         ($other : tt) => {} } _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
-        DMA_CH0, UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1,
-        UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, UHCI0));
+        DMA_CH0, UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0,
+        I2S0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH0, I2S1));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH1, I2S1));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH2, I2S1));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH3, I2S1));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, UHCI0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, I2S0));
+        _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", DMA_CH4, I2S1));
         _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH0, SPI2));
         _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH0, SPI3));
         _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH0, AES));
@@ -1049,24 +1105,32 @@ macro_rules! for_each_dma_channel_peri_pair {
         _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH2, AES));
         _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", DMA_AXI_CH2, SHA));
         _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel = AhbGdmaChannel,
-        UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", any_channel =
-        AxiGdmaChannel, SPI2)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
-        any_channel = AxiGdmaChannel, SPI3));
+        UHCI0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA", any_channel =
+        AhbGdmaChannel, I2S0)); _for_each_inner_dma_channel_peri_pair!(("AHB_GDMA",
+        any_channel = AhbGdmaChannel, I2S1));
         _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", any_channel = AxiGdmaChannel,
-        AES)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", any_channel =
-        AxiGdmaChannel, SHA));
-        _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0, UHCI0),
-        ("AHB_GDMA", DMA_CH1, UHCI0), ("AHB_GDMA", DMA_CH2, UHCI0), ("AHB_GDMA", DMA_CH3,
-        UHCI0), ("AHB_GDMA", DMA_CH4, UHCI0), ("AXI_GDMA", DMA_AXI_CH0, SPI2),
-        ("AXI_GDMA", DMA_AXI_CH0, SPI3), ("AXI_GDMA", DMA_AXI_CH0, AES), ("AXI_GDMA",
-        DMA_AXI_CH0, SHA), ("AXI_GDMA", DMA_AXI_CH1, SPI2), ("AXI_GDMA", DMA_AXI_CH1,
-        SPI3), ("AXI_GDMA", DMA_AXI_CH1, AES), ("AXI_GDMA", DMA_AXI_CH1, SHA),
-        ("AXI_GDMA", DMA_AXI_CH2, SPI2), ("AXI_GDMA", DMA_AXI_CH2, SPI3), ("AXI_GDMA",
-        DMA_AXI_CH2, AES), ("AXI_GDMA", DMA_AXI_CH2, SHA)));
+        SPI2)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", any_channel =
+        AxiGdmaChannel, SPI3)); _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA",
+        any_channel = AxiGdmaChannel, AES));
+        _for_each_inner_dma_channel_peri_pair!(("AXI_GDMA", any_channel = AxiGdmaChannel,
+        SHA)); _for_each_inner_dma_channel_peri_pair!((channels("AHB_GDMA", DMA_CH0,
+        UHCI0), ("AHB_GDMA", DMA_CH0, I2S0), ("AHB_GDMA", DMA_CH0, I2S1), ("AHB_GDMA",
+        DMA_CH1, UHCI0), ("AHB_GDMA", DMA_CH1, I2S0), ("AHB_GDMA", DMA_CH1, I2S1),
+        ("AHB_GDMA", DMA_CH2, UHCI0), ("AHB_GDMA", DMA_CH2, I2S0), ("AHB_GDMA", DMA_CH2,
+        I2S1), ("AHB_GDMA", DMA_CH3, UHCI0), ("AHB_GDMA", DMA_CH3, I2S0), ("AHB_GDMA",
+        DMA_CH3, I2S1), ("AHB_GDMA", DMA_CH4, UHCI0), ("AHB_GDMA", DMA_CH4, I2S0),
+        ("AHB_GDMA", DMA_CH4, I2S1), ("AXI_GDMA", DMA_AXI_CH0, SPI2), ("AXI_GDMA",
+        DMA_AXI_CH0, SPI3), ("AXI_GDMA", DMA_AXI_CH0, AES), ("AXI_GDMA", DMA_AXI_CH0,
+        SHA), ("AXI_GDMA", DMA_AXI_CH1, SPI2), ("AXI_GDMA", DMA_AXI_CH1, SPI3),
+        ("AXI_GDMA", DMA_AXI_CH1, AES), ("AXI_GDMA", DMA_AXI_CH1, SHA), ("AXI_GDMA",
+        DMA_AXI_CH2, SPI2), ("AXI_GDMA", DMA_AXI_CH2, SPI3), ("AXI_GDMA", DMA_AXI_CH2,
+        AES), ("AXI_GDMA", DMA_AXI_CH2, SHA)));
         _for_each_inner_dma_channel_peri_pair!((any_channels("AHB_GDMA", any_channel =
-        AhbGdmaChannel, UHCI0), ("AXI_GDMA", any_channel = AxiGdmaChannel, SPI2),
-        ("AXI_GDMA", any_channel = AxiGdmaChannel, SPI3), ("AXI_GDMA", any_channel =
-        AxiGdmaChannel, AES), ("AXI_GDMA", any_channel = AxiGdmaChannel, SHA)));
+        AhbGdmaChannel, UHCI0), ("AHB_GDMA", any_channel = AhbGdmaChannel, I2S0),
+        ("AHB_GDMA", any_channel = AhbGdmaChannel, I2S1), ("AXI_GDMA", any_channel =
+        AxiGdmaChannel, SPI2), ("AXI_GDMA", any_channel = AxiGdmaChannel, SPI3),
+        ("AXI_GDMA", any_channel = AxiGdmaChannel, AES), ("AXI_GDMA", any_channel =
+        AxiGdmaChannel, SHA)));
     };
 }
 #[macro_export]
@@ -1099,6 +1163,14 @@ macro_rules! with_aes_dma_engine {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _with_inner_aes_dma_engine { $(($pattern) => $code;)* ($other : tt)
         => {} } _with_inner_aes_dma_engine!(("AXI_GDMA", AxiGdmaChannel));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! with_i2s_dma_engine {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _with_inner_i2s_dma_engine { $(($pattern) => $code;)* ($other : tt)
+        => {} } _with_inner_i2s_dma_engine!(("AHB_GDMA", AhbGdmaChannel));
     };
 }
 #[macro_export]
@@ -3963,6 +4035,10 @@ macro_rules! implement_peripheral_clocks {
             I2c0,
             /// I2C1 peripheral clock signal
             I2c1,
+            /// I2S0 peripheral clock signal
+            I2s0,
+            /// I2S1 peripheral clock signal
+            I2s1,
             /// RMT peripheral clock signal
             Rmt,
             /// RSA peripheral clock signal
@@ -4009,6 +4085,8 @@ macro_rules! implement_peripheral_clocks {
                 Self::GpioSd,
                 Self::I2c0,
                 Self::I2c1,
+                Self::I2s0,
+                Self::I2s1,
                 Self::Rmt,
                 Self::Rsa,
                 Self::SdioHost,
@@ -4068,6 +4146,22 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .i2c_ctrl0(1)
                         .modify(|_, w| w.apb_clk_en().bit(enable).clk_en().bit(enable));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .i2s0_ctrl0()
+                        .modify(|_, w| w.apb_clk_en().bit(enable));
+                    crate::peripherals::HP_ALIVE_SYS::regs()
+                        .hp_pad_i2s0_ctrl()
+                        .modify(|_, w| w.hp_pad_i2s0_mclk_en().bit(enable));
+                }
+                Peripheral::I2s1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .i2s1_ctrl0()
+                        .modify(|_, w| w.apb_clk_en().bit(enable));
+                    crate::peripherals::HP_ALIVE_SYS::regs()
+                        .hp_pad_i2s1_ctrl()
+                        .modify(|_, w| w.hp_pad_i2s1_mclk_en().bit(enable));
                 }
                 Peripheral::Rmt => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -4193,6 +4287,16 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .i2c_ctrl0(1)
                         .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::I2s0 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .i2s0_ctrl0()
+                        .modify(|_, w| w.apb_rst_en().bit(reset));
+                }
+                Peripheral::I2s1 => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .i2s1_ctrl0()
+                        .modify(|_, w| w.apb_rst_en().bit(reset));
                 }
                 Peripheral::Rmt => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -4369,7 +4473,16 @@ macro_rules! for_each_i2c_master {
 macro_rules! for_each_i2s {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_i2s { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner_i2s!((names)); _for_each_inner_i2s!((all));
+        _for_each_inner_i2s!((I2S0)); _for_each_inner_i2s!((I2S1));
+        _for_each_inner_i2s!((I2S0, I2s0, I2S0_MCLK, I2S0O_BCK, I2S0O_WS, I2S0I_BCK,
+        I2S0I_WS, [I2S0O_SD, I2S0O_SD1], [I2S0I_SD, I2S0I_SD1, I2S0I_SD2, I2S0I_SD3],
+        true, true, true, true)); _for_each_inner_i2s!((I2S1, I2s1, I2S1_MCLK, I2S1O_BCK,
+        I2S1O_WS, I2S1I_BCK, I2S1I_WS, [I2S1O_SD], [I2S1I_SD], true, true, false,
+        false)); _for_each_inner_i2s!((names(I2S0), (I2S1)));
+        _for_each_inner_i2s!((all(I2S0, I2s0, I2S0_MCLK, I2S0O_BCK, I2S0O_WS, I2S0I_BCK,
+        I2S0I_WS, [I2S0O_SD, I2S0O_SD1], [I2S0I_SD, I2S0I_SD1, I2S0I_SD2, I2S0I_SD3],
+        true, true, true, true), (I2S1, I2s1, I2S1_MCLK, I2S1O_BCK, I2S1O_WS, I2S1I_BCK,
+        I2S1I_WS, [I2S1O_SD], [I2S1I_SD], true, true, false, false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the UART driver.
@@ -4765,8 +4878,13 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "I2C1 peripheral singleton"]
         I2C1 <= I2C1(I2C1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
-        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "I2S1 peripheral singleton"]
+        I2S1 <= I2S1(I2S1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <=
+        INTERRUPT_CORE0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)));
@@ -4923,6 +5041,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((HP_ALIVE_SYS(unstable)));
         _for_each_inner_peripheral!((HP_SYS_CLKRST(unstable)));
         _for_each_inner_peripheral!((I2C0)); _for_each_inner_peripheral!((I2C1));
+        _for_each_inner_peripheral!((I2S0(unstable)));
+        _for_each_inner_peripheral!((I2S1(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE1(unstable)));
         _for_each_inner_peripheral!((IO_MUX(unstable)));
@@ -4972,9 +5092,11 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((FROM_CPU_INTR2(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR3(unstable)));
         _for_each_inner_peripheral!((UHCI0, Uhci0, 0, AhbGdmaChannel));
+        _for_each_inner_peripheral!((I2S0, I2s0, 1, AhbGdmaChannel));
         _for_each_inner_peripheral!((SPI2, Spi2, 1, AxiGdmaChannel));
         _for_each_inner_peripheral!((SPI3, Spi3, 2, AxiGdmaChannel));
         _for_each_inner_peripheral!((AES, Aes, 4, AxiGdmaChannel));
+        _for_each_inner_peripheral!((I2S1, I2s1, 5, AhbGdmaChannel));
         _for_each_inner_peripheral!((SHA, Sha, 5, AxiGdmaChannel));
         _for_each_inner_peripheral!((all(@ peri_type #[doc =
         "GPIO0 peripheral singleton"] GPIO0 <= virtual()), (@ peri_type #[doc =
@@ -5209,8 +5331,12 @@ macro_rules! for_each_peripheral {
         : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
         peri_type #[doc = "I2C1 peripheral singleton"] I2C1 <= I2C1(I2C1 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
-        peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <=
-        INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
+        peri_type #[doc = "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S0 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "I2S1 peripheral singleton"] I2S1 <= I2S1(I2S1
+        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"]
+        INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
         (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX <=
         IO_MUX() (unstable)), (@ peri_type #[doc = "IOMUX_MSPI_PIN peripheral singleton"]
@@ -5301,23 +5427,25 @@ macro_rules! for_each_peripheral {
         (CLIC(unstable)), (ECC(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
         (HP_APM(unstable)), (HP_MEM_APM(unstable)), (HP_SYS(unstable)),
         (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0), (I2C1),
-        (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)), (IO_MUX(unstable)),
-        (LP_AON_CLK_RST(unstable)), (LP_APM(unstable)), (LP_GPIO(unstable)),
-        (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_SYS(unstable)),
-        (LP_TEE(unstable)), (LP_WDT(unstable)), (LPWR(unstable)),
-        (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
-        (PAU(unstable)), (PMU(unstable)), (RTC_TIMER(unstable)), (RNG(unstable)),
-        (RMT(unstable)), (RSA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2),
-        (SPI3), (AXI_GDMA(unstable)), (DMA(unstable)), (SHA(unstable)),
-        (SYSTEM(unstable)), (SYSTIMER(unstable)), (SDHOST(unstable)), (TEE(unstable)),
-        (TIMG0(unstable)), (TIMG1(unstable)), (UART0), (UART1), (UART2), (UART3),
-        (UHCI0(unstable)), (USB_DEVICE(unstable)), (USB_HS(unstable)), (ADC1(unstable)),
-        (ADC2(unstable)), (FLASH(unstable)), (PSRAM(unstable)),
-        (GPIO_DEDICATED(unstable)), (CPU_CTRL(unstable)), (FROM_CPU_INTR0(unstable)),
-        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
-        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(UHCI0,
-        Uhci0, 0, AhbGdmaChannel), (SPI2, Spi2, 1, AxiGdmaChannel), (SPI3, Spi3, 2,
-        AxiGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (SHA, Sha, 5, AxiGdmaChannel)));
+        (I2S0(unstable)), (I2S1(unstable)), (INTERRUPT_CORE0(unstable)),
+        (INTERRUPT_CORE1(unstable)), (IO_MUX(unstable)), (LP_AON_CLK_RST(unstable)),
+        (LP_APM(unstable)), (LP_GPIO(unstable)), (LP_IO_MUX(unstable)),
+        (LP_PERI(unstable)), (LP_SYS(unstable)), (LP_TEE(unstable)), (LP_WDT(unstable)),
+        (LPWR(unstable)), (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)),
+        (MODEM_SYSCON(unstable)), (PAU(unstable)), (PMU(unstable)),
+        (RTC_TIMER(unstable)), (RNG(unstable)), (RMT(unstable)), (RSA(unstable)),
+        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (AXI_GDMA(unstable)),
+        (DMA(unstable)), (SHA(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)),
+        (SDHOST(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
+        (UART0), (UART1), (UART2), (UART3), (UHCI0(unstable)), (USB_DEVICE(unstable)),
+        (USB_HS(unstable)), (ADC1(unstable)), (ADC2(unstable)), (FLASH(unstable)),
+        (PSRAM(unstable)), (GPIO_DEDICATED(unstable)), (CPU_CTRL(unstable)),
+        (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
+        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(UHCI0, Uhci0, 0, AhbGdmaChannel),
+        (I2S0, I2s0, 1, AhbGdmaChannel), (SPI2, Spi2, 1, AxiGdmaChannel), (SPI3, Spi3, 2,
+        AxiGdmaChannel), (AES, Aes, 4, AxiGdmaChannel), (I2S1, I2s1, 5, AhbGdmaChannel),
+        (SHA, Sha, 5, AxiGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
@@ -6466,12 +6594,21 @@ macro_rules! define_io_mux_signals {
             U3RXD                   = 137,
             U3CTS                   = 138,
             U3DSR                   = 139,
-            I2SO_BCK                = 25,
-            I2S_MCLK                = 26,
-            I2SO_WS                 = 27,
-            I2SI_SD                 = 28,
-            I2SI_BCK                = 29,
-            I2SI_WS                 = 30,
+            I2S0O_BCK               = 25,
+            I2S0_MCLK               = 26,
+            I2S0O_WS                = 27,
+            I2S0I_SD                = 28,
+            I2S0I_BCK               = 29,
+            I2S0I_WS                = 30,
+            I2S0I_SD1               = 43,
+            I2S0I_SD2               = 44,
+            I2S0I_SD3               = 45,
+            I2S1O_BCK               = 31,
+            I2S1_MCLK               = 32,
+            I2S1O_WS                = 33,
+            I2S1I_SD                = 34,
+            I2S1I_BCK               = 35,
+            I2S1I_WS                = 36,
             FSPICLK                 = 53,
             FSPIQ                   = 54,
             FSPID                   = 55,
@@ -6487,8 +6624,6 @@ macro_rules! define_io_mux_signals {
             FSPICS3                 = 65,
             FSPICS4                 = 66,
             FSPICS5                 = 67,
-            SPI3_CS2                = 45,
-            SPI3_CS1                = 46,
             SPI3_CK                 = 47,
             SPI3_Q                  = 48,
             SPI3_D                  = 49,
@@ -6662,12 +6797,19 @@ macro_rules! define_io_mux_signals {
             U3TXD                  = 137,
             U3RTS                  = 138,
             U3DTR                  = 116,
-            I2SO_BCK               = 25,
-            I2S_MCLK               = 26,
-            I2SO_WS                = 27,
-            I2SO_SD                = 28,
-            I2SI_BCK               = 29,
-            I2SI_WS                = 30,
+            I2S0O_BCK              = 25,
+            I2S0_MCLK              = 26,
+            I2S0O_WS               = 27,
+            I2S0O_SD               = 28,
+            I2S0I_BCK              = 29,
+            I2S0I_WS               = 30,
+            I2S0O_SD1              = 43,
+            I2S1O_BCK              = 31,
+            I2S1_MCLK              = 32,
+            I2S1O_WS               = 33,
+            I2S1O_SD               = 34,
+            I2S1I_BCK              = 35,
+            I2S1I_WS               = 36,
             FSPICLK                = 53,
             FSPIQ                  = 54,
             FSPID                  = 55,

@@ -25,7 +25,9 @@ pub(crate) struct I2sMclkDividers {
 impl I2sClockDividers {
     pub(crate) fn mclk_dividers(&self) -> I2sMclkDividers {
         let (x, y, z, yn1) = if self.denominator == 0 || self.numerator == 0 {
-            (0, 0, 0, true)
+            // IDF `i2s_ll_tx_set_mclk`: no fraction → x/y/z/yn1 all 0.
+            // `yn1` with z=0 makes the hardware run at N+1.
+            (0, 0, 0, false)
         } else if self.numerator > self.denominator / 2 {
             let x = self
                 .denominator

@@ -10,8 +10,9 @@
 //!   3V3          ────────────── VCC
 //! ```
 //!
-//! Reads 16 kHz mono PCM on chips with a hardware PDM2PCM filter (ESP32, ESP32-S3, …),
-//! or 2.048 MHz raw PDM oversampling on chips without one (ESP32-C6, …), matching ESP-IDF.
+//! Reads 16 kHz mono PCM on chips with a hardware PDM2PCM filter (ESP32, ESP32-S3,
+//! ESP32-S31, …), or 2.048 MHz raw PDM oversampling on chips without one
+//! (ESP32-C6, …), matching ESP-IDF.
 //! Values are printed as `i16` like IDF's example — on raw-PDM targets that means line
 //! bitstream words, not decoded PCM.
 
@@ -79,7 +80,7 @@ async fn main(_spawner: Spawner) {
     };
 
     cfg_select! {
-        any(feature = "esp32", feature = "esp32s3", feature = "esp32p4") => {
+        i2s_supports_pdm2pcm => {
             println!("embassy_i2s_pdm_rx: PDM RX in PCM format");
         }
         _ => {
@@ -88,7 +89,7 @@ async fn main(_spawner: Spawner) {
     }
 
     let rx_cfg = cfg_select! {
-        any(feature = "esp32", feature = "esp32s3", feature = "esp32p4") => {
+        i2s_supports_pdm2pcm => {
             PdmRxConfig::new_pcm_default(Rate::from_hz(16_000), PdmSlotMode::Mono)
         }
         _ => PdmRxConfig::new_raw_default(Rate::from_hz(2_048_000), PdmSlotMode::Mono),

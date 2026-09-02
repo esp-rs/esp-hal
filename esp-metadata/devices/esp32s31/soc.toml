@@ -61,6 +61,8 @@ peripherals = [
     { name = "HP_SYS_CLKRST" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C", stable = true },
     { name = "I2C1", interrupts = { peri = "I2C1" }, clock_group = "I2C", stable = true },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S1", interrupts = { peri = "I2S1" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
@@ -279,9 +281,11 @@ engines = [
         name = "AHB_GDMA",
         max_priority = 15,
         burst_sizes = [0, 4, 16, 32, 64],
-        drivers = ["uhci"],
+        drivers = ["uhci", "i2s"],
         peripheral_instances = [
             { name = "UHCI0", dma_id = 0 },
+            { name = "I2S0", dma_id = 1 },
+            { name = "I2S1", dma_id = 5 },
         ],
         channels = [
             { name = "DMA_CH0", mem2mem = true, mem2mem_id = 9, interrupt_in = "AHB_PDMA_IN_CH0", interrupt_out = "AHB_PDMA_OUT_CH0" },
@@ -400,7 +404,44 @@ support_status = "not_supported"
 [device.i2c_slave]
 support_status = "not_supported"
 [device.i2s]
-support_status = "not_supported"
+support_status = "partial"
+version = 3
+# 0 = XTAL. Prefer APLL (1) once it's modelled in the clock tree.
+default_clock_source = 0
+clock_configured_by_hp_sys_clkrst = true
+mclk_divider_bit_width = 8
+max_ws_width = 512
+supports_pdm_rx_hp_filter = true
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        mclk = "I2S0_MCLK",
+        bclk = "I2S0O_BCK",
+        ws = "I2S0O_WS",
+        bclk_rx = "I2S0I_BCK",
+        ws_rx = "I2S0I_WS",
+        dout = ["I2S0O_SD", "I2S0O_SD1"],
+        din = ["I2S0I_SD", "I2S0I_SD1", "I2S0I_SD2", "I2S0I_SD3"],
+        pdm_tx = true,
+        pdm_rx = true,
+        pcm2pdm = true,
+        pdm2pcm = true,
+    },
+    {
+        name = "i2s1",
+        sys_instance = "I2s1",
+        mclk = "I2S1_MCLK",
+        bclk = "I2S1O_BCK",
+        ws = "I2S1O_WS",
+        bclk_rx = "I2S1I_BCK",
+        ws_rx = "I2S1I_WS",
+        dout = ["I2S1O_SD"],
+        din = ["I2S1I_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
+    },
+]
 [device.ieee802154]
 support_status = "not_supported"
 [device.key_manager]
