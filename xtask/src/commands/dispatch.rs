@@ -28,9 +28,9 @@ pub enum Verb {
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(verbs(
-        build = "Build an example, crate, or tests. Tokens: chip, crate, example, test, or package alias (examples, tests, qa), in any order.",
+        build = "Build an example, crate, or tests. Tokens: chip, crate, example, test, or package alias (examples, tests, qa), in any order. Always pass the chip, building detects no device.",
         run = "Flash and run an example or qa binary. Tokens: chip, example name, or package alias (examples, qa). Not for HIL tests — use `test`. Chip is inferred from a connected device when omitted.",
-        check = "Check crates with cargo check, or try-build examples and tests. Tokens: chip, crate, example, test, or package alias. No tokens checks all published crates.",
+        check = "Check crates with cargo check, or try-build examples and tests. Tokens: chip, crate, example, test, or package alias. No tokens checks all published crates on all chips. Pass the chip when naming an example or test, checking detects no device.",
         test = "Run HIL tests only. Tokens: chip and/or test name. Not for examples — use `run`. Chip is inferred from probe-rs when omitted.",
     ))
 )]
@@ -360,10 +360,12 @@ fn required_chips(verb: Verb, chips: &[Chip]) -> Result<Vec<Chip>> {
         return Ok(chips.to_vec());
     }
 
-    let inferred = if verb == Verb::Run {
-        crate::detect::with_espflash()
-    } else {
-        crate::detect::with_probe_rs()
+    // Only the verbs that drive a board detect one, each with the tool it is about to use.
+    // `build` and `check` never touch hardware, so they ask instead of poking every serial port.
+    let inferred = match verb {
+        Verb::Run => crate::detect::with_espflash(),
+        Verb::Test => crate::detect::with_probe_rs(),
+        Verb::Build | Verb::Check => None,
     };
     if let Some(chip) = inferred {
         return Ok(vec![chip]);
