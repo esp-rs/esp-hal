@@ -3228,6 +3228,8 @@ ignored."
     #[procmacros::doc_replace]
     /// Disconnect Wi-Fi station from the AP.
     ///
+    /// If a connection attempt is currently in progress, it is aborted.
+    ///
     /// This function will wait for the connection to be closed before returning.
     ///
     /// ## Example
@@ -3248,9 +3250,14 @@ ignored."
     /// }
     /// # {after_snippet}
     pub async fn disconnect_async(&mut self) -> Result<sta::DisconnectedInfo, WifiError> {
-        // If not connected it would wait forever for a `StationDisconnected` event that will never
-        // happen. Return early instead of hanging.
-        if !self.is_connected() {
+        // If neither connected nor connecting it would wait forever for a `StationDisconnected`
+        // event that will never happen. Return early instead of hanging. Disconnecting while
+        // `Connecting` is allowed: `esp_wifi_disconnect` cancels an in-progress connection
+        // attempt and posts a `StationDisconnected` event.
+        if !matches!(
+            station_state(),
+            WifiStationState::Connected | WifiStationState::Connecting
+        ) {
             return Err(WifiError::NotConnected);
         }
 
