@@ -8,8 +8,8 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use clap::Args;
 use serde::Deserialize;
+use strum::IntoEnumIterator as _;
 
-use super::DocTestArgs;
 use crate::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
@@ -20,6 +20,24 @@ use crate::{
 
 // ----------------------------------------------------------------------------
 // Command Arguments
+
+/// Arguments common to commands which act on doctests.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Run doc tests for the specified chip and packages",
+        command = "doc-tests"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct DocTestArgs {
+    /// Package(s) where we wish to run doc tests.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    pub packages: Vec<Package>,
+    /// Chip to target.
+    #[arg(value_enum)]
+    pub chip: Chip,
+}
 
 /// Arguments for running ELFs.
 #[cfg_attr(
