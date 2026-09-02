@@ -4598,8 +4598,9 @@ macro_rules! for_each_peripheral {
         LEDC <= LEDC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "NRX peripheral singleton"] NRX <= NRX() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "PCNT peripheral singleton"]
-        PCNT <= PCNT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "PMS peripheral singleton"] PMS <= PMS() (unstable)));
+        PCNT <= PCNT(PCNT : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "PMS peripheral singleton"] PMS <= PMS() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
         <= RMT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "RNG peripheral singleton"] RNG <= RNG() (unstable)));
@@ -4969,7 +4970,8 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX <=
         IO_MUX() (unstable)), (@ peri_type #[doc = "LEDC peripheral singleton"] LEDC <=
         LEDC() (unstable)), (@ peri_type #[doc = "NRX peripheral singleton"] NRX <= NRX()
-        (unstable)), (@ peri_type #[doc = "PCNT peripheral singleton"] PCNT <= PCNT()
+        (unstable)), (@ peri_type #[doc = "PCNT peripheral singleton"] PCNT <= PCNT(PCNT
+        : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "PMS peripheral singleton"] PMS <= PMS()
         (unstable)), (@ peri_type #[doc = "RMT peripheral singleton"] RMT <= RMT()
         (unstable)), (@ peri_type #[doc = "RNG peripheral singleton"] RNG <= RNG()

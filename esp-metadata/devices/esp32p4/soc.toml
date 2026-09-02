@@ -375,7 +375,7 @@ ram_size = 32  # placeholder; LP UART RAM size on P4 needs verification
 [device.mcpwm]
 support_status = "not_supported"  # 2 instances (MCPWM0/1)
 [device.pcnt]
-support_status = "not_supported"
+support_status = "partial"
 [device.rgb_display]
 support_status = "not_supported"  # LCD path of LCD_CAM block
 

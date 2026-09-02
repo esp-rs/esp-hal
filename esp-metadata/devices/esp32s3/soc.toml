@@ -60,7 +60,7 @@ peripherals = [
     { name = "RTC_TIMER", pac = "RTC_CNTL" },
     { name = "MCPWM0", clock_group = "MCPWM" },
     { name = "MCPWM1", clock_group = "MCPWM" },
-    { name = "PCNT" },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PERI_BACKUP" },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },

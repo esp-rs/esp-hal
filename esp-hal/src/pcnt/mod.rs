@@ -95,18 +95,14 @@
 //! [unit]: unit/index.html
 
 use self::unit::Unit;
-use crate::{
-    interrupt::{self, InterruptHandler},
-    peripherals::{Interrupt, PCNT},
-    system::GenericPeripheralGuard,
-};
+use crate::{interrupt::InterruptHandler, peripherals::PCNT, system::GenericPeripheralGuard};
 
 pub mod channel;
 pub mod unit;
 
 /// Pulse Counter (PCNT) peripheral driver.
 pub struct Pcnt<'d> {
-    _instance: PCNT<'d>,
+    pcnt: PCNT<'d>,
 
     /// Unit 0
     pub unit0: Unit<'d, 0>,
@@ -134,14 +130,14 @@ pub struct Pcnt<'d> {
 
 impl<'d> Pcnt<'d> {
     /// Returns a new PCNT.
-    pub fn new(_instance: PCNT<'d>) -> Self {
+    pub fn new(pcnt: PCNT<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
-        let pcnt = PCNT::regs();
+        let regs = pcnt.register_block();
 
-        let unit_count = pcnt.unit_iter().count() as u8;
+        let unit_count = regs.unit_iter().count() as u8;
 
         // disable filter, all events, and channel settings
-        for unit in pcnt.unit_iter() {
+        for unit in regs.unit_iter() {
             unit.conf0().write(|w| unsafe {
                 // All bits are accounted for in the TRM.
                 w.bits(0)
@@ -149,7 +145,7 @@ impl<'d> Pcnt<'d> {
         }
 
         // Remove reset bit from units.
-        pcnt.ctrl().modify(|_, w| {
+        regs.ctrl().modify(|_, w| {
             for i in 0..unit_count {
                 w.cnt_rst_u(i).clear_bit();
             }
@@ -158,7 +154,7 @@ impl<'d> Pcnt<'d> {
         });
 
         Pcnt {
-            _instance,
+            pcnt,
             unit0: Unit::new(),
             unit1: Unit::new(),
             unit2: Unit::new(),
@@ -180,10 +176,8 @@ impl<'d> Pcnt<'d> {
     /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::PCNT);
-        }
-        interrupt::bind_handler(Interrupt::PCNT, handler);
+        self.pcnt.disable_peri_interrupt_on_all_cores();
+        self.pcnt.bind_peri_interrupt(handler);
     }
 }
 
