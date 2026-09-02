@@ -165,6 +165,12 @@ fn mspi_timing_psram_tuning() {
 /// `calculate_best_flash_tuning_config`
 #[ram]
 fn mspi_timing_enter_high_speed_mode(config: &PsramConfig) {
+    info!(
+        "PSRAM clock {} MHz, flash clock {} MHz",
+        config.ram_frequency.mhz(),
+        config.flash_frequency.mhz()
+    );
+
     super::mspi_timing_config_set_flash_clock(
         config.flash_frequency.mhz(),
         MspiTimingSpeedMode::MspiTimingSpeedModeNormalPerf,

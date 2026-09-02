@@ -61,9 +61,9 @@ impl FlashFreq {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SpiRamFreq {
     /// PSRAM frequency 40 MHz
-    #[default]
     Freq40m = 40,
-    /// PSRAM frequency 80 MHz
+    /// PSRAM frequency 80 MHz. Default.
+    #[default]
     Freq80m = 80,
 }
 
@@ -121,6 +121,7 @@ impl Default for PsramConfig {
                 extra_dummy_len: 2,
             },
             ram_frequency: Default::default(),
+            // IDF default 80 MHz STR tuning point
             ram_tuning: MspiTimingTuningParam {
                 spi_din_mode: 3,
                 spi_din_num: 1,

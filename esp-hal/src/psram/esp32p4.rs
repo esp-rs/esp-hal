@@ -14,14 +14,12 @@ mod oct_hex;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum PsramMode {
-    /// 16-line DDR, AP HEX PSRAM with MR8.x16 = 1. Default.
+    /// 16-line DDR. Default.
     #[default]
     Hex,
-    // TODO; selecting `Oct`
-    // requires the cache-side controller config (`mem_sdin_hex` /
-    // `mem_sdout_hex` bits) and chip MR8.x16 to flip together. Wire that
-    // path before exposing.
-    // Oct,
+
+    /// 8-line DDR.
+    Oct,
 }
 
 /// PSRAM configuration.
