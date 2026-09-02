@@ -113,6 +113,7 @@ where
         ".option push",
         ".option norelax",
         "la gp, __global_pointer$",
+        "li ra, 0", // ensure probe-rs stops unwinding
         ".option pop",
         // Initialize the FPU (riscv32imafc has F).
         "li t0, 0x6000",
