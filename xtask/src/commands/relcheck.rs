@@ -552,7 +552,7 @@ fn revert_scrap_path_deps() -> Result<()> {
         crate::Package::Examples.to_string(),
         crate::Package::HilTest.to_string(),
         crate::Package::HilTestRadio.to_string(),
-        crate::Package::QaTest.to_string(),
+        crate::Package::QaTest.directory().to_string(),
     ];
 
     for pkg in pkgs {
@@ -595,7 +595,7 @@ fn scrap_path_deps() -> Result<()> {
         crate::Package::Examples.to_string(),
         crate::Package::HilTest.to_string(),
         crate::Package::HilTestRadio.to_string(),
-        crate::Package::QaTest.to_string(),
+        crate::Package::QaTest.directory().to_string(),
     ];
 
     for pkg in pkgs {

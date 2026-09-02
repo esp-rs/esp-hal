@@ -88,8 +88,8 @@ Ensuring the quality and reliability of `esp-hal` is a shared responsibility, an
 
 Further steps that can (or should) be taken in testing:
 
-* Using [xtask], build examples for the specified chip.
-* When documentation or doctests change, run `cargo xtask build documentation` and `cargo xtask run doc-tests <CHIP>` to build the documentation and run the doctests. To reduce build/test time, use `--packages` to specify the package(s) and `--chips` (for documentation builds) to specify the target chip(s).
+* Using [xtask], build examples for the specified chip (`cargo xtask build <name> --chip <chip>`, or `cargo xtask build examples all --chip <chip>`).
+* When documentation or doctests change, run `cargo xtask documentation` and `cargo xtask doc-tests <CHIP>` to build the documentation and run the doctests. To reduce build/test time, use `--packages` to specify the package(s) and `--chips` (for documentation builds) to specify the target chip(s).
 * Run the [HIL] tests locally if changes have been made to them.
 * Run host-side unit tests with `cargo xtask host-tests` (or `cargo xtask host-tests <package>`). When adding `#[test]` functions to a package for the first time, also add a match arm for that package in `run_host_tests` in `xtask/src/lib.rs` — see [xtask/README.md#host-tests].
 
@@ -110,13 +110,13 @@ We _strongly_ recommend that you format your code before committing to ensure co
 To format all packages in the workspace, run the following command in a terminal from the root of the repository:
 
 ```shell
-cargo xtask fmt-packages
+cargo xtask fmt
 ```
 
-We also recommend using the `lint-packages` subcommand, which uses `cargo clippy` and will lint the entire driver in order to catch common mistakes in the code.
+We also recommend using the `lint` subcommand, which uses `cargo clippy` and will lint the entire driver in order to catch common mistakes in the code.
 
 ```shell
-cargo xtask lint-packages
+cargo xtask lint
 ```
 
 This will use `rustfmt` to ensure that all source code is formatted correctly prior to committing.

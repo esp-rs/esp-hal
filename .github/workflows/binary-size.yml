@@ -18,7 +18,7 @@ on:
         required: true
         type: string
       package:
-        description: "Optional --package argument (e.g., qa-test)"
+        description: "Optional --package argument (e.g., qa)"
         required: false
         default: ""
         type: string
@@ -114,7 +114,7 @@ jobs:
             PKG_ARGS="--package $PACKAGE"
           fi
 
-          cargo xtask build examples $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
+          cargo xtask build $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
 
           EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
           MANIFEST=$(find examples -path "*/${EXAMPLE_NAME}/Cargo.toml" -print -quit 2>/dev/null || true)
@@ -123,12 +123,12 @@ jobs:
           fi
           BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
 
-          BIN=$(find target qa-test/target examples -type f \
+          BIN=$(find target examples -type f \
             -path "*/release/${BIN_NAME}" -executable 2>/dev/null | head -n 1 || true)
 
           # Fallback to `_` instead of `-`
           if [ -z "$BIN" ]; then
-            BIN=$(find target qa-test/target examples -type f \
+            BIN=$(find target examples -type f \
               -path "*/release/${EXAMPLE_NAME}" -executable 2>/dev/null | head -n 1 || true)
           fi
 
@@ -157,7 +157,7 @@ jobs:
             PKG_ARGS="--package $PACKAGE"
           fi
 
-          cargo xtask build examples $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
+          cargo xtask build $RAW_INPUT $PKG_ARGS --chip "${{ matrix.soc }}"
 
           EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
           MANIFEST=$(find examples -path "*/${EXAMPLE_NAME}/Cargo.toml" -print -quit 2>/dev/null || true)
@@ -166,12 +166,12 @@ jobs:
           fi
           BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
 
-          BIN=$(find target qa-test/target examples -type f \
+          BIN=$(find target examples -type f \
             -path "*/release/${BIN_NAME}" -executable 2>/dev/null | head -n 1 || true)
 
           # Fallback to `_` instead of `-`
           if [ -z "$BIN" ]; then
-            BIN=$(find target qa-test/target examples -type f \
+            BIN=$(find target examples -type f \
               -path "*/release/${EXAMPLE_NAME}" -executable 2>/dev/null | head -n 1 || true)
           fi
 

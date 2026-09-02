@@ -601,7 +601,7 @@ const DEPENDENCY_KINDS: [&str; 3] = ["dependencies", "dev-dependencies", "build-
 impl CargoToml {
     /// Load and parse the Cargo.toml for the specified package in the given workspace.
     pub fn new(workspace: &Path, package: Package) -> Result<Self> {
-        let package_path = workspace.join(package.to_string());
+        let package_path = workspace.join(package.directory());
         let manifest_path = package_path.join("Cargo.toml");
         if !manifest_path.exists() {
             bail!(
@@ -662,7 +662,7 @@ impl CargoToml {
 
     /// Get the absolute path to the package directory.
     pub fn package_path(&self) -> PathBuf {
-        self.workspace.join(self.package.to_string())
+        self.workspace.join(self.package.directory())
     }
 
     /// Get the absolute path to the Cargo.toml file of the package.

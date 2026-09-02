@@ -6,10 +6,10 @@ use std::{
 };
 
 use anyhow::{Context as _, Result, bail};
-use clap::{Args, Subcommand};
+use clap::Args;
 use serde::Deserialize;
 
-use super::{DocTestArgs, ExamplesArgs, TestsArgs};
+use super::DocTestArgs;
 use crate::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
@@ -19,29 +19,14 @@ use crate::{
 };
 
 // ----------------------------------------------------------------------------
-// Subcommands
-
-#[derive(Debug, Subcommand)]
-pub enum Run {
-    /// Run doctests for specified chip and package.
-    DocTests(DocTestArgs),
-    /// Run all ELFs in a folder.
-    Elfs(RunElfsArgs),
-    /// Run the given example for the specified chip.
-    Example(ExamplesArgs),
-    /// Run all applicable tests or the specified test for a specified chip.
-    Tests(TestsArgs),
-}
-
-// ----------------------------------------------------------------------------
-// Subcommand Arguments
+// Command Arguments
 
 /// Arguments for running ELFs.
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
         description = "Run all ELFs in a folder using probe-rs. Use --filter binary or binary::test_name to select which ELFs/tests run.",
-        command = "run elfs"
+        command = "elfs"
     )
 )]
 #[derive(Debug, Args)]
@@ -416,15 +401,17 @@ fn resolve_harness_binary_path(elfs: &[(String, PathBuf)], harness_name: &str) -
 
 /// Run the specified examples for the given chip.
 pub fn run_examples(
-    args: ExamplesArgs,
+    package: Package,
+    chip: Chip,
+    debug: bool,
+    toolchain: Option<&str>,
+    timings: bool,
     examples: Vec<Metadata>,
     package_path: &Path,
 ) -> Result<()> {
     let mut examples = examples;
 
-    // At this point, chip can never be `None`, so we can safely unwrap it.
-    let chip = args.chip.unwrap();
-    let target = args.package.as_package().target_triple(&chip)?;
+    let target = package.target_triple(&chip)?;
 
     examples.sort_by_key(|ex| ex.tag());
 
@@ -467,9 +454,9 @@ pub fn run_examples(
                 &target,
                 &example,
                 CargoAction::Run,
-                args.debug,
-                args.toolchain.as_deref(),
-                args.timings,
+                debug,
+                toolchain,
+                timings,
                 &[],
             );
 

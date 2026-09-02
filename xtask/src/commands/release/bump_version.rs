@@ -401,10 +401,7 @@ fn finalize_changelog(
     new_version: &semver::Version,
     dry_run: bool,
 ) -> Result<()> {
-    let changelog_path = bumped_package
-        .workspace
-        .join(bumped_package.package.to_string())
-        .join("CHANGELOG.md");
+    let changelog_path = bumped_package.package_path().join("CHANGELOG.md");
 
     if !changelog_path.exists() {
         // No changelog exists for this package

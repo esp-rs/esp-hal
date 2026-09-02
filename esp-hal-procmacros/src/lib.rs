@@ -113,7 +113,7 @@ mod unified_main;
 /// static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
 /// ```
 ///
-/// See the `ram` example in the qa-test folder of the esp-hal repository for a full usage example.
+/// See the `ram` example in `examples/qa` of the esp-hal repository for a full usage example.
 ///
 /// [`bytemuck::AnyBitPattern`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.AnyBitPattern.html
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html

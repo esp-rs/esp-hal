@@ -121,6 +121,20 @@ enum TypeClass {
     Other, // enums, String, PathBuf, etc. — treated as required string
 }
 
+fn generic_arg0(ty: &Type) -> Option<&Type> {
+    let Type::Path(tp) = ty else {
+        return None;
+    };
+    let args = &tp.path.segments.last()?.arguments;
+    let syn::PathArguments::AngleBracketed(ab) = args else {
+        return None;
+    };
+    match ab.args.first()? {
+        syn::GenericArgument::Type(inner) => Some(inner),
+        _ => None,
+    }
+}
+
 fn classify_type(ty: &Type) -> TypeClass {
     let Type::Path(tp) = ty else {
         return TypeClass::Other;
@@ -135,7 +149,13 @@ fn classify_type(ty: &Type) -> TypeClass {
     match segs[0].ident.to_string().as_str() {
         "bool" => TypeClass::Bool,
         "usize" | "u32" | "u64" | "i64" | "i32" => TypeClass::Integer,
-        "Option" => TypeClass::Option,
+        "Option" => {
+            if generic_arg0(ty).is_some_and(|inner| classify_type(inner) == TypeClass::Vec) {
+                TypeClass::Vec
+            } else {
+                TypeClass::Option
+            }
+        }
         "Vec" => TypeClass::Vec,
         _ => TypeClass::Other,
     }
@@ -349,20 +369,30 @@ fn gen_cli_push(fd: &FieldDesc) -> TokenStream2 {
 ///
 /// # Usage
 ///
+/// One CLI verb:
+///
 /// ```ignore
 /// #[cfg_attr(feature = "mcp", xtask_mcp_macros::mcp_tool(
 ///     description = "Short description visible in tool listing",
 ///     command = "subcommand-name"
 /// ))]
-/// #[derive(Debug, Args)]
-/// struct MyArgs { ... }
+/// ```
+///
+/// Several verbs that share the same Args struct:
+///
+/// ```ignore
+/// #[cfg_attr(feature = "mcp", xtask_mcp_macros::mcp_tool(
+///     verbs(
+///         build = "Build an example, crate, or tests",
+///         run = "Flash and run an example or tests",
+///     )
+/// ))]
 /// ```
 ///
 /// The macro generates:
 /// 1. A `MyArgsMcpInput` struct (`Deserialize` + `JsonSchema`)
-/// 2. A helper function `my_args_mcp_to_cli_args` that converts the input to a `Vec<String>` of CLI
-///    arguments.
-/// 3. An `inventory::submit!` block that registers the tool.
+/// 2. A helper that converts the input to CLI arguments, prefixed with the verb
+/// 3. An `inventory::submit!` block per verb
 #[proc_macro_attribute]
 pub fn mcp_tool(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
@@ -377,8 +407,8 @@ pub fn mcp_tool(attrs: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 struct McpToolAttrs {
-    description: String,
-    command: String,
+    /// `(command, description)` pairs. One pair for a single-verb tool.
+    verbs: Vec<(String, String)>,
 }
 
 fn parse_mcp_tool_attrs(attrs: TokenStream2) -> syn::Result<McpToolAttrs> {
@@ -387,51 +417,77 @@ fn parse_mcp_tool_attrs(attrs: TokenStream2) -> syn::Result<McpToolAttrs> {
 
     let mut description = None;
     let mut command = None;
+    let mut verbs = Vec::new();
 
     for item in &items {
-        let Meta::NameValue(nv) = item else {
-            continue;
-        };
-        if nv.path.is_ident("description") {
-            description = expr_lit_str(&nv.value);
-        } else if nv.path.is_ident("command") {
-            command = expr_lit_str(&nv.value);
+        match item {
+            Meta::NameValue(nv) if nv.path.is_ident("description") => {
+                description = expr_lit_str(&nv.value);
+            }
+            Meta::NameValue(nv) if nv.path.is_ident("command") => {
+                command = expr_lit_str(&nv.value);
+            }
+            Meta::List(list) if list.path.is_ident("verbs") => {
+                let inner =
+                    Punctuated::<Meta, Token![,]>::parse_terminated.parse2(list.tokens.clone())?;
+                for meta in inner {
+                    let Meta::NameValue(nv) = meta else {
+                        return Err(syn::Error::new_spanned(
+                            meta,
+                            "verbs(...) entries must be `name = \"description\"`",
+                        ));
+                    };
+                    let Some(ident) = nv.path.get_ident() else {
+                        return Err(syn::Error::new_spanned(
+                            &nv.path,
+                            "verb name must be an ident",
+                        ));
+                    };
+                    let Some(desc) = expr_lit_str(&nv.value) else {
+                        return Err(syn::Error::new_spanned(
+                            &nv.value,
+                            "description must be a string",
+                        ));
+                    };
+                    verbs.push((ident.to_string(), desc));
+                }
+            }
+            _ => {}
         }
+    }
+
+    if !verbs.is_empty() {
+        if command.is_some() || description.is_some() {
+            return Err(syn::Error::new(
+                proc_macro2::Span::call_site(),
+                "mcp_tool: use either `command`/`description` or `verbs(...)`, not both",
+            ));
+        }
+        return Ok(McpToolAttrs { verbs });
     }
 
     let description = description.ok_or_else(|| {
         syn::Error::new(
             proc_macro2::Span::call_site(),
-            "mcp_tool requires `description = \"...\"`",
+            "mcp_tool requires `description = \"...\"` or `verbs(...)`",
         )
     })?;
     let command = command.ok_or_else(|| {
         syn::Error::new(
             proc_macro2::Span::call_site(),
-            "mcp_tool requires `command = \"...\"`",
+            "mcp_tool requires `command = \"...\"` or `verbs(...)`",
         )
     })?;
 
     Ok(McpToolAttrs {
-        description,
-        command,
+        verbs: vec![(command, description)],
     })
 }
 
 fn expand_mcp_tool(attrs: McpToolAttrs, item: &ItemStruct) -> syn::Result<TokenStream2> {
     let struct_name = &item.ident;
     let input_type_name = format_ident!("{}McpInput", struct_name);
-
-    // Derive the tool name from the command string: spaces/hyphens → underscores.
-    let tool_name = attrs.command.replace([' ', '-'], "_");
-
-    // Split the command string into individual CLI tokens.
-    let command_parts: Vec<String> = attrs
-        .command
-        .split_whitespace()
-        .map(str::to_string)
-        .collect();
-    let command_parts_lit = command_parts.iter().map(|p| quote! { #p.to_string(), });
+    let struct_snake = to_snake(struct_name.to_string());
 
     let syn::Fields::Named(fields) = &item.fields else {
         return Err(syn::Error::new_spanned(
@@ -451,49 +507,54 @@ fn expand_mcp_tool(attrs: McpToolAttrs, item: &ItemStruct) -> syn::Result<TokenS
         mcp_fields.push(gen_mcp_field(&fd));
     }
 
-    let to_cli_fn = format_ident!("{}_mcp_to_cli_args", to_snake(struct_name.to_string()));
-    let schema_fn = format_ident!("{}_mcp_schema", to_snake(struct_name.to_string()));
+    let to_cli_fn = format_ident!("{}_mcp_to_cli_args", struct_snake);
+    let schema_fn = format_ident!("{}_mcp_schema", struct_snake);
 
-    let description = &attrs.description;
+    let registrations = attrs.verbs.iter().map(|(command, description)| {
+        let tool_name = command.replace([' ', '-'], "_");
+        let exec_fn = format_ident!("{}_mcp_exec_{}", struct_snake, tool_name);
+        quote! {
+            fn #exec_fn(json: ::serde_json::Value) -> ::anyhow::Result<String> {
+                let input: #input_type_name = ::serde_json::from_value(json)?;
+                let cli_args = #to_cli_fn(#command, &input);
+                crate::commands::mcp::run_xtask_subprocess(&cli_args)
+            }
+
+            ::inventory::submit!(crate::McpToolRegistration {
+                name: #tool_name,
+                description: #description,
+                input_schema_fn: #schema_fn,
+                execute_fn: #exec_fn,
+            });
+        }
+    });
 
     let generated = quote! {
-        // 1. MCP input type
         #[derive(::serde::Deserialize, ::schemars::JsonSchema)]
         pub struct #input_type_name {
             #(#mcp_fields)*
         }
 
-        // 2. CLI conversion function
-        fn #to_cli_fn(input: &#input_type_name) -> Vec<String> {
-            let mut args: Vec<String> = vec![#(#command_parts_lit)*];
+        fn #to_cli_fn(command: &str, input: &#input_type_name) -> Vec<String> {
+            let mut args: Vec<String> = command
+                .split_whitespace()
+                .map(str::to_string)
+                .collect();
             #(#cli_pushes)*
             args
         }
 
-        // 3. Schema function (plain fn pointer, not closure)
         fn #schema_fn() -> ::serde_json::Value {
             let schema = ::schemars::schema_for!(#input_type_name);
             ::serde_json::to_value(&schema)
                 .expect("schemars Schema serialization cannot fail")
         }
 
-        // 4. Inventory registration
-        ::inventory::submit!(crate::McpToolRegistration {
-            name: #tool_name,
-            description: #description,
-            input_schema_fn: #schema_fn,
-            execute_fn: |json| {
-                let input: #input_type_name = ::serde_json::from_value(json)?;
-                let cli_args = #to_cli_fn(&input);
-                crate::commands::mcp::run_xtask_subprocess(&cli_args)
-            },
-        });
+        #(#registrations)*
     };
 
-    // Emit: original struct unchanged, then the generated code.
-    let original = quote! { #item };
     Ok(quote! {
-        #original
+        #item
         #generated
     })
 }

@@ -19,6 +19,7 @@ use crate::{
 mod build;
 mod check_changelog;
 mod check_pr_changelog;
+pub mod dispatch;
 #[cfg(feature = "report")]
 pub mod generate_report;
 #[cfg(feature = "semver-checks")]
@@ -68,12 +69,12 @@ pub struct CiArgs {
     pub no_check_crates: bool,
 }
 
-/// Arguments for the `fmt-packages` subcommand.
+/// Arguments for the `fmt` subcommand.
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
         description = "Format all packages in the workspace with rustfmt",
-        command = "fmt-packages"
+        command = "fmt"
     )
 )]
 #[derive(Debug, Args)]
@@ -117,14 +118,8 @@ pub struct HostTestsArgs {
     pub packages: Vec<Package>,
 }
 
-/// Arguments for the `check-packages` subcommand.
-#[cfg_attr(
-    feature = "mcp",
-    xtask_mcp_macros::mcp_tool(
-        description = "Check all packages in the workspace with cargo check",
-        command = "check-packages"
-    )
-)]
+/// Arguments for checking packages (`check` without an example/test name, and
+/// `check-global-symbols`).
 #[derive(Debug, Args)]
 pub struct CheckPackagesArgs {
     /// Package(s) to target.
@@ -140,12 +135,12 @@ pub struct CheckPackagesArgs {
     pub toolchain: Option<String>,
 }
 
-/// Arguments for the `lint-packages` subcommand.
+/// Arguments for the `lint` subcommand.
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
         description = "Lint all packages in the workspace with clippy",
-        command = "lint-packages"
+        command = "lint"
     )
 )]
 #[derive(Debug, Args)]
@@ -167,73 +162,55 @@ pub struct LintPackagesArgs {
     pub toolchain: Option<String>,
 }
 
-// ----------------------------------------------------------------------------
-// Subcommand Arguments
-
-/// Arguments common to commands which act on examples.
+/// Flags and free-form tokens shared by `build` / `run` / `check` / `test`.
 #[cfg_attr(
     feature = "mcp",
-    xtask_mcp_macros::mcp_tool(
-        description = "Run examples for the specified chip and package",
-        command = "run example"
-    )
+    xtask_mcp_macros::mcp_tool(verbs(
+        build = "Build an example, crate, or tests. Tokens: chip, crate, example, test, or package alias (examples, tests, qa), in any order.",
+        run = "Flash and run an example or qa binary. Tokens: chip, example name, or package alias (examples, qa). Not for HIL tests — use `test`. Chip is inferred from a connected device when omitted.",
+        check = "Check crates with cargo check, or try-build examples and tests. Tokens: chip, crate, example, test, or package alias. No tokens checks all published crates.",
+        test = "Run HIL tests only. Tokens: chip and/or test name. Not for examples — use `run`. Chip is inferred from probe-rs when omitted.",
+    ))
 )]
 #[derive(Debug, Args)]
-pub struct ExamplesArgs {
-    /// Example to act on ("all" will execute every example). Omitting it asks, which needs a
-    /// terminal.
-    pub example: Option<String>,
-    /// Chip to target.
-    #[arg(value_enum, long)]
-    pub chip: Option<Chip>,
-    /// Package whose examples we wish to act on.
-    #[arg(value_enum, long, default_value_t = ExamplesPackage::Examples)]
-    pub package: ExamplesPackage,
-    /// Build examples in debug mode only
+pub struct DispatchArgs {
+    /// Chip(s) to target. Inferred from a connected device when omitted.
+    #[arg(long, value_enum, value_delimiter = ',')]
+    pub chip: Vec<Chip>,
+
+    /// Package(s) to act on.
+    #[arg(long, value_enum, value_delimiter = ',')]
+    pub package: Vec<Package>,
+
+    /// Build examples in debug mode.
     #[arg(long)]
     pub debug: bool,
 
-    /// The toolchain used to build the examples
+    /// Toolchain used to build.
     #[arg(long)]
     pub toolchain: Option<String>,
 
-    /// Emit crate build timings
+    /// Emit crate build timings.
     #[arg(long)]
     pub timings: bool,
+
+    /// Repeat HIL tests this many times.
+    #[arg(long, default_value_t = 1)]
+    pub repeat: usize,
+
+    /// HIL test selector(s). Also accepted as free-form tokens.
+    #[arg(long, short = 't', alias = "tests", value_delimiter = ',', num_args = 1..)]
+    pub test: Option<Vec<String>>,
+
+    /// Chip, crate, example, or test names, in any order.
+    pub tokens: Vec<String>,
 }
 
-/// The different packages which contain examples, and which the `examples` subcommand can act on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub enum ExamplesPackage {
-    Examples,
-    QaTest,
-    EspLpHal,
-    CompileTests,
-}
+// ----------------------------------------------------------------------------
+// Subcommand Arguments
 
-impl From<ExamplesPackage> for Package {
-    fn from(ep: ExamplesPackage) -> Self {
-        match ep {
-            ExamplesPackage::Examples => Package::Examples,
-            ExamplesPackage::QaTest => Package::QaTest,
-            ExamplesPackage::EspLpHal => Package::EspLpHal,
-            ExamplesPackage::CompileTests => Package::CompileTests,
-        }
-    }
-}
-
-impl ExamplesPackage {
-    /// Get the underlying Package
-    pub fn as_package(self) -> Package {
-        Package::from(self)
-    }
-
-    fn single_project_examples(&self) -> bool {
-        matches!(
-            self,
-            ExamplesPackage::Examples | ExamplesPackage::CompileTests
-        )
-    }
+fn standalone_example_projects(package: Package) -> bool {
+    matches!(package, Package::Examples | Package::CompileTests)
 }
 
 /// Arguments common to commands which act on doctests.
@@ -241,7 +218,7 @@ impl ExamplesPackage {
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
         description = "Run doc tests for the specified chip and packages",
-        command = "run doc-tests"
+        command = "doc-tests"
     )
 )]
 #[derive(Debug, Args)]
@@ -254,44 +231,6 @@ pub struct DocTestArgs {
     pub chip: Chip,
 }
 
-/// Arguments common to commands which act on tests.
-#[cfg_attr(
-    feature = "mcp",
-    xtask_mcp_macros::mcp_tool(
-        description = "Build or run HIL tests for the specified chip",
-        command = "run tests"
-    )
-)]
-#[derive(Debug, Args)]
-pub struct TestsArgs {
-    /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
-
-    /// Repeat the tests for a specific number of times.
-    #[arg(long, default_value_t = 1)]
-    pub repeat: usize,
-    /// Optional test to act on (all tests used if omitted).
-    ///
-    /// Multiple tests may be selected via a comma-separated list, e.g. `--test rmt,i2c,uart`.
-    /// The `test_suite::test_name` syntax allows selecting a specific test (and may be combined
-    /// with commas).
-    #[arg(long, short = 't', alias = "tests", value_delimiter = ',', num_args = 1..)]
-    pub test: Option<Vec<String>>,
-
-    /// The toolchain used to build the tests
-    #[arg(long)]
-    pub toolchain: Option<String>,
-
-    /// Emit crate build timings
-    #[arg(long)]
-    pub timings: bool,
-
-    /// "hil-test" or "hil-test-radio"
-    #[arg(default_value = "hil-test")]
-    pub package: String,
-}
-
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
@@ -302,7 +241,11 @@ const EXAMPLE_ARGUMENT_HINT: &str =
 ///
 /// A prompt needs someone to answer it, and a caller that is not a person — a script, a CI job, an
 /// agent — would wait for input that never arrives. Say what to pass instead, and stop.
-fn select<T: std::fmt::Display>(message: &str, options: Vec<T>, hint: &str) -> Result<T> {
+pub(crate) fn select<T: std::fmt::Display>(
+    message: &str,
+    options: Vec<T>,
+    hint: &str,
+) -> Result<T> {
     use std::io::IsTerminal;
     if !std::io::stdin().is_terminal() {
         bail!("\"{message}\" needs a terminal to answer it. Pass {hint}.");
@@ -312,43 +255,30 @@ fn select<T: std::fmt::Display>(message: &str, options: Vec<T>, hint: &str) -> R
 }
 
 /// Execute the given action on the specified examples.
-pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -> Result<()> {
-    log::debug!(
-        "Running examples for '{}' on '{:?}'",
-        args.package.as_package(),
-        args.chip
-    );
-    if args.chip.is_none() {
-        let chip_variants = Chip::iter().collect::<Vec<_>>();
+pub fn examples(
+    workspace: &Path,
+    package: Package,
+    chip: Chip,
+    example: Option<&str>,
+    action: CargoAction,
+    debug: bool,
+    toolchain: Option<&str>,
+    timings: bool,
+) -> Result<()> {
+    log::debug!("Running examples for '{package}' on '{chip:?}'");
 
-        let chip = select("Select your target chip:", chip_variants, "`--chip <CHIP>`")?;
-
-        args.chip = Some(chip);
-    }
-
-    let chip = args.chip.unwrap();
-
-    // Ensure that the package/chip combination provided are valid:
-    args.package
-        .as_package()
+    package
         .validate_package_chip(&chip)
-        .with_context(|| {
-            format!(
-                "The package '{0}' does not support the chip '{chip:?}'",
-                args.package.as_package()
-            )
-        })?;
+        .with_context(|| format!("The package '{package}' does not support the chip '{chip:?}'"))?;
 
-    // Absolute path of the package's root:
-    let package_path =
-        crate::windows_safe_path(&workspace.join(args.package.as_package().to_string()));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
     // Load all examples which support the specified chip and parse their metadata.
     //
     // Directories might contain a number of individual projects, and don't not rely on
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
-    let examples = if args.package.single_project_examples() {
+    let examples = if standalone_example_projects(package) {
         crate::firmware::load_cargo_toml(&package_path).with_context(|| {
             format!(
                 "Failed to load specified examples from {}",
@@ -356,7 +286,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             )
         })?
     } else {
-        let example_path = match args.package.as_package() {
+        let example_path = match package {
             Package::QaTest => package_path.join("src").join("bin"),
             _ => package_path.join("examples"),
         };
@@ -369,21 +299,13 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
         .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
-    // At this point, chip can never be `None`, so we can safely unwrap it.
-    let chip = args.chip.unwrap();
-
-    // Filter the examples down to only the binaries supported by the given chip
-    examples.retain(|ex| ex.supports_chip(chip));
-
-    // Sort all examples by name:
     examples.sort_by_key(|a| a.binary_name());
 
     let mut filtered = vec![];
 
-    if let Some(example) = args.example.as_deref() {
+    if let Some(example) = example {
         filtered.clone_from(&examples);
         if !example.eq_ignore_ascii_case("all") {
-            // Only keep the example the user wants
             filtered.retain(|ex| ex.matches_name(example));
 
             if filtered.is_empty() {
@@ -393,12 +315,14 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
                 let example_name = select(
                     "Select the example:",
-                    examples.iter().map(|ex| ex.binary_name()).collect(),
+                    examples
+                        .iter()
+                        .map(|ex| ex.lookup_name(&package_path))
+                        .collect(),
                     EXAMPLE_ARGUMENT_HINT,
                 )?;
 
-                if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_name)
-                {
+                if let Some(selected) = examples.iter().find(|ex| ex.matches_name(&example_name)) {
                     filtered.push(selected.clone());
                 }
             }
@@ -406,47 +330,68 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     } else {
         let example_name = select(
             "Select an example:",
-            examples.iter().map(|ex| ex.binary_name()).collect(),
+            examples
+                .iter()
+                .map(|ex| ex.lookup_name(&package_path))
+                .collect(),
             EXAMPLE_ARGUMENT_HINT,
         )?;
 
-        if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_name) {
+        if let Some(selected) = examples.iter().find(|ex| ex.matches_name(&example_name)) {
             filtered.push(selected.clone());
         }
     }
 
-    // Execute the specified action:
     match action {
-        CargoAction::Build(out_path) => {
-            build_examples(args, filtered, &package_path, out_path.as_deref())
-        }
-        CargoAction::Run => run_examples(args, filtered, &package_path),
+        CargoAction::Build(out_path) => build_examples(
+            package,
+            chip,
+            debug,
+            toolchain,
+            timings,
+            filtered,
+            &package_path,
+            out_path.as_deref(),
+        ),
+        CargoAction::Run => run_examples(
+            package,
+            chip,
+            debug,
+            toolchain,
+            timings,
+            filtered,
+            &package_path,
+        ),
     }
 }
 
 /// Execute the given action on the specified HIL tests.
-pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
-    // Absolute path of the 'hil-test' package's root:
-    let package_name = args.package.as_str();
+pub fn tests(
+    workspace: &Path,
+    package: Package,
+    chip: Chip,
+    test: Option<&[String]>,
+    action: CargoAction,
+    repeat: usize,
+    toolchain: Option<&str>,
+    timings: bool,
+) -> Result<()> {
+    if !matches!(package, Package::HilTest | Package::HilTestRadio) {
+        bail!("Unknown test package: {package}. Use 'hil-test' or 'hil-test-radio'");
+    }
 
-    let package_path = match package_name {
-        "hil-test" => crate::windows_safe_path(&workspace.join("hil-test")),
-        "hil-test-radio" => crate::windows_safe_path(&workspace.join("hil-test-radio")),
-        other => bail!(
-            "Unknown package: {}. Use 'hil-test' or 'hil-test-radio'",
-            other
-        ),
-    };
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
+    let is_radio_package = package == Package::HilTestRadio;
 
     // Determine the appropriate build target for the given package and chip:
-    let target = Package::HilTest.target_triple(&args.chip)?;
+    let target = Package::HilTest.target_triple(&chip)?;
 
     // Load all test metadata first so we can differentiate between:
     // - unknown test selectors (typos)
     // - valid tests that are unsupported for the selected chip.
     let bins_root = package_path.join("src").join("bin");
     let mut all_tests = crate::firmware::load(&bins_root)?;
-    if package_name == "hil-test-radio" {
+    if is_radio_package {
         let tests_root = bins_root.join("tests");
         if tests_root.exists() {
             all_tests.extend(crate::firmware::load(&tests_root)?);
@@ -459,12 +404,11 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     all_tests.sort_by_key(|a| a.binary_name());
     let tests_for_chip = all_tests
         .iter()
-        .filter(|example| example.supports_chip(args.chip))
+        .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
     // Radio tests reuse the normal HIL flow; the only difference is a pre-step
     // that builds and flashes the support firmware on a secondary probe.
-    let is_radio_package = package_name == "hil-test-radio";
     if let CargoAction::Build(Some(out_dir)) = &action {
         // Make sure the tmp directory has no garbage for us.
         let tmp_dir = out_dir.join("tmp");
@@ -476,7 +420,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     let mut artifact_meta = HashMap::<String, firmware::Metadata>::new();
     // Execute the specified action:
     // If user sets some specific test(s)
-    if let Some(test_arg) = args.test.as_deref() {
+    if let Some(test_arg) = test {
         let trimmed: Vec<&str> = test_arg.iter().map(|s| s.trim()).collect();
 
         // Reject `--test ""` / `--test " "`
@@ -506,18 +450,17 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
 
             if matched.is_empty() {
                 if is_radio_package
-                    && let Some(radio_meta) =
-                        resolve_radio_module_alias(&all_tests, args.chip, selected)
+                    && let Some(radio_meta) = resolve_radio_module_alias(&all_tests, chip, selected)
                 {
                     let command = crate::generate_build_command(
                         &package_path,
-                        args.chip,
+                        chip,
                         &target,
                         &radio_meta,
                         action.clone(),
                         false,
-                        args.toolchain.as_deref(),
-                        args.timings,
+                        toolchain,
+                        timings,
                         &[],
                     )?;
                     artifact_meta.insert(command.artifact_name.clone(), radio_meta);
@@ -528,7 +471,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             } else {
                 let matched_for_chip: Vec<_> = matched
                     .into_iter()
-                    .filter(|t| t.supports_chip(args.chip))
+                    .filter(|t| t.supports_chip(chip))
                     .collect();
 
                 if matched_for_chip.is_empty() {
@@ -539,13 +482,13 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 for test in matched_for_chip {
                     let command = crate::generate_build_command(
                         &package_path,
-                        args.chip,
+                        chip,
                         &target,
                         test,
                         action.clone(),
                         false,
-                        args.toolchain.as_deref(),
-                        args.timings,
+                        toolchain,
+                        timings,
                         run_test_extra_args,
                     )?;
                     artifact_meta.insert(command.artifact_name.clone(), test.clone());
@@ -557,7 +500,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         if !unsupported_for_chip.is_empty() {
             log::warn!(
                 "Skipping unsupported tests for '{}': {}",
-                args.chip,
+                chip,
                 unsupported_for_chip.join(", ")
             );
         }
@@ -569,13 +512,13 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         for test in tests_for_chip {
             let command = crate::generate_build_command(
                 &package_path,
-                args.chip,
+                chip,
                 &target,
                 test,
                 action.clone(),
                 false,
-                args.toolchain.as_deref(),
-                args.timings,
+                toolchain,
+                timings,
                 &[],
             )?;
             artifact_meta.insert(command.artifact_name.clone(), test.clone());
@@ -594,7 +537,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             };
 
             let Some(harness_meta) = all_tests.iter().find(|candidate| {
-                if !candidate.supports_chip(args.chip) {
+                if !candidate.supports_chip(chip) {
                     return false;
                 }
 
@@ -635,13 +578,13 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         for harness in harnesses_to_add {
             let command = crate::generate_build_command(
                 &package_path,
-                args.chip,
+                chip,
                 &target,
                 &harness,
                 action.clone(),
                 false,
-                args.toolchain.as_deref(),
-                args.timings,
+                toolchain,
+                timings,
                 &[],
             )?;
             artifact_meta.insert(command.artifact_name.clone(), harness);
@@ -657,7 +600,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
 
     for c in built_commands {
         let repeat = if matches!(action, CargoAction::Run) {
-            args.repeat
+            repeat
         } else {
             1
         };
@@ -687,10 +630,10 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 let harness_path = match build_radio_harness(
                     workspace,
                     &package_path,
-                    args.chip,
+                    chip,
                     &target,
-                    args.toolchain.as_deref(),
-                    args.timings,
+                    toolchain,
+                    timings,
                     harness_meta,
                     &mut built_harness,
                 ) {
@@ -723,7 +666,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         }
     }
 
-    move_artifacts(args.chip, &action);
+    move_artifacts(chip, &action);
 
     if !failed.is_empty() {
         bail!("Failed tests: {:#?}", failed);
@@ -732,7 +675,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     if is_radio_package && let CargoAction::Build(Some(out_dir)) = &action {
         write_radio_elf_manifest(
             out_dir,
-            args.chip,
+            chip,
             &built_artifacts,
             &artifact_meta,
             &harness_for_artifact,
