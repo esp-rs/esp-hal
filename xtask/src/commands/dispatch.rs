@@ -3,9 +3,10 @@
 use std::path::Path;
 
 use anyhow::{Result, bail};
+use clap::Args;
 use strum::IntoEnumIterator as _;
 
-use super::{CheckPackagesArgs, DispatchArgs, examples, tests};
+use super::{check::CheckPackagesArgs, examples::examples, tests::tests};
 use crate::{
     Package,
     cargo::CargoAction,
@@ -13,6 +14,50 @@ use crate::{
     metadata::Chip,
     resolve::{ResolveInput, Verb, resolve},
 };
+
+/// Flags and free-form tokens shared by `build` / `run` / `check` / `test`.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(verbs(
+        build = "Build an example, crate, or tests. Tokens: chip, crate, example, test, or package alias (examples, tests, qa), in any order.",
+        run = "Flash and run an example or qa binary. Tokens: chip, example name, or package alias (examples, qa). Not for HIL tests — use `test`. Chip is inferred from a connected device when omitted.",
+        check = "Check crates with cargo check, or try-build examples and tests. Tokens: chip, crate, example, test, or package alias. No tokens checks all published crates.",
+        test = "Run HIL tests only. Tokens: chip and/or test name. Not for examples — use `run`. Chip is inferred from probe-rs when omitted.",
+    ))
+)]
+#[derive(Debug, Args)]
+pub struct DispatchArgs {
+    /// Chip(s) to target. Inferred from a connected device when omitted.
+    #[arg(long, value_enum, value_delimiter = ',')]
+    pub chip: Vec<Chip>,
+
+    /// Package(s) to act on.
+    #[arg(long, value_enum, value_delimiter = ',')]
+    pub package: Vec<Package>,
+
+    /// Build examples in debug mode.
+    #[arg(long)]
+    pub debug: bool,
+
+    /// Toolchain used to build.
+    #[arg(long)]
+    pub toolchain: Option<String>,
+
+    /// Emit crate build timings.
+    #[arg(long)]
+    pub timings: bool,
+
+    /// Repeat HIL tests this many times.
+    #[arg(long, default_value_t = 1)]
+    pub repeat: usize,
+
+    /// HIL test selector(s). Also accepted as free-form tokens.
+    #[arg(long, short = 't', alias = "tests", value_delimiter = ',', num_args = 1..)]
+    pub test: Option<Vec<String>>,
+
+    /// Chip, crate, example, or test names, in any order.
+    pub tokens: Vec<String>,
+}
 
 /// Resolve tokens and run the matching existing action.
 pub fn dispatch(
