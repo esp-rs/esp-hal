@@ -2,7 +2,7 @@ const RUN_TESTS_STEP = "Run Tests";
 
 function isHilRunMatrixJob(name) {
   // Matches "hil-run (…)" but not "hil-run-radio (…)".
-  return /^hil-run \(/i.test(String(name || ""));
+  return /(?:^|\/\s*)hil-run \(/i.test(String(name || ""));
 }
 
 function classifyMatrixJob(job) {
@@ -14,21 +14,13 @@ function classifyMatrixJob(job) {
 
   const conclusion = runTests.conclusion;
   if (conclusion === "skipped") {
-    // A successful job intentionally skipped this chip because it had no ELFs.
-    // An unsuccessful job skipped this step because an earlier step failed.
+    // The guard step skips a chip that produced no ELFs. A job that failed, was
+    // cancelled or timed out leaves the same skipped step behind, so only a
+    // successful job means "not tested".
     if (job.conclusion === "success") {
       return { kind: "skipped" };
     }
-    if (
-      job.conclusion === "failure" ||
-      job.conclusion === "cancelled" ||
-      job.conclusion === null
-    ) {
-      return { kind: "failed" };
-    }
-    return {
-      error: `job "${job.name}" has skipped "${RUN_TESTS_STEP}" step and unexpected conclusion: ${job.conclusion}`,
-    };
+    return { kind: "failed" };
   }
   if (conclusion === "success") {
     return { kind: "passed" };
@@ -75,8 +67,12 @@ async function listWorkflowRunJobs(github, context) {
       page,
     });
 
-    jobs.push(...(data.jobs || []));
-    if (jobs.length >= data.total_count) {
+    const page_jobs = data.jobs || [];
+    jobs.push(...page_jobs);
+    // An empty page ends the walk even when total_count claims more: the count
+    // can drift while the run is still going, and trusting it alone spins here
+    // until the job times out.
+    if (page_jobs.length === 0 || jobs.length >= data.total_count) {
       break;
     }
     page += 1;

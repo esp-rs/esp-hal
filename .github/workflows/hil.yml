@@ -12,7 +12,7 @@ on:
   workflow_call:
     inputs:
       chips:
-        description: "Space-separated list of SoCs to build and test"
+        description: 'Space-separated list of SoCs to build and test, or "all"'
         required: true
         type: string
       tests:
@@ -25,6 +25,18 @@ on:
         required: false
         type: string
         default: "hil-test"
+      # Set only by the workflow_dispatch path. Declared here with empty
+      # defaults so the `inputs.branch == ''` tests that select the plain
+      # checkout, enable continue-on-error and enable hil-gate are
+      # well-defined on the workflow_call path too.
+      repository:
+        required: false
+        type: string
+        default: ""
+      branch:
+        required: false
+        type: string
+        default: ""
       # Not used by the workflow_call path, but referenced in run-name; declared
       # here (with empty defaults) so that expression is well-defined for both
       # triggers.
@@ -51,9 +63,9 @@ on:
         required: false
         default: ""
       chips:
-        description: "Space-separated list of SoCs to build and test"
+        description: 'Space-separated list of SoCs to build and test, or "all"'
         required: true
-        default: "esp32 esp32s2 esp32s3 esp32s31 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4"
+        default: "all"
       tests:
         description: "Optional list of test names to run (ELF basenames)"
         required: false
@@ -77,98 +89,103 @@ jobs:
     outputs:
       matrix: ${{ steps.chips.outputs.matrix }}
       radio_matrix: ${{ steps.chips.outputs.radio_matrix }}
+      has_radio: ${{ steps.chips.outputs.has_radio }}
     steps:
+      # Unconditional and first, because the chip table below has to come from
+      # the tree this workflow file came from.
+      - uses: actions/checkout@v6
+
       - name: Resolve chip matrix
         id: chips
+        env:
+          REQUESTED_CHIPS: ${{ inputs.chips }}
+          PKG: ${{ inputs.package }}
         run: |
-          ALL_CHIPS='[
-            {"soc":"esp32",   "rust-target":"xtensa-esp32-none-elf",        "runner":"esp32-jtag",    "host":"aarch64"},
-            {"soc":"esp32s2", "rust-target":"xtensa-esp32s2-none-elf",      "runner":"esp32s2-jtag",  "host":"aarch64"},
-            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-usb",   "host":"aarch64"},
-            {"soc":"esp32c2", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c2-jtag",  "host":"aarch64"},
-            {"soc":"esp32c3", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c3-usb",   "host":"aarch64"},
-            {"soc":"esp32c5", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c5-usb",   "host":"aarch64"},
-            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-usb",   "host":"aarch64"},
-            {"soc":"esp32c61","rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c61-usb",  "host":"aarch64"},
-            {"soc":"esp32h2", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32h2-usb",   "host":"aarch64"},
-            {"soc":"esp32p4", "rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32p4",       "host":"aarch64"},
-            {"soc":"esp32s31","rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32s31-jtag", "host":"aarch64"}
-          ]'
+          REQUESTED="$REQUESTED_CHIPS"
+          # `all` saves callers from restating the chip list. Chips without a
+          # `hil-runner` have no board on the rack, so they stay out of the
+          # matrix: a null runner label would queue forever.
+          if [ "$REQUESTED" = "all" ]; then
+            REQUESTED=$(jq -r '[.[] | select(has("hil-runner")) | .soc] | join(" ")' \
+              .github/chips.json)
+            echo "Expanded 'all' to: $REQUESTED"
+          fi
 
-          # Chips that have a dedicated radio HIL runner.
-          RADIO_CHIPS='[
-            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-radio", "host":"aarch64"},
-            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-radio", "host":"aarch64"}
-          ]'
-
-          REQUESTED="${{ inputs.chips }}"
-          MATRIX=$(echo "$ALL_CHIPS" | jq -c --arg chips "$REQUESTED" \
-            '[.[] | select(.soc as $s | $chips | split(" ") | index($s))]')
+          MATRIX=$(jq -c --arg chips "$REQUESTED" '
+            [ .[]
+              | select(has("hil-runner"))
+              | select(.soc as $s | $chips | split(" ") | index($s))
+              | { soc, arch, runner: ."hil-runner" } ]' .github/chips.json)
 
           if [ "$(echo "$MATRIX" | jq 'length')" -eq 0 ]; then
             echo "::error::No valid chips selected from input: '$REQUESTED'"
             exit 1
           fi
 
-          RADIO_MATRIX=$(echo "$RADIO_CHIPS" | jq -c --arg chips "$REQUESTED" \
-            '[.[] | select(.soc as $s | $chips | split(" ") | index($s))]')
+          RADIO_MATRIX=$(jq -c --arg chips "$REQUESTED" '
+            [ .[]
+              | select(has("hil-radio-runner"))
+              | select(.soc as $s | $chips | split(" ") | index($s))
+              | { soc, runner: ."hil-radio-runner" } ]' .github/chips.json)
 
-          PKG="${{ inputs.package }}"
           # `package: hil-test` disables the radio HIL run entirely.
           if [ "$PKG" = "hil-test" ]; then
             RADIO_MATRIX='[]'
           fi
 
-          echo "matrix={\"target\":$(echo "$MATRIX" | jq -c .)}" >> "$GITHUB_OUTPUT"
-          echo "radio_matrix={\"target\":$(echo "$RADIO_MATRIX" | jq -c .)}" >> "$GITHUB_OUTPUT"
+          echo "matrix={\"target\":$MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "radio_matrix={\"target\":$RADIO_MATRIX}" >> "$GITHUB_OUTPUT"
+          # A plain flag for the hil-run-radio `if`, so that job condition does
+          # not have to string-match the serialized matrix.
+          echo "has_radio=$(echo "$RADIO_MATRIX" | jq -r 'length > 0')" >> "$GITHUB_OUTPUT"
+
+          # Which toolchains the build below needs.
+          echo "xtensa=$(echo "$MATRIX" | jq 'any(.[]; .arch == "xtensa")')" >> "$GITHUB_OUTPUT"
+          echo "riscv=$(echo "$MATRIX" | jq 'any(.[]; .arch == "riscv")')" >> "$GITHUB_OUTPUT"
+
           echo "Selected chips: $(echo "$MATRIX" | jq -r '.[].soc' | tr '\n' ' ')"
           echo "Selected radio chips: $(echo "$RADIO_MATRIX" | jq -r '.[].soc' | tr '\n' ' ')"
 
-      - name: Determine required architectures
-        id: arch
-        run: |
-          NEED_XTENSA=false
-          NEED_RISCV=false
-          for chip in ${{ inputs.chips }}; do
-            case $chip in
-              esp32|esp32s2|esp32s3) NEED_XTENSA=true ;;
-              *) NEED_RISCV=true ;;
-            esac
-          done
-          echo "xtensa=$NEED_XTENSA" >> "$GITHUB_OUTPUT"
-          echo "riscv=$NEED_RISCV" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@v6
-        if: github.event_name != 'workflow_dispatch'
-      - uses: actions/checkout@v6
-        if: github.event_name == 'workflow_dispatch'
+      # Xtensa before RISC-V, because dtolnay/rust-toolchain makes the toolchain
+      # it installs the rustup default.
+      - uses: ./.github/actions/setup-toolchains
+        if: steps.chips.outputs.xtensa == 'true'
         with:
-          repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.branch }}
-
-      - uses: esp-rs/xtensa-toolchain@v1.6
-        if: steps.arch.outputs.xtensa == 'true'
-        with:
-          buildtargets: esp32,esp32s2,esp32s3
-          default: true
-          version: 1.97.0.0
+          xtensa: "true"
+          xtensa-default: "true"
 
       - uses: ./.github/actions/setup-nightly
-        if: steps.arch.outputs.riscv == 'true'
+        if: steps.chips.outputs.riscv == 'true'
         with:
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          targets: all
           components: rust-src
           alias: "true"
+
+      # Only the code under test comes from the dispatched ref. The chip table
+      # and the toolchains above come from the tree this workflow came from.
+      - uses: actions/checkout@v6
+        if: inputs.branch != ''
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.branch }}
 
       # Build hil-test ELFs for each requested chip (unless the dispatch
       # asked for radio-only via package=hil-test-radio).
       - name: Build hil-test tests
         if: ${{ inputs.package != 'hil-test-radio' }}
+        env:
+          # The probe below only earns its keep on a dispatch, where the ref that
+          # got checked out may predate a chip its xtask never learned about. On
+          # the workflow_call path the tree and the chip list ship together, so
+          # every chip is by definition supported and probing is pure overhead.
+          PROBE_XTASK: ${{ inputs.branch != '' }}
+          MATRIX: ${{ steps.chips.outputs.matrix }}
+          TESTS: ${{ inputs.tests }}
         run: |
-          CHIPS=$(echo '${{ steps.chips.outputs.matrix }}' | jq -r '.target[].soc')
-          TESTS="${{ inputs.tests }}"
+          CHIPS=$(echo "$MATRIX" | jq -r '.target[].soc')
           for chip in $CHIPS; do
-            if ! cargo xtask build tests "$chip" --help >/dev/null 2>&1; then
+            if [ "$PROBE_XTASK" = "true" ] && \
+               ! cargo xtask build tests "$chip" --help >/dev/null 2>&1; then
               echo "Skipping $chip: not supported by this ref's xtask"
               continue
             fi
@@ -187,7 +204,9 @@ jobs:
         with:
           name: hil-tests
           path: target/tests/
-          if-no-files-found: warn
+          # An unfiltered build must produce ELFs, so silence there is a real
+          # failure. A --tests filter legitimately matches nothing for a chip.
+          if-no-files-found: ${{ inputs.tests == '' && 'error' || 'warn' }}
 
       # Build hil-test-radio ELFs (unless the dispatch asked for hil-test
       # only).  Chips for which the radio package has no applicable binaries
@@ -198,10 +217,20 @@ jobs:
 
       - name: Build hil-test-radio tests
         if: ${{ inputs.package != 'hil-test' }}
+        env:
+          # Same reasoning as the hil-test build above: only a dispatch can
+          # land on a ref whose xtask predates a chip in the list.
+          PROBE_XTASK: ${{ inputs.branch != '' }}
+          MATRIX: ${{ steps.chips.outputs.matrix }}
+          TESTS: ${{ inputs.tests }}
         run: |
-          CHIPS=$(echo '${{ steps.chips.outputs.matrix }}' | jq -r '.target[].soc')
-          TESTS="${{ inputs.tests }}"
+          CHIPS=$(echo "$MATRIX" | jq -r '.target[].soc')
           for chip in $CHIPS; do
+            if [ "$PROBE_XTASK" = "true" ] && \
+               ! cargo xtask build tests "$chip" hil-test-radio --help >/dev/null 2>&1; then
+              echo "Skipping $chip: not supported by this ref's xtask"
+              continue
+            fi
             if [ -n "$TESTS" ]; then
               echo "Building selected hil-test-radio tests for $chip: $TESTS"
               cargo xtask build tests "$chip" hil-test-radio --tests "$TESTS"
@@ -223,12 +252,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        if: github.event_name != 'workflow_dispatch'
+        if: inputs.branch == ''
       - uses: actions/checkout@v6
-        if: github.event_name == 'workflow_dispatch'
+        if: inputs.branch != ''
         with:
-          repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.branch }}
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.branch }}
+
+      - name: Cache Dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          # Restore everywhere, but only the dispatch path is worth saving
+          # from: it runs on the default branch ref, so the entry lands in the
+          # base-branch scope every later run can read. The workflow_call path
+          # runs under merge_group, whose ephemeral ref nothing can restore
+          # from. `cross` mounts $CARGO_HOME, so a warm registry does speed up
+          # the cross build whenever the esp-devtool binary cache misses.
+          save-if: ${{ inputs.branch != '' }}
 
       # xtask runs on the AArch64 HIL runners as a host tool.
       # We build the actual tests separately using the correct toolchain.
@@ -264,9 +304,13 @@ jobs:
           path: target/aarch64-unknown-linux-gnu/release/esp-devtool
           if-no-files-found: error
 
-  hil:
+  hil-run:
     needs: [build, devtool]
     if: ${{ inputs.package != 'hil-test-radio' }}
+    # When called from ci.yml, hil-gate below decides the verdict from the ≥50%
+    # rule, so a single flaky runner must not fail the run and with it the
+    # caller's job.
+    continue-on-error: ${{ inputs.branch == '' }}
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
     strategy:
@@ -281,7 +325,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: xtask-${{ matrix.target.host }}
+          name: xtask-aarch64
 
       - name: Skip if this target wasn't built
         id: guard
@@ -291,26 +335,26 @@ jobs:
             echo "No tests for ${{ matrix.target.soc }} in this run; skipping."
           fi
 
-      - name: Compute tests arg
-        if: steps.guard.outputs.skip != 'true'
-        id: tests
-        run: |
-          if [ -n "${{ inputs.tests }}" ]; then
-            echo "value=--filter ${{ inputs.tests }}" >> $GITHUB_OUTPUT
-          else
-            echo "value=" >> $GITHUB_OUTPUT
-          fi
-
       - name: Run Tests
         if: steps.guard.outputs.skip != 'true'
         id: run-tests
+        env:
+          SOC: ${{ matrix.target.soc }}
+          TESTS: ${{ inputs.tests }}
         run: |
           [ -f ~/setup.sh ] && source ~/setup.sh
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x esp-devtool
 
-          ./esp-devtool run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
+          # An array keeps the flag off the command line entirely when no
+          # filter was asked for, without word-splitting the value itself.
+          FILTER=()
+          if [ -n "$TESTS" ]; then
+            FILTER=(--filter "$TESTS")
+          fi
+
+          ./esp-devtool run elfs "$SOC" "tests/$SOC" "${FILTER[@]}"
 
       - name: Clean up
         if: always()
@@ -321,11 +365,12 @@ jobs:
   # Radio HIL device runs (hil-test-radio) — wifi/BT capable chips on dedicated
   # radio runners.  The matrix is empty when no requested chip has a radio
   # runner, which causes this job to be skipped entirely.
-  hil-radio:
+  hil-run-radio:
     needs: [build, devtool]
     if: >
       inputs.package != 'hil-test' &&
-      needs.build.outputs.radio_matrix != '{"target":[]}'
+      needs.build.outputs.has_radio == 'true'
+    continue-on-error: ${{ inputs.branch == '' }}
     runs-on:
       labels: [self-hosted, "${{ matrix.target.runner }}"]
     strategy:
@@ -340,7 +385,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: xtask-${{ matrix.target.host }}
+          name: xtask-aarch64
 
       - name: Skip if this target wasn't built
         id: guard
@@ -348,16 +393,6 @@ jobs:
           if [ ! -d "tests/${{ matrix.target.soc }}" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT
             echo "No radio tests for ${{ matrix.target.soc }} in this run; skipping."
-          fi
-
-      - name: Compute tests arg
-        if: steps.guard.outputs.skip != 'true'
-        id: tests
-        run: |
-          if [ -n "${{ inputs.tests }}" ]; then
-            echo "value=--filter ${{ inputs.tests }}" >> $GITHUB_OUTPUT
-          else
-            echo "value=" >> $GITHUB_OUTPUT
           fi
 
       - name: Reset ESP USB-JTAG devices
@@ -398,15 +433,47 @@ jobs:
         if: steps.guard.outputs.skip != 'true'
         id: run-tests
         timeout-minutes: 3
+        env:
+          SOC: ${{ matrix.target.soc }}
+          TESTS: ${{ inputs.tests }}
         run: |
           [ -f ~/setup.sh ] && source ~/setup.sh
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x esp-devtool
-          ./esp-devtool run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }} ${{ steps.tests.outputs.value }}
+
+          FILTER=()
+          if [ -n "$TESTS" ]; then
+            FILTER=(--filter "$TESTS")
+          fi
+
+          ./esp-devtool run elfs "$SOC" "tests/$SOC" "${FILTER[@]}"
 
       - name: Clean up
         if: always()
         run: |
           rm -rf tests/ || true
           rm -f esp-devtool || true
+
+  # Merge gate for hil-run matrix legs.  Blocks when ≥50% of legs that actually
+  # ran tests failed or were cancelled.  Skipped legs (no ELFs for that chip)
+  # are excluded.  hil-run-radio is not part of this gate.
+  hil-gate:
+    needs: [build, hil-run]
+    if: >
+      always() &&
+      inputs.branch == '' &&
+      needs.build.result == 'success' &&
+      needs.hil-run.result != 'skipped'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Evaluate hil-run results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { evaluateHilGate } = require('./.github/scripts/hil-gate.js');
+            await evaluateHilGate({ github, context, core });

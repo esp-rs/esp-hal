@@ -1,6 +1,6 @@
 # esp-hal agent instructions
 
-Bare-metal `no_std` Rust HAL for Espressif SoCs. MSRV: **1.95.0** (source: `MSRV` env in `.github/workflows/ci.yml`).
+Bare-metal `no_std` Rust HAL for Espressif SoCs. MSRV: see `rust-version` in `esp-hal/Cargo.toml`.
 
 ## Chip reference
 
@@ -128,5 +128,6 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 - `documentation/API-DOC-RULES.md` — API / rustdoc writing rules (STE, EMoS, item docs)
 - `documentation/CONTRIBUTING.md` — contribution workflow
 - `xtask/README.md` — metadata annotations and xtask usage
-- `.github/workflows/ci.yml` — CI steps and MSRV
+- `.github/workflows/ci.yml` — CI steps
+- `.github/chips.json` — chip list CI builds from (arch, rust target, CI build group, HIL runner labels)
 - `esp-metadata/devices/*.toml` — per-chip peripheral definitions

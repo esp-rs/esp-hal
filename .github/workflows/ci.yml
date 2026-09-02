@@ -1,13 +1,13 @@
 # NOTE:
 #
-# When adding support for a new chip to `esp-hal`, there are a number of
-# updates which must be made to the CI workflow in order to reflect this; the
-# changes are:
+# Adding support for a new chip to `esp-hal` only needs `.github/chips.json`,
+# which feeds the 'esp-hal', 'docs' and 'msrv' jobs, the toolchain setup
+# actions, ci-nightly, binary-size and the HIL matrix.
 #
-# 1.) In the 'esp-hal' job, add the appropriate build command.
-# 1a.) If the device has a low-power core (which is supported in
-#      `esp-lp-hal`), then update the `if` condition to build prerequisites.
-# 2.) In the 'msrv' job, add checks as needed for the new chip.
+# `ci-toolchain` picks the 'esp-hal' build group the chip lands in, which is
+# also how the load is balanced across the runners. Give the chip a
+# `hil-runner` (and `hil-radio-runner`) once it has a board on the rack;
+# without one it is built but not HIL tested.
 
 name: CI
 
@@ -20,7 +20,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MSRV: "1.95.0"
   DEFMT_LOG: trace
   PROBE_RS_CONFIG_PRESET: local-hil
 
@@ -75,20 +74,18 @@ jobs:
 
           PACKAGES=""
           if [ -n "$LABELS" ]; then
-            PACKAGES=$(echo "$LABELS" \
-              | grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true \
-              | tr '\n' ',' \
-              | sed 's/,$//')
+            PACKAGES=$(printf '%s\n' "$LABELS" \
+              | { grep -oP '(?<=^breaking-change-)[a-z0-9-]+$' || true; } \
+              | tr '\n' ' ' | xargs)
           fi
 
           LABELS_SPACE=$(echo "$LABELS" | tr '\n' ' ' | xargs)
-          PACKAGES_SPACE=$(echo "$PACKAGES" | tr ',' ' ')
 
           echo "labels=$LABELS_SPACE" >> "$GITHUB_OUTPUT"
-          echo "packages=$PACKAGES_SPACE" >> "$GITHUB_OUTPUT"
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
 
           echo "Detected labels: $LABELS_SPACE"
-          echo "Detected packages: $PACKAGES_SPACE"
+          echo "Detected packages: $PACKAGES"
 
       - name: Decide what to run
         id: decide
@@ -143,28 +140,17 @@ jobs:
 
     strategy:
       matrix:
-        # load-blance runners a bit
-        group:
-          - chips: [esp32, esp32s2, esp32s3, esp32c2, esp32c3]
-            toolchain: esp
-          - chips: [esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31]
-            toolchain: stable
+        # Which chips each toolchain builds comes from `ci-toolchain` in
+        # .github/chips.json, which is also how the runner load is balanced.
+        toolchain: [esp, stable]
 
     steps:
       - uses: actions/checkout@v6
 
-      # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.6
-        if: matrix.group.toolchain == 'esp'
+      - uses: ./.github/actions/setup-toolchains
         with:
-          version: 1.97.0.0
-
-      # Install the Rust stable toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: stable
-          components: rust-src
+          xtensa: ${{ matrix.toolchain == 'esp' }}
+          riscv: "true"
 
       - name: Setup cargo-batch
         run: |
@@ -172,11 +158,18 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
+      - name: Resolve chips for this toolchain
+        id: chips
+        shell: bash
+        run: |
+          echo "chips=$(jq -r --arg t '${{ matrix.toolchain }}' \
+            '[.[] | select(."ci-toolchain" == $t) | .soc] | join(" ")' .github/chips.json)" >> "$GITHUB_OUTPUT"
+
       - name: Build and Check
         shell: bash
         env:
-          CHIPS: ${{ join(matrix.group.chips, ' ') }}
-          TOOLCHAIN: ${{ matrix.group.toolchain }}
+          CHIPS: ${{ steps.chips.outputs.chips }}
+          TOOLCHAIN: ${{ matrix.toolchain }}
         run: |
           # lints and docs are checked separately
           for chip in $CHIPS; do
@@ -198,54 +191,52 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.6
+      # Docs mix toolchains: Xtensa builds on the MSRV pin while
+      # RISC-V builds on stable.
+      - uses: ./.github/actions/setup-toolchains
         with:
-          version: 1.95.0.0
+          channel: msrv
+          xtensa: "true"
 
-      # Install the Rust stable toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: ./.github/actions/setup-toolchains
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: stable
-          components: rust-src
+          riscv: "true"
+
       # Install the Rust nightly toolchain for RISC-V devices:
       - uses: ./.github/actions/setup-nightly
         with:
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          targets: all
           components: rust-src
           alias: "true"
 
-      - name: Build Xtensa docs
-        if: matrix.group == 'xtensa'
-        shell: bash
-        run: cargo xtask build documentation --chips esp32,esp32s2,esp32s3
+      # The xtensa and riscv build disjoint chip sets, so give them
+      # separate cache entries
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: docs-${{ matrix.group }}
+          # Every merge_group run gets a unique ephemeral ref, so a cache saved
+          # there can never be restored. Restore everywhere, save elsewhere.
+          save-if: ${{ github.event_name != 'merge_group' }}
 
-      - name: Build RISC-V docs
-        if: matrix.group == 'riscv'
-        shell: bash
-        run: cargo xtask build documentation --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4,esp32s31
-
-      - name: Run Xtensa doc tests
-        if: matrix.group == 'xtensa'
+      - name: Resolve chips for this group
+        id: chips
         shell: bash
         run: |
-          cargo xtask run doc-tests esp32
-          cargo xtask run doc-tests esp32s2
-          cargo xtask run doc-tests esp32s3
+          echo "chips=$(jq -r --arg a '${{ matrix.group }}' \
+            '[.[] | select(.arch == $a) | .soc] | join(",")' .github/chips.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Run RISC-V doc tests
-        if: matrix.group == 'riscv'
+      - name: Build docs
         shell: bash
+        run: cargo xtask build documentation --chips ${{ steps.chips.outputs.chips }}
+
+      - name: Run doc tests
+        shell: bash
+        env:
+          CHIPS: ${{ steps.chips.outputs.chips }}
         run: |
-          cargo xtask run doc-tests esp32c2
-          cargo xtask run doc-tests esp32c3
-          cargo xtask run doc-tests esp32c5
-          cargo xtask run doc-tests esp32c6
-          cargo xtask run doc-tests esp32c61
-          cargo xtask run doc-tests esp32h2
-          cargo xtask run doc-tests esp32p4
-          cargo xtask run doc-tests esp32s31
+          for chip in ${CHIPS//,/ }; do
+            cargo xtask run doc-tests "$chip"
+          done
 
   # --------------------------------------------------------------------------
   # MSRV
@@ -265,36 +256,40 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: esp-rs/xtensa-toolchain@v1.6
-        if: matrix.group == 'xtensa'
+      - id: toolchains
+        uses: ./.github/actions/setup-toolchains
         with:
-          version: ${{ env.MSRV }}
+          channel: msrv
+          xtensa: ${{ matrix.group == 'xtensa' }}
+          riscv: ${{ matrix.group == 'riscv' }}
+          riscv-extra-targets: x86_64-unknown-linux-gnu
+          riscv-components: rust-src,clippy
 
       - name: esp toolchain checks
         if: matrix.group == 'xtensa'
         run: rustc +esp --version --verbose
 
-      - uses: dtolnay/rust-toolchain@v1
-        if: matrix.group == 'riscv'
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf,x86_64-unknown-linux-gnu
-          toolchain: ${{ env.MSRV }}
-          components: rust-src,clippy
-
       - name: Stable toolchain checks
         if: matrix.group == 'riscv'
-        run: rustc +${{ env.MSRV }} --version --verbose
+        run: rustc +${{ steps.toolchains.outputs.riscv-toolchain }} --version --verbose
 
-      # Verify the MSRV for all chips by running a lint session
-      - name: msrv RISC-V (esp-hal)
-        if: matrix.group == 'riscv'
-        run: |
-          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c5,esp32c6,esp32c61,esp32h2,esp32p4,esp32s31 --toolchain ${{ env.MSRV }}
+      # The xtensa and riscv lint disjoint chip sets under different
+      # toolchains, so keep their caches separate.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: msrv-${{ matrix.group }}
+          save-if: ${{ github.event_name != 'merge_group' }}
 
-      - name: msrv Xtensa (esp-hal)
-        if: matrix.group == 'xtensa'
+      - name: Resolve chips for this group
+        id: chips
         run: |
-          cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
+          echo "chips=$(jq -r --arg a '${{ matrix.group }}' \
+            '[.[] | select(.arch == $a) | .soc] | join(",")' .github/chips.json)" >> "$GITHUB_OUTPUT"
+
+      - name: msrv lint (esp-hal)
+        run: |
+          cargo xtask lint-packages --chips ${{ steps.chips.outputs.chips }} \
+            --toolchain ${{ matrix.group == 'xtensa' && 'esp' || steps.toolchains.outputs.riscv-toolchain }}
 
   # --------------------------------------------------------------------------
   # Xtensa LLD linking
@@ -320,12 +315,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Install the Rust toolchain for Xtensa devices. Keep this in sync with
-      # the `esp-hal` build job above so the LLD linking test exercises the
-      # same compiler as the rest of CI.
-      - uses: esp-rs/xtensa-toolchain@v1.6
+      # Uses the same pin as the `esp-hal` build job above, so the LLD linking
+      # test exercises the same compiler as the rest of CI.
+      - uses: ./.github/actions/setup-toolchains
         with:
-          version: 1.97.0.0
+          xtensa: "true"
 
       - name: Build hello_world with LLD
         working-directory: examples/hello_world
@@ -362,6 +356,18 @@ jobs:
         with:
           components: rustfmt,miri
           alias: "true"
+
+      # xtask funnels every package it drives into the root `target`, but the
+      # `extras` crates are built directly and keep their own target dirs.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: host-tests
+          save-if: ${{ github.event_name != 'merge_group' }}
+          workspaces: |
+            . -> target
+            extras/bench-server -> target
+            extras/esp-wifishark -> target
+            extras/ieee802154-sniffer -> target
 
       # Run xtask tests
       - name: Run xtask tests
@@ -419,6 +425,8 @@ jobs:
 
   # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
+  #
+  # Deliberately absent from `ci-result` below.
 
   link-check:
     needs: calculate
@@ -466,273 +474,14 @@ jobs:
   # --------------------------------------------------------------------------
   # HIL — build jobs gate artifacts; hil-gate gates device runs (≥50% rule).
 
-  hil-build:
+  hil:
     needs: calculate
     if: needs.calculate.outputs.run-hil == 'true'
-    runs-on: macos-m1-self-hosted
-    outputs:
-      matrix: ${{ steps.chips.outputs.matrix }}
-    steps:
-      - name: Resolve chip matrix
-        id: chips
-        run: |
-          ALL_CHIPS='[
-            {"soc":"esp32",   "rust-target":"xtensa-esp32-none-elf",        "runner":"esp32-jtag",    "host":"aarch64"},
-            {"soc":"esp32s2", "rust-target":"xtensa-esp32s2-none-elf",      "runner":"esp32s2-jtag",  "host":"aarch64"},
-            {"soc":"esp32s3", "rust-target":"xtensa-esp32s3-none-elf",      "runner":"esp32s3-usb",   "host":"aarch64"},
-            {"soc":"esp32c2", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c2-jtag",  "host":"aarch64"},
-            {"soc":"esp32c3", "rust-target":"riscv32imc-unknown-none-elf",  "runner":"esp32c3-usb",   "host":"aarch64"},
-            {"soc":"esp32c5", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c5-usb",   "host":"aarch64"},
-            {"soc":"esp32c6", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c6-usb",   "host":"aarch64"},
-            {"soc":"esp32c61","rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32c61-usb",  "host":"aarch64"},
-            {"soc":"esp32h2", "rust-target":"riscv32imac-unknown-none-elf", "runner":"esp32h2-usb",   "host":"aarch64"},
-            {"soc":"esp32p4", "rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32p4",       "host":"aarch64"},
-            {"soc":"esp32s31","rust-target":"riscv32imafc-unknown-none-elf","runner":"esp32s31-jtag", "host":"aarch64"}
-          ]'
-          echo "matrix={\"target\":$(echo "$ALL_CHIPS" | jq -c .)}" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@v6
-
-      - uses: esp-rs/xtensa-toolchain@v1.6
-        with:
-          buildtargets: esp32,esp32s2,esp32s3
-          default: true
-          version: 1.97.0.0
-
-      - uses: ./.github/actions/setup-nightly
-        with:
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          components: rust-src
-          alias: "true"
-
-      - name: Build hil-test tests
-        run: |
-          for chip in esp32 esp32s2 esp32s3 esp32s31 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4; do
-            if cargo xtask build tests "$chip" --help >/dev/null 2>&1; then
-              echo "Building ALL hil-test tests for $chip"
-              cargo xtask build tests "$chip"
-            else
-              echo "Skipping $chip: not supported by this ref's xtask"
-            fi
-          done
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: hil-tests
-          path: target/tests/
-          if-no-files-found: error
-
-      # Build radio HIL tests (hil-test-radio).  Chips for which the radio
-      # package has no applicable binaries produce no output and are silently
-      # skipped via `if-no-files-found: ignore`.
-      - name: Reset tests output directory for radio build
-        run: rm -rf target/tests
-
-      - name: Build hil-test-radio tests
-        run: |
-          for chip in esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2; do
-            if cargo xtask build tests "$chip" hil-test-radio --help >/dev/null 2>&1; then
-              echo "Building ALL hil-test-radio tests for $chip"
-              cargo xtask build tests "$chip" hil-test-radio
-            else
-              echo "Skipping $chip: not supported by this ref's xtask"
-            fi
-          done
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: hil-tests-radio
-          path: target/tests/
-          if-no-files-found: ignore
-
-  hil-devtool:
-    needs: calculate
-    if: needs.calculate.outputs.run-hil == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Cache Dependencies
-        uses: Swatinem/rust-cache@v2
-
-      # xtask runs on the AArch64 HIL runners as a host tool.
-      # Restore the binary after the dependency cache, which may replace the
-      # target directory while restoring its own cache.
-      - name: Cache xtask binary
-        id: xtask-cache
-        uses: actions/cache@v6
-        with:
-          path: target/aarch64-unknown-linux-gnu/release/esp-devtool
-          key: xtask-hil-aarch64-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'xtask/**', 'xtask-mcp-macros/**') }}
-
-      - name: Install cross-compilation target
-        if: steps.xtask-cache.outputs.cache-hit != 'true'
-        run: rustup target add aarch64-unknown-linux-gnu
-
-      - uses: taiki-e/install-action@v2
-        if: steps.xtask-cache.outputs.cache-hit != 'true'
-        with:
-          tool: cross
-
-      - name: Build xtask for HIL runners
-        if: steps.xtask-cache.outputs.cache-hit != 'true'
-        run: cross build --release --target aarch64-unknown-linux-gnu -p esp-devtool
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: xtask-aarch64
-          path: target/aarch64-unknown-linux-gnu/release/esp-devtool
-          if-no-files-found: error
-
-  # Device runs — aggregated by hil-gate (see below).
-  hil-run:
-    needs: [hil-build, hil-devtool]
-    runs-on:
-      labels: [self-hosted, "${{ matrix.target.runner }}"]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.hil-build.outputs.matrix) }}
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: hil-tests
-          path: tests/
-        continue-on-error: true
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: xtask-${{ matrix.target.host }}
-
-      - name: Skip if this target wasn't built
-        id: guard
-        run: |
-          if [ ! -d "tests/${{ matrix.target.soc }}" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "No tests for ${{ matrix.target.soc }} in this run; skipping."
-          fi
-
-      - name: Run Tests
-        if: steps.guard.outputs.skip != 'true'
-        run: |
-          [ -f ~/setup.sh ] && source ~/setup.sh
-
-          export PATH=$PATH:/home/espressif/.cargo/bin
-          chmod +x esp-devtool
-          ./esp-devtool run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
-
-      - name: Clean up
-        if: always()
-        run: |
-          rm -rf tests/ || true
-          rm -f esp-devtool || true
-
-  # Radio HIL device runs — wifi/BT capable chips on dedicated radio runners.
-  # Not gated by hil-gate or ci-result.
-  hil-run-radio:
-    needs: [hil-build, hil-devtool]
-    runs-on:
-      labels: [self-hosted, "${{ matrix.target.runner }}"]
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - soc: esp32c6
-            runner: esp32c6-radio
-            host: aarch64
-          - soc: esp32s3
-            runner: esp32s3-radio
-            host: aarch64
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: hil-tests-radio
-          path: tests/
-        continue-on-error: true
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: xtask-${{ matrix.target.host }}
-
-      - name: Skip if this target wasn't built
-        id: guard
-        run: |
-          if [ ! -d "tests/${{ matrix.target.soc }}" ]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
-            echo "No radio tests for ${{ matrix.target.soc }} in this run; skipping."
-          fi
-
-      - name: Reset ESP USB-JTAG devices
-        if: steps.guard.outputs.skip != 'true'
-        timeout-minutes: 1
-        shell: bash
-        run: |
-          # The support firmware runs forever on the harness probe; a previous
-          # run can leave the in-chip USB-Serial-JTAG bridge wedged so the next
-          # flash hangs. Issue USBDEVFS_RESET to force a clean re-enumeration.
-          python3 - <<'PY'
-          import fcntl, glob, os, time
-          USBDEVFS_RESET = (ord('U') << 8) | 20  # _IO('U', 20)
-          reset_any = False
-          for dev in glob.glob('/sys/bus/usb/devices/*'):
-              try:
-                  vid = open(os.path.join(dev, 'idVendor')).read().strip().lower()
-                  pid = open(os.path.join(dev, 'idProduct')).read().strip().lower()
-              except OSError:
-                  continue
-              if (vid, pid) != ('303a', '1001'):
-                  continue
-              busnum = int(open(os.path.join(dev, 'busnum')).read())
-              devnum = int(open(os.path.join(dev, 'devnum')).read())
-              node = f'/dev/bus/usb/{busnum:03d}/{devnum:03d}'
-              try:
-                  with open(node, 'wb') as f:
-                      fcntl.ioctl(f, USBDEVFS_RESET, 0)
-                  print(f'reset {node} ({vid}:{pid})')
-                  reset_any = True
-              except OSError as e:
-                  print(f'failed to reset {node}: {e}')
-          if reset_any:
-              time.sleep(2)  # allow udev to re-enumerate before probe-rs runs
-          PY
-
-      - name: Run Radio Tests
-        if: steps.guard.outputs.skip != 'true'
-        timeout-minutes: 3
-        run: |
-          [ -f ~/setup.sh ] && source ~/setup.sh
-
-          export PATH=$PATH:/home/espressif/.cargo/bin
-          chmod +x esp-devtool
-
-          ./esp-devtool run elfs ${{ matrix.target.soc }} tests/${{ matrix.target.soc }}
-
-      - name: Clean up
-        if: always()
-        run: |
-          rm -rf tests/ || true
-          rm -f esp-devtool || true
-
-  # Merge gate for hil-run matrix legs.  Blocks when ≥50% of legs that actually
-  # ran tests failed or were cancelled.  Skipped legs (no ELFs for that chip)
-  # are excluded.  hil-run-radio is not part of this gate.
-  hil-gate:
-    needs: [hil-build, hil-run]
-    if: >
-      always() &&
-      needs.hil-build.result == 'success' &&
-      needs.hil-run.result != 'skipped'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 1
-
-      - name: Evaluate hil-run results
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { evaluateHilGate } = require('./.github/scripts/hil-gate.js');
-            await evaluateHilGate({ github, context, core });
+    uses: ./.github/workflows/hil.yml
+    with:
+      chips: all
+      package: all
+    secrets: inherit
 
   # --------------------------------------------------------------------------
   # Gate job for branch protection
@@ -741,21 +490,24 @@ jobs:
   # Skipped jobs (due to calculate outputs) are treated as success.
   # Failed or cancelled jobs cause this gate to fail.
   #
-  # hil-build gates test compilation, and hil-devtool gates the runner tool.
-  # hil-gate gates device runs when ≥50% of executed hil-run matrix legs fail.
-  # hil-run-radio is informational only.
+  # The `hil` job is the reusable hil.yml workflow, so it covers test
+  # compilation and the runner tool as well; its hil-gate job blocks when ≥50%
+  # of executed hil-run matrix legs fail. hil-run-radio is informational only.
   ci-result:
     if: ${{ always() }}
     needs:
+      # `calculate` gates everything below it, so a failure there leaves every
+      # other job `skipped` — which this gate treats as success. Depend on it
+      # directly, or a broken decision step passes CI without running any.
+      - calculate
       - esp-hal
       - docs
       - msrv
+      - xtensa-lld
       - host-tests
       - changelog
       - semver-check
-      - hil-build
-      - hil-devtool
-      - hil-gate
+      - hil
     runs-on: ubuntu-latest
     steps:
       - name: Check CI results

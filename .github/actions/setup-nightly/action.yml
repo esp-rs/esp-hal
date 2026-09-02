@@ -3,7 +3,9 @@ description: Install the repo-wide pinned Rust nightly toolchain, with an option
 
 inputs:
   targets:
-    description: Comma-separated list of target triples to install.
+    description: >-
+      Comma-separated list of target triples to install, or "all" for every RISC-V
+      triple in chips.json.
     required: false
     default: ""
   components:
@@ -24,10 +26,25 @@ runs:
       shell: bash
       run: echo "nightly=nightly" >> "$GITHUB_OUTPUT"
 
+    - id: targets
+      shell: bash
+      run: |
+        if [ '${{ inputs.targets }}' = all ]; then
+          # Order-preserving dedupe, so the triple list reads the same as
+          # chips.json rather than being alphabetised.
+          VALUE=$(jq -r '
+            [.[] | select(.arch == "riscv") | ."rust-target"]
+            | reduce .[] as $t ([]; if index($t) then . else . + [$t] end)
+            | join(",")' .github/chips.json)
+        else
+          VALUE='${{ inputs.targets }}'
+        fi
+        echo "value=$VALUE" >> "$GITHUB_OUTPUT"
+
     - uses: dtolnay/rust-toolchain@v1
       with:
         toolchain: ${{ steps.version.outputs.nightly }}
-        targets: ${{ inputs.targets }}
+        targets: ${{ steps.targets.outputs.value }}
         components: ${{ inputs.components }}
 
     # xtask docs/doc-tests call `cargo +nightly`; make that name resolve to the pin.

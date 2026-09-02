@@ -238,240 +238,70 @@ jobs:
             }
             core.setOutput('allowed', allowed ? 'true' : 'false');
 
-  hil-quick:
+  hil:
     needs: auth
     if: github.event_name == 'issue_comment' &&
       needs.auth.outputs.allowed == 'true' &&
-      startsWith(github.event.comment.body, '/hil quick')
+      startsWith(github.event.comment.body, '/hil ')
     runs-on: ubuntu-latest
     outputs:
       run_id: ${{ steps.find-run.outputs.run_id }}
       comment_id: ${{ steps.comment.outputs.comment-id }}
+      kind: ${{ steps.mode.outputs.kind }}
+      max_polls: ${{ steps.mode.outputs.max_polls }}
     steps:
       - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
-      - name: Parse tests
-        id: parse-tests
+      - name: Resolve dispatch parameters
+        id: mode
         uses: actions/github-script@v7
         with:
           script: |
-            const { parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
+            const { parseChips, parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
+            const chips = require('./.github/chips.json');
             const body = context.payload.comment.body;
 
-            core.setOutput('tests', parseTests(body));
-            core.setOutput('package', parsePackage(body));
-
-      - name: Dispatch HIL (quick)
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          workflow: hil.yml
-          ref: ${{ github.event.repository.default_branch }}
-          inputs: |
-            {
-              "repository": "${{ github.repository }}",
-              "branch": "refs/pull/${{ github.event.issue.number }}/head",
-              "pr_number": "${{ github.event.issue.number }}",
-              "chips": "esp32c6 esp32s3",
-              "tests": "${{ steps.parse-tests.outputs.tests }}",
-              "package": "${{ steps.parse-tests.outputs.package }}",
-              "distinct_id": "${{ env.DISTINCT_ID }}"
+            // Even a quick run can legitimately take well over 15 minutes once
+            // queueing is counted, and a full one always does, so give every
+            // mode the same 45 minute budget (180 * 15s).
+            let mode, selected, kind, maxPolls = 180, error = '';
+            if (body.startsWith('/hil quick')) {
+              mode = 'quick';
+              selected = chips.filter(c => c.quick).map(c => c.soc).join(' ');
+              kind = 'HIL (quick)';
+            } else if (body.startsWith('/hil full')) {
+              mode = 'full';
+              selected = chips.map(c => c.soc).join(' ');
+              kind = 'HIL (full)';
+            } else {
+              mode = 'chips';
+              const res = parseChips(body);
+              selected = res.chips;
+              kind = 'HIL (per-chip)';
+              error = res.error;
             }
 
-      - name: Find HIL run URL (quick)
-        id: find-run
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { findHilRun } = require('./.github/scripts/hil-find-run.js');
-
-            const { runId, body } = await findHilRun({
-              github,
-              context,
-              pr: context.payload.issue.number,
-              selector: 'quick',
-              distinctId: '${{ env.DISTINCT_ID }}',
-            });
-
-            core.setOutput('run_id', runId);
-            core.setOutput('body', body);
-
-      - name: Confirm in PR
-        id: comment
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: ${{ steps.find-run.outputs.body }}
-
-  hil-quick-status:
-    needs: hil-quick
-    if: needs.hil-quick.outputs.run_id != '' && needs.hil-quick.outputs.comment_id != ''
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6 # for `require`
-        with:
-          fetch-depth: 1
-
-      - name: Wait for quick HIL run and update comment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { pollRun } = require('./.github/scripts/hil-status.js');
-
-            await pollRun({
-              github,
-              context,
-              runId: Number('${{ needs.hil-quick.outputs.run_id }}'),
-              commentId: Number('${{ needs.hil-quick.outputs.comment_id }}'),
-              kind: 'HIL (quick)',
-              // Quick runs can legitimately take >15min, especially with queueing.
-              maxPolls: 180,
-            });
-
-  hil-full:
-    needs: auth
-    if: github.event_name == 'issue_comment' &&
-      needs.auth.outputs.allowed == 'true' &&
-      startsWith(github.event.comment.body, '/hil full')
-    runs-on: ubuntu-latest
-    outputs:
-      run_id: ${{ steps.find-run.outputs.run_id }}
-      comment_id: ${{ steps.comment.outputs.comment-id }}
-    steps:
-      - uses: actions/checkout@v6 # for `require`
-        with:
-          fetch-depth: 1
-
-      - name: Parse tests
-        id: parse-tests
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
-            const body = context.payload.comment.body;
-
-            core.setOutput('tests', parseTests(body));
-            core.setOutput('package', parsePackage(body));
-
-      - name: Dispatch HIL (full)
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          workflow: hil.yml
-          ref: ${{ github.event.repository.default_branch }}
-          inputs: |
-            {
-              "repository": "${{ github.repository }}",
-              "branch": "refs/pull/${{ github.event.issue.number }}/head",
-              "pr_number": "${{ github.event.issue.number }}",
-              "chips": "esp32 esp32s2 esp32s3 esp32s31 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32p4",
-              "tests": "${{ steps.parse-tests.outputs.tests }}",
-              "package": "${{ steps.parse-tests.outputs.package }}",
-              "distinct_id": "${{ env.DISTINCT_ID }}"
-            }
-
-      - name: Find HIL run URL (full)
-        id: find-run
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { findHilRun } = require('./.github/scripts/hil-find-run.js');
-
-            const { runId, body } = await findHilRun({
-              github,
-              context,
-              pr: context.payload.issue.number,
-              selector: 'full',
-              distinctId: '${{ env.DISTINCT_ID }}',
-            });
-
-            core.setOutput('run_id', runId);
-            core.setOutput('body', body);
-
-      - name: Confirm in PR
-        id: comment
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: ${{ steps.find-run.outputs.body }}
-
-  hil-full-status:
-    needs: hil-full
-    if: needs.hil-full.outputs.run_id != '' && needs.hil-full.outputs.comment_id != ''
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6 # for `require`
-        with:
-          fetch-depth: 1
-
-      - name: Wait for full HIL run and update comment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { pollRun } = require('./.github/scripts/hil-status.js');
-
-            await pollRun({
-              github,
-              context,
-              runId: Number('${{ needs.hil-full.outputs.run_id }}'),
-              commentId: Number('${{ needs.hil-full.outputs.comment_id }}'),
-              kind: 'HIL (full)',
-            });
-
-  # ---------------------------------------------------------------------------
-  # PER-CHIP HIL: /hil esp32c3 [esp32s3 ...] [--tests ...]
-  # ---------------------------------------------------------------------------
-
-  hil-chips:
-    needs: auth
-    if: github.event_name == 'issue_comment' &&
-      needs.auth.outputs.allowed == 'true' &&
-      startsWith(github.event.comment.body, '/hil ') &&
-      !startsWith(github.event.comment.body, '/hil quick') &&
-      !startsWith(github.event.comment.body, '/hil full')
-    runs-on: ubuntu-latest
-    outputs:
-      run_id: ${{ steps.find-run.outputs.run_id }}
-      comment_id: ${{ steps.comment.outputs.comment-id }}
-    steps:
-      - uses: actions/checkout@v6 # for `require`
-        with:
-          fetch-depth: 1
-
-      - name: Parse chips
-        id: parse
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { parseChips } = require('./.github/scripts/hil-parse.js');
-
-            const res = parseChips(context.payload.comment.body);
-
-            core.setOutput('chips', res.chips);
-            core.setOutput('chips_label', res.chipsLabel);
-            core.setOutput('error', res.error);
-
-      - name: Parse tests
-        id: parse-tests
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
-            const body = context.payload.comment.body;
-
+            core.setOutput('selector', mode === 'chips' ? selected : mode);
+            core.setOutput('mode', mode);
+            core.setOutput('chips', selected);
+            core.setOutput('kind', kind);
+            core.setOutput('max_polls', String(maxPolls));
+            core.setOutput('error', error);
             core.setOutput('tests', parseTests(body));
             core.setOutput('package', parsePackage(body));
 
       - name: Report invalid chips
-        if: steps.parse.outputs.chips == '' && steps.parse.outputs.error != ''
+        if: steps.mode.outputs.chips == '' && steps.mode.outputs.error != ''
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: |
-            @${{ github.event.comment.user.login }}, HIL **per-chip** request failed: ${{ steps.parse.outputs.error }}
+            @${{ github.event.comment.user.login }}, HIL **per-chip** request failed: ${{ steps.mode.outputs.error }}
 
-      - name: Dispatch HIL (per-chip)
-        if: steps.parse.outputs.chips != ''
+      - name: Dispatch HIL
+        if: steps.mode.outputs.chips != ''
         uses: benc-uk/workflow-dispatch@v1
         with:
           workflow: hil.yml
@@ -481,14 +311,14 @@ jobs:
               "repository": "${{ github.repository }}",
               "branch": "refs/pull/${{ github.event.issue.number }}/head",
               "pr_number": "${{ github.event.issue.number }}",
-              "chips": "${{ steps.parse.outputs.chips }}",
-              "tests": "${{ steps.parse-tests.outputs.tests }}",
-              "package": "${{ steps.parse-tests.outputs.package }}",
+              "chips": "${{ steps.mode.outputs.chips }}",
+              "tests": "${{ steps.mode.outputs.tests }}",
+              "package": "${{ steps.mode.outputs.package }}",
               "distinct_id": "${{ env.DISTINCT_ID }}"
             }
 
-      - name: Find HIL run URL (per-chip)
-        if: steps.parse.outputs.chips != ''
+      - name: Find HIL run URL
+        if: steps.mode.outputs.chips != ''
         id: find-run
         uses: actions/github-script@v7
         with:
@@ -499,7 +329,7 @@ jobs:
               github,
               context,
               pr: context.payload.issue.number,
-              selector: '${{ steps.parse.outputs.chips }}',
+              selector: '${{ steps.mode.outputs.selector }}',
               distinctId: '${{ env.DISTINCT_ID }}',
             });
 
@@ -507,23 +337,23 @@ jobs:
             core.setOutput('body', body);
 
       - name: Confirm in PR
-        if: steps.parse.outputs.chips != ''
+        if: steps.mode.outputs.chips != ''
         id: comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: ${{ steps.find-run.outputs.body }}
 
-  hil-chips-status:
-    needs: hil-chips
-    if: needs.hil-chips.outputs.run_id != '' && needs.hil-chips.outputs.comment_id != ''
+  hil-status:
+    needs: hil
+    if: needs.hil.outputs.run_id != '' && needs.hil.outputs.comment_id != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6 # for `require`
         with:
           fetch-depth: 1
 
-      - name: Wait for per-chip HIL run and update comment
+      - name: Wait for HIL run and update comment
         uses: actions/github-script@v7
         with:
           script: |
@@ -532,18 +362,17 @@ jobs:
             await pollRun({
               github,
               context,
-              runId: Number('${{ needs.hil-chips.outputs.run_id }}'),
-              commentId: Number('${{ needs.hil-chips.outputs.comment_id }}'),
-              kind: 'HIL (per-chip)',
+              runId: Number('${{ needs.hil.outputs.run_id }}'),
+              commentId: Number('${{ needs.hil.outputs.comment_id }}'),
+              kind: '${{ needs.hil.outputs.kind }}',
+              maxPolls: Number('${{ needs.hil.outputs.max_polls }}'),
             });
 
   hil-deny:
     needs: auth
     if:
       github.event_name == 'issue_comment' && needs.auth.outputs.allowed != 'true' &&
-      (startsWith(github.event.comment.body, '/hil quick') ||
-      startsWith(github.event.comment.body, '/hil full')  ||
-      startsWith(github.event.comment.body, '/hil ')      ||
+      (startsWith(github.event.comment.body, '/hil ') ||
       startsWith(github.event.comment.body, '/test-size'))
     runs-on: ubuntu-latest
     steps:
@@ -603,9 +432,10 @@ jobs:
 
       - name: Extract parameters from comment
         id: extract
+        env:
+          COMMENT: ${{ github.event.comment.body }}
         run: |
           # Expected format: /test-size example_name chip(s)
-          COMMENT="${{ github.event.comment.body }}"
           # Use only the line that holds the command (let users add free-form
           # text in the rest of the comment) and strip any CR characters that
           # GitHub may include on CRLF line endings.
@@ -626,7 +456,7 @@ jobs:
           fi
 
           # Known chips — everything matching these is a chip, first token is the example
-          KNOWN_CHIPS="esp32 esp32c2 esp32c3 esp32c5 esp32c6 esp32c61 esp32h2 esp32s2 esp32s3 esp32s31 esp32p4"
+          KNOWN_CHIPS=$(jq -r '[.[].soc] | join(" ")' .github/chips.json)
 
           EXAMPLE_NAME=""
           CHIPS_JSON="["
