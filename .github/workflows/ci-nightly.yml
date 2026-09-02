@@ -82,7 +82,7 @@ jobs:
           xtensa: "true"
 
       - name: Lint esp-hal on Xtensa chip
-        run: cargo xtask lint-packages --chips ${{ matrix.device }} --toolchain esp
+        run: cargo xtask lint --chips ${{ matrix.device }} --toolchain esp
 
   check-global-symbols:
     name: Check Global Symbols in esp-hal

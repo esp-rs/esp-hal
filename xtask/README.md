@@ -8,60 +8,79 @@ Automation using [cargo-xtask](https://github.com/matklad/cargo-xtask).
 Usage: esp-devtool <COMMAND>
 
 Commands:
-  build                 Build-related subcommands
-  run                   Run-related subcommands
+  build                 Build an example, crate, or tests
+  run                   Run an example or qa binary
+  check                 Check crates, or try-build examples and tests
+  test                  Run HIL tests
+  documentation         Build rustdoc for the specified packages and chips
+  doc-tests             Run rustdoc tests for the specified chip
+  elfs                  Run prebuilt ELFs with probe-rs
   release               Release-related subcommands
   ci                    Perform (parts of) the checks done in CI
-  fmt-packages          Format all packages in the workspace with rustfmt
+  fmt                   Format all packages in the workspace with rustfmt
   clean                 Run cargo clean
-  check-packages        Check all packages in the workspace with cargo check
-  lint-packages         Lint all packages in the workspace with clippy
-  semver-check          Semver Checks
-  check-changelog       Check the changelog for packages
-  check-pr-changelog    Validate the changelog format of a PR description
-  host-tests            Run host-tests in the workspace with `cargo test`
-  check-global-symbols  Check global symbols in the compiled `.rlib` of the specified packages for the specified chips
-  generate-report       Generate reports from CI data
-  rel-check             Tasks for checking compile tests with a local registry
-  mcp                   Start the MCP server (stdio transport, for use with Claude Code)
-  help                  Print this message or the help of the given subcommand(s)
-
-Options:
-  -h, --help  Print help
+  lint                  Lint all packages in the workspace with clippy
+  ...
 ```
 
-You can get help for subcommands, too!
+`build` / `run` / `check` / `test` take free-form tokens (chip, crate, example, test, or a package
+alias like `examples` / `qa` / `tests`) in any order. `--chip` / `--package` are optional flags:
 
 ```text
-cargo xtask build examples --help
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
-     Running `[...]/target/debug/xtask build examples --help`
+cargo xtask build --help
+```
 
-Build all examples for the specified chip
-
-Usage: esp-devtool build examples [OPTIONS] <EXAMPLE>
-
-[...]
+```text
+Usage: esp-devtool build [OPTIONS] [TOKENS]...
 ```
 
 ### Selecting examples
 
-`build examples` and `run example` take the example name as their first argument, and `all` in that
-position means every example of the package:
-
 ```text
-cargo xtask build examples uart --chip esp32c6
+cargo xtask build uart --chip esp32c6
 cargo xtask build examples all --chip esp32c6
-cargo xtask build examples all --chip esp32c6 --package qa-test
+cargo xtask build qa all --chip esp32c6
+cargo xtask run hello_world
 ```
 
-Omitting the name is not a shortcut for `all`. The command asks which example to act on, so a caller
-with no terminal — a script, a CI job, an agent — gets an error naming this argument instead of a
-build. `--chip` behaves the same way.
+`examples` / `qa` / `tests` are package aliases, so `build examples uart` still selects the examples
+crate. Omitting the name is not a shortcut for `all`. The command asks which example to act on, so a
+caller with no terminal — a script, a CI job, an agent — gets an error naming this argument instead
+of a build. `--chip` behaves the same way when it cannot be inferred.
 
-> Tip: To avoid rebuilding the xtask, you can install it using `cargo install-xtask` from the repo root once, then call `esp-devtool <command>`.
->
-> You will need to reinstall from time to time, for example when a new driver is added to `esp-metadata`.
+## `cargo xtask` vs `esp-devtool`
+
+The binary is named **`esp-devtool`**. `cargo xtask` is just a cargo alias that builds and
+runs it from this repo.
+
+Same CLI, two ways to invoke it:
+
+| How | When to use |
+|---|---|
+| `cargo xtask <command>` | Default while working in this repo. Cargo rebuilds the tool when its sources change. |
+| `esp-devtool <command>` | Daily use after a one-time install. Skips the rebuild of the tool itself. |
+
+Install from the repository root:
+
+```text
+cargo install-xtask
+```
+
+That is an alias for `cargo install --path ./xtask --all-features`. The binary lands in
+`~/.cargo/bin/esp-devtool` (must be on `PATH`, which rustup usually already provides).
+
+Reinstall after pulling changes that touch `xtask/` or `esp-metadata/` (new chips, new
+drivers, CLI changes). Until you reinstall, `esp-devtool` is the old binary.
+
+```text
+esp-devtool fmt
+esp-devtool fmt --check
+cargo xtask fmt              # same command, rebuilt from source
+cargo xfmt                   # cargo alias for `xtask fmt`
+```
+
+`fmt-packages` and `format-packages` remain aliases of `fmt`. `lint-packages` remains an alias of
+`lint`.
 
 ## Releasing crates
 
@@ -147,7 +166,7 @@ semver-config = {
 `check-configs` and `clippy-configs` are arrays of cases. `doc-config` and `semver-config` are
 single inline tables.
 
-`cargo xtask check-packages` reads `check-configs`; `cargo xtask lint-packages` reads
+`cargo xtask check` reads `check-configs`; `cargo xtask lint` reads
 `clippy-configs`; documentation builds read `doc-config`; semver checks read `semver-config`. If `check-configs` is absent, a single
 default case with no features and no env overrides is used. `CI`, `DEFMT_LOG`, and `ESP_LOG`
 (check only) are always set by xtask and override duplicate keys from metadata. Documentation
@@ -292,9 +311,9 @@ option, while the other will select `multiple-integrated`.
 You can specify a test or example by file, or by configuration. If the
 parameters match multiple files, they will be built or executed in succession.
 
-For example, running `cargo xtask run tests esp32 embassy_test` will run both
+For example, running `cargo xtask test esp32 embassy_test` will run both
 `embassy_test_single_integrated` and `embassy_test_multiple_integrated`, but you can also
-run `cargo xtask run tests esp32 embassy_test_multiple_integrated` to select only one.
+run `cargo xtask test esp32 embassy_test_multiple_integrated` to select only one.
 
 In this example, running the `cargo xtask build tests esp32 embassy_test` command creates an
 `embassy_test_single_integrated` and an `embassy_test_multiple_integrated` binary.

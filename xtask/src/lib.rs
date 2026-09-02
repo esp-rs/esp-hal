@@ -2,10 +2,12 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    time::Duration,
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use cargo::CargoAction;
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use pretty_yaml::{config::FormatOptions, format_text};
@@ -22,11 +24,13 @@ use crate::{
 pub mod cargo;
 pub mod changelog;
 pub mod commands;
+pub mod detect;
 pub mod documentation;
 pub mod firmware;
 pub mod git;
 pub mod metadata;
 pub mod pr_changelog;
+pub mod resolve;
 
 /// GitHub repository used for all `gh` CLI calls.
 pub const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
@@ -131,6 +135,16 @@ fn repo_root() -> PathBuf {
 static TOML: Mutex<Option<HashMap<Package, Option<CargoToml>>>> = Mutex::new(None);
 
 impl Package {
+    /// Source directory relative to the workspace root.
+    ///
+    /// Usually matches the clap/package name. QA tests live under `examples/qa`.
+    pub fn directory(&self) -> &str {
+        match self {
+            Self::QaTest => "examples/qa",
+            other => other.as_ref(),
+        }
+    }
+
     /// Does the package have chip-specific cargo features?
     pub fn has_chip_features(&self) -> bool {
         use strum::IntoEnumIterator;
@@ -865,7 +879,7 @@ pub fn format_package(
     format_rules: Option<&Path>,
 ) -> Result<()> {
     log::info!("Formatting package: {}", package);
-    let package_path = workspace.join(package.as_ref());
+    let package_path = workspace.join(package.directory());
 
     let paths = if package.contains_standalone_projects() {
         crate::find_packages(&package_path)?
@@ -888,7 +902,7 @@ pub fn format_package(
 /// with the correct `cargo test` flags/features. See `xtask/README.md` ("Host tests").
 pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     log::info!("Running host tests for package: {}", package);
-    let package_path = workspace.join(package.as_ref());
+    let package_path = workspace.join(package.directory());
 
     let cmd = CargoArgsBuilder::default();
 
@@ -1184,6 +1198,36 @@ pub(crate) fn repo_root_for_tests() -> PathBuf {
         .to_path_buf()
 }
 
+/// Spawn `command`, capture stdout/stderr, kill it if it exceeds `timeout`.
+pub(crate) fn run_command_with_output_timeout(
+    mut command: Command,
+    name: &str,
+    timeout: Duration,
+) -> Result<std::process::Output> {
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| anyhow!("Failed to spawn {name}: {e}"))?;
+    let start = Instant::now();
+
+    loop {
+        if child.try_wait()?.is_some() {
+            return child
+                .wait_with_output()
+                .map_err(|e| anyhow!("Failed to collect {name} output: {e}"));
+        }
+
+        if start.elapsed() > timeout {
+            let _ = child.kill();
+            let _ = child.wait();
+            bail!("{name} timed out after {}s", timeout.as_secs());
+        }
+
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use strum::IntoEnumIterator;
@@ -1195,7 +1239,7 @@ mod tests {
         let workspace = repo_root_for_tests();
 
         for package in Package::iter() {
-            let package_path = workspace.join(package.to_string());
+            let package_path = workspace.join(package.directory());
             assert!(
                 package_path.is_dir(),
                 "package '{package}' has no directory at {}",
@@ -1211,6 +1255,9 @@ mod tests {
                 package.contains_standalone_projects(),
             );
         }
+
+        assert_eq!(Package::QaTest.to_string(), "qa-test");
+        assert_eq!(Package::QaTest.directory(), "examples/qa");
     }
 
     #[test]
@@ -1218,7 +1265,7 @@ mod tests {
         let workspace = repo_root_for_tests();
 
         for package in Package::iter().filter(Package::contains_standalone_projects) {
-            let projects = find_packages(&workspace.join(package.to_string()))
+            let projects = find_packages(&workspace.join(package.directory()))
                 .unwrap_or_else(|err| panic!("could not enumerate projects of '{package}': {err}"));
 
             assert!(

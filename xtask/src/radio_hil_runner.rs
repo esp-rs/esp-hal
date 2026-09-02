@@ -346,7 +346,8 @@ fn detect_probes(probes: Option<String>) -> Result<Vec<String>> {
 
     let mut command = Command::new("probe-rs");
     command.args(["list"]);
-    let output = run_command_with_output_timeout(command, "probe-rs list", PROBE_LIST_TIMEOUT)?;
+    let output =
+        crate::run_command_with_output_timeout(command, "probe-rs list", PROBE_LIST_TIMEOUT)?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!("Failed to run `probe-rs list`: {}", stderr.trim());
@@ -371,33 +372,4 @@ fn detect_probes(probes: Option<String>) -> Result<Vec<String>> {
     }
 
     Ok(discovered)
-}
-
-fn run_command_with_output_timeout(
-    mut command: Command,
-    name: &str,
-    timeout: Duration,
-) -> Result<std::process::Output> {
-    let mut child = command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| anyhow!("Failed to spawn {name}: {e}"))?;
-    let start = Instant::now();
-
-    loop {
-        if child.try_wait()?.is_some() {
-            return child
-                .wait_with_output()
-                .map_err(|e| anyhow!("Failed to collect {name} output: {e}"));
-        }
-
-        if start.elapsed() > timeout {
-            let _ = child.kill();
-            let _ = child.wait();
-            bail!("{name} timed out after {}s", timeout.as_secs());
-        }
-
-        thread::sleep(Duration::from_millis(100));
-    }
 }

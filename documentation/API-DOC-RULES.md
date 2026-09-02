@@ -49,7 +49,7 @@ After any bulk doc pass:
    - typos: `Fow `, `Finishes of`, British spellings (`behaviour`, `whilst`, `initialised`)
    - empty sections: `# Examples` / `# Errors` / `# Panics` / `# Safety` / `# Cancellation Safety` immediately followed by the next item or another `#` heading with no body
    - stray characters: unexpected non-ASCII in `///` / `//!` lines (e.g. `ç`, `Ã`, mojibake), or a letter immediately after a sentence-ending `.` (`level.ç`, `pin.x`)
-3. Run `cargo xtask build documentation --packages=esp-hal --chips=<chip>` (esp-hal denies `rustdoc::all` warnings).
+3. Run `cargo xtask documentation --packages=esp-hal --chips=<chip>` (esp-hal denies `rustdoc::all` warnings).
 
 ## Simplified Technical English (ASD-STE100)
 

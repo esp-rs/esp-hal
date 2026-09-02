@@ -110,13 +110,50 @@ impl Metadata {
             return false;
         };
 
-        filter == self.binary_name() || filter == self.output_file_name()
+        self.matches_name(filter)
     }
 
-    /// Check if the example matches the given name (case insensitive).
-    pub fn matches_name(&self, name: &str) -> bool {
-        name.to_lowercase() == self.binary_name() || name.to_lowercase() == self.output_file_name()
+    /// Returns this example's path relative to `package_root` for matching.
+    ///
+    /// Drops a `.rs` suffix and a `src/bin/` prefix, so nested projects become
+    /// `ota/update` and bins stay `sleep_timer`.
+    pub fn lookup_name(&self, package_root: &Path) -> String {
+        let path = self.example_path();
+        let relative = path.strip_prefix(package_root).unwrap_or(path);
+        let mut name = relative.to_string_lossy().replace('\\', "/");
+        if let Some(stripped) = name.strip_suffix(".rs") {
+            name = stripped.to_string();
+        }
+        if let Some(stripped) = name.strip_prefix("src/bin/") {
+            name = stripped.to_string();
+        }
+        name
     }
+
+    /// Checks if the example matches the given name (case insensitive).
+    ///
+    /// Accepts the binary name, the output file name, and a relative path
+    /// (`ota/update`, `examples/ota/update`).
+    pub fn matches_name(&self, name: &str) -> bool {
+        let name = normalize_source_name(name);
+        if name.is_empty() {
+            return false;
+        }
+        if name == self.binary_name().to_lowercase()
+            || name == self.output_file_name().to_lowercase()
+        {
+            return true;
+        }
+        let path = normalize_source_name(&self.example_path().to_string_lossy());
+        path.ends_with(&format!("/{name}"))
+    }
+}
+
+fn normalize_source_name(name: &str) -> String {
+    name.trim()
+        .trim_end_matches(".rs")
+        .replace('\\', "/")
+        .to_lowercase()
 }
 
 /// A single configuration of an example, as parsed from metadata lines.

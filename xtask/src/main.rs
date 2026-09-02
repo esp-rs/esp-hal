@@ -15,6 +15,7 @@ use xtask::{
     cargo::{CargoAction, CargoArgsBuilder, CargoCommandBatcher},
     commands::*,
     metadata::{Chip, Config},
+    resolve::Verb,
 };
 
 // ----------------------------------------------------------------------------
@@ -22,12 +23,24 @@ use xtask::{
 
 #[derive(Debug, Parser)]
 enum Cli {
-    /// Build-related subcommands
-    #[clap(subcommand)]
-    Build(Build),
-    /// Run-related subcommands
-    #[clap(subcommand)]
-    Run(Run),
+    /// Build an example, crate, or tests.
+    Build(DispatchArgs),
+    /// Run an example or qa binary.
+    Run(DispatchArgs),
+    /// Check crates, or try-build examples and tests.
+    Check(DispatchArgs),
+    /// Run HIL tests.
+    Test(DispatchArgs),
+    /// Build rustdoc for the specified packages and chips.
+    #[clap(alias = "docs")]
+    Documentation(BuildDocumentationArgs),
+    /// Build the documentation index.
+    #[cfg(feature = "deploy-docs")]
+    DocumentationIndex(BuildDocumentationIndexArgs),
+    /// Run rustdoc tests for the specified chip.
+    DocTests(DocTestArgs),
+    /// Run prebuilt ELFs with probe-rs.
+    Elfs(RunElfsArgs),
     /// Release-related subcommands
     #[clap(subcommand)]
     Release(Release),
@@ -35,13 +48,12 @@ enum Cli {
     /// Perform (parts of) the checks done in CI
     Ci(CiArgs),
     /// Format all packages in the workspace with rustfmt
-    #[clap(alias = "format-packages")]
+    #[clap(name = "fmt", alias = "fmt-packages", alias = "format-packages")]
     FmtPackages(FmtPackagesArgs),
     /// Run cargo clean
     Clean(CleanArgs),
-    /// Check all packages in the workspace with cargo check
-    CheckPackages(CheckPackagesArgs),
     /// Lint all packages in the workspace with clippy
+    #[clap(name = "lint", alias = "lint-packages")]
     LintPackages(LintPackagesArgs),
     /// Semver Checks
     SemverCheck(SemverCheckArgs),
@@ -119,27 +131,23 @@ fn main() -> Result<()> {
     }
 
     match Cli::parse() {
-        // Build-related subcommands:
-        Cli::Build(build) => match build {
-            Build::Documentation(args) => build_documentation(&workspace, args),
-            #[cfg(feature = "deploy-docs")]
-            Build::DocumentationIndex(args) => build_documentation_index(&workspace, args),
-            Build::Examples(args) => examples(&workspace, args, CargoAction::Build(None)),
-            Build::Package(args) => build_package(&workspace, args),
-            Build::Tests(args) => tests(
-                &workspace,
-                args,
-                CargoAction::Build(Some(target_path.join("tests"))),
-            ),
-        },
-
-        // Run-related subcommands:
-        Cli::Run(run) => match run {
-            Run::DocTests(args) => run_doc_tests(&workspace, args),
-            Run::Elfs(args) => run_elfs(args),
-            Run::Example(args) => examples(&workspace, args, CargoAction::Run),
-            Run::Tests(args) => tests(&workspace, args, CargoAction::Run),
-        },
+        Cli::Build(args) => dispatch::dispatch(&workspace, Verb::Build, args, |args| {
+            check_packages(&workspace, args)
+        }),
+        Cli::Run(args) => dispatch::dispatch(&workspace, Verb::Run, args, |args| {
+            check_packages(&workspace, args)
+        }),
+        Cli::Check(args) => dispatch::dispatch(&workspace, Verb::Check, args, |args| {
+            check_packages(&workspace, args)
+        }),
+        Cli::Test(args) => dispatch::dispatch(&workspace, Verb::Test, args, |args| {
+            check_packages(&workspace, args)
+        }),
+        Cli::Documentation(args) => build_documentation(&workspace, args),
+        #[cfg(feature = "deploy-docs")]
+        Cli::DocumentationIndex(args) => build_documentation_index(&workspace, args),
+        Cli::DocTests(args) => run_doc_tests(&workspace, args),
+        Cli::Elfs(args) => run_elfs(args),
 
         // Release-related subcommands:
         Cli::Release(release) => match release {
@@ -162,7 +170,6 @@ fn main() -> Result<()> {
         Cli::Ci(args) => run_ci_checks(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::Clean(args) => clean(&workspace, args),
-        Cli::CheckPackages(args) => check_packages(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
@@ -211,7 +218,7 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
-        let path = workspace.join(package.to_string());
+        let path = workspace.join(package.directory());
         for dir in walkdir::WalkDir::new(path) {
             if let Ok(dir) = dir
                 && let path = dir.path()
@@ -301,7 +308,7 @@ fn build_check_package_command(
         check_config.env
     );
 
-    let path = workspace.join(package.to_string());
+    let path = workspace.join(package.directory());
     let features = &check_config.features;
 
     let mut builder = CargoArgsBuilder::default()
@@ -396,7 +403,7 @@ fn lint_package(
         check_config.env
     );
 
-    let path = workspace.join(package.to_string());
+    let path = workspace.join(package.directory());
     let features = &check_config.features;
 
     let mut builder = CargoArgsBuilder::default()
@@ -619,15 +626,13 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             }
             let result = examples(
                 workspace,
-                ExamplesArgs {
-                    package: ExamplesPackage::EspLpHal,
-                    chip: Some(args.chip),
-                    example: Some("all".to_string()),
-                    debug: false,
-                    toolchain: args.toolchain.clone(),
-                    timings: false,
-                },
+                Package::EspLpHal,
+                args.chip,
+                Some("all"),
                 CargoAction::Build(None),
+                false,
+                args.toolchain.as_deref(),
+                false,
             );
 
             // Still need to rename examples to remove the fingerprint off of their names:
@@ -742,30 +747,26 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 
         examples(
             workspace,
-            ExamplesArgs {
-                package: ExamplesPackage::Examples,
-                chip: Some(args.chip),
-                example: Some("all".to_string()),
-                debug: true,
-                toolchain: args.toolchain.clone(),
-                timings: false,
-            },
+            Package::Examples,
+            args.chip,
+            Some("all"),
             CargoAction::Build(None),
+            true,
+            args.toolchain.as_deref(),
+            false,
         )
     });
 
     runner.run("qa-test", "Build qa-test", || {
         examples(
             workspace,
-            ExamplesArgs {
-                package: ExamplesPackage::QaTest,
-                chip: Some(args.chip),
-                example: Some("all".to_string()),
-                debug: true,
-                toolchain: args.toolchain.clone(),
-                timings: false,
-            },
+            Package::QaTest,
+            args.chip,
+            Some("all"),
             CargoAction::Build(None),
+            true,
+            args.toolchain.as_deref(),
+            false,
         )
     });
 
@@ -775,28 +776,24 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 
         tests(
             workspace,
-            TestsArgs {
-                chip: args.chip,
-                repeat: 1,
-                test: None,
-                toolchain: None,
-                timings: false,
-                package: "hil-test".to_string(),
-            },
+            Package::HilTest,
+            args.chip,
+            None,
             CargoAction::Build(Some(target_path.join("tests"))),
+            1,
+            None,
+            false,
         )?;
 
         tests(
             workspace,
-            TestsArgs {
-                chip: args.chip,
-                repeat: 1,
-                test: None,
-                toolchain: None,
-                timings: false,
-                package: "hil-test-radio".to_string(),
-            },
+            Package::HilTestRadio,
+            args.chip,
+            None,
             CargoAction::Build(Some(target_path.join("tests"))),
+            1,
+            None,
+            false,
         )
     });
 

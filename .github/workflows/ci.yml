@@ -374,7 +374,7 @@ jobs:
         run: cd xtask && cargo test --features release
 
       # Check the formatting of all packages:
-      - run: cargo xtask fmt-packages --check
+      - run: cargo xtask fmt --check
 
       # Check metadata generation for all packages:
       - run: cargo update-metadata --check
