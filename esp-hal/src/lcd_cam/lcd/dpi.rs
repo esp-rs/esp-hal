@@ -1,4 +1,29 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(lcd_cam_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(lcd_cam_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
+    },
+    "vsync_pin" => gpio_for_signal!(LCD_V_SYNC, "GPIO3"),
+    "hsync_pin" => gpio_for_signal!(LCD_H_SYNC, "GPIO46"),
+    "de_pin" => gpio_for_signal!(LCD_H_ENABLE, "GPIO43"),
+    "pclk_pin" => gpio_for_signal!(LCD_PCLK, "GPIO9"),
+    "data0_pin" => gpio_for_signal!(LCD_DATA_0, "GPIO10"),
+    "data1_pin" => gpio_for_signal!(LCD_DATA_1, "GPIO11"),
+    "data2_pin" => gpio_for_signal!(LCD_DATA_2, "GPIO12"),
+    "data3_pin" => gpio_for_signal!(LCD_DATA_3, "GPIO13"),
+    "data4_pin" => gpio_for_signal!(LCD_DATA_4, "GPIO14"),
+    "data5_pin" => gpio_for_signal!(LCD_DATA_5, "GPIO21"),
+    "data6_pin" => gpio_for_signal!(LCD_DATA_6, "GPIO8"),
+    "data7_pin" => gpio_for_signal!(LCD_DATA_7, "GPIO18"),
+    "data8_pin" => gpio_for_signal!(LCD_DATA_8, "GPIO45"),
+    "data9_pin" => gpio_for_signal!(LCD_DATA_9, "GPIO38"),
+    "data10_pin" => gpio_for_signal!(LCD_DATA_10, "GPIO39"),
+    "data11_pin" => gpio_for_signal!(LCD_DATA_11, "GPIO40"),
+    "data12_pin" => gpio_for_signal!(LCD_DATA_12, "GPIO41"),
+    "data13_pin" => gpio_for_signal!(LCD_DATA_13, "GPIO42"),
+    "data14_pin" => gpio_for_signal!(LCD_DATA_14, "GPIO2"),
+    "data15_pin" => gpio_for_signal!(LCD_DATA_15, "GPIO1"),
+))]
 //! # LCD - RGB/Digital Parallel Interface Mode
 //!
 //! ## Overview
@@ -26,7 +51,7 @@
 //! # };
 //! # use esp_hal::dma_loop_buffer;
 //!
-//! # let channel = peripherals.DMA_CH0;
+//! # let channel = peripherals.__dma_channel__;
 //! # let mut dma_buf = dma_loop_buffer!(32);
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
@@ -61,29 +86,29 @@
 //!     .with_disable_black_region(false);
 //!
 //! let mut dpi = Dpi::new(lcd_cam.lcd, channel, config)?
-//!     .with_vsync(peripherals.GPIO3)
-//!     .with_hsync(peripherals.GPIO46)
-//!     .with_de(peripherals.GPIO17)
-//!     .with_pclk(peripherals.GPIO9)
+//!     .with_vsync(peripherals.__vsync_pin__)
+//!     .with_hsync(peripherals.__hsync_pin__)
+//!     .with_de(peripherals.__de_pin__)
+//!     .with_pclk(peripherals.__pclk_pin__)
 //!     // Blue
-//!     .with_data0(peripherals.GPIO10)
-//!     .with_data1(peripherals.GPIO11)
-//!     .with_data2(peripherals.GPIO12)
-//!     .with_data3(peripherals.GPIO13)
-//!     .with_data4(peripherals.GPIO14)
+//!     .with_data0(peripherals.__data0_pin__)
+//!     .with_data1(peripherals.__data1_pin__)
+//!     .with_data2(peripherals.__data2_pin__)
+//!     .with_data3(peripherals.__data3_pin__)
+//!     .with_data4(peripherals.__data4_pin__)
 //!     // Green
-//!     .with_data5(peripherals.GPIO21)
-//!     .with_data6(peripherals.GPIO8)
-//!     .with_data7(peripherals.GPIO18)
-//!     .with_data8(peripherals.GPIO45)
-//!     .with_data9(peripherals.GPIO38)
-//!     .with_data10(peripherals.GPIO39)
+//!     .with_data5(peripherals.__data5_pin__)
+//!     .with_data6(peripherals.__data6_pin__)
+//!     .with_data7(peripherals.__data7_pin__)
+//!     .with_data8(peripherals.__data8_pin__)
+//!     .with_data9(peripherals.__data9_pin__)
+//!     .with_data10(peripherals.__data10_pin__)
 //!     // Red
-//!     .with_data11(peripherals.GPIO40)
-//!     .with_data12(peripherals.GPIO41)
-//!     .with_data13(peripherals.GPIO42)
-//!     .with_data14(peripherals.GPIO2)
-//!     .with_data15(peripherals.GPIO1);
+//!     .with_data11(peripherals.__data11_pin__)
+//!     .with_data12(peripherals.__data12_pin__)
+//!     .with_data13(peripherals.__data13_pin__)
+//!     .with_data14(peripherals.__data14_pin__)
+//!     .with_data15(peripherals.__data15_pin__);
 //!
 //! let color: u16 = 0b11111_000000_00000; // RED
 //! for chunk in dma_buf.chunks_mut(2) {

@@ -1,4 +1,19 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(lcd_cam_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(lcd_cam_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
+    },
+    "dc_pin" => gpio_for_signal!(LCD_DC, "GPIO0"),
+    "wrx_pin" => gpio_for_signal!(LCD_PCLK, "GPIO47"),
+    "data0_pin" => gpio_for_signal!(LCD_DATA_0, "GPIO9"),
+    "data1_pin" => gpio_for_signal!(LCD_DATA_1, "GPIO46"),
+    "data2_pin" => gpio_for_signal!(LCD_DATA_2, "GPIO3"),
+    "data3_pin" => gpio_for_signal!(LCD_DATA_3, "GPIO8"),
+    "data4_pin" => gpio_for_signal!(LCD_DATA_4, "GPIO18"),
+    "data5_pin" => gpio_for_signal!(LCD_DATA_5, "GPIO17"),
+    "data6_pin" => gpio_for_signal!(LCD_DATA_6, "GPIO16"),
+    "data7_pin" => gpio_for_signal!(LCD_DATA_7, "GPIO15"),
+))]
 //! # LCD - I8080/MOTO6800 Mode.
 //!
 //! ## Overview
@@ -26,17 +41,17 @@
 //!
 //! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
-//! let mut i8080 = I8080::new(lcd_cam.lcd, peripherals.DMA_CH0, config)?
-//!     .with_dc(peripherals.GPIO0)
-//!     .with_wrx(peripherals.GPIO47)
-//!     .with_data0(peripherals.GPIO9)
-//!     .with_data1(peripherals.GPIO46)
-//!     .with_data2(peripherals.GPIO3)
-//!     .with_data3(peripherals.GPIO8)
-//!     .with_data4(peripherals.GPIO18)
-//!     .with_data5(peripherals.GPIO17)
-//!     .with_data6(peripherals.GPIO16)
-//!     .with_data7(peripherals.GPIO15);
+//! let mut i8080 = I8080::new(lcd_cam.lcd, peripherals.__dma_channel__, config)?
+//!     .with_dc(peripherals.__dc_pin__)
+//!     .with_wrx(peripherals.__wrx_pin__)
+//!     .with_data0(peripherals.__data0_pin__)
+//!     .with_data1(peripherals.__data1_pin__)
+//!     .with_data2(peripherals.__data2_pin__)
+//!     .with_data3(peripherals.__data3_pin__)
+//!     .with_data4(peripherals.__data4_pin__)
+//!     .with_data5(peripherals.__data5_pin__)
+//!     .with_data6(peripherals.__data6_pin__)
+//!     .with_data7(peripherals.__data7_pin__);
 //!
 //! dma_buf.fill(&[0x55]);
 //! let transfer = i8080.send(0x3Au8, 0, dma_buf)?; // RGB565
