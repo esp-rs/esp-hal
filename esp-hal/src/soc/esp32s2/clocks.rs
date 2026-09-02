@@ -227,6 +227,12 @@ fn configure_pll_clk_impl(
     // `enable_pll_clk_impl`.
 }
 
+// PLL_F160M_CLK
+
+fn enable_pll_f160m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
 // APLL_CLK
 
 fn enable_apll_clk_impl(_clocks: &mut ClockTree, en: bool) {

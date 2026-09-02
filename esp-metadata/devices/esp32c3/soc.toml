@@ -53,7 +53,7 @@ peripherals = [
     { name = "HMAC" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
     { name = "INTERRUPT_CORE0" },
     { name = "IO_MUX" },
     { name = "LEDC" },
@@ -293,7 +293,6 @@ wakeup_sources = {
 ## Interfaces
 [device.i2s]
 version = 2
-default_clock_source = 2
 mclk_divider_bit_width = 9
 max_ws_width = 128
 instances = [

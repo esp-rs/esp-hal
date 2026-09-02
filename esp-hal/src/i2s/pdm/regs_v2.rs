@@ -14,6 +14,8 @@ use super::{
 use crate::i2s::master::Info;
 
 pub(crate) fn configure_pdm(i2s: &Info, config: &PdmConfig) -> Result<(), PdmError> {
+    i2s.configure_mclk_pad(config.mclk_out);
+
     if let Some(tx) = &config.tx {
         configure_tx(i2s, tx)?;
     }
@@ -96,23 +98,7 @@ fn configure_tx(i2s: &Info, config: &super::PdmTxConfig) -> Result<(), PdmError>
         });
     }
 
-    cfg_select! {
-        i2s_clock_configured_by_pcr => {
-            crate::peripherals::PCR::regs()
-                .i2s_rx_clkm_conf()
-                .modify(|_, w| w.i2s_mclk_sel().clear_bit());
-        }
-        i2s_clock_configured_by_hp_sys_clkrst => {
-            // MCLK mux is configured in `hp_sys_clkrst::set_tx_clock` via `Info::peripheral`.
-        }
-        _ => {
-            i2s.regs()
-                .rx_clkm_conf()
-                .modify(|_, w| w.mclk_sel().clear_bit());
-        }
-    }
-
-    set_pdm_tx_clock(i2s, &clock);
+    set_pdm_tx_clock(i2s, config.clock.clock_source, &clock);
 
     i2s.regs().tx_conf().modify(|_, w| {
         w.tx_pdm_en().set_bit();
@@ -189,23 +175,8 @@ fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError>
         .rx_tdm_ctrl()
         .modify(|r, w| unsafe { w.bits((r.bits() & 0xFFFF0000) | u32::from(slot_mask)) });
 
-    cfg_select! {
-        i2s_clock_configured_by_pcr => {
-            crate::peripherals::PCR::regs()
-                .i2s_rx_clkm_conf()
-                .modify(|_, w| w.i2s_mclk_sel().set_bit());
-        }
-        i2s_clock_configured_by_hp_sys_clkrst => {
-            // MCLK mux is configured in `hp_sys_clkrst::set_rx_clock` via `Info::peripheral`.
-        }
-        _ => {
-            i2s.regs()
-                .rx_clkm_conf()
-                .modify(|_, w| w.mclk_sel().set_bit());
-        }
-    }
-
-    i2s.set_rx_clock(clock.dividers);
+    i2s.configure_rx_mclk(config.clock.clock_source, &clock.dividers);
+    i2s.set_rx_bclk(clock.dividers.bclk_divider);
 
     #[cfg(all(i2s_supports_pdm2pcm, i2s_supports_pdm_rx_hp_filter))]
     {
@@ -240,41 +211,11 @@ fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError>
     Ok(())
 }
 
-fn set_pdm_tx_clock(i2s: &Info, clock: &clock::PdmTxClockResult) {
-    set_pdm_tx_clock_common(i2s, clock);
-    #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
-    apply_tx_pdm_clock_workaround(i2s, clock.dividers.mclk_divider);
-}
-
-fn set_pdm_tx_clock_common(i2s: &Info, clock: &clock::PdmTxClockResult) {
-    use crate::i2s::master::private::I2sClockDividers;
-    let dividers = I2sClockDividers {
-        mclk_divider: clock.dividers.mclk_divider,
-        bclk_divider: clock.dividers.bclk_divider,
-        denominator: clock.dividers.denominator,
-        numerator: clock.dividers.numerator,
-    };
-    i2s.set_tx_clock(dividers);
-}
-
-#[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
-fn apply_tx_pdm_clock_workaround(i2s: &Info, mclk_div: u32) {
-    i2s.regs()
-        .tx_clkm_conf()
-        .modify(|_, w| unsafe { w.tx_clkm_div_num().bits(2) });
-    i2s.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
-        w.tx_clkm_div_yn1().clear_bit();
-        w.tx_clkm_div_y().bits(1);
-        w.tx_clkm_div_z().bits(0);
-        w.tx_clkm_div_x().bits(0)
-    });
-    i2s.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
-        w.tx_clkm_div_yn1().clear_bit();
-        w.tx_clkm_div_y().bits(1);
-        w.tx_clkm_div_z().bits(0);
-        w.tx_clkm_div_x().bits(1)
-    });
-    i2s.regs()
-        .tx_clkm_conf()
-        .modify(|_, w| unsafe { w.tx_clkm_div_num().bits(mclk_div as u8) });
+fn set_pdm_tx_clock(
+    i2s: &Info,
+    source: crate::i2s::master::I2sClockSource,
+    clock: &clock::PdmTxClockResult,
+) {
+    i2s.configure_tx_mclk(source, &clock.dividers);
+    i2s.set_tx_bclk(clock.dividers.bclk_divider);
 }

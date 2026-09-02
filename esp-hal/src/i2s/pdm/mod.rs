@@ -223,6 +223,8 @@ pub struct PdmTxClockConfig {
     pub up_sample_fs: u32,
     /// Bit clock divider.
     pub bclk_div: u32,
+    /// Source clock for the I2S module clock.
+    pub clock_source: crate::i2s::master::I2sClockSource,
 }
 
 /// PDM TX slot / filter configuration.
@@ -322,6 +324,8 @@ pub struct PdmRxClockConfig {
 
     /// Bit clock divider.
     pub bclk_div: u32,
+    /// Source clock for the I2S module clock.
+    pub clock_source: crate::i2s::master::I2sClockSource,
 }
 
 /// PDM RX slot configuration.
@@ -495,6 +499,9 @@ pub struct PdmConfig {
     pub tx: Option<PdmTxConfig>,
     /// Optional RX unit configuration.
     pub rx: Option<PdmRxConfig>,
+    /// Selects which module clock is routed to the MCLK pad.
+    #[cfg(not(i2s_version = "1"))]
+    pub mclk_out: crate::i2s::master::MclkOut,
 }
 
 impl PdmConfig {
@@ -504,6 +511,8 @@ impl PdmConfig {
         Self {
             tx: Some(tx),
             rx: None,
+            #[cfg(not(i2s_version = "1"))]
+            mclk_out: crate::i2s::master::MclkOut::Tx,
         }
     }
 
@@ -513,6 +522,8 @@ impl PdmConfig {
         Self {
             tx: None,
             rx: Some(rx),
+            #[cfg(not(i2s_version = "1"))]
+            mclk_out: crate::i2s::master::MclkOut::Rx,
         }
     }
 

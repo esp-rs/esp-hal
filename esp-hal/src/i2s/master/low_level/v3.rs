@@ -1,168 +1,19 @@
 use bitfield::Bit;
 
 use super::Info;
-use crate::i2s::master::{
-    BitOrder,
-    Config,
-    ConfigError,
-    Endianness,
-    Polarity,
-    UnitConfig,
-    private::I2sClockDividers,
-};
+use crate::i2s::master::{BitOrder, Config, ConfigError, Endianness, Polarity, UnitConfig};
 
 impl Info {
-    #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
-    pub(crate) fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
-        let clkm_div = clock_settings.mclk_dividers();
-
-        self.regs().tx_clkm_div_conf().modify(|_, w| unsafe {
-            w.tx_clkm_div_x().bits(clkm_div.x as u16);
-            w.tx_clkm_div_y().bits(clkm_div.y as u16);
-            w.tx_clkm_div_yn1().bit(clkm_div.yn1);
-            w.tx_clkm_div_z().bits(clkm_div.z as u16)
-        });
-
-        self.regs().tx_clkm_conf().modify(|_, w| unsafe {
-            w.clk_en().set_bit();
-            w.tx_clk_active().set_bit();
-            // for now fixed at 160MHz
-            w.tx_clk_sel().bits(property!("i2s.default_clock_source"));
-            w.tx_clkm_div_num().bits(clock_settings.mclk_divider as u8)
-        });
-
-        self.regs().tx_conf().modify(|_, w| unsafe {
-            w.tx_bck_div_num()
-                .bits((clock_settings.bclk_divider - 1) as u8)
-        });
+    pub(crate) fn set_tx_bclk(&self, bclk_divider: u32) {
+        self.regs()
+            .tx_conf()
+            .modify(|_, w| unsafe { w.tx_bck_div_num().bits((bclk_divider - 1) as u8) });
     }
 
-    #[cfg(not(any(i2s_clock_configured_by_pcr, i2s_clock_configured_by_hp_sys_clkrst)))]
-    pub(crate) fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
-        let clkm_div = clock_settings.mclk_dividers();
-
-        self.regs().rx_clkm_div_conf().modify(|_, w| unsafe {
-            w.rx_clkm_div_x().bits(clkm_div.x as u16);
-            w.rx_clkm_div_y().bits(clkm_div.y as u16);
-            w.rx_clkm_div_yn1().bit(clkm_div.yn1);
-            w.rx_clkm_div_z().bits(clkm_div.z as u16)
-        });
-
-        self.regs().rx_clkm_conf().modify(|_, w| unsafe {
-            w.rx_clk_active().set_bit();
-            // for now fixed at 160MHz
-            w.rx_clk_sel().bits(property!("i2s.default_clock_source"));
-            w.rx_clkm_div_num().bits(clock_settings.mclk_divider as u8);
-            w.mclk_sel().bit(true)
-        });
-
-        self.regs().rx_conf().modify(|_, w| unsafe {
-            w.rx_bck_div_num()
-                .bits((clock_settings.bclk_divider - 1) as u8)
-        });
-    }
-
-    #[cfg(i2s_clock_configured_by_pcr)]
-    pub(crate) fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
-        // I2S clocks are configured via PCR
-        use crate::peripherals::PCR;
-
-        let clkm_div = clock_settings.mclk_dividers();
-        let pcr = PCR::regs();
-
-        // Pulse a temporary divider before applying the target coefficients to avoid
-        // a hardware glitch where the clock divider applies twice on PCR chips.
-        pcr.i2s_tx_clkm_conf()
-            .modify(|_, w| unsafe { w.i2s_tx_clkm_div_num().bits(2) });
-        pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
-            w.i2s_tx_clkm_div_yn1().clear_bit();
-            w.i2s_tx_clkm_div_y().bits(1);
-            w.i2s_tx_clkm_div_z().bits(0);
-            w.i2s_tx_clkm_div_x().bits(0)
-        });
-
-        pcr.i2s_tx_clkm_div_conf().modify(|_, w| unsafe {
-            w.i2s_tx_clkm_div_x().bits(clkm_div.x as u16);
-            w.i2s_tx_clkm_div_y().bits(clkm_div.y as u16);
-            w.i2s_tx_clkm_div_yn1().bit(clkm_div.yn1);
-            w.i2s_tx_clkm_div_z().bits(clkm_div.z as u16)
-        });
-
-        pcr.i2s_tx_clkm_conf().modify(|_, w| unsafe {
-            w.i2s_tx_clkm_en().set_bit();
-            // for now fixed at 160MHz for C6 and 96MHz for H2
-            w.i2s_tx_clkm_sel()
-                .bits(property!("i2s.default_clock_source"));
-            w.i2s_tx_clkm_div_num()
-                .bits(clock_settings.mclk_divider as u8)
-        });
-
-        self.regs().tx_conf().modify(|_, w| unsafe {
-            w.tx_bck_div_num()
-                .bits((clock_settings.bclk_divider - 1) as u8)
-        });
-    }
-
-    #[cfg(i2s_clock_configured_by_pcr)]
-    pub(crate) fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
-        // I2S clocks are configured via PCR
-        use crate::peripherals::PCR;
-
-        let clkm_div = clock_settings.mclk_dividers();
-        let pcr = PCR::regs();
-
-        // Pulse a temporary divider before applying the target coefficients to avoid
-        // a hardware glitch where the clock divider applies twice on PCR chips.
-        pcr.i2s_rx_clkm_conf()
-            .modify(|_, w| unsafe { w.i2s_rx_clkm_div_num().bits(2) });
-        pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
-            w.i2s_rx_clkm_div_yn1().clear_bit();
-            w.i2s_rx_clkm_div_y().bits(1);
-            w.i2s_rx_clkm_div_z().bits(0);
-            w.i2s_rx_clkm_div_x().bits(0)
-        });
-
-        pcr.i2s_rx_clkm_div_conf().modify(|_, w| unsafe {
-            w.i2s_rx_clkm_div_x().bits(clkm_div.x as u16);
-            w.i2s_rx_clkm_div_y().bits(clkm_div.y as u16);
-            w.i2s_rx_clkm_div_yn1().bit(clkm_div.yn1);
-            w.i2s_rx_clkm_div_z().bits(clkm_div.z as u16)
-        });
-
-        pcr.i2s_rx_clkm_conf().modify(|_, w| unsafe {
-            w.i2s_rx_clkm_en().set_bit();
-            // for now fixed at 160MHz for C6 and 96MHz for H2
-            w.i2s_rx_clkm_sel()
-                .bits(property!("i2s.default_clock_source"));
-            w.i2s_rx_clkm_div_num()
-                .bits(clock_settings.mclk_divider as u8);
-            w.i2s_mclk_sel().bit(true)
-        });
-
-        self.regs().rx_conf().modify(|_, w| unsafe {
-            w.rx_bck_div_num()
-                .bits((clock_settings.bclk_divider - 1) as u8)
-        });
-    }
-
-    #[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
-    pub(crate) fn set_tx_clock(&self, clock_settings: I2sClockDividers) {
-        crate::i2s::hp_sys_clkrst::set_tx_clock(self.peripheral, &clock_settings);
-
-        self.regs().tx_conf().modify(|_, w| unsafe {
-            w.tx_bck_div_num()
-                .bits((clock_settings.bclk_divider - 1) as u8)
-        });
-    }
-
-    #[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
-    pub(crate) fn set_rx_clock(&self, clock_settings: I2sClockDividers) {
-        crate::i2s::hp_sys_clkrst::set_rx_clock(self.peripheral, &clock_settings);
-
-        self.regs().rx_conf().modify(|_, w| unsafe {
-            w.rx_bck_div_num()
-                .bits((clock_settings.bclk_divider - 1) as u8)
-        });
+    pub(crate) fn set_rx_bclk(&self, bclk_divider: u32) {
+        self.regs()
+            .rx_conf()
+            .modify(|_, w| unsafe { w.rx_bck_div_num().bits((bclk_divider - 1) as u8) });
     }
 
     pub(crate) fn update_tx(&self) {
@@ -186,6 +37,7 @@ impl Info {
             Config::Tdm(c) => {
                 self.configure_tx(&c.tx_config)?;
                 self.configure_rx(&c.rx_config)?;
+                self.configure_mclk_pad(c.mclk_out);
 
                 self.regs()
                     .tx_conf()
@@ -205,7 +57,9 @@ impl Info {
 
     pub(crate) fn configure_tx(&self, config: &UnitConfig) -> Result<(), ConfigError> {
         let ws_width = config.calculate_ws_width()?;
-        self.set_tx_clock(config.calculate_clock());
+        let clocks = config.calculate_clock();
+        self.configure_tx_mclk(config.clock_source, &clocks);
+        self.set_tx_bclk(clocks.bclk_divider);
 
         self.regs().tx_conf1().modify(|_, w| unsafe {
             #[allow(clippy::useless_conversion)]
@@ -264,7 +118,9 @@ impl Info {
 
     pub(crate) fn configure_rx(&self, config: &UnitConfig) -> Result<(), ConfigError> {
         let ws_width = config.calculate_ws_width()?;
-        self.set_rx_clock(config.calculate_clock());
+        let clocks = config.calculate_clock();
+        self.configure_rx_mclk(config.clock_source, &clocks);
+        self.set_rx_bclk(clocks.bclk_divider);
 
         self.regs().rx_conf1().modify(|_, w| unsafe {
             #[allow(clippy::useless_conversion)]

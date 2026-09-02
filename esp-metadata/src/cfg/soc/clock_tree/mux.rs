@@ -217,6 +217,20 @@ impl ClockTreeNodeType for Multiplexer {
         }
     }
 
+    fn config_frequency_needs_instance(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> bool {
+        self.variants.iter().any(|variant| {
+            instance
+                .resolve_node(tree, &variant.outputs)
+                .properties
+                .receiver
+                .is_some()
+        })
+    }
+
     fn skips_frequency_cache(
         &self,
         _instance: &ClockTreeNodeInstance,

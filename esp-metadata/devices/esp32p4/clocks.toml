@@ -146,6 +146,32 @@ system_clocks = { clock_tree = [
             { name = "SPLL",    outputs = "SPLL_D3_CLOCK", default = true },
         ] },
     ] },
+    { group = "I2S",
+      presets = {
+        CLK = {
+          type = "generic",
+          wake_locking = true,
+          output = "(sclk * div_a) / (div_num * div_a + div_b)",
+          params = {
+            sclk = [
+              { name = "XTAL",      outputs = "XTAL_CLK" },
+              { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
+            ],
+            div_num = "1 ..= 255",
+            div_a   = "1 ..= 511",
+            div_b   = "0 ..= 511",
+          },
+        },
+      },
+      clocks = [
+        { name = "TX_CLK",   preset = "CLK" },
+        { name = "RX_CLK",   preset = "CLK" },
+        { name = "MCLK_OUT", type = "mux", variants = [
+          { name = "TX", outputs = "TX_CLK" },
+          { name = "RX", outputs = "RX_CLK", default = true },
+        ] },
+      ],
+    },
     # APLL (register value 1 on PHY_PLL_REFCLK) is intentionally omitted
     # because it is not yet modelled in the clock tree.
     { group = "MIPI_DSI", clocks = [
