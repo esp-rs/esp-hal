@@ -1,3 +1,6 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "rmii_clk_gpio" => gpio_for_signal!(EMAC_RMII_CLK),
+))]
 //! EMAC clock configuration for ESP32-S31.
 //!
 //! # RMII reference clock sources
@@ -5,8 +8,8 @@
 //! The ESP32-S31 EMAC needs a 50 MHz reference clock for RMII.
 //!
 //! - **[`ExternalRefClock`]** — the PHY drives the reference clock into one of the `EMAC_RMII_CLK`
-//!   input pads (GPIO13 or GPIO43). This is the recommended configuration when the PHY has an
-//!   integrated oscillator.
+//!   input pads (for example __rmii_clk_gpio__). This is the recommended configuration when the PHY
+//!   has an integrated oscillator.
 //!
 //! # MII clock source
 //!
@@ -47,10 +50,13 @@ const RGMII_TX_CLK_10M_HZ: u32 = 2_500_000;
 
 // ── ExternalRefClock ─────────────────────────────────────────────────────────
 
+#[cfg_attr(docsrs, procmacros::doc_replace(
+    "rmii_clk_gpio" => gpio_for_signal!(EMAC_RMII_CLK),
+))]
 /// RMII reference clock provided externally by the PHY.
 ///
 /// The PHY must drive a 50 MHz clock into one of the `EMAC_RMII_CLK` input
-/// pads: GPIO13 or GPIO43.
+/// pads (for example __rmii_clk_gpio__).
 pub struct ExternalRefClock<P>(P);
 
 impl<P> ExternalRefClock<P> {

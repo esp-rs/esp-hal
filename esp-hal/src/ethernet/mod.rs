@@ -1,48 +1,24 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "clk_in_gpio" => {
-        cfg(esp32) => "GPIO0",
-        cfg(esp32p4) => "GPIO50",
-        cfg(esp32s31) => "GPIO13",
+        cfg(esp32) => gpio_for_signal!(EMAC_TX_CLK),
+        _ => gpio_for_signal!(EMAC_RMII_CLK),
     },
-    "rxd0_gpio" => {
-        cfg(esp32) => "GPIO25",
-        cfg(esp32p4) => "GPIO29",
-        cfg(esp32s31) => "GPIO19",
-    },
-    "rxd1_gpio" => {
-        cfg(esp32) => "GPIO26",
-        cfg(esp32p4) => "GPIO30",
-        cfg(esp32s31) => "GPIO18",
-    },
-    "rxdv_gpio" => {
-        cfg(esp32) => "GPIO27",
-        cfg(esp32p4) => "GPIO28",
-        cfg(esp32s31) => "GPIO15",
-    },
-    "txd0_gpio" => {
-        cfg(esp32) => "GPIO19",
-        cfg(esp32p4) => "GPIO34",
-        cfg(esp32s31) => "GPIO8",
-    },
-    "txd1_gpio" => {
-        cfg(esp32) => "GPIO22",
-        cfg(esp32p4) => "GPIO35",
-        cfg(esp32s31) => "GPIO9",
-    },
-    "txen_gpio" => {
-        cfg(esp32) => "GPIO21",
-        cfg(esp32p4) => "GPIO49",
-        cfg(esp32s31) => "GPIO12",
-    },
+    "rxd0_gpio" => gpio_for_signal!(EMAC_RXD0),
+    "rxd1_gpio" => gpio_for_signal!(EMAC_RXD1),
+    "rxdv_gpio" => gpio_for_signal!(EMAC_RXDV),
+    "txd0_gpio" => gpio_for_signal!(EMAC_TXD0),
+    "txd1_gpio" => gpio_for_signal!(EMAC_TXD1),
+    "txen_gpio" => gpio_for_signal!(EMAC_TXEN),
+    // MDC/MDIO are GPIO-matrix signals, so gpio_for_signal! has no pad and needs a fallback.
     "mdc_gpio" => {
-        cfg(esp32) => "GPIO23",
-        cfg(esp32p4) => "GPIO31",
-        cfg(esp32s31) => "GPIO5",
+        cfg(esp32) => gpio_for_signal!(EMAC_MDC, "GPIO23"),
+        cfg(esp32p4) => gpio_for_signal!(EMAC_MDC, "GPIO31"),
+        cfg(esp32s31) => gpio_for_signal!(EMAC_MDC, "GPIO5"),
     },
     "mdio_gpio" => {
-        cfg(esp32) => "GPIO18",
-        cfg(esp32p4) => "GPIO52",
-        cfg(esp32s31) => "GPIO6",
+        cfg(esp32) => gpio_for_signal!(EMAC_MDI, "GPIO18"),
+        cfg(esp32p4) => gpio_for_signal!(EMAC_MDI, "GPIO52"),
+        cfg(esp32s31) => gpio_for_signal!(EMAC_MDI, "GPIO6"),
     }
 ))]
 //! EMAC Ethernet driver for ESP32.
