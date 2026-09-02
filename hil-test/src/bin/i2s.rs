@@ -877,15 +877,121 @@ mod tests {
 #[cfg(esp32)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod i2s_parallel_tests {
+    use core::cell::RefCell;
+
+    use critical_section::Mutex as CsMutex;
     use esp_hal::{
+        Blocking,
         dma::I2sDmaChannel,
         gpio::NoPin,
         i2s::{
             AnyI2s,
-            parallel::{I2sParallel, TxSixteenBits},
+            parallel::{I2sParallel, I2sParallelInterrupt, I2sParallelTransfer, TxSixteenBits},
         },
+        interrupt::{InterruptHandler, Priority},
         time::Rate,
     };
+    use portable_atomic::{AtomicUsize, Ordering};
+
+    static ISR_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+    type BlockingTransfer = I2sParallelTransfer<'static, esp_hal::dma::DmaTxBuf, Blocking>;
+
+    // The ongoing transfer, so the ISR can query and clear interrupt flags
+    // through it (the driver itself is consumed by `send`).
+    static TRANSFER: CsMutex<RefCell<Option<BlockingTransfer>>> = CsMutex::new(RefCell::new(None));
+
+    extern "C" fn i2s_parallel_isr() {
+        critical_section::with(|cs| {
+            if let Some(xfer) = TRANSFER.borrow_ref(cs).as_ref() {
+                let active = xfer.interrupts();
+                xfer.clear_interrupts(active);
+            }
+        });
+        ISR_COUNT.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn poll_until(mut condition: impl FnMut() -> bool, message: &str) {
+        let delay = esp_hal::delay::Delay::new();
+        for _ in 0..1000 {
+            if condition() {
+                return;
+            }
+            delay.delay_millis(1);
+        }
+        panic!("{}", message);
+    }
+
+    fn run_i2s_parallel_interrupt(i2s: AnyI2s<'static>, dma_channel: I2sDmaChannel<'static>) {
+        ISR_COUNT.store(0, Ordering::Relaxed);
+        critical_section::with(|cs| TRANSFER.replace(cs, None));
+
+        let pins = TxSixteenBits::new(
+            NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin,
+            NoPin, NoPin, NoPin, NoPin,
+        );
+        let mut i2s = I2sParallel::new(i2s, dma_channel, Rate::from_mhz(20), pins, NoPin);
+        i2s.set_interrupt_handler(InterruptHandler::new(i2s_parallel_isr, Priority::Priority1));
+
+        let mut tx_buf = esp_hal::dma_tx_buffer!(4096).unwrap();
+        tx_buf.fill(&[0x55; 512]);
+
+        // Publish the transfer so the ISR can use it, then listen.
+        // The transfer may complete before we listen; the flags still assert,
+        // so the ISR still fires.
+        let xfer = i2s
+            .send(tx_buf)
+            .map_err(|_| "failed to send buffer")
+            .unwrap();
+        critical_section::with(|cs| TRANSFER.replace(cs, Some(xfer)));
+        critical_section::with(|cs| {
+            if let Some(xfer) = TRANSFER.borrow_ref(cs).as_ref() {
+                xfer.listen(I2sParallelInterrupt::TotalEof | I2sParallelInterrupt::Done);
+            }
+        });
+
+        // Wait for the transfer to complete and the ISR to fire.
+        poll_until(
+            || {
+                critical_section::with(|cs| {
+                    TRANSFER
+                        .borrow_ref(cs)
+                        .as_ref()
+                        .is_some_and(|xfer| xfer.is_done())
+                }) && ISR_COUNT.load(Ordering::Relaxed) > 0
+            },
+            "transfer did not complete or ISR did not fire",
+        );
+        assert!(
+            ISR_COUNT.load(Ordering::Relaxed) > 0,
+            "ISR should have fired at least once"
+        );
+
+        let xfer = critical_section::with(|cs| TRANSFER.take(cs)).unwrap();
+        let (_i2s, _tx_buf) = xfer.wait();
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s0)]
+    fn i2s_parallel_interrupt_i2s0() {
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+        let i2s = peripherals.I2S0.into();
+        let dma_channel: I2sDmaChannel<'static> = peripherals.DMA_I2S0.into();
+        run_i2s_parallel_interrupt(i2s, dma_channel);
+    }
+
+    #[test]
+    #[cfg(soc_has_i2s1)]
+    fn i2s_parallel_interrupt_i2s1() {
+        let peripherals = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
+        );
+        let i2s = peripherals.I2S1.into();
+        let dma_channel: I2sDmaChannel<'static> = peripherals.DMA_I2S1.into();
+        run_i2s_parallel_interrupt(i2s, dma_channel);
+    }
 
     async fn run_driver_does_not_hang_when_async(
         i2s: AnyI2s<'static>,
