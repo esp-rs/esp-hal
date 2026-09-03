@@ -107,6 +107,7 @@ embedded-io-async-06 = { package = "embedded-io-async", version = "0.6", default
 embedded-io-07 = { package = "embedded-io", version = "0.7", default-features = false, optional = true }
 embedded-io-async-07 = { package = "embedded-io-async", version = "0.7", default-features = false, optional = true }
 embassy-net-driver-02 = { package = "embassy-net-driver", version = "0.2.0", optional = true }
+xarxa-driver = { version = "0.1.0", features = ["async"], optional = true }
 bt-hci = { version = "0.9.0", optional = true }
 bt-hci-transport = { version = "0.1.0", optional = true }
 
@@ -269,7 +270,7 @@ esp32s3 = [
 
 #DOC_IF has("wifi_driver_supported")
 ## Enable Wi-Fi support.
-wifi = ["dep:enumset", "dep:embassy-net-driver-02"]
+wifi = ["dep:enumset", "dep:embassy-net-driver-02", "dep:xarxa-driver"]
 
 ## Enable Wi-Fi Enterprise Authentication Protocol (EAP) support.
 ##
@@ -353,6 +354,7 @@ defmt = [
     "esp-sync/defmt",
     "esp-phy/defmt",
     "ieee802154?/defmt",
+    "xarxa-driver?/defmt",
 ]
 
 #! ### Unstable APIs
