@@ -18,9 +18,7 @@ pub use esp_riscv_rt::TrapFrame;
 #[cfg_attr(interrupt_controller = "clic", path = "riscv/clic.rs")]
 mod cpu_int;
 
-// The software-interrupt driver is the only caller on this architecture, and that driver is
-// unstable.
-#[cfg(feature = "unstable")]
+// The software-interrupt driver is the only caller on this architecture.
 pub(crate) use riscv::interrupt::free;
 
 use crate::{

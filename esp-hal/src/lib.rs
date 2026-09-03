@@ -255,8 +255,6 @@ macro_rules! unstable_driver {
     };
 }
 
-use core::marker::PhantomData;
-
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
 #[cfg_attr(esp32s31, allow(unused))]
@@ -551,17 +549,28 @@ let uart = Uart::new(peripherals.UART0, Config::default())?
 ///
 /// When initializing an async driver, the driver disables user-specified
 /// interrupt handlers, and sets up internal interrupt handlers that drive the
-/// driver's async API. The driver's interrupt handlers run on the same core as
-/// the driver was initialized on. This means that the driver can not be sent
-/// across threads, to prevent incorrect concurrent access to the peripheral.
-///
-/// Switching back to blocking mode will disable the interrupt handlers and
-/// return the driver to a state where it can be sent across threads.
+/// driver's async API.
+#[cfg_attr(
+    multi_core,
+    doc = r"
+
+# Interrupt affinity
+
+The driver maps its interrupt to the core that calls `into_async`, and the mapping does not
+follow the driver. An async driver that moves to another core keeps its interrupt handler on
+the core that set it up. Two rules follow:
+
+- The core that calls `into_async` must keep servicing interrupts while the driver is async.
+  Parking that core, or holding its run level above the priority of the driver's interrupt
+  handler, stops the driver from making progress.
+- Awaiting a driver on another core needs a runtime that wakes tasks across cores, like
+  `esp-rtos`. An executor that only wakes tasks of its own core never polls the driver again.
+"
+)]
+/// Switching back to blocking mode disables the interrupt handlers.
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct Async(PhantomData<*const ()>);
-
-unsafe impl Sync for Async {}
+pub struct Async;
 
 impl crate::DriverMode for Blocking {}
 impl crate::DriverMode for Async {}
