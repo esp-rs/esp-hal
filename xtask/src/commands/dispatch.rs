@@ -112,6 +112,10 @@ pub fn dispatch(
         }
     }
 
+    for name in &mut resolution.names {
+        *name = expand_name(workspace, verb, &resolution.packages, name)?;
+    }
+
     if resolution.packages.is_empty() {
         return dispatch_defaults(workspace, verb, &resolution, &args, check_libs);
     }
@@ -237,6 +241,14 @@ fn is_test_package(package: Package) -> bool {
     matches!(package, Package::HilTest | Package::HilTestRadio)
 }
 
+/// The packages that hold examples or tests.
+const FIRMWARE_PACKAGES: [Package; 4] = [
+    Package::Examples,
+    Package::QaTest,
+    Package::HilTest,
+    Package::HilTestRadio,
+];
+
 /// Decide which package owns `name`: a standalone example, a qa bin, or a HIL test.
 /// Unknown names default to [`Package::Examples`].
 fn source_package(workspace: &Path, name: &str) -> Package {
@@ -244,42 +256,65 @@ fn source_package(workspace: &Path, name: &str) -> Package {
         return Package::Examples;
     }
 
-    let examples = firmware::load_cargo_toml(&workspace.join(Package::Examples.directory()));
-    if examples.is_ok_and(|examples| examples.iter().any(|example| example.matches_name(name))) {
-        return Package::Examples;
+    FIRMWARE_PACKAGES
+        .into_iter()
+        .find(|package| {
+            firmware::load_package(workspace, *package)
+                .is_ok_and(|firmware| firmware.iter().any(|meta| meta.matches_name(name)))
+        })
+        .unwrap_or(Package::Examples)
+}
+
+/// Complete a partial name, so `sdmmc` becomes `sdmmc_sd_async`.
+///
+/// A name that already names something is returned as it came. A partial one has to fit a single
+/// example or test, otherwise there is nothing to complete it to.
+fn expand_name(workspace: &Path, verb: Verb, packages: &[Package], name: &str) -> Result<String> {
+    if name.eq_ignore_ascii_case("all") || name.contains("::") {
+        return Ok(name.to_owned());
     }
 
-    let qa_bins = workspace
-        .join(Package::QaTest.directory())
-        .join("src")
-        .join("bin");
-    if firmware::load(&qa_bins).is_ok_and(|qa| qa.iter().any(|example| example.matches_name(name)))
-    {
-        return Package::QaTest;
-    }
+    // Look in the packages that were named, or in the ones this verb can act on.
+    let searched: Vec<Package> = if !packages.is_empty() {
+        packages.to_vec()
+    } else {
+        FIRMWARE_PACKAGES
+            .into_iter()
+            .filter(|package| match verb {
+                Verb::Run => is_example_package(*package),
+                Verb::Test => is_test_package(*package),
+                Verb::Build | Verb::Check => true,
+            })
+            .collect()
+    };
 
-    let hil = workspace
-        .join(Package::HilTest.directory())
-        .join("src")
-        .join("bin");
-    if firmware::load(&hil).is_ok_and(|tests| tests.iter().any(|test| test.matches_name(name))) {
-        return Package::HilTest;
-    }
+    let wanted = name.to_lowercase();
+    let mut fits: Vec<String> = Vec::new();
 
-    let radio = workspace
-        .join(Package::HilTestRadio.directory())
-        .join("src")
-        .join("bin");
-    for path in [&radio, &radio.join("tests"), &radio.join("support")] {
-        if path.exists()
-            && firmware::load(path)
-                .is_ok_and(|tests| tests.iter().any(|test| test.matches_name(name)))
-        {
-            return Package::HilTestRadio;
+    for package in searched {
+        let Ok(firmware) = firmware::load_package(workspace, package) else {
+            continue;
+        };
+        if firmware.iter().any(|meta| meta.matches_name(name)) {
+            return Ok(name.to_owned());
+        }
+        // One entry per supported chip, so the same name turns up more than once.
+        for candidate in firmware.iter().map(|meta| meta.binary_name()) {
+            if candidate.to_lowercase().contains(&wanted) && !fits.contains(&candidate) {
+                fits.push(candidate);
+            }
         }
     }
 
-    Package::Examples
+    match fits.len() {
+        // Nothing fits, so leave the name alone and let the package have its say about it.
+        0 => Ok(name.to_owned()),
+        1 => {
+            log::info!("'{name}' selected '{}'", fits[0]);
+            Ok(fits.remove(0))
+        }
+        _ => bail!("'{name}' fits several: {}", fits.join(", ")),
+    }
 }
 
 fn dispatch_examples(

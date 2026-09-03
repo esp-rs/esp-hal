@@ -9,7 +9,7 @@ use clap::ValueEnum;
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
 
-use crate::{ScriptContext, metadata::Chip, windows_safe_path};
+use crate::{Package, ScriptContext, metadata::Chip, windows_safe_path};
 
 /// A single, configured example (or test).
 #[derive(Debug, Clone)]
@@ -524,6 +524,33 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     }
 
     Ok(examples)
+}
+
+/// Load every example or test the given package owns.
+///
+/// Packages keep their firmware in one of three shapes: a directory of standalone projects, a
+/// `src/bin` directory, or an `examples` directory.
+pub fn load_package(workspace: &Path, package: Package) -> Result<Vec<Metadata>> {
+    let root = windows_safe_path(&workspace.join(package.directory()));
+    if package.contains_standalone_projects() {
+        return load_cargo_toml(&root);
+    }
+
+    let bins = match package {
+        Package::QaTest | Package::HilTest | Package::HilTestRadio => root.join("src").join("bin"),
+        _ => root.join("examples"),
+    };
+
+    let mut firmware = load(&bins)?;
+    // hil-test-radio keeps the tests and their harness firmware in subdirectories.
+    for nested in ["tests", "support"] {
+        let dir = bins.join(nested);
+        if dir.exists() {
+            firmware.extend(load(&dir)?);
+        }
+    }
+
+    Ok(firmware)
 }
 
 /// Find the metadata entry for an artifact/test name.
