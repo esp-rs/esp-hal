@@ -121,12 +121,13 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
+use esp_sync::RawMutex;
 
 use crate::{
     Async,
     Blocking,
     DriverMode,
-    asynch::AtomicWaker,
+    asynch::{AsyncModeGuard, AtomicWaker, InterruptAffinity},
     clock::ll::{ClockTree, I2cFunctionClockConfig},
     gpio::{
         DriveMode,
@@ -677,6 +678,8 @@ pub struct I2c<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
+    /// `I2c` cannot implement `Drop`, because the mode changes move its fields out.
+    async_guard: AsyncModeGuard,
     config: DriverConfig,
 }
 
@@ -723,11 +726,13 @@ impl<'d> I2c<'d, Blocking> {
         let scl_pin = PinGuard::new_unconnected();
 
         let i2c_any = i2c.degrade();
+        let (info, state) = i2c_any.parts();
 
         let i2c = I2c {
             i2c: i2c_any,
             phantom: PhantomData,
             guard,
+            async_guard: AsyncModeGuard::new(&state.affinity, info.async_teardown),
             config: DriverConfig {
                 config,
                 sda_pin,
@@ -749,12 +754,15 @@ impl<'d> I2c<'d, Blocking> {
     /// See the [`Async`] documentation for an example on how to use this
     /// method.
     pub fn into_async(mut self) -> I2c<'d, Async> {
+        // Claim before the handler can run.
+        self.i2c.state().affinity.claim();
         self.set_interrupt_handler(self.driver().info.async_handler);
 
         I2c {
             i2c: self.i2c,
             phantom: PhantomData,
             guard: self.guard,
+            async_guard: self.async_guard,
             config: self.config,
         }
     }
@@ -840,12 +848,14 @@ impl<'d> I2c<'d, Async> {
     /// See the [`Blocking`] documentation for an example on how to use this
     /// method.
     pub fn into_blocking(self) -> I2c<'d, Blocking> {
-        self.i2c.disable_peri_interrupt_on_all_cores();
+        let (info, state) = self.i2c.parts();
+        state.affinity.tear_down(info.async_teardown);
 
         I2c {
             i2c: self.i2c,
             phantom: PhantomData,
             guard: self.guard,
+            async_guard: self.async_guard,
             config: self.config,
         }
     }

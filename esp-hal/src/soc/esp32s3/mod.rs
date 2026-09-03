@@ -10,8 +10,11 @@ crate::unstable_module! {
     pub mod trng;
     pub mod lp_core;
 }
-#[cfg(feature = "unstable")]
-pub mod cpu_control;
+// The async driver teardown checks whether the second core runs, so this module is compiled
+// without the `unstable` feature, too.
+crate::unstable_module! {
+    pub mod cpu_control;
+}
 pub mod gpio;
 pub(crate) mod regi2c;
 

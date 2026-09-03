@@ -6,11 +6,14 @@
 //! and managing the APP (second) CPU core on the `ESP32-S3` chip. It is used to
 //! start and stop program execution on the APP core.
 
+#[cfg(feature = "unstable")]
 use core::sync::atomic::Ordering;
 
+#[cfg(feature = "unstable")]
+use crate::system::multi_core::*;
 use crate::{
     peripherals::{LPWR, SYSTEM},
-    system::{Cpu, multi_core::*},
+    system::Cpu,
 };
 
 pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
@@ -77,6 +80,7 @@ pub fn is_running(core: Cpu) -> bool {
     is_stalled != 0x86
 }
 
+#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     let system_control = SYSTEM::regs();
 
@@ -96,6 +100,7 @@ pub(crate) fn start_core1(entry_point: *const u32) {
         .modify(|_, w| w.control_core_1_reseting().clear_bit());
 }
 
+#[cfg(feature = "unstable")]
 pub(crate) fn start_core1_init<F>() -> !
 where
     F: FnOnce(),
