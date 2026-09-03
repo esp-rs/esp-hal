@@ -64,6 +64,7 @@ define_lp_functions!();
 #[cfg_attr(lp_io_version = "v3", path = "low_level/v3.rs")]
 #[cfg_attr(lp_io_version = "esp32h2", path = "low_level/esp32h2.rs")]
 #[cfg_attr(lp_io_version = "esp32p4", path = "low_level/esp32p4.rs")]
+#[cfg_attr(lp_io_version = "esp32s31", path = "low_level/esp32s31.rs")]
 #[cfg_attr(lp_io_version = "v4", path = "low_level/v4.rs")]
 pub(crate) mod low_level;
 
@@ -171,8 +172,16 @@ fn route_input(lp_pin: u8, input: LpInputSignal, use_gpio_matrix: bool) {
         .func_in_sel_cfg(input as usize)
         .write(|w| unsafe {
             w.sig_in_sel().bit(use_gpio_matrix);
-            w.in_inv_sel().clear_bit();
-            w.in_sel().bits(lp_pin)
+            cfg_select! {
+                esp32s31 => {
+                    w.func_in_inv_sel().clear_bit();
+                    w.func_in_sel().bits(lp_pin)
+                }
+                _ => {
+                    w.in_inv_sel().clear_bit();
+                    w.in_sel().bits(lp_pin)
+                }
+            }
         });
 }
 
@@ -181,11 +190,21 @@ fn route_output(lp_pin: u8, output: LpOutputSignal) {
     crate::peripherals::LP_GPIO::regs()
         .func_out_sel_cfg(lp_pin as usize)
         .write(|w| unsafe {
-            w.out_sel().bits(output as _);
-            w.out_inv_sel().clear_bit();
-            // Let the peripheral drive the output enable signal.
-            w.oe_sel().clear_bit();
-            w.oe_inv_sel().clear_bit()
+            cfg_select! {
+                esp32s31 => {
+                    w.func_out_sel().bits(output as _);
+                    w.func_out_inv_sel().clear_bit();
+                    w.func_oe_sel().clear_bit();
+                    w.func_oe_inv_sel().clear_bit()
+                }
+                _ => {
+                    w.out_sel().bits(output as _);
+                    w.out_inv_sel().clear_bit();
+                    // Let the peripheral drive the output enable signal.
+                    w.oe_sel().clear_bit();
+                    w.oe_inv_sel().clear_bit()
+                }
+            }
         });
 }
 

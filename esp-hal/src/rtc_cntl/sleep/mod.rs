@@ -33,6 +33,7 @@ mod pmu_common;
 #[cfg_attr(esp32c2, path = "esp32c2.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "esp32s31.rs")]
 mod sleep_impl;
 pub use sleep_impl::*;
 

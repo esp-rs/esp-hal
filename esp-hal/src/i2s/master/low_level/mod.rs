@@ -1,9 +1,12 @@
 use enumset::EnumSet;
 
-use super::I2sInterrupt;
+use super::{I2sClockSource, I2sInterrupt, private::I2sClockDividers};
 #[cfg(not(i2s_version = "1"))]
-use super::private::I2sClockDividers;
+use crate::clock::ll::I2sClkConfig as ModuleClockConfig;
+#[cfg(i2s_version = "1")]
+use crate::clock::ll::I2sMclkConfig as ModuleClockConfig;
 use crate::{
+    clock::ll::{ClockTree, I2sInstance},
     gpio::{InputSignal, OutputSignal},
     pac::i2s0::RegisterBlock,
 };
@@ -12,42 +15,6 @@ use crate::{
 #[cfg_attr(i2s_version = "2", path = "v2.rs")]
 #[cfg_attr(i2s_version = "3", path = "v3.rs")]
 mod version;
-
-#[cfg(not(i2s_version = "1"))]
-pub(crate) struct I2sMclkDividers {
-    pub(crate) x: u32,
-    pub(crate) y: u32,
-    pub(crate) z: u32,
-    pub(crate) yn1: bool,
-}
-
-#[cfg(not(i2s_version = "1"))]
-impl I2sClockDividers {
-    pub(crate) fn mclk_dividers(&self) -> I2sMclkDividers {
-        let (x, y, z, yn1) = if self.denominator == 0 || self.numerator == 0 {
-            // IDF `i2s_ll_tx_set_mclk`: no fraction → x/y/z/yn1 all 0.
-            // `yn1` with z=0 makes the hardware run at N+1.
-            (0, 0, 0, false)
-        } else if self.numerator > self.denominator / 2 {
-            let x = self
-                .denominator
-                .overflowing_div(self.denominator.overflowing_sub(self.numerator).0)
-                .0
-                .overflowing_sub(1)
-                .0;
-            let y = self.denominator % (self.denominator.overflowing_sub(self.numerator).0);
-            let z = self.denominator.overflowing_sub(self.numerator).0;
-            (x, y, z, true)
-        } else {
-            let x = self.denominator / self.numerator - 1;
-            let y = self.denominator % self.numerator;
-            let z = self.numerator;
-            (x, y, z, false)
-        };
-
-        I2sMclkDividers { x, y, z, yn1 }
-    }
-}
 
 /// Peripheral data describing a particular I2S instance.
 ///
@@ -96,6 +63,9 @@ pub struct Info {
 
     /// Hardware PDM-to-PCM format conversion filter supported on RX.
     pub pdm2pcm: bool,
+
+    /// Clock tree instance for this I2S peripheral.
+    pub clock_instance: I2sInstance,
 }
 
 // SAFETY: The register block pointer refers to a static peripheral memory region.
@@ -167,6 +137,53 @@ impl Info {
                 };
             }
             w
+        });
+    }
+}
+
+/// Describes a module clock for the clock tree: the source to select, and the MCLK divider.
+fn clock_config(source: I2sClockSource, dividers: &I2sClockDividers) -> ModuleClockConfig {
+    ModuleClockConfig::new(
+        source,
+        dividers.mclk_divider,
+        dividers.denominator,
+        dividers.numerator,
+    )
+}
+
+impl Info {
+    /// Configures the module clock that both directions share.
+    #[cfg(i2s_version = "1")]
+    pub(crate) fn configure_mclk(&self, source: I2sClockSource, dividers: &I2sClockDividers) {
+        ClockTree::with(|clocks| {
+            self.clock_instance
+                .configure_mclk(clocks, clock_config(source, dividers));
+        });
+    }
+
+    /// Configures the module clock of the transmitter.
+    #[cfg(not(i2s_version = "1"))]
+    pub(crate) fn configure_tx_mclk(&self, source: I2sClockSource, dividers: &I2sClockDividers) {
+        ClockTree::with(|clocks| {
+            self.clock_instance
+                .configure_tx_clk(clocks, clock_config(source, dividers));
+        });
+    }
+
+    /// Configures the module clock of the receiver.
+    #[cfg(not(i2s_version = "1"))]
+    pub(crate) fn configure_rx_mclk(&self, source: I2sClockSource, dividers: &I2sClockDividers) {
+        ClockTree::with(|clocks| {
+            self.clock_instance
+                .configure_rx_clk(clocks, clock_config(source, dividers));
+        });
+    }
+
+    /// Selects the module clock that drives the MCLK pad.
+    #[cfg(not(i2s_version = "1"))]
+    pub(crate) fn configure_mclk_pad(&self, sel: super::MclkOut) {
+        ClockTree::with(|clocks| {
+            self.clock_instance.configure_mclk_out(clocks, sel);
         });
     }
 }

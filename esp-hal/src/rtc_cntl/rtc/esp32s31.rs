@@ -124,6 +124,24 @@ bitfield::bitfield! {
     pub u32, drv_b, set_drv_b: 31, 8;
 }
 
+/// Analog settings of the high-power system during sleep.
+#[derive(Clone, Copy, Default)]
+pub struct HpAnalog {
+    pub bias: AnalogBias,
+    pub regulator0: HpRegulator0,
+    pub regulator1: HpRegulator1,
+}
+
+/// Power settings of the high-power system during sleep.
+#[derive(Clone, Copy, Default)]
+pub struct HpSysPower {
+    pub dig_power: HpDigPower,
+    pub clk: HpClkPower,
+    pub xtal: XtalPower,
+}
+
+pub type HpSysCntlReg = HpSysCntl;
+
 bitfield::bitfield! {
     #[derive(Clone, Copy, Default)]
     pub struct HpBackup(u32);
@@ -451,6 +469,22 @@ bitfield::bitfield! {
     pub struct LpRegulator1(u32);
 
     pub u8, drv_b, set_drv_b: 31, 28;
+}
+
+/// Power settings of the low-power system during sleep.
+#[derive(Clone, Copy, Default)]
+pub struct LpSysPower {
+    pub dig_power: LpDigPower,
+    pub clk_power: LpClkPower,
+    pub xtal: XtalPower,
+}
+
+/// Analog settings of the low-power system during sleep.
+#[derive(Clone, Copy, Default)]
+pub struct LpAnalog {
+    pub bias: AnalogBias,
+    pub regulator0: LpRegulator0,
+    pub regulator1: LpRegulator1,
 }
 
 #[derive(Clone, Copy, Default)]

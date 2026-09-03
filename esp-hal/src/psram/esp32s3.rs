@@ -1,5 +1,7 @@
 use core::ops::Range;
 
+use procmacros::ram;
+
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::peripherals::{EXTMEM, IO_MUX, MMU_TABLE, SPI0, SPI1};
 
@@ -190,14 +192,16 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
 }
 
 pub(crate) mod quad_spi_impl {
-    use procmacros::ram;
-
     use super::*;
+    use crate::psram::quad_xtensa;
 
-    const PSRAM_RESET_EN: u16 = 0x66;
-    const PSRAM_RESET: u16 = 0x99;
-    const PSRAM_DEVICE_ID: u16 = 0x9F;
-    const CS_PSRAM_SEL: u8 = 1 << 1;
+    const PSRAM_CS_IO: u8 = 26;
+    const SPI_CS1_GPIO_NUM: u8 = 26;
+    const FUNC_SPICS1_SPICS1: u8 = 0;
+    const PIN_FUNC_GPIO: u8 = 2;
+    const PSRAM_SPIWP_SD3_IO: u8 = 10;
+    const ESP_ROM_EFUSE_FLASH_DEFAULT_SPI: u32 = 0;
+    const SPICS1_OUT_IDX: u8 = 6;
 
     #[ram]
     pub(crate) fn psram_init(config: &mut PsramConfig) -> bool {
@@ -205,53 +209,9 @@ pub(crate) mod quad_spi_impl {
         psram_set_cs_timing();
 
         if config.size.is_auto() {
-            psram_disable_qio_mode_spi1();
-
-            // read chip id
-            let mut dev_id = 0u32;
-            psram_exec_cmd(
-                CommandMode::PsramCmdSpi,
-                PSRAM_DEVICE_ID,
-                8, // command and command bit len
-                0,
-                24, // address and address bit len
-                0,  // dummy bit len
-                core::ptr::null(),
-                0, // tx data and tx bit len
-                &mut dev_id as *mut _ as *mut u8,
-                24,           // rx data and rx bit len
-                CS_PSRAM_SEL, // cs bit mask
-                false,
-            );
-            if dev_id == 0xffffff {
-                debug!(
-                    "Unknown PSRAM chip ID: {:x}. PSRAM chip not found or not supported. Check if the interface mode is configured correctly.",
-                    dev_id
-                );
+            let Some(size) = quad_xtensa::detect_quad_size() else {
                 return false;
-            }
-
-            info!("chip id = {:x}", dev_id);
-
-            const PSRAM_ID_EID_S: u32 = 16;
-            const PSRAM_ID_EID_M: u32 = 0xff;
-            const PSRAM_EID_SIZE_M: u32 = 0x07;
-            const PSRAM_EID_SIZE_S: u32 = 5;
-
-            let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
-                & PSRAM_EID_SIZE_M;
-
-            const PSRAM_EID_SIZE_32MBITS: u32 = 1;
-            const PSRAM_EID_SIZE_64MBITS: u32 = 2;
-
-            let size = match size_id {
-                PSRAM_EID_SIZE_64MBITS => 64 / 8 * 1024 * 1024,
-                PSRAM_EID_SIZE_32MBITS => 32 / 8 * 1024 * 1024,
-                _ => 16 / 8 * 1024 * 1024,
             };
-
-            info!("size is {}", size);
-
             config.size = PsramSize::Size(size);
         }
 
@@ -263,42 +223,19 @@ pub(crate) mod quad_spi_impl {
             });
         }
 
-        // SPI1: send psram reset command
-        psram_reset_mode_spi1();
-        // SPI1: send QPI enable command
-        psram_enable_qio_mode_spi1();
+        quad_xtensa::psram_reset_mode_spi1();
+        quad_xtensa::psram_enable_qio_mode_spi1();
 
-        // Do PSRAM timing tuning, we use SPI1 to do the tuning, and set the SPI0 PSRAM
-        // timing related registers accordingly
+        // Timing tuning is not implemented. Quad 80 MHz does not require it.
+        // See IDF `mspi_timing_psram_tuning`.
         mspi_timing_psram_tuning();
 
-        // Configure SPI0 PSRAM related SPI Phases
-        config_psram_spi_phases();
-        // Back to the high speed mode. Flash/PSRAM clocks are set to the clock that
-        // user selected. SPI0/1 registers are all set correctly
+        quad_xtensa::config_psram_spi_phases();
         mspi_timing_enter_high_speed_mode(true, config);
 
         info!("PSRAM initialized successfully in Quad SPI mode");
         true
     }
-
-    const PSRAM_CS_IO: u8 = 26;
-    const SPI_CS1_GPIO_NUM: u8 = 26;
-    const FUNC_SPICS1_SPICS1: u8 = 0;
-    const PIN_FUNC_GPIO: u8 = 2;
-    const PSRAM_SPIWP_SD3_IO: u8 = 10;
-    const ESP_ROM_EFUSE_FLASH_DEFAULT_SPI: u32 = 0;
-    const SPICS1_OUT_IDX: u8 = 6;
-
-    const PSRAM_QUAD_WRITE: u32 = 0x38;
-    const PSRAM_FAST_READ_QUAD: u32 = 0xEB;
-    const PSRAM_FAST_READ_QUAD_DUMMY: u32 = 6;
-    const SPI_MEM_CLKCNT_N_S: u32 = 16;
-    const SPI_MEM_SCLKCNT_N_S: u32 = 16;
-    const SPI_MEM_CLKCNT_H_S: u32 = 8;
-    const SPI_MEM_SCLKCNT_H_S: u32 = 8;
-    const SPI_MEM_CLKCNT_L_S: u32 = 0;
-    const SPI_MEM_SCLKCNT_L_S: u32 = 0;
 
     unsafe extern "C" {
         fn esp_rom_efuse_get_flash_gpio_info() -> u32;
@@ -328,61 +265,6 @@ pub(crate) mod quad_spi_impl {
         ///   (use HSPI if CLK pin is the HSPI clock pin, otherwise use SPI).
         //   Both HD & WP pins are configured via GPIO matrix to map to the selected peripheral.
         fn esp_rom_spiflash_select_qio_pins(wp_gpio_num: u8, spiconfig: u32);
-    }
-
-    // Configure PSRAM SPI0 phase related registers here according to the PSRAM chip
-    // requirement
-    #[ram]
-    fn config_psram_spi_phases() {
-        unsafe {
-            let spi = SPI0::regs();
-            // Config CMD phase
-            spi.cache_sctrl()
-                .modify(|_, w| w.usr_sram_dio().clear_bit()); // disable dio mode for cache command
-
-            spi.cache_sctrl().modify(|_, w| w.usr_sram_qio().set_bit()); // enable qio mode for cache command
-
-            spi.cache_sctrl()
-                .modify(|_, w| w.cache_sram_usr_rcmd().set_bit()); // enable cache read command
-
-            spi.cache_sctrl()
-                .modify(|_, w| w.cache_sram_usr_wcmd().set_bit()); // enable cache write command
-
-            spi.sram_dwr_cmd()
-                .modify(|_, w| w.cache_sram_usr_wr_cmd_bitlen().bits(7));
-
-            spi.sram_dwr_cmd().modify(|_, w| {
-                w.cache_sram_usr_wr_cmd_value()
-                    .bits(PSRAM_QUAD_WRITE as u16)
-            });
-
-            spi.sram_drd_cmd()
-                .modify(|_, w| w.cache_sram_usr_rd_cmd_bitlen().bits(7));
-
-            spi.sram_drd_cmd().modify(|_, w| {
-                w.cache_sram_usr_rd_cmd_value()
-                    .bits(PSRAM_FAST_READ_QUAD as u16)
-            });
-
-            // Config ADDR phase
-            spi.cache_sctrl()
-                .modify(|_, w| w.sram_addr_bitlen().bits(23));
-
-            // Dummy
-            // We set the PSRAM chip required dummy here. If timing tuning is
-            // needed, the dummy length will be updated in
-            // `mspi_timing_enter_high_speed_mode()`
-            spi.cache_sctrl()
-                .modify(|_, w| w.usr_rd_sram_dummy().set_bit()); // enable cache read dummy
-
-            spi.cache_sctrl().modify(|_, w| {
-                w.sram_rdummy_cyclelen()
-                    .bits((PSRAM_FAST_READ_QUAD_DUMMY - 1) as u8)
-            });
-
-            // ENABLE SPI0 CS1 TO PSRAM(CS0--FLASH; CS1--SRAM)
-            spi.misc().modify(|_, w| w.cs1_dis().clear_bit());
-        }
     }
 
     #[ram]
@@ -423,12 +305,7 @@ pub(crate) mod quad_spi_impl {
         if control_spi1 {
             spi1_timing_config_set_flash_clock(flash_div);
         }
-        // Set PSRAM module clock
-        spi0_timing_config_set_psram_clock(psram_div);
-
-        // #if SPI_TIMING_FLASH_NEEDS_TUNING || SPI_TIMING_PSRAM_NEEDS_TUNING
-        //     set_timing_tuning_regs_as_required(true);
-        // #endif
+        quad_xtensa::spi0_timing_config_set_psram_clock(psram_div);
     }
 
     #[ram]
@@ -442,54 +319,6 @@ pub(crate) mod quad_spi_impl {
                     SpiTimingConfigCoreClock::SpiTimingConfigCoreClock240m => 3,
                 })
             });
-        }
-    }
-
-    #[ram]
-    fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
-        if freqdiv == 1 {
-            SPI0::regs()
-                .clock()
-                .modify(|_, w| w.clk_equ_sysclk().set_bit());
-        } else {
-            let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
-                | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
-                | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
-            unsafe {
-                SPI0::regs().clock().modify(|_, w| w.bits(freqbits));
-            }
-        }
-    }
-
-    #[ram]
-    fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
-        if freqdiv == 1 {
-            SPI1::regs()
-                .clock()
-                .modify(|_, w| w.clk_equ_sysclk().set_bit());
-        } else {
-            let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
-                | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
-                | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
-            unsafe {
-                SPI1::regs().clock().modify(|_, w| w.bits(freqbits));
-            }
-        }
-    }
-
-    #[ram]
-    fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
-        if freqdiv == 1 {
-            SPI0::regs()
-                .sram_clk()
-                .modify(|_, w| w.sclk_equ_sysclk().set_bit());
-        } else {
-            let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
-                | ((freqdiv / 2 - 1) << SPI_MEM_SCLKCNT_H_S)
-                | ((freqdiv - 1) << SPI_MEM_SCLKCNT_L_S);
-            unsafe {
-                SPI0::regs().sram_clk().modify(|_, w| w.bits(freqbits));
-            }
         }
     }
 
@@ -508,268 +337,34 @@ pub(crate) mod quad_spi_impl {
         config.core_clock.unwrap_or_default() as u32 / config.ram_frequency as u32
     }
 
-    // send reset command to psram, in spi mode
-    #[ram]
-    fn psram_reset_mode_spi1() {
-        psram_exec_cmd(
-            CommandMode::PsramCmdSpi,
-            PSRAM_RESET_EN,
-            8, // command and command bit len
-            0,
-            0, // address and address bit len
-            0, // dummy bit len
-            core::ptr::null(),
-            0, // tx data and tx bit len
-            core::ptr::null_mut(),
-            0,            // rx data and rx bit len
-            CS_PSRAM_SEL, // cs bit mask
-            false,
-        ); // whether is program/erase operation
-
-        psram_exec_cmd(
-            CommandMode::PsramCmdSpi,
-            PSRAM_RESET,
-            8, // command and command bit len
-            0,
-            0, // address and address bit len
-            0, // dummy bit len
-            core::ptr::null(),
-            0, // tx data and tx bit len
-            core::ptr::null_mut(),
-            0,            // rx data and rx bit len
-            CS_PSRAM_SEL, // cs bit mask
-            false,
-        ); // whether is program/erase operation
-    }
-
-    #[derive(PartialEq)]
-    #[allow(unused)]
-    enum CommandMode {
-        PsramCmdQpi = 0,
-        PsramCmdSpi = 1,
-    }
-
-    #[expect(clippy::too_many_arguments)]
-    #[ram]
-    fn psram_exec_cmd(
-        mode: CommandMode,
-        cmd: u16,
-        cmd_bit_len: u16,
-        addr: u32,
-        addr_bit_len: u32,
-        dummy_bits: u32,
-        mosi_data: *const u8,
-        mosi_bit_len: u32,
-        miso_data: *mut u8,
-        miso_bit_len: u32,
-        cs_mask: u8,
-        is_write_erase_operation: bool,
-    ) {
-        unsafe extern "C" {
-            ///  Starts a SPI user command sequence.
-            ///  [`spi_num`] spi port
-            ///  [`rx_buf`] buffer pointer to receive data
-            ///  [`rx_len`] receive data length in byte
-            ///  [`cs_en_mask`] decide which cs to use, 0 for cs0, 1 for cs1
-            ///  [`is_write_erase`] to indicate whether this is a write or erase
-            /// operation, since the CPU would check permission.
-            fn esp_rom_spi_cmd_start(
-                spi_num: u32,
-                rx_buf: *const u8,
-                rx_len: u16,
-                cs_en_mask: u8,
-                is_write_erase: bool,
-            );
-        }
-
-        unsafe {
-            let spi1 = SPI1::regs();
-            let backup_usr = spi1.user().read().bits();
-            let backup_usr1 = spi1.user1().read().bits();
-            let backup_usr2 = spi1.user2().read().bits();
-            let backup_ctrl = spi1.ctrl().read().bits();
-            psram_set_op_mode(mode);
-            _psram_exec_cmd(
-                cmd,
-                cmd_bit_len,
-                addr,
-                addr_bit_len,
-                dummy_bits,
-                mosi_data,
-                mosi_bit_len,
-                miso_data,
-                miso_bit_len,
-            );
-            esp_rom_spi_cmd_start(
-                1,
-                miso_data,
-                (miso_bit_len / 8) as u16,
-                cs_mask,
-                is_write_erase_operation,
-            );
-
-            spi1.user().write(|w| w.bits(backup_usr));
-            spi1.user1().write(|w| w.bits(backup_usr1));
-            spi1.user2().write(|w| w.bits(backup_usr2));
-            spi1.ctrl().write(|w| w.bits(backup_ctrl));
-        }
-    }
-
-    #[expect(clippy::too_many_arguments)]
-    #[ram]
-    fn _psram_exec_cmd(
-        cmd: u16,
-        cmd_bit_len: u16,
-        addr: u32,
-        addr_bit_len: u32,
-        dummy_bits: u32,
-        mosi_data: *const u8,
-        mosi_bit_len: u32,
-        miso_data: *mut u8,
-        miso_bit_len: u32,
-    ) {
-        #[repr(C)]
-        struct esp_rom_spi_cmd_t {
-            cmd: u16,             // Command value
-            cmd_bit_len: u16,     // Command byte length
-            addr: *const u32,     // Point to address value
-            addr_bit_len: u32,    // Address byte length
-            tx_data: *const u32,  // Point to send data buffer
-            tx_data_bit_len: u32, // Send data byte length.
-            rx_data: *mut u32,    // Point to recevie data buffer
-            rx_data_bit_len: u32, // Recevie Data byte length.
-            dummy_bit_len: u32,
-        }
-
-        unsafe extern "C" {
-            /// Config the spi user command
-            /// [`spi_num`] spi port
-            /// [`pcmd`] pointer to accept the spi command struct
-            fn esp_rom_spi_cmd_config(spi_num: u32, pcmd: *const esp_rom_spi_cmd_t);
-        }
-
-        let conf = esp_rom_spi_cmd_t {
-            cmd,
-            cmd_bit_len,
-            addr: &addr,
-            addr_bit_len,
-            tx_data: mosi_data as *const u32,
-            tx_data_bit_len: mosi_bit_len,
-            rx_data: miso_data as *mut u32,
-            rx_data_bit_len: miso_bit_len,
-            dummy_bit_len: dummy_bits,
-        };
-
-        unsafe {
-            esp_rom_spi_cmd_config(1, &conf);
-        }
-    }
-
-    #[ram]
-    fn psram_set_op_mode(mode: CommandMode) {
-        unsafe extern "C" {
-            fn esp_rom_spi_set_op_mode(spi: u32, mode: u32);
-        }
-
-        const ESP_ROM_SPIFLASH_QIO_MODE: u32 = 0;
-        const ESP_ROM_SPIFLASH_SLOWRD_MODE: u32 = 5;
-
-        unsafe {
-            match mode {
-                CommandMode::PsramCmdQpi => {
-                    esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_QIO_MODE);
-                    SPI1::regs().ctrl().modify(|_, w| w.fcmd_quad().set_bit());
-                }
-                CommandMode::PsramCmdSpi => {
-                    esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_SLOWRD_MODE);
-                }
-            }
-        }
-    }
-
-    /// Exits QPI mode.
-    #[ram]
-    fn psram_disable_qio_mode_spi1() {
-        const PSRAM_EXIT_QMODE: u16 = 0xF5;
-        const CS_PSRAM_SEL: u8 = 1 << 1;
-
-        psram_exec_cmd(
-            CommandMode::PsramCmdQpi,
-            PSRAM_EXIT_QMODE,
-            8, // command and command bit len
-            0,
-            0, // address and address bit len
-            0, // dummy bit len
-            core::ptr::null(),
-            0, // tx data and tx bit len
-            core::ptr::null_mut(),
-            0,            // rx data and rx bit len
-            CS_PSRAM_SEL, // cs bit mask
-            false,        // whether is program/erase operation
-        );
-    }
-
-    /// Enters QPI mode.
-    #[ram]
-    fn psram_enable_qio_mode_spi1() {
-        const PSRAM_ENTER_QMODE: u16 = 0x35;
-        const CS_PSRAM_SEL: u8 = 1 << 1;
-
-        psram_exec_cmd(
-            CommandMode::PsramCmdSpi,
-            PSRAM_ENTER_QMODE,
-            8, // command and command bit len
-            0,
-            0, // address and address bit len
-            0, // dummy bit len
-            core::ptr::null(),
-            0, // tx data and tx bit len
-            core::ptr::null_mut(),
-            0,            // rx data and rx bit len
-            CS_PSRAM_SEL, // cs bit mask
-            false,        // whether is program/erase operation
-        );
-    }
-
     #[ram]
     fn psram_set_cs_timing() {
-        unsafe {
-            // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time registers
-            // for PSRAM, so we only need to set SPI0 related registers here
-            SPI0::regs()
-                .spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_hold_time().bits(0));
-            SPI0::regs()
-                .spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_setup_time().bits(0));
-            SPI0::regs()
-                .spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_hold().set_bit());
-            SPI0::regs()
-                .spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_setup().set_bit());
-        }
+        // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time registers
+        // for PSRAM, so we only need to set SPI0 related registers here
+        SPI0::regs().spi_smem_ac().modify(|_, w| unsafe {
+            w.spi_smem_cs_hold_time().bits(0);
+            w.spi_smem_cs_setup_time().bits(0);
+            w.spi_smem_cs_hold().set_bit();
+            w.spi_smem_cs_setup().set_bit()
+        });
     }
 
     #[ram]
     fn psram_gpio_config() {
         // CS1
         let cs1_io: u8 = PSRAM_CS_IO;
-        if cs1_io == SPI_CS1_GPIO_NUM {
-            unsafe {
-                IO_MUX::regs()
-                    .gpio(cs1_io as usize)
-                    .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
-            }
+        let mcu_sel = if cs1_io == SPI_CS1_GPIO_NUM {
+            FUNC_SPICS1_SPICS1
         } else {
             unsafe {
                 esp_rom_gpio_connect_out_signal(cs1_io, SPICS1_OUT_IDX, false, false);
-
-                IO_MUX::regs()
-                    .gpio(cs1_io as usize)
-                    .modify(|_, w| w.mcu_sel().bits(PIN_FUNC_GPIO));
+                PIN_FUNC_GPIO
             }
-        }
+        };
+
+        IO_MUX::regs()
+            .gpio(cs1_io as usize)
+            .modify(|_, w| unsafe { w.mcu_sel().bits(mcu_sel) });
 
         // WP HD
         let mut wp_io: u8 = PSRAM_SPIWP_SD3_IO;
@@ -790,9 +385,8 @@ pub(crate) mod quad_spi_impl {
 }
 
 pub(crate) mod octal_spi_impl {
-    use procmacros::ram;
-
     use super::*;
+    use crate::psram::quad_xtensa;
 
     const OPI_PSRAM_SYNC_READ: u16 = 0x0000;
     const OPI_PSRAM_SYNC_WRITE: u16 = 0x8080;
@@ -810,21 +404,9 @@ pub(crate) mod octal_spi_impl {
     const OCT_PSRAM_CS_HOLD_TIME: u8 = 3;
     const OCT_PSRAM_CS_HOLD_DELAY: u8 = 2;
 
-    const PSRAM_SIZE_2MB: usize = 2 * 1024 * 1024;
-    const PSRAM_SIZE_4MB: usize = 4 * 1024 * 1024;
-    const PSRAM_SIZE_8MB: usize = 8 * 1024 * 1024;
-    const PSRAM_SIZE_16MB: usize = 16 * 1024 * 1024;
-    const PSRAM_SIZE_32MB: usize = 32 * 1024 * 1024;
-
     const SPI_CS1_GPIO_NUM: u8 = 26;
     const FUNC_SPICS1_SPICS1: u8 = 0;
 
-    const SPI_MEM_CLKCNT_N_S: u32 = 16;
-    const SPI_MEM_SCLKCNT_N_S: u32 = 16;
-    const SPI_MEM_CLKCNT_H_S: u32 = 8;
-    const SPI_MEM_SCLKCNT_H_S: u32 = 8;
-    const SPI_MEM_CLKCNT_L_S: u32 = 0;
-    const SPI_MEM_SCLKCNT_L_S: u32 = 0;
     const ESP_ROM_SPIFLASH_OPI_DTR_MODE: u8 = 7;
 
     unsafe extern "C" {
@@ -1081,7 +663,6 @@ pub(crate) mod octal_spi_impl {
     #[ram]
     pub(crate) fn psram_init(config: &mut PsramConfig) -> bool {
         mspi_pin_init();
-        init_psram_pins();
         set_psram_cs_timing();
 
         // for now we don't support ECC
@@ -1121,11 +702,11 @@ pub(crate) mod octal_spi_impl {
         }
 
         let psram_size = match mode_reg.density() {
-            0x0 => PSRAM_SIZE_2MB,
-            0x1 => PSRAM_SIZE_4MB,
-            0x3 => PSRAM_SIZE_8MB,
-            0x5 => PSRAM_SIZE_16MB,
-            0x7 => PSRAM_SIZE_32MB,
+            0x0 => 2 * 1024 * 1024,
+            0x1 => 4 * 1024 * 1024,
+            0x3 => 8 * 1024 * 1024,
+            0x5 => 16 * 1024 * 1024,
+            0x7 => 32 * 1024 * 1024,
             _ => 0,
         };
         info!("{} bytes of PSRAM", psram_size);
@@ -1169,60 +750,51 @@ pub(crate) mod octal_spi_impl {
     // Configure PSRAM SPI0 phase related registers here according to the PSRAM chip
     // requirement
     fn config_psram_spi_phases() {
-        unsafe {
-            let spi = SPI0::regs();
-            // Config Write CMD phase for SPI0 to access PSRAM
-            spi.cache_sctrl()
-                .modify(|_, w| w.cache_sram_usr_wcmd().set_bit());
+        SPI0::regs().cache_sctrl().modify(|_, w| unsafe {
+            w.sram_oct().set_bit();
 
-            spi.sram_dwr_cmd().modify(|_, w| {
-                w.cache_sram_usr_wr_cmd_bitlen()
-                    .bits(OCT_PSRAM_WR_CMD_BITLEN - 1)
-            });
-            spi.sram_dwr_cmd()
-                .modify(|_, w| w.cache_sram_usr_wr_cmd_value().bits(OPI_PSRAM_SYNC_WRITE));
-
-            // Config Read CMD phase for SPI0 to access PSRAM
-            spi.cache_sctrl()
-                .modify(|_, w| w.cache_sram_usr_rcmd().set_bit());
-
-            spi.sram_drd_cmd().modify(|_, w| {
-                w.cache_sram_usr_rd_cmd_bitlen()
-                    .bits(OCT_PSRAM_RD_CMD_BITLEN - 1)
-            });
-            spi.sram_drd_cmd()
-                .modify(|_, w| w.cache_sram_usr_rd_cmd_value().bits(OPI_PSRAM_SYNC_READ));
+            w.cache_sram_usr_rcmd().set_bit();
+            w.cache_sram_usr_wcmd().set_bit();
 
             // Config ADDR phase
-            spi.cache_sctrl()
-                .modify(|_, w| w.sram_addr_bitlen().bits(OCT_PSRAM_ADDR_BITLEN - 1));
-            spi.cache_sctrl()
-                .modify(|_, w| w.cache_usr_scmd_4byte().set_bit());
+            w.sram_addr_bitlen().bits(OCT_PSRAM_ADDR_BITLEN - 1);
+            w.cache_usr_scmd_4byte().set_bit();
 
             // Config RD/WR Dummy phase
-            spi.cache_sctrl()
-                .modify(|_, w| w.usr_rd_sram_dummy().set_bit());
-            spi.cache_sctrl()
-                .modify(|_, w| w.usr_wr_sram_dummy().set_bit());
-            spi.cache_sctrl()
-                .modify(|_, w| w.sram_rdummy_cyclelen().bits(OCT_PSRAM_RD_DUMMY_BITLEN - 1));
-            spi.spi_smem_ddr()
-                .modify(|_, w| w.spi_smem_var_dummy().set_bit());
-            spi.cache_sctrl()
-                .modify(|_, w| w.sram_wdummy_cyclelen().bits(OCT_PSRAM_WR_DUMMY_BITLEN - 1));
+            w.usr_rd_sram_dummy().set_bit();
+            w.usr_wr_sram_dummy().set_bit();
+            w.sram_rdummy_cyclelen().bits(OCT_PSRAM_RD_DUMMY_BITLEN - 1);
+            w.sram_wdummy_cyclelen().bits(OCT_PSRAM_WR_DUMMY_BITLEN - 1)
+        });
 
-            spi.spi_smem_ddr().modify(|_, w| w.wdat_swp().clear_bit());
-            spi.spi_smem_ddr().modify(|_, w| w.rdat_swp().clear_bit());
-            spi.spi_smem_ddr().modify(|_, w| w.en().set_bit());
+        // Config Write CMD phase for SPI0 to access PSRAM
+        SPI0::regs().sram_dwr_cmd().modify(|_, w| unsafe {
+            w.cache_sram_usr_wr_cmd_value().bits(OPI_PSRAM_SYNC_WRITE);
+            w.cache_sram_usr_wr_cmd_bitlen()
+                .bits(OCT_PSRAM_WR_CMD_BITLEN - 1)
+        });
 
-            spi.sram_cmd().modify(|_, w| w.sdummy_out().set_bit());
-            spi.sram_cmd().modify(|_, w| w.scmd_oct().set_bit());
-            spi.sram_cmd().modify(|_, w| w.saddr_oct().set_bit());
-            spi.sram_cmd().modify(|_, w| w.sdout_oct().set_bit());
-            spi.sram_cmd().modify(|_, w| w.sdin_oct().set_bit());
+        // Config Read CMD phase for SPI0 to access PSRAM
+        SPI0::regs().sram_drd_cmd().modify(|_, w| unsafe {
+            w.cache_sram_usr_rd_cmd_bitlen()
+                .bits(OCT_PSRAM_RD_CMD_BITLEN - 1);
+            w.cache_sram_usr_rd_cmd_value().bits(OPI_PSRAM_SYNC_READ)
+        });
 
-            spi.cache_sctrl().modify(|_, w| w.sram_oct().set_bit());
-        }
+        SPI0::regs().spi_smem_ddr().modify(|_, w| {
+            w.spi_smem_var_dummy().set_bit();
+            w.wdat_swp().clear_bit();
+            w.rdat_swp().clear_bit();
+            w.en().set_bit()
+        });
+
+        SPI0::regs().sram_cmd().modify(|_, w| {
+            w.sdummy_out().set_bit();
+            w.scmd_oct().set_bit();
+            w.saddr_oct().set_bit();
+            w.sdout_oct().set_bit();
+            w.sdin_oct().set_bit()
+        });
     }
 
     #[ram]
@@ -1241,31 +813,38 @@ pub(crate) mod octal_spi_impl {
     #[ram]
     fn mspi_pin_init() {
         unsafe { esp_rom_opiflash_pin_config() };
-        spi_timing_set_pin_drive_strength();
         // Set F4R4 board pin drive strength. TODO: IDF-3663
-    }
 
-    #[ram]
-    fn spi_timing_set_pin_drive_strength() {
         // For now, set them all to 3. Need to check after QVL test results are out.
         // TODO: IDF-3663 Set default clk
-        unsafe {
-            SPI0::regs()
-                .date()
-                .modify(|_, w| w.spi_spiclk_pad_drv_ctl_en().set_bit());
-            SPI0::regs()
-                .date()
-                .modify(|_, w| w.spi_smem_spiclk_fun_drv().bits(3));
-            SPI0::regs()
-                .date()
-                .modify(|_, w| w.spi_fmem_spiclk_fun_drv().bits(3));
+        SPI0::regs().date().modify(|_, w| unsafe {
+            w.spi_spiclk_pad_drv_ctl_en().set_bit();
+            w.spi_smem_spiclk_fun_drv().bits(3);
+            w.spi_fmem_spiclk_fun_drv().bits(3)
+        });
 
-            // Set default mspi d0 ~ d7, dqs pin drive strength
-            let pins = [27usize, 28, 31, 32, 33, 34, 35, 36, 37];
-            for pin in pins {
-                IO_MUX::regs().gpio(pin).modify(|_, w| w.fun_drv().bits(3));
-            }
+        // Set default mspi d0 ~ d7, dqs pin drive strength
+        let pins = [
+            OCT_PSRAM_CS1_IO as usize,
+            27,
+            28,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+        ];
+        for pin in pins {
+            IO_MUX::regs()
+                .gpio(pin)
+                .modify(|_, w| unsafe { w.fun_drv().bits(3) });
         }
+
+        IO_MUX::regs()
+            .gpio(OCT_PSRAM_CS1_IO as usize)
+            .modify(|_, w| unsafe { w.mcu_sel().bits(FUNC_SPICS1_SPICS1) });
     }
 
     fn spi_timing_enter_mspi_low_speed_mode(control_spi1: bool) {
@@ -1288,7 +867,7 @@ pub(crate) mod octal_spi_impl {
         }
 
         // Set PSRAM module clock
-        spi0_timing_config_set_psram_clock(4);
+        quad_xtensa::spi0_timing_config_set_psram_clock(4);
 
         // for now we don't support tuning the timing
         // "clear_timing_tuning_regs(control_spi1);"
@@ -1313,56 +892,26 @@ pub(crate) mod octal_spi_impl {
             spi1_timing_config_set_flash_clock(flash_div);
         }
         // Set PSRAM module clock
-        spi0_timing_config_set_psram_clock(psram_div);
+        quad_xtensa::spi0_timing_config_set_psram_clock(psram_div);
 
         // for now we don't support tuning the timing
         // "set_timing_tuning_regs_as_required(true);"
     }
 
     fn set_psram_cs_timing() {
-        unsafe {
-            let spi = SPI0::regs();
-            // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time,
-            // cs_hold_delay registers for PSRAM, so we only need to set SPI0 related
-            // registers here
-            spi.spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_hold().set_bit());
-            spi.spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_setup().set_bit());
-
-            spi.spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_hold_time().bits(OCT_PSRAM_CS_HOLD_TIME));
-            spi.spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_setup_time().bits(OCT_PSRAM_CS_SETUP_TIME));
+        // SPI0/1 share the cs_hold / cs_setup, cd_hold_time / cd_setup_time,
+        // cs_hold_delay registers for PSRAM, so we only need to set SPI0 related
+        // registers here
+        SPI0::regs().spi_smem_ac().modify(|_, w| unsafe {
+            w.spi_smem_cs_hold().set_bit();
+            w.spi_smem_cs_setup().set_bit();
+            w.spi_smem_cs_hold_time().bits(OCT_PSRAM_CS_HOLD_TIME);
+            w.spi_smem_cs_setup_time().bits(OCT_PSRAM_CS_SETUP_TIME);
 
             // CONFIG_SPIRAM_ECC_ENABLE unsupported for now
             // CS1 high time
-            spi.spi_smem_ac()
-                .modify(|_, w| w.spi_smem_cs_hold_delay().bits(OCT_PSRAM_CS_HOLD_DELAY));
-        }
-    }
-
-    fn init_psram_pins() {
-        // Set cs1 pin function
-        unsafe {
-            IO_MUX::regs()
-                .gpio(OCT_PSRAM_CS1_IO as usize)
-                .modify(|_, w| w.mcu_sel().bits(FUNC_SPICS1_SPICS1));
-        }
-
-        // Set mspi cs1 drive strength
-        unsafe {
-            IO_MUX::regs()
-                .gpio(OCT_PSRAM_CS1_IO as usize)
-                .modify(|_, w| w.fun_drv().bits(3));
-        }
-
-        // Set psram clock pin drive strength
-        unsafe {
-            SPI0::regs()
-                .date()
-                .modify(|_, w| w.spi_smem_spiclk_fun_drv().bits(3));
-        }
+            w.spi_smem_cs_hold_delay().bits(OCT_PSRAM_CS_HOLD_DELAY)
+        });
     }
 
     fn psram_mode_reg(spi_num: u32, out_reg: &mut OpiPsramModeReg) {
@@ -1613,54 +1162,6 @@ pub(crate) mod octal_spi_impl {
     }
 
     #[ram]
-    fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
-        if freqdiv == 1 {
-            SPI0::regs()
-                .clock()
-                .modify(|_, w| w.clk_equ_sysclk().set_bit());
-        } else {
-            let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
-                | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
-                | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
-            unsafe {
-                SPI0::regs().clock().modify(|_, w| w.bits(freqbits));
-            }
-        }
-    }
-
-    #[ram]
-    fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
-        if freqdiv == 1 {
-            SPI1::regs()
-                .clock()
-                .modify(|_, w| w.clk_equ_sysclk().set_bit());
-        } else {
-            let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_CLKCNT_N_S)
-                | ((freqdiv / 2 - 1) << SPI_MEM_CLKCNT_H_S)
-                | ((freqdiv - 1) << SPI_MEM_CLKCNT_L_S);
-            unsafe {
-                SPI1::regs().clock().modify(|_, w| w.bits(freqbits));
-            }
-        }
-    }
-
-    #[ram]
-    fn spi0_timing_config_set_psram_clock(freqdiv: u32) {
-        if freqdiv == 1 {
-            SPI0::regs()
-                .sram_clk()
-                .modify(|_, w| w.sclk_equ_sysclk().set_bit());
-        } else {
-            let freqbits: u32 = ((freqdiv - 1) << SPI_MEM_SCLKCNT_N_S)
-                | ((freqdiv / 2 - 1) << SPI_MEM_SCLKCNT_H_S)
-                | ((freqdiv - 1) << SPI_MEM_SCLKCNT_L_S);
-            unsafe {
-                SPI0::regs().sram_clk().modify(|_, w| w.bits(freqbits));
-            }
-        }
-    }
-
-    #[ram]
     fn flash_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock.unwrap_or_default() as u32 / config.flash_frequency as u32
     }
@@ -1668,5 +1169,43 @@ pub(crate) mod octal_spi_impl {
     #[ram]
     fn psram_clock_divider(config: &PsramConfig) -> u32 {
         config.core_clock.unwrap_or_default() as u32 / config.ram_frequency as u32
+    }
+}
+
+#[ram]
+fn spi0_timing_config_set_flash_clock(freqdiv: u32) {
+    if freqdiv == 1 {
+        SPI0::regs().clock().write(|w| unsafe {
+            w.clk_equ_sysclk().set_bit();
+            w.clkcnt_h().bits(0);
+            w.clkcnt_n().bits(0);
+            w.clkcnt_l().bits(0)
+        });
+    } else {
+        SPI0::regs().clock().write(|w| unsafe {
+            w.clk_equ_sysclk().clear_bit();
+            w.clkcnt_h().bits((freqdiv / 2 - 1) as u8);
+            w.clkcnt_n().bits((freqdiv - 1) as u8);
+            w.clkcnt_l().bits((freqdiv - 1) as u8)
+        });
+    }
+}
+
+#[ram]
+fn spi1_timing_config_set_flash_clock(freqdiv: u32) {
+    if freqdiv == 1 {
+        SPI1::regs().clock().write(|w| unsafe {
+            w.clk_equ_sysclk().set_bit();
+            w.clkcnt_h().bits(0);
+            w.clkcnt_n().bits(0);
+            w.clkcnt_l().bits(0)
+        });
+    } else {
+        SPI1::regs().clock().write(|w| unsafe {
+            w.clk_equ_sysclk().clear_bit();
+            w.clkcnt_h().bits((freqdiv / 2 - 1) as u8);
+            w.clkcnt_n().bits((freqdiv - 1) as u8);
+            w.clkcnt_l().bits((freqdiv - 1) as u8)
+        });
     }
 }

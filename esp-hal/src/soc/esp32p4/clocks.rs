@@ -58,6 +58,7 @@ impl CpuClock {
         mem_clk: Some(MemClkConfig::new(1)), // /2 = 200 MHz
         sys_clk: Some(SysClkConfig::new(0)), // /1 = 200 MHz
         apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
             0,
@@ -77,6 +78,7 @@ impl CpuClock {
         mem_clk: Some(MemClkConfig::new(0)), // /1 = 200 MHz
         sys_clk: Some(SysClkConfig::new(0)), // /1 = 200 MHz
         apb_clk: Some(ApbClkConfig::new(1)), // /2 = 100 MHz
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
             0,
@@ -94,6 +96,7 @@ impl CpuClock {
         mem_clk: Some(MemClkConfig::new(0)), // /1 = 100 MHz
         sys_clk: Some(SysClkConfig::new(0)), // /1 = 100 MHz
         apb_clk: Some(ApbClkConfig::new(0)), // /1 = 100 MHz
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
             0,
@@ -531,6 +534,29 @@ fn enable_pll_f25m_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_pll_f50m_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn enable_spll_d3_clock_impl(_clocks: &mut ClockTree, _en: bool) {}
+
+// CRYPTO_CLK
+
+fn enable_crypto_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here.
+}
+
+fn configure_crypto_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<CryptoClkConfig>,
+    new_config: CryptoClkConfig,
+) {
+    HP_SYS_CLKRST::regs()
+        .peri_clk_ctrl25()
+        .modify(|_, w| unsafe {
+            w.crypto_clk_src_sel().bits(match new_config {
+                CryptoClkConfig::Xtal => 0,
+                CryptoClkConfig::RcFast => 1,
+                CryptoClkConfig::PllF240m => 2,
+                CryptoClkConfig::PllF160m => 3,
+            })
+        });
+}
 
 // TIMG_CALIBRATION_CLOCK
 

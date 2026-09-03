@@ -61,8 +61,8 @@ peripherals = [
     { name = "HP_SYS_CLKRST" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C", stable = true },
     { name = "I2C1", interrupts = { peri = "I2C1" }, clock_group = "I2C", stable = true },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
-    { name = "I2S1", interrupts = { peri = "I2S1" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
+    { name = "I2S1", interrupts = { peri = "I2S1" }, clock_group = "I2S" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
@@ -155,8 +155,8 @@ support_status = "supported"
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
-    { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS" },
-    { name = "uart3", sys_instance = "Uart3", tx = "U3TXD", rx = "U3RXD", cts = "U3CTS", rts = "U3RTS" },
+    { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS", wakeup_source = false },
+    { name = "uart3", sys_instance = "Uart3", tx = "U3TXD", rx = "U3RXD", cts = "U3CTS", rts = "U3RTS", wakeup_source = false },
 ]
 ram_size = 128
 version = 2
@@ -205,7 +205,7 @@ apb_cycle_wait_num = 16 # TODO
 is_lp_sys = false
 
 [device.sleep]
-support_status = "not_supported"
+support_status = "partial"
 light_sleep = true
 deep_sleep = true
 ext1_version = 3
@@ -406,8 +406,6 @@ support_status = "not_supported"
 [device.i2s]
 support_status = "partial"
 version = 3
-# 0 = XTAL. Prefer APLL (1) once it's modelled in the clock tree.
-default_clock_source = 0
 clock_configured_by_hp_sys_clkrst = true
 mclk_divider_bit_width = 8
 max_ws_width = 512

@@ -1,7 +1,10 @@
 //! PDM clock calculations.
 
 use super::{PdmDownsampleRate, PdmError, PdmRxClockConfig, PdmTxClockConfig};
-use crate::{i2s::master::private::I2sClockDividers, soc, time::Rate};
+use crate::{
+    i2s::master::{private::I2sClockDividers, source_frequency},
+    time::Rate,
+};
 
 pub(crate) const PDM_BCK_FACTOR: u32 = 64;
 pub(crate) const PDM_TX_BCLK_DIV_MIN: u32 = 8;
@@ -50,7 +53,7 @@ pub(crate) fn calculate_tx_clock(
     };
 
     let mclk = bclk * bclk_div;
-    let sclk = soc::i2s_sclk_frequency();
+    let sclk = source_frequency(clk.clock_source);
     let mut dividers = calculate_mclk_dividers(sclk, mclk)?;
     dividers.bclk_divider = bclk_div;
 
@@ -81,7 +84,7 @@ pub(crate) fn calculate_rx_clock(
     let bclk_div = clk.bclk_div.max(PDM_RX_BCLK_DIV_MIN).max(bclk_limit);
 
     let mclk = bclk * bclk_div;
-    let sclk = soc::i2s_sclk_frequency();
+    let sclk = source_frequency(clk.clock_source);
     let mut dividers = calculate_mclk_dividers(sclk, mclk)?;
     dividers.bclk_divider = bclk_div;
 
@@ -105,6 +108,7 @@ impl PdmTxClockConfig {
             up_sample_fp: 960,
             up_sample_fs: 480,
             bclk_div: PDM_TX_BCLK_DIV_MIN,
+            clock_source: Default::default(),
         }
     }
 
@@ -115,6 +119,7 @@ impl PdmTxClockConfig {
             up_sample_fp: 960,
             up_sample_fs: sample_rate.as_hz() / 100,
             bclk_div: 13,
+            clock_source: Default::default(),
         }
     }
 }
@@ -126,6 +131,7 @@ impl PdmRxClockConfig {
             sample_rate,
             downsample_rate: PdmDownsampleRate::Dsr8s,
             bclk_div: PDM_RX_BCLK_DIV_MIN,
+            clock_source: Default::default(),
         }
     }
 }

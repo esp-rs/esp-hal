@@ -45,6 +45,15 @@ system_clocks = { clock_tree = [
     # LP_DYN_SLOW_CLK is LP_SLOW_CLK
     # LP_DYN_FAST_CLK is automatically managed based on power mode. Not sure how to model it, some LP peripherals need it.
 
+    # Global peripheral-related clocks
+    # PCR.sec_conf.sec_clk_sel: external memory encryption and decryption
+    { name = "CRYPTO_CLK", type = "mux", variants = [
+        { name = "XTAL",     outputs = "XTAL_CLK"     },
+        { name = "RC_FAST",  outputs = "RC_FAST_CLK"  },
+        { name = "PLL_F64M", outputs = "PLL_F64M_CLK" },
+        { name = "PLL_F96M", outputs = "PLL_F96M_CLK" },
+    ] },
+
     # There are separate clock muxes for each TIMG instance, but esp-hal only uses one. Only modelling
     # one makes the HAL code simpler.
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
@@ -106,6 +115,33 @@ system_clocks = { clock_tree = [
       clocks = [
         { name = "RX_CLOCK", preset = "CLK" },
         { name = "TX_CLOCK", preset = "CLK" },
+      ],
+    },
+    { group = "I2S",
+      presets = {
+        CLK = {
+          type = "generic",
+          wake_locking = true,
+          output = "(sclk * div_a) / (div_num * div_a + div_b)",
+          params = {
+            sclk = [
+              { name = "XTAL",     outputs = "XTAL_CLK" },
+              { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
+              { name = "PLL_F64M", outputs = "PLL_F64M_CLK" },
+            ],
+            div_num = "1 ..= 255",
+            div_a   = "1 ..= 511",
+            div_b   = "0 ..= 511",
+          },
+        },
+      },
+      clocks = [
+        { name = "TX_CLK",   preset = "CLK" },
+        { name = "RX_CLK",   preset = "CLK" },
+        { name = "MCLK_OUT", type = "mux", variants = [
+          { name = "TX", outputs = "TX_CLK" },
+          { name = "RX", outputs = "RX_CLK", default = true },
+        ] },
       ],
     },
     { group = "I2C", clocks = [

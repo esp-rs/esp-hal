@@ -6,10 +6,10 @@ pub(crate) mod btdm;
 #[cfg(bt_controller = "npl")]
 pub(crate) mod npl;
 
-use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
+use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::mem::MaybeUninit;
 
-pub(crate) use ble::{ble_deinit, ble_init, send_hci};
+pub(crate) use ble::{ble_deinit, ble_init, send_hci, send_hci_async};
 use docsplay::Display;
 use esp_sync::NonReentrantMutex;
 
@@ -48,12 +48,14 @@ pub(crate) unsafe extern "C" fn free(ptr: *mut crate::sys::c_types::c_void) {
 
 struct BleState {
     pub rx_queue: VecDeque<ReceivedPacket>,
-    pub hci_read_data: Vec<u8>,
+    /// The packet that the byte-stream reader is part-way through, and the number of bytes the
+    /// host already took from it.
+    pub partial_read: Option<(Box<[u8]>, usize)>,
 }
 
 static BT_STATE: NonReentrantMutex<BleState> = NonReentrantMutex::new(BleState {
     rx_queue: VecDeque::new(),
-    hci_read_data: Vec::new(),
+    partial_read: None,
 });
 
 static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
@@ -65,8 +67,16 @@ enum HciOutType {
     Command,
 }
 
+/// The largest HCI packet, including the packet type indicator byte.
+const MAX_HCI_PACKET_LEN: usize = 259;
+
+/// Reassembles whole HCI packets out of the byte stream that the host writes.
+///
+/// The byte-stream write APIs put no constraint on where the caller splits a packet, and one
+/// write can hold several packets. The collector takes only the bytes that the packet in progress
+/// still needs, so that it never runs past a packet boundary.
 struct HciOutCollector {
-    data: [u8; 256],
+    data: [u8; MAX_HCI_PACKET_LEN],
     index: usize,
     ready: bool,
     kind: HciOutType,
@@ -75,7 +85,7 @@ struct HciOutCollector {
 impl HciOutCollector {
     fn new() -> HciOutCollector {
         HciOutCollector {
-            data: [0u8; 256],
+            data: [0u8; MAX_HCI_PACKET_LEN],
             index: 0,
             ready: false,
             kind: HciOutType::Unknown,
@@ -86,30 +96,83 @@ impl HciOutCollector {
         self.ready
     }
 
-    fn push(&mut self, data: &[u8]) {
-        self.data[self.index..(self.index + data.len())].copy_from_slice(data);
-        self.index += data.len();
+    /// The length of the header, including the packet type indicator byte.
+    ///
+    /// The kind is unknown until the indicator byte arrives, so ask for that byte on its own
+    /// first.
+    fn header_len(&self) -> usize {
+        match self.kind {
+            HciOutType::Unknown => 1,
+            HciOutType::Command => 4,
+            HciOutType::Acl => 5,
+        }
+    }
 
-        if self.kind == HciOutType::Unknown {
-            self.kind = match self.data[0] {
+    /// The length of the packet in progress, or `None` while its header is incomplete.
+    fn packet_len(&self) -> Option<usize> {
+        if self.index < self.header_len() {
+            return None;
+        }
+
+        match self.kind {
+            HciOutType::Unknown => None,
+            HciOutType::Command => Some(self.data[3] as usize + 4),
+            HciOutType::Acl => Some(u16::from_le_bytes([self.data[3], self.data[4]]) as usize + 5),
+        }
+    }
+
+    /// Copies bytes from `data` until the packet buffer holds `upto` bytes.
+    ///
+    /// Returns the number of bytes copied.
+    fn fill_to(&mut self, data: &[u8], upto: usize) -> usize {
+        let take = usize::min(data.len(), upto - self.index);
+        self.data[self.index..][..take].copy_from_slice(&data[..take]);
+        self.index += take;
+        take
+    }
+
+    /// Copies as much of `data` as the packet in progress needs, and returns how much it took.
+    ///
+    /// Bytes that belong to the next packet stay in `data`. The caller must send and reset the
+    /// collector once [`Self::is_ready`] holds, before it offers those bytes again.
+    fn push(&mut self, data: &[u8]) -> usize {
+        if data.is_empty() {
+            return 0;
+        }
+
+        if self.index == 0 {
+            self.kind = match data[0] {
                 1 => HciOutType::Command,
                 2 => HciOutType::Acl,
-                _ => HciOutType::Unknown,
+                indicator => {
+                    warn!(
+                        "Dropping HCI byte with unknown packet type indicator {}",
+                        indicator
+                    );
+                    return 1;
+                }
             };
         }
 
-        if !self.ready {
-            if self.kind == HciOutType::Command && self.index >= 4 {
-                if self.index == self.data[3] as usize + 4 {
-                    self.ready = true;
-                }
-            } else if self.kind == HciOutType::Acl
-                && self.index >= 5
-                && self.index == (self.data[3] as usize) + ((self.data[4] as usize) << 8) + 5
-            {
-                self.ready = true;
-            }
+        // The packet length lives in the header, so complete the header before asking for the
+        // rest of the packet.
+        let mut taken = 0;
+        if self.packet_len().is_none() {
+            taken += self.fill_to(data, self.header_len());
         }
+
+        if let Some(total) = self.packet_len() {
+            if total > self.data.len() {
+                warn!("Dropping HCI packet of {} bytes, which is too long", total);
+                self.reset();
+                return taken;
+            }
+
+            taken += self.fill_to(&data[taken..], total);
+            self.ready = self.index == total;
+        }
+
+        taken
     }
 
     fn reset(&mut self) {
@@ -121,6 +184,24 @@ impl HciOutCollector {
     fn packet(&self) -> &[u8] {
         &self.data[0..self.index]
     }
+}
+
+/// Collects bytes of the host's stream, and passes the packet to `send` once it is complete.
+///
+/// This behaves like a byte-stream write: it handles at most one packet, and returns the number
+/// of bytes it took from `data`. Bytes that belong to the next packet stay in `data`, so the
+/// caller offers the rest in a later call. A non-empty `data` always yields a non-zero count.
+pub(crate) fn collect_and_send(data: &[u8], send: impl FnOnce(&[u8])) -> usize {
+    let hci_out = unsafe { (*core::ptr::addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
+
+    let taken = hci_out.push(data);
+
+    if hci_out.is_ready() {
+        send(hci_out.packet());
+        hci_out.reset();
+    }
+
+    taken
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -142,20 +223,30 @@ impl defmt::Format for ReceivedPacket {
 pub(crate) fn clear_bt_state() {
     BT_STATE.with(|state| {
         state.rx_queue.clear();
-        state.hci_read_data.clear();
+        state.partial_read = None;
     });
 }
 
 /// Checks if there is any HCI data available to read.
 #[instability::unstable]
 pub fn have_hci_read_data() -> bool {
-    BT_STATE.with(|state| !state.rx_queue.is_empty() || !state.hci_read_data.is_empty())
+    BT_STATE.with(|state| !state.rx_queue.is_empty() || state.partial_read.is_some())
+}
+
+/// Checks if the receive queue holds a complete packet.
+pub(crate) fn have_hci_packet() -> bool {
+    BT_STATE.with(|state| !state.rx_queue.is_empty())
+}
+
+/// Removes the next packet from the receive queue, without copying it.
+pub(crate) fn take_next() -> Option<Box<[u8]>> {
+    BT_STATE.with(|state| state.rx_queue.pop_front().map(|packet| packet.data))
 }
 
 pub(crate) fn read_next(data: &mut [u8]) -> usize {
-    if let Some(packet) = BT_STATE.with(|state| state.rx_queue.pop_front()) {
-        data[..packet.data.len()].copy_from_slice(&packet.data[..packet.data.len()]);
-        packet.data.len()
+    if let Some(packet) = take_next() {
+        data[..packet.len()].copy_from_slice(&packet);
+        packet.len()
     } else {
         0
     }
@@ -165,15 +256,26 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
 #[instability::unstable]
 pub fn read_hci(data: &mut [u8]) -> usize {
     BT_STATE.with(|state| {
-        if state.hci_read_data.is_empty()
+        if state.partial_read.is_none()
             && let Some(packet) = state.rx_queue.pop_front()
         {
-            state.hci_read_data.extend_from_slice(&packet.data);
+            state.partial_read = Some((packet.data, 0));
         }
 
-        let l = usize::min(state.hci_read_data.len(), data.len());
-        data[..l].copy_from_slice(&state.hci_read_data[..l]);
-        state.hci_read_data.drain(..l);
+        let Some((packet, read)) = state.partial_read.as_mut() else {
+            return 0;
+        };
+
+        let remaining = &packet[*read..];
+        let l = usize::min(remaining.len(), data.len());
+        data[..l].copy_from_slice(&remaining[..l]);
+        *read += l;
+
+        let drained = *read == packet.len();
+        if drained {
+            state.partial_read = None;
+        }
+
         l
     })
 }

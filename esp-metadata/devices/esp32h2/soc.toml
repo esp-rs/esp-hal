@@ -52,7 +52,7 @@ peripherals = [
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
     { name = "IEEE802154", interrupts = { mac = "ZB_MAC" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
@@ -341,7 +341,6 @@ wakeup_sources = {
 ## Interfaces
 [device.i2s]
 version = 3
-default_clock_source = 1
 mclk_divider_bit_width = 9
 max_ws_width = 512
 clock_configured_by_pcr = true

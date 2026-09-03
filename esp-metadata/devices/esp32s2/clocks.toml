@@ -2,6 +2,7 @@ system_clocks = { clock_tree = [
     { name = "XTAL_CLK",    type = "source",                     values = "40",                         output = "VALUE * 1_000_000", always_on = true },
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000" }, # TODO reject = "VALUE == 320_000_000 && CPU_PLL_DIV_OUT == 240_000_000"
     { name = "APLL_CLK",    type = "derived", from = "PLL_CLK",  values = "16_000_000 ..= 128_000_000", output = "VALUE" },
+    { name = "PLL_F160M_CLK", type = "derived", from = "PLL_CLK", output = "160_000_000" },
     { name = "RC_FAST_CLK", type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
 
     # Represents SEL0 = 1, 3
@@ -110,6 +111,12 @@ system_clocks = { clock_tree = [
         { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
             { name = "APB", outputs = "APB_CLK", default = true },
         ] },
+    ] },
+    { group = "I2S", clocks = [
+        { name = "MCLK", type = "generic", wake_locking = true, output = "(sclk * div_a) / (div_num * div_a + div_b)", params = { sclk = [
+            { name = "PLL_F160M", outputs = "PLL_F160M_CLK", default = true },
+            { name = "APLL",      outputs = "APLL_CLK" },
+        ], div_num = "1 ..= 255", div_a = "1 ..= 63", div_b = "0 ..= 63" } },
     ] },
 ] }
 

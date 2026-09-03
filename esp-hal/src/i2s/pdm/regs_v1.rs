@@ -32,7 +32,8 @@ fn configure_tx(i2s: &Info, config: &super::PdmTxConfig) -> Result<(), PdmError>
 
     let pcm = config.slot.data_format == PdmDataFormat::Pcm;
     let clock = clock::calculate_tx_clock(&config.clock, pcm)?;
-    i2s.set_clock(clock.dividers);
+    i2s.configure_mclk(config.clock.clock_source, &clock.dividers);
+    i2s.set_bclk(clock.dividers.bclk_divider);
 
     let is_mono = config.slot.slot_mode == PdmSlotMode::Mono;
     let regs = i2s.regs();
@@ -116,7 +117,8 @@ fn configure_rx(i2s: &Info, config: &super::PdmRxConfig) -> Result<(), PdmError>
 
     let slot_mask = config.slot.slot_mask.bits();
     let clock = clock::calculate_rx_clock(&config.clock, pcm, slot_mask)?;
-    i2s.set_clock(clock.dividers);
+    i2s.configure_mclk(config.clock.clock_source, &clock.dividers);
+    i2s.set_bclk(clock.dividers.bclk_divider);
 
     let is_mono = config.slot.slot_mode == PdmSlotMode::Mono;
     let regs = i2s.regs();

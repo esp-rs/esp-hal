@@ -52,6 +52,14 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 
+    # Global peripheral-related clocks
+    # HP_SYS_CLKRST.crypto_ctrl0.crypto_clk_src_sel
+    { name = "CRYPTO_CLK", type = "mux", variants = [
+        { name = "XTAL",      outputs = "XTAL_CLK"    },
+        { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
+        { name = "PLL_F240M", outputs = "PLL_F240M"   },
+    ] },
+
     {
         name = "IOMUX_FUNCTION_CLOCK", type = "generic", output = "source / (div_num + 1)", always_on = true,
         params = {
@@ -109,6 +117,34 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST", outputs = "RC_FAST_CLK" },
         ], div_num = "0 .. 0x100" } },
     ] },
+    # APLL (register value 1) is intentionally omitted because it is not yet modelled in the
+    # clock tree.
+    { group = "I2S",
+      presets = {
+        CLK = {
+          type = "generic",
+          wake_locking = true,
+          output = "(sclk * div_a) / (div_num * div_a + div_b)",
+          params = {
+            sclk = [
+              { name = "XTAL", outputs = "XTAL_CLK", default = true },
+            ],
+            # `div_n` is 8 bits; X/Y/Z (the A/B encoding) are 9 bits each.
+            div_num = "1 ..= 256",
+            div_a   = "1 ..= 511",
+            div_b   = "0 ..= 511",
+          },
+        },
+      },
+      clocks = [
+        { name = "TX_CLK",   preset = "CLK" },
+        { name = "RX_CLK",   preset = "CLK" },
+        { name = "MCLK_OUT", type = "mux", variants = [
+          { name = "TX", outputs = "TX_CLK" },
+          { name = "RX", outputs = "RX_CLK", default = true },
+        ] },
+      ],
+    },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", wake_locking = true, variants = [
             { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
@@ -179,7 +215,7 @@ peripheral_clocks = { templates = [
         clk_en_template = "{{default_clk_template}} crate::peripherals::CNNT_SYS::regs().sys_hp_usb_device_ctrl().modify(|_, w| w.sys_usb_device_48m_clk_en().bit(enable));",
         rst_template = "crate::peripherals::CNNT_SYS::regs().sys_hp_usb_device_ctrl().modify(|_, w| w.sys_usb_device_rst_en().bit(reset));"
     }, keep_enabled = true },
-    # Crypto - there is a crypto_clk_en bit as well, luckily it starts as 1
+    # Crypto - crypto_sys_clk_en and crypto_sec_clk_en gate the whole domain, CRYPTO_CLK drives those
     { name = "Aes", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Ecc", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },
     { name = "Sha", template_params = { ctrl_reg = "crypto_ctrl0()", clk_en = "{{crypto_clk}}", rst_en = "{{crypto_rst}}" } },

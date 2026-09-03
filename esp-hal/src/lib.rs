@@ -293,6 +293,10 @@ pub mod clock;
 pub mod gpio;
 #[cfg(i2c_master_driver_supported)]
 pub mod i2c;
+// The I2S driver is unstable, but its clock tree nodes are part of every build.
+#[cfg(i2s_driver_supported)]
+#[path = "i2s/clocks/mod.rs"]
+mod i2s_clocks;
 pub mod peripherals;
 #[cfg(all(
     feature = "unstable",
