@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+/// C11 `__atomic_*` helpers where the target has no hardware CAS (RISC-V IMC, ESP32-S2).
+#[cfg(any(all(target_arch = "riscv32", not(target_feature = "a")), esp32s2))]
+pub mod atomic;
+
 pub mod common;
 pub mod malloc;
 pub mod misc;
