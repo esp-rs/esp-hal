@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::{
     mem::transmute,
     ptr::{NonNull, addr_of, addr_of_mut},
@@ -1458,19 +1458,18 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
     let payload = unsafe { core::slice::from_raw_parts(cmd.offset(2), len) };
     trace!("$ pld = {:?}", payload);
 
+    let mut data = Vec::with_capacity(len + 3);
+    data.push(0x04); // this is an event
+    data.push(event);
+    data.push(len as u8);
+    data.extend_from_slice(payload);
+
+    dump_packet_info(&data);
+
     super::BT_STATE.with(|state| {
-        let mut data = [0u8; 256];
-
-        data[0] = 0x04; // this is an event
-        data[1] = event;
-        data[2] = len as u8;
-        data[3..][..len].copy_from_slice(payload);
-
         state.rx_queue.push_back(ReceivedPacket {
-            data: Box::from(&data[..len + 3]),
+            data: data.into_boxed_slice(),
         });
-
-        dump_packet_info(&data[..(len + 3)]);
     });
 
     unsafe {
@@ -1489,17 +1488,16 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     let len = unsafe { (*om).om_len };
     let data_slice = unsafe { core::slice::from_raw_parts(data_ptr, len as usize) };
 
+    let mut data = Vec::with_capacity(data_slice.len() + 1);
+    data.push(0x02); // ACL
+    data.extend_from_slice(data_slice);
+
+    super::dump_packet_info(&data);
+
     super::BT_STATE.with(|state| {
-        let mut data = [0u8; 256];
-
-        data[0] = 0x02; // ACL
-        data[1..][..data_slice.len()].copy_from_slice(data_slice);
-
         state.rx_queue.push_back(ReceivedPacket {
-            data: Box::from(&data[..data_slice.len() + 1]),
+            data: data.into_boxed_slice(),
         });
-
-        super::dump_packet_info(&data[..(len + 1) as usize]);
     });
 
     unsafe {
@@ -1512,59 +1510,60 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
 }
 
 /// Sends HCI data to the Bluetooth controller.
-#[instability::unstable]
-pub fn send_hci(data: &[u8]) {
-    let hci_out = unsafe { (*addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
-    hci_out.push(data);
+///
+/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
+/// caller must offer the remaining bytes again.
+pub(crate) fn send_hci(data: &[u8]) -> usize {
+    super::collect_and_send(data, send_packet)
+}
 
-    if hci_out.is_ready() {
-        let packet = hci_out.packet();
+/// Sends HCI data to the Bluetooth controller.
+///
+/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
+/// caller must offer the remaining bytes again.
+pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
+    super::collect_and_send(data, send_packet)
+}
 
-        unsafe {
-            const DATA_TYPE_COMMAND: u8 = 1;
-            const DATA_TYPE_ACL: u8 = 2;
+fn send_packet(packet: &[u8]) {
+    const DATA_TYPE_COMMAND: u8 = 1;
+    const DATA_TYPE_ACL: u8 = 2;
 
-            dump_packet_info(packet);
+    dump_packet_info(packet);
 
-            super::BT_STATE.with(|_state| {
-                if packet[0] == DATA_TYPE_COMMAND {
-                    let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
-                    core::ptr::copy_nonoverlapping(
-                        &packet[1] as *const _ as *mut u8, // don't send the TYPE
-                        cmd as *mut u8,
-                        packet.len() - 1,
-                    );
+    super::BT_STATE.with(|_state| unsafe {
+        if packet[0] == DATA_TYPE_COMMAND {
+            let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
+            core::ptr::copy_nonoverlapping(
+                &raw const packet[1], // don't send the TYPE
+                cmd as *mut u8,
+                packet.len() - 1,
+            );
 
-                    let res = r_ble_hci_trans_hs_cmd_tx(cmd);
+            let res = r_ble_hci_trans_hs_cmd_tx(cmd);
 
-                    if res != 0 {
-                        warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
-                    }
-                } else if packet[0] == DATA_TYPE_ACL {
-                    let om = r_os_msys_get_pkthdr(
-                        packet.len() as u16,
-                        ACL_DATA_MBUF_LEADINGSPACE as u16,
-                    );
+            if res != 0 {
+                warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
+            }
+        } else if packet[0] == DATA_TYPE_ACL {
+            let om = r_os_msys_get_pkthdr(packet.len() as u16, ACL_DATA_MBUF_LEADINGSPACE as u16);
 
-                    let res =
-                        r_os_mbuf_append(om, packet.as_ptr().offset(1), (packet.len() - 1) as u16);
-                    if res != 0 {
-                        panic!("r_os_mbuf_append returned {}", res);
-                    }
+            let res = r_os_mbuf_append(om, packet.as_ptr().offset(1), (packet.len() - 1) as u16);
+            if res != 0 {
+                panic!("r_os_mbuf_append returned {}", res);
+            }
 
-                    // this modification of the ACL data packet makes it getting sent and
-                    // received by the other side
-                    *((*om).om_data as *mut u8).offset(1) = 0;
+            // this modification of the ACL data packet makes it getting sent and
+            // received by the other side
+            *((*om).om_data as *mut u8).offset(1) = 0;
 
-                    let res = r_ble_hci_trans_hs_acl_tx(om);
-                    if res != 0 {
-                        panic!("ble_hci_trans_hs_acl_tx returned {}", res);
-                    }
-                    trace!("ACL tx done");
-                }
-            });
+            let res = r_ble_hci_trans_hs_acl_tx(om);
+            if res != 0 {
+                panic!("ble_hci_trans_hs_acl_tx returned {}", res);
+            }
+            trace!("ACL tx done");
+        } else {
+            warn!("Unknown packet kind {} dropped", packet[0]);
         }
-
-        hci_out.reset();
-    }
+    });
 }
