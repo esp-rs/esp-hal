@@ -54,6 +54,9 @@ crate. Omitting the name is not a shortcut for `all`. The command asks which exa
 caller with no terminal — a script, a CI job, an agent — gets an error naming this argument instead
 of a build. The chip name behaves the same way when it is missing.
 
+A name may be a binary name, a relative path (`ota/update`), or a fragment that fits one of them:
+`build sdmmc` finds `sdmmc_sd_async`. A fragment fitting several is an error listing them.
+
 Only `run` and `test` infer the chip from a connected device, because they are the ones that talk to
 it. `build` and `check` compile for whatever chip you name and never look at hardware.
 

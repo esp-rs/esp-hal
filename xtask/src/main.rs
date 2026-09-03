@@ -23,7 +23,7 @@ enum Cli {
     /// Run HIL tests.
     Test(DispatchArgs),
     /// Build rustdoc for the specified packages and chips.
-    #[clap(alias = "docs")]
+    #[clap(alias = "docs", alias = "doc")]
     Documentation(BuildDocumentationArgs),
     /// Build the documentation index.
     #[cfg(feature = "deploy-docs")]
