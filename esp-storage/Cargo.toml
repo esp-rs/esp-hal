@@ -40,17 +40,17 @@ esp-sync         = { version = "0.3.0", path = "../esp-sync", optional = true }
 esp-rom-sys      = { version = "0.1.5", path = "../esp-rom-sys", optional = true }
 defmt  = { version = "1.1", optional = true }
 
-esp32   = { version = "0.41", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32c2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32c3 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32c5 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32c6 = { version = "0.24", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32c61 = { version = "0.4", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32h2 = { version = "0.20", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32s2 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32s3 = { version = "0.36", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32s31 = { version = "0.2", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
-esp32p4 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "afda6ab" }
+esp32   = { version = "0.41", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c3 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c5 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c6 = { version = "0.24", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c61 = { version = "0.4", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32h2 = { version = "0.20", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32s2 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32s3 = { version = "0.36", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32s31 = { version = "0.2", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32p4 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
 
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2"
