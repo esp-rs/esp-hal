@@ -545,7 +545,6 @@ pub(crate) fn rtc_slow_cal_period() -> u32 {
 
 /// Reads the calibrated RTC fast clock period from memory.
 #[cfg_attr(not(soc_has_pmu), expect(dead_code))]
-#[cfg_attr(esp32s31, expect(dead_code))]
 pub(crate) fn rtc_fast_cal_period() -> u32 {
     RC_FAST_CAL_VAL.load(core::sync::atomic::Ordering::Relaxed)
 }

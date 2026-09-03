@@ -56,7 +56,7 @@ pub(crate) fn deadline_missed() -> bool {
     let regs = RTC_TIMER::regs();
 
     let (low, high) = cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4) => (
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => (
             regs.tar0_low().read().main_timer_tar_low0().bits(),
             regs.tar0_high().read().main_timer_tar_high0().bits(),
         ),
@@ -89,7 +89,7 @@ fn arm(ticks: u64) {
     let regs = RTC_TIMER::regs();
 
     cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4) => {
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => {
             regs.int_clr().write(|w| w.soc_wakeup().clear_bit_by_one());
             regs.tar0_low()
                 .write(|w| unsafe { w.main_timer_tar_low0().bits(low) });
@@ -114,7 +114,7 @@ fn disarm() {
     let regs = RTC_TIMER::regs();
 
     cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4) => {
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => {
             regs.tar0_high()
                 .modify(|_, w| w.main_timer_tar_en0().clear_bit());
             regs.int_clr().write(|w| w.soc_wakeup().clear_bit_by_one());

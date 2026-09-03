@@ -115,6 +115,12 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
+    ("lp_io.version") => {
+        "esp32s31"
+    };
+    ("lp_io.has_gpio_matrix") => {
+        true
+    };
     ("uart.ram_size") => {
         128
     };
@@ -397,6 +403,30 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
+    ("sleep.light_sleep") => {
+        true
+    };
+    ("sleep.deep_sleep") => {
+        true
+    };
+    ("sleep.rejectable_mask") => {
+        46150029
+    };
+    ("sleep.ext1_version") => {
+        3
+    };
+    ("sleep.ext1_version", str) => {
+        stringify!(3)
+    };
+    ("sleep.pin_wakeup_version") => {
+        3
+    };
+    ("sleep.pin_wakeup_version", str) => {
+        stringify!(3)
+    };
+    ("sleep.deep_sleep_needs_gpio_isolation") => {
+        false
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -633,6 +663,45 @@ macro_rules! for_each_dedicated_gpio {
         CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7), (1, 0, CPU_GPIO_8), (1, 1,
         CPU_GPIO_9), (1, 2, CPU_GPIO_10), (1, 3, CPU_GPIO_11), (1, 4, CPU_GPIO_12), (1,
         5, CPU_GPIO_13), (1, 6, CPU_GPIO_14), (1, 7, CPU_GPIO_15)));
+    };
+}
+/// Defines the `LpInputSignal` and `LpOutputSignal` enums.
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_lp_io_signals {
+    () => {
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum LpInputSignal {
+            LP_I2C_SCL   = 0,
+            LP_I2C_SDA   = 1,
+            LP_UART_RXD  = 2,
+            LP_UART_CTSN = 3,
+            LP_UART_DSRN = 4,
+            LP_SPI_CK    = 5,
+            LP_SPI_CS    = 6,
+            LP_SPI_D     = 7,
+            LP_SPI_Q     = 8,
+        }
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum LpOutputSignal {
+            LP_I2C_SCL   = 0,
+            LP_I2C_SDA   = 1,
+            LP_UART_TXD  = 2,
+            LP_UART_RTSN = 3,
+            LP_UART_DTRN = 4,
+            LP_SPI_CK    = 5,
+            LP_SPI_CS    = 6,
+            LP_SPI_D     = 7,
+            LP_SPI_Q     = 8,
+        }
     };
 }
 /// This macro can be used to generate code for each channel of the RMT peripheral.
@@ -1033,6 +1102,23 @@ macro_rules! for_each_sha_algorithm {
         "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 4),
         (Sha512_224, "SHA-512/224"(sizes : 128, 28, 16) (insecure_against :), 5),
         (Sha512_256, "SHA-512/256"(sizes : 128, 32, 16) (insecure_against :), 6)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_wakeup_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_wakeup_source!((LpCore, 0));
+        _for_each_inner_wakeup_source!((Gpio, 2)); _for_each_inner_wakeup_source!((Usb,
+        3)); _for_each_inner_wakeup_source!((Uart1, 7));
+        _for_each_inner_wakeup_source!((Uart0, 8)); _for_each_inner_wakeup_source!((Ext1,
+        12)); _for_each_inner_wakeup_source!((Timer, 13));
+        _for_each_inner_wakeup_source!((Wifi, 22));
+        _for_each_inner_wakeup_source!((WifiBeacon, 23));
+        _for_each_inner_wakeup_source!((Bt, 25));
+        _for_each_inner_wakeup_source!((all(LpCore, 0), (Gpio, 2), (Usb, 3), (Uart1, 7),
+        (Uart0, 8), (Ext1, 12), (Timer, 13), (Wifi, 22), (WifiBeacon, 23), (Bt, 25)));
     };
 }
 #[macro_export]
@@ -5004,13 +5090,13 @@ macro_rules! for_each_uart {
         } _for_each_inner_uart!((0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
         wakeup_source = true)); _for_each_inner_uart!((1, UART1, Uart1, U1RXD, U1TXD,
         U1CTS, U1RTS, wakeup_source = true)); _for_each_inner_uart!((2, UART2, Uart2,
-        U2RXD, U2TXD, U2CTS, U2RTS, wakeup_source = true)); _for_each_inner_uart!((3,
-        UART3, Uart3, U3RXD, U3TXD, U3CTS, U3RTS, wakeup_source = true));
+        U2RXD, U2TXD, U2CTS, U2RTS, wakeup_source = false)); _for_each_inner_uart!((3,
+        UART3, Uart3, U3RXD, U3TXD, U3CTS, U3RTS, wakeup_source = false));
         _for_each_inner_uart!((all(0, UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS,
         wakeup_source = true), (1, UART1, Uart1, U1RXD, U1TXD, U1CTS, U1RTS,
         wakeup_source = true), (2, UART2, Uart2, U2RXD, U2TXD, U2CTS, U2RTS,
-        wakeup_source = true), (3, UART3, Uart3, U3RXD, U3TXD, U3CTS, U3RTS,
-        wakeup_source = true)));
+        wakeup_source = false), (3, UART3, Uart3, U3RXD, U3TXD, U3CTS, U3RTS,
+        wakeup_source = false)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the SPI master driver.
@@ -6283,30 +6369,30 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0, _0));
-        _for_each_inner_lp_function!((LP_GPIO1, GPIO1, _0));
-        _for_each_inner_lp_function!((LP_GPIO2, GPIO2, _0));
-        _for_each_inner_lp_function!((LP_GPIO3, GPIO3, _0));
-        _for_each_inner_lp_function!((LP_GPIO4, GPIO4, _0));
-        _for_each_inner_lp_function!((LP_GPIO5, GPIO5, _0));
-        _for_each_inner_lp_function!((LP_GPIO6, GPIO6, _0));
-        _for_each_inner_lp_function!((LP_GPIO7, GPIO7, _0));
-        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0, _0, () ()));
-        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1, _0, () ()));
-        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2, _0, () ()));
-        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3, _0, () ()));
-        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4, _0, () ()));
-        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5, _0, () ()));
-        _for_each_inner_lp_function!(((LP_GPIO6, LP_GPIOn, 6), GPIO6, _0, () ()));
-        _for_each_inner_lp_function!(((LP_GPIO7, LP_GPIOn, 7), GPIO7, _0, () ()));
-        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0, _0), (LP_GPIO1, GPIO1, _0),
-        (LP_GPIO2, GPIO2, _0), (LP_GPIO3, GPIO3, _0), (LP_GPIO4, GPIO4, _0), (LP_GPIO5,
-        GPIO5, _0), (LP_GPIO6, GPIO6, _0), (LP_GPIO7, GPIO7, _0)));
-        _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0, LP_GPIOn, 0), GPIO0, _0, ()
-        ()), ((LP_GPIO1, LP_GPIOn, 1), GPIO1, _0, () ()), ((LP_GPIO2, LP_GPIOn, 2),
-        GPIO2, _0, () ()), ((LP_GPIO3, LP_GPIOn, 3), GPIO3, _0, () ()), ((LP_GPIO4,
-        LP_GPIOn, 4), GPIO4, _0, () ()), ((LP_GPIO5, LP_GPIOn, 5), GPIO5, _0, () ()),
-        ((LP_GPIO6, LP_GPIOn, 6), GPIO6, _0, () ()), ((LP_GPIO7, LP_GPIOn, 7), GPIO7, _0,
+        => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0, _1));
+        _for_each_inner_lp_function!((LP_GPIO1, GPIO1, _1));
+        _for_each_inner_lp_function!((LP_GPIO2, GPIO2, _1));
+        _for_each_inner_lp_function!((LP_GPIO3, GPIO3, _1));
+        _for_each_inner_lp_function!((LP_GPIO4, GPIO4, _1));
+        _for_each_inner_lp_function!((LP_GPIO5, GPIO5, _1));
+        _for_each_inner_lp_function!((LP_GPIO6, GPIO6, _1));
+        _for_each_inner_lp_function!((LP_GPIO7, GPIO7, _1));
+        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO6, LP_GPIOn, 6), GPIO6, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO7, LP_GPIOn, 7), GPIO7, _1, () ()));
+        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0, _1), (LP_GPIO1, GPIO1, _1),
+        (LP_GPIO2, GPIO2, _1), (LP_GPIO3, GPIO3, _1), (LP_GPIO4, GPIO4, _1), (LP_GPIO5,
+        GPIO5, _1), (LP_GPIO6, GPIO6, _1), (LP_GPIO7, GPIO7, _1)));
+        _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0, LP_GPIOn, 0), GPIO0, _1, ()
+        ()), ((LP_GPIO1, LP_GPIOn, 1), GPIO1, _1, () ()), ((LP_GPIO2, LP_GPIOn, 2),
+        GPIO2, _1, () ()), ((LP_GPIO3, LP_GPIOn, 3), GPIO3, _1, () ()), ((LP_GPIO4,
+        LP_GPIOn, 4), GPIO4, _1, () ()), ((LP_GPIO5, LP_GPIOn, 5), GPIO5, _1, () ()),
+        ((LP_GPIO6, LP_GPIOn, 6), GPIO6, _1, () ()), ((LP_GPIO7, LP_GPIOn, 7), GPIO7, _1,
         () ())));
     };
 }
@@ -7473,12 +7559,12 @@ macro_rules! define_lp_functions {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[doc(hidden)]
         pub enum LpFunction {
-            /// LP IO MUX function 0.
-            _0 = 0,
+            /// LP IO MUX function 1.
+            _1 = 1,
         }
         impl LpFunction {
             /// The function that connects the pad to the LP GPIO peripheral.
-            pub const LP_GPIO: Self = Self::_0;
+            pub const LP_GPIO: Self = Self::_1;
         }
     };
 }

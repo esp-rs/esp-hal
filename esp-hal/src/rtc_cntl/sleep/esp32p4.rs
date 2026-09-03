@@ -1,8 +1,4 @@
-//! Light- and deep-sleep support for the ESP32-P4 (chip revision v3.x / eco5).
-//!
-//! v1 scope: timer wakeup only, single core. Ported from the ESP32-C6 PMU sleep
-//! driver and adapted to the P4 PMU (DCDC, no wireless modem, no regdma
-//! retention) using the esp-idf `pmu_sleep.c` / `pmu_param.h` references.
+//! Light- and deep-sleep support for the ESP32-P4.
 
 use core::{
     ops::Not,
