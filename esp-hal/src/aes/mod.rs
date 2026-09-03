@@ -55,6 +55,9 @@ use crate::{
 
 pub mod cipher_modes;
 
+mod rust_crypto;
+pub use rust_crypto::*;
+
 for_each_aes_key_length! {
     ($len:literal) => {
         // Implementing From for easy conversion from array to Key enum.
@@ -1532,6 +1535,10 @@ impl AesContext {
                 key: key.into(),
             }),
         }
+    }
+
+    fn set_operation(&mut self, operation: Operation) {
+        self.frontend.data_mut().mode = operation;
     }
 
     fn post(&mut self) -> AesHandle<'_> {

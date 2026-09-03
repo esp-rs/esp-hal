@@ -78,6 +78,7 @@ procmacros               = { version = "0.23.0", package = "esp-hal-procmacros",
 
 # Dependencies that are optional because they are used by unstable drivers.
 # They are needed when using the `unstable` feature.
+cipher                   = { version = "0.5.2", default-features = false, optional = true }
 digest-010               = { package = "digest", version = "0.10.7", default-features = false, features = ["core-api"],  optional = true }
 digest-011               = { package = "digest", version = "0.11",   default-features = false, features = ["block-api"], optional = true }
 embassy-usb-driver       = { version = "0.2", optional = true }
@@ -353,6 +354,7 @@ defmt = [
 ## Enables APIs that are not stable and thus come with no stability guarantees.
 ## Never enable this feature in a library crate using esp-hal.
 unstable = [
+    "dep:cipher",
     "dep:digest-010",
     "dep:digest-011",
     "dep:embassy-embedded-hal",

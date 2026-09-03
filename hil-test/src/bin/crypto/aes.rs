@@ -247,6 +247,37 @@ where
     hil_test::assert_eq!(&block_buf[..plaintext.len()], plaintext);
 }
 
+fn rust_crypto_roundtrip<C>(key: &[u8], plaintext: [u8; 16], ciphertext: [u8; 16])
+where
+    C: cipher::BlockSizeUser<BlockSize = cipher::consts::U16>
+        + cipher::KeyInit
+        + cipher::BlockCipherEncrypt
+        + cipher::BlockCipherDecrypt,
+{
+    use cipher::Array;
+
+    let cipher = C::new_from_slice(key).unwrap();
+    let plaintext_block = Array::from(plaintext);
+
+    let mut in_place = plaintext_block;
+    cipher.encrypt_block(&mut in_place);
+    hil_test::assert_eq!(in_place.as_slice(), ciphertext);
+    cipher.decrypt_block(&mut in_place);
+    hil_test::assert_eq!(in_place.as_slice(), plaintext);
+
+    let mut output = Array::default();
+    cipher.encrypt_block_b2b(&plaintext_block, &mut output);
+    hil_test::assert_eq!(output.as_slice(), ciphertext);
+
+    let mut blocks = [plaintext_block, plaintext_block];
+    cipher.encrypt_blocks(&mut blocks);
+    hil_test::assert_eq!(blocks[0].as_slice(), ciphertext);
+    hil_test::assert_eq!(blocks[1].as_slice(), ciphertext);
+    cipher.decrypt_blocks(&mut blocks);
+    hil_test::assert_eq!(blocks[0].as_slice(), plaintext);
+    hil_test::assert_eq!(blocks[1].as_slice(), plaintext);
+}
+
 fn aes_roundtrip<const K: usize>(
     tag: &'static str,
     block_ctx: impl Into<CipherState>,
@@ -480,6 +511,31 @@ mod work_queue_tests {
     }
 
     #[test]
+    fn test_aes_rust_crypto_traits(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+        let plaintext = PLAINTEXT[0..16].try_into().unwrap();
+
+        rust_crypto_roundtrip::<esp_hal::aes::Aes128>(
+            &KEY_128,
+            plaintext,
+            CIPHERTEXT_ECB_128[0..16].try_into().unwrap(),
+        );
+
+        #[cfg(any(esp32, esp32s2))]
+        rust_crypto_roundtrip::<esp_hal::aes::Aes192>(
+            &pad_to::<24>(KEY),
+            plaintext,
+            CIPHERTEXT_ECB_192[0..16].try_into().unwrap(),
+        );
+
+        rust_crypto_roundtrip::<esp_hal::aes::Aes256>(
+            &KEY_256,
+            plaintext,
+            CIPHERTEXT_ECB_256[0..16].try_into().unwrap(),
+        );
+    }
+
+    #[test]
     fn test_aes_work_queue_work_posted_before_queue_started(mut ctx: Context) {
         let mut output = [0; PLAINTEXT_BUF_SIZE];
 
@@ -626,6 +682,17 @@ mod work_queue_dma_tests {
 
         // Different alignments in internal memory
         run_unaligned_dma_tests::<MAX_SHIFT>(&mut internal_memory);
+    }
+
+    #[test]
+    fn test_aes_rust_crypto_traits_dma(mut ctx: Context) {
+        let _backend = ctx.aes.start();
+
+        rust_crypto_roundtrip::<esp_hal::aes::Aes128>(
+            &KEY_128,
+            PLAINTEXT[0..16].try_into().unwrap(),
+            CIPHERTEXT_ECB_128[0..16].try_into().unwrap(),
+        );
     }
 
     #[test]
