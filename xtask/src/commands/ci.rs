@@ -185,8 +185,8 @@ pub fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         run_doc_tests(
             workspace,
             DocTestArgs {
+                tokens: vec![args.chip.to_string()],
                 packages: Package::iter().collect(),
-                chip: args.chip,
             },
         )
     });
@@ -195,8 +195,8 @@ pub fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         build_documentation(
             workspace,
             BuildDocumentationArgs {
+                tokens: vec![args.chip.to_string()],
                 packages: vec![Package::EspHal, Package::EspRadio, Package::EspRtos],
-                chips: vec![args.chip],
                 ..Default::default()
             },
         )
@@ -325,8 +325,8 @@ pub fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             build_documentation(
                 workspace,
                 BuildDocumentationArgs {
+                    tokens: vec![args.chip.to_string()],
                     packages: vec![Package::EspLpHal],
-                    chips: vec![args.chip],
                     ..Default::default()
                 },
             )

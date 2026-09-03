@@ -227,7 +227,9 @@ jobs:
 
       - name: Build docs
         shell: bash
-        run: cargo xtask documentation ${{ steps.chips.outputs.chips }}
+        env:
+          CHIPS: ${{ steps.chips.outputs.chips }}
+        run: cargo xtask docs ${CHIPS//,/ }
 
       - name: Run doc tests
         shell: bash

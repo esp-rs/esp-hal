@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Args;
 use strum::IntoEnumIterator as _;
 
@@ -10,6 +10,7 @@ use crate::{
     commands::move_artifacts,
     firmware::Metadata,
     metadata::Chip,
+    resolve::{ResolveInput, resolve},
 };
 
 // ----------------------------------------------------------------------------
@@ -25,12 +26,11 @@ use crate::{
 )]
 #[derive(Debug, Default, Args)]
 pub struct BuildDocumentationArgs {
-    /// Package(s) to document.
-    #[arg(long, alias = "package", value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    /// Chip and/or package, in any order. Omitted means every package on every chip.
+    pub tokens: Vec<String>,
+    /// Package(s) to document. Accepts the same names the tokens do.
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',')]
     pub packages: Vec<Package>,
-    /// Chip(s) to build documentation for. Omitted means every chip.
-    #[arg(value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
-    pub chips: Vec<Chip>,
     /// Base URL of the deployed documentation.
     #[arg(long)]
     pub base_url: Option<String>,
@@ -58,21 +58,34 @@ pub struct BuildDocumentationIndexArgs {
 // Subcommand Actions
 
 /// Build documentation for the specified packages and chips.
-pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
-    log::debug!(
-        "Building documentation for packages {:?} on chips {:?}",
-        args.packages,
-        args.chips
-    );
+pub fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
+    let mut input = ResolveInput::from_tokens(args.tokens);
+    input.packages = args.packages;
+    let resolution = resolve(input);
+    if !resolution.names.is_empty() {
+        bail!("Unknown argument: {}", resolution.names.join(", "));
+    }
+    let mut packages = if resolution.packages.is_empty() {
+        Package::iter().collect()
+    } else {
+        resolution.packages
+    };
+    let mut chips = if resolution.chips.is_empty() {
+        Chip::iter().collect()
+    } else {
+        resolution.chips
+    };
+
+    log::debug!("Building documentation for packages {packages:?} on chips {chips:?}");
     crate::documentation::build_documentation(
         workspace,
-        &mut args.packages,
-        &mut args.chips,
+        &mut packages,
+        &mut chips,
         args.base_url.clone(),
         args.channel,
     )?;
 
-    crate::documentation::build_documentation_index(workspace, &mut args.packages, args.base_url)?;
+    crate::documentation::build_documentation_index(workspace, &mut packages, args.base_url)?;
 
     #[cfg(feature = "preview-docs")]
     if args.serve {

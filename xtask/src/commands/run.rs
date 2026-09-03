@@ -16,6 +16,7 @@ use crate::{
     firmware::{self, Metadata},
     metadata::Chip,
     radio_hil_runner::run_radio_test_elf,
+    resolve::{ResolveInput, resolve},
 };
 
 // ----------------------------------------------------------------------------
@@ -31,12 +32,11 @@ use crate::{
 )]
 #[derive(Debug, Args)]
 pub struct DocTestArgs {
-    /// Package(s) where we wish to run doc tests.
-    #[arg(long, alias = "package", value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    /// Chip and/or package, in any order. Doc tests run on one chip, so the chip is required.
+    pub tokens: Vec<String>,
+    /// Package(s) where we wish to run doc tests. Accepts the same names the tokens do.
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',')]
     pub packages: Vec<Package>,
-    /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
 }
 
 /// Arguments for running ELFs.
@@ -66,9 +66,24 @@ pub struct RunElfsArgs {
 
 /// Run doc tests for the specified package and chip.
 pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
+    let mut input = ResolveInput::from_tokens(args.tokens);
+    input.packages = args.packages;
+    let resolution = resolve(input);
+    if !resolution.names.is_empty() {
+        bail!("Unknown argument: {}", resolution.names.join(", "));
+    }
+    let [chip] = resolution.chips[..] else {
+        bail!("Name exactly one chip to run doc tests for");
+    };
+    let packages = if resolution.packages.is_empty() {
+        Package::iter().collect()
+    } else {
+        resolution.packages
+    };
+
     let mut success = true;
-    for package in args.packages {
-        success &= run_doc_tests_for_package(workspace, package, args.chip)?;
+    for package in packages {
+        success &= run_doc_tests_for_package(workspace, package, chip)?;
     }
     anyhow::ensure!(success, "One or more doc tests failed");
     Ok(())
