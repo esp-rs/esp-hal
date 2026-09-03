@@ -13,7 +13,7 @@ use xtask::{
 
 #[derive(Debug, Parser)]
 enum Cli {
-    /// Build an example, crate, or tests.
+    /// Build examples or HIL tests.
     Build(DispatchArgs),
     /// Run an example or qa binary.
     Run(DispatchArgs),

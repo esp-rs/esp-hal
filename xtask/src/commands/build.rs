@@ -6,7 +6,7 @@ use strum::IntoEnumIterator as _;
 
 use crate::{
     Package,
-    cargo::{self, CargoAction, CargoArgsBuilder, CargoCommandBatcher},
+    cargo::{CargoAction, CargoCommandBatcher},
     commands::move_artifacts,
     firmware::Metadata,
     metadata::Chip,
@@ -158,28 +158,6 @@ pub fn build_examples(
         c.run(false)?;
     }
     move_artifacts(chip, &action);
-
-    Ok(())
-}
-
-/// Build the specified package.
-pub fn build_package(workspace: &Path, package: Package, toolchain: Option<&str>) -> Result<()> {
-    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
-
-    log::info!("Building package '{}'", package_path.display());
-
-    let mut builder = CargoArgsBuilder::default()
-        .subcommand("build")
-        .arg("--release");
-
-    if let Some(toolchain) = toolchain {
-        builder = builder.toolchain(toolchain);
-    }
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    cargo::run(&args, &package_path)?;
 
     Ok(())
 }

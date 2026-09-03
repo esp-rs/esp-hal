@@ -28,7 +28,7 @@ pub enum Verb {
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(verbs(
-        build = "Build an example, crate, or tests. Tokens: chip, crate, example, test, or package alias (examples, tests, qa), in any order. Always pass the chip, building detects no device.",
+        build = "Build examples or HIL tests. Tokens: chip, example, test, or package alias (examples, tests, qa), in any order. Crates are not built, use `check` for those. Always pass the chip, building detects no device.",
         run = "Flash and run an example or qa binary. Tokens: chip, example name, or package alias (examples, qa). Not for HIL tests — use `test`. Chip is inferred from a connected device when omitted.",
         check = "Check crates with cargo check, or try-build examples and tests. Tokens: chip, crate, example, test, or package alias. No tokens checks all published crates on all chips. Pass the chip when naming an example or test, checking detects no device.",
         test = "Run HIL tests only. Tokens: chip and/or test name. Not for examples — use `run`. Chip is inferred from probe-rs when omitted.",
@@ -143,11 +143,10 @@ pub fn dispatch(
             )?;
         } else if verb == Verb::Check {
             lib_packages.push(*package);
-        } else if verb == Verb::Build {
-            crate::commands::build_package(workspace, *package, args.toolchain.as_deref())?;
         } else {
             bail!(
-                "Cannot {verb:?} crate '{package}'. Pass an example or test name, or use `check`."
+                "Cannot {} crate '{package}'. Pass an example or test name, or use `check`.",
+                format!("{verb:?}").to_lowercase()
             );
         }
     }
