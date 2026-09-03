@@ -21,7 +21,8 @@ Bare-metal `no_std` Rust HAL for Espressif SoCs. MSRV: see `rust-version` in `es
 ## Commands
 
 All automation goes through `cargo xtask`. Daily commands (`build` / `run` / `check` / `test`) take
-free-form tokens (chip, crate, example, test, or package alias) in any order. Package aliases
+free-form tokens (chip, crate, example, test, or package alias) in any order. A crate name is only
+for `check`, the other three build firmware: examples or HIL tests. Package aliases
 (`qa`, `tests`, `example`) work both as tokens and as `--package` values. `lint`, `ci`,
 `documentation`, and `doc-tests` take the chip name the same way — write `esp32c6`, not `--chip`.
 
@@ -30,6 +31,7 @@ free-form tokens (chip, crate, example, test, or package alias) in any order. Pa
 | Format (required before PR) | `cargo xtask fmt` | Fast |
 | Lint | `cargo xtask lint [<pkg or chip>...]` | Always scope: every chip and package takes minutes |
 | Check | `cargo xtask check [<pkg or chip>...]` | Compiles without linting. No tokens checks all published crates on all chips |
+| Compile a crate for a chip | `cargo xtask check <crate> <chip>` | `build` is firmware only, crates go through `check` |
 | Host-side unit tests | `cargo xtask host-tests` | Fast, runs on host |
 | Validate metadata | `cargo update-metadata --check` | Fast |
 | Validate changelog | `cargo xtask check-changelog` | Fast |

@@ -8,7 +8,7 @@ Automation using [cargo-xtask](https://github.com/matklad/cargo-xtask).
 Usage: esp-devtool <COMMAND>
 
 Commands:
-  build                 Build an example, crate, or tests
+  build                 Build examples or HIL tests
   run                   Run an example or qa binary
   check                 Check crates, or try-build examples and tests
   test                  Run HIL tests
@@ -25,6 +25,7 @@ Commands:
 
 `build` / `run` / `check` / `test` take free-form tokens (chip, crate, example, test, or a package
 alias like `examples` / `qa` / `tests`) in any order. There is no `--chip` flag: write `esp32c6`.
+A crate name is only a token `check` acts on, the other three want firmware: examples or HIL tests.
 `--package` exists for callers that want to be explicit and accepts the same names and aliases the
 tokens do, so `build qa all esp32c6` and `build all --package qa-test esp32c6` are the same command.
 
@@ -62,6 +63,21 @@ it. `build` and `check` compile for whatever chip you name and never look at har
 
 `check` with no example or test name checks every published crate on every chip. To build every HIL
 test for a chip, write `all` or omit the test name: `build tests esp32c6`.
+
+### Compiling a crate
+
+`build` only builds firmware, so a crate goes to `check`: `check esp-hal esp32c6` compiles the crate
+for that chip, once per feature case from its `check-configs`. Naming no chip does that for every
+chip it supports.
+
+`cargo check` skips codegen and linking, so it will not hand you an artifact. Reach for cargo itself
+when you need one, the crates sit outside the root workspace:
+
+```text
+cd esp-hal
+cargo build --release --target riscv32imac-unknown-none-elf --no-default-features \
+    --features esp32c6,unstable,rt
+```
 
 ## `cargo xtask` vs `esp-devtool`
 

@@ -383,7 +383,7 @@ fn gen_cli_push(fd: &FieldDesc) -> TokenStream2 {
 /// ```ignore
 /// #[cfg_attr(feature = "mcp", xtask_mcp_macros::mcp_tool(
 ///     verbs(
-///         build = "Build an example, crate, or tests",
+///         build = "Build an example or test",
 ///         run = "Flash and run an example or tests",
 ///     )
 /// ))]
