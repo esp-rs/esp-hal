@@ -18,11 +18,6 @@ pub(crate) use crate::soc::pac;
 #[path = "overlay_h2.rs"]
 mod overlay;
 
-#[cfg(any(esp32p4, esp32s31))]
-#[path = "overlay_rmt.rs"]
-#[cfg(feature = "unstable")]
-mod overlay;
-
 /// Macro to create a peripheral structure.
 macro_rules! create_peripheral {
     ($(#[$attr:meta])* $name:ident <= virtual ($($interrupt:ident: { $bind:ident, $enable:ident, $disable:ident }),*)) => {

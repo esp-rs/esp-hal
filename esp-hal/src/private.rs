@@ -5,6 +5,35 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use portable_atomic::{AtomicPtr, Ordering};
+
+/// An optional `extern "C" fn()` stored as an atomic pointer.
+pub(crate) struct CFnPtr(AtomicPtr<()>);
+
+impl CFnPtr {
+    pub const fn new() -> Self {
+        Self(AtomicPtr::new(core::ptr::null_mut()))
+    }
+
+    pub fn store(&self, f: extern "C" fn()) {
+        self.0.store(f as *mut (), Ordering::Relaxed);
+    }
+
+    pub fn clear(&self) {
+        self.0.store(core::ptr::null_mut(), Ordering::Relaxed);
+    }
+
+    pub fn call(&self) -> bool {
+        let ptr = self.0.load(Ordering::Relaxed);
+        if !ptr.is_null() {
+            unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
+            true
+        } else {
+            false
+        }
+    }
+}
+
 pub trait Sealed {}
 
 #[non_exhaustive]

@@ -11,7 +11,7 @@
 
 #[cfg(pcnt_driver_supported)]
 use esp_hal::pcnt::{
-    Pcnt,
+    Unit,
     channel::{CtrlMode, EdgeMode},
 };
 use esp_hal::{
@@ -104,7 +104,7 @@ mod blocking_tests {
 
     struct Context<'d> {
         lcd_cam: LcdCam<'d, Blocking>,
-        pcnt: Pcnt<'d>,
+        units: [Unit<'d>; 4],
         pins: [AnyPin<'d>; 5],
         dma: DmaChannelInstance<'d>,
         dma_buf: DmaTxBuf,
@@ -114,13 +114,21 @@ mod blocking_tests {
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-        let pcnt = Pcnt::new(peripherals.PCNT);
         let dma_buf = dma_tx_buffer!(DATA_SIZE).unwrap();
+        let dma_channel = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
 
         Context {
             lcd_cam,
-            dma: peripherals.DMA_CH0,
-            pcnt,
+            dma: dma_channel,
+            units: [
+                Unit::new(peripherals.PCNT0_UNIT0),
+                Unit::new(peripherals.PCNT0_UNIT1),
+                Unit::new(peripherals.PCNT0_UNIT2),
+                Unit::new(peripherals.PCNT0_UNIT3),
+            ],
             pins: [
                 peripherals.GPIO8.into(),
                 peripherals.GPIO11.into(),
@@ -154,30 +162,30 @@ mod blocking_tests {
         let (unit2_input, unit2_signal) = unsafe { u2.split() };
         let (unit3_input, unit3_signal) = unsafe { u3.split() };
 
-        let pcnt = ctx.pcnt;
-        pcnt.unit0
+        let [unit0, unit1, unit2, unit3] = ctx.units;
+        unit0
             .channel0
             .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-        pcnt.unit1
+        unit1
             .channel0
             .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-        pcnt.unit2
+        unit2
             .channel0
             .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-        pcnt.unit3
+        unit3
             .channel0
             .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
 
-        pcnt.unit0
+        unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-        pcnt.unit1
+        unit1
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-        pcnt.unit2
+        unit2
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-        pcnt.unit3
+        unit3
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -196,20 +204,20 @@ mod blocking_tests {
         core::mem::drop(ctx.lcd_cam.cam);
         i8080.set_bit_order(BitOrder::Inverted);
 
-        pcnt.unit0.channel0.set_edge_signal(unit0_input);
-        pcnt.unit1.channel0.set_edge_signal(unit1_input);
-        pcnt.unit2.channel0.set_edge_signal(unit2_input);
-        pcnt.unit3.channel0.set_edge_signal(unit3_input);
+        unit0.channel0.set_edge_signal(unit0_input);
+        unit1.channel0.set_edge_signal(unit1_input);
+        unit2.channel0.set_edge_signal(unit2_input);
+        unit3.channel0.set_edge_signal(unit3_input);
 
-        pcnt.unit0.channel0.set_ctrl_signal(unit_ctrl.clone());
-        pcnt.unit1.channel0.set_ctrl_signal(unit_ctrl.clone());
-        pcnt.unit2.channel0.set_ctrl_signal(unit_ctrl.clone());
-        pcnt.unit3.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit0.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit1.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit2.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit3.channel0.set_ctrl_signal(unit_ctrl.clone());
 
-        pcnt.unit0.resume();
-        pcnt.unit1.resume();
-        pcnt.unit2.resume();
-        pcnt.unit3.resume();
+        unit0.resume();
+        unit1.resume();
+        unit2.resume();
+        unit3.resume();
 
         let data_to_send = [
             0b0000_0000,
@@ -231,12 +239,7 @@ mod blocking_tests {
         let xfer = i8080.send(Command::<u8>::None, 0, dma_buf).unwrap();
         xfer.wait().0.unwrap();
 
-        let actual = [
-            pcnt.unit0.value(),
-            pcnt.unit1.value(),
-            pcnt.unit2.value(),
-            pcnt.unit3.value(),
-        ];
+        let actual = [unit0.value(), unit1.value(), unit2.value(), unit3.value()];
         assert_eq!([5, 3, 2, 1], actual);
     }
 
@@ -249,30 +252,30 @@ mod blocking_tests {
         let (unit2_input, unit2_signal) = unsafe { u2.split() };
         let (unit3_input, unit3_signal) = unsafe { u3.split() };
 
-        let pcnt = ctx.pcnt;
-        pcnt.unit0
+        let [unit0, unit1, unit2, unit3] = ctx.units;
+        unit0
             .channel0
             .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-        pcnt.unit1
+        unit1
             .channel0
             .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-        pcnt.unit2
+        unit2
             .channel0
             .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-        pcnt.unit3
+        unit3
             .channel0
             .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
 
-        pcnt.unit0
+        unit0
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-        pcnt.unit1
+        unit1
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-        pcnt.unit2
+        unit2
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-        pcnt.unit3
+        unit3
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
@@ -290,20 +293,20 @@ mod blocking_tests {
 
         i8080.set_bit_order(BitOrder::Inverted);
 
-        pcnt.unit0.channel0.set_edge_signal(unit0_input);
-        pcnt.unit1.channel0.set_edge_signal(unit1_input);
-        pcnt.unit2.channel0.set_edge_signal(unit2_input);
-        pcnt.unit3.channel0.set_edge_signal(unit3_input);
+        unit0.channel0.set_edge_signal(unit0_input);
+        unit1.channel0.set_edge_signal(unit1_input);
+        unit2.channel0.set_edge_signal(unit2_input);
+        unit3.channel0.set_edge_signal(unit3_input);
 
-        pcnt.unit0.channel0.set_ctrl_signal(unit_ctrl.clone());
-        pcnt.unit1.channel0.set_ctrl_signal(unit_ctrl.clone());
-        pcnt.unit2.channel0.set_ctrl_signal(unit_ctrl.clone());
-        pcnt.unit3.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit0.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit1.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit2.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit3.channel0.set_ctrl_signal(unit_ctrl.clone());
 
-        pcnt.unit0.resume();
-        pcnt.unit1.resume();
-        pcnt.unit2.resume();
-        pcnt.unit3.resume();
+        unit0.resume();
+        unit1.resume();
+        unit2.resume();
+        unit3.resume();
 
         let data_to_send = [
             0b0000_0000_0000_0000u16,
@@ -328,12 +331,7 @@ mod blocking_tests {
         let xfer = i8080.send(Command::<u16>::None, 0, dma_buf).unwrap();
         xfer.wait().0.unwrap();
 
-        let actual = [
-            pcnt.unit0.value(),
-            pcnt.unit1.value(),
-            pcnt.unit2.value(),
-            pcnt.unit3.value(),
-        ];
+        let actual = [unit0.value(), unit1.value(), unit2.value(), unit3.value()];
         assert_eq!([5, 3, 2, 1], actual);
     }
 }

@@ -81,10 +81,12 @@ peripherals = [
     { name = "MODEM_LPCON" },
     { name = "MODEM_SYSCON" },
     { name = "PAU" },
+    { name = "PCNT",  interrupts = { peri = "PCNT0" } },
+    { name = "PCNT1", interrupts = { peri = "PCNT1" } },
     { name = "PMU" },
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "RNG", pac = "TRNG" },
-    { name = "RMT", virtual = true, interrupts = { peri = "RMT" }, clock_group = "RMT" }, # PAC field names differ from ESP32-S3; overlay_rmt maps them.
+    { name = "RMT", interrupts = { peri = "RMT" }, clock_group = "RMT" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SPI0" },
     { name = "SPI1" },
@@ -449,7 +451,28 @@ support_status = "not_supported"
 [device.mcpwm]
 support_status = "not_supported"
 [device.pcnt]
-support_status = "not_supported"
+instances = {
+    PCNT = {
+        sys_instance = "Pcnt",
+        interrupt = "PCNT0",
+        units = [
+            { sig_ch0 = "PCNT0_SIG_CH0", sig_ch1 = "PCNT0_SIG_CH1", ctrl_ch0 = "PCNT0_CTRL_CH0", ctrl_ch1 = "PCNT0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_SIG_CH0", sig_ch1 = "PCNT1_SIG_CH1", ctrl_ch0 = "PCNT1_CTRL_CH0", ctrl_ch1 = "PCNT1_CTRL_CH1" },
+            { sig_ch0 = "PCNT2_SIG_CH0", sig_ch1 = "PCNT2_SIG_CH1", ctrl_ch0 = "PCNT2_CTRL_CH0", ctrl_ch1 = "PCNT2_CTRL_CH1" },
+            { sig_ch0 = "PCNT3_SIG_CH0", sig_ch1 = "PCNT3_SIG_CH1", ctrl_ch0 = "PCNT3_CTRL_CH0", ctrl_ch1 = "PCNT3_CTRL_CH1" },
+        ],
+    },
+    PCNT1 = {
+        sys_instance = "Pcnt1",
+        interrupt = "PCNT1",
+        units = [
+            { sig_ch0 = "PCNT1_U0_SIG_CH0", sig_ch1 = "PCNT1_U0_SIG_CH1", ctrl_ch0 = "PCNT1_U0_CTRL_CH0", ctrl_ch1 = "PCNT1_U0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_U1_SIG_CH0", sig_ch1 = "PCNT1_U1_SIG_CH1", ctrl_ch0 = "PCNT1_U1_CTRL_CH0", ctrl_ch1 = "PCNT1_U1_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_U2_SIG_CH0", sig_ch1 = "PCNT1_U2_SIG_CH1", ctrl_ch0 = "PCNT1_U2_CTRL_CH0", ctrl_ch1 = "PCNT1_U2_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_U3_SIG_CH0", sig_ch1 = "PCNT1_U3_SIG_CH1", ctrl_ch0 = "PCNT1_U3_CTRL_CH0", ctrl_ch1 = "PCNT1_U3_CTRL_CH1" },
+        ],
+    },
+}
 [device.rgb_display]
 support_status = "partial"
 output_lines = 24

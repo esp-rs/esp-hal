@@ -1,35 +1,37 @@
 //! # PCNT - Channel Configuration
 //!
 //! ## Overview
-//! The `channel` module configures and manages individual channels of the
-//! `PCNT` peripheral. It provides methods to set various parameters for each
-//! channel, such as control modes for signal edges, action on control level,
-//! and configurations for positive and negative edge count modes.
+//! The `channel` module configures the two channels of a PCNT unit: control
+//! modes for signal edges, action on control level, and positive/negative edge
+//! count modes.
 
 use core::marker::PhantomData;
 
 pub use crate::pac::pcnt::unit::conf0::{CTRL_MODE as CtrlMode, EDGE_MODE as EdgeMode};
 use crate::{
-    gpio::{InputSignal, interconnect::PeripheralInput},
-    peripherals::PCNT,
-    system::GenericPeripheralGuard,
+    gpio::{
+        InputSignal,
+        interconnect::{self, PeripheralInput},
+    },
+    pcnt::AnyPcntUnit,
+    system::PeripheralGuard,
 };
 
 /// Represents a channel within a pulse counter unit.
-pub struct Channel<'d, const UNIT: usize, const NUM: usize> {
-    _phantom: PhantomData<&'d ()>,
+pub struct Channel<'d, const NUM: usize> {
+    unit: AnyPcntUnit<'d>,
     // Individual channels are not Send, since they share registers.
     _not_send: PhantomData<*const ()>,
-    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Pcnt as u8 }>,
+    _guard: PeripheralGuard,
 }
 
-impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
-    /// return a new Channel
-    pub(super) fn new() -> Self {
-        let guard = GenericPeripheralGuard::new();
+impl<'d, const NUM: usize> Channel<'d, NUM> {
+    pub(super) fn new(unit: AnyPcntUnit<'d>) -> Self {
+        const { ::core::assert!(NUM < 2) };
+        let guard = PeripheralGuard::new(unit.info().peripheral);
 
         Self {
-            _phantom: PhantomData,
+            unit,
             _not_send: PhantomData,
             _guard: guard,
         }
@@ -38,11 +40,14 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// Configures how the channel behaves based on the level of the control
     /// signal.
     ///
-    /// * `low` - The behavior of the channel when the control signal is low
-    /// * `high` - The behavior of the channel when the control signal is high
+    /// * `low` - The behaviour of the channel when the control signal is low.
+    /// * `high` - The behaviour of the channel when the control signal is high.
     pub fn set_ctrl_mode(&self, low: CtrlMode, high: CtrlMode) {
-        let pcnt = PCNT::regs();
-        let conf0 = pcnt.unit(UNIT).conf0();
+        let conf0 = self
+            .unit
+            .register_block()
+            .unit(self.unit.info().unit)
+            .conf0();
 
         conf0.modify(|_, w| {
             w.ch_hctrl_mode(NUM as u8).variant(high);
@@ -56,8 +61,11 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// * `neg_edge` - The effect on the counter when the input signal goes 1 -> 0.
     /// * `pos_edge` - The effect on the counter when the input signal goes 0 -> 1.
     pub fn set_input_mode(&self, neg_edge: EdgeMode, pos_edge: EdgeMode) {
-        let pcnt = PCNT::regs();
-        let conf0 = pcnt.unit(UNIT).conf0();
+        let conf0 = self
+            .unit
+            .register_block()
+            .unit(self.unit.info().unit)
+            .conf0();
 
         conf0.modify(|_, w| {
             w.ch_neg_mode(NUM as u8).variant(neg_edge);
@@ -65,123 +73,21 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
         });
     }
 
-    /// Sets the control signal (pin/high/low) for this channel.
-    pub fn set_ctrl_signal<'d>(&self, source: impl PeripheralInput<'d>) -> &Self {
-        let signal = match UNIT {
-            0 => match NUM {
-                0 => InputSignal::PCNT0_CTRL_CH0,
-                1 => InputSignal::PCNT0_CTRL_CH1,
-                _ => unreachable!(),
-            },
-            1 => match NUM {
-                0 => InputSignal::PCNT1_CTRL_CH0,
-                1 => InputSignal::PCNT1_CTRL_CH1,
-                _ => unreachable!(),
-            },
-            2 => match NUM {
-                0 => InputSignal::PCNT2_CTRL_CH0,
-                1 => InputSignal::PCNT2_CTRL_CH1,
-                _ => unreachable!(),
-            },
-            3 => match NUM {
-                0 => InputSignal::PCNT3_CTRL_CH0,
-                1 => InputSignal::PCNT3_CTRL_CH1,
-                _ => unreachable!(),
-            },
-            #[cfg(esp32)]
-            4 => match NUM {
-                0 => InputSignal::PCNT4_CTRL_CH0,
-                1 => InputSignal::PCNT4_CTRL_CH1,
-                _ => unreachable!(),
-            },
-            #[cfg(esp32)]
-            5 => match NUM {
-                0 => InputSignal::PCNT5_CTRL_CH0,
-                1 => InputSignal::PCNT5_CTRL_CH1,
-                _ => unreachable!(),
-            },
-            #[cfg(esp32)]
-            6 => match NUM {
-                0 => InputSignal::PCNT6_CTRL_CH0,
-                1 => InputSignal::PCNT6_CTRL_CH1,
-                _ => unreachable!(),
-            },
-            #[cfg(esp32)]
-            7 => match NUM {
-                0 => InputSignal::PCNT7_CTRL_CH0,
-                1 => InputSignal::PCNT7_CTRL_CH1,
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        };
-
-        if signal as usize <= property!("gpio.input_signal_max") {
-            let source = source.into();
-            source.set_input_enable(true);
-            signal.connect_to(&source);
-        } else {
-            warn!("Signal {:?} out of range", signal);
-        }
-        self
+    /// Set the control signal (pin/high/low) for this channel
+    pub fn set_ctrl_signal(&self, source: impl PeripheralInput<'d>) -> &Self {
+        let signal = self.unit.info().ctrl_ch[NUM];
+        self.connect_input(signal, source.into())
     }
 
-    /// Sets the edge signal (pin/high/low) for this channel.
-    pub fn set_edge_signal<'d>(&self, source: impl PeripheralInput<'d>) -> &Self {
-        let signal = match UNIT {
-            0 => match NUM {
-                0 => InputSignal::PCNT0_SIG_CH0,
-                1 => InputSignal::PCNT0_SIG_CH1,
-                _ => unreachable!(),
-            },
-            1 => match NUM {
-                0 => InputSignal::PCNT1_SIG_CH0,
-                1 => InputSignal::PCNT1_SIG_CH1,
-                _ => unreachable!(),
-            },
-            2 => match NUM {
-                0 => InputSignal::PCNT2_SIG_CH0,
-                1 => InputSignal::PCNT2_SIG_CH1,
-                _ => unreachable!(),
-            },
-            3 => match NUM {
-                0 => InputSignal::PCNT3_SIG_CH0,
-                1 => InputSignal::PCNT3_SIG_CH1,
-                _ => unreachable!(),
-            },
-            #[cfg(esp32)]
-            4 => match NUM {
-                0 => InputSignal::PCNT4_SIG_CH0,
-                1 => InputSignal::PCNT4_SIG_CH1,
-                _ => unreachable!(),
-            },
-            #[cfg(esp32)]
-            5 => match NUM {
-                0 => InputSignal::PCNT5_SIG_CH0,
-                1 => InputSignal::PCNT5_SIG_CH1,
-                _ => unreachable!(),
-            },
-            #[cfg(esp32)]
-            6 => match NUM {
-                0 => InputSignal::PCNT6_SIG_CH0,
-                1 => InputSignal::PCNT6_SIG_CH1,
-                _ => unreachable!(),
-            },
-            #[cfg(esp32)]
-            7 => match NUM {
-                0 => InputSignal::PCNT7_SIG_CH0,
-                1 => InputSignal::PCNT7_SIG_CH1,
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
-        };
+    /// Set the edge signal (pin/high/low) for this channel
+    pub fn set_edge_signal(&self, source: impl PeripheralInput<'d>) -> &Self {
+        let signal = self.unit.info().sig_ch[NUM];
+        self.connect_input(signal, source.into())
+    }
 
-        if signal as usize <= property!("gpio.input_signal_max") {
-            let source = source.into();
-            source.set_input_enable(true);
-            signal.connect_to(&source);
-        } else {
-            warn!("Signal {:?} out of range", signal);
-        }
+    fn connect_input(&self, signal: InputSignal, source: interconnect::InputSignal<'d>) -> &Self {
+        source.set_input_enable(true);
+        signal.connect_to(&source);
         self
     }
 }

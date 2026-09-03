@@ -2450,17 +2450,8 @@ mod chip_specific {
 
     // documented in re-export below
     #[allow(missing_docs)]
-    pub const MAX_TX_LOOPCOUNT: u16 = {
-        // TODO: unify naming in PAC
-        cfg_select! {
-            any(esp32p4, esp32s31) => {
-                max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_CH_W)
-            }
-            _ => {
-                max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_W)
-            }
-        }
-    };
+    pub const MAX_TX_LOOPCOUNT: u16 =
+        max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_W);
 
     impl DynChannelAccess<Tx> {
         #[inline(always)]

@@ -242,5 +242,7 @@ peripheral_clocks = { templates = [
     } },
     { name = "Rmt", template_params = { clk_en = "{{sys_clk}}" } },
     { name = "LcdCam", template_params = { peripheral = "lcdcam", rst_en = ".apb_rst_en().bit(reset).rst_en().bit(reset)" } },
+    { name = "Pcnt", template_params = { clk_en = ".pcnt0_apb_clk_en().bit(enable)", rst_en = ".pcnt0_rst_en().bit(reset)" } },
+    { name = "Pcnt1", template_params = { ctrl_reg = "pcnt_ctrl0()", clk_en = ".pcnt1_apb_clk_en().bit(enable)", rst_en = ".pcnt1_rst_en().bit(reset)" } },
     { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "{{no_rst}}" } },
 ] }
