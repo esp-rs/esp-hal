@@ -186,7 +186,7 @@ pub trait DmaChannel: Sized + crate::private::Sealed {
     type Tx: DmaTxChannel + From<Self>;
 
     /// Splits the DMA channel into its RX and TX halves.
-    #[cfg(any(esp32c5, esp32c6, esp32h2, esp32s3))] // TODO relax this to allow splitting on all chips
+    #[cfg(dma_separate_in_out_interrupts)] // TODO relax this to allow splitting on all chips
     fn split(self) -> (Self::Rx, Self::Tx) {
         // This function is exposed safely on chips that have separate IN and OUT
         // interrupt handlers.

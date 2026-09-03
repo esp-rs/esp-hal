@@ -20,7 +20,7 @@
 //! - D8    => GPIO17
 //! - D9    => GPIO16
 
-//% CHIP_FILTER: camera_driver_supported
+//% CHIP_FILTER: camera_driver_supported && lcd_cam_dma_engine == "AHB_GDMA"
 
 #![no_std]
 #![no_main]

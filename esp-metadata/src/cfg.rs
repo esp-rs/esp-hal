@@ -664,7 +664,9 @@ driver_configs![
         RgbProperties {
             driver: rgb_display,
             name: "RGB display", // LCD_CAM, ESP32 I2S, S2 I2S
-            properties: {}
+            properties: {
+                output_lines: u32,
+            }
         },
         SpiLcdProperties {
             driver: spi_lcd,

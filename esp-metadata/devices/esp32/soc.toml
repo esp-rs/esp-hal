@@ -279,6 +279,7 @@ support_status = "partial"
 support_status = "not_supported"
 [device.rgb_display]
 support_status = "partial"
+output_lines = 24
 
 [device.rng]
 support_status = { status = "partial", issue = 5979 }

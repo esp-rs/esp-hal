@@ -74,8 +74,14 @@ impl<'d, Dm: DriverMode> Lcd<'d, Dm> {
         self.regs().lcd_clock().write(|w| unsafe {
             // Force enable the clock for all configuration registers.
             w.clk_en().set_bit();
-            w.lcd_clk_equ_sysclk().clear_bit();
-            w.lcd_clkcnt_n().bits(2 - 1); // Must not be 0.
+            if cfg!(esp32s3) {
+                // ESP32-S3 errata: LCD_PCLK must divide LCD_CLK by at least 2.
+                w.lcd_clk_equ_sysclk().clear_bit();
+                w.lcd_clkcnt_n().bits(2 - 1); // Must not be 0.
+            } else {
+                // ESP32-S31: PCLK tracks LCD_CLK.
+                w.lcd_clk_equ_sysclk().set_bit();
+            }
             w.lcd_ck_idle_edge()
                 .bit(config.clock_mode.polarity == Polarity::IdleHigh);
             w.lcd_ck_out_edge()

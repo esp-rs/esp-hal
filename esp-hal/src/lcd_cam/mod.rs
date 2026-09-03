@@ -21,6 +21,7 @@ use crate::{
 
 pub mod cam;
 pub mod lcd;
+pub(crate) mod ll;
 
 /// DMA TX channel trait for LCD (I8080, DPI) peripherals.
 ///

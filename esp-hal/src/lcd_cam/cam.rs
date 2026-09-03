@@ -1,4 +1,21 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(lcd_cam_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(lcd_cam_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
+    },
+    "mclk_pin" => gpio_for_signal!(CAM_CLK, "GPIO15"),
+    "vsync_pin" => gpio_for_signal!(CAM_V_SYNC, "GPIO6"),
+    "href_pin" => gpio_for_signal!(CAM_H_ENABLE, "GPIO7"),
+    "pclk_pin" => gpio_for_signal!(CAM_PCLK, "GPIO13"),
+    "data0_pin" => gpio_for_signal!(CAM_DATA_0, "GPIO11"),
+    "data1_pin" => gpio_for_signal!(CAM_DATA_1, "GPIO9"),
+    "data2_pin" => gpio_for_signal!(CAM_DATA_2, "GPIO8"),
+    "data3_pin" => gpio_for_signal!(CAM_DATA_3, "GPIO10"),
+    "data4_pin" => gpio_for_signal!(CAM_DATA_4, "GPIO12"),
+    "data5_pin" => gpio_for_signal!(CAM_DATA_5, "GPIO18"),
+    "data6_pin" => gpio_for_signal!(CAM_DATA_6, "GPIO17"),
+    "data7_pin" => gpio_for_signal!(CAM_DATA_7, "GPIO16"),
+))]
 //! # Camera - Master or Slave Mode
 //!
 //! ## Overview
@@ -22,27 +39,27 @@
 //!
 //! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 //!
-//! let mclk_pin = peripherals.GPIO15;
-//! let vsync_pin = peripherals.GPIO6;
-//! let href_pin = peripherals.GPIO7;
-//! let pclk_pin = peripherals.GPIO13;
+//! let mclk_pin = peripherals.__mclk_pin__;
+//! let vsync_pin = peripherals.__vsync_pin__;
+//! let href_pin = peripherals.__href_pin__;
+//! let pclk_pin = peripherals.__pclk_pin__;
 //!
 //! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-//! let mut camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, config)?
+//! let mut camera = Camera::new(lcd_cam.cam, peripherals.__dma_channel__, config)?
 //!     .with_master_clock(mclk_pin) // Remove this for slave mode
 //!     .with_pixel_clock(pclk_pin)
 //!     .with_vsync(vsync_pin)
 //!     .with_h_enable(href_pin)
-//!     .with_data0(peripherals.GPIO11)
-//!     .with_data1(peripherals.GPIO9)
-//!     .with_data2(peripherals.GPIO8)
-//!     .with_data3(peripherals.GPIO10)
-//!     .with_data4(peripherals.GPIO12)
-//!     .with_data5(peripherals.GPIO18)
-//!     .with_data6(peripherals.GPIO17)
-//!     .with_data7(peripherals.GPIO16);
+//!     .with_data0(peripherals.__data0_pin__)
+//!     .with_data1(peripherals.__data1_pin__)
+//!     .with_data2(peripherals.__data2_pin__)
+//!     .with_data3(peripherals.__data3_pin__)
+//!     .with_data4(peripherals.__data4_pin__)
+//!     .with_data5(peripherals.__data5_pin__)
+//!     .with_data6(peripherals.__data6_pin__)
+//!     .with_data7(peripherals.__data7_pin__);
 //!
 //! let transfer = camera.receive(dma_buf).map_err(|e| e.0)?;
 //!
@@ -64,7 +81,15 @@ use crate::{
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, ErasedRxChannel, calculate_clkm},
+    lcd_cam::{
+        BitOrder,
+        ByteOrder,
+        CamDmaRxChannel,
+        ClockError,
+        ErasedRxChannel,
+        calculate_clkm,
+        ll,
+    },
     pac,
     peripherals::LCD_CAM,
     soc::clocks::{ClockTree, LcdCamCamClockConfig, LcdCamInstance},
@@ -239,9 +264,7 @@ impl<'d> Camera<'d> {
             w.cam_vsync_inv().bit(config.invert_vsync)
         });
 
-        self.regs()
-            .cam_rgb_yuv()
-            .write(|w| w.cam_conv_bypass().clear_bit());
+        ll::set_cam_conv_bypass(self.regs());
 
         self.regs()
             .cam_ctrl()

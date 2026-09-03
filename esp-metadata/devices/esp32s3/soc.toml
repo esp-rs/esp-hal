@@ -403,6 +403,8 @@ instances = [
 
 [device.camera]
 [device.rgb_display]
+output_lines = 16
+
 [device.ledc]
 version = 2
 channel_count = 8
