@@ -12,7 +12,7 @@ Commands:
   run                   Run an example or qa binary
   check                 Check crates, or try-build examples and tests
   test                  Run HIL tests
-  documentation         Build rustdoc for the specified packages and chips
+  doc                   Build rustdoc for the specified packages and chips
   doc-tests             Run rustdoc tests for the specified chip
   elfs                  Run prebuilt ELFs with probe-rs
   release               Release-related subcommands
@@ -29,9 +29,13 @@ A crate name is only a token `check` acts on, the other three want firmware: exa
 `--package` exists for callers that want to be explicit and accepts the same names and aliases the
 tokens do, so `build qa all esp32c6` and `build all --package qa-test esp32c6` are the same command.
 
-`lint`, `ci`, `documentation`, `doc-tests` and `check-global-symbols` take the chip the same way,
+`lint`, `ci`, `doc`, `doc-tests` and `check-global-symbols` take the chip the same way,
 as a bare name. The one exception is `semver-check`, which takes `--chips`, it has a subcommand of
 its own, and clap cannot tell a trailing chip name from it.
+
+`lint` and `doc` read crates from their tokens too, so `doc esp-hal esp-radio
+esp32 esp32c6` documents both crates for both chips. Naming no crate means every crate, naming no
+chip means every chip.
 
 ```text
 cargo xtask build --help
