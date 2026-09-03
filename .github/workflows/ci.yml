@@ -128,7 +128,7 @@ jobs:
   # Lives here so that `ci-result` carries it: a check that never reports on
   # `pull_request` cannot be a required check on its own, GitHub would wait for
   # it forever. Outside the merge queue this only asks whether a freeze issue is
-  # open and exits, so it runs on every event to keep `hil-build` reachable.
+  # open and exits, so it runs on every event to keep `hil` reachable.
   merge-freeze-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -520,7 +520,7 @@ jobs:
 
   # `merge-freeze-gate` is a dependency so that a frozen-out queue entry never
   # occupies the device runners.
-  hil-build:
+  hil:
     needs: [calculate, merge-freeze-gate]
     if: needs.calculate.outputs.run-hil == 'true'
     uses: ./.github/workflows/hil.yml
