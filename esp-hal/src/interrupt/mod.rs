@@ -81,7 +81,10 @@ pub use arch::*;
 
 use crate::pac;
 
-unstable_driver! {
+// Stable async drivers tear their async mode down on the core that services their interrupt,
+// so these modules are compiled without the `unstable` feature, too. `ipc` drives the
+// teardown, and it raises a software interrupt.
+crate::unstable_module! {
     pub mod software;
 
     #[cfg(all(feature = "rt", multi_core))]
