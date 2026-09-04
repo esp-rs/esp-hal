@@ -73,6 +73,7 @@ for_each_classified_interrupt!(
             /// Enumeration of CPU interrupts available for direct binding.
             #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            #[instability::unstable]
             pub enum DirectBindableCpuInterrupt {
                 $(
                     #[doc = concat!(" Direct bindable CPU interrupt number ", stringify!($idx_in_class), ".")]
