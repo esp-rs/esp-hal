@@ -12,9 +12,7 @@
 //! switching does not interfere with other interrupts, so we don't leave an interrupt handler only
 //! partially executed.
 
-#[cfg(feature = "esp-radio")]
-use core::ffi::c_void;
-use core::sync::atomic::Ordering;
+use core::{ffi::c_void, sync::atomic::Ordering};
 
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
 #[cfg(not(esp32))]
@@ -57,7 +55,6 @@ const PS_UM: u32 = 1 << 5;
 // Windowed mode.
 const PS_WOE: u32 = 1 << 18;
 // CALLINC field value for call4 instruction.
-#[cfg(feature = "esp-radio")]
 const PS_CALLINC_CALL4: u32 = 1 << 16;
 
 pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn) {
@@ -86,7 +83,6 @@ pub(crate) fn write_thread_pointer(task: *mut Task) {
     unsafe { core::arch::asm!("wur.threadptr {0}", in(reg) task, options(nostack)) };
 }
 
-#[cfg(feature = "esp-radio")]
 pub(crate) fn new_task_context(
     task_fn: extern "C" fn(*mut c_void),
     param: *mut c_void,

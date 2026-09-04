@@ -5,21 +5,17 @@ use core::{
     ptr::NonNull,
 };
 
-#[cfg(feature = "alloc")]
-use allocator_api2::boxed::Box;
 use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::RawMutex;
 use macros::ram;
 
-#[cfg(feature = "alloc")]
-use crate::InternalMemory;
 #[cfg(feature = "rtos-trace")]
 use crate::TraceEvents;
 #[cfg(feature = "embassy")]
 use crate::timer::embassy::TimerQueue;
 use crate::{
-    run_queue::{Priority, RunQueue},
+    run_queue::{Priority, RunQueue, RunSchedulerOn},
     task::{
         self,
         ContextExt,
@@ -129,13 +125,13 @@ impl CpuState {
             main_task: Task {
                 cpu_context: CpuContext::new(),
                 thread_local: ThreadLocalData::new(),
+                name: None,
                 state: TaskState::Ready,
                 stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
                 #[cfg(any(hw_task_overflow_detection, sw_task_overflow_detection))]
                 stack_guard: core::ptr::null_mut(),
                 #[cfg(sw_task_overflow_detection)]
                 stack_guard_value: 0,
-                #[cfg(feature = "esp-radio")]
                 current_wait_queue: None,
                 priority: Priority::ZERO,
                 #[cfg(multi_core)]
@@ -150,8 +146,7 @@ impl CpuState {
                 timer_queue_item: TaskListItem::None,
                 delete_list_item: TaskListItem::None,
 
-                #[cfg(feature = "alloc")]
-                heap_allocated: false,
+                thread: None,
             },
         }
     }
@@ -199,30 +194,19 @@ impl SchedulerState {
         }
     }
 
-    #[cfg(feature = "esp-radio")]
-    pub(crate) fn create_task(
-        &mut self,
-        name: &str,
-        task: extern "C" fn(*mut c_void),
-        param: *mut c_void,
-        task_stack_size: usize,
-        priority: usize,
-        pinned_to: Option<Cpu>,
-    ) -> TaskPtr {
-        if let Some(cpu) = pinned_to {
+    /// Adds a task to the scheduler.
+    ///
+    /// The caller must have initialized the `Task` object, and must keep it alive until the task
+    /// is deleted.
+    pub(crate) fn register_task(&mut self, mut task_ptr: TaskPtr) {
+        #[cfg(multi_core)]
+        if let Some(cpu) = unsafe { task_ptr.as_ref().pinned_to } {
             assert!(
                 self.active_cores.contains(cpu),
                 "Cannot create a task on {:?}, because the scheduler does not run on it",
                 cpu
             );
         }
-
-        let mut task = Box::new_in(
-            Task::new(name, task, param, task_stack_size, priority, pinned_to),
-            InternalMemory,
-        );
-        task.heap_allocated = true;
-        let mut task_ptr = NonNull::from(Box::leak(task));
 
         unsafe {
             task_ptr
@@ -240,17 +224,17 @@ impl SchedulerState {
                 .mark_task_ready(&self.per_cpu, self.active_cores, task_ptr);
         task::trigger_scheduler(run_scheduler);
 
-        debug!("Task '{}' created: {:?}", name, task_ptr);
-
-        task_ptr
+        debug!("Task created: {:?}", task_ptr);
     }
 
     /// Deletes the tasks marked for deletion on `cpu`, except the one that owns `current_sp`.
     ///
     /// A task that deletes itself keeps running on its own stack until the scheduler switches away
     /// from it. Freeing that stack here would hand it back to the allocator while this CPU still
-    /// writes to it, and the other core could hand it out again. Such a task stays in the list, and
-    /// a later scheduler run deletes it, once this CPU runs on a different stack.
+    /// writes to it, and the other core could hand it out again. Such a task stays in the list,
+    /// and this function requests another scheduler run, which deletes the task once this CPU runs
+    /// on a different stack. Without that request the task could stay in the list forever, because
+    /// a CPU that has nothing else to run goes idle.
     ///
     /// Only the task the CPU currently runs on can be deferred, so the list holds at most one task
     /// after this function returns.
@@ -274,6 +258,7 @@ impl SchedulerState {
 
         if let Some(task_ptr) = in_use {
             self.per_cpu[cpu as usize].to_delete.push(task_ptr);
+            task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
         }
     }
 
@@ -441,7 +426,6 @@ impl SchedulerState {
     }
 
     /// Returns whether `task` is the main task of any CPU.
-    #[cfg(feature = "esp-radio")]
     fn is_main_task(&self, task: TaskPtr) -> bool {
         self.per_cpu
             .iter()
@@ -449,7 +433,7 @@ impl SchedulerState {
     }
 
     /// Returns the CPU that runs `task`, if that CPU is not the current one.
-    #[cfg(all(multi_core, feature = "esp-radio"))]
+    #[cfg(multi_core)]
     fn other_cpu_running(&self, task: TaskPtr) -> Option<Cpu> {
         let current_cpu = Cpu::current();
         Cpu::all().find(|cpu| {
@@ -458,7 +442,6 @@ impl SchedulerState {
         })
     }
 
-    #[cfg(feature = "esp-radio")]
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: Option<TaskPtr>) -> bool {
         let current_task = SCHEDULER.current_task();
         let task_to_delete = task_to_delete.unwrap_or(current_task);
@@ -505,7 +488,6 @@ impl SchedulerState {
     }
 
     /// Marks `task` deleted, and queues it to be deleted by a scheduler run on `cpu`.
-    #[cfg(feature = "esp-radio")]
     fn mark_for_deletion(&mut self, cpu: Cpu, task: TaskPtr) {
         if task.state() != TaskState::Deleted {
             self.per_cpu[cpu as usize].to_delete.push(task);
@@ -529,7 +511,7 @@ impl SchedulerState {
         task::trigger_scheduler(run_scheduler);
     }
 
-    fn delete_task(&mut self, mut to_delete: TaskPtr) {
+    fn delete_task(&mut self, to_delete: TaskPtr) {
         unsafe {
             cfg_select! {
                 xtensa => {
@@ -543,19 +525,16 @@ impl SchedulerState {
         };
 
         debug!("Dropping task: {:x}", to_delete.as_ptr() as usize);
-        unsafe {
-            #[cfg(feature = "alloc")]
-            if to_delete.as_ref().heap_allocated {
-                let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
-                core::mem::drop(task);
-                return;
-            }
 
-            core::ptr::drop_in_place(to_delete.as_mut());
-        }
+        // The task locates the memory block of the thread, so the owner of the block destroys the
+        // task when it releases the memory.
+        let thread = unwrap!(
+            unsafe { to_delete.as_ref().thread },
+            "The main task cannot be deleted"
+        );
+        unsafe { crate::thread::release(thread, self) };
     }
 
-    #[cfg(feature = "esp-radio")]
     fn remove_from_all_queues(&mut self, mut task: TaskPtr) {
         self.all_tasks.remove(task);
         unwrap!(self.time_driver.as_mut()).timer_queue.remove(task);
@@ -573,12 +552,7 @@ impl SchedulerState {
             let task = unsafe { task.as_ref() };
             let in_queue = task.in_run_or_wait_queue;
 
-            let in_waitqueue = cfg_select! {
-                feature = "esp-radio" => task.current_wait_queue.is_some(),
-                _ => false,
-            };
-
-            in_queue && !in_waitqueue
+            in_queue && task.current_wait_queue.is_none()
         };
 
         if task_in_run_queue {
@@ -661,28 +635,6 @@ impl Scheduler {
             TaskPtr::new(tp),
             "The scheduler has not been started. Make sure to call `esp_rtos::init()` before trying to access the current task."
         )
-    }
-
-    #[cfg(feature = "esp-radio")]
-    pub(crate) fn create_task(
-        &self,
-        name: &str,
-        task: extern "C" fn(*mut c_void),
-        param: *mut c_void,
-        task_stack_size: usize,
-        priority: u32,
-        pinned_to: Option<Cpu>,
-    ) -> TaskPtr {
-        self.with(|state| {
-            state.create_task(
-                name,
-                task,
-                param,
-                task_stack_size,
-                priority as usize,
-                pinned_to,
-            )
-        })
     }
 
     pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {

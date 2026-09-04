@@ -20,9 +20,11 @@ use esp_radio_rtos_driver::{
 };
 
 use crate::{
+    SCHEDULER,
     run_queue::{MaxPriority, Priority},
     scheduler::Scheduler,
     task::{self, Task, TaskExt as _},
+    thread::ThreadSpawner,
     wait_queue::WaitQueue,
 };
 
@@ -68,23 +70,32 @@ impl esp_radio_rtos_driver::SchedulerImplementation for Scheduler {
         pin_to_core: Option<u32>,
         task_stack_size: usize,
     ) -> ThreadPtr {
-        self.create_task(
-            name,
-            task,
-            param,
-            task_stack_size,
-            priority.min(self.max_task_priority()),
-            pin_to_core.and_then(|core| match core {
-                0 => Some(Cpu::ProCpu),
-                #[cfg(multi_core)]
-                1 => Some(Cpu::AppCpu),
-                _ => {
-                    warn!("Invalid core number: {}", core);
-                    None
-                }
-            }),
-        )
-        .cast()
+        debug!(
+            "task_create {} {:?}({:?}) stack_size = {} priority = {}",
+            name, task, param, task_stack_size, priority
+        );
+
+        // Debug builds use a lot more stack than release builds do.
+        #[cfg(debug_build)]
+        let task_stack_size = task_stack_size + 6 * 1024;
+
+        let mut spawner = ThreadSpawner::new(task_stack_size)
+            .with_priority(priority.min(self.max_task_priority()) as usize);
+
+        let pin_to_core = pin_to_core.and_then(|core| match core {
+            0 => Some(Cpu::ProCpu),
+            #[cfg(multi_core)]
+            1 => Some(Cpu::AppCpu),
+            _ => {
+                warn!("Invalid core number: {}", core);
+                None
+            }
+        });
+        if let Some(cpu) = pin_to_core {
+            spawner = spawner.with_pinned_to(cpu);
+        }
+
+        spawner.spawn_extern(task, param).cast()
     }
 
     fn current_task(&self) -> ThreadPtr {
@@ -147,20 +158,22 @@ impl WaitQueueImplementation for WaitQueue {
     }
 
     unsafe fn wait_until(queue: WaitQueuePtr, deadline_instant: Option<u64>) {
-        let wait_queue = unsafe { Self::from_ptr(queue) };
+        let deadline = Instant::EPOCH
+            + deadline_instant
+                .map(Duration::from_micros)
+                .unwrap_or(Duration::MAX);
 
-        wait_queue.wait_with_deadline(
-            Instant::EPOCH
-                + deadline_instant
-                    .map(Duration::from_micros)
-                    .unwrap_or(Duration::MAX),
-        )
+        SCHEDULER.with(|scheduler| {
+            let wait_queue = unsafe { Self::from_ptr(queue) };
+            wait_queue.wait_with_deadline(scheduler, deadline)
+        })
     }
 
     unsafe fn notify(queue: WaitQueuePtr) {
-        let wait_queue = unsafe { Self::from_ptr(queue) };
-
-        wait_queue.notify()
+        SCHEDULER.with(|scheduler| {
+            let wait_queue = unsafe { Self::from_ptr(queue) };
+            wait_queue.notify(scheduler)
+        })
     }
 
     unsafe fn notify_from_isr(queue: WaitQueuePtr, _higher_prio_task_waken: Option<&mut bool>) {
