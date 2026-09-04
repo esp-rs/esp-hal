@@ -72,18 +72,7 @@ Using the [`~` operator](https://doc.rust-lang.org/cargo/reference/specifying-de
 
 ## Release policy
 
-We follow a few general guidelines regarding releases:
-
-- Releases happen organically alongside development rather than on a fixed schedule. The table below outlines our general approach to each release type and when one might be cut.
-- During the `rc` phase of a release:
-    - We aim to leave them in the wild for testing for at least one week per release.
-    - If a considerable change (like a new addition) is added, we must extend the `rc` by at least another release.
-
-| Release Type | Cadence    | Pre-release Requirement                         |
-| ------------ | ---------- | ----------------------------------------------- |
-| Patch        | Frequent   | None                                            |
-| Minor        | Periodic   | `rc` release required                           |
-| Major        | Infrequent | Full pre-release cycle (`alpha` may be skipped) |
+For how releases are prepared, staged as release candidates, and published, see [RELEASING.md](https://github.com/esp-rs/esp-hal/blob/main/documentation/RELEASING.md).
 
 ## AI Contribution Policy
 
