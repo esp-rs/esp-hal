@@ -53,32 +53,33 @@ impl CacheGuard {
         Self { inner }
     }
 
-    /// Drop cached lines that still map the given flash physical range.
+    /// Flush every line. Must run while the caches are still off.
+    #[cfg(esp32)]
     #[ram]
-    pub(super) fn invalidate_physical(&self, start: u32, len: u32) {
-        if len == 0 {
-            return;
-        }
-
-        cfg_select! {
-            esp32 => {
-                // The ESP32 cannot invalidate a single address; flush while still off.
-                let _ = (self, start);
-                unsafe {
-                    if self.inner.pro {
-                        Cache_Flush_rom(0);
-                    }
-                    if self.inner.app {
-                        Cache_Flush_rom(1);
-                    }
-                }
+    pub(super) fn flush_while_off(&self) {
+        unsafe {
+            if self.inner.pro {
+                Cache_Flush_rom(0);
             }
-            _ => {
-                let _ = self;
-                invalidate_mapped_range(start, len);
+            if self.inner.app {
+                Cache_Flush_rom(1);
             }
         }
     }
+}
+
+/// Drop cache lines that map `start..start+len` after the caches are back on.
+///
+/// IDF invalidates in this order (`spi_flash_check_and_flush_cache` after the
+/// operation’s cache-restore path). ESP32 cannot invalidate by address and
+/// flushes while still off instead.
+#[cfg(not(esp32))]
+#[ram]
+pub(super) fn invalidate_mapped(start: u32, len: u32) {
+    if len == 0 {
+        return;
+    }
+    invalidate_mapped_range(start, len);
 }
 
 impl Drop for CacheGuard {
@@ -326,10 +327,21 @@ fn invalidate_cache_addr(vaddr: u32, size: u32) {
             }
         }
         esp32p4 => {
+            const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;
+            const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
             const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
             const CACHE_MAP_L2_CACHE: u32 = 1 << 5;
-            // Flash is L2; L1 DCache may still hold a copy of a mapped line.
-            unsafe { Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE | CACHE_MAP_L2_CACHE, vaddr, size) }
+            // IROM and DROM share the same window; invalidate I, D, and L2.
+            unsafe {
+                Cache_Invalidate_Addr(
+                    CACHE_MAP_L1_ICACHE_0
+                        | CACHE_MAP_L1_ICACHE_1
+                        | CACHE_MAP_L1_DCACHE
+                        | CACHE_MAP_L2_CACHE,
+                    vaddr,
+                    size,
+                )
+            }
         }
         _ => unsafe { Cache_Invalidate_Addr(vaddr, size) },
     }
@@ -340,6 +352,8 @@ fn invalidate_cache_addr(vaddr: u32, size: u32) {
 fn mmu_page_size() -> u32 {
     cfg_select! {
         not(soc_has_mmu_table) => indexed::mmu_page_size(),
+        // C2 page size is configurable (IDF `mmu_ll_get_page_size`).
+        esp32c2 => c2::mmu_page_size(),
         _ => property!("mmu.page_size"),
     }
 }
@@ -360,6 +374,7 @@ fn mmu_entry_scan_range() -> (u32, u32) {
 fn flash_page_number(page_paddr: u32) -> u32 {
     cfg_select! {
         not(soc_has_mmu_table) => indexed::flash_page_number(page_paddr),
+        esp32c2 => page_paddr >> c2::mmu_page_size().trailing_zeros(),
         _ => page_paddr >> 16,
     }
 }
@@ -504,6 +519,28 @@ mod table {
             .read()
             .paddr()
             .bits() as u32
+    }
+}
+
+#[cfg(esp32c2)]
+mod c2 {
+    use procmacros::ram;
+
+    use crate::peripherals::EXTMEM;
+
+    /// 0 = 16 KiB, 1 = 32 KiB, 2 = 64 KiB (`EXTMEM_CACHE_MMU_PAGE_SIZE`).
+    #[ram]
+    pub(super) fn mmu_page_size() -> u32 {
+        match EXTMEM::regs()
+            .cache_conf_misc()
+            .read()
+            .cache_mmu_page_size()
+            .bits()
+        {
+            0 => 0x4000,
+            1 => 0x8000,
+            _ => 0x10000,
+        }
     }
 }
 

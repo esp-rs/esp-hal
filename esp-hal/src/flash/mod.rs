@@ -8,7 +8,7 @@
 //!
 //! Write and erase are NOR-flash operations: bits can only change from 1 to 0
 //! without an erase. There is no read-modify-write. [`Flash::read`] and
-//! [`Flash::write`] take word slices (`&[u32]`) and a 4-byte-aligned flash
+//! [`Flash::write`] take word slices (`&[u32]`) and a 4-byte-aligned **byte**
 //! offset; the buffer must be in internal RAM. [`Flash::erase`] requires
 //! 4096-byte alignment.
 //!
@@ -17,7 +17,15 @@
 //! [`Config`] currently only selects the multi-core strategy on dual-core
 //! chips (default: automatically park the other core).
 //!
+//! ## Usage
+//!
+//! Construct [`Flash`] from the virtual [`FLASH`] peripheral. `offset` is a
+//! flash byte address, not a word index. There is no `embedded-storage` impl
+//! on this type; higher layers own partitioning and trait wrappers.
+//!
 //! ## Examples
+//!
+//! ### Read a word-aligned range
 //!
 //! ```rust, no_run
 //! # {before_snippet}
@@ -33,11 +41,19 @@
 #![cfg_attr(
     esp32,
     doc = "- On ESP32, a second-stage bootloader must identify the flash chip; the ROM does not.
-  [`Flash::new`] fails with [`ConfigError::UnknownFlashChip`] if identification is missing."
+  [`Flash::new`] fails with [`ConfigError::UnknownFlashChip`] if identification is missing
+  (including the ROM placeholder id `0x001540EF`, a valid W25Q16 id on other chips)."
 )]
+//! - Driver bounds use the JEDEC density from the ROM-cached device id. ROM operations also
+//!   check the ROM's cached chip size, which a bootloader may set from the image header. A
+//!   range that passes [`Flash`] can still fail in the ROM, and the reverse if the header
+//!   claims a larger chip.
 //! - [`Flash::write`] and [`Flash::erase`] do not refuse currently mapped flash.
 //! - Programming a mapped `.text` or `.rodata` page can destroy the running image or change memory
 //!   the compiler treats as immutable.
+//! - A single [`Flash::read`] / [`Flash::write`] is one ROM call. The flash-backed cache stays off
+//!   (and the other core may stay parked) for the whole transfer. Split large operations in a
+//!   higher layer if that latency matters.
 //! - On dual-core chips, the default strategy stalls the other CPU around every operation,
 //!   including reads. The other core may be frozen while holding a lock or inside an interrupt
 //!   handler.
@@ -135,6 +151,10 @@ impl MultiCoreStrategy {
 pub enum ConfigError {
     /// The attached flash chip could not be identified, or its size is not
     /// recognized.
+    ///
+    /// This includes no-response JEDEC sentinels, an unrecognized density
+    /// byte, and on ESP32 the ROM placeholder `0x001540EF` (the ROM does not
+    /// run `RDID`; that word is a valid W25Q16 id on other chips).
     UnknownFlashChip,
 }
 
@@ -159,18 +179,23 @@ impl core::fmt::Display for ConfigError {
 #[allow(clippy::enum_variant_names, reason = "matches ROM result / issue 6203")]
 #[non_exhaustive]
 pub enum Error {
-    /// I/O error.
+    /// I/O error reported by the ROM.
+    ///
+    /// Includes a ROM-side size check against its cached chip size when that
+    /// is smaller than [`Flash::capacity`].
     IoError,
     /// The operation timed out.
     IoTimeout,
-    /// The chip status bits still protect the target range.
-    Locked,
     /// Address or length is not aligned for this operation.
     ///
     /// [`Flash::read`] and [`Flash::write`] require a 4-byte-aligned flash
     /// offset. [`Flash::erase`] requires a 4096-byte range.
     NotAligned,
-    /// The range exceeds the detected flash capacity, or `from` > `to`.
+    /// The range exceeds [`Flash::capacity`], or `from` > `to`.
+    ///
+    /// Capacity is the JEDEC density, not the ROM's cached chip size. A range
+    /// inside this limit can still fail in the ROM if that cached size is
+    /// smaller (often the image-header size on ESP32).
     OutOfBounds,
     /// Not supported in the current environment.
     ///
@@ -192,7 +217,6 @@ impl core::fmt::Display for Error {
         match self {
             Self::IoError => write!(f, "Flash I/O error"),
             Self::IoTimeout => write!(f, "Flash I/O timed out"),
-            Self::Locked => write!(f, "Flash is locked for writing"),
             Self::NotAligned => write!(f, "Flash address or length is not aligned"),
             Self::OutOfBounds => write!(f, "Flash range is out of bounds"),
             Self::NotSupported => write!(f, "Flash operation is not supported"),
@@ -214,8 +238,10 @@ impl core::fmt::Display for Error {
 pub struct ChipInfo {
     /// JEDEC id, manufacturer in bits 23:16.
     pub chip_id: u32,
-    /// Detected physical capacity in bytes.
-    pub capacity: u32,
+    /// JEDEC-decoded physical capacity in bytes.
+    ///
+    /// See [`Flash::capacity`].
+    pub capacity: usize,
     /// Erase sector size in bytes.
     pub sector_size: u32,
     /// Erase block size in bytes.
@@ -239,16 +265,25 @@ pub struct Flash<'d, Dm: DriverMode> {
 }
 
 impl<'d> Flash<'d, Blocking> {
+    /// Program page size in bytes.
+    pub const PAGE_SIZE: u32 = 256;
+    /// Erase sector size in bytes.
+    pub const SECTOR_SIZE: u32 = 4096;
+    /// Erase block size in bytes.
+    pub const BLOCK_SIZE: u32 = 65536;
+
     /// Creates a new flash driver from the `FLASH` peripheral.
     ///
-    /// Capacity is the detected chip size, not the size field in the image
-    /// header.
+    /// Capacity is the JEDEC density from the ROM-cached device id, not the
+    /// image-header size and not the ROM's cached chip size used by
+    /// read/write/erase.
     #[cfg_attr(esp32, doc = "# Limitations")]
     #[cfg_attr(
         esp32,
         doc = "On ESP32, a second-stage bootloader must identify the flash chip; the
 ROM does not. Without that, this method returns
-[`ConfigError::UnknownFlashChip`]."
+[`ConfigError::UnknownFlashChip`] (including the ROM placeholder
+`0x001540EF`)."
     )]
     pub fn new(flash: FLASH<'d>, config: Config) -> Result<Self, ConfigError> {
         let raw_id = rom::cached_device_id();
@@ -281,38 +316,47 @@ ROM does not. Without that, this method returns
         Ok(())
     }
 
-    /// Returns the detected physical flash capacity in bytes.
+    /// Returns the JEDEC-decoded flash capacity in bytes.
     ///
-    /// This is the chip size identified at construction, not the size field in
-    /// the image header.
+    /// Driver bounds use this value. ROM read/write/erase also check the ROM's
+    /// cached chip size, which a bootloader may set from the image header.
     pub fn capacity(&self) -> usize {
         self.capacity
     }
 
     /// Returns chip identification and fixed geometry.
     ///
-    /// `chip_id` is manufacturer-first. Geometry is always 256-byte pages,
-    /// 4096-byte sectors and 64 KiB blocks; it is not probed from the chip.
+    /// `chip_id` is manufacturer-first. `capacity` is the JEDEC density; see
+    /// [`Self::capacity`]. Geometry is always 256-byte pages, 4096-byte
+    /// sectors and 64 KiB blocks; it is not probed from the chip.
     #[instability::unstable]
     pub fn chip_info(&self) -> ChipInfo {
         ChipInfo {
             chip_id: self.chip_id,
-            capacity: self.capacity as u32,
+            capacity: self.capacity,
             sector_size: SECTOR_SIZE,
             block_size: BLOCK_SIZE,
             page_size: PAGE_SIZE,
         }
     }
 
-    /// Reads `data.len()` words starting at `offset`.
+    /// Reads `data.len()` words starting at byte address `offset`.
     ///
-    /// `offset` must be a multiple of 4. `data` must be in internal RAM.
+    /// `offset` is a flash byte address and, when `data` is non-empty, must be
+    /// a multiple of 4. `data` must be in internal RAM. An empty `data`
+    /// slice only checks that `offset` is within [`Self::capacity`].
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NotAligned`] if `offset` is not a multiple of 4,
-    /// [`Error::OutOfBounds`] if the range exceeds [`Self::capacity`], or
-    /// [`Error::NotSupported`] if `data` is not in internal RAM.
+    /// Returns [`Error::NotAligned`] if `data` is non-empty and `offset` is
+    /// not a multiple of 4, [`Error::OutOfBounds`] if the range exceeds
+    /// [`Self::capacity`], [`Error::NotSupported`] if `data` is not in
+    /// internal RAM, or a ROM I/O error ([`Error::IoError`],
+    /// [`Error::IoTimeout`], [`Error::Unknown`]).
+    #[cfg_attr(
+        all(multi_core, feature = "unstable"),
+        doc = " On dual-core chips with [`MultiCoreStrategy::Error`], also [`Error::OtherCoreRunning`]."
+    )]
     #[ram]
     pub fn read(&mut self, offset: u32, data: &mut [u32]) -> Result<(), Error> {
         let Some(len) = byte_len(data) else {
@@ -328,17 +372,25 @@ ROM does not. Without that, this method returns
         self.with_guard(None, |_| rom::read(offset, data))
     }
 
-    /// Writes `data` starting at `offset` using NOR flash semantics.
+    /// Writes `data` starting at byte address `offset` using NOR flash
+    /// semantics.
     ///
-    /// The target must already be erased. `offset` must be a multiple of 4.
-    /// `data` must be in internal RAM.
+    /// The target must already be erased. `offset` is a flash byte address and,
+    /// when `data` is non-empty, must be a multiple of 4. `data` must be in
+    /// internal RAM. An empty `data` slice only checks that `offset` is
+    /// within [`Self::capacity`].
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NotAligned`] if `offset` is not a multiple of 4,
-    /// [`Error::OutOfBounds`] if the range exceeds [`Self::capacity`], or
-    /// [`Error::NotSupported`] if `data` is not in internal RAM.
-    ///
+    /// Returns [`Error::NotAligned`] if `data` is non-empty and `offset` is
+    /// not a multiple of 4, [`Error::OutOfBounds`] if the range exceeds
+    /// [`Self::capacity`], [`Error::NotSupported`] if `data` is not in
+    /// internal RAM, or a ROM I/O error ([`Error::IoError`],
+    /// [`Error::IoTimeout`], [`Error::Unknown`]).
+    #[cfg_attr(
+        all(multi_core, feature = "unstable"),
+        doc = " On dual-core chips with [`MultiCoreStrategy::Error`], also [`Error::OtherCoreRunning`]."
+    )]
     /// # Safety
     ///
     /// The programmed range must not be mapped for instruction fetch or as
@@ -363,15 +415,20 @@ ROM does not. Without that, this method returns
 
     /// Erases flash in `[from, to)`.
     ///
-    /// `from` and `to` must be multiples of 4096 bytes ([`ChipInfo::sector_size`]).
+    /// `from` and `to` must be multiples of [`Self::SECTOR_SIZE`] (4096 bytes).
     /// `to == capacity` is allowed. There is no byte-granular erase.
+    /// `from == to` only checks that `from` is within [`Self::capacity`].
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NotAligned`] if `from` or `to` is not a multiple of
-    /// 4096, [`Error::OutOfBounds`] if `from > to` or the range exceeds
-    /// [`Self::capacity`].
-    ///
+    /// Returns [`Error::NotAligned`] if `from != to` and `from` or `to` is not
+    /// a multiple of 4096, [`Error::OutOfBounds`] if `from > to` or the range
+    /// exceeds [`Self::capacity`], or a ROM I/O error ([`Error::IoError`],
+    /// [`Error::IoTimeout`], [`Error::Unknown`]).
+    #[cfg_attr(
+        all(multi_core, feature = "unstable"),
+        doc = " On dual-core chips with [`MultiCoreStrategy::Error`], also [`Error::OtherCoreRunning`]."
+    )]
     /// # Safety
     ///
     /// The erased range must not be mapped for instruction fetch or as
@@ -444,10 +501,21 @@ impl Flash<'_, Blocking> {
             let _park = ParkGuard::enter(self)?;
             let cache = cache::CacheGuard::suspend();
             let result = f(self);
-            if let Some((start, len)) = invalidate {
-                cache.invalidate_physical(start, len);
+            cfg_select! {
+                esp32 => {
+                    // Address-based invalidate is unavailable; flush while still off.
+                    if invalidate.is_some() {
+                        cache.flush_while_off();
+                    }
+                    drop(cache);
+                }
+                _ => {
+                    drop(cache);
+                    if let Some((start, len)) = invalidate {
+                        cache::invalidate_mapped(start, len);
+                    }
+                }
             }
-            drop(cache);
             result
         })
     }

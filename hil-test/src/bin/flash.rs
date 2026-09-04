@@ -73,10 +73,10 @@ mod tests {
 
         // TODO: Assert decoded `capacity` against this board's known flash size.
         // Checking only that decode succeeded can pass with the JEDEC byte order reversed.
-        assert_eq!(info.capacity as usize, flash.capacity());
-        assert_eq!(info.sector_size, 4096);
-        assert_eq!(info.block_size, 65536);
-        assert_eq!(info.page_size, 256);
+        assert_eq!(info.capacity, flash.capacity());
+        assert_eq!(info.sector_size, Flash::SECTOR_SIZE);
+        assert_eq!(info.block_size, Flash::BLOCK_SIZE);
+        assert_eq!(info.page_size, Flash::PAGE_SIZE);
     }
 
     #[test]
@@ -170,8 +170,13 @@ mod tests {
         let mut buf = [0u32; 1];
 
         assert_eq!(flash.read(cap, &mut buf), Err(Error::OutOfBounds));
+        assert_eq!(flash.read(cap - 4, &mut [0u32; 2]), Err(Error::OutOfBounds));
         assert_eq!(
             unsafe { flash.write(cap, &[0u32; 1]) },
+            Err(Error::OutOfBounds)
+        );
+        assert_eq!(
+            unsafe { flash.write(cap - 4, &[0u32; 2]) },
             Err(Error::OutOfBounds)
         );
         assert_eq!(
@@ -185,9 +190,17 @@ mod tests {
 
         flash.read(0, &mut []).unwrap();
         flash.read(cap, &mut []).unwrap();
+        // Empty slices skip alignment and only check bounds.
+        flash.read(1, &mut []).unwrap();
+        unsafe { flash.write(1, &[]).unwrap() };
+        unsafe { flash.erase(1, 1).unwrap() };
         assert_eq!(flash.read(cap + 1, &mut []), Err(Error::OutOfBounds));
         unsafe { flash.write(NVS, &[]).unwrap() };
         unsafe { flash.erase(NVS, NVS).unwrap() };
+
+        flash
+            .apply_config(&Config::default())
+            .expect("apply_config is a no-op on success");
 
         assert_eq!(flash.read(1, &mut buf), Err(Error::NotAligned));
         assert_eq!(unsafe { flash.write(1, &buf) }, Err(Error::NotAligned));
@@ -197,6 +210,10 @@ mod tests {
         );
     }
 
+    /// ROM-read of mapped firmware still works after programming *unmapped* NVS.
+    ///
+    /// This does not exercise cache invalidation of a page that is MMU-mapped
+    /// and then programmed; NVS at `0x9000` is not part of the app mapping.
     #[test]
     fn test_mapped_read_after_nvs_program() {
         let peripherals = esp_hal::init(esp_hal::Config::default());

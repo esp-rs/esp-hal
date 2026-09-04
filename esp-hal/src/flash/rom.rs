@@ -40,15 +40,20 @@ pub(super) fn cached_device_id() -> u32 {
     }
 }
 
-/// No-response sentinels and the ROM's static W25Q16 placeholder (`0x001540EF`).
+/// No-response sentinels.
 ///
 /// `0xFFFF3F` is esptool's raw `RDID` no-response value; `0x3FFFFF` is that
 /// word after the ROM's manufacturer-first swap.
+///
+/// `0x001540EF` is a valid Winbond W25Q16 JEDEC id. It is only rejected on
+/// ESP32, where the ROM does not run `RDID` and leaves that word as a
+/// static placeholder until a second-stage bootloader identifies the chip.
 fn is_unusable_id(id: u32) -> bool {
-    matches!(
-        id,
-        0x0000_0000 | 0x00FF_FFFF | 0x00FF_FF3F | 0x003F_FFFF | 0x0015_40EF
-    )
+    let no_response = matches!(id, 0x0000_0000 | 0x00FF_FFFF | 0x00FF_FF3F | 0x003F_FFFF);
+    cfg_select! {
+        esp32 => no_response || id == 0x0015_40EF,
+        _ => no_response,
+    }
 }
 
 #[inline(never)]

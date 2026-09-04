@@ -76,7 +76,7 @@ fn main() -> ! {
     // SAFETY: NVS is a data partition, not mapped firmware.
     unsafe {
         flash
-            .erase(NVS_OFFSET, NVS_OFFSET + info.sector_size)
+            .erase(NVS_OFFSET, NVS_OFFSET + Flash::SECTOR_SIZE)
             .unwrap();
         flash.write(NVS_OFFSET, &words).unwrap();
     }
