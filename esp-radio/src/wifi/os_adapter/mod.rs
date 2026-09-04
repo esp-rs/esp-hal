@@ -756,24 +756,36 @@ pub unsafe extern "C" fn dport_access_stall_other_cpu_end_wrap() {
     trace!("dport_access_stall_other_cpu_end_wrap")
 }
 /// **************************************************************************
-/// Name: wifi_apb80m_request
+/// Name: wifi_pm_sleep_lock_acquire
 ///
 /// Description:
 ///   Take Wi-Fi lock in auto-sleep
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_apb80m_request() {
-    trace!("wifi_apb80m_request - no-op")
+pub unsafe extern "C" fn wifi_pm_sleep_lock_acquire() {
+    trace!("wifi_pm_sleep_lock_acquire - no-op")
 }
 /// **************************************************************************
-/// Name: wifi_apb80m_release
+/// Name: wifi_pm_sleep_lock_release
 ///
 /// Description:
 ///   Release Wi-Fi lock in auto-sleep
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_apb80m_release() {
-    trace!("wifi_apb80m_release - no-op")
+pub unsafe extern "C" fn wifi_pm_sleep_lock_release() {
+    trace!("wifi_pm_sleep_lock_release - no-op")
+}
+
+#[cfg(any(esp32c5, esp32c6, esp32c61))]
+pub unsafe extern "C" fn wifi_disable_ac_ax() -> bool {
+    // IDF's C6/C5/C61 wrappers return false: disabling 11ac/11ax is not supported.
+    false
+}
+
+#[cfg(any(esp32c5, esp32c6, esp32c61))]
+pub unsafe extern "C" fn wifi_sleep_retention_unsupported() -> i32 {
+    // IDF returns 1 when CONFIG_MAC_BB_PD is off.
+    1
 }
 
 /// **************************************************************************

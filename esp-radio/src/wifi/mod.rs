@@ -109,6 +109,8 @@ pub mod sta;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
 
+#[cfg(not(esp32))]
+mod ftm_calibration;
 mod internal;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
@@ -416,9 +418,9 @@ impl AuthenticationMethod {
             AuthenticationMethod::Wpa3EntSuiteB192Bit => {
                 include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192
             }
-            AuthenticationMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
-            AuthenticationMethod::Wpa3ExtPskMixed => {
-                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE
+            // Deprecated Ext-PSK variants have no dedicated IDF auth mode.
+            AuthenticationMethod::Wpa3ExtPsk | AuthenticationMethod::Wpa3ExtPskMixed => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK
             }
             AuthenticationMethod::Dpp => include::wifi_auth_mode_t_WIFI_AUTH_DPP,
             AuthenticationMethod::Wpa3Enterprise => {
@@ -454,10 +456,9 @@ impl AuthenticationMethod {
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => {
                 AuthenticationMethod::Wpa3EntSuiteB192Bit
             }
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthenticationMethod::Wpa3ExtPsk,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE => {
-                AuthenticationMethod::Wpa3ExtPskMixed
-            }
+            // Unused IDF auth-mode slots; same as the Ext-PSK write path.
+            include::wifi_auth_mode_t_WIFI_AUTH_DUMMY_1
+            | include::wifi_auth_mode_t_WIFI_AUTH_DUMMY_2 => AuthenticationMethod::Wpa3Personal,
             include::wifi_auth_mode_t_WIFI_AUTH_DPP => AuthenticationMethod::Dpp,
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE => {
                 AuthenticationMethod::Wpa3Enterprise
@@ -1148,13 +1149,13 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
         esp_wifi_result!(esp_wifi_set_tx_done_cb(Some(esp_wifi_tx_done_cb)))?;
 
         esp_wifi_result!(esp_wifi_internal_reg_rxcb(
-            esp_interface_t_ESP_IF_WIFI_STA,
+            wifi_interface_t_WIFI_IF_STA,
             Some(recv_cb_sta)
         ))?;
 
         // until we support APSTA we just register the same callback for AP and station
         esp_wifi_result!(esp_wifi_internal_reg_rxcb(
-            esp_interface_t_ESP_IF_WIFI_AP,
+            wifi_interface_t_WIFI_IF_AP,
             Some(recv_cb_ap)
         ))?;
 
@@ -1661,8 +1662,8 @@ pub enum Bandwidth {
 impl Bandwidth {
     fn to_raw(self) -> wifi_bandwidth_t {
         match self {
-            Bandwidth::_20MHz => wifi_bandwidth_t_WIFI_BW_HT20,
-            Bandwidth::_40MHz => wifi_bandwidth_t_WIFI_BW_HT40,
+            Bandwidth::_20MHz => wifi_bandwidth_t_WIFI_BW20,
+            Bandwidth::_40MHz => wifi_bandwidth_t_WIFI_BW40,
             Bandwidth::_80MHz => wifi_bandwidth_t_WIFI_BW80,
             Bandwidth::_160MHz => wifi_bandwidth_t_WIFI_BW160,
             Bandwidth::_80_80MHz => wifi_bandwidth_t_WIFI_BW80_BW80,
@@ -1671,8 +1672,8 @@ impl Bandwidth {
 
     fn from_raw(raw: wifi_bandwidth_t) -> Self {
         match raw {
-            raw if raw == wifi_bandwidth_t_WIFI_BW_HT20 => Bandwidth::_20MHz,
-            raw if raw == wifi_bandwidth_t_WIFI_BW_HT40 => Bandwidth::_40MHz,
+            raw if raw == wifi_bandwidth_t_WIFI_BW20 => Bandwidth::_20MHz,
+            raw if raw == wifi_bandwidth_t_WIFI_BW40 => Bandwidth::_40MHz,
             raw if raw == wifi_bandwidth_t_WIFI_BW80 => Bandwidth::_80MHz,
             raw if raw == wifi_bandwidth_t_WIFI_BW160 => Bandwidth::_160MHz,
             raw if raw == wifi_bandwidth_t_WIFI_BW80_BW80 => Bandwidth::_80_80MHz,
@@ -2678,6 +2679,10 @@ impl<'d> WifiController<'d> {
                 tx_hetb_queue_num: 3,
                 dump_hesigb_enable: false,
 
+                // WIFI_INIT_CONFIG_DEFAULT: both are off unless the matching sdkconfig is set.
+                privacy_enhancements: false,
+                rmac_auto_reset_int: 0,
+
                 magic: WIFI_INIT_CONFIG_MAGIC as i32,
             };
         }
@@ -3498,8 +3503,10 @@ ignored."
                 sae_pwe_h2e: 0,
                 csa_count: 3,
                 dtim_period: config.dtim_period,
-                transition_disable: 0,
-                sae_ext: 0,
+                _bitfield_align_1: [0; 0],
+                // transition_disable, sae_ext, wpa3_compatible_mode, reserved.
+                // wpa3_compatible_mode is opt-in: enabling it overrides AP authmode.
+                _bitfield_1: wifi_ap_config_t::new_bitfield_1(0, 0, 0, 0),
                 bss_max_idle_cfg: include::wifi_bss_max_idle_config_t {
                     period: 0,
                     protected_keep_alive: false,

@@ -66,26 +66,26 @@ type OsMembufT = u32;
 #[repr(C)]
 pub(crate) struct OsMempool {
     /// Size of the memory blocks, in bytes.
-    mp_block_size: u32,
+    pub(crate) mp_block_size: u32,
     /// The number of memory blocks.
-    mp_num_blocks: u16,
+    pub(crate) mp_num_blocks: u16,
     /// The number of free blocks left
-    mp_num_free: u16,
+    pub(crate) mp_num_free: u16,
     /// The lowest number of free blocks seen
-    mp_min_free: u16,
+    pub(crate) mp_min_free: u16,
     /// Bitmap of OS_MEMPOOL_F_[...] values.
-    mp_flags: u8,
+    pub(crate) mp_flags: u8,
     /// Address of memory buffer used by pool
-    mp_membuf_addr: u32,
+    pub(crate) mp_membuf_addr: u32,
 
     // STAILQ_ENTRY(os_mempool) mp_list;
-    next: *const OsMempool,
+    pub(crate) next: *const OsMempool,
 
     // SLIST_HEAD(,os_memblock);
-    first: *const c_void,
+    pub(crate) first: *const c_void,
 
     /// Name for memory block
-    name: *const u8,
+    pub(crate) name: *const u8,
 }
 
 #[cfg(esp32c2)]
