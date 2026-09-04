@@ -1,8 +1,11 @@
 //% CHIP_FILTER(no_wifi):      bt_driver_supported && !wifi_driver_supported
 //% CHIP_FILTER(no_ble):       wifi_driver_supported && !bt_driver_supported
 //% CHIP_FILTER(no_radio):     !wifi_driver_supported && !bt_driver_supported
-//% CHIP_FILTER(has_wifi_ble): wifi_driver_supported && bt_driver_supported
 //% CHIP_FILTER(stable_wifi):  wifi_driver_supported
+// The ESP32-S31 does not support coexistence yet, see `esp-radio/build.rs`, so for now
+// it gets the same coverage through a configuration that leaves `esp-radio/coex` out.
+//% CHIP_FILTER(has_wifi_ble): wifi_driver_supported && bt_driver_supported && !esp32s31
+//% CHIP_FILTER(no_coex):      wifi_driver_supported && bt_driver_supported && esp32s31
 
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(no_radio): rtos-radio-driver
@@ -10,6 +13,8 @@
 //% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio-unstable trouble-host
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio/coex esp-radio-unstable
 //% FEATURES(has_wifi_ble): trouble-host esp-radio/esp-now
+//% FEATURES(no_coex): esp-radio/wifi esp-radio/ble esp-radio-unstable
+//% FEATURES(no_coex): trouble-host esp-radio/esp-now
 //% FEATURES(stable_wifi): esp-radio/wifi esp-radio
 
 // Even if the defaults change, keep this at a low-ish value for

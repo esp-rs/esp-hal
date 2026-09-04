@@ -2,6 +2,7 @@
 
 #[cfg_attr(bt_controller = "btdm", path = "btdm/mod.rs")]
 #[cfg_attr(bt_controller = "npl", path = "npl/mod.rs")]
+#[cfg_attr(bt_controller = "btdm2", path = "btdm2/mod.rs")]
 pub(crate) mod porting;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::mem::MaybeUninit;
@@ -27,10 +28,13 @@ unstable_module! {
     pub mod controller;
 }
 
+// btdm2 registers its own `wr_btdm_osal_malloc` / `wr_btdm_osal_free` wrappers.
+#[cfg(not(bt_controller = "btdm2"))]
 pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::sys::c_types::c_void {
     unsafe { crate::compat::malloc::malloc(size as usize).cast() }
 }
 
+#[cfg(not(bt_controller = "btdm2"))]
 pub(crate) unsafe extern "C" fn free(ptr: *mut crate::sys::c_types::c_void) {
     unsafe { crate::compat::malloc::free(ptr.cast()) }
 }

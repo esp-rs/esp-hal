@@ -18,7 +18,8 @@ doc-config = { features = ["esp-hal/unstable", "esp-hal/rt", "esp-alloc/global-a
     { if = 'wifi_driver_supported && wifi_csi_supported', features = ["csi"] },
     { if = 'bt_driver_supported', features = ["ble"] },
     { if = 'ieee802154_driver_supported', features = ["ieee802154", "__docs_build"] },
-    { if = 'wifi_driver_supported && bt_driver_supported', features = ["coex"] },
+    # Coexistence is not implemented for the ESP32-S31 yet, see `build.rs`.
+    { if = 'wifi_driver_supported && bt_driver_supported && !esp32s31', features = ["coex"] },
     { if = 'wifi_driver_supported || bt_driver_supported || ieee802154_driver_supported', features = ["unstable"] },
 ] }
 # Semver guarantees cover only the stable API, so the `unstable` feature is left OFF: the
@@ -38,7 +39,9 @@ check-configs = [
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer"], if = 'wifi_driver_supported' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'bt_driver_supported' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'ieee802154_driver_supported' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble", "coex"], if = 'wifi_driver_supported && bt_driver_supported' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble", "coex"], if = 'wifi_driver_supported && bt_driver_supported && !esp32s31' },
+    # The ESP32-S31 has no coexistence support yet, but Wi-Fi and BLE still have to build together.
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble"], if = 'wifi_driver_supported && bt_driver_supported && esp32s31' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "wifi-eap", "unstable"], if = 'wifi_driver_supported' },
 ]
 clippy-configs = [
