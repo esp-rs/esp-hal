@@ -68,8 +68,13 @@ for_each_interrupt!(
 );
 
 for_each_classified_interrupt!(
-    (direct_bindable $( ([$class:ident $idx_in_class:literal] $n:literal) ),*) => {
+    (direct_bindable
+        ([$class0:ident $idx_in_class0:literal] $n0:literal), // 0 is reserved for IPC
+        $( ([$class:ident $idx_in_class:literal] $n:literal) ),*
+    ) => {
         paste::paste! {
+            pub(crate) const IPC_INTERRUPT: CpuInterrupt = CpuInterrupt::[<Interrupt $n0>];
+
             /// Enumeration of CPU interrupts available for direct binding.
             #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -304,10 +309,6 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
 /// - The handler must be declared as a naked function. The compiler does not insert a function
 ///   prologue or epilogue; a normal Rust `fn` results in an error
 ///
-/// After [`crate::init`], [`DirectBindableCpuInterrupt::Interrupt0`] is reserved for
-/// inter-processor call (IPC). A later call with that CPU interrupt overwrites the IPC
-/// handler, including the scheduler yield path.
-///
 /// Unless low-level control is required for the lowest possible latency,
 /// [`enable`][crate::interrupt::enable] is usually preferable.
 #[instability::unstable]
@@ -315,6 +316,15 @@ pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
     cpu_interrupt: DirectBindableCpuInterrupt,
+    handler: unsafe extern "C" fn(),
+) {
+    enable_direct_inner(interrupt, level, cpu_interrupt.into(), handler)
+}
+
+pub(crate) fn enable_direct_inner(
+    interrupt: Interrupt,
+    level: Priority,
+    cpu_interrupt: CpuInterrupt,
     handler: unsafe extern "C" fn(),
 ) {
     cfg_select! {

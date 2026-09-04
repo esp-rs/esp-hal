@@ -23,7 +23,6 @@
     multi_core,
     doc = "Starting the APP CPU installs the handler on that CPU.\n"
 )]
-//!
 //! ## Usage
 //!
 //! An [`Ipc`] handle is created from the `IPC` peripheral singleton.
@@ -318,10 +317,10 @@ fn install_core(core: Cpu) {
         Ordering::Relaxed,
     );
 
-    crate::interrupt::enable_direct(
+    crate::interrupt::enable_direct_inner(
         interrupt(core),
         Priority::min(),
-        crate::interrupt::DirectBindableCpuInterrupt::Interrupt0,
+        crate::interrupt::IPC_INTERRUPT,
         match core {
             Cpu::ProCpu => ipc_handler::<0>,
             #[cfg(multi_core)]
