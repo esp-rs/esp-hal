@@ -104,7 +104,7 @@ pub unsafe extern "C" fn os_mempool_init_internal(
     if membuf.is_null() && blocks != 0 {
         return OS_INVALID_PARM;
     }
-    if !membuf.is_null() && (membuf as usize) % OS_ALIGNMENT != 0 {
+    if !membuf.is_null() && !(membuf as usize).is_multiple_of(OS_ALIGNMENT) {
         return OS_MEM_NOT_ALIGNED;
     }
 
@@ -247,7 +247,9 @@ pub unsafe extern "C" fn os_memblock_from(mp: *const OsMempool, block: *const u8
     if addr < start || addr >= end {
         return 0;
     }
-    if unsafe { (*mp).mp_flags } & OS_MEMPOOL_F_COMBINATION == 0 && (addr - start) % stride != 0 {
+    if unsafe { (*mp).mp_flags } & OS_MEMPOOL_F_COMBINATION == 0
+        && !(addr - start).is_multiple_of(stride)
+    {
         return 0;
     }
     1
