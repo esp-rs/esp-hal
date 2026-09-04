@@ -128,15 +128,18 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             )
         })?;
 
-        let new_version = update_package(
+        // `plan` decided this version, resolving it against crates.io so it does
+        // not land on a number that is already reserved. Write it as-is.
+        let new_version = step.new_version.clone();
+
+        update_package(
             &mut package,
-            &step.bump,
+            &new_version,
             !args.no_dry_run,
             skip_dependent_rewrites,
         )?;
 
-        step.tag_name = package.package.tag(&new_version);
-        step.new_version = new_version;
+        step.tag_name = step.package.tag(&new_version);
 
         if step.package.is_semver_checked() {
             if args.no_dry_run {
