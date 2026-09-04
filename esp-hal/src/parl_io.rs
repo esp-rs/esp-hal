@@ -120,6 +120,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
+use esp_sync::RawMutex;
 use private::*;
 
 use crate::{
@@ -134,7 +135,9 @@ use crate::{
         DmaError,
         DmaPeripheral,
         DmaRxBuffer,
+        DmaRxInterrupt,
         DmaTxBuffer,
+        DmaTxInterrupt,
     },
     gpio::{
         self,
@@ -206,7 +209,7 @@ pub enum BitPackOrder {
 }
 
 #[cfg(parl_io_version = "1")]
-/// Enables Mode.
+/// Selects how the RX enable signal is interpreted.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EnableMode {
@@ -286,7 +289,7 @@ impl EnableMode {
 }
 
 #[cfg(parl_io_version = "2")]
-/// Enables Mode.
+/// Selects how the RX enable signal is interpreted.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EnableMode {
@@ -348,7 +351,7 @@ pub struct RxConfig {
     frequency: Rate,
 
     /// Configures the packing order to pack bits into 1 byte when data
-    /// bus width is 4/2/1 bit.
+    /// bus width is 4, 2, or 1 bit.
     bit_order: BitPackOrder,
 
     /// RX threshold of a timeout counter.
@@ -400,7 +403,7 @@ pub struct TxConfig {
     sample_edge: SampleEdge,
 
     /// Configures the unpacking order to unpack bits from 1 byte when
-    /// data bus width is 4/2/1 bit.
+    /// data bus width is 4, 2, or 1 bit.
     bit_order: BitPackOrder,
 
     /// Configures the source of the TX EOF event.
@@ -485,7 +488,7 @@ fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> 
     Ok(())
 }
 
-/// Used to configure no pin as clock output
+/// Implements a clock pin that connects no signal.
 impl TxClkPin for NoPin {
     fn configure(&mut self) {
         OutputSignal::PARL_TX_CLK.connect_to(self);
@@ -497,7 +500,7 @@ impl RxClkPin for NoPin {
     }
 }
 
-/// Wraps a GPIO pin which will be used as the clock output signal.
+/// Wraps a GPIO pin used as the clock output signal.
 pub struct ClkOutPin<'d> {
     pin: interconnect::OutputSignal<'d>,
 }
@@ -516,7 +519,7 @@ impl TxClkPin for ClkOutPin<'_> {
     }
 }
 
-/// Wraps a GPIO pin which will be used as the TX clock input signal.
+/// Wraps a GPIO pin used as the TX clock input signal.
 pub struct ClkInPin<'d> {
     pin: interconnect::InputSignal<'d>,
 }
@@ -538,7 +541,7 @@ impl TxClkPin for ClkInPin<'_> {
     }
 }
 
-/// Wraps a GPIO pin which will be used as the RX clock input signal.
+/// Wraps a GPIO pin used as the RX clock input signal.
 pub struct RxClkInPin<'d> {
     pin: interconnect::InputSignal<'d>,
     sample_edge: SampleEdge,
@@ -964,6 +967,11 @@ where
     Dm: DriverMode,
 {
     /// Configures TX to use the given pins and settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError::UnreachableClockRate`] when the requested
+    /// frequency cannot be reached.
     pub fn with_config<P, CP>(
         self,
         mut tx_pins: P,
@@ -1014,6 +1022,11 @@ where
     Dm: DriverMode,
 {
     /// Configures RX to use the given pins and settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError::UnreachableClockRate`] when the requested
+    /// frequency cannot be reached.
     pub fn with_config<P, CP>(
         self,
         mut rx_pins: P,
@@ -1082,16 +1095,25 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
     }
 }
 
+// NOTE: the PARL_IO interrupt enable register is shared between the TX and RX
+// units, and can also be touched by interrupt handlers (e.g. the async driver's
+// waker handler or a user handler managing the transfer through the transfer
+// object). `listen`/`unlisten` are read-modify-writes, so they must run inside
+// a reentrancy-safe lock to avoid losing enable bits to concurrent updates.
+static INTERRUPT_LOCK: RawMutex = RawMutex::new();
+
 fn internal_listen(interrupts: EnumSet<ParlIoInterrupt>, enable: bool) {
-    PARL_IO::regs().int_ena().write(|w| {
-        for interrupt in interrupts {
-            match interrupt {
-                ParlIoInterrupt::TxFifoReEmpty => w.tx_fifo_rempty().bit(enable),
-                ParlIoInterrupt::RxFifoWOvf => w.rx_fifo_wovf().bit(enable),
-                ParlIoInterrupt::TxEof => w.tx_eof().bit(enable),
-            };
-        }
-        w
+    INTERRUPT_LOCK.lock(|| {
+        PARL_IO::regs().int_ena().modify(|_, w| {
+            for interrupt in interrupts {
+                match interrupt {
+                    ParlIoInterrupt::TxFifoReEmpty => w.tx_fifo_rempty().bit(enable),
+                    ParlIoInterrupt::RxFifoWOvf => w.rx_fifo_wovf().bit(enable),
+                    ParlIoInterrupt::TxEof => w.tx_eof().bit(enable),
+                };
+            }
+            w
+        });
     });
 }
 
@@ -1141,6 +1163,11 @@ where
 
 impl<'d> ParlIo<'d, Blocking> {
     /// Creates a new instance of [ParlIo].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::DmaError`] when the DMA channel is not compatible
+    /// with the PARL_IO peripheral.
     pub fn new(
         _parl_io: PARL_IO<'d>,
         dma_channel: impl ParlIoDmaChannel<'d>,
@@ -1179,7 +1206,7 @@ impl<'d> ParlIo<'d, Blocking> {
     }
 
     /// Sets the interrupt handler, enables it with
-    /// [crate::interrupt::Priority::min()].
+    /// [`crate::interrupt::Priority::min()`].
     ///
     /// Interrupts are not enabled at the peripheral level here.
     #[instability::unstable]
@@ -1239,9 +1266,15 @@ where
 {
     /// Performs a DMA write.
     ///
-    /// Returns a [`ParlIoTxTransfer`].
+    /// Returns a [`ParlIoTxTransfer`] that can be used to wait for the
+    /// transfer to complete.
     ///
-    /// The maximum amount of data to be sent is 32736 bytes.
+    /// # Errors
+    ///
+    /// Returns [`Error::MaxDmaTransferSizeExceeded`] when more than 65535
+    /// bytes are requested.
+    /// Returns [`Error::DmaError`] when the DMA transfer cannot be prepared
+    /// or started.
     pub fn write<BUF>(
         mut self,
         number_of_bytes: usize,
@@ -1285,6 +1318,11 @@ where
     }
 
     /// Changes the bus configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError::UnreachableClockRate`] when the requested
+    /// frequency cannot be reached.
     pub fn apply_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
         apply_clock_divider(true, config.frequency)?;
 
@@ -1298,6 +1336,96 @@ where
     }
 }
 
+/// DMA interrupt management for the TX driver.
+///
+/// These methods manage the DMA TX channel's own interrupt, which is separate
+/// from the PARL_IO interrupt managed by [`ParlIo`]'s interrupt methods.
+#[instability::unstable]
+impl<'d> ParlIoTx<'d, Blocking> {
+    /// Registers an interrupt handler for the DMA TX channel used by this
+    /// driver.
+    ///
+    /// The handler services the sources enabled via [`Self::listen_dma`]. It
+    /// fires on the channel's own interrupt, which is separate from the
+    /// PARL_IO interrupt used by [`ParlIo::set_interrupt_handler`].
+    ///
+    /// Binding the handler unlistens from and clears all DMA TX interrupt
+    /// sources, so this function must be called before
+    /// [`Self::listen_dma`]. It must also be called before [`Self::write`],
+    /// which consumes the driver.
+    pub fn set_dma_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.tx_channel.set_interrupt_handler(handler);
+    }
+
+    /// Listens for the given DMA TX interrupt sources.
+    ///
+    /// A handler must have been registered via
+    /// [`Self::set_dma_interrupt_handler`] first.
+    pub fn listen_dma(&mut self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.tx_channel.listen_out(interrupts.into());
+    }
+
+    /// Stops listening for the given DMA TX interrupt sources.
+    pub fn unlisten_dma(&mut self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.tx_channel.unlisten_out(interrupts.into());
+    }
+
+    /// Returns the asserted DMA TX interrupt sources.
+    pub fn interrupts_dma(&mut self) -> EnumSet<DmaTxInterrupt> {
+        self.tx_channel.pending_out_interrupts()
+    }
+
+    /// Clears the given asserted DMA TX interrupt sources.
+    pub fn clear_interrupts_dma(&mut self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.tx_channel.clear_out(interrupts.into());
+    }
+}
+
+/// DMA interrupt management for the RX driver.
+///
+/// These methods manage the DMA RX channel's own interrupt, which is separate
+/// from the PARL_IO interrupt managed by [`ParlIo`]'s interrupt methods.
+#[instability::unstable]
+impl<'d> ParlIoRx<'d, Blocking> {
+    /// Registers an interrupt handler for the DMA RX channel used by this
+    /// driver.
+    ///
+    /// The handler services the sources enabled via [`Self::listen_dma`]. It
+    /// fires on the channel's own interrupt, which is separate from the
+    /// PARL_IO interrupt used by [`ParlIo::set_interrupt_handler`].
+    ///
+    /// Binding the handler unlistens from and clears all DMA RX interrupt
+    /// sources, so this function must be called before
+    /// [`Self::listen_dma`]. It must also be called before [`Self::read`],
+    /// which consumes the driver.
+    pub fn set_dma_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.rx_channel.set_interrupt_handler(handler);
+    }
+
+    /// Listens for the given DMA RX interrupt sources.
+    ///
+    /// A handler must have been registered via
+    /// [`Self::set_dma_interrupt_handler`] first.
+    pub fn listen_dma(&mut self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        self.rx_channel.listen_in(interrupts.into());
+    }
+
+    /// Stops listening for the given DMA RX interrupt sources.
+    pub fn unlisten_dma(&mut self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        self.rx_channel.unlisten_in(interrupts.into());
+    }
+
+    /// Returns the asserted DMA RX interrupt sources.
+    pub fn interrupts_dma(&mut self) -> EnumSet<DmaRxInterrupt> {
+        self.rx_channel.pending_in_interrupts()
+    }
+
+    /// Clears the given asserted DMA RX interrupt sources.
+    pub fn clear_interrupts_dma(&mut self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        self.rx_channel.clear_in(interrupts.into());
+    }
+}
+
 /// Represents an ongoing (or potentially finished) transfer using the PARL_IO
 /// TX.
 pub struct ParlIoTxTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
@@ -1306,7 +1434,7 @@ pub struct ParlIoTxTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> ParlIoTxTransfer<'d, BUF, Dm> {
-    /// Returns whether [`Self::wait`] will not block.
+    /// Returns whether [`Self::wait`] returns immediately.
     pub fn is_done(&self) -> bool {
         Instance::is_tx_eof()
     }
@@ -1341,6 +1469,70 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> ParlIoTxTransfer<'d, BUF, Dm> {
         };
         core::mem::forget(self);
         (parl_io, view)
+    }
+}
+
+/// Interrupt management for an ongoing transfer.
+///
+/// The driver itself has been consumed by [`ParlIoTx::write`], so these
+/// methods take `&self` and allow an interrupt handler to manage the
+/// interrupt sources through the transfer object.
+#[instability::unstable]
+impl<'d, BUF> ParlIoTxTransfer<'d, BUF, Blocking>
+where
+    BUF: DmaTxBuffer,
+{
+    /// Sets the interrupt handler for the PARL_IO peripheral.
+    ///
+    /// The new handler removes the old handler, including any handler the
+    /// async driver has bound. This method does not turn on the interrupt
+    /// sources. Use [`Self::listen`] to turn on interrupt sources.
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        internal_set_interrupt_handler(handler);
+    }
+
+    /// Turns on the given interrupt sources.
+    pub fn listen(&self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), true);
+    }
+
+    /// Turns off the given interrupt sources.
+    pub fn unlisten(&self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), false);
+    }
+
+    /// Returns the asserted interrupt sources.
+    pub fn interrupts(&self) -> EnumSet<ParlIoInterrupt> {
+        internal_interrupts()
+    }
+
+    /// Clears the interrupt flags of the given interrupt sources.
+    pub fn clear_interrupts(&self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_clear_interrupts(interrupts.into());
+    }
+
+    /// Listens for the given DMA TX interrupt sources.
+    ///
+    /// A handler must have been registered via
+    /// [`ParlIoTx::set_dma_interrupt_handler`] before the transfer was
+    /// started.
+    pub fn listen_dma(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.parl_io.tx_channel.listen_out(interrupts.into());
+    }
+
+    /// Stops listening for the given DMA TX interrupt sources.
+    pub fn unlisten_dma(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.parl_io.tx_channel.unlisten_out(interrupts.into());
+    }
+
+    /// Returns the asserted DMA TX interrupt sources.
+    pub fn interrupts_dma(&self) -> EnumSet<DmaTxInterrupt> {
+        self.parl_io.tx_channel.pending_out_interrupts()
+    }
+
+    /// Clears the given asserted DMA TX interrupt sources.
+    pub fn clear_interrupts_dma(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.parl_io.tx_channel.clear_out(interrupts.into());
     }
 }
 
@@ -1380,15 +1572,22 @@ where
 {
     /// Performs a DMA read.
     ///
-    /// Returns a [`ParlIoRxTransfer`].
+    /// Returns a [`ParlIoRxTransfer`] that can be used to wait for the
+    /// transfer to complete.
     ///
-    /// When the number of bytes is specified, the maximum amount of data is
-    /// 32736 bytes and the transfer ends when the number of specified bytes
-    /// is received.
+    /// When the number of bytes is specified, the transfer ends when the
+    /// number of specified bytes is received.
     ///
     /// When the number of bytes is unspecified, there is no limit to the amount of
     /// data transferred and the transfer ends when the enable signal
     /// signals the end or the DMA buffer runs out of space.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::MaxDmaTransferSizeExceeded`] when more than 65535
+    /// bytes are requested.
+    /// Returns [`Error::DmaError`] when the DMA transfer cannot be prepared
+    /// or started.
     pub fn read<BUF>(
         mut self,
         number_of_bytes: Option<usize>,
@@ -1437,6 +1636,11 @@ where
     }
 
     /// Changes the bus configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConfigError::UnreachableClockRate`] when the requested
+    /// frequency cannot be reached.
     pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
         apply_clock_divider(false, config.frequency)?;
 
@@ -1457,7 +1661,7 @@ pub struct ParlIoRxTransfer<'d, BUF: DmaRxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> ParlIoRxTransfer<'d, BUF, Dm> {
-    /// Returns whether [`Self::wait`] will not block.
+    /// Returns whether [`Self::wait`] returns immediately.
     pub fn is_done(&self) -> bool {
         if self.dma_result.is_some() {
             return true;
@@ -1526,6 +1730,70 @@ impl<BUF: DmaRxBuffer, Dm: DriverMode> Drop for ParlIoRxTransfer<'_, BUF, Dm> {
             ManuallyDrop::take(&mut self.buf_view)
         };
         let _ = BUF::from_view(view);
+    }
+}
+
+/// Interrupt management for an ongoing RX transfer.
+///
+/// The driver itself has been consumed by [`ParlIoRx::read`], so these
+/// methods take `&self` and allow an interrupt handler to manage the
+/// interrupt sources through the transfer object.
+#[instability::unstable]
+impl<'d, BUF> ParlIoRxTransfer<'d, BUF, Blocking>
+where
+    BUF: DmaRxBuffer,
+{
+    /// Sets the interrupt handler for the PARL_IO peripheral.
+    ///
+    /// The new handler removes the old handler, including any handler the
+    /// async driver has bound. This method does not turn on the interrupt
+    /// sources. Use [`Self::listen`] to turn on interrupt sources.
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        internal_set_interrupt_handler(handler);
+    }
+
+    /// Turns on the given interrupt sources.
+    pub fn listen(&self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), true);
+    }
+
+    /// Turns off the given interrupt sources.
+    pub fn unlisten(&self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_listen(interrupts.into(), false);
+    }
+
+    /// Returns the asserted interrupt sources.
+    pub fn interrupts(&self) -> EnumSet<ParlIoInterrupt> {
+        internal_interrupts()
+    }
+
+    /// Clears the interrupt flags of the given interrupt sources.
+    pub fn clear_interrupts(&self, interrupts: impl Into<EnumSet<ParlIoInterrupt>>) {
+        internal_clear_interrupts(interrupts.into());
+    }
+
+    /// Listens for the given DMA RX interrupt sources.
+    ///
+    /// A handler must have been registered via
+    /// [`ParlIoRx::set_dma_interrupt_handler`] before the transfer was
+    /// started.
+    pub fn listen_dma(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        self.parl_io.rx_channel.listen_in(interrupts.into());
+    }
+
+    /// Stops listening for the given DMA RX interrupt sources.
+    pub fn unlisten_dma(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        self.parl_io.rx_channel.unlisten_in(interrupts.into());
+    }
+
+    /// Returns the asserted DMA RX interrupt sources.
+    pub fn interrupts_dma(&self) -> EnumSet<DmaRxInterrupt> {
+        self.parl_io.rx_channel.pending_in_interrupts()
+    }
+
+    /// Clears the given asserted DMA RX interrupt sources.
+    pub fn clear_interrupts_dma(&self, interrupts: impl Into<EnumSet<DmaRxInterrupt>>) {
+        self.parl_io.rx_channel.clear_in(interrupts.into());
     }
 }
 
@@ -1615,6 +1883,12 @@ pub mod asynch {
 
     impl<BUF: DmaTxBuffer> ParlIoTxTransfer<'_, BUF, crate::Async> {
         /// Waits for [`Self::is_done`] to return true.
+        ///
+        /// # Cancellation Safety
+        ///
+        /// This method is cancellation safe. Dropping the future does not
+        /// stop the transfer, and this method can be called again to wait
+        /// for completion.
         pub async fn wait_for_done(&mut self) {
             let future = TxDoneFuture::new();
             future.await;
@@ -1623,6 +1897,12 @@ pub mod asynch {
 
     impl<BUF: DmaRxBuffer> ParlIoRxTransfer<'_, BUF, crate::Async> {
         /// Waits for [`Self::is_done`] to return true.
+        ///
+        /// # Cancellation Safety
+        ///
+        /// This method is cancellation safe. Dropping the future does not
+        /// stop the transfer, and this method can be called again to wait
+        /// for completion.
         pub async fn wait_for_done(&mut self) {
             if self.dma_result.is_some() {
                 return;
@@ -1636,7 +1916,7 @@ pub mod asynch {
 mod private {
     #[cfg(parl_io_version = "2")]
     use super::TxEofSource;
-    use super::{BitPackOrder, SampleEdge};
+    use super::{BitPackOrder, ParlIoInterrupt, SampleEdge};
     use crate::{
         gpio::{InputSignal, OutputSignal},
         peripherals::PARL_IO,
@@ -1875,15 +2155,11 @@ mod private {
         }
 
         pub fn listen_tx_done() {
-            let reg_block = PARL_IO::regs();
-
-            reg_block.int_ena().modify(|_, w| w.tx_eof().set_bit());
+            super::internal_listen(ParlIoInterrupt::TxEof.into(), true);
         }
 
         pub fn unlisten_tx_done() {
-            let reg_block = PARL_IO::regs();
-
-            reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
+            super::internal_listen(ParlIoInterrupt::TxEof.into(), false);
         }
 
         pub fn is_tx_done_set() -> bool {
@@ -2105,15 +2381,11 @@ mod private {
         }
 
         pub fn listen_tx_done() {
-            let reg_block = PARL_IO::regs();
-
-            reg_block.int_ena().modify(|_, w| w.tx_eof().set_bit());
+            super::internal_listen(ParlIoInterrupt::TxEof.into(), true);
         }
 
         pub fn unlisten_tx_done() {
-            let reg_block = PARL_IO::regs();
-
-            reg_block.int_ena().modify(|_, w| w.tx_eof().clear_bit());
+            super::internal_listen(ParlIoInterrupt::TxEof.into(), false);
         }
 
         pub fn is_tx_done_set() -> bool {
