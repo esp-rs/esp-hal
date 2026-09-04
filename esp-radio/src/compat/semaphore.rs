@@ -70,3 +70,9 @@ pub(crate) fn sem_give_from_isr(semphr: *mut c_void, _higher_prio_task_waken: *m
 
     handle.give() as i32
 }
+
+pub(crate) fn sem_count(semphr: *mut c_void) -> u32 {
+    let ptr = unwrap!(SemaphorePtr::new(semphr.cast()), "semphr is null");
+    let handle = unsafe { SemaphoreHandle::ref_from_ptr(&ptr) };
+    handle.current_count()
+}

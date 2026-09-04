@@ -135,6 +135,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             "#
         );
+
+        // The BTDM2 controller reports BLE activity to the software scheduler
+        // through hooks we only partly forward so far: forwarding all of them
+        // starved Wi-Fi badly enough to time out DNS lookups. Until those are
+        // worked out, refuse the build instead of handing out one that quietly
+        // performs badly. Wi-Fi and BLE can still run together without this
+        // feature, arbitrated in hardware.
+        assert!(
+            chip != Chip::Esp32s31,
+            r#"
+
+            Wi-Fi/Bluetooth coexistence is not yet supported on this target.
+
+            "#
+        );
     }
 
     // emit config

@@ -204,6 +204,8 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s2::*;
     #[cfg(esp32s3)]
     pub use esp_wifi_sys_esp32s3::*;
+    #[cfg(esp32s31)]
+    pub use esp_wifi_sys_esp32s31::*;
 }
 
 use crate::refcount::Refcount;
@@ -234,6 +236,8 @@ macro_rules! unstable_module {
 
 mod asynch;
 mod compat;
+#[cfg(esp32s31)]
+mod compiler_rt_abi;
 mod interrupt_dispatch;
 mod radio_clocks;
 mod refcount;
@@ -256,7 +260,7 @@ unstable_module! {
 
 pub(crate) mod common_adapter;
 
-#[cfg(all(feature = "ble", bt_controller = "npl"))]
+#[cfg(all(feature = "ble", any(bt_controller = "npl", bt_controller = "btdm2")))]
 pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 // this is just to verify that we use the correct defaults in `build.rs`

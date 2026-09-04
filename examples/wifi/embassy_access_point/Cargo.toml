@@ -82,6 +82,14 @@ esp32c61 = [
     "esp-rtos/esp32c61",
     "esp-radio/esp32c61",
 ]
+esp32s31 = [
+    "esp-alloc/esp32s31",
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+    "esp-rtos/esp32s31",
+    "esp-radio/esp32s31",
+]
 esp32s2 = [
     "esp-alloc/esp32s2",
     "esp-backtrace/esp32s2",
