@@ -143,32 +143,16 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 
 ## Merge Freezes
 
-Around a release we stop merging into `main` for a while, so that what gets
-published is tested isolated from new changes. A freeze is announced by a pinned
-issue labelled `merge-freeze`, which names the release it leads up to. Other
-branches are never affected.
+Around a release we stop merging into `main`, so that what gets published is
+tested in isolation from new changes.
 
-Open pull requests are left untouched: nothing is labelled, no CI is re-run, and
-review carries on as usual. The freeze is enforced only when a pull request is
-added to the merge queue — CI's `merge-freeze-gate` job fails there, which fails
-`ci-result` and makes the queue drop the entry, with a comment on the pull
-request explaining why. HIL waits for that job, so a frozen-out entry never
-reaches the device runners.
+A "freeze" is an open issue labelled `merge-freeze`, pinned so that everyone can
+see it. Anyone with write access starts a freeze by opening or reopening that
+issue and lifts it by closing it. Review and CI carry on as usual, only the
+merge queue rejects pull requests targeting `main` while it is open.
 
-### Landing something urgent during a freeze
-
-Regressions and release blockers still need to get in. Add the
-`merge-freeze-exempt` label to the pull request and it can go through the queue
-as usual. Once it is merged, that is recorded as a comment on the freeze issue,
-so it stays visible what landed during the freeze. The label is not removed
-automatically, so drop it after the merge, otherwise the pull request carries an
-exemption into the next freeze.
-
-### Starting and lifting a freeze
-
-Anyone with write access opens an issue from the `Merge freeze` template, which
-applies the `merge-freeze` label, and pins it. That is all there is to it: the
-freeze holds while the issue is open, and closing the issue lifts it.
+To land a release blocker anyway, label the pull request with
+`merge-freeze-exempt`. Such merge gets recorded on the freeze issue.
 
 ## Changelog and Migration Guide Entries
 
