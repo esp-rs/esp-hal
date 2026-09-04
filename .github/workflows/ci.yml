@@ -123,6 +123,50 @@ jobs:
 
           echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
 
+  # Merge freeze — see documentation/CONTRIBUTING.md.
+  #
+  # Lives here so that `ci-result` carries it: a check that never reports on
+  # `pull_request` cannot be a required check on its own, GitHub would wait for
+  # it forever. Outside the merge queue this only asks whether a freeze issue is
+  # open and exits, so it runs on every event to keep `hil` reachable.
+  merge-freeze-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: write
+    steps:
+      # Base branch, never the queue branch: a queued pull request must not be
+      # able to rewrite the gate that judges it.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.merge_group.base_ref || github.base_ref }}
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      # A base branch without the script is a base branch without merge
+      # freezes, so there is nothing to enforce. This is not only for
+      # bootstrapping, backport pull requests target `esp-hal-x.y.x` branches
+      # that were cut before the gate existed, and CI runs on those too.
+      - name: Look for the gate
+        id: gate
+        env:
+          BASE_REF: ${{ github.event.merge_group.base_ref || github.base_ref }}
+        run: |
+          if [ -f .github/scripts/merge-freeze.js ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No merge freeze gate on $BASE_REF, nothing to enforce."
+          fi
+
+      - uses: actions/github-script@v8
+        if: steps.gate.outputs.present == 'true'
+        with:
+          script: |
+            const { gate } = require('./.github/scripts/merge-freeze.js');
+            await gate({ github, context, core });
+
   # --------------------------------------------------------------------------
   # Build Packages
   esp-hal:
@@ -474,8 +518,10 @@ jobs:
   # --------------------------------------------------------------------------
   # HIL — build jobs gate artifacts; hil-gate gates device runs (≥50% rule).
 
+  # `merge-freeze-gate` is a dependency so that a frozen-out queue entry never
+  # occupies the device runners.
   hil:
-    needs: calculate
+    needs: [calculate, merge-freeze-gate]
     if: needs.calculate.outputs.run-hil == 'true'
     uses: ./.github/workflows/hil.yml
     with:
@@ -493,6 +539,7 @@ jobs:
   # The `hil` job is the reusable hil.yml workflow, so it covers test
   # compilation and the runner tool as well; its hil-gate job blocks when ≥50%
   # of executed hil-run matrix legs fail. hil-run-radio is informational only.
+  # merge-freeze-gate rejects queue entries while a merge freeze is in effect.
   ci-result:
     if: ${{ always() }}
     needs:
@@ -508,6 +555,7 @@ jobs:
       - changelog
       - semver-check
       - hil
+      - merge-freeze-gate
     runs-on: ubuntu-latest
     steps:
       - name: Check CI results
