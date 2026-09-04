@@ -260,7 +260,7 @@ unstable_module! {
 
 pub(crate) mod common_adapter;
 
-#[cfg(all(feature = "ble", bt_controller = "npl"))]
+#[cfg(all(feature = "ble", any(bt_controller = "npl", bt_controller = "btdm2")))]
 pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 // this is just to verify that we use the correct defaults in `build.rs`

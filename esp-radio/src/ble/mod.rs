@@ -3,6 +3,9 @@
 #[cfg(bt_controller = "btdm")]
 pub(crate) mod btdm;
 
+#[cfg(bt_controller = "btdm2")]
+pub(crate) mod btdm2;
+
 #[cfg(bt_controller = "npl")]
 pub(crate) mod npl;
 #[cfg(bt_controller = "npl")]
@@ -28,6 +31,8 @@ pub use ble::ble_os_adapter_chip_specific::*;
 
 #[cfg(bt_controller = "btdm")]
 use self::btdm as ble;
+#[cfg(bt_controller = "btdm2")]
+use self::btdm2 as ble;
 #[cfg(bt_controller = "npl")]
 use self::npl as ble;
 
@@ -35,6 +40,8 @@ unstable_module! {
     pub mod controller;
 }
 
+// btdm2 registers its own `wr_btdm_osal_malloc` / `wr_btdm_osal_free` wrappers.
+#[cfg(not(bt_controller = "btdm2"))]
 pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::sys::c_types::c_void {
     unsafe { crate::compat::malloc::malloc(size as usize).cast() }
 }
@@ -51,6 +58,7 @@ pub(crate) unsafe extern "C" fn malloc_retention(size: u32) -> *mut crate::sys::
     unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
 }
 
+#[cfg(not(bt_controller = "btdm2"))]
 pub(crate) unsafe extern "C" fn free(ptr: *mut crate::sys::c_types::c_void) {
     unsafe { crate::compat::malloc::free(ptr.cast()) }
 }

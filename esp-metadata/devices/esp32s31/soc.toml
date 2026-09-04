@@ -120,6 +120,7 @@ peripherals = [
 
     { name = "ADC1", virtual = true },
     { name = "ADC2", virtual = true },
+    { name = "BT", virtual = true, interrupts = { mac = "MODEM_BT_MAC", bb = "MODEM_BT_BB", lp_timer = "MODEM_LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "PSRAM", virtual = true, clock_group = "PSRAM" },
     { name = "GPIO_DEDICATED", virtual = true },
@@ -556,8 +557,9 @@ has_wifi6 = true
 csi_supported = true
 
 [device.bt]
-support_status = "not_supported"
-controller = "npl" # FIXME: placeholder
+support_status = "partial"
+# IDF `porting_btdm` (nested config + `esp_*` VHCI), not the ESP32/C3/S3 OSI table
+controller = "btdm2"
 
 [device.phy]
 support_status = "partial"
