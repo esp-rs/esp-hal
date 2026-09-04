@@ -3,7 +3,7 @@
 //! Assumes the default factory layout (app at `0x1_0000`, NVS at `0x9000`).
 //! Write and erase are unsafe NOR operations: there is no auto-erase, and they
 //! can overwrite the running application. This example only mutates the first
-//! NVS sector. Buffers are word slices in internal RAM.
+//! NVS sector. Buffers are word slices in DRAM.
 
 //% CHIP_FILTER: flash_driver_supported
 

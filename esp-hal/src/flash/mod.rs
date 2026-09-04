@@ -9,7 +9,7 @@
 //! Write and erase are NOR-flash operations: bits can only change from 1 to 0
 //! without an erase. There is no read-modify-write. [`Flash::read`] and
 //! [`Flash::write`] take word slices (`&[u32]`) and a 4-byte-aligned **byte**
-//! offset; the buffer must be in internal RAM. [`Flash::erase`] requires
+//! offset; the buffer must be in DRAM. [`Flash::erase`] requires
 //! 4096-byte alignment.
 //!
 //! ## Configuration
@@ -44,10 +44,10 @@
   [`Flash::new`] fails with [`ConfigError::UnknownFlashChip`] if identification is missing
   (including the ROM placeholder id `0x001540EF`, a valid W25Q16 id on other chips)."
 )]
-//! - Driver bounds use the JEDEC density from the ROM-cached device id. ROM operations also
-//!   check the ROM's cached chip size, which a bootloader may set from the image header. A
-//!   range that passes [`Flash`] can still fail in the ROM, and the reverse if the header
-//!   claims a larger chip.
+//! - Driver bounds use the JEDEC density from the ROM-cached device id. ROM operations also check
+//!   the ROM's cached chip size, which a bootloader may set from the image header. A range that
+//!   passes [`Flash`] can still fail in the ROM, and the reverse if the header claims a larger
+//!   chip.
 //! - [`Flash::write`] and [`Flash::erase`] do not refuse currently mapped flash.
 //! - Programming a mapped `.text` or `.rodata` page can destroy the running image or change memory
 //!   the compiler treats as immutable.
@@ -81,6 +81,7 @@ const SECTOR_SIZE: u32 = 4096;
 const BLOCK_SIZE: u32 = 65536;
 
 /// Flash driver configuration.
+#[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -123,6 +124,7 @@ pub enum MultiCoreStrategy {
 /// [`MultiCoreStrategy::ignore`].
 #[cfg(multi_core)]
 #[doc(hidden)]
+#[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct IgnoreMarker {
@@ -145,6 +147,7 @@ impl MultiCoreStrategy {
 }
 
 /// Error constructing or configuring the flash driver.
+#[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -174,6 +177,7 @@ impl core::fmt::Display for ConfigError {
 }
 
 /// Flash operation error.
+#[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(clippy::enum_variant_names, reason = "matches ROM result / issue 6203")]
@@ -199,7 +203,7 @@ pub enum Error {
     OutOfBounds,
     /// Not supported in the current environment.
     ///
-    /// Returned when the buffer is not in internal RAM.
+    /// Returned when the buffer is not in DRAM.
     NotSupported,
     /// The other core is running and the configured strategy is
     /// [`MultiCoreStrategy::Error`].
@@ -253,6 +257,7 @@ pub struct ChipInfo {
 /// Internal SPI flash driver.
 ///
 /// Only [`Blocking`] mode is constructible.
+#[instability::unstable]
 #[derive(Debug)]
 pub struct Flash<'d, Dm: DriverMode> {
     _flash: FLASH<'d>,
@@ -266,10 +271,13 @@ pub struct Flash<'d, Dm: DriverMode> {
 
 impl<'d> Flash<'d, Blocking> {
     /// Program page size in bytes.
+    #[instability::unstable]
     pub const PAGE_SIZE: u32 = 256;
     /// Erase sector size in bytes.
+    #[instability::unstable]
     pub const SECTOR_SIZE: u32 = 4096;
     /// Erase block size in bytes.
+    #[instability::unstable]
     pub const BLOCK_SIZE: u32 = 65536;
 
     /// Creates a new flash driver from the `FLASH` peripheral.
@@ -285,6 +293,7 @@ ROM does not. Without that, this method returns
 [`ConfigError::UnknownFlashChip`] (including the ROM placeholder
 `0x001540EF`)."
     )]
+    #[instability::unstable]
     pub fn new(flash: FLASH<'d>, config: Config) -> Result<Self, ConfigError> {
         let raw_id = rom::cached_device_id();
         let capacity = rom::capacity_from_cached_id(raw_id)?;
@@ -307,6 +316,7 @@ ROM does not. Without that, this method returns
     ///
     /// On dual-core chips this updates the multi-core strategy. On single-core
     /// chips it is a no-op.
+    #[instability::unstable]
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         #[cfg(multi_core)]
         {
@@ -320,6 +330,7 @@ ROM does not. Without that, this method returns
     ///
     /// Driver bounds use this value. ROM read/write/erase also check the ROM's
     /// cached chip size, which a bootloader may set from the image header.
+    #[instability::unstable]
     pub fn capacity(&self) -> usize {
         self.capacity
     }
@@ -343,20 +354,22 @@ ROM does not. Without that, this method returns
     /// Reads `data.len()` words starting at byte address `offset`.
     ///
     /// `offset` is a flash byte address and, when `data` is non-empty, must be
-    /// a multiple of 4. `data` must be in internal RAM. An empty `data`
-    /// slice only checks that `offset` is within [`Self::capacity`].
+    /// a multiple of 4. `data` must be in DRAM (not flash, IRAM, RTC memory,
+    /// or PSRAM). An empty `data` slice only checks that `offset` is within
+    /// [`Self::capacity`].
     ///
     /// # Errors
     ///
     /// Returns [`Error::NotAligned`] if `data` is non-empty and `offset` is
     /// not a multiple of 4, [`Error::OutOfBounds`] if the range exceeds
     /// [`Self::capacity`], [`Error::NotSupported`] if `data` is not in
-    /// internal RAM, or a ROM I/O error ([`Error::IoError`],
+    /// DRAM, or a ROM I/O error ([`Error::IoError`],
     /// [`Error::IoTimeout`], [`Error::Unknown`]).
     #[cfg_attr(
         all(multi_core, feature = "unstable"),
         doc = " On dual-core chips with [`MultiCoreStrategy::Error`], also [`Error::OtherCoreRunning`]."
     )]
+    #[instability::unstable]
     #[ram]
     pub fn read(&mut self, offset: u32, data: &mut [u32]) -> Result<(), Error> {
         let Some(len) = byte_len(data) else {
@@ -377,15 +390,15 @@ ROM does not. Without that, this method returns
     ///
     /// The target must already be erased. `offset` is a flash byte address and,
     /// when `data` is non-empty, must be a multiple of 4. `data` must be in
-    /// internal RAM. An empty `data` slice only checks that `offset` is
-    /// within [`Self::capacity`].
+    /// DRAM (not flash, IRAM, RTC memory, or PSRAM). An empty `data` slice
+    /// only checks that `offset` is within [`Self::capacity`].
     ///
     /// # Errors
     ///
     /// Returns [`Error::NotAligned`] if `data` is non-empty and `offset` is
     /// not a multiple of 4, [`Error::OutOfBounds`] if the range exceeds
     /// [`Self::capacity`], [`Error::NotSupported`] if `data` is not in
-    /// internal RAM, or a ROM I/O error ([`Error::IoError`],
+    /// DRAM, or a ROM I/O error ([`Error::IoError`],
     /// [`Error::IoTimeout`], [`Error::Unknown`]).
     #[cfg_attr(
         all(multi_core, feature = "unstable"),
@@ -397,6 +410,7 @@ ROM does not. Without that, this method returns
     /// immutable data. Writing a mapped `.text` or `.rodata` page overwrites
     /// the running image, or mutates `static` / `.rodata` the compiler treats
     /// as immutable.
+    #[instability::unstable]
     #[ram]
     pub unsafe fn write(&mut self, offset: u32, data: &[u32]) -> Result<(), Error> {
         let Some(len) = byte_len(data) else {
@@ -435,6 +449,7 @@ ROM does not. Without that, this method returns
     /// immutable data. Erasing a mapped `.text` or `.rodata` page destroys the
     /// running image, or mutates `static` / `.rodata` the compiler treats as
     /// immutable.
+    #[instability::unstable]
     #[ram]
     pub unsafe fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
         let Some(len) = to.checked_sub(from) else {
