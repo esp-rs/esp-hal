@@ -214,6 +214,11 @@ peripheral_clocks = { templates = [
         clk_en_template = "{{default_clk_template}} crate::peripherals::HP_ALIVE_SYS::regs().hp_pad_i2s1_ctrl().modify(|_, w| w.hp_pad_i2s1_mclk_en().bit(enable));"
     } },
     { name = "SdioHost", template_params = { clk_en = "{{sys_clk}}", rst_template = "crate::peripherals::CNNT_SYS::regs().sys_hp_sdmmc_ctrl().modify(|_, w| w.sys_sdmmc_rst_en().bit(reset));" } },
+    # EMAC bus clock; the hardware reset lives in CNNT_SYS and is pulsed during clock setup.
+    { name = "Emac", template_params = {
+        clk_en_template = "crate::peripherals::HP_SYS_CLKRST::regs().emac_ctrl0().modify(|_, w| w.sys_clk_en().bit(enable));",
+        rst_template = "{{no_rst}}"
+    } },
     # DMA engines
     { name = "AxiGdma", template_params = { peripheral = "axi_pdma", clk_en = "{{sys_clk}}" } },
     { name = "AhbGdma", template_params = { peripheral = "ahb_pdma", clk_en = "{{sys_clk}}" } },

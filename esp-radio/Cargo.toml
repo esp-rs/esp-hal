@@ -91,15 +91,15 @@ esp-wifi-sys-esp32h2 = { version = "0.2.0", optional = true, git = "https://gith
 esp-wifi-sys-esp32s2 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "2ea8e3e" }
 esp-wifi-sys-esp32s3 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "2ea8e3e" }
 
-esp32   = { version = "0.41", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
-esp32c2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
-esp32c3 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
-esp32c5 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
-esp32c6 = { version = "0.24", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
-esp32c61 = { version = "0.4", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
-esp32h2 = { version = "0.20", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
-esp32s2 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
-esp32s3 = { version = "0.36", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "fa506e6" }
+esp32   = { version = "0.41", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c3 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c5 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c6 = { version = "0.24", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32c61 = { version = "0.4", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32h2 = { version = "0.20", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32s2 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
+esp32s3 = { version = "0.36", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5cd68d2" }
 
 # Optional dependencies enabling ecosystem features
 embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = false, optional = true }

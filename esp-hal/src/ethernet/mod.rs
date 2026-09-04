@@ -1,39 +1,24 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "clk_in_gpio" => {
-        cfg(esp32) => "GPIO0",
-        cfg(esp32p4) => "GPIO50",
+        cfg(esp32) => gpio_for_signal!(EMAC_TX_CLK),
+        _ => gpio_for_signal!(EMAC_RMII_CLK),
     },
-    "rxd0_gpio" => {
-        cfg(esp32) => "GPIO25",
-        cfg(esp32p4) => "GPIO29",
-    },
-    "rxd1_gpio" => {
-        cfg(esp32) => "GPIO26",
-        cfg(esp32p4) => "GPIO30",
-    },
-    "rxdv_gpio" => {
-        cfg(esp32) => "GPIO27",
-        cfg(esp32p4) => "GPIO28",
-    },
-    "txd0_gpio" => {
-        cfg(esp32) => "GPIO19",
-        cfg(esp32p4) => "GPIO34",
-    },
-    "txd1_gpio" => {
-        cfg(esp32) => "GPIO22",
-        cfg(esp32p4) => "GPIO35",
-    },
-    "txen_gpio" => {
-        cfg(esp32) => "GPIO21",
-        cfg(esp32p4) => "GPIO49",
-    },
+    "rxd0_gpio" => gpio_for_signal!(EMAC_RXD0),
+    "rxd1_gpio" => gpio_for_signal!(EMAC_RXD1),
+    "rxdv_gpio" => gpio_for_signal!(EMAC_RXDV),
+    "txd0_gpio" => gpio_for_signal!(EMAC_TXD0),
+    "txd1_gpio" => gpio_for_signal!(EMAC_TXD1),
+    "txen_gpio" => gpio_for_signal!(EMAC_TXEN),
+    // MDC/MDIO are GPIO-matrix signals, so gpio_for_signal! has no pad and needs a fallback.
     "mdc_gpio" => {
-        cfg(esp32) => "GPIO23",
-        cfg(esp32p4) => "GPIO31",
+        cfg(esp32) => gpio_for_signal!(EMAC_MDC, "GPIO23"),
+        cfg(esp32p4) => gpio_for_signal!(EMAC_MDC, "GPIO31"),
+        cfg(esp32s31) => gpio_for_signal!(EMAC_MDC, "GPIO5"),
     },
     "mdio_gpio" => {
-        cfg(esp32) => "GPIO18",
-        cfg(esp32p4) => "GPIO52",
+        cfg(esp32) => gpio_for_signal!(EMAC_MDI, "GPIO18"),
+        cfg(esp32p4) => gpio_for_signal!(EMAC_MDI, "GPIO52"),
+        cfg(esp32s31) => gpio_for_signal!(EMAC_MDI, "GPIO6"),
     }
 ))]
 //! EMAC Ethernet driver for ESP32.
@@ -76,7 +61,11 @@
 //! # {after_snippet}
 //! ```
 
-use core::{marker::PhantomData, task::Context};
+use core::{
+    marker::PhantomData,
+    sync::atomic::{AtomicBool, Ordering},
+    task::Context,
+};
 
 use crate::{
     Async,
@@ -92,14 +81,14 @@ use crate::{
         Pin,
         interconnect::{self, PeripheralInput, PeripheralOutput},
     },
-    interrupt,
-    peripherals::{EMAC_DMA, ETH, Interrupt},
+    peripherals::{EMAC_DMA, ETH},
     private::Sealed,
     system::{GenericPeripheralGuard, Peripheral},
 };
 
 #[cfg_attr(esp32, path = "clock/esp32.rs")]
 #[cfg_attr(esp32p4, path = "clock/esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "clock/esp32s31.rs")]
 pub mod clock;
 pub(crate) mod dma;
 pub(crate) mod embassy_net;
@@ -156,6 +145,24 @@ macro_rules! emac_pin {
     };
 }
 
+/// Enable the GPIO output driver without touching GPIO-matrix routing.
+///
+/// Matches IDF `gpio_iomux_output` for dedicated EMAC TX pads. `gpio::low_level`
+/// is crate-private, so this writes the enable register directly.
+fn enable_gpio_output(n: u8) {
+    let bit = 1u32 << (n % 32);
+    if n < 32 {
+        crate::peripherals::GPIO::regs()
+            .enable_w1ts()
+            .write(|w| unsafe { w.bits(bit) });
+    } else {
+        #[cfg(gpio_has_bank_1)]
+        crate::peripherals::GPIO::regs()
+            .enable1_w1ts()
+            .write(|w| unsafe { w.bits(bit) });
+    }
+}
+
 macro_rules! implement_trait {
     ($trait:ident, $gpio:ident, $af:ident) => {
         impl $trait for crate::peripherals::$gpio<'_> {
@@ -165,8 +172,29 @@ macro_rules! implement_trait {
                 // TX-direction pads where no peripheral reads the feedback path.
                 crate::gpio::io_mux_reg(self.number()).modify(|_, w| {
                     unsafe { w.mcu_sel().bits(AlternateFunction::$af as u8) };
+                    unsafe { w.fun_drv().bits(2) }; // 20 mA, IDF default for EMAC pads
                     w.fun_ie().set_bit()
                 });
+            }
+        }
+    };
+}
+
+/// Like [`implement_trait`], but also enables the GPIO output driver.
+///
+/// IDF `gpio_iomux_output` does this for RGMII TX_CLK/TXD/TX_CTL. S31 routes
+/// RGMII TX_CLK through the RMII CLK pad (`EMAC_RMII_CLK`).
+macro_rules! implement_output_trait {
+    ($trait:ident, $gpio:ident, $af:ident) => {
+        impl $trait for crate::peripherals::$gpio<'_> {
+            fn configure_iomux(self) {
+                let n = self.number();
+                crate::gpio::io_mux_reg(n).modify(|_, w| {
+                    unsafe { w.mcu_sel().bits(AlternateFunction::$af as u8) };
+                    unsafe { w.fun_drv().bits(2) };
+                    w.fun_ie().set_bit()
+                });
+                enable_gpio_output(n);
             }
         }
     };
@@ -296,17 +324,22 @@ emac_pin!(RmiiTxd1, "RMII TXD1 pin");
 emac_pin!(RmiiCrsDv, "RMII CRS/DV pin");
 emac_pin!(RmiiRxd0, "RMII RXD0 pin");
 emac_pin!(RmiiRxd1, "RMII RXD1 pin");
+emac_pin!(RgmiiRxClk, "RGMII RX clock pin");
+emac_pin!(RgmiiTxd2, "RGMII TXD2 pin");
+emac_pin!(RgmiiTxd3, "RGMII TXD3 pin");
+emac_pin!(RgmiiRxd2, "RGMII RXD2 pin");
+emac_pin!(RgmiiRxd3, "RGMII RXD3 pin");
 
 // RMII traits
 for_each_iomux_function! {
     (EMAC_TXEN, $gpio:ident, $af:ident) => {
-        implement_trait!(RmiiTxEn, $gpio, $af);
+        implement_output_trait!(RmiiTxEn, $gpio, $af);
     };
     (EMAC_TXD0, $gpio:ident, $af:ident) => {
-        implement_trait!(RmiiTxd0, $gpio, $af);
+        implement_output_trait!(RmiiTxd0, $gpio, $af);
     };
     (EMAC_TXD1, $gpio:ident, $af:ident) => {
-        implement_trait!(RmiiTxd1, $gpio, $af);
+        implement_output_trait!(RmiiTxd1, $gpio, $af);
     };
     (EMAC_RXDV, $gpio:ident, $af:ident) => {
         implement_trait!(RmiiCrsDv, $gpio, $af);
@@ -317,32 +350,60 @@ for_each_iomux_function! {
     (EMAC_RXD1, $gpio:ident, $af:ident) => {
         implement_trait!(RmiiRxd1, $gpio, $af);
     };
+    (EMAC_RX_CLK, $gpio:ident, $af:ident) => {
+        implement_trait!(RgmiiRxClk, $gpio, $af);
+    };
+    (EMAC_TXD2, $gpio:ident, $af:ident) => {
+        implement_output_trait!(RgmiiTxd2, $gpio, $af);
+    };
+    (EMAC_TXD3, $gpio:ident, $af:ident) => {
+        implement_output_trait!(RgmiiTxd3, $gpio, $af);
+    };
+    (EMAC_RXD2, $gpio:ident, $af:ident) => {
+        implement_trait!(RgmiiRxd2, $gpio, $af);
+    };
+    (EMAC_RXD3, $gpio:ident, $af:ident) => {
+        implement_trait!(RgmiiRxd3, $gpio, $af);
+    };
 
     // ESP32-specific
     (EMAC_TX_CLK, $gpio:ident, $af:ident) => {
         implement_trait!(RmiiClkIn, $gpio, $af);
     };
     (EMAC_CLK_OUT, $gpio:ident, $af:ident) => {
-        implement_trait!(RmiiClkOut, $gpio, $af);
+        implement_output_trait!(RmiiClkOut, $gpio, $af);
     };
     (EMAC_CLK_180, $gpio:ident, $af:ident) => {
-        implement_trait!(RmiiClkOut, $gpio, $af);
+        implement_output_trait!(RmiiClkOut, $gpio, $af);
     };
 
-    // ESP32-P4-specific: MPLL-derived 50 MHz reference clock output pad.
+    // ESP32-P4 / ESP32-S31: 50 MHz reference clock output pad.
     (REF_50M_CLK, $gpio:ident, $af:ident) => {
-        implement_trait!(RmiiClkOut, $gpio, $af);
+        implement_output_trait!(RmiiClkOut, $gpio, $af);
     };
     (EMAC_RMII_CLK, $gpio:ident, $af:ident) => {
         implement_trait!(RmiiClkIn, $gpio, $af);
+        implement_output_trait!(RmiiClkOut, $gpio, $af);
     };
 }
 
 /// RMII or MII pad wiring for [`Ethernet::new`].
 pub trait EthernetPinBundle: crate::private::Sealed {
+    /// Fastest link speed this interface can carry.
+    ///
+    /// RMII and MII are limited to 100 Mbps; only RGMII reaches 1000 Mbps. The
+    /// PHY is told not to advertise anything faster.
+    const MAX_SPEED: Speed;
+
     /// Applies the required configuration. Intended to be
     /// called by the Ethernet driver internally.
     fn apply(self);
+
+    /// Retunes the interface clocking for a newly negotiated link speed.
+    ///
+    /// Called by the driver from [`Ethernet::set_speed`], after the pins have
+    /// been consumed by [`apply`][Self::apply], so it takes no `self`.
+    fn apply_speed(speed: Speed);
 }
 
 /// Wired RMII pads and RMII clock (pass to [`Ethernet::new`]).
@@ -390,6 +451,13 @@ where
 
         configure_mdio(self.mdc, self.mdio);
         self.clock.configure();
+    }
+
+    const MAX_SPEED: Speed = Speed::_100M;
+
+    fn apply_speed(_speed: Speed) {
+        // No-op: the RMII reference clock is fixed at 50 MHz and the MAC derives
+        // the 10/100 Mbps timing from it internally.
     }
 }
 
@@ -538,6 +606,138 @@ where
 
         clock::MiiClock.configure();
     }
+
+    const MAX_SPEED: Speed = Speed::_100M;
+
+    fn apply_speed(_speed: Speed) {
+        // No-op: in MII mode the PHY drives `TX_CLK` and `RX_CLK` at the rate that
+        // matches the negotiated speed.
+    }
+}
+
+/// Wired RGMII pads (pass to [`Ethernet::new`]).
+///
+/// RGMII data and clock pads use IOMUX only. Do not route them through the GPIO
+/// matrix (`MiiTxd*` / `MiiRxd*`).
+#[cfg(ethernet_has_rgmii)]
+#[allow(
+    missing_docs,
+    reason = "The field names are indicative of their function."
+)]
+pub struct RgmiiPinBundle<
+    RxClk,
+    TxClk,
+    RxCtl,
+    TxCtl,
+    Rxd0,
+    Rxd1,
+    Rxd2,
+    Rxd3,
+    Txd0,
+    Txd1,
+    Txd2,
+    Txd3,
+    Mdc,
+    Mdio,
+> {
+    pub rx_clk: RxClk,
+    pub tx_clk: TxClk,
+    pub rx_ctl: RxCtl,
+    pub tx_ctl: TxCtl,
+    pub rxd0: Rxd0,
+    pub rxd1: Rxd1,
+    pub rxd2: Rxd2,
+    pub rxd3: Rxd3,
+    pub txd0: Txd0,
+    pub txd1: Txd1,
+    pub txd2: Txd2,
+    pub txd3: Txd3,
+    pub mdc: Mdc,
+    pub mdio: Mdio,
+}
+
+#[cfg(ethernet_has_rgmii)]
+impl<RxClk, TxClk, RxCtl, TxCtl, Rxd0, Rxd1, Rxd2, Rxd3, Txd0, Txd1, Txd2, Txd3, Mdc, Mdio>
+    crate::private::Sealed
+    for RgmiiPinBundle<
+        RxClk,
+        TxClk,
+        RxCtl,
+        TxCtl,
+        Rxd0,
+        Rxd1,
+        Rxd2,
+        Rxd3,
+        Txd0,
+        Txd1,
+        Txd2,
+        Txd3,
+        Mdc,
+        Mdio,
+    >
+{
+}
+
+#[cfg(ethernet_has_rgmii)]
+impl<'d, RxClk, TxClk, RxCtl, TxCtl, Rxd0, Rxd1, Rxd2, Rxd3, Txd0, Txd1, Txd2, Txd3, Mdc, Mdio>
+    EthernetPinBundle
+    for RgmiiPinBundle<
+        RxClk,
+        TxClk,
+        RxCtl,
+        TxCtl,
+        Rxd0,
+        Rxd1,
+        Rxd2,
+        Rxd3,
+        Txd0,
+        Txd1,
+        Txd2,
+        Txd3,
+        Mdc,
+        Mdio,
+    >
+where
+    RxClk: RgmiiRxClk + 'd,
+    TxClk: RmiiClkOut + 'd,
+    RxCtl: RmiiCrsDv + 'd,
+    TxCtl: RmiiTxEn + 'd,
+    Rxd0: RmiiRxd0 + 'd,
+    Rxd1: RmiiRxd1 + 'd,
+    Rxd2: RgmiiRxd2 + 'd,
+    Rxd3: RgmiiRxd3 + 'd,
+    Txd0: RmiiTxd0 + 'd,
+    Txd1: RmiiTxd1 + 'd,
+    Txd2: RgmiiTxd2 + 'd,
+    Txd3: RgmiiTxd3 + 'd,
+    Mdc: PeripheralOutput<'d>,
+    Mdio: PeripheralInput<'d> + PeripheralOutput<'d>,
+{
+    fn apply(self) {
+        self.rx_clk.configure_iomux();
+        self.tx_clk.configure_iomux();
+        self.rx_ctl.configure_iomux();
+        self.tx_ctl.configure_iomux();
+        self.rxd0.configure_iomux();
+        self.rxd1.configure_iomux();
+        self.rxd2.configure_iomux();
+        self.rxd3.configure_iomux();
+        self.txd0.configure_iomux();
+        self.txd1.configure_iomux();
+        self.txd2.configure_iomux();
+        self.txd3.configure_iomux();
+
+        configure_mdio(self.mdc, self.mdio);
+        clock::RgmiiClock.configure();
+    }
+
+    const MAX_SPEED: Speed = Speed::_1000M;
+
+    /// The MAC drives RGMII `TX_CLK`, so its divider has to follow the link:
+    /// 125 MHz at 1000 Mbps, 25 MHz at 100 Mbps, 2.5 MHz at 10 Mbps.
+    fn apply_speed(speed: Speed) {
+        clock::apply_rgmii_tx_speed(speed);
+    }
 }
 
 // ── Async wakers ──────────────────────────────────────────────────────────────
@@ -548,6 +748,20 @@ pub(super) static TX_WAKER: AtomicWaker = AtomicWaker::new();
 const DMASTATUS_RI: u32 = 1 << 6;
 /// DMASTATUS bit mask for the TX-complete interrupt.
 const DMASTATUS_TI: u32 = 1 << 0;
+
+static ISR_BOUND: AtomicBool = AtomicBool::new(false);
+
+/// Binds the DMA ISR on first use.
+///
+/// `bind_peri_interrupt` also enables the interrupt, so this must not run before
+/// the peripheral is ready to have its interrupt line unmasked.
+pub(super) fn bind_eth_isr() {
+    if !ISR_BOUND.swap(true, Ordering::Relaxed) {
+        // Safety: the ISR only touches DMA status registers; ETH ownership is
+        // tracked by `Ethernet`.
+        unsafe { ETH::steal() }.bind_peri_interrupt(eth_mac_isr);
+    }
+}
 
 #[crate::handler]
 fn eth_mac_isr() {
@@ -574,24 +788,41 @@ pub struct Ethernet<'d, DM: DriverMode, P: Phy> {
     phy: P,
     mac_addr: [u8; 6],
     speed: Speed,
+    /// Fastest speed the wired interface can carry, from the pin bundle.
+    max_speed: Speed,
+    /// The pin bundle's [`EthernetPinBundle::apply_speed`]. The bundle itself is
+    /// consumed during setup, so the driver keeps only this hook.
+    apply_speed: fn(Speed),
     duplex: Duplex,
     _mode: PhantomData<DM>,
 }
 
 impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
     /// Creates an Ethernet driver using RMII ([`RmiiPinBundle`]) or MII ([`MiiPinBundle`]).
-    pub fn new<const RX: usize, const TX: usize>(
+    #[cfg_attr(
+        ethernet_has_rgmii,
+        doc = "On chips with RGMII, use [`RgmiiPinBundle`]."
+    )]
+    pub fn new<B: EthernetPinBundle + 'd, const RX: usize, const TX: usize>(
         eth: ETH<'d>,
         storage: &'d mut EthernetDmaStorage<RX, TX>,
         mac_addr: [u8; 6],
         phy: P,
-        pins: impl EthernetPinBundle + 'd,
+        pins: B,
     ) -> Result<Self, Error> {
         let clock_guard = GenericPeripheralGuard::new();
 
         pins.apply();
 
-        init_common(clock_guard, storage, mac_addr, phy, eth)
+        init_common(
+            clock_guard,
+            storage,
+            mac_addr,
+            phy,
+            eth,
+            B::MAX_SPEED,
+            B::apply_speed,
+        )
     }
 
     /// Returns the received frame data if one is ready.
@@ -615,16 +846,20 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
         EmacRegs.demand_rx_poll();
     }
 
-    /// Converts to async mode, enabling DMA interrupts and binding the ISR.
+    /// Converts to async mode.
+    ///
+    /// The DMA ISR is bound and its interrupts enabled on the first link-up,
+    /// not here: without a link there is no RX clock and the DMA would only
+    /// report errors.
     pub fn into_async(self) -> Ethernet<'d, Async, P> {
-        EmacRegs.dma_enable_interrupts(true);
-        interrupt::bind_handler(Interrupt::ETH_MAC, eth_mac_isr);
         Ethernet {
             tx: self.tx,
             rx: self.rx,
             phy: self.phy,
             mac_addr: self.mac_addr,
             speed: self.speed,
+            max_speed: self.max_speed,
+            apply_speed: self.apply_speed,
             duplex: self.duplex,
             _clock_guard: self._clock_guard,
             _eth: self._eth,
@@ -652,9 +887,18 @@ fn configure_mdio<'d>(
 
 impl<'d, Dm: DriverMode, P: Phy> Ethernet<'d, Dm, P> {
     /// Configures the MAC for the given speed.
+    ///
+    /// The speed must be one the wired interface can carry: MII and RMII top
+    /// out at 100 Mbps, only RGMII reaches 1000 Mbps.
     pub fn set_speed(&mut self, speed: Speed) {
+        debug_assert!(
+            !(speed == Speed::_1000M && self.max_speed != Speed::_1000M),
+            "1000 Mbps requires an RGMII interface"
+        );
+
         if speed != self.speed {
             EmacRegs.set_speed(speed);
+            (self.apply_speed)(speed);
             self.speed = speed;
         }
     }
@@ -758,6 +1002,8 @@ impl<'d, P: Phy> Ethernet<'d, Async, P> {
             phy: self.phy,
             mac_addr: self.mac_addr,
             speed: self.speed,
+            max_speed: self.max_speed,
+            apply_speed: self.apply_speed,
             duplex: self.duplex,
             _clock_guard: self._clock_guard,
             _eth: self._eth,
@@ -793,13 +1039,16 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
     mac_addr: [u8; 6],
     mut phy: P,
     eth: ETH<'d>,
+    max_speed: Speed,
+    apply_speed: fn(Speed),
 ) -> Result<Ethernet<'d, Blocking, P>, Error> {
     // DMA soft-reset (also enables enhanced 32B descriptor format).
     EmacRegs.dma_soft_reset();
+    EmacRegs.dma_init_op_mode();
 
     // Init PHY (MDIO requires DMA/MAC clocks to be running after reset).
     let mut mdio = MdioDriver::new(&EmacRegs);
-    phy.init(&mut mdio).map_err(Error::Phy)?;
+    phy.init(&mut mdio, max_speed).map_err(Error::Phy)?;
 
     // Build descriptor rings from the erased slice references.
     let tx = TDesRing::new(&mut storage.tx_descs, &mut storage.tx_bufs);
@@ -814,6 +1063,8 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
         phy,
         mac_addr,
         speed: Speed::_100M,
+        max_speed,
+        apply_speed,
         duplex: Duplex::Full,
         _clock_guard: clock_guard,
         _eth: eth,
@@ -824,9 +1075,16 @@ fn init_common<'d, P: Phy, const RX: usize, const TX: usize>(
     EmacRegs.mac_init(eth.speed, eth.duplex);
     EmacRegs.set_mac_address(&eth.mac_addr);
 
+    // Bring the interface clocking in line with the recorded default speed. For
+    // RGMII the clock setup leaves TX_CLK at the 1000 Mbps rate, and
+    // `set_speed` skips speeds that already match, so without this a 100 Mbps
+    // link would keep transmitting at 125 MHz.
+    apply_speed(eth.speed);
+
     // In blocking mode all DMA interrupts stay disabled; async mode enables
-    // them via into_async().
+    // them once the link is up.
     EmacRegs.dma_disable_interrupts();
+    EmacRegs.mask_mac_interrupts();
 
     // Start both DMA engines.
     EmacRegs.dma_start();

@@ -331,6 +331,24 @@ macro_rules! property {
     ("ethernet.mii_via_gpio_matrix") => {
         false
     };
+    ("ethernet.rx_store_and_forward") => {
+        true
+    };
+    ("ethernet.rx_checksum_offload") => {
+        false
+    };
+    ("ethernet.tx_checksum_offload") => {
+        false
+    };
+    ("ethernet.dma_burst_len") => {
+        32
+    };
+    ("ethernet.dma_burst_len", str) => {
+        stringify!(32)
+    };
+    ("ethernet.has_rgmii") => {
+        false
+    };
     ("phy.combo_module") => {
         true
     };
@@ -4712,11 +4730,12 @@ macro_rules! for_each_peripheral {
         SYSTEM <= DPORT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "ETH peripheral singleton"] ETH
-        <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "EMAC_DMA peripheral singleton"] EMAC_DMA <= EMAC_DMA() (unstable)));
+        <= virtual(ETH_MAC : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_EXT peripheral singleton"]
         EMAC_EXT <= EMAC_EXT() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)));
+        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "FLASH_ENCRYPTION peripheral singleton"] FLASH_ENCRYPTION <= FLASH_ENCRYPTION()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -5112,12 +5131,13 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type #[doc = "SYSTEM peripheral singleton"] SYSTEM <=
         DPORT() (unstable)), (@ peri_type #[doc = "EFUSE peripheral singleton"] EFUSE <=
         EFUSE() (unstable)), (@ peri_type #[doc = "ETH peripheral singleton"] ETH <=
-        virtual() (unstable)), (@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
-        EMAC_DMA <= EMAC_DMA() (unstable)), (@ peri_type #[doc =
-        "EMAC_EXT peripheral singleton"] EMAC_EXT <= EMAC_EXT() (unstable)), (@ peri_type
-        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= EMAC_MAC() (unstable)), (@
-        peri_type #[doc = "FLASH_ENCRYPTION peripheral singleton"] FLASH_ENCRYPTION <=
-        FLASH_ENCRYPTION() (unstable)), (@ peri_type #[doc =
+        virtual(ETH_MAC : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)), (@ peri_type
+        #[doc = "EMAC_EXT peripheral singleton"] EMAC_EXT <= EMAC_EXT() (unstable)), (@
+        peri_type #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC()
+        (unstable)), (@ peri_type #[doc = "FLASH_ENCRYPTION peripheral singleton"]
+        FLASH_ENCRYPTION <= FLASH_ENCRYPTION() (unstable)), (@ peri_type #[doc =
         "FRC_TIMER peripheral singleton"] FRC_TIMER <= FRC_TIMER() (unstable)), (@
         peri_type #[doc = "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)), (@
         peri_type #[doc = "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_SD()

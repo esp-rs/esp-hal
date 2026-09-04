@@ -6,7 +6,7 @@
 
 use core::task::Context;
 
-use crate::ethernet::mac::{EmacRegs, LinkState};
+use crate::ethernet::mac::{EmacRegs, LinkState, Speed};
 
 pub mod generic;
 
@@ -26,6 +26,12 @@ pub const ANAR: u8 = 0x04;
 pub const ANLPAR: u8 = 0x05;
 /// Auto-Negotiation Expansion Register.
 pub const ANER: u8 = 0x06;
+/// 1000BASE-T Control Register.
+pub const GBCR: u8 = 0x09;
+/// 1000BASE-T Status Register.
+pub const GBSR: u8 = 0x0A;
+/// Extended Status Register.
+pub const EXSR: u8 = 0x0F;
 
 /// Bit definitions for [`BMCR`].
 pub mod bmcr {
@@ -35,10 +41,14 @@ pub mod bmcr {
     pub const SPEED_100: u16 = 1 << 13;
     /// Enables auto-negotiation.
     pub const ANEN: u16 = 1 << 12;
+    /// IEEE power-down (all except MDIO).
+    pub const POWER_DOWN: u16 = 1 << 11;
     /// Restarts auto-negotiation.
     pub const RESTART_AN: u16 = 1 << 9;
     /// Full-duplex (when auto-neg disabled).
     pub const FULL_DUPLEX: u16 = 1 << 8;
+    /// 1000 Mbps MSB (with [`SPEED_100`] clear) when auto-neg is disabled.
+    pub const SPEED_1000: u16 = 1 << 6;
 }
 
 /// Bit definitions for [`BMSR`].
@@ -49,6 +59,8 @@ pub mod bmsr {
     pub const AN_COMPLETE: u16 = 1 << 5;
     /// Auto-negotiation ability.
     pub const AN_ABILITY: u16 = 1 << 3;
+    /// Extended status register is present (register 15).
+    pub const EXTENDED_STATUS: u16 = 1 << 8;
 }
 
 /// Bit definitions for [`ANAR`] and [`ANLPAR`].
@@ -61,6 +73,32 @@ pub mod an {
     pub const BASE_100_HALF: u16 = 1 << 7;
     /// 100BASE-TX full-duplex.
     pub const BASE_100_FULL: u16 = 1 << 8;
+}
+
+/// Bit definitions for [`GBCR`].
+pub mod gbcr {
+    /// Advertise 1000BASE-T half-duplex.
+    pub const ADV_1000_HALF: u16 = 1 << 8;
+    /// Advertise 1000BASE-T full-duplex.
+    pub const ADV_1000_FULL: u16 = 1 << 9;
+    /// Prefer 1000BASE-T master (AN, not forced).
+    pub const PREFER_MASTER: u16 = 1 << 11;
+}
+
+/// Bit definitions for [`GBSR`].
+pub mod gbsr {
+    /// Link partner 1000BASE-T half-duplex.
+    pub const LP_1000_HALF: u16 = 1 << 10;
+    /// Link partner 1000BASE-T full-duplex.
+    pub const LP_1000_FULL: u16 = 1 << 11;
+}
+
+/// Bit definitions for [`EXSR`].
+pub mod exsr {
+    /// 1000BASE-T half-duplex ability.
+    pub const BASE1000_T_HD: u16 = 1 << 12;
+    /// 1000BASE-T full-duplex ability.
+    pub const BASE1000_T_FD: u16 = 1 << 13;
 }
 
 // ── MdioBus trait ───────────────────────────────────────────────────────────
@@ -140,14 +178,23 @@ pub trait Phy {
     ///
     /// Must reset the PHY, configure auto-negotiation, and wait until the
     /// hardware is ready to respond to further MDIO transactions.
-    fn init<M: MdioBus>(&mut self, mdio: &mut M) -> Result<(), PhyError>;
+    ///
+    /// `max_speed` is the fastest speed the wired MAC interface can carry (100
+    /// Mbps for MII/RMII, 1000 Mbps for RGMII). Faster abilities must not be
+    /// advertised, or the link partner may settle on a speed the MAC cannot
+    /// drive.
+    fn init<M: MdioBus>(&mut self, mdio: &mut M, max_speed: Speed) -> Result<(), PhyError>;
 
     /// Polls the current link state.
     ///
-    /// Returns [`LinkState`] with `up == true` once auto-negotiation is
-    /// complete and the link partner is detected. The context can be used
-    /// to wake the caller when the link state should be re-polled, if the PHY chip
-    /// supports interrupt-driven notifications.
+    /// Returns [`LinkState`] with `up == true` once the link partner is
+    /// detected.
+    ///
+    /// In async mode the context must be used to schedule the next poll:
+    /// register a waker for a PHY interrupt or a timer, or wake immediately.
+    /// An implementation that does neither will never be polled again, so
+    /// drivers without an interrupt source wake immediately, which busy-polls.
+    /// Wrap them to rate-limit the polling if a timer is available.
     fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, _cx: Option<&mut Context<'_>>) -> LinkState;
 
     /// Returns the Clause 22 PHY address on the MDIO bus.
