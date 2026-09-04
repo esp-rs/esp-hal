@@ -7,7 +7,7 @@
 #![no_std]
 #![no_main]
 
-use core::ptr::addr_of;
+use core::ptr::{addr_of, read_volatile};
 
 use esp_hal::{
     Blocking,
@@ -22,6 +22,24 @@ const NVS: u32 = 0x9000;
 
 /// Source that lives in flash (`.rodata`); writes of this must be rejected.
 static FLASH_PATTERN: [u32; 4] = [0x3C3C_3C3C; 4];
+
+/// Mapped DROM sector reserved for cache-invalidation. Aligned so erase cannot
+/// touch neighboring `.rodata` (including the app descriptor).
+#[repr(C, align(4096))]
+struct Scratch([u32; 1024]);
+
+#[used]
+static SCRATCH: Scratch = Scratch([0xA5A5_A5A5; 1024]);
+
+/// Flash address of `SCRATCH`. Same RODATA segment as [`hil_test::ESP_APP_DESC`].
+fn scratch_flash_offset() -> u32 {
+    let scratch = addr_of!(SCRATCH) as u32;
+    let app_desc = addr_of!(hil_test::ESP_APP_DESC) as u32;
+    let delta = scratch
+        .checked_sub(app_desc)
+        .expect("SCRATCH must follow ESP_APP_DESC in DROM");
+    APP_DESC_OFFSET + delta
+}
 
 fn as_bytes(words: &[u32]) -> &[u8] {
     // SAFETY: inspecting the in-memory bytes of `u32` words.
@@ -212,8 +230,8 @@ mod tests {
 
     /// ROM-read of mapped firmware still works after programming *unmapped* NVS.
     ///
-    /// This does not exercise cache invalidation of a page that is MMU-mapped
-    /// and then programmed; NVS at `0x9000` is not part of the app mapping.
+    /// Does not test invalidation of a programmed mapped page; see
+    /// `test_mapped_drom_read_after_program`.
     #[test]
     fn test_mapped_read_after_nvs_program() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -233,6 +251,46 @@ mod tests {
         flash.read(APP_DESC_OFFSET, &mut after).unwrap();
         assert_eq!(before, after);
         assert_eq!(as_bytes(&after), expected_app_desc());
+    }
+
+    /// Program a mapped DROM sector and read it back through the cache.
+    ///
+    /// The first volatile load fills D-cache. After erase/write the driver must
+    /// drop that line; a second load must see the programmed word. The sector
+    /// stays dirty until the image is re-flashed.
+    #[test]
+    fn test_mapped_drom_read_after_program() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut flash = flash_from_peripherals(peripherals);
+
+        let sector = Flash::SECTOR_SIZE;
+        let offset = scratch_flash_offset();
+        assert!(
+            offset.is_multiple_of(sector),
+            "scratch flash offset {offset:#x} is not sector-aligned"
+        );
+        assert!(
+            offset >= APP_DESC_OFFSET + sector || offset + sector <= APP_DESC_OFFSET,
+            "scratch sector {offset:#x} overlaps the app descriptor"
+        );
+
+        let mapped = addr_of!(SCRATCH.0[0]);
+        // Warm D-cache; do not use `SCRATCH.0[0]` as a value (const-folded).
+        let _cached = unsafe { read_volatile(mapped) };
+
+        let pattern = [0x5A5A_5A5Au32; 1];
+        // SAFETY: `SCRATCH` is a dedicated mapped sector, not firmware.
+        unsafe {
+            flash.erase(offset, offset + sector).unwrap();
+            flash.write(offset, &pattern).unwrap();
+        }
+
+        let mut via_rom = [0u32; 1];
+        flash.read(offset, &mut via_rom).unwrap();
+        assert_eq!(via_rom, pattern);
+
+        let via_cache = unsafe { read_volatile(mapped) };
+        assert_eq!(via_cache, pattern[0]);
     }
 
     #[cfg(multi_core)]
