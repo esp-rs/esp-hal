@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `StationConfig::rm_enabled` and `StationConfig::btm_enabled` to opt into 802.11k (Radio Resource Measurement) and 802.11v (BSS Transition Management) on the station interface (#6239)
+- `EventInfo::StationNeighborRep`, carrying the raw 802.11k Neighbor Report received from the AP, and `event::MAX_NEIGHBOR_REPORT_LEN` (#6239)
+
 
 ### Changed
 

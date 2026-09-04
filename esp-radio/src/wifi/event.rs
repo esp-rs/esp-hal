@@ -758,10 +758,18 @@ impl HomeChannelChange<'_> {
     }
 }
 
+/// Maximum number of Neighbor Report bytes the driver reports for a single
+/// [`WifiEvent::StationNeighborRep`] event.
+#[instability::unstable]
+pub const MAX_NEIGHBOR_REPORT_LEN: usize =
+    crate::sys::include::ESP_WIFI_MAX_NEIGHBOR_REP_LEN as usize;
+
 impl StationNeighborRep<'_> {
     /// Get the Neighbor Report received from the access point.
     pub fn report(&self) -> &[u8] {
-        &self.0.report[..self.0.report_len as usize]
+        // `report_len` comes from the driver; clamp it so a bogus value cannot panic here.
+        let len = (self.0.report_len as usize).min(self.0.report.len());
+        &self.0.report[..len]
     }
 
     /// Get the length of report.
@@ -1041,6 +1049,18 @@ pub enum EventInfo {
     // we don't currently support NAN - and there is no intention right now to change that
     /// Wi-Fi home channel change, doesn't occur when scanning.
     HomeChannelChange,
+
+    /// Received Neighbor Report response (802.11k).
+    ///
+    /// Carries the raw Neighbor Report bytes from the AP. Use
+    /// [`StationNeighborRep::report`](crate::wifi::event::StationNeighborRep)
+    /// to access them.
+    StationNeighborRep {
+        /// Neighbor Report bytes from the AP.
+        report: [u8; MAX_NEIGHBOR_REPORT_LEN],
+        /// Number of valid bytes in `report`.
+        report_len: u16,
+    },
 }
 
 impl EventInfo {
@@ -1281,6 +1301,17 @@ impl EventInfo {
             }
             WifiEvent::HomeChannelChange => {
                 Some(EventInfo::HomeChannelChange)
+            }
+            WifiEvent::StationNeighborRep => {
+                let ev = unsafe { StationNeighborRep::from_raw_event_data(payload) };
+                let src = ev.report();
+                let len = src.len().min(MAX_NEIGHBOR_REPORT_LEN);
+                let mut report = [0u8; MAX_NEIGHBOR_REPORT_LEN];
+                report[..len].copy_from_slice(&src[..len]);
+                Some(EventInfo::StationNeighborRep {
+                    report,
+                    report_len: len as u16,
+                })
             }
             _ => None,
         }
