@@ -5413,7 +5413,8 @@ macro_rules! for_each_peripheral {
         enable_mac_interrupt, disable_mac_interrupt }, WIFI_PWR : { bind_pwr_interrupt,
         enable_pwr_interrupt, disable_pwr_interrupt }))); _for_each_inner_peripheral!((@
         peri_type #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "IPC peripheral singleton"] IPC
+        <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)));
@@ -5519,7 +5520,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((LP_CORE(unstable)));
         _for_each_inner_peripheral!((WIFI));
         _for_each_inner_peripheral!((PSRAM(unstable)));
-        _for_each_inner_peripheral!((FROM_CPU_INTR0(unstable)));
+        _for_each_inner_peripheral!((IPC(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR1(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR2(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR3(unstable)));
@@ -5797,6 +5798,7 @@ macro_rules! for_each_peripheral {
         }, WIFI_MAC : { bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt
         }, WIFI_PWR : { bind_pwr_interrupt, enable_pwr_interrupt, disable_pwr_interrupt
         })), (@ peri_type #[doc = "PSRAM peripheral singleton"] PSRAM <= virtual()
+        (unstable)), (@ peri_type #[doc = "IPC peripheral singleton"] IPC <= virtual()
         (unstable)), (@ peri_type #[doc = "FROM_CPU_INTR0 peripheral singleton"]
         FROM_CPU_INTR0 <= virtual() (unstable)), (@ peri_type #[doc =
         "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)),
@@ -5830,7 +5832,7 @@ macro_rules! for_each_peripheral {
         (SYSTIMER(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
         (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)), (ADC1(unstable)),
         (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
-        (LP_CORE(unstable)), (WIFI), (PSRAM(unstable)), (FROM_CPU_INTR0(unstable)),
+        (LP_CORE(unstable)), (WIFI), (PSRAM(unstable)), (IPC(unstable)),
         (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
         (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
         Spi2, 1, AhbGdmaChannel), (UHCI0, Uhci0, 2, AhbGdmaChannel), (I2S0, I2s0, 3,
