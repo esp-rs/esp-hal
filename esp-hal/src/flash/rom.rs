@@ -4,11 +4,6 @@ use procmacros::ram;
 
 use super::{ConfigError, Error};
 
-/// Direct-read chunk limit (ESP-IDF `MAX_READ_CHUNK`), not a ROM hard limit.
-pub(super) const ROM_READ_CHUNK: usize = 16384;
-/// Direct-write chunk limit (ESP-IDF `MAX_WRITE_CHUNK`), not a ROM hard limit.
-pub(super) const ROM_WRITE_CHUNK: usize = 8192;
-
 #[repr(C)]
 struct RomSpiflashChip {
     device_id: u32,
@@ -143,23 +138,23 @@ fn decode_rom_error(rc: i32) -> Result<(), Error> {
 }
 
 #[inline(always)]
-pub(super) fn read(src_addr: u32, data: &mut [u8]) -> Result<(), Error> {
+pub(super) fn read(src_addr: u32, data: &mut [u32]) -> Result<(), Error> {
     check_rc(unsafe {
         esp_rom_sys::rom::spiflash::esp_rom_spiflash_read(
             src_addr,
-            data.as_mut_ptr().cast(),
-            data.len() as u32,
+            data.as_mut_ptr(),
+            data.len() as u32 * super::WORD_SIZE,
         )
     })
 }
 
 #[inline(always)]
-pub(super) fn write(dest_addr: u32, data: &[u8]) -> Result<(), Error> {
+pub(super) fn write(dest_addr: u32, data: &[u32]) -> Result<(), Error> {
     check_rc(unsafe {
         esp_rom_sys::rom::spiflash::esp_rom_spiflash_write(
             dest_addr,
-            data.as_ptr().cast(),
-            data.len() as u32,
+            data.as_ptr(),
+            data.len() as u32 * super::WORD_SIZE,
         )
     })
 }

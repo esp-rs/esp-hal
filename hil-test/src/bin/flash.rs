@@ -21,10 +21,12 @@ const APP_DESC_OFFSET: u32 = 0x10_020;
 const NVS: u32 = 0x9000;
 
 /// Source that lives in flash (`.rodata`); writes of this must be rejected.
-static FLASH_PATTERN: [u8; 16] = [0x3C; 16];
+static FLASH_PATTERN: [u32; 4] = [0x3C3C_3C3C; 4];
 
-#[repr(align(4))]
-struct Aligned<const N: usize>([u8; N]);
+fn as_bytes(words: &[u32]) -> &[u8] {
+    // SAFETY: inspecting the in-memory bytes of `u32` words.
+    unsafe { core::slice::from_raw_parts(words.as_ptr().cast(), size_of_val(words)) }
+}
 
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
@@ -37,13 +39,13 @@ mod tests {
     }
 
     fn assert_range_erased(flash: &mut Flash<'static, Blocking>, offset: u32, len: usize) {
-        let mut buf = Aligned([0u8; 256]);
+        let mut buf = [0u32; 64];
         let mut remaining = len;
         let mut addr = offset;
         while remaining > 0 {
-            let n = remaining.min(buf.0.len());
-            flash.read(addr, &mut buf.0[..n]).unwrap();
-            assert!(buf.0[..n].iter().all(|&b| b == 0xFF));
+            let n = remaining.min(size_of_val(&buf));
+            flash.read(addr, &mut buf[..n / 4]).unwrap();
+            assert!(as_bytes(&buf)[..n].iter().all(|&b| b == 0xFF));
             addr += n as u32;
             remaining -= n;
         }
@@ -58,9 +60,9 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let mut flash = flash_from_peripherals(peripherals);
 
-        let mut bytes = Aligned([0u8; 256]);
-        flash.read(APP_DESC_OFFSET, &mut bytes.0).unwrap();
-        assert_eq!(&bytes.0, expected_app_desc());
+        let mut words = [0u32; 64];
+        flash.read(APP_DESC_OFFSET, &mut words).unwrap();
+        assert_eq!(as_bytes(&words), expected_app_desc());
     }
 
     #[test]
@@ -83,25 +85,25 @@ mod tests {
         let mut flash = flash_from_peripherals(peripherals);
 
         let sector = flash.chip_info().sector_size;
-        let pattern = Aligned([0xA5u8; 256]);
-        let mut read_back = Aligned([0u8; 256]);
+        let pattern = [0xA5A5_A5A5u32; 64];
+        let mut read_back = [0u32; 64];
 
         // SAFETY: NVS is not mapped firmware.
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
-        assert_range_erased(&mut flash, NVS, pattern.0.len());
+        assert_range_erased(&mut flash, NVS, size_of_val(&pattern));
 
-        unsafe { flash.write(NVS, &pattern.0).unwrap() };
-        flash.read(NVS, &mut read_back.0).unwrap();
-        assert_eq!(pattern.0, read_back.0);
+        unsafe { flash.write(NVS, &pattern).unwrap() };
+        flash.read(NVS, &mut read_back).unwrap();
+        assert_eq!(pattern, read_back);
 
         // NOR: programming cannot turn 0-bits back to 1 without an erase.
-        let zeros = Aligned([0x00u8; 4]);
-        let ones = Aligned([0xFFu8; 4]);
-        unsafe { flash.write(NVS, &zeros.0).unwrap() };
-        unsafe { flash.write(NVS, &ones.0).unwrap() };
-        let mut word = Aligned([0u8; 4]);
-        flash.read(NVS, &mut word.0).unwrap();
-        assert_eq!(word.0, [0x00; 4]);
+        let zeros = [0x0000_0000u32; 1];
+        let ones = [0xFFFF_FFFFu32; 1];
+        unsafe { flash.write(NVS, &zeros).unwrap() };
+        unsafe { flash.write(NVS, &ones).unwrap() };
+        let mut word = [0u32; 1];
+        flash.read(NVS, &mut word).unwrap();
+        assert_eq!(word, [0x0000_0000; 1]);
     }
 
     #[test]
@@ -110,28 +112,34 @@ mod tests {
         let mut flash = flash_from_peripherals(peripherals);
 
         let sector = flash.chip_info().sector_size;
-        let mut pattern = Aligned([0u8; 512]);
-        for (i, b) in pattern.0.iter_mut().enumerate() {
-            *b = i as u8;
+        let mut pattern = [0u32; 128];
+        for (i, word) in pattern.iter_mut().enumerate() {
+            let b0 = (4 * i) as u8;
+            *word = u32::from_le_bytes([
+                b0,
+                b0.wrapping_add(1),
+                b0.wrapping_add(2),
+                b0.wrapping_add(3),
+            ]);
         }
 
         // SAFETY: NVS is not mapped firmware.
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
-        assert_range_erased(&mut flash, NVS, pattern.0.len());
-        unsafe { flash.write(NVS, &pattern.0).unwrap() };
+        assert_range_erased(&mut flash, NVS, size_of_val(&pattern));
+        unsafe { flash.write(NVS, &pattern).unwrap() };
 
-        let mut read_back = Aligned([0u8; 512]);
-        flash.read(NVS, &mut read_back.0).unwrap();
-        assert_eq!(pattern.0, read_back.0);
+        let mut read_back = [0u32; 128];
+        flash.read(NVS, &mut read_back).unwrap();
+        assert_eq!(pattern, read_back);
 
         // Remaining writes need 1-bits; erase first (NOR cannot program 0→1).
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
 
-        let page_cross = Aligned([0xAAu8; 8]);
-        unsafe { flash.write(NVS + 252, &page_cross.0).unwrap() };
-        let mut page_cross_read = Aligned([0u8; 8]);
-        flash.read(NVS + 252, &mut page_cross_read.0).unwrap();
-        assert_eq!(page_cross.0, page_cross_read.0);
+        let page_cross = [0xAAAA_AAAAu32; 2];
+        unsafe { flash.write(NVS + 252, &page_cross).unwrap() };
+        let mut page_cross_read = [0u32; 2];
+        flash.read(NVS + 252, &mut page_cross_read).unwrap();
+        assert_eq!(page_cross, page_cross_read);
 
         // Flash-resident source is rejected; the caller must stage through RAM.
         assert_eq!(
@@ -159,11 +167,11 @@ mod tests {
 
         let cap = flash.capacity() as u32;
         let sector = flash.chip_info().sector_size;
-        let mut buf = Aligned([0u8; 4]);
+        let mut buf = [0u32; 1];
 
-        assert_eq!(flash.read(cap, &mut buf.0), Err(Error::OutOfBounds));
+        assert_eq!(flash.read(cap, &mut buf), Err(Error::OutOfBounds));
         assert_eq!(
-            unsafe { flash.write(cap, &[0u8; 4]) },
+            unsafe { flash.write(cap, &[0u32; 1]) },
             Err(Error::OutOfBounds)
         );
         assert_eq!(
@@ -181,19 +189,10 @@ mod tests {
         unsafe { flash.write(NVS, &[]).unwrap() };
         unsafe { flash.erase(NVS, NVS).unwrap() };
 
-        assert_eq!(flash.read(1, &mut buf.0), Err(Error::NotAligned));
-        assert_eq!(flash.read(0, &mut [0u8; 1]), Err(Error::NotAligned));
-        assert_eq!(unsafe { flash.write(1, &buf.0) }, Err(Error::NotAligned));
-        assert_eq!(unsafe { flash.write(0, &[0u8; 1]) }, Err(Error::NotAligned));
+        assert_eq!(flash.read(1, &mut buf), Err(Error::NotAligned));
+        assert_eq!(unsafe { flash.write(1, &buf) }, Err(Error::NotAligned));
         assert_eq!(
             unsafe { flash.erase(1, 1 + sector) },
-            Err(Error::NotAligned)
-        );
-
-        let mut pad = [0u8; 8];
-        assert_eq!(flash.read(NVS, &mut pad[1..5]), Err(Error::NotAligned));
-        assert_eq!(
-            unsafe { flash.write(NVS, &pad[1..5]) },
             Err(Error::NotAligned)
         );
     }
@@ -203,20 +202,20 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let mut flash = flash_from_peripherals(peripherals);
 
-        let mut before = Aligned([0u8; 256]);
-        flash.read(APP_DESC_OFFSET, &mut before.0).unwrap();
-        assert_eq!(&before.0, expected_app_desc());
+        let mut before = [0u32; 64];
+        flash.read(APP_DESC_OFFSET, &mut before).unwrap();
+        assert_eq!(as_bytes(&before), expected_app_desc());
 
         let sector = flash.chip_info().sector_size;
         // SAFETY: NVS is not mapped firmware.
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
-        let marker = Aligned([0x5Au8; 16]);
-        unsafe { flash.write(NVS, &marker.0).unwrap() };
+        let marker = [0x5A5A_5A5Au32; 4];
+        unsafe { flash.write(NVS, &marker).unwrap() };
 
-        let mut after = Aligned([0u8; 256]);
-        flash.read(APP_DESC_OFFSET, &mut after.0).unwrap();
-        assert_eq!(before.0, after.0);
-        assert_eq!(&after.0, expected_app_desc());
+        let mut after = [0u32; 64];
+        flash.read(APP_DESC_OFFSET, &mut after).unwrap();
+        assert_eq!(before, after);
+        assert_eq!(as_bytes(&after), expected_app_desc());
     }
 
     #[cfg(multi_core)]
@@ -244,14 +243,14 @@ mod tests {
 
         let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
         let sector = flash.chip_info().sector_size;
-        let pattern = Aligned([0x5Au8; 256]);
-        let mut read_back = Aligned([0u8; 256]);
+        let pattern = [0x5A5A_5A5Au32; 64];
+        let mut read_back = [0u32; 64];
 
         // SAFETY: NVS is not mapped firmware.
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
-        unsafe { flash.write(NVS, &pattern.0).unwrap() };
-        flash.read(NVS, &mut read_back.0).unwrap();
-        assert_eq!(pattern.0, read_back.0);
+        unsafe { flash.write(NVS, &pattern).unwrap() };
+        flash.read(NVS, &mut read_back).unwrap();
+        assert_eq!(pattern, read_back);
 
         let before = TICKS.load(Ordering::Relaxed);
         while TICKS.load(Ordering::Relaxed) == before {}
@@ -288,9 +287,9 @@ mod tests {
         )
         .unwrap();
 
-        let mut buf = Aligned([0u8; 4]);
+        let mut buf = [0u32; 1];
         assert_eq!(
-            flash.read(APP_DESC_OFFSET, &mut buf.0),
+            flash.read(APP_DESC_OFFSET, &mut buf),
             Err(Error::OtherCoreRunning)
         );
     }

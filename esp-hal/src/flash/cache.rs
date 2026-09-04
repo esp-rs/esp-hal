@@ -261,13 +261,51 @@ fn invalidate_mapped_range(start: u32, len: u32) {
     let mut addr = page_start;
 
     while addr < end {
-        if let Some(entry_id) = find_existing_entry(addr) {
-            let vaddr = entry_id_to_vaddr(entry_id);
+        invalidate_mapped_page(addr, page_size);
+        addr = addr.saturating_add(page_size);
+    }
+}
+
+/// Drop cache lines for every MMU entry that maps `page_paddr`.
+///
+/// One physical page can appear more than once. On C2, C3, and S3 the same
+/// entry is also visible through a separate I-bus window, so both vaddrs are
+/// invalidated.
+#[cfg(not(esp32))]
+#[ram]
+fn invalidate_mapped_page(page_paddr: u32, page_size: u32) {
+    let page = flash_page_number(page_paddr);
+    let (start, end) = mmu_entry_scan_range();
+
+    for entry_id in start..end {
+        if entry_is_valid(entry_id)
+            && entry_is_flash_mapping(entry_id)
+            && entry_flash_page(entry_id) == page
+        {
+            invalidate_entry_caches(entry_id, page_size);
+        }
+    }
+}
+
+#[cfg(not(esp32))]
+#[ram]
+fn invalidate_entry_caches(entry_id: u32, page_size: u32) {
+    cfg_select! {
+        esp32s2 => {
+            let vaddr = s2::entry_id_to_vaddr(entry_id);
             if !vaddr.is_null() {
                 invalidate_cache_addr(vaddr as u32, page_size);
             }
         }
-        addr = addr.saturating_add(page_size);
+        _ => {
+            let offset = entry_id * page_size;
+            let drom = memory_range!("DROM").start as u32 + offset;
+            invalidate_cache_addr(drom, page_size);
+            let irom = memory_range!("IROM").start as u32 + offset;
+            if irom != drom {
+                invalidate_cache_addr(irom, page_size);
+            }
+        }
     }
 }
 
@@ -308,35 +346,11 @@ fn mmu_page_size() -> u32 {
 
 #[cfg(not(esp32))]
 #[ram]
-fn entry_id_to_vaddr(entry_id: u32) -> *const u8 {
-    cfg_select! {
-        esp32s2 => s2::entry_id_to_vaddr(entry_id),
-        _ => {
-            let base = memory_range!("DROM").start as u32;
-            (base + entry_id * mmu_page_size()) as *const u8
-        }
-    }
-}
-
-#[cfg(not(esp32))]
-#[ram]
-fn find_existing_entry(page_paddr: u32) -> Option<u32> {
-    let page = flash_page_number(page_paddr);
-    let (start, end) = mmu_entry_scan_range();
-
-    (start..end).find(|&entry_id| {
-        entry_is_valid(entry_id)
-            && entry_is_flash_mapping(entry_id)
-            && entry_flash_page(entry_id) == page
-    })
-}
-
-#[cfg(not(esp32))]
-#[ram]
 fn mmu_entry_scan_range() -> (u32, u32) {
     cfg_select! {
         not(soc_has_mmu_table) => (0, property!("mmu.entry_num")),
-        esp32s2 => (s2::DATA_ENTRY_START, s2::DATA_ENTRY_END),
+        // Include I-bus slots (0..0x80). Skip DBUS2/DPORT (0x140..).
+        esp32s2 => (0, s2::DATA_ENTRY_END),
         _ => (0, property!("mmu.entry_num")),
     }
 }
@@ -495,17 +509,23 @@ mod table {
 
 #[cfg(esp32s2)]
 mod s2 {
-    pub(super) const DATA_ENTRY_START: u32 = 0x200 / 4;
+    use procmacros::ram;
+
     pub(super) const DATA_ENTRY_END: u32 = 0x500 / 4;
 
+    #[ram]
     pub(super) fn entry_id_to_vaddr(entry_id: u32) -> *const u8 {
         let page_size = super::mmu_page_size();
-        let relative = match entry_id {
-            0x80..0xC0 => entry_id - 0x80,
-            0xC0..0x100 => entry_id - 0xC0,
-            0x100..0x140 => entry_id - 0x100,
+        // Matches `mmu_ll_entry_id_to_vaddr_base()`: IBUS0/1 at 0x4000_0000,
+        // DROM/DBUS at 0x3F00_0000. Skip DBUS2/DPORT (0x140..).
+        let (base, relative) = match entry_id {
+            0x00..0x40 => (0x4000_0000u32, entry_id),
+            0x40..0x80 => (0x4000_0000u32, entry_id - 0x40),
+            0x80..0xC0 => (0x3F00_0000u32, entry_id - 0x80),
+            0xC0..0x100 => (0x3F00_0000u32, entry_id - 0xC0),
+            0x100..0x140 => (0x3F00_0000u32, entry_id - 0x100),
             _ => return core::ptr::null(),
         };
-        (0x3F00_0000u32 + relative * page_size) as *const u8
+        (base + relative * page_size) as *const u8
     }
 }

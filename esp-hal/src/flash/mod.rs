@@ -8,8 +8,9 @@
 //!
 //! Write and erase are NOR-flash operations: bits can only change from 1 to 0
 //! without an erase. There is no read-modify-write. [`Flash::read`] and
-//! [`Flash::write`] require a 4-byte-aligned flash offset, length, and buffer
-//! in internal RAM. [`Flash::erase`] requires 4096-byte alignment.
+//! [`Flash::write`] take word slices (`&[u32]`) and a 4-byte-aligned flash
+//! offset; the buffer must be in internal RAM. [`Flash::erase`] requires
+//! 4096-byte alignment.
 //!
 //! ## Configuration
 //!
@@ -22,12 +23,9 @@
 //! # {before_snippet}
 //! use esp_hal::flash::{Config, Flash};
 //!
-//! #[repr(align(4))]
-//! struct Aligned([u8; 32]);
-//!
 //! let mut flash = Flash::new(peripherals.FLASH, Config::default())?;
-//! let mut buf = Aligned([0u8; 32]);
-//! flash.read(0x10_020, &mut buf.0)?;
+//! let mut buf = [0u32; 8];
+//! flash.read(0x10_020, &mut buf)?;
 //! # {after_snippet}
 //! ```
 //!
@@ -167,11 +165,10 @@ pub enum Error {
     IoTimeout,
     /// The chip status bits still protect the target range.
     Locked,
-    /// Address, length, or buffer pointer is not aligned for this operation.
+    /// Address or length is not aligned for this operation.
     ///
     /// [`Flash::read`] and [`Flash::write`] require a 4-byte-aligned flash
-    /// offset, length, and buffer pointer. [`Flash::erase`] requires a
-    /// 4096-byte range.
+    /// offset. [`Flash::erase`] requires a 4096-byte range.
     NotAligned,
     /// The range exceeds the detected flash capacity, or `from` > `to`.
     OutOfBounds,
@@ -196,7 +193,7 @@ impl core::fmt::Display for Error {
             Self::IoError => write!(f, "Flash I/O error"),
             Self::IoTimeout => write!(f, "Flash I/O timed out"),
             Self::Locked => write!(f, "Flash is locked for writing"),
-            Self::NotAligned => write!(f, "Flash address, length, or buffer is not aligned"),
+            Self::NotAligned => write!(f, "Flash address or length is not aligned"),
             Self::OutOfBounds => write!(f, "Flash range is out of bounds"),
             Self::NotSupported => write!(f, "Flash operation is not supported"),
             #[cfg(all(multi_core, feature = "unstable"))]
@@ -307,46 +304,40 @@ ROM does not. Without that, this method returns
         }
     }
 
-    /// Reads `data.len()` bytes starting at `offset`.
+    /// Reads `data.len()` words starting at `offset`.
     ///
-    /// `offset` and `data.len()` must be multiples of 4. `data` must be in
-    /// internal RAM and word-aligned.
-    ///
-    /// Transfers larger than 16 KiB are split into multiple ROM calls (ESP-IDF
-    /// `MAX_READ_CHUNK`). Flash-backed caches are resumed between chunks.
+    /// `offset` must be a multiple of 4. `data` must be in internal RAM.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NotAligned`] if `offset`, `data.len()`, or the buffer
-    /// pointer is not a multiple of 4, [`Error::OutOfBounds`] if the range
-    /// exceeds [`Self::capacity`], or [`Error::NotSupported`] if `data` is not
-    /// in internal RAM.
+    /// Returns [`Error::NotAligned`] if `offset` is not a multiple of 4,
+    /// [`Error::OutOfBounds`] if the range exceeds [`Self::capacity`], or
+    /// [`Error::NotSupported`] if `data` is not in internal RAM.
     #[ram]
-    pub fn read(&mut self, offset: u32, data: &mut [u8]) -> Result<(), Error> {
+    pub fn read(&mut self, offset: u32, data: &mut [u32]) -> Result<(), Error> {
+        let Some(len) = byte_len(data) else {
+            return Err(Error::OutOfBounds);
+        };
         if data.is_empty() {
             return self.check_bounds(offset, 0);
         }
 
-        self.check_alignment(WORD_SIZE, offset, data.len())?;
-        self.check_bounds(offset, data.len())?;
+        self.check_word_offset(offset)?;
+        self.check_bounds(offset, len)?;
         check_buffer(data)?;
-        self.read_chunked(offset, data)
+        self.with_guard(None, |_| rom::read(offset, data))
     }
 
     /// Writes `data` starting at `offset` using NOR flash semantics.
     ///
-    /// The target must already be erased. `offset` and `data.len()` must be
-    /// multiples of 4. `data` must be in internal RAM and word-aligned.
-    ///
-    /// Transfers larger than 8 KiB are split into multiple ROM calls (ESP-IDF
-    /// `MAX_WRITE_CHUNK`). Flash-backed caches are resumed between chunks.
+    /// The target must already be erased. `offset` must be a multiple of 4.
+    /// `data` must be in internal RAM.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::NotAligned`] if `offset`, `data.len()`, or the buffer
-    /// pointer is not a multiple of 4, [`Error::OutOfBounds`] if the range
-    /// exceeds [`Self::capacity`], or [`Error::NotSupported`] if `data` is not
-    /// in internal RAM.
+    /// Returns [`Error::NotAligned`] if `offset` is not a multiple of 4,
+    /// [`Error::OutOfBounds`] if the range exceeds [`Self::capacity`], or
+    /// [`Error::NotSupported`] if `data` is not in internal RAM.
     ///
     /// # Safety
     ///
@@ -355,16 +346,19 @@ ROM does not. Without that, this method returns
     /// the running image, or mutates `static` / `.rodata` the compiler treats
     /// as immutable.
     #[ram]
-    pub unsafe fn write(&mut self, offset: u32, data: &[u8]) -> Result<(), Error> {
+    pub unsafe fn write(&mut self, offset: u32, data: &[u32]) -> Result<(), Error> {
+        let Some(len) = byte_len(data) else {
+            return Err(Error::OutOfBounds);
+        };
         if data.is_empty() {
             return self.check_bounds(offset, 0);
         }
 
-        self.check_alignment(WORD_SIZE, offset, data.len())?;
-        self.check_bounds(offset, data.len())?;
+        self.check_word_offset(offset)?;
+        self.check_bounds(offset, len)?;
         check_buffer(data)?;
         self.ensure_unlocked()?;
-        self.write_chunked(offset, data)
+        self.with_guard(Some((offset, len as u32)), |_| rom::write(offset, data))
     }
 
     /// Erases flash in `[from, to)`.
@@ -397,22 +391,32 @@ ROM does not. Without that, this method returns
         self.check_alignment(SECTOR_SIZE, from, len)?;
         self.check_bounds(from, len)?;
         self.ensure_unlocked()?;
-        self.erase_chunked(from, to)
+        self.erase_range(from, to)
     }
 }
 
 #[ram]
-fn check_buffer(buf: &[u8]) -> Result<(), Error> {
+fn byte_len(data: &[u32]) -> Option<usize> {
+    data.len().checked_mul(WORD_SIZE as usize)
+}
+
+#[ram]
+fn check_buffer(buf: &[u32]) -> Result<(), Error> {
     if !is_slice_in_dram(buf) {
         return Err(Error::NotSupported);
-    }
-    if !(buf.as_ptr() as usize).is_multiple_of(WORD_SIZE as usize) {
-        return Err(Error::NotAligned);
     }
     Ok(())
 }
 
 impl Flash<'_, Blocking> {
+    #[ram]
+    fn check_word_offset(&self, offset: u32) -> Result<(), Error> {
+        if !offset.is_multiple_of(WORD_SIZE) {
+            return Err(Error::NotAligned);
+        }
+        Ok(())
+    }
+
     #[ram]
     fn check_alignment(&self, align: u32, offset: u32, length: usize) -> Result<(), Error> {
         if !offset.is_multiple_of(align) || !length.is_multiple_of(align as usize) {
@@ -467,31 +471,7 @@ impl Flash<'_, Blocking> {
     }
 
     #[ram]
-    fn read_chunked(&mut self, mut offset: u32, mut data: &mut [u8]) -> Result<(), Error> {
-        while !data.is_empty() {
-            let n = data.len().min(rom::ROM_READ_CHUNK);
-            let dest = &mut data[..n];
-            self.with_guard(None, |_| rom::read(offset, dest))?;
-            offset += n as u32;
-            data = &mut data[n..];
-        }
-        Ok(())
-    }
-
-    #[ram]
-    fn write_chunked(&mut self, mut offset: u32, mut data: &[u8]) -> Result<(), Error> {
-        while !data.is_empty() {
-            let n = data.len().min(rom::ROM_WRITE_CHUNK);
-            let src = &data[..n];
-            self.with_guard(Some((offset, n as u32)), |_| rom::write(offset, src))?;
-            offset += n as u32;
-            data = &data[n..];
-        }
-        Ok(())
-    }
-
-    #[ram]
-    fn erase_chunked(&mut self, from: u32, to: u32) -> Result<(), Error> {
+    fn erase_range(&mut self, from: u32, to: u32) -> Result<(), Error> {
         let mut address = from;
         while address < to && !address.is_multiple_of(BLOCK_SIZE) {
             self.with_guard(Some((address, SECTOR_SIZE)), |_| {
