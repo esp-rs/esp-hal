@@ -60,21 +60,21 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:compile-test') }}
         shell: bash
         run: |
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s2
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s3
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32s31
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c2
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c3
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c5
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c6
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c61
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32p4
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32h2
+          cargo xtask build compile-tests all esp32 --toolchain esp
+          cargo xtask build compile-tests all esp32s2 --toolchain esp
+          cargo xtask build compile-tests all esp32s3 --toolchain esp
+          cargo xtask build compile-tests all esp32s31 --toolchain stable
+          cargo xtask build compile-tests all esp32c2 --toolchain stable
+          cargo xtask build compile-tests all esp32c3 --toolchain stable
+          cargo xtask build compile-tests all esp32c5 --toolchain stable
+          cargo xtask build compile-tests all esp32c6 --toolchain stable
+          cargo xtask build compile-tests all esp32c61 --toolchain stable
+          cargo xtask build compile-tests all esp32p4 --toolchain stable
+          cargo xtask build compile-tests all esp32h2 --toolchain stable
 
-      # Build the examples/qa-test/tests against the local registry. Gated on
+      # Build the examples/qa/tests against the local registry. Gated on
       # `release:registry:ci` so a release can opt out of this heavy check.
-      - name: try-build [examples/qa-test/tests]
+      - name: try-build [examples/qa/tests]
         if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:ci') }}
         shell: bash
         run: |
