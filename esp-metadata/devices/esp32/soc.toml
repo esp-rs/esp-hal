@@ -18,6 +18,9 @@ support_note = "Revisions below v3.0 are not supported."
 page_size = 0x10000
 entry_num = 256
 
+[device.flash]
+support_status = "partial"
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
