@@ -123,7 +123,11 @@ pub fn dispatch(
     let mut lib_packages = Vec::new();
 
     for package in &resolution.packages {
-        if is_test_package(*package) {
+        // `esp-lp-hal` holds examples but is a crate as well, so checking it without naming an
+        // example checks the crate.
+        if verb == Verb::Check && resolution.names.is_empty() && package.is_published() {
+            lib_packages.push(*package);
+        } else if is_test_package(*package) {
             dispatch_tests(
                 workspace,
                 verb,
