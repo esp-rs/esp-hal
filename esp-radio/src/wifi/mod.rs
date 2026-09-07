@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 32423)
+Total output lines: 3753
+
 //! # Wi-Fi (Station, Access Point and Station/AP-coexistence)
 //!
 //! ## Introduction
@@ -36,13 +39,14 @@
 //!    available.
 //! 6. Uses an Embassy TCP or UDP socket to send and receive application data.
 //!
-//! The [`embassy_dhcp`] example contains the complete setup and sends an HTTP
-//! request over TCP. The [`embassy_sntp`] example shows how to send and receive
-//! UDP datagrams.
+//! The minimal [`embassy_udp`] example contains the complete setup, creates an
+//! `embassy_net::udp::UdpSocket` directly, and sends `b"banana"` to another
+//! machine. The [`embassy_dhcp`] example builds on the same setup to resolve a
+//! host name and send an HTTP request over TCP.
 //!
 //! [`embassy-net`]: https://docs.embassy.dev/embassy-net/
+//! [`embassy_udp`]: https://github.com/esp-rs/esp-hal/tree/main/examples/wifi/embassy_udp
 //! [`embassy_dhcp`]: https://github.com/esp-rs/esp-hal/tree/main/examples/wifi/embassy_dhcp
-//! [`embassy_sntp`]: https://github.com/esp-rs/esp-hal/tree/main/examples/wifi/embassy_sntp
 //!
 //! ## Expected heap memory usage
 //!
@@ -1845,240 +1849,7 @@ pub struct RxControlInfo {
     /// Length of the dump buffer.
     pub dump_len: u32,
     /// Length of HE-SIG-B field (802.11ax).
-    pub he_sigb_len: u32,
-    /// Current baseband format.
-    pub cur_bb_format: u32,
-    /// Channel estimation validity.
-    pub rx_channel_estimate_info_vld: u32,
-    /// Length of the channel estimation.
-    pub rx_channel_estimate_len: u32,
-    /// The secondary channel if in HT40. Otherwise invalid.
-    pub secondary_channel: SecondaryChannel,
-    /// Primary channel on which the packet is received.
-    pub channel: u32,
-    /// Noise floor of the Radio Frequency module, in dBm.
-    pub noise_floor: i32,
-    /// Indicates if this is a group-addressed frame.
-    pub is_group: u32,
-    /// End state of the packet reception.
-    pub rxend_state: u32,
-    /// Indicate whether the reception frame is from interface 3.
-    pub rxmatch3: u32,
-    /// Indicate whether the reception frame is from interface 2.
-    pub rxmatch2: u32,
-    /// Indicate whether the reception frame is from interface 1.
-    pub rxmatch1: u32,
-    /// Indicate whether the reception frame is from interface 0.
-    pub rxmatch0: u32,
-    /// The local time when this packet is received. It is precise only if modem sleep or light
-    /// sleep is not enabled. unit: microsecond.
-    pub timestamp: Instant,
-}
-
-#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
-impl RxControlInfo {
-    // Signed bitfields are broken in rust-bindgen, see
-    // https://github.com/esp-rs/esp-wifi-sys/issues/482.
-    // Casting through u8 makes the intended 8-bit truncation explicit before sign extension.
-    const fn sign_extend_i8_bitfield(value: i32) -> i32 {
-        (value as u8 as i8) as i32
-    }
-
-    /// Create an instance from a raw pointer to [wifi_pkt_rx_ctrl_t].
-    ///
-    /// # Safety
-    /// When calling this, you must ensure, that `rx_cntl` points to a valid
-    /// instance of [wifi_pkt_rx_ctrl_t].
-    pub(super) unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
-        #[cfg(wifi_mac_version = "1")]
-        let rx_control_info = unsafe {
-            RxControlInfo {
-                rssi: Self::sign_extend_i8_bitfield((*rx_cntl).rssi()),
-                rate: (*rx_cntl).rate(),
-                sig_mode: (*rx_cntl).sig_mode(),
-                mcs: (*rx_cntl).mcs(),
-                cwb: (*rx_cntl).cwb(),
-                smoothing: (*rx_cntl).smoothing(),
-                not_sounding: (*rx_cntl).not_sounding(),
-                aggregation: (*rx_cntl).aggregation(),
-                stbc: (*rx_cntl).stbc(),
-                fec_coding: (*rx_cntl).fec_coding(),
-                sgi: (*rx_cntl).sgi(),
-                ampdu_cnt: (*rx_cntl).ampdu_cnt(),
-                channel: (*rx_cntl).channel(),
-                secondary_channel: SecondaryChannel::from_raw_or_default(
-                    (*rx_cntl).secondary_channel(),
-                ),
-                timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
-                noise_floor: Self::sign_extend_i8_bitfield((*rx_cntl).noise_floor()),
-                ant: (*rx_cntl).ant(),
-                sig_len: (*rx_cntl).sig_len(),
-                rx_state: (*rx_cntl).rx_state(),
-            }
-        };
-        #[cfg(wifi_mac_version = "2")]
-        let rx_control_info = unsafe {
-            RxControlInfo {
-                rssi: Self::sign_extend_i8_bitfield((*rx_cntl).rssi()),
-                rate: (*rx_cntl).rate(),
-                sig_len: (*rx_cntl).sig_len(),
-                rx_state: (*rx_cntl).rx_state(),
-                dump_len: (*rx_cntl).dump_len(),
-                he_sigb_len: (*rx_cntl).he_sigb_len(),
-                cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
-                cur_bb_format: (*rx_cntl).cur_bb_format(),
-                rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
-                rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-                secondary_channel: SecondaryChannel::from_raw_or_default((*rx_cntl).second()),
-                channel: (*rx_cntl).channel(),
-                noise_floor: Self::sign_extend_i8_bitfield((*rx_cntl).noise_floor()),
-                is_group: (*rx_cntl).is_group(),
-                rxend_state: (*rx_cntl).rxend_state(),
-                rxmatch3: (*rx_cntl).rxmatch3(),
-                rxmatch2: (*rx_cntl).rxmatch2(),
-                rxmatch1: (*rx_cntl).rxmatch1(),
-                rxmatch0: (*rx_cntl).rxmatch0(),
-                timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
-            }
-        };
-        #[cfg(wifi_mac_version = "3")]
-        let rx_control_info = unsafe {
-            RxControlInfo {
-                rssi: Self::sign_extend_i8_bitfield((*rx_cntl).rssi()),
-                rate: (*rx_cntl).rate(),
-                sig_len: (*rx_cntl).sig_len(),
-                rx_state: (*rx_cntl).rx_state(),
-                dump_len: (*rx_cntl).dump_len(),
-                he_sigb_len: (*rx_cntl).sigb_len(),
-                cur_bb_format: (*rx_cntl).cur_bb_format(),
-                rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
-                rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-                secondary_channel: SecondaryChannel::from_raw_or_default((*rx_cntl).second()),
-                channel: (*rx_cntl).channel(),
-                noise_floor: Self::sign_extend_i8_bitfield((*rx_cntl).noise_floor()),
-                is_group: (*rx_cntl).is_group(),
-                rxend_state: (*rx_cntl).rxend_state(),
-                rxmatch3: (*rx_cntl).rxmatch3(),
-                rxmatch2: (*rx_cntl).rxmatch2(),
-                rxmatch1: (*rx_cntl).rxmatch1(),
-                rxmatch0: (*rx_cntl).rxmatch0(),
-                timestamp: Instant::EPOCH + Duration::from_micros((*rx_cntl).timestamp() as u64),
-            }
-        };
-        rx_control_info
-    }
-}
-
-#[doc(hidden)]
-/// This token is deliberately hidden to avoid polluting the crate namespace with these typically
-/// advanced usage types. We can't make them private, as they're used in various built-in network
-/// stack impls. Once we are ready to stabilize these, we can remove the doc hidden cfg.
-pub struct WifiRxToken {
-    mode: InterfaceType,
-}
-
-impl WifiRxToken {
-    /// Consumes the RX token and applies the callback function to the received
-    /// data buffer.
-    pub fn consume_token<R, F>(self, f: F) -> R
-    where
-        F: FnOnce(&mut [u8]) -> R,
-    {
-        let mut data = self.mode.data_queue_rx().with(|queue| {
-            unwrap!(
-                queue.pop_front(),
-                "unreachable: transmit()/receive() ensures there is a packet to process"
-            )
-        });
-
-        // We handle the received data outside of the lock because
-        // PacketBuffer::drop must not be called in a critical section.
-        // Dropping an PacketBuffer will call `esp_wifi_internal_free_rx_buffer`
-        // which will try to lock an internal mutex. If the mutex is already
-        // taken, the function will try to trigger a context switch, which will
-        // fail if we are in an interrupt-free context.
-        let buffer = data.as_slice_mut();
-        dump_packet_info(buffer);
-
-        f(buffer)
-    }
-}
-
-#[doc(hidden)]
-/// This token is deliberately hidden to avoid polluting the crate namespace with these typically
-/// advanced usage types. We can't make them private, as they're used in various built-in network
-/// stack impls. Once we are ready to stabilize these, we can remove the doc hidden cfg.
-pub struct WifiTxToken {
-    mode: InterfaceType,
-}
-
-impl WifiTxToken {
-    /// Consumes the TX token and applies the callback function to the received
-    /// data buffer.
-    pub fn consume_token<R, F>(self, len: usize, f: F) -> R
-    where
-        F: FnOnce(&mut [u8]) -> R,
-    {
-        self.mode.increase_in_flight_counter();
-
-        let mut buffer: [u8; MTU] = [0u8; MTU];
-        let buffer = &mut buffer[..len];
-
-        let res = f(buffer);
-
-        esp_wifi_send_data(self.mode.interface(), buffer);
-
-        res
-    }
-}
-
-// FIXME data here has to be &mut because of `esp_wifi_internal_tx` signature,
-// requiring a *mut ptr to the buffer Casting const to mut is instant UB, even
-// though in reality `esp_wifi_internal_tx` copies the buffer into its own
-// memory and does not modify
-pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
-    // `esp_wifi_internal_tx` will crash if wifi is uninitialized or de-inited
-
-    state::locked(|| {
-        // even checking for !Uninitialized would be enough to not crash
-        if (interface == wifi_interface_t_WIFI_IF_STA
-            && !matches!(station_state(), WifiStationState::Connected))
-            || (interface == wifi_interface_t_WIFI_IF_AP
-                && !matches!(access_point_state(), WifiAccessPointState::Started))
-        {
-            return;
-        }
-
-        trace!("sending... {} bytes", data.len());
-        dump_packet_info(data);
-
-        let len = data.len() as u16;
-        let ptr = data.as_mut_ptr().cast();
-
-        let res = unsafe { esp_wifi_internal_tx(interface, ptr, len) };
-
-        if res != include::ESP_OK as i32 {
-            warn!("esp_wifi_internal_tx returned error: {}", res);
-            decrement_inflight_counter();
-        }
-    })
-}
-
-fn dump_packet_info(_buffer: &mut [u8]) {
-    #[cfg(dump_packets)]
-    {
-        info!("@WIFIFRAME {:?}", _buffer);
-    }
-}
-
-macro_rules! esp_wifi_result {
-    ($value:expr) => {{
-        use num_traits::FromPrimitive;
-        let result = $value;
-        if result != $crate::sys::include::ESP_OK as i32 {
-            let error = unwrap!(FromPrimitive::from_i32(result));
-            warn!(
-                "{} returned an error: {:?} ({}). If this error is unmapped, please open an issue at <https://github.com/esp-rs/esp-hal/issues>.",
+    p…2423 tokens truncated…apped, please open an issue at <https://github.com/esp-rs/esp-hal/issues>.",
                 stringify!($value),
                 error,
                 result
