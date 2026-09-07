@@ -32,46 +32,71 @@ cargo xtask run example embassy_hello_world --chip=esp32c6
 
 Again, note that we must specify which package to build the example from, plus which example to build and flash to the target device.
 
-## Wi-Fi Networking
+## Wi-Fi networking
 
 The Wi-Fi examples use `esp-radio` for the IEEE 802.11 link and `embassy-net`
-for DHCP, DNS, TCP, and UDP. Both ESP32-C3 and ESP32-S3 run the same example
-source. The `--chip` argument selects the target and chip-specific Cargo
-features.
+for DHCP, DNS, TCP, and UDP. The ESP32-C3 and ESP32-S3 run the same source, but
+use different architectures:
 
-Start with `embassy_dhcp`. It connects in Station mode, obtains an IPv4 address
-through DHCP, resolves `httpbin.org`, and sends an HTTP request over TCP. Set
-the access point credentials as build-time environment variables:
+| Chip | Architecture | Target selected by `xtask` |
+| --- | --- | --- |
+| ESP32-C3 | RISC-V | `riscv32imc-unknown-none-elf` |
+| ESP32-S3 | Xtensa | `xtensa-esp32s3-none-elf` using the `esp` toolchain |
+
+Install the prerequisites from [The Rust on ESP Book] before running an
+example. The `--chip` argument then selects the correct target, toolchain, and
+chip features.
+
+Start with `embassy_udp`. It connects to a WPA2-Personal network in station
+mode, obtains an IPv4 address
+through DHCP, creates an `embassy_net::udp::UdpSocket` directly, and sends
+`b"banana"` to a configurable address. On a Linux PC connected to the same
+network, start a UDP listener (and allow UDP port 5000 through its firewall):
+
+```shell
+nc -u -l 5000
+```
+
+Find that PC's local IP address, then set it along with the access point
+credentials as build-time environment variables:
 
 ```shell
 SSID='your-network' PASSWORD='your-password' \
-  cargo xtask run example embassy_dhcp --chip=esp32c3
+  UDP_DESTINATION='192.168.1.100:5000' \
+  cargo xtask run example embassy_udp --chip=esp32c3
 ```
 
 For ESP32-S3, change only the chip argument:
 
 ```shell
 SSID='your-network' PASSWORD='your-password' \
-  cargo xtask run example embassy_dhcp --chip=esp32s3
+  UDP_DESTINATION='192.168.1.100:5000' \
+  cargo xtask run example embassy_udp --chip=esp32s3
 ```
 
-`SSID` and `PASSWORD` are compiled into the example firmware. Do not commit
-real credentials to a source file or repository.
+`SSID`, `PASSWORD`, and `UDP_DESTINATION` are compiled into the example
+firmware. Do not commit real credentials to a source file or repository. When
+`banana` appears in `nc`, type a reply and press Enter; the example receives it
+with `recv_from()` and prints the bytes to the serial console.
 
 Use the example that matches the networking task:
 
 | Task | Example | Application protocol |
 | --- | --- | --- |
+| Send and receive arbitrary bytes | `embassy_udp` | DHCP and UDP |
 | Connect to a router and make a web request | `embassy_dhcp` | DNS, TCP, and HTTP |
 | Send and receive UDP datagrams | `embassy_sntp` | DNS, UDP, and SNTP |
 | Create a Wi-Fi network and serve a page | `embassy_access_point` | TCP and HTTP |
 | Run Access Point and Station modes together | `embassy_access_point_with_sta` | DNS, TCP, and HTTP |
 | Run Wi-Fi and Bluetooth Low Energy together | `embassy_coex` | DNS, TCP, HTTP, and BLE |
 
-For custom application data, keep the radio, connection task, network runner,
-and DHCP setup from `embassy_dhcp`. Replace its HTTP client with an
-`embassy_net::tcp::TcpSocket` or `embassy_net::udp::UdpSocket`. Create sockets
-only after `stack.wait_config_up().await` completes.
+For custom application data, start from `embassy_udp`: change the payload and
+destination passed to `send_to()`. Create sockets only after
+`stack.wait_config_up().await` completes. This deliberately minimal example
+connects once; applications that must survive an access-point restart should
+run connection management in a separate task, as `embassy_dhcp` does.
+
+[The Rust on ESP Book]: https://docs.espressif.com/projects/rust/book/getting-started/toolchain.html
 
 ## Adding Examples
 
