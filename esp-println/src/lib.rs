@@ -182,7 +182,7 @@ mod auto_printer {
             ))]
             const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
             #[cfg(feature = "esp32s3")]
-            const USB_DEVICE_INT_RAW: *const u32 = 0x60038000 as *const u32;
+            const USB_DEVICE_INT_RAW: *const u32 = 0x60038008 as *const u32;
             #[cfg(feature = "esp32p4")]
             const USB_DEVICE_INT_RAW: *const u32 = 0x500D2008 as *const u32;
             #[cfg(feature = "esp32s31")]
