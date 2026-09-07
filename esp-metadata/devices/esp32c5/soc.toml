@@ -115,8 +115,8 @@ peripherals = [
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
     # { name = "TRACE0", pac = "TRACE" },
-    # { name = "TWAI0" }, # TODO: too different from what we know
-    # { name = "TWAI1" }, # TODO: too different from what we know
+    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" }, clock_group = "TWAI" },
+    { name = "TWAI1", interrupts = { peri = "TWAI1", timer = "TWAI1_TIMER" }, clock_group = "TWAI" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0" },
@@ -331,7 +331,11 @@ has_region_monitor = true
 support_status = { status = "not_supported", issue = 5168 }
 
 [device.canfd]
-support_status = { status = "not_supported", issue = 5163 }
+support_status = "partial"
+instances = [
+    { name = "twai0", sys_instance = "Twai0", rx = "TWAI0_RX", tx = "TWAI0_TX" },
+    { name = "twai1", sys_instance = "Twai1", rx = "TWAI1_RX", tx = "TWAI1_TX" },
+]
 
 [device.key_manager]
 support_status = { status = "not_supported", issue = 5171 }
