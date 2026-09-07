@@ -6,42 +6,45 @@ use std::{
 };
 
 use anyhow::{Context as _, Result, bail};
-use clap::{Args, Subcommand};
+use clap::Args;
 use serde::Deserialize;
+use strum::IntoEnumIterator as _;
 
-use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::{self, Metadata},
     metadata::Chip,
     radio_hil_runner::run_radio_test_elf,
+    resolve::{ResolveInput, resolve},
 };
 
 // ----------------------------------------------------------------------------
-// Subcommands
+// Command Arguments
 
-#[derive(Debug, Subcommand)]
-pub enum Run {
-    /// Run doctests for specified chip and package.
-    DocTests(DocTestArgs),
-    /// Run all ELFs in a folder.
-    Elfs(RunElfsArgs),
-    /// Run the given example for the specified chip.
-    Example(ExamplesArgs),
-    /// Run all applicable tests or the specified test for a specified chip.
-    Tests(TestsArgs),
+/// Arguments common to commands which act on doctests.
+#[cfg_attr(
+    feature = "mcp",
+    xtask_mcp_macros::mcp_tool(
+        description = "Run doc tests for the specified chip and packages",
+        command = "doc-tests"
+    )
+)]
+#[derive(Debug, Args)]
+pub struct DocTestArgs {
+    /// Chip and/or package, in any order. Doc tests run on one chip, so the chip is required.
+    pub tokens: Vec<String>,
+    /// Package(s) where we wish to run doc tests. Accepts the same names the tokens do.
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',')]
+    pub packages: Vec<Package>,
 }
-
-// ----------------------------------------------------------------------------
-// Subcommand Arguments
 
 /// Arguments for running ELFs.
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
         description = "Run all ELFs in a folder using probe-rs. Use --filter binary or binary::test_name to select which ELFs/tests run.",
-        command = "run elfs"
+        command = "elfs"
     )
 )]
 #[derive(Debug, Args)]
@@ -63,9 +66,24 @@ pub struct RunElfsArgs {
 
 /// Run doc tests for the specified package and chip.
 pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
+    let mut input = ResolveInput::from_tokens(args.tokens);
+    input.packages = args.packages;
+    let resolution = resolve(input);
+    if !resolution.names.is_empty() {
+        bail!("Unknown argument: {}", resolution.names.join(", "));
+    }
+    let [chip] = resolution.chips[..] else {
+        bail!("Name exactly one chip to run doc tests for");
+    };
+    let packages = if resolution.packages.is_empty() {
+        Package::iter().collect()
+    } else {
+        resolution.packages
+    };
+
     let mut success = true;
-    for package in args.packages {
-        success &= run_doc_tests_for_package(workspace, package, args.chip)?;
+    for package in packages {
+        success &= run_doc_tests_for_package(workspace, package, chip)?;
     }
     anyhow::ensure!(success, "One or more doc tests failed");
     Ok(())
@@ -92,8 +110,7 @@ pub fn run_doc_tests_for_package(workspace: &Path, package: Package, chip: Chip)
         return Ok(true);
     };
 
-    let package_name = package.to_string();
-    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
     if package.has_chip_features() {
         doc_config.features.push(chip.to_string());
@@ -416,15 +433,17 @@ fn resolve_harness_binary_path(elfs: &[(String, PathBuf)], harness_name: &str) -
 
 /// Run the specified examples for the given chip.
 pub fn run_examples(
-    args: ExamplesArgs,
+    package: Package,
+    chip: Chip,
+    debug: bool,
+    toolchain: Option<&str>,
+    timings: bool,
     examples: Vec<Metadata>,
     package_path: &Path,
 ) -> Result<()> {
     let mut examples = examples;
 
-    // At this point, chip can never be `None`, so we can safely unwrap it.
-    let chip = args.chip.unwrap();
-    let target = args.package.as_package().target_triple(&chip)?;
+    let target = package.target_triple(&chip)?;
 
     examples.sort_by_key(|ex| ex.tag());
 
@@ -467,9 +486,9 @@ pub fn run_examples(
                 &target,
                 &example,
                 CargoAction::Run,
-                args.debug,
-                args.toolchain.as_deref(),
-                args.timings,
+                debug,
+                toolchain,
+                timings,
                 &[],
             );
 

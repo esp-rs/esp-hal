@@ -184,14 +184,15 @@ jobs:
         run: |
           CHIPS=$(echo "$MATRIX" | jq -r '.target[].soc')
           for chip in $CHIPS; do
+            # `build` accepts any chip token, `ci` rejects a chip this ref never learned.
             if [ "$PROBE_XTASK" = "true" ] && \
-               ! cargo xtask build tests "$chip" --help >/dev/null 2>&1; then
+               ! cargo xtask ci "$chip" --help >/dev/null 2>&1; then
               echo "Skipping $chip: not supported by this ref's xtask"
               continue
             fi
             if [ -n "$TESTS" ]; then
               echo "Building selected hil-test tests for $chip: $TESTS"
-              cargo xtask build tests "$chip" --tests "$TESTS"
+              cargo xtask build tests "$chip" --test "$TESTS"
             else
               echo "Building ALL hil-test tests for $chip"
               cargo xtask build tests "$chip"
@@ -226,17 +227,18 @@ jobs:
         run: |
           CHIPS=$(echo "$MATRIX" | jq -r '.target[].soc')
           for chip in $CHIPS; do
+            # See the hil-test build above for why the probe uses `ci`.
             if [ "$PROBE_XTASK" = "true" ] && \
-               ! cargo xtask build tests "$chip" hil-test-radio --help >/dev/null 2>&1; then
+               ! cargo xtask ci "$chip" --help >/dev/null 2>&1; then
               echo "Skipping $chip: not supported by this ref's xtask"
               continue
             fi
             if [ -n "$TESTS" ]; then
               echo "Building selected hil-test-radio tests for $chip: $TESTS"
-              cargo xtask build tests "$chip" hil-test-radio --tests "$TESTS"
+              cargo xtask build hil-test-radio "$chip" --test "$TESTS"
             else
               echo "Building ALL hil-test-radio tests for $chip"
-              cargo xtask build tests "$chip" hil-test-radio
+              cargo xtask build hil-test-radio "$chip"
             fi
           done
 
@@ -354,7 +356,7 @@ jobs:
             FILTER=(--filter "$TESTS")
           fi
 
-          ./esp-devtool run elfs "$SOC" "tests/$SOC" "${FILTER[@]}"
+          ./esp-devtool elfs "$SOC" "tests/$SOC" "${FILTER[@]}"
 
       - name: Clean up
         if: always()
@@ -447,7 +449,7 @@ jobs:
             FILTER=(--filter "$TESTS")
           fi
 
-          ./esp-devtool run elfs "$SOC" "tests/$SOC" "${FILTER[@]}"
+          ./esp-devtool elfs "$SOC" "tests/$SOC" "${FILTER[@]}"
 
       - name: Clean up
         if: always()

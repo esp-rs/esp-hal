@@ -23,21 +23,21 @@ Target device **MUST** be connected via its USB-Serial-JTAG port, or if unavaila
 You can run all tests for a given device by running the following command from the workspace root:
 
 ```shell
-cargo xtask run tests $CHIP
+cargo xtask test $CHIP
 ```
 
 To run a single test on a target, run the following command from the workspace root:
 
 ```shell
 # Run GPIO tests for ESP32-C6
-cargo xtask run tests esp32c6 --test gpio
+cargo xtask test esp32c6 gpio
 ```
 
 If you want to run a test multiple times:
 
 ```shell
 # Run GPIO tests for ESP32-C6
-cargo xtask run tests esp32c6 --test gpio --repeat 10
+cargo xtask test esp32c6 gpio --repeat 10
 ```
 
 Some tests will require physical connections, please see the current [configuration in our runners].

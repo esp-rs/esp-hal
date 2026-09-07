@@ -20,30 +20,34 @@ Bare-metal `no_std` Rust HAL for Espressif SoCs. MSRV: see `rust-version` in `es
 
 ## Commands
 
-All automation goes through `cargo xtask`. Scope the work with `--chips` and with the package name,
-which the `*-packages` commands take as a positional argument, not as `--packages`.
+All automation goes through `cargo xtask`. Daily commands (`build` / `run` / `check` / `test`) take
+free-form tokens (chip, crate, example, test, or package alias) in any order. A crate name is only
+for `check`, the other three build firmware: examples or HIL tests. Package aliases
+(`qa`, `tests`, `example`) work both as tokens and as `--package` values. `lint`, `ci`,
+`documentation`, and `doc-tests` take the chip name the same way — write `esp32c6`, not `--chip`.
 
 | Task | Command | Notes |
 |------|---------|-------|
-| Format (required before PR) | `cargo xtask fmt-packages` | Fast |
-| Lint | `cargo xtask lint-packages [<pkg>...] [--chips X]` | Always scope: every chip and package takes minutes |
-| Check | `cargo xtask check-packages [<pkg>...] [--chips X]` | Compiles without linting |
+| Format (required before PR) | `cargo xtask fmt` | Fast |
+| Lint | `cargo xtask lint [<pkg or chip>...]` | Always scope: every chip and package takes minutes |
+| Check | `cargo xtask check [<pkg or chip>...]` | Compiles without linting. No tokens checks all published crates on all chips |
+| Compile a crate for a chip | `cargo xtask check <crate> <chip>` | `build` is firmware only, crates go through `check` |
 | Host-side unit tests | `cargo xtask host-tests` | Fast, runs on host |
 | Validate metadata | `cargo update-metadata --check` | Fast |
 | Validate changelog | `cargo xtask check-changelog` | Fast |
-| Build one example | `cargo xtask build examples <name> --chip <chip> [--package <pkg>]` | Name is required — see below |
-| Build every example | `cargo xtask build examples all --chip <chip> [--package <pkg>]` | `--package qa-test` for the `qa-test` binaries |
-| Build and flash an example | `cargo xtask run example <name> --chip <chip>` | Requires a connected device |
-| Build docs | `cargo xtask build documentation --chips <list>` | Slow — scope to affected chips |
-| HIL tests (needs hardware) | `cargo xtask run tests <chip> [--test name]` | Requires connected device |
+| Build one example | `cargo xtask build <name> <chip>` | Name is required — see below |
+| Build every example | `cargo xtask build examples all <chip>` | `build qa all <chip>` for qa binaries |
+| Build and flash an example | `cargo xtask run <name>` | Requires a connected device; chip is inferred when omitted |
+| Build docs | `cargo xtask documentation [<chip>...]` | Slow — scope to affected chips |
+| HIL tests (needs hardware) | `cargo xtask test <chip> [<name>]` | Requires connected device |
 | Full CI check for one chip | `cargo xtask ci <chip>` | **Very slow** — use only as final check before opening a PR |
 
-**Name the example, always.** `build examples` and `run example` take the example name as their first
-argument, and `all` in that position means every example of the package. Leaving it out is not a
-shortcut for `all`: the command asks which example to act on, and an agent or a script gets an error
-instead of a build. The same holds for `--chip`.
+**Name the example, always.** `build` and `run` take the example name as a token, and `all` means
+every example of the package. Leaving it out is not a shortcut for `all`: the command asks which
+example to act on, and an agent or a script gets an error instead of a build. Name the chip too:
+only `run` and `test` read it off a connected device, `build` and `check` never do.
 
-**Prefer targeted commands** (`lint-packages esp-hal --chips X`, `build examples <name> --chip X`) during development. Only run `ci` as a final validation pass.
+**Prefer targeted commands** (`lint esp-hal esp32c6`, `build <name> esp32c6`) during development. Only run `ci` as a final validation pass.
 
 ## Test & example metadata
 
@@ -115,8 +119,8 @@ Prefer these over `#[cfg(feature = "esp32c3")]` where possible.
 
 ## PR checklist
 
-1. `cargo xtask fmt-packages`
-2. `cargo xtask lint-packages <affected packages> --chips <affected chips>` — fix all warnings
+1. `cargo xtask fmt`
+2. `cargo xtask lint <affected packages> <affected chips>` — fix all warnings
 3. `cargo update-metadata --check` — if metadata changed
 4. `cargo xtask check-pr-changelog` — add changelog entries to the PR description if API changed
 5. Build affected examples/tests for relevant chips

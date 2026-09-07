@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [build-dependencies]
-esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { path = "../../esp-metadata-generated", features = ["build-script"] }
 
 [dependencies]
 embassy-executor = "0.10.0"
@@ -17,23 +17,23 @@ embassy-sync = "0.8.0"
 embedded-graphics = "0.8.1"
 embedded-hal-async = "1.0.0"
 embedded-io-async = "0.7.0"
-esp-alloc = { path = "../esp-alloc" }
-esp-backtrace = { path = "../esp-backtrace", features = [
+esp-alloc = { path = "../../esp-alloc" }
+esp-backtrace = { path = "../../esp-backtrace", features = [
     "panic-handler",
     "println",
 ] }
-esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
-esp-hal = { path = "../esp-hal", features = ["log-04", "unstable"] }
-esp-rtos = { path = "../esp-rtos", optional = true, features = [
+esp-bootloader-esp-idf = { path = "../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../esp-hal", features = ["log-04", "unstable"] }
+esp-rtos = { path = "../../esp-rtos", optional = true, features = [
     "log-04",
     "embassy",
 ] }
-esp-println = { path = "../esp-println", features = ["log-04"] }
-esp-radio = { path = "../esp-radio", features = [
+esp-println = { path = "../../esp-println", features = ["log-04"] }
+esp-radio = { path = "../../esp-radio", features = [
     "log-04",
     "unstable",
 ], optional = true }
-esp-storage = { path = "../esp-storage", optional = true }
+esp-storage = { path = "../../esp-storage", optional = true }
 ieee802154 = "0.6.1"
 lis3dh-async = "0.9.3"
 ssd1306 = "0.10.0"
@@ -50,7 +50,6 @@ trouble-host = { version = "0.7.0", features = [
 ] }
 log = "0.4"
 libm = "0.2"
-nb = "0"
 
 [features]
 unstable = []

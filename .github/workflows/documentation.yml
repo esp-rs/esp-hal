@@ -146,7 +146,7 @@ jobs:
           if [ -n "${{ needs.setup.outputs.channel }}" ]; then
             CHANNEL_ARGS="--channel ${{ needs.setup.outputs.channel }}"
           fi
-          ~/.cargo/bin/esp-devtool build documentation --packages=${{ matrix.packages.name }} --base-url ${{ needs.setup.outputs.base_url }} $CHANNEL_ARGS
+          ~/.cargo/bin/esp-devtool documentation --packages=${{ matrix.packages.name }} --base-url ${{ needs.setup.outputs.base_url }} $CHANNEL_ARGS
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
@@ -176,7 +176,7 @@ jobs:
       - name: Create index.html
         run: |
           chmod +x docs/xtask/esp-devtool
-          docs/xtask/esp-devtool build documentation-index --base-url ${{ needs.setup.outputs.base_url }}
+          docs/xtask/esp-devtool documentation-index --base-url ${{ needs.setup.outputs.base_url }}
           rm -rf docs/xtask
 
       - if: ${{ github.event.inputs.server == 'preview' || github.event_name == 'pull_request' }}

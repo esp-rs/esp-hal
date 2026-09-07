@@ -320,8 +320,7 @@ fn cargo_doc(
     channel: Option<&str>,
     base_url: Option<&str>,
 ) -> Result<PathBuf> {
-    let package_name = package.to_string();
-    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
     // Process Cargo.toml for documentation
     let pre_process_res = pre_process_cargo_toml(chip, &package_path);
@@ -348,7 +347,7 @@ fn cargo_doc_without_pre_processing(
     base_url: Option<&str>,
 ) -> Result<PathBuf> {
     let package_name = package.to_string();
-    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
     // build documentation using the pre-processed Cargo.toml
     if let Some(chip) = chip {
@@ -389,7 +388,7 @@ fn cargo_doc_without_pre_processing(
     let mut docs_target = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {
         PathBuf::from(target_path)
     } else {
-        workspace.join(package.to_string()).join("target")
+        workspace.join(package.directory()).join("target")
     };
     if let Some(ref target) = target {
         docs_target = docs_target.join(&target);
@@ -506,7 +505,7 @@ fn cargo_doc_without_pre_processing(
     let mut docs_path = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {
         PathBuf::from(target_path)
     } else {
-        workspace.join(package.to_string()).join("target")
+        workspace.join(package.directory()).join("target")
     };
 
     if let Some(ref target) = target {
