@@ -12,6 +12,38 @@
 //! - Scanning for access points (active & passive scanning).
 //! - Promiscuous mode for monitoring of IEEE802.11 Wi-Fi packets.
 //!
+//! ## Network Stack
+//!
+//! This module establishes and controls the IEEE 802.11 link. It does not
+//! implement Internet Protocol (IP), Dynamic Host Configuration Protocol
+//! (DHCP), Domain Name System (DNS), Transmission Control Protocol (TCP), or
+//! User Datagram Protocol (UDP).
+//!
+//! [`WifiController`] configures the radio, scans for access points, and starts
+//! a connection. [`Interface`] sends and receives network frames. Pass the
+//! interface to [`embassy-net`] to obtain an IP address and create TCP or UDP
+//! sockets.
+//!
+//! A Station mode application typically does these steps:
+//!
+//! 1. Allocates a heap and starts the preemptive scheduler as described in the [crate-level quick
+//!    start](crate#quick-start).
+//! 2. Creates a [`sta::StationConfig`] and a [`WifiController`].
+//! 3. Creates an [`Interface`] with [`Interface::station`].
+//! 4. Passes the interface to `embassy_net::new` and runs the returned network runner in an
+//!    executor task.
+//! 5. Connects the controller and waits for the Embassy network stack configuration to become
+//!    available.
+//! 6. Uses an Embassy TCP or UDP socket to send and receive application data.
+//!
+//! The [`embassy_dhcp`] example contains the complete setup and sends an HTTP
+//! request over TCP. The [`embassy_sntp`] example shows how to send and receive
+//! UDP datagrams.
+//!
+//! [`embassy-net`]: https://docs.embassy.dev/embassy-net/
+//! [`embassy_dhcp`]: https://github.com/esp-rs/esp-hal/tree/main/examples/wifi/embassy_dhcp
+//! [`embassy_sntp`]: https://github.com/esp-rs/esp-hal/tree/main/examples/wifi/embassy_sntp
+//!
 //! ## Expected heap memory usage
 //!
 //! These are numbers measured via `esp-alloc`'s "internal-heap-stats" feature.

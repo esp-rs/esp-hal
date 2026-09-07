@@ -26,6 +26,23 @@ If a cell contains an em dash (&mdash;) this means that the particular feature i
 | ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    | &mdash; |
 | ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
 
+## Wi-Fi networking
+
+`esp-radio` manages the Wi-Fi radio and provides a network-device interface. It
+does not provide IP, DHCP, DNS, TCP, or UDP by itself. Use the Wi-Fi
+[`Interface`] with [`embassy-net`] to add these protocols.
+
+The [`embassy_dhcp`] example shows the complete Station mode data path. It
+connects to an access point, obtains an IPv4 address through DHCP, resolves a
+host name, and sends an HTTP request over TCP. The Wi-Fi [examples guide]
+includes commands for the ESP32-C3 and ESP32-S3 and points to examples for UDP
+and Access Point mode.
+
+[`Interface`]: https://docs.espressif.com/projects/rust/esp-radio/latest/esp32c3/esp_radio/wifi/struct.Interface.html
+[`embassy-net`]: https://docs.embassy.dev/embassy-net/
+[`embassy_dhcp`]: https://github.com/esp-rs/esp-hal/tree/main/examples/wifi/embassy_dhcp
+[examples guide]: https://github.com/esp-rs/esp-hal/tree/main/examples#wifi-networking
+
 ## Bluetooth stack
 We recommend using [`TrouBLE`] as the Bluetooth stack. You can find detailed examples [here].
 

@@ -32,6 +32,47 @@ cargo xtask run example embassy_hello_world --chip=esp32c6
 
 Again, note that we must specify which package to build the example from, plus which example to build and flash to the target device.
 
+## Wi-Fi Networking
+
+The Wi-Fi examples use `esp-radio` for the IEEE 802.11 link and `embassy-net`
+for DHCP, DNS, TCP, and UDP. Both ESP32-C3 and ESP32-S3 run the same example
+source. The `--chip` argument selects the target and chip-specific Cargo
+features.
+
+Start with `embassy_dhcp`. It connects in Station mode, obtains an IPv4 address
+through DHCP, resolves `httpbin.org`, and sends an HTTP request over TCP. Set
+the access point credentials as build-time environment variables:
+
+```shell
+SSID='your-network' PASSWORD='your-password' \
+  cargo xtask run example embassy_dhcp --chip=esp32c3
+```
+
+For ESP32-S3, change only the chip argument:
+
+```shell
+SSID='your-network' PASSWORD='your-password' \
+  cargo xtask run example embassy_dhcp --chip=esp32s3
+```
+
+`SSID` and `PASSWORD` are compiled into the example firmware. Do not commit
+real credentials to a source file or repository.
+
+Use the example that matches the networking task:
+
+| Task | Example | Application protocol |
+| --- | --- | --- |
+| Connect to a router and make a web request | `embassy_dhcp` | DNS, TCP, and HTTP |
+| Send and receive UDP datagrams | `embassy_sntp` | DNS, UDP, and SNTP |
+| Create a Wi-Fi network and serve a page | `embassy_access_point` | TCP and HTTP |
+| Run Access Point and Station modes together | `embassy_access_point_with_sta` | DNS, TCP, and HTTP |
+| Run Wi-Fi and Bluetooth Low Energy together | `embassy_coex` | DNS, TCP, HTTP, and BLE |
+
+For custom application data, keep the radio, connection task, network runner,
+and DHCP setup from `embassy_dhcp`. Replace its HTTP client with an
+`embassy_net::tcp::TcpSocket` or `embassy_net::udp::UdpSocket`. Create sockets
+only after `stack.wait_config_up().await` completes.
+
 ## Adding Examples
 
 If you are contributing to `esp-hal` and would like to add an example, the process is generally the same as any other project. The `Cargo.toml` file should include a feature for each supported chip, which itself should enable any dependency's features required for the given chip.
