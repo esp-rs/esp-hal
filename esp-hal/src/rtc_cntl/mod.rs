@@ -133,6 +133,13 @@ pub(crate) use cpu_retention::installed_buffer_ptr;
 #[instability::unstable]
 pub use cpu_retention::{CpuRetentionMemory, CpuRetentionMemoryError};
 
+#[cfg(supports_tagmem_power_down)]
+#[path = "cpu_retention/tagmem.rs"]
+mod tagmem;
+#[cfg(supports_tagmem_power_down)]
+#[instability::unstable]
+pub use tagmem::{CacheTagRetentionMemory, CacheTagRetentionMemoryError};
+
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
 #[cfg_attr(esp32c2, path = "rtc/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "rtc/esp32c3.rs")]
