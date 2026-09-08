@@ -22,13 +22,16 @@ static INSTALLED: AtomicPtr<CpuRetentionMemory> = AtomicPtr::new(ptr::null_mut()
 /// to read or write its contents.
 ///
 /// Install the buffer with [`LowPower::install_cpu_retention_memory`]. The retention DMA reaches
-/// one range of internal RAM only, which the [`#[ram(unstable(retention))]`][crate::ram] attribute
-/// takes care of.
+/// one range of internal RAM only. The [`#[ram(reclaimed)]`][crate::ram] attribute
+/// places a static inside that range, in the memory that the bootloader gives back.
 #[repr(align(16))]
 #[instability::unstable]
 pub struct CpuRetentionMemory {
     storage: UnsafeCell<MaybeUninit<[u8; BUFFER_SIZE]>>,
 }
+
+// SAFETY: the type is a `MaybeUninit` buffer, and the retention DMA is the only writer.
+unsafe impl crate::Uninit for CpuRetentionMemory {}
 
 impl CpuRetentionMemory {
     /// Creates the retention memory.
@@ -90,20 +93,21 @@ impl LowPower<'_> {
     /// # Errors
     ///
     /// Returns [`CpuRetentionMemoryError`] if the driver holds a buffer already, or if the buffer
-    /// is not inside the range that the retention DMA reaches.
+    /// is not inside the range that the retention DMA reaches. The
+    /// [`#[ram(reclaimed)]`][crate::ram] attribute places a static inside that range.
     ///
     /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
     /// use esp_hal::rtc_cntl::{CpuRetentionMemory, sleep::LowPower};
-    /// use static_cell::ConstStaticCell;
     ///
-    /// static RETENTION: ConstStaticCell<CpuRetentionMemory> =
-    ///     ConstStaticCell::new(CpuRetentionMemory::new());
+    /// // A program adds `#[ram(reclaimed)]` here, to place the buffer in the range that the
+    /// // retention DMA reaches.
+    /// static mut RETENTION: CpuRetentionMemory = CpuRetentionMemory::new();
     ///
     /// let mut lpwr = LowPower::new(peripherals.LPWR);
-    /// lpwr.install_cpu_retention_memory(RETENTION.take())?;
+    /// lpwr.install_cpu_retention_memory(unsafe { &mut *(&raw mut RETENTION) })?;
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
