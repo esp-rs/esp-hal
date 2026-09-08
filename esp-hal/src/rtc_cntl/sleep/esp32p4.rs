@@ -909,10 +909,11 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures the wakeup options and requests the sleep.
+    /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// The caller waits for the result of the request. The return value is a guard that restores
-    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
+    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
+    /// sleep ends.
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
         // Switch the CPU root clock to XTAL for the duration of sleep.
@@ -1040,11 +1041,17 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode.
 
+        (restore_clock_config, restore_boot_vector)
+    }
+
+    /// Requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    #[crate::ram]
+    pub(crate) fn enter_sleep(&self) {
         PMU::regs()
             .slp_wakeup_cntl0()
             .write(|w| w.sleep_req().bit(true));
-
-        (restore_clock_config, restore_boot_vector)
     }
 
     /// Cleans up after sleep.

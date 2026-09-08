@@ -658,10 +658,11 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures the wakeup options and requests the sleep.
+    /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// The caller waits for the result of the request. The return value is a guard that restores
-    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
+    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
+    /// sleep ends.
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
         let restore_clock_config = ClockTree::with(|clocks| {
@@ -727,12 +728,21 @@ impl RtcSleepConfig {
             w.soc_wakeup().clear_bit_by_one()
         });
 
-        PMU::regs().slp_wakeup_cntl0().write(|w| {
-            w.slp_reject_en().bit(reject_mask != 0);
-            w.sleep_req().bit(true)
-        });
+        PMU::regs()
+            .slp_wakeup_cntl0()
+            .write(|w| w.slp_reject_en().bit(reject_mask != 0));
 
         restore_clock_config
+    }
+
+    /// Requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    #[crate::ram]
+    pub(crate) fn enter_sleep(&self) {
+        PMU::regs()
+            .slp_wakeup_cntl0()
+            .modify(|_, w| w.sleep_req().bit(true));
     }
 
     /// Cleans up after sleep.
