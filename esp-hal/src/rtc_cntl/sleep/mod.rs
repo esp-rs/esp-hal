@@ -260,6 +260,9 @@ impl<'d> LowPower<'d> {
             return false;
         }
 
+        #[cfg(cpu_retention = "rtc_cntl")]
+        sleep_impl::configure_cpu_retention(&mut config, crate::rtc_cntl::installed_buffer_ptr());
+
         // The PMU chips write the configuration when the sleep starts.
         #[cfg(not(soc_has_pmu))]
         config.apply();
