@@ -129,6 +129,28 @@ impl LowPower<'_> {
     }
 }
 
+// Cache maintenance is needed only where the cache tag memory powers down with the CPU. That is the
+// ESP32-S3, so only its sleep code calls these. Tag memory retention, which lets a program skip the
+// work, comes later; until then the answer is always yes.
+
+/// Whether a retained sleep must write the data cache back before the CPU domain powers down.
+#[allow(dead_code)]
+pub(crate) fn dcache_writeback_needed() -> bool {
+    true
+}
+
+/// Whether a retained sleep must invalidate the instruction cache after wake.
+#[allow(dead_code)]
+pub(crate) fn icache_invalidate_needed() -> bool {
+    true
+}
+
+/// Whether a retained sleep must invalidate the data cache after wake.
+#[allow(dead_code)]
+pub(crate) fn dcache_invalidate_needed() -> bool {
+    true
+}
+
 pub(crate) fn installed_buffer_ptr() -> Option<*mut u8> {
     // SAFETY: `INSTALLED` holds a pointer that `install_cpu_retention_memory` took as a
     // `&'static mut`, so the memory outlives the read.
