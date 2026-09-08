@@ -698,7 +698,9 @@ const RETENTION_CONFIG_WORD3: u32 = 0xfffe_0000;
 const RETENTION_WAIT_CYCLES: u8 = 0x7f;
 const RETENTION_CLKOFF_WAIT_CYCLES: u8 = 0x0f;
 const RETENTION_DONE_WAIT_CYCLES: u8 = 0x07;
+// `RETENTION_TARGET` is a bit per target: the CPU is 1 and the cache tag memory is 2.
 const RETENTION_TARGET_CPU: u8 = 1;
+const RETENTION_TARGET_TAGMEM: u8 = 2;
 
 /// RTC_CNTL retention DMA link node. Matches `lldesc_t` in `esp_rom_lldesc.h`.
 #[repr(C)]
@@ -708,19 +710,27 @@ struct RtcCntlDmaLink {
     next: u32,
 }
 
+/// Whether the tag memory survives the sleep, which is what lets the cache work be skipped.
+///
+/// Both caches are retained together, so one answer serves all three questions below. esp-idf
+/// gates them separately because it retains only the tags that cover its mapped segments.
+fn tag_memory_retained() -> bool {
+    crate::rtc_cntl::tagmem::installed_buffer_ptr().is_some()
+}
+
 /// Whether a retained sleep must write the data cache back before the CPU domain powers down.
 fn dcache_writeback_needed() -> bool {
-    true
+    !tag_memory_retained()
 }
 
 /// Whether a retained sleep must invalidate the instruction cache after wake.
 fn icache_invalidate_needed() -> bool {
-    true
+    !tag_memory_retained()
 }
 
 /// Whether a retained sleep must invalidate the data cache after wake.
 fn dcache_invalidate_needed() -> bool {
-    true
+    !tag_memory_retained()
 }
 
 /// Sets CPU power-down in the sleep configuration when a retention buffer is installed.
@@ -740,6 +750,13 @@ pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
         init_dma_link(buffer);
         enable_cpu_retention(buffer as usize);
 
+        // The tags are lost only when the CPU domain powers down, so this is armed with the CPU
+        // and never on its own.
+        if let Some(tag_memory) = crate::rtc_cntl::tagmem::installed_buffer_ptr() {
+            init_tag_memory_dma_link(tag_memory);
+            enable_tag_memory_retention(tag_memory as usize);
+        }
+
         // Only PSRAM data in the d-cache is at risk, and nothing writes to it between here and the
         // sleep request, so a writeback now is enough. Follows
         // `rtc_cntl_hal_enable_cpu_retention`.
@@ -758,6 +775,10 @@ pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, rejected: bool) {
     // Disarm on every exit, including a rejected request that never slept. A stale descriptor
     // would otherwise affect the next unretained sleep.
     disable_cpu_retention();
+
+    if tag_memory_retained() {
+        disable_tag_memory_retention();
+    }
 
     // A rejected request never slept, so it lost no cache contents.
     if rejected {
@@ -785,15 +806,24 @@ fn dma_link_word0(units: u16) -> u32 {
     units | (units << 12) | (1 << 30) | (1 << 31)
 }
 
-unsafe fn init_dma_link(buffer: *mut u8) {
+/// Writes the descriptor at the head of the buffer and returns the payload that follows it.
+unsafe fn init_link(buffer: *mut u8, payload_size: usize) -> *mut u8 {
     unsafe {
         let link = buffer.cast::<RtcCntlDmaLink>();
         let payload = buffer.add(DMA_LINK_SIZE);
-        let units = (PAYLOAD_SIZE >> 4) as u16;
+        let units = (payload_size >> 4) as u16;
 
         core::ptr::write_volatile(&raw mut (*link).word0, dma_link_word0(units));
         core::ptr::write_volatile(&raw mut (*link).buf, payload);
         core::ptr::write_volatile(&raw mut (*link).next, 0);
+
+        payload
+    }
+}
+
+unsafe fn init_dma_link(buffer: *mut u8) {
+    unsafe {
+        let payload = init_link(buffer, PAYLOAD_SIZE);
 
         let cfg = payload.cast::<u32>();
         core::ptr::write_volatile(cfg, 0);
@@ -833,4 +863,58 @@ fn disable_cpu_retention() {
     LPWR::regs()
         .retention_ctrl()
         .modify(|_, w| w.retention_en().clear_bit());
+}
+
+/// The tag memory needs no configuration header, unlike the CPU frames.
+unsafe fn init_tag_memory_dma_link(buffer: *mut u8) {
+    unsafe {
+        init_link(buffer, crate::rtc_cntl::tagmem::payload_size());
+    }
+}
+
+fn enable_tag_memory_retention(link_addr: usize) {
+    let (icache_size, dcache_size) = crate::rtc_cntl::tagmem::size_fields();
+
+    APB_CTRL::regs()
+        .retention_ctrl1()
+        .modify(|_, w| unsafe { w.retention_tag_link_addr().bits(link_addr as u32) });
+
+    // Every set is retained, so the valid size is the whole size and the starting row does not
+    // matter. esp-idf narrows both to the rows its mapped code and data segments occupy, which
+    // saves DMA time but needs those segment addresses; retaining all of it needs nothing and
+    // cannot under-cover. The size field wraps, so the largest cache writes zero.
+    APB_CTRL::regs().retention_ctrl2().modify(|_, w| unsafe {
+        w.ret_icache_start_point().bits(0);
+        w.ret_icache_vld_size().bits(icache_size);
+        w.ret_icache_size().bits(icache_size);
+        w.ret_icache_enable().set_bit()
+    });
+
+    APB_CTRL::regs().retention_ctrl3().modify(|_, w| unsafe {
+        w.ret_dcache_start_point().bits(0);
+        w.ret_dcache_vld_size().bits(dcache_size);
+        w.ret_dcache_size().bits(dcache_size);
+        w.ret_dcache_enable().set_bit()
+    });
+
+    // The CPU shares this field, and it is armed first, so the bit is added rather than written.
+    LPWR::regs().retention_ctrl().modify(|r, w| unsafe {
+        w.retention_target()
+            .bits(r.retention_target().bits() | RETENTION_TARGET_TAGMEM)
+    });
+}
+
+fn disable_tag_memory_retention() {
+    LPWR::regs().retention_ctrl().modify(|r, w| unsafe {
+        w.retention_target()
+            .bits(r.retention_target().bits() & !RETENTION_TARGET_TAGMEM)
+    });
+
+    APB_CTRL::regs()
+        .retention_ctrl2()
+        .modify(|_, w| w.ret_icache_enable().clear_bit());
+
+    APB_CTRL::regs()
+        .retention_ctrl3()
+        .modify(|_, w| w.ret_dcache_enable().clear_bit());
 }
