@@ -709,7 +709,16 @@ impl RtcSleepConfig {
     }
 }
 
+// The cache needs no maintenance around a retained sleep on this chip: the tag memory stays
+// powered, so it survives the CPU power-down. This is why the chip has no tag memory retention
+// feature, and why `rtc_cntl_hal_enable_cpu_retention` and its disable counterpart touch no cache.
+
 /// Prepares CPU retention for the upcoming sleep.
 pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
     let _ = buffer;
+}
+
+/// Finishes CPU retention after the sleep request returns.
+pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, rejected: bool) {
+    let _ = (buffer, rejected);
 }

@@ -240,6 +240,9 @@ impl<'d> LowPower<'d> {
             rejected
         };
 
+        #[cfg(cpu_retention = "rtc_cntl")]
+        sleep_impl::finish_cpu_retention(crate::rtc_cntl::installed_buffer_ptr(), rejected);
+
         config.finish_sleep();
 
         let after = rtc.time_since_boot_raw();

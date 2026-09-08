@@ -129,4 +129,40 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     }
 }
 
+/// Writes back all dirty data cache lines.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_writeback_all() {
+    unsafe extern "C" {
+        fn Cache_WriteBack_All();
+    }
+    unsafe {
+        Cache_WriteBack_All();
+    }
+}
+
+/// Invalidates the entire instruction cache.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_invalidate_icache_all() {
+    unsafe extern "C" {
+        fn Cache_Invalidate_ICache_All();
+    }
+    unsafe {
+        Cache_Invalidate_ICache_All();
+    }
+}
+
+/// Invalidates the entire data cache.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_invalidate_dcache_all() {
+    unsafe extern "C" {
+        fn Cache_Invalidate_DCache_All();
+    }
+    unsafe {
+        Cache_Invalidate_DCache_All();
+    }
+}
+
 pub(crate) fn pre_init() {}

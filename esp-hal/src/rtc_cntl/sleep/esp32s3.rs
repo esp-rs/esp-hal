@@ -685,5 +685,37 @@ impl RtcSleepConfig {
 
 /// Prepares CPU retention for the upcoming sleep.
 pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
-    let _ = buffer;
+    if buffer.is_none() {
+        return;
+    }
+
+    // Only PSRAM data in the d-cache is at risk, and nothing writes to it between here and the
+    // sleep request, so a writeback now is enough. Follows
+    // `rtc_cntl_hal_enable_cpu_retention`.
+    if super::super::cpu_retention::dcache_writeback_needed() {
+        unsafe {
+            crate::soc::cache_writeback_all();
+        }
+    }
+}
+
+/// Finishes CPU retention after the sleep request returns.
+pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, rejected: bool) {
+    // A rejected request never slept, so it lost no cache contents.
+    if buffer.is_none() || rejected {
+        return;
+    }
+
+    use super::super::cpu_retention::{dcache_invalidate_needed, icache_invalidate_needed};
+
+    // The tag memory powered down with the CPU, so every line is stale. Follows
+    // `rtc_cntl_hal_disable_cpu_retention`.
+    unsafe {
+        if icache_invalidate_needed() {
+            crate::soc::cache_invalidate_icache_all();
+        }
+        if dcache_invalidate_needed() {
+            crate::soc::cache_invalidate_dcache_all();
+        }
+    }
 }
