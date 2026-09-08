@@ -978,6 +978,13 @@ driver_configs![
                 /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
                 #[serde(default)]
                 deep_sleep_needs_gpio_isolation: bool,
+                /// CPU retention capabilities and reachable retention-memory bounds.
+                ///
+                /// Not `Option`: an absent table must emit no symbols at all, and an optional
+                /// property also emits `<name>_is_set`, which would claim retention on the chips
+                /// that have none. `cfgs()` returns `None` when the table is empty.
+                #[serde(default)]
+                retention: SleepRetentionProperties,
             }
         },
         UlpFsmProperties {

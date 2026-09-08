@@ -349,6 +349,10 @@ wakeup_sources = {
     LpCore = 11,
 }
 
+[device.sleep.retention]
+cpu_retention = "software"
+supports_top_power_down = true
+
 [device.parl_io]
 support_status = "partial"
 version = 1
