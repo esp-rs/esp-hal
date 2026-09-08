@@ -29,7 +29,7 @@ use crate::wifi::csi::CsiConfig;
 use crate::{
     asynch::AtomicWaker,
     sys::include::*,
-    wifi::{RxControlInfo, WifiError},
+    wifi::{RxControlInfo, WifiError, WifiRefGuard},
 };
 
 /// Maximum payload length
@@ -482,11 +482,11 @@ pub struct RateConfig {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct EspNowManager<'d> {
-    _rc: EspNowRc<'d>,
+pub struct EspNowManager {
+    _rc: EspNowRc,
 }
 
-impl EspNowManager<'_> {
+impl EspNowManager {
     /// Set primary Wi-Fi channel.
     /// When using ESP-NOW with an access point or station,
     /// the device cannot switch channels after connecting to Wi-Fi.
@@ -690,11 +690,11 @@ impl EspNowManager<'_> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct EspNowSender<'d> {
-    _rc: EspNowRc<'d>,
+pub struct EspNowSender {
+    _rc: EspNowRc,
 }
 
-impl EspNowSender<'_> {
+impl EspNowSender {
     /// Send data to peer
     ///
     /// The peer needs to be added to the peer list first.
@@ -724,7 +724,7 @@ impl EspNowSender<'_> {
 /// invoked.
 #[must_use]
 #[instability::unstable]
-pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender<'s>>);
+pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender>);
 
 impl SendWaiter<'_> {
     /// Wait for the previous sending to complete, i.e. the send callback is
@@ -757,11 +757,11 @@ impl Drop for SendWaiter<'_> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct EspNowReceiver<'d> {
-    _rc: EspNowRc<'d>,
+pub struct EspNowReceiver {
+    _rc: EspNowRc,
 }
 
-impl EspNowReceiver<'_> {
+impl EspNowReceiver {
     /// Receives data from the ESP-NOW queue.
     #[instability::unstable]
     pub fn receive(&self) -> Option<ReceivedData<'_>> {
@@ -778,24 +778,24 @@ impl EspNowReceiver<'_> {
 /// The reference counter for properly deinit espnow after all parts are
 /// dropped.
 #[derive(Debug)]
-struct EspNowRc<'d> {
+struct EspNowRc {
     rc: &'static AtomicU8,
-    inner: PhantomData<EspNow<'d>>,
+    _wifi_guard: WifiRefGuard,
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for EspNowRc<'_> {
+impl defmt::Format for EspNowRc {
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(
             f,
-            "EspNowRc {{ rc: {}, inner: ... }}",
+            "EspNowRc {{ rc: {}, _wifi_guard: ... }}",
             self.rc.load(Ordering::Relaxed)
         );
     }
 }
 
-impl EspNowRc<'_> {
-    fn new() -> Self {
+impl EspNowRc {
+    fn new(wifi_guard: WifiRefGuard) -> Self {
         static ESP_NOW_RC: AtomicU8 = AtomicU8::new(0);
         assert!(
             ESP_NOW_RC.fetch_add(1, Ordering::AcqRel) == 0,
@@ -804,22 +804,22 @@ impl EspNowRc<'_> {
 
         Self {
             rc: &ESP_NOW_RC,
-            inner: PhantomData,
+            _wifi_guard: wifi_guard,
         }
     }
 }
 
-impl Clone for EspNowRc<'_> {
+impl Clone for EspNowRc {
     fn clone(&self) -> Self {
         self.rc.fetch_add(1, Ordering::Release);
         Self {
             rc: self.rc,
-            inner: PhantomData,
+            _wifi_guard: self._wifi_guard.clone(),
         }
     }
 }
 
-impl Drop for EspNowRc<'_> {
+impl Drop for EspNowRc {
     fn drop(&mut self) {
         if self.rc.fetch_sub(1, Ordering::AcqRel) == 1 {
             unsafe {
@@ -845,16 +845,15 @@ impl Drop for EspNowRc<'_> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct EspNow<'d> {
-    manager: EspNowManager<'d>,
-    sender: EspNowSender<'d>,
-    receiver: EspNowReceiver<'d>,
-    _phantom: PhantomData<&'d ()>,
+pub struct EspNow {
+    manager: EspNowManager,
+    sender: EspNowSender,
+    receiver: EspNowReceiver,
 }
 
-impl<'d> EspNow<'d> {
-    pub(crate) fn new_internal(rx_queue_storage: QueueStorage) -> EspNow<'d> {
-        let espnow_rc = EspNowRc::new();
+impl EspNow {
+    pub(crate) fn new_internal(guard: WifiRefGuard, rx_queue_storage: QueueStorage) -> EspNow {
+        let espnow_rc = EspNowRc::new(guard);
         let esp_now = EspNow {
             manager: EspNowManager {
                 _rc: espnow_rc.clone(),
@@ -863,7 +862,6 @@ impl<'d> EspNow<'d> {
                 _rc: espnow_rc.clone(),
             },
             receiver: EspNowReceiver { _rc: espnow_rc },
-            _phantom: PhantomData,
         };
 
         check_error_expect!({ esp_now_init() }, "esp-now-init failed");
@@ -893,7 +891,7 @@ impl<'d> EspNow<'d> {
     /// Splits the `EspNow` instance into its manager, sender, and receiver
     /// components.
     #[instability::unstable]
-    pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
+    pub fn split(self) -> (EspNowManager, EspNowSender, EspNowReceiver) {
         (self.manager, self.sender, self.receiver)
     }
 
@@ -1065,7 +1063,7 @@ unsafe extern "C" fn rcv_cb(
     }
 }
 
-impl EspNowReceiver<'_> {
+impl EspNowReceiver {
     /// This function takes mutable reference to self because the
     /// implementation of `ReceiveFuture` is not logically thread
     /// safe.
@@ -1075,7 +1073,7 @@ impl EspNowReceiver<'_> {
     }
 }
 
-impl EspNowSender<'_> {
+impl EspNowSender {
     /// Sends data asynchronously to a peer (using its MAC) using ESP-NOW.
     #[instability::unstable]
     pub fn send_async<'s, 'r>(
@@ -1092,7 +1090,7 @@ impl EspNowSender<'_> {
     }
 }
 
-impl EspNow<'_> {
+impl EspNow {
     /// This function takes mutable reference to self because the
     /// implementation of `ReceiveFuture` is not logically thread
     /// safe.
@@ -1118,7 +1116,7 @@ impl EspNow<'_> {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[instability::unstable]
 pub struct SendFuture<'s, 'r> {
-    _sender: PhantomData<&'s mut EspNowSender<'s>>,
+    _sender: PhantomData<&'s mut EspNowSender>,
     addr: &'r [u8; 6],
     data: &'r [u8],
     sent: bool,
@@ -1156,7 +1154,7 @@ impl core::future::Future for SendFuture<'_, '_> {
 /// the rest of them unwakable.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[instability::unstable]
-pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
+pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver>);
 
 impl<'a> core::future::Future for ReceiveFuture<'a> {
     type Output = ReceivedData<'a>;

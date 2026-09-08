@@ -2,7 +2,7 @@
 mod tests {
     use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
     use esp_radio::{
-        esp_now::{Error, EspNowError, EspNowWifiInterface, PeerInfo},
+        esp_now::{BROADCAST_ADDRESS, Error, EspNowError, EspNowWifiInterface, PeerInfo},
         wifi::{ControllerConfig, WifiController},
     };
 
@@ -38,7 +38,7 @@ mod tests {
         )
         .unwrap();
 
-        let esp_now = controller.esp_now();
+        let esp_now = controller.esp_now(Default::default());
         esp_now.set_pmk(&PMK).unwrap();
 
         esp_now.add_peer(peer(1, true)).unwrap();
@@ -66,7 +66,7 @@ mod tests {
         )
         .unwrap();
 
-        let esp_now = controller.esp_now();
+        let esp_now = controller.esp_now(Default::default());
         esp_now.set_pmk(&PMK).unwrap();
 
         for index in 1..=4 {
@@ -74,6 +74,28 @@ mod tests {
         }
 
         assert_eq!(esp_now.peer_count().unwrap().encrypted_count, 4);
+    }
+
+    #[test]
+    fn esp_now_survives_controller_drop(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+
+        let mut wifi = p.WIFI;
+        let controller = WifiController::new(wifi.reborrow(), Default::default()).unwrap();
+        let mut esp_now = controller.esp_now(Default::default());
+        drop(controller);
+
+        esp_now.set_channel(1).unwrap();
+        esp_now
+            .send(&BROADCAST_ADDRESS, b"hello")
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        drop(esp_now);
+
+        let _controller = WifiController::new(wifi, Default::default()).unwrap();
     }
 
     #[test]

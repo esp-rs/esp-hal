@@ -85,6 +85,7 @@ use crate::{
     RadioRefGuard,
     asynch::AtomicWaker,
     hal::ram,
+    refcount::Refcount,
     sys::{
         c_types,
         include::{self, *},
@@ -94,7 +95,7 @@ use crate::{
 pub mod ap;
 
 unstable_module!(
-    #[cfg(all(feature = "csi", wifi_csi_supported))]
+    #[cfg(feature = "csi")]
     #[cfg_attr(docsrs, doc(cfg(feature = "csi")))]
     pub mod csi;
     pub mod event;
@@ -2565,35 +2566,55 @@ impl ControllerConfig {
     }
 }
 
+static WIFI_REFCOUNT: Refcount = Refcount::new();
+
+/// Keeps Wi-Fi initialized until the last guard is dropped.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct WifiRefGuard {
+    _radio_guard: RadioRefGuard,
+}
+
+impl Clone for WifiRefGuard {
+    fn clone(&self) -> Self {
+        let _radio_guard = RadioRefGuard::new();
+        WIFI_REFCOUNT.increment(|| {});
+        Self { _radio_guard }
+    }
+}
+
+impl Drop for WifiRefGuard {
+    fn drop(&mut self) {
+        WIFI_REFCOUNT.decrement(|| {
+            state::locked(|| {
+                set_access_point_state(WifiAccessPointState::Uninitialized);
+                set_station_state(WifiStationState::Uninitialized);
+
+                if let Err(e) = crate::wifi::wifi_deinit() {
+                    warn!("Failed to cleanly deinit wifi: {:?}", e);
+                }
+
+                #[cfg(rng_trng_supported)]
+                esp_hal::if_unstable_hal! {
+                    esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+                        esp_hal::Internal::conjure()
+                    });
+                }
+            })
+        });
+    }
+}
+
 /// Wi-Fi controller.
 ///
-/// When the controller is dropped, the Wi-Fi driver is
-/// deinitialized and Wi-Fi is stopped.
+/// When the controller is dropped, the Wi-Fi driver is deinitialized and Wi-Fi
+/// is stopped unless an ESP-NOW or sniffer instance created from it is still
+/// alive. In that case, Wi-Fi keeps running until that instance is dropped too.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct WifiController<'d> {
-    _guard: RadioRefGuard,
+    _guard: WifiRefGuard,
     _phantom: PhantomData<&'d ()>,
-}
-
-impl Drop for WifiController<'_> {
-    fn drop(&mut self) {
-        state::locked(|| {
-            set_access_point_state(WifiAccessPointState::Uninitialized);
-            set_station_state(WifiStationState::Uninitialized);
-
-            if let Err(e) = crate::wifi::wifi_deinit() {
-                warn!("Failed to cleanly deinit wifi: {:?}", e);
-            }
-
-            #[cfg(rng_trng_supported)]
-            esp_hal::if_unstable_hal! {
-                esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
-                    esp_hal::Internal::conjure()
-                });
-            }
-        })
-    }
 }
 
 impl<'d> WifiController<'d> {
@@ -2610,7 +2631,8 @@ impl<'d> WifiController<'d> {
     /// Create a Wi-Fi controller. The default initial configuration is
     /// [`Config::Station`]`(`[`StationConfig::default()`]`)`.
     ///
-    /// Dropping the controller will deinitialize / stop Wi-Fi.
+    /// Dropping the controller deinitializes Wi-Fi unless an ESP-NOW or sniffer
+    /// instance created from it is still alive.
     ///
     /// Create [`Interface`]s separately via [`Interface::station()`] /
     /// [`Interface::access_point()`].
@@ -2632,8 +2654,6 @@ impl<'d> WifiController<'d> {
         device: crate::hal::peripherals::WIFI<'d>,
         config: ControllerConfig,
     ) -> Result<Self, WifiError> {
-        let _guard = RadioRefGuard::new();
-
         config.validate();
 
         event::enable_wifi_events(
@@ -2648,60 +2668,75 @@ impl<'d> WifiController<'d> {
                 | WifiEvent::ScanDone,
         );
 
-        unsafe {
-            internal::G_CONFIG = wifi_init_config_t {
-                osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+        let radio_guard = RadioRefGuard::new();
 
-                wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
-                static_rx_buf_num: config.static_rx_buf_num as _,
-                dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
-                tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
-                static_tx_buf_num: config.static_tx_buf_num as _,
-                dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
-                rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
-                rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
-                cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
-                csi_enable: cfg!(feature = "csi") as i32,
-                ampdu_rx_enable: config.ampdu_rx_enable as _,
-                ampdu_tx_enable: config.ampdu_tx_enable as _,
-                amsdu_tx_enable: config.amsdu_tx_enable as _,
-                nvs_enable: 0,
-                nano_enable: 0,
-                rx_ba_win: config.rx_ba_win as _,
-                wifi_task_core_id: Cpu::current() as _,
-                beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
-                mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
-                feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
-                sta_disconnected_pm: config.sta_disconnected_pm as _,
-                espnow_max_encrypt_num: config.espnow_max_encrypt_num as _,
-
-                tx_hetb_queue_num: 3,
-                dump_hesigb_enable: false,
-
-                magic: WIFI_INIT_CONFIG_MAGIC as i32,
-            };
-        }
-
-        DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
-        DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
-
-        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
-
-        crate::wifi::wifi_init(device)?;
-
-        // At some point the "High-speed ADC" entropy source became available.
-        #[cfg(rng_trng_supported)]
-        esp_hal::if_unstable_hal! {
+        let first = WIFI_REFCOUNT.try_increment(|| -> Result<(), WifiError> {
             unsafe {
-                esp_hal::rng::TrngSource::increase_entropy_source_counter()
-            };
+                internal::G_CONFIG = wifi_init_config_t {
+                    osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+
+                    wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
+                    static_rx_buf_num: config.static_rx_buf_num as _,
+                    dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
+                    tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
+                    static_tx_buf_num: config.static_tx_buf_num as _,
+                    dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
+                    rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF
+                        as i32,
+                    rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF
+                        as i32,
+                    cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
+                    csi_enable: cfg!(feature = "csi") as i32,
+                    ampdu_rx_enable: config.ampdu_rx_enable as _,
+                    ampdu_tx_enable: config.ampdu_tx_enable as _,
+                    amsdu_tx_enable: config.amsdu_tx_enable as _,
+                    nvs_enable: 0,
+                    nano_enable: 0,
+                    rx_ba_win: config.rx_ba_win as _,
+                    wifi_task_core_id: Cpu::current() as _,
+                    beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
+                    mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
+                    feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
+                    sta_disconnected_pm: config.sta_disconnected_pm as _,
+                    espnow_max_encrypt_num: config.espnow_max_encrypt_num as _,
+
+                    tx_hetb_queue_num: 3,
+                    dump_hesigb_enable: false,
+
+                    magic: WIFI_INIT_CONFIG_MAGIC as i32,
+                };
+            }
+
+            DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+            DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+
+            TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
+
+            crate::wifi::wifi_init(device)?;
+
+            #[cfg(rng_trng_supported)]
+            esp_hal::if_unstable_hal! {
+                unsafe {
+                    esp_hal::rng::TrngSource::increase_entropy_source_counter()
+                };
+            }
+
+            Ok(())
+        })?;
+
+        if !first {
+            warn!(
+                "Wi-Fi is already initialized; init-only ControllerConfig settings were ignored: \
+                 static_rx_buf_num, dynamic_rx_buf_num, static_tx_buf_num, dynamic_tx_buf_num, \
+                 rx_queue_size, tx_queue_size, rx_ba_win, espnow_max_encrypt_num, \
+                 ampdu_rx_enable, ampdu_tx_enable, amsdu_tx_enable"
+            );
         }
 
-        // Only create WifiController after we've enabled TRNG - otherwise returning an
-        // error from this function will cause panic because WifiController::drop tries
-        // to disable the TRNG.
         let mut controller = WifiController {
-            _guard,
+            _guard: WifiRefGuard {
+                _radio_guard: radio_guard,
+            },
             _phantom: Default::default(),
         };
 
@@ -2719,33 +2754,39 @@ impl<'d> WifiController<'d> {
 }
 
 impl WifiController<'_> {
-    /// Returns an ESP-NOW instance tied to this controller's lifetime.
+    /// Returns an ESP-NOW instance independent of this controller.
+    ///
+    /// Wi-Fi stays initialized, configured, and running until the instance is
+    /// dropped.
     ///
     /// # Panics
     ///
     /// Panics if an ESP-NOW instance already exists.
-    #[cfg(all(feature = "esp-now", feature = "unstable"))]
+    #[cfg(feature = "esp-now")]
     #[instability::unstable]
-    pub fn esp_now<'d>(
-        &'d self,
+    pub fn esp_now(
+        &self,
         rx_queue_storage: crate::esp_now::QueueStorage,
-    ) -> crate::esp_now::EspNow<'d> {
-        crate::esp_now::EspNow::new_internal(rx_queue_storage)
+    ) -> crate::esp_now::EspNow {
+        crate::esp_now::EspNow::new_internal(self._guard.clone(), rx_queue_storage)
     }
 
-    /// Returns a sniffer instance tied to this controller's lifetime.
+    /// Returns a sniffer instance independent of this controller.
+    ///
+    /// Wi-Fi stays initialized, configured, and running until the instance is
+    /// dropped.
     ///
     /// # Panics
     ///
     /// Panics if a sniffer instance already exists.
-    #[cfg(all(feature = "sniffer", feature = "unstable"))]
+    #[cfg(feature = "sniffer")]
     #[instability::unstable]
-    pub fn sniffer(&self) -> Sniffer<'_> {
-        Sniffer::new()
+    pub fn sniffer(&self) -> Sniffer {
+        Sniffer::new(self._guard.clone())
     }
 
     /// Set CSI configuration and register the receiving callback.
-    #[cfg(all(feature = "csi", feature = "unstable"))]
+    #[cfg(feature = "csi")]
     #[instability::unstable]
     pub fn set_csi(
         &mut self,
