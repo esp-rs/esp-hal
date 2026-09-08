@@ -47,20 +47,19 @@ async fn main(spawner: Spawner) -> ! {
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let wifi = peripherals.WIFI;
-    let controller = mk_static!(
-        esp_radio::wifi::WifiController<'static>,
-        esp_radio::wifi::WifiController::new(wifi, Default::default()).unwrap()
-    );
+    let controller = esp_radio::wifi::WifiController::new(wifi, Default::default()).unwrap();
 
     let esp_now = controller.esp_now();
+    // For demonstration purposes - you _may_ drop the controller, you don't _have to_.
+    drop(controller);
     esp_now.set_channel(11).unwrap();
 
     println!("esp-now version {}", esp_now.version().unwrap());
 
     let (manager, sender, receiver) = esp_now.split();
-    let manager = mk_static!(EspNowManager<'static>, manager);
+    let manager = mk_static!(EspNowManager, manager);
     let sender = mk_static!(
-        Mutex::<NoopRawMutex, EspNowSender<'static>>,
+        Mutex::<NoopRawMutex, EspNowSender>,
         Mutex::<NoopRawMutex, _>::new(sender)
     );
 
@@ -89,7 +88,7 @@ async fn main(spawner: Spawner) -> ! {
 }
 
 #[embassy_executor::task]
-async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender<'static>>) {
+async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender>) {
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
         ticker.next().await;
@@ -102,7 +101,7 @@ async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender<'static>>
 }
 
 #[embassy_executor::task]
-async fn listener(manager: &'static EspNowManager<'static>, mut receiver: EspNowReceiver<'static>) {
+async fn listener(manager: &'static EspNowManager, mut receiver: EspNowReceiver) {
     loop {
         let r = receiver.receive_async().await;
         println!("Received {:?}", r.data());
