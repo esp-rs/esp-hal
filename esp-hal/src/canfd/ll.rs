@@ -10,10 +10,6 @@
 
 use crate::pac::twai0::RegisterBlock;
 
-/// Offset of the first TX buffer RAM cell from the peripheral base (TRM 38.3.8).
-const TXT_BUFFER_BASE: usize = 0x100;
-/// Stride between TX buffer RAM cells.
-const TXT_BUFFER_STRIDE: usize = 0x100;
 /// Words in a frame buffer: 1 format + 1 identifier + 2 timestamp + 16 data.
 pub(super) const FRAME_WORDS: usize = 20;
 
@@ -655,17 +651,6 @@ impl Ll {
         unsafe { &*self.regs }
     }
 
-    /// Address of one TX buffer RAM cell.
-    ///
-    /// The TX buffer RAM is documented in TRM 38.3.8 but absent from the register
-    /// summary in TRM 38.6, so it is missing from the SVD and hence from the PAC.
-    /// Until esp-pacs models it, address it directly.
-    fn txt_buffer(&self, index: u8) -> *mut u32 {
-        debug_assert!((index as usize) < self.tx_buffer_count() as usize);
-        let base = self.regs as usize;
-        (base + TXT_BUFFER_BASE + TXT_BUFFER_STRIDE * index as usize) as *mut u32
-    }
-
     // ---------------------------------------------------------------- identity
 
     /// Device ID reported by the core. Reads `0xCAFD` on a working core.
@@ -806,11 +791,18 @@ impl Ll {
     /// Writes a frame into a TX buffer.
     ///
     /// The buffer must be in a writable state; see [`TxBufferState::is_writable`].
+    /// The PAC models the four buffers this core has (TRM 38.3.8), and the
+    /// caller keeps `index` below [`Ll::tx_buffer_count`].
     pub(super) fn write_tx_buffer(&self, index: u8, frame: &FrameBuffer) {
-        let ptr = self.txt_buffer(index);
+        debug_assert!(index < 4, "the PAC models four TX buffers");
+        let regs = self.r();
         for (i, &word) in frame.words.iter().enumerate() {
-            // SAFETY: `ptr` addresses a TX buffer RAM cell of FRAME_WORDS words.
-            unsafe { ptr.add(i).write_volatile(word) };
+            match index {
+                0 => regs.txtb1_data(i).write(|w| unsafe { w.data().bits(word) }),
+                1 => regs.txtb2_data(i).write(|w| unsafe { w.data().bits(word) }),
+                2 => regs.txtb3_data(i).write(|w| unsafe { w.data().bits(word) }),
+                _ => regs.txtb4_data(i).write(|w| unsafe { w.data().bits(word) }),
+            };
         }
     }
 
