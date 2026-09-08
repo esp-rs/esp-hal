@@ -2070,12 +2070,7 @@ static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
 // (but 0.1 clashes with embassy-time-driver)
 pub(crate) mod embassy_02 {
     use embassy_net_driver_02::{
-        Capabilities,
-        Driver,
-        HardwareAddress,
-        LinkState,
-        RxToken,
-        TxToken,
+        Capabilities, Driver, HardwareAddress, LinkState, RxToken, TxToken,
     };
 
     use super::*;
@@ -2153,12 +2148,7 @@ pub(crate) mod embassy_02 {
 
 pub(crate) mod xarxa {
     use xarxa_driver::{
-        Capabilities,
-        Driver,
-        HardwareAddress,
-        LinkState,
-        NotSupported,
-        PacketBuf,
+        Capabilities, Driver, HardwareAddress, LinkState, NotSupported, PacketBuf,
         config::PACKET_BUF_SIZE,
     };
 
@@ -2726,8 +2716,11 @@ impl WifiController<'_> {
     /// Panics if an ESP-NOW instance already exists.
     #[cfg(all(feature = "esp-now", feature = "unstable"))]
     #[instability::unstable]
-    pub fn esp_now(&self) -> crate::esp_now::EspNow<'_> {
-        crate::esp_now::EspNow::new_internal()
+    pub fn esp_now<'d>(
+        &'d self,
+        rx_queue_storage: crate::esp_now::QueueStorage,
+    ) -> crate::esp_now::EspNow<'d> {
+        crate::esp_now::EspNow::new_internal(rx_queue_storage)
     }
 
     /// Returns a sniffer instance tied to this controller's lifetime.

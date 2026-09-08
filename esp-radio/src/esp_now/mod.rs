@@ -9,19 +9,21 @@
 //!
 //! For more information see <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html>
 
-use alloc::{boxed::Box, collections::vec_deque::VecDeque};
+use alloc::{boxed::Box, vec::Vec};
+use bbqueue::{BBQueue, prod_cons::framed::FramedGrantR, traits::storage::Storage};
 use core::{
+    cell::UnsafeCell,
     fmt::Debug,
     marker::PhantomData,
+    mem::{ManuallyDrop, MaybeUninit},
+    ptr::NonNull,
     task::{Context, Poll},
 };
 
 use docsplay::Display;
 use esp_hal::time::Duration;
-use esp_sync::NonReentrantMutex;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
-use super::*;
 #[cfg(feature = "csi")]
 use crate::wifi::csi::CsiConfig;
 use crate::{
@@ -30,22 +32,86 @@ use crate::{
     wifi::{RxControlInfo, WifiError},
 };
 
-const RECEIVE_QUEUE_SIZE: usize = 10;
-
 /// Maximum payload length
 pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 
 /// Broadcast address
-pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
+pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8; 6];
+
+#[cfg(target_has_atomic = "ptr")]
+type Coord = bbqueue::traits::coordination::cas::AtomicCoord;
+
+#[cfg(not(target_has_atomic = "ptr"))]
+type Coord = bbqueue::traits::coordination::cs::CsCoord;
+
+type Queue = BBQueue<QueueStorage, Coord, bbqueue::traits::notifier::polling::Polling>;
+
+/// Storage for a queue
+#[instability::unstable]
+pub enum QueueStorage {
+    /// Static lifetime slice, use [`QueueStorage::slice`] for easier construction
+    Slice(&'static UnsafeCell<[u8]>),
+    /// Boxed slice, use [`QueueStorage::boxed`] for easier construction
+    Boxed(Box<[UnsafeCell<u8>]>),
+}
+
+impl QueueStorage {
+    /// Boxed variant
+    #[instability::unstable]
+    pub fn boxed(len: usize) -> Self {
+        let mut v = Vec::new();
+        v.resize_with(len, || UnsafeCell::new(0));
+        Self::Boxed(v.into_boxed_slice())
+    }
+    /// Slice variant
+    #[instability::unstable]
+    pub fn slice(s: &'static mut [u8]) -> Self {
+        Self::Slice(UnsafeCell::from_mut(s))
+    }
+}
+
+#[instability::unstable]
+impl Storage for QueueStorage {
+    unsafe fn ptr_len(&self) -> (NonNull<u8>, usize) {
+        unsafe {
+            match self {
+                Self::Slice(s) => {
+                    let ptr = s.get();
+                    (NonNull::new_unchecked(ptr.cast()), ptr.len())
+                }
+                Self::Boxed(b) => {
+                    let ptr = UnsafeCell::raw_get(b.as_ptr());
+                    (NonNull::new_unchecked(ptr), b.len())
+                }
+            }
+        }
+    }
+}
 
 struct EspNowState {
     // Stores received packets until dequeued by the user
-    rx_queue: VecDeque<ReceivedData>,
+    rx_queue: UnsafeCell<MaybeUninit<Queue>>,
 }
 
-static STATE: NonReentrantMutex<EspNowState> = NonReentrantMutex::new(EspNowState {
-    rx_queue: VecDeque::new(),
-});
+unsafe impl Sync for EspNowState {}
+
+impl EspNowState {
+    unsafe fn queue(&self) -> &Queue {
+        unsafe { STATE.rx_queue.get().as_ref_unchecked().assume_init_ref() }
+    }
+
+    unsafe fn set_queue(&self, q: Queue) {
+        unsafe { STATE.rx_queue.get().as_mut_unchecked().write(q) };
+    }
+
+    unsafe fn drop_queue(&self) {
+        unsafe { STATE.rx_queue.get().as_mut_unchecked().assume_init_drop() }
+    }
+}
+
+static STATE: EspNowState = EspNowState {
+    rx_queue: UnsafeCell::new(MaybeUninit::uninit()),
+};
 
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
@@ -88,25 +154,25 @@ macro_rules! check_error_expect {
 #[instability::unstable]
 pub enum Error {
     /// ESP-NOW is not initialized.
-    NotInitialized    = 12389,
+    NotInitialized = 12389,
 
     /// Invalid argument.
-    InvalidArgument   = 12390,
+    InvalidArgument = 12390,
 
     /// Indicates that there was insufficient memory to complete the operation.
-    OutOfMemory       = 12391,
+    OutOfMemory = 12391,
 
     /// ESP-NOW peer list is full.
-    PeerListFull      = 12392,
+    PeerListFull = 12392,
 
     /// ESP-NOW peer is not found.
-    NotFound          = 12393,
+    NotFound = 12393,
 
     /// Internal error.
-    Internal          = 12394,
+    Internal = 12394,
 
     /// ESP-NOW peer already exists.
-    PeerExists        = 12395,
+    PeerExists = 12395,
 
     /// The Wi-Fi interface used for ESP-NOW doesn't match the expected one for the peer.
     InterfaceMismatch = 12396,
@@ -177,79 +243,79 @@ pub struct PeerCount {
 #[instability::unstable]
 pub enum WifiPhyRate {
     /// 1 Mbps with long preamble
-    Rate1mL      = wifi_phy_rate_t_WIFI_PHY_RATE_1M_L,
+    Rate1mL = wifi_phy_rate_t_WIFI_PHY_RATE_1M_L,
     /// 2 Mbps with long preamble
-    Rate2m       = wifi_phy_rate_t_WIFI_PHY_RATE_2M_L,
+    Rate2m = wifi_phy_rate_t_WIFI_PHY_RATE_2M_L,
     /// 5.5 Mbps with long preamble
-    Rate5mL      = wifi_phy_rate_t_WIFI_PHY_RATE_5M_L,
+    Rate5mL = wifi_phy_rate_t_WIFI_PHY_RATE_5M_L,
     /// 11 Mbps with long preamble
-    Rate11mL     = wifi_phy_rate_t_WIFI_PHY_RATE_11M_L,
+    Rate11mL = wifi_phy_rate_t_WIFI_PHY_RATE_11M_L,
     /// 2 Mbps with short preamble
-    Rate2mS      = wifi_phy_rate_t_WIFI_PHY_RATE_2M_S,
+    Rate2mS = wifi_phy_rate_t_WIFI_PHY_RATE_2M_S,
     /// 5.5 Mbps with short preamble
-    Rate5mS      = wifi_phy_rate_t_WIFI_PHY_RATE_5M_S,
+    Rate5mS = wifi_phy_rate_t_WIFI_PHY_RATE_5M_S,
     /// 11 Mbps with short preamble
-    Rate11mS     = wifi_phy_rate_t_WIFI_PHY_RATE_11M_S,
+    Rate11mS = wifi_phy_rate_t_WIFI_PHY_RATE_11M_S,
     /// 48 Mbps
-    Rate48m      = wifi_phy_rate_t_WIFI_PHY_RATE_48M,
+    Rate48m = wifi_phy_rate_t_WIFI_PHY_RATE_48M,
     /// 24 Mbps
-    Rate24m      = wifi_phy_rate_t_WIFI_PHY_RATE_24M,
+    Rate24m = wifi_phy_rate_t_WIFI_PHY_RATE_24M,
     /// 12 Mbps
-    Rate12m      = wifi_phy_rate_t_WIFI_PHY_RATE_12M,
+    Rate12m = wifi_phy_rate_t_WIFI_PHY_RATE_12M,
     /// 6 Mbps
-    Rate6m       = wifi_phy_rate_t_WIFI_PHY_RATE_6M,
+    Rate6m = wifi_phy_rate_t_WIFI_PHY_RATE_6M,
     /// 54 Mbps
-    Rate54m      = wifi_phy_rate_t_WIFI_PHY_RATE_54M,
+    Rate54m = wifi_phy_rate_t_WIFI_PHY_RATE_54M,
     /// 36 Mbps
-    Rate36m      = wifi_phy_rate_t_WIFI_PHY_RATE_36M,
+    Rate36m = wifi_phy_rate_t_WIFI_PHY_RATE_36M,
     /// 18 Mbps
-    Rate18m      = wifi_phy_rate_t_WIFI_PHY_RATE_18M,
+    Rate18m = wifi_phy_rate_t_WIFI_PHY_RATE_18M,
     /// 9 Mbps
-    Rate9m       = wifi_phy_rate_t_WIFI_PHY_RATE_9M,
+    Rate9m = wifi_phy_rate_t_WIFI_PHY_RATE_9M,
     /// MCS0 with long GI, 6.5 Mbps for 20MHz, 13.5 Mbps for 40MHz
-    RateMcs0Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS0_LGI,
+    RateMcs0Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS0_LGI,
     /// MCS1 with long GI, 13 Mbps for 20MHz, 27 Mbps for 40MHz
-    RateMcs1Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS1_LGI,
+    RateMcs1Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS1_LGI,
     /// MCS2 with long GI, 19.5 Mbps for 20MHz, 40.5 Mbps for 40MHz
-    RateMcs2Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS2_LGI,
+    RateMcs2Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS2_LGI,
     /// MCS3 with long GI, 26 Mbps for 20MHz, 54 Mbps for 40MHz
-    RateMcs3Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS3_LGI,
+    RateMcs3Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS3_LGI,
     /// MCS4 with long GI, 39 Mbps for 20MHz, 81 Mbps for 40MHz
-    RateMcs4Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS4_LGI,
+    RateMcs4Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS4_LGI,
     /// MCS5 with long GI, 52 Mbps for 20MHz, 108 Mbps for 40MHz
-    RateMcs5Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS5_LGI,
+    RateMcs5Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS5_LGI,
     /// MCS6 with long GI, 58.5 Mbps for 20MHz, 121.5 Mbps for 40MHz
-    RateMcs6Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS6_LGI,
+    RateMcs6Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS6_LGI,
     /// MCS7 with long GI, 65 Mbps for 20MHz, 135 Mbps for 40MHz
-    RateMcs7Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS7_LGI,
+    RateMcs7Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS7_LGI,
     /// MCS8 with long GI
     #[cfg(not(wifi_mac_version = "1"))]
-    RateMcs8Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS8_LGI,
+    RateMcs8Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS8_LGI,
     /// MCS9 with long GI
     #[cfg(not(wifi_mac_version = "1"))]
-    RateMcs9Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS9_LGI,
+    RateMcs9Lgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS9_LGI,
     /// MCS0 with short GI, 7.2 Mbps for 20MHz, 15 Mbps for 40MHz
-    RateMcs0Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS0_SGI,
+    RateMcs0Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS0_SGI,
     /// MCS1 with short GI, 14.4 Mbps for 20MHz, 30 Mbps for 40MHz
-    RateMcs1Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS1_SGI,
+    RateMcs1Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS1_SGI,
     /// MCS2 with short GI, 21.7 Mbps for 20MHz, 45 Mbps for 40MHz
-    RateMcs2Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS2_SGI,
+    RateMcs2Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS2_SGI,
     /// MCS3 with short GI, 28.9 Mbps for 20MHz, 60 Mbps for 40MHz
-    RateMcs3Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS3_SGI,
+    RateMcs3Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS3_SGI,
     /// MCS4 with short GI, 43.3 Mbps for 20MHz, 90 Mbps for 40MHz
-    RateMcs4Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS4_SGI,
+    RateMcs4Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS4_SGI,
     /// MCS5 with short GI, 57.8 Mbps for 20MHz, 120 Mbps for 40MHz
-    RateMcs5Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS5_SGI,
+    RateMcs5Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS5_SGI,
     /// MCS6 with short GI, 65 Mbps for 20MHz, 135 Mbps for 40MHz
-    RateMcs6Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS6_SGI,
+    RateMcs6Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS6_SGI,
     /// MCS7 with short GI, 72.2 Mbps for 20MHz, 150 Mbps for 40MHz
-    RateMcs7Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS7_SGI,
+    RateMcs7Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS7_SGI,
     /// MCS8 with short GI
     #[cfg(not(wifi_mac_version = "1"))]
-    RateMcs8Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS8_SGI,
+    RateMcs8Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS8_SGI,
     /// MCS9 with short GI
     #[cfg(not(wifi_mac_version = "1"))]
-    RateMcs9Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS9_SGI,
+    RateMcs9Sgi = wifi_phy_rate_t_WIFI_PHY_RATE_MCS9_SGI,
     /// 250 Kbps
     RateLora250k = wifi_phy_rate_t_WIFI_PHY_RATE_LORA_250K,
     /// 500 Kbps
@@ -296,34 +362,42 @@ pub struct ReceiveInfo {
 
 /// Stores information about the received data, including the packet content and
 /// associated information.
-#[derive(Clone)]
 #[instability::unstable]
-pub struct ReceivedData {
-    data: Box<[u8]>,
-    /// Information about the received packet.
-    pub info: ReceiveInfo,
+pub struct ReceivedData<'a> {
+    g: ManuallyDrop<FramedGrantR<&'a Queue>>,
 }
 
-impl ReceivedData {
+impl<'a> Drop for ReceivedData<'a> {
+    fn drop(&mut self) {
+        unsafe { ManuallyDrop::take(&mut self.g).release() }
+    }
+}
+
+impl ReceivedData<'_> {
     /// Returns the received payload.
     #[instability::unstable]
     pub fn data(&self) -> &[u8] {
-        &self.data
+        unsafe { self.g.get_unchecked(size_of::<ReceiveInfo>()..) }
+    }
+
+    #[instability::unstable]
+    pub fn info(&self) -> ReceiveInfo {
+        unsafe { self.g.as_ptr().cast::<ReceiveInfo>().read_unaligned() }
     }
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for ReceivedData {
+impl<'a> defmt::Format for ReceivedData<'a> {
     fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "ReceivedData {}, Info {}", &self.data[..], &self.info,)
+        defmt::write!(fmt, "ReceivedData {}, Info {}", &self.data(), &self.info(),)
     }
 }
 
-impl Debug for ReceivedData {
+impl<'a> Debug for ReceivedData<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ReceivedData")
             .field("data", &self.data())
-            .field("info", &self.info)
+            .field("info", &self.info())
             .finish()
     }
 }
@@ -365,19 +439,19 @@ impl EspNowWifiInterface {
 #[instability::unstable]
 pub enum PhyMode {
     /// PHY mode for Low Rate
-    Lr    = wifi_phy_mode_t_WIFI_PHY_MODE_LR,
+    Lr = wifi_phy_mode_t_WIFI_PHY_MODE_LR,
     /// PHY mode for 11b
-    _11b  = wifi_phy_mode_t_WIFI_PHY_MODE_11B,
+    _11b = wifi_phy_mode_t_WIFI_PHY_MODE_11B,
     /// PHY mode for 11g
-    _11g  = wifi_phy_mode_t_WIFI_PHY_MODE_11G,
+    _11g = wifi_phy_mode_t_WIFI_PHY_MODE_11G,
     /// PHY mode for 11a
-    _11a  = wifi_phy_mode_t_WIFI_PHY_MODE_11A,
+    _11a = wifi_phy_mode_t_WIFI_PHY_MODE_11A,
     /// PHY mode for Bandwidth HT20
-    Ht20  = wifi_phy_mode_t_WIFI_PHY_MODE_HT20,
+    Ht20 = wifi_phy_mode_t_WIFI_PHY_MODE_HT20,
     /// PHY mode for Bandwidth HT40
-    Ht40  = wifi_phy_mode_t_WIFI_PHY_MODE_HT40,
+    Ht40 = wifi_phy_mode_t_WIFI_PHY_MODE_HT40,
     /// PHY mode for Bandwidth HE20
-    He20  = wifi_phy_mode_t_WIFI_PHY_MODE_HE20,
+    He20 = wifi_phy_mode_t_WIFI_PHY_MODE_HE20,
     /// PHY mode for Bandwidth VHT20
     Vht20 = wifi_phy_mode_t_WIFI_PHY_MODE_VHT20,
 }
@@ -684,8 +758,14 @@ pub struct EspNowReceiver<'d> {
 impl EspNowReceiver<'_> {
     /// Receives data from the ESP-NOW queue.
     #[instability::unstable]
-    pub fn receive(&self) -> Option<ReceivedData> {
-        STATE.with(|state| state.rx_queue.pop_front())
+    pub fn receive(&self) -> Option<ReceivedData<'_>> {
+        unsafe { STATE.queue() }
+            .framed_consumer()
+            .read()
+            .ok()
+            .map(|g| ReceivedData {
+                g: ManuallyDrop::new(g),
+            })
     }
 }
 
@@ -739,6 +819,7 @@ impl Drop for EspNowRc<'_> {
             unsafe {
                 esp_now_unregister_recv_cb();
                 esp_now_deinit();
+                STATE.drop_queue();
             }
         }
     }
@@ -766,7 +847,7 @@ pub struct EspNow<'d> {
 }
 
 impl<'d> EspNow<'d> {
-    pub(crate) fn new_internal() -> EspNow<'d> {
+    pub(crate) fn new_internal(rx_queue_storage: QueueStorage) -> EspNow<'d> {
         let espnow_rc = EspNowRc::new();
         let esp_now = EspNow {
             manager: EspNowManager {
@@ -780,6 +861,7 @@ impl<'d> EspNow<'d> {
         };
 
         check_error_expect!({ esp_now_init() }, "esp-now-init failed");
+        unsafe { STATE.set_queue(Queue::new_with_storage(rx_queue_storage)) };
         check_error_expect!(
             { esp_now_register_recv_cb(Some(rcv_cb)) },
             "receiving callback failed"
@@ -908,7 +990,7 @@ impl<'d> EspNow<'d> {
 
     /// Receive data.
     #[instability::unstable]
-    pub fn receive(&self) -> Option<ReceivedData> {
+    pub fn receive(&self) -> Option<ReceivedData<'_>> {
         self.receiver.receive()
     }
 }
@@ -957,18 +1039,24 @@ unsafe extern "C" fn rcv_cb(
         dst_address: dst,
         rx_control,
     };
-    let slice = unsafe { core::slice::from_raw_parts(data, data_len as usize) };
 
-    STATE.with(|state| {
-        let data = Box::from(slice);
+    if let Ok(g_len) = (size_of::<ReceiveInfo>() + data_len as usize).try_into()
+        && let Ok(mut g) = unsafe { STATE.queue() }.framed_producer().grant(g_len)
+    {
+        unsafe { core::ptr::write_unaligned(g.as_mut_ptr().cast(), info) }
 
-        if state.rx_queue.len() >= RECEIVE_QUEUE_SIZE {
-            state.rx_queue.pop_front();
+        unsafe {
+            core::ptr::copy_nonoverlapping(
+                data,
+                g.as_mut_ptr().add(size_of::<ReceiveInfo>()),
+                data_len as usize,
+            );
         }
 
-        state.rx_queue.push_back(ReceivedData { data, info });
+        g.commit(g_len);
+
         ESP_NOW_RX_WAKER.wake();
-    });
+    }
 }
 
 impl EspNowReceiver<'_> {
@@ -1064,14 +1152,16 @@ impl core::future::Future for SendFuture<'_, '_> {
 #[instability::unstable]
 pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
 
-impl core::future::Future for ReceiveFuture<'_> {
-    type Output = ReceivedData;
+impl<'a> core::future::Future for ReceiveFuture<'a> {
+    type Output = ReceivedData<'a>;
 
     fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ESP_NOW_RX_WAKER.register(cx.waker());
 
-        if let Some(data) = STATE.with(|state| state.rx_queue.pop_front()) {
-            Poll::Ready(data)
+        if let Ok(g) = unsafe { STATE.queue() }.framed_consumer().read() {
+            Poll::Ready(ReceivedData {
+                g: ManuallyDrop::new(g),
+            })
         } else {
             Poll::Pending
         }

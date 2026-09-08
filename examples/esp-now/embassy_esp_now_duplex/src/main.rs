@@ -21,6 +21,7 @@ use esp_radio::esp_now::{
     EspNowReceiver,
     EspNowSender,
     PeerInfo,
+    QueueStorage,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -52,7 +53,7 @@ async fn main(spawner: Spawner) -> ! {
         esp_radio::wifi::WifiController::new(wifi, Default::default()).unwrap()
     );
 
-    let esp_now = controller.esp_now();
+    let esp_now = controller.esp_now(QueueStorage::boxed(5000));
     esp_now.set_channel(11).unwrap();
 
     println!("esp-now version {}", esp_now.version().unwrap());
@@ -105,19 +106,20 @@ async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender<'static>>
 async fn listener(manager: &'static EspNowManager<'static>, mut receiver: EspNowReceiver<'static>) {
     loop {
         let r = receiver.receive_async().await;
+        let info = r.info();
         println!("Received {:?}", r.data());
-        if r.info.dst_address == BROADCAST_ADDRESS {
-            if !manager.peer_exists(&r.info.src_address) {
+        if info.dst_address == BROADCAST_ADDRESS {
+            if !manager.peer_exists(&info.src_address) {
                 manager
                     .add_peer(PeerInfo {
                         interface: esp_radio::esp_now::EspNowWifiInterface::Station,
-                        peer_address: r.info.src_address,
+                        peer_address: info.src_address,
                         lmk: None,
                         channel: None,
                         encrypt: false,
                     })
                     .unwrap();
-                println!("Added peer {:?}", r.info.src_address);
+                println!("Added peer {:?}", info.src_address);
             }
         }
     }
