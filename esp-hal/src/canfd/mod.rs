@@ -1098,7 +1098,18 @@ impl<Dm: DriverMode> CanFdTx<'_, Dm> {
 
     /// Queues a frame in the first free TX buffer and arms it.
     ///
-    /// Returns the index of the buffer used.
+    /// Returns the index of the buffer used. Up to [`CanFdTx::tx_buffer_count`]
+    /// frames can be queued at once, and the hardware sends them without any
+    /// gap between them.
+    ///
+    /// The hardware picks the next frame to send among the armed buffers by
+    /// priority, and among equal priorities by the lower buffer index; see
+    /// [`CanFd::set_tx_priority`]. The order in which frames were queued plays
+    /// no part in that choice. With equal priorities a frame queued into a
+    /// buffer that a finished frame freed up is sent before frames still
+    /// waiting in higher-numbered buffers. To keep frames in the order they
+    /// were queued, wait for each buffer to leave [`TxBufferState::Ready`]
+    /// before queueing the next frame, or give later frames lower priorities.
     ///
     /// # Errors
     ///
@@ -1776,7 +1787,9 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
 
     /// Queues a frame in the first free TX buffer and arms it.
     ///
-    /// Returns the index of the buffer used.
+    /// Returns the index of the buffer used. The hardware chooses the order in
+    /// which armed buffers are sent, not the order in which they were queued;
+    /// see [`CanFdTx::transmit`].
     ///
     /// # Errors
     ///
@@ -1824,9 +1837,15 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
     /// Sets a TX buffer's arbitration priority.
     ///
     /// Higher values win. Equal priorities are resolved in favor of the lower
-    /// buffer index (TRM 38.3.8.1). The hardware field holds up to
-    /// [`MAX_TX_PRIORITY`], and a larger value counts as that maximum. Does
-    /// nothing for an index the hardware does not have.
+    /// buffer index (TRM 38.3.8.1), whichever buffer was armed first. The
+    /// hardware field holds up to [`MAX_TX_PRIORITY`], and a larger value
+    /// counts as that maximum. Does nothing for an index the hardware does not
+    /// have.
+    ///
+    /// The priority belongs to the buffer, not to the frame in it, and all
+    /// buffers start out equal. Set it before arming the buffer with
+    /// [`CanFd::transmit`], or right after, while the frame is still
+    /// [`TxBufferState::Ready`].
     pub fn set_tx_priority(&mut self, index: u8, priority: u8) {
         if index < self.bus.tx_buffers {
             // Saturated rather than truncated: the field is three bits, and
