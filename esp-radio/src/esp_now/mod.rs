@@ -369,7 +369,7 @@ pub struct ReceivedData<'a> {
 
 impl<'a> Drop for ReceivedData<'a> {
     fn drop(&mut self) {
-        unsafe { ManuallyDrop::take(&mut self.g).release() }
+        unsafe { ManuallyDrop::take(&mut self.g) }.release()
     }
 }
 
@@ -1043,9 +1043,9 @@ unsafe extern "C" fn rcv_cb(
     if let Ok(g_len) = (size_of::<ReceiveInfo>() + data_len as usize).try_into()
         && let Ok(mut g) = unsafe { STATE.queue() }.framed_producer().grant(g_len)
     {
-        unsafe { core::ptr::write_unaligned(g.as_mut_ptr().cast(), info) }
-
         unsafe {
+            core::ptr::write_unaligned(g.as_mut_ptr().cast(), info);
+
             core::ptr::copy_nonoverlapping(
                 data,
                 g.as_mut_ptr().add(size_of::<ReceiveInfo>()),
