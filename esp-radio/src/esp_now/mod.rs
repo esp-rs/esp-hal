@@ -32,8 +32,11 @@ use crate::{
 
 const RECEIVE_QUEUE_SIZE: usize = 10;
 
-/// Maximum payload length
-pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
+/// Maximum ESP-NOW v1.0 payload length.
+pub const ESP_NOW_MAX_DATA_LEN_V1: usize = crate::sys::include::ESP_NOW_MAX_DATA_LEN as _;
+
+/// Maximum ESP-NOW v2.0 payload length.
+pub const ESP_NOW_MAX_DATA_LEN_V2: usize = crate::sys::include::ESP_NOW_MAX_DATA_LEN_V2 as _;
 
 /// Broadcast address
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
@@ -417,6 +420,16 @@ impl EspNowManager<'_> {
     }
 
     /// Get the version of ESP-NOW.
+    ///
+    /// Currently, ESP-NOW supports two versions: v1.0 and v2.0. The maximum packet length supported
+    /// by v2.0 devices is 1470 (ESP_NOW_MAX_DATA_LEN_V2) bytes, while the maximum packet length
+    /// supported by v1.0 devices is 250 (ESP_NOW_MAX_DATA_LEN_V1) bytes. The v2.0 devices are
+    /// capable of receiving packets from both v2.0 and v1.0 devices. In contrast, v1.0 devices
+    /// can only receive packets from other v1.0 devices.
+    ///
+    /// However, v1.0 devices can receive v2.0 packets if the packet length is less than or equal to
+    /// 250. For packets exceeding this length, the v1.0 devices will either truncate the data to the
+    /// first 250 bytes or discard the packet entirely.
     #[instability::unstable]
     pub fn version(&self) -> Result<u32, EspNowError> {
         let mut version = 0u32;
