@@ -432,6 +432,10 @@ wakeup_sources = {
     LpCore = 11,
 }
 
+[device.sleep.retention]
+cpu_retention = "software"
+supports_top_power_down = true
+
 [device.etm]
 support_status = { status = "not_supported", issue = 5167 }
 

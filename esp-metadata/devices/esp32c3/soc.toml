@@ -290,6 +290,13 @@ wakeup_sources = {
     Bt = 10,
 }
 
+[device.sleep.retention]
+cpu_retention = "rtc_cntl"
+cpu_retention_mem_size = 1744
+cpu_retention_mem_align = 16
+cpu_retention_mem_start = 0x3FCC0000
+cpu_retention_mem_end = 0x3FCE0000
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
