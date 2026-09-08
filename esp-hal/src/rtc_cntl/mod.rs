@@ -122,6 +122,17 @@ use crate::{peripherals::RTC_TIMER, system::Cpu, time::Duration};
 #[cfg(sleep_driver_supported)]
 pub mod sleep;
 
+#[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
+#[cfg_attr(cpu_retention = "rtc_cntl", path = "cpu_retention/rtc_cntl.rs")]
+#[cfg_attr(cpu_retention = "software", path = "cpu_retention/software.rs")]
+mod cpu_retention;
+#[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
+pub(crate) use cpu_retention::installed_buffer_ptr;
+// The software-retention chips gain these once their frames are defined.
+#[cfg(cpu_retention = "rtc_cntl")]
+#[instability::unstable]
+pub use cpu_retention::{CpuRetentionMemory, CpuRetentionMemoryError};
+
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
 #[cfg_attr(esp32c2, path = "rtc/esp32c2.rs")]
 #[cfg_attr(esp32c3, path = "rtc/esp32c3.rs")]
