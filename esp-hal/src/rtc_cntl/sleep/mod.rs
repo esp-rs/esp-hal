@@ -218,6 +218,11 @@ impl<'d> LowPower<'d> {
         let rejected = {
             // A chip can keep a guard for the length of the sleep, to restore what sleep entry
             // changed for the sleep only. The guard must therefore outlive the wait below.
+            // ESP-IDF arms retention in `misc_modules_sleep_prepare`, before it arms the wakeup
+            // sources.
+            #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
+            sleep_impl::prepare_cpu_retention(crate::rtc_cntl::installed_buffer_ptr());
+
             #[allow(clippy::let_unit_value)]
             let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
 

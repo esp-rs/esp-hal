@@ -751,3 +751,8 @@ impl RtcSleepConfig {
     /// [`Self::start_sleep`] restores the clock, and the wakeup sources keep their configuration.
     pub(crate) fn finish_sleep(&self) {}
 }
+
+/// Prepares CPU retention for the upcoming sleep.
+pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
+    let _ = buffer;
+}
