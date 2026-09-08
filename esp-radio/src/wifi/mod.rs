@@ -2070,7 +2070,12 @@ static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
 // (but 0.1 clashes with embassy-time-driver)
 pub(crate) mod embassy_02 {
     use embassy_net_driver_02::{
-        Capabilities, Driver, HardwareAddress, LinkState, RxToken, TxToken,
+        Capabilities,
+        Driver,
+        HardwareAddress,
+        LinkState,
+        RxToken,
+        TxToken,
     };
 
     use super::*;
@@ -2148,7 +2153,12 @@ pub(crate) mod embassy_02 {
 
 pub(crate) mod xarxa {
     use xarxa_driver::{
-        Capabilities, Driver, HardwareAddress, LinkState, NotSupported, PacketBuf,
+        Capabilities,
+        Driver,
+        HardwareAddress,
+        LinkState,
+        NotSupported,
+        PacketBuf,
         config::PACKET_BUF_SIZE,
     };
 
