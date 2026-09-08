@@ -181,6 +181,9 @@ impl<'d> LowPower<'d> {
         // paths.
         run_entry_hooks(&mut config);
 
+        #[cfg(cpu_retention = "rtc_cntl")]
+        sleep_impl::configure_cpu_retention(&mut config, crate::rtc_cntl::installed_buffer_ptr());
+
         config.apply();
 
         // A sleep with no wakeup source never ends. No counter overflow ends it either.
