@@ -49,7 +49,7 @@ type Queue = BBQueue<QueueStorage, Coord, bbqueue::traits::notifier::polling::Po
 /// Storage for a queue
 #[instability::unstable]
 pub struct QueueStorage {
-    ptr_len: (NonNull<u8>, usize),
+    data: NonNull<[u8]>,
     is_a_box: bool,
 }
 
@@ -69,7 +69,7 @@ impl QueueStorage {
         let s = Box::leak(v.into_boxed_slice());
 
         Self {
-            ptr_len: (unsafe { NonNull::new_unchecked(s.as_mut_ptr()) }, len),
+            data: NonNull::from_ref(s),
             is_a_box: true,
         }
     }
@@ -78,7 +78,7 @@ impl QueueStorage {
     pub fn slice(s: &'static mut [u8]) -> Self {
         Self {
             is_a_box: false,
-            ptr_len: (unsafe { NonNull::new_unchecked(s.as_mut_ptr()) }, s.len()),
+            data: NonNull::from_ref(s),
         }
     }
 }
@@ -86,7 +86,7 @@ impl QueueStorage {
 impl Drop for QueueStorage {
     fn drop(&mut self) {
         if self.is_a_box {
-            drop(unsafe { Box::from_raw(self.ptr_len.0.as_ptr()) });
+            drop(unsafe { Box::from_raw(self.data.as_ptr()) });
         }
     }
 }
@@ -94,7 +94,7 @@ impl Drop for QueueStorage {
 #[instability::unstable]
 impl Storage for QueueStorage {
     unsafe fn ptr_len(&self) -> (NonNull<u8>, usize) {
-        self.ptr_len
+        (self.data.cast(), self.data.len())
     }
 }
 
