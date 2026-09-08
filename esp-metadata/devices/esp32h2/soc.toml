@@ -340,6 +340,10 @@ wakeup_sources = {
     LpCore = 11,
 }
 
+[device.sleep.retention]
+cpu_retention = "software"
+supports_top_power_down = true
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
