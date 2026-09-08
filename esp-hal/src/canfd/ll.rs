@@ -605,7 +605,15 @@ impl FrameBuffer {
 }
 
 /// Converts a CAN FD data length code to a payload length in bytes.
+///
+/// A data length code is four bits, so `dlc` is at most 15. A larger value is
+/// treated as 15, which is 64 bytes.
+///
+/// # Panics
+///
+/// With debug assertions enabled, when `dlc` is larger than 15.
 pub const fn dlc_to_len(dlc: u8) -> u8 {
+    core::debug_assert!(dlc <= MAX_DLC, "a data length code is four bits");
     match dlc {
         0..=8 => dlc,
         9..=12 => (dlc - 8) * 4 + 8,
@@ -617,12 +625,24 @@ pub const fn dlc_to_len(dlc: u8) -> u8 {
 
 /// Converts a payload length in bytes to the smallest CAN FD data length code
 /// that can carry it.
+///
+/// A CAN FD frame carries at most 64 bytes. A larger `len` is treated as 64
+/// and maps to the code 15.
+///
+/// # Panics
+///
+/// With debug assertions enabled, when `len` is larger than 64.
 pub const fn len_to_dlc(len: u8) -> u8 {
+    core::debug_assert!(
+        len as usize <= MAX_DATA_LEN,
+        "a frame carries at most 64 bytes"
+    );
     match len {
         0..=8 => len,
         9..=24 => (len - 8).div_ceil(4) + 8,
         25..=32 => (len - 24).div_ceil(8) + 12,
-        _ => (len - 32).div_ceil(16) + 13,
+        33..=64 => (len - 32).div_ceil(16) + 13,
+        _ => MAX_DLC,
     }
 }
 

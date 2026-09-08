@@ -95,6 +95,7 @@ pub use ll::{
     ErrorState,
     FD_TIMING_LIMITS,
     FrameKinds,
+    MAX_RETRANSMIT_LIMIT,
     MaskFilter,
     NOMINAL_TIMING_LIMITS,
     Timing,
@@ -119,7 +120,7 @@ use crate::rtc_cntl::WakeLock;
 pub use crate::soc::clocks::TwaiFunctionClockConfig as ClockSource;
 
 /// The device ID every CTU CAN FD core reports in `TWAIFD_DEVICE_ID_VERSION_REG`.
-pub const CANFD_DEVICE_ID: u16 = 0xCAFD;
+const CTU_CAN_FD_DEVICE_ID: u16 = 0xCAFD;
 
 /// An interrupt source of the controller (TRM 38.4).
 #[derive(Debug, EnumSetType)]
@@ -198,6 +199,16 @@ pub struct Identity {
     pub version_minor: u8,
 }
 
+impl Identity {
+    /// Returns whether the device ID is the one a CTU CAN FD core reports.
+    ///
+    /// Any other value means the registers did not answer as the core: the
+    /// peripheral is not clocked, or something else sits at its address.
+    pub fn is_ctu_can_fd(&self) -> bool {
+        self.device_id == CTU_CAN_FD_DEVICE_ID
+    }
+}
+
 /// How the controller participates on the bus.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -231,7 +242,7 @@ pub enum ConfigError {
     UnsupportedTimestampResolution,
     /// The timestamp counter did not start ticking.
     TimestampTimerStalled,
-    /// The retransmission limit is larger than the hardware field can hold.
+    /// The retransmission limit is larger than [`MAX_RETRANSMIT_LIMIT`].
     UnsupportedRetransmitLimit,
     /// The secondary sample point cannot be placed where it was asked for.
     ///
@@ -333,8 +344,6 @@ pub enum FrameError {
     ///
     /// Classic CAN frames carry up to 8 bytes, CAN FD frames up to 64.
     PayloadTooLong,
-    /// The data length code is larger than 15.
-    InvalidDataLengthCode,
     /// The identifier does not fit the frame format.
     ///
     /// A base identifier is 11 bits and an extended one 29.
@@ -349,7 +358,6 @@ impl core::fmt::Display for FrameError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let message = match self {
             Self::PayloadTooLong => "The payload is longer than the frame format can carry",
-            Self::InvalidDataLengthCode => "The data length code is larger than 15",
             Self::IdTooLarge => "The identifier does not fit the frame format",
             Self::NotClassic => "The frame is a CAN FD frame",
         };
@@ -387,7 +395,8 @@ pub struct Config {
 
     /// Number of retransmission attempts, or `None` to retry forever.
     ///
-    /// The first attempt is not a retransmission.
+    /// The first attempt is not a retransmission. The hardware holds at most
+    /// [`MAX_RETRANSMIT_LIMIT`].
     ///
     /// Default value: `Some(3)`.
     retransmit_limit: Option<u8>,
@@ -468,7 +477,7 @@ impl Config {
         // "retry sixteen times" into "never retry".
         if self
             .retransmit_limit
-            .is_some_and(|limit| limit > ll::MAX_RETRANSMIT_LIMIT)
+            .is_some_and(|limit| limit > MAX_RETRANSMIT_LIMIT)
         {
             return Err(ConfigError::UnsupportedRetransmitLimit);
         }
@@ -1060,6 +1069,23 @@ impl<Dm: DriverMode> CanFdRx<'_, Dm> {
     pub fn flush_rx(&mut self) {
         self.ll.flush_rx();
     }
+
+    /// Returns the size and the free space of the RX buffer, as `(size, free)`
+    /// in 32-bit words.
+    pub fn rx_buffer_words(&self) -> (u16, u16) {
+        (self.ll.rx_buffer_size(), self.ll.rx_free_words())
+    }
+
+    /// Returns whether the RX buffer has overrun and dropped a frame
+    /// (TRM 38.3.9.4).
+    pub fn rx_overrun(&self) -> bool {
+        self.ll.rx_overrun()
+    }
+
+    /// Clears the RX buffer overrun flag.
+    pub fn clear_rx_overrun(&mut self) {
+        self.ll.clear_overrun();
+    }
 }
 
 impl CanFdRx<'_, Async> {
@@ -1162,6 +1188,28 @@ impl<Dm: DriverMode> CanFdTx<'_, Dm> {
     pub fn release_tx_buffer(&mut self, index: u8) {
         if index < self.tx_buffers {
             self.ll.set_tx_empty(index);
+        }
+    }
+
+    /// Sets a TX buffer's arbitration priority.
+    ///
+    /// Higher values win. Equal priorities are resolved in favor of the lower
+    /// buffer index (TRM 38.3.8.1), whichever buffer was armed first. The
+    /// hardware field holds up to [`MAX_TX_PRIORITY`], and a larger value
+    /// counts as that maximum. Does nothing for an index the hardware does not
+    /// have.
+    ///
+    /// The priority belongs to the buffer, not to the frame in it, and all
+    /// buffers start out equal. Set it before arming the buffer with
+    /// [`CanFdTx::transmit`], or right after, while the frame is still
+    /// [`TxBufferState::Ready`].
+    pub fn set_tx_priority(&mut self, index: u8, priority: u8) {
+        if index < self.tx_buffers {
+            // Saturated rather than truncated: the field is three bits, and
+            // letting the write mask the value would turn 8 into 0 — the
+            // buffer the caller ranked highest would go last.
+            self.ll
+                .set_tx_priority(index, priority.min(MAX_TX_PRIORITY));
         }
     }
 }
@@ -1598,14 +1646,16 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
             self.bus.quiesce().map_err(|_| ConfigError::BusBusy)?;
         }
 
-        // Re-point the clock mux next. Every timing parameter below is expressed
-        // in periods of this clock (TRM 38.3.1), so programming the timing while
-        // the mux still selects the previous source yields a bit rate that
-        // silently differs from the configured one.
-        self._function_clock.set_source(self.config.clock_source);
-
-        // Mode bits can only be changed while the controller is disabled.
+        // Mode bits can only be changed while the controller is disabled, and
+        // the clock mux is better left alone until it is.
         self.bus.disable();
+
+        // Re-point the clock mux before the timing. Every timing parameter
+        // below is expressed in periods of this clock (TRM 38.3.1), so
+        // programming the timing while the mux still selects the previous
+        // source yields a bit rate that silently differs from the configured
+        // one.
+        self._function_clock.set_source(self.config.clock_source);
 
         let config = self.config;
         let (listen_only, self_test, loopback) = match config.mode {
@@ -1836,25 +1886,10 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
 
     /// Sets a TX buffer's arbitration priority.
     ///
-    /// Higher values win. Equal priorities are resolved in favor of the lower
-    /// buffer index (TRM 38.3.8.1), whichever buffer was armed first. The
-    /// hardware field holds up to [`MAX_TX_PRIORITY`], and a larger value
-    /// counts as that maximum. Does nothing for an index the hardware does not
-    /// have.
-    ///
-    /// The priority belongs to the buffer, not to the frame in it, and all
-    /// buffers start out equal. Set it before arming the buffer with
-    /// [`CanFd::transmit`], or right after, while the frame is still
-    /// [`TxBufferState::Ready`].
+    /// Higher values win, and a value above [`MAX_TX_PRIORITY`] counts as that
+    /// maximum; see [`CanFdTx::set_tx_priority`].
     pub fn set_tx_priority(&mut self, index: u8, priority: u8) {
-        if index < self.bus.tx_buffers {
-            // Saturated rather than truncated: the field is three bits, and
-            // letting the write mask the value would turn 8 into 0 — the
-            // buffer the caller ranked highest would go last.
-            self.bus
-                .ll
-                .set_tx_priority(index, priority.min(MAX_TX_PRIORITY));
-        }
+        self.tx_half().set_tx_priority(index, priority);
     }
 
     /// Returns the size and the free space of the RX buffer, as `(size, free)`

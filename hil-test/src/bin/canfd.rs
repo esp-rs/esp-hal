@@ -24,7 +24,6 @@ mod canfd {
         Blocking,
         DriverMode,
         canfd::{
-            CANFD_DEVICE_ID,
             CanFd,
             CanFdInterrupt,
             ClockSource,
@@ -171,7 +170,7 @@ mod canfd {
 
         #[test]
         fn reports_the_ctu_can_fd_core(ctx: Context<Blocking>) {
-            assert_eq!(ctx.canfd.identity().device_id, CANFD_DEVICE_ID);
+            assert!(ctx.canfd.identity().is_ctu_can_fd());
             assert_eq!(ctx.canfd.tx_buffer_count(), 4);
         }
 
