@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v1.2.1] - 2026-09-08
+
+### Fixed
+
+- Reverted the unintentionally stable `DirectBindableCpuInterrupt` to `unstable`. (#6270)
+
 ## [v1.2.0] - 2026-09-01
 
 ### Fixed
@@ -1890,4 +1896,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.1.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0...esp-hal-v1.1.0
 [v1.2.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...esp-hal-v1.2.0-rc.0
 [v1.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0-rc.0...esp-hal-v1.2.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0...HEAD
+[v1.2.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0...esp-hal-v1.2.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.1...HEAD
