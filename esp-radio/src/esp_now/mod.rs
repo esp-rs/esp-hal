@@ -57,7 +57,7 @@ pub enum QueueStorage {
 
 impl Default for QueueStorage {
     fn default() -> Self {
-        Self::boxed(16384)
+        Self::boxed(4096)
     }
 }
 
