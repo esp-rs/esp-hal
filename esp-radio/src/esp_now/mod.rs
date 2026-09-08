@@ -48,11 +48,9 @@ type Queue = BBQueue<QueueStorage, Coord, bbqueue::traits::notifier::polling::Po
 
 /// Storage for a queue
 #[instability::unstable]
-pub enum QueueStorage {
-    /// Static lifetime slice, use [`QueueStorage::slice`] for easier construction
-    Slice(&'static UnsafeCell<[u8]>),
-    /// Boxed slice, use [`QueueStorage::boxed`] for easier construction
-    Boxed(Box<[UnsafeCell<u8>]>),
+pub struct QueueStorage {
+    ptr_len: (NonNull<u8>, usize),
+    is_a_box: bool,
 }
 
 impl Default for QueueStorage {
@@ -65,32 +63,38 @@ impl QueueStorage {
     /// Boxed variant
     #[instability::unstable]
     pub fn boxed(len: usize) -> Self {
-        let mut v = Vec::new();
-        v.resize_with(len, || UnsafeCell::new(0));
-        Self::Boxed(v.into_boxed_slice())
+        let mut v = Vec::with_capacity(len);
+        v.resize(len, 0u8);
+
+        let s = Box::leak(v.into_boxed_slice());
+
+        Self {
+            ptr_len: (unsafe { NonNull::new_unchecked(s.as_mut_ptr()) }, len),
+            is_a_box: true,
+        }
     }
     /// Slice variant
     #[instability::unstable]
     pub fn slice(s: &'static mut [u8]) -> Self {
-        Self::Slice(UnsafeCell::from_mut(s))
+        Self {
+            is_a_box: false,
+            ptr_len: (unsafe { NonNull::new_unchecked(s.as_mut_ptr()) }, s.len()),
+        }
+    }
+}
+
+impl Drop for QueueStorage {
+    fn drop(&mut self) {
+        if self.is_a_box {
+            drop(unsafe { Box::from_raw(self.ptr_len.0.as_ptr()) });
+        }
     }
 }
 
 #[instability::unstable]
 impl Storage for QueueStorage {
     unsafe fn ptr_len(&self) -> (NonNull<u8>, usize) {
-        unsafe {
-            match self {
-                Self::Slice(s) => {
-                    let ptr = s.get();
-                    (NonNull::new_unchecked(ptr.cast()), ptr.len())
-                }
-                Self::Boxed(b) => {
-                    let ptr = UnsafeCell::raw_get(b.as_ptr());
-                    (NonNull::new_unchecked(ptr), b.len())
-                }
-            }
-        }
+        self.ptr_len
     }
 }
 
