@@ -5,9 +5,10 @@
 //! minimal, CAN bus between the two controllers of the chip. The single-node
 //! tests loop one controller back to itself and work with the pins unwired.
 //!
-//! The default data phase runs at 2 Mbit/s. Its rising edges need a pull-up of
-//! a few kilo-ohms to 3V3 on the wire; the internal pull-up is too weak for
-//! that rate.
+//! No external pull-up is needed. The two-node tests run the data phase at the
+//! default 2 Mbit/s, which the two internal pull-ups of the wired pins handle
+//! together. The single-node tests have one pull-up and run their data phase
+//! at 1 Mbit/s; at 2 Mbit/s the recessive edge of one pin is too slow.
 
 //% CHIP_FILTER: canfd_driver_supported
 //% FEATURES: unstable embassy
@@ -65,10 +66,23 @@ mod canfd {
     /// Loopback plus self test lets one controller exercise itself: the frame is
     /// routed back into the RX buffer, and self test keeps the missing external
     /// acknowledgement from failing the transmission.
+    ///
+    /// The data phase runs at 1 Mbit/s rather than the default 2 Mbit/s. A
+    /// single pin has only its own internal pull-up to pull the wire recessive,
+    /// and on the runner that edge is too slow for 2 Mbit/s; two pins wired
+    /// together pull twice as hard, which is why the two-node tests keep the
+    /// default.
     fn config() -> Config {
         Config::default()
             .with_mode(Mode::LoopbackSelfTest)
             .with_no_transceiver(true)
+            .with_fd_timing(Timing {
+                baud_rate_prescaler: 20,
+                propagation_segment: 1,
+                phase_segment_1: 1,
+                phase_segment_2: 1,
+                sync_jump_width: 1,
+            })
     }
 
     /// Waits for a queued frame to leave the in-progress states.
@@ -804,10 +818,12 @@ mod canfd {
             // offset of 16 quanta lands exactly on the four-bit-time limit of
             // TRM 38.3.7.3 — and the hardware adds the delay it measures on top,
             // which is never zero. Accepting this configuration means every FD
-            // transmission fails instead.
+            // transmission fails instead. Nothing is transmitted here, so the
+            // default data phase is used rather than the slower loopback one.
+            let default_data_phase = config().with_fd_timing(Config::default().fd_timing());
             assert_eq!(
                 ctx.canfd
-                    .apply_config(&config().with_secondary_sample_point_offset(16)),
+                    .apply_config(&default_data_phase.with_secondary_sample_point_offset(16)),
                 Err(ConfigError::UnsupportedSecondarySamplePoint)
             );
 
@@ -816,7 +832,7 @@ mod canfd {
 
             // One quantum lower leaves room for the core's own input delay.
             ctx.canfd
-                .apply_config(&config().with_secondary_sample_point_offset(15))
+                .apply_config(&default_data_phase.with_secondary_sample_point_offset(15))
                 .unwrap();
             assert_eq!(ctx.canfd.config().secondary_sample_point_offset(), Some(15));
         }
@@ -1027,9 +1043,13 @@ mod canfd {
                 .into_async();
             canfd.start().unwrap();
 
+            // Same wire, so the same data phase as the loopback node: a peer
+            // that expects the default 2 Mbit/s would flag the node's 1 Mbit/s
+            // payload as an error and destroy the frame.
             let peer_config = Config::default()
                 .with_mode(Mode::SelfTest)
-                .with_no_transceiver(true);
+                .with_no_transceiver(true)
+                .with_fd_timing(config().fd_timing());
             let mut peer = CanFd::new(peripherals.TWAI1, peer_config)
                 .unwrap()
                 .with_rx(rx1)
