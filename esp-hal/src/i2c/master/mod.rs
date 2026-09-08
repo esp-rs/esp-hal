@@ -677,9 +677,10 @@ impl Default for Config {
 pub struct I2c<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
-    guard: PeripheralGuard,
-    /// `I2c` cannot implement `Drop`, because the mode changes move its fields out.
+    /// `I2c` cannot implement `Drop`, because the mode changes move its fields out. Before
+    /// `guard`: the teardown writes registers.
     async_guard: AsyncModeGuard,
+    guard: PeripheralGuard,
     config: DriverConfig,
 }
 
