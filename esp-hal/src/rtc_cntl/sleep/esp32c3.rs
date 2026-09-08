@@ -713,6 +713,9 @@ impl RtcSleepConfig {
 // powered, so it survives the CPU power-down. This is why the chip has no tag memory retention
 // feature, and why `rtc_cntl_hal_enable_cpu_retention` and its disable counterpart touch no cache.
 
+/// Sets CPU power-down in the sleep configuration when a retention buffer is installed.
+pub(crate) fn configure_cpu_retention(_config: &mut RtcSleepConfig, _buffer: Option<*mut u8>) {}
+
 /// Prepares CPU retention for the upcoming sleep.
 pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
     let _ = buffer;

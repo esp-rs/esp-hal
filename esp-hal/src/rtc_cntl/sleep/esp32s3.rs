@@ -687,6 +687,27 @@ impl RtcSleepConfig {
 // first and invalidate both caches after. Tag memory retention, which lets a program skip this
 // work, comes later; until then the answer is always yes.
 
+const DMA_LINK_SIZE: usize = 16;
+const BUFFER_SIZE: usize = property!("sleep.cpu_retention_mem_size");
+const PAYLOAD_SIZE: usize = BUFFER_SIZE - DMA_LINK_SIZE;
+
+// `SOC_RTC_CNTL_CPU_PD_REG_FILE_NUM` (549) times `SOC_RTC_CNTL_CPU_PD_DMA_BLOCK_SIZE` (16).
+const _: () = assert!(PAYLOAD_SIZE == 549 * 16);
+
+const RETENTION_CONFIG_WORD3: u32 = 0xfffe_0000;
+const RETENTION_WAIT_CYCLES: u8 = 0x7f;
+const RETENTION_CLKOFF_WAIT_CYCLES: u8 = 0x0f;
+const RETENTION_DONE_WAIT_CYCLES: u8 = 0x07;
+const RETENTION_TARGET_CPU: u8 = 1;
+
+/// RTC_CNTL retention DMA link node. Matches `lldesc_t` in `esp_rom_lldesc.h`.
+#[repr(C)]
+struct RtcCntlDmaLink {
+    word0: u32,
+    buf: *mut u8,
+    next: u32,
+}
+
 /// Whether a retained sleep must write the data cache back before the CPU domain powers down.
 fn dcache_writeback_needed() -> bool {
     true
@@ -702,17 +723,27 @@ fn dcache_invalidate_needed() -> bool {
     true
 }
 
+/// Sets CPU power-down in the sleep configuration when a retention buffer is installed.
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
+    if buffer.is_some() {
+        config.set_cpu_pd_en(true);
+    }
+}
+
 /// Prepares CPU retention for the upcoming sleep.
 pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
-    if buffer.is_none() {
+    let Some(buffer) = buffer else {
         return;
-    }
+    };
 
-    // Only PSRAM data in the d-cache is at risk, and nothing writes to it between here and the
-    // sleep request, so a writeback now is enough. Follows
-    // `rtc_cntl_hal_enable_cpu_retention`.
-    if dcache_writeback_needed() {
-        unsafe {
+    unsafe {
+        init_dma_link(buffer);
+        enable_cpu_retention(buffer as usize);
+
+        // Only PSRAM data in the d-cache is at risk, and nothing writes to it between here and the
+        // sleep request, so a writeback now is enough. Follows
+        // `rtc_cntl_hal_enable_cpu_retention`.
+        if dcache_writeback_needed() {
             crate::soc::cache_writeback_all();
         }
     }
@@ -720,8 +751,16 @@ pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
 
 /// Finishes CPU retention after the sleep request returns.
 pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, rejected: bool) {
+    if buffer.is_none() {
+        return;
+    }
+
+    // Disarm on every exit, including a rejected request that never slept. A stale descriptor
+    // would otherwise affect the next unretained sleep.
+    disable_cpu_retention();
+
     // A rejected request never slept, so it lost no cache contents.
-    if buffer.is_none() || rejected {
+    if rejected {
         return;
     }
 
@@ -735,4 +774,63 @@ pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, rejected: bool) {
             crate::soc::cache_invalidate_dcache_all();
         }
     }
+}
+
+/// Builds the DMA link word. `units` is the payload size in 16-byte blocks.
+fn dma_link_word0(units: u16) -> u32 {
+    let units = units as u32;
+    // `lldesc_t` first word, from `rom/lldesc.h`: size in bits 0..12, length in 12..24, `eof` at
+    // bit 30 for the only node in the list, `owner` at bit 31 for the DMA. Both counts are in
+    // 16-byte units, as `rtc_cntl_hal_dma_link_init` writes them.
+    units | (units << 12) | (1 << 30) | (1 << 31)
+}
+
+unsafe fn init_dma_link(buffer: *mut u8) {
+    unsafe {
+        let link = buffer.cast::<RtcCntlDmaLink>();
+        let payload = buffer.add(DMA_LINK_SIZE);
+        let units = (PAYLOAD_SIZE >> 4) as u16;
+
+        core::ptr::write_volatile(&raw mut (*link).word0, dma_link_word0(units));
+        core::ptr::write_volatile(&raw mut (*link).buf, payload);
+        core::ptr::write_volatile(&raw mut (*link).next, 0);
+
+        let cfg = payload.cast::<u32>();
+        core::ptr::write_volatile(cfg, 0);
+        core::ptr::write_volatile(cfg.add(1), 0);
+        core::ptr::write_volatile(cfg.add(2), 0);
+        core::ptr::write_volatile(cfg.add(3), RETENTION_CONFIG_WORD3);
+    }
+}
+
+fn enable_cpu_retention(link_addr: usize) {
+    // The field is 27 bits and the address needs 30, so the write drops the top three. The DMA
+    // reaches internal SRAM only, so the hardware supplies those bits; esp-idf truncates the same
+    // way through `REG_SET_FIELD`. `modify` keeps `nobypass_cpu_iso_rst`, which shares the
+    // register.
+    APB_CTRL::regs()
+        .retention_ctrl()
+        .modify(|_, w| unsafe { w.retention_cpu_link_addr().bits(link_addr as u32) });
+
+    LPWR::regs().retention_ctrl().modify(|_, w| unsafe {
+        w.retention_wait().bits(RETENTION_WAIT_CYCLES);
+        w.retention_clkoff_wait().bits(RETENTION_CLKOFF_WAIT_CYCLES);
+        w.retention_done_wait().bits(RETENTION_DONE_WAIT_CYCLES)
+    });
+
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_clk8m_en().set_bit());
+
+    LPWR::regs().retention_ctrl().modify(|r, w| unsafe {
+        w.retention_target()
+            .bits(r.retention_target().bits() | RETENTION_TARGET_CPU);
+        w.retention_en().set_bit()
+    });
+}
+
+fn disable_cpu_retention() {
+    LPWR::regs()
+        .retention_ctrl()
+        .modify(|_, w| w.retention_en().clear_bit());
 }
