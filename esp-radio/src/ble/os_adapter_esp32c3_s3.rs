@@ -83,6 +83,7 @@ pub(super) struct osi_funcs_s {
     esp_hw_power_down: Option<unsafe extern "C" fn()>,
     esp_hw_power_up: Option<unsafe extern "C" fn()>,
     ets_backup_dma_copy: Option<unsafe extern "C" fn(u32, u32, u32, i32)>,
+    malloc_retention: Option<unsafe extern "C" fn(u32) -> *mut c_void>,
     ets_delay_us: Option<unsafe extern "C" fn(u32)>,
     btdm_rom_table_ready: Option<unsafe extern "C" fn()>,
     coex_bt_wakeup_request: Option<unsafe extern "C" fn()>,
@@ -93,7 +94,7 @@ pub(super) struct osi_funcs_s {
 
 pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     magic: 0xfadebead,
-    version: 0x0001000A,
+    version: 0x0001000B,
     interrupt_alloc: Some(interrupt_set),
     interrupt_free: Some(interrupt_clear),
     interrupt_handler_set: Some(interrupt_handler_set),
@@ -148,6 +149,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     esp_hw_power_down: Some(esp_hw_power_down),
     esp_hw_power_up: Some(esp_hw_power_up),
     ets_backup_dma_copy: Some(ets_backup_dma_copy),
+    malloc_retention: Some(crate::ble::malloc_retention),
     ets_delay_us: Some(ets_delay_us_wrapper),
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
     coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
