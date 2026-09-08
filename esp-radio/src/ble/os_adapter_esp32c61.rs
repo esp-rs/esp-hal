@@ -332,6 +332,9 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         slv_fst_rx_lat_en: 0,
         dl_itvl_phy_sync_en: 0,
         scan_allow_adi_filter: 0,
+        // BT_CONTROLLER_INIT_CONFIG_DEFAULT: both stay 0 unless ADV_FAST_TX is set.
+        enhanced_mem_resv: 0,
+        rxbuf_reserved: 0,
         config_magic: CONFIG_MAGIC,
     }
 }
