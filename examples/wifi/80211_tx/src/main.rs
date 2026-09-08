@@ -42,8 +42,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
-    // The sniffer borrows the controller, so we only need the controller here —
-    // no station/AP `Interface` is required for raw 802.11 transmit.
+    // Wi-Fi stays initialized while the sniffer is alive — no station/AP
+    // `Interface` is required for raw 802.11 transmit.
     let controller =
         esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default()).unwrap();
 

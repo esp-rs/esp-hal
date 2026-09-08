@@ -399,7 +399,7 @@ static RADIO_REFCOUNT: Refcount = Refcount::new();
 impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         debug!("Creating RadioRefGuard");
 
         RADIO_REFCOUNT.increment(init);
