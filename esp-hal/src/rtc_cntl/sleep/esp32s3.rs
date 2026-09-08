@@ -683,6 +683,25 @@ impl RtcSleepConfig {
     }
 }
 
+// The cache tag memory powers down with the CPU, so a retained sleep must write the data cache back
+// first and invalidate both caches after. Tag memory retention, which lets a program skip this
+// work, comes later; until then the answer is always yes.
+
+/// Whether a retained sleep must write the data cache back before the CPU domain powers down.
+fn dcache_writeback_needed() -> bool {
+    true
+}
+
+/// Whether a retained sleep must invalidate the instruction cache after wake.
+fn icache_invalidate_needed() -> bool {
+    true
+}
+
+/// Whether a retained sleep must invalidate the data cache after wake.
+fn dcache_invalidate_needed() -> bool {
+    true
+}
+
 /// Prepares CPU retention for the upcoming sleep.
 pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
     if buffer.is_none() {
@@ -692,7 +711,7 @@ pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
     // Only PSRAM data in the d-cache is at risk, and nothing writes to it between here and the
     // sleep request, so a writeback now is enough. Follows
     // `rtc_cntl_hal_enable_cpu_retention`.
-    if super::super::cpu_retention::dcache_writeback_needed() {
+    if dcache_writeback_needed() {
         unsafe {
             crate::soc::cache_writeback_all();
         }
@@ -705,8 +724,6 @@ pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, rejected: bool) {
     if buffer.is_none() || rejected {
         return;
     }
-
-    use super::super::cpu_retention::{dcache_invalidate_needed, icache_invalidate_needed};
 
     // The tag memory powered down with the CPU, so every line is stale. Follows
     // `rtc_cntl_hal_disable_cpu_retention`.
