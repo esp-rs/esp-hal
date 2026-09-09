@@ -1096,6 +1096,10 @@ driver_configs![
                 has_swd_watchdog: bool,
                 #[serde(default)]
                 cpu_mcause_mask: u32,
+                /// Whether PMP address matching has 128-byte granularity instead of 4.
+                /// ESP-IDF: `SOC_CPU_PMP_REGION_GRANULARITY`.
+                #[serde(default)]
+                cpu_pmp_granularity_128: bool,
                 #[serde(flatten)]
                 config: SocConfig,
             }

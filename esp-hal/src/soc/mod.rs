@@ -355,6 +355,17 @@ pub(crate) fn enable_pmp() {
         end_addr: u32,
         permission: u8,
     ) -> Result<(), PmpError> {
+        // The CPU hardwires the address bits below the PMP granularity to zero, rounding both ends
+        // of the region down. Round the start up instead, so that the region cannot grow downwards
+        // over memory in front of it, such as the trap section and its interrupt handler table.
+        let granularity = if property!("soc.cpu_pmp_granularity_128") {
+            128
+        } else {
+            4
+        };
+        let start_addr = start_addr.next_multiple_of(granularity);
+        let end_addr = end_addr & !(granularity - 1);
+
         if start_addr >= end_addr {
             return Err(PmpError::InvalidRange);
         }
