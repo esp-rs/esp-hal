@@ -34,22 +34,21 @@ use esp_hal::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-// FIXME: add `ram(reclaimed, zeroed)` and associated ASM machinery
 cfg_select! {
     feature = "esp32s3" => {
-        use esp_hal::rtc_cntl::CacheTagRetentionMemory;
+        use esp_hal::rtc_cntl::CacheTagRetentionStorage;
 
-        #[ram(reclaimed)]
-        static mut CACHE_TAGMEM: CacheTagRetentionMemory = CacheTagRetentionMemory::new();
+        #[ram(reclaimed, unstable(zeroed))]
+        static CACHE_TAGMEM: CacheTagRetentionStorage = CacheTagRetentionStorage::new();
     }
     _ => {}
 }
 cfg_select! {
     any(feature = "esp32c3", feature = "esp32s3") => {
-        use esp_hal::rtc_cntl::CpuRetentionMemory;
+        use esp_hal::rtc_cntl::CpuRetentionStorage;
 
-        #[ram(reclaimed)]
-        static mut CPU_RETENTION_MEMORY: CpuRetentionMemory = CpuRetentionMemory::new();
+        #[ram(reclaimed, unstable(zeroed))]
+        static CPU_RETENTION_MEMORY: CpuRetentionStorage = CpuRetentionStorage::new();
     }
     _ => {}
 }
@@ -133,14 +132,12 @@ async fn main(spawner: Spawner) {
     let mut sleep = esp_rtos::sleep::configure(p.LPWR);
 
     #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
-    #[allow(static_mut_refs)]
     sleep
-        .enable_cpu_powerdown(unsafe { &mut CPU_RETENTION_MEMORY })
+        .enable_cpu_powerdown(CPU_RETENTION_MEMORY.take())
         .unwrap();
 
     #[cfg(feature = "esp32s3")]
-    #[allow(static_mut_refs)]
-    sleep.keep_cache_tags(unsafe { &mut CACHE_TAGMEM }).unwrap();
+    sleep.keep_cache_tags(CACHE_TAGMEM.take()).unwrap();
 
     esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
 
