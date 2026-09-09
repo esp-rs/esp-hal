@@ -6082,13 +6082,13 @@ impl Chip {
                         (
                             "dram",
                             MemoryRegion {
-                                address_range: 0x4FF40000..0x4FFC0000,
+                                address_range: 0x4FF40000..0x4FFADFC0,
                             },
                         ),
                         (
                             "dram2_uninit",
                             MemoryRegion {
-                                address_range: 0x4FF00000..0x4FF40000,
+                                address_range: 0x4FFADFC0..0x4FFBEFC0,
                             },
                         ),
                         (

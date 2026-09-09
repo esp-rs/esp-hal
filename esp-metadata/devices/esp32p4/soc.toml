@@ -41,13 +41,9 @@ internal_memory_cached = true
 
 has_swd_watchdog = true
 
-# HP L2MEM: 0x4FF0_0000 - 0x4FFC_0000 (768 KB)
-# ROM bootloader reserves 0x4FF0_0000 - 0x4FF4_0000 (256 KB)
-# dram: usable application RAM (after ROM reserved region)
-# dram2_uninit: ROM reserved area, reclaimable after 2nd-stage bootloader
 memory_map = { ranges = [
-    { name = "dram", start = 0x4FF4_0000, end = 0x4FFC_0000 },
-    { name = "dram2_uninit", start = 0x4FF0_0000, end = 0x4FF4_0000 },
+    { name = "dram", start = 0x4FF4_0000, end = 0x4FFA_DFC0 },
+    { name = "dram2_uninit", start = 0x4FFA_DFC0, end = 0x4FFB_EFC0 },
     { name = "irom", start = 0x4000_0000, end = 0x4400_0000 },
     { name = "drom", start = 0x4000_0000, end = 0x4400_0000 },
 ] }
