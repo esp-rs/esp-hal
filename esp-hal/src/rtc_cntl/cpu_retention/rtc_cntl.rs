@@ -3,6 +3,7 @@
 use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
 
 use portable_atomic::{AtomicPtr, Ordering};
+use static_cell::ConstStaticCell;
 
 use crate::rtc_cntl::sleep::LowPower;
 
@@ -21,6 +22,39 @@ static INSTALLED: AtomicPtr<CpuRetentionMemory> = AtomicPtr::new(ptr::null_mut()
 
 /// Memory that light sleep uses to retain the CPU domain.
 ///
+/// This storage must be placed to `#[ram(reclaimed, unstable(zeroed))]`, then
+/// a static mutable reference to [`CpuRetentionMemory`] can be taken out of it.
+#[instability::unstable]
+pub struct CpuRetentionStorage {
+    inner: ConstStaticCell<CpuRetentionMemory>,
+}
+
+impl CpuRetentionStorage {
+    /// Creates storage for the retention memory.
+    #[instability::unstable]
+    pub const fn new() -> Self {
+        Self {
+            inner: ConstStaticCell::new(CpuRetentionMemory {
+                storage: UnsafeCell::new(MaybeUninit::uninit()),
+            }),
+        }
+    }
+
+    /// Takes the reference to the retention memory.
+    ///
+    /// Can only be called once.
+    #[instability::unstable]
+    pub fn take(&'static self) -> &'static mut CpuRetentionMemory {
+        self.inner.take()
+    }
+}
+
+// SAFETY: ConstStaticCell is a `MaybeUninit` buffer, and an AtomicBool strapped together,
+// both are safe to be zero-initialized.
+unsafe impl bytemuck::Zeroable for CpuRetentionStorage {}
+
+/// Memory that light sleep uses to retain the CPU domain.
+///
 /// The retention DMA writes this memory while the CPU is powered down, so the buffer gives no way
 /// to read or write its contents.
 ///
@@ -33,27 +67,9 @@ pub struct CpuRetentionMemory {
     storage: UnsafeCell<MaybeUninit<[u8; BUFFER_SIZE]>>,
 }
 
-// SAFETY: the type is a `MaybeUninit` buffer, and the retention DMA is the only writer.
-unsafe impl crate::Uninit for CpuRetentionMemory {}
-
 impl CpuRetentionMemory {
-    /// Creates the retention memory.
-    #[instability::unstable]
-    pub const fn new() -> Self {
-        Self {
-            storage: UnsafeCell::new(MaybeUninit::uninit()),
-        }
-    }
-
     fn as_mut_ptr(&self) -> *mut u8 {
         self.storage.get().cast()
-    }
-}
-
-#[instability::unstable]
-impl Default for CpuRetentionMemory {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
