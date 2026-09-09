@@ -209,6 +209,16 @@ macro_rules! critical_regs_asm {
 #[cfg(interrupt_controller = "plic")]
 critical_regs_asm!(save_extra: [], restore_extra: []);
 
+// A CLIC part also holds the interrupt threshold. `MINTTHRESH_CSR` comes from
+// `components/riscv/include/riscv/csr_clic.h`.
+#[cfg(interrupt_controller = "clic")]
+critical_regs_asm!(
+    save_extra: ["csrr t2, {mintthresh_csr}", "sw t2, {mintthresh}(t0)"],
+    restore_extra: ["lw t2, {mintthresh}(t0)", "csrw {mintthresh_csr}, t2"],
+    mintthresh = const offset_of!(CriticalSleepFrame, mintthresh),
+    mintthresh_csr = const 0x347,
+);
+
 unsafe extern "C" {
     fn critical_regs_save(frame: *mut CriticalSleepFrame) -> *mut CriticalSleepFrame;
     fn critical_regs_restore();
