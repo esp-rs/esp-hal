@@ -6,6 +6,7 @@ use crate::{
         device_regs::DeviceRegion,
         frames::s31::{CRITICAL_FRAME_SIZE, NON_CRITICAL_FRAME_SIZE},
     },
+    system::Cpu,
 };
 
 /// `CLIC_INT_CONFIG_REG`.
@@ -37,9 +38,12 @@ pub(crate) const CRITICAL_FRAME_OFFSET: usize = 0;
 pub(crate) const NON_CRITICAL_FRAME_OFFSET: usize = CRITICAL_FRAME_OFFSET + CRITICAL_FRAME_SIZE;
 pub(crate) const DEVICE_REGIONS_OFFSET: usize = NON_CRITICAL_FRAME_OFFSET + NON_CRITICAL_FRAME_SIZE;
 
-/// Bytes the frames of this chip need, rounded up to the alignment of the buffer.
-pub(crate) const BUFFER_SIZE: usize =
+/// Bytes one core's frames need, rounded up to the alignment of the buffer.
+pub(crate) const BLOCK_SIZE: usize =
     (DEVICE_REGIONS_OFFSET + DEVICE_REGION_WORDS * 4).next_multiple_of(16);
+
+/// Bytes every core's frames need.
+pub(crate) const BUFFER_SIZE: usize = BLOCK_SIZE * Cpu::COUNT;
 
 /// `RTC_SLEEP_WAKE_STUB_ADDR_REG`: the word that holds the wake stub address across the sleep. On
 /// this chip it is `LP_SYSTEM_REG_LP_STORE8_REG`, not the `LP_AON` word the other chips use.

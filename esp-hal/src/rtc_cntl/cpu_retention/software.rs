@@ -17,10 +17,16 @@ use super::{
         PMUFUNC_JUST_WOKE,
     },
 };
-use crate::macros::write_csr;
+use crate::{
+    macros::write_csr,
+    system::{self, Cpu},
+};
 
-// The wake stub is an `extern "C" fn()` with no argument, so the critical frame address lives here.
-static CRITICAL_FRAME_PTR: AtomicPtr<CriticalSleepFrame> = AtomicPtr::new(ptr::null_mut());
+// The wake stub is an `extern "C" fn()` with no argument, so the critical frame address of each
+// core lives here. Every core of a chip returns through the one wake stub register, so the restore
+// assembly picks its entry by hart id.
+static CRITICAL_FRAME_PTR: [AtomicPtr<CriticalSleepFrame>; Cpu::COUNT] =
+    [const { AtomicPtr::new(ptr::null_mut()) }; Cpu::COUNT];
 
 /// Emits `critical_regs_save` and `critical_regs_restore` for one frame shape.
 ///
@@ -105,6 +111,12 @@ macro_rules! critical_regs_asm {
             ".align 4",
             "critical_regs_restore:",
             "la t1, {critical_frame_ptr}",
+            // The mask keeps a single-core chip on entry 0 without a second copy of this block.
+            // No general register is live here, so `t1` and `t2` are free.
+            "csrr t2, mhartid",
+            "andi t2, t2, {core_mask}",
+            "slli t2, t2, 2",
+            "add t1, t1, t2",
             "lw t0, 0(t1)",
             "beqz t0, 2f",
             "lw t1, {pmufunc}(t0)",
@@ -201,6 +213,7 @@ macro_rules! critical_regs_asm {
             going_to_sleep = const PMUFUNC_GOING_TO_SLEEP,
             just_woke = const PMUFUNC_JUST_WOKE,
             critical_frame_ptr = sym CRITICAL_FRAME_PTR,
+            core_mask = const Cpu::COUNT - 1,
             $($operand = const $value,)*
         );
     };
@@ -362,6 +375,12 @@ unsafe extern "C" {
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> bool) -> bool {
     let saved_mstatus = save_mstatus_and_disable_global_int();
 
+    // Each core saves itself into its own block, because each core has its own frames and its own
+    // core-local device registers.
+    let core = system::raw_core();
+    // SAFETY: `install_cpu_retention_memory` checked the buffer against the size of every block.
+    let buffer = unsafe { buffer.add(core * chip::BLOCK_SIZE) };
+
     let regions = chip::regions();
     let device_frame = unsafe {
         slice::from_raw_parts_mut(
@@ -378,7 +397,7 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
 
     // SAFETY: the buffer is installed and sized for this chip.
     let critical = unsafe { buffer.add(chip::CRITICAL_FRAME_OFFSET) as *mut CriticalSleepFrame };
-    CRITICAL_FRAME_PTR.store(critical, Ordering::Release);
+    CRITICAL_FRAME_PTR[core].store(critical, Ordering::Release);
 
     // This call returns twice. It returns here after it saved the frame, and again from the wake
     // stub, with every register of the frame back in place.

@@ -473,7 +473,7 @@ macro_rules! property {
         false
     };
     ("sleep.cpu_retention_mem_size") => {
-        784
+        1568
     };
     ("sleep.cpu_retention_mem_align") => {
         16
