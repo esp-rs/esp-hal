@@ -128,15 +128,15 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             )
         })?;
 
-        let new_version = update_package(
+        update_package(
             &mut package,
-            &step.bump,
+            &step.new_version,
             !args.no_dry_run,
             skip_dependent_rewrites,
         )?;
 
-        step.tag_name = package.package.tag(&new_version);
-        step.new_version = new_version;
+        // Re-derived because `new_version` may have been hand-edited in the plan.
+        step.tag_name = step.package.tag(&step.new_version);
 
         if step.package.is_semver_checked() {
             if args.no_dry_run {
