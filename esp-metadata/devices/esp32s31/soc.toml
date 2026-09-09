@@ -242,8 +242,8 @@ wakeup_sources = {
 cpu_retention = "software"
 cpu_retention_frame = "s31"
 supports_top_power_down = true
-# 304-byte critical frame + 280-byte non-critical frame + 50 device words (200 bytes), 16-byte aligned.
-cpu_retention_mem_size = 784
+# 2 × (304-byte critical frame + 280-byte non-critical frame + 50 device words (200 bytes)), 16-byte aligned.
+cpu_retention_mem_size = 1568
 cpu_retention_mem_align = 16
 # Internal HP SRAM from `components/soc/esp32s31/include/soc/soc.h` (`SOC_DRAM_LOW`/`SOC_DRAM_HIGH`).
 cpu_retention_mem_start = 0x2F000000
