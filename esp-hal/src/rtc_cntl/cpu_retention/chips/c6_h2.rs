@@ -54,3 +54,9 @@ pub(crate) const DEVICE_REGIONS_OFFSET: usize = NON_CRITICAL_FRAME_OFFSET + NON_
 /// Bytes the frames of this chip need, rounded up to the alignment of the buffer.
 pub(crate) const BUFFER_SIZE: usize =
     (DEVICE_REGIONS_OFFSET + DEVICE_REGION_WORDS * 4).next_multiple_of(16);
+
+/// `RTC_SLEEP_WAKE_STUB_ADDR_REG`: the word that holds the wake stub address across the sleep.
+#[crate::ram]
+pub(crate) fn wake_stub_reg() -> *mut u32 {
+    crate::peripherals::LP_AON::regs().store8().as_ptr()
+}
