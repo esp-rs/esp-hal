@@ -1,5 +1,9 @@
 //! Power management utilities.
 
+#[cfg(supports_tagmem_power_down)]
+use esp_hal::rtc_cntl::{CacheTagRetentionMemory, CacheTagRetentionMemoryError};
+#[cfg(cpu_retention = "rtc_cntl")]
+use esp_hal::rtc_cntl::{CpuRetentionMemory, CpuRetentionMemoryError};
 #[cfg(multi_core)]
 use esp_hal::{peripherals::CPU_CTRL, system::Cpu, system::CpuControl};
 use esp_hal::{
@@ -26,6 +30,53 @@ pub struct Sleep {
 
     /// The idle hook to use for light sleep.
     pub light_sleep_hook: IdleFn,
+}
+
+#[cfg(cpu_retention = "rtc_cntl")]
+impl Sleep {
+    /// Lets automatic light sleep power the CPU domain down.
+    ///
+    /// A light sleep keeps the CPU state in `memory` while the CPU domain has no power, which
+    /// draws less current than a light sleep that keeps the domain powered. The saving costs the
+    /// memory, and it adds the save and the restore to the sleep and the wake.
+    ///
+    /// Every light sleep after this call powers the CPU domain down. Nothing turns it off again,
+    /// because the memory stays with the driver for the life of the program.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CpuRetentionMemoryError`] if a buffer is installed already, or if `memory` is
+    /// outside the range that the retention hardware reaches. See
+    /// [`LowPower::install_cpu_retention_memory`] for how to place the static.
+    pub fn enable_cpu_powerdown(
+        &mut self,
+        memory: &'static mut CpuRetentionMemory,
+    ) -> Result<(), CpuRetentionMemoryError> {
+        // `configure` took `LPWR`, so this is the only driver, and the idle hook takes it the same
+        // way for every sleep.
+        LowPower::new(unsafe { LPWR::steal() }).install_cpu_retention_memory(memory)
+    }
+
+    /// Keeps the cache tag memory across a light sleep that powers the CPU domain down.
+    ///
+    /// This shortens the wake, because the caches keep what they held before the sleep. Without
+    /// it, the wake path invalidates both caches, and the code that runs next takes a miss for
+    /// every line it needs. The memory it costs buys latency only, never correctness.
+    ///
+    /// This does nothing on its own: the tag memory is lost only when the CPU domain powers down,
+    /// which needs [`enable_cpu_powerdown`][Self::enable_cpu_powerdown].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CacheTagRetentionMemoryError`] if a buffer is installed already, or if `memory`
+    /// is outside the range that the retention hardware reaches.
+    #[cfg(supports_tagmem_power_down)]
+    pub fn keep_cache_tags(
+        &mut self,
+        memory: &'static mut CacheTagRetentionMemory,
+    ) -> Result<(), CacheTagRetentionMemoryError> {
+        LowPower::new(unsafe { LPWR::steal() }).install_cache_tag_retention_memory(memory)
+    }
 }
 
 /// A handle you can use to enter deep sleep.
@@ -70,6 +121,9 @@ impl DeepSleep {
 /// On multi-core chips, the core that commits to sleep hardware-stalls the other core(s)
 /// for the duration of the sleep so their CPU state is frozen and restored coherently,
 /// then thaws them on wakeup.
+///
+/// Light sleep keeps the CPU domain powered, unless the program calls
+/// [`Sleep::enable_cpu_powerdown`].
 ///
 /// See [`WakeLock`] for the wake-lock contract that governs when sleeping is safe.
 ///
@@ -155,9 +209,14 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                     for cpu in Cpu::other() {
                         if scheduler.active_cores.contains(cpu) {
                             unsafe { cpu_control.park_core(cpu) };
-                            // FIXME: this is insufficient when we power down the CPU - we will
-                            // need to force the other core to be parked in a known place, saving
-                            // its state so we can restore it after wakeup.
+                            // A stall is enough where the retention DMA saves the CPU domain,
+                            // because the domain holds both cores and the hardware brings the
+                            // parked core back with this one. esp-idf stalls the other core the
+                            // same way and adds nothing more (`sleep_modes.c`, where the SMP
+                            // retention work is gated on `SOC_PM_CPU_RETENTION_BY_SW`).
+                            // FIXME: the chips that retain the CPU in software need more: each
+                            // core saves itself, so the other core must park in a known place
+                            // and save its state there.
                         }
                     }
                 }

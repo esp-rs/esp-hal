@@ -25,6 +25,7 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::{Event, Input, InputConfig, Pull},
     peripherals,
+    ram,
     rtc_cntl::WakeLock,
     system::wakeup_cause,
     time::Instant,
@@ -32,6 +33,26 @@ use esp_hal::{
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
+
+// FIXME: add `ram(reclaimed, zeroed)` and associated ASM machinery
+cfg_select! {
+    feature = "esp32s3" => {
+        use esp_hal::rtc_cntl::CacheTagRetentionMemory;
+
+        #[ram(reclaimed)]
+        static mut CACHE_TAGMEM: CacheTagRetentionMemory = CacheTagRetentionMemory::new();
+    }
+    _ => {}
+}
+cfg_select! {
+    any(feature = "esp32c3", feature = "esp32s3") => {
+        use esp_hal::rtc_cntl::CpuRetentionMemory;
+
+        #[ram(reclaimed)]
+        static mut CPU_RETENTION_MEMORY: CpuRetentionMemory = CpuRetentionMemory::new();
+    }
+    _ => {}
+}
 
 #[embassy_executor::task]
 async fn periodic() {
@@ -109,7 +130,18 @@ async fn main(spawner: Spawner) {
 
     let timg0 = TimerGroup::new(p.TIMG0);
 
-    let sleep = esp_rtos::sleep::configure(p.LPWR);
+    let mut sleep = esp_rtos::sleep::configure(p.LPWR);
+
+    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    #[allow(static_mut_refs)]
+    sleep
+        .enable_cpu_powerdown(unsafe { &mut CPU_RETENTION_MEMORY })
+        .unwrap();
+
+    #[cfg(feature = "esp32s3")]
+    #[allow(static_mut_refs)]
+    sleep.keep_cache_tags(unsafe { &mut CACHE_TAGMEM }).unwrap();
+
     esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
 
     let boot_btn = cfg_select! {

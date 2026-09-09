@@ -193,7 +193,10 @@ bitfield::bitfield! {
     /// power down BT
     pub bt_pd_en, set_bt_pd_en: 6;
     /// power down CPU, but not restart when lightsleep.
-    pub cpu_pd_en, set_cpu_pd_en: 7;
+    ///
+    /// Crate-private, because esp-hal has no CPU retention for this chip. Only deep sleep, which
+    /// keeps no CPU state, powers the CPU domain down.
+    pub(crate) cpu_pd_en, set_cpu_pd_en: 7;
     /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 8;
     /// power down digital peripherals

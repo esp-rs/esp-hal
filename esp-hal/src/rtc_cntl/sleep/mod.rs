@@ -190,8 +190,12 @@ impl<'d> LowPower<'d> {
             SleepKind::Deep => None,
         };
 
+        // A deep sleep keeps what `RtcSleepConfig::deep` asked for, because the wake resets the
+        // chip and keeps no CPU state to lose.
         #[cfg(cpu_retention = "rtc_cntl")]
-        sleep_impl::configure_cpu_retention(&mut config, retention_buffer);
+        if kind == SleepKind::Light {
+            sleep_impl::configure_cpu_retention(&mut config, retention_buffer);
+        }
 
         config.apply();
 

@@ -192,7 +192,10 @@ bitfield::bitfield! {
     /// power down BT
     pub bt_pd_en, set_bt_pd_en: 6;
     /// power down CPU, but not restart when lightsleep.
-    pub cpu_pd_en, set_cpu_pd_en: 7;
+    ///
+    /// Crate-private, because a light sleep derives this from the installed retention memory. A
+    /// CPU power-down without retention loses the CPU state.
+    pub(crate) cpu_pd_en, set_cpu_pd_en: 7;
     /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 8;
     /// power down digital peripherals
@@ -714,17 +717,18 @@ impl RtcSleepConfig {
 // feature, and why `rtc_cntl_hal_enable_cpu_retention` and its disable counterpart touch no cache.
 
 // `SOC_RTC_CNTL_CPU_PD_REG_FILE_NUM` (108) times `SOC_RTC_CNTL_CPU_PD_DMA_BLOCK_SIZE` (16).
-const _: () = assert!(cpu_retention::payload_size() == 108 * 16);
+const _: () = ::core::assert!(cpu_retention::payload_size() == 108 * 16);
 
 /// The last of the four configuration words that the CPU frames begin with. The S3 writes a
 /// different value here, so the word belongs to the chip and not to the shared descriptor code.
 const RETENTION_CONFIG_WORD3: u32 = 0xffff_ffff;
 
-/// Sets CPU power-down in the sleep configuration when a retention buffer is installed.
+/// Couples CPU power-down to the installed retention buffer, for a light sleep.
+///
+/// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
+/// cannot carry a power-down into a light sleep that has no retention memory.
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
-    if buffer.is_some() {
-        config.set_cpu_pd_en(true);
-    }
+    config.set_cpu_pd_en(buffer.is_some());
 }
 
 /// Prepares CPU retention for the upcoming sleep.

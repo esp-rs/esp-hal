@@ -91,7 +91,10 @@ bitfield::bitfield! {
     /// power down Modem(wifi and ble)
     pub modem_pd_en, set_modem_pd_en: 5;
     /// power down CPU, but not restart when lightsleep.
-    pub cpu_pd_en, set_cpu_pd_en: 6;
+    ///
+    /// Crate-private, because a light sleep derives this from the installed retention memory. A
+    /// CPU power-down without retention loses the CPU state.
+    pub(crate) cpu_pd_en, set_cpu_pd_en: 6;
     /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 7;
     /// power down digital peripherals
@@ -688,7 +691,7 @@ impl RtcSleepConfig {
 // work, comes later; until then the answer is always yes.
 
 // `SOC_RTC_CNTL_CPU_PD_REG_FILE_NUM` (549) times `SOC_RTC_CNTL_CPU_PD_DMA_BLOCK_SIZE` (16).
-const _: () = assert!(cpu_retention::payload_size() == 549 * 16);
+const _: () = ::core::assert!(cpu_retention::payload_size() == 549 * 16);
 
 const RETENTION_CONFIG_WORD3: u32 = 0xfffe_0000;
 const RETENTION_WAIT_CYCLES: u8 = 0x7f;
@@ -721,11 +724,12 @@ fn dcache_invalidate_needed() -> bool {
     !tag_memory_retained()
 }
 
-/// Sets CPU power-down in the sleep configuration when a retention buffer is installed.
+/// Couples CPU power-down to the installed retention buffer, for a light sleep.
+///
+/// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
+/// cannot carry a power-down into a light sleep that has no retention memory.
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
-    if buffer.is_some() {
-        config.set_cpu_pd_en(true);
-    }
+    config.set_cpu_pd_en(buffer.is_some());
 }
 
 /// Prepares CPU retention for the upcoming sleep.
