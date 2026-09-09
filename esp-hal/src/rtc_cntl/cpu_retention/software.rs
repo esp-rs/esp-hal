@@ -3,7 +3,7 @@
 //! esp-idf saves the CPU-domain device registers with plain loops, not with the PAU regdma engine
 //! (`esp32c6/sleep_cpu.c:237-341`).
 
-use core::{arch::asm, mem::offset_of, ptr, slice};
+use core::{mem::offset_of, ptr, slice};
 
 use portable_atomic::{AtomicPtr, Ordering};
 
@@ -17,10 +17,7 @@ use super::{
         PMUFUNC_JUST_WOKE,
     },
 };
-use crate::{
-    macros::write_csr,
-    system::{self, Cpu},
-};
+use crate::system::{self, Cpu};
 
 // The wake stub is an `extern "C" fn()` with no argument, so the critical frame address of each
 // core lives here. Every core of a chip returns through the one wake stub register, so the restore
@@ -366,6 +363,9 @@ unsafe extern "C" {
 
 /// Saves and restores the CPU domain around a light sleep request.
 ///
+/// The caller must run with interrupts disabled on this core. [`LowPower::sleep_light`] holds that
+/// state for the whole sleep path.
+///
 /// `enter_sleep` requests the sleep. `wait` blocks until the hardware reports the result.
 ///
 /// esp-idf does not write back or invalidate the cache on this chip. It saves and restores the
@@ -373,8 +373,6 @@ unsafe extern "C" {
 /// (`esp32c6/sleep_cpu.c:317-341`).
 #[crate::ram]
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> bool) -> bool {
-    let saved_mstatus = save_mstatus_and_disable_global_int();
-
     // Each core saves itself into its own block, because each core has its own frames and its own
     // core-local device registers.
     let core = system::raw_core();
@@ -422,7 +420,6 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
         restore_non_critical(non_critical);
         device_regs::restore(&regions, device_frame);
     }
-    restore_mstatus(saved_mstatus);
 
     rejected
 }
@@ -432,22 +429,6 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
 pub(crate) fn disarm_wake_stub() {
     // SAFETY: the register is the retention word of this chip, and it holds no other state.
     unsafe { chip::wake_stub_reg().write_volatile(0) };
-}
-
-#[crate::ram]
-fn save_mstatus_and_disable_global_int() -> u32 {
-    let mstatus: u32;
-    // SAFETY: the instruction only reads and clears the global interrupt enable bit of `mstatus`.
-    unsafe {
-        asm!("csrrci {0}, mstatus, 0x8", out(reg) mstatus);
-    }
-    mstatus
-}
-
-#[crate::ram]
-fn restore_mstatus(mstatus: u32) {
-    // SAFETY: `mstatus` came from [`save_mstatus_and_disable_global_int`].
-    unsafe { write_csr!(0x300, mstatus) };
 }
 
 #[crate::ram]

@@ -6,11 +6,14 @@
 //! and managing the APP (second) CPU core on the `ESP32` chip. It is used to
 //! start and stop program execution on the APP core.
 
+#[cfg(feature = "unstable")]
 use core::sync::atomic::Ordering;
 
+#[cfg(feature = "unstable")]
+use crate::{peripherals::SPI0, system::multi_core::*};
 use crate::{
-    peripherals::{DPORT, LPWR, SPI0},
-    system::{Cpu, multi_core::*},
+    peripherals::{DPORT, LPWR},
+    system::Cpu,
 };
 
 pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
@@ -81,6 +84,7 @@ pub fn is_running(core: Cpu) -> bool {
     is_stalled != 0x86
 }
 
+#[cfg(feature = "unstable")]
 fn flush_cache(core: Cpu) {
     let dport_control = DPORT::regs();
 
@@ -123,6 +127,7 @@ fn flush_cache(core: Cpu) {
     };
 }
 
+#[cfg(feature = "unstable")]
 fn enable_cache(core: Cpu) {
     let spi0 = SPI0::regs();
     let dport_control = DPORT::regs();
@@ -143,6 +148,7 @@ fn enable_cache(core: Cpu) {
     };
 }
 
+#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     let dport_control = DPORT::regs();
 
@@ -167,6 +173,7 @@ pub(crate) fn start_core1(entry_point: *const u32) {
         .modify(|_, w| w.appcpu_resetting().clear_bit());
 }
 
+#[cfg(feature = "unstable")]
 pub(crate) fn start_core1_init<F>() -> !
 where
     F: FnOnce(),
