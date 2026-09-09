@@ -103,6 +103,18 @@ macro_rules! property {
     ("gpio.output_signal_max", str) => {
         stringify!(256)
     };
+    ("dedicated_gpio.version") => {
+        "riscv_v1"
+    };
+    ("dedicated_gpio.needs_initialization") => {
+        false
+    };
+    ("dedicated_gpio.channel_count") => {
+        8
+    };
+    ("dedicated_gpio.channel_count", str) => {
+        stringify!(8)
+    };
     ("timergroup.timg_has_timer1") => {
         false
     };
@@ -178,6 +190,9 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(63)
     };
+    ("soc.cpu_pmp_granularity_128") => {
+        true
+    };
     ("clock_tree.iomux_function_clock") => {
         [crate ::soc::clocks::IomuxFunctionClockConfig::XtalClk, crate
         ::soc::clocks::IomuxFunctionClockConfig::RcFastClk, crate
@@ -221,6 +236,39 @@ macro_rules! property {
         [crate ::soc::clocks::TimgWdtClockConfig::XtalClk, crate
         ::soc::clocks::TimgWdtClockConfig::RcFastClk, crate
         ::soc::clocks::TimgWdtClockConfig::PllF48m]
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_dedicated_gpio {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_dedicated_gpio { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_dedicated_gpio!((0));
+        _for_each_inner_dedicated_gpio!((1)); _for_each_inner_dedicated_gpio!((2));
+        _for_each_inner_dedicated_gpio!((3)); _for_each_inner_dedicated_gpio!((4));
+        _for_each_inner_dedicated_gpio!((5)); _for_each_inner_dedicated_gpio!((6));
+        _for_each_inner_dedicated_gpio!((7)); _for_each_inner_dedicated_gpio!((0, 0,
+        CPU_GPIO_0)); _for_each_inner_dedicated_gpio!((0, 1, CPU_GPIO_1));
+        _for_each_inner_dedicated_gpio!((0, 2, CPU_GPIO_2));
+        _for_each_inner_dedicated_gpio!((0, 3, CPU_GPIO_3));
+        _for_each_inner_dedicated_gpio!((0, 4, CPU_GPIO_4));
+        _for_each_inner_dedicated_gpio!((0, 5, CPU_GPIO_5));
+        _for_each_inner_dedicated_gpio!((0, 6, CPU_GPIO_6));
+        _for_each_inner_dedicated_gpio!((0, 7, CPU_GPIO_7));
+        _for_each_inner_dedicated_gpio!((1, 0, CPU_GPIO_8));
+        _for_each_inner_dedicated_gpio!((1, 1, CPU_GPIO_9));
+        _for_each_inner_dedicated_gpio!((1, 2, CPU_GPIO_10));
+        _for_each_inner_dedicated_gpio!((1, 3, CPU_GPIO_11));
+        _for_each_inner_dedicated_gpio!((1, 4, CPU_GPIO_12));
+        _for_each_inner_dedicated_gpio!((1, 5, CPU_GPIO_13));
+        _for_each_inner_dedicated_gpio!((1, 6, CPU_GPIO_14));
+        _for_each_inner_dedicated_gpio!((1, 7, CPU_GPIO_15));
+        _for_each_inner_dedicated_gpio!((channels(0), (1), (2), (3), (4), (5), (6),
+        (7))); _for_each_inner_dedicated_gpio!((signals(0, 0, CPU_GPIO_0), (0, 1,
+        CPU_GPIO_1), (0, 2, CPU_GPIO_2), (0, 3, CPU_GPIO_3), (0, 4, CPU_GPIO_4), (0, 5,
+        CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7), (1, 0, CPU_GPIO_8), (1, 1,
+        CPU_GPIO_9), (1, 2, CPU_GPIO_10), (1, 3, CPU_GPIO_11), (1, 4, CPU_GPIO_12), (1,
+        5, CPU_GPIO_13), (1, 6, CPU_GPIO_14), (1, 7, CPU_GPIO_15)));
     };
 }
 #[macro_export]

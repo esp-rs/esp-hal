@@ -514,6 +514,9 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(0)
     };
+    ("soc.cpu_pmp_granularity_128") => {
+        false
+    };
     ("clock_tree.cpu_pll_div_in") => {
         [crate ::soc::clocks::CpuPllDivInConfig::Pll, crate
         ::soc::clocks::CpuPllDivInConfig::Apll]

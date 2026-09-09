@@ -535,6 +535,9 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(63)
     };
+    ("soc.cpu_pmp_granularity_128") => {
+        true
+    };
     ("clock_tree.iomux_function_clock.source") => {
         [crate ::soc::clocks::IomuxFunctionClockSource::XtalClk, crate
         ::soc::clocks::IomuxFunctionClockSource::PllF80m]

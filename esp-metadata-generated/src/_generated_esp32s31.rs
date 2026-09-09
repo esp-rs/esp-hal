@@ -559,6 +559,9 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(63)
     };
+    ("soc.cpu_pmp_granularity_128") => {
+        true
+    };
     ("clock_tree.cpu_root_clk") => {
         [crate ::soc::clocks::CpuRootClkConfig::Xtal, crate
         ::soc::clocks::CpuRootClkConfig::Cpll, crate
