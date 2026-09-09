@@ -627,7 +627,7 @@ use procmacros::doc_replace;
 ///
 /// The caller must make sure that the CSR exists on this chip, and that the read has no effect
 /// that the caller does not expect.
-#[cfg(esp32c6)]
+#[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
 macro_rules! read_csr {
     ($csr:expr) => {{
         let value: u32;
@@ -635,7 +635,7 @@ macro_rules! read_csr {
         value
     }};
 }
-#[cfg(esp32c6)]
+#[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
 pub(crate) use read_csr;
 
 /// Writes `value` to the RISC-V CSR that `csr` numbers.
@@ -646,13 +646,13 @@ pub(crate) use read_csr;
 ///
 /// The caller must make sure that the CSR exists on this chip, and that the write has no effect
 /// that the caller does not expect.
-#[cfg(esp32c6)]
+#[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
 macro_rules! write_csr {
     ($csr:expr, $value:expr) => {
         core::arch::asm!("csrw {1}, {0}", in(reg) $value, const $csr)
     };
 }
-#[cfg(esp32c6)]
+#[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
 pub(crate) use write_csr;
 
 /// Macro to allow using unstable HAL features conditionally. Other crates can
