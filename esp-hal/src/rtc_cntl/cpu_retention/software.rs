@@ -206,17 +206,144 @@ macro_rules! critical_regs_asm {
     };
 }
 
-#[cfg(interrupt_controller = "plic")]
+#[cfg(cpu_retention_frame = "c6_h2")]
 critical_regs_asm!(save_extra: [], restore_extra: []);
 
 // A CLIC part also holds the interrupt threshold. `MINTTHRESH_CSR` comes from
 // `components/riscv/include/riscv/csr_clic.h`.
-#[cfg(interrupt_controller = "clic")]
+#[cfg(cpu_retention_frame = "clic")]
 critical_regs_asm!(
     save_extra: ["csrr t2, {mintthresh_csr}", "sw t2, {mintthresh}(t0)"],
     restore_extra: ["lw t2, {mintthresh}(t0)", "csrw {mintthresh_csr}, t2"],
     mintthresh = const offset_of!(CriticalSleepFrame, mintthresh),
     mintthresh_csr = const 0x347,
+);
+
+// The S31 critical frame also holds the FPU. esp-idf moves it only when the FreeRTOS port marks
+// the context dirty; esp-hal tracks no such state, so this code moves it every time.
+//
+// Both halves set `mstatus.FS` before they touch an FPU register, as `sleep_fpu_asm.S` does,
+// because an access traps while the unit is off. The bit needs no undo: `mstatus` is in the frame,
+// and the restore writes it back after the FPU registers. A core that had the unit off saves and
+// restores register values that no later code can read.
+#[cfg(cpu_retention_frame = "s31")]
+critical_regs_asm!(
+    save_extra: [
+        "csrr t2, {mintthresh_csr}",
+        "sw t2, {mintthresh}(t0)",
+        "li t2, {fpu_enable}",
+        "csrs mstatus, t2",
+        "fsw ft0, {fpu_ft0}(t0)",
+        "fsw ft1, {fpu_ft1}(t0)",
+        "fsw ft2, {fpu_ft2}(t0)",
+        "fsw ft3, {fpu_ft3}(t0)",
+        "fsw ft4, {fpu_ft4}(t0)",
+        "fsw ft5, {fpu_ft5}(t0)",
+        "fsw ft6, {fpu_ft6}(t0)",
+        "fsw ft7, {fpu_ft7}(t0)",
+        "fsw fs0, {fpu_fs0}(t0)",
+        "fsw fs1, {fpu_fs1}(t0)",
+        "fsw fa0, {fpu_fa0}(t0)",
+        "fsw fa1, {fpu_fa1}(t0)",
+        "fsw fa2, {fpu_fa2}(t0)",
+        "fsw fa3, {fpu_fa3}(t0)",
+        "fsw fa4, {fpu_fa4}(t0)",
+        "fsw fa5, {fpu_fa5}(t0)",
+        "fsw fa6, {fpu_fa6}(t0)",
+        "fsw fa7, {fpu_fa7}(t0)",
+        "fsw fs2, {fpu_fs2}(t0)",
+        "fsw fs3, {fpu_fs3}(t0)",
+        "fsw fs4, {fpu_fs4}(t0)",
+        "fsw fs5, {fpu_fs5}(t0)",
+        "fsw fs6, {fpu_fs6}(t0)",
+        "fsw fs7, {fpu_fs7}(t0)",
+        "fsw fs8, {fpu_fs8}(t0)",
+        "fsw fs9, {fpu_fs9}(t0)",
+        "fsw fs10, {fpu_fs10}(t0)",
+        "fsw fs11, {fpu_fs11}(t0)",
+        "fsw ft8, {fpu_ft8}(t0)",
+        "fsw ft9, {fpu_ft9}(t0)",
+        "fsw ft10, {fpu_ft10}(t0)",
+        "fsw ft11, {fpu_ft11}(t0)",
+        "csrr t2, fcsr",
+        "sw t2, {fpu_fcsr}(t0)",
+    ],
+    restore_extra: [
+        "li t2, {fpu_enable}",
+        "csrs mstatus, t2",
+        "flw ft0, {fpu_ft0}(t0)",
+        "flw ft1, {fpu_ft1}(t0)",
+        "flw ft2, {fpu_ft2}(t0)",
+        "flw ft3, {fpu_ft3}(t0)",
+        "flw ft4, {fpu_ft4}(t0)",
+        "flw ft5, {fpu_ft5}(t0)",
+        "flw ft6, {fpu_ft6}(t0)",
+        "flw ft7, {fpu_ft7}(t0)",
+        "flw fs0, {fpu_fs0}(t0)",
+        "flw fs1, {fpu_fs1}(t0)",
+        "flw fa0, {fpu_fa0}(t0)",
+        "flw fa1, {fpu_fa1}(t0)",
+        "flw fa2, {fpu_fa2}(t0)",
+        "flw fa3, {fpu_fa3}(t0)",
+        "flw fa4, {fpu_fa4}(t0)",
+        "flw fa5, {fpu_fa5}(t0)",
+        "flw fa6, {fpu_fa6}(t0)",
+        "flw fa7, {fpu_fa7}(t0)",
+        "flw fs2, {fpu_fs2}(t0)",
+        "flw fs3, {fpu_fs3}(t0)",
+        "flw fs4, {fpu_fs4}(t0)",
+        "flw fs5, {fpu_fs5}(t0)",
+        "flw fs6, {fpu_fs6}(t0)",
+        "flw fs7, {fpu_fs7}(t0)",
+        "flw fs8, {fpu_fs8}(t0)",
+        "flw fs9, {fpu_fs9}(t0)",
+        "flw fs10, {fpu_fs10}(t0)",
+        "flw fs11, {fpu_fs11}(t0)",
+        "flw ft8, {fpu_ft8}(t0)",
+        "flw ft9, {fpu_ft9}(t0)",
+        "flw ft10, {fpu_ft10}(t0)",
+        "flw ft11, {fpu_ft11}(t0)",
+        "lw t2, {fpu_fcsr}(t0)",
+        "csrw fcsr, t2",
+        "lw t2, {mintthresh}(t0)",
+        "csrw {mintthresh_csr}, t2",
+    ],
+    mintthresh = const offset_of!(CriticalSleepFrame, mintthresh),
+    mintthresh_csr = const 0x347,
+    fpu_enable = const 1 << 13,
+    fpu_ft0 = const offset_of!(CriticalSleepFrame, fpu_ft0),
+    fpu_ft1 = const offset_of!(CriticalSleepFrame, fpu_ft1),
+    fpu_ft2 = const offset_of!(CriticalSleepFrame, fpu_ft2),
+    fpu_ft3 = const offset_of!(CriticalSleepFrame, fpu_ft3),
+    fpu_ft4 = const offset_of!(CriticalSleepFrame, fpu_ft4),
+    fpu_ft5 = const offset_of!(CriticalSleepFrame, fpu_ft5),
+    fpu_ft6 = const offset_of!(CriticalSleepFrame, fpu_ft6),
+    fpu_ft7 = const offset_of!(CriticalSleepFrame, fpu_ft7),
+    fpu_fs0 = const offset_of!(CriticalSleepFrame, fpu_fs0),
+    fpu_fs1 = const offset_of!(CriticalSleepFrame, fpu_fs1),
+    fpu_fa0 = const offset_of!(CriticalSleepFrame, fpu_fa0),
+    fpu_fa1 = const offset_of!(CriticalSleepFrame, fpu_fa1),
+    fpu_fa2 = const offset_of!(CriticalSleepFrame, fpu_fa2),
+    fpu_fa3 = const offset_of!(CriticalSleepFrame, fpu_fa3),
+    fpu_fa4 = const offset_of!(CriticalSleepFrame, fpu_fa4),
+    fpu_fa5 = const offset_of!(CriticalSleepFrame, fpu_fa5),
+    fpu_fa6 = const offset_of!(CriticalSleepFrame, fpu_fa6),
+    fpu_fa7 = const offset_of!(CriticalSleepFrame, fpu_fa7),
+    fpu_fs2 = const offset_of!(CriticalSleepFrame, fpu_fs2),
+    fpu_fs3 = const offset_of!(CriticalSleepFrame, fpu_fs3),
+    fpu_fs4 = const offset_of!(CriticalSleepFrame, fpu_fs4),
+    fpu_fs5 = const offset_of!(CriticalSleepFrame, fpu_fs5),
+    fpu_fs6 = const offset_of!(CriticalSleepFrame, fpu_fs6),
+    fpu_fs7 = const offset_of!(CriticalSleepFrame, fpu_fs7),
+    fpu_fs8 = const offset_of!(CriticalSleepFrame, fpu_fs8),
+    fpu_fs9 = const offset_of!(CriticalSleepFrame, fpu_fs9),
+    fpu_fs10 = const offset_of!(CriticalSleepFrame, fpu_fs10),
+    fpu_fs11 = const offset_of!(CriticalSleepFrame, fpu_fs11),
+    fpu_ft8 = const offset_of!(CriticalSleepFrame, fpu_ft8),
+    fpu_ft9 = const offset_of!(CriticalSleepFrame, fpu_ft9),
+    fpu_ft10 = const offset_of!(CriticalSleepFrame, fpu_ft10),
+    fpu_ft11 = const offset_of!(CriticalSleepFrame, fpu_ft11),
+    fpu_fcsr = const offset_of!(CriticalSleepFrame, fpu_fcsr),
 );
 
 unsafe extern "C" {
@@ -284,9 +411,8 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
 /// Clears the wake stub address that [`arm_wake_stub`] wrote.
 #[crate::ram]
 pub(crate) fn disarm_wake_stub() {
-    crate::peripherals::LP_AON::regs()
-        .store8()
-        .write(|w| unsafe { w.bits(0) });
+    // SAFETY: the register is the retention word of this chip, and it holds no other state.
+    unsafe { chip::wake_stub_reg().write_volatile(0) };
 }
 
 #[crate::ram]
@@ -307,9 +433,9 @@ fn restore_mstatus(mstatus: u32) {
 
 #[crate::ram]
 fn arm_wake_stub() {
-    crate::peripherals::LP_AON::regs()
-        .store8()
-        .write(|w| unsafe { w.bits(critical_regs_restore as *const () as usize as u32) });
+    let stub = critical_regs_restore as *const () as usize as u32;
+    // SAFETY: the register is the retention word of this chip, and it holds no other state.
+    unsafe { chip::wake_stub_reg().write_volatile(stub) };
 }
 
 #[crate::ram]
