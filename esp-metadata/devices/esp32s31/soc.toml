@@ -18,6 +18,9 @@ support_note = "In early stages of development."
 page_size = 0x10000
 entry_num = 1024
 
+[device.flash]
+support_status = "partial"
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true

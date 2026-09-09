@@ -62,7 +62,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
     // see https://github.com/apache/nuttx/blob/f25db331136351dbf8ebe6925a98d3b77e1ca983/arch/xtensa/src/esp32s3/esp32s3_start.c#L213
 
     unsafe extern "C" {
-        fn Cache_Suspend_DCache();
+        fn Cache_Suspend_DCache() -> u32;
 
         fn Cache_Resume_DCache(param: u32);
 
