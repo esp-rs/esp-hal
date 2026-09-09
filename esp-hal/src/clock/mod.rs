@@ -113,7 +113,7 @@ impl CpuClock {
         cfg_select! {
             esp32c2 => Self::_120MHz,
             any(esp32c3, esp32c6, esp32c61) => Self::_160MHz,
-            esp32h2 => Self::_96MHz,
+            any(esp32h2, esp32h4) => Self::_96MHz,
             esp32p4 => Self::_400MHz,
             esp32s31 => Self::_320MHz,
             _ => Self::_240MHz,
