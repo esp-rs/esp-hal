@@ -14,6 +14,8 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
+
 use crate::{
     gpio,
     peripherals::LPWR,
@@ -170,6 +172,22 @@ impl<'d> LowPower<'d> {
     #[cfg(sleep_driver_supported)]
     #[crate::ram]
     fn sleep(&mut self, config: RtcSleepConfig, kind: SleepKind, allow_reject: bool) {
+        // ESP-IDF runs `esp_light_sleep_start` inside `portENTER_CRITICAL(&light_sleep_lock)`.
+        // A sleep ends when `wait_for_sleep_result` sees a wakeup or reject bit, so nothing in
+        // this path needs interrupts.
+        let irq_token = unsafe { SingleCoreInterruptLock.enter() };
+        self.sleep_with_interrupts_disabled(config, kind, allow_reject);
+        unsafe { SingleCoreInterruptLock.exit(irq_token) };
+    }
+
+    #[cfg(sleep_driver_supported)]
+    #[crate::ram]
+    fn sleep_with_interrupts_disabled(
+        &mut self,
+        config: RtcSleepConfig,
+        kind: SleepKind,
+        allow_reject: bool,
+    ) {
         let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
 
         let mut config = config;
@@ -231,6 +249,15 @@ impl<'d> LowPower<'d> {
         let before = rtc.time_since_boot_raw();
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
+
+        #[cfg(multi_core)]
+        let parked = match kind {
+            SleepKind::Light => park_other_cores(),
+            // A deep sleep resets the chip, so the other core needs no stall, and nothing thaws
+            // it afterwards.
+            SleepKind::Deep => 0,
+        };
+
         let rejected = {
             // A chip can keep a guard for the length of the sleep, to restore what sleep entry
             // changed for the sleep only. The guard must therefore outlive the wait below.
@@ -269,6 +296,9 @@ impl<'d> LowPower<'d> {
 
         config.finish_sleep();
 
+        #[cfg(multi_core)]
+        unpark_cores(parked);
+
         let after = rtc.time_since_boot_raw();
 
         let slept_us = crate::clock::rtc_ticks_to_us(after.wrapping_sub(before));
@@ -290,6 +320,49 @@ impl<'d> LowPower<'d> {
         // Last, because this call reads the wakeup cause, and after a light sleep the cause is
         // available only after the line above.
         gpio::wakeup::record_wakeup();
+    }
+}
+
+/// Hardware-stalls the other running cores for the length of a light sleep, or thaws them.
+///
+/// A stall is enough where the retention DMA saves the CPU domain, because the domain holds every
+/// core and the hardware brings the stalled core back with this one. esp-idf stalls the other core
+/// the same way and adds nothing more (`sleep_modes.c`, where the SMP retention work is gated on
+/// `SOC_PM_CPU_RETENTION_BY_SW`).
+///
+/// FIXME: a stall freezes the other core wherever it stands, which can be inside an interrupt
+/// handler that holds a cross-core lock, such as the clock tree, the peripheral reference counts,
+/// or the UART locks that this path takes. This core then spins for that lock for ever, because the
+/// frozen core cannot release it.
+///
+/// FIXME: the chips that retain the CPU in software need more than a stall, because each core saves
+/// itself, and a frozen core saves nothing. Step 4 of the light-sleep retention plan replaces the
+/// stall for those chips.
+/// Returns the cores that it stalled, as a bit for each [`Cpu`], for [`unpark_cores`]. A core that
+/// the program stalled before the sleep stays stalled after it.
+#[cfg(all(multi_core, sleep_driver_supported))]
+#[crate::ram]
+fn park_other_cores() -> u8 {
+    let mut parked = 0;
+    for cpu in crate::system::Cpu::other() {
+        if crate::soc::cpu_control::is_running(cpu) {
+            // SAFETY: [`unpark_cores`] runs before this function returns to its caller.
+            unsafe { crate::soc::cpu_control::internal_park_core(cpu, true) };
+            parked |= 1 << cpu as u8;
+        }
+    }
+    parked
+}
+
+/// Thaws the cores that [`park_other_cores`] stalled.
+#[cfg(all(multi_core, sleep_driver_supported))]
+#[crate::ram]
+fn unpark_cores(parked: u8) {
+    for cpu in crate::system::Cpu::other() {
+        if parked & (1 << cpu as u8) != 0 {
+            // SAFETY: this core stalled that core for the sleep, and the sleep is over.
+            unsafe { crate::soc::cpu_control::internal_park_core(cpu, false) };
+        }
     }
 }
 

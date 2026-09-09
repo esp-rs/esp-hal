@@ -5,7 +5,7 @@ use esp_hal::rtc_cntl::{CacheTagRetentionMemory, CacheTagRetentionMemoryError};
 #[cfg(supports_cpu_power_down)]
 use esp_hal::rtc_cntl::{CpuRetentionMemory, CpuRetentionMemoryError};
 #[cfg(multi_core)]
-use esp_hal::{peripherals::CPU_CTRL, system::Cpu, system::CpuControl};
+use esp_hal::system::Cpu;
 use esp_hal::{
     peripherals::LPWR,
     rtc_cntl::{
@@ -14,6 +14,7 @@ use esp_hal::{
     },
     time::{Duration, Instant},
 };
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 
 use crate::{SCHEDULER, task::IdleFn};
 #[cfg(multi_core)]
@@ -108,19 +109,20 @@ impl DeepSleep {
 ///
 /// Pass the idle hook to [`start_with_idle_hook`] to enable automatic light sleep.
 ///
-/// Each time the scheduler runs out of ready tasks, the hook (with interrupts
-/// disabled) checks that:
+/// Each time the scheduler runs out of ready tasks, the hook disables interrupts on this core,
+/// takes the scheduler lock, and checks that:
 /// - no [`WakeLock`] is held,
 /// - all cores are idle,
 /// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
-/// If all hold, it calls [`LowPower::sleep_light`] for the next wakeup; otherwise
-/// it falls back to `WFI`. The minimum-residency threshold is configurable via the
-/// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
+/// If all hold, it releases the lock and calls [`LowPower::sleep_light`] with interrupts still
+/// disabled. [`LowPower::sleep_light`] disables interrupts for the whole sleep path, and on
+/// multi-core chips it hardware-stalls every other running core for the duration of the sleep.
+/// After the sleep, the hook takes the scheduler lock again to rearm the time driver and to wake
+/// the scheduler on the other cores, then it enables interrupts and falls back to `WFI`.
 ///
-/// On multi-core chips, the core that commits to sleep hardware-stalls the other core(s)
-/// for the duration of the sleep so their CPU state is frozen and restored coherently,
-/// then thaws them on wakeup.
+/// The minimum-residency threshold is configurable via the
+/// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
 ///
 /// Light sleep keeps the CPU domain powered, unless the program calls
 /// [`Sleep::enable_cpu_powerdown`].
@@ -149,39 +151,34 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             continue;
         }
 
-        SCHEDULER.with(|scheduler| {
+        // Interrupts stay off from the decision until the sleep is over. A handler on this core
+        // can take a `WakeLock`, and a sleep must not start after that.
+        let irq_token = unsafe { SingleCoreInterruptLock.enter() };
+
+        let sleep = SCHEDULER.with(|scheduler| {
             if WakeLock::is_active() {
-                return;
+                return false;
             }
 
             #[cfg(multi_core)]
             {
                 if scheduler.run_queue.has_ready_tasks() {
-                    return;
+                    return false;
                 }
                 for cpu in Cpu::all() {
                     if !scheduler.cpu_idle(cpu) {
-                        return;
+                        return false;
                     }
                 }
 
-                // All cores are ready to sleep. Since we are here in a critical section,
-                // the other core must be waiting for the scheduler lock. We will go to sleep,
-                // and after wakeup the other core will reattempt this check.
-
-                // FIXME: We hardware-stall the other core(s) for the duration of the sleep so
-                // their CPU state is frozen and restored coherently. The other core is frozen
-                // wherever it happens to be - including in the middle of an interrupt handler
-                // that holds a cross-core lock (e.g. the clock tree, peripheral refcount, or
-                // UART locks taken by the light-sleep enter/exit path in `Rtc::sleep`). If that
-                // happens, this core will spin forever trying to take that lock during sleep
-                // prep, because the frozen core can never release it. We accept this (unlikely)
-                // deadlock risk for now rather than ordering all lock-taking work before the
-                // stall.
+                // Every core is ready to sleep. The other core can make a task ready again after
+                // this function gives the lock back, and this core then sleeps the chip with work
+                // waiting. Step 4 of the light-sleep retention plan closes that window, with a
+                // rendezvous in esp-hal that lets the other core refuse the sleep.
             }
 
             let Some(time_driver) = scheduler.time_driver.as_mut() else {
-                return;
+                return false;
             };
             let next_wakeup = time_driver.next_wakeup();
 
@@ -196,54 +193,45 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 lpwr.set_wakeup_deadline(Instant::EPOCH + Duration::from_micros(next_wakeup));
 
                 if next_wakeup.saturating_sub(crate::now()) < LIGHT_SLEEP_MIN_US {
-                    return;
+                    return false;
                 }
             }
 
-            // We have committed to sleeping. Park (hardware-stall) the other core(s) so their
-            // CPU state is frozen and restored coherently across the sleep, then enter light
-            // sleep, then thaw them.
-            cfg_select! {
-                multi_core => {
-                    let mut cpu_control = CpuControl::new(unsafe { CPU_CTRL::steal() });
-                    for cpu in Cpu::other() {
-                        if scheduler.active_cores.contains(cpu) {
-                            unsafe { cpu_control.park_core(cpu) };
-                            // A stall is enough where the retention DMA saves the CPU domain,
-                            // because the domain holds both cores and the hardware brings the
-                            // parked core back with this one. esp-idf stalls the other core the
-                            // same way and adds nothing more (`sleep_modes.c`, where the SMP
-                            // retention work is gated on `SOC_PM_CPU_RETENTION_BY_SW`).
-                            // FIXME: the chips that retain the CPU in software need more: each
-                            // core saves itself, so the other core must park in a known place
-                            // and save its state there.
-                        }
-                    }
-                }
-                _ => {}
-            }
+            true
+        });
 
+        // The other core can take a `WakeLock` in the window that the release of the lock opens.
+        // This read closes most of that window, and step 5 of the light-sleep retention plan
+        // closes the rest.
+        if sleep && !WakeLock::is_active() {
             // The driver of each other wakeup source enables it. A listening pin wakes the chip
             // because it listens, and this hook cannot know which pins listen. If no source is
             // enabled, the call refuses the sleep and returns immediately. The code then reaches
             // the same `WFI` that this hook would select.
-            lpwr.sleep_light(RtcSleepConfig::default());
+            LowPower::new(unsafe { LPWR::steal() }).sleep_light(RtcSleepConfig::default());
 
-            // The alarm timer was gated during light sleep, so its pre-armed alarm is
-            // stale. Force a re-arm against the restored time base so the tick handler
-            // fires promptly and drains the timer queue.
-            time_driver.rearm(crate::now());
+            SCHEDULER.with(|scheduler| {
+                let Some(time_driver) = scheduler.time_driver.as_mut() else {
+                    return;
+                };
 
-            // Trigger the scheduler on the other core to prevent it from putting
-            // the system back to sleep immediately.
-            #[cfg(multi_core)]
-            for cpu in Cpu::other() {
-                if scheduler.active_cores.contains(cpu) {
-                    cpu_control.unpark_core(cpu);
-                    task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
+                // The alarm timer was gated during light sleep, so its pre-armed alarm is
+                // stale. Force a re-arm against the restored time base so the tick handler
+                // fires promptly and drains the timer queue.
+                time_driver.rearm(crate::now());
+
+                // Trigger the scheduler on the other core to prevent it from putting
+                // the system back to sleep immediately.
+                #[cfg(multi_core)]
+                for cpu in Cpu::other() {
+                    if scheduler.active_cores.contains(cpu) {
+                        task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
+                    }
                 }
-            }
-        });
+            });
+        }
+
+        unsafe { SingleCoreInterruptLock.exit(irq_token) };
 
         esp_hal::interrupt::wait_for_interrupt();
     }
