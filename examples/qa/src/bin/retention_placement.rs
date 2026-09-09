@@ -13,21 +13,20 @@ use esp_backtrace as _;
 use esp_hal::{
     main,
     ram,
-    rtc_cntl::{CpuRetentionMemory, sleep::LowPower},
+    rtc_cntl::{CpuRetentionStorage, sleep::LowPower},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[ram(reclaimed)]
-static mut RETENTION: CpuRetentionMemory = CpuRetentionMemory::new();
+#[ram(reclaimed, unstable(zeroed))]
+static RETENTION: CpuRetentionStorage = CpuRetentionStorage::new();
 
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut lpwr = LowPower::new(peripherals.LPWR);
-    lpwr.install_cpu_retention_memory(unsafe { &mut *(&raw mut RETENTION) })
-        .unwrap();
+    lpwr.install_cpu_retention_memory(RETENTION.take()).unwrap();
 
     loop {}
 }
