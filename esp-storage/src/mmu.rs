@@ -19,6 +19,8 @@ use esp32c6 as pac;
 use esp32c61 as pac;
 #[cfg(esp32h2)]
 use esp32h2 as pac;
+#[cfg(esp32h4)]
+use esp32h4 as pac;
 #[cfg(esp32p4)]
 use esp32p4 as pac;
 #[cfg(esp32s2)]
@@ -182,7 +184,7 @@ pub(crate) fn invalidate_flash_cache(start: u32, len: u32) {
     }
 }
 
-#[cfg(not(any(esp32, esp32p4, esp32s31)))]
+#[cfg(not(any(esp32, esp32h4, esp32p4, esp32s31)))]
 fn invalidate_cache(vaddr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(addr: u32, size: u32);
@@ -192,7 +194,7 @@ fn invalidate_cache(vaddr: u32, size: u32) {
     }
 }
 
-#[cfg(esp32s31)]
+#[cfg(any(esp32h4, esp32s31))]
 fn invalidate_cache(vaddr: u32, size: u32) {
     const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 
@@ -308,11 +310,11 @@ mod indexed {
     }
 
     fn flash_mapping_from_entry(entry: pac::spi0::mmu_item_content::R) -> bool {
-        #[cfg(any(esp32c5, esp32c61))]
+        #[cfg(any(esp32c5, esp32c61, esp32h4))]
         {
             !entry.access_spiram().bit()
         }
-        #[cfg(not(any(esp32c5, esp32c61)))]
+        #[cfg(not(any(esp32c5, esp32c61, esp32h4)))]
         {
             let _ = entry;
             true
@@ -336,7 +338,7 @@ mod indexed {
         select_entry(entry_id);
         spi0().mmu_item_content().write(|w| {
             unsafe { w.paddr().bits(page) };
-            #[cfg(any(esp32c5, esp32c61))]
+            #[cfg(any(esp32c5, esp32c61, esp32h4))]
             w.access_spiram().clear_bit();
             w.valid().set_bit();
             if encrypted {

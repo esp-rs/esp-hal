@@ -231,6 +231,17 @@ impl InterruptStatus {
                             .read()
                             .bits()
                     }
+                    esp32h4 => {
+                        if word == 3 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE0::regs().core_0_intr_status3().read().bits()
+                                & 0x3;
+                        }
+                        INTERRUPT_CORE0::regs()
+                            .core_0_intr_status(word)
+                            .read()
+                            .bits()
+                    }
                     _ => INTERRUPT_CORE0::regs()
                         .core_0_intr_status(word)
                         .read()
@@ -255,6 +266,17 @@ impl InterruptStatus {
                         if word == 4 {
                             // Discontiguous, cannot be part of the standard status array
                             return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
+                        }
+                        INTERRUPT_CORE1::regs()
+                            .core_1_intr_status(word)
+                            .read()
+                            .bits()
+                    }
+                    esp32h4 => {
+                        if word == 3 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE1::regs().core_1_intr_status3().read().bits()
+                                & 0x3;
                         }
                         INTERRUPT_CORE1::regs()
                             .core_1_intr_status(word)

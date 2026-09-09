@@ -114,7 +114,7 @@ impl CpuClock {
         cfg_select! {
             esp32c2 => Self::_120MHz,
             any(esp32c3, esp32c6, esp32c61) => Self::_160MHz,
-            esp32h2 => Self::_96MHz,
+            any(esp32h2, esp32h4) => Self::_96MHz,
             esp32p4 => Self::_400MHz,
             esp32s31 => Self::_320MHz,
             _ => Self::_240MHz,
@@ -544,7 +544,13 @@ pub(crate) fn rtc_slow_cal_period() -> u32 {
 }
 
 /// Reads the calibrated RTC fast clock period from memory.
-#[cfg_attr(not(soc_has_pmu), expect(dead_code))]
+#[cfg_attr(
+    any(not(soc_has_pmu), not(sleep_driver_supported)),
+    expect(
+        dead_code,
+        reason = "Only the PMU sleep code reads the calibrated period."
+    )
+)]
 pub(crate) fn rtc_fast_cal_period() -> u32 {
     RC_FAST_CAL_VAL.load(core::sync::atomic::Ordering::Relaxed)
 }
