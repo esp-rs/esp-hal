@@ -5,7 +5,7 @@ use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
 use portable_atomic::{AtomicPtr, Ordering};
 
 use crate::{
-    rtc_cntl::sleep::LowPower,
+    rtc_cntl::{cpu_retention::DMA_LINK_SIZE, sleep::LowPower},
     soc::{
         CONFIG_DATA_CACHE_LINE_SIZE,
         CONFIG_DATA_CACHE_SIZE,
@@ -18,9 +18,6 @@ use crate::{
 
 const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
 const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
-
-/// Bytes the DMA descriptor takes at the head of the buffer.
-const DMA_LINK_SIZE: usize = 16;
 
 /// Tag block groups the retention hardware moves for one cache.
 ///
