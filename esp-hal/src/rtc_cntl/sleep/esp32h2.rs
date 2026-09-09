@@ -441,7 +441,10 @@ bitfield::bitfield! {
     /// Controls the power-down status of the modem power domain.
     pub u32, pd_modem    , set_pd_modem    : 2;
     /// Controls the power-down status of the CPU power domain.
-    pub u32, pd_cpu      , set_pd_cpu      : 3;
+    ///
+    /// Crate-private, because a light sleep needs CPU retention to power this domain down. A
+    /// power-down without retention loses the CPU state.
+    pub(crate) u32, pd_cpu, set_pd_cpu: 3;
     /// Controls the power-down status of the crystal oscillator.
     pub u32, pd_xtal     , set_pd_xtal     : 4;
     /// Controls the power-down status of the fast RC oscillator.
