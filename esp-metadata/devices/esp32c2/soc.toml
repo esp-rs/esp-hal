@@ -17,6 +17,9 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp8684_te
 page_size = 0x10000
 entry_num = 64
 
+[device.flash]
+support_status = "partial"
+
 [device.rom]
 has_crc_le      = true
 has_crc_be      = true
