@@ -62,7 +62,6 @@ pub(crate) mod dividers;
 /// can render the device temporarily unusable. Use with caution.
 /// </section>
 #[doc = ""]
-#[instability::unstable]
 pub mod ll {
     #[instability::unstable]
     pub use crate::soc::clocks::*;
@@ -77,7 +76,6 @@ use crate::efuse::ChipRevision;
 use crate::peripherals::PCR;
 #[cfg(soc_has_clock_node_timg_calibration_clock)]
 use crate::peripherals::TIMG0;
-#[instability::unstable]
 pub use crate::soc::clocks::ClockConfig;
 pub use crate::soc::clocks::CpuClock;
 use crate::{
@@ -123,7 +121,6 @@ impl CpuClock {
 }
 
 /// RTC Clocks.
-#[instability::unstable]
 pub struct RtcClock;
 
 #[cfg(soc_has_clock_node_timg_calibration_clock)]
@@ -520,6 +517,104 @@ fn calibrate_rtc_fast_clock() {
 /// The CPU clock frequency.
 pub fn cpu_clock() -> Rate {
     Rate::from_hz(ll::cpu_clk_frequency())
+}
+
+/// Switch the CPU clock at runtime.
+///
+/// Reuses [`ClockConfig::configure`], which applies only the diff from the current clock
+/// tree, so a switch between two presets sharing a PLL is divider-only (no recalibration).
+/// Does not change core voltage: lowering the clock is safe; raising it above what the
+/// boot-time voltage sustains may be unstable.
+pub fn set_cpu_clock(clock: CpuClock) {
+    ClockTree::with(|clocks| {
+        ClockConfig::from(clock).configure(clocks);
+    });
+}
+
+/// Performance level for [`PerfLock`]-based dynamic frequency scaling.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PerfLevel {
+    /// Resting, power-efficient clock.
+    Base,
+    /// On-demand high-performance clock.
+    High,
+}
+
+struct PerfState {
+    base: CpuClock,
+    high: CpuClock,
+    high_refs: usize,
+}
+
+// Defaults to `max()` so an unconfigured system never scales down.
+static PERF: esp_sync::NonReentrantMutex<PerfState> =
+    esp_sync::NonReentrantMutex::new(PerfState {
+        base: CpuClock::max(),
+        high: CpuClock::max(),
+        high_refs: 0,
+    });
+
+/// Set the `Base` (resting) and `High` (on-demand) clocks for [`PerfLock`].
+///
+/// Pick a `high` sharing `base`'s PLL to keep the switch divider-only. Does not change
+/// the current clock; both default to [`CpuClock::max`] until set.
+pub fn set_perf_levels(base: CpuClock, high: CpuClock) {
+    PERF.with(|s| {
+        s.base = base;
+        s.high = high;
+    });
+}
+
+/// Refcounted request to run at a [`PerfLevel`] until dropped.
+///
+/// The CPU runs at `High` while at least one `PerfLock(High)` is alive and returns to
+/// `Base` when the last is dropped; `Base` requests are inert. The refcount and the clock
+/// switch update under one critical section, so requests from either core stay consistent.
+#[must_use = "the performance level is released when the PerfLock is dropped"]
+#[non_exhaustive]
+pub struct PerfLock {
+    holds_high: bool,
+}
+
+impl PerfLock {
+    /// Request `level` until the returned guard is dropped.
+    pub fn request(level: PerfLevel) -> Self {
+        let holds_high = level == PerfLevel::High;
+        if holds_high {
+            PERF.with(|s| {
+                s.high_refs += 1;
+                if s.high_refs == 1 {
+                    set_cpu_clock(s.high);
+                }
+            });
+        }
+        Self { holds_high }
+    }
+
+    /// The level currently in effect.
+    pub fn current_level() -> PerfLevel {
+        PERF.with(|s| {
+            if s.high_refs > 0 {
+                PerfLevel::High
+            } else {
+                PerfLevel::Base
+            }
+        })
+    }
+}
+
+impl Drop for PerfLock {
+    fn drop(&mut self) {
+        if self.holds_high {
+            PERF.with(|s| {
+                s.high_refs -= 1;
+                if s.high_refs == 0 {
+                    set_cpu_clock(s.base);
+                }
+            });
+        }
+    }
 }
 
 /// The XTAL clock frequency.

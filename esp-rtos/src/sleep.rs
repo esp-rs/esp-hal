@@ -74,6 +74,19 @@ impl DeepSleep {
 /// See [`WakeLock`] for the wake-lock contract that governs when sleeping is safe.
 ///
 /// [`start_with_idle_hook`]: crate::start_with_idle_hook
+/// When set, the automatic light-sleep idle hook keeps the main XTAL powered
+/// (`RtcSleepConfig::xtal_fpu`). Needed only when a BLE connection sleeps on the
+/// MAIN_XTAL sleep clock (no external 32.768 kHz crystal), where the controller
+/// needs the XTAL running to keep connection-event timing. Default off.
+static KEEP_MAIN_XTAL_PU: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
+/// Opt into keeping the main XTAL powered during automatic light sleep (see
+/// [`KEEP_MAIN_XTAL_PU`]). Call once at boot, before the idle hook can run.
+pub fn set_main_xtal_powered_in_light_sleep(on: bool) {
+    KEEP_MAIN_XTAL_PU.store(on, core::sync::atomic::Ordering::Relaxed);
+}
+
 pub fn configure(lpwr: LPWR<'static>) -> Sleep {
     Sleep {
         #[cfg(sleep_deep_sleep)]
@@ -168,7 +181,13 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             // because it listens, and this hook cannot know which pins listen. If no source is
             // enabled, the call refuses the sleep and returns immediately. The code then reaches
             // the same `WFI` that this hook would select.
-            lpwr.sleep_light(RtcSleepConfig::default());
+            // Keep the main XTAL powered only when a board opts in (the no-32k-crystal
+            // connected-BLE path). Default off powers it down for a lower sleep floor.
+            let mut cfg = RtcSleepConfig::default();
+            if KEEP_MAIN_XTAL_PU.load(core::sync::atomic::Ordering::Relaxed) {
+                cfg.set_xtal_fpu(true);
+            }
+            lpwr.sleep_light(cfg);
 
             // The alarm timer was gated during light sleep, so its pre-armed alarm is
             // stale. Force a re-arm against the restored time base so the tick handler

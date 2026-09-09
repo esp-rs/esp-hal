@@ -352,6 +352,47 @@ pub enum CcaMode {
     SoftwareTriggered = 2,
 }
 
+/// BLE controller low-power sleep clock source (ESP-IDF `esp_bt_sleep_clock_t`).
+///
+/// Only used when modem sleep is enabled (`sleep_mode = MODE_1`). Selects which clock
+/// keeps BLE timing while the RF/baseband is gated between events.
+#[derive(Default, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum BleSleepClock {
+    /// Main 40 MHz XTAL. Exact, but forces the controller to keep the SoC awake
+    /// between events (ESP-IDF `no_light_sleep = 1`). The safe default, and the only
+    /// sound choice on a board without a 32.768 kHz crystal.
+    #[default]
+    MainXtal   = 1,
+    /// MAIN_XTAL kept powered during light sleep (ESP-IDF `main_xtal_pu`). Same clock
+    /// as `MainXtal`, but the controller releases the sleep lock between events so the
+    /// SoC can light-sleep. The board must also call esp-rtos
+    /// `set_main_xtal_powered_in_light_sleep(true)` to keep the XTAL alive across the
+    /// sleep. To the controller this is `MAIN_XTAL`; keeping it powered is SoC-side.
+    MainXtalPu = 4,
+    /// External 32.768 kHz crystal (XTAL_32K pins). Accurate enough (<500 ppm) to hold
+    /// a BLE connection while the SoC light-sleeps between events. Requires the crystal
+    /// populated and selected as the RTC slow clock; init falls back to `MainXtal` with
+    /// a warning if absent.
+    Ext32kXtal = 2,
+    /// Internal ~136 kHz RC. Always present, no crystal needed, but ~7% drift. Fine for
+    /// advertising or disconnected idle; ESP-IDF advises against it for a BLE connection
+    /// (drift far exceeds the <500 ppm a connection needs). Opt-in only.
+    RtcSlow    = 3,
+}
+
+impl BleSleepClock {
+    /// The value the controller config (`esp_bt_sleep_clock_t`) expects. `MainXtalPu`
+    /// maps to `MAIN_XTAL` (1); keeping the XTAL powered in light sleep is SoC-side.
+    fn c_value(self) -> u8 {
+        match self {
+            BleSleepClock::MainXtal | BleSleepClock::MainXtalPu => 1,
+            BleSleepClock::Ext32kXtal => 2,
+            BleSleepClock::RtcSlow => 3,
+        }
+    }
+}
+
 /// Bluetooth controller configuration.
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -453,6 +494,11 @@ pub struct Config {
 
     /// Disconnect when Instant Passed (0x28) occurs during ACL PHY update.
     disconnect_llcp_phy_update: bool,
+
+    /// BLE modem-sleep low-power clock source (only used when `sleep_mode = MODE_1`).
+    /// See [`BleSleepClock`]. Select `Ext32kXtal` iff a 32.768 kHz crystal is populated;
+    /// otherwise `MainXtal`.
+    sleep_clock: BleSleepClock,
 }
 
 impl Default for Config {
@@ -487,11 +533,18 @@ impl Default for Config {
             disconnect_llcp_conn_update: false,
             disconnect_llcp_chan_map_update: false,
             disconnect_llcp_phy_update: false,
+            sleep_clock: BleSleepClock::MainXtal,
         }
     }
 }
 
 impl Config {
+    /// The selected BLE modem-sleep LP clock (read by `btdm::ble_init`). Named
+    /// `_src` to avoid colliding with the `BuilderLite`-generated `sleep_clock` getter.
+    pub(crate) fn sleep_clock_src(&self) -> BleSleepClock {
+        self.sleep_clock
+    }
+
     pub(crate) fn validate(&self) -> Result<(), InvalidConfigError> {
         crate::ble::validate_range!(
             self,
@@ -523,8 +576,12 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         bluetooth_mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,
 
         ble_max_act: config.max_connections,
-        sleep_mode: 0,
-        sleep_clock: 0,
+        // Modem sleep. MODE_1 gates the RWBLE baseband/RF between connection events;
+        // the btdm_sleep_* OS callbacks in btdm.rs drive the PHY disable/enable. Was 0.
+        sleep_mode: 1,
+        // LP clock (was hardcoded 0). c_value() maps MainXtalPu to MAIN_XTAL(1); the
+        // LP-clock select/div and lpcycle_us are set in btdm.rs ble_init.
+        sleep_clock: config.sleep_clock.c_value(),
         ble_st_acl_tx_buf_nb: 0,
         ble_hw_cca_check: 0,
         ble_adv_dup_filt_max: 30,
