@@ -749,6 +749,7 @@ impl RtcSleepConfig {
     /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
     /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
     /// sleep ends.
+    #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
         let restore_clock_config = ClockTree::with(|clocks| {
             let old_root = clocks.soc_root_clk();
@@ -835,14 +836,13 @@ impl RtcSleepConfig {
     /// Requests the sleep.
     ///
     /// The caller waits for the result of the request.
+    #[crate::ram]
     pub(crate) fn enter_sleep(&self) {
-        // pmu_ll_hp_set_sleep_enable
-        PMU::regs()
-            .slp_wakeup_cntl0()
-            .write(|w| w.sleep_req().bit(true));
+        request_sleep();
     }
 
     /// Cleans up after sleep.
+    #[crate::ram]
     pub(crate) fn finish_sleep(&self) {
         // like esp-idf pmu_sleep_finish()
         // In "pd_cpu lightsleep" and "deepsleep" modes we never get here
@@ -852,7 +852,49 @@ impl RtcSleepConfig {
     }
 }
 
-/// Prepares CPU retention for the upcoming sleep.
-pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
-    let _ = buffer;
+/// Couples CPU power-down to the installed retention buffer, for a light sleep.
+///
+/// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
+/// cannot carry a power-down into a light sleep that has no retention memory.
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
+    config.pd_flags.set_pd_cpu(buffer.is_some());
+}
+
+/// Requests the sleep.
+///
+/// The software retention path calls this through a function pointer after the critical frame is
+/// saved.
+#[crate::ram]
+pub(crate) fn request_sleep() {
+    PMU::regs()
+        .slp_wakeup_cntl0()
+        .write(|w| w.sleep_req().bit(true));
+}
+
+/// Requests the sleep, and retains the CPU across it if the program installed the memory.
+///
+/// The retained path returns twice, so it owns the request and the wait.
+#[crate::ram]
+pub(crate) fn enter_sleep_with_retention(config: &RtcSleepConfig, buffer: Option<*mut u8>) -> bool {
+    match buffer {
+        Some(buffer) => crate::rtc_cntl::cpu_retention::sleep_retained(
+            buffer,
+            request_sleep,
+            super::wait_for_sleep_result,
+        ),
+        None => {
+            config.enter_sleep();
+            super::wait_for_sleep_result()
+        }
+    }
+}
+
+/// Finishes CPU retention after the sleep request returns.
+///
+/// The disarm is unconditional, because the tail of the sleep runs on a wake and on a rejected
+/// request. A stale stub address would otherwise outlive the sleep that armed it.
+pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, _rejected: bool) {
+    if buffer.is_some() {
+        crate::rtc_cntl::cpu_retention::disarm_wake_stub();
+    }
 }
