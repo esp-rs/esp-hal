@@ -96,6 +96,13 @@ impl CacheTagRetentionStorage {
     }
 }
 
+#[instability::unstable]
+impl Default for CacheTagRetentionStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // SAFETY: ConstStaticCell is a `MaybeUninit` buffer, and an AtomicBool strapped together,
 // both are safe to be zero-initialized.
 unsafe impl bytemuck::Zeroable for CacheTagRetentionStorage {}
