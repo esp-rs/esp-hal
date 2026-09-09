@@ -1,6 +1,6 @@
 //! # System Control
 
-#![cfg_attr(esp32s31, allow(dead_code))]
+#![cfg_attr(any(esp32s31, esp32h4), allow(dead_code))]
 
 use esp_sync::NonReentrantMutex;
 
@@ -327,7 +327,7 @@ use crate::rtc_cntl::SocResetReason;
 #[inline]
 pub fn software_reset() -> ! {
     let _uart0_sclk_guard = ensure_uart0_sclk_enabled();
-    #[cfg(any(esp32p4, esp32s31))]
+    #[cfg(any(esp32h4, esp32p4, esp32s31))]
     crate::soc::cpu_control::pre_system_reset();
     crate::rom::software_reset()
 }
