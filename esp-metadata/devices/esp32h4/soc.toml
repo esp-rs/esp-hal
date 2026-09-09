@@ -29,6 +29,10 @@ cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x3f
+# ESP-IDF does not define SOC_CPU_PMP_REGION_GRANULARITY for this chip yet. Measured on hardware
+# by writing all ones into a free `pmpaddr` and reading it back: the lowest five bits are hardwired
+# to zero.
+cpu_pmp_granularity_128 = true
 has_swd_watchdog = true
 
 # SRAM_SEG_START = 0x40810000, SRAM_SEG_END = 0x4084F350
@@ -110,6 +114,16 @@ support_status = "partial"
 
 # The CSR interface is identical to the C6/H2 one (see `dedic_gpio_cpu_ll.h`), but each core has
 # its own set of 8 channels: CPU_GPIO_0..7 belong to core 0, CPU_GPIO_8..15 to core 1.
+[device.dedicated_gpio]
+version = "riscv_v1"
+support_status = "partial"
+channels = [
+    ["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
+    ["CPU_GPIO_8", "CPU_GPIO_9", "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
+]
+
+[device.io_mux]
+
 [device.i2c_slave]
 support_status = { status = "not_supported", issue = 1909 }
 
@@ -131,3 +145,6 @@ instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 # see esp-idf components/esp_hw_support/port/esp32h4/rtc_time.c
 rc_fast_calibration = { divider = 32, min_rev = 0 }
+
+[device.usb_serial_jtag]
+support_status = "partial"
