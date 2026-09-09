@@ -19,6 +19,10 @@ pub(crate) struct SleepRetentionProperties {
     #[serde(default)]
     supports_tagmem_power_down: bool,
     /// Bytes the CPU frames need, including the DMA descriptor that precedes them.
+    ///
+    /// The size is the mark that esp-hal describes the frames of this chip, so it also drives the
+    /// `supports_cpu_power_down` cfg. A chip that has the hardware but no frame layout keeps the
+    /// CPU domain powered.
     cpu_retention_mem_size: Option<u32>,
     cpu_retention_mem_align: Option<u32>,
     /// First address the retention DMA can reach.
@@ -33,6 +37,9 @@ impl GenericProperty for SleepRetentionProperties {
 
         if let Some(mode) = &self.cpu_retention {
             cfgs.push(format!("cpu_retention=\"{mode}\""));
+        }
+        if self.cpu_retention_mem_size.is_some() {
+            cfgs.push("supports_cpu_power_down".to_string());
         }
         if self.supports_top_power_down {
             cfgs.push("supports_top_power_down".to_string());
