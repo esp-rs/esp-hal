@@ -5,6 +5,10 @@
 
 #[cfg(interrupt_controller = "plic")]
 pub(crate) mod c6_h2;
+#[cfg(interrupt_controller = "clic")]
+pub(crate) mod clic;
 
 #[cfg(interrupt_controller = "plic")]
 pub(crate) use c6_h2 as chip;
+#[cfg(interrupt_controller = "clic")]
+pub(crate) use clic as chip;
