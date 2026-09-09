@@ -48,6 +48,7 @@ peripherals = [
     { name = "DS" },
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
+    { name = "EXTMEM", hidden = true },
     { name = "GPIO" },
     { name = "GPIO_SD", clock_group = "SDM" },
     { name = "HMAC" },
@@ -81,6 +82,7 @@ peripherals = [
     { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PLIC_MX" },
+    { name = "PLIC_UX", hidden = true },
     { name = "PMU" },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG", virtual = true }, # a) RNG is LP_PERI in truth. b) we need to offset the rng_data register at runtime for newer revisions.
@@ -343,6 +345,12 @@ wakeup_sources = {
 [device.sleep.retention]
 cpu_retention = "software"
 supports_top_power_down = true
+# 160-byte critical frame + 292-byte non-critical frame + 137 device words (548 bytes), 16-byte aligned.
+cpu_retention_mem_size = 1008
+cpu_retention_mem_align = 16
+# Internal HP SRAM from `components/soc/esp32h2/include/soc/soc.h` (`SOC_DRAM_LOW`/`SOC_DRAM_HIGH`).
+cpu_retention_mem_start = 0x40800000
+cpu_retention_mem_end = 0x40850000
 
 # Other drivers which are partially supported but have no other configuration:
 

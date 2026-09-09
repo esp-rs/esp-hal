@@ -88,6 +88,7 @@ peripherals = [
     { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PLIC_MX" },
+    { name = "PLIC_UX", hidden = true },
     { name = "PMU" },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG", pac = "LP_PERI" },

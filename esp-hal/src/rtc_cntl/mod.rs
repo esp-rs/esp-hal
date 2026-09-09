@@ -127,8 +127,7 @@ pub mod sleep;
 mod cpu_retention;
 #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
 pub(crate) use cpu_retention::installed_buffer_ptr;
-// A software-retention chip gains these with its frame layout.
-#[cfg(any(cpu_retention = "rtc_cntl", esp32c6))]
+#[cfg(supports_cpu_power_down)]
 #[instability::unstable]
 pub use cpu_retention::memory::{CpuRetentionMemory, CpuRetentionMemoryError, CpuRetentionStorage};
 

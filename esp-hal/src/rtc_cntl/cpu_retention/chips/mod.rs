@@ -1,10 +1,7 @@
 //! Retention buffer layout and device regions, per chip.
 
-#[cfg(esp32c6)]
-pub(crate) mod esp32c6;
-
-#[cfg(esp32c6)]
-use esp32c6 as chip;
+#[cfg_attr(any(esp32c6, esp32h2), path = "c6_h2.rs")]
+pub(crate) mod chip;
 
 // The metadata carries the size, because the install API checks the buffer against it before any
 // frame code runs.
