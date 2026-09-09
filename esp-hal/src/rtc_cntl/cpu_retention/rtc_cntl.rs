@@ -15,7 +15,7 @@ pub(crate) const DMA_LINK_SIZE: usize = 16;
 
 /// `repr(align)` takes a literal, so the buffer takes the strictest alignment of every chip. The
 /// alignment then needs no check at run time.
-const _: () = assert!(property!("sleep.cpu_retention_mem_align") <= 16);
+const _: () = ::core::assert!(property!("sleep.cpu_retention_mem_align") <= 16);
 
 static INSTALLED: AtomicPtr<CpuRetentionMemory> = AtomicPtr::new(ptr::null_mut());
 

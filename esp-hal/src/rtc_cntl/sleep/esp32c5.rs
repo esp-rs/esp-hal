@@ -625,7 +625,10 @@ bitfield::bitfield! {
     /// Controls the power-down status of the high-performance peripheral power domain.
     pub u32, pd_hp_periph, set_pd_hp_periph: 3;
     /// Controls the power-down status of the CPU power domain.
-    pub u32, pd_cpu      , set_pd_cpu      : 4;
+    ///
+    /// Crate-private, because a light sleep needs CPU retention to power this domain down. A
+    /// power-down without retention loses the CPU state.
+    pub(crate) u32, pd_cpu, set_pd_cpu: 4;
     /// Controls the power-down status of the high-performance always-on domain.
     pub u32, pd_hp_aon   , set_pd_hp_aon   : 5;
     /// Controls the power-down status of memory group 0.
