@@ -3,7 +3,7 @@
 //! Build this and read the symbol table to confirm the buffer is inside the range that
 //! `sleep.cpu_retention_mem_start` and `_end` give.
 
-//% CHIP_FILTER: esp32s3 || esp32c3
+//% CHIP_FILTER: cpu_retention == "rtc_cntl" || esp32c6
 //% FEATURES: unstable
 
 #![no_std]

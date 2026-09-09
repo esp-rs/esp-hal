@@ -2,7 +2,7 @@
 
 #[cfg(supports_tagmem_power_down)]
 use esp_hal::rtc_cntl::{CacheTagRetentionMemory, CacheTagRetentionMemoryError};
-#[cfg(cpu_retention = "rtc_cntl")]
+#[cfg(any(cpu_retention = "rtc_cntl", esp32c6))]
 use esp_hal::rtc_cntl::{CpuRetentionMemory, CpuRetentionMemoryError};
 #[cfg(multi_core)]
 use esp_hal::{peripherals::CPU_CTRL, system::Cpu, system::CpuControl};
@@ -32,7 +32,7 @@ pub struct Sleep {
     pub light_sleep_hook: IdleFn,
 }
 
-#[cfg(cpu_retention = "rtc_cntl")]
+#[cfg(any(cpu_retention = "rtc_cntl", esp32c6))]
 impl Sleep {
     /// Lets automatic light sleep power the CPU domain down.
     ///
