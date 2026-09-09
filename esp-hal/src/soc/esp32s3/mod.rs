@@ -9,9 +9,9 @@ crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
     pub mod lp_core;
+    // The light sleep path stalls the other core, and it is not gated on the feature.
+    pub mod cpu_control;
 }
-#[cfg(feature = "unstable")]
-pub mod cpu_control;
 pub mod gpio;
 pub(crate) mod regi2c;
 

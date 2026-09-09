@@ -6,8 +6,10 @@
 //! and managing the APP (second) CPU core on the `ESP32` chip. It is used to
 //! start and stop program execution on the APP core.
 
+#[cfg(feature = "unstable")]
+use crate::peripherals::SPI0;
 use crate::{
-    peripherals::{DPORT, LPWR, SPI0},
+    peripherals::{DPORT, LPWR},
     system::Cpu,
 };
 
@@ -79,6 +81,7 @@ pub fn is_running(core: Cpu) -> bool {
     is_stalled != 0x86
 }
 
+#[cfg(feature = "unstable")]
 fn flush_cache(core: Cpu) {
     let dport_control = DPORT::regs();
 
@@ -121,6 +124,7 @@ fn flush_cache(core: Cpu) {
     };
 }
 
+#[cfg(feature = "unstable")]
 fn enable_cache(core: Cpu) {
     let spi0 = SPI0::regs();
     let dport_control = DPORT::regs();
@@ -141,6 +145,7 @@ fn enable_cache(core: Cpu) {
     };
 }
 
+#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     let dport_control = DPORT::regs();
 
