@@ -1,7 +1,7 @@
 use super::SleepKind;
 use crate::{
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
-    rtc_cntl::Rtc,
+    rtc_cntl::{Rtc, cpu_retention},
     soc::regi2c,
 };
 
@@ -687,12 +687,8 @@ impl RtcSleepConfig {
 // first and invalidate both caches after. Tag memory retention, which lets a program skip this
 // work, comes later; until then the answer is always yes.
 
-const DMA_LINK_SIZE: usize = 16;
-const BUFFER_SIZE: usize = property!("sleep.cpu_retention_mem_size");
-const PAYLOAD_SIZE: usize = BUFFER_SIZE - DMA_LINK_SIZE;
-
 // `SOC_RTC_CNTL_CPU_PD_REG_FILE_NUM` (549) times `SOC_RTC_CNTL_CPU_PD_DMA_BLOCK_SIZE` (16).
-const _: () = assert!(PAYLOAD_SIZE == 549 * 16);
+const _: () = assert!(cpu_retention::payload_size() == 549 * 16);
 
 const RETENTION_CONFIG_WORD3: u32 = 0xfffe_0000;
 const RETENTION_WAIT_CYCLES: u8 = 0x7f;
@@ -701,14 +697,6 @@ const RETENTION_DONE_WAIT_CYCLES: u8 = 0x07;
 // `RETENTION_TARGET` is a bit per target: the CPU is 1 and the cache tag memory is 2.
 const RETENTION_TARGET_CPU: u8 = 1;
 const RETENTION_TARGET_TAGMEM: u8 = 2;
-
-/// RTC_CNTL retention DMA link node. Matches `lldesc_t` in `esp_rom_lldesc.h`.
-#[repr(C)]
-struct RtcCntlDmaLink {
-    word0: u32,
-    buf: *mut u8,
-    next: u32,
-}
 
 /// Whether the tag memory survives the sleep, which is what lets the cache work be skipped.
 ///
@@ -747,7 +735,7 @@ pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
     };
 
     unsafe {
-        init_dma_link(buffer);
+        cpu_retention::init_cpu_dma_link(buffer, RETENTION_CONFIG_WORD3);
         enable_cpu_retention(buffer as usize);
 
         // The tags are lost only when the CPU domain powers down, so this is armed with the CPU
@@ -797,42 +785,6 @@ pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, rejected: bool) {
     }
 }
 
-/// Builds the DMA link word. `units` is the payload size in 16-byte blocks.
-fn dma_link_word0(units: u16) -> u32 {
-    let units = units as u32;
-    // `lldesc_t` first word, from `rom/lldesc.h`: size in bits 0..12, length in 12..24, `eof` at
-    // bit 30 for the only node in the list, `owner` at bit 31 for the DMA. Both counts are in
-    // 16-byte units, as `rtc_cntl_hal_dma_link_init` writes them.
-    units | (units << 12) | (1 << 30) | (1 << 31)
-}
-
-/// Writes the descriptor at the head of the buffer and returns the payload that follows it.
-unsafe fn init_link(buffer: *mut u8, payload_size: usize) -> *mut u8 {
-    unsafe {
-        let link = buffer.cast::<RtcCntlDmaLink>();
-        let payload = buffer.add(DMA_LINK_SIZE);
-        let units = (payload_size >> 4) as u16;
-
-        core::ptr::write_volatile(&raw mut (*link).word0, dma_link_word0(units));
-        core::ptr::write_volatile(&raw mut (*link).buf, payload);
-        core::ptr::write_volatile(&raw mut (*link).next, 0);
-
-        payload
-    }
-}
-
-unsafe fn init_dma_link(buffer: *mut u8) {
-    unsafe {
-        let payload = init_link(buffer, PAYLOAD_SIZE);
-
-        let cfg = payload.cast::<u32>();
-        core::ptr::write_volatile(cfg, 0);
-        core::ptr::write_volatile(cfg.add(1), 0);
-        core::ptr::write_volatile(cfg.add(2), 0);
-        core::ptr::write_volatile(cfg.add(3), RETENTION_CONFIG_WORD3);
-    }
-}
-
 fn enable_cpu_retention(link_addr: usize) {
     // The field is 27 bits and the address needs 30, so the write drops the top three. The DMA
     // reaches internal SRAM only, so the hardware supplies those bits; esp-idf truncates the same
@@ -868,7 +820,7 @@ fn disable_cpu_retention() {
 /// The tag memory needs no configuration header, unlike the CPU frames.
 unsafe fn init_tag_memory_dma_link(buffer: *mut u8) {
     unsafe {
-        init_link(buffer, crate::rtc_cntl::tagmem::payload_size());
+        cpu_retention::init_link(buffer, crate::rtc_cntl::tagmem::payload_size());
     }
 }
 
