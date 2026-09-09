@@ -131,14 +131,14 @@ pub(crate) use cpu_retention::installed_buffer_ptr;
 // The software-retention chips gain these once their frames are defined.
 #[cfg(cpu_retention = "rtc_cntl")]
 #[instability::unstable]
-pub use cpu_retention::{CpuRetentionMemory, CpuRetentionMemoryError};
+pub use cpu_retention::{CpuRetentionMemory, CpuRetentionMemoryError, CpuRetentionStorage};
 
 #[cfg(supports_tagmem_power_down)]
 #[path = "cpu_retention/tagmem.rs"]
 mod tagmem;
 #[cfg(supports_tagmem_power_down)]
 #[instability::unstable]
-pub use tagmem::{CacheTagRetentionMemory, CacheTagRetentionMemoryError};
+pub use tagmem::{CacheTagRetentionMemory, CacheTagRetentionMemoryError, CacheTagRetentionStorage};
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
 #[cfg_attr(esp32c2, path = "rtc/esp32c2.rs")]
@@ -285,12 +285,11 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
-        let (low_reg, high_reg) =
-            cfg_select! {
-                esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
-                esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
-                _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
-            };
+        let (low_reg, high_reg) = cfg_select! {
+            esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+            esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+            _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+        };
 
         let l = low_reg.read().bits() as u64;
         let h = high_reg.read().bits() as u64;
@@ -305,12 +304,11 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        let (low_reg, high_reg) =
-            cfg_select! {
-                esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
-                esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
-                _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
-            };
+        let (low_reg, high_reg) = cfg_select! {
+            esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+            esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+            _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+        };
 
         // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
 
