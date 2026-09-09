@@ -111,6 +111,8 @@ mod xtensa {
     }
 
     unsafe extern "C" {
+        static _dram2_uninit_bss_start: u32;
+        static _dram2_uninit_bss_end: u32;
         static _rtc_fast_bss_start: u32;
         static _rtc_fast_bss_end: u32;
         static _rtc_fast_persistent_end: u32;
@@ -131,6 +133,9 @@ mod xtensa {
         .literal sym_init_persistent, {__init_persistent}
         .literal sym_xtensa_lx_rt_zero_fill, {_xtensa_lx_rt_zero_fill}
 
+        .literal sym_dram2_uninit_bss_start, {_dram2_uninit_bss_start}
+        .literal sym_dram2_uninit_bss_end, {_dram2_uninit_bss_end}
+
         .literal sym_rtc_fast_bss_start, {_rtc_fast_bss_start}
         .literal sym_rtc_fast_bss_end, {_rtc_fast_bss_end}
         .literal sym_rtc_fast_persistent_end, {_rtc_fast_persistent_end}
@@ -143,6 +148,9 @@ mod xtensa {
         ",
         __init_persistent = sym __init_persistent,
         _xtensa_lx_rt_zero_fill = sym _xtensa_lx_rt_zero_fill,
+
+        _dram2_uninit_bss_end = sym _dram2_uninit_bss_end,
+        _dram2_uninit_bss_start = sym _dram2_uninit_bss_start,
 
         _rtc_fast_bss_end = sym _rtc_fast_bss_end,
         _rtc_fast_bss_start = sym _rtc_fast_bss_start,
@@ -164,6 +172,10 @@ mod xtensa {
             entry  a1, 0x10                            // 4 words for callx4 spill area
 
             l32r   a2, sym_xtensa_lx_rt_zero_fill      // Pre-load address of zero-fill function
+
+            l32r   a6, sym_dram2_uninit_bss_start      // Set input range to .dram2_uninit.bss
+            l32r   a7, sym_dram2_uninit_bss_end        //
+            callx4 a2                                  // Zero-fill
 
             l32r   a6, sym_rtc_fast_bss_start          // Set input range to .rtc_fast.bss
             l32r   a7, sym_rtc_fast_bss_end            //
