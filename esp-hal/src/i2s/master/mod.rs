@@ -119,6 +119,48 @@
 //! }
 //! # }
 //! ```
+//!
+//! ### I2S Write
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! # use esp_hal::time::Rate;
+//! # use esp_hal::i2s::master::{I2s, Channels, DataFormat, TdmConfig};
+//! # use esp_hal::dma_tx_stream_buffer;
+//! let tx_buffer = dma_tx_stream_buffer!(4 * 4092, 1024);
+//! let samples: &[u8] = [...];
+//!
+//! let i2s = I2s::new(
+//!     peripheral.I2S0,
+//!     peripherals.__dma_channel__,
+//!     TdmConfig::new_tdm_philips()
+//!         .with_sample_rate(Rate::from_hz(44100))
+//!         .with_data_format(DataFormat::Data16Channel16)
+//!         .with_channels(Channels::STEREO),
+//! )?;
+//! # {mclk}
+//!
+//! let i2s_tx = i2s
+//!     .i2s_tx
+//!     .with_bclk(peripherals.GPIO2)
+//!     .with_ws(peripherals.GPIO4)
+//!     .with_dout(peripherals.GPIO5)
+//!     .build();
+//!
+//! let mut transfer = i2s_tx.write(i2s_buffer).unwrap();
+//!
+//! let mut written = 0;
+//! let audio_sample_len = audio_sample.iter().len();
+//! while written < audio_sample_len {
+//!     let out_written = transfer.push_with(|out| {
+//!         let len = (audio_sample.len() - written).min(out.len());
+//!         out[..len].copy_from_slice(&audio_sample[written..written + len]);
+//!         len
+//!     });
+//!     written += out_written;
+//! }
+//! ```
+//!
 #![cfg_attr(
     any(i2s_supports_pdm_tx, i2s_supports_pdm_rx),
     doc = r"## PDM mode
