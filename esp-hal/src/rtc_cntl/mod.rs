@@ -123,15 +123,14 @@ use crate::{peripherals::RTC_TIMER, system::Cpu, time::Duration};
 pub mod sleep;
 
 #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
-#[cfg_attr(cpu_retention = "rtc_cntl", path = "cpu_retention/rtc_cntl.rs")]
-#[cfg_attr(cpu_retention = "software", path = "cpu_retention/software.rs")]
+#[path = "cpu_retention/mod.rs"]
 mod cpu_retention;
 #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
 pub(crate) use cpu_retention::installed_buffer_ptr;
-// The software-retention chips gain these once their frames are defined.
-#[cfg(cpu_retention = "rtc_cntl")]
+// A software-retention chip gains these with its frame layout.
+#[cfg(any(cpu_retention = "rtc_cntl", esp32c6))]
 #[instability::unstable]
-pub use cpu_retention::{CpuRetentionMemory, CpuRetentionMemoryError, CpuRetentionStorage};
+pub use cpu_retention::memory::{CpuRetentionMemory, CpuRetentionMemoryError, CpuRetentionStorage};
 
 #[cfg(supports_tagmem_power_down)]
 #[path = "cpu_retention/tagmem.rs"]
@@ -285,11 +284,12 @@ impl<'d> Rtc<'d> {
     #[cfg(lp_timer_driver_supported)]
     fn boot_time_us(&self) -> u64 {
         // For more info on about how RTC setting works and what it has to do with boot time, see https://github.com/esp-rs/esp-hal/pull/1883
-        let (low_reg, high_reg) = cfg_select! {
-            esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
-            esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
-            _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
-        };
+        let (low_reg, high_reg) =
+            cfg_select! {
+                esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+                esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+                _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+            };
 
         let l = low_reg.read().bits() as u64;
         let h = high_reg.read().bits() as u64;
@@ -304,11 +304,12 @@ impl<'d> Rtc<'d> {
         // Please see `boot_time_us` for documentation on registers and peripherals
         // used for certain SOCs.
 
-        let (low_reg, high_reg) = cfg_select! {
-            esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
-            esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
-            _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
-        };
+        let (low_reg, high_reg) =
+            cfg_select! {
+                esp32s31 => (LP_AON::regs().lp_store(2), LP_AON::regs().lp_store(3)),
+                esp32p4 => (LP_AON::regs().lp_store2(), LP_AON::regs().lp_store3()),
+                _ => (LP_AON::regs().store2(), LP_AON::regs().store3()),
+            };
 
         // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
 

@@ -618,6 +618,43 @@ pub(crate) use impl_dma_channel_trait;
 #[cfg(feature = "unstable")]
 use procmacros::doc_replace;
 
+/// Reads the RISC-V CSR that `csr` numbers.
+///
+/// The `riscv` crate names no debug CSR and no Espressif custom CSR, so the retention code reads
+/// them by number. `csr` is an `asm!` `const` operand, so it must be a constant expression.
+///
+/// # Safety
+///
+/// The caller must make sure that the CSR exists on this chip, and that the read has no effect
+/// that the caller does not expect.
+#[cfg(esp32c6)]
+macro_rules! read_csr {
+    ($csr:expr) => {{
+        let value: u32;
+        core::arch::asm!("csrr {0}, {1}", out(reg) value, const $csr);
+        value
+    }};
+}
+#[cfg(esp32c6)]
+pub(crate) use read_csr;
+
+/// Writes `value` to the RISC-V CSR that `csr` numbers.
+///
+/// `csr` is an `asm!` `const` operand, so it must be a constant expression.
+///
+/// # Safety
+///
+/// The caller must make sure that the CSR exists on this chip, and that the write has no effect
+/// that the caller does not expect.
+#[cfg(esp32c6)]
+macro_rules! write_csr {
+    ($csr:expr, $value:expr) => {
+        core::arch::asm!("csrw {1}, {0}", in(reg) $value, const $csr)
+    };
+}
+#[cfg(esp32c6)]
+pub(crate) use write_csr;
+
 /// Macro to allow using unstable HAL features conditionally. Other crates can
 /// use this to "detect" the esp-hal/unstable feature.
 #[macro_export]

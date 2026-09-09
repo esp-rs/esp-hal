@@ -192,7 +192,7 @@ impl<'d> LowPower<'d> {
 
         // A deep sleep keeps what `RtcSleepConfig::deep` asked for, because the wake resets the
         // chip and keeps no CPU state to lose.
-        #[cfg(cpu_retention = "rtc_cntl")]
+        #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
         if kind == SleepKind::Light {
             sleep_impl::configure_cpu_retention(&mut config, retention_buffer);
         }
@@ -234,16 +234,24 @@ impl<'d> LowPower<'d> {
         let rejected = {
             // A chip can keep a guard for the length of the sleep, to restore what sleep entry
             // changed for the sleep only. The guard must therefore outlive the wait below.
-            // ESP-IDF arms retention in `misc_modules_sleep_prepare`, before it arms the wakeup
-            // sources.
-            #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
+            // ESP-IDF arms RTC_CNTL retention in `misc_modules_sleep_prepare`, before it arms the
+            // wakeup sources.
+            #[cfg(cpu_retention = "rtc_cntl")]
             sleep_impl::prepare_cpu_retention(retention_buffer);
 
             #[allow(clippy::let_unit_value)]
             let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
 
-            config.enter_sleep();
-            let rejected = wait_for_sleep_result();
+            // The software chips save the CPU inside the request, so the request belongs to
+            // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
+            #[cfg(cpu_retention = "software")]
+            let rejected = sleep_impl::enter_sleep_with_retention(&config, retention_buffer);
+
+            #[cfg(not(cpu_retention = "software"))]
+            let rejected = {
+                config.enter_sleep();
+                wait_for_sleep_result()
+            };
 
             if config.is_deep_sleep() && !rejected {
                 // The chip is entering deep sleep, and the wake resets it. Because RTC is in a
@@ -256,7 +264,7 @@ impl<'d> LowPower<'d> {
             rejected
         };
 
-        #[cfg(cpu_retention = "rtc_cntl")]
+        #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
         sleep_impl::finish_cpu_retention(retention_buffer, rejected);
 
         config.finish_sleep();
@@ -293,6 +301,7 @@ impl<'d> LowPower<'d> {
 /// only report of that case. ESP-IDF waits in the same place, in `rtc_sleep_start` and in
 /// `pmu_sleep_start`.
 #[cfg(sleep_driver_supported)]
+#[crate::ram]
 fn wait_for_sleep_result() -> bool {
     loop {
         cfg_select! {

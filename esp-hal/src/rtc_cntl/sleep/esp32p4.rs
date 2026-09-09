@@ -1078,7 +1078,25 @@ impl RtcSleepConfig {
     }
 }
 
-/// Prepares CPU retention for the upcoming sleep.
-pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
-    let _ = buffer;
+/// Couples CPU power-down to the installed retention buffer, for a light sleep.
+///
+/// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
+/// cannot carry a power-down into a light sleep that has no retention memory.
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
+    config.pd_flags.set_pd_cpu(buffer.is_some());
 }
+
+/// Requests the sleep.
+///
+/// The chip has no frame layout yet, so no buffer can be installed and no CPU state is at risk.
+#[crate::ram]
+pub(crate) fn enter_sleep_with_retention(
+    config: &RtcSleepConfig,
+    _buffer: Option<*mut u8>,
+) -> bool {
+    config.enter_sleep();
+    super::wait_for_sleep_result()
+}
+
+/// Finishes CPU retention after the sleep request returns.
+pub(crate) fn finish_cpu_retention(_buffer: Option<*mut u8>, _rejected: bool) {}
