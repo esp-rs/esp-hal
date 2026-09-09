@@ -14,6 +14,8 @@ use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 pub(crate) struct SleepRetentionProperties {
     /// How the chip retains CPU state across light sleep with CPU power-down.
     cpu_retention: Option<String>,
+    /// Register context frame shape for software CPU retention.
+    cpu_retention_frame: Option<String>,
     #[serde(default)]
     supports_top_power_down: bool,
     #[serde(default)]
@@ -37,6 +39,9 @@ impl GenericProperty for SleepRetentionProperties {
 
         if let Some(mode) = &self.cpu_retention {
             cfgs.push(format!("cpu_retention=\"{mode}\""));
+        }
+        if let Some(frame) = &self.cpu_retention_frame {
+            cfgs.push(format!("cpu_retention_frame=\"{frame}\""));
         }
         if self.cpu_retention_mem_size.is_some() {
             cfgs.push("supports_cpu_power_down".to_string());
