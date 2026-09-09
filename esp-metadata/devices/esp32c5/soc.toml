@@ -48,6 +48,7 @@ peripherals = [
     # { name = "AVC" },
     # { name = "BITSCRAMBLER" },
     { name = "CACHE" },
+    { name = "CLIC", hidden = true },
     { name = "CLINT" },
     # { name = "CPU_APM" }, # TODO: verify we need it
     { name = "DMA" },
@@ -435,6 +436,12 @@ wakeup_sources = {
 [device.sleep.retention]
 cpu_retention = "software"
 supports_top_power_down = true
+# 160-byte critical frame + 260-byte non-critical frame + 62 device words (248 bytes), 16-byte aligned.
+cpu_retention_mem_size = 672
+cpu_retention_mem_align = 16
+# Internal HP SRAM from `components/soc/esp32c5/include/soc/soc.h` (`SOC_DRAM_LOW`/`SOC_DRAM_HIGH`).
+cpu_retention_mem_start = 0x40800000
+cpu_retention_mem_end = 0x40860000
 
 [device.etm]
 support_status = { status = "not_supported", issue = 5167 }
