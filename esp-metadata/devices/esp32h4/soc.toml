@@ -1,0 +1,133 @@
+# ESP32-H4 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-metadata` to
+# update the table in the esp-hal README.
+
+[device]
+name   = "esp32h4"
+arch   = "riscv"
+target = "riscv32imafc-unknown-none-elf"
+cores  = 2
+datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-h4_datasheet_en.pdf"
+trm       = "https://www.espressif.com/sites/default/files/documentation/esp32-h4_technical_reference_manual_en.pdf"
+support_note = "In early stages of development."
+
+[device.mmu]
+page_size = 0x10000
+entry_num = 512
+
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
+
+[device.soc]
+multi_core_enabled = true
+cpu_has_branch_predictor = true
+cpu_has_csr_pc = false
+cpu_csr_prv_mode = 0x810
+cpu_mcause_mask = 0x3f
+has_swd_watchdog = true
+
+# SRAM_SEG_START = 0x40810000, SRAM_SEG_END = 0x4084F350
+# (from esp-idf components/esp_system/ld/esp32h4/memory.ld.in)
+# dram2_uninit: SRAM_SEG_END..SOC_ROM_STACK_START (PRO CPU stack, reclaimable)
+# SOC_ROM_STACK_START = 0x4085D350 (from soc.h)
+memory_map = { ranges = [
+    { name = "dram", start = 0x4081_0000, end = 0x4084_F350 },
+    { name = "dram2_uninit", start = 0x4084_F350, end = 0x4085_D350 },
+    { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x4200_0000, end = 0x4400_0000 },
+] }
+
+peripherals = [
+    { name = "AES", interrupts = { peri = "AES" } },
+    { name = "DMA" },
+    { name = "ECC", interrupts = { peri = "ECC" } },
+    { name = "EFUSE", hidden = true },
+    { name = "GPIO" },
+    { name = "GPIO_DEDICATED", virtual = true },
+    { name = "GPIO_SD" },
+    { name = "HP_APM" },
+    { name = "HP_SYS" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2S0", interrupts = { peri = "I2S" } },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
+    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true },
+    { name = "INTERRUPT_CORE0" },
+    { name = "INTERRUPT_CORE1" },
+    { name = "INTPRI" },
+    { name = "IO_MUX" },
+    { name = "LEDC" },
+    { name = "LPWR", pac = "LP_CLKRST" },
+    { name = "LP_ANA" },
+    { name = "LP_AON" },
+    { name = "LP_CLKRST" },
+    { name = "LP_PERI" },
+    { name = "LP_WDT" },
+    { name = "MODEM_LPCON" },
+    { name = "MODEM_SYSCON" },
+    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" } },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
+    { name = "PCR" },
+    { name = "PMU" },
+    { name = "RMT", interrupts = { peri = "RMT" } },
+    { name = "RNG" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "RTC_TIMER", pac = "LP_TIMER" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "GPSPI2" }, stable = true },
+    { name = "SPI3", interrupts = { peri = "GPSPI3" }, stable = true },
+    { name = "SYSTEM", pac = "PCR" },
+    { name = "SYSTIMER" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
+    { name = "UHCI0" },
+    { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
+
+    { name = "CPU_CTRL", virtual = true },
+    { name = "FLASH", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
+]
+
+[device.soc.clocks]
+# {include clocks.toml}
+
+[device.ecdsa]
+support_status = { status = "not_supported", issue = 5444 }
+
+[device.gpio]
+support_status = "partial"
+# {include gpio.toml}
+
+# The CSR interface is identical to the C6/H2 one (see `dedic_gpio_cpu_ll.h`), but each core has
+# its own set of 8 channels: CPU_GPIO_0..7 belong to core 0, CPU_GPIO_8..15 to core 1.
+[device.i2c_slave]
+support_status = { status = "not_supported", issue = 1909 }
+
+[device.interrupts]
+support_status = "partial"
+# 98 interrupt sources => ceil(98/32) = 4 status words
+status_registers = 4
+software_interrupt_count = 4
+controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
+
+[device.hmac]
+support_status = { status = "not_supported", issue = 5166 }
+
+[device.systimer]
+
+[device.timergroup]
+support_status = "partial"
+instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
+# see esp-idf components/esp_hw_support/port/esp32h4/rtc_time.c
+rc_fast_calibration = { divider = 32, min_rev = 0 }

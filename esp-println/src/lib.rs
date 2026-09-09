@@ -151,6 +151,7 @@ type PrinterImpl = noop::Printer;
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32p4",
         feature = "esp32s3",
         feature = "esp32s31"
@@ -187,6 +188,8 @@ mod auto_printer {
             const USB_DEVICE_INT_RAW: *const u32 = 0x500D2008 as *const u32;
             #[cfg(feature = "esp32s31")]
             const USB_DEVICE_INT_RAW: *const u32 = 0x20391008 as *const u32;
+            #[cfg(feature = "esp32h4")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x6001D008 as *const u32;
 
             const SOF_INT_MASK: u32 = 0b10;
 
@@ -219,6 +222,7 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32p4",
         feature = "esp32s3",
         feature = "esp32s31"
@@ -237,6 +241,7 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32p4",
         feature = "esp32s3",
         feature = "esp32s31"
@@ -284,6 +289,12 @@ mod serial_jtag_printer {
     const SERIAL_JTAG_FIFO_REG: usize = 0x2039_1000;
     #[cfg(feature = "esp32s31")]
     const SERIAL_JTAG_CONF_REG: usize = 0x2039_1004;
+
+    // ESP32-H4: USB_DEVICE peripheral at 0x6001_D000 per PAC.
+    #[cfg(feature = "esp32h4")]
+    const SERIAL_JTAG_FIFO_REG: usize = 0x6001_D000;
+    #[cfg(feature = "esp32h4")]
+    const SERIAL_JTAG_CONF_REG: usize = 0x6001_D004;
 
     /// A previous wait has timed out. We use this flag to avoid blocking
     /// forever if there is no host attached.
@@ -425,7 +436,8 @@ mod uart_printer {
         feature = "esp32c5",
         feature = "esp32c6",
         feature = "esp32c61",
-        feature = "esp32h2"
+        feature = "esp32h2",
+        feature = "esp32h4"
     ))]
     impl Functions for Device {
         const TX_ONE_CHAR: usize = 0x4000_0058;
@@ -433,7 +445,11 @@ mod uart_printer {
         fn flush() {
             const TX_FLUSH: usize = 0x4000_0074;
 
-            const GET_CHANNEL: usize = if cfg!(any(feature = "esp32c5", feature = "esp32c61")) {
+            const GET_CHANNEL: usize = if cfg!(any(
+                feature = "esp32c5",
+                feature = "esp32c61",
+                feature = "esp32h4"
+            )) {
                 0x4000_0038
             } else {
                 0x4000_003C
