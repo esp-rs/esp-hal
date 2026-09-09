@@ -181,8 +181,17 @@ impl<'d> LowPower<'d> {
         // paths.
         run_entry_hooks(&mut config);
 
+        // Retention serves light sleep only. Deep sleep resets the chip, so it has no CPU state to
+        // bring back, and an armed descriptor would outlive the sleep in the RTC domain. esp-idf
+        // arms retention from its light sleep path alone.
+        #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
+        let retention_buffer = match kind {
+            SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
+            SleepKind::Deep => None,
+        };
+
         #[cfg(cpu_retention = "rtc_cntl")]
-        sleep_impl::configure_cpu_retention(&mut config, crate::rtc_cntl::installed_buffer_ptr());
+        sleep_impl::configure_cpu_retention(&mut config, retention_buffer);
 
         config.apply();
 
@@ -224,7 +233,7 @@ impl<'d> LowPower<'d> {
             // ESP-IDF arms retention in `misc_modules_sleep_prepare`, before it arms the wakeup
             // sources.
             #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
-            sleep_impl::prepare_cpu_retention(crate::rtc_cntl::installed_buffer_ptr());
+            sleep_impl::prepare_cpu_retention(retention_buffer);
 
             #[allow(clippy::let_unit_value)]
             let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
@@ -244,7 +253,7 @@ impl<'d> LowPower<'d> {
         };
 
         #[cfg(cpu_retention = "rtc_cntl")]
-        sleep_impl::finish_cpu_retention(crate::rtc_cntl::installed_buffer_ptr(), rejected);
+        sleep_impl::finish_cpu_retention(retention_buffer, rejected);
 
         config.finish_sleep();
 
