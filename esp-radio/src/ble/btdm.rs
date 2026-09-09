@@ -56,6 +56,17 @@ unsafe extern "C" {
 
     #[cfg(not(esp32))]
     fn coex_pti_v2();
+
+    // BLE modem-sleep symbols (in libbtdm_app.a; GC'd until referenced). Used by
+    // ble_init (lp-clock setup) and the btdm_sleep_* OS callbacks below.
+    #[cfg(any(esp32c3, esp32s3))]
+    fn btdm_lpclk_select_src(sel: u32) -> bool;
+    #[cfg(any(esp32c3, esp32s3))]
+    fn btdm_lpclk_set_div(div: u32) -> bool;
+    #[cfg(any(esp32c3, esp32s3))]
+    fn btdm_controller_get_sleep_mode() -> u8;
+    #[cfg(any(esp32c3, esp32s3))]
+    fn btdm_sleep_clock_sync() -> bool;
 }
 
 static VHCI_HOST_CALLBACK: VhciHostCallbacks = VhciHostCallbacks {
@@ -210,46 +221,109 @@ unsafe extern "C" fn rand() -> i32 {
     unsafe { crate::common_adapter::random() as i32 }
 }
 
+// Sleep-clock calibration in Q19 fixed point (mirrors bt.c btdm_lpcycle_us).
+const G_BTDM_LPCYCLE_US_FRAC: u32 = 19;
+// Runtime us-per-lp-cycle, set once in ble_init from the selected sleep clock.
+// MAIN_XTAL @ 1 MHz is 1 << 19. Values fit u32 (min ~136 kHz RTC is ~3.86M).
+static G_BTDM_LPCYCLE_US: core::sync::atomic::AtomicU32 =
+    core::sync::atomic::AtomicU32::new(1 << G_BTDM_LPCYCLE_US_FRAC);
+
+// Convert lp-cycles to half-microseconds, carrying the fractional remainder in
+// *error_corr. The slot is typed u32 but the controller passes a pointer there
+// (ABI-compatible on 32-bit). Ported from bt.c btdm_lpcycles_2_hus.
 #[ram]
-unsafe extern "C" fn btdm_lpcycles_2_hus(_cycles: u32, _error_corr: u32) -> u32 {
-    todo!();
+unsafe extern "C" fn btdm_lpcycles_2_hus(cycles: u32, error_corr: u32) -> u32 {
+    let error_corr = error_corr as *mut u32;
+    let mut local: u64 = if error_corr.is_null() {
+        0
+    } else {
+        unsafe { *error_corr as u64 }
+    };
+    let lpcycle_us = G_BTDM_LPCYCLE_US.load(core::sync::atomic::Ordering::Relaxed) as u64;
+    local += lpcycle_us * (cycles as u64) * 2;
+    let res = local >> G_BTDM_LPCYCLE_US_FRAC;
+    local -= res << G_BTDM_LPCYCLE_US_FRAC;
+    if !error_corr.is_null() {
+        unsafe { *error_corr = local as u32 };
+    }
+    res as u32
 }
 
+/// Convert a duration in half-us into low-power clock cycles. Ported from bt.c.
 #[ram]
-unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
-    const RTC_CLK_CAL_FRACT: u32 = 19;
-    let g_btdm_lpcycle_us_frac = RTC_CLK_CAL_FRACT;
-    let g_btdm_lpcycle_us = 2 << (g_btdm_lpcycle_us_frac);
-
-    // Converts a duration in half us into a number of low power clock cycles.
-    let cycles: u64 = ((us as u64) << g_btdm_lpcycle_us_frac) / (g_btdm_lpcycle_us as u64);
-    trace!("btdm_hus_2_lpcycles {} {}", us, cycles);
-
+unsafe extern "C" fn btdm_hus_2_lpcycles(hus: u32) -> u32 {
+    let lpcycle_us = G_BTDM_LPCYCLE_US.load(core::sync::atomic::Ordering::Relaxed) as u64;
+    let mut cycles: u64 = ((hus as u64) << G_BTDM_LPCYCLE_US_FRAC) / lpcycle_us;
+    cycles >>= 1;
     cycles as u32
 }
 
-unsafe extern "C" fn btdm_sleep_check_duration(_slot_cnt: i32) -> i32 {
-    todo!();
+// BLE modem-sleep OS callbacks (ported from bt.c). PHY_ENABLED mirrors bt.c
+// s_lp_stat.phy_enabled so the shared PHY is disabled/enabled once per sleep
+// cycle. With a BLE-only build, gating the whole PHY during controller sleep is safe.
+static PHY_ENABLED: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(true);
+
+// True only for a sleep clock accurate enough to let the SoC light-sleep between BLE
+// events (EXT_32K, RTC_SLOW, or MAIN_XTAL kept powered). Set in ble_init. When false
+// the enter/exit wrappers leave the WakeLock alone, so the SoC stays awake.
+static SLEEP_CLOCK_LIGHT_SLEEP: core::sync::atomic::AtomicBool =
+    core::sync::atomic::AtomicBool::new(false);
+
+const BTDM_MIN_SLEEP_DURATION: i32 = 24; // half-slots; below this, don't sleep
+const BTDM_MODEM_WAKE_UP_DELAY: i32 = 8; // half-slots; wake early to re-enable PHY/RF
+
+// The slot is typed fn(i32)->i32 but the controller passes *mut i32 (the half-slot
+// count) and expects a bool return (ABI-compatible on 32-bit).
+unsafe extern "C" fn btdm_sleep_check_duration(half_slot_cnt: i32) -> i32 {
+    let p = half_slot_cnt as *mut i32;
+    let cnt = unsafe { *p };
+    if cnt < BTDM_MIN_SLEEP_DURATION {
+        return 0; // false: window too short to enter modem sleep
+    }
+    unsafe { *p = cnt - BTDM_MODEM_WAKE_UP_DELAY };
+    1 // true
 }
 
-unsafe extern "C" fn btdm_sleep_enter_phase1(_lpcycles: i32) {
-    todo!();
-}
+// Modem-only sleep needs no wakeup timer (that is the CONFIG_PM system-light-sleep
+// path); bt.c returns immediately when wakeup_timer_required == 0.
+unsafe extern "C" fn btdm_sleep_enter_phase1(_lpcycles: i32) {}
 
+// Power the RF/baseband down for the sleep window.
 unsafe extern "C" fn btdm_sleep_enter_phase2() {
-    todo!();
+    if unsafe { btdm_controller_get_sleep_mode() } == 1
+        && PHY_ENABLED.swap(false, core::sync::atomic::Ordering::AcqRel)
+    {
+        esp_phy::disable_phy();
+        // The controller is sleeping the modem for the whole gap, so release the wake
+        // lock; the esp-rtos idle hook may light-sleep the SoC until the pre-event wake.
+        // Re-acquired in exit_phase3.
+        if SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
+            esp_hal::rtc_cntl::WakeLock::release();
+        }
+    }
 }
 
-unsafe extern "C" fn btdm_sleep_exit_phase1() {
-    todo!();
-}
+// exit_phase1/2 are NULL in bt.c's OSI table; never invoked.
+unsafe extern "C" fn btdm_sleep_exit_phase1() {}
 
-unsafe extern "C" fn btdm_sleep_exit_phase2() {
-    todo!();
-}
+unsafe extern "C" fn btdm_sleep_exit_phase2() {}
 
+// Re-power the RF/baseband on wake, then wait for the sleep FSM to resync.
 unsafe extern "C" fn btdm_sleep_exit_phase3() {
-    todo!();
+    if unsafe { btdm_controller_get_sleep_mode() } == 1
+        && !PHY_ENABLED.swap(true, core::sync::atomic::Ordering::AcqRel)
+    {
+        // Re-acquire the wake lock before the RF comes back, so the SoC cannot light-
+        // sleep through the imminent event. Balances the enter_phase2 release, paired
+        // with the PHY_ENABLED gate so the lock count stays matched.
+        if SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
+            esp_hal::rtc_cntl::WakeLock::acquire();
+        }
+        // Balanced raw increment: enable_phy() returns an RAII guard; forget it
+        // so the +1 persists until the matching enter_phase2 disable.
+        core::mem::forget(esp_phy::enable_phy());
+    }
+    while unsafe { btdm_sleep_clock_sync() } {}
 }
 
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
@@ -346,6 +420,49 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         assert!(res == 0, "btdm_controller_init returned {}", res);
 
         debug!("The btdm_controller_init was initialized");
+
+        // BLE modem-sleep LP-clock setup from the selected sleep clock (mirrors bt.c
+        // controller_init). Runs after init (cfg has sleep_mode=1), before enable.
+        #[cfg(any(esp32c3, esp32s3))]
+        {
+            use ble_os_adapter_chip_specific::BleSleepClock;
+            const BTDM_LPCLK_SEL_XTAL: u32 = 0;
+            const BTDM_LPCLK_SEL_XTAL32K: u32 = 1;
+            const BTDM_LPCLK_SEL_RTC_SLOW: u32 = 2;
+            // (sel, div, clk_hz after div, allows-SoC-light-sleep)
+            let (sel, div, clk_hz, light_sleep): (u32, u32, u32, bool) =
+                match config.sleep_clock_src() {
+                    // Modem gates between events but the SoC stays awake: the main XTAL is
+                    // powered down in light sleep, so it cannot clock the controller across
+                    // a SoC sleep. The safe default without a 32k crystal.
+                    BleSleepClock::MainXtal => (BTDM_LPCLK_SEL_XTAL, 40, 1_000_000, false),
+                    // MAIN_XTAL kept powered during light sleep (ESP-IDF main_xtal_pu):
+                    // same clock as MainXtal but light_sleep = true. Requires the board to
+                    // also call esp-rtos set_main_xtal_powered_in_light_sleep(true), or the
+                    // controller loses its clock in sleep and the connection drops.
+                    BleSleepClock::MainXtalPu => (BTDM_LPCLK_SEL_XTAL, 40, 1_000_000, true),
+                    // 32.768 kHz crystal, undivided: exact, no runtime calibration needed.
+                    BleSleepClock::Ext32kXtal => (BTDM_LPCLK_SEL_XTAL32K, 0, 32_768, true),
+                    // ~136 kHz RC nominal; real RC drifts ~7% (ESP-IDF: advertising/idle only).
+                    BleSleepClock::RtcSlow => (BTDM_LPCLK_SEL_RTC_SLOW, 0, 136_000, true),
+                };
+            // us-per-lp-cycle in Q19 fixed point: (1_000_000 << FRAC) / clk_hz.
+            let lpcycle_us = ((1_000_000u64 << G_BTDM_LPCYCLE_US_FRAC) / clk_hz as u64) as u32;
+            G_BTDM_LPCYCLE_US.store(lpcycle_us, core::sync::atomic::Ordering::Relaxed);
+            SLEEP_CLOCK_LIGHT_SLEEP.store(light_sleep, core::sync::atomic::Ordering::Relaxed);
+            let sel_ok = btdm_lpclk_select_src(sel);
+            let div_ok = if div > 0 { btdm_lpclk_set_div(div) } else { true };
+            if light_sleep {
+                // Baseline wake lock held during events; enter_phase2 releases it in each
+                // gap and exit_phase3 re-acquires it, so the SoC only light-sleeps between
+                // events.
+                esp_hal::rtc_cntl::WakeLock::acquire();
+            }
+            debug!(
+                "btdm modem-sleep lpclk sel={} div={} lpcycle_us={} light_sleep={} sel_ok={} div_ok={}",
+                sel, div, lpcycle_us, light_sleep, sel_ok, div_ok
+            );
+        }
 
         #[cfg(feature = "coex")]
         crate::sys::include::coex_enable();
