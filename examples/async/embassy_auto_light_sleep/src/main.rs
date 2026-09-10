@@ -43,8 +43,18 @@ cfg_select! {
     }
     _ => {}
 }
+// An example reads no chip capability, so this condition and the one at `enable_cpu_powerdown`
+// list the chips that `supports_cpu_power_down` holds for.
 cfg_select! {
-    any(feature = "esp32c3", feature = "esp32s3") => {
+    any(
+        feature = "esp32c3",
+        feature = "esp32s3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32h2",
+        feature = "esp32s31"
+    ) => {
         use esp_hal::rtc_cntl::CpuRetentionStorage;
 
         #[ram(reclaimed, unstable(zeroed))]
@@ -131,7 +141,15 @@ async fn main(spawner: Spawner) {
 
     let mut sleep = esp_rtos::sleep::configure(p.LPWR);
 
-    #[cfg(any(feature = "esp32c3", feature = "esp32s3"))]
+    #[cfg(any(
+        feature = "esp32c3",
+        feature = "esp32s3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32h2",
+        feature = "esp32s31"
+    ))]
     sleep
         .enable_cpu_powerdown(CPU_RETENTION_MEMORY.take())
         .unwrap();
