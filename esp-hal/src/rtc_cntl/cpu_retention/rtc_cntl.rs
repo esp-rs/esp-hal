@@ -1,6 +1,8 @@
 //! CPU retention through the RTC_CNTL retention DMA.
 
-const BUFFER_SIZE: usize = super::memory::buffer_size();
+use core::ptr::NonNull;
+
+use super::memory::BUFFER_SIZE;
 
 /// Bytes the DMA descriptor takes at the head of a retention buffer.
 pub(crate) const DMA_LINK_SIZE: usize = 16;
@@ -23,7 +25,8 @@ struct RtcCntlDmaLink {
 /// # Safety
 ///
 /// `buffer` must be valid for `DMA_LINK_SIZE + payload_size` bytes, and aligned as the DMA needs.
-pub(crate) unsafe fn init_link(buffer: *mut u8, payload_size: usize) -> *mut u8 {
+pub(crate) unsafe fn init_link(buffer: NonNull<u8>, payload_size: usize) -> *mut u8 {
+    let buffer = buffer.as_ptr();
     unsafe {
         let link = buffer.cast::<RtcCntlDmaLink>();
         let payload = buffer.add(DMA_LINK_SIZE);
@@ -49,7 +52,7 @@ pub(crate) unsafe fn init_link(buffer: *mut u8, payload_size: usize) -> *mut u8 
 /// # Safety
 ///
 /// `buffer` must be the installed CPU retention buffer.
-pub(crate) unsafe fn init_cpu_dma_link(buffer: *mut u8, config_word3: u32) {
+pub(crate) unsafe fn init_cpu_dma_link(buffer: NonNull<u8>, config_word3: u32) {
     unsafe {
         let cfg = init_link(buffer, payload_size()).cast::<u32>();
 

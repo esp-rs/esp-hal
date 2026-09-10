@@ -4,7 +4,7 @@ use crate::{
     peripherals::CLIC,
     rtc_cntl::cpu_retention::{
         device_regs::DeviceRegion,
-        frames::s31::{CRITICAL_FRAME_SIZE, NON_CRITICAL_FRAME_SIZE},
+        frames::chip::{CRITICAL_FRAME_SIZE, NON_CRITICAL_FRAME_SIZE},
     },
     system::Cpu,
 };

@@ -1,3 +1,5 @@
+use core::ptr::NonNull;
+
 use super::SleepKind;
 use crate::{
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
@@ -728,25 +730,25 @@ fn dcache_invalidate_needed() -> bool {
 ///
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
 /// cannot carry a power-down into a light sleep that has no retention memory.
-pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
     config.set_cpu_pd_en(buffer.is_some());
 }
 
 /// Prepares CPU retention for the upcoming sleep.
-pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
+pub(crate) fn prepare_cpu_retention(buffer: Option<NonNull<u8>>) {
     let Some(buffer) = buffer else {
         return;
     };
 
     unsafe {
         cpu_retention::init_cpu_dma_link(buffer, RETENTION_CONFIG_WORD3);
-        enable_cpu_retention(buffer as usize);
+        enable_cpu_retention(buffer.addr().get());
 
         // The tags are lost only when the CPU domain powers down, so this is armed with the CPU
         // and never on its own.
         if let Some(tag_memory) = crate::rtc_cntl::tagmem::installed_buffer_ptr() {
             init_tag_memory_dma_link(tag_memory);
-            enable_tag_memory_retention(tag_memory as usize);
+            enable_tag_memory_retention(tag_memory.addr().get());
         }
 
         // Only PSRAM data in the d-cache is at risk, and nothing writes to it between here and the
@@ -759,7 +761,7 @@ pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
 }
 
 /// Finishes CPU retention after the sleep request returns.
-pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, rejected: bool) {
+pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, rejected: bool) {
     if buffer.is_none() {
         return;
     }
@@ -822,7 +824,7 @@ fn disable_cpu_retention() {
 }
 
 /// The tag memory needs no configuration header, unlike the CPU frames.
-unsafe fn init_tag_memory_dma_link(buffer: *mut u8) {
+unsafe fn init_tag_memory_dma_link(buffer: NonNull<u8>) {
     unsafe {
         cpu_retention::init_link(buffer, crate::rtc_cntl::tagmem::payload_size());
     }

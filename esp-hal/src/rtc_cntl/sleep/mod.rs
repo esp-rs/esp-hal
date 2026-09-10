@@ -251,16 +251,16 @@ impl<'d> LowPower<'d> {
         // arms retention from its light sleep path alone.
         #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
         let retention_buffer = match kind {
-            SleepKind::Light => crate::rtc_cntl::installed_buffer_ptr(),
+            SleepKind::Light => {
+                let buffer = crate::rtc_cntl::installed_buffer_ptr();
+                sleep_impl::configure_cpu_retention(&mut config, buffer);
+                buffer
+            }
+
+            // A deep sleep keeps what `RtcSleepConfig::deep` asked for, because the wake resets
+            // the chip and keeps no CPU state to lose.
             SleepKind::Deep => None,
         };
-
-        // A deep sleep keeps what `RtcSleepConfig::deep` asked for, because the wake resets the
-        // chip and keeps no CPU state to lose.
-        #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
-        if kind == SleepKind::Light {
-            sleep_impl::configure_cpu_retention(&mut config, retention_buffer);
-        }
 
         config.apply();
 

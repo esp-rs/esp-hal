@@ -1,6 +1,10 @@
 //! Cache tag memory retention through the RTC_CNTL retention DMA.
 
-use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
+use core::{
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+    ptr::{self, NonNull},
+};
 
 use portable_atomic::{AtomicPtr, Ordering};
 use static_cell::ConstStaticCell;
@@ -65,7 +69,7 @@ const PAYLOAD_SIZE: usize =
 
 const BUFFER_SIZE: usize = PAYLOAD_SIZE + DMA_LINK_SIZE;
 
-static INSTALLED: AtomicPtr<CacheTagRetentionMemory> = AtomicPtr::new(ptr::null_mut());
+static INSTALLED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
 
 /// Memory that light sleep uses to retain the cache tag memory.
 ///
@@ -204,7 +208,7 @@ impl LowPower<'_> {
         &mut self,
         memory: &'static mut CacheTagRetentionMemory,
     ) -> Result<(), CacheTagRetentionMemoryError> {
-        let memory = ptr::from_mut(memory);
+        let memory = memory.as_mut_ptr();
         let start = memory as usize;
 
         if start < MEM_START || start + BUFFER_SIZE > MEM_END {
@@ -219,12 +223,10 @@ impl LowPower<'_> {
 }
 
 /// The installed buffer, and the payload size the DMA descriptor needs.
-pub(crate) fn installed_buffer_ptr() -> Option<*mut u8> {
-    // SAFETY: `INSTALLED` holds a pointer that `install_cache_tag_retention_memory` took as a
-    // `&'static mut`, so the memory outlives the read.
-    let memory = unsafe { INSTALLED.load(Ordering::Acquire).as_ref()? };
+pub(crate) fn installed_buffer_ptr() -> Option<NonNull<u8>> {
+    let memory = INSTALLED.load(Ordering::Acquire);
 
-    Some(memory.as_mut_ptr())
+    NonNull::new(memory)
 }
 
 /// Bytes the DMA moves, not counting the descriptor.

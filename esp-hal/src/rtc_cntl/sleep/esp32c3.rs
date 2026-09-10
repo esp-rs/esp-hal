@@ -1,3 +1,5 @@
+use core::ptr::NonNull;
+
 use super::SleepKind;
 use crate::{
     peripherals::{APB_CTRL, BB, EXTMEM, FE, FE2, LPWR, NRX, SPI0, SPI1, SYSTEM},
@@ -727,12 +729,12 @@ const RETENTION_CONFIG_WORD3: u32 = 0xffff_ffff;
 ///
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
 /// cannot carry a power-down into a light sleep that has no retention memory.
-pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
     config.set_cpu_pd_en(buffer.is_some());
 }
 
 /// Prepares CPU retention for the upcoming sleep.
-pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
+pub(crate) fn prepare_cpu_retention(buffer: Option<NonNull<u8>>) {
     let Some(buffer) = buffer else {
         return;
     };
@@ -741,11 +743,11 @@ pub(crate) fn prepare_cpu_retention(buffer: Option<*mut u8>) {
         cpu_retention::init_cpu_dma_link(buffer, RETENTION_CONFIG_WORD3);
     }
 
-    enable_cpu_retention(buffer as usize);
+    enable_cpu_retention(buffer.addr().get());
 }
 
 /// Finishes CPU retention after the sleep request returns.
-pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, _rejected: bool) {
+pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, _rejected: bool) {
     if buffer.is_none() {
         return;
     }
