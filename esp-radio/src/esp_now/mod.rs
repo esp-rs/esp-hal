@@ -32,8 +32,11 @@ use crate::{
 
 const RECEIVE_QUEUE_SIZE: usize = 10;
 
-/// Maximum payload length
-pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
+/// Maximum ESP-NOW v1.0 payload length.
+pub const ESP_NOW_MAX_DATA_LEN_V1: usize = crate::sys::include::ESP_NOW_MAX_DATA_LEN as _;
+
+/// Maximum ESP-NOW v2.0 payload length.
+pub const ESP_NOW_MAX_DATA_LEN_V2: usize = crate::sys::include::ESP_NOW_MAX_DATA_LEN_V2 as _;
 
 /// Broadcast address
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
@@ -417,6 +420,10 @@ impl EspNowManager {
     }
 
     /// Get the version of ESP-NOW.
+    ///
+    /// ESP-NOW supports two versions: v1.0 and v2.0. v1.0 and v2.0 are capable of talking to each
+    /// other, but v1.0 devices may truncate or discard v2.0 messages that exceed the v1.0 maximum
+    /// data length ([`ESP_NOW_MAX_DATA_LEN_V1`]).
     #[instability::unstable]
     pub fn version(&self) -> Result<u32, EspNowError> {
         let mut version = 0u32;
