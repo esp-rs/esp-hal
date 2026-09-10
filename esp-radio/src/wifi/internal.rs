@@ -243,15 +243,15 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
 
     #[cfg(esp32s31)]
     _coex_configure_preemption_end_cb: Some(coex_configure_preemption_end_cb),
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
+    #[cfg(wifi_has_wifi6)]
     _wifi_disable_ac_ax: Some(wifi_disable_ac_ax),
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
+    #[cfg(wifi_has_wifi6)]
     _wifi_bb_sleep_retention_attach: Some(wifi_sleep_retention_unsupported),
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
+    #[cfg(wifi_has_wifi6)]
     _wifi_bb_sleep_retention_detach: Some(wifi_sleep_retention_unsupported),
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
+    #[cfg(wifi_has_wifi6)]
     _wifi_mac_sleep_retention_attach: Some(wifi_sleep_retention_unsupported),
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
+    #[cfg(wifi_has_wifi6)]
     _wifi_mac_sleep_retention_detach: Some(wifi_sleep_retention_unsupported),
 
     _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,

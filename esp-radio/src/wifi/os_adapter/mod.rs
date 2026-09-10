@@ -777,13 +777,13 @@ pub unsafe extern "C" fn wifi_pm_sleep_lock_release() {
     trace!("wifi_pm_sleep_lock_release - no-op")
 }
 
-#[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
+#[cfg(wifi_has_wifi6)]
 pub unsafe extern "C" fn wifi_disable_ac_ax() -> bool {
     // IDF's C6/C5/C61 wrappers return false: disabling 11ac/11ax is not supported.
     false
 }
 
-#[cfg(any(esp32c5, esp32c6, esp32c61, esp32s31))]
+#[cfg(wifi_has_wifi6)]
 pub unsafe extern "C" fn wifi_sleep_retention_unsupported() -> i32 {
     // IDF returns 1 when CONFIG_MAC_BB_PD is off.
     1

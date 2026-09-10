@@ -223,13 +223,12 @@ fn ieee802154_txpower_convert(txpower: i8) -> u8 {
             const IEEE802154_TXPOWER_VALUE_MIN: i8 = -24;
             const IEEE802154_TXPOWER_INDEX_MIN: i8 = 0;
         }
-        any(esp32c6, esp32c5, esp32s31) => {
+        _ => {
             // https://github.com/espressif/esp-idf/blob/v5.3/components/hal/esp32c6/include/hal/ieee802154_ll.h
             const IEEE802154_TXPOWER_VALUE_MAX: i8 = 20;
             const IEEE802154_TXPOWER_VALUE_MIN: i8 = -15;
             const IEEE802154_TXPOWER_INDEX_MIN: i8 = 3;
         }
-        _ => {}
     }
     if txpower >= IEEE802154_TXPOWER_VALUE_MAX {
         15
