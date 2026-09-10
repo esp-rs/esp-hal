@@ -116,10 +116,12 @@ impl DeepSleep {
 /// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
 /// If all hold, it releases the lock and calls [`LowPower::sleep_light`] with interrupts still
-/// disabled. [`LowPower::sleep_light`] disables interrupts for the whole sleep path, and on
-/// multi-core chips it hardware-stalls every other running core for the duration of the sleep.
-/// After the sleep, the hook takes the scheduler lock again to rearm the time driver and to wake
-/// the scheduler on the other cores, then it enables interrupts and falls back to `WFI`.
+/// disabled. [`LowPower::sleep_light`] disables interrupts for the whole sleep path. A sleep that
+/// keeps the CPU domain powered hardware-stalls every other running core for the duration of the
+/// sleep. A sleep that powers the domain down instead asks the other core to save itself, and that
+/// core keeps running. After the sleep, the hook takes the scheduler lock again to rearm the time
+/// driver and to wake the scheduler on the other cores, then it enables interrupts and falls back
+/// to `WFI`.
 ///
 /// The minimum-residency threshold is configurable via the
 /// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
@@ -163,17 +165,6 @@ fn can_sleep() -> bool {
 
 extern "C" fn auto_light_sleep_hook() -> ! {
     loop {
-        // ESP32-P4 HP wakeup handling is coordinated by the primary core. If
-        // AppCpu enters sleep after parking ProCpu, an HP peripheral wakeup
-        // such as GPIO cannot resume the parked primary core.
-        #[cfg(all(multi_core, esp32p4))]
-        if Cpu::current() == Cpu::AppCpu {
-            // Kick the other core so that it can put the system to sleep.
-            task::trigger_scheduler(RunSchedulerOn::RunOnCore(Cpu::ProCpu));
-            esp_hal::interrupt::wait_for_interrupt();
-            continue;
-        }
-
         // Interrupts stay off from the decision until the sleep is over. A handler on this core
         // can take a `WakeLock`, and a sleep must not start after that.
         let irq_token = unsafe { SingleCoreInterruptLock.enter() };

@@ -1082,21 +1082,73 @@ impl RtcSleepConfig {
 ///
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
 /// cannot carry a power-down into a light sleep that has no retention memory.
+///
+/// A second running core must save itself, so the power-down also needs the rendezvous.
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
-    config.pd_flags.set_pd_cpu(buffer.is_some());
+    let allow_pd =
+        buffer.is_some() && crate::rtc_cntl::cpu_retention::rendezvous::retention_allowed();
+    config.pd_flags.set_pd_cpu(allow_pd);
+}
+
+/// Writes the dirty lines of the level-one data cache back to memory.
+///
+/// The cache belongs to the CPU power domain, so a sleep that powers the domain down loses every
+/// dirty line. The retention frames are among them, because the save writes them through the cache.
+/// esp-idf writes the cache back in `pmu_sleep_start` (`esp32p4/pmu_sleep.c:410`), and it uses the
+/// registers and not the ROM helper, because the return of a call dirties the cache again.
+#[crate::ram]
+fn writeback_data_cache() {
+    // `CACHE_MAP_L1_DCACHE` of `esp32p4/rom/cache.h`.
+    const L1_DATA_CACHE: u8 = 1 << 4;
+
+    let cache = crate::peripherals::CACHE::regs();
+    cache.sync_addr().write(|w| unsafe { w.bits(0) });
+    cache.sync_size().write(|w| unsafe { w.bits(0) });
+    cache
+        .sync_map()
+        .write(|w| unsafe { w.sync_map().bits(L1_DATA_CACHE) });
+    cache.sync_ctrl().modify(|_, w| w.writeback_ena().set_bit());
+    while !cache.sync_ctrl().read().sync_done().bit_is_set() {}
 }
 
 /// Requests the sleep.
 ///
-/// The chip has no frame layout yet, so no buffer can be installed and no CPU state is at risk.
+/// The software retention path calls this through a function pointer after the critical frame is
+/// saved.
 #[crate::ram]
-pub(crate) fn enter_sleep_with_retention(
-    config: &RtcSleepConfig,
-    _buffer: Option<*mut u8>,
-) -> bool {
-    config.enter_sleep();
-    super::wait_for_sleep_result()
+pub(crate) fn request_sleep() {
+    writeback_data_cache();
+    PMU::regs()
+        .slp_wakeup_cntl0()
+        .write(|w| w.sleep_req().bit(true));
+}
+
+/// Requests the sleep, and retains the CPU across it if the sleep powers the CPU domain down.
+///
+/// The retained path returns twice, so it owns the request and the wait. A sleep that keeps the
+/// domain powered needs no frames, and it must not write them back: the registers still hold what
+/// a save would have read, and a restore repeats side effects such as an interrupt claim.
+#[crate::ram]
+pub(crate) fn enter_sleep_with_retention(config: &RtcSleepConfig, buffer: Option<*mut u8>) -> bool {
+    match buffer.filter(|_| config.pd_flags.pd_cpu()) {
+        Some(buffer) => crate::rtc_cntl::cpu_retention::sleep_retained(
+            buffer,
+            request_sleep,
+            super::wait_for_sleep_result,
+        ),
+        None => {
+            config.enter_sleep();
+            super::wait_for_sleep_result()
+        }
+    }
 }
 
 /// Finishes CPU retention after the sleep request returns.
-pub(crate) fn finish_cpu_retention(_buffer: Option<*mut u8>, _rejected: bool) {}
+///
+/// The disarm is unconditional, because the tail of the sleep runs on a wake and on a rejected
+/// request. A stale stub address would otherwise outlive the sleep that armed it.
+pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, _rejected: bool) {
+    if buffer.is_some() {
+        crate::rtc_cntl::cpu_retention::disarm_wake_stub();
+    }
+}

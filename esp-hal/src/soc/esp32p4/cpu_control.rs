@@ -81,6 +81,29 @@ pub(crate) fn disable_core1() {
         .modify(|_, w| w.rst_en_core1_global().set_bit());
 }
 
+/// Releases core 1 from reset after a CPU-domain power-down wake.
+///
+/// esp-idf keys this on `core_id == 0` in both the initiator and the helper paths.
+#[cfg(all(
+    cpu_retention = "software",
+    multi_core,
+    supports_cpu_power_down,
+    feature = "rt",
+    feature = "unstable"
+))]
+#[crate::ram]
+pub(crate) fn restart_core1_after_wake() {
+    if Cpu::current() != Cpu::ProCpu {
+        return;
+    }
+    HP_SYS_CLKRST::regs()
+        .soc_clk_ctrl0()
+        .modify(|_, w| w.core1_cpu_clk_en().set_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_core1_global().clear_bit());
+}
+
 #[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     // Enable Core 1's CPU clock.

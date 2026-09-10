@@ -454,6 +454,18 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.cpu_retention_mem_size") => {
+        1504
+    };
+    ("sleep.cpu_retention_mem_align") => {
+        16
+    };
+    ("sleep.cpu_retention_mem_start") => {
+        1341128704
+    };
+    ("sleep.cpu_retention_mem_end") => {
+        1341915136
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -6520,9 +6532,11 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "LP_I2C_ANA_MST peripheral singleton"] LP_I2C_ANA_MST <= LP_I2C_ANA_MST()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "CLIC peripheral singleton"] CLIC <= CLIC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "CLINT peripheral singleton"]
-        CLINT <= CLINT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "CACHE peripheral singleton"] CACHE <= CACHE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "CLIC peripheral singleton"]
+        CLIC <= CLIC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "CLINT_OTHER_CORE peripheral singleton"] CLINT_OTHER_CORE <= CLINT_OTHER_CORE()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)));
@@ -6977,6 +6991,7 @@ macro_rules! for_each_peripheral {
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
         (unstable)), (@ peri_type #[doc = "LP_I2C_ANA_MST peripheral singleton"]
         LP_I2C_ANA_MST <= LP_I2C_ANA_MST() (unstable)), (@ peri_type #[doc =
+        "CACHE peripheral singleton"] CACHE <= CACHE() (unstable)), (@ peri_type #[doc =
         "CLIC peripheral singleton"] CLIC <= CLIC() (unstable)), (@ peri_type #[doc =
         "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)), (@ peri_type #[doc =
         "CLINT_OTHER_CORE peripheral singleton"] CLINT_OTHER_CORE <= CLINT_OTHER_CORE()

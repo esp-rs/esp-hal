@@ -61,6 +61,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "LP_I2C_ANA_MST" },
+    { name = "CACHE", hidden = true },
     { name = "CLIC" },
     { name = "CLINT" },
     { name = "CLINT_OTHER_CORE" },
@@ -486,7 +487,14 @@ wakeup_sources = {
 
 [device.sleep.retention]
 cpu_retention = "software"
+cpu_retention_frame = "p4"
 supports_top_power_down = true
+# 2 × (304-byte critical frame + 240-byte non-critical frame + 51 device words (204 bytes)), 16-byte aligned.
+cpu_retention_mem_size = 1504
+cpu_retention_mem_align = 16
+# Internal HP SRAM from `components/soc/esp32p4/include/soc/soc.h` (`SOC_DRAM_LOW`/`SOC_DRAM_HIGH`).
+cpu_retention_mem_start = 0x4FF00000
+cpu_retention_mem_end = 0x4FFC0000
 
 [device.spi_slave]
 support_status = "partial"
