@@ -29,6 +29,14 @@ use self::btdm as ble;
 #[cfg(bt_controller = "npl")]
 use self::npl as ble;
 
+/// Modem-sleep window diagnostics: `[sleep entries, wakes, sum of window us, min window
+/// us, max window us]`. Bench aid for tuning the light-sleep wake deadline.
+#[cfg(all(bt_controller = "btdm", any(esp32c3, esp32s3)))]
+#[instability::unstable]
+pub fn modem_sleep_diag() -> [u64; 5] {
+    btdm::modem_sleep_diag()
+}
+
 unstable_module! {
     pub mod controller;
 }

@@ -640,7 +640,7 @@ where
                 guard: rx_guard,
                 peri_clock_guard: peri_clock_guard.clone(),
                 // Receiving data continuously, the peripheral can't let the system sleep.
-                _wake_lock: WakeLock::new(),
+                wake_lock: Some(WakeLock::new()),
                 reported_errors: config.rx.reported_errors,
             },
             tx: UartTx {
@@ -698,8 +698,9 @@ pub struct UartRx<'d, Dm: DriverMode> {
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
-    // Receiving data continuously, the peripheral can't let the system sleep.
-    _wake_lock: WakeLock,
+    // Receiving data continuously, the peripheral can't let the system sleep, unless the RX
+    // line is a wakeup source (see `enable_wakeup`), in which case the lock is dropped.
+    wake_lock: Option<WakeLock>,
     reported_errors: EnumSet<RxErrorKind>,
 }
 
@@ -1178,7 +1179,7 @@ impl<'d> UartRx<'d, Blocking> {
             phantom: PhantomData,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
-            _wake_lock: self._wake_lock,
+            wake_lock: self.wake_lock,
             reported_errors: self.reported_errors,
         }
     }
@@ -1201,7 +1202,7 @@ impl<'d> UartRx<'d, Async> {
             phantom: PhantomData,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
-            _wake_lock: self._wake_lock,
+            wake_lock: self.wake_lock,
             reported_errors: self.reported_errors,
         }
     }
@@ -1443,7 +1444,10 @@ where
     #[cfg(sleep_driver_supported)]
     #[instability::unstable]
     pub fn enable_wakeup(&mut self, config: &WakeupConfig) -> Result<(), WakeConfigError> {
-        self.uart.info().enable_wakeup(config)
+        self.uart.info().enable_wakeup(config)?;
+        // The RX line now wakes the chip itself, so the receiver no longer needs to keep it awake.
+        self.wake_lock = None;
+        Ok(())
     }
 
     /// Stops the UART from waking the chip.
@@ -1451,6 +1455,9 @@ where
     #[instability::unstable]
     pub fn disable_wakeup(&mut self) {
         self.uart.info().disable_wakeup();
+        if self.wake_lock.is_none() {
+            self.wake_lock = Some(WakeLock::new());
+        }
     }
 
     /// Reads and clears RX error conditions set by received data.

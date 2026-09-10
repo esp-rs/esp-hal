@@ -42,6 +42,24 @@ mod timer;
 mod wakeup;
 pub(crate) use wakeup::*;
 
+/// Lets the Bluetooth controller wake the chip from light sleep.
+///
+/// A radio driver that lets the chip light-sleep between controller events enables this, so
+/// controller activity ends the sleep. Deep sleep powers the controller down, so this source
+/// ends light sleep only.
+#[cfg(any(esp32c3, esp32s3))]
+#[instability::unstable]
+pub fn enable_bt_wakeup() {
+    WakeupSource::Bt.enable();
+}
+
+/// Stops the Bluetooth controller from waking the chip.
+#[cfg(any(esp32c3, esp32s3))]
+#[instability::unstable]
+pub fn disable_bt_wakeup() {
+    WakeupSource::Bt.disable();
+}
+
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
 /// The wakeup-enable mask survives a deep-sleep wake, so here it still holds the request of the run

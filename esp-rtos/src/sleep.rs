@@ -87,6 +87,50 @@ pub fn set_main_xtal_powered_in_light_sleep(on: bool) {
     KEEP_MAIN_XTAL_PU.store(on, core::sync::atomic::Ordering::Relaxed);
 }
 
+/// Index into [`sleep_diag`]: passes refused because a wake lock was held.
+pub const DIAG_GATE_WAKELOCK: usize = 0;
+/// Index into [`sleep_diag`]: passes refused because a sleep deadline had passed.
+pub const DIAG_GATE_DEADLINE: usize = 1;
+/// Index into [`sleep_diag`]: passes refused because a core or the run queue was busy.
+pub const DIAG_GATE_NOT_IDLE: usize = 2;
+/// Index into [`sleep_diag`]: passes refused because the next wakeup was too near.
+pub const DIAG_GATE_TOO_SOON: usize = 3;
+/// Index into [`sleep_diag`]: light sleeps entered.
+pub const DIAG_SLEPT: usize = 4;
+/// Index into [`sleep_diag`]: microseconds spent in light sleep.
+pub const DIAG_SLEPT_US: usize = 5;
+
+/// Index into [`sleep_diag`]: first of four microsecond totals, one per gate in the same
+/// order as the gate counters, attributing the time between idle passes to the gate that
+/// refused the previous pass.
+pub const DIAG_GATE_US: usize = 6;
+
+static DIAG: [portable_atomic::AtomicU64; 10] =
+    [const { portable_atomic::AtomicU64::new(0) }; 10];
+static DIAG_LAST_PASS_US: portable_atomic::AtomicU64 = portable_atomic::AtomicU64::new(0);
+static DIAG_LAST_GATE: portable_atomic::AtomicUsize = portable_atomic::AtomicUsize::new(usize::MAX);
+
+fn diag_count(idx: usize) {
+    DIAG[idx].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+    if idx < DIAG_SLEPT {
+        let now = crate::now();
+        let last = DIAG_LAST_PASS_US.swap(now, core::sync::atomic::Ordering::Relaxed);
+        let prev = DIAG_LAST_GATE.swap(idx, core::sync::atomic::Ordering::Relaxed);
+        if prev < DIAG_SLEPT && last != 0 {
+            DIAG[DIAG_GATE_US + prev]
+                .fetch_add(now.saturating_sub(last), core::sync::atomic::Ordering::Relaxed);
+        }
+    } else {
+        DIAG_LAST_GATE.store(usize::MAX, core::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// Snapshot of the light-sleep idle hook's gate/sleep counters, indexed by the `DIAG_*`
+/// constants. Diagnostic aid for judging why the chip does or does not sleep.
+pub fn sleep_diag() -> [u64; 10] {
+    core::array::from_fn(|i| DIAG[i].load(core::sync::atomic::Ordering::Relaxed))
+}
+
 pub fn configure(lpwr: LPWR<'static>) -> Sleep {
     Sleep {
         #[cfg(sleep_deep_sleep)]
@@ -110,16 +154,29 @@ extern "C" fn auto_light_sleep_hook() -> ! {
 
         SCHEDULER.with(|scheduler| {
             if WakeLock::is_active() {
+                diag_count(DIAG_GATE_WAKELOCK);
+                return;
+            }
+
+            // A driver that released its wake lock for a bounded gap sets a deadline; past it
+            // the chip must stay awake until the driver takes its lock back.
+            let deadline = WakeLock::sleep_deadline().map(|d| d.duration_since_epoch().as_micros());
+            if let Some(deadline) = deadline
+                && crate::now() >= deadline
+            {
+                diag_count(DIAG_GATE_DEADLINE);
                 return;
             }
 
             #[cfg(multi_core)]
             {
                 if scheduler.run_queue.has_ready_tasks() {
+                    diag_count(DIAG_GATE_NOT_IDLE);
                     return;
                 }
                 for cpu in Cpu::all() {
                     if !scheduler.cpu_idle(cpu) {
+                        diag_count(DIAG_GATE_NOT_IDLE);
                         return;
                     }
                 }
@@ -143,6 +200,10 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 return;
             };
             let next_wakeup = time_driver.next_wakeup();
+            let next_wakeup = match deadline {
+                Some(d) => next_wakeup.min(d),
+                None => next_wakeup,
+            };
 
             let mut lpwr = LowPower::new(unsafe { LPWR::steal() });
 
@@ -155,6 +216,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 lpwr.set_wakeup_deadline(Instant::EPOCH + Duration::from_micros(next_wakeup));
 
                 if next_wakeup.saturating_sub(crate::now()) < LIGHT_SLEEP_MIN_US {
+                    diag_count(DIAG_GATE_TOO_SOON);
                     return;
                 }
             }
@@ -187,7 +249,13 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             if KEEP_MAIN_XTAL_PU.load(core::sync::atomic::Ordering::Relaxed) {
                 cfg.set_xtal_fpu(true);
             }
+            let before = crate::now();
             lpwr.sleep_light(cfg);
+            diag_count(DIAG_SLEPT);
+            DIAG[DIAG_SLEPT_US].fetch_add(
+                crate::now().saturating_sub(before),
+                core::sync::atomic::Ordering::Relaxed,
+            );
 
             // The alarm timer was gated during light sleep, so its pre-armed alarm is
             // stale. Force a re-arm against the restored time base so the tick handler

@@ -1,5 +1,11 @@
 use crate::trapframe::TrapFrame;
 
+/// Last CPU exception, for reading over a debug probe: `[cpu, exccause, pc, excvaddr]`.
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+pub static ESP_HAL_LAST_EXCEPTION: [portable_atomic::AtomicU32; 4] =
+    [const { portable_atomic::AtomicU32::new(0) }; 4];
+
 #[cfg(xtensa)]
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".rwtext")]
@@ -7,6 +13,15 @@ unsafe extern "C" fn __user_exception(
     cause: xtensa_lx_rt::exception::ExceptionCause,
     context: &TrapFrame,
 ) {
+    // Bench aid: keep the raw exception details readable over JTAG after the panic halts
+    // the chip (the panic printer may drop the message): [cpu, cause, pc, excvaddr].
+    {
+        use portable_atomic::Ordering::Relaxed;
+        ESP_HAL_LAST_EXCEPTION[0].store(crate::system::Cpu::current() as u32, Relaxed);
+        ESP_HAL_LAST_EXCEPTION[1].store(context.EXCCAUSE, Relaxed);
+        ESP_HAL_LAST_EXCEPTION[2].store(context.PC, Relaxed);
+        ESP_HAL_LAST_EXCEPTION[3].store(context.EXCVADDR, Relaxed);
+    }
     panic!(
         "\n\nException occurred on {:?} '{:?}'\n{:?}",
         crate::system::Cpu::current(),
