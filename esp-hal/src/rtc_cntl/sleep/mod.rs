@@ -45,6 +45,41 @@ mod timer;
 mod wakeup;
 pub(crate) use wakeup::*;
 
+/// The handler that answers whether this core still agrees to a light sleep, or null.
+///
+/// Only the rendezvous of the software retention path reads this, which is why the read lives
+/// there.
+#[cfg(all(multi_core, sleep_driver_supported))]
+pub(crate) static CAN_SLEEP_HANDLER: portable_atomic::AtomicPtr<()> =
+    portable_atomic::AtomicPtr::new(core::ptr::null_mut());
+
+/// The parts of the sleep path that an RTOS fills in.
+#[cfg(all(multi_core, sleep_driver_supported))]
+#[doc(hidden)]
+#[instability::unstable]
+pub mod __rtos_implementation {
+    use portable_atomic::Ordering;
+
+    /// Registers the function that answers whether the core that runs it agrees to a light sleep.
+    ///
+    /// A light sleep that powers the CPU domain down needs every running core to save itself, so
+    /// one core requests the sleep and the other core joins it. The core that requests the sleep
+    /// decides for itself. The other core answers this function, and a `false` answer stops the
+    /// sleep.
+    ///
+    /// The answer holds for the whole sleep. The core that gives it has its interrupts disabled
+    /// already, so nothing can give that core work while the sleep runs.
+    ///
+    /// # Safety
+    ///
+    /// The handler runs in an interrupt handler, with interrupts disabled and with the caches of
+    /// the sleep path. It must return, it must take no lock that a core can hold across a sleep,
+    /// and it must stay callable for the life of the program.
+    pub unsafe fn set_can_sleep_handler(handler: fn() -> bool) {
+        super::CAN_SLEEP_HANDLER.store(handler as *mut (), Ordering::Release);
+    }
+}
+
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
 /// The wakeup-enable mask survives a deep-sleep wake, so here it still holds the request of the run

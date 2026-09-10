@@ -109,17 +109,28 @@ pub(crate) fn engage() -> bool {
     // posts one function, and two posts of the same function coalesce.
     Ipc::new(unsafe { IPC::steal() }).call_function(other_cpu(), helper_entry);
 
-    if wait_for_timeout(other, State::BackupStart, ENLIST_TIMEOUT_US) {
-        HELPER_ENLISTED.store(true, Ordering::Release);
-    } else {
-        // The helper did not answer in time. `SkipRetention` stays until [`finish`], so that a
-        // helper which took the request flag before this store leaves its routine, instead of
-        // waiting for a sleep that keeps the CPU domain powered.
-        REQUEST[other].store(false, Ordering::Release);
-        set_state(core, State::SkipRetention);
+    match enlist(other) {
+        Enlisted::Joined => {
+            HELPER_ENLISTED.store(true, Ordering::Release);
+            true
+        }
+        Enlisted::Refused => {
+            // The other core has work of its own, so the system must not sleep. The helper waits
+            // for this store before it leaves its routine.
+            REQUEST[other].store(false, Ordering::Release);
+            set_state(core, State::Idle);
+            release_initiator(core);
+            false
+        }
+        Enlisted::NoAnswer => {
+            // `SkipRetention` stays until [`finish`], so that a helper which took the request flag
+            // before this store leaves its routine, instead of waiting for a sleep that keeps the
+            // CPU domain powered.
+            REQUEST[other].store(false, Ordering::Release);
+            set_state(core, State::SkipRetention);
+            true
+        }
     }
-
-    true
 }
 
 /// Returns whether a helper saved itself and waits for this core to request the sleep.
@@ -189,6 +200,25 @@ pub(crate) fn finish() {
 
     HELPER_ENLISTED.store(false, Ordering::Release);
     set_state(core, State::Idle);
+    release_initiator(core);
+}
+
+/// Returns whether this core agrees to a light sleep that the other core requests.
+///
+/// A program that registered no handler agrees to every sleep.
+#[crate::ram]
+fn can_sleep() -> bool {
+    let handler = crate::rtc_cntl::sleep::CAN_SLEEP_HANDLER.load(Ordering::Acquire);
+    match handler.is_null() {
+        true => true,
+        // SAFETY: `set_can_sleep_handler` takes a `fn() -> bool`, and this is that pointer.
+        false => unsafe { core::mem::transmute::<*mut (), fn() -> bool>(handler)() },
+    }
+}
+
+/// Gives the initiator slot back, if this core holds it.
+#[crate::ram]
+fn release_initiator(core: usize) {
     let _ = INITIATOR.compare_exchange(
         core as u8,
         INITIATOR_NONE,
@@ -220,7 +250,11 @@ fn run_helper() {
     let core = system::raw_core();
     let other = other_core();
 
-    if !wait_for_backup_or_skip(other) {
+    // The answer holds for the whole sleep, because the interrupts of this core are off from here
+    // until the sleep is over, and nothing else can give this core work.
+    if !can_sleep() {
+        set_state(core, State::SkipRetention);
+    } else if !wait_for_backup_or_skip(other) {
         set_state(core, State::BackupStart);
 
         // SAFETY: the rendezvous runs for a sleep that retains the CPU, so the memory of the
@@ -293,17 +327,29 @@ fn wait_for(core: usize, state: State) {
     }
 }
 
-/// Returns whether `core` reached `state` inside `timeout_us`.
+/// What the helper answered to the doorbell.
+enum Enlisted {
+    /// The helper started its backup, so the sleep can power the CPU domain down.
+    Joined,
+
+    /// The helper has work of its own, so the sleep must not happen.
+    Refused,
+
+    /// The helper did not answer inside [`ENLIST_TIMEOUT_US`].
+    NoAnswer,
+}
+
 #[crate::ram]
-fn wait_for_timeout(core: usize, state: State, timeout_us: u64) -> bool {
-    let deadline = implem::raw_counter() + implem::us_to_ticks(timeout_us);
-    while state_of(core) != state {
-        if implem::raw_counter() >= deadline {
-            return false;
+fn enlist(core: usize) -> Enlisted {
+    let deadline = implem::raw_counter() + implem::us_to_ticks(ENLIST_TIMEOUT_US);
+    loop {
+        match state_of(core) {
+            State::BackupStart => return Enlisted::Joined,
+            State::SkipRetention => return Enlisted::Refused,
+            _ if implem::raw_counter() >= deadline => return Enlisted::NoAnswer,
+            _ => core::hint::spin_loop(),
         }
-        core::hint::spin_loop();
     }
-    true
 }
 
 /// Waits until `core` starts its backup, or reports that the sleep does not happen, and returns
