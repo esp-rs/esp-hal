@@ -53,7 +53,8 @@ cfg_select! {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
-        feature = "esp32s31"
+        feature = "esp32s31",
+        feature = "esp32p4"
     ) => {
         use esp_hal::rtc_cntl::CpuRetentionStorage;
 
@@ -148,7 +149,8 @@ async fn main(spawner: Spawner) {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
-        feature = "esp32s31"
+        feature = "esp32s31",
+        feature = "esp32p4"
     ))]
     sleep
         .enable_cpu_powerdown(CPU_RETENTION_MEMORY.take())
