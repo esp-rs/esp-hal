@@ -260,7 +260,7 @@ fn run_helper() {
         // SAFETY: the rendezvous runs for a sleep that retains the CPU, so the memory of the
         // frames is installed.
         let buffer = unsafe { crate::rtc_cntl::installed_buffer_ptr().unwrap_unchecked() };
-        let mut ctx = CoreRetentionContext::new(buffer, core);
+        let mut ctx = CoreRetentionContext::new(buffer.as_ptr(), core);
         save_pre_critical(&mut ctx);
         let frame = save_critical_frame(&ctx);
 

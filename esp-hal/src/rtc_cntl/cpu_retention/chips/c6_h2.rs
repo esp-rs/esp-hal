@@ -4,7 +4,7 @@ use crate::{
     peripherals::{CLINT, EXTMEM, INTPRI, PLIC_MX, PLIC_UX},
     rtc_cntl::cpu_retention::{
         device_regs::DeviceRegion,
-        frames::c6_h2::{CRITICAL_FRAME_SIZE, NON_CRITICAL_FRAME_SIZE},
+        frames::chip::{CRITICAL_FRAME_SIZE, NON_CRITICAL_FRAME_SIZE},
     },
     system::Cpu,
 };

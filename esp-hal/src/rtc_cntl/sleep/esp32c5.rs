@@ -1,4 +1,4 @@
-use core::ops::Not;
+use core::{ops::Not, ptr::NonNull};
 
 use crate::{
     peripherals::{LP_AON, PMU},
@@ -884,7 +884,7 @@ impl RtcSleepConfig {
 ///
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
 /// cannot carry a power-down into a light sleep that has no retention memory.
-pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
     config.pd_flags.set_pd_cpu(buffer.is_some());
 }
 
@@ -903,10 +903,13 @@ pub(crate) fn request_sleep() {
 ///
 /// The retained path returns twice, so it owns the request and the wait.
 #[crate::ram]
-pub(crate) fn enter_sleep_with_retention(config: &RtcSleepConfig, buffer: Option<*mut u8>) -> bool {
+pub(crate) fn enter_sleep_with_retention(
+    config: &RtcSleepConfig,
+    buffer: Option<NonNull<u8>>,
+) -> bool {
     match buffer {
         Some(buffer) => crate::rtc_cntl::cpu_retention::sleep_retained(
-            buffer,
+            buffer.as_ptr(),
             request_sleep,
             super::wait_for_sleep_result,
         ),
@@ -921,7 +924,7 @@ pub(crate) fn enter_sleep_with_retention(config: &RtcSleepConfig, buffer: Option
 ///
 /// The disarm is unconditional, because the tail of the sleep runs on a wake and on a rejected
 /// request. A stale stub address would otherwise outlive the sleep that armed it.
-pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, _rejected: bool) {
+pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, _rejected: bool) {
     if buffer.is_some() {
         crate::rtc_cntl::cpu_retention::disarm_wake_stub();
     }
