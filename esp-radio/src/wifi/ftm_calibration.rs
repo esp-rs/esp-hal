@@ -166,6 +166,35 @@ mod values {
     pub const R_40_40D_DIS: u16 = 572;
 }
 
+#[cfg(esp32s31)]
+mod values {
+    // IDF `ftm_calibration_data.h` ESP32-S31 values (marked dummy in IDF).
+    pub const I_20_20U: u16 = 437;
+    pub const R_20_20U: u16 = 426;
+    pub const I_20_20D: u16 = 443;
+    pub const R_20_20D: u16 = 420;
+    pub const I_20_20U_DIS: u16 = 433;
+    pub const I_20_20D_DIS: u16 = 442;
+    pub const R_20_20U_DIS: u16 = 429;
+    pub const R_20_20D_DIS: u16 = 421;
+    pub const I_20_40U: u16 = 462;
+    pub const R_20_40U: u16 = 425;
+    pub const I_20_40D: u16 = 438;
+    pub const R_20_40D: u16 = 420;
+    pub const I_20_40U_DIS: u16 = 433;
+    pub const R_20_40U_DIS: u16 = 430;
+    pub const I_20_40D_DIS: u16 = 442;
+    pub const R_20_40D_DIS: u16 = 420;
+    pub const I_40_40U: u16 = 237;
+    pub const R_40_40U: u16 = 626;
+    pub const I_40_40D: u16 = 234;
+    pub const R_40_40D: u16 = 629;
+    pub const I_40_40U_DIS: u16 = 237;
+    pub const R_40_40U_DIS: u16 = 626;
+    pub const I_40_40D_DIS: u16 = 234;
+    pub const R_40_40D_DIS: u16 = 629;
+}
+
 #[cfg(esp32c5)]
 mod values {
     pub const I_20_20U: u16 = 931;

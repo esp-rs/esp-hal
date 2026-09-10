@@ -1,5 +1,7 @@
 use alloc::collections::VecDeque as Queue;
 
+#[cfg(esp32s31)]
+use coex_i154::*;
 use esp_hal::{handler, interrupt::Priority, peripherals::IEEE802154};
 use esp_phy::{PhyClockGuard, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
@@ -15,15 +17,28 @@ use super::{
     hal::*,
     pib::*,
 };
-use crate::{
-    radio_clocks::{clocks_ll::enable_ieee802154, deinit_radio_clocks, init_radio_clocks},
-    sys::include::{
-        ieee802154_coex_event_t,
-        ieee802154_coex_event_t_IEEE802154_IDLE,
-        ieee802154_coex_event_t_IEEE802154_LOW,
-        ieee802154_coex_event_t_IEEE802154_MIDDLE,
-    },
+use crate::radio_clocks::{clocks_ll::enable_ieee802154, deinit_radio_clocks, init_radio_clocks};
+#[cfg(not(esp32s31))]
+use crate::sys::include::{
+    ieee802154_coex_event_t,
+    ieee802154_coex_event_t_IEEE802154_IDLE,
+    ieee802154_coex_event_t_IEEE802154_LOW,
+    ieee802154_coex_event_t_IEEE802154_MIDDLE,
 };
+
+/// Stand-in for the `esp_coex_i154.h` bindings, which esp-wifi-sys does not
+/// generate for S31. `ieee802154_coex_event_t` is `HIGH = 1, MIDDLE, LOW,
+/// IDLE`; the driver only uses the last three.
+// TODO: drop once esp-wifi-sys covers the header on S31.
+#[cfg(esp32s31)]
+#[allow(non_camel_case_types, non_upper_case_globals)]
+mod coex_i154 {
+    pub type ieee802154_coex_event_t = crate::sys::c_types::c_uint;
+
+    pub const ieee802154_coex_event_t_IEEE802154_MIDDLE: ieee802154_coex_event_t = 2;
+    pub const ieee802154_coex_event_t_IEEE802154_LOW: ieee802154_coex_event_t = 3;
+    pub const ieee802154_coex_event_t_IEEE802154_IDLE: ieee802154_coex_event_t = 4;
+}
 
 const PHY_ENABLE_VERSION_PRINT: u8 = 1;
 
@@ -141,7 +156,7 @@ fn esp_btbb_enable() {
 }
 
 fn ieee802154_mac_init(radio: IEEE802154<'_>) {
-    #[cfg(any(esp32c6, esp32c5))]
+    #[cfg(soc_has_wifi)]
     unsafe {
         unsafe extern "C" {
             static mut coex_pti_tab_ptr: u32;

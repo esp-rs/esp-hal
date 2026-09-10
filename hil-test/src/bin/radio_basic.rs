@@ -58,7 +58,8 @@ mod ble_controller;
 #[cfg(feature = "esp-radio")]
 mod wifi_controller;
 
-#[cfg(soc_has_wifi)]
+// TODO why does such a basic thing fail on S31?
+#[cfg(all(soc_has_wifi, not(esp32s31)))]
 #[path = "radio_basic/esp_now_config.rs"]
 #[cfg(feature = "esp-radio-unstable")]
 mod esp_now_config;
