@@ -781,6 +781,10 @@ cfg_select! {
     }
 }
 
+// Absolute time (microseconds since boot) past which automatic light sleep is refused until
+// cleared; `u64::MAX` means no deadline. See `WakeLock::set_sleep_deadline`.
+static SLEEP_DEADLINE_US: portable_atomic::AtomicU64 = portable_atomic::AtomicU64::new(u64::MAX);
+
 /// A guard that prevents the system from entering automatic light sleep.
 ///
 /// While at least one `WakeLock` is held, [`WakeLock::is_active`] returns `true`
@@ -818,6 +822,41 @@ impl WakeLock {
         {
             let previous = wake_lock_count().fetch_sub(1, portable_atomic::Ordering::AcqRel);
             debug_assert_ne!(previous, 0, "wake lock counter underflow");
+        }
+    }
+
+    /// Returns the number of wake locks currently held.
+    pub fn holders() -> usize {
+        cfg_select! {
+            sleep_light_sleep => wake_lock_count().load(portable_atomic::Ordering::Acquire),
+            _ => 0,
+        }
+    }
+
+    /// Allows automatic light sleep only until `deadline`, then holds the chip awake.
+    ///
+    /// A driver that released its wake lock for a bounded gap (a radio controller in modem
+    /// sleep) uses this to make the idle hook wake the chip before the gap ends. The hook
+    /// sleeps at most until the deadline, and refuses to sleep once the deadline has passed
+    /// until [`Self::clear_sleep_deadline`] is called. This mirrors the ESP-IDF pattern of a
+    /// wakeup timer that re-takes the power-management lock before the controller wakes.
+    pub fn set_sleep_deadline(deadline: crate::time::Instant) {
+        SLEEP_DEADLINE_US.store(
+            deadline.duration_since_epoch().as_micros(),
+            portable_atomic::Ordering::Release,
+        );
+    }
+
+    /// Removes the deadline set by [`Self::set_sleep_deadline`].
+    pub fn clear_sleep_deadline() {
+        SLEEP_DEADLINE_US.store(u64::MAX, portable_atomic::Ordering::Release);
+    }
+
+    /// Returns the current sleep deadline, if one is set.
+    pub fn sleep_deadline() -> Option<crate::time::Instant> {
+        match SLEEP_DEADLINE_US.load(portable_atomic::Ordering::Acquire) {
+            u64::MAX => None,
+            us => Some(crate::time::Instant::EPOCH + crate::time::Duration::from_micros(us)),
         }
     }
 

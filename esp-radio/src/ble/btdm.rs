@@ -87,6 +87,36 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
 
     let data = unsafe { core::slice::from_raw_parts(data, len as usize) };
 
+    // Track active connections from the controller->host HCI event stream so the SoC-wake
+    // deadline (the pre-event margin) is armed ONLY while connected. Idle advertising does
+    // not need it (the controller runs the adv events autonomously on the kept-alive XTAL),
+    // so skipping it there lets the SoC light-sleep the whole advertising gap. HCI event =
+    // [0x04][evt][len][params]; LE Connection Complete (0x3E/sub 0x01|0x0A, status 0) opens
+    // a connection, Disconnection Complete (0x05) closes one.
+    if data.len() >= 4 && data[0] == 0x04 {
+        match data[1] {
+            0x05 => {
+                if BLE_CONN_COUNT.load(core::sync::atomic::Ordering::Relaxed) > 0
+                    && BLE_CONN_COUNT.fetch_sub(1, core::sync::atomic::Ordering::Relaxed) == 1
+                {
+                    // last connection gone → advertising only; drop the Bt wake source.
+                    #[cfg(any(esp32c3, esp32s3))]
+                    esp_hal::rtc_cntl::sleep::disable_bt_wakeup();
+                }
+            }
+            0x3E if data.len() >= 5 && matches!(data[3], 0x01 | 0x0A) && data[4] == 0x00 => {
+                if BLE_CONN_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed) == 0 {
+                    // first connection → arm the Bt wake source as the event backstop.
+                    #[cfg(any(esp32c3, esp32s3))]
+                    if SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
+                        esp_hal::rtc_cntl::sleep::enable_bt_wakeup();
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     let packet = ReceivedPacket {
         data: Box::from(data),
     };
@@ -286,11 +316,68 @@ unsafe extern "C" fn btdm_sleep_check_duration(half_slot_cnt: i32) -> i32 {
     1 // true
 }
 
-// Modem-only sleep needs no wakeup timer (that is the CONFIG_PM system-light-sleep
-// path); bt.c returns immediately when wakeup_timer_required == 0.
-unsafe extern "C" fn btdm_sleep_enter_phase1(_lpcycles: i32) {}
+// Modem-sleep window diagnostics: [enter_phase1 calls, exit_phase3 wakes, sum of window
+// us, min window us, max window us].
+static MODEM_SLEEP_DIAG: [portable_atomic::AtomicU64; 5] = [
+    portable_atomic::AtomicU64::new(0),
+    portable_atomic::AtomicU64::new(0),
+    portable_atomic::AtomicU64::new(0),
+    portable_atomic::AtomicU64::new(u64::MAX),
+    portable_atomic::AtomicU64::new(0),
+];
+
+/// Snapshot of the modem-sleep window diagnostics (see `MODEM_SLEEP_DIAG`).
+pub(crate) fn modem_sleep_diag() -> [u64; 5] {
+    core::array::from_fn(|i| MODEM_SLEEP_DIAG[i].load(core::sync::atomic::Ordering::Relaxed))
+}
+
+// bt.c: with CONFIG_PM the controller arms a wakeup timer slightly before the modem
+// sleep window ends, so the SoC leaves light sleep and re-takes the pm lock before the
+// controller wakes. Here the wake lock released in enter_phase2 is replaced by a sleep
+// deadline: the idle hook sleeps at most until it, and refuses to sleep past it until
+// exit_phase3 clears it. Modem-only sleep (SoC awake) needs none of this.
+/// Pre-event wake margin: wake the SoC this far before the modem-sleep window ends so it is
+/// fully out of light sleep in time to service the controller event. bt.c's
+/// BTDM_MIN_TIMER_UNCERTAINTY_US = 1800; empirically load-bearing for a held CONNECTION
+/// (events ~30 ms) — 800 µs let the SoC wake too late and the link dropped before service
+/// discovery. The Bt wake source is a backstop, not a substitute for waking in time.
+const MODEM_MIN_UNCERTAINTY_US: u32 = 1800;
+/// `wake_in` (µs) computed by enter_phase1, consumed by enter_phase2 so the deadline is set
+/// PAIRED with the wakelock release (and thus always cleared by the paired exit_phase3).
+/// Setting it in enter_phase1 unconditionally left stale deadlines that held the SoC awake
+/// between events whenever the enter_phase2/exit_phase3 pairing did not fire.
+static PENDING_WAKE_IN_US: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+/// Number of active BLE connections (from the HCI event stream). The SoC-wake deadline is
+/// armed only while this is > 0; idle advertising skips it and light-sleeps the whole gap.
+static BLE_CONN_COUNT: core::sync::atomic::AtomicI32 = core::sync::atomic::AtomicI32::new(0);
+
+#[ram]
+unsafe extern "C" fn btdm_sleep_enter_phase1(lpcycles: i32) {
+    if !SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    let us_to_sleep = unsafe { btdm_lpcycles_2_hus(lpcycles as u32, 0) } >> 1;
+    let uncertainty = (us_to_sleep >> 11).max(MODEM_MIN_UNCERTAINTY_US);
+    let wake_in = us_to_sleep.saturating_sub(uncertainty);
+    {
+        use core::sync::atomic::Ordering::Relaxed;
+        MODEM_SLEEP_DIAG[0].fetch_add(1, Relaxed);
+        MODEM_SLEEP_DIAG[2].fetch_add(us_to_sleep as u64, Relaxed);
+        MODEM_SLEEP_DIAG[3].fetch_min(us_to_sleep as u64, Relaxed);
+        MODEM_SLEEP_DIAG[4].fetch_max(us_to_sleep as u64, Relaxed);
+    }
+    // Don't set the deadline here — hand wake_in to enter_phase2, which sets it in the same
+    // branch that releases the wakelock, so exit_phase3 always clears it.
+    PENDING_WAKE_IN_US.store(wake_in, core::sync::atomic::Ordering::Relaxed);
+}
 
 // Power the RF/baseband down for the sleep window.
+// Modem sleep is only wired on the c3/s3 BTDM controllers (the blob sleep symbols and
+// the lp-clock setup are c3/s3-only). On esp32-classic these callbacks are never invoked
+// (the controller is left in sleep_mode 0), so they are no-ops there, which also keeps the
+// esp32-classic build free of the c3/s3-only externs.
+#[cfg(any(esp32c3, esp32s3))]
 unsafe extern "C" fn btdm_sleep_enter_phase2() {
     if unsafe { btdm_controller_get_sleep_mode() } == 1
         && PHY_ENABLED.swap(false, core::sync::atomic::Ordering::AcqRel)
@@ -298,12 +385,30 @@ unsafe extern "C" fn btdm_sleep_enter_phase2() {
         esp_phy::disable_phy();
         // The controller is sleeping the modem for the whole gap, so release the wake
         // lock; the esp-rtos idle hook may light-sleep the SoC until the pre-event wake.
+        // Set the deadline HERE (paired with the release), so exit_phase3's paired
+        // re-acquire always clears it — no stale deadline can strand the SoC awake.
         // Re-acquired in exit_phase3.
         if SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
             esp_hal::rtc_cntl::WakeLock::release();
+            // Arm the pre-event wake deadline ONLY while connected. A held CONNECTION needs
+            // the SoC awake for its periodic events (without it the link drops before service
+            // discovery — HW-proven); idle advertising does not, so skipping the deadline
+            // there lets the SoC light-sleep the whole gap (~55% -> ~87% residency).
+            if BLE_CONN_COUNT.load(core::sync::atomic::Ordering::Relaxed) > 0 {
+                let wake_in = PENDING_WAKE_IN_US.load(core::sync::atomic::Ordering::Relaxed);
+                if wake_in > 0 {
+                    esp_hal::rtc_cntl::WakeLock::set_sleep_deadline(
+                        esp_hal::time::Instant::now()
+                            + esp_hal::time::Duration::from_micros(wake_in as u64),
+                    );
+                }
+            }
         }
     }
 }
+
+#[cfg(not(any(esp32c3, esp32s3)))]
+unsafe extern "C" fn btdm_sleep_enter_phase2() {}
 
 // exit_phase1/2 are NULL in bt.c's OSI table; never invoked.
 unsafe extern "C" fn btdm_sleep_exit_phase1() {}
@@ -311,6 +416,7 @@ unsafe extern "C" fn btdm_sleep_exit_phase1() {}
 unsafe extern "C" fn btdm_sleep_exit_phase2() {}
 
 // Re-power the RF/baseband on wake, then wait for the sleep FSM to resync.
+#[cfg(any(esp32c3, esp32s3))]
 unsafe extern "C" fn btdm_sleep_exit_phase3() {
     if unsafe { btdm_controller_get_sleep_mode() } == 1
         && !PHY_ENABLED.swap(true, core::sync::atomic::Ordering::AcqRel)
@@ -320,6 +426,9 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
         // with the PHY_ENABLED gate so the lock count stays matched.
         if SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
             esp_hal::rtc_cntl::WakeLock::acquire();
+            // The lock is held again, so the pre-event deadline has done its job.
+            esp_hal::rtc_cntl::WakeLock::clear_sleep_deadline();
+            MODEM_SLEEP_DIAG[1].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
         }
         // Balanced raw increment: enable_phy() returns an RAII guard; forget it
         // so the +1 persists until the matching enter_phase2 disable.
@@ -327,6 +436,9 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
     }
     while unsafe { btdm_sleep_clock_sync() } {}
 }
+
+#[cfg(not(any(esp32c3, esp32s3)))]
+unsafe extern "C" fn btdm_sleep_exit_phase3() {}
 
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
     trace!("coex_schm_status_bit_set {} {}", _typ, status);
@@ -454,12 +566,15 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             SLEEP_CLOCK_LIGHT_SLEEP.store(light_sleep, core::sync::atomic::Ordering::Relaxed);
             let sel_ok = btdm_lpclk_select_src(sel);
             let div_ok = if div > 0 { btdm_lpclk_set_div(div) } else { true };
-            if light_sleep {
-                // Baseline wake lock held during events; enter_phase2 releases it in each
-                // gap and exit_phase3 re-acquires it, so the SoC only light-sleeps between
-                // events.
-                esp_hal::rtc_cntl::WakeLock::acquire();
-            }
+            // With a light-sleep capable sleep clock, the wake lock esp-radio took in `init()`
+            // doubles as the controller's per-event lock: enter_phase2 releases it in each
+            // gap and exit_phase3 re-acquires it, so the SoC only light-sleeps between events.
+            // Without one, that lock stays held for the controller's lifetime.
+            // The Bt light-sleep wake source is armed per-CONNECTION (in notify_host_recv),
+            // NOT here: during idle advertising the controller runs autonomously on the
+            // kept-alive XTAL and does not need to wake the SoC, so leaving Bt-wake off there
+            // avoids fragmenting the advertising sleep gap with per-event wakeups.
+            let _ = light_sleep;
             debug!(
                 "btdm modem-sleep lpclk sel={} div={} lpcycle_us={} light_sleep={} sel_ok={} div_ok={}",
                 sel, div, lpcycle_us, light_sleep, sel_ok, div_ok
@@ -516,6 +631,17 @@ pub(crate) fn ble_deinit() {
 
     unsafe {
         btdm_controller_deinit();
+    }
+    // If the controller was in a modem-sleep gap, enter_phase2 released the wake lock that
+    // `deinit()` is about to release again; re-take it so the count stays balanced.
+    if SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
+        // Bt wakeup is only ever enabled on the light-sleep-capable btdm chips.
+        #[cfg(any(esp32c3, esp32s3))]
+        esp_hal::rtc_cntl::sleep::disable_bt_wakeup();
+        if !PHY_ENABLED.swap(true, core::sync::atomic::Ordering::AcqRel) {
+            esp_hal::rtc_cntl::WakeLock::acquire();
+            esp_hal::rtc_cntl::WakeLock::clear_sleep_deadline();
+        }
     }
     // Disabling the PHY happens automatically, when the BLEController gets dropped.
 }
