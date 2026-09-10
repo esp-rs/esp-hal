@@ -8,4 +8,4 @@ pub(crate) mod chip;
 
 // The metadata carries the size, because the install API checks the buffer against it before any
 // frame code runs.
-const _: () = ::core::assert!(chip::BUFFER_SIZE == super::memory::buffer_size());
+const _: () = ::core::assert!(chip::BUFFER_SIZE == super::memory::BUFFER_SIZE);

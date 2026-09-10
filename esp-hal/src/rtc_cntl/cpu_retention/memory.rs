@@ -1,13 +1,17 @@
 //! Shared CPU retention buffer types and the one-shot install API.
 
-use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
+use core::{
+    cell::UnsafeCell,
+    mem::MaybeUninit,
+    ptr::{self, NonNull},
+};
 
 use portable_atomic::{AtomicPtr, Ordering};
 use static_cell::ConstStaticCell;
 
 use crate::rtc_cntl::sleep::LowPower;
 
-const BUFFER_SIZE: usize = property!("sleep.cpu_retention_mem_size");
+pub(crate) const BUFFER_SIZE: usize = property!("sleep.cpu_retention_mem_size");
 const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
 const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
 
@@ -15,7 +19,7 @@ const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
 /// alignment then needs no check at run time.
 const _: () = ::core::assert!(property!("sleep.cpu_retention_mem_align") <= 16);
 
-static INSTALLED: AtomicPtr<CpuRetentionMemory> = AtomicPtr::new(ptr::null_mut());
+static INSTALLED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
 
 /// Memory that light sleep uses to retain the CPU domain.
 ///
@@ -138,7 +142,7 @@ impl LowPower<'_> {
         &mut self,
         memory: &'static mut CpuRetentionMemory,
     ) -> Result<(), CpuRetentionMemoryError> {
-        let memory = ptr::from_mut(memory);
+        let memory = memory.as_mut_ptr();
         let start = memory as usize;
 
         if start < MEM_START || start + BUFFER_SIZE > MEM_END {
@@ -152,14 +156,8 @@ impl LowPower<'_> {
     }
 }
 
-pub(crate) fn installed_buffer_ptr() -> Option<*mut u8> {
-    // SAFETY: `INSTALLED` holds a pointer that `install_cpu_retention_memory` took as a
-    // `&'static mut`, so the memory outlives the read.
-    let memory = unsafe { INSTALLED.load(Ordering::Acquire).as_ref()? };
+pub(crate) fn installed_buffer_ptr() -> Option<NonNull<u8>> {
+    let memory = INSTALLED.load(Ordering::Acquire);
 
-    Some(memory.as_mut_ptr())
-}
-
-pub(crate) const fn buffer_size() -> usize {
-    BUFFER_SIZE
+    NonNull::new(memory.cast::<u8>())
 }
