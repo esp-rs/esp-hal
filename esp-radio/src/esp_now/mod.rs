@@ -64,7 +64,7 @@ impl QueueStorage {
     #[instability::unstable]
     pub fn boxed(len: usize) -> Self {
         Self {
-            data: NonNull::from_ref(Box::leak(vec![0; len].into_boxed_slice())),
+            data: NonNull::from_mut(Box::leak(vec![0; len].into_boxed_slice())),
             is_a_box: true,
         }
     }
@@ -73,7 +73,7 @@ impl QueueStorage {
     pub fn slice(s: &'static mut [u8]) -> Self {
         Self {
             is_a_box: false,
-            data: NonNull::from_ref(s),
+            data: NonNull::from_mut(s),
         }
     }
 }
@@ -98,19 +98,20 @@ struct EspNowState {
     rx_queue: UnsafeCell<MaybeUninit<Queue>>,
 }
 
+// SAFETY: bbqueue is SPSC, P is rcv_cb and C is user app
 unsafe impl Sync for EspNowState {}
 
 impl EspNowState {
     unsafe fn queue(&self) -> &Queue {
-        unsafe { STATE.rx_queue.get().as_ref_unchecked().assume_init_ref() }
+        unsafe { self.rx_queue.get().as_ref_unchecked().assume_init_ref() }
     }
 
     unsafe fn set_queue(&self, q: Queue) {
-        unsafe { STATE.rx_queue.get().as_mut_unchecked().write(q) };
+        unsafe { self.rx_queue.get().as_mut_unchecked().write(q) };
     }
 
     unsafe fn drop_queue(&self) {
-        unsafe { STATE.rx_queue.get().as_mut_unchecked().assume_init_drop() }
+        unsafe { self.rx_queue.get().as_mut_unchecked().assume_init_drop() }
     }
 }
 
@@ -763,7 +764,7 @@ pub struct EspNowReceiver {
 impl EspNowReceiver {
     /// Receives data from the ESP-NOW queue.
     #[instability::unstable]
-    pub fn receive(&self) -> Option<ReceivedData<'_>> {
+    pub fn receive(&mut self) -> Option<ReceivedData<'_>> {
         unsafe { STATE.queue() }
             .framed_consumer()
             .read()
@@ -993,7 +994,7 @@ impl EspNow {
 
     /// Receive data.
     #[instability::unstable]
-    pub fn receive(&self) -> Option<ReceivedData<'_>> {
+    pub fn receive(&mut self) -> Option<ReceivedData<'_>> {
         self.receiver.receive()
     }
 }

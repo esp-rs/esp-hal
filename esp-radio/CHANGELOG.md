@@ -12,9 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Use `bbqueue` as the esp-now rx queue, now `WifiController::esp_now` takes
-  a `QueueStorage` as an argument to allow the user to choose where to store
-  the queue buffer.
 
 ### Fixed
 
