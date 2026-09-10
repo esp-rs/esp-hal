@@ -90,7 +90,7 @@ pub fn ensure_workspace_clean(workspace: &std::path::Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "release")]
+#[cfg(any(feature = "release", feature = "semver-checks"))]
 /// Get the remote name for the given repository URL.
 pub fn get_remote_name_for(repo: &str) -> Result<String> {
     let remotes = Command::new("git")
