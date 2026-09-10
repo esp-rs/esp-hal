@@ -301,6 +301,11 @@ extern "C" fn timer_tick_handler() {
             if active_cores.contains(cpu)
                 && now >= time_driver.timer_queue.time_slice_target[cpu as usize]
             {
+                // The context switch cannot preempt this handler, because it runs at the lowest
+                // interrupt priority. Clear the expired target, or this handler keeps re-arming
+                // the alarm for a time in the past, and its interrupt starves the context switch.
+                // The scheduler sets the next target when the context switch runs.
+                time_driver.set_time_slice(cpu, now, false);
                 task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
             }
         }

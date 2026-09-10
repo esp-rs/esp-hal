@@ -21,7 +21,7 @@ use esp_hal::{
         SoftwareTimeout,
     },
     interrupt::Priority,
-    peripherals::FROM_CPU_INTR1,
+    peripherals::FROM_CPU_INTR2,
     time,
     timer::timg::TimerGroup,
 };
@@ -29,7 +29,7 @@ use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 
 struct Context {
-    interrupt: FROM_CPU_INTR1<'static>,
+    interrupt: FROM_CPU_INTR2<'static>,
     i2c: I2c<'static, Blocking>,
 }
 
@@ -75,7 +75,7 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
 
         // Test that the pin can be explicitly configured using Flex:
@@ -98,7 +98,7 @@ mod tests {
 
         Context {
             i2c,
-            interrupt: peripherals.FROM_CPU_INTR1,
+            interrupt: peripherals.FROM_CPU_INTR2,
         }
     }
 
@@ -352,7 +352,7 @@ mod tests {
         let mut i2c = ctx.i2c.into_async();
 
         let interrupt_executor =
-            mk_static!(InterruptExecutor<1>, InterruptExecutor::new(ctx.interrupt));
+            mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.interrupt));
 
         let spawner = interrupt_executor.start(Priority::Priority3);
 
@@ -497,5 +497,102 @@ mod tests {
             .unwrap();
 
         assert_ne!(data, [0u8; 22]);
+    }
+
+    // Awaits the driver on the core that did not call `into_async`, so that the interrupt
+    // handler and the future run on different cores.
+    #[test]
+    #[cfg(multi_core)]
+    async fn async_operation_on_other_core(ctx: Context) {
+        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+        use esp_hal::{
+            peripherals::CPU_CTRL,
+            system::{Cpu, CpuControl, Stack},
+        };
+        use esp_rtos::embassy::Executor;
+
+        #[embassy_executor::task]
+        async fn read_task(
+            mut i2c: I2c<'static, Async>,
+            done: &'static Signal<CriticalSectionRawMutex, [u8; 22]>,
+        ) {
+            let mut data = [0u8; 22];
+            i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut data)
+                .await
+                .unwrap();
+
+            done.signal(data);
+        }
+
+        let done = &*mk_static!(Signal<CriticalSectionRawMutex, [u8; 22]>, Signal::new());
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+
+        // This core services the interrupt of the driver from here on.
+        let i2c = ctx.i2c.into_async();
+
+        esp_rtos::start_second_core(unsafe { CPU_CTRL::steal() }, app_core_stack, move || {
+            let executor = mk_static!(Executor, Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(read_task(i2c, done).unwrap());
+            });
+        });
+
+        assert_ne!(done.wait().await, [0u8; 22]);
+
+        // Park the second core, we don't need it anymore
+        unsafe { CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu) };
+    }
+
+    // Calls `into_blocking` from the core that did not call `into_async`, which makes the driver
+    // tear the async mode down through an IPC call.
+    #[test]
+    #[cfg(multi_core)]
+    async fn into_blocking_on_other_core(ctx: Context) {
+        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+        use esp_hal::{
+            peripherals::CPU_CTRL,
+            system::{Cpu, CpuControl, Stack},
+        };
+        use esp_rtos::embassy::Executor;
+
+        #[embassy_executor::task]
+        async fn read_task(
+            i2c: I2c<'static, Async>,
+            done: &'static Signal<CriticalSectionRawMutex, [u8; 22]>,
+        ) {
+            let mut i2c = i2c;
+            let mut data = [0u8; 22];
+            i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut data)
+                .await
+                .unwrap();
+
+            // Tears the async mode down on the other core.
+            let mut i2c = i2c.into_blocking();
+
+            // The peripheral must work after the teardown.
+            let mut data = [0u8; 22];
+            i2c.write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut data)
+                .unwrap();
+
+            done.signal(data);
+        }
+
+        let done = &*mk_static!(Signal<CriticalSectionRawMutex, [u8; 22]>, Signal::new());
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+
+        // This core services the interrupt of the driver from here on.
+        let i2c = ctx.i2c.into_async();
+
+        esp_rtos::start_second_core(unsafe { CPU_CTRL::steal() }, app_core_stack, move || {
+            let executor = mk_static!(Executor, Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(read_task(i2c, done).unwrap());
+            });
+        });
+
+        assert_ne!(done.wait().await, [0u8; 22]);
+
+        // Park the second core, we don't need it anymore
+        unsafe { CpuControl::new(CPU_CTRL::steal()).park_core(Cpu::AppCpu) };
     }
 }

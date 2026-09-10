@@ -31,6 +31,7 @@ support_status = "partial"
 status_registers = 5
 software_interrupt_count = 4
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
+context_switch_source = "ipc"
 
 [device.soc]
 cpu_has_branch_predictor = true
@@ -65,6 +66,8 @@ peripherals = [
     { name = "INTERRUPT_CORE1" },
     { name = "LP_I2C_ANA_MST" },
     { name = "CLIC" },
+    { name = "CLINT" },
+    { name = "CLINT_OTHER_CORE" },
     { name = "IO_MUX" },
     { name = "IOMUX_MSPI_PIN", hidden = true },
     { name = "LP_I2C0" },
@@ -136,6 +139,7 @@ peripherals = [
     { name = "PSRAM", virtual = true, clock_group = "PSRAM" },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "CPU_CTRL", virtual = true },
+    { name = "IPC", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
     { name = "FROM_CPU_INTR1", virtual = true },
     { name = "FROM_CPU_INTR2", virtual = true },
