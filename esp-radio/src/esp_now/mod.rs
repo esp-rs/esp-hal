@@ -9,7 +9,7 @@
 //!
 //! For more information see <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html>
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, vec};
 use core::{
     cell::UnsafeCell,
     fmt::Debug,
@@ -63,13 +63,8 @@ impl QueueStorage {
     /// Boxed variant
     #[instability::unstable]
     pub fn boxed(len: usize) -> Self {
-        let mut v = Vec::with_capacity(len);
-        v.resize(len, 0u8);
-
-        let s = Box::leak(v.into_boxed_slice());
-
         Self {
-            data: NonNull::from_ref(s),
+            data: NonNull::from_ref(Box::leak(vec![0; len].into_boxed_slice())),
             is_a_box: true,
         }
     }

@@ -55,8 +55,10 @@ let wifi_interface = esp_radio::wifi::Interface::station();
 let mut controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, config)?;
 ```
 
-For ESP-NOW and Sniffer, use the controller methods. The returned instances borrow the
-controller, so the controller must outlive them:
+For ESP-NOW and Sniffer, use the controller methods.
+The `esp_now` method takes `QueueStorage` as an argument, which determines
+where the bbqueue buffer is stored.
+The returned instances borrow the controller, so the controller must outlive them:
 
 ```rust
 // Before
@@ -67,7 +69,7 @@ let esp_now = interfaces.esp_now;
 // After
 let controller = esp_radio::wifi::WifiController::new(peripherals.WIFI, config)?;
 let mut sniffer = controller.sniffer();
-let esp_now = controller.esp_now();
+let esp_now = controller.esp_now(Default::default());
 ```
 
 `Interface` is no longer `Clone` or `Copy`. Each mode (station / access point) is a
