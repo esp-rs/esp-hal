@@ -361,6 +361,63 @@ unsafe extern "C" {
     fn critical_regs_restore();
 }
 
+/// Per-core retention buffer layout for one save or restore pass.
+pub(crate) struct CoreRetentionContext {
+    pub(crate) buffer: *mut u8,
+    pub(crate) core: usize,
+}
+
+impl CoreRetentionContext {
+    #[crate::ram]
+    pub(crate) fn new(buffer: *mut u8, core: usize) -> Self {
+        // SAFETY: `install_cpu_retention_memory` checked the buffer against the size of every
+        // block.
+        let buffer = unsafe { buffer.add(core * chip::BLOCK_SIZE) };
+        Self { buffer, core }
+    }
+
+    #[crate::ram]
+    pub(crate) fn device_frame(&mut self) -> &mut [u32] {
+        // SAFETY: the buffer is installed and sized for this chip.
+        unsafe {
+            slice::from_raw_parts_mut(
+                self.buffer.add(chip::DEVICE_REGIONS_OFFSET) as *mut u32,
+                chip::DEVICE_REGION_WORDS,
+            )
+        }
+    }
+
+    #[crate::ram]
+    pub(crate) fn non_critical(&self) -> *mut NonCriticalSleepFrame {
+        // SAFETY: the buffer is installed and sized for this chip.
+        unsafe { self.buffer.add(chip::NON_CRITICAL_FRAME_OFFSET) as *mut NonCriticalSleepFrame }
+    }
+
+    #[crate::ram]
+    pub(crate) fn critical(&self) -> *mut CriticalSleepFrame {
+        // SAFETY: the buffer is installed and sized for this chip.
+        unsafe { self.buffer.add(chip::CRITICAL_FRAME_OFFSET) as *mut CriticalSleepFrame }
+    }
+}
+
+/// Saves the device registers and the non-critical frame.
+#[crate::ram]
+pub(crate) fn save_pre_critical(ctx: &mut CoreRetentionContext) {
+    device_regs::save(&chip::regions(), ctx.device_frame());
+    // SAFETY: the buffer is installed and sized for this chip.
+    unsafe { ctx.non_critical().as_mut().unwrap().save() };
+}
+
+/// Saves the critical frame and returns its pointer.
+#[crate::ram]
+pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSleepFrame {
+    let critical = ctx.critical();
+    CRITICAL_FRAME_PTR[ctx.core].store(critical, Ordering::Release);
+    // This call returns twice. It returns here after it saved the frame, and again from the wake
+    // stub, with every register of the frame back in place.
+    unsafe { critical_regs_save(critical) }
+}
+
 /// Saves and restores the CPU domain around a light sleep request.
 ///
 /// The caller must run with interrupts disabled on this core. [`LowPower::sleep_light`] holds that
@@ -373,36 +430,19 @@ unsafe extern "C" {
 /// (`esp32c6/sleep_cpu.c:317-341`).
 #[crate::ram]
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> bool) -> bool {
-    // Each core saves itself into its own block, because each core has its own frames and its own
-    // core-local device registers.
+    // The rendezvous exists on a multi-core chip only, and this body is what it delegates to.
+    #[cfg(all(multi_core, feature = "rt", feature = "unstable"))]
+    if super::rendezvous::helper_enlisted() {
+        return super::rendezvous::sleep_retained(buffer, enter_sleep, wait);
+    }
+
     let core = system::raw_core();
-    // SAFETY: `install_cpu_retention_memory` checked the buffer against the size of every block.
-    let buffer = unsafe { buffer.add(core * chip::BLOCK_SIZE) };
-
-    let regions = chip::regions();
-    let device_frame = unsafe {
-        slice::from_raw_parts_mut(
-            buffer.add(chip::DEVICE_REGIONS_OFFSET) as *mut u32,
-            chip::DEVICE_REGION_WORDS,
-        )
-    };
-    device_regs::save(&regions, device_frame);
-
-    // SAFETY: the buffer is installed and sized for this chip.
-    let non_critical =
-        unsafe { buffer.add(chip::NON_CRITICAL_FRAME_OFFSET) as *mut NonCriticalSleepFrame };
-    save_non_critical(non_critical);
-
-    // SAFETY: the buffer is installed and sized for this chip.
-    let critical = unsafe { buffer.add(chip::CRITICAL_FRAME_OFFSET) as *mut CriticalSleepFrame };
-    CRITICAL_FRAME_PTR[core].store(critical, Ordering::Release);
-
-    // This call returns twice. It returns here after it saved the frame, and again from the wake
-    // stub, with every register of the frame back in place.
-    let frame = unsafe { critical_regs_save(critical) };
+    let mut ctx = CoreRetentionContext::new(buffer, core);
+    save_pre_critical(&mut ctx);
+    let frame = save_critical_frame(&ctx);
 
     // The wake stub writes this word while the compiler believes that nothing did.
-    // SAFETY: `critical_regs_save` returns the frame pointer that it was given.
+    // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
     let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
     let rejected = if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
         arm_wake_stub();
@@ -417,8 +457,9 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
     // `esp_sleep_cpu_retention` restores on a wake only, for the same reason
     // (`esp32c6/sleep_cpu.c:331-341`).
     if !rejected {
-        restore_non_critical(non_critical);
-        device_regs::restore(&regions, device_frame);
+        // SAFETY: the frame was filled on this path before the sleep.
+        unsafe { ctx.non_critical().as_mut().unwrap().restore() };
+        device_regs::restore(&chip::regions(), &*ctx.device_frame());
     }
 
     rejected
@@ -432,20 +473,8 @@ pub(crate) fn disarm_wake_stub() {
 }
 
 #[crate::ram]
-fn arm_wake_stub() {
+pub(crate) fn arm_wake_stub() {
     let stub = critical_regs_restore as *const () as usize as u32;
     // SAFETY: the register is the retention word of this chip, and it holds no other state.
     unsafe { chip::wake_stub_reg().write_volatile(stub) };
-}
-
-#[crate::ram]
-fn save_non_critical(frame: *mut NonCriticalSleepFrame) {
-    // SAFETY: the buffer is installed and sized for this chip.
-    unsafe { frame.as_mut().unwrap().save() };
-}
-
-#[crate::ram]
-fn restore_non_critical(frame: *mut NonCriticalSleepFrame) {
-    // SAFETY: the frame was filled by [`save_non_critical`] on this path.
-    unsafe { frame.as_ref().unwrap().restore() };
 }
