@@ -407,6 +407,8 @@ unstable_driver! {
     pub mod trace;
     #[cfg(soc_has_tsens)]
     pub mod tsens;
+    #[cfg(canfd_driver_supported)]
+    pub mod canfd;
     #[cfg(twai_driver_supported)]
     pub mod twai;
     #[cfg(any(

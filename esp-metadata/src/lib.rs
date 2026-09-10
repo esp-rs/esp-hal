@@ -736,6 +736,9 @@ impl Config {
         if let Some(peri) = self.device.peri_config.pcnt.as_ref() {
             tokens.extend(cfg::generate_pcnt_peripherals(peri));
         };
+        if let Some(peri) = self.device.peri_config.canfd.as_ref() {
+            tokens.extend(cfg::generate_canfd_peripherals(peri));
+        };
 
         tokens.extend(self.generate_peripherals_macro());
 

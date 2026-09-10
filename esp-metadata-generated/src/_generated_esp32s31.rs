@@ -5714,6 +5714,30 @@ macro_rules! for_each_pcnt_unit {
         _for_each_inner_pcnt_unit!((regs(PCNT), (PCNT1)));
     };
 }
+/// This macro can be used to generate code for each peripheral instance of the CAN FD driver.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($instance:ident, $sys:ident, $rx:ident, $tx:ident)`
+///
+/// Macro fragments:
+///
+/// - `$instance`: the name of the CAN FD instance
+/// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+/// - `$rx`, `$tx`: signal names.
+///
+/// Example data: `(TWAI0, Twai0, TWAI0_RX, TWAI0_TX)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_canfd {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_canfd { $(($pattern) => $code;)* ($other : tt) => {}
+        } _for_each_inner_canfd!((all));
+    };
+}
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_peripheral {
