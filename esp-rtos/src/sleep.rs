@@ -131,6 +131,39 @@ pub fn sleep_diag() -> [u64; 10] {
     core::array::from_fn(|i| DIAG[i].load(core::sync::atomic::Ordering::Relaxed))
 }
 
+/// Histogram of the REQUESTED light-sleep duration (next_wakeup - now) at each committed
+/// sleep, so a bench can see the wake cadence (what limits sleep length). Buckets (ms):
+/// [<2, 2-4, 4-8, 8-16, 16-32, 32-64, 64-160, >=160].
+static SLEEP_HIST: [portable_atomic::AtomicU64; 8] =
+    [const { portable_atomic::AtomicU64::new(0) }; 8];
+
+fn hist_bump(us: u64) {
+    let ms = us / 1000;
+    let b = if ms < 2 {
+        0
+    } else if ms < 4 {
+        1
+    } else if ms < 8 {
+        2
+    } else if ms < 16 {
+        3
+    } else if ms < 32 {
+        4
+    } else if ms < 64 {
+        5
+    } else if ms < 160 {
+        6
+    } else {
+        7
+    };
+    SLEEP_HIST[b].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// Snapshot of the requested-sleep-duration histogram (see [`SLEEP_HIST`]).
+pub fn sleep_hist() -> [u64; 8] {
+    core::array::from_fn(|i| SLEEP_HIST[i].load(core::sync::atomic::Ordering::Relaxed))
+}
+
 pub fn configure(lpwr: LPWR<'static>) -> Sleep {
     Sleep {
         #[cfg(sleep_deep_sleep)]
@@ -250,6 +283,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 cfg.set_xtal_fpu(true);
             }
             let before = crate::now();
+            hist_bump(next_wakeup.saturating_sub(before));
             lpwr.sleep_light(cfg);
             diag_count(DIAG_SLEPT);
             DIAG[DIAG_SLEPT_US].fetch_add(
