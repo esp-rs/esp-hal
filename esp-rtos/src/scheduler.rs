@@ -629,7 +629,7 @@ impl Scheduler {
 
         unwrap!(
             TaskPtr::new(tp),
-            "The scheduler has not been started. Make sure to call `esp_rtos::init()` before trying to access the current task."
+            "The scheduler has not been started. Make sure to call `esp_rtos::start()` before trying to access the current task."
         )
     }
 
