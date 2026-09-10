@@ -136,11 +136,34 @@ impl DeepSleep {
 ///
 /// [`start_with_idle_hook`]: crate::start_with_idle_hook
 pub fn configure(lpwr: LPWR<'static>) -> Sleep {
+    // SAFETY: the handler only reads scheduler state, it takes the scheduler lock, which no core
+    // holds across a sleep, and it lives as long as this crate.
+    #[cfg(multi_core)]
+    unsafe {
+        esp_hal::rtc_cntl::sleep::__rtos_implementation::set_can_sleep_handler(can_sleep)
+    };
+
     Sleep {
         #[cfg(sleep_deep_sleep)]
         deep_sleep: DeepSleep { lpwr },
         light_sleep_hook: auto_light_sleep_hook,
     }
+}
+
+/// Answers whether this core agrees to a light sleep that the other core requests.
+///
+/// esp-hal calls this from the rendezvous of the sleep, after it disabled the interrupts of this
+/// core. A task that became ready after the other core decided, and a [`WakeLock`] that any core
+/// took after that decision, both stop the sleep here.
+#[cfg(multi_core)]
+fn can_sleep() -> bool {
+    if WakeLock::is_active() {
+        return false;
+    }
+
+    SCHEDULER.with(|scheduler| {
+        !scheduler.run_queue.has_ready_tasks() && scheduler.cpu_idle(Cpu::current())
+    })
 }
 
 extern "C" fn auto_light_sleep_hook() -> ! {
@@ -177,9 +200,9 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 }
 
                 // Every core is ready to sleep. The other core can make a task ready again after
-                // this function gives the lock back, and this core then sleeps the chip with work
-                // waiting. Step 4 of the light-sleep retention plan closes that window, with a
-                // rendezvous in esp-hal that lets the other core refuse the sleep.
+                // this function gives the lock back. The rendezvous of esp-hal closes that
+                // window: it asks the other core through [`can_sleep`] before it powers the CPU
+                // domain down, and that core answers with its interrupts already off.
             }
 
             let Some(time_driver) = scheduler.time_driver.as_mut() else {
@@ -208,8 +231,8 @@ extern "C" fn auto_light_sleep_hook() -> ! {
         });
 
         // The other core can take a `WakeLock` in the window that the release of the lock opens.
-        // This read closes most of that window, and step 5 of the light-sleep retention plan
-        // closes the rest.
+        // This read closes most of that window, and [`can_sleep`] closes the rest for a sleep
+        // that powers the CPU domain down.
         if sleep && !WakeLock::is_active() {
             // Each driver enables the wakeup source it owns. This hook does not know which
             // sources are enabled. `sleep_light` returns immediately when none are enabled.
