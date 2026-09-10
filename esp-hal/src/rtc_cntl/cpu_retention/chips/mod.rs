@@ -2,6 +2,7 @@
 
 #[cfg_attr(any(esp32c6, esp32h2), path = "c6_h2.rs")]
 #[cfg_attr(any(esp32c5, esp32c61), path = "c5_c61.rs")]
+#[cfg_attr(esp32p4, path = "esp32p4.rs")]
 #[cfg_attr(esp32s31, path = "esp32s31.rs")]
 pub(crate) mod chip;
 
