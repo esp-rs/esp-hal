@@ -193,6 +193,18 @@ impl<'d> LowPower<'d> {
         let mut config = config;
         config.set_sleep_kind(kind);
 
+        // A chip that retains the CPU in software needs every running core to save itself, so the
+        // rendezvous comes first, before any step that a return would have to undo. This core
+        // acts as the helper of the other core when it loses the arbitration, and the sleep is
+        // over when that call returns.
+        #[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+        if kind == SleepKind::Light
+            && crate::rtc_cntl::installed_buffer_ptr().is_some()
+            && !crate::rtc_cntl::cpu_retention::rendezvous::engage()
+        {
+            return;
+        }
+
         // The hooks run before `apply`, so that a request to keep a power domain powered reaches
         // the hardware. They also run before the last read of the mask, because a hook can
         // enable another source. The GPIO hook does this while it allocates its pins to the
@@ -294,6 +306,13 @@ impl<'d> LowPower<'d> {
         #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
         sleep_impl::finish_cpu_retention(retention_buffer, rejected);
 
+        // The helper waits for this store, so it must run before this core can request another
+        // sleep.
+        #[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+        if kind == SleepKind::Light && retention_buffer.is_some() {
+            crate::rtc_cntl::cpu_retention::rendezvous::finish();
+        }
+
         config.finish_sleep();
 
         #[cfg(multi_core)]
@@ -335,14 +354,22 @@ impl<'d> LowPower<'d> {
 /// or the UART locks that this path takes. This core then spins for that lock for ever, because the
 /// frozen core cannot release it.
 ///
-/// FIXME: the chips that retain the CPU in software need more than a stall, because each core saves
-/// itself, and a frozen core saves nothing. Step 4 of the light-sleep retention plan replaces the
-/// stall for those chips.
+/// A chip that retains the CPU in software needs more than a stall, because each core saves
+/// itself, and a frozen core saves nothing. The rendezvous of that path keeps the other core
+/// running, so this function stalls nothing while a helper is enlisted.
+///
 /// Returns the cores that it stalled, as a bit for each [`Cpu`], for [`unpark_cores`]. A core that
 /// the program stalled before the sleep stays stalled after it.
 #[cfg(all(multi_core, sleep_driver_supported))]
 #[crate::ram]
 fn park_other_cores() -> u8 {
+    // A core that saves itself in the rendezvous must keep running, because a stalled core saves
+    // nothing.
+    #[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+    if crate::rtc_cntl::cpu_retention::rendezvous::helper_enlisted() {
+        return 0;
+    }
+
     let mut parked = 0;
     for cpu in crate::system::Cpu::other() {
         if crate::soc::cpu_control::is_running(cpu) {

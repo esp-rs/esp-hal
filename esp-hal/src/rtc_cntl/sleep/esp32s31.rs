@@ -754,11 +754,12 @@ impl RtcSleepConfig {
 /// Couples CPU power-down to the installed retention buffer, for a light sleep.
 ///
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
-/// cannot carry a power-down into a light sleep that has no retention memory. CPU power-down is
-/// refused while the app core runs; a later step replaces this guard with a rendezvous protocol.
+/// cannot carry a power-down into a light sleep that has no retention memory.
+///
+/// A second running core must save itself, so the power-down also needs the rendezvous.
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
     let allow_pd =
-        buffer.is_some() && !crate::soc::cpu_control::is_running(crate::system::Cpu::AppCpu);
+        buffer.is_some() && crate::rtc_cntl::cpu_retention::rendezvous::retention_allowed();
     config.pd_flags.set_pd_cpu(allow_pd);
 }
 
@@ -773,12 +774,14 @@ pub(crate) fn request_sleep() {
         .modify(|_, w| w.sleep_req().bit(true));
 }
 
-/// Requests the sleep, and retains the CPU across it if the program installed the memory.
+/// Requests the sleep, and retains the CPU across it if the sleep powers the CPU domain down.
 ///
-/// The retained path returns twice, so it owns the request and the wait.
+/// The retained path returns twice, so it owns the request and the wait. A sleep that keeps the
+/// domain powered needs no frames, and it must not write them back: the registers still hold what
+/// a save would have read, and a restore repeats side effects such as an interrupt claim.
 #[crate::ram]
 pub(crate) fn enter_sleep_with_retention(config: &RtcSleepConfig, buffer: Option<*mut u8>) -> bool {
-    match buffer {
+    match buffer.filter(|_| config.pd_flags.pd_cpu()) {
         Some(buffer) => crate::rtc_cntl::cpu_retention::sleep_retained(
             buffer,
             request_sleep,
