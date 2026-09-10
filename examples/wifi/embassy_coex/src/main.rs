@@ -5,7 +5,8 @@
 //! - performs an HTTP get request to some "random" server
 //! - does BLE advertising and allows to connect
 
-//% CHIP_FILTER: wifi_driver_supported && bt_driver_supported
+// The ESP32-S31 does not support coexistence yet, see `esp-radio/build.rs`.
+//% CHIP_FILTER: wifi_driver_supported && bt_driver_supported && !esp32s31
 
 #![no_std]
 #![no_main]
