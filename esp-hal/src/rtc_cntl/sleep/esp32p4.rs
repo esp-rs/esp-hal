@@ -2,6 +2,7 @@
 
 use core::{
     ops::Not,
+    ptr::NonNull,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -1084,7 +1085,7 @@ impl RtcSleepConfig {
 /// cannot carry a power-down into a light sleep that has no retention memory.
 ///
 /// A second running core must save itself, so the power-down also needs the rendezvous.
-pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<*mut u8>) {
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
     let allow_pd =
         buffer.is_some() && crate::rtc_cntl::cpu_retention::rendezvous::retention_allowed();
     config.pd_flags.set_pd_cpu(allow_pd);
@@ -1129,10 +1130,13 @@ pub(crate) fn request_sleep() {
 /// domain powered needs no frames, and it must not write them back: the registers still hold what
 /// a save would have read, and a restore repeats side effects such as an interrupt claim.
 #[crate::ram]
-pub(crate) fn enter_sleep_with_retention(config: &RtcSleepConfig, buffer: Option<*mut u8>) -> bool {
+pub(crate) fn enter_sleep_with_retention(
+    config: &RtcSleepConfig,
+    buffer: Option<NonNull<u8>>,
+) -> bool {
     match buffer.filter(|_| config.pd_flags.pd_cpu()) {
         Some(buffer) => crate::rtc_cntl::cpu_retention::sleep_retained(
-            buffer,
+            buffer.as_ptr(),
             request_sleep,
             super::wait_for_sleep_result,
         ),
@@ -1147,7 +1151,7 @@ pub(crate) fn enter_sleep_with_retention(config: &RtcSleepConfig, buffer: Option
 ///
 /// The disarm is unconditional, because the tail of the sleep runs on a wake and on a rejected
 /// request. A stale stub address would otherwise outlive the sleep that armed it.
-pub(crate) fn finish_cpu_retention(buffer: Option<*mut u8>, _rejected: bool) {
+pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, _rejected: bool) {
     if buffer.is_some() {
         crate::rtc_cntl::cpu_retention::disarm_wake_stub();
     }
