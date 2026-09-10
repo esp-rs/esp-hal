@@ -80,6 +80,10 @@ name              = "storage"
 harness           = false
 
 [[bin]]
+name              = "flash"
+harness           = false
+
+[[bin]]
 name              = "uart"
 harness           = false
 

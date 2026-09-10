@@ -17,6 +17,9 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_t
 page_size = 0x10000
 entry_num = 384
 
+[device.flash]
+support_status = "partial"
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true

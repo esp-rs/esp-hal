@@ -191,6 +191,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | DMA          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | ETM          |       |          |          | [❌][5167] [^1] | ⚒️      | [❌][5419] [^1] | ⚒️      | ❌       |          |          | ❌        |
 | Interrupts   | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
+| Flash        | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | PSRAM        | ⚒️   |          |          | ⚒️      |          | ⚒️       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 
 [^1]: This cell is clickable and will open the peripheral's issue on GitHub
