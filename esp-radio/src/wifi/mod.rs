@@ -2788,8 +2788,11 @@ impl WifiController<'_> {
     /// Panics if an ESP-NOW instance already exists.
     #[cfg(feature = "esp-now")]
     #[instability::unstable]
-    pub fn esp_now(&self) -> crate::esp_now::EspNow {
-        crate::esp_now::EspNow::new_internal(self._guard.clone())
+    pub fn esp_now(
+        &self,
+        rx_queue_storage: crate::esp_now::QueueStorage,
+    ) -> crate::esp_now::EspNow {
+        crate::esp_now::EspNow::new_internal(self._guard.clone(), rx_queue_storage)
     }
 
     /// Returns a sniffer instance independent of this controller.
