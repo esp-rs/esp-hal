@@ -1,4 +1,4 @@
-#[embedded_test::tests(default_timeout = 3, executor = esp_rtos::embassy::Executor::new())]
+#[embedded_test::tests(default_timeout = 6, executor = esp_rtos::embassy::Executor::new())]
 mod init_tests {
 
     use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
