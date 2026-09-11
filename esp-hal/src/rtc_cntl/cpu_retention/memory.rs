@@ -11,13 +11,21 @@ use static_cell::ConstStaticCell;
 
 use crate::rtc_cntl::sleep::LowPower;
 
-pub(crate) const BUFFER_SIZE: usize = property!("sleep.cpu_retention_mem_size");
-const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
-const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
+cfg_select! {
+    cpu_retention = "software" => {
+        pub(crate) use super::chips::BUFFER_SIZE;
+    }
+    _ => {
+        pub(crate) const BUFFER_SIZE: usize = property!("sleep.cpu_retention_mem_size");
 
-/// `repr(align)` takes a literal, so the buffer takes the strictest alignment of every chip. The
-/// alignment then needs no check at run time.
-const _: () = ::core::assert!(property!("sleep.cpu_retention_mem_align") <= 16);
+        /// `repr(align)` takes a literal, so the buffer takes the strictest alignment of every chip. The
+        /// alignment then needs no check at run time.
+        const _: () = ::core::assert!(property!("sleep.cpu_retention_mem_align") <= 16);
+
+        const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
+        const MEM_END: usize = property!("sleep.cpu_retention_mem_end");
+    }
+}
 
 static INSTALLED: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
 
@@ -88,6 +96,7 @@ impl CpuRetentionMemory {
 #[non_exhaustive]
 pub enum CpuRetentionMemoryError {
     /// The buffer is not inside the range that retention needs.
+    #[cfg(not(cpu_retention = "software"))]
     OutOfRange,
     /// The driver holds a retention buffer already.
     AlreadyInstalled,
@@ -100,6 +109,7 @@ impl core::error::Error for CpuRetentionMemoryError {}
 impl core::fmt::Display for CpuRetentionMemoryError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            #[cfg(not(cpu_retention = "software"))]
             Self::OutOfRange => write!(
                 f,
                 "the buffer is outside the retention memory range (0x{MEM_START:X}..0x{MEM_END:X})"
@@ -143,10 +153,13 @@ impl LowPower<'_> {
         memory: &'static mut CpuRetentionMemory,
     ) -> Result<(), CpuRetentionMemoryError> {
         let memory = memory.as_mut_ptr();
-        let start = memory as usize;
 
-        if start < MEM_START || start + BUFFER_SIZE > MEM_END {
-            return Err(CpuRetentionMemoryError::OutOfRange);
+        #[cfg(not(cpu_retention = "software"))]
+        {
+            let start = memory as usize;
+            if start < MEM_START || start + BUFFER_SIZE > MEM_END {
+                return Err(CpuRetentionMemoryError::OutOfRange);
+            }
         }
 
         INSTALLED

@@ -107,7 +107,3 @@ pub(crate) fn wake_stub_reg() -> *mut u32 {
         }
     }
 }
-
-// The metadata carries the size, because the install API checks the buffer against it before any
-// frame code runs.
-const _: () = ::core::assert!(BUFFER_SIZE == super::memory::BUFFER_SIZE);
