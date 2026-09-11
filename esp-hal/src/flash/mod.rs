@@ -527,7 +527,10 @@ impl<'d> Flash<'d, Blocking> {
     /// 32-byte aligned, the driver preserves the adjacent 16-byte block by
     /// re-encrypting its existing plaintext to the same ciphertext. The neighbor
     /// block therefore does not require prior erasing.
-    ///
+    #[cfg_attr(
+        esp32c5,
+        doc = " Encrypted writes may fail at higher CPU frequencies (240 MHz)."
+    )]
     /// An empty `data` slice only checks that `offset` is within [`Self::capacity`].
     ///
     /// # Errors
