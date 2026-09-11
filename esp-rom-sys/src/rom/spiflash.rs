@@ -33,8 +33,10 @@ unsafe extern "C" {
 
     /// Write data to flash with transparent encryption.
     ///
-    /// `flash_addr` and `len` must be 32-byte aligned. The sector must already be
-    /// erased.
+    /// The sector must already be erased. `data` may be encrypted in place.
+    ///
+    /// On ESP32, `flash_addr` and `len` must be 32-byte aligned. On later
+    /// chips the ROM accepts 16-, 32-, or 64-byte rows (chip-dependent max).
     pub fn esp_rom_spiflash_write_encrypted(flash_addr: u32, data: *mut u32, len: u32) -> i32;
 
     /// Enable SPI flash encryption mode.

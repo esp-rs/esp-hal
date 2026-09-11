@@ -43,6 +43,8 @@ fn try_main() -> Result<(), Box<dyn Error>> {
     // by metadata for single-I2C chips (e.g. ESP32-C3). Register it here to avoid unexpected_cfgs
     // warnings on those targets.
     println!("cargo:rustc-check-cfg=cfg(i2c_slave_i2c1)");
+    // HIL rustflags for encrypted-write tests that run without burned eFuses.
+    println!("cargo:rustc-check-cfg=cfg(__test_flash)");
     if let Ok(level) = std::env::var("OPT_LEVEL")
         && (level == "0" || level == "1")
     {
