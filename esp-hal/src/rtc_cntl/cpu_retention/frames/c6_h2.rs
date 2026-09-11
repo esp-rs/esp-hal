@@ -2,6 +2,7 @@
 //!
 //! The two chips have byte-identical `rvsleep-frames.h`, so they share one layout.
 
+pub(crate) use super::{CRITICAL_FRAME_SIZE, CriticalSleepFrame};
 use crate::macros::{read_csr, write_csr};
 
 /// Low two bits of `CriticalSleepFrame::pmufunc`: the CPU is about to sleep.
@@ -9,58 +10,7 @@ pub(crate) const PMUFUNC_GOING_TO_SLEEP: u32 = 1;
 /// Low two bits of `CriticalSleepFrame::pmufunc`: the CPU has just woken.
 pub(crate) const PMUFUNC_JUST_WOKE: u32 = 3;
 
-/// Registers that the assembly saves, because the CPU has no valid state at that point.
-///
-/// The field order is the order of `RvCoreCriticalSleepFrame` in
-/// `components/esp_hw_support/lowpower/port/esp32c6/rvsleep-frames.h`. The assembly addresses the
-/// fields through `offset_of!`, so the order must not change.
-#[repr(C)]
-pub(crate) struct CriticalSleepFrame {
-    pub mepc: u32,
-    pub ra: u32,
-    pub sp: u32,
-    pub gp: u32,
-    pub tp: u32,
-    pub t0: u32,
-    pub t1: u32,
-    pub t2: u32,
-    pub s0: u32,
-    pub s1: u32,
-    pub a0: u32,
-    pub a1: u32,
-    pub a2: u32,
-    pub a3: u32,
-    pub a4: u32,
-    pub a5: u32,
-    pub a6: u32,
-    pub a7: u32,
-    pub s2: u32,
-    pub s3: u32,
-    pub s4: u32,
-    pub s5: u32,
-    pub s6: u32,
-    pub s7: u32,
-    pub s8: u32,
-    pub s9: u32,
-    pub s10: u32,
-    pub s11: u32,
-    pub t3: u32,
-    pub t4: u32,
-    pub t5: u32,
-    pub t6: u32,
-    pub mstatus: u32,
-    pub mtvec: u32,
-    pub mcause: u32,
-    pub mtval: u32,
-    pub mie: u32,
-    pub mip: u32,
-    pub pmufunc: u32,
-}
-
 const _: () = ::core::assert!(size_of::<CriticalSleepFrame>() == 39 * 4);
-
-/// `RV_SLEEP_CTX_FRMSZ`: the critical frame size, rounded up to 16 bytes.
-pub(crate) const CRITICAL_FRAME_SIZE: usize = size_of::<CriticalSleepFrame>().next_multiple_of(16);
 
 // The custom numbers come from `esp32c6/sleep_cpu.c:39-52`, and the PMA numbers from
 // `components/riscv/include/riscv/csr_pma.h`.
