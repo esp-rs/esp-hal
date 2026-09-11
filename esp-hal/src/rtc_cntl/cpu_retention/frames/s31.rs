@@ -94,45 +94,9 @@ const _: () = ::core::assert!(size_of::<CriticalSleepFrame>() == 73 * 4);
 /// `RV_SLEEP_CTX_FRMSZ`: the critical frame size, rounded up to 16 bytes.
 pub(crate) const CRITICAL_FRAME_SIZE: usize = size_of::<CriticalSleepFrame>().next_multiple_of(16);
 
-/// Declares the non-critical frame and the matched pair that moves it.
-///
-/// One list drives the struct, the save and the restore, so the three cannot drift apart.
-macro_rules! non_critical_frame {
-    ($($field:ident = $csr:expr),* $(,)?) => {
-        /// Registers that Rust saves, because the CPU is usable while they move.
-        ///
-        /// The field order is the order of `RvCoreNonCriticalSleepFrame` in
-        /// `components/esp_hw_support/lowpower/port/esp32s31/rvsleep-frames.h`.
-        #[repr(C)]
-        pub(crate) struct NonCriticalSleepFrame {
-            $($field: u32,)*
-        }
-
-        impl NonCriticalSleepFrame {
-            /// Reads every CSR of the frame.
-            ///
-            /// # Safety
-            ///
-            /// The caller must own the CPU state that the frame describes.
-            pub(crate) unsafe fn save(&mut self) {
-                $(self.$field = unsafe { read_csr!($csr) };)*
-            }
-
-            /// Writes every CSR of the frame back.
-            ///
-            /// # Safety
-            ///
-            /// The frame must hold a state that [`Self::save`] read from this core.
-            pub(crate) unsafe fn restore(&self) {
-                $(unsafe { write_csr!($csr, self.$field) };)*
-            }
-        }
-    };
-}
-
 // The custom numbers come from `esp32s31/sleep_cpu.c:65-75`, and the PMA numbers from
 // `components/riscv/include/riscv/csr.h`.
-non_critical_frame! {
+super::non_critical_frame! {
     mscratch = 0x340,
     misa = 0x301,
     mtvt = 0x307,
