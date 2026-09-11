@@ -67,6 +67,24 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
+    # PCR.uartX_sclk_conf.uartX_sclk_sel: 0 = XTAL, 1 = RC_FAST, 2 = PLL_F48M,
+    # see uart_ll_set_sclk().
+    { group = "UART", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "PLL_F48M", outputs = "PLL_F48M_CLK", default = true },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+        ], div_num = "0 .. 0x100" } },
+        { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+    ] },
+    # PCR.spiX_clkm_conf.spiX_clkm_sel, see TRM 8.5 and SOC_SPI_CLKS.
+    { group = "SPI", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "PLL_F48M", outputs = "PLL_F48M_CLK", default = true },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+        ] },
+    ] },
     # Sources: SOC_GPTIMER_CLKS and SOC_MWDT_CLKS. Like the other chips we default
     # to XTAL
     { group = "TIMG", clocks = [

@@ -83,14 +83,14 @@ peripherals = [
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "GPSPI2" }, stable = true },
-    { name = "SPI3", interrupts = { peri = "GPSPI3" }, stable = true },
+    { name = "SPI2", interrupts = { peri = "GPSPI2" }, stable = true, clock_group = "SPI" },
+    { name = "SPI3", interrupts = { peri = "GPSPI3" }, stable = true, clock_group = "SPI" },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
-    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
-    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
@@ -104,6 +104,37 @@ peripherals = [
 
 [device.soc.clocks]
 # {include clocks.toml}
+
+[device.dma]
+support_status = "partial"
+gdma_version = 3
+separate_in_out_interrupts = true
+engines = [
+    {
+        name = "AHB_GDMA",
+        max_priority = 5,
+        # Mux IDs below include later peripherals; only list HAL drivers that are enabled.
+        drivers = ["spi_master"],
+        # Peripheral selector values, TRM table 2.4-1.
+        peripheral_instances = [
+            { name = "SPI3", dma_id = 0 },
+            { name = "SPI2", dma_id = 1 },
+            { name = "UHCI0", dma_id = 2 },
+            { name = "I2S0", dma_id = 3 },
+            { name = "AES", dma_id = 4 },
+            { name = "SHA", dma_id = 7 },
+            { name = "PARL_IO", dma_id = 9 },
+        ],
+        # 10 ~ 15 are the "dummy" selectors used for memory-to-memory transfers.
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, mem2mem_id = 10, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+            { name = "DMA_CH1", mem2mem = true, mem2mem_id = 11, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+            { name = "DMA_CH2", mem2mem = true, mem2mem_id = 12, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+            { name = "DMA_CH3", mem2mem = true, mem2mem_id = 13, interrupt_in = "DMA_IN_CH3", interrupt_out = "DMA_OUT_CH3" },
+            { name = "DMA_CH4", mem2mem = true, mem2mem_id = 14, interrupt_in = "DMA_IN_CH4", interrupt_out = "DMA_OUT_CH4" },
+        ]
+    },
+]
 
 [device.ecdsa]
 support_status = { status = "not_supported", issue = 5444 }
@@ -145,6 +176,40 @@ instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 # see esp-idf components/esp_hw_support/port/esp32h4/rtc_time.c
 rc_fast_calibration = { divider = 32, min_rev = 0 }
+
+[device.spi_master]
+support_status = "partial"
+version = 3
+fifo_size = 64
+has_app_interrupts = true
+has_dma_segmented_transfer = true
+instances = [
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"],
+        cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "FSPI3CLK",
+        sio = ["FSPI3D", "FSPI3Q", "FSPI3WP", "FSPI3HD"],
+        cs = ["FSPI3CS0", "FSPI3CS1", "FSPI3CS2"]
+    },
+]
+
+[device.uart]
+support_status = "partial"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
+ram_size = 128
+version = 2
+peripheral_controls_mem_clk = true
+has_sclk_enable = true
 
 [device.usb_serial_jtag]
 support_status = "partial"

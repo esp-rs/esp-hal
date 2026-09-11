@@ -1,7 +1,15 @@
-use pac::ahb_dma as gdma_pac;
-
 use super::*;
 use crate::RegisterToggle;
+
+cfg_select! {
+    esp32s31 => {
+        use pac::ahb_dma as gdma_pac;
+    }
+    // esp32h4
+    _ => {
+        use pac::dma as gdma_pac;
+    }
+}
 
 impl AhbGdmaTxChannel<'_> {
     #[inline(always)]
