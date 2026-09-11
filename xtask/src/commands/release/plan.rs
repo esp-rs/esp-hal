@@ -44,6 +44,10 @@ pub struct PackagePlan {
     pub tag_name: String,
     /// The version bump that will be applied to the package.
     pub bump: VersionBump,
+    /// Public items stable now but not at the last release. `None` if the
+    /// package is not semver-checked. Informational; `execute-plan` ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub new_stable_api: Option<Vec<String>>,
 }
 
 /// A release plan is a list of packages and their version increments.
@@ -192,9 +196,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     );
 
     for package in sorted.iter().copied() {
+        let mut new_stable_api = None;
         let amount = if changed[&package] {
             let mut amount = if package.is_semver_checked() {
-                min_package_update(workspace, package, &all_chips)?
+                let (amount, newly_stable) =
+                    min_package_update(workspace, package, &all_chips, true)?;
+                new_stable_api = Some(newly_stable);
+                amount
             } else {
                 let forever_unstable = if let Some(metadata) =
                     package_tomls[&package].espressif_metadata()
@@ -239,7 +247,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
             None
         };
 
-        update_amounts.push((package, amount));
+        update_amounts.push((package, amount, new_stable_api));
     }
 
     // Generate plan file. The plan should include, as an ordered list, the packages
@@ -258,7 +266,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         backport: backport.clone(),
         packages: update_amounts
             .into_iter()
-            .filter_map(|(package, bump)| {
+            .filter_map(|(package, bump, new_stable_api)| {
                 bump.map(|b| {
                     let current_version = package_tomls[&package].package_version();
 
@@ -302,6 +310,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                         new_version,
                         tag_name,
                         bump,
+                        new_stable_api,
                     }
                 })
             })
@@ -341,6 +350,24 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // Starting a pre-release cycle from a stable version without also setting
 // `base` is an error, as it would produce a version lower than the current
 // one.
+//
+// NEW STABLE API
+// For semver-checked packages, `new_stable_api` lists the public items that are stable now but
+// were not stable at the last release tag. Review it: an item you did not mean to stabilize is
+// much easier to remove before the release than after. An empty list means nothing was
+// stabilized; the field is absent only for packages that are not semver-checked. The list is
+// informational and `execute-plan` ignores it.
+//
+// Only the roots are listed. An item whose owner is new too adds nothing, so a stabilized enum
+// appears once rather than once per variant and derived impl, and an entry naming a module
+// stands for everything in it. Each entry ends with the chips it is new for. An entry naming
+// only a chip or two is usually not a stabilization at all: the item was already stable API
+// on the other chips, and that chip has only just gained the peripheral it belongs to. The
+// entries to look at are the ones new across the board. Paths are the definition sites
+// rustdoc records, so an item re-exported out of a private module is listed under that module
+// rather than under the path you would write to name it. If the release tag cannot be built,
+// the list falls back to the semver baseline, which may hide items stabilized before the
+// baseline was last regenerated.
 //
 // CHANGELOG NOTE
 // When you run `cargo xrelease execute-plan`, changelog entries from recently

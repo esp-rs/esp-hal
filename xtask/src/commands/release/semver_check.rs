@@ -64,6 +64,7 @@ pub fn semver_checks(workspace: &Path, args: SemverCheckArgs) -> anyhow::Result<
 #[cfg(feature = "semver-checks")]
 pub mod checker {
     use std::{
+        collections::{BTreeMap, BTreeSet},
         fs,
         io::Write,
         path::{Path, PathBuf},
@@ -99,7 +100,7 @@ pub mod checker {
 
                 package.prepare_semver_check(&package_path, chip)?;
 
-                let current_path = build_doc_json(package, chip, &package_path)?;
+                let current_path = build_doc_json(package, chip, &package_path, None)?;
 
                 let dest_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
                 package.clean_semver_check(&dest_path)?;
@@ -132,12 +133,15 @@ pub mod checker {
         Ok(())
     }
 
-    /// Determine the minimum required version bump for the specified package and chips.
+    /// Minimum version bump, plus newly stable public items when
+    /// `collect_new_stable_api` is set (union over chips, each tagged with the
+    /// chips it is new for).
     pub fn min_package_update(
         workspace: &Path,
         package: Package,
         chips: &[Chip],
-    ) -> anyhow::Result<ReleaseType> {
+        collect_new_stable_api: bool,
+    ) -> anyhow::Result<(ReleaseType, Vec<String>)> {
         fn stricter(a: ReleaseType, b: ReleaseType) -> ReleaseType {
             fn index_of(rt: ReleaseType) -> usize {
                 match rt {
@@ -151,24 +155,49 @@ pub mod checker {
         }
 
         let mut highest_result = ReleaseType::Patch;
+        let mut newly_stable: BTreeMap<String, BTreeSet<Chip>> = BTreeMap::new();
         for chip in chips {
             if !package.supports_chip(*chip) {
                 continue;
             }
-            let result = minimum_update(workspace, package, *chip)?;
-
-            if result == ReleaseType::Major {
-                return Ok(result);
+            let (result, new_stable_items) =
+                minimum_update(workspace, package, *chip, collect_new_stable_api)?;
+            for item in new_stable_items {
+                newly_stable.entry(item).or_default().insert(*chip);
             }
 
             highest_result = stricter(highest_result, result);
+
+            // A major bump is the strictest answer, so no remaining chip can
+            // change it. Stop there unless the caller wants the new stable API:
+            // that list is a union over chips, and ending the loop early would
+            // drop whatever is only stable on the chips not yet checked.
+            if highest_result == ReleaseType::Major && !collect_new_stable_api {
+                break;
+            }
 
             if !package.chip_features_matter() {
                 break;
             }
         }
 
-        Ok(highest_result)
+        if collect_new_stable_api {
+            crate::semver_check::discard_release_tag_scratch(workspace);
+        }
+
+        let newly_stable = newly_stable
+            .into_iter()
+            .map(|(item, chips)| {
+                let chips = chips
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("{item} [{chips}]")
+            })
+            .collect();
+
+        Ok((highest_result, newly_stable))
     }
 
     /// Check for breaking changes in the specified packages and chips.
@@ -193,7 +222,7 @@ pub mod checker {
         for package in packages {
             log::info!("Semver-check API for {package}");
 
-            let result = min_package_update(workspace, package, &chips)?;
+            let (result, _) = min_package_update(workspace, package, &chips, false)?;
             log::info!("Required bump = {:?}", result);
             if result == ReleaseType::Major {
                 semver_incompatible_packages.push(package.to_string());
