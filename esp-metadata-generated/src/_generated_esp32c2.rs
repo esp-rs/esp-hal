@@ -388,6 +388,12 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(31)
     };
+    ("soc.cpu_pmp_granularity") => {
+        4
+    };
+    ("soc.cpu_pmp_granularity", str) => {
+        stringify!(4)
+    };
     ("clock_tree.system_pre_div_in") => {
         [crate ::soc::clocks::SystemPreDivInConfig::Xtal, crate
         ::soc::clocks::SystemPreDivInConfig::RcFast]

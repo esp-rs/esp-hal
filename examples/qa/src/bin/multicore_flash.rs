@@ -35,9 +35,9 @@ const CACHE_PRESSURE_BASE: u32 = 0x4200_0000;
 const CACHE_PRESSURE_SIZE: usize = 65536; // 64KB
 
 unsafe extern "C" {
-    #[cfg(feature = "esp32s31")]
+    #[cfg(any(feature = "esp32h4", feature = "esp32s31"))]
     fn Cache_Invalidate_All(cache_map: u32);
-    #[cfg(not(feature = "esp32s31"))]
+    #[cfg(not(any(feature = "esp32h4", feature = "esp32s31")))]
     fn Cache_Invalidate_ICache_All();
 }
 
@@ -91,10 +91,10 @@ fn read() {
         // Read through the entire region to stress cache
         for offset in (0..CACHE_PRESSURE_SIZE).step_by(32) {
             let ptr = base_ptr.add(offset / 4);
-            #[cfg(feature = "esp32s31")]
+            #[cfg(any(feature = "esp32h4", feature = "esp32s31"))]
             // CACHE_MAP_L1_ICACHE_0 | CACHE_MAP_L1_ICACHE_1 | CACHE_MAP_L1_DCACHE
             Cache_Invalidate_All(0x13);
-            #[cfg(not(feature = "esp32s31"))]
+            #[cfg(not(any(feature = "esp32h4", feature = "esp32s31")))]
             Cache_Invalidate_ICache_All();
             core::ptr::read_volatile(ptr);
         }

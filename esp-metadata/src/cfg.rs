@@ -172,6 +172,10 @@ pub(crate) struct SupportItem {
     pub hide_from_peri_table: bool,
 }
 
+fn default_cpu_pmp_granularity() -> Option<u32> {
+    Some(4)
+}
+
 /// Define driver configuration structs, and a PeriConfig struct
 /// that contains all of them.
 macro_rules! driver_configs {
@@ -1096,6 +1100,10 @@ driver_configs![
                 has_swd_watchdog: bool,
                 #[serde(default)]
                 cpu_mcause_mask: u32,
+                /// PMP address matching granularity, in bytes.
+                /// ESP-IDF: `SOC_CPU_PMP_REGION_GRANULARITY`.
+                #[serde(default = "default_cpu_pmp_granularity")]
+                cpu_pmp_granularity: Option<u32>,
                 #[serde(flatten)]
                 config: SocConfig,
             }

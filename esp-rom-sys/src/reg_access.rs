@@ -20,6 +20,8 @@ pub(crate) use esp32c61 as pac;
 #[cfg(esp32h2)]
 #[expect(unused)]
 pub(crate) use esp32h2 as pac;
+#[cfg(esp32h4)]
+pub(crate) use esp32h4 as pac;
 #[cfg(esp32p4)]
 #[expect(unused)]
 pub(crate) use esp32p4 as pac;
