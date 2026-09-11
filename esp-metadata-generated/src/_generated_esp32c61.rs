@@ -355,18 +355,6 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
-    ("sleep.cpu_retention_mem_size") => {
-        672
-    };
-    ("sleep.cpu_retention_mem_align") => {
-        16
-    };
-    ("sleep.cpu_retention_mem_start") => {
-        1082130432
-    };
-    ("sleep.cpu_retention_mem_end") => {
-        1082458112
-    };
     ("assist_debug.has_sp_monitor") => {
         true
     };

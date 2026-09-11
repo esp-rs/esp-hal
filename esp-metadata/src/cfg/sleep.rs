@@ -43,7 +43,7 @@ impl GenericProperty for SleepRetentionProperties {
         if let Some(frame) = &self.cpu_retention_frame {
             cfgs.push(format!("cpu_retention_frame=\"{frame}\""));
         }
-        if self.cpu_retention_mem_size.is_some() {
+        if self.cpu_retention.is_some() {
             cfgs.push("supports_cpu_power_down".to_string());
         }
         if self.supports_top_power_down {
