@@ -32,7 +32,7 @@ cpu_mcause_mask = 0x3f
 # ESP-IDF does not define SOC_CPU_PMP_REGION_GRANULARITY for this chip yet. Measured on hardware
 # by writing all ones into a free `pmpaddr` and reading it back: the lowest five bits are hardwired
 # to zero.
-cpu_pmp_granularity_128 = true
+cpu_pmp_granularity = 128
 has_swd_watchdog = true
 
 # SRAM_SEG_START = 0x40810000, SRAM_SEG_END = 0x4084F350
