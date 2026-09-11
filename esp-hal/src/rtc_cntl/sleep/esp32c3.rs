@@ -1,7 +1,9 @@
+use core::ptr::NonNull;
+
 use super::SleepKind;
 use crate::{
     peripherals::{APB_CTRL, BB, EXTMEM, FE, FE2, LPWR, NRX, SPI0, SPI1, SYSTEM},
-    rtc_cntl::Rtc,
+    rtc_cntl::{Rtc, cpu_retention},
     soc::regi2c,
 };
 
@@ -192,7 +194,10 @@ bitfield::bitfield! {
     /// power down BT
     pub bt_pd_en, set_bt_pd_en: 6;
     /// power down CPU, but not restart when lightsleep.
-    pub cpu_pd_en, set_cpu_pd_en: 7;
+    ///
+    /// Crate-private, because a light sleep derives this from the installed retention memory. A
+    /// CPU power-down without retention loses the CPU state.
+    pub(crate) cpu_pd_en, set_cpu_pd_en: 7;
     /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 8;
     /// power down digital peripherals
@@ -672,9 +677,9 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures the wakeup options and requests the sleep.
+    /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// The caller waits for the result of the request.
+    /// [`Self::enter_sleep`] requests the sleep after this call.
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         // set bits for what can wake us up
         LPWR::regs()
@@ -686,7 +691,12 @@ impl RtcSleepConfig {
         LPWR::regs()
             .slp_reject_conf()
             .modify(|_, w| unsafe { w.sleep_reject_ena().bits(reject_mask) });
+    }
 
+    /// Requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    pub(crate) fn enter_sleep(&self) {
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }
 
@@ -702,4 +712,75 @@ impl RtcSleepConfig {
             rtc_sleep_pu(true);
         }
     }
+}
+
+// The cache needs no maintenance around a retained sleep on this chip: the tag memory stays
+// powered, so it survives the CPU power-down. This is why the chip has no tag memory retention
+// feature, and why `rtc_cntl_hal_enable_cpu_retention` and its disable counterpart touch no cache.
+
+// `SOC_RTC_CNTL_CPU_PD_REG_FILE_NUM` (108) times `SOC_RTC_CNTL_CPU_PD_DMA_BLOCK_SIZE` (16).
+const _: () = ::core::assert!(cpu_retention::payload_size() == 108 * 16);
+
+/// The last of the four configuration words that the CPU frames begin with. The S3 writes a
+/// different value here, so the word belongs to the chip and not to the shared descriptor code.
+const RETENTION_CONFIG_WORD3: u32 = 0xffff_ffff;
+
+/// Couples CPU power-down to the installed retention buffer, for a light sleep.
+///
+/// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
+/// cannot carry a power-down into a light sleep that has no retention memory.
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
+    config.set_cpu_pd_en(buffer.is_some());
+}
+
+/// Prepares CPU retention for the upcoming sleep.
+pub(crate) fn prepare_cpu_retention(buffer: Option<NonNull<u8>>) {
+    let Some(buffer) = buffer else {
+        return;
+    };
+
+    unsafe {
+        cpu_retention::init_cpu_dma_link(buffer, RETENTION_CONFIG_WORD3);
+    }
+
+    enable_cpu_retention(buffer.addr().get());
+}
+
+/// Finishes CPU retention after the sleep request returns.
+pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, _rejected: bool) {
+    if buffer.is_none() {
+        return;
+    }
+
+    // Disarm on every exit, including a rejected request that never slept. A stale descriptor
+    // would otherwise affect the next unretained sleep.
+    disable_cpu_retention();
+}
+
+fn enable_cpu_retention(link_addr: usize) {
+    // The field is 27 bits and the address needs 30, so the write drops the top three. The DMA
+    // reaches internal SRAM only, so the hardware supplies those bits; esp-idf truncates the same
+    // way through `REG_SET_FIELD`. `modify` keeps `nobypass_cpu_iso_rst`, which shares the
+    // register.
+    APB_CTRL::regs()
+        .retention_ctrl()
+        .modify(|_, w| unsafe { w.retention_link_addr().bits(link_addr as u32) });
+
+    // The retention timing fields keep their reset values of 20, 3 and 2 cycles.
+    // `rtc_cntl_hal_enable_cpu_retention` lengthens them to the maximum on the S3, which has five
+    // times as many register frames and the cache tag memory to move, and leaves them alone here.
+
+    LPWR::regs()
+        .clk_conf()
+        .modify(|_, w| w.dig_clk8m_en().set_bit());
+
+    LPWR::regs()
+        .retention_ctrl()
+        .modify(|_, w| w.retention_en().set_bit());
+}
+
+fn disable_cpu_retention() {
+    LPWR::regs()
+        .retention_ctrl()
+        .modify(|_, w| w.retention_en().clear_bit());
 }

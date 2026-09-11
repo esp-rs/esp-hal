@@ -44,6 +44,7 @@ peripherals = [
     { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
     { name = "ATOMIC" },
+    { name = "CLINT", hidden = true },
     { name = "DMA" },
     { name = "DS" },
     { name = "ECC" },
@@ -87,6 +88,7 @@ peripherals = [
     { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PLIC_MX" },
+    { name = "PLIC_UX", hidden = true },
     { name = "PMU" },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG", pac = "LP_PERI" },
@@ -236,6 +238,9 @@ support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
 controller = { Riscv = { flavour = "plic", interrupts = 32, priority_levels = 15 } }
+# The PLIC priority threshold does not mask the machine software interrupt, so raising the run
+# level masks it in `mie` instead.
+context_switch_source = "clint"
 
 [device.rmt]
 support_status = "partial"
@@ -344,6 +349,11 @@ wakeup_sources = {
     Bt = 10,
     LpCore = 11,
 }
+
+[device.sleep.retention]
+cpu_retention = "software"
+cpu_retention_frame = "c6_h2"
+supports_top_power_down = true
 
 [device.parl_io]
 support_status = "partial"

@@ -3,7 +3,98 @@ use indexmap::IndexMap;
 use quote::{format_ident, quote};
 use serde::{Deserialize, Serialize};
 
-use crate::{generate_for_each_macro, number};
+use crate::{cfg::GenericProperty, generate_for_each_macro, number};
+
+/// Light-sleep CPU retention capabilities and memory placement constraints.
+///
+/// Declared in `[device.sleep.retention]` so these keys are not captured by
+/// [`WakeupSources`]'s flattened wakeup-source map.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SleepRetentionProperties {
+    /// How the chip retains CPU state across light sleep with CPU power-down.
+    cpu_retention: Option<String>,
+    /// Register context frame shape for software CPU retention.
+    cpu_retention_frame: Option<String>,
+    #[serde(default)]
+    supports_top_power_down: bool,
+    #[serde(default)]
+    supports_tagmem_power_down: bool,
+    /// Bytes the CPU frames need, including the DMA descriptor that precedes them.
+    ///
+    /// The size is the mark that esp-hal describes the frames of this chip, so it also drives the
+    /// `supports_cpu_power_down` cfg. A chip that has the hardware but no frame layout keeps the
+    /// CPU domain powered.
+    cpu_retention_mem_size: Option<u32>,
+    cpu_retention_mem_align: Option<u32>,
+    /// First address the retention DMA can reach.
+    cpu_retention_mem_start: Option<u32>,
+    /// First address past the range the retention DMA can reach.
+    cpu_retention_mem_end: Option<u32>,
+}
+
+impl GenericProperty for SleepRetentionProperties {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let mut cfgs = vec![];
+
+        if let Some(mode) = &self.cpu_retention {
+            cfgs.push(format!("cpu_retention=\"{mode}\""));
+        }
+        if let Some(frame) = &self.cpu_retention_frame {
+            cfgs.push(format!("cpu_retention_frame=\"{frame}\""));
+        }
+        if self.cpu_retention.is_some() {
+            cfgs.push("supports_cpu_power_down".to_string());
+        }
+        if self.supports_top_power_down {
+            cfgs.push("supports_top_power_down".to_string());
+        }
+        if self.supports_tagmem_power_down {
+            cfgs.push("supports_tagmem_power_down".to_string());
+        }
+
+        if cfgs.is_empty() { None } else { Some(cfgs) }
+    }
+
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        let mut branches = quote! {};
+
+        if let Some(size) = self.cpu_retention_mem_size {
+            let size = number(size);
+            branches.extend(quote! {
+                ("sleep.cpu_retention_mem_size") => {
+                    #size
+                };
+            });
+        }
+        if let Some(align) = self.cpu_retention_mem_align {
+            let align = number(align);
+            branches.extend(quote! {
+                ("sleep.cpu_retention_mem_align") => {
+                    #align
+                };
+            });
+        }
+        if let Some(start) = self.cpu_retention_mem_start {
+            let start = number(start);
+            branches.extend(quote! {
+                ("sleep.cpu_retention_mem_start") => {
+                    #start
+                };
+            });
+        }
+        if let Some(end) = self.cpu_retention_mem_end {
+            let end = number(end);
+            branches.extend(quote! {
+                ("sleep.cpu_retention_mem_end") => {
+                    #end
+                };
+            });
+        }
+
+        branches
+    }
+}
 
 /// The set of wakeup sources supported by a chip.
 ///

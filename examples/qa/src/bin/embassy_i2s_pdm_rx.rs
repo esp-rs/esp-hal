@@ -72,7 +72,7 @@ async fn main(_spawner: Spawner) {
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     let dma_channel = cfg_select! {
         i2s_dma_engine = "I2S_DMA" => peripherals.DMA_I2S0,

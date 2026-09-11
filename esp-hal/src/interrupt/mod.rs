@@ -1,4 +1,3 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Interrupt support
 //!
 //! This module contains code to configure and handle peripheral interrupts.
@@ -19,32 +18,49 @@
 //!
 //! Peripheral drivers manage interrupts for you. Where appropriate, a `set_interrupt_handler`
 //! function is provided to register a function that handles interrupts at a chosen priority
-//! level. Interrupt handler functions need to be marked by the [`#[handler]`]
+//! level. Interrupt handler functions need to be marked by the [`#[handler]`][crate::handler]
 //! attribute. These drivers also provide `listen` and `unlisten` functions that control whether an
 //! interrupt will be generated for the matching event or not. For more information and examples,
 //! consult the documentation of the specific peripheral drivers.
 //!
 //! If you are writing your own peripheral driver, you will need to first register interrupt
-//! handlers using the [peripheral singletons'] `bind_X_interrupt` functions. You can use the
-//! matching `enable` and `disable` functions to control the peripheral interrupt in the interrupt
-//! matrix, or you can, depending on the peripheral, set or clear the appropriate enable bits in the
-//! `int_ena` register.
+//! handlers using the [peripheral singletons'][crate::peripherals::I2C0] `bind_X_interrupt`
+//! functions. You can use the matching `enable` and `disable` functions to control the peripheral
+//! interrupt in the interrupt matrix, or you can, depending on the peripheral, set or clear the
+//! appropriate enable bits in the `int_ena` register.
 //!
-//! [`#[handler]`]: crate::handler
-//! [peripheral singletons']: crate::peripherals::I2C0
-//!
-//! ## Software interrupts
+//! ## Software Interrupts
 //!
 //! The [`software`] module implements software interrupts using peripheral interrupt signals.
 #![cfg_attr(
     multi_core,
-    doc = "This mechanism can be used to implement efficient cross-core communication."
+    doc = "Those signals can also carry cross-core communication."
+)]
+#![cfg_attr(
+    all(feature = "rt", multi_core),
+    doc = "
+## Inter-Processor Call (IPC)
+
+The [`ipc`] module posts a function to a CPU, and raises the IPC interrupt of that CPU.
+"
+)]
+#![cfg_attr(
+    all(feature = "rt", multi_core, xtensa),
+    doc = "The HAL reserves `FROM_CPU_INTR0` and `FROM_CPU_INTR1` for this path."
+)]
+#![cfg_attr(
+    all(feature = "rt", single_core, context_switch_source = "from_cpu"),
+    doc = "The HAL reserves `FROM_CPU_INTR0` to switch tasks."
+)]
+#![cfg_attr(
+    all(feature = "rt", context_switch_source = "software0"),
+    doc = "
+## Context Switching
+
+The HAL defines the `Software0` interrupt handler, and switches tasks in that interrupt.
+"
 )]
 
-#[cfg(riscv)]
-pub use self::riscv::*;
-#[cfg(xtensa)]
-pub use self::xtensa::*;
 use crate::{peripherals::Interrupt, system::Cpu};
 
 cfg_select! {
@@ -58,15 +74,22 @@ cfg_select! {
     }
 }
 
-#[cfg(riscv)]
-mod riscv;
-#[cfg(xtensa)]
-mod xtensa;
+#[cfg_attr(riscv, path = "riscv.rs")]
+#[cfg_attr(xtensa, path = "xtensa.rs")]
+mod arch;
+pub use arch::*;
 
 use crate::pac;
 
-unstable_driver! {
+unstable_module! {
     pub mod software;
+
+    #[cfg(all(feature = "rt", multi_core))]
+    pub mod ipc;
+
+    #[cfg(feature = "rt")]
+    #[doc(hidden)]
+    pub mod __rtos_implementation;
 }
 
 #[cfg(feature = "rt")]
@@ -94,14 +117,10 @@ pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
 /// [`InterruptHandler`].
 #[instability::unstable]
 pub trait InterruptConfigurable: crate::private::Sealed {
-    #[cfg_attr(
-        not(multi_core),
-        doc = "Registers an interrupt handler for the peripheral."
-    )]
-    #[cfg_attr(
-        multi_core,
-        doc = "Registers an interrupt handler for the peripheral on the current core."
-    )]
+    #[doc = cfg_select! {
+        multi_core => "Registers an interrupt handler for the peripheral on the current core.",
+        _ => "Registers an interrupt handler for the peripheral.",
+    }]
     #[doc = ""]
     /// Replaces any previously registered interrupt handlers. Some peripherals
     /// offer a shared interrupt handler for multiple purposes. The caller must
@@ -379,13 +398,16 @@ pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
 /// Only one interrupt handler can be bound to a peripheral interrupt.
 #[instability::unstable]
 pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
+    bind_vector(interrupt, handler);
+    enable(interrupt, handler.priority());
+}
+
+/// Binds `handler` to `interrupt` without enabling the peripheral interrupt.
+pub(crate) fn bind_vector(interrupt: Interrupt, handler: InterruptHandler) {
     unsafe {
         let vector = vector_entry(interrupt);
-
         let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
 
-        // On RISC-V MCUs we may be protecting the trap section using a watchpoint.
-        // If we do, we need to temporarily disable this protection.
         #[cfg(all(riscv, write_vec_table_monitoring))]
         if crate::soc::trap_section_protected() {
             crate::debugger::DEBUGGER_LOCK.lock(|| {
@@ -393,13 +415,11 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
                 ptr.write_volatile(handler.handler().address());
                 crate::debugger::restore_watchpoint(1, wp);
             });
-            enable(interrupt, handler.priority());
             return;
         }
 
         ptr.write_volatile(handler.handler().address());
     }
-    enable(interrupt, handler.priority());
 }
 
 /// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.

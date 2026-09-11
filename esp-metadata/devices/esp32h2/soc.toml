@@ -43,10 +43,12 @@ peripherals = [
     { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
+    { name = "CLINT", hidden = true },
     { name = "DMA" },
     { name = "DS" },
     { name = "ECC" },
     { name = "EFUSE", hidden = true },
+    { name = "EXTMEM", hidden = true },
     { name = "GPIO" },
     { name = "GPIO_SD", clock_group = "SDM" },
     { name = "HMAC" },
@@ -80,6 +82,7 @@ peripherals = [
     { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PLIC_MX" },
+    { name = "PLIC_UX", hidden = true },
     { name = "PMU" },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG", virtual = true }, # a) RNG is LP_PERI in truth. b) we need to offset the rng_data register at runtime for newer revisions.
@@ -224,6 +227,9 @@ support_status = "partial"
 status_registers = 2
 software_interrupt_count = 4
 controller = { Riscv = { flavour = "plic", interrupts = 32, priority_levels = 15 } }
+# The PLIC priority threshold does not mask the machine software interrupt, so raising the run
+# level masks it in `mie` instead.
+context_switch_source = "clint"
 
 [device.rmt]
 support_status = "partial"
@@ -335,6 +341,11 @@ wakeup_sources = {
     Bt = 10,
     LpCore = 11,
 }
+
+[device.sleep.retention]
+cpu_retention = "software"
+cpu_retention_frame = "c6_h2"
+supports_top_power_down = true
 
 # Other drivers which are partially supported but have no other configuration:
 

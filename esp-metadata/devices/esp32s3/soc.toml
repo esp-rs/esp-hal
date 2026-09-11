@@ -103,8 +103,9 @@ peripherals = [
     { name = "PSRAM", virtual = true },
     { name = "ULP_RISCV_CORE", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
-    { name = "FROM_CPU_INTR0", virtual = true },
-    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "IPC", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
+    { name = "FROM_CPU_INTR1", virtual = true, hidden = true },
     { name = "FROM_CPU_INTR2", virtual = true },
     { name = "FROM_CPU_INTR3", virtual = true },
 ]
@@ -213,6 +214,7 @@ support_status = "partial"
 status_registers = 4
 software_interrupt_count = 4
 controller = "Xtensa"
+context_switch_source = "software0"
 
 [device.rmt]
 support_status = "partial"
@@ -362,6 +364,14 @@ wakeup_sources = {
     UlpRiscv = 11,
     UlpRiscvTrap = 13
 }
+
+[device.sleep.retention]
+cpu_retention = "rtc_cntl"
+supports_tagmem_power_down = true
+cpu_retention_mem_size = 8800
+cpu_retention_mem_align = 16
+cpu_retention_mem_start = 0x3FC88000
+cpu_retention_mem_end = 0x3FCF0000
 
 # Other drivers which are partially supported but have no other configuration:
 

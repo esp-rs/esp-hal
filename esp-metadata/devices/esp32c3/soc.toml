@@ -89,7 +89,7 @@ peripherals = [
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "TSENS", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
-    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
     { name = "FROM_CPU_INTR1", virtual = true },
     { name = "FROM_CPU_INTR2", virtual = true },
     { name = "FROM_CPU_INTR3", virtual = true },
@@ -183,7 +183,9 @@ instances = [
 support_status = "partial"
 status_registers = 2
 software_interrupt_count = 4
-controller = { Riscv = { flavour = "basic", interrupts = 32, priority_levels = 15 } }
+controller = { Riscv = { flavour = "basic", interrupts = 32, priority_levels = 15, context_switch_interrupt = true } }
+# The CPU has no CLINT.
+context_switch_source = "from_cpu"
 
 [device.rmt]
 support_status = "partial"
@@ -287,6 +289,13 @@ wakeup_sources = {
     Ulp = 9,
     Bt = 10,
 }
+
+[device.sleep.retention]
+cpu_retention = "rtc_cntl"
+cpu_retention_mem_size = 1744
+cpu_retention_mem_align = 16
+cpu_retention_mem_start = 0x3FCC0000
+cpu_retention_mem_end = 0x3FCE0000
 
 # Other drivers which are partially supported but have no other configuration:
 
