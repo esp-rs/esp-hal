@@ -316,15 +316,16 @@ impl<'d> LowPower<'d> {
             #[allow(clippy::let_unit_value)]
             let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
 
-            // The software chips save the CPU inside the request, so the request belongs to
-            // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
-            #[cfg(cpu_retention = "software")]
-            let rejected = sleep_impl::enter_sleep_with_retention(&config, retention_buffer);
-
-            #[cfg(not(cpu_retention = "software"))]
-            let rejected = {
-                config.enter_sleep();
-                wait_for_sleep_result()
+            cfg_select! {
+                cpu_retention = "software" => {
+                    // The software chips save the CPU inside the request, so the request belongs to
+                    // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
+                    let rejected = sleep_impl::enter_sleep_with_retention(&config, retention_buffer);
+                },
+                _ => {
+                    config.enter_sleep();
+                    let rejected = wait_for_sleep_result();
+                }
             };
 
             if config.is_deep_sleep() && !rejected {
@@ -338,7 +339,7 @@ impl<'d> LowPower<'d> {
             rejected
         };
 
-        #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
+        #[cfg(supports_cpu_power_down)]
         sleep_impl::finish_cpu_retention(retention_buffer, rejected);
 
         // The helper waits for this store, so it must run before this core can request another
