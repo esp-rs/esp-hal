@@ -1,5 +1,6 @@
 //! Sleep frames of the ESP32-P4 RISC-V core.
 
+pub(crate) use super::{CRITICAL_FRAME_SIZE, CriticalSleepFrame};
 use crate::macros::{read_csr, write_csr};
 
 /// Low two bits of `CriticalSleepFrame::pmufunc`: the CPU is about to sleep.
@@ -7,93 +8,7 @@ pub(crate) const PMUFUNC_GOING_TO_SLEEP: u32 = 1;
 /// Low two bits of `CriticalSleepFrame::pmufunc`: the CPU has just woken.
 pub(crate) const PMUFUNC_JUST_WOKE: u32 = 3;
 
-/// Registers that the assembly saves, because the CPU has no valid state at that point.
-///
-/// The field order is the order of `RvCoreCriticalSleepFrame` in
-/// `components/esp_hw_support/lowpower/port/esp32p4/rvsleep-frames.h`. The assembly addresses the
-/// fields through `offset_of!`, so the order must not change.
-#[repr(C)]
-pub(crate) struct CriticalSleepFrame {
-    pub mepc: u32,
-    pub ra: u32,
-    pub sp: u32,
-    pub gp: u32,
-    pub tp: u32,
-    pub t0: u32,
-    pub t1: u32,
-    pub t2: u32,
-    pub s0: u32,
-    pub s1: u32,
-    pub a0: u32,
-    pub a1: u32,
-    pub a2: u32,
-    pub a3: u32,
-    pub a4: u32,
-    pub a5: u32,
-    pub a6: u32,
-    pub a7: u32,
-    pub s2: u32,
-    pub s3: u32,
-    pub s4: u32,
-    pub s5: u32,
-    pub s6: u32,
-    pub s7: u32,
-    pub s8: u32,
-    pub s9: u32,
-    pub s10: u32,
-    pub s11: u32,
-    pub t3: u32,
-    pub t4: u32,
-    pub t5: u32,
-    pub t6: u32,
-    pub mstatus: u32,
-    pub mtvec: u32,
-    pub mtvt: u32,
-    pub mintthresh: u32,
-    pub mcause: u32,
-    pub mtval: u32,
-    pub mie: u32,
-    pub mip: u32,
-    pub fpu_ft0: u32,
-    pub fpu_ft1: u32,
-    pub fpu_ft2: u32,
-    pub fpu_ft3: u32,
-    pub fpu_ft4: u32,
-    pub fpu_ft5: u32,
-    pub fpu_ft6: u32,
-    pub fpu_ft7: u32,
-    pub fpu_fs0: u32,
-    pub fpu_fs1: u32,
-    pub fpu_fa0: u32,
-    pub fpu_fa1: u32,
-    pub fpu_fa2: u32,
-    pub fpu_fa3: u32,
-    pub fpu_fa4: u32,
-    pub fpu_fa5: u32,
-    pub fpu_fa6: u32,
-    pub fpu_fa7: u32,
-    pub fpu_fs2: u32,
-    pub fpu_fs3: u32,
-    pub fpu_fs4: u32,
-    pub fpu_fs5: u32,
-    pub fpu_fs6: u32,
-    pub fpu_fs7: u32,
-    pub fpu_fs8: u32,
-    pub fpu_fs9: u32,
-    pub fpu_fs10: u32,
-    pub fpu_fs11: u32,
-    pub fpu_ft8: u32,
-    pub fpu_ft9: u32,
-    pub fpu_ft10: u32,
-    pub fpu_ft11: u32,
-    pub fpu_fcsr: u32,
-    pub pmufunc: u32,
-}
-
 const _: () = ::core::assert!(size_of::<CriticalSleepFrame>() == 74 * 4);
-
-/// `RV_SLEEP_CTX_FRMSZ`: the critical frame size, rounded up to 16 bytes.
-pub(crate) const CRITICAL_FRAME_SIZE: usize = size_of::<CriticalSleepFrame>().next_multiple_of(16);
 
 // The custom numbers come from `esp32p4/sleep_cpu.c:79-85`, and the PMA numbers from
 // `components/riscv/include/riscv/csr.h`.
