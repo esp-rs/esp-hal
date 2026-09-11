@@ -11,7 +11,7 @@ use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 use super::{
-    chips::chip,
+    chips,
     device_regs,
     frames::chip::PMUFUNC_GOING_TO_SLEEP,
     software::{CoreRetentionContext, arm_wake_stub, save_critical_frame, save_pre_critical},
@@ -292,7 +292,7 @@ fn run_helper() {
 fn restore(ctx: &mut CoreRetentionContext) {
     // SAFETY: the frame holds what this core saved before the sleep.
     unsafe { ctx.non_critical().as_ref().unwrap().restore() };
-    device_regs::restore(&chip::regions(), ctx.device_frame());
+    device_regs::restore(&chips::regions(), ctx.device_frame());
 }
 
 /// Returns the index of the core that this core shares the rendezvous with.
