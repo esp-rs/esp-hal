@@ -39,8 +39,9 @@ pub const PLACEHOLDER: &str = "{{currentVersion}}";
 #[derive(Debug, Subcommand)]
 pub enum Release {
     /// Create a release plan. This is the first step in the release process.
-    /// Accepts zero or more package names. If no package names are
-    /// specified, all packages are included.
+    /// The plan always covers every published package; use `--exclude` to leave
+    /// specific packages out (along with any dependency that becomes private to
+    /// the excluded set).
     ///
     /// The result of this command is a json file that can be customized to
     /// control what and how gets released.

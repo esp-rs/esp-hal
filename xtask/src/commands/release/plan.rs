@@ -1,8 +1,14 @@
-use std::{collections::HashMap, io::Write, path::Path, process::Command};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Write,
+    path::Path,
+    process::Command,
+};
 
 use anyhow::{Context, Result, bail, ensure};
 use cargo_semver_checks::ReleaseType;
 use clap::Args;
+use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, Value};
@@ -29,9 +35,15 @@ pub struct PlanArgs {
     #[arg(long)]
     allow_non_main: bool,
 
-    /// The packages to be released.
-    #[arg(value_enum, default_values_t = Package::iter())]
-    packages: Vec<Package>,
+    /// Packages to leave out of the release plan.
+    ///
+    /// The plan always starts from the full set of published packages; this only
+    /// removes the named packages, plus any dependency that becomes private to
+    /// the excluded set. If what remains is inconsistent (a frozen crate would
+    /// pull an incompatible version of a released crate), planning fails and
+    /// names the conflict.
+    #[arg(long, value_enum)]
+    exclude: Vec<Package>,
 }
 
 /// A package in the release plan.
@@ -127,13 +139,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         println!("Backport branch detected: releasing only {}.", ctx.package);
         vec![ctx.package]
     } else {
-        // Recursively collect dependencies. A bit inefficient, but we don't
-        // need to sort a lot.
-        let mut pkgs = args
-            .packages
-            .iter()
+        // Always start from every published package plus their dependencies.
+        // Only `--exclude` narrows this: releasing an arbitrary subset would
+        // pull in dependencies while silently dropping the dependents that also
+        // need re-releasing.
+        let mut pkgs = Package::iter()
             .filter(|p| p.is_published())
-            .flat_map(|p| related_crates(workspace, *p))
+            .flat_map(|p| related_crates(workspace, p))
             .collect::<Vec<_>>();
 
         pkgs.sort();
@@ -252,60 +264,72 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // after tweaks keeps targeting the same release branch.
     let slug = read_existing_slug(&plan_path)?.unwrap_or_else(generate_slug);
 
+    let mut plan_packages = update_amounts
+        .into_iter()
+        .filter_map(|(package, bump)| {
+            bump.map(|b| {
+                let current_version = package_tomls[&package].package_version();
+
+                let bump = if !current_version.pre.is_empty() {
+                    // Package is already in a pre-release cycle - continue it
+                    // on the same base. Hand-edit the plan to start a new
+                    // cycle on a bumped base (e.g. `1.1.0-alpha.0` from
+                    // `1.0.0`) by also setting `base`.
+                    VersionBump {
+                        base: None,
+                        pre: Some(
+                            current_version
+                                .pre
+                                .as_str()
+                                .split('.')
+                                .next()
+                                .unwrap()
+                                .to_string(),
+                        ),
+                    }
+                } else {
+                    let base = match b {
+                        ReleaseType::Major => Version::Major,
+                        ReleaseType::Minor => Version::Minor,
+                        ReleaseType::Patch => Version::Patch,
+                        _ => unreachable!(),
+                    };
+                    VersionBump {
+                        base: Some(base),
+                        pre: None,
+                    }
+                };
+
+                let new_version = do_version_bump(&current_version, &bump).unwrap();
+                let tag_name = package.tag(&new_version);
+
+                PackagePlan {
+                    package,
+                    semver_checked: package.is_semver_checked(),
+                    current_version,
+                    new_version,
+                    tag_name,
+                    bump,
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    // Drop any excluded packages (and dependencies that become private to them)
+    // before validating that what remains is a self-consistent release.
+    apply_exclusions(workspace, &mut plan_packages, &args.exclude)?;
+
+    let releasing = plan_packages
+        .iter()
+        .map(|p| (p.package, p.new_version.clone()))
+        .collect::<HashMap<_, _>>();
+    validate_release_closure(workspace, &releasing)?;
+
     let plan = Plan {
         base: current_branch,
         slug,
         backport: backport.clone(),
-        packages: update_amounts
-            .into_iter()
-            .filter_map(|(package, bump)| {
-                bump.map(|b| {
-                    let current_version = package_tomls[&package].package_version();
-
-                    let bump = if !current_version.pre.is_empty() {
-                        // Package is already in a pre-release cycle — continue it
-                        // on the same base. Hand-edit the plan to start a new
-                        // cycle on a bumped base (e.g. `1.1.0-alpha.0` from
-                        // `1.0.0`) by also setting `base`.
-                        VersionBump {
-                            base: None,
-                            pre: Some(
-                                current_version
-                                    .pre
-                                    .as_str()
-                                    .split('.')
-                                    .next()
-                                    .unwrap()
-                                    .to_string(),
-                            ),
-                        }
-                    } else {
-                        let base = match b {
-                            ReleaseType::Major => Version::Major,
-                            ReleaseType::Minor => Version::Minor,
-                            ReleaseType::Patch => Version::Patch,
-                            _ => unreachable!(),
-                        };
-                        VersionBump {
-                            base: Some(base),
-                            pre: None,
-                        }
-                    };
-
-                    let new_version = do_version_bump(&current_version, &bump).unwrap();
-                    let tag_name = package.tag(&new_version);
-
-                    PackagePlan {
-                        package,
-                        semver_checked: package.is_semver_checked(),
-                        current_version,
-                        new_version,
-                        tag_name,
-                        bump,
-                    }
-                })
-            })
-            .collect(),
+        packages: plan_packages,
     };
 
     log::debug!("Writing release plan to {}", plan_path.display());
@@ -510,6 +534,204 @@ fn related_crates(workspace: &Path, package: Package) -> Vec<Package> {
     related_crates_cb(package, &|p| {
         CargoToml::new(workspace, p).unwrap().repo_dependencies()
     })
+}
+
+/// Build a map from each published package to the published packages that
+/// depend on it. `dev-dependencies` are excluded (see
+/// [`CargoToml::repo_dependency_requirements`]).
+fn build_dependents(workspace: &Path) -> Result<HashMap<Package, Vec<Package>>> {
+    let mut dependents: HashMap<Package, Vec<Package>> = HashMap::new();
+    for pkg in Package::iter().filter(|p| p.is_published() && !p.contains_standalone_projects()) {
+        let mut deps = CargoToml::new(workspace, pkg)?
+            .repo_dependency_requirements()
+            .into_iter()
+            .map(|(dep, _)| dep)
+            .collect::<Vec<_>>();
+        deps.sort();
+        deps.dedup();
+        for dep in deps {
+            dependents.entry(dep).or_default().push(pkg);
+        }
+    }
+    Ok(dependents)
+}
+
+/// Remove the excluded packages from `plan_packages`, along with any package
+/// that becomes private to the excluded set (every published dependent removed).
+///
+/// Version consistency of what remains is left to [`validate_release_closure`],
+/// so exclusions that stay compatible are allowed and only genuine
+/// incompatibilities are rejected.
+fn apply_exclusions(
+    workspace: &Path,
+    plan_packages: &mut Vec<PackagePlan>,
+    exclude: &[Package],
+) -> Result<()> {
+    if exclude.is_empty() {
+        return Ok(());
+    }
+
+    let dependents = build_dependents(workspace)?;
+    let in_plan = plan_packages
+        .iter()
+        .map(|p| p.package)
+        .collect::<HashSet<_>>();
+
+    for pkg in exclude {
+        if !in_plan.contains(pkg) {
+            log::warn!("--exclude {pkg}: not part of the generated plan; ignoring.");
+        }
+    }
+
+    let removed = compute_exclusion_removals(&dependents, &in_plan, exclude);
+
+    // Report what was dropped so the removal is visible.
+    let explicit = exclude.iter().copied().collect::<HashSet<_>>();
+    let mut dropped = removed.iter().copied().collect::<Vec<_>>();
+    dropped.sort();
+    for pkg in &dropped {
+        if explicit.contains(pkg) {
+            println!("Excluding {pkg} from the release plan.");
+        } else {
+            println!("Dropping {pkg}: only depended on by excluded packages.");
+        }
+    }
+
+    plan_packages.retain(|p| !removed.contains(&p.package));
+
+    Ok(())
+}
+
+/// Pure core of [`apply_exclusions`]: given the in-repo dependents map, the set
+/// of packages currently in the plan, and the packages to exclude, return the
+/// full set of packages to remove - the explicitly excluded ones plus any that
+/// become private to the excluded set.
+fn compute_exclusion_removals(
+    dependents: &HashMap<Package, Vec<Package>>,
+    in_plan: &HashSet<Package>,
+    exclude: &[Package],
+) -> HashSet<Package> {
+    let mut kept = in_plan.clone();
+    let mut removed = HashSet::new();
+
+    // Remove the explicitly excluded packages.
+    for pkg in exclude {
+        if kept.remove(pkg) {
+            removed.insert(*pkg);
+        }
+    }
+
+    // Iteratively drop packages whose every published dependent has been
+    // removed: with no remaining consumer among the released crates, releasing
+    // them is pointless. A top-level crate (no in-repo dependents at all) is
+    // kept.
+    loop {
+        let newly_private = kept
+            .iter()
+            .copied()
+            .filter(|p| {
+                let deps = dependents.get(p).map(Vec::as_slice).unwrap_or(&[]);
+                !deps.is_empty() && deps.iter().all(|q| !kept.contains(q))
+            })
+            .collect::<Vec<_>>();
+
+        if newly_private.is_empty() {
+            break;
+        }
+        for p in newly_private {
+            kept.remove(&p);
+            removed.insert(p);
+        }
+    }
+
+    removed
+}
+
+/// Validate that the set of packages being released is self-consistent.
+///
+/// Guards against a "diamond": a crate that is *not* being released lands in a
+/// released crate's dependency tree while requiring an incompatible version of
+/// another crate that *is* being released. Classic case: releasing a breaking
+/// `xtensa-lx 0.13 -> 0.14` without `esp-hal`, so anything depending on the
+/// frozen `esp-hal` pulls `xtensa-lx 0.13` alongside the new `0.14`.
+///
+/// `releasing` maps each released package to its new version. Released packages
+/// are skipped as violation sources: the tooling rewrites their requirements to
+/// the new versions anyway.
+pub fn validate_release_closure(
+    workspace: &Path,
+    releasing: &HashMap<Package, semver::Version>,
+) -> Result<()> {
+    // Forward in-repo dependency graph, keeping each edge's version requirement.
+    let mut deps_of: HashMap<Package, Vec<(Package, String)>> = HashMap::new();
+    for pkg in Package::iter().filter(|p| !p.contains_standalone_projects()) {
+        deps_of.insert(
+            pkg,
+            CargoToml::new(workspace, pkg)?.repo_dependency_requirements(),
+        );
+    }
+
+    let violations = release_closure_violations(&deps_of, releasing);
+    if !violations.is_empty() {
+        bail!(
+            "The release plan is not self-consistent. The following crates are not being \
+             released but would be pulled into a released crate's dependency tree while \
+             requiring an incompatible version of a crate that IS being released:\n{}\n\nAdd the \
+             listed crate(s) to the plan, or remove from the plan the crate(s) they conflict \
+             with.",
+            violations.join("\n")
+        );
+    }
+
+    Ok(())
+}
+
+/// Pure core of [`validate_release_closure`]: given the forward dependency
+/// graph (each edge carrying its version requirement) and the packages being
+/// released (with their new versions), return the sorted list of consistency
+/// violations. An empty result means the release is self-consistent.
+fn release_closure_violations(
+    deps_of: &HashMap<Package, Vec<(Package, String)>>,
+    releasing: &HashMap<Package, semver::Version>,
+) -> Vec<String> {
+    // Everything reachable (downward) from the released packages, i.e. what
+    // will actually be pulled into a released crate's build.
+    let mut reachable = releasing.keys().copied().collect::<HashSet<_>>();
+    let mut stack = reachable.iter().copied().collect::<Vec<_>>();
+    while let Some(pkg) = stack.pop() {
+        for (dep, _) in deps_of.get(&pkg).into_iter().flatten() {
+            if reachable.insert(*dep) {
+                stack.push(*dep);
+            }
+        }
+    }
+
+    // For every *frozen* crate that is nonetheless reachable, its requirement on
+    // any released crate must accept that crate's new version.
+    let mut violations = Vec::new();
+    for pkg in &reachable {
+        if releasing.contains_key(pkg) {
+            continue;
+        }
+        for (dep, req) in deps_of.get(pkg).into_iter().flatten() {
+            let Some(new_version) = releasing.get(dep) else {
+                continue;
+            };
+            let accepted = VersionReq::parse(req)
+                .map(|r| r.matches(new_version))
+                .unwrap_or(false);
+            if !accepted {
+                violations.push(format!(
+                    "  - {pkg} (not in the plan) requires {dep} \"{req}\", which does not accept \
+                     the planned {dep} {new_version}"
+                ));
+            }
+        }
+    }
+
+    violations.sort();
+    violations.dedup();
+    violations
 }
 
 /// Merge PR changelog and migration guide entries from recently-merged PRs
@@ -752,6 +974,206 @@ mod tests {
         assert_changes(
             &[Package::EspHal],
             &[Package::EspHal, Package::EspRadio, Package::EspRtos],
+        );
+    }
+
+    fn ver(s: &str) -> semver::Version {
+        semver::Version::parse(s).unwrap()
+    }
+
+    /// A forward dependency graph (with version requirements) modelled on the
+    /// real xtensa/Wi-Fi chain. Dev-dependencies are excluded, matching the
+    /// real graph (notably esp-radio's dev-dependency on esp-rtos, which must
+    /// NOT make esp-rtos look private to esp-radio):
+    /// ```text
+    /// esp-radio -> esp-hal, esp-phy, esp-radio-rtos-driver, esp-alloc
+    /// esp-rtos  -> esp-hal, esp-radio-rtos-driver, esp-alloc
+    /// esp-hal   -> esp-sync, xtensa-lx
+    /// esp-sync  -> xtensa-lx
+    /// esp-phy   -> esp-sync
+    /// ```
+    fn xtensa_deps_of() -> HashMap<Package, Vec<(Package, String)>> {
+        HashMap::from([
+            (
+                Package::EspRadio,
+                vec![
+                    (Package::EspHal, "~1.2.0-rc.0".to_string()),
+                    (Package::EspPhy, "0.2.0".to_string()),
+                    (Package::EspRadioRtosDriver, "0.3.0".to_string()),
+                    (Package::EspAlloc, "0.10.0".to_string()),
+                ],
+            ),
+            (
+                Package::EspRtos,
+                vec![
+                    (Package::EspHal, "~1.2.0-rc.0".to_string()),
+                    (Package::EspRadioRtosDriver, "0.3.0".to_string()),
+                    (Package::EspAlloc, "0.10.0".to_string()),
+                ],
+            ),
+            (
+                Package::EspHal,
+                vec![
+                    (Package::EspSync, "0.3.0".to_string()),
+                    (Package::XtensaLx, "0.13.0".to_string()),
+                ],
+            ),
+            (
+                Package::EspSync,
+                vec![(Package::XtensaLx, "0.13.0".to_string())],
+            ),
+            (
+                Package::EspPhy,
+                vec![(Package::EspSync, "0.3.0".to_string())],
+            ),
+            (Package::EspRadioRtosDriver, vec![]),
+            (Package::EspAlloc, vec![]),
+            (Package::XtensaLx, vec![]),
+        ])
+    }
+
+    /// Inverse of [`xtensa_deps_of`]: each crate to its in-repo dependents.
+    fn xtensa_dependents() -> HashMap<Package, Vec<Package>> {
+        HashMap::from([
+            (Package::EspHal, vec![Package::EspRadio, Package::EspRtos]),
+            (Package::EspPhy, vec![Package::EspRadio]),
+            (
+                Package::EspRadioRtosDriver,
+                vec![Package::EspRadio, Package::EspRtos],
+            ),
+            (Package::EspAlloc, vec![Package::EspRadio, Package::EspRtos]),
+            (Package::EspSync, vec![Package::EspHal, Package::EspPhy]),
+            (Package::XtensaLx, vec![Package::EspHal, Package::EspSync]),
+        ])
+    }
+
+    fn full_release_set() -> HashSet<Package> {
+        [
+            Package::EspRadio,
+            Package::EspRtos,
+            Package::EspHal,
+            Package::EspSync,
+            Package::EspPhy,
+            Package::EspRadioRtosDriver,
+            Package::EspAlloc,
+            Package::XtensaLx,
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    #[test]
+    fn closure_full_release_is_consistent() {
+        // Everything is released, so no frozen crate can hold a stale requirement.
+        let releasing = HashMap::from([
+            (Package::EspRadio, ver("1.0.0-beta.1")),
+            (Package::EspRtos, ver("0.4.0")),
+            (Package::EspHal, ver("1.2.0-rc.1")),
+            (Package::EspSync, ver("0.4.0")),
+            (Package::EspPhy, ver("0.3.0")),
+            (Package::EspRadioRtosDriver, ver("0.4.0")),
+            (Package::EspAlloc, ver("0.11.0")),
+            (Package::XtensaLx, ver("0.14.0")),
+        ]);
+        assert!(release_closure_violations(&xtensa_deps_of(), &releasing).is_empty());
+    }
+
+    #[test]
+    fn closure_excluding_radio_leaf_is_consistent() {
+        // esp-radio (and its private esp-phy) dropped. Nothing released depends
+        // on them, so they never enter a released crate's dependency tree.
+        let releasing = HashMap::from([
+            (Package::EspRtos, ver("0.4.0")),
+            (Package::EspHal, ver("1.2.0-rc.1")),
+            (Package::EspSync, ver("0.4.0")),
+            (Package::EspRadioRtosDriver, ver("0.4.0")),
+            (Package::EspAlloc, ver("0.11.0")),
+            (Package::XtensaLx, ver("0.14.0")),
+        ]);
+        assert!(release_closure_violations(&xtensa_deps_of(), &releasing).is_empty());
+    }
+
+    #[test]
+    fn closure_frozen_esp_hal_with_bumped_xtensa_is_rejected() {
+        // Bump xtensa-lx (breaking) but freeze esp-hal: esp-rtos would pull the
+        // frozen esp-hal (xtensa-lx 0.13) alongside the new xtensa-lx 0.14.
+        let releasing = HashMap::from([
+            (Package::XtensaLx, ver("0.14.0")),
+            (Package::EspSync, ver("0.4.0")),
+            (Package::EspRtos, ver("0.4.0")),
+        ]);
+        let violations = release_closure_violations(&xtensa_deps_of(), &releasing);
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("esp-hal") && v.contains("xtensa-lx")),
+            "expected an esp-hal/xtensa-lx violation, got: {violations:?}"
+        );
+    }
+
+    #[test]
+    fn exclusion_radio_prunes_only_phy() {
+        // Excluding esp-radio drops its genuinely-private esp-phy, but keeps
+        // esp-rtos, esp-alloc and esp-radio-rtos-driver: those are used beyond
+        // esp-radio (and esp-radio's dev-dependency on esp-rtos is not counted).
+        let removed = compute_exclusion_removals(
+            &xtensa_dependents(),
+            &full_release_set(),
+            &[Package::EspRadio],
+        );
+        assert_eq!(
+            removed,
+            [Package::EspRadio, Package::EspPhy]
+                .into_iter()
+                .collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn exclusion_esp_hal_removes_only_esp_hal() {
+        // esp-hal keeps dependents that stay in the plan, so nothing is
+        // auto-pruned. Whether freezing esp-hal is *safe* is left to the
+        // closure check, not decided here.
+        let removed = compute_exclusion_removals(
+            &xtensa_dependents(),
+            &full_release_set(),
+            &[Package::EspHal],
+        );
+        assert_eq!(
+            removed,
+            [Package::EspHal].into_iter().collect::<HashSet<_>>()
+        );
+    }
+
+    #[test]
+    fn closure_releasing_radio_over_frozen_lower_stack_is_ok() {
+        // Release esp-radio while freezing esp-phy and the whole lower stack:
+        // esp-radio keeps depending on the already-published versions, which is
+        // consistent because none of those frozen crates' deps are bumped.
+        let releasing = HashMap::from([
+            (Package::EspRadio, ver("1.0.0-beta.1")),
+            (Package::EspRtos, ver("0.4.0")),
+            (Package::EspRadioRtosDriver, ver("0.4.0")),
+            (Package::EspAlloc, ver("0.11.0")),
+        ]);
+        assert!(release_closure_violations(&xtensa_deps_of(), &releasing).is_empty());
+    }
+
+    #[test]
+    fn closure_freezing_esp_phy_while_bumping_esp_sync_is_rejected() {
+        // Bump esp-sync but freeze esp-phy: released esp-radio pulls the frozen
+        // esp-phy (which still requires esp-sync 0.3) alongside the new esp-sync
+        // 0.4.
+        let releasing = HashMap::from([
+            (Package::EspRadio, ver("1.0.0-beta.1")),
+            (Package::EspSync, ver("0.4.0")),
+        ]);
+        let violations = release_closure_violations(&xtensa_deps_of(), &releasing);
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("esp-phy") && v.contains("esp-sync")),
+            "expected an esp-phy/esp-sync violation, got: {violations:?}"
         );
     }
 }
