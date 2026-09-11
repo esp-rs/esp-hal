@@ -83,16 +83,16 @@ ieee802154 = { version = "0.6.1", optional = true }
 heapless = "0.9"
 embassy-sync = "0.8"
 # Make sure these are aligned with esp-phy's dependencies, too!
-esp-wifi-sys-esp32 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32c2 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32c3 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32c5 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32c6 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32c61 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32h2 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32s2 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32s3 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
-esp-wifi-sys-esp32s31 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "88abcf2" }
+esp-wifi-sys-esp32 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32c2 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32c3 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32c5 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32c6 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32c61 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32h2 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32s2 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32s3 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
+esp-wifi-sys-esp32s31 = { version = "0.2.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "b1ab831" }
 
 esp32   = { version = "0.41", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
 esp32c2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
