@@ -21,7 +21,7 @@ use crate::{
     peripherals::IPC,
     soc::cpu_control,
     system::{self, Cpu},
-    time::implem,
+    time::implem as raw_time,
 };
 
 /// How long [`engage`] waits for the helper to start its backup.
@@ -109,7 +109,19 @@ pub(crate) fn engage() -> bool {
     // posts one function, and two posts of the same function coalesce.
     Ipc::new(unsafe { IPC::steal() }).call_function(other_cpu(), helper_entry);
 
-    match enlist(other) {
+    let enlisted = {
+        let deadline = raw_time::raw_counter() + raw_time::us_to_ticks(ENLIST_TIMEOUT_US);
+        loop {
+            match state_of(other) {
+                State::BackupStart => break Enlisted::Joined,
+                State::SkipRetention => break Enlisted::Refused,
+                _ if raw_time::raw_counter() >= deadline => break Enlisted::NoAnswer,
+                _ => core::hint::spin_loop(),
+            }
+        }
+    };
+
+    match enlisted {
         Enlisted::Joined => {
             HELPER_ENLISTED.store(true, Ordering::Release);
             true
@@ -134,7 +146,7 @@ pub(crate) fn engage() -> bool {
 }
 
 /// Returns whether a helper saved itself and waits for this core to request the sleep.
-#[crate::ram]
+#[inline(always)]
 pub(crate) fn helper_enlisted() -> bool {
     HELPER_ENLISTED.load(Ordering::Acquire)
 }
@@ -142,7 +154,7 @@ pub(crate) fn helper_enlisted() -> bool {
 /// Returns whether the sleep can power the CPU domain down.
 ///
 /// A sleep that powers the domain down needs every running core to save itself.
-#[crate::ram]
+#[inline(always)]
 pub(crate) fn retention_allowed() -> bool {
     !cpu_control::is_running(Cpu::AppCpu) || helper_enlisted()
 }
@@ -203,21 +215,8 @@ pub(crate) fn finish() {
     release_initiator(core);
 }
 
-/// Returns whether this core agrees to a light sleep that the other core requests.
-///
-/// A program that registered no handler agrees to every sleep.
-#[crate::ram]
-fn can_sleep() -> bool {
-    let handler = crate::rtc_cntl::sleep::CAN_SLEEP_HANDLER.load(Ordering::Acquire);
-    match handler.is_null() {
-        true => true,
-        // SAFETY: `set_can_sleep_handler` takes a `fn() -> bool`, and this is that pointer.
-        false => unsafe { core::mem::transmute::<*mut (), fn() -> bool>(handler)() },
-    }
-}
-
 /// Gives the initiator slot back, if this core holds it.
-#[crate::ram]
+#[inline(always)]
 fn release_initiator(core: usize) {
     let _ = INITIATOR.compare_exchange(
         core as u8,
@@ -228,7 +227,7 @@ fn release_initiator(core: usize) {
 }
 
 /// Takes the request of this core, and runs the helper routine.
-#[crate::ram]
+#[inline(always)]
 fn helper_entry() {
     if REQUEST[system::raw_core()].swap(false, Ordering::AcqRel) {
         run_helper();
@@ -252,31 +251,50 @@ fn run_helper() {
 
     // The answer holds for the whole sleep, because the interrupts of this core are off from here
     // until the sleep is over, and nothing else can give this core work.
-    if !can_sleep() {
+    let can_sleep = {
+        let handler = crate::rtc_cntl::sleep::CAN_SLEEP_HANDLER.load(Ordering::Acquire);
+        match handler.is_null() {
+            true => true,
+            // SAFETY: `set_can_sleep_handler` takes a `fn() -> bool`, and this is that pointer.
+            false => unsafe { core::mem::transmute::<*mut (), fn() -> bool>(handler)() },
+        }
+    };
+
+    if !can_sleep {
         set_state(core, State::SkipRetention);
-    } else if !wait_for_backup_or_skip(other) {
-        set_state(core, State::BackupStart);
+    } else {
+        let skip_retention = loop {
+            match state_of(core) {
+                State::SkipRetention => break true,
+                State::BackupStart => break false,
+                _ => core::hint::spin_loop(),
+            }
+        };
 
-        // SAFETY: the rendezvous runs for a sleep that retains the CPU, so the memory of the
-        // frames is installed.
-        let buffer = unsafe { crate::rtc_cntl::installed_buffer_ptr().unwrap_unchecked() };
-        let mut ctx = CoreRetentionContext::new(buffer.as_ptr(), core);
-        save_pre_critical(&mut ctx);
-        let frame = save_critical_frame(&ctx);
+        if !skip_retention {
+            set_state(core, State::BackupStart);
 
-        // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
-        let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
-        if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
-            set_state(core, State::BackupDone);
-            // Either the CPU domain loses power here, or the initiator reports that the hardware
-            // rejected the request. This core does not arm the wake stub: the initiator arms it
-            // for both cores.
-            wait_for(other, State::SkipRetention);
-        } else {
-            cpu_control::restart_core1_after_wake();
-            set_state(core, State::RestoreStart);
-            restore(&mut ctx);
-            set_state(core, State::RestoreDone);
+            // SAFETY: the rendezvous runs for a sleep that retains the CPU, so the memory of the
+            // frames is installed.
+            let buffer = unsafe { crate::rtc_cntl::installed_buffer_ptr().unwrap_unchecked() };
+            let mut ctx = CoreRetentionContext::new(buffer.as_ptr(), core);
+            save_pre_critical(&mut ctx);
+            let frame = save_critical_frame(&ctx);
+
+            // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
+            let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
+            if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
+                set_state(core, State::BackupDone);
+                // Either the CPU domain loses power here, or the initiator reports that the
+                // hardware rejected the request. This core does not arm the wake
+                // stub: the initiator arms it for both cores.
+                wait_for(other, State::SkipRetention);
+            } else {
+                cpu_control::restart_core1_after_wake();
+                set_state(core, State::RestoreStart);
+                restore(&mut ctx);
+                set_state(core, State::RestoreDone);
+            }
         }
     }
 
@@ -288,7 +306,7 @@ fn run_helper() {
 }
 
 /// Restores the frames that memory kept. The wake stub restored the critical frame already.
-#[crate::ram]
+#[inline(always)]
 fn restore(ctx: &mut CoreRetentionContext) {
     // SAFETY: the frame holds what this core saved before the sleep.
     unsafe { ctx.non_critical().as_ref().unwrap().restore() };
@@ -296,12 +314,12 @@ fn restore(ctx: &mut CoreRetentionContext) {
 }
 
 /// Returns the index of the core that this core shares the rendezvous with.
-#[crate::ram]
+#[inline(always)]
 fn other_core() -> usize {
-    Cpu::COUNT - 1 - system::raw_core()
+    other_cpu() as usize
 }
 
-#[crate::ram]
+#[inline(always)]
 fn other_cpu() -> Cpu {
     match system::raw_core() {
         0 => Cpu::AppCpu,
@@ -309,18 +327,18 @@ fn other_cpu() -> Cpu {
     }
 }
 
-#[crate::ram]
+#[inline(always)]
 fn state_of(core: usize) -> State {
     // SAFETY: `set_state` is the only writer, and it writes a `State`.
     unsafe { core::mem::transmute::<u8, State>(STATES[core].load(Ordering::Acquire)) }
 }
 
-#[crate::ram]
+#[inline(always)]
 fn set_state(core: usize, state: State) {
     STATES[core].store(state as u8, Ordering::Release);
 }
 
-#[crate::ram]
+#[inline(always)]
 fn wait_for(core: usize, state: State) {
     while state_of(core) != state {
         core::hint::spin_loop();
@@ -337,30 +355,4 @@ enum Enlisted {
 
     /// The helper did not answer inside [`ENLIST_TIMEOUT_US`].
     NoAnswer,
-}
-
-#[crate::ram]
-fn enlist(core: usize) -> Enlisted {
-    let deadline = implem::raw_counter() + implem::us_to_ticks(ENLIST_TIMEOUT_US);
-    loop {
-        match state_of(core) {
-            State::BackupStart => return Enlisted::Joined,
-            State::SkipRetention => return Enlisted::Refused,
-            _ if implem::raw_counter() >= deadline => return Enlisted::NoAnswer,
-            _ => core::hint::spin_loop(),
-        }
-    }
-}
-
-/// Waits until `core` starts its backup, or reports that the sleep does not happen, and returns
-/// whether this core must skip the retention.
-#[crate::ram]
-fn wait_for_backup_or_skip(core: usize) -> bool {
-    loop {
-        match state_of(core) {
-            State::SkipRetention => return true,
-            State::BackupStart => return false,
-            _ => core::hint::spin_loop(),
-        }
-    }
 }
