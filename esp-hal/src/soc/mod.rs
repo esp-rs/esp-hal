@@ -14,6 +14,7 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32c6, path = "esp32c6/mod.rs")]
 #[cfg_attr(esp32c61, path = "esp32c61/mod.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2/mod.rs")]
+#[cfg_attr(esp32h4, path = "esp32h4/mod.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
@@ -366,6 +367,13 @@ pub(crate) fn enable_pmp() {
         end_addr: u32,
         permission: u8,
     ) -> Result<(), PmpError> {
+        // The CPU hardwires the address bits below the PMP granularity to zero, rounding both ends
+        // of the region down. Round the start up instead, so that the region cannot grow downwards
+        // over memory in front of it, such as the trap section and its interrupt handler table.
+        let granularity = property!("soc.cpu_pmp_granularity");
+        let start_addr = start_addr.next_multiple_of(granularity);
+        let end_addr = end_addr & !(granularity - 1);
+
         if start_addr >= end_addr {
             return Err(PmpError::InvalidRange);
         }

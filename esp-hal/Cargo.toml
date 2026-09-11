@@ -119,6 +119,7 @@ esp32c5 = { version = "0.3",  features = ["critical-section"], optional = true, 
 esp32c6 = { version = "0.24", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
 esp32c61 = { version = "0.4", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
 esp32h2 = { version = "0.20", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
+esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
 esp32s2 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
 esp32s3 = { version = "0.36", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
 esp32s31 = { version = "0.2", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "de5316b" }
@@ -173,6 +174,7 @@ rt = [
     "esp32c61?/rt",
     "esp32p4?/rt",
     "esp32h2?/rt",
+    "esp32h4?/rt",
     "esp32s2?/rt",
     "esp32s3?/rt",
     "esp32s31?/rt",
@@ -285,6 +287,14 @@ esp32h2 = [
     "esp-metadata-generated/esp32h2",
 ]
 ##
+esp32h4 = [
+    "dep:esp32h4",
+    "esp-riscv-rt/clic-48",
+    "esp-rom-sys/esp32h4",
+    "esp-sync/esp32h4",
+    "esp-metadata-generated/esp32h4",
+]
+##
 esp32s2 = [
     "dep:esp32s2",
     "__usb_otg",
@@ -343,6 +353,7 @@ defmt = [
     "esp32c6?/defmt",
     "esp32c61?/defmt",
     "esp32h2?/defmt",
+    "esp32h4?/defmt",
     "esp32s2?/defmt",
     "esp32s3?/defmt",
     "fugit/defmt",

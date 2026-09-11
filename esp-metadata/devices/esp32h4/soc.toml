@@ -1,0 +1,215 @@
+# ESP32-H4 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-metadata` to
+# update the table in the esp-hal README.
+
+[device]
+name   = "esp32h4"
+arch   = "riscv"
+target = "riscv32imafc-unknown-none-elf"
+cores  = 2
+datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-h4_datasheet_en.pdf"
+trm       = "https://www.espressif.com/sites/default/files/documentation/esp32-h4_technical_reference_manual_en.pdf"
+support_note = "In early stages of development."
+
+[device.mmu]
+page_size = 0x10000
+entry_num = 512
+
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
+
+[device.soc]
+multi_core_enabled = true
+cpu_has_branch_predictor = true
+cpu_has_csr_pc = false
+cpu_csr_prv_mode = 0x810
+cpu_mcause_mask = 0x3f
+# ESP-IDF does not define SOC_CPU_PMP_REGION_GRANULARITY for this chip yet. Measured on hardware
+# by writing all ones into a free `pmpaddr` and reading it back: the lowest five bits are hardwired
+# to zero.
+cpu_pmp_granularity = 128
+has_swd_watchdog = true
+
+# SRAM_SEG_START = 0x40810000, SRAM_SEG_END = 0x4084F350
+# (from esp-idf components/esp_system/ld/esp32h4/memory.ld.in)
+# dram2_uninit: SRAM_SEG_END..SOC_ROM_STACK_START (PRO CPU stack, reclaimable)
+# SOC_ROM_STACK_START = 0x4085D350 (from soc.h)
+memory_map = { ranges = [
+    { name = "dram", start = 0x4081_0000, end = 0x4084_F350 },
+    { name = "dram2_uninit", start = 0x4084_F350, end = 0x4085_D350 },
+    { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x4200_0000, end = 0x4400_0000 },
+] }
+
+peripherals = [
+    { name = "AES", interrupts = { peri = "AES" } },
+    { name = "DMA" },
+    { name = "ECC", interrupts = { peri = "ECC" } },
+    { name = "EFUSE", hidden = true },
+    { name = "GPIO" },
+    { name = "GPIO_DEDICATED", virtual = true },
+    { name = "GPIO_SD" },
+    { name = "HP_APM" },
+    { name = "HP_SYS" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2S0", interrupts = { peri = "I2S" } },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
+    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true },
+    { name = "INTERRUPT_CORE0" },
+    { name = "INTERRUPT_CORE1" },
+    { name = "INTPRI" },
+    { name = "IO_MUX" },
+    { name = "LEDC" },
+    { name = "LPWR", pac = "LP_CLKRST" },
+    { name = "LP_ANA" },
+    { name = "LP_AON" },
+    { name = "LP_CLKRST" },
+    { name = "LP_PERI" },
+    { name = "LP_WDT" },
+    { name = "MODEM_LPCON" },
+    { name = "MODEM_SYSCON" },
+    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" } },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
+    { name = "PCR" },
+    { name = "PMU" },
+    { name = "RMT", interrupts = { peri = "RMT" } },
+    { name = "RNG" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "RTC_TIMER", pac = "LP_TIMER" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "GPSPI2" }, stable = true, clock_group = "SPI" },
+    { name = "SPI3", interrupts = { peri = "GPSPI3" }, stable = true, clock_group = "SPI" },
+    { name = "SYSTEM", pac = "PCR" },
+    { name = "SYSTIMER" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
+    { name = "UHCI0" },
+    { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
+
+    { name = "CPU_CTRL", virtual = true },
+    { name = "FLASH", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
+]
+
+[device.soc.clocks]
+# {include clocks.toml}
+
+[device.dma]
+support_status = "partial"
+gdma_version = 3
+separate_in_out_interrupts = true
+engines = [
+    {
+        name = "AHB_GDMA",
+        max_priority = 5,
+        # Mux IDs below include later peripherals; only list HAL drivers that are enabled.
+        drivers = ["spi_master"],
+        # Peripheral selector values, TRM table 2.4-1.
+        peripheral_instances = [
+            { name = "SPI3", dma_id = 0 },
+            { name = "SPI2", dma_id = 1 },
+            { name = "UHCI0", dma_id = 2 },
+            { name = "I2S0", dma_id = 3 },
+            { name = "AES", dma_id = 4 },
+            { name = "SHA", dma_id = 7 },
+            { name = "PARL_IO", dma_id = 9 },
+        ],
+        # 10 ~ 15 are the "dummy" selectors used for memory-to-memory transfers.
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, mem2mem_id = 10, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+            { name = "DMA_CH1", mem2mem = true, mem2mem_id = 11, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+            { name = "DMA_CH2", mem2mem = true, mem2mem_id = 12, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+            { name = "DMA_CH3", mem2mem = true, mem2mem_id = 13, interrupt_in = "DMA_IN_CH3", interrupt_out = "DMA_OUT_CH3" },
+            { name = "DMA_CH4", mem2mem = true, mem2mem_id = 14, interrupt_in = "DMA_IN_CH4", interrupt_out = "DMA_OUT_CH4" },
+        ]
+    },
+]
+
+[device.ecdsa]
+support_status = { status = "not_supported", issue = 5444 }
+
+[device.gpio]
+support_status = "partial"
+# {include gpio.toml}
+
+# The CSR interface is identical to the C6/H2 one (see `dedic_gpio_cpu_ll.h`), but each core has
+# its own set of 8 channels: CPU_GPIO_0..7 belong to core 0, CPU_GPIO_8..15 to core 1.
+[device.dedicated_gpio]
+version = "riscv_v1"
+support_status = "partial"
+channels = [
+    ["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
+    ["CPU_GPIO_8", "CPU_GPIO_9", "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
+]
+
+[device.io_mux]
+
+[device.i2c_slave]
+support_status = { status = "not_supported", issue = 1909 }
+
+[device.interrupts]
+support_status = "partial"
+# 98 interrupt sources => ceil(98/32) = 4 status words
+status_registers = 4
+software_interrupt_count = 4
+controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
+
+[device.hmac]
+support_status = { status = "not_supported", issue = 5166 }
+
+[device.systimer]
+
+[device.timergroup]
+support_status = "partial"
+instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
+# see esp-idf components/esp_hw_support/port/esp32h4/rtc_time.c
+rc_fast_calibration = { divider = 32, min_rev = 0 }
+
+[device.spi_master]
+support_status = "partial"
+version = 3
+fifo_size = 64
+has_app_interrupts = true
+has_dma_segmented_transfer = true
+instances = [
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"],
+        cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "FSPI3CLK",
+        sio = ["FSPI3D", "FSPI3Q", "FSPI3WP", "FSPI3HD"],
+        cs = ["FSPI3CS0", "FSPI3CS1", "FSPI3CS2"]
+    },
+]
+
+[device.uart]
+support_status = "partial"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
+ram_size = 128
+version = 2
+peripheral_controls_mem_clk = true
+has_sclk_enable = true
+
+[device.usb_serial_jtag]
+support_status = "partial"
