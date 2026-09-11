@@ -42,15 +42,25 @@ fn pulse_wifibb_reset() {
         .modify(|_, w| w.rst_wifibb().clear_bit());
 }
 
+/// The Wi-Fi MAC clock and the APB clock that reaches its registers.
+///
+/// The driver asks for its clocks to be gated while it is still tearing down, and then writes Wi-Fi
+/// MAC registers. With these gated, the access hangs the CPU and debug connection.
+fn set_wifi_mac_clocks(en: bool) {
+    regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
+        w.clk_wifi_apb_en().bit(en);
+        w.clk_wifimac_en().bit(en)
+    });
+}
+
 pub(crate) fn enable_wifi(en: bool) {
     if en {
         enable_soc_pll_source_cg();
         pulse_wifibb_reset();
+        set_wifi_mac_clocks(true);
     }
 
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
-        w.clk_wifi_apb_en().bit(en);
-        w.clk_wifimac_en().bit(en);
         w.clk_fe_apb_en().bit(en);
         w.clk_fe_160m_en().bit(en);
         w.clk_fe_80m_en().bit(en);
