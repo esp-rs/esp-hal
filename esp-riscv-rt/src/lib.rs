@@ -86,6 +86,18 @@ __pre_init:"#,
     blt a0, a1, 1b
     2:
 "#,
+    // Zero .dram2_uninit.bss
+    r#"
+    la a0, _dram2_uninit_bss_start
+    la a1, _dram2_uninit_bss_end
+    bge a0, a1, 2f
+    mv a3, x0
+    1:
+    sw a3, 0(a0)
+    addi a0, a0, 4
+    blt a0, a1, 1b
+    2:
+"#,
 r#"
     ret
 
