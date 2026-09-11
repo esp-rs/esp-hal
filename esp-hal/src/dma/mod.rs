@@ -1020,7 +1020,7 @@ where
         }
     }
 
-    fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub(crate) fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.unlisten_in(EnumSet::all());
         self.clear_in(EnumSet::all());
 
