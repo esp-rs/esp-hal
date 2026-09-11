@@ -87,13 +87,13 @@ mod timers_executors {
 
     fn set_up_embassy_with_timg0(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
     }
 
     #[cfg(not(feature = "esp32"))]
     fn set_up_embassy_with_systimer(peripherals: Peripherals) {
         let systimer = SystemTimer::new(peripherals.SYSTIMER);
-        esp_rtos::start(systimer.alarm0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(systimer.alarm0);
     }
 
     #[init]
@@ -165,7 +165,7 @@ mod timers_executors {
     #[test]
     async fn test_interrupt_executor(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let executor = mk_static!(
             InterruptExecutor<2>,
@@ -256,7 +256,7 @@ mod interrupt_executor {
     use esp_hal::{interrupt::Priority, peripherals::FROM_CPU_INTR2, timer::timg::TimerGroup};
     #[cfg(multi_core)]
     use esp_hal::{
-        peripherals::{CPU_CTRL, FROM_CPU_INTR1},
+        peripherals::CPU_CTRL,
         system::{Cpu, CpuControl, Stack},
     };
     use esp_rtos::embassy::{Callbacks, Executor, InterruptExecutor};
@@ -307,8 +307,6 @@ mod interrupt_executor {
     }
 
     struct Context {
-        #[cfg(multi_core)]
-        sw_int1: FROM_CPU_INTR1<'static>,
         sw_int2: FROM_CPU_INTR2<'static>,
         #[cfg(multi_core)]
         cpu_control: CPU_CTRL<'static>,
@@ -319,11 +317,9 @@ mod interrupt_executor {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         Context {
-            #[cfg(multi_core)]
-            sw_int1: peripherals.FROM_CPU_INTR1,
             sw_int2: peripherals.FROM_CPU_INTR2,
             #[cfg(multi_core)]
             cpu_control: peripherals.CPU_CTRL,
@@ -382,7 +378,7 @@ mod interrupt_executor {
         let response = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let signal = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        esp_rtos::start_second_core(ctx.cpu_control, ctx.sw_int1, app_core_stack, || {
+        esp_rtos::start_second_core(ctx.cpu_control, app_core_stack, || {
             let interrupt_executor =
                 mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.sw_int2));
 
@@ -404,7 +400,7 @@ mod interrupt_executor {
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
         let response = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        esp_rtos::start_second_core(ctx.cpu_control, ctx.sw_int1, app_core_stack, || {
+        esp_rtos::start_second_core(ctx.cpu_control, app_core_stack, || {
             let executor = mk_static!(Executor, Executor::new());
             executor.run(|spawner| {
                 spawner.spawn(responder_task(signal, response).unwrap());
@@ -493,7 +489,7 @@ mod interrupt_spi_dma {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let (dma_channel1, dma_channel2) =
             cfg_select! {
@@ -544,8 +540,8 @@ mod interrupt_spi_dma {
         .unwrap();
 
         let interrupt_executor = mk_static!(
-            InterruptExecutor<1>,
-            InterruptExecutor::new(peripherals.FROM_CPU_INTR1)
+            InterruptExecutor<2>,
+            InterruptExecutor::new(peripherals.FROM_CPU_INTR2)
         );
 
         let spawner = interrupt_executor.start(Priority::Priority3);
@@ -640,7 +636,7 @@ mod interrupt_spi_dma {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let dma_channel = cfg_select! {
             spi_master_dma_engine = "SPI_DMA" => peripherals.DMA_SPI2,
@@ -657,23 +653,18 @@ mod interrupt_spi_dma {
 
         let app_core_stack = mk_static!(Stack<8192>, Stack::new());
 
-        esp_rtos::start_second_core(
-            peripherals.CPU_CTRL,
-            peripherals.FROM_CPU_INTR1,
-            app_core_stack,
-            || {
-                use esp_hal::interrupt::Priority;
-                let software_interrupt = peripherals.FROM_CPU_INTR2;
-                let hp_executor = mk_static!(
-                    InterruptExecutor<2>,
-                    InterruptExecutor::new(software_interrupt)
-                );
-                let high_pri_spawner = hp_executor.start(Priority::Priority2);
+        esp_rtos::start_second_core(peripherals.CPU_CTRL, app_core_stack, || {
+            use esp_hal::interrupt::Priority;
+            let software_interrupt = peripherals.FROM_CPU_INTR2;
+            let hp_executor = mk_static!(
+                InterruptExecutor<2>,
+                InterruptExecutor::new(software_interrupt)
+            );
+            let high_pri_spawner = hp_executor.start(Priority::Priority2);
 
-                // spi runs as high priority task
-                high_pri_spawner.spawn(run_spi(spi_peripherals, transfer_finished).unwrap());
-            },
-        );
+            // spi runs as high priority task
+            high_pri_spawner.spawn(run_spi(spi_peripherals, transfer_finished).unwrap());
+        });
 
         // Wait for a few SPI transfers to happen
         for _ in 0..5 {

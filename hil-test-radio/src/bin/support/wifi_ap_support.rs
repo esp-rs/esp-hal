@@ -57,7 +57,7 @@ async fn main(spawner: Spawner) -> ! {
     let p = esp_hal::init(config);
 
     let timg0 = TimerGroup::new(p.TIMG0);
-    esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     let access_point_config = Config::AccessPoint(
         AccessPointConfig::default()

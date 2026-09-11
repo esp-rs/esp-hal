@@ -55,7 +55,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     let access_point_config = Config::AccessPoint(
         AccessPointConfig::default().with_ssid("esp-radio".try_into().unwrap()),

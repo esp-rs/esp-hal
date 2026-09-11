@@ -109,7 +109,7 @@ async fn main(_s: Spawner) -> ! {
     init_heap();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    esp_rtos::start(timg0.timer0);
 
     // Read the iteration left behind by the previous boot, then bump it so the
     // next boot (after our software reset) runs the other radio.

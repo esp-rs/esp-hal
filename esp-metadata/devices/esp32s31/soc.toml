@@ -51,6 +51,8 @@ peripherals = [
     { name = "ASSIST_DEBUG" },
     { name = "CACHE" },
     { name = "CLIC" },
+    { name = "CLINT" },
+    { name = "CLINT_OTHER_CORE" },
     { name = "CNNT_SYS", hidden = true },
     { name = "CNNT_IO_MUX", hidden = true },
     { name = "ETH", virtual = true, interrupts = { peri = "SBD" } },
@@ -125,6 +127,7 @@ peripherals = [
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "MODEM_WIFI_BB", mac = "MODEM_WIFI_MAC", pwr = "MODEM_WIFI_PWR" }, stable = true },
     { name = "CPU_CTRL", virtual = true },
+    { name = "IPC", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
     { name = "FROM_CPU_INTR1", virtual = true },
     { name = "FROM_CPU_INTR2", virtual = true },
@@ -140,6 +143,7 @@ support_status = "partial"
 status_registers = 6
 software_interrupt_count = 4
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
+context_switch_source = "ipc"
 
 [device.timergroup]
 support_status = "partial"
