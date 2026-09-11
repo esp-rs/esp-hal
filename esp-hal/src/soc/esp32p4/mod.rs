@@ -41,13 +41,7 @@ pub(crate) fn enable_branch_predictor() {
     }
 }
 
-#[cfg(all(
-    cpu_retention = "software",
-    multi_core,
-    supports_cpu_power_down,
-    feature = "rt",
-    feature = "unstable"
-))]
+#[cfg(feature = "rt")]
 pub(crate) fn disable_branch_predictor() {
     unsafe {
         core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);

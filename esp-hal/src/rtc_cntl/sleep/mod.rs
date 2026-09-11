@@ -232,7 +232,7 @@ impl<'d> LowPower<'d> {
         // rendezvous comes first, before any step that a return would have to undo. This core
         // acts as the helper of the other core when it loses the arbitration, and the sleep is
         // over when that call returns.
-        #[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+        #[cfg(cpu_retention = "software")]
         if kind == SleepKind::Light
             && crate::rtc_cntl::installed_buffer_ptr().is_some()
             && !crate::rtc_cntl::cpu_retention::rendezvous::engage()
@@ -249,7 +249,7 @@ impl<'d> LowPower<'d> {
         // Retention serves light sleep only. Deep sleep resets the chip, so it has no CPU state to
         // bring back, and an armed descriptor would outlive the sleep in the RTC domain. esp-idf
         // arms retention from its light sleep path alone.
-        #[cfg(any(cpu_retention = "rtc_cntl", cpu_retention = "software"))]
+        #[cfg(supports_cpu_power_down)]
         let retention_buffer = match kind {
             SleepKind::Light => {
                 let buffer = crate::rtc_cntl::installed_buffer_ptr();
@@ -344,7 +344,7 @@ impl<'d> LowPower<'d> {
 
         // The helper waits for this store, so it must run before this core can request another
         // sleep.
-        #[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+        #[cfg(cpu_retention = "software")]
         if kind == SleepKind::Light && retention_buffer.is_some() {
             crate::rtc_cntl::cpu_retention::rendezvous::finish();
         }
@@ -401,7 +401,7 @@ impl<'d> LowPower<'d> {
 fn park_other_cores() -> u8 {
     // A core that saves itself in the rendezvous must keep running, because a stalled core saves
     // nothing.
-    #[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+    #[cfg(cpu_retention = "software")]
     if crate::rtc_cntl::cpu_retention::rendezvous::helper_enlisted() {
         return 0;
     }

@@ -88,8 +88,7 @@ pub(crate) fn disable_core1() {
     cpu_retention = "software",
     multi_core,
     supports_cpu_power_down,
-    feature = "rt",
-    feature = "unstable"
+    feature = "rt"
 ))]
 #[crate::ram]
 pub(crate) fn restart_core1_after_wake() {

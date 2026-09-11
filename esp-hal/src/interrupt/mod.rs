@@ -61,10 +61,6 @@ The HAL defines the `Software0` interrupt handler, and switches tasks in that in
 "
 )]
 
-#[cfg(riscv)]
-pub use self::riscv::*;
-#[cfg(xtensa)]
-pub use self::xtensa::*;
 use crate::{peripherals::Interrupt, system::Cpu};
 
 cfg_select! {
@@ -78,14 +74,14 @@ cfg_select! {
     }
 }
 
-#[cfg(riscv)]
-mod riscv;
-#[cfg(xtensa)]
-mod xtensa;
+#[cfg_attr(riscv, path = "riscv.rs")]
+#[cfg_attr(xtensa, path = "xtensa.rs")]
+mod arch;
+pub use arch::*;
 
 use crate::pac;
 
-unstable_driver! {
+unstable_module! {
     pub mod software;
 
     #[cfg(all(feature = "rt", multi_core))]
@@ -121,14 +117,10 @@ pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
 /// [`InterruptHandler`].
 #[instability::unstable]
 pub trait InterruptConfigurable: crate::private::Sealed {
-    #[cfg_attr(
-        not(multi_core),
-        doc = "Registers an interrupt handler for the peripheral."
-    )]
-    #[cfg_attr(
-        multi_core,
-        doc = "Registers an interrupt handler for the peripheral on the current core."
-    )]
+    #[doc = cfg_select! {
+        multi_core => "Registers an interrupt handler for the peripheral on the current core.",
+        _ => "Registers an interrupt handler for the peripheral.",
+    }]
     #[doc = ""]
     /// Replaces any previously registered interrupt handlers. Some peripherals
     /// offer a shared interrupt handler for multiple purposes. The caller must

@@ -18,10 +18,21 @@ pub use esp_riscv_rt::TrapFrame;
 #[cfg_attr(interrupt_controller = "clic", path = "riscv/clic.rs")]
 mod cpu_int;
 
-// The software-interrupt driver is the only caller on this architecture, and that driver is
-// unstable.
-#[cfg(feature = "unstable")]
-pub(crate) use riscv::interrupt::free;
+// riscv::interrupt::free is not safe on C6/H2
+#[inline]
+pub(crate) fn free<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
+    let irq_token = unsafe { SingleCoreInterruptLock.enter() };
+
+    let r = f();
+
+    unsafe { SingleCoreInterruptLock.exit(irq_token) };
+
+    r
+}
 
 use crate::{
     interrupt::{PriorityError, RunLevel},

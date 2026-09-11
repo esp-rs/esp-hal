@@ -73,8 +73,7 @@ pub(crate) fn pre_system_reset() {
     cpu_retention = "software",
     multi_core,
     supports_cpu_power_down,
-    feature = "rt",
-    feature = "unstable"
+    feature = "rt"
 ))]
 #[crate::ram]
 pub(crate) fn restart_core1_after_wake() {
