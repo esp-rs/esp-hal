@@ -1,7 +1,7 @@
 //! Retention of the CPU power domain across a light sleep.
 
 cfg_select! {
-    all(cpu_retention = "software", supports_cpu_power_down) => {
+    cpu_retention = "software" => {
         mod chips;
         mod device_regs;
         mod frames;
@@ -15,13 +15,12 @@ cfg_select! {
         // need no condition of their own.
         #[cfg(all(
             multi_core,
-            feature = "rt",
-            feature = "unstable"
+            feature = "rt"
         ))]
         pub(crate) mod rendezvous;
 
         /// The answers of a chip that sleeps as one core.
-        #[cfg(not(all(multi_core, feature = "rt", feature = "unstable")))]
+        #[cfg(not(all(multi_core, feature = "rt")))]
         pub(crate) mod rendezvous {
             /// One core has nothing to rendezvous with, so its caller always sleeps.
             #[crate::ram]
@@ -69,7 +68,7 @@ cfg_select! {
 }
 
 /// A software-retention chip with no frame layout yet cannot retain the CPU.
-#[cfg(all(cpu_retention = "software", not(supports_cpu_power_down)))]
+#[cfg(not(supports_cpu_power_down))]
 pub(crate) fn installed_buffer_ptr() -> Option<core::ptr::NonNull<u8>> {
     None
 }
