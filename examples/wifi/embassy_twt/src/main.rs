@@ -88,7 +88,7 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
             .with_ssid(SSID.try_into().unwrap())
             .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
                 PASSWORD.try_into().unwrap(),
-            )),
+            ))
             .with_protocols(Protocols::default().with_2_4(Protocol::AX.into())),
     );
 
