@@ -17,7 +17,6 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
     ram,
     time::{Duration, Instant},
     timer::timg::TimerGroup,
@@ -33,6 +32,7 @@ macro_rules! tprintln {
 }
 use enumset::EnumSet;
 use esp_radio::wifi::{
+    AuthenticationMethodConfig,
     Config,
     ControllerConfig,
     PowerSaveMode,
@@ -81,13 +81,14 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let station_config = Config::Station(
         StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into())
+            .with_ssid(SSID.try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                PASSWORD.try_into().unwrap(),
+            )),
             .with_protocols(Protocols::default().with_2_4(Protocol::AX.into())),
     );
 
