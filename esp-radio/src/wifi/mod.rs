@@ -1070,8 +1070,8 @@ pub enum WifiError {
     /// Passed arguments are invalid.
     InvalidArguments,
 
-    /// Generic failure - not further specified.
-    Failed,
+    /// An unspecified error occurred in the radio driver.
+    Other,
 
     /// Out of memory.
     OutOfMemory,
@@ -1088,17 +1088,42 @@ pub enum WifiError {
 
 impl WifiError {
     fn from_error_code(code: i32) -> Self {
-        if crate::sys::include::ESP_FAIL == code {
-            return WifiError::Failed;
+        use crate::sys::include::*;
+
+        // `ESP_FAIL` is a generic, unspecified failure. Map it to the opaque
+        // `Other` variant.
+        if code == ESP_FAIL {
+            return WifiError::Other;
         }
 
         match code as u32 {
-            crate::sys::include::ESP_ERR_NO_MEM => WifiError::OutOfMemory,
-            crate::sys::include::ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
-            crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
-            crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
-            crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
-            _ => panic!("Unknown error code: {}", code),
+            // Meaningful, public mappings. These are ordinary outcomes, so they
+            // are returned without any logging.
+            ESP_ERR_NO_MEM => WifiError::OutOfMemory,
+            ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
+            ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
+            ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
+            ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
+
+            // Known driver state-machine and timeout codes. These occur in
+            // perfectly normal operation.
+            ESP_ERR_WIFI_NOT_INIT
+            | ESP_ERR_WIFI_NOT_STARTED
+            | ESP_ERR_WIFI_STATE
+            | ESP_ERR_WIFI_CONN
+            | ESP_ERR_WIFI_STOP_STATE
+            | ESP_ERR_WIFI_TIMEOUT => WifiError::Other,
+
+            // Any code we don't recognise: warn so it can be reported, then fall
+            // back to the opaque variant. We must never panic here - an
+            // unexpected code from the driver should not bring down the firmware.
+            _ => {
+                warn!(
+                    "Unmapped Wi-Fi error code: {}. Please open an issue at <https://github.com/esp-rs/esp-hal/issues>.",
+                    code
+                );
+                WifiError::Other
+            }
         }
     }
 }
@@ -2043,17 +2068,11 @@ fn dump_packet_info(_buffer: &mut [u8]) {
 
 macro_rules! esp_wifi_result {
     ($value:expr) => {{
-        use num_traits::FromPrimitive;
         let result = $value;
         if result != $crate::sys::include::ESP_OK as i32 {
-            let error = unwrap!(FromPrimitive::from_i32(result));
-            warn!(
-                "{} returned an error: {:?} ({}). If this error is unmapped, please open an issue at <https://github.com/esp-rs/esp-hal/issues>.",
-                stringify!($value),
-                error,
-                result
-            );
-            Err(WifiError::from_error_code(error))
+            // `from_error_code` decides how to classify and (only for truly
+            // unmapped codes) log the result, so we don't warn here.
+            Err(WifiError::from_error_code(result))
         } else {
             Ok::<(), WifiError>(())
         }
@@ -3504,7 +3523,7 @@ ignored."
     /// Subscribe to events.
     ///
     /// # Errors
-    /// This returns [WifiError::Failed] if no more subscriptions are available.
+    /// This returns [WifiError::Other] if no more subscriptions are available.
     /// Consider increasing the internal event channel subscriber count in this case.
     #[instability::unstable]
     pub fn subscribe<'a>(&'a self) -> Result<event::EventSubscriber<'a>, WifiError> {
@@ -3512,7 +3531,7 @@ ignored."
             return Ok(event::EventSubscriber::new(subscriber));
         }
 
-        Err(WifiError::Failed)
+        Err(WifiError::Other)
     }
 
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {

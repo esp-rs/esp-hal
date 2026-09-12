@@ -141,7 +141,7 @@ fn esp_btbb_enable() {
 }
 
 fn ieee802154_mac_init(radio: IEEE802154<'_>) {
-    #[cfg(any(esp32c6, esp32c5))]
+    #[cfg(soc_has_wifi)]
     unsafe {
         unsafe extern "C" {
             static mut coex_pti_tab_ptr: u32;
