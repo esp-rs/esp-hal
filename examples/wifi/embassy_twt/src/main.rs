@@ -15,12 +15,7 @@
 use embassy_time::Timer;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    ram,
-    time::{Duration, Instant},
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, ram, rng::Rng, time::Duration, timer::timg::TimerGroup};
 
 macro_rules! tprintln {
     ($($arg:tt)*) => {{
