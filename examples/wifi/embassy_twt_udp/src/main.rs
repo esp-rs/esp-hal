@@ -20,13 +20,7 @@ use embassy_net::{Runner, StackResources, udp::UdpSocket};
 use embassy_time::Timer;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    ram,
-    rng::Rng,
-    time::Duration,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, ram, rng::Rng, time::Duration, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::wifi::{
     AuthenticationMethodConfig,
