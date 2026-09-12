@@ -1151,7 +1151,6 @@ impl WifiError {
             ESP_ERR_WIFI_TWT_SETUP_TXFAIL => WifiError::TwtSetupTxFail,
             ESP_ERR_WIFI_TWT_SETUP_REJECT => WifiError::TwtSetupRejected,
 
-
             // Known driver state-machine and timeout codes. These occur in
             // perfectly normal operation.
             ESP_ERR_WIFI_NOT_INIT
