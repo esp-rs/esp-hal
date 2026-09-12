@@ -23,21 +23,21 @@ Target device **MUST** be connected via its USB-Serial-JTAG port, or if unavaila
 You can run all tests for a given device by running the following command from the workspace root:
 
 ```shell
-cargo xtask run tests $CHIP
+cargo xtask test $CHIP
 ```
 
 To run a single test on a target, run the following command from the workspace root:
 
 ```shell
 # Run GPIO tests for ESP32-C6
-cargo xtask run tests esp32c6 --test gpio
+cargo xtask test esp32c6 gpio
 ```
 
 If you want to run a test multiple times:
 
 ```shell
 # Run GPIO tests for ESP32-C6
-cargo xtask run tests esp32c6 --test gpio --repeat 10
+cargo xtask test esp32c6 gpio --repeat 10
 ```
 
 Some tests will require physical connections, please see the current [configuration in our runners].
@@ -97,16 +97,21 @@ Our self-hosted runners have the following setup:
     - `GPIO2` and `GPIO3` are I2C pins.
     - `GPIO9` and `GPIO10` are connected.
   - RPi: Raspbian 12 configured with the following [setup]
+- ESP32-S31 (`esp32s31-jtag`):
+  - Devkit: `ESP32-S31_QFN80_Test_Board` connected via UART (`USB-UART` port).
+    - `GPIO6` and `GPIO7` are I2C pins.
+    - `GPIO2` and `GPIO3` are connected.
+  - Probe: `ESP-Prog` connected with the [following connections][connection_s31]
+  - RPi: Raspbian 12 configured with the following [setup]
 - ESP32 (`esp32-jtag`):
-  - Devkit: `ESP32-DevKitC-V4` connected via UART (`UART` port).
+  - Devkit: `ESP32-ETHERNET-A-v1.2` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO32` and `GPIO33` are I2C pins.
     - `GPIO2` and `GPIO4` are connected.
-  - Probe: `ESP-Prog` connected with the [following connections][connection_esp32]
   - RPi: Raspbian 12 configured with the following [setup]
 
+[connection_s31]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_c2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32c2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
 [connection_s2]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32s2/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware
-[connection_esp32]: https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware.html#configure-hardware
 [`hil.yml`]: https://github.com/esp-rs/esp-hal/blob/main/.github/workflows/hil.yml
 [setup]: #rpi-setup
 

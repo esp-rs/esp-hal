@@ -6,12 +6,12 @@ use std::{
 
 use anyhow::{Context, Error};
 use cargo_semver_checks::{Check, GlobalConfig, ReleaseType, Rustdoc};
-use esp_metadata::{Chip, Config};
 
 use crate::{
     Package,
     cargo::{CargoArgsBuilder, CargoCommandBatcher},
     commands::checker::download_baselines,
+    metadata::{Chip, Config},
 };
 
 /// Return the minimum required bump for the next release.

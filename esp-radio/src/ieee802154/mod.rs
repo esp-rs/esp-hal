@@ -9,8 +9,7 @@
 //! Note that this module requires the `unstable` feature on both `esp-radio`
 //! and `esp-hal`.
 //!
-//! NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
-//! things will break.
+//! NOTE: Coexistence with Wi-Fi is currently not supported.
 //!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [openthread]: https://github.com/esp-rs/openthread
@@ -114,21 +113,25 @@ pub struct Ieee802154<'a> {
     transmit_buffer: [u8; FRAME_SIZE],
     _phy_clock_guard: PhyClockGuard<'a>,
     _phy_init_guard: PhyInitGuard<'a>,
+    // Fields drop in declaration order: this guard must stay last so the PHY
+    // is torn down (which still needs the modem clocks) before the clocks are
+    // gated off.
+    _radio_clock_guard: RadioClockGuard,
 }
 
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
     ///
-    /// NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
-    /// things will break.
+    /// NOTE: Coexistence with Wi-Fi is currently not supported.
     #[instability::unstable]
     pub fn new(radio: IEEE802154<'a>) -> Self {
-        let (_phy_clock_guard, _phy_init_guard) = esp_ieee802154_enable(radio);
+        let (_phy_clock_guard, _phy_init_guard, _radio_clock_guard) = esp_ieee802154_enable(radio);
         Self {
             _align: 0,
             transmit_buffer: [0u8; FRAME_SIZE],
             _phy_clock_guard,
             _phy_init_guard,
+            _radio_clock_guard,
         }
     }
 

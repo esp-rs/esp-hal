@@ -6,10 +6,10 @@
 
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(no_radio): rtos-radio-driver
-//% FEATURES(no_ble): esp-radio/wifi esp-radio esp-radio-unstable
+//% FEATURES(no_ble): esp-radio/wifi esp-radio/esp-now esp-radio esp-radio-unstable
 //% FEATURES(no_wifi): esp-radio/ble esp-radio esp-radio-unstable trouble-host
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio/coex esp-radio-unstable
-//% FEATURES(has_wifi_ble): trouble-host
+//% FEATURES(has_wifi_ble): trouble-host esp-radio/esp-now
 //% FEATURES(stable_wifi): esp-radio/wifi esp-radio
 
 // Even if the defaults change, keep this at a low-ish value for
@@ -57,6 +57,12 @@ mod ble_controller;
 #[path = "radio_basic/wifi_controller.rs"]
 #[cfg(feature = "esp-radio")]
 mod wifi_controller;
+
+// TODO why does such a basic thing fail on S31?
+#[cfg(all(soc_has_wifi, not(esp32s31)))]
+#[path = "radio_basic/esp_now_config.rs"]
+#[cfg(feature = "esp-radio-unstable")]
+mod esp_now_config;
 
 #[cfg(xtensa)]
 #[path = "radio_basic/fpu.rs"]

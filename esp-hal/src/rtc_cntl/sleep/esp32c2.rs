@@ -1,4 +1,4 @@
-use super::WakeTriggers;
+use super::SleepKind;
 use crate::{
     peripherals::{APB_CTRL, BB, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
     rtc_cntl::Rtc,
@@ -60,9 +60,9 @@ pub const RTC_CNTL_PD_CUR_MONITOR_DEFAULT: bool = false;
 pub const RTC_CNTL_PLL_BUF_WAIT_DEFAULT: u8 = 20;
 /// Default number of cycles to wait for the XTL buffer to stabilize.
 pub const RTC_CNTL_XTL_BUF_WAIT_DEFAULT: u8 = 100;
-/// Default number of cycles to wait for the internal 8MHz clock to stabilize.
+/// Default number of cycles to wait for the internal 8 MHz clock to stabilize.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
-/// Default number of cycles required to enable the internal 8MHz clock.
+/// Default number of cycles required to enable the internal 8 MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
 /// Minimum number of cycles for sleep duration.
@@ -70,7 +70,7 @@ pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 
 /// Power-up cycles for other hardware blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
-/// Wait cycles for other hardware blocks to stabilize.
+/// Waits cycles for other hardware blocks to stabilize.
 pub const OTHER_BLOCKS_WAIT: u16 = 1;
 
 /// Disables GPIO interrupt.
@@ -98,19 +98,19 @@ bitfield::bitfield! {
     pub u8, xtal_wait, set_xtal_wait: 15, 8;
     /// Number of rtc_fast_clk cycles to wait for PLL clock to be ready
     pub u8, pll_wait, set_pll_wait: 23, 16;
-    /// Perform clock control related initialization.
+    /// Performs clock control related initialization.
     pub clkctl_init, set_clkctl_init: 24;
-    /// Perform power control related initialization.
+    /// Performs power control related initialization.
     pub pwrctl_init, set_pwrctl_init: 25;
-    /// Force power down RTC_DBOOST
+    /// Forces power-down of RTC_DBOOST.
     pub rtc_dboost_fpd, set_rtc_dboost_fpd: 26;
-    /// Keep the XTAL oscillator powered up in sleep.
+    /// Keeps the XTAL oscillator powered up in sleep.
     pub xtal_fpu, set_xtal_fpu: 27;
-    /// Keep the BBPLL oscillator powered up in sleep.
+    /// Keeps the BBPLL oscillator powered up in sleep.
     pub bbpll_fpu, set_bbpll_fpu: 28;
-    /// Enable clock gating when the CPU is in wait-for-interrupt state.
+    /// Enables clock gating when the CPU is in wait-for-interrupt state.
     pub cpu_waiti_clk_gate, set_cpu_waiti_clk_gate: 29;
-    /// Calibrate Ocode to make bandgap voltage more precise.
+    /// Calibrates Ocode to make bandgap voltage more precise.
     pub cali_ocode, set_cali_ocode: 30;
 }
 
@@ -194,7 +194,7 @@ bitfield::bitfield! {
     pub bt_pd_en, set_bt_pd_en: 6;
     /// power down CPU, but not restart when lightsleep.
     pub cpu_pd_en, set_cpu_pd_en: 7;
-    /// Power down Internal 8M oscillator
+    /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 8;
     /// power down digital peripherals
     pub dig_peri_pd_en, set_dig_peri_pd_en: 9;
@@ -351,6 +351,10 @@ impl RtcSleepConfig {
 
     pub(crate) fn is_deep_sleep(&self) -> bool {
         self.deep_slp()
+    }
+
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.set_deep_slp(kind == SleepKind::Deep);
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -563,12 +567,20 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+    /// Configures the wakeup options and requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         // set bits for what can wake us up
-        LPWR::regs().wakeup_state().modify(|_, w| unsafe {
-            w.wakeup_ena()
-                .bits((wakeup_triggers.as_u32() as u16).into())
-        });
+        LPWR::regs()
+            .wakeup_state()
+            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_mask) });
+
+        // Set the bits of the sources that reject the sleep. The reject enables that `apply` wrote
+        // arm those sources.
+        LPWR::regs()
+            .slp_reject_conf()
+            .modify(|_, w| unsafe { w.sleep_reject_ena().bits(reject_mask) });
 
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }

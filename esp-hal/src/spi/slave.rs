@@ -1,7 +1,8 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "dma_channel" => {
-        cfg(any(esp32, esp32s2)) => "DMA_SPI2",
-        _ => "DMA_CH0",
+        cfg(spi_slave_dma_engine = "SPI_DMA") => "DMA_SPI2",
+        cfg(spi_slave_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(spi_slave_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
     },
 ))]
 //! # Serial Peripheral Interface - Slave Mode
@@ -94,7 +95,7 @@ pub struct Spi<'d, Dm: DriverMode> {
     _guard: PeripheralGuard,
 }
 impl<'d> Spi<'d, Blocking> {
-    /// Constructs an SPI instance in 8bit dataframe mode.
+    /// Creates a new SPI instance in 8-bit data-frame mode.
     #[instability::unstable]
     pub fn new(spi: impl Instance + 'd, mode: Mode) -> Spi<'d, Blocking> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
@@ -121,21 +122,21 @@ impl<'d> Spi<'d, Blocking> {
         signal.connect_to(&pin);
     }
 
-    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    /// Assigns the SCK (Serial Clock) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_sck(self, sclk: impl PeripheralInput<'d>) -> Self {
         self.connect_input_pin(sclk, self.spi.info().sclk);
         self
     }
 
-    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    /// Assigns the MOSI (Master Out Slave In) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_mosi(self, mosi: impl PeripheralInput<'d>) -> Self {
         self.connect_input_pin(mosi, self.spi.info().mosi);
         self
     }
 
-    /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    /// Assigns the MISO (Master In Slave Out) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_miso(self, miso: impl PeripheralOutput<'d>) -> Self {
         let miso = miso.into();
@@ -147,7 +148,7 @@ impl<'d> Spi<'d, Blocking> {
         self
     }
 
-    /// Assign the CS (Chip Select) pin for the SPI instance.
+    /// Assigns the CS (Chip Select) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_cs(self, cs: impl PeripheralInput<'d>) -> Self {
         self.connect_input_pin(cs, self.spi.info().cs);
@@ -232,10 +233,10 @@ pub mod dma {
             }
         }
 
-        /// Register a buffer for a DMA write.
+        /// Registers a buffer for a DMA write.
         ///
-        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
-        /// be sent is 32736 bytes.
+        /// Returns a [`SpiDmaTransfer`] that can be used to wait for the transfer to complete.
+        /// The maximum amount of data to be sent is 32736 bytes.
         ///
         /// The write is driven by the SPI master's sclk signal and cs line.
         #[instability::unstable]
@@ -267,10 +268,10 @@ pub mod dma {
             Ok(SpiDmaTransfer::new(self, buffer, false, true))
         }
 
-        /// Register a buffer for a DMA read.
+        /// Registers a buffer for a DMA read.
         ///
-        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
-        /// be received is 32736 bytes.
+        /// Returns a [`SpiDmaTransfer`] that can be used to wait for the transfer to complete.
+        /// The maximum amount of data to be received is 32736 bytes.
         ///
         /// The read is driven by the SPI master's sclk signal and cs line.
         #[instability::unstable]
@@ -302,10 +303,10 @@ pub mod dma {
             Ok(SpiDmaTransfer::new(self, buffer, true, false))
         }
 
-        /// Register buffers for a DMA transfer.
+        /// Registers buffers for a DMA transfer.
         ///
-        /// This will return a [SpiDmaTransfer]. The maximum amount of data to
-        /// be sent/received is 32736 bytes.
+        /// Returns a [`SpiDmaTransfer`] that can be used to wait for the transfer to complete.
+        /// The maximum amount of data to be sent/received is 32736 bytes.
         ///
         /// The data transfer is driven by the SPI master's sclk signal and cs
         /// line.
@@ -355,8 +356,7 @@ pub mod dma {
 
     /// A structure representing a DMA transfer for SPI.
     ///
-    /// This structure holds references to the SPI instance, DMA buffers, and
-    /// transfer status.
+    /// Holds references to the SPI instance, DMA buffers, and transfer status.
     #[instability::unstable]
     pub struct SpiDmaTransfer<'d, Dm, Buf>
     where
@@ -383,10 +383,10 @@ pub mod dma {
             }
         }
 
-        /// Checks if the transfer is complete.
+        /// Returns whether the transfer is complete.
         ///
-        /// This method returns `true` if both RX and TX operations are done,
-        /// and the SPI instance is no longer busy.
+        /// Both RX and TX operations are done, and the SPI instance is no longer
+        /// busy.
         #[instability::unstable]
         pub fn is_done(&self) -> bool {
             if self.has_rx {
@@ -407,7 +407,7 @@ pub mod dma {
 
         /// Waits for the DMA transfer to complete.
         ///
-        /// This method blocks until the transfer is finished and returns the
+        /// Blocks until the transfer is finished and returns the
         /// `SpiDma` instance and the associated buffer.
         #[instability::unstable]
         pub fn wait(mut self) -> (SpiDma<'d, Dm>, Buf) {
@@ -513,7 +513,7 @@ pub mod dma {
         }
 
         fn reset_dma_before_usr_cmd(&self) {
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(spi_slave_dma_engine = "SPI_DMA"))]
             self.regs().dma_conf().modify(|_, w| {
                 w.rx_afifo_rst().set_bit();
                 w.buf_afifo_rst().set_bit();
@@ -523,7 +523,7 @@ pub mod dma {
 
         fn enable_dma(&self) {
             cfg_select! {
-                any(esp32, esp32s2) => {
+                spi_slave_dma_engine = "SPI_DMA" => {
                     use crate::RegisterToggle;
                     self.regs().dma_conf().toggle(|w, bit| {
                         w.in_rst().bit(bit);
@@ -533,7 +533,7 @@ pub mod dma {
                         w.dma_infifo_full_clr().bit(bit);
                         w.ahbm_rst().bit(bit)
                     });
-                },
+                }
                 _ => {
                     self.regs().dma_conf().modify(|_, w| {
                         w.dma_tx_ena().set_bit();
@@ -547,7 +547,7 @@ pub mod dma {
         fn clear_dma_interrupts(&self) {
             self.regs().dma_int_clr().write(|w| {
                 cfg_select! {
-                    any(esp32, esp32s2) => {
+                    spi_slave_dma_engine = "SPI_DMA" => {
                         w.inlink_dscr_empty().clear_bit_by_one();
                         w.outlink_dscr_error().clear_bit_by_one();
                         w.inlink_dscr_error().clear_bit_by_one();
@@ -557,7 +557,7 @@ pub mod dma {
                         w.out_done().clear_bit_by_one();
                         w.out_eof().clear_bit_by_one();
                         w.out_total_eof().clear_bit_by_one()
-                    },
+                    }
                     _ => {
                         w.dma_infifo_full_err().clear_bit_by_one();
                         w.dma_outfifo_empty_err().clear_bit_by_one();
@@ -619,7 +619,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with [`Self::register_block`] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// System peripheral marker.
@@ -679,7 +679,7 @@ impl Info {
         });
     }
 
-    /// Initialize for full-duplex 1 bit mode
+    /// Initializes for full-duplex 1 bit mode.
     fn init(&self) {
         #[cfg(soc_has_pcr)]
         crate::peripherals::PCR::regs()
@@ -782,12 +782,8 @@ impl Info {
     #[cfg(spi_slave_supports_dma)]
     fn is_bus_busy(&self) -> bool {
         let reg = cfg_select! {
-            any(esp32, esp32s2) => {
-                self.regs().slave()
-            },
-            _ => {
-                self.regs().dma_int_raw()
-            }
+            any(esp32, esp32s2) => self.regs().slave(),
+            _ => self.regs().dma_int_raw(),
         };
         reg.read().trans_done().bit_is_clear()
     }
@@ -800,7 +796,7 @@ impl Info {
                 self.regs()
                     .slave()
                     .modify(|_, w| w.trans_done().clear_bit());
-            },
+            }
             _ => {
                 self.regs()
                     .dma_int_clr()
@@ -824,7 +820,7 @@ for_each_spi_slave! {
             #[inline(always)]
             fn info(&self) -> &'static Info {
                 static INFO: Info = Info {
-                    register_block: crate::peripherals::$peri::regs(),
+                    register_block: crate::peripherals::$peri::ptr(),
                     peripheral: crate::system::Peripheral::$sys,
                     sclk: InputSignal::$sclk,
                     mosi: InputSignal::$mosi,

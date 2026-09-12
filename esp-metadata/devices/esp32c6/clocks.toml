@@ -5,7 +5,7 @@ system_clocks = { clock_tree = [
     { name = "RC_FAST_CLK", type = "source",                     output = "17_500_000" },
 
     # Low-speed clocks
-    { name = "XTAL32K_CLK",     type = "source",  output = "32768" },
+    { name = "XTAL32K_CLK",     type = "source",  output = "32768", cfg = "use_xtal32k" },
     { name = "OSC_SLOW_CLK",    type = "source",  output = "32768" },
     { name = "RC_SLOW_CLK",     type = "source",  output = "136_000" },
 
@@ -45,6 +45,11 @@ system_clocks = { clock_tree = [
     { name = "PLL_F80M",  type = "derived", from = "PLL_CLK", output = "80_000_000"  },
     { name = "PLL_F160M", type = "derived", from = "PLL_CLK", output = "160_000_000" },
     { name = "PLL_F240M", type = "derived", from = "PLL_CLK", output = "240_000_000" },
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", always_on = true, variants = [
+        { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
+        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+    ] },
     { name = "LEDC_SCLK", type = "mux", variants = [
         { name = "PLL_F80M",    outputs = "PLL_F80M" },
         { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
@@ -58,7 +63,7 @@ system_clocks = { clock_tree = [
         { name = "XTAL_D2_CLK", outputs = "XTAL_D2_CLK" },
     ] },
     { name = "LP_SLOW_CLK", type = "mux", variants = [
-        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
@@ -70,7 +75,7 @@ system_clocks = { clock_tree = [
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
         { name = "RC_SLOW_CLK",     outputs = "LP_SLOW_CLK" },
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" },
-        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
     { group = "UART", clocks = [
@@ -80,6 +85,9 @@ system_clocks = { clock_tree = [
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
         ], div_num = "0 .. 0x100" } },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+    ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
     ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", wake_locking = true, variants = [
@@ -108,19 +116,51 @@ system_clocks = { clock_tree = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
         ] },
     ] },
-    { group = "PARL_IO", clocks = [
-        { name = "RX_CLOCK", type = "mux", wake_locking = true, variants = [
+    { group = "PARL_IO",
+      presets = {
+        CLK = {
+          type = "mux",
+          wake_locking = true,
+          variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
             { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
-            # TODO: external clock
+            # TODO: external clock (TX and RX may differ)
+          ],
+        },
+      },
+      clocks = [
+        { name = "RX_CLOCK", preset = "CLK" },
+        { name = "TX_CLOCK", preset = "CLK" },
+      ],
+    },
+    { group = "I2S",
+      presets = {
+        CLK = {
+          type = "generic",
+          wake_locking = true,
+          output = "(sclk * div_a) / (div_num * div_a + div_b)",
+          params = {
+            sclk = [
+              { name = "XTAL",      outputs = "XTAL_CLK" },
+              { name = "PLL_F240M", outputs = "PLL_F240M" },
+              { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
+            ],
+            div_num = "1 ..= 255",
+            div_a   = "1 ..= 511",
+            div_b   = "0 ..= 511",
+          },
+        },
+      },
+      clocks = [
+        { name = "TX_CLK",   preset = "CLK" },
+        { name = "RX_CLK",   preset = "CLK" },
+        { name = "MCLK_OUT", type = "mux", variants = [
+          { name = "TX", outputs = "TX_CLK" },
+          { name = "RX", outputs = "RX_CLK", default = true },
         ] },
-        { name = "TX_CLOCK", type = "mux", wake_locking = true, variants = [
-            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
-            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
-        ] },
-    ] },
+      ],
+    },
     { group = "I2C", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",    outputs = "XTAL_CLK", default = true },
@@ -129,8 +169,8 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SPI", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
-            { name = "PLL_F80M", outputs = "PLL_F80M" },
-            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
+            { name = "PLL_F80M", outputs = "PLL_F80M", default = true },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         ] },
     ] },
@@ -155,6 +195,7 @@ peripheral_clocks = { templates = [
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Rmt" },
     { name = "Ledc" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Systimer", keep_enabled = true },

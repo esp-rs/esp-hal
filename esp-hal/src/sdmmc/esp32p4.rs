@@ -17,7 +17,7 @@ use super::*;
 /// bit, and `tieh = 1` ties the output to the 3.3 V rail directly, so the
 /// `dref`/`mul` reference is irrelevant. `target0`/`target1` keep their
 /// reset (power-on delay) defaults via `modify`.
-pub fn enable_sd_io_ldo() {
+pub fn chip_setup() {
     let pmu = crate::peripherals::PMU::regs();
 
     // Limit inrush current while the output cap charges; keep ripple

@@ -12,17 +12,16 @@
 //! switching does not interfere with other interrupts, so we don't leave an interrupt handler only
 //! partially executed.
 
-#[cfg(feature = "esp-radio")]
-use core::ffi::c_void;
-use core::sync::atomic::Ordering;
+use core::{ffi::c_void, sync::atomic::Ordering};
 
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
 #[cfg(not(esp32))]
 use esp_hal::xtensa_lx::interrupt;
-use esp_hal::{interrupt::software::SoftwareInterrupt, ram};
+use esp_hal::{interrupt::software::Instance, ram};
 #[cfg(multi_core)]
 use esp_hal::{
-    interrupt::{InterruptHandler, Priority},
+    interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
+    peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1},
     system::Cpu,
 };
 use portable_atomic::AtomicPtr;
@@ -50,12 +49,12 @@ extern "C" fn idle_entry() -> ! {
 // Exception mode. Setting this bit prevents interrupts below EXCMLEVEL. Cleared by `rfe` at the end
 // of the Level 1 interrupt handler.
 const PS_EXCM: u32 = 1 << 4;
-// User mode. This bit doesn't matter for us yet, we don't have separate kernel mode exceptions.
+// User mode. Selects the user exception vector, instead of the kernel one. Both vectors point at
+// the same handler, but tasks must run with this bit set, because the interrupt handlers do, too.
 const PS_UM: u32 = 1 << 5;
 // Windowed mode.
 const PS_WOE: u32 = 1 << 18;
 // CALLINC field value for call4 instruction.
-#[cfg(feature = "esp-radio")]
 const PS_CALLINC_CALL4: u32 = 1 << 16;
 
 pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext, hook_fn: IdleFn) {
@@ -84,7 +83,6 @@ pub(crate) fn write_thread_pointer(task: *mut Task) {
     unsafe { core::arch::asm!("wur.threadptr {0}", in(reg) task, options(nostack)) };
 }
 
-#[cfg(feature = "esp-radio")]
 pub(crate) fn new_task_context(
     task_fn: extern "C" fn(*mut c_void),
     param: *mut c_void,
@@ -133,7 +131,7 @@ pub(crate) fn task_switch(
 #[cfg(not(esp32))]
 const SW_INTERRUPT: u32 = 1 << 7;
 
-pub(crate) fn setup_multitasking<const IRQ: u8>(mut _irq: SoftwareInterrupt<'static, IRQ>) {
+pub(crate) fn setup_multitasking<const IRQ: u8>(mut _irq: impl Instance<IRQ> + 'static) {
     #[cfg(not(esp32))]
     unsafe {
         // Set up a CPU-internal interrupt, which will be used to trigger a context switch on the
@@ -143,7 +141,8 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(mut _irq: SoftwareInterrupt<'sta
 
     #[cfg(multi_core)]
     {
-        _irq.set_interrupt_handler(InterruptHandler::new(
+        let mut irq = SoftwareInterrupt::new(_irq);
+        irq.set_interrupt_handler(InterruptHandler::new(
             unsafe {
                 core::mem::transmute::<*const (), extern "C" fn()>(
                     cross_core_yield_handler as *const (),
@@ -155,7 +154,7 @@ pub(crate) fn setup_multitasking<const IRQ: u8>(mut _irq: SoftwareInterrupt<'sta
 }
 
 #[cfg(multi_core)]
-pub(crate) fn setup_smp<const IRQ: u8>(irq: SoftwareInterrupt<'static, IRQ>) {
+pub(crate) fn setup_smp<const IRQ: u8>(irq: impl Instance<IRQ> + 'static) {
     setup_multitasking(irq);
 }
 
@@ -187,8 +186,8 @@ pub(crate) fn yield_task() {
 
     #[cfg(esp32)]
     match Cpu::current() {
-        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
-        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
+        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).raise(),
+        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).raise(),
     }
 }
 
@@ -196,8 +195,8 @@ pub(crate) fn yield_task() {
 #[ram]
 extern "C" fn cross_core_yield_handler(context: &mut CpuContext) {
     match Cpu::current() {
-        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.reset(),
-        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.reset(),
+        Cpu::ProCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
+        Cpu::AppCpu => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
     }
 
     trigger_task_switch(context);

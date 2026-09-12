@@ -33,7 +33,7 @@
 //!
 //! ```rust, no_run
 #![doc = esp_hal::before_snippet!()]
-//! use esp_hal::interrupt::software::SoftwareInterruptControl;
+//! use esp_hal::interrupt::software::SoftwareInterrupt;
 //! use esp_hal::ram;
 //! use esp_hal::timer::timg::TimerGroup;
 //!
@@ -41,11 +41,10 @@
 //! esp_alloc::heap_allocator!(size: 36 * 1024);
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! let sw_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //!
 //! // THIS IS IMPORTANT FOR WIFI AND BLE: You MUST start the scheduler
 //! // before initializing the radio!
-//! esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
+//! esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 #![cfg_attr(
     wifi_driver_supported,
     doc = r#"
@@ -205,6 +204,8 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s2::*;
     #[cfg(esp32s3)]
     pub use esp_wifi_sys_esp32s3::*;
+    #[cfg(esp32s31)]
+    pub use esp_wifi_sys_esp32s31::*;
 }
 
 use crate::refcount::Refcount;
@@ -235,6 +236,8 @@ macro_rules! unstable_module {
 
 mod asynch;
 mod compat;
+#[cfg(esp32s31)]
+mod compiler_rt_abi;
 mod interrupt_dispatch;
 mod radio_clocks;
 mod refcount;
@@ -323,10 +326,15 @@ pub(crate) fn init() {
         );
     }
 
+    // Ungate the modem clocks first: `enable_wifi_power_domain` pulses the
+    // modem reset, which is ineffective while the clocks are gated — and
+    // esp-phy's clock guard has gated them again by the time we re-init.
+    // (ESP-IDF never gates these clocks, so its power-up reset always lands.)
+    radio_clocks::init_radio_clocks();
+
     crate::common_adapter::enable_wifi_power_domain();
 
     wifi_set_log_verbose();
-    radio_clocks::init_radio_clocks();
 
     #[cfg(feature = "coex")]
     match crate::wifi::coex_initialize() {
@@ -349,6 +357,27 @@ pub(crate) fn deinit() {
     wifi::shutdown_wifi_isr();
     #[cfg(feature = "ble")]
     ble::shutdown_ble_isr();
+
+    // Gate the BT clocks (the Wi-Fi driver gates its own clocks during
+    // `wifi_deinit`), power down the modem power domain, and gate the
+    // remaining modem clocks, mirroring ESP-IDF's fixed-mask clock control
+    // (`periph_ll_wifi_module_disable_clk_set_rst` and friends). This must
+    // only run once all radios are off: PHY teardown still needs the modem
+    // clocks.
+    #[cfg(feature = "ble")]
+    crate::radio_clocks::clocks_ll::enable_bt(false);
+    crate::common_adapter::disable_wifi_power_domain();
+    crate::radio_clocks::deinit_radio_clocks();
+
+    // After the modem power domain has been powered down, the PHY driver's
+    // internal init flag must be reset, otherwise the next `phy_wakeup_init`
+    // assumes retained PHY registers that the power-down wiped (mirrors
+    // ESP-IDF's `esp_phy_modem_deinit`, "Fix the issue caused by the power
+    // domain off. This issue is only on ESP32C3.").
+    #[cfg(esp32c3)]
+    unsafe {
+        crate::sys::include::phy_init_flag()
+    };
 
     esp_hal::if_unstable_hal! {
         // Allow using `ADC2` again
@@ -374,7 +403,7 @@ static RADIO_REFCOUNT: Refcount = Refcount::new();
 impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         debug!("Creating RadioRefGuard");
 
         RADIO_REFCOUNT.increment(init);

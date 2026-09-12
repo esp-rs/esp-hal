@@ -18,11 +18,24 @@ mod pcnt {
     use esp_hal::{
         delay::Delay,
         gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull},
-        pcnt::{Pcnt, channel::EdgeMode},
+        handler,
+        pcnt::{Unit, channel::EdgeMode},
+        time::{Duration, Instant},
     };
+    use portable_atomic::{AtomicUsize, Ordering};
+
+    static HANDLER_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[handler]
+    fn count_calls() {
+        HANDLER_CALLS.fetch_add(1, Ordering::Relaxed);
+    }
 
     struct Context<'d> {
-        pcnt: Pcnt<'d>,
+        unit0: Unit<'d>,
+        unit1: Unit<'d>,
+        unit2: Unit<'d>,
+        unit3: Unit<'d>,
         input: AnyPin<'d>,
         output: AnyPin<'d>,
         delay: Delay,
@@ -37,7 +50,10 @@ mod pcnt {
         let dout = dout.degrade();
 
         Context {
-            pcnt: Pcnt::new(peripherals.PCNT),
+            unit0: Unit::new(peripherals.PCNT0_UNIT0),
+            unit1: Unit::new(peripherals.PCNT0_UNIT1),
+            unit2: Unit::new(peripherals.PCNT0_UNIT2),
+            unit3: Unit::new(peripherals.PCNT0_UNIT3),
             input: din,
             output: dout,
             delay: Delay::new(),
@@ -46,7 +62,7 @@ mod pcnt {
 
     #[test]
     fn test_increment_on_pos_edge(ctx: Context<'static>) {
-        let unit = ctx.pcnt.unit0;
+        let unit = ctx.unit0;
 
         // Setup channel 0 to increment the count when input changes LOW -> HIGH
         unit.channel0.set_edge_signal(Input::new(
@@ -85,7 +101,7 @@ mod pcnt {
 
     #[test]
     fn test_increment_on_neg_edge(ctx: Context<'static>) {
-        let unit = ctx.pcnt.unit1;
+        let unit = ctx.unit1;
 
         // Setup channel 0 to increment the count when input changes HIGH -> LOW
         unit.channel0.set_edge_signal(Input::new(
@@ -124,7 +140,7 @@ mod pcnt {
 
     #[test]
     fn test_increment_past_high_limit(ctx: Context<'static>) {
-        let unit = ctx.pcnt.unit3;
+        let unit = ctx.unit3;
 
         unit.set_high_limit(Some(3)).unwrap();
 
@@ -184,7 +200,7 @@ mod pcnt {
 
     #[test]
     fn test_increment_past_thresholds(ctx: Context<'static>) {
-        let unit = ctx.pcnt.unit0;
+        let unit = ctx.unit0;
 
         unit.set_threshold0(Some(2));
         unit.set_threshold1(Some(4));
@@ -252,7 +268,7 @@ mod pcnt {
 
     #[test]
     fn test_decrement_past_low_limit(ctx: Context<'static>) {
-        let unit = ctx.pcnt.unit0;
+        let unit = ctx.unit0;
 
         unit.set_low_limit(Some(-3)).unwrap();
         // For some reason this is needed for the above limit to apply.
@@ -314,7 +330,7 @@ mod pcnt {
 
     #[test]
     fn test_unit_count_range(ctx: Context<'static>) {
-        let unit = ctx.pcnt.unit2;
+        let unit = ctx.unit2;
 
         // Setup channel 1 to increment the count when gpio2 does LOW -> HIGH
         unit.channel1.set_edge_signal(Input::new(
@@ -353,6 +369,65 @@ mod pcnt {
             output.set_high();
             ctx.delay.delay_micros(1);
         }
+    }
+
+    #[test]
+    fn test_unit_counts_after_previous_unit_dropped(ctx: Context<'static>) {
+        let input = Input::new(ctx.input, InputConfig::default().with_pull(Pull::Down));
+        let mut output = Output::new(ctx.output, Level::Low, OutputConfig::default());
+
+        let unit = ctx.unit0;
+        unit.channel0.set_edge_signal(input.peripheral_input());
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        output.set_high();
+        ctx.delay.delay_micros(1);
+        assert_eq!(1, unit.value());
+
+        core::mem::drop(unit);
+        output.set_low();
+        ctx.delay.delay_micros(1);
+
+        // A unit built from a fresh singleton must count without an explicit resume,
+        // the same as after a cold boot.
+        let unit = Unit::new(unsafe { esp_hal::peripherals::PCNT0_UNIT0::steal() });
+        unit.channel0.set_edge_signal(input.peripheral_input());
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        assert_eq!(0, unit.value());
+
+        output.set_high();
+        ctx.delay.delay_micros(1);
+
+        assert_eq!(1, unit.value());
+    }
+
+    #[test]
+    fn test_listening_unit_without_handler_does_not_stall_the_cpu(ctx: Context<'static>) {
+        let input = Input::new(ctx.input, InputConfig::default().with_pull(Pull::Down));
+        let mut output = Output::new(ctx.output, Level::Low, OutputConfig::default());
+
+        let mut unit0 = ctx.unit0;
+        unit0.set_interrupt_handler(count_calls);
+
+        let unit1 = ctx.unit1;
+        unit1.channel0.set_edge_signal(input.peripheral_input());
+        unit1
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        unit1.set_high_limit(Some(1)).unwrap();
+        unit1.clear();
+        unit1.listen();
+
+        output.set_high();
+
+        let deadline = Instant::now() + Duration::from_millis(50);
+        while Instant::now() < deadline {}
+
+        assert_eq!(0, HANDLER_CALLS.load(Ordering::Relaxed));
+        assert!(unit0.value() == 0);
     }
 }
 
@@ -523,13 +598,12 @@ mod systimer {
 
 #[cfg(twai_driver_supported)]
 mod twai {
-    use embedded_can::Frame;
     use esp_hal::{
         Async,
         Blocking,
         DriverMode,
         interrupt,
-        interrupt::{Priority, software::SoftwareInterruptControl},
+        interrupt::Priority,
         peripherals::Interrupt::TWAI0,
         system::Cpu,
         timer::timg::TimerGroup,
@@ -545,6 +619,8 @@ mod twai {
 
     #[embedded_test::tests(default_timeout = 3)]
     mod blocking_tests {
+        use esp_hal::gpio::{Level, NoPin};
+
         use super::*;
 
         #[init]
@@ -583,11 +659,43 @@ mod twai {
 
             assert_eq!(frame.data(), &[1, 2, 3])
         }
+
+        fn no_init() {}
+
+        #[test(init = no_init)]
+        // Make sure we don't hang when writing to a bus with no receivers
+        // also for non-async
+        fn test_write_into_the_void() {
+            let peripherals = esp_hal::init(esp_hal::Config::default());
+
+            // The bus is permanently recessive, so every transmission attempt
+            // fails immediately (a transmitted dominant bit reads back
+            // recessive) and drives the peripheral into the error-passive
+            // state, at which point the driver must give up on the pending
+            // frame.
+            let config = twai::TwaiConfiguration::new(
+                peripherals.TWAI0,
+                Level::High,
+                NoPin,
+                twai::BaudRate::B1000K,
+                TwaiMode::Normal,
+            );
+
+            let mut twai = config.start();
+
+            let frame = EspTwaiFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
+
+            block!(twai.transmit(&frame)).unwrap();
+            assert_eq!(
+                block!(twai.transmit(&frame)),
+                Err(twai::EspTwaiError::TransmissionAborted)
+            );
+        }
     }
 
     #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
     mod async_tests {
-        use esp_hal::gpio::NoPin;
+        use esp_hal::gpio::{Level, NoPin};
 
         use super::*;
 
@@ -607,11 +715,9 @@ mod twai {
                 TwaiMode::SelfTest,
             );
 
-            let _sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
             let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-            esp_rtos::start(timg0.timer0, _sw_int.software_interrupt0);
+            esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
             let twai = config.into_async().start();
 
@@ -675,18 +781,21 @@ mod twai {
         fn no_init() {}
 
         #[test(init = no_init)]
-        #[ignore]
         // Regression test for https://github.com/esp-rs/esp-hal/issues/5307
         async fn test_write_into_the_void() {
             let peripherals = esp_hal::init(esp_hal::Config::default());
 
-            let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+            esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
+            // The bus is permanently recessive, so every transmission attempt
+            // fails immediately (a transmitted dominant bit reads back
+            // recessive) and drives the peripheral into the error-passive
+            // state, at which point the driver must give up on the pending
+            // frame.
             let config = twai::TwaiConfiguration::new(
                 peripherals.TWAI0,
-                NoPin,
+                Level::High,
                 NoPin,
                 twai::BaudRate::B1000K,
                 TwaiMode::Normal,
@@ -696,7 +805,10 @@ mod twai {
 
             let frame = EspTwaiFrame::new(StandardId::new(5).unwrap(), b"12345678").unwrap();
 
-            twai.transmit_async(&frame).await.unwrap();
+            assert_eq!(
+                twai.transmit_async(&frame).await,
+                Err(twai::EspTwaiError::TransmissionAborted)
+            );
         }
     }
 }

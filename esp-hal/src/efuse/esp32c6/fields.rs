@@ -125,7 +125,7 @@ pub const DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 
 /// Represents whether security download is enabled or disabled. 1: enabled. 0:
 /// disabled
 pub const ENABLE_SECURITY_DOWNLOAD: EfuseField = EfuseField::new(0, 4, 133, 1);
-/// Set the default UARTboot message output mode
+/// Set the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 4, 134, 2);
 /// Reserved
 pub const RPT4_RESERVED3_4: EfuseField = EfuseField::new(0, 4, 136, 1);

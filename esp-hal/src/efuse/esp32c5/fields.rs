@@ -17,10 +17,10 @@ pub const BOOTLOADER_ANTI_ROLLBACK_SECURE_VERSION_HI: EfuseField = EfuseField::n
 /// Represents whether cache is disabled
 pub const DIS_ICACHE: EfuseField = EfuseField::new(0, 1, 40, 1);
 /// Represents whether the USB-to-JTAG function in USB Serial/JTAG is disabled.
-/// Note that EFUSE_DIS_USB_JTAG is available only when
-/// EFUSE_DIS_USB_SERIAL_JTAG is configured to 0
+/// `EFUSE_DIS_USB_JTAG` is available only when `EFUSE_DIS_USB_SERIAL_JTAG` is
+/// configured to 0.
 pub const DIS_USB_JTAG: EfuseField = EfuseField::new(0, 1, 41, 1);
-/// Represents whether the ani-rollback check for the 2nd stage bootloader is
+/// Represents whether the anti-rollback check for the 2nd stage bootloader is
 /// enabled
 pub const BOOTLOADER_ANTI_ROLLBACK_EN: EfuseField = EfuseField::new(0, 1, 42, 1);
 /// Represents whether USB Serial/JTAG is disabled
@@ -80,7 +80,7 @@ pub const FORCE_USE_KEY_MANAGER_KEY: EfuseField = EfuseField::new(0, 2, 74, 4);
 /// Represents whether to disable the use of the initialization key written by
 /// software and instead force use efuse_init_key
 pub const FORCE_DISABLE_SW_INIT_KEY: EfuseField = EfuseField::new(0, 2, 78, 1);
-/// Represents whether the ani-rollback SECURE_VERSION will be updated from the
+/// Represents whether the anti-rollback SECURE_VERSION will be updated from the
 /// ROM bootloader
 pub const BOOTLOADER_ANTI_ROLLBACK_UPDATE_IN_ROM: EfuseField = EfuseField::new(0, 2, 79, 1);
 /// Enables flash encryption when 1 or 3 bits are set and disables otherwise
@@ -241,11 +241,11 @@ pub const TEMPERATURE_SENSOR: EfuseField = EfuseField::new(2, 4, 128, 9);
 pub const OCODE: EfuseField = EfuseField::new(2, 4, 137, 8);
 /// Average initcode of ADC1 atten0
 pub const ADC1_AVE_INITCODE_ATTEN0: EfuseField = EfuseField::new(2, 4, 145, 10);
-/// Average initcode of ADC1 atten0
+/// Average initcode of ADC1 atten1
 pub const ADC1_AVE_INITCODE_ATTEN1: EfuseField = EfuseField::new(2, 4, 155, 10);
-/// Average initcode of ADC1 atten0
+/// Average initcode of ADC1 atten2
 pub const ADC1_AVE_INITCODE_ATTEN2: EfuseField = EfuseField::new(2, 5, 165, 10);
-/// Average initcode of ADC1 atten0
+/// Average initcode of ADC1 atten3
 pub const ADC1_AVE_INITCODE_ATTEN3: EfuseField = EfuseField::new(2, 5, 175, 10);
 /// HI DOUT of ADC1 atten0
 pub const ADC1_HI_DOUT_ATTEN0: EfuseField = EfuseField::new(2, 5, 185, 10);

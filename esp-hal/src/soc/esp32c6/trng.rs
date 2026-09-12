@@ -8,7 +8,7 @@ const SAR2_ATTEN: u32 = 1;
 const SAR1_ATTEN: u32 = 1;
 const PATTERN_BIT_WIDTH: u32 = 6;
 
-/// Enable true randomness by enabling the entropy source.
+/// Enables true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
 pub(crate) fn ensure_randomness() {
     let pcr = PCR::regs();
@@ -73,7 +73,7 @@ pub(crate) fn ensure_randomness() {
     }
 }
 
-/// Disable true randomness. Unlocks `ADC` peripheral.
+/// Disables true randomness. Unlocks `ADC` peripheral.
 pub(crate) fn revert_trng() {
     unsafe {
         APB_SARADC::regs()

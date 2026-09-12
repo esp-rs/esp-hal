@@ -230,8 +230,6 @@ mod tests {
 
     #[test]
     fn existing_device_configs_still_load() {
-        use strum::IntoEnumIterator;
-
         use crate::{Chip, Config};
 
         for chip in Chip::iter() {

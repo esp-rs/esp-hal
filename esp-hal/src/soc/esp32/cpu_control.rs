@@ -36,7 +36,7 @@ pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
     }
 }
 
-/// Returns `true` if the specified core is currently running (not stalled).
+/// Returns whether the specified core is currently running (not stalled).
 #[instability::unstable]
 pub fn is_running(core: Cpu) -> bool {
     if core == Cpu::AppCpu {

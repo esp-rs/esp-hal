@@ -7,10 +7,13 @@
 
 use core::marker::PhantomData;
 
+use enumset::{EnumSet, EnumSetType};
+
 use crate::{
     Async,
     Blocking,
     asynch::AtomicWaker,
+    clock::dividers::FractionalDivider,
     handler,
     interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
@@ -20,6 +23,7 @@ use crate::{
 
 pub mod cam;
 pub mod lcd;
+pub(crate) mod ll;
 
 /// DMA TX channel trait for LCD (I8080, DPI) peripherals.
 ///
@@ -76,13 +80,17 @@ impl<'d> LcdCam<'d, Blocking> {
 
         Self {
             lcd: Lcd {
-                lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+                inner: lcd::Inner {
+                    lcd_cam: unsafe { lcd_cam.clone_unchecked() },
+                    _guard: lcd_guard,
+                    clock_requested: false,
+                },
                 _mode: PhantomData,
-                _guard: lcd_guard,
             },
             cam: Cam {
                 lcd_cam,
                 _guard: cam_guard,
+                clock_requested: false,
             },
         }
     }
@@ -91,19 +99,14 @@ impl<'d> LcdCam<'d, Blocking> {
     pub fn into_async(mut self) -> LcdCam<'d, Async> {
         self.set_interrupt_handler(interrupt_handler);
         LcdCam {
-            lcd: Lcd {
-                lcd_cam: self.lcd.lcd_cam,
-                _mode: PhantomData,
-                _guard: self.lcd._guard,
-            },
+            lcd: self.lcd.into_async(),
             cam: self.cam,
         }
     }
 
     /// Registers an interrupt handler for the LCD_CAM peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         for core in crate::system::Cpu::other() {
@@ -128,11 +131,7 @@ impl<'d> LcdCam<'d, Async> {
     pub fn into_blocking(self) -> LcdCam<'d, Blocking> {
         crate::interrupt::disable(Cpu::current(), Interrupt::LCD_CAM);
         LcdCam {
-            lcd: Lcd {
-                lcd_cam: self.lcd.lcd_cam,
-                _mode: PhantomData,
-                _guard: self.lcd._guard,
-            },
+            lcd: self.lcd.into_blocking(),
             cam: self.cam,
         }
     }
@@ -145,7 +144,7 @@ pub enum BitOrder {
     /// Do not change bit order.
     #[default]
     Native   = 0,
-    /// Invert bit order.
+    /// Inverts bit order.
     Inverted = 1,
 }
 
@@ -156,7 +155,7 @@ pub enum ByteOrder {
     /// Do not change byte order.
     #[default]
     Native   = 0,
-    /// Invert byte order.
+    /// Inverts byte order.
     Inverted = 1,
 }
 
@@ -173,183 +172,194 @@ fn interrupt_handler() {
 
 pub(crate) struct Instance;
 
-// NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera and
-// this is only implemented for the LCD side, when the Camera is implemented a
-// CriticalSection will be needed to protect these shared registers.
+/// The interrupt sources of the LCD_CAM DMA interrupt registers.
+///
+/// This type is `pub(crate)` today. If the Camera driver ever needs its own
+/// listen API, it can be promoted to a public `LcdCamInterrupt` without
+/// renaming.
+#[derive(Debug, EnumSetType)]
+pub(crate) enum LcdCamInterrupt {
+    /// The LCD has started outputting a new frame.
+    LcdVsync,
+
+    /// A DMA transfer to the LCD has finished.
+    LcdTransDone,
+
+    /// The camera has received a VSYNC pulse.
+    CamVsync,
+
+    /// The camera has received an HSYNC pulse.
+    CamHs,
+}
+
+// NOTE: the LCD_CAM interrupt registers are shared between LCD and Camera, so
+// concurrent use of both halves needs a CriticalSection to protect these
+// shared registers.
 impl Instance {
-    fn enable_listenlcd_done(en: bool) {
-        LCD_CAM::regs()
-            .lc_dma_int_ena()
-            .modify(|_, w| w.lcd_trans_done_int_ena().bit(en));
+    fn enable_listen(sources: EnumSet<LcdCamInterrupt>, en: bool) {
+        LCD_CAM::regs().lc_dma_int_ena().modify(|_, w| {
+            for source in sources {
+                match source {
+                    LcdCamInterrupt::LcdVsync => {
+                        w.lcd_vsync_int_ena().bit(en);
+                    }
+                    LcdCamInterrupt::LcdTransDone => {
+                        w.lcd_trans_done_int_ena().bit(en);
+                    }
+                    LcdCamInterrupt::CamVsync => {
+                        w.cam_vsync_int_ena().bit(en);
+                    }
+                    LcdCamInterrupt::CamHs => {
+                        w.cam_hs_int_ena().bit(en);
+                    }
+                }
+            }
+            w
+        });
+    }
+
+    pub(crate) fn listen(sources: EnumSet<LcdCamInterrupt>) {
+        Self::enable_listen(sources, true);
+    }
+
+    pub(crate) fn unlisten(sources: EnumSet<LcdCamInterrupt>) {
+        Self::enable_listen(sources, false);
+    }
+
+    pub(crate) fn interrupts() -> EnumSet<LcdCamInterrupt> {
+        let raw = LCD_CAM::regs().lc_dma_int_raw().read();
+        let mut sources = EnumSet::new();
+        if raw.lcd_vsync_int_raw().bit() {
+            sources.insert(LcdCamInterrupt::LcdVsync);
+        }
+        if raw.lcd_trans_done_int_raw().bit() {
+            sources.insert(LcdCamInterrupt::LcdTransDone);
+        }
+        if raw.cam_vsync_int_raw().bit() {
+            sources.insert(LcdCamInterrupt::CamVsync);
+        }
+        if raw.cam_hs_int_raw().bit() {
+            sources.insert(LcdCamInterrupt::CamHs);
+        }
+        sources
+    }
+
+    /// Only reachable through the unstable `I8080` interrupt API, hence the
+    /// `dead_code` allowance when the `unstable` feature is disabled.
+    #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
+    pub(crate) fn clear_interrupts(sources: EnumSet<LcdCamInterrupt>) {
+        LCD_CAM::regs().lc_dma_int_clr().write(|w| {
+            for source in sources {
+                match source {
+                    LcdCamInterrupt::LcdVsync => {
+                        w.lcd_vsync_int_clr().set_bit();
+                    }
+                    LcdCamInterrupt::LcdTransDone => {
+                        w.lcd_trans_done_int_clr().set_bit();
+                    }
+                    LcdCamInterrupt::CamVsync => {
+                        w.cam_vsync_int_clr().set_bit();
+                    }
+                    LcdCamInterrupt::CamHs => {
+                        w.cam_hs_int_clr().set_bit();
+                    }
+                }
+            }
+            w
+        });
     }
 
     pub(crate) fn listen_lcd_done() {
-        Self::enable_listenlcd_done(true);
+        Self::listen(LcdCamInterrupt::LcdTransDone.into());
     }
 
     pub(crate) fn unlisten_lcd_done() {
-        Self::enable_listenlcd_done(false);
+        Self::unlisten(LcdCamInterrupt::LcdTransDone.into());
     }
 
     pub(crate) fn is_lcd_done_set() -> bool {
-        LCD_CAM::regs()
-            .lc_dma_int_raw()
-            .read()
-            .lcd_trans_done_int_raw()
-            .bit()
+        Self::interrupts().contains(LcdCamInterrupt::LcdTransDone)
     }
 }
 pub(crate) struct ClockDivider {
-    // Integral LCD clock divider value. (8 bits)
-    // Value 0 is treated as 256
-    // Value 1 is treated as 2
-    // Value N is treated as N
-    pub div_num: usize,
+    /// Integral clock divider value, 2 to 256.
+    pub div_num: u32,
 
-    // Fractional clock divider numerator value. (6 bits)
-    pub div_b: usize,
+    /// Fractional clock divider numerator value, 0 to 63.
+    pub div_b: u32,
 
-    // Fractional clock divider denominator value. (6 bits)
-    pub div_a: usize,
+    /// Fractional clock divider denominator value, 1 to 63.
+    pub div_a: u32,
+}
+
+impl ClockDivider {
+    fn new(divider: FractionalDivider) -> Self {
+        Self {
+            div_num: divider.integer,
+            div_b: divider.numerator,
+            // An integral divider has no denominator, but the clock tree only accepts
+            // denominators of 1 or more.
+            div_a: divider.denominator.max(1),
+        }
+    }
 }
 
 /// Clock configuration errors.
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ClockError {
-    /// Desired frequency was too low for the dividers to divide to
+    /// Desired frequency was too low for the dividers to divide to.
     FrequencyTooLow,
 }
 
 pub(crate) fn calculate_clkm(
-    desired_frequency: usize,
-    source_frequencies: &[usize],
+    desired_frequency: u32,
+    source_frequencies: &[u32],
 ) -> Result<(usize, ClockDivider), ClockError> {
-    let mut result_freq = 0;
+    let mut result_error = 0;
     let mut result = None;
 
     for (i, &source_frequency) in source_frequencies.iter().enumerate() {
-        let div = calculate_closest_divider(source_frequency, desired_frequency);
-        if let Some(div) = div {
-            let freq = calculate_output_frequency(source_frequency, &div);
-            if result.is_none() || freq > result_freq {
-                result = Some((i, div));
-                result_freq = freq;
-            }
+        let Some(divider) = calculate_closest_divider(source_frequency, desired_frequency) else {
+            continue;
+        };
+
+        // A divider may land either side of the desired frequency, so pick the source that gets
+        // closest to it.
+        let error = divider
+            .output_frequency(source_frequency)
+            .abs_diff(desired_frequency);
+        if result.is_none() || error < result_error {
+            result = Some((i, divider));
+            result_error = error;
         }
     }
 
-    result.ok_or(ClockError::FrequencyTooLow)
-}
+    let (index, divider) = result.ok_or(ClockError::FrequencyTooLow)?;
 
-fn calculate_output_frequency(source_frequency: usize, divider: &ClockDivider) -> usize {
-    let n = match divider.div_num {
-        0 => 256,
-        1 => 2,
-        _ => divider.div_num.min(256),
-    };
-
-    if divider.div_b != 0 && divider.div_a != 0 {
-        // OUTPUT = SOURCE / (N + B/A)
-        // OUTPUT = SOURCE / ((NA + B)/A)
-        // OUTPUT = (SOURCE * A) / (NA + B)
-
-        // u64 is required to fit the numbers from this arithmetic.
-
-        let source = source_frequency as u64;
-        let n = n as u64;
-        let a = divider.div_b as u64;
-        let b = divider.div_a as u64;
-
-        ((source * a) / (n * a + b)) as _
-    } else {
-        source_frequency / n
-    }
+    Ok((index, ClockDivider::new(divider)))
 }
 
 fn calculate_closest_divider(
-    source_frequency: usize,
-    desired_frequency: usize,
-) -> Option<ClockDivider> {
-    let div_num = source_frequency / desired_frequency;
-    if div_num < 2 {
+    source_frequency: u32,
+    desired_frequency: u32,
+) -> Option<FractionalDivider> {
+    // For current chips, LCD and CAM have the same divider range.
+    let (min_divider, max_divider) = property!("clock_tree.lcd_cam.lcd_clock.div_num");
+    let (_, max_denominator) = property!("clock_tree.lcd_cam.lcd_clock.div_a");
+
+    if source_frequency / desired_frequency < min_divider {
         // Source clock isn't fast enough to reach the desired frequency.
         // Return max output.
-        return Some(ClockDivider {
-            div_num: 1,
-            div_b: 0,
-            div_a: 0,
+        return Some(FractionalDivider {
+            integer: min_divider,
+            numerator: 0,
+            denominator: 0,
         });
     }
-    if div_num > 256 {
-        // Source is too fast to divide to the desired frequency. Return None.
-        return None;
-    }
 
-    let div_num = if div_num == 256 { 0 } else { div_num };
+    let divider = FractionalDivider::new(source_frequency, desired_frequency, max_denominator);
 
-    let div_fraction = {
-        let div_remainder = source_frequency % desired_frequency;
-        let gcd = hcf(div_remainder, desired_frequency);
-        Fraction {
-            numerator: div_remainder / gcd,
-            denominator: desired_frequency / gcd,
-        }
-    };
-
-    let divider = if div_fraction.numerator == 0 {
-        ClockDivider {
-            div_num,
-            div_b: 0,
-            div_a: 0,
-        }
-    } else {
-        let target = div_fraction;
-        let closest = farey_sequence(63).find(|curr| {
-            // https://en.wikipedia.org/wiki/Fraction#Adding_unlike_quantities
-
-            let new_curr_num = curr.numerator * target.denominator;
-            let new_target_num = target.numerator * curr.denominator;
-            new_curr_num >= new_target_num
-        });
-
-        let closest = unwrap!(closest, "The fraction must be between 0 and 1");
-
-        ClockDivider {
-            div_num,
-            div_b: closest.numerator,
-            div_a: closest.denominator,
-        }
-    };
-    Some(divider)
-}
-
-// https://en.wikipedia.org/wiki/Euclidean_algorithm
-const fn hcf(a: usize, b: usize) -> usize {
-    if b != 0 { hcf(b, a % b) } else { a }
-}
-
-struct Fraction {
-    pub numerator: usize,
-    pub denominator: usize,
-}
-
-// https://en.wikipedia.org/wiki/Farey_sequence#Next_term
-fn farey_sequence(denominator: usize) -> impl Iterator<Item = Fraction> {
-    let mut a = 0;
-    let mut b = 1;
-    let mut c = 1;
-    let mut d = denominator;
-    core::iter::from_fn(move || {
-        if a > denominator {
-            return None;
-        }
-        let next = Fraction {
-            numerator: a,
-            denominator: b,
-        };
-        let k = (denominator + b) / d;
-        (a, b, c, d) = (c, d, k * c - a, k * d - b);
-        Some(next)
-    })
+    // Source is too fast to divide down to the desired frequency.
+    (divider.integer <= max_divider).then_some(divider)
 }

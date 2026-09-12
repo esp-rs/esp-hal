@@ -1,92 +1,140 @@
 use crate::{
-    gpio::{RtcPin, RtcPinWithResistors},
+    gpio::{AlternateFunction, Level, LpPin, lp_io::LpFunction},
     peripherals::{GPIO, IO_MUX, LPWR},
 };
 
 for_each_lp_function! {
-    (($_rtc:ident, RTC_GPIOn, $pin:literal), $gpio:ident) => {
+    (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) => {
+        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        impl LpPin for crate::peripherals::$gpio<'_> {
+            fn lp_number(&self) -> u8 {
+                $pin
+            }
+        }
+    };
+
+    // The wakeup register and the hold register have one named field for each pad, and no index, so
+    // these functions select the field by the low-power number.
+    (LP_GPIOn $( (($_lp:ident, LP_GPIOn, $pin:literal), $gpio:ident, $_af:ident, $_lp_in:tt $_lp_out:tt) ),*) => {
         paste::paste! {
-            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-            impl RtcPin for crate::peripherals::$gpio<'_> {
-                fn rtc_number(&self) -> u8 {
-                    $pin
-                }
+            pub(crate) fn apply_wakeup(lp: u8, wakeup: bool, level: Level) {
+                let trigger = crate::gpio::lp_io::wake_trigger(level);
 
-                unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
-                    let gpio_wakeup = cfg_select! {
-                        esp32c2 => LPWR::regs().cntl_gpio_wakeup(),
-                        esp32c3 => LPWR::regs().gpio_wakeup(),
-                    };
+                let gpio_wakeup = cfg_select! {
+                    esp32c2 => LPWR::regs().cntl_gpio_wakeup(),
+                    esp32c3 => LPWR::regs().gpio_wakeup(),
+                };
 
-                    gpio_wakeup.modify(|_, w| unsafe {
-                        w.[<gpio_pin $pin _wakeup_enable>]().bit(wakeup);
-                        w.[<gpio_pin $pin _int_type>]().bits(level)
-                    });
-                }
+                gpio_wakeup.modify(|_, w| unsafe {
+                    match lp {
+                        $(
+                            $pin => {
+                                w.[<gpio_pin $pin _wakeup_enable>]().bit(wakeup);
+                                w.[<gpio_pin $pin _int_type>]().bits(trigger)
+                            }
+                        )*
+                        _ => unreachable!(),
+                    }
+                });
+            }
 
-                fn rtcio_pad_hold(&self, enable: bool) {
-                    LPWR::regs()
-                        .pad_hold()
-                        .modify(|_, w| w.[<gpio_pin $pin _hold>]().bit(enable));
+            pub(crate) fn pad_hold(lp: u8, enable: bool) {
+                LPWR::regs().pad_hold().modify(|_, w| {
+                    match lp {
+                        $( $pin => w.[<gpio_pin $pin _hold>]().bit(enable), )*
+                        _ => unreachable!(),
+                    }
+                });
+            }
+
+            /// Returns whether something holds the pad.
+            pub(crate) fn is_pad_held(lp: u8) -> bool {
+                let r = LPWR::regs().pad_hold().read();
+                match lp {
+                    $( $pin => r.[<gpio_pin $pin _hold>]().bit_is_set(), )*
+                    _ => unreachable!(),
                 }
             }
 
-            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-            impl RtcPinWithResistors for crate::peripherals::$gpio<'_> {
-                fn rtcio_pullup(&self, enable: bool) {
-                    pullup_enable($pin, enable)
-                }
+            /// Returns the pads that can wake the chip through the per-pin path, as a mask of
+            /// low-power numbers.
+            #[cfg(sleep_driver_supported)]
+            pub(crate) fn wakeup_enabled_mask() -> u32 {
+                let gpio_wakeup = cfg_select! {
+                    esp32c2 => LPWR::regs().cntl_gpio_wakeup().read(),
+                    esp32c3 => LPWR::regs().gpio_wakeup().read(),
+                };
 
-                fn rtcio_pulldown(&self, enable: bool) {
-                    pulldown_enable($pin, enable)
-                }
+                let mut mask = 0;
+                $(
+                    if gpio_wakeup.[<gpio_pin $pin _wakeup_enable>]().bit_is_set() {
+                        mask |= 1 << $pin;
+                    }
+                )*
+                mask
             }
         }
     };
 }
 
-pub(super) fn init_pin(pin: &impl RtcPin, input_enable: bool) -> u8 {
-    let pin = pin.number();
-    input_enable_fn(pin, input_enable);
-    pin
+/// Takes or releases the hold of the pad of `gpio`.
+///
+/// The register numbers the pads of the digital supply the way the digital registers do, and the
+/// low-power pads have their own register.
+pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
+    let mask = 1 << gpio;
+    LPWR::regs().dig_pad_hold().modify(|r, w| unsafe {
+        let bits = r.dig_pad_hold().bits();
+        w.dig_pad_hold()
+            .bits(if enable { bits | mask } else { bits & !mask })
+    });
 }
 
-pub(super) fn output_enable(pin: u8, enable: bool) {
+/// Returns whether something holds the pad of `gpio`.
+pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
+    LPWR::regs().dig_pad_hold().read().dig_pad_hold().bits() & (1 << gpio) != 0
+}
+
+/// Configures the pad.
+///
+/// The low-power domain reaches the pad through the digital IO MUX. There is thus no low-power
+/// function to select, and the low-power number is the digital pin number.
+pub(crate) fn set_config(lp: u8, input_enable: bool, _mux: bool, _func: LpFunction) {
+    IO_MUX::regs().gpio(lp as usize).modify(|_, w| unsafe {
+        w.slp_sel().bit(false);
+        w.mcu_sel().bits(AlternateFunction::GPIO as u8);
+        w.fun_ie().bit(input_enable)
+    });
+}
+
+#[expect(dead_code)]
+pub(crate) fn init_pin(lp: u8, enable_input: bool) -> u8 {
+    input_enable(lp, enable_input);
+    lp
+}
+
+#[expect(dead_code)]
+pub(crate) fn output_enable(lp: u8, enable: bool) {
     if enable {
         GPIO::regs()
             .enable_w1ts()
-            .write(|w| unsafe { w.enable_w1ts().bits(1 << pin) });
+            .write(|w| unsafe { w.enable_w1ts().bits(1 << lp) });
     } else {
         GPIO::regs()
             .enable_w1tc()
-            .write(|w| unsafe { w.enable_w1tc().bits(1 << pin) });
+            .write(|w| unsafe { w.enable_w1tc().bits(1 << lp) });
     }
 }
 
-pub(super) fn input_enable(pin: u8, enable: bool) {
-    input_enable_fn(pin, enable);
-}
-
-fn input_enable_fn(pin: u8, enable: bool) {
+pub(crate) fn input_enable(lp: u8, enable: bool) {
     IO_MUX::regs()
-        .gpio(pin as usize)
+        .gpio(lp as usize)
         .modify(|_, w| w.fun_ie().bit(enable));
 }
 
-pub(super) fn pullup_enable(pin: u8, enable: bool) {
-    IO_MUX::regs()
-        .gpio(pin as usize)
-        .modify(|_, w| w.fun_wpu().bit(enable));
-}
-
-pub(super) fn pulldown_enable(pin: u8, enable: bool) {
-    IO_MUX::regs()
-        .gpio(pin as usize)
-        .modify(|_, w| w.fun_wpd().bit(enable));
-}
-
-pub(super) fn set_open_drain_output(pin: u8, enable: bool) {
+#[expect(dead_code)]
+pub(crate) fn set_open_drain_output(lp: u8, enable: bool) {
     GPIO::regs()
-        .pin(pin as usize)
+        .pin(lp as usize)
         .modify(|_, w| w.pad_driver().bit(enable));
 }

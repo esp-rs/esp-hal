@@ -109,6 +109,7 @@ where
         ".option push",
         ".option norelax",
         "la gp, __global_pointer$",
+        "li ra, 0", // ensure probe-rs stops unwinding
         ".option pop",
         // Follow IDF's FPU initialization, enable it in Initial state, touch
         // fcsr (which makes the state Dirty), then clear the dirty bit to

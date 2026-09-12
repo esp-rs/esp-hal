@@ -1,4 +1,29 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(lcd_cam_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(lcd_cam_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
+    },
+    "vsync_pin" => gpio_for_signal!(LCD_V_SYNC, "GPIO3"),
+    "hsync_pin" => gpio_for_signal!(LCD_H_SYNC, "GPIO46"),
+    "de_pin" => gpio_for_signal!(LCD_H_ENABLE, "GPIO43"),
+    "pclk_pin" => gpio_for_signal!(LCD_PCLK, "GPIO9"),
+    "data0_pin" => gpio_for_signal!(LCD_DATA_0, "GPIO10"),
+    "data1_pin" => gpio_for_signal!(LCD_DATA_1, "GPIO11"),
+    "data2_pin" => gpio_for_signal!(LCD_DATA_2, "GPIO12"),
+    "data3_pin" => gpio_for_signal!(LCD_DATA_3, "GPIO13"),
+    "data4_pin" => gpio_for_signal!(LCD_DATA_4, "GPIO14"),
+    "data5_pin" => gpio_for_signal!(LCD_DATA_5, "GPIO21"),
+    "data6_pin" => gpio_for_signal!(LCD_DATA_6, "GPIO8"),
+    "data7_pin" => gpio_for_signal!(LCD_DATA_7, "GPIO18"),
+    "data8_pin" => gpio_for_signal!(LCD_DATA_8, "GPIO45"),
+    "data9_pin" => gpio_for_signal!(LCD_DATA_9, "GPIO38"),
+    "data10_pin" => gpio_for_signal!(LCD_DATA_10, "GPIO39"),
+    "data11_pin" => gpio_for_signal!(LCD_DATA_11, "GPIO40"),
+    "data12_pin" => gpio_for_signal!(LCD_DATA_12, "GPIO41"),
+    "data13_pin" => gpio_for_signal!(LCD_DATA_13, "GPIO42"),
+    "data14_pin" => gpio_for_signal!(LCD_DATA_14, "GPIO2"),
+    "data15_pin" => gpio_for_signal!(LCD_DATA_15, "GPIO1"),
+))]
 //! # LCD - RGB/Digital Parallel Interface Mode
 //!
 //! ## Overview
@@ -26,7 +51,7 @@
 //! # };
 //! # use esp_hal::dma_loop_buffer;
 //!
-//! # let channel = peripherals.DMA_CH0;
+//! # let channel = peripherals.__dma_channel__;
 //! # let mut dma_buf = dma_loop_buffer!(32);
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
@@ -61,29 +86,29 @@
 //!     .with_disable_black_region(false);
 //!
 //! let mut dpi = Dpi::new(lcd_cam.lcd, channel, config)?
-//!     .with_vsync(peripherals.GPIO3)
-//!     .with_hsync(peripherals.GPIO46)
-//!     .with_de(peripherals.GPIO17)
-//!     .with_pclk(peripherals.GPIO9)
+//!     .with_vsync(peripherals.__vsync_pin__)
+//!     .with_hsync(peripherals.__hsync_pin__)
+//!     .with_de(peripherals.__de_pin__)
+//!     .with_pclk(peripherals.__pclk_pin__)
 //!     // Blue
-//!     .with_data0(peripherals.GPIO10)
-//!     .with_data1(peripherals.GPIO11)
-//!     .with_data2(peripherals.GPIO12)
-//!     .with_data3(peripherals.GPIO13)
-//!     .with_data4(peripherals.GPIO14)
+//!     .with_data0(peripherals.__data0_pin__)
+//!     .with_data1(peripherals.__data1_pin__)
+//!     .with_data2(peripherals.__data2_pin__)
+//!     .with_data3(peripherals.__data3_pin__)
+//!     .with_data4(peripherals.__data4_pin__)
 //!     // Green
-//!     .with_data5(peripherals.GPIO21)
-//!     .with_data6(peripherals.GPIO8)
-//!     .with_data7(peripherals.GPIO18)
-//!     .with_data8(peripherals.GPIO45)
-//!     .with_data9(peripherals.GPIO38)
-//!     .with_data10(peripherals.GPIO39)
+//!     .with_data5(peripherals.__data5_pin__)
+//!     .with_data6(peripherals.__data6_pin__)
+//!     .with_data7(peripherals.__data7_pin__)
+//!     .with_data8(peripherals.__data8_pin__)
+//!     .with_data9(peripherals.__data9_pin__)
+//!     .with_data10(peripherals.__data10_pin__)
 //!     // Red
-//!     .with_data11(peripherals.GPIO40)
-//!     .with_data12(peripherals.GPIO41)
-//!     .with_data13(peripherals.GPIO42)
-//!     .with_data14(peripherals.GPIO2)
-//!     .with_data15(peripherals.GPIO1);
+//!     .with_data11(peripherals.__data11_pin__)
+//!     .with_data12(peripherals.__data12_pin__)
+//!     .with_data13(peripherals.__data13_pin__)
+//!     .with_data14(peripherals.__data14_pin__)
+//!     .with_data15(peripherals.__data15_pin__);
 //!
 //! let color: u16 = 0b11111_000000_00000; // RED
 //! for chunk in dma_buf.chunks_mut(2) {
@@ -96,7 +121,6 @@
 //! ```
 
 use core::{
-    marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
@@ -112,12 +136,10 @@ use crate::{
         ClockError,
         ErasedTxChannel,
         LcdDmaTxChannel,
-        calculate_clkm,
-        lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
+        lcd::{ClockConfig, ClockMode, DelayMode, Lcd},
+        ll,
     },
     pac,
-    peripherals::LCD_CAM,
-    system::{self, GenericPeripheralGuard},
     time::Rate,
 };
 
@@ -131,17 +153,15 @@ pub enum ConfigError {
 
 /// Represents the RGB LCD interface.
 pub struct Dpi<'d, Dm: DriverMode> {
-    lcd_cam: LCD_CAM<'d>,
+    lcd: Lcd<'d, Dm>,
     tx_channel: ChannelTx<Blocking, ErasedTxChannel<'d>>,
-    _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
-    _mode: PhantomData<Dm>,
 }
 
 impl<'d, Dm> Dpi<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Create a new instance of the RGB/DPI driver.
+    /// Creates a new instance of the RGB/DPI driver.
     pub fn new(
         lcd: Lcd<'d, Dm>,
         channel: impl LcdDmaTxChannel<'d>,
@@ -150,12 +170,7 @@ where
         let tx_channel = ChannelTx::new(channel.into());
         tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
-        let mut this = Self {
-            lcd_cam: lcd.lcd_cam,
-            tx_channel,
-            _guard: lcd._guard,
-            _mode: PhantomData,
-        };
+        let mut this = Self { lcd, tx_channel };
 
         this.apply_config(&config)?;
 
@@ -163,64 +178,43 @@ where
     }
 
     fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
-        self.lcd_cam.register_block()
+        self.lcd.regs()
     }
 
     /// Applies the configuration to the peripheral.
     ///
     /// # Errors
     ///
-    /// [`ConfigError::Clock`] variant will be returned if the frequency passed
-    /// in `Config` is too low.
+    /// [`ConfigError::Clock`] when the frequency passed in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
-        // the LCD_PCLK divider must be at least 2. To make up for this the user
-        // provided frequency is doubled to match.
-        let (i, divider) = calculate_clkm(
-            (config.frequency.as_hz() * 2) as _,
-            &[
-                crate::soc::clocks::xtal_clk_frequency() as usize,
-                crate::soc::clocks::pll_d2_frequency() as usize,
-                crate::soc::clocks::crypto_pwm_clk_frequency() as usize,
-            ],
-        )
-        .map_err(ConfigError::Clock)?;
+        self.lcd
+            .configure_clocks(&ClockConfig {
+                clock_mode: config.clock_mode,
+                // ESP32-S3 errata requires LCD_PCLK to divide LCD_CLK by at least 2.
+                // Double the requested frequency so the extra divider still matches.
+                frequency: if cfg!(esp32s3) {
+                    config.frequency * 2
+                } else {
+                    config.frequency
+                },
+            })
+            .map_err(ConfigError::Clock)?;
 
-        self.regs().lcd_clock().write(|w| unsafe {
-            // Force enable the clock for all configuration registers.
-            w.clk_en().set_bit();
-            w.lcd_clk_sel().bits((i + 1) as _);
-            w.lcd_clkm_div_num().bits(divider.div_num as _);
-            w.lcd_clkm_div_b().bits(divider.div_b as _);
-            w.lcd_clkm_div_a().bits(divider.div_a as _); // LCD_PCLK = LCD_CLK / 2
-            w.lcd_clk_equ_sysclk().clear_bit();
-            w.lcd_clkcnt_n().bits(2 - 1); // Must not be 0.
-            w.lcd_ck_idle_edge()
-                .bit(config.clock_mode.polarity == Polarity::IdleHigh);
-            w.lcd_ck_out_edge()
-                .bit(config.clock_mode.phase == Phase::ShiftHigh)
-        });
         self.regs()
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
 
-        self.regs()
-            .lcd_rgb_yuv()
-            .write(|w| w.lcd_conv_bypass().clear_bit());
+        ll::set_lcd_conv_bypass(self.regs());
 
         self.regs().lcd_user().modify(|_, w| {
             if config.format.enable_2byte_mode {
-                w.lcd_8bits_order().bit(false);
                 w.lcd_byte_order()
                     .bit(config.format.byte_order == ByteOrder::Inverted);
             } else {
-                w.lcd_8bits_order()
-                    .bit(config.format.byte_order == ByteOrder::Inverted);
                 w.lcd_byte_order().bit(false);
             }
             w.lcd_bit_order()
                 .bit(config.format.bit_order == BitOrder::Inverted);
-            w.lcd_2byte_en().bit(config.format.enable_2byte_mode);
 
             // Only valid in Intel8080 mode.
             w.lcd_cmd().clear_bit();
@@ -229,42 +223,31 @@ where
             // This needs to be explicitly set for RGB mode.
             w.lcd_dout().set_bit()
         });
+        ll::set_8bits_order(
+            self.regs(),
+            !config.format.enable_2byte_mode && config.format.byte_order == ByteOrder::Inverted,
+        );
+        ll::set_2byte_mode(self.regs(), config.format.enable_2byte_mode);
 
         let timing = &config.timing;
-        self.regs().lcd_ctrl().modify(|_, w| unsafe {
-            // Enable RGB mode, and input VSYNC, HSYNC, and DE signals.
-            w.lcd_rgb_mode_en().set_bit();
-
-            w.lcd_hb_front()
-                .bits((timing.horizontal_blank_front_porch as u16).saturating_sub(1));
-            w.lcd_va_height()
-                .bits((timing.vertical_active_height as u16).saturating_sub(1));
-            w.lcd_vt_height()
-                .bits((timing.vertical_total_height as u16).saturating_sub(1))
-        });
-        self.regs().lcd_ctrl1().modify(|_, w| unsafe {
-            w.lcd_vb_front()
-                .bits((timing.vertical_blank_front_porch as u8).saturating_sub(1));
-            w.lcd_ha_width()
-                .bits((timing.horizontal_active_width as u16).saturating_sub(1));
-            w.lcd_ht_width()
-                .bits((timing.horizontal_total_width as u16).saturating_sub(1))
-        });
-        self.regs().lcd_ctrl2().modify(|_, w| unsafe {
-            w.lcd_vsync_width()
-                .bits((timing.vsync_width as u8).saturating_sub(1));
-            w.lcd_vsync_idle_pol().bit(config.vsync_idle_level.into());
-            w.lcd_de_idle_pol().bit(config.de_idle_level.into());
-            w.lcd_hs_blank_en().bit(config.hs_blank_en);
-            w.lcd_hsync_width()
-                .bits((timing.hsync_width as u8).saturating_sub(1));
-            w.lcd_hsync_idle_pol().bit(config.hsync_idle_level.into());
-            w.lcd_hsync_position().bits(timing.hsync_position as u8)
-        });
-
+        ll::configure_rgb_timing(
+            self.regs(),
+            (timing.horizontal_blank_front_porch as u16).saturating_sub(1),
+            (timing.vertical_active_height as u16).saturating_sub(1),
+            (timing.vertical_total_height as u16).saturating_sub(1),
+            (timing.vertical_blank_front_porch as u16).saturating_sub(1),
+            (timing.horizontal_active_width as u16).saturating_sub(1),
+            (timing.horizontal_total_width as u16).saturating_sub(1),
+            (timing.vsync_width as u16).saturating_sub(1),
+            config.vsync_idle_level.into(),
+            config.de_idle_level.into(),
+            config.hs_blank_en,
+            (timing.hsync_width as u8).saturating_sub(1),
+            config.hsync_idle_level.into(),
+            timing.hsync_position as u8,
+        );
         self.regs().lcd_misc().modify(|_, w| unsafe {
-            // TODO: Find out what this field actually does.
-            // Set the threshold for Async Tx FIFO full event. (5 bits)
+            #[cfg(not(esp32s31))]
             w.lcd_afifo_threshold_num().bits((1 << 5) - 1);
 
             // Doesn't matter for RGB mode.
@@ -278,30 +261,13 @@ where
             // Enable blank region when LCD sends data out.
             w.lcd_bk_en().bit(!config.disable_black_region)
         });
-        self.regs().lcd_dly_mode().modify(|_, w| unsafe {
-            w.lcd_de_mode().bits(config.de_mode as u8);
-            w.lcd_hsync_mode().bits(config.hsync_mode as u8);
-            w.lcd_vsync_mode().bits(config.vsync_mode as u8);
-            w
-        });
-        self.regs().lcd_data_dout_mode().modify(|_, w| unsafe {
-            w.dout0_mode().bits(config.output_bit_mode as u8);
-            w.dout1_mode().bits(config.output_bit_mode as u8);
-            w.dout2_mode().bits(config.output_bit_mode as u8);
-            w.dout3_mode().bits(config.output_bit_mode as u8);
-            w.dout4_mode().bits(config.output_bit_mode as u8);
-            w.dout5_mode().bits(config.output_bit_mode as u8);
-            w.dout6_mode().bits(config.output_bit_mode as u8);
-            w.dout7_mode().bits(config.output_bit_mode as u8);
-            w.dout8_mode().bits(config.output_bit_mode as u8);
-            w.dout9_mode().bits(config.output_bit_mode as u8);
-            w.dout10_mode().bits(config.output_bit_mode as u8);
-            w.dout11_mode().bits(config.output_bit_mode as u8);
-            w.dout12_mode().bits(config.output_bit_mode as u8);
-            w.dout13_mode().bits(config.output_bit_mode as u8);
-            w.dout14_mode().bits(config.output_bit_mode as u8);
-            w.dout15_mode().bits(config.output_bit_mode as u8)
-        });
+        ll::set_sync_delay(
+            self.regs(),
+            config.de_mode as u8,
+            config.hsync_mode as u8,
+            config.vsync_mode as u8,
+        );
+        ll::set_data_bit_delay(self.regs(), config.output_bit_mode as u8);
 
         self.regs()
             .lcd_user()
@@ -310,7 +276,7 @@ where
         Ok(())
     }
 
-    /// Assign the VSYNC pin for the LCD_CAM.
+    /// Assigns the VSYNC pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the VSYNC
     /// signal.
@@ -323,7 +289,7 @@ where
         self
     }
 
-    /// Assign the HSYNC pin for the LCD_CAM.
+    /// Assigns the HSYNC pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the HSYNC
     /// signal.
@@ -336,7 +302,7 @@ where
         self
     }
 
-    /// Assign the DE pin for the LCD_CAM.
+    /// Assigns the DE pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DE
     /// signal.
@@ -349,7 +315,7 @@ where
         self
     }
 
-    /// Assign the PCLK pin for the LCD_CAM.
+    /// Assigns the PCLK pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the PCLK
     /// signal.
@@ -372,7 +338,7 @@ where
         self
     }
 
-    /// Assign the DATA_0 pin for the LCD_CAM.
+    /// Assigns the DATA_0 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_0
     /// signal.
@@ -380,7 +346,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_0, pin)
     }
 
-    /// Assign the DATA_1 pin for the LCD_CAM.
+    /// Assigns the DATA_1 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_1
     /// signal.
@@ -388,7 +354,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_1, pin)
     }
 
-    /// Assign the DATA_2 pin for the LCD_CAM.
+    /// Assigns the DATA_2 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_2
     /// signal.
@@ -396,7 +362,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_2, pin)
     }
 
-    /// Assign the DATA_3 pin for the LCD_CAM.
+    /// Assigns the DATA_3 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_3
     /// signal.
@@ -404,7 +370,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_3, pin)
     }
 
-    /// Assign the DATA_4 pin for the LCD_CAM.
+    /// Assigns the DATA_4 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_4
     /// signal.
@@ -412,7 +378,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_4, pin)
     }
 
-    /// Assign the DATA_5 pin for the LCD_CAM.
+    /// Assigns the DATA_5 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_5
     /// signal.
@@ -420,7 +386,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_5, pin)
     }
 
-    /// Assign the DATA_6 pin for the LCD_CAM.
+    /// Assigns the DATA_6 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_6
     /// signal.
@@ -428,7 +394,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_6, pin)
     }
 
-    /// Assign the DATA_7 pin for the LCD_CAM.
+    /// Assigns the DATA_7 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_7
     /// signal.
@@ -436,7 +402,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_7, pin)
     }
 
-    /// Assign the DATA_8 pin for the LCD_CAM.
+    /// Assigns the DATA_8 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_8
     /// signal.
@@ -444,7 +410,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_8, pin)
     }
 
-    /// Assign the DATA_9 pin for the LCD_CAM.
+    /// Assigns the DATA_9 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the DATA_9
     /// signal.
@@ -452,7 +418,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_9, pin)
     }
 
-    /// Assign the DATA_10 pin for the LCD_CAM.
+    /// Assigns the DATA_10 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_10 signal.
@@ -460,7 +426,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_10, pin)
     }
 
-    /// Assign the DATA_11 pin for the LCD_CAM.
+    /// Assigns the DATA_11 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_11 signal.
@@ -468,7 +434,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_11, pin)
     }
 
-    /// Assign the DATA_12 pin for the LCD_CAM.
+    /// Assigns the DATA_12 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_12 signal.
@@ -476,7 +442,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_12, pin)
     }
 
-    /// Assign the DATA_13 pin for the LCD_CAM.
+    /// Assigns the DATA_13 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_13 signal.
@@ -484,7 +450,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_13, pin)
     }
 
-    /// Assign the DATA_14 pin for the LCD_CAM.
+    /// Assigns the DATA_14 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_14 signal.
@@ -492,7 +458,7 @@ where
         self.with_data_pin(OutputSignal::LCD_DATA_14, pin)
     }
 
-    /// Assign the DATA_15 pin for the LCD_CAM.
+    /// Assigns the DATA_15 pin for the LCD_CAM.
     ///
     /// Sets the specified pin to push-pull output and connects it to the
     /// DATA_15 signal.
@@ -509,16 +475,8 @@ where
         next_frame_en: bool,
         mut buf: TX,
     ) -> Result<DpiTransfer<'d, TX, Dm>, (DmaError, Self, TX)> {
-        let result = unsafe {
-            self.tx_channel
-                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
-        }
-        .and_then(|_| self.tx_channel.start_transfer());
-        if let Err(err) = result {
-            return Err((err, self, buf));
-        }
-
-        // Reset LCD control unit and Async Tx FIFO
+        // Reset before DMA start. AXI-GDMA can fill the LCD AFIFO immediately; a later
+        // FIFO reset would drop the first pixels of the frame.
         self.regs()
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
@@ -531,6 +489,15 @@ where
             // 0: LCD stops when the current frame is sent out.
             w.lcd_next_frame_en().bit(next_frame_en)
         });
+
+        let result = unsafe {
+            self.tx_channel
+                .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
+        }
+        .and_then(|_| self.tx_channel.start_transfer());
+        if let Err(err) = result {
+            return Err((err, self, buf));
+        }
 
         // Start the transfer.
         self.regs().lcd_user().modify(|_, w| {
@@ -553,7 +520,7 @@ pub struct DpiTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.dpi.regs().lcd_user().read().lcd_start().bit_is_clear()
     }
@@ -567,8 +534,8 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     ///
-    /// Note: If you specified `next_frame_en` as true in [Dpi::send], you're
-    /// just waiting for a DMA error when you call this.
+    /// If `next_frame_en` was specified as true in [`Dpi::send`], this waits
+    /// for a DMA error.
     pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF::Final) {
         while !self.is_done() {
             core::hint::spin_loop();
@@ -728,9 +695,9 @@ pub struct Format {
 
 /// The timing numbers for the driver to follow.
 ///
-/// Note: The names of the fields in this struct don't match what you
-/// would typically find in an LCD's datasheet. Carefully read the doc on each
-/// field to understand what to set it to.
+/// The names of the fields in this struct do not match what is typically found
+/// in an LCD datasheet. Carefully read the doc on each field to understand what
+/// to set it to.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FrameTiming {
@@ -747,7 +714,7 @@ pub struct FrameTiming {
     /// This is the number of PCLKs between the start of the line and the start
     /// of active data in the line.
     ///
-    /// Note: This includes `hsync_width`.
+    /// Includes `hsync_width`.
     ///
     /// Max is 2048 (11 bits).
     pub horizontal_blank_front_porch: usize,
@@ -771,7 +738,7 @@ pub struct FrameTiming {
     /// This is the number of (blank/invalid) lines before the start of the
     /// frame.
     ///
-    /// Note: This includes `vsync_width`.
+    /// Includes `vsync_width`.
     ///
     /// Max is 256 (8 bits).
     pub vertical_blank_front_porch: usize,

@@ -117,7 +117,7 @@ impl VdmaLinkItem {
         self._res3.set(0);
     }
 
-    /// Update the source address in this LLI.
+    /// Updates the source address in this LLI.
     ///
     /// Safe to call while the DMA is running: the controller latches `sar_lo`
     /// at the **start** of each block, so an in-flight block is unaffected and
@@ -138,13 +138,13 @@ impl VdmaLinkItem {
     }
 }
 
-/// Handle for a single VDMA channel dedicated to the DSI bridge.
+/// Handles for a single VDMA channel dedicated to the DSI bridge.
 pub(super) struct VdmaChannel {
     channel_id: u8,
 }
 
 impl VdmaChannel {
-    /// Initialise the VDMA controller and configure channel `channel_id`
+    /// Initializes the VDMA controller and configures channel `channel_id`
     /// (0-indexed, 0–3) for mem→DSI linked-list transfers.
     ///
     /// The caller must hold the `Vdma` peripheral guard before calling this.
@@ -180,7 +180,7 @@ impl VdmaChannel {
         Self { channel_id }
     }
 
-    /// Point the channel's LLP at `item` and enable the channel.
+    /// Points the channel's LLP at `item` and enables the channel.
     pub(super) fn start(&mut self, item: &VdmaLinkItem) {
         let addr = item as *const VdmaLinkItem as u32;
         debug_assert_eq!(addr & 0x3F, 0, "LLI must be 64-byte aligned");

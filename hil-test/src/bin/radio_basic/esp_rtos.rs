@@ -6,29 +6,33 @@ mod tests {
     use defmt::info;
     use esp_hal::{
         clock::CpuClock,
-        interrupt::{
-            Priority,
-            software::{SoftwareInterrupt, SoftwareInterruptControl},
-        },
-        peripherals::TIMG0,
+        interrupt::{Priority, software::SoftwareInterrupt},
+        peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR2, TIMG0},
         time::{Duration, Instant},
         timer::timg::TimerGroup,
     };
     #[cfg(multi_core)]
-    use esp_hal::{peripherals::CPU_CTRL, system::Cpu};
+    use esp_hal::{
+        peripherals::{CPU_CTRL, FROM_CPU_INTR1},
+        system::Cpu,
+    };
     use esp_radio_rtos_driver::{
         self as preempt,
         queue::QueueHandle,
         semaphore::{SemaphoreHandle, SemaphoreKind},
     };
-    use esp_rtos::{CurrentThreadHandle, embassy::InterruptExecutor};
+    use esp_rtos::{
+        CurrentThreadHandle,
+        embassy::InterruptExecutor,
+        thread::{Stack as ThreadStack, ThreadSpawner},
+    };
     use portable_atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering};
-    use static_cell::StaticCell;
+    use static_cell::{ConstStaticCell, StaticCell};
 
     struct Context {
         #[cfg(multi_core)]
-        sw_int1: SoftwareInterrupt<'static, 1>,
-        sw_int2: SoftwareInterrupt<'static, 2>,
+        sw_int1: FROM_CPU_INTR1<'static>,
+        sw_int2: FROM_CPU_INTR2<'static>,
         #[cfg(multi_core)]
         cpu_cntl: CPU_CTRL<'static>,
     }
@@ -36,8 +40,9 @@ mod tests {
     #[allow(unused)] // compile test
     fn baremetal_preempt_can_be_initialized_with_any_timer(
         timer: esp_hal::timer::AnyTimer<'static>,
+        int: FROM_CPU_INTR0<'static>,
     ) {
-        esp_rtos::start(timer, unsafe { SoftwareInterrupt::<'static, 0>::steal() });
+        esp_rtos::start(timer, int);
     }
 
     #[init]
@@ -47,14 +52,13 @@ mod tests {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
 
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         Context {
             #[cfg(multi_core)]
-            sw_int1: sw_ints.software_interrupt1,
-            sw_int2: sw_ints.software_interrupt2,
+            sw_int1: p.FROM_CPU_INTR1,
+            sw_int2: p.FROM_CPU_INTR2,
             #[cfg(multi_core)]
             cpu_cntl: p.CPU_CTRL,
         }
@@ -66,7 +70,7 @@ mod tests {
     #[should_panic]
     fn panics_in_interrupt_context() {
         #[embassy_executor::task]
-        async fn try_init(timer: TIMG0<'static>, sw_int0: SoftwareInterrupt<'static, 0>) {
+        async fn try_init(timer: TIMG0<'static>, sw_int0: FROM_CPU_INTR0<'static>) {
             let timg0 = TimerGroup::new(timer);
             esp_rtos::start(timg0.timer0, sw_int0);
         }
@@ -76,15 +80,13 @@ mod tests {
         let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let p = esp_hal::init(config);
 
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-
         static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-        let executor_core0 = InterruptExecutor::new(sw_ints.software_interrupt1);
+        let executor_core0 = InterruptExecutor::new(p.FROM_CPU_INTR1);
         let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
         let spawner = executor_core0.start(Priority::Priority1);
 
-        spawner.spawn(try_init(p.TIMG0, sw_ints.software_interrupt0).unwrap());
+        spawner.spawn(try_init(p.TIMG0, p.FROM_CPU_INTR0).unwrap());
     }
 
     #[test]
@@ -94,6 +96,111 @@ mod tests {
         CurrentThreadHandle::get().delay(Duration::from_millis(10));
 
         hil_test::assert!(now.elapsed() >= Duration::from_millis(10));
+    }
+
+    #[test]
+    fn thread_runs_a_function_and_returns_its_value() {
+        fn worker() -> u32 {
+            42
+        }
+
+        let handle = ThreadSpawner::new(4096).with_name("worker").spawn(worker);
+
+        hil_test::assert_eq!(handle.name(), Some("worker"));
+
+        let (value, _spawner) = handle.join();
+        hil_test::assert_eq!(value, 42);
+    }
+
+    #[test]
+    fn thread_returns_a_value_that_is_not_copy() {
+        let captured = Box::new(3_u32);
+
+        let handle = ThreadSpawner::new(4096).spawn(move || {
+            let mut items = alloc::vec::Vec::new();
+            items.push(*captured);
+            items.push(*captured);
+            items
+        });
+
+        let (value, _spawner) = handle.join();
+        hil_test::assert_eq!(value.len(), 2);
+        hil_test::assert_eq!(value[0], 3);
+        hil_test::assert_eq!(value[1], 3);
+    }
+
+    #[test]
+    fn a_static_stack_can_be_reused_after_a_join() {
+        static STACK: ConstStaticCell<ThreadStack<4096>> = ConstStaticCell::new(ThreadStack::new());
+
+        let spawner = ThreadSpawner::from_static(STACK.take()).with_priority(2);
+
+        let (first, spawner) = spawner.spawn(|| 1_u32).join();
+        let (second, _spawner) = spawner.spawn(|| 2_u32).join();
+
+        hil_test::assert_eq!(first, 1);
+        hil_test::assert_eq!(second, 2);
+    }
+
+    #[test]
+    fn a_detached_thread_keeps_running() {
+        static FINISHED: AtomicBool = AtomicBool::new(false);
+
+        ThreadSpawner::new(4096)
+            .spawn(|| {
+                CurrentThreadHandle::get().delay(Duration::from_millis(10));
+                FINISHED.store(true, Ordering::SeqCst);
+            })
+            .detach();
+
+        while !FINISHED.load(Ordering::SeqCst) {
+            CurrentThreadHandle::get().delay(Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    fn a_detached_thread_drops_its_return_value() {
+        static DROPPED: AtomicBool = AtomicBool::new(false);
+
+        struct Observed;
+        impl Drop for Observed {
+            fn drop(&mut self) {
+                DROPPED.store(true, Ordering::SeqCst);
+            }
+        }
+
+        ThreadSpawner::new(4096).spawn(|| Observed).detach();
+
+        while !DROPPED.load(Ordering::SeqCst) {
+            CurrentThreadHandle::get().delay(Duration::from_millis(1));
+        }
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    fn a_thread_can_be_pinned_to_the_second_core(ctx: Context) {
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            ctx.sw_int1,
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        let (cpu, _spawner) = ThreadSpawner::new(4096)
+            .with_pinned_to(Cpu::AppCpu)
+            .with_priority(2)
+            .spawn(Cpu::current)
+            .join();
+
+        hil_test::assert!(cpu == Cpu::AppCpu);
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
     }
 
     #[test]
@@ -292,7 +399,38 @@ mod tests {
     }
 
     #[test]
-    fn interrupt_handler_is_not_preempted_by_context_switch(mut ctx: Context) {
+    fn task_can_delete_itself_when_nothing_else_is_ready() {
+        // The task deletes itself while the main task sleeps. The run queue is empty at that point,
+        // so the scheduler has to switch from the deleted task to the idle context.
+        extern "C" fn self_deleting_task(_context: *mut c_void) {
+            // Wait for the main task to go to sleep, so that this task is the last ready one.
+            CurrentThreadHandle::get().delay(Duration::from_millis(10));
+
+            info!("Task: deleting itself");
+            unsafe { preempt::schedule_task_deletion(None) };
+
+            unreachable!("A deleted task must not run again");
+        }
+
+        unsafe {
+            preempt::task_create(
+                "self_deleting_task",
+                self_deleting_task,
+                core::ptr::null_mut(),
+                3,
+                None,
+                4096,
+            )
+        };
+
+        // Sleeping takes the main task out of the run queue.
+        CurrentThreadHandle::get().delay(Duration::from_millis(50));
+
+        info!("Main: done");
+    }
+
+    #[test]
+    fn interrupt_handler_is_not_preempted_by_context_switch(ctx: Context) {
         // In this test, we start a thread, and make it wait for a signal. We then trigger a
         // low-priority interrupt, which sets the signal and exits the test. The test must not time
         // out.
@@ -323,14 +461,15 @@ mod tests {
 
         #[esp_hal::handler]
         fn sw_handler() {
-            unsafe { SoftwareInterrupt::<'static, 2>::steal() }.reset();
+            SoftwareInterrupt::<'static, 2>::new(unsafe { FROM_CPU_INTR2::steal() }).reset();
             let sem = unsafe { &*SEM.load(Ordering::Relaxed) };
             sem.give();
             embedded_test::export::check_outcome(());
         }
 
-        ctx.sw_int2.set_interrupt_handler(sw_handler);
-        ctx.sw_int2.raise();
+        let mut sw_int2 = SoftwareInterrupt::new(ctx.sw_int2);
+        sw_int2.set_interrupt_handler(sw_handler);
+        sw_int2.raise();
 
         loop {}
     }
@@ -461,6 +600,96 @@ mod tests {
         info!("Wait for tasks to finish");
         test_context.ready_semaphore.take(None);
         test_context.ready_semaphore.take(None);
+
+        unsafe {
+            // Park the second core, we don't need it anymore
+            esp_hal::system::CpuControl::new(ctx.cpu_cntl).park_core(Cpu::AppCpu);
+        }
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    fn deleting_a_task_on_another_core_keeps_other_tasks_alive(ctx: Context) {
+        // Core 0 deletes a task that is running on core 1. The task is freed while core 1 still
+        // holds it as its current task, so the allocator can hand the same address to a task
+        // created afterwards. Core 1 then acts on the new task instead of the deleted one.
+        struct TestContext {
+            victim_runs: SemaphoreHandle,
+            successor_alive: SemaphoreHandle,
+        }
+
+        let test_context = TestContext {
+            victim_runs: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+            successor_alive: SemaphoreHandle::new(SemaphoreKind::Counting { initial: 0, max: 1 }),
+        };
+
+        extern "C" fn victim(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+
+            context.victim_runs.give();
+
+            // Stay the current task of core 1, and keep entering the scheduler.
+            loop {
+                preempt::yield_task();
+            }
+        }
+
+        extern "C" fn successor(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+
+            // Report being alive, and sleep in between so that the main task can run.
+            loop {
+                context.successor_alive.give();
+                CurrentThreadHandle::get().delay(Duration::from_millis(10));
+            }
+        }
+
+        esp_rtos::start_second_core(
+            unsafe { ctx.cpu_cntl.clone_unchecked() },
+            ctx.sw_int1,
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            || {},
+        );
+
+        // The spinning tasks must not starve the main task, otherwise this test can only time out.
+        CurrentThreadHandle::get().set_priority(5);
+
+        let context_ptr = (&raw const test_context).cast::<c_void>().cast_mut();
+
+        // Both tasks use the same stack size, so that the successor can reuse the memory of the
+        // victim.
+        const STACK_SIZE: usize = 4096;
+
+        let victim_handle =
+            unsafe { preempt::task_create("victim", victim, context_ptr, 1, Some(1), STACK_SIZE) };
+
+        info!("Wait for the victim to run on core 1");
+        hil_test::assert!(test_context.victim_runs.take(Some(1_000_000)));
+
+        info!("Delete the victim from core 0");
+        unsafe { preempt::schedule_task_deletion(Some(victim_handle)) };
+
+        let successor_handle = unsafe {
+            preempt::task_create("successor", successor, context_ptr, 1, Some(0), STACK_SIZE)
+        };
+        info!(
+            "victim: {:?}, successor: {:?}",
+            victim_handle.as_ptr(),
+            successor_handle.as_ptr()
+        );
+
+        // The successor must keep running. If core 1 still treats the freed address as its current
+        // task, it corrupts or deletes the successor instead.
+        for round in 0..5 {
+            hil_test::assert!(
+                test_context.successor_alive.take(Some(500_000)),
+                "The task created after the deletion stopped running in round {}",
+                round
+            );
+        }
 
         unsafe {
             // Park the second core, we don't need it anymore
@@ -743,5 +972,161 @@ mod tests {
                 }
             }
         }
+    }
+}
+
+/// Tests for the configuration where the scheduler runs on the second core only, and the first core
+/// stays bare-metal.
+///
+/// The test functions run on the first core, so they must not use any esp-rtos API. They observe
+/// the second core through atomics instead.
+#[cfg(multi_core)]
+#[embedded_test::tests(default_timeout = 3)]
+mod second_core_only {
+    use core::ffi::c_void;
+
+    use esp_hal::{
+        clock::CpuClock,
+        peripherals::{CPU_CTRL, FROM_CPU_INTR1},
+        system::Cpu,
+        time::Duration,
+        timer::timg::{Timer, TimerGroup},
+    };
+    use esp_radio_rtos_driver as preempt;
+    use esp_rtos::CurrentThreadHandle;
+    use portable_atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    struct Context {
+        cpu_control: CPU_CTRL<'static>,
+        sw_int1: FROM_CPU_INTR1<'static>,
+        timer: Timer<'static>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        crate::init_heap();
+
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+
+        Context {
+            cpu_control: p.CPU_CTRL,
+            sw_int1: p.FROM_CPU_INTR1,
+            timer: timg0.timer0,
+        }
+    }
+
+    fn start_on_second_core(ctx: Context, func: impl FnOnce() + Send + 'static) {
+        esp_rtos::start_on_second_core_only(
+            ctx.cpu_control,
+            ctx.sw_int1,
+            ctx.timer,
+            #[allow(static_mut_refs)]
+            unsafe {
+                &mut crate::APP_CORE_STACK
+            },
+            func,
+        );
+    }
+
+    fn spawn(name: &str, task: extern "C" fn(*mut c_void), priority: u32) {
+        unsafe { preempt::task_create(name, task, core::ptr::null_mut(), priority, None, 4096) };
+    }
+
+    #[test]
+    fn task_runs_on_the_second_core(ctx: Context) {
+        static FINISHED: AtomicBool = AtomicBool::new(false);
+        static RAN_ON_SECOND_CORE: AtomicBool = AtomicBool::new(false);
+
+        extern "C" fn task(_: *mut c_void) {
+            RAN_ON_SECOND_CORE.store(Cpu::current() == Cpu::AppCpu, Ordering::SeqCst);
+            FINISHED.store(true, Ordering::SeqCst);
+        }
+
+        start_on_second_core(ctx, || spawn("task", task, 1));
+
+        while !FINISHED.load(Ordering::SeqCst) {}
+
+        hil_test::assert!(RAN_ON_SECOND_CORE.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn time_slicing_on_the_second_core(ctx: Context) {
+        // Two tasks of the same priority must both make progress. Each task counts up until the
+        // counter jumps, which means the other task ran in between.
+        static FINISHED: AtomicUsize = AtomicUsize::new(0);
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+        extern "C" fn task(_: *mut c_void) {
+            let mut expected_value = None;
+
+            loop {
+                let was = COUNTER.fetch_add(1, Ordering::SeqCst);
+
+                if let Some(expected) = expected_value {
+                    // Not the first iteration. Check that the counter matches the expected value.
+                    if was == expected {
+                        expected_value = Some(was + 1);
+                    } else {
+                        break;
+                    }
+                } else {
+                    // First iteration, just grab the initial value.
+                    expected_value = Some(was + 1);
+                }
+            }
+
+            FINISHED.fetch_add(1, Ordering::SeqCst);
+        }
+
+        start_on_second_core(ctx, || {
+            // The tasks run at the priority of the main thread, so that the main thread can create
+            // the second task.
+            spawn("task1", task, 0);
+            spawn("task2", task, 0);
+        });
+
+        while FINISHED.load(Ordering::SeqCst) < 2 {}
+    }
+
+    #[test]
+    fn the_first_core_keeps_running(ctx: Context) {
+        static FIRST_CORE_COUNTER: AtomicUsize = AtomicUsize::new(0);
+        static FIRST_CORE_ADVANCED: AtomicBool = AtomicBool::new(false);
+        static FINISHED: AtomicBool = AtomicBool::new(false);
+
+        extern "C" fn observer(_: *mut c_void) {
+            let before = FIRST_CORE_COUNTER.load(Ordering::Relaxed);
+
+            // Sleeping proves that the scheduler of the second core works while the first core runs
+            // its own code.
+            CurrentThreadHandle::get().delay(Duration::from_millis(50));
+
+            let after = FIRST_CORE_COUNTER.load(Ordering::Relaxed);
+            FIRST_CORE_ADVANCED.store(after > before, Ordering::SeqCst);
+            FINISHED.store(true, Ordering::SeqCst);
+        }
+
+        start_on_second_core(ctx, || spawn("observer", observer, 1));
+
+        while !FINISHED.load(Ordering::SeqCst) {
+            FIRST_CORE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        }
+
+        hil_test::assert!(FIRST_CORE_ADVANCED.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    #[should_panic]
+    fn thread_mode_executor_on_the_first_core_panics(ctx: Context) {
+        use esp_rtos::embassy::Executor;
+        use static_cell::StaticCell;
+
+        start_on_second_core(ctx, || {});
+
+        static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+        EXECUTOR.init(Executor::new()).run(|_| {});
     }
 }

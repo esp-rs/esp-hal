@@ -1,7 +1,7 @@
 use core::sync::atomic::Ordering;
 
+use embassy_sync::lazy_lock::LazyLock;
 use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind};
-use esp_sync::NonReentrantMutex;
 use portable_atomic_enum::atomic_enum;
 
 use super::event::WifiEvent;
@@ -120,19 +120,14 @@ pub(crate) fn is_wifi_initialized() -> bool {
 }
 
 pub(crate) fn locked<R>(f: impl FnOnce() -> R) -> R {
-    static LOCK: NonReentrantMutex<Option<SemaphoreHandle>> = NonReentrantMutex::new(None);
+    static LOCK: LazyLock<SemaphoreHandle> =
+        LazyLock::new(|| SemaphoreHandle::new(SemaphoreKind::Mutex));
 
-    LOCK.with(|sem| {
-        sem.get_or_insert_with(|| SemaphoreHandle::new(SemaphoreKind::Mutex))
-            .take(None)
-    });
+    let sem = LOCK.get();
 
-    let res: R = f();
-
-    LOCK.with(|sem| {
-        sem.get_or_insert_with(|| SemaphoreHandle::new(SemaphoreKind::Mutex))
-            .give()
-    });
+    sem.take(None);
+    let res = f();
+    sem.give();
 
     res
 }

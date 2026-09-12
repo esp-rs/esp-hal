@@ -109,6 +109,8 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s2::*;
     #[cfg(esp32s3)]
     pub use esp_wifi_sys_esp32s3::*;
+    #[cfg(esp32s31)]
+    pub use esp_wifi_sys_esp32s31::*;
 }
 
 mod common_adapter;
@@ -214,7 +216,7 @@ impl PhyState {
             }
             phy_combo_module => unsafe {
                 sys::include::phy_init_param_set(1);
-            }
+            },
             _ => {}
         }
 
@@ -354,7 +356,7 @@ impl PhyState {
 fn is_reset_from_deepsleep() -> bool {
     // feature gated to avoid forgetting to double check the correct value for future chips
     #[cfg(any(
-        esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s2, esp32s3
+        esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s2, esp32s3, esp32s31
     ))]
     const CORE_DEEP_SLEEP: u32 = 5;
 
@@ -453,13 +455,14 @@ fn set_wifi_rx_enabled(enabled: bool) {
             // C5 is excluded for the same reason as `phy_init_param_set` (ESP-IDF leaves
             // `SOC_PHY_COMBO_MODULE` undefined for C5, see:
             // https://github.com/espressif/esp-idf/blob/7e3df61a/components/soc/esp32c5/include/soc/soc_caps.h#L658);
-            // its Wi-Fi adapter only calls `phy_wifi_enable_set` alongside a `set_bb_wdg` workaround
-            // we don't implement yet. TODO: enable for C5 once `set_bb_wdg` is handled.
+            // its Wi-Fi adapter only calls `phy_wifi_enable_set` alongside a `set_bb_wdg`
+            // workaround we don't implement yet. TODO: enable for C5 once `set_bb_wdg`
+            // is handled.
             let _ = enabled;
         }
         phy_combo_module => unsafe {
             sys::include::phy_wifi_enable_set(enabled as u8);
-        }
+        },
         _ => {
             let _ = enabled;
         }

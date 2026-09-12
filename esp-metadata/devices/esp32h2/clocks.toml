@@ -5,12 +5,17 @@ system_clocks = { clock_tree = [
     { name = "PLL_F64M_CLK", type = "generic",                    output = "PLL_F96M_CLK * 2 / 3" },
     { name = "PLL_F48M_CLK", type = "generic",                    output = "PLL_F96M_CLK / 2" },
     { name = "RC_FAST_CLK",  type = "source",                     output = "8_000_000" },
+
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", always_on = true, variants = [
+        { name = "XTAL_CLK", outputs = "XTAL_CLK" },
+        { name = "PLL_F48M", outputs = "PLL_F48M_CLK", default = true },
+    ] },
     
     # Low-speed clocks
-    { name = "XTAL32K_CLK",     type = "source",                        output = "32768" },
+    { name = "XTAL32K_CLK",     type = "source",                        output = "32768", cfg = "use_xtal32k" },
     { name = "OSC_SLOW_CLK",    type = "source",                        output = "32768" },
     { name = "RC_SLOW_CLK",     type = "source",                        output = "130_000" },
-    { name = "PLL_LP_CLK",      type = "derived", from = "XTAL32K_CLK", output = "8_000_000" },
+    { name = "PLL_LP_CLK",      type = "derived", from = "XTAL32K_CLK", output = "8_000_000", cfg = "use_xtal32k" },
 
     { name = "HP_ROOT_CLK", type = "mux", variants = [
         { name = "PLL96",   outputs = "PLL_F96M_CLK" },
@@ -29,23 +34,32 @@ system_clocks = { clock_tree = [
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },
     { name = "LP_FAST_CLK", type = "mux", variants = [
         { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-        { name = "PLL_LP_CLK",  outputs = "PLL_LP_CLK" },
+        { name = "PLL_LP_CLK",  outputs = "PLL_LP_CLK", cfg = "use_xtal32k" },
         { name = "XTAL_D2_CLK", outputs = "XTAL_D2_CLK" },
     ] },
     { name = "LP_SLOW_CLK", type = "mux", variants = [
-        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
     # LP_DYN_SLOW_CLK is LP_SLOW_CLK
     # LP_DYN_FAST_CLK is automatically managed based on power mode. Not sure how to model it, some LP peripherals need it.
 
+    # Global peripheral-related clocks
+    # PCR.sec_conf.sec_clk_sel: external memory encryption and decryption
+    { name = "CRYPTO_CLK", type = "mux", variants = [
+        { name = "XTAL",     outputs = "XTAL_CLK"     },
+        { name = "RC_FAST",  outputs = "RC_FAST_CLK"  },
+        { name = "PLL_F64M", outputs = "PLL_F64M_CLK" },
+        { name = "PLL_F96M", outputs = "PLL_F96M_CLK" },
+    ] },
+
     # There are separate clock muxes for each TIMG instance, but esp-hal only uses one. Only modelling
     # one makes the HAL code simpler.
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
         { name = "RC_SLOW_CLK",     outputs = "LP_SLOW_CLK" },
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" }, #?
-        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
     { group = "UART", clocks = [
@@ -55,6 +69,9 @@ system_clocks = { clock_tree = [
             { name = "XTAL",     outputs = "XTAL_CLK", default = true },
         ], div_num = "0 .. 0x100" } },
         { name = "BAUD_RATE_GENERATOR", type = "generic", output = "(FUNCTION_CLOCK * 16) / (integral * 16 + fractional)", params = { fractional = "0..16", integral = "0..0x1000" } },
+    ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
     ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", wake_locking = true, variants = [
@@ -82,19 +99,51 @@ system_clocks = { clock_tree = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
         ] },
     ] },
-    { group = "PARL_IO", clocks = [
-        { name = "RX_CLOCK", type = "mux", wake_locking = true, variants = [
+    { group = "PARL_IO",
+      presets = {
+        CLK = {
+          type = "mux",
+          wake_locking = true,
+          variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
             { name = "PLL_F96M",    outputs = "PLL_F96M_CLK", default = true },
-            # TODO: external clock
+            # TODO: external clock (TX and RX may differ)
+          ],
+        },
+      },
+      clocks = [
+        { name = "RX_CLOCK", preset = "CLK" },
+        { name = "TX_CLOCK", preset = "CLK" },
+      ],
+    },
+    { group = "I2S",
+      presets = {
+        CLK = {
+          type = "generic",
+          wake_locking = true,
+          output = "(sclk * div_a) / (div_num * div_a + div_b)",
+          params = {
+            sclk = [
+              { name = "XTAL",     outputs = "XTAL_CLK" },
+              { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
+              { name = "PLL_F64M", outputs = "PLL_F64M_CLK" },
+            ],
+            div_num = "1 ..= 255",
+            div_a   = "1 ..= 511",
+            div_b   = "0 ..= 511",
+          },
+        },
+      },
+      clocks = [
+        { name = "TX_CLK",   preset = "CLK" },
+        { name = "RX_CLK",   preset = "CLK" },
+        { name = "MCLK_OUT", type = "mux", variants = [
+          { name = "TX", outputs = "TX_CLK" },
+          { name = "RX", outputs = "RX_CLK", default = true },
         ] },
-        { name = "TX_CLOCK", type = "mux", wake_locking = true, variants = [
-            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
-            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F96M",    outputs = "PLL_F96M_CLK", default = true },
-        ] },
-    ] },
+      ],
+    },
     { group = "I2C", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",    outputs = "XTAL_CLK", default = true },
@@ -103,8 +152,8 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SPI", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", wake_locking = true, variants = [
-            { name = "XTAL",     outputs = "XTAL_CLK", default = true },
-            { name = "PLL_F48M", outputs = "PLL_F48M_CLK" },
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "PLL_F48M", outputs = "PLL_F48M_CLK", default = true },
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         ] },
     ] },
@@ -130,6 +179,7 @@ peripheral_clocks = { templates = [
     { name = "Uhci0", template_params = { peripheral = "uhci" } },
     { name = "Rmt" },
     { name = "Ledc" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Timg0", template_params = { conf_register = "timergroup(0).conf", clk_en_field = "clk_en", rst_field = "rst_en" }, keep_enabled = true },
     { name = "Timg1", template_params = { conf_register = "timergroup(1).conf", clk_en_field = "clk_en", rst_field = "rst_en" } },
     { name = "Systimer", keep_enabled = true },

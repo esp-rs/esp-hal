@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add ESP32-S31 support (#5922)
 
 ### Changed
 
@@ -19,6 +18,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+
+## [v0.10.0] - 2026-08-25
+
+### Added
+
+- Add ESP32-S31 support (#5922)
+- `FlashStorage::read_encrypted` and `FlashStorage::write_encrypted` for transparent flash encryption read/write (#5810)
+- `flash_encryption()` helper to query whether flash encryption is enabled in eFuses (#5810)
+- Support for ESP32-P4 (#5751)
+- Inherent flash I/O methods on `FlashStorage`: `read`, `write`, `capacity`, `read_nor`, `write_nor`, and `erase` (#5739)
+
+### Changed
+
+- `FlashStorage::read_encrypted` now follows the multi-core strategy, so it can return `OtherCoreRunning`. (#6120)
+- esp-storage can now be built with any opt-level (#5911)
+- updated defmt to 1.1 (#5752)
+- `embedded-storage` trait implementations are now an opt-in feature (non-default) (#5739)
+
+### Fixed
+
+- On ESP32, reading and writing encrypted flash no longer hangs. The flash MMU and the cache are now changed with the cache turned off, as the hardware requires. (#6120)
+- `FlashStorage::erase` rejects reversed ranges (`to < from`) (#6045)
 
 ## [v0.9.0] - 2026-04-16
 
@@ -96,4 +117,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.7.0...esp-storage-v0.8.0
 [v0.8.1]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.8.0...esp-storage-v0.8.1
 [v0.9.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.8.1...esp-storage-v0.9.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.9.0...HEAD
+[v0.10.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.9.0...esp-storage-v0.10.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.10.0...HEAD

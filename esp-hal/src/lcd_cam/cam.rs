@@ -1,4 +1,21 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(lcd_cam_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(lcd_cam_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
+    },
+    "mclk_pin" => gpio_for_signal!(CAM_CLK, "GPIO15"),
+    "vsync_pin" => gpio_for_signal!(CAM_V_SYNC, "GPIO6"),
+    "href_pin" => gpio_for_signal!(CAM_H_ENABLE, "GPIO7"),
+    "pclk_pin" => gpio_for_signal!(CAM_PCLK, "GPIO13"),
+    "data0_pin" => gpio_for_signal!(CAM_DATA_0, "GPIO11"),
+    "data1_pin" => gpio_for_signal!(CAM_DATA_1, "GPIO9"),
+    "data2_pin" => gpio_for_signal!(CAM_DATA_2, "GPIO8"),
+    "data3_pin" => gpio_for_signal!(CAM_DATA_3, "GPIO10"),
+    "data4_pin" => gpio_for_signal!(CAM_DATA_4, "GPIO12"),
+    "data5_pin" => gpio_for_signal!(CAM_DATA_5, "GPIO18"),
+    "data6_pin" => gpio_for_signal!(CAM_DATA_6, "GPIO17"),
+    "data7_pin" => gpio_for_signal!(CAM_DATA_7, "GPIO16"),
+))]
 //! # Camera - Master or Slave Mode
 //!
 //! ## Overview
@@ -22,27 +39,27 @@
 //!
 //! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
 //!
-//! let mclk_pin = peripherals.GPIO15;
-//! let vsync_pin = peripherals.GPIO6;
-//! let href_pin = peripherals.GPIO7;
-//! let pclk_pin = peripherals.GPIO13;
+//! let mclk_pin = peripherals.__mclk_pin__;
+//! let vsync_pin = peripherals.__vsync_pin__;
+//! let href_pin = peripherals.__href_pin__;
+//! let pclk_pin = peripherals.__pclk_pin__;
 //!
 //! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-//! let mut camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, config)?
+//! let mut camera = Camera::new(lcd_cam.cam, peripherals.__dma_channel__, config)?
 //!     .with_master_clock(mclk_pin) // Remove this for slave mode
 //!     .with_pixel_clock(pclk_pin)
 //!     .with_vsync(vsync_pin)
 //!     .with_h_enable(href_pin)
-//!     .with_data0(peripherals.GPIO11)
-//!     .with_data1(peripherals.GPIO9)
-//!     .with_data2(peripherals.GPIO8)
-//!     .with_data3(peripherals.GPIO10)
-//!     .with_data4(peripherals.GPIO12)
-//!     .with_data5(peripherals.GPIO18)
-//!     .with_data6(peripherals.GPIO17)
-//!     .with_data7(peripherals.GPIO16);
+//!     .with_data0(peripherals.__data0_pin__)
+//!     .with_data1(peripherals.__data1_pin__)
+//!     .with_data2(peripherals.__data2_pin__)
+//!     .with_data3(peripherals.__data3_pin__)
+//!     .with_data4(peripherals.__data4_pin__)
+//!     .with_data5(peripherals.__data5_pin__)
+//!     .with_data6(peripherals.__data6_pin__)
+//!     .with_data7(peripherals.__data7_pin__);
 //!
 //! let transfer = camera.receive(dma_buf).map_err(|e| e.0)?;
 //!
@@ -64,9 +81,18 @@ use crate::{
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{BitOrder, ByteOrder, CamDmaRxChannel, ClockError, ErasedRxChannel, calculate_clkm},
+    lcd_cam::{
+        BitOrder,
+        ByteOrder,
+        CamDmaRxChannel,
+        ClockError,
+        ErasedRxChannel,
+        calculate_clkm,
+        ll,
+    },
     pac,
     peripherals::LCD_CAM,
+    soc::clocks::{ClockTree, LcdCamCamClockConfig, LcdCamInstance},
     system::{self, GenericPeripheralGuard},
     time::Rate,
 };
@@ -75,11 +101,11 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EofMode {
-    /// Generate GDMA SUC EOF by data byte length.
+    /// Generates GDMA SUC EOF by data byte length.
     ///
     /// When the length of received data reaches this value + 1, GDMA in_suc_eof is triggered.
     ByteLen(u16),
-    /// Generate GDMA SUC EOF by the vsync signal
+    /// Generates GDMA SUC EOF by the vsync signal.
     VsyncSignal,
 }
 
@@ -111,7 +137,7 @@ pub enum VsyncFilterThreshold {
 pub enum VhdeMode {
     /// VSYNC + HSYNC mode is selected, in this mode,
     /// the signals of VSYNC, HSYNC and DE are used to control the data.
-    /// For this case, users need to wire the three signal lines.
+    /// For this case, the VSYNC, HSYNC, and DE signal lines must be wired.
     VsyncHsync,
 
     /// DE mode is selected, the signals of VSYNC and
@@ -137,13 +163,21 @@ pub struct Cam<'d> {
     /// The LCD_CAM peripheral reference for managing the camera functionality.
     pub(crate) lcd_cam: LCD_CAM<'d>,
     pub(super) _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
+    pub(super) clock_requested: bool,
+}
+
+impl Drop for Cam<'_> {
+    fn drop(&mut self) {
+        if self.clock_requested {
+            ClockTree::with(|clocks| LcdCamInstance::LcdCam.release_cam_clock(clocks));
+        }
+    }
 }
 
 /// Represents the camera interface with DMA support.
 pub struct Camera<'d> {
-    lcd_cam: LCD_CAM<'d>,
+    cam: Cam<'d>,
     rx_channel: ChannelRx<Blocking, ErasedRxChannel<'d>>,
-    _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
 }
 
 impl<'d> Camera<'d> {
@@ -156,11 +190,7 @@ impl<'d> Camera<'d> {
         let rx_channel = ChannelRx::new(channel.into());
         rx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
-        let mut this = Self {
-            lcd_cam: cam.lcd_cam,
-            rx_channel,
-            _guard: cam._guard,
-        };
+        let mut this = Self { cam, rx_channel };
 
         this.apply_config(&config)?;
 
@@ -168,25 +198,23 @@ impl<'d> Camera<'d> {
     }
 
     fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
-        self.lcd_cam.register_block()
+        self.cam.lcd_cam.register_block()
     }
 
     /// Applies the configuration to the camera interface.
     ///
     /// # Errors
     ///
-    /// [`ConfigError::Clock`] will be returned if the frequency passed in
-    /// `Config` is too low.
+    /// [`ConfigError::Clock`] when the frequency passed in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        let sources = property!("clock_tree.lcd_cam.cam_clock.sclk");
         let (i, divider) = calculate_clkm(
-            config.frequency.as_hz() as _,
-            &[
-                crate::soc::clocks::xtal_clk_frequency() as usize,
-                crate::soc::clocks::pll_d2_frequency() as usize,
-                crate::soc::clocks::crypto_pwm_clk_frequency() as usize,
-            ],
+            config.frequency.as_hz(),
+            &sources.map(LcdCamInstance::cam_clock_source_frequency),
         )
         .map_err(ConfigError::Clock)?;
+        let clock_config =
+            LcdCamCamClockConfig::new(sources[i], divider.div_num, divider.div_a, divider.div_b);
 
         if let Some(value) = config.line_interrupt
             && value > 0b0111_1111
@@ -197,10 +225,6 @@ impl<'d> Camera<'d> {
         self.regs().cam_ctrl().write(|w| {
             // Force enable the clock for all configuration registers.
             unsafe {
-                w.cam_clk_sel().bits((i + 1) as _);
-                w.cam_clkm_div_num().bits(divider.div_num as _);
-                w.cam_clkm_div_b().bits(divider.div_b as _);
-                w.cam_clkm_div_a().bits(divider.div_a as _);
                 if let Some(threshold) = config.vsync_filter_threshold {
                     w.cam_vsync_filter_thres().bits(threshold as _);
                 }
@@ -214,6 +238,14 @@ impl<'d> Camera<'d> {
                 w.cam_stop_en().clear_bit()
             }
         });
+        ClockTree::with(|clocks| {
+            LcdCamInstance::LcdCam.configure_cam_clock(clocks, clock_config);
+            if !self.cam.clock_requested {
+                LcdCamInstance::LcdCam.request_cam_clock(clocks);
+                self.cam.clock_requested = true;
+            }
+        });
+
         self.regs().cam_ctrl1().write(|w| unsafe {
             w.cam_2byte_en().bit(config.enable_2byte_mode);
             w.cam_vh_de_mode_en()
@@ -232,9 +264,7 @@ impl<'d> Camera<'d> {
             w.cam_vsync_inv().bit(config.invert_vsync)
         });
 
-        self.regs()
-            .cam_rgb_yuv()
-            .write(|w| w.cam_conv_bypass().clear_bit());
+        ll::set_cam_conv_bypass(self.regs());
 
         self.regs()
             .cam_ctrl()
@@ -449,7 +479,7 @@ pub struct CameraTransfer<'d, BUF: DmaRxBuffer> {
 }
 
 impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         // This peripheral doesn't really "complete". As long the camera (or anything
         // pretending to be :D) sends data, it will receive it and pass it to the DMA.
@@ -484,9 +514,9 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
     ///
-    /// Note: The camera doesn't really "finish" its transfer, so what you're
-    /// really waiting for here is a DMA Error. You typically just want to
-    /// call [Self::stop] once you have the data you need.
+    /// The camera does not really "finish" its transfer, so this typically
+    /// waits for a DMA error. Call [`Self::stop`] once the needed data is
+    /// available.
     pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d>, BUF::Final) {
         while !self.is_done() {}
 
@@ -564,7 +594,7 @@ pub struct Config {
     /// The pixel clock frequency for the camera interface.
     frequency: Rate,
 
-    /// Enable 16 bit mode (instead of 8 bit).
+    /// Enables 16 bit mode (instead of 8 bit).
     enable_2byte_mode: bool,
 
     /// The byte order for the camera data.
@@ -588,16 +618,16 @@ pub struct Config {
     /// This is a 7 bit value which means a max of 128 lines.
     line_interrupt: Option<u8>,
 
-    /// Invert VSYNC signal, valid in high level.
+    /// Inverts VSYNC signal, valid in high level.
     invert_vsync: bool,
 
-    /// Invert HSYNC signal, valid in high level.
+    /// Inverts HSYNC signal, valid in high level.
     invert_hsync: bool,
 
-    /// Invert H_ENABLE signal (Also known as "Data Enable"), valid in high level.
+    /// Inverts H_ENABLE signal (Also known as "Data Enable"), valid in high level.
     invert_h_enable: bool,
 
-    /// Invert PCLK signal.
+    /// Inverts PCLK signal.
     invert_pixel_clock: bool,
 }
 

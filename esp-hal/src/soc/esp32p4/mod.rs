@@ -52,7 +52,7 @@ fn cache_l2_bus(addr: u32) -> u32 {
     if internal { 0 } else { CACHE_MAP_L2_CACHE }
 }
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 pub(crate) unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(bus: u32, addr: u32, size: u32);
@@ -86,10 +86,4 @@ pub(crate) unsafe fn cache_invalidate_icache_addr(addr: u32, size: u32) {
             size,
         );
     }
-}
-
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    clocks::pll_f160m_frequency()
 }

@@ -86,7 +86,9 @@ impl ServerHandler for EspHalServer {
     fn get_info(&self) -> ServerInfo {
         use strum::IntoEnumIterator;
 
-        let chips: Vec<String> = esp_metadata::Chip::iter().map(|c| c.to_string()).collect();
+        let chips: Vec<String> = crate::metadata::Chip::iter()
+            .map(|c| c.to_string())
+            .collect();
         let packages: Vec<String> = crate::Package::iter().map(|p| p.to_string()).collect();
 
         // Read the copilot-instructions file for agent onboarding context.

@@ -2,31 +2,25 @@
 mod tests {
     use esp_hal::{
         clock::CpuClock,
-        interrupt::{
-            InterruptHandler,
-            Priority,
-            software::{SoftwareInterrupt, SoftwareInterruptControl},
-        },
-        peripherals::Peripherals,
+        interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
+        peripherals::{FROM_CPU_INTR0, FROM_CPU_INTR1, Peripherals},
         sync::RawPriorityLimitedMutex,
     };
     use esp_sync::NonReentrantMutex;
     use portable_atomic::{AtomicU32, Ordering};
 
-    fn test_access_at_priority(peripherals: Peripherals, priority: Priority) {
+    fn test_access_at_priority(p: Peripherals, priority: Priority) {
         static LOCK: RawPriorityLimitedMutex = RawPriorityLimitedMutex::new(Priority::Priority1);
 
-        extern "C" fn access<const INT: u8>() {
-            unsafe { SoftwareInterrupt::<INT>::steal().reset() };
+        extern "C" fn access() {
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset();
             LOCK.lock(|| {});
             embedded_test::export::check_outcome(());
         }
 
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+        let mut prio_2_interrupt = SoftwareInterrupt::new(p.FROM_CPU_INTR1);
 
-        let mut prio_2_interrupt = sw_ints.software_interrupt1;
-
-        prio_2_interrupt.set_interrupt_handler(InterruptHandler::new(access::<1>, priority));
+        prio_2_interrupt.set_interrupt_handler(InterruptHandler::new(access, priority));
 
         prio_2_interrupt.raise();
         loop {}
@@ -35,15 +29,13 @@ mod tests {
     fn software_interrupt_fires_before_returning(p: Peripherals) {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
-        extern "C" fn increment<const INT: u8>() {
-            unsafe { SoftwareInterrupt::<INT>::steal().reset() };
+        extern "C" fn increment() {
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset();
             COUNTER.fetch_add(1, Ordering::AcqRel);
         }
 
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-
-        let mut interrupt = sw_ints.software_interrupt0;
-        interrupt.set_interrupt_handler(InterruptHandler::new(increment::<0>, Priority::Priority1));
+        let mut interrupt = SoftwareInterrupt::new(p.FROM_CPU_INTR0);
+        interrupt.set_interrupt_handler(InterruptHandler::new(increment, Priority::Priority1));
 
         const ITERATIONS: u32 = 100;
 
@@ -106,14 +98,16 @@ mod tests {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment<const INT: u8>() {
-            unsafe { SoftwareInterrupt::<INT>::steal().reset() };
+            match INT {
+                0 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
+                1 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
+                _ => unreachable!(),
+            }
             COUNTER.fetch_add(1, Ordering::AcqRel);
         }
 
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
-        let mut prio_1_interrupt = sw_ints.software_interrupt0;
-        let mut prio_2_interrupt = sw_ints.software_interrupt1;
+        let mut prio_1_interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
+        let mut prio_2_interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR1);
 
         prio_1_interrupt
             .set_interrupt_handler(InterruptHandler::new(increment::<0>, Priority::Priority1));
@@ -157,13 +151,15 @@ mod tests {
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment<const INT: u8>() {
-            unsafe { SoftwareInterrupt::<INT>::steal().reset() };
+            match INT {
+                0 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR0::steal() }).reset(),
+                1 => SoftwareInterrupt::new(unsafe { FROM_CPU_INTR1::steal() }).reset(),
+                _ => unreachable!(),
+            }
             COUNTER.fetch_add(1, Ordering::AcqRel);
         }
 
-        let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
-        let mut interrupt = sw_ints.software_interrupt0;
+        let mut interrupt = SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
         interrupt.set_interrupt_handler(InterruptHandler::new(increment::<0>, Priority::Priority1));
 
         let lock = RawPriorityLimitedMutex::new(Priority::max());

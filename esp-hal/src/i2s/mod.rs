@@ -2,9 +2,6 @@
 
 pub mod master;
 
-#[cfg(i2s_clock_configured_by_hp_sys_clkrst)]
-mod hp_sys_clkrst;
-
 #[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
 pub mod pdm;
 

@@ -1,6 +1,6 @@
 [package]
 name          = "esp-rtos"
-version       = "0.3.0"
+version       = "0.4.0"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "A task scheduler for Espressif devices"
@@ -11,9 +11,11 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
-doc-config = { features = ["esp-hal/unstable", "embassy", "esp-radio"] }
+chip-features-matter = true
+doc-config = { features = ["esp-hal/unstable", "embassy", "esp-radio", "defmt"] }
 check-configs = [
     { features = ["esp-hal/unstable"] },
+    { features = ["esp-hal/unstable", "alloc"] },
     { features = ["esp-hal/unstable", "esp-alloc"] },
     { features = ["esp-hal/unstable", "esp-radio"] },
     { features = ["esp-hal/unstable", "esp-radio", "embassy"] },
@@ -34,7 +36,7 @@ features       = ["esp32c6", "embassy", "esp-radio"]
 bench = false
 
 [dependencies]
-esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, features = [
+esp-hal = { version = "~1.2.0", path = "../esp-hal", default-features = false, features = [
     # FIXME: rt technically shouldn't be enabled, but rtos requires `TrapFrame`
     # and uses reexported riscv/xtensa-lx from esp-hal
     "requires-unstable", "rt"
@@ -47,11 +49,11 @@ rtos-trace = { version = "0.2.0", optional = true }
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"], optional = true }
 document-features  = "0.2"
 embassy-sync = "0.8"
-esp-alloc = { version = "0.10.0", path = "../esp-alloc", optional = true, default-features = false }
-esp-config = { version = "0.7.0", path = "../esp-config" }
-esp-sync = { version = "0.2.1", path = "../esp-sync" }
-esp-radio-rtos-driver = { version = "0.3.0", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
-macros = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-alloc = { version = "0.11.0", path = "../esp-alloc", optional = true, default-features = false }
+esp-config = { version = "0.8.0", path = "../esp-config" }
+esp-sync = { version = "0.3.0", path = "../esp-sync" }
+esp-radio-rtos-driver = { version = "0.4.1", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
+macros = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
 
 # Optional dependencies that enable ecosystem support.
@@ -70,11 +72,11 @@ riscv            = { version = "0.15.0" }
 xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-esp-config             = { version = "0.7.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config             = { version = "0.8.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
-esp-hal = { version = "~1.1.0", path = "../esp-hal", features = ["unstable"] }
+esp-hal = { version = "~1.2.0", path = "../esp-hal", features = ["unstable"] }
 static_cell = "2"
 
 [features]
@@ -86,18 +88,18 @@ embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-
 ## Enable esp-radio support.
 esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
 
-# Not documented because we don't currently expose anything that requires alloc, but isn't related to esp-radio.
-# TODO: make this public once we actually have alloc-based APIs.
-alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver", "defmt?/alloc"]
-
-## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
+## Enable APIs that dynamically allocate memory, such as spawning a thread on a heap-allocated stack.
 ##
-## Memory allocation is required by `esp-radio`. If you choose to not enable
-## this feature, you need to provide implementations for the following functions:
+## Memory allocation is required by `esp-radio`.
+##
+## Without `esp-alloc` you must provide the following functions:
 ## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
 ## - `pub extern "C" fn free_internal(ptr: *mut u8)`
-## 
+##
 ## Note that the untyped nature of the allocator functions means that esp-alloc is likely the more memory efficient option.
+alloc = ["dep:allocator-api2", "defmt?/alloc"]
+
+## Enable the use of the `esp-alloc` crate for dynamic memory allocation. Also enables `alloc`.
 esp-alloc = ["alloc", "dep:esp-alloc"]
 
 ## Enable [`rtos-trace`](https://crates.io/crates/rtos-trace) support.
@@ -107,27 +109,82 @@ rtos-trace = ["dep:rtos-trace"]
 #! One of the following features must be enabled to select the target chip:
 
 ##
-esp32 = ["esp-hal/esp32", "esp-metadata-generated/esp32", "esp-rom-sys/esp32"]
+esp32 = [
+    "esp-hal/esp32",
+    "esp-alloc?/esp32",
+    "esp-metadata-generated/esp32",
+    "esp-rom-sys/esp32",
+]
 ##
-esp32c2 = ["esp-hal/esp32c2", "esp-metadata-generated/esp32c2", "esp-rom-sys/esp32c2"]
+esp32c2 = [
+    "esp-hal/esp32c2",
+    "esp-alloc?/esp32c2",
+    "esp-metadata-generated/esp32c2",
+    "esp-rom-sys/esp32c2",
+]
 ##
-esp32c3 = ["esp-hal/esp32c3", "esp-metadata-generated/esp32c3", "esp-rom-sys/esp32c3"]
+esp32c3 = [
+    "esp-hal/esp32c3",
+    "esp-alloc?/esp32c3",
+    "esp-metadata-generated/esp32c3",
+    "esp-rom-sys/esp32c3",
+]
 ##
-esp32c5 = ["esp-hal/esp32c5", "esp-metadata-generated/esp32c5", "esp-rom-sys/esp32c5"]
+esp32c5 = [
+    "esp-hal/esp32c5",
+    "esp-alloc?/esp32c5",
+    "esp-metadata-generated/esp32c5",
+    "esp-rom-sys/esp32c5",
+]
 ##
-esp32c6 = ["esp-hal/esp32c6", "esp-metadata-generated/esp32c6", "esp-rom-sys/esp32c6"]
+esp32c6 = [
+    "esp-hal/esp32c6",
+    "esp-alloc?/esp32c6",
+    "esp-metadata-generated/esp32c6",
+    "esp-rom-sys/esp32c6",
+]
 ##
-esp32c61 = ["esp-hal/esp32c61", "esp-metadata-generated/esp32c61", "esp-rom-sys/esp32c61"]
+esp32c61 = [
+    "esp-hal/esp32c61",
+    "esp-alloc?/esp32c61",
+    "esp-metadata-generated/esp32c61",
+    "esp-rom-sys/esp32c61",
+]
 ##
-esp32h2 = ["esp-hal/esp32h2", "esp-metadata-generated/esp32h2", "esp-rom-sys/esp32h2"]
+esp32h2 = [
+    "esp-hal/esp32h2",
+    "esp-alloc?/esp32h2",
+    "esp-metadata-generated/esp32h2",
+    "esp-rom-sys/esp32h2",
+]
 ##
-esp32p4 = ["esp-hal/esp32p4", "esp-metadata-generated/esp32p4", "esp-rom-sys/esp32p4"]
+esp32p4 = [
+    "esp-hal/esp32p4",
+    "esp-alloc?/esp32p4",
+    "esp-metadata-generated/esp32p4",
+    "esp-rom-sys/esp32p4",
+]
 ##
-esp32s2 = ["esp-hal/esp32s2", "esp-metadata-generated/esp32s2", "esp-rom-sys/esp32s2"]
+esp32s2 = [
+    "esp-hal/esp32s2",
+    "esp-alloc?/esp32s2",
+    "esp-metadata-generated/esp32s2",
+    "esp-rom-sys/esp32s2",
+]
 ##
-esp32s3 = ["esp-hal/esp32s3", "esp-metadata-generated/esp32s3", "esp-rom-sys/esp32s3"]
+esp32s3 = [
+    "esp-hal/esp32s3",
+    "esp-alloc?/esp32s3",
+    "esp-metadata-generated/esp32s3",
+    "esp-rom-sys/esp32s3",
+]
 ##
-esp32s31 = ["esp-hal/esp32s31", "esp-metadata-generated/esp32s31", "esp-rom-sys/esp32s31"]
+esp32s31 = [
+    "esp-hal/esp32s31",
+    "esp-alloc?/esp32s31",
+    "esp-metadata-generated/esp32s31",
+    "esp-rom-sys/esp32s31",
+]
 
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.

@@ -76,10 +76,15 @@ use low_level::{gpio_intr_enable, is_int_enabled, set_int_enable};
 
 mod placeholder;
 
+#[cfg(sleep_driver_supported)]
+pub(crate) mod wakeup;
 use core::fmt::Display;
 
 use esp_sync::RawMutex;
 pub use placeholder::NoPin;
+#[cfg(sleep_driver_supported)]
+#[instability::unstable]
+pub use wakeup::WakeupConfig;
 
 use crate::{
     asynch::AtomicWaker,
@@ -95,8 +100,8 @@ pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 /// Represents a pin-peripheral connection that, when dropped, disconnects the
 /// peripheral from the pin.
 ///
-/// This only needs to be applied to output signals, as it's not possible to
-/// connect multiple inputs to the same peripheral signal.
+/// This only needs to be applied to output signals, as it is not possible to connect multiple
+/// inputs to the same peripheral signal.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct PinGuard {
@@ -152,26 +157,6 @@ pub enum Event {
     HighLevel   = 5,
 }
 
-impl From<WakeEvent> for Event {
-    fn from(value: WakeEvent) -> Self {
-        match value {
-            WakeEvent::LowLevel => Event::LowLevel,
-            WakeEvent::HighLevel => Event::HighLevel,
-        }
-    }
-}
-
-/// Event used to wake up from light sleep.
-#[instability::unstable]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum WakeEvent {
-    /// Wake on low level
-    LowLevel  = 4,
-    /// Wake on high level
-    HighLevel = 5,
-}
-
 /// Digital input or output level.
 ///
 /// `Level` can be used to control a GPIO output, and it can act as a peripheral
@@ -204,7 +189,7 @@ impl core::ops::Not for Level {
 }
 
 impl Level {
-    /// Create a [`Level`] from [`bool`].
+    /// Creates a new [`Level`] from [`bool`].
     ///
     /// Like `<Level as From<bool>>::from(val)`, but `const`.
     pub(crate) const fn const_from(val: bool) -> Self {
@@ -214,7 +199,7 @@ impl Level {
         }
     }
 
-    /// Convert a [`Level`] to [`bool`].
+    /// Converts a [`Level`] to [`bool`].
     ///
     /// Like `<bool as From<Level>>::from(self)`, but `const`.
     pub(crate) const fn const_into(self) -> bool {
@@ -243,36 +228,22 @@ impl From<Level> for bool {
 #[instability::unstable]
 #[non_exhaustive]
 pub enum WakeConfigError {
-    /// Returned when trying to configure a pin to wake up from light sleep on
-    /// an edge trigger, which is not supported.
-    EdgeTriggeringNotSupported,
+    /// The pad has no low-power path. It cannot wake the chip while the high-performance GPIO
+    /// peripheral is powered down.
+    NoLowPowerPath,
 }
 
 impl Display for WakeConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            WakeConfigError::EdgeTriggeringNotSupported => {
-                write!(
-                    f,
-                    "Edge triggering is not supported for wake-up from light sleep"
-                )
+            WakeConfigError::NoLowPowerPath => {
+                write!(f, "The pad is not a low-power pad")
             }
         }
     }
 }
 
 impl core::error::Error for WakeConfigError {}
-
-/// Options for [`Input::wait_for_with_options`] and
-/// [`Flex::wait_for_with_options`].
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, procmacros::BuilderLite)]
-#[non_exhaustive]
-#[instability::unstable]
-pub struct WaitForOptions {
-    /// Enable waking from light sleep on the configured event.
-    wake_enable: bool,
-}
 
 /// Pull setting for a GPIO.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
@@ -309,7 +280,7 @@ pub enum DriveStrength {
 /// output.
 ///
 /// The different variants correspond to different functionality depending on
-/// the chip and the specific pin. For more information, refer to your chip's
+/// the chip and the specific pin. For more information, refer to the chip's
 #[doc(hidden)]
 #[doc = crate::trm_markdown_link!("iomuxgpio")]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
@@ -330,7 +301,7 @@ pub enum AlternateFunction {
 }
 
 impl AlternateFunction {
-    const GPIO: Self = match Self::const_try_from(property!("gpio.gpio_function")) {
+    pub(crate) const GPIO: Self = match Self::const_try_from(property!("gpio.gpio_function")) {
         Ok(func) => func,
         Err(_) => ::core::panic!("Invalid GPIO function"),
     };
@@ -356,56 +327,17 @@ impl TryFrom<usize> for AlternateFunction {
     }
 }
 
-/// RTC function
-#[instability::unstable]
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum RtcFunction {
-    /// RTC mode.
-    Rtc     = 0,
-    /// Digital mode.
-    Digital = 1,
-    /// RTC_I2C mode.
-    #[cfg(soc_has_rtc_i2c)]
-    I2c     = 3,
-}
-
-/// Trait implemented by RTC pins
+/// Trait implemented by the pins that the low-power domain can reach.
+///
+/// The low-power domain has its own numbers for these pads, and the low-power registers take such a
+/// number. Only some chips give a pad the same number in both domains, so do not mix the two
+/// numbers. Give [`Self::lp_number`] to the low-power registers, and [`Pin::number`] to the digital
+/// registers.
 #[instability::unstable]
 #[cfg(lp_io_driver_supported)]
-pub trait RtcPin: Pin {
-    /// RTC number of the pin
-    fn rtc_number(&self) -> u8;
-
-    /// Configure the pin
-    #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
-    #[doc(hidden)]
-    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction);
-
-    /// Enable or disable PAD_HOLD
-    #[doc(hidden)]
-    fn rtcio_pad_hold(&self, enable: bool);
-
-    /// # Safety
-    ///
-    /// The `level` argument needs to be a valid setting for the
-    /// `rtc_cntl.gpio_wakeup.gpio_pinX_int_type`.
-    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
-    #[doc(hidden)]
-    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8);
-}
-
-/// Trait implemented by RTC pins which support internal pull-up / pull-down
-/// resistors.
-#[instability::unstable]
-#[cfg(lp_io_driver_supported)]
-pub trait RtcPinWithResistors: RtcPin {
-    /// Enable/disable the internal pull-up resistor
-    #[doc(hidden)]
-    fn rtcio_pullup(&self, enable: bool);
-    /// Enable/disable the internal pull-down resistor
-    #[doc(hidden)]
-    fn rtcio_pulldown(&self, enable: bool);
+pub trait LpPin: Pin {
+    /// LP number of the pin
+    fn lp_number(&self) -> u8;
 }
 
 /// Common trait implemented by pins
@@ -414,13 +346,13 @@ pub trait Pin: Sealed {
     fn number(&self) -> u8;
 
     #[procmacros::doc_replace]
-    /// Type-erase this pin into an [`AnyPin`].
+    /// Type-erases this pin into an [`AnyPin`].
     ///
-    /// This function converts pin singletons (`GPIO0<'_>`, …), which are all
-    /// different types, into the same type. It is useful for creating
-    /// arrays of pins, or avoiding generics.
+    /// Converts pin singletons (`GPIO0<'_>`, …), which are all different types,
+    /// into the same type. Useful for creating arrays of pins, or avoiding
+    /// generics.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -470,31 +402,31 @@ pub trait InputPin: Pin {
 /// Trait implemented by pins which can be used as outputs.
 pub trait OutputPin: Pin {}
 
-/// Trait implemented by pins which can be used as analog pins
+/// Trait implemented by pins which can be used as analog pins.
 #[instability::unstable]
 pub trait AnalogPin: Pin {
-    /// Configure the pin for analog operation
+    /// Configures the pin for analog operation.
     #[doc(hidden)]
     fn set_analog(&self, _: private::Internal);
 }
 
-/// Trait implemented by pins which can be used as Touchpad pins
+/// Trait implemented by pins which can be used as Touchpad pins.
 #[cfg(touch_driver_supported)]
 #[instability::unstable]
 pub trait TouchPin: Pin {
-    /// Configure the pin for analog operation
+    /// Configures the pin for analog operation.
     #[doc(hidden)]
     fn set_touch(&self, _: private::Internal);
 
-    /// Reads the pin's touch measurement register
+    /// Reads the pin's touch measurement register.
     #[doc(hidden)]
     fn touch_measurement(&self, _: private::Internal) -> u16;
 
-    /// Maps the pin nr to the touch pad nr
+    /// Maps the pin nr to the touch pad nr.
     #[doc(hidden)]
     fn touch_nr(&self, _: private::Internal) -> u8;
 
-    /// Set a pins touch threshold for interrupts.
+    /// Sets a pins touch threshold for interrupts.
     #[doc(hidden)]
     fn set_threshold(&self, threshold: u16, _: private::Internal);
 }
@@ -507,7 +439,7 @@ pub struct AnyPin<'lt> {
     pub(crate) _lifetime: core::marker::PhantomData<&'lt mut ()>,
 }
 
-/// General Purpose Input/Output driver
+/// General Purpose Input/Output driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -516,38 +448,37 @@ pub struct Io<'d> {
 }
 
 impl<'d> Io<'d> {
-    /// Initialize the I/O driver.
+    /// Initializes the I/O driver.
     #[instability::unstable]
     pub fn new(_io_mux: IO_MUX<'d>) -> Self {
         Io { _io_mux }
     }
 
-    #[doc = cfg_select!(
-        any(single_core, esp32s3) => "Sets the the interrupt priority and enables GPIO interrupts.",
+    #[doc = cfg_select!{
+        any(single_core, esp32s3) => "Sets the interrupt priority and enables GPIO interrupts.",
         _ => "Sets the interrupt priority and enables GPIO interrupts on all cores.",
-    )]
+    }]
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
         low_level::set_interrupt_priority(prio);
     }
 
-    #[doc = cfg_select!(
+    #[doc = cfg_select!{
         any(single_core, esp32s3) => "Registers an interrupt handler for all GPIO pins.",
         _ => "Registers an interrupt handler for all GPIO pins. Enables interrupts on all cores.",
-    )]
+    }]
     #[doc = ""]
-    /// Note that when using interrupt handlers registered by this function, or
-    /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
-    /// **not** clear the interrupt status register or the interrupt enable
-    /// setting for you. Based on your use case, you need to do one of this
-    /// yourself:
+    /// When using interrupt handlers registered by this method, or by defining a
+    /// `#[no_mangle] unsafe extern "C" fn GPIO()` function, the interrupt status
+    /// register and the interrupt enable setting for the GPIO pin are **not**
+    /// cleared automatically. Based on the use case, do one of the following:
     ///
-    /// - Disabling the interrupt enable setting for the GPIO pin allows you to handle an event once
-    ///   per call to [`listen()`]. Using this method, the [`is_interrupt_set()`] method will return
-    ///   `true` if the interrupt is set even after your handler has finished running.
-    /// - Clearing the interrupt status register allows you to handle an event repeatedly after
-    ///   [`listen()`] is called. Using this method, [`is_interrupt_set()`] will return `false`
-    ///   after your handler has finished running.
+    /// - Disabling the interrupt enable setting for the GPIO pin lets an event be handled once per
+    ///   call to [`listen()`]. Using this method, the [`is_interrupt_set()`] method returns `true`
+    ///   if the interrupt is set even after the handler has finished running.
+    /// - Clearing the interrupt status register lets an event be handled repeatedly after
+    ///   [`listen()`] is called. Using this method, [`is_interrupt_set()`] returns `false` after
+    ///   the handler has finished running.
     ///
     /// [`listen()`]: Input::listen
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
@@ -570,12 +501,12 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
     }
 }
 
-/// Drive the GPIO async API from a user-installed raw GPIO interrupt handler.
+/// Drives the GPIO async API from a user-installed raw GPIO interrupt handler.
 ///
-/// This is the entry point that lets users who bypass esp-hal's GPIO ISR
-/// dispatch (typically by defining their own `#[unsafe(no_mangle)]
-/// unsafe extern "C" fn GPIO()`, or by registering their own handler via
-/// [`crate::interrupt::bind_handler`]) keep the GPIO async API working.
+/// Entry point for code that bypasses esp-hal's GPIO ISR dispatch (typically
+/// by defining a custom `#[unsafe(no_mangle)] unsafe extern "C" fn GPIO()`, or
+/// by registering a handler via [`crate::interrupt::bind_handler`]) and needs
+/// the GPIO async API to keep working.
 ///
 /// # Safety
 ///
@@ -585,7 +516,7 @@ pub unsafe fn handle_gpio_interrupt() {
     unsafe { interrupt::handle_gpio_interrupt_impl() }
 }
 
-/// Complete any in-flight async wait on a single GPIO pin.
+/// Completes any in-flight async wait on a single GPIO pin.
 ///
 /// Per-pin counterpart of [`handle_gpio_interrupt`].
 ///
@@ -601,23 +532,23 @@ for_each_analog_function! {
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
         #[instability::unstable]
         impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
-            #[cfg(riscv)]
             fn set_analog(&self, _: private::Internal) {
-                io_mux_reg(self.number()).modify(|_, w| unsafe {
-                    w.mcu_sel().bits(1);
-                    w.fun_ie().clear_bit();
-                    w.fun_wpu().clear_bit();
-                    w.fun_wpd().clear_bit()
-                });
+                cfg_select! {
+                    xtensa => { self.set_analog_impl(); }
+                    riscv => {
+                        // Just configure as a floating GPIO.
+                        io_mux_reg(self.number()).modify(|_, w| unsafe {
+                            w.mcu_sel().bits(AlternateFunction::GPIO as u8);
+                            w.fun_ie().clear_bit();
+                            w.fun_wpu().clear_bit();
+                            w.fun_wpd().clear_bit()
+                        });
 
-                GPIO::regs()
-                    .enable_w1tc()
-                    .write(|w| unsafe { w.bits(1 << self.number()) });
-            }
-
-            #[cfg(not(riscv))]
-            fn set_analog(&self, _: private::Internal) {
-                self.set_analog_impl();
+                        GPIO::regs()
+                            .enable_w1tc()
+                            .write(|w| unsafe { w.bits(1 << self.number()) });
+                    }
+                }
             }
         }
     };
@@ -648,8 +579,8 @@ pub enum DriveMode {
 
 /// Output pin configuration.
 ///
-/// This struct is used to configure the drive mode, drive strength, and pull
-/// direction of an output pin. By default, the configuration is set to:
+/// Configures the drive mode, drive strength, and pull direction of an output
+/// pin. By default, the configuration is set to:
 /// - Drive mode: [`DriveMode::PushPull`]
 /// - Drive strength: [`DriveStrength::_20mA`]
 /// - Pull direction: [`Pull::None`] (no pull resistors connected)
@@ -697,7 +628,7 @@ impl<'d> Output<'d> {
     /// The `config` parameter sets the drive mode, drive strength, and pull
     /// direction of the pin.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// The following example configures `GPIO5` to pulse a LED once. The
     /// example assumes that the LED is connected such that it is on when
@@ -743,10 +674,9 @@ impl<'d> Output<'d> {
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::OutputSignal::freeze).
+    /// The returned signal is [frozen](interconnect::OutputSignal::freeze).
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -763,9 +693,9 @@ impl<'d> Output<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -781,9 +711,9 @@ impl<'d> Output<'d> {
         self.pin.apply_output_config(config)
     }
     #[procmacros::doc_replace]
-    /// Set the output as high.
+    /// Sets the output as high.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -799,9 +729,9 @@ impl<'d> Output<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Set the output as low.
+    /// Sets the output as low.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -817,9 +747,9 @@ impl<'d> Output<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Set the output level.ç
+    /// Sets the output level.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -837,10 +767,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns whether the pin is set to high level.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
-    /// `set_low`. It does not need the input stage to be enabled.
+    /// Reads back the value set using `set_level`, `set_high` or `set_low`. Does
+    /// not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -858,10 +788,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns whether the pin is set to low level.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
-    /// `set_low`. It does not need the input stage to be enabled.
+    /// Reads back the value set using `set_level`, `set_high` or `set_low`. Does
+    /// not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -879,10 +809,10 @@ impl<'d> Output<'d> {
     #[procmacros::doc_replace]
     /// Returns which level the pin is set to.
     ///
-    /// This function reads back the value set using `set_level`, `set_high` or
-    /// `set_low`. It does not need the input stage to be enabled.
+    /// Reads back the value set using `set_level`, `set_high` or `set_low`. Does
+    /// not need the input stage to be enabled.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -903,7 +833,7 @@ impl<'d> Output<'d> {
     /// If the pin was previously set to high, it will be set to low, and vice
     /// versa.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -916,6 +846,24 @@ impl<'d> Output<'d> {
     #[inline]
     pub fn toggle(&mut self) {
         self.pin.toggle();
+    }
+
+    /// Takes or releases the hold of the pad.
+    ///
+    /// A held pad keeps its level, its function and its resistors, and it ignores this driver.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn set_pad_hold(&mut self, enable: bool) {
+        self.pin.set_pad_hold(enable);
+    }
+
+    /// Returns whether something holds the pad.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn is_pad_held(&self) -> bool {
+        self.pin.is_pad_held()
     }
 
     /// Converts the pin driver into a [`Flex`] driver.
@@ -1001,7 +949,7 @@ impl<'d> Input<'d> {
     /// The `pull` parameter configures internal pull-up or pull-down
     /// resistors.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// The following example configures `GPIO5` to read a button press. The
     /// example assumes that the button is connected such that the pin is low
@@ -1050,10 +998,9 @@ impl<'d> Input<'d> {
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::InputSignal::freeze).
+    /// The returned signal is [frozen](interconnect::InputSignal::freeze).
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1072,9 +1019,9 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Get whether the pin input level is high.
+    /// Returns whether the pin input level is high.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1090,9 +1037,9 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Get whether the pin input level is low.
+    /// Returns whether the pin input level is low.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1108,9 +1055,9 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Get the current pin input level.
+    /// Returns the current pin input level.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1126,9 +1073,9 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Change the configuration.
+    /// Changes the configuration.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1143,19 +1090,25 @@ impl<'d> Input<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Listen for interrupts.
+    /// Listens for interrupts.
     ///
     /// The interrupts will be handled by the handler set using
     /// [`Io::set_interrupt_handler`]. All GPIO pins share the same
     /// interrupt handler.
     ///
-    /// Note that [`Event::LowLevel`] and [`Event::HighLevel`] are fired
-    /// continuously when the pin is low or high, respectively. You must use
-    /// a custom interrupt handler to stop listening for these events,
-    /// otherwise your program will be stuck in a loop as long as the pin is
-    /// reading the corresponding level.
+    /// [`Event::LowLevel`] and [`Event::HighLevel`] are fired continuously when
+    /// the pin is low or high, respectively. A custom interrupt handler is
+    /// required to stop listening for these events; otherwise the program can
+    /// remain in a loop as long as the pin reads the corresponding level.
     ///
-    /// ## Examples
+    /// A listening pin also ends a light sleep. On most chips, sleep entry must give the trigger as
+    /// a level, so an edge trigger becomes the level at the end of the edge. A rising edge becomes
+    /// a high level, a falling edge becomes a low level, and any edge becomes the level that
+    /// the pin is not at when the sleep starts. A pin that listens for a rising edge on a line
+    /// that is already high therefore ends each light sleep immediately, and without an
+    /// interrupt, because no edge occurred. Automatic light sleep then makes no sleep at all.
+    ///
+    /// # Examples
     ///
     /// ### Print something when a button is pressed.
     /// ```rust, no_run
@@ -1219,39 +1172,69 @@ impl<'d> Input<'d> {
         self.pin.listen(event);
     }
 
-    /// Stop listening for interrupts
+    /// Stops listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn unlisten(&mut self) {
         self.pin.unlisten();
     }
 
-    /// Clear the interrupt status bit for this Pin
+    /// Clears the interrupt status bit for this Pin.
     #[inline]
     #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
         self.pin.clear_interrupt();
     }
 
-    /// Checks if the interrupt status bit for this Pin is set
+    /// Returns whether the interrupt status bit for this Pin is set.
     #[inline]
     #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
         self.pin.is_interrupt_set()
     }
 
-    /// Enable as a wake-up source.
+    /// Configures whether the pin can wake the chip from sleep.
     ///
-    /// This will unlisten for interrupts
+    /// [`Flex::apply_wakeup_config`] describes the configuration, and the conditions that wake the
+    /// chip.
     ///
-    /// # Error
-    /// Configuring pin to wake up from light sleep on an edge
-    /// trigger is currently not supported, corresponding variant of
-    /// [`WakeConfigError`] will be returned.
+    /// # Errors
+    ///
+    /// [`WakeConfigError::NoLowPowerPath`] when the configuration requests the low-power path
+    /// for a pad that has no such path.
+    #[cfg(sleep_driver_supported)]
     #[instability::unstable]
     #[inline]
-    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
-        self.pin.wakeup_enable(enable, event)
+    pub fn apply_wakeup_config(&mut self, config: &WakeupConfig) -> Result<(), WakeConfigError> {
+        self.pin.apply_wakeup_config(config)
+    }
+
+    /// Returns whether this pin ended the most recent sleep.
+    ///
+    /// See [`Flex::caused_wakeup`].
+    #[cfg(sleep_driver_supported)]
+    #[instability::unstable]
+    #[inline]
+    pub fn caused_wakeup(&self) -> bool {
+        self.pin.caused_wakeup()
+    }
+
+    /// Takes or releases the hold of the pad.
+    ///
+    /// A held pad keeps its level, its function and its resistors, and it ignores this driver.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn set_pad_hold(&mut self, enable: bool) {
+        self.pin.set_pad_hold(enable);
+    }
+
+    /// Returns whether something holds the pad.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn is_pad_held(&self) -> bool {
+        self.pin.is_pad_held()
     }
 
     /// Converts the pin driver into a [`Flex`] driver.
@@ -1269,7 +1252,7 @@ impl<'d> Input<'d> {
 /// separately configurable, and they have independent enable states.
 ///
 /// Enabling the input stage does not change the output stage, and vice versa.
-/// Disabling the input or output stages don't forget their configuration.
+/// Disabling the input or output stages do not forget their configuration.
 /// Disabling the output stage will not change the output level, but it will
 /// disable the driver.
 #[derive(Debug)]
@@ -1283,7 +1266,7 @@ impl private::Sealed for Flex<'_> {}
 impl private::Sealed for &mut Flex<'_> {}
 
 impl<'d> Flex<'d> {
-    /// Create flexible pin driver for a [Pin].
+    /// Creates flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
     #[instability::unstable]
@@ -1300,55 +1283,70 @@ impl<'d> Flex<'d> {
 
     /// Applies the given input configuration to the pin.
     ///
-    /// This function does not set the pin as input (i.e. it does not enable the
-    /// input buffer). Note that the pull direction is common between the
-    /// input and output configuration.
+    /// Does not set the pin as input (does not enable the input buffer). The pull
+    /// direction is common between the input and output configuration.
     #[inline]
     #[instability::unstable]
     pub fn apply_input_config(&mut self, config: &InputConfig) {
         self.pin.apply_input_config(config);
     }
 
-    /// Enable or disable the GPIO pin input buffer.
+    /// Enables or disables the GPIO pin input buffer.
     #[inline]
     #[instability::unstable]
     pub fn set_input_enable(&mut self, enable_input: bool) {
         self.pin.set_input_enable(enable_input);
     }
 
-    /// Get whether the pin input level is high.
+    /// Takes or releases the hold of the pad.
+    ///
+    /// A held pad keeps its level, its function and its resistors, and it ignores this driver.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn set_pad_hold(&mut self, enable: bool) {
+        self.pin.set_pad_hold(enable);
+    }
+
+    /// Returns whether something holds the pad.
+    #[inline]
+    #[instability::unstable]
+    #[cfg(lp_io_driver_supported)]
+    pub fn is_pad_held(&self) -> bool {
+        self.pin.is_pad_held()
+    }
+
+    /// Returns whether the pin input level is high.
     #[inline]
     #[instability::unstable]
     pub fn is_high(&self) -> bool {
         self.level() == Level::High
     }
 
-    /// Get whether the pin input level is low.
+    /// Returns whether the pin input level is low.
     #[inline]
     #[instability::unstable]
     pub fn is_low(&self) -> bool {
         self.level() == Level::Low
     }
 
-    /// Get the current pin input level.
+    /// Returns the current pin input level.
     #[inline]
     #[instability::unstable]
     pub fn level(&self) -> Level {
         self.pin.is_input_high().into()
     }
 
-    /// Listen for interrupts.
+    /// Listens for interrupts.
     ///
     /// See [`Input::listen`] for more information and an example.
     #[inline]
     #[instability::unstable]
     pub fn listen(&mut self, event: Event) {
-        // Unwrap can't fail currently as listen_with_options is only supposed to return
-        // an error if wake_up_from_light_sleep is true.
-        unwrap!(self.pin.listen_with_options(event, true, false));
+        self.pin.listen(event);
     }
 
-    /// Stop listening for interrupts.
+    /// Stops listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn unlisten(&mut self) {
@@ -1364,14 +1362,14 @@ impl<'d> Flex<'d> {
         });
     }
 
-    /// Check if the pin is listening for interrupts.
+    /// Returns whether the pin is listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn is_listening(&self) -> bool {
         is_int_enabled(self.pin.number())
     }
 
-    /// Clear the interrupt status bit for this Pin
+    /// Clears the interrupt status bit for this Pin.
     #[inline]
     #[instability::unstable]
     pub fn clear_interrupt(&mut self) {
@@ -1380,68 +1378,93 @@ impl<'d> Flex<'d> {
             .write_interrupt_status_clear(self.pin.mask());
     }
 
-    /// Checks if the interrupt status bit for this Pin is set
+    /// Returns whether the interrupt status bit for this Pin is set.
     #[inline]
     #[instability::unstable]
     pub fn is_interrupt_set(&self) -> bool {
         self.pin.bank().read_interrupt_status() & self.pin.mask() != 0
     }
 
-    /// Enable as a wake-up source.
+    /// Configures whether the pin can wake the chip from sleep.
     ///
-    /// This will unlisten for interrupts
+    /// The configuration selects the hardware paths that the pin can use. The wake condition is the
+    /// interrupt trigger, so **a pin that does not listen is not a wakeup source**. A pin that
+    /// listens already wakes the chip from light sleep through the digital path. See
+    /// [`WakeupConfig`].
     ///
-    /// # Error
-    /// Configuring pin to wake up from light sleep on an edge
-    /// trigger is currently not supported, corresponding variant of
-    /// [`WakeConfigError`] will be returned.
+    /// The configuration stays after the driver is dropped, because a pad that wakes the chip from
+    /// deep sleep must continue to do so while no driver owns it. To remove the configuration, call
+    /// this function again with [`WakeupConfig::default()`].
+    ///
+    /// # Errors
+    ///
+    /// [`WakeConfigError::NoLowPowerPath`] when the configuration requests the low-power path
+    /// for a pad that has no such path.
+    #[cfg(sleep_driver_supported)]
     #[inline]
     #[instability::unstable]
-    pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
-        self.pin.listen_with_options(event.into(), false, enable)
+    pub fn apply_wakeup_config(&mut self, config: &WakeupConfig) -> Result<(), WakeConfigError> {
+        wakeup::apply_config(&self.pin, config)
+    }
+
+    /// Returns whether this pin ended the most recent sleep.
+    ///
+    /// More than one pin can end a sleep, so this function can return `true` for several pins. It
+    /// returns `false` if the chip did not wake from a sleep, and `false` for a pin that ended an
+    /// earlier sleep only.
+    ///
+    /// esp-hal reads the result while the sleep ends, so a later clear of the interrupt of the pin
+    /// does not change it. One case depends on the interrupt status: a pin that ends a light sleep
+    /// without [`WakeupConfig::low_power_path`]. The interrupt handler of that pin clears the
+    /// status, so the pin reports `false` if the handler runs before the sleep call returns.
+    /// This can only occur if interrupts were enabled during the sleep.
+    #[cfg(sleep_driver_supported)]
+    #[inline]
+    #[instability::unstable]
+    pub fn caused_wakeup(&self) -> bool {
+        wakeup::caused_wakeup(&self.pin)
     }
 
     // Output functions
 
     /// Applies the given output configuration to the pin.
     ///
-    /// This function does not set the pin to output (i.e. it does not enable
-    /// the output driver). Note that the pull direction is common between
-    /// the input and output configuration.
+    /// Does not set the pin to output (does not enable the output driver). The
+    /// pull direction is common between the input and output configuration.
     #[inline]
     #[instability::unstable]
     pub fn apply_output_config(&mut self, config: &OutputConfig) {
         self.pin.apply_output_config(config);
     }
 
-    /// Enable or disable the GPIO pin output driver.
+    /// Enables or disables the GPIO pin output driver.
     ///
     /// The output level will be set to the last value. Use [`Self::set_high`],
     /// [`Self::set_low`] or [`Self::set_level`] to set the output level before
     /// enabling the output.
     ///
-    /// This function does not disable the input buffer.
+    /// Does not disable the input buffer.
     #[inline]
     #[instability::unstable]
     pub fn set_output_enable(&mut self, enable_output: bool) {
         self.pin.set_output_enable(enable_output);
     }
 
-    /// Set the output as high.
+    /// Sets the output as high.
     #[inline]
     #[instability::unstable]
     pub fn set_high(&mut self) {
         self.set_level(Level::High)
     }
 
-    /// Set the output as low.
+    /// Sets the output as low.
     #[inline]
     #[instability::unstable]
     pub fn set_low(&mut self) {
         self.set_level(Level::Low)
     }
 
-    /// Set the output level.
+    /// Sets the output level.
     #[inline]
     #[instability::unstable]
     pub fn set_level(&mut self, level: Level) {
@@ -1462,14 +1485,14 @@ impl<'d> Flex<'d> {
         self.output_level() == Level::Low
     }
 
-    /// What level output is set to
+    /// What level output is set to.
     #[inline]
     #[instability::unstable]
     pub fn output_level(&self) -> Level {
         self.pin.is_set_high().into()
     }
 
-    /// Toggle pin output
+    /// Toggles pin output.
     #[inline]
     #[instability::unstable]
     pub fn toggle(&mut self) {
@@ -1485,8 +1508,7 @@ impl<'d> Flex<'d> {
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::InputSignal::freeze).
+    /// The returned signal is [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1509,13 +1531,12 @@ impl<'d> Flex<'d> {
     }
 
     #[procmacros::doc_replace]
-    /// Split the pin into an input and output signal pair.
+    /// Splits the pin into an input and output signal pair.
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
     ///
-    /// Note that the signals returned by this function is
-    /// [frozen](interconnect::InputSignal::freeze).
+    /// The returned signals are [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1538,16 +1559,14 @@ impl<'d> Flex<'d> {
         (input, output)
     }
 
-    /// Split the pin into an [Input] and an [Output] driver pair.
+    /// Splits the pin into an [Input] and an [Output] driver pair.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::InputSignal::freeze). On the other hand,
-    /// the pin driver is free to change settings.
+    /// The returned input signal is [frozen](interconnect::InputSignal::freeze). The
+    /// pin driver is free to change settings.
     ///
-    /// This function allows you to configure an input-output pin, then keep
-    /// working with the output half. This is mainly intended for testing,
-    /// allowing you to drive a peripheral from a signal generated by
-    /// software.
+    /// Lets an input-output pin be configured, then keeps working with the output
+    /// half. Mainly intended for testing, to drive a peripheral from a signal
+    /// generated by software.
     ///
     /// # Safety
     ///
@@ -1579,8 +1598,7 @@ impl<'d> Flex<'d> {
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
     ///
-    /// Note that the signal returned by this function is
-    /// [frozen](interconnect::OutputSignal::freeze).
+    /// The returned signal is [frozen](interconnect::OutputSignal::freeze).
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1641,10 +1659,14 @@ impl<'lt> AnyPin<'lt> {
             macro_rules! disable_usb_fs_pads {
                 ($gpio:ident) => {
                     if self.number() == crate::peripherals::$gpio::NUMBER {
-                        #[cfg(esp32p4)]
-                        disable_usb_fs_pads(crate::peripherals::$gpio::NUMBER);
-                        #[cfg(not(esp32p4))]
-                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
+                        cfg_select! {
+                            esp32p4 => {
+                                disable_usb_fs_pads(crate::peripherals::$gpio::NUMBER);
+                            }
+                            _ => {
+                                disable_usb_pads(crate::peripherals::$gpio::NUMBER);
+                            }
+                        }
                     }
                 };
             }
@@ -1666,26 +1688,58 @@ impl<'lt> AnyPin<'lt> {
         }
     }
 
+    /// Takes or releases the hold of the pad.
+    ///
+    /// A held pad keeps its level, its function and its resistors, and it ignores its driver. Sleep
+    /// takes the hold of a wakeup pad, because a deep sleep powers the circuit that drives the pad
+    /// down.
+    ///
+    /// A pad that the low-power registers reach keeps its hold in the low-power domain, and every
+    /// other pad has a bit in a register of the digital pads.
+    #[cfg(lp_io_driver_supported)]
+    pub(crate) fn set_pad_hold(&self, enable: bool) {
+        GPIO_LOCK.lock(|| {
+            if let Some(lp) = lp_io::lp_number(self.number()) {
+                lp_io::low_level::pad_hold(lp, enable);
+            } else {
+                lp_io::low_level::digital_pad_hold(self.number(), enable);
+            }
+        })
+    }
+
+    /// Returns whether something holds the pad.
+    #[cfg(lp_io_driver_supported)]
+    pub(crate) fn is_pad_held(&self) -> bool {
+        // No lock necessary, as this pin cannot be written
+        // while this function is being called.
+        if let Some(lp) = lp_io::lp_number(self.number()) {
+            lp_io::low_level::is_pad_held(lp)
+        } else {
+            lp_io::low_level::is_digital_pad_held(self.number())
+        }
+    }
+
     #[inline]
     /// Resets the GPIO to a known state.
     ///
-    /// This function needs to be called before using the GPIO pin:
+    /// Must be called before using the GPIO pin:
     /// - Before converting it into signals
     /// - Before using it as an input or output
     pub(crate) fn init_gpio(&self) {
         self.set_output_enable(false);
         self.disable_usb_pads();
 
-        #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
+        // A held pad ignores every configuration that follows the hold, and only a power-on reset
+        // releases the hold by itself. Without this, a pad that an earlier program held keeps its
+        // level for the rest of the life of the chip.
+        #[cfg(lp_io_driver_supported)]
+        self.set_pad_hold(false);
+
+        #[cfg(lp_io_driver_supported)]
         for_each_lp_function! {
-            (($_signal:ident, LP_GPIOn, $_lp_pin:literal), $gpio:ident) => {
+            (($_signal:ident, LP_GPIOn, $lp_pin:literal), $gpio:ident, $af:ident, $_lp_in:tt $_lp_out:tt) => {
                 if self.number() == crate::peripherals::$gpio::NUMBER {
-                    RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
-                }
-            };
-            (($_signal:ident, RTC_GPIOn, $_lp_pin:literal), $gpio:ident) => {
-                if self.number() == crate::peripherals::$gpio::NUMBER {
-                    RtcPin::rtc_set_config(self, false, false, RtcFunction::Digital);
+                    lp_io::low_level::set_config($lp_pin, false, false, lp_io::LpFunction::$af);
                 }
             };
         }
@@ -1703,24 +1757,14 @@ impl<'lt> AnyPin<'lt> {
     }
 
     #[procmacros::doc_replace]
-    /// Split the pin into an input and output signal.
+    /// Splits the pin into an input and output signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
     ///
     /// Creating an input signal enables the pin's input buffer.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure that peripheral drivers don't configure the same
-    /// GPIO at the same time in multiple places. This includes clones of the
-    /// `InputSignal` struct, as well as the `OutputSignal` struct.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the pin is not an output pin.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1729,6 +1773,16 @@ impl<'lt> AnyPin<'lt> {
     /// let (input, output) = unsafe { pin1.split() };
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the pin is not an output pin.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that peripheral drivers do not configure the same
+    /// GPIO at the same time in multiple places. This includes clones of the
+    /// `InputSignal` struct, as well as the `OutputSignal` struct
     #[inline]
     #[instability::unstable]
     pub unsafe fn split(
@@ -1753,7 +1807,7 @@ impl<'lt> AnyPin<'lt> {
         (input, output)
     }
 
-    /// Convert the pin into an input signal.
+    /// Converts the pin into an input signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
@@ -1762,7 +1816,7 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// # Safety
     ///
-    /// The caller must ensure that peripheral drivers don't configure the same
+    /// The caller must ensure that peripheral drivers do not configure the same
     /// GPIO at the same time in multiple places. This includes clones of the
     /// `InputSignal` struct.
     #[inline]
@@ -1777,14 +1831,14 @@ impl<'lt> AnyPin<'lt> {
         input
     }
 
-    /// Convert the pin into an output signal.
+    /// Converts the pin into an output signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
     ///
     /// # Panics
     ///
-    /// This function panics if the pin is not an output pin.
+    /// Panics if the pin is not an output pin.
     #[inline]
     #[instability::unstable]
     pub fn into_output_signal(self) -> interconnect::OutputSignal<'lt> {
@@ -1829,14 +1883,14 @@ impl<'lt> AnyPin<'lt> {
     //     io_mux_reg(self.number()).modify(|_, w| w.slp_sel().bit(on));
     // }
 
-    /// Enable or disable the GPIO pin output buffer.
+    /// Enables or disables the GPIO pin output buffer.
     #[inline]
     pub(crate) fn set_output_enable(&self, enable: bool) {
         assert!(self.is_output() || !enable);
         self.bank().write_out_en(self.mask(), enable);
     }
 
-    /// Enable input for the pin
+    /// Enables input for the pin.
     #[inline]
     pub(crate) fn set_input_enable(&self, on: bool) {
         io_mux_reg(self.number()).modify(|_, w| w.fun_ie().bit(on));
@@ -1882,21 +1936,12 @@ impl<'lt> AnyPin<'lt> {
         }
     }
 
-    fn listen_with_options(
-        &self,
-        event: Event,
-        int_enable: bool,
-        wake_up_from_light_sleep: bool,
-    ) -> Result<(), WakeConfigError> {
-        if wake_up_from_light_sleep {
-            match event {
-                Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
-                    return Err(WakeConfigError::EdgeTriggeringNotSupported);
-                }
-                _ => {}
-            }
-        }
-
+    /// Starts to listen for `event`, which also makes the pin a light-sleep wakeup source.
+    ///
+    /// One register write sets the interrupt enable and the wakeup enable of the pad. A pin that
+    /// cannot end a light sleep also cannot deliver its interrupt. A pin that listens therefore
+    /// always wakes the chip through the digital path, and needs no configuration for that.
+    fn listen(&self, event: Event) {
         self.with_gpio_lock(|| {
             // Clear the interrupt status bit for this Pin, just in case the user forgot.
             // Since we disabled the interrupt in the handler, it's not possible to
@@ -1905,12 +1950,15 @@ impl<'lt> AnyPin<'lt> {
 
             set_int_enable(
                 self.number(),
-                Some(gpio_intr_enable(int_enable)),
+                Some(gpio_intr_enable(true)),
                 event as u8,
-                wake_up_from_light_sleep,
+                true,
             );
         });
-        Ok(())
+
+        // The mask bit tells sleep entry to look at the pads.
+        #[cfg(sleep_driver_supported)]
+        wakeup::enable();
     }
 
     #[inline]
@@ -1940,19 +1988,19 @@ impl<'lt> AnyPin<'lt> {
         1 << (self.number() % 32)
     }
 
-    /// The current state of the input
+    /// The current state of the input.
     #[inline]
     pub(crate) fn is_input_high(&self) -> bool {
         self.bank().read_input() & self.mask() != 0
     }
 
-    /// Set the pin's level to high or low
+    /// Sets the pin's level to high or low.
     #[inline]
     pub(crate) fn set_output_high(&self, high: bool) {
         self.bank().write_output(self.mask(), high);
     }
 
-    /// Is the output set to high
+    /// Is the output set to high.
     #[inline]
     pub(crate) fn is_set_high(&self) -> bool {
         self.bank().read_output() & self.mask() != 0
@@ -2046,7 +2094,7 @@ impl AnyPin<'_> {
     #[procmacros::doc_replace]
     /// Attempts to downcast the pin into the underlying GPIO instance.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust,no_run
     /// # {before_snippet}
@@ -2079,15 +2127,7 @@ impl AnyPin<'_> {
     #[procmacros::doc_replace]
     /// Conjure a new GPIO pin out of thin air.
     ///
-    /// # Safety
-    ///
-    /// The caller must ensure that only one instance of a pin is in use at one time.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the pin with the given number does not exist.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2097,6 +2137,14 @@ impl AnyPin<'_> {
     /// #
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the pin with the given number does not exist.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that only one instance of a pin is in use at one time.
     pub unsafe fn steal(pin: u8) -> Self {
         for_each_gpio! {
             (all $( ($n:literal $($any:tt)*) ),*) => { const PINS: &[u8] = &[ $($n),* ]; };
@@ -2111,11 +2159,7 @@ impl AnyPin<'_> {
     #[procmacros::doc_replace]
     /// Unsafely clone the pin.
     ///
-    /// # Safety
-    ///
-    /// Ensure that only one instance of a pin is in use at one time.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2126,6 +2170,10 @@ impl AnyPin<'_> {
     /// #
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that only one instance of a pin is in use at one time.
     pub unsafe fn clone_unchecked(&self) -> Self {
         Self {
             pin: self.pin,
@@ -2134,10 +2182,10 @@ impl AnyPin<'_> {
     }
 
     #[procmacros::doc_replace]
-    /// Create a new AnyPin object that is limited to the lifetime of the
+    /// Creates a new AnyPin object that is limited to the lifetime of the
     /// passed reference.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -2170,112 +2218,6 @@ impl AnyPin<'_> {
     }
 }
 
-#[cold]
-#[allow(unused)]
-fn pin_does_not_support_function(pin: u8, function: &str) {
-    panic!("Pin {} is not an {}", pin, function)
-}
-
-#[cfg(lp_io_driver_supported)]
-macro_rules! for_each_rtcio_pin {
-    (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt) => {
-        if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-            #[allow(unused_mut)]
-            let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-            return $code;
-        }
-    };
-
-    (($ident:ident, $target:ident) => $code:tt;) => {
-        for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
-                for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
-            };
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
-                for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
-            };
-        }
-        unreachable!();
-    };
-}
-
-#[cfg(lp_io_driver_supported)]
-macro_rules! for_each_rtcio_output_pin {
-    (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
-        if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-            for_each_gpio! {
-                // If the pin is an output pin, generate $code
-                ($n:tt, $gpio $in_afs:tt $out_afs:tt ($input:tt [Output])) => {
-                    #[allow(unused_mut)]
-                    let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                    return $code;
-                };
-                // If the pin is not an output pin, generate a panic
-                ($n:tt, $gpio $in_afs:tt $out_afs:tt ($input:tt [])) => {
-                    pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, $kind)
-                };
-            }
-        }
-    };
-
-    (($ident:ident, $target:ident) => $code:tt;) => {
-        for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
-                for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "RTC_IO output")
-            };
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
-                for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "LP_IO output")
-            };
-        }
-        unreachable!();
-    };
-}
-
-#[cfg(lp_io_driver_supported)]
-impl RtcPin for AnyPin<'_> {
-    fn rtc_number(&self) -> u8 {
-        for_each_rtcio_pin! {
-            (self, target) => { RtcPin::rtc_number(&target) };
-        }
-    }
-
-    // Keep device cfg aligned with init_gpio!
-    #[cfg(any(xtensa, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
-    fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
-        for_each_rtcio_pin! {
-            (self, target) => { RtcPin::rtc_set_config(&target, input_enable, mux, func) };
-        }
-    }
-
-    fn rtcio_pad_hold(&self, enable: bool) {
-        for_each_rtcio_pin! {
-            (self, target) => { RtcPin::rtcio_pad_hold(&target, enable) };
-        }
-    }
-
-    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32p4))]
-    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
-        for_each_rtcio_pin! {
-            (self, target) => { unsafe { RtcPin::apply_wakeup(&target, wakeup, level) } };
-        }
-    }
-}
-
-#[cfg(lp_io_driver_supported)]
-impl RtcPinWithResistors for AnyPin<'_> {
-    fn rtcio_pullup(&self, enable: bool) {
-        for_each_rtcio_output_pin! {
-            (self, target) => { RtcPinWithResistors::rtcio_pullup(&target, enable) };
-        }
-    }
-
-    fn rtcio_pulldown(&self, enable: bool) {
-        for_each_rtcio_output_pin! {
-            (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
-        }
-    }
-}
-
 for_each_gpio! {
     ($n:literal, $gpio:ident $af_ins:tt $af_outs:tt ([Input] $output:tt)) => {
         impl InputPin for crate::peripherals::$gpio<'_> {
@@ -2300,14 +2242,14 @@ for_each_gpio! {
             pub(crate) const NUMBER: u8 = $n;
 
             #[procmacros::doc_replace]
-            /// Split the pin into an input and output signal.
+            /// Splits the pin into an input and output signal.
             ///
             /// Peripheral signals allow connecting peripherals together without using
             /// external hardware.
             ///
             /// # Safety
             ///
-            /// The caller must ensure that peripheral drivers don't configure the same
+            /// The caller must ensure that peripheral drivers do not configure the same
             /// GPIO at the same time in multiple places. This includes clones of the
             /// `InputSignal` struct, as well as the `OutputSignal` struct.
             ///
@@ -2358,3 +2300,113 @@ for_each_gpio! {
 }
 
 define_io_mux_reg!();
+
+// documentation only - renders nicer than the blanket implementation, but
+// doesn't prevent generic code from working.
+#[cfg(docsrs)]
+mod io_matrix_impls {
+    use crate::gpio::{
+        self,
+        AnyPin,
+        interconnect::{
+            InputSignal,
+            OutputSignal,
+            PeripheralInput,
+            PeripheralOutput,
+            PeripheralSignal,
+        },
+    };
+
+    impl<'d> PeripheralSignal<'d> for AnyPin<'d> {
+        fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
+            let pin = unsafe { self.clone_unchecked() };
+            InputSignal::new(pin).connect_input_to_peripheral(signal);
+        }
+    }
+
+    impl<'d> PeripheralInput<'d> for AnyPin<'d> {}
+
+    impl<'d> PeripheralOutput<'d> for AnyPin<'d> {
+        fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal) {
+            let pin = unsafe { self.clone_unchecked() };
+            OutputSignal::new(pin).connect_peripheral_to_output(signal);
+        }
+        fn disconnect_from_peripheral_output(&self) {
+            let pin = unsafe { self.clone_unchecked() };
+            OutputSignal::new(pin).disconnect_from_peripheral_output();
+        }
+    }
+
+    for_each_gpio! {
+        ($n:literal, $gpio:ident $($_rest:tt)*) => {
+            impl<'d> PeripheralSignal<'d> for crate::peripherals::$gpio<'d> {
+                fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
+                    let pin = unsafe { AnyPin::steal($n) };
+                    pin.connect_input_to_peripheral(signal);
+                }
+            }
+
+            impl<'d> PeripheralInput<'d> for crate::peripherals::$gpio<'d> {}
+        };
+    }
+
+    for_each_gpio! {
+        ($n:literal, $gpio:ident $_af_ins:tt $_af_outs:tt ($input:tt [Output])) => {
+            impl<'d> PeripheralOutput<'d> for crate::peripherals::$gpio<'d>
+            {
+                fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal) {
+                    let pin = unsafe { AnyPin::steal($n) };
+                    pin.connect_peripheral_to_output(signal);
+                }
+                fn disconnect_from_peripheral_output(&self) {
+                    let pin = unsafe { AnyPin::steal($n) };
+                    pin.disconnect_from_peripheral_output();
+                }
+            }
+        };
+    }
+}
+
+#[cfg(not(docsrs))]
+mod io_matrix_impls {
+    use crate::gpio::{
+        self,
+        AnyPin,
+        InputPin,
+        OutputPin,
+        Pin,
+        interconnect::{
+            InputSignal,
+            OutputSignal,
+            PeripheralInput,
+            PeripheralOutput,
+            PeripheralSignal,
+        },
+    };
+
+    // Pins
+    impl<'d, P> PeripheralSignal<'d> for P
+    where
+        P: Pin + 'd,
+    {
+        fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
+            let pin = unsafe { AnyPin::steal(self.number()) };
+            InputSignal::new(pin).connect_input_to_peripheral(signal);
+        }
+    }
+    impl<'d, P> PeripheralInput<'d> for P where P: InputPin + 'd {}
+
+    impl<'d, P> PeripheralOutput<'d> for P
+    where
+        P: OutputPin + 'd,
+    {
+        fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal) {
+            let pin = unsafe { AnyPin::steal(self.number()) };
+            OutputSignal::new(pin).connect_peripheral_to_output(signal);
+        }
+        fn disconnect_from_peripheral_output(&self) {
+            let pin = unsafe { AnyPin::steal(self.number()) };
+            OutputSignal::new(pin).disconnect_from_peripheral_output();
+        }
+    }
+}

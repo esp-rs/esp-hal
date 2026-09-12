@@ -1,6 +1,6 @@
 //! SPI slave loopback test using DMA
 //!
-//! The following wiring is assumed for the (bitbang) slave:
+//! The following wiring is assumed for the slave:
 //!
 //! - SCLK => GPIO0
 //! - MISO => GPIO1
@@ -62,6 +62,7 @@ fn main() -> ! {
 
     let dma_channel = cfg_select! {
         feature = "esp32s2" => peripherals.DMA_SPI2,
+        any(feature = "esp32p4", feature = "esp32s31") => peripherals.DMA_AXI_CH0,
         _ => peripherals.DMA_CH0,
     };
 

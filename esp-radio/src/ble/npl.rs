@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::{
     mem::transmute,
     ptr::{NonNull, addr_of, addr_of_mut},
@@ -66,26 +66,26 @@ type OsMembufT = u32;
 #[repr(C)]
 pub(crate) struct OsMempool {
     /// Size of the memory blocks, in bytes.
-    mp_block_size: u32,
+    pub(crate) mp_block_size: u32,
     /// The number of memory blocks.
-    mp_num_blocks: u16,
+    pub(crate) mp_num_blocks: u16,
     /// The number of free blocks left
-    mp_num_free: u16,
+    pub(crate) mp_num_free: u16,
     /// The lowest number of free blocks seen
-    mp_min_free: u16,
+    pub(crate) mp_min_free: u16,
     /// Bitmap of OS_MEMPOOL_F_[...] values.
-    mp_flags: u8,
+    pub(crate) mp_flags: u8,
     /// Address of memory buffer used by pool
-    mp_membuf_addr: u32,
+    pub(crate) mp_membuf_addr: u32,
 
     // STAILQ_ENTRY(os_mempool) mp_list;
-    next: *const OsMempool,
+    pub(crate) next: *const OsMempool,
 
     // SLIST_HEAD(,os_memblock);
-    first: *const c_void,
+    pub(crate) first: *const c_void,
 
     /// Name for memory block
-    name: *const u8,
+    pub(crate) name: *const u8,
 }
 
 #[cfg(esp32c2)]
@@ -716,17 +716,31 @@ unsafe extern "C" fn ble_npl_callout_is_active(callout: *const ble_npl_callout) 
     }
 }
 
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/npl/freertos/src/npl_os_freertos.c#L185-L194>
 unsafe extern "C" fn ble_npl_callout_mem_reset(callout: *const ble_npl_callout) {
-    trace!("ble_npl_callout_mem_reset");
-    unsafe {
-        ble_npl_callout_stop(callout);
-    }
+    trace!("ble_npl_callout_mem_reset {:?}", callout);
+
+    let co = unsafe { (*callout).dummy } as *mut Callout;
+    assert!(!co.is_null());
+
+    unsafe { ble_npl_event_reset(&raw const (*co).events) };
 }
 
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/npl/freertos/src/npl_os_freertos.c#L962-L998>
 unsafe extern "C" fn ble_npl_callout_deinit(callout: *const ble_npl_callout) {
-    trace!("ble_npl_callout_deinit");
+    trace!("ble_npl_callout_deinit {:?}", callout);
+
+    if unsafe { (*callout).dummy } == 0 {
+        return;
+    }
+
     unsafe {
-        ble_npl_callout_stop(callout);
+        let co = (*callout).dummy as *mut Callout;
+        compat::timer_compat::compat_timer_done(&raw mut (*co).timer_handle);
+        ble_npl_event_deinit(&raw const (*co).events);
+        crate::compat::malloc::free(co.cast());
+
+        (*callout.cast_mut()).dummy = 0;
     }
 }
 
@@ -978,6 +992,16 @@ unsafe extern "C" fn ble_npl_eventq_get(
 
 unsafe extern "C" fn ble_npl_eventq_init(queue: *mut ble_npl_eventq) {
     trace!("ble_npl_eventq_init {:?}", queue);
+
+    // Keep the existing queue and empty it, the way IDF's `npl_freertos_eventq_init` calls
+    // `xQueueReset` instead of allocating again.
+    // <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/npl/freertos/src/npl_os_freertos.c#L135-L164>
+    let existing = unsafe { (*queue).dummy };
+    if existing != 0 {
+        let mut event: usize = 0;
+        while queue::queue_receive(existing as *mut c_void, (&raw mut event).cast(), 0) != 0 {}
+        return;
+    }
 
     let queue_ptr = queue::queue_create(EVENT_QUEUE_SIZE as _, core::mem::size_of::<usize>() as _);
 
@@ -1330,12 +1354,16 @@ pub(crate) fn ble_deinit() {
 
         assert!(res == 0, "ble_controller_deinit returned {}", res);
 
+        #[cfg(esp32c2)]
+        os_msys_buf_free();
+
         npl::esp_unregister_npl_funcs();
 
         npl::esp_unregister_ext_funcs();
     }
 }
 
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L218-L279>
 #[cfg(esp32c2)]
 fn os_msys_buf_alloc() -> bool {
     unsafe {
@@ -1348,7 +1376,31 @@ fn os_msys_buf_alloc() -> bool {
             core::mem::size_of::<OsMembufT>() * SYSINIT_MSYS_2_MEMPOOL_SIZE,
         ) as *mut u32;
 
-        !(OS_MSYS_INIT_1_DATA.is_null() || OS_MSYS_INIT_2_DATA.is_null())
+        if OS_MSYS_INIT_1_DATA.is_null() || OS_MSYS_INIT_2_DATA.is_null() {
+            os_msys_buf_free();
+            return false;
+        }
+
+        true
+    }
+}
+
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L281-L318>
+#[cfg(esp32c2)]
+fn os_msys_buf_free() {
+    unsafe {
+        // No C2 ROM revision exposes `os_mempool_unregister`, so drop every registered pool before
+        // releasing the memory it points at.
+        r_os_msys_reset();
+
+        if !OS_MSYS_INIT_1_DATA.is_null() {
+            crate::compat::malloc::free(OS_MSYS_INIT_1_DATA.cast());
+            OS_MSYS_INIT_1_DATA = core::ptr::null_mut();
+        }
+        if !OS_MSYS_INIT_2_DATA.is_null() {
+            crate::compat::malloc::free(OS_MSYS_INIT_2_DATA.cast());
+            OS_MSYS_INIT_2_DATA = core::ptr::null_mut();
+        }
     }
 }
 
@@ -1406,19 +1458,18 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
     let payload = unsafe { core::slice::from_raw_parts(cmd.offset(2), len) };
     trace!("$ pld = {:?}", payload);
 
+    let mut data = Vec::with_capacity(len + 3);
+    data.push(0x04); // this is an event
+    data.push(event);
+    data.push(len as u8);
+    data.extend_from_slice(payload);
+
+    dump_packet_info(&data);
+
     super::BT_STATE.with(|state| {
-        let mut data = [0u8; 256];
-
-        data[0] = 0x04; // this is an event
-        data[1] = event;
-        data[2] = len as u8;
-        data[3..][..len].copy_from_slice(payload);
-
         state.rx_queue.push_back(ReceivedPacket {
-            data: Box::from(&data[..len + 3]),
+            data: data.into_boxed_slice(),
         });
-
-        dump_packet_info(&data[..(len + 3)]);
     });
 
     unsafe {
@@ -1437,17 +1488,16 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     let len = unsafe { (*om).om_len };
     let data_slice = unsafe { core::slice::from_raw_parts(data_ptr, len as usize) };
 
+    let mut data = Vec::with_capacity(data_slice.len() + 1);
+    data.push(0x02); // ACL
+    data.extend_from_slice(data_slice);
+
+    super::dump_packet_info(&data);
+
     super::BT_STATE.with(|state| {
-        let mut data = [0u8; 256];
-
-        data[0] = 0x02; // ACL
-        data[1..][..data_slice.len()].copy_from_slice(data_slice);
-
         state.rx_queue.push_back(ReceivedPacket {
-            data: Box::from(&data[..data_slice.len() + 1]),
+            data: data.into_boxed_slice(),
         });
-
-        super::dump_packet_info(&data[..(len + 1) as usize]);
     });
 
     unsafe {
@@ -1460,59 +1510,60 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
 }
 
 /// Sends HCI data to the Bluetooth controller.
-#[instability::unstable]
-pub fn send_hci(data: &[u8]) {
-    let hci_out = unsafe { (*addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
-    hci_out.push(data);
+///
+/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
+/// caller must offer the remaining bytes again.
+pub(crate) fn send_hci(data: &[u8]) -> usize {
+    super::collect_and_send(data, send_packet)
+}
 
-    if hci_out.is_ready() {
-        let packet = hci_out.packet();
+/// Sends HCI data to the Bluetooth controller.
+///
+/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
+/// caller must offer the remaining bytes again.
+pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
+    super::collect_and_send(data, send_packet)
+}
 
-        unsafe {
-            const DATA_TYPE_COMMAND: u8 = 1;
-            const DATA_TYPE_ACL: u8 = 2;
+fn send_packet(packet: &[u8]) {
+    const DATA_TYPE_COMMAND: u8 = 1;
+    const DATA_TYPE_ACL: u8 = 2;
 
-            dump_packet_info(packet);
+    dump_packet_info(packet);
 
-            super::BT_STATE.with(|_state| {
-                if packet[0] == DATA_TYPE_COMMAND {
-                    let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
-                    core::ptr::copy_nonoverlapping(
-                        &packet[1] as *const _ as *mut u8, // don't send the TYPE
-                        cmd as *mut u8,
-                        packet.len() - 1,
-                    );
+    super::BT_STATE.with(|_state| unsafe {
+        if packet[0] == DATA_TYPE_COMMAND {
+            let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
+            core::ptr::copy_nonoverlapping(
+                &raw const packet[1], // don't send the TYPE
+                cmd as *mut u8,
+                packet.len() - 1,
+            );
 
-                    let res = r_ble_hci_trans_hs_cmd_tx(cmd);
+            let res = r_ble_hci_trans_hs_cmd_tx(cmd);
 
-                    if res != 0 {
-                        warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
-                    }
-                } else if packet[0] == DATA_TYPE_ACL {
-                    let om = r_os_msys_get_pkthdr(
-                        packet.len() as u16,
-                        ACL_DATA_MBUF_LEADINGSPACE as u16,
-                    );
+            if res != 0 {
+                warn!("ble_hci_trans_hs_cmd_tx res == {}", res);
+            }
+        } else if packet[0] == DATA_TYPE_ACL {
+            let om = r_os_msys_get_pkthdr(packet.len() as u16, ACL_DATA_MBUF_LEADINGSPACE as u16);
 
-                    let res =
-                        r_os_mbuf_append(om, packet.as_ptr().offset(1), (packet.len() - 1) as u16);
-                    if res != 0 {
-                        panic!("r_os_mbuf_append returned {}", res);
-                    }
+            let res = r_os_mbuf_append(om, packet.as_ptr().offset(1), (packet.len() - 1) as u16);
+            if res != 0 {
+                panic!("r_os_mbuf_append returned {}", res);
+            }
 
-                    // this modification of the ACL data packet makes it getting sent and
-                    // received by the other side
-                    *((*om).om_data as *mut u8).offset(1) = 0;
+            // this modification of the ACL data packet makes it getting sent and
+            // received by the other side
+            *((*om).om_data as *mut u8).offset(1) = 0;
 
-                    let res = r_ble_hci_trans_hs_acl_tx(om);
-                    if res != 0 {
-                        panic!("ble_hci_trans_hs_acl_tx returned {}", res);
-                    }
-                    trace!("ACL tx done");
-                }
-            });
+            let res = r_ble_hci_trans_hs_acl_tx(om);
+            if res != 0 {
+                panic!("ble_hci_trans_hs_acl_tx returned {}", res);
+            }
+            trace!("ACL tx done");
+        } else {
+            warn!("Unknown packet kind {} dropped", packet[0]);
         }
-
-        hci_out.reset();
-    }
+    });
 }

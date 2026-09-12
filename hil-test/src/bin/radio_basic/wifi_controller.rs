@@ -1,11 +1,7 @@
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use esp_hal::{
-        clock::CpuClock,
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::Peripherals,
-        timer::timg::TimerGroup,
-    };
+    use embassy_time::{Duration, Timer};
+    use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
     use esp_radio::wifi::scan::ScanConfig;
 
     #[init]
@@ -21,8 +17,7 @@ mod tests {
     #[test]
     async fn wifi_starts_with_trng_enabled(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let _source = esp_hal::rng::TrngSource::new(p.RNG, p.ADC1);
 
@@ -35,8 +30,7 @@ mod tests {
     #[timeout(15)]
     async fn test_scan_doesnt_leak(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let mut controller =
             esp_radio::wifi::WifiController::new(p.WIFI, Default::default()).unwrap();
@@ -53,10 +47,23 @@ mod tests {
 
         for _ in 0..10 {
             let _ = controller.scan_async(&scan_config).await.unwrap();
+
+            // The Wi-Fi driver runs in its own task. Memory that the driver holds while we read
+            // the free heap makes the heap look smaller than it is. The driver free's this memory
+            // soon, but it does not free leaked memory, so wait for the heap to recover.
+            let mut free = esp_alloc::HEAP.free();
+            for _ in 0..20 {
+                if free >= min_free {
+                    break;
+                }
+                Timer::after(Duration::from_millis(10)).await;
+                free = esp_alloc::HEAP.free();
+            }
+
             assert!(
-                esp_alloc::HEAP.free() >= min_free,
+                free >= min_free,
                 "current free: {}, min free: {}",
-                esp_alloc::HEAP.free(),
+                free,
                 min_free
             );
         }

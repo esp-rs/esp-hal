@@ -9,17 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add ESP32-S31 support (#5922)
 
 ### Changed
 
-- ESP32-P4: Use ROM CRC32 / MD5 functions instead of the software fallback (#5400)
 
 ### Fixed
 
 
 ### Removed
 
+
+## [v0.6.0] - 2026-08-25
+
+### Added
+
+- Add ESP32-S31 support (#5922)
+- `PartitionEntry::sha256()` for partition integrity checks (#6061)
+- FlashRegion::as_nor_flash() and FlashRegion::as_nor_flash_encrypted() for NOR flash access with correct encryption semantics. (#5857)
+- FlashRegionPlainNorFlash and FlashRegionEncryptedNorFlash wrapper types. (#5857)
+- Error::NotSupported for incompatible partition/accessor combinations. (#5857)
+- `OtaUpdater::reset_data()` to erase the OTA data partition and select the factory app (#5767)
+- OTA / partition table support for ESP32-P4 (#5751)
+- Inherent `read`, `write`, and `capacity` methods on [`FlashRegion`](crate::partitions::FlashRegion) (#5739)
+
+### Changed
+
+- ESP32-P4: Use ROM CRC32 / MD5 functions instead of the software fallback (#5400)
+- `PartitionEntry` is now no longer lifetime-tied to `PartitionTable`. (#6056)
+- `FlashRegion` supports transparent encryption support (#5810)
+- updated defmt to 1.1 (#5752)
+- `esp-bootloader-esp-idf` now directly depends on `esp-storage` (#5739)
+- `embedded-storage` trait implementations are now an opt-in feature (non-default) (#5739)
+- `PartitionEntry::as_embedded_storage` is deprecated in favor of [`PartitionEntry::as_flash_region`](crate::partitions::PartitionEntry::as_flash_region) (#5739)
+
+### Fixed
+
+- `FlashRegion::erase` no longer fails when erasing up to the end of the partition (e.g. the last sector or the whole partition) (#6045)
+- `SOURCE_DATE_EPOCH` is now interpreted as seconds since the Unix epoch, as the reproducible-builds specification requires, and changing it re-runs the build script. (#6017)
+- OTA select entries are now validated (CRC and state) before being read into Rust types, avoiding UB on corrupted flash (#5767)
+
+### Removed
+
+- Direct ReadNorFlash, NorFlash, and MultiwriteNorFlash impls on FlashRegion. (#5857)
+- `as_embedded_storage` - use `as_flash_region` instead (#5739)
 
 ## [v0.5.0] - 2026-04-16
 
@@ -100,4 +132,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.3.0]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.2.0...esp-bootloader-esp-idf-v0.3.0
 [v0.4.0]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.3.0...esp-bootloader-esp-idf-v0.4.0
 [v0.5.0]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.4.0...esp-bootloader-esp-idf-v0.5.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.5.0...HEAD
+[v0.6.0]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.5.0...esp-bootloader-esp-idf-v0.6.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.6.0...HEAD

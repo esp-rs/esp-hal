@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# If you modify a driver support status, run `cargo update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -12,6 +12,13 @@ target = "riscv32imac-unknown-none-elf"
 cores  = 1
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_technical_reference_manual_en.pdf"
+
+[device.mmu]
+page_size = 0x10000
+entry_num = 512
+
+[device.flash]
+support_status = "partial"
 
 [device.rom]
 has_crc_le  = true
@@ -30,6 +37,8 @@ memory_map = { ranges = [
     { name = "dram", start = 0x4080_0000, end = 0x4086_0000 },
     # start address from correct bootloader commit: https://github.com/espressif/esp-idf/blob/d66ebb8/components/bootloader/subproject/main/ld/esp32c5/bootloader.ld#L32
     { name = "dram2_uninit", start = 0x4084_E5A0, end = 0x4085_E5A0 },
+    { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x4200_0000, end = 0x4400_0000 },
 ] }
 
 peripherals = [
@@ -48,7 +57,7 @@ peripherals = [
     { name = "EFUSE", hidden = true },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "GPIO" },
-    { name = "GPIO_SD", pac = "GPIO_EXT" },
+    { name = "GPIO_SD", pac = "GPIO_EXT", clock_group = "SDM" },
     # { name = "HINF" },
     { name = "HMAC" },
     { name = "HP_APM" },
@@ -56,7 +65,7 @@ peripherals = [
     { name = "HUK" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
     { name = "IEEE802154", interrupts = { mac = "ZB_MAC" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTPRI" },
@@ -69,7 +78,7 @@ peripherals = [
     { name = "LP_APM0" },
     { name = "LP_CLKRST" },
     { name = "LP_GPIO", pac = "LP_IO" },
-    # { name = "LP_I2C0" },
+    { name = "LP_I2C0" },
     { name = "LP_I2C_ANA_MST" },
     { name = "LP_IO_MUX" },
     { name = "LP_PERI", pac = "LPPERI" },
@@ -89,7 +98,7 @@ peripherals = [
     # { name = "OTP_DEBUG" },
     { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, clock_group = "PARL_IO" },
     { name = "PAU" },
-    { name = "PCNT" },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PMU" },
     # { name = "PSRAM_MEM_MONITOR" },
@@ -122,9 +131,12 @@ peripherals = [
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "LP_CORE", virtual = true },
-    { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
     { name = "PSRAM", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
 ]
 
 [device.soc.clocks]
@@ -156,7 +168,7 @@ engines = [
         name = "AHB_GDMA",
         max_priority = 5,
         burst_sizes = [4, 16, 32],
-        drivers = ["aes", "sha", "spi_master", "uhci", "i2s", "parl_io"],
+        drivers = ["aes", "sha", "spi_master", "spi_slave", "uhci", "i2s", "parl_io"],
         peripheral_instances = [
             { name = "SPI2", dma_id = 1 },
             { name = "UHCI0", dma_id = 2 },
@@ -198,10 +210,6 @@ separate_jacobian_point_memory = true
 has_memory_clock_gate = true
 supports_enhanced_security = true
 
-[device.lp_io]
-support_status = "partial"
-version = "v4"
-
 [device.gpio]
 support_status = "supported"
 # {include gpio.toml}
@@ -213,7 +221,7 @@ channels = [["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2", "CPU_GPIO_3", "CPU_GPIO_4
 
 [device.i2c_master]
 support_status = "supported"
-version = 3
+version = 4
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
 ]
@@ -325,7 +333,7 @@ has_region_monitor = true
 [device.avc]
 support_status = { status = "not_supported", issue = 5168 }
 
-[device.twai]
+[device.canfd]
 support_status = { status = "not_supported", issue = 5163 }
 
 [device.key_manager]
@@ -338,7 +346,8 @@ support_status = { status = "not_supported", issue = 5164 }
 support_status = { status = "not_supported", issue = 884 }
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 4
 
 [device.lp_uart]
 support_status = { status = "not_supported", issue = 5155 }
@@ -346,10 +355,11 @@ ram_size = 32
 
 [device.lp_i2c_master]
 support_status = "partial"
+version = "lp_i2c"
 fifo_size = 16
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5980 }
 trng_supported = false  # TODO
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = true
@@ -359,6 +369,7 @@ is_lp_sys = true
 mac_version = 3
 has_5g = true
 csi_supported = true
+has_wifi6 = true
 
 [device.bt]
 support_status = "partial"
@@ -373,6 +384,18 @@ combo_module = true
 # ## Miscellaneous
 [device.systimer]
 [device.pcnt]
+instances = {
+    PCNT = {
+        sys_instance = "Pcnt",
+        interrupt = "PCNT",
+        units = [
+            { sig_ch0 = "PCNT0_SIG_CH0", sig_ch1 = "PCNT0_SIG_CH1", ctrl_ch0 = "PCNT0_CTRL_CH0", ctrl_ch1 = "PCNT0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_SIG_CH0", sig_ch1 = "PCNT1_SIG_CH1", ctrl_ch0 = "PCNT1_CTRL_CH0", ctrl_ch1 = "PCNT1_CTRL_CH1" },
+            { sig_ch0 = "PCNT2_SIG_CH0", sig_ch1 = "PCNT2_SIG_CH1", ctrl_ch0 = "PCNT2_CTRL_CH0", ctrl_ch1 = "PCNT2_CTRL_CH1" },
+            { sig_ch0 = "PCNT3_SIG_CH0", sig_ch1 = "PCNT3_SIG_CH1", ctrl_ch0 = "PCNT3_CTRL_CH0", ctrl_ch1 = "PCNT3_CTRL_CH1" },
+        ],
+    },
+}
 [device.usb_serial_jtag]
 
 [device.parl_io]
@@ -393,6 +416,8 @@ support_status = { status = "not_supported", issue = 5154 }
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+ext1_version = 2
+pin_wakeup_version = 3
 wakeup_sources = {
     Ext1 = 1,
     Gpio = 2,
@@ -404,7 +429,6 @@ wakeup_sources = {
     Sdio = 8,
     Bt = 10,
     LpCore = 11,
-    Usb = 14,
 }
 
 [device.etm]
@@ -418,7 +442,6 @@ support_status = { status = "not_supported", issue = 5444 }
 
 [device.i2s]
 version = 3
-default_clock_source = 2
 mclk_divider_bit_width = 9
 max_ws_width = 512
 clock_configured_by_pcr = true

@@ -19,7 +19,7 @@ use crate::{i2s::master::Info, time::Rate};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PdmError {
-    /// PDM is not supported on this I2S peripheral instance (I2S1).
+    /// PDM is not supported on this I2S peripheral instance.
     UnsupportedInstance,
     /// PCM format requested but hardware PCM2PDM/PDM2PCM is unavailable.
     PcmFormatUnsupported,
@@ -40,10 +40,12 @@ impl core::error::Error for PdmError {}
 impl core::fmt::Display for PdmError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::UnsupportedInstance => write!(f, "PDM mode is only supported on I2S0"),
+            Self::UnsupportedInstance => {
+                write!(f, "PDM mode is not supported on this I2S instance")
+            }
             Self::PcmFormatUnsupported => write!(
                 f,
-                "PCM PDM format is not supported on this chip; use raw PDM format"
+                "PCM PDM format is not supported on this I2S instance; use raw PDM format"
             ),
             Self::InvalidClock => write!(f, "PDM clock configuration is out of supported range"),
             Self::InvalidSlotMask => {
@@ -60,14 +62,21 @@ impl core::fmt::Display for PdmError {
     }
 }
 
-/// A peripheral singleton that supports PDM mode (I2S0 only).
+/// A peripheral singleton that supports PDM mode.
 pub trait PdmInstance: Instance {}
 
 for_each_i2s! {
     (
         $instance:ident, $sys:ident, $mclk:ident,
         $bclk:ident, $ws:ident, $bclk_rx:ident, $ws_rx:ident,
-        $dout:tt, $din:tt, true, true, $pcm2pdm:literal, $pdm2pcm:literal
+        $dout:tt, $din:tt, true, $pdm_rx:literal, $pcm2pdm:literal, $pdm2pcm:literal
+    ) => {
+        impl PdmInstance for crate::peripherals::$instance<'_> {}
+    };
+    (
+        $instance:ident, $sys:ident, $mclk:ident,
+        $bclk:ident, $ws:ident, $bclk_rx:ident, $ws_rx:ident,
+        $dout:tt, $din:tt, false, true, $pcm2pdm:literal, $pdm2pcm:literal
     ) => {
         impl PdmInstance for crate::peripherals::$instance<'_> {}
     };
@@ -133,7 +142,7 @@ impl PdmSlotMask {
     /// Line 3, right slot.
     pub const LINE3_RIGHT: Self = Self(1 << 6);
 
-    /// Create a mask from raw slot bits.
+    /// Creates a new mask from raw slot bits.
     pub const fn from_bits(bits: u16) -> Self {
         Self(bits)
     }
@@ -167,7 +176,7 @@ pub enum PdmDownsampleRate {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PdmSigScaling {
-    /// Divide input by 2.
+    /// Divides input by 2.
     Div2,
     /// Multiply input by 1.
     #[default]
@@ -214,6 +223,8 @@ pub struct PdmTxClockConfig {
     pub up_sample_fs: u32,
     /// Bit clock divider.
     pub bclk_div: u32,
+    /// Source clock for the I2S module clock.
+    pub clock_source: crate::i2s::master::I2sClockSource,
 }
 
 /// PDM TX slot / filter configuration.
@@ -238,7 +249,7 @@ pub struct PdmTxSlotConfig {
     #[cfg(not(i2s_version = "1"))]
     /// Output line routing mode.
     pub line_mode: PdmTxLineMode,
-    /// Enable the TX high-pass filter.
+    /// Enables the TX high-pass filter.
     pub hp_en: bool,
     /// High-pass filter cut-off frequency in Hz.
     pub hp_cut_off_freq_hz: f32,
@@ -293,10 +304,10 @@ impl PdmTxSlotConfig {
         cfg
     }
 
-    #[cfg(not(i2s_supports_pcm2pdm))]
     fn raw_default(mode: PdmSlotMode) -> Self {
         let mut cfg = Self::codec_pcm_default(mode);
         cfg.data_format = PdmDataFormat::Raw;
+        cfg.hp_en = false;
         cfg
     }
 }
@@ -313,6 +324,8 @@ pub struct PdmRxClockConfig {
 
     /// Bit clock divider.
     pub bclk_div: u32,
+    /// Source clock for the I2S module clock.
+    pub clock_source: crate::i2s::master::I2sClockSource,
 }
 
 /// PDM RX slot configuration.
@@ -330,7 +343,7 @@ pub struct PdmRxSlotConfig {
     pub data_format: PdmDataFormat,
 
     #[cfg(i2s_supports_pdm_rx_hp_filter)]
-    /// Enable the RX high-pass filter.
+    /// Enables the RX high-pass filter.
     pub hp_en: bool,
 
     #[cfg(i2s_supports_pdm_rx_hp_filter)]
@@ -388,6 +401,14 @@ impl PdmTxConfig {
         }
     }
 
+    /// Raw PDM TX defaults (no hardware PCM conversion).
+    pub fn new_raw_default(sample_rate: Rate, mode: PdmSlotMode) -> Self {
+        Self {
+            clock: PdmTxClockConfig::codec_default(sample_rate),
+            slot: PdmTxSlotConfig::raw_default(mode),
+        }
+    }
+
     /// DAC-line defaults (`I2S_PDM_TX_*_DAC_DEFAULT_CONFIG`, HW v2+).
     #[cfg(not(i2s_version = "1"))]
     pub fn new_dac_default(sample_rate: Rate, mode: PdmSlotMode) -> Self {
@@ -397,7 +418,7 @@ impl PdmTxConfig {
         }
     }
 
-    /// Validate TX configuration against hardware capabilities.
+    /// Validates TX configuration against hardware capabilities.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.slot.data_format == PdmDataFormat::Pcm && !info.pcm2pdm {
             return Err(PdmError::PcmFormatUnsupported);
@@ -451,7 +472,7 @@ impl PdmRxConfig {
         }
     }
 
-    /// Validate RX configuration against hardware capabilities.
+    /// Validates RX configuration against hardware capabilities.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.slot.data_format == PdmDataFormat::Pcm && !info.pdm2pcm {
             return Err(PdmError::PcmFormatUnsupported);
@@ -470,7 +491,7 @@ fn default_rx_slot(mode: PdmSlotMode) -> PdmRxSlotConfig {
     }
 }
 
-/// PDM mode configuration (simplex TX and/or RX).
+/// PDM mode configuration (simplex TX, RX, or both).
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PdmConfig {
@@ -478,6 +499,9 @@ pub struct PdmConfig {
     pub tx: Option<PdmTxConfig>,
     /// Optional RX unit configuration.
     pub rx: Option<PdmRxConfig>,
+    /// Selects which module clock is routed to the MCLK pad.
+    #[cfg(not(i2s_version = "1"))]
+    pub mclk_out: crate::i2s::master::MclkOut,
 }
 
 impl PdmConfig {
@@ -487,6 +511,8 @@ impl PdmConfig {
         Self {
             tx: Some(tx),
             rx: None,
+            #[cfg(not(i2s_version = "1"))]
+            mclk_out: crate::i2s::master::MclkOut::Tx,
         }
     }
 
@@ -496,10 +522,12 @@ impl PdmConfig {
         Self {
             tx: None,
             rx: Some(rx),
+            #[cfg(not(i2s_version = "1"))]
+            mclk_out: crate::i2s::master::MclkOut::Rx,
         }
     }
 
-    /// Validate that exactly one direction is configured and that the settings
+    /// Validates that exactly one direction is configured and that the settings
     /// are valid for the given I2S instance.
     pub fn validate(&self, info: &Info) -> Result<(), PdmError> {
         if self.tx.is_none() && self.rx.is_none() {
@@ -507,6 +535,12 @@ impl PdmConfig {
         }
         if self.tx.is_some() && self.rx.is_some() {
             return Err(PdmError::DuplexUnsupported);
+        }
+        if self.tx.is_some() && !info.pdm_tx {
+            return Err(PdmError::UnsupportedInstance);
+        }
+        if self.rx.is_some() && !info.pdm_rx {
+            return Err(PdmError::UnsupportedInstance);
         }
         if let Some(tx) = &self.tx {
             tx.validate(info)?;

@@ -5,6 +5,7 @@ use crate::{
     soc::{
         clocks::{ClockConfig, LpSlowClkConfig},
         regi2c,
+        xtal32k,
     },
 };
 
@@ -113,6 +114,7 @@ impl From<LpSlowClkConfig> for ModemClockLpclkSource {
     fn from(src: LpSlowClkConfig) -> Self {
         match src {
             LpSlowClkConfig::RcSlow => Self::RcSlow,
+            #[cfg(use_xtal32k)]
             LpSlowClkConfig::Xtal32k => Self::XTAL32K,
             LpSlowClkConfig::OscSlow => Self::EXT32K,
         }
@@ -900,7 +902,7 @@ impl LpSystemInit {
         dig_power.set_mem_dslp(false);
 
         let mut clk_power = LpClkPower::default();
-        clk_power.set_xpd_xtal32k(true);
+        clk_power.set_xpd_xtal32k(xtal32k::use_xtal32k());
         // ESP32-C61 disables RC32K in LP active by default.
         clk_power.set_xpd_rc32k(false);
         clk_power.set_xpd_fosc(true);
@@ -1085,7 +1087,7 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
 /// SOC Reset Reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ///
     /// In ESP-IDF this value (0x01) can *also* be `ChipBrownOut` or
     /// `ChipSuperWdt`, however that is not really compatible with Rust-style
@@ -1107,7 +1109,7 @@ pub enum SocResetReason {
     Cpu0Sw        = 0x0C,
     /// RTC watch dog resets CPU 0
     Cpu0RtcWdt    = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,
@@ -1123,7 +1125,7 @@ pub enum SocResetReason {
     CoreUsbJtag   = 0x16,
     /// JTAG resets CPU
     Cpu0JtagCpu   = 0x18,
-    /// Power glitch resets CPU
+    /// Powers glitch resets CPU.
     PowerGlitch   = 0x19,
     /// CPU lockup reset
     CpuLockup     = 0x1A,

@@ -83,6 +83,7 @@ pub(super) struct osi_funcs_s {
     esp_hw_power_down: Option<unsafe extern "C" fn()>,
     esp_hw_power_up: Option<unsafe extern "C" fn()>,
     ets_backup_dma_copy: Option<unsafe extern "C" fn(u32, u32, u32, i32)>,
+    malloc_retention: Option<unsafe extern "C" fn(u32) -> *mut c_void>,
     ets_delay_us: Option<unsafe extern "C" fn(u32)>,
     btdm_rom_table_ready: Option<unsafe extern "C" fn()>,
     coex_bt_wakeup_request: Option<unsafe extern "C" fn()>,
@@ -93,7 +94,7 @@ pub(super) struct osi_funcs_s {
 
 pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     magic: 0xfadebead,
-    version: 0x0001000A,
+    version: 0x0001000B,
     interrupt_alloc: Some(interrupt_set),
     interrupt_free: Some(interrupt_clear),
     interrupt_handler_set: Some(interrupt_handler_set),
@@ -148,6 +149,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     esp_hw_power_down: Some(esp_hw_power_down),
     esp_hw_power_up: Some(esp_hw_power_up),
     ets_backup_dma_copy: Some(ets_backup_dma_copy),
+    malloc_retention: Some(crate::ble::malloc_retention),
     ets_delay_us: Some(ets_delay_us_wrapper),
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
     coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
@@ -179,15 +181,11 @@ extern "C" fn coex_schm_register_btdm_callback(_callback: *mut c_void) -> i32 {
     trace!("coex_schm_register_btdm_callback");
 
     cfg_select! {
-        feature = "coex" => {
-            unsafe {
-                const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
-                coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, _callback)
-            }
-        }
-        _ => {
-            0
-        }
+        feature = "coex" => unsafe {
+            const COEX_SCHM_CALLBACK_TYPE_BT: u32 = 1;
+            coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, _callback)
+        },
+        _ => 0,
     }
 }
 
@@ -302,7 +300,6 @@ pub enum TxPower {
     P20,
 }
 
-#[allow(dead_code)]
 impl TxPower {
     fn idx(self) -> esp_power_level_t {
         match self {
@@ -322,6 +319,7 @@ impl TxPower {
         }
     }
 
+    #[allow(dead_code)]
     fn dbm(self) -> i8 {
         match self {
             Self::N15 => -15,
@@ -537,7 +535,9 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         hci_tl_funcs: core::ptr::null_mut(),
         txant_dft: config.default_tx_antenna as u8,
         rxant_dft: config.default_rx_antenna as u8,
-        txpwr_dft: config.default_tx_power as u8,
+        // `txpwr_dft` expects an `esp_power_level_t` index, which is offset by 3
+        // from the plain `TxPower` discriminant (`ESP_PWR_LVL_N15` is 3, not 0).
+        txpwr_dft: config.default_tx_power.idx() as u8,
         cfg_mask: CFG_MASK,
 
         // Bluetooth mesh options, currently not supported

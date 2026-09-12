@@ -150,7 +150,7 @@ impl<Dm: DriverMode> embedded_hal::i2c::ErrorType for I2cSlave<'_, Dm> {
 }
 
 impl<'d> I2cSlave<'d, Blocking> {
-    /// Create a new I2C slave instance.
+    /// Creates a new I2C slave instance.
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
@@ -209,7 +209,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
         }
     }
 
-    /// Connect a pin to the I2C SDA signal.
+    /// Connects a pin to the I2C SDA signal.
     pub fn with_sda(mut self, sda: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.sda_input;
@@ -218,7 +218,7 @@ impl<'d, Dm: DriverMode> I2cSlave<'d, Dm> {
         self
     }
 
-    /// Connect a pin to the I2C SCL signal.
+    /// Connects a pin to the I2C SCL signal.
     pub fn with_scl(mut self, scl: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;

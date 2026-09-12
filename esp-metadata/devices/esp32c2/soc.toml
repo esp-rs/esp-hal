@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-metadata` to
+# If you modify a driver support status, run `cargo update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -12,6 +12,13 @@ target = "riscv32imc-unknown-none-elf"
 cores  = 1
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp8684_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
+
+[device.mmu]
+page_size = 0x10000
+entry_num = 64
+
+[device.flash]
+support_status = "partial"
 
 [device.rom]
 has_crc_le      = true
@@ -26,6 +33,8 @@ has_swd_watchdog = true
 memory_map = { ranges = [
     { name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 },
     { name = "dram2_uninit", start = 0x3FCC_E800, end = 0x3FCD_EB70 },
+    { name = "irom", start = 0x4200_0000, end = 0x4240_0000 },
+    { name = "drom", start = 0x3C00_0000, end = 0x3C40_0000 },
 ] }
 
 peripherals = [
@@ -64,8 +73,11 @@ peripherals = [
     { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", lp_timer = "LP_TIMER" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
-    { name = "SW_INTERRUPT", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
 ]
 
 [device.soc.clocks]
@@ -116,10 +128,6 @@ curves = [
     { id = 1, curve = 256 }
 ]
 zero_extend_writes = true
-
-[device.lp_io]
-support_status = "partial"
-version = "v3"
 
 [device.gpio]
 support_status = "supported"
@@ -204,7 +212,7 @@ has_sclk_divider = true
 has_sclk_enable = true
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
@@ -212,7 +220,11 @@ apb_cycle_wait_num = 16 # TODO
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+pin_wakeup_version = 2
+deep_sleep_needs_gpio_isolation = true
 wakeup_sources = {
+    # A UART wake cannot reject a sleep.
+    rejectable = ["Gpio", "Timer", "Sdio", "Wifi", "Touch", "Ulp", "Bt"],
     Gpio = 2,
     Timer = 3,
     Sdio = 4,

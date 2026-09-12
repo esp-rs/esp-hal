@@ -9,14 +9,14 @@
 //! chip used!
 //!
 //! ```ignore,bash
-//! cargo xtask build examples gpio --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt examples/target/ota_image
-//! cargo xtask build examples update --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
-//! cargo xtask build examples update --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! cargo xtask build gpio esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt target/ota_image
+//! cargo xtask build ota/update esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
+//! cargo xtask build ota/update esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
 //! espflash erase-flash
-//! cargo xtask run example update --chip=esp32
+//! cargo xtask run ota/update esp32
 //! ```
 //!
 //! On first boot notice the firmware partition gets booted ("Loaded app from
@@ -44,7 +44,7 @@ use esp_storage::FlashStorage;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-static OTA_IMAGE: &[u8] = include_bytes!("../../../target/ota_image");
+static OTA_IMAGE: &[u8] = include_bytes!("../../../../target/ota_image");
 
 #[main]
 fn main() -> ! {
@@ -93,13 +93,14 @@ fn main() -> ! {
         }
     }
 
-    let button = cfg_select! {
-        any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
-        feature = "esp32c5" => peripherals.GPIO28,
-        feature = "esp32p4" => peripherals.GPIO35,
-        feature = "esp32s31" => peripherals.GPIO61,
-        _ => peripherals.GPIO9,
-    };
+    let button =
+        cfg_select! {
+            any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
+            feature = "esp32c5" => peripherals.GPIO28,
+            feature = "esp32p4" => peripherals.GPIO35,
+            feature = "esp32s31" => peripherals.GPIO61,
+            _ => peripherals.GPIO9,
+        };
 
     let boot_button = Input::new(button, InputConfig::default().with_pull(Pull::Up));
 

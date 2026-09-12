@@ -1,7 +1,7 @@
-use super::WakeTriggers;
+use super::SleepKind;
 use crate::{
     peripherals::{BB, DPORT, I2S0, LPWR, NRX},
-    rtc_cntl::Rtc,
+    rtc_cntl::{Rtc, WakeupSource},
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
@@ -29,13 +29,13 @@ pub const RTC_CNTL_DBIAS_1V25: u8 = 7;
 pub const RTC_CNTL_XTL_BUF_WAIT_SLP_US: u32 = 1000;
 /// Cycles to wait for PLL buffer stabilization.
 pub const RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES: u8 = 1;
-/// Cycles to wait for the 8MHz clock to stabilize.
+/// Cycles to wait for the 8 MHz clock to stabilize.
 pub const RTC_CNTL_CK8M_WAIT_SLP_CYCLES: u8 = 4;
 /// Delay in cycles for wakeup signal to be applied.
 pub const RTC_CNTL_WAKEUP_DELAY_CYCLES: u8 = 7;
 /// Power-up cycles for other blocks.
 pub const RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES: u8 = 1;
-/// Wait cycles for other blocks.
+/// Waits cycles for other blocks.
 pub const RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES: u16 = 1;
 /// Minimum sleep value (in cycles).
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 128;
@@ -44,28 +44,28 @@ pub const RTC_CNTL_DBG_ATTEN_DEFAULT: u8 = 3;
 
 /// Power-up cycles for RTC memory.
 pub const RTC_MEM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for RTC memory.
+/// Waits cycles for RTC memory.
 pub const RTC_MEM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for ROM and RAM.
 pub const ROM_RAM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for ROM and RAM.
+/// Waits cycles for ROM and RAM.
 pub const ROM_RAM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for Wi-Fi.
 pub const WIFI_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for Wi-Fi.
+/// Waits cycles for Wi-Fi.
 pub const WIFI_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for RTC components.
 pub const RTC_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for RTC components.
+/// Waits cycles for RTC components.
 pub const RTC_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for the digital wrap components.
 pub const DG_WRAP_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for the digital wrap components.
+/// Waits cycles for the digital wrap components.
 pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 
-/// Default wait cycles for the 8MHz clock.
+/// Default wait cycles for the 8 MHz clock.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
-/// Default wait cycles to enable the 8MHz clock.
+/// Default wait cycles to enable the 8 MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
 
 bitfield::bitfield! {
@@ -87,7 +87,7 @@ bitfield::bitfield! {
     pub rtc_peri_pd_en, set_rtc_peri_pd_en: 5;
     /// power down WiFi
     pub wifi_pd_en, set_wifi_pd_en: 6;
-    /// Power down Internal 8M oscillator
+    /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 7;
     /// power down main RAM and ROM
     pub rom_mem_pd_en, set_rom_mem_pd_en: 8;
@@ -149,6 +149,10 @@ impl RtcSleepConfig {
 
     pub(crate) fn is_deep_sleep(&self) -> bool {
         self.deep_slp()
+    }
+
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.set_deep_slp(kind == SleepKind::Deep);
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -442,7 +446,10 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+    /// Configures the wakeup options and requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         LPWR::regs()
             .reset_state()
             .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
@@ -450,7 +457,15 @@ impl RtcSleepConfig {
         // set bits for what can wake us up
         LPWR::regs()
             .wakeup_state()
-            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.as_u32() as u16) });
+            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_mask as u16) });
+
+        // esp32 has no reject-source mask. GPIO and SDIO have one reject enable each, and no other
+        // source can reject a sleep. The reject bits that `apply` wrote arm these enables.
+        let rejects = enumset::EnumSet::<WakeupSource>::from_u32_truncated(reject_mask);
+        LPWR::regs().slp_reject_conf().modify(|_, w| {
+            w.gpio_reject_en().bit(rejects.contains(WakeupSource::Gpio));
+            w.sdio_reject_en().bit(rejects.contains(WakeupSource::Sdio))
+        });
 
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }

@@ -13,7 +13,6 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    interrupt::software::SoftwareInterruptControl,
     rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
     time::Rate,
     timer::timg::TimerGroup,
@@ -45,9 +44,8 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let freq = cfg_select! {
         feature = "esp32h2" => Rate::from_mhz(32),
@@ -60,8 +58,12 @@ async fn main(spawner: Spawner) {
         .with_idle_threshold(10000);
 
     let channel = cfg_select! {
-        any(feature = "esp32", feature = "esp32s2") => rmt.channel0.configure_rx(&rx_config).unwrap(),
-        feature = "esp32s3" => rmt.channel7.configure_rx(&rx_config).unwrap(),
+        any(feature = "esp32", feature = "esp32s2") => {
+            rmt.channel0.configure_rx(&rx_config).unwrap()
+        }
+        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => {
+            rmt.channel7.configure_rx(&rx_config).unwrap()
+        }
         _ => rmt.channel2.configure_rx(&rx_config).unwrap(),
     };
 

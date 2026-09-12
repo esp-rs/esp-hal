@@ -17,8 +17,8 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LPWR, RMT, SYSTEM, TIMG0, TIMG1},
-    soc::regi2c,
+    peripherals::{I2C_ANA_MST, LCD_CAM, LPWR, RMT, SYSTEM, TIMG0, TIMG1},
+    soc::{regi2c, xtal32k},
     time::Rate,
 };
 
@@ -54,7 +54,7 @@ impl CpuClock {
         cpu_pll_div_out: Some(CpuPllDivOutConfig::_80),
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
         timg_calibration_clock: None,
@@ -66,7 +66,7 @@ impl CpuClock {
         cpu_pll_div_out: Some(CpuPllDivOutConfig::_160),
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
         timg_calibration_clock: None,
@@ -78,7 +78,7 @@ impl CpuClock {
         cpu_pll_div_out: Some(CpuPllDivOutConfig::_240),
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
         timg_calibration_clock: None,
@@ -280,6 +280,7 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 // XTAL32K_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // RTCIO could be configured to allow an external oscillator to be used. We could model this
     // with a MUX, probably, but this is omitted for now for simplicity.
@@ -681,6 +682,7 @@ fn configure_rtc_slow_clk_impl(
     LPWR::regs().clk_conf().modify(|_, w| unsafe {
         // TODO: variants should be in PAC
         w.ana_clk_rtc_sel().bits(match new_config {
+            #[cfg(use_xtal32k)]
             RtcSlowClkConfig::Xtal32k => 1,
             RtcSlowClkConfig::RcSlow => 0,
             RtcSlowClkConfig::RcFast => 2,
@@ -726,8 +728,12 @@ fn configure_low_power_clk_impl(
             .bit(new_config == LowPowerClkConfig::RtcSlow);
         w.lpclk_sel_xtal()
             .bit(new_config == LowPowerClkConfig::Xtal);
-        w.lpclk_sel_xtal32k()
-            .bit(new_config == LowPowerClkConfig::Xtal32k)
+        w.lpclk_sel_xtal32k().bit({
+            cfg_select! {
+                use_xtal32k => new_config == LowPowerClkConfig::Xtal32k,
+                _ => false,
+            }
+        })
     });
 }
 
@@ -766,9 +772,64 @@ fn configure_timg_calibration_clock_impl(
         w.rtc_cali_clk_sel().bits(match new_config {
             TimgCalibrationClockConfig::RcSlowClk => 0,
             TimgCalibrationClockConfig::RcFastDivClk => 1,
+            #[cfg(use_xtal32k)]
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
+}
+
+impl LcdCamInstance {
+    // LCD_CAM_LCD_CLOCK
+
+    fn enable_lcd_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // The selector doubles as the clock gate, so gating is handled by
+        // `configure_lcd_clock_impl`.
+    }
+
+    fn configure_lcd_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamLcdClockConfig>,
+        new_config: LcdCamLcdClockConfig,
+    ) {
+        LCD_CAM::regs().lcd_clock().modify(|_, w| unsafe {
+            // The divider is 8 bits wide, the maximum divisor of 256 is encoded as 0.
+            w.lcd_clkm_div_num().bits(new_config.div_num() as u8);
+            w.lcd_clkm_div_a().bits(new_config.div_a() as u8);
+            w.lcd_clkm_div_b().bits(new_config.div_b() as u8);
+            w.lcd_clk_sel().bits(match new_config.sclk() {
+                LcdCamLcdClockSclk::XtalClk => 1,
+                LcdCamLcdClockSclk::PllD2 => 2,
+                LcdCamLcdClockSclk::Pll160m => 3,
+            })
+        });
+    }
+
+    // LCD_CAM_CAM_CLOCK
+
+    fn enable_cam_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // The selector doubles as the clock gate, so gating is handled by
+        // `configure_cam_clock_impl`.
+    }
+
+    fn configure_cam_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamCamClockConfig>,
+        new_config: LcdCamCamClockConfig,
+    ) {
+        LCD_CAM::regs().cam_ctrl().modify(|_, w| unsafe {
+            // The divider is 8 bits wide, the maximum divisor of 256 is encoded as 0.
+            w.cam_clkm_div_num().bits(new_config.div_num() as u8);
+            w.cam_clkm_div_a().bits(new_config.div_a() as u8);
+            w.cam_clkm_div_b().bits(new_config.div_b() as u8);
+            w.cam_clk_sel().bits(match new_config.sclk() {
+                LcdCamCamClockSclk::XtalClk => 1,
+                LcdCamCamClockSclk::PllD2 => 2,
+                LcdCamCamClockSclk::Pll160m => 3,
+            })
+        });
+    }
 }
 
 impl McpwmInstance {
@@ -788,6 +849,15 @@ impl McpwmInstance {
     }
 }
 
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.function_clk_en().bit(en));
+    }
+}
 impl RmtInstance {
     // RMT_SCLK
 

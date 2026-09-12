@@ -1,8 +1,5 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "dac1_pin" => {
-        cfg(esp32) => "GPIO25",
-        cfg(esp32s2) => "GPIO17"
-    }
+    "dac1_pin" => gpio_for_signal!(DAC1),
 ))]
 //! # Digital to Analog Converter (DAC)
 //!
@@ -74,7 +71,7 @@ where
     T: Instance + 'd,
     T::Pin: AnalogPin + 'd,
 {
-    /// Construct a new instance of [`Dac`].
+    /// Creates a new instance of [`Dac`].
     pub fn new(dac: T, pin: T::Pin) -> Self {
         // TODO: Revert on drop.
         pin.set_analog(crate::private::Internal);

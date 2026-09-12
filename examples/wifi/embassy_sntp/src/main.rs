@@ -24,15 +24,10 @@ use embassy_net::{
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
-    rng::Rng,
-    rtc_cntl::Rtc,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, ram, rng::Rng, rtc_cntl::Rtc, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::wifi::{
+    AuthenticationMethodConfig,
     Config,
     ControllerConfig,
     Interface,
@@ -91,16 +86,18 @@ async fn main(spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(config);
     let rtc = Rtc::new(peripherals.RTC_TIMER);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let station_config = Config::Station(
         StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into()),
+            .with_ssid(SSID.try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                PASSWORD.try_into().unwrap(),
+            )),
     );
 
     println!("Starting wifi");

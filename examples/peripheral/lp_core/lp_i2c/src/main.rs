@@ -9,15 +9,14 @@
 //! - SDA => GPIO6
 //! - SCL => GPIO7
 
-//% CHIP_FILTER: ulp_riscv_driver_supported && soc_has_lp_i2c0
+//% CHIP_FILTER: ulp_riscv_driver_supported && lp_i2c_master_version == "lp_i2c"
 
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
 use esp_hal::{
-    gpio::lp_io::LowPowerOutputOpenDrain,
-    i2c::lp_i2c::LpI2c,
+    i2c::lp_i2c::{Config, LpI2c},
     load_lp_code,
     lp_core::{LpCore, LpCoreWakeupSource},
     main,
@@ -47,10 +46,11 @@ fn main() -> ! {
     // configure LP I2C
     let i2c = LpI2c::new(
         peripherals.LP_I2C0,
-        LowPowerOutputOpenDrain::new(peripherals.GPIO6),
-        LowPowerOutputOpenDrain::new(peripherals.GPIO7),
-        Rate::from_khz(100),
-    );
+        Config::default().with_frequency(Rate::from_khz(100)),
+        peripherals.GPIO6,
+        peripherals.GPIO7,
+    )
+    .unwrap();
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     lp_core.stop();

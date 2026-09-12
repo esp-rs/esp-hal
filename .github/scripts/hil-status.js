@@ -17,7 +17,7 @@ async function pollRun({
   runId,
   commentId,
   kind,
-  maxPolls = 60,
+  maxPolls = 180,
   pollIntervalMs = 15000,
 }) {
   const { owner, repo } = context.repo;
@@ -25,7 +25,8 @@ async function pollRun({
 
   let conclusion = null;
 
-  // Poll up to ~15 minutes by default (60 * 15s)
+  // Poll up to ~45 minutes by default (180 * 15s), matching what dispatch.yml
+  // passes for every HIL mode.
   for (let i = 0; i < maxPolls; i++) {
     await delay(pollIntervalMs);
 

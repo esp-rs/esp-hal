@@ -23,7 +23,7 @@ use crate::{
     pac::{self, ecc::mult_conf::KEY_LENGTH},
     peripherals::{ECC, Interrupt},
     private::Sealed,
-    system::{self, GenericPeripheralGuard},
+    system::{self, CryptoClockGuard, GenericPeripheralGuard},
     work_queue::{Handle, Poll, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
 
@@ -105,10 +105,9 @@ macro_rules! define_operations {
                     $(#[doc = $lines])*
                     #[doc = r"
 
-## Errors
+# Errors
 
-This function will return an error if the bitlength of the parameters is different
-from the bitlength of the prime fields of the curve."]
+[`KeyLengthMismatch`] when the bitlength of the parameters is different from the bitlength of the prime fields of the curve."]
                     #[inline]
                     pub fn $function<'op>(
                         &'op mut self,
@@ -367,13 +366,13 @@ const MEM_BLOCK_SIZE: usize = property!("ecc.mem_block_size");
 
 /// The ECC Accelerator driver.
 ///
-/// Note that as opposed to commonly used standards, this driver operates on
-/// **little-endian** data.
+/// Unlike commonly used standards, this driver operates on **little-endian** data.
 pub struct Ecc<'d, Dm: DriverMode> {
     _ecc: ECC<'d>,
     phantom: PhantomData<Dm>,
     _memory_guard: EccMemoryPowerGuard,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Ecc as u8 }>,
+    _clock_guard: CryptoClockGuard,
 }
 
 struct EccMemoryPowerGuard;
@@ -409,14 +408,14 @@ impl Drop for EccMemoryPowerGuard {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
-    /// Force enable register clock.
+    /// Force-enables the register clock.
     force_enable_reg_clock: bool,
 
-    /// Force enable memory clock.
+    /// Force-enables the memory clock.
     #[cfg(ecc_has_memory_clock_gate)]
     force_enable_mem_clock: bool,
 
-    /// Enable constant time operation and minimized power consumption variation for
+    /// Enables constant time operation and minimized power consumption variation for
     /// point-multiplication operations.
     #[cfg_attr(
         esp32h2,
@@ -507,13 +506,15 @@ for_each_ecc_working_mode! {
 }
 
 impl<'d> Ecc<'d, Blocking> {
-    /// Create a new instance in [Blocking] mode.
+    /// Creates a new instance in [Blocking] mode.
     pub fn new(ecc: ECC<'d>, config: Config) -> Self {
+        let clock_guard = CryptoClockGuard::new();
         let this = Self {
             _ecc: ecc,
             phantom: PhantomData,
             _memory_guard: EccMemoryPowerGuard::new(),
             _guard: GenericPeripheralGuard::new(),
+            _clock_guard: clock_guard,
         };
 
         this.info().apply_config(&config);
@@ -619,34 +620,22 @@ impl Info {
 
     fn qx_mem(&self) -> *mut u32 {
         cfg_select! {
-            ecc_separate_jacobian_point_memory => {
-                self.regs.qx_mem(0).as_ptr()
-            }
-            _ => {
-                self.regs.px_mem(0).as_ptr()
-            }
+            ecc_separate_jacobian_point_memory => self.regs.qx_mem(0).as_ptr(),
+            _ => self.regs.px_mem(0).as_ptr(),
         }
     }
 
     fn qy_mem(&self) -> *mut u32 {
         cfg_select! {
-            ecc_separate_jacobian_point_memory => {
-                self.regs.qy_mem(0).as_ptr()
-            }
-            _ => {
-                self.regs.py_mem(0).as_ptr()
-            }
+            ecc_separate_jacobian_point_memory => self.regs.qy_mem(0).as_ptr(),
+            _ => self.regs.py_mem(0).as_ptr(),
         }
     }
 
     fn qz_mem(&self) -> *mut u32 {
         cfg_select! {
-            ecc_separate_jacobian_point_memory => {
-                self.regs.qz_mem(0).as_ptr()
-            }
-            _ => {
-                self.regs.k_mem(0).as_ptr()
-            }
+            ecc_separate_jacobian_point_memory => self.regs.qz_mem(0).as_ptr(),
+            _ => self.regs.k_mem(0).as_ptr(),
         }
     }
 
@@ -661,7 +650,7 @@ impl Info {
         self.read_mem(self.qz_mem(), qz);
     }
 
-    /// Clears all peripheral memory blocks
+    /// Clears all peripheral memory blocks.
     #[cfg(clear_crypto_secrets)]
     fn clear_secrets(&self) {
         self.zero_mem(self.k_mem());
@@ -775,10 +764,9 @@ for_each_ecc_working_mode! {
                 self.info().reset()
             }
 
-            /// Register an interrupt handler for the ECC peripheral.
+            /// Registers an interrupt handler for the ECC peripheral.
             ///
-            /// Note that this will replace any previously registered interrupt
-            /// handlers.
+            /// Replaces any previously registered interrupt handlers.
             #[instability::unstable]
             pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
                 for core in crate::system::Cpu::other() {
@@ -833,9 +821,9 @@ pub trait OperationVerifiesPoint: EccOperation {}
 
 /// The result of an ECC operation.
 ///
-/// This struct can be used to read the result of an ECC operation. The methods which can be used
-/// depend on the operation. An operation can compute multiple values, such as an affine point and
-/// a Jacobian point at the same time.
+/// Used to read the result of an ECC operation. The available methods depend on
+/// the operation. An operation can compute multiple values, such as an affine point
+/// and a Jacobian point at the same time.
 #[must_use]
 pub struct EccResultHandle<'op, O>
 where
@@ -879,11 +867,11 @@ where
         }
     }
 
-    /// Retrieve the scalar result of the operation.
+    /// Retrieves the scalar result of the operation.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Returns an error if point verification failed, or if `out` is not the correct size.
+    /// [`OperationError`] when point verification failed, or when `out` is not the correct size.
     pub fn read_scalar_result(&self, out: &mut [u8]) -> Result<(), OperationError>
     where
         O: OperationReturnsScalar,
@@ -899,11 +887,12 @@ where
         Ok(())
     }
 
-    /// Retrieve the affine point result of the operation.
+    /// Retrieves the affine point result of the operation.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Returns an error if point verification failed, or if `x` or `y` are not the correct size.
+    /// [`OperationError`] when point verification failed, or when `x` or `y` are not the correct
+    /// size.
     pub fn read_affine_point_result(&self, x: &mut [u8], y: &mut [u8]) -> Result<(), OperationError>
     where
         O: OperationReturnsAffinePoint,
@@ -913,12 +902,12 @@ where
         Ok(())
     }
 
-    /// Retrieve the Jacobian point result of the operation.
+    /// Retrieves the Jacobian point result of the operation.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Returns an error if point verification failed, or if `x`, `y`, or `z` are not the correct
-    /// size.
+    /// [`OperationError`] when point verification failed, or when `x`, `y`, or `z` are not the
+    /// correct size.
     pub fn read_jacobian_point_result(
         &self,
         x: &mut [u8],
@@ -1058,7 +1047,7 @@ enum DriverState<'d> {
 
 /// ECC processing backend.
 ///
-/// This struct enables shared access to the device's ECC hardware using a work queue.
+/// Enables shared access to the device's ECC hardware using a work queue.
 pub struct EccBackend<'d> {
     driver: DriverState<'d>,
     config: Config,
@@ -1067,7 +1056,7 @@ pub struct EccBackend<'d> {
 impl<'d> EccBackend<'d> {
     /// Creates a new ECC backend.
     ///
-    /// The backend needs to be [`start`][Self::start]ed before it can execute ECC operations.
+    /// The backend must be started with [`Self::start`] before it can execute ECC operations.
     pub fn new(ecc: ECC<'d>, config: Config) -> Self {
         Self {
             driver: DriverState::Uninitialized(ecc),
@@ -1240,9 +1229,9 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// Once the operation is processed, the result can be retrieved from the designated buffer.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Returns an error if `out` is not the correct size.
+    /// [`KeyLengthMismatch`] when `out` is not the correct size.
     pub fn with_scalar_result(mut self, out: &'op mut [u8]) -> Result<Self, KeyLengthMismatch>
     where
         O: OperationReturnsScalar,
@@ -1261,9 +1250,9 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// Once the operation is processed, the result can be retrieved from the designated buffers.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Returns an error if `x` or `y` are not the correct size.
+    /// [`KeyLengthMismatch`] when `x` or `y` are not the correct size.
     pub fn with_affine_point_result(
         mut self,
         px: &'op mut [u8],
@@ -1284,9 +1273,9 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// Once the operation is processed, the result can be retrieved from the designated buffers.
     ///
-    /// ## Errors
+    /// # Errors
     ///
-    /// Returns an error if `x`, `y`, or `z` are not the correct size.
+    /// [`KeyLengthMismatch`] when `x`, `y`, or `z` are not the correct size.
     pub fn with_jacobian_point_result(
         mut self,
         qx: &'op mut [u8],
@@ -1305,7 +1294,7 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
         Ok(self)
     }
 
-    /// Returns `true` if the input point is on the curve.
+    /// Returns whether the input point is on the curve.
     ///
     /// The operation must be processed before this method returns a meaningful value.
     pub fn point_on_curve(&self) -> bool
@@ -1331,7 +1320,7 @@ pub struct EccHandle<'t>(Handle<'t, EccWorkItem>);
 impl EccHandle<'_> {
     /// Polls the status of the work item.
     ///
-    /// This function returns `true` if the item has been processed.
+    /// Returns whether the item has been processed.
     #[inline]
     pub fn poll(&mut self) -> bool {
         self.0.poll()
@@ -1339,7 +1328,7 @@ impl EccHandle<'_> {
 
     /// Polls the work item to completion, by busy-looping.
     ///
-    /// This function returns immediately if `poll` returns `true`.
+    /// Returns immediately if `poll` returns `true`.
     #[inline]
     pub fn wait_blocking(self) -> Status {
         self.0.wait_blocking()

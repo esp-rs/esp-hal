@@ -23,7 +23,7 @@ pub fn check_changelog(workspace: &Path, packages: &[Package], normalize: bool) 
 }
 
 fn check_changelog_for_package(workspace: &Path, package: Package, normalize: bool) -> Result<()> {
-    let changelog_path = workspace.join(package.to_string()).join("CHANGELOG.md");
+    let changelog_path = workspace.join(package.directory()).join("CHANGELOG.md");
 
     if !changelog_path.exists() {
         // No changelog exists for this package

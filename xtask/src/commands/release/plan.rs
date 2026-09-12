@@ -3,7 +3,6 @@ use std::{collections::HashMap, io::Write, path::Path, process::Command};
 use anyhow::{Context, Result, bail, ensure};
 use cargo_semver_checks::ReleaseType;
 use clap::Args;
-use esp_metadata::Chip;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, Value};
@@ -19,6 +18,7 @@ use crate::{
         release::changelog_preview,
     },
     git::{BackportInfo, current_branch, parse_backport_branch},
+    metadata::Chip,
 };
 
 /// Arguments for generating a release plan.
@@ -543,17 +543,14 @@ pub(super) fn generate_changelog_draft(workspace: &Path, plan: &Plan) -> Vec<std
     // from (`main`, or a backport branch like `esp-hal-1.1.x`). Without this,
     // backport PRs would leak into the next `main` release and every `main` PR
     // would leak into a patch release.
-    let (changelogs, migrations) = match changelog_preview::collect_changelogs(
-        workspace, &since_ref, 500, &plan.base,
-    ) {
-        Ok(r) => r,
-        Err(e) => {
-            log::warn!(
-                "Could not collect changelog entries (is `gh` installed and authenticated?): {e}"
-            );
-            return vec![];
-        }
-    };
+    let (changelogs, migrations) =
+        match changelog_preview::collect_changelogs(workspace, &since_ref, 500, &plan.base) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("Could not collect changelog entries: {e}");
+                return vec![];
+            }
+        };
 
     let mut modified: Vec<std::path::PathBuf> = Vec::new();
 

@@ -21,6 +21,7 @@ use crate::{
 
 #[cfg_attr(dma_gdma_version = "1", path = "ahb_v1.rs")]
 #[cfg_attr(dma_gdma_version = "2", path = "ahb_v2.rs")]
+#[cfg_attr(dma_gdma_version = "3", path = "ahb_v3.rs")]
 mod implementation;
 
 /// Immutable per-channel metadata owned by each `DMA_CH*` singleton.
@@ -56,7 +57,7 @@ pub(crate) struct ChannelState {
     pub(crate) rx_is_async: portable_atomic::AtomicBool,
 }
 
-/// An arbitrary GDMA channel
+/// An arbitrary GDMA channel.
 pub struct AhbGdmaChannel<'d> {
     info: &'static ChannelInfo,
     state: &'static ChannelState,
@@ -106,12 +107,12 @@ impl<'d> DmaChannel for AhbGdmaChannel<'d> {
     }
 }
 
-/// An arbitrary GDMA RX channel
+/// An arbitrary GDMA RX channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AhbGdmaRxChannel<'d>(AhbGdmaChannel<'d>);
 
-/// An arbitrary GDMA TX channel
+/// An arbitrary GDMA TX channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AhbGdmaTxChannel<'d>(AhbGdmaChannel<'d>);

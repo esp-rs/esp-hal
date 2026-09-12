@@ -1,109 +1,91 @@
 use std::path::Path;
 
-use anyhow::Result;
-use clap::{Args, Subcommand};
-use esp_metadata::Chip;
+use anyhow::{Result, bail};
+use clap::Args;
 use strum::IntoEnumIterator as _;
 
-use super::{ExamplesArgs, TestsArgs};
 use crate::{
     Package,
-    cargo::{self, CargoAction, CargoArgsBuilder, CargoCommandBatcher},
+    cargo::{CargoAction, CargoCommandBatcher},
     commands::move_artifacts,
     firmware::Metadata,
+    metadata::Chip,
+    resolve::{ResolveInput, resolve},
 };
 
 // ----------------------------------------------------------------------------
-// Subcommands
-
-/// Build subcommands and their arguments.
-#[derive(Debug, Subcommand)]
-pub enum Build {
-    /// Build documentation for the specified chip.
-    Documentation(BuildDocumentationArgs),
-    /// Build documentation index.
-    #[cfg(feature = "deploy-docs")]
-    DocumentationIndex,
-    /// Build all examples for the specified chip.
-    Examples(ExamplesArgs),
-    /// Build the specified package with the given options.
-    Package(BuildPackageArgs),
-    /// Build all applicable tests or the specified test for a specified chip.
-    Tests(TestsArgs),
-}
-
-// ----------------------------------------------------------------------------
-// Subcommand Arguments
+// Command Arguments
 
 /// Arguments for building documentation.
 #[cfg_attr(
     feature = "mcp",
     xtask_mcp_macros::mcp_tool(
         description = "Build documentation for the specified packages and chips",
-        command = "build documentation"
+        command = "documentation"
     )
 )]
 #[derive(Debug, Default, Args)]
 pub struct BuildDocumentationArgs {
-    /// Package(s) to document.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    /// Chip and/or package, in any order. Omitted means every package on every chip.
+    pub tokens: Vec<String>,
+    /// Package(s) to document. Accepts the same names the tokens do.
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',')]
     pub packages: Vec<Package>,
-    /// Chip(s) to build documentation for.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
-    pub chips: Vec<Chip>,
     /// Base URL of the deployed documentation.
     #[arg(long)]
     pub base_url: Option<String>,
+    /// Documentation channel name (for example `main`).
+    ///
+    /// When set, documentation is written under this name instead of the crate
+    /// version, so a local or CI build cannot overwrite a released docs tree.
+    #[arg(long)]
+    pub channel: Option<String>,
     #[cfg(feature = "preview-docs")]
     #[arg(long)]
     pub serve: bool,
 }
 
-/// Arguments for building a package.
-#[cfg_attr(
-    feature = "mcp",
-    xtask_mcp_macros::mcp_tool(
-        description = "Build the specified package with the given options",
-        command = "build package"
-    )
-)]
-#[derive(Debug, Args)]
-pub struct BuildPackageArgs {
-    /// Package to build.
-    #[arg(value_enum)]
-    pub package: Package,
-    /// Target to build for.
+/// Arguments for building the documentation index.
+#[cfg(feature = "deploy-docs")]
+#[derive(Debug, Default, Args)]
+pub struct BuildDocumentationIndexArgs {
+    /// Base URL of the deployed documentation.
     #[arg(long)]
-    pub target: Option<String>,
-    /// Features to build with.
-    #[arg(long, value_delimiter = ',')]
-    pub features: Vec<String>,
-    /// Toolchain to build with.
-    #[arg(long)]
-    pub toolchain: Option<String>,
-    /// Don't enabled the default features.
-    #[arg(long)]
-    pub no_default_features: bool,
+    pub base_url: Option<String>,
 }
 
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
 /// Build documentation for the specified packages and chips.
-pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
-    log::debug!(
-        "Building documentation for packages {:?} on chips {:?}",
-        args.packages,
-        args.chips
-    );
+pub fn build_documentation(workspace: &Path, args: BuildDocumentationArgs) -> Result<()> {
+    let mut input = ResolveInput::from_tokens(args.tokens);
+    input.packages = args.packages;
+    let resolution = resolve(input);
+    if !resolution.names.is_empty() {
+        bail!("Unknown argument: {}", resolution.names.join(", "));
+    }
+    let mut packages = if resolution.packages.is_empty() {
+        Package::iter().collect()
+    } else {
+        resolution.packages
+    };
+    let mut chips = if resolution.chips.is_empty() {
+        Chip::iter().collect()
+    } else {
+        resolution.chips
+    };
+
+    log::debug!("Building documentation for packages {packages:?} on chips {chips:?}");
     crate::documentation::build_documentation(
         workspace,
-        &mut args.packages,
-        &mut args.chips,
-        args.base_url,
+        &mut packages,
+        &mut chips,
+        args.base_url.clone(),
+        args.channel,
     )?;
 
-    crate::documentation::build_documentation_index(workspace, &mut args.packages)?;
+    crate::documentation::build_documentation_index(workspace, &mut packages, args.base_url)?;
 
     #[cfg(feature = "preview-docs")]
     if args.serve {
@@ -138,24 +120,28 @@ pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -
 
 /// Build the documentation index for all packages.
 #[cfg(feature = "deploy-docs")]
-pub fn build_documentation_index(workspace: &Path) -> Result<()> {
+pub fn build_documentation_index(
+    workspace: &Path,
+    args: BuildDocumentationIndexArgs,
+) -> Result<()> {
     let mut packages = Package::iter().collect::<Vec<_>>();
-    crate::documentation::build_documentation_index(workspace, &mut packages)?;
+    crate::documentation::build_documentation_index(workspace, &mut packages, args.base_url)?;
 
     Ok(())
 }
 
 /// Build all examples for the specified package and chip.
 pub fn build_examples(
-    args: ExamplesArgs,
+    package: Package,
+    chip: Chip,
+    debug: bool,
+    toolchain: Option<&str>,
+    timings: bool,
     examples: Vec<Metadata>,
     package_path: &Path,
     out_path: Option<&Path>,
 ) -> Result<()> {
-    let chip = args.chip.unwrap();
-
-    // Determine the appropriate build target for the given package and chip:
-    let target = args.package.as_package().target_triple(&chip)?;
+    let target = package.target_triple(&chip)?;
 
     // Attempt to build each supported example, with all required features enabled:
 
@@ -164,14 +150,14 @@ pub fn build_examples(
     // Build command list
     for example in examples.iter() {
         let command = crate::generate_build_command(
-            &package_path,
+            package_path,
             chip,
             &target,
             example,
             action.clone(),
-            args.debug,
-            args.toolchain.as_deref(),
-            args.timings,
+            debug,
+            toolchain,
+            timings,
             &[],
         )?;
         commands.push(command);
@@ -185,60 +171,6 @@ pub fn build_examples(
         c.run(false)?;
     }
     move_artifacts(chip, &action);
-
-    Ok(())
-}
-
-/// Build the specified package with the given options.
-pub fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
-    log::debug!(
-        "Building package '{}' with target '{:?}' and features {:?}",
-        args.package,
-        args.target,
-        args.features
-    );
-    // Absolute path of the package's root:
-    let package_path = crate::windows_safe_path(&workspace.join(args.package.to_string()));
-
-    // Build the package using the provided features and/or target, if any:
-
-    log::info!("Building package '{}'", package_path.display());
-    if !args.features.is_empty() {
-        log::info!("  Features: {}", args.features.join(","));
-    }
-    if let Some(ref target) = args.target {
-        log::info!("  Target:   {}", target);
-    }
-
-    let mut builder = CargoArgsBuilder::default()
-        .subcommand("build")
-        .arg("--release");
-
-    if let Some(toolchain) = args.toolchain {
-        builder = builder.toolchain(toolchain);
-    }
-
-    if let Some(target) = args.target {
-        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-        if target.starts_with("xtensa") {
-            builder = builder.toolchain("esp");
-            builder = builder.arg("-Zbuild-std=core,alloc")
-        }
-        builder = builder.target(target);
-    }
-
-    if !args.features.is_empty() {
-        builder = builder.features(&args.features);
-    }
-
-    if args.no_default_features {
-        builder = builder.arg("--no-default-features");
-    }
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    cargo::run(&args, &package_path)?;
 
     Ok(())
 }

@@ -1,4 +1,7 @@
-use crate::peripherals::{CNNT_SYS, HP_ALIVE_SYS, HP_SYS_CLKRST};
+use crate::{
+    peripherals::{CNNT_SYS, HP_ALIVE_SYS},
+    system::{Peripheral, PeripheralClockControl},
+};
 
 pub fn hs_enable_device_mode() {
     hs_init();
@@ -11,13 +14,7 @@ pub fn hs_enable_host_mode() {
 }
 
 fn hs_init() {
-    // Mirrors ESP-IDF's S31 UTMI initialization:
-    // https://github.com/espressif/esp-idf/blob/055ba9d3f9c6fd9a0efacd4993a2a942972dd65d/components/esp_hal_usb/usb_utmi_hal.c#L10-L23
-    // https://github.com/espressif/esp-idf/blob/055ba9d3f9c6fd9a0efacd4993a2a942972dd65d/components/esp_hal_usb/esp32s31/include/hal/usb_utmi_ll.h#L52-L137
-    HP_SYS_CLKRST::regs().usb_otghs_ctrl0().modify(|_, w| {
-        w.usb_otghs_apb_clk_en().set_bit();
-        w.usb_otghs_sys_clk_en().set_bit()
-    });
+    PeripheralClockControl::enable(Peripheral::UsbHs);
 
     CNNT_SYS::regs().sys_usb_otg20_ctrl().modify(|_, w| {
         w.sys_usb_otg20_utmifs_clk_en().set_bit();

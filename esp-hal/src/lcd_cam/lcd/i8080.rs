@@ -1,4 +1,19 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(lcd_cam_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(lcd_cam_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
+    },
+    "dc_pin" => gpio_for_signal!(LCD_DC, "GPIO0"),
+    "wrx_pin" => gpio_for_signal!(LCD_PCLK, "GPIO47"),
+    "data0_pin" => gpio_for_signal!(LCD_DATA_0, "GPIO9"),
+    "data1_pin" => gpio_for_signal!(LCD_DATA_1, "GPIO46"),
+    "data2_pin" => gpio_for_signal!(LCD_DATA_2, "GPIO3"),
+    "data3_pin" => gpio_for_signal!(LCD_DATA_3, "GPIO8"),
+    "data4_pin" => gpio_for_signal!(LCD_DATA_4, "GPIO18"),
+    "data5_pin" => gpio_for_signal!(LCD_DATA_5, "GPIO17"),
+    "data6_pin" => gpio_for_signal!(LCD_DATA_6, "GPIO16"),
+    "data7_pin" => gpio_for_signal!(LCD_DATA_7, "GPIO15"),
+))]
 //! # LCD - I8080/MOTO6800 Mode.
 //!
 //! ## Overview
@@ -26,35 +41,90 @@
 //!
 //! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
-//! let mut i8080 = I8080::new(lcd_cam.lcd, peripherals.DMA_CH0, config)?
-//!     .with_dc(peripherals.GPIO0)
-//!     .with_wrx(peripherals.GPIO47)
-//!     .with_data0(peripherals.GPIO9)
-//!     .with_data1(peripherals.GPIO46)
-//!     .with_data2(peripherals.GPIO3)
-//!     .with_data3(peripherals.GPIO8)
-//!     .with_data4(peripherals.GPIO18)
-//!     .with_data5(peripherals.GPIO17)
-//!     .with_data6(peripherals.GPIO16)
-//!     .with_data7(peripherals.GPIO15);
+//! let mut i8080 = I8080::new(lcd_cam.lcd, peripherals.__dma_channel__, config)?
+//!     .with_dc(peripherals.__dc_pin__)
+//!     .with_wrx(peripherals.__wrx_pin__)
+//!     .with_data0(peripherals.__data0_pin__)
+//!     .with_data1(peripherals.__data1_pin__)
+//!     .with_data2(peripherals.__data2_pin__)
+//!     .with_data3(peripherals.__data3_pin__)
+//!     .with_data4(peripherals.__data4_pin__)
+//!     .with_data5(peripherals.__data5_pin__)
+//!     .with_data6(peripherals.__data6_pin__)
+//!     .with_data7(peripherals.__data7_pin__);
 //!
 //! dma_buf.fill(&[0x55]);
 //! let transfer = i8080.send(0x3Au8, 0, dma_buf)?; // RGB565
 //! transfer.wait();
 //! # {after_snippet}
 //! ```
+//!
+//! ## Interrupts
+//!
+//! The I8080 driver owns two interrupt domains: the LCD half of the LCD_CAM
+//! peripheral, and the DMA TX channel it was created with. The LCD sources
+//! fire on the `LCD_CAM` interrupt, while the DMA sources fire on the DMA
+//! channel's own interrupt, so each domain binds its own handler and controls
+//! its sources separately. Handlers are registered with
+//! [`I8080::set_interrupt_handler`] and [`I8080::set_dma_interrupt_handler`],
+//! and sources are enabled with [`I8080::listen`] and [`I8080::listen_dma`].
+//!
+//! ### Notifying on descriptor completion
+//!
+//! In continuous output mode the transfer does not finish, but every
+//! descriptor with the `suc_eof` bit set raises the DMA channel's
+//! [`DmaTxInterrupt::Eof`] source once its
+//! data has been sent:
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! # use esp_hal::dma::{DmaTxBuf, DmaTxInterrupt};
+//! # use esp_hal::dma_tx_buffer;
+//! # use esp_hal::handler;
+//! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080}};
+//! # use esp_hal::time::Rate;
+//! #
+//! # static EOF_COUNT: core::sync::atomic::AtomicUsize =
+//! #     core::sync::atomic::AtomicUsize::new(0);
+//! # let mut dma_buf = dma_tx_buffer!(32678)?;
+//! # let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+//! # let config = Config::default().with_frequency(Rate::from_mhz(20));
+//! # let mut i8080 = I8080::new(lcd_cam.lcd, peripherals.__dma_channel__, config)?
+//! #     .with_dc(peripherals.__dc_pin__)
+//! #     .with_wrx(peripherals.__wrx_pin__);
+//! # dma_buf.fill(&[0x55]);
+//!
+//! #[handler]
+//! fn dma_handler() {
+//!     EOF_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+//!     // The source is cleared through the transfer, see below.
+//! }
+//!
+//! // Binding the handler must happen before listening for DMA sources, and
+//! // before `send` consumes the driver.
+//! i8080.set_dma_interrupt_handler(dma_handler);
+//! i8080.listen_dma(DmaTxInterrupt::Eof);
+//!
+//! let transfer = i8080.send(0x3Au8, 0, dma_buf)?; // RGB565
+//!
+//! // In `dma_handler`, clear the source through the transfer:
+//! // transfer.clear_interrupts_dma(DmaTxInterrupt::Eof);
+//! transfer.wait();
+//! # {after_snippet}
+//! ```
 
 use core::{
     fmt::Formatter,
-    marker::PhantomData,
     mem::{ManuallyDrop, size_of},
     ops::{Deref, DerefMut},
 };
 
+use enumset::{EnumSet, EnumSetType};
+
 use crate::{
     Blocking,
     DriverMode,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, DmaTxInterrupt},
     gpio::{OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
@@ -65,12 +135,10 @@ use crate::{
         LCD_DONE_WAKER,
         Lcd,
         LcdDmaTxChannel,
-        calculate_clkm,
-        lcd::{ClockMode, DelayMode, Phase, Polarity},
+        lcd::{ClockConfig, ClockMode, DelayMode},
+        ll,
     },
     pac,
-    peripherals::LCD_CAM,
-    system::{self, GenericPeripheralGuard},
     time::Rate,
 };
 
@@ -82,12 +150,28 @@ pub enum ConfigError {
     Clock(ClockError),
 }
 
+/// Interrupt sources of the LCD half of the LCD_CAM peripheral, as exposed by
+/// the [`I8080`] driver.
+///
+/// These sources fire on the `LCD_CAM` interrupt, which is bound via
+/// [`I8080::set_interrupt_handler`]. The DMA TX channel's sources fire on the
+/// channel's own interrupt instead; see [`I8080::set_dma_interrupt_handler`]
+/// and [`DmaTxInterrupt`].
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum I8080Interrupt {
+    /// The LCD has started outputting a new frame.
+    Vsync,
+
+    /// A DMA transfer to the LCD has finished.
+    TransDone,
+}
+
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, Dm: DriverMode> {
-    lcd_cam: LCD_CAM<'d>,
+    lcd: Lcd<'d, Dm>,
     tx_channel: ChannelTx<Blocking, ErasedTxChannel<'d>>,
-    _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
-    _mode: PhantomData<Dm>,
 }
 
 impl<'d, Dm> I8080<'d, Dm>
@@ -103,12 +187,7 @@ where
         let tx_channel = ChannelTx::new(channel.into());
         tx_channel.runtime_ensure_compatible(DmaPeripheral::LCD_CAM);
 
-        let mut this = Self {
-            lcd_cam: lcd.lcd_cam,
-            tx_channel,
-            _guard: lcd._guard,
-            _mode: PhantomData,
-        };
+        let mut this = Self { lcd, tx_channel };
 
         this.apply_config(&config)?;
 
@@ -116,59 +195,39 @@ where
     }
 
     fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
-        self.lcd_cam.register_block()
+        self.lcd.regs()
     }
 
     /// Applies configuration.
     ///
     /// # Errors
     ///
-    /// [`ConfigError::Clock`] variant will be returned if the frequency passed
-    /// in `Config` is too low.
+    /// [`ConfigError::Clock`] when the frequency passed in `Config` is too low.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        // Due to https://www.espressif.com/sites/default/files/documentation/esp32-s3_errata_en.pdf
-        // the LCD_PCLK divider must be at least 2. To make up for this the user
-        // provided frequency is doubled to match.
-        let (i, divider) = calculate_clkm(
-            (config.frequency.as_hz() * 2) as _,
-            &[
-                crate::soc::clocks::xtal_clk_frequency() as usize,
-                crate::soc::clocks::pll_d2_frequency() as usize,
-                crate::soc::clocks::crypto_pwm_clk_frequency() as usize,
-            ],
-        )
-        .map_err(ConfigError::Clock)?;
+        self.lcd
+            .configure_clocks(&ClockConfig {
+                clock_mode: config.clock_mode,
+                // ESP32-S3 errata requires LCD_PCLK to divide LCD_CLK by at least 2.
+                // Double the requested frequency so the extra divider still matches.
+                frequency: if cfg!(esp32s3) {
+                    config.frequency * 2
+                } else {
+                    config.frequency
+                },
+            })
+            .map_err(ConfigError::Clock)?;
 
-        self.regs().lcd_clock().write(|w| unsafe {
-            // Force enable the clock for all configuration registers.
-            w.clk_en().set_bit();
-            w.lcd_clk_sel().bits((i + 1) as _);
-            w.lcd_clkm_div_num().bits(divider.div_num as _);
-            w.lcd_clkm_div_b().bits(divider.div_b as _);
-            w.lcd_clkm_div_a().bits(divider.div_a as _); // LCD_PCLK = LCD_CLK / 2
-            w.lcd_clk_equ_sysclk().clear_bit();
-            w.lcd_clkcnt_n().bits(2 - 1); // Must not be 0.
-            w.lcd_ck_idle_edge()
-                .bit(config.clock_mode.polarity == Polarity::IdleHigh);
-            w.lcd_ck_out_edge()
-                .bit(config.clock_mode.phase == Phase::ShiftHigh)
-        });
-
-        self.regs()
-            .lcd_ctrl()
-            .write(|w| w.lcd_rgb_mode_en().clear_bit());
-        self.regs()
-            .lcd_rgb_yuv()
-            .write(|w| w.lcd_conv_bypass().clear_bit());
+        ll::set_rgb_mode_en(self.regs(), false);
+        ll::set_lcd_conv_bypass(self.regs());
 
         self.regs().lcd_user().modify(|_, w| {
-            w.lcd_8bits_order().bit(false);
             w.lcd_bit_order().bit(false);
-            w.lcd_byte_order().bit(false);
-            w.lcd_2byte_en().bit(false)
+            w.lcd_byte_order().bit(false)
         });
+        ll::set_8bits_order(self.regs(), false);
+        ll::set_2byte_mode(self.regs(), false);
         self.regs().lcd_misc().write(|w| unsafe {
-            // Set the threshold for Async Tx FIFO full event. (5 bits)
+            #[cfg(not(esp32s31))]
             w.lcd_afifo_threshold_num().bits(0);
             // Configure the setup cycles in LCD non-RGB mode. Setup cycles
             // expected = this value + 1. (6 bit)
@@ -198,27 +257,8 @@ where
             // The default value of LCD_CD
             w.lcd_cd_idle_edge().bit(config.cd_idle_edge)
         });
-        self.regs()
-            .lcd_dly_mode()
-            .write(|w| unsafe { w.lcd_cd_mode().bits(config.cd_mode as u8) });
-        self.regs().lcd_data_dout_mode().write(|w| unsafe {
-            w.dout0_mode().bits(config.output_bit_mode as u8);
-            w.dout1_mode().bits(config.output_bit_mode as u8);
-            w.dout2_mode().bits(config.output_bit_mode as u8);
-            w.dout3_mode().bits(config.output_bit_mode as u8);
-            w.dout4_mode().bits(config.output_bit_mode as u8);
-            w.dout5_mode().bits(config.output_bit_mode as u8);
-            w.dout6_mode().bits(config.output_bit_mode as u8);
-            w.dout7_mode().bits(config.output_bit_mode as u8);
-            w.dout8_mode().bits(config.output_bit_mode as u8);
-            w.dout9_mode().bits(config.output_bit_mode as u8);
-            w.dout10_mode().bits(config.output_bit_mode as u8);
-            w.dout11_mode().bits(config.output_bit_mode as u8);
-            w.dout12_mode().bits(config.output_bit_mode as u8);
-            w.dout13_mode().bits(config.output_bit_mode as u8);
-            w.dout14_mode().bits(config.output_bit_mode as u8);
-            w.dout15_mode().bits(config.output_bit_mode as u8)
-        });
+        ll::set_cd_delay(self.regs(), config.cd_mode as u8);
+        ll::set_data_bit_delay(self.regs(), config.output_bit_mode as u8);
 
         self.regs()
             .lcd_user()
@@ -243,9 +283,7 @@ where
     /// mode.
     pub fn set_8bits_order(&mut self, byte_order: ByteOrder) -> &mut Self {
         let is_inverted = byte_order != ByteOrder::default();
-        self.regs()
-            .lcd_user()
-            .modify(|_, w| w.lcd_8bits_order().bit(is_inverted));
+        ll::set_8bits_order(self.regs(), is_inverted);
         self
     }
 
@@ -301,82 +339,82 @@ where
         self
     }
 
-    /// Associate a DATA 0 pin with the I8080 interface.
+    /// Associates a DATA 0 pin with the I8080 interface.
     pub fn with_data0(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_0, pin)
     }
 
-    /// Associate a DATA 1 pin with the I8080 interface.
+    /// Associates a DATA 1 pin with the I8080 interface.
     pub fn with_data1(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_1, pin)
     }
 
-    /// Associate a DATA 2 pin with the I8080 interface.
+    /// Associates a DATA 2 pin with the I8080 interface.
     pub fn with_data2(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_2, pin)
     }
 
-    /// Associate a DATA 3 pin with the I8080 interface.
+    /// Associates a DATA 3 pin with the I8080 interface.
     pub fn with_data3(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_3, pin)
     }
 
-    /// Associate a DATA 4 pin with the I8080 interface.
+    /// Associates a DATA 4 pin with the I8080 interface.
     pub fn with_data4(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_4, pin)
     }
 
-    /// Associate a DATA 5 pin with the I8080 interface.
+    /// Associates a DATA 5 pin with the I8080 interface.
     pub fn with_data5(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_5, pin)
     }
 
-    /// Associate a DATA 6 pin with the I8080 interface.
+    /// Associates a DATA 6 pin with the I8080 interface.
     pub fn with_data6(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_6, pin)
     }
 
-    /// Associate a DATA 7 pin with the I8080 interface.
+    /// Associates a DATA 7 pin with the I8080 interface.
     pub fn with_data7(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_7, pin)
     }
 
-    /// Associate a DATA 8 pin with the I8080 interface.
+    /// Associates a DATA 8 pin with the I8080 interface.
     pub fn with_data8(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_8, pin)
     }
 
-    /// Associate a DATA 9 pin with the I8080 interface.
+    /// Associates a DATA 9 pin with the I8080 interface.
     pub fn with_data9(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_9, pin)
     }
 
-    /// Associate a DATA 10 pin with the I8080 interface.
+    /// Associates a DATA 10 pin with the I8080 interface.
     pub fn with_data10(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_10, pin)
     }
 
-    /// Associate a DATA 11 pin with the I8080 interface.
+    /// Associates a DATA 11 pin with the I8080 interface.
     pub fn with_data11(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_11, pin)
     }
 
-    /// Associate a DATA 12 pin with the I8080 interface.
+    /// Associates a DATA 12 pin with the I8080 interface.
     pub fn with_data12(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_12, pin)
     }
 
-    /// Associate a DATA 13 pin with the I8080 interface.
+    /// Associates a DATA 13 pin with the I8080 interface.
     pub fn with_data13(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_13, pin)
     }
 
-    /// Associate a DATA 14 pin with the I8080 interface.
+    /// Associates a DATA 14 pin with the I8080 interface.
     pub fn with_data14(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_14, pin)
     }
 
-    /// Associate a DATA 15 pin with the I8080 interface.
+    /// Associates a DATA 15 pin with the I8080 interface.
     pub fn with_data15(self, pin: impl PeripheralOutput<'d>) -> Self {
         self.with_data_pin(OutputSignal::LCD_DATA_15, pin)
     }
@@ -386,8 +424,8 @@ where
     /// Passing a `Command<u8>` will make this an 8-bit transfer and a
     /// `Command<u16>` will make this a 16-bit transfer.
     ///
-    /// Note: A 16-bit transfer on an 8-bit bus will silently truncate the 2nd
-    /// byte and an 8-bit transfer on a 16-bit bus will silently pad each
+    /// A 16-bit transfer on an 8-bit bus silently truncates the 2nd
+    /// byte and an 8-bit transfer on a 16-bit bus silently pads each
     /// byte to 2 bytes.
     pub fn send<W: Into<u16> + Copy, BUF: DmaTxBuffer>(
         mut self,
@@ -417,19 +455,14 @@ where
                     w.lcd_cmd().set_bit();
                     w.lcd_cmd_2_cycle_en().clear_bit()
                 });
-                self.regs()
-                    .lcd_cmd_val()
-                    .write(|w| unsafe { w.lcd_cmd_value().bits(value.into() as _) });
+                ll::write_command(self.regs(), value.into() as u32, None);
             }
             Command::Two(first, second) => {
                 self.regs().lcd_user().modify(|_, w| {
                     w.lcd_cmd().set_bit();
                     w.lcd_cmd_2_cycle_en().set_bit()
                 });
-                let cmd = first.into() as u32 | ((second.into() as u32) << 16);
-                self.regs()
-                    .lcd_cmd_val()
-                    .write(|w| unsafe { w.lcd_cmd_value().bits(cmd) });
+                ll::write_command(self.regs(), first.into() as u32, Some(second.into() as u32));
             }
         }
 
@@ -446,9 +479,8 @@ where
             } else {
                 w.lcd_dummy().clear_bit()
             }
-            .lcd_2byte_en()
-            .bit(is_2byte_mode)
         });
+        ll::set_2byte_mode(self.regs(), is_2byte_mode);
 
         // Use continous mode for DMA. FROM the S3 TRM:
         // > In a continuous output, LCD module keeps sending data till:
@@ -485,6 +517,140 @@ where
     }
 }
 
+#[instability::unstable]
+impl I8080<'_, Blocking> {
+    /// Maps the LCD sources of the given set onto the peripheral's interrupt
+    /// sources.
+    fn map_i8080_to_lcdcam(
+        interrupts: EnumSet<I8080Interrupt>,
+    ) -> enumset::EnumSet<crate::lcd_cam::LcdCamInterrupt> {
+        use crate::lcd_cam::LcdCamInterrupt;
+
+        let mut sources = enumset::EnumSet::new();
+        for interrupt in interrupts {
+            sources.insert(LcdCamInterrupt::from(interrupt));
+        }
+        sources
+    }
+
+    /// Maps the peripheral's asserted LCD interrupt sources back to
+    /// [`I8080Interrupt`].
+    ///
+    /// The mapping is lossy by design: Camera-only [`LcdCamInterrupt`]
+    /// variants have no `I8080Interrupt` counterpart and are dropped.
+    fn map_lcdcam_to_i8080(
+        sources: enumset::EnumSet<crate::lcd_cam::LcdCamInterrupt>,
+    ) -> EnumSet<I8080Interrupt> {
+        let mut interrupts = enumset::EnumSet::new();
+        for source in sources {
+            if let Ok(interrupt) = I8080Interrupt::try_from(source) {
+                interrupts.insert(interrupt);
+            }
+        }
+        interrupts
+    }
+
+    /// Registers an interrupt handler for the `LCD_CAM` interrupt.
+    ///
+    /// The handler services the sources enabled via [`Self::listen`].
+    ///
+    /// Note that this replaces any previously registered handler for the
+    /// `LCD_CAM` interrupt, including the one the async driver binds.
+    pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        for core in crate::system::Cpu::other() {
+            crate::interrupt::disable(core, crate::peripherals::Interrupt::LCD_CAM);
+        }
+        crate::interrupt::bind_handler(crate::peripherals::Interrupt::LCD_CAM, handler);
+    }
+
+    /// Registers an interrupt handler for the DMA TX channel used by this
+    /// driver.
+    ///
+    /// The handler services the sources enabled via [`Self::listen_dma`]. It
+    /// fires on the channel's own interrupt, which is separate from the
+    /// `LCD_CAM` interrupt used by [`Self::set_interrupt_handler`].
+    ///
+    /// Binding the handler unlistens from and clears all DMA TX interrupt
+    /// sources, so this function must be called before
+    /// [`Self::listen_dma`]. It must also be called before [`Self::send`],
+    /// which consumes the driver.
+    pub fn set_dma_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        self.tx_channel.set_interrupt_handler(handler);
+    }
+
+    /// Listens for the given LCD interrupt sources.
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<I8080Interrupt>>) {
+        Instance::listen(Self::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Stops listening for the given LCD interrupt sources.
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I8080Interrupt>>) {
+        Instance::unlisten(Self::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Returns the asserted LCD interrupt sources.
+    pub fn interrupts(&mut self) -> EnumSet<I8080Interrupt> {
+        Self::map_lcdcam_to_i8080(Instance::interrupts())
+    }
+
+    /// Clears the given asserted LCD interrupt sources.
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I8080Interrupt>>) {
+        Instance::clear_interrupts(Self::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Listens for the given DMA TX interrupt sources.
+    ///
+    /// A handler must have been registered via
+    /// [`Self::set_dma_interrupt_handler`] first.
+    pub fn listen_dma(&mut self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.tx_channel.listen_out(interrupts.into());
+    }
+
+    /// Stops listening for the given DMA TX interrupt sources.
+    pub fn unlisten_dma(&mut self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.tx_channel.unlisten_out(interrupts.into());
+    }
+
+    /// Returns the asserted DMA TX interrupt sources.
+    pub fn interrupts_dma(&mut self) -> EnumSet<DmaTxInterrupt> {
+        self.tx_channel.pending_out_interrupts()
+    }
+
+    /// Clears the given asserted DMA TX interrupt sources.
+    pub fn clear_interrupts_dma(&mut self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.tx_channel.clear_out(interrupts.into());
+    }
+}
+
+/// Variant-for-variant mapping onto the peripheral's interrupt sources.
+///
+/// This is total: every [`I8080Interrupt`] source has an
+/// [`LcdCamInterrupt`] counterpart. Camera-only [`LcdCamInterrupt`]
+/// variants are simply not reachable from [`I8080Interrupt`].
+impl From<I8080Interrupt> for crate::lcd_cam::LcdCamInterrupt {
+    fn from(value: I8080Interrupt) -> Self {
+        match value {
+            I8080Interrupt::Vsync => crate::lcd_cam::LcdCamInterrupt::LcdVsync,
+            I8080Interrupt::TransDone => crate::lcd_cam::LcdCamInterrupt::LcdTransDone,
+        }
+    }
+}
+
+/// Lossy reverse mapping: Camera-only [`LcdCamInterrupt`] variants have no
+/// [`I8080Interrupt`] counterpart and are dropped.
+impl TryFrom<crate::lcd_cam::LcdCamInterrupt> for I8080Interrupt {
+    type Error = ();
+
+    fn try_from(value: crate::lcd_cam::LcdCamInterrupt) -> Result<Self, ()> {
+        match value {
+            crate::lcd_cam::LcdCamInterrupt::LcdVsync => Ok(I8080Interrupt::Vsync),
+            crate::lcd_cam::LcdCamInterrupt::LcdTransDone => Ok(I8080Interrupt::TransDone),
+            crate::lcd_cam::LcdCamInterrupt::CamVsync => Err(()),
+            crate::lcd_cam::LcdCamInterrupt::CamHs => Err(()),
+        }
+    }
+}
+
 impl<Dm: DriverMode> core::fmt::Debug for I8080<'_, Dm> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("I8080").finish()
@@ -499,7 +665,7 @@ pub struct I8080Transfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.i8080
             .regs()
@@ -518,8 +684,8 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
     ///
-    /// Note: This also clears the transfer interrupt so it can be used in
-    /// interrupt handlers to "handle" the interrupt.
+    /// Also clears the transfer interrupt so it can be used in
+    /// interrupt handlers to handle the interrupt.
     pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
@@ -574,7 +740,7 @@ impl<BUF: DmaTxBuffer, Dm: DriverMode> DerefMut for I8080Transfer<'_, BUF, Dm> {
 }
 
 impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
-    /// Waits for [Self::is_done] to return true.
+    /// Waits for [`Self::is_done`] to return true.
     pub async fn wait_for_done(&mut self) {
         use core::{
             future::Future,
@@ -613,6 +779,54 @@ impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, crate::Async> {
     }
 }
 
+/// Interrupt management for an ongoing transfer.
+///
+/// The driver itself has been consumed by [`I8080::send`], so these methods
+/// take `&self` and allow an interrupt handler to manage the interrupt
+/// sources through the transfer object.
+#[instability::unstable]
+impl<BUF: DmaTxBuffer> I8080Transfer<'_, BUF, Blocking> {
+    /// Listens for the given LCD interrupt sources.
+    pub fn listen(&self, interrupts: impl Into<EnumSet<I8080Interrupt>>) {
+        Instance::listen(I8080::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Stops listening for the given LCD interrupt sources.
+    pub fn unlisten(&self, interrupts: impl Into<EnumSet<I8080Interrupt>>) {
+        Instance::unlisten(I8080::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Returns the asserted LCD interrupt sources.
+    pub fn interrupts(&self) -> EnumSet<I8080Interrupt> {
+        I8080::map_lcdcam_to_i8080(Instance::interrupts())
+    }
+
+    /// Clears the given asserted LCD interrupt sources.
+    pub fn clear_interrupts(&self, interrupts: impl Into<EnumSet<I8080Interrupt>>) {
+        Instance::clear_interrupts(I8080::map_i8080_to_lcdcam(interrupts.into()));
+    }
+
+    /// Listens for the given DMA TX interrupt sources.
+    pub fn listen_dma(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.i8080.tx_channel.listen_out(interrupts.into());
+    }
+
+    /// Stops listening for the given DMA TX interrupt sources.
+    pub fn unlisten_dma(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.i8080.tx_channel.unlisten_out(interrupts.into());
+    }
+
+    /// Returns the asserted DMA TX interrupt sources.
+    pub fn interrupts_dma(&self) -> EnumSet<DmaTxInterrupt> {
+        self.i8080.tx_channel.pending_out_interrupts()
+    }
+
+    /// Clears the given asserted DMA TX interrupt sources.
+    pub fn clear_interrupts_dma(&self, interrupts: impl Into<EnumSet<DmaTxInterrupt>>) {
+        self.i8080.tx_channel.clear_out(interrupts.into());
+    }
+}
+
 impl<BUF: DmaTxBuffer, Dm: DriverMode> Drop for I8080Transfer<'_, BUF, Dm> {
     fn drop(&mut self) {
         self.stop_peripherals();
@@ -640,7 +854,7 @@ pub struct Config {
     /// Setup cycles expected, must be at least 1. (6 bits)
     setup_cycles: usize,
 
-    /// Hold cycles expected, must be at least 1. (13 bits)
+    /// Holds cycles expected, must be at least 1. (13 bits)
     hold_cycles: usize,
 
     /// The default value of LCD_CD.

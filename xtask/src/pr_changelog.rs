@@ -176,6 +176,23 @@ fn parse_section_heading(heading: &str) -> Option<(String, Option<String>)> {
     }
 }
 
+/// Is `title` the title of a block that holds sections (`# Changelog`, `# Migration guide`)?
+fn is_block_title(title: &str) -> bool {
+    title.eq_ignore_ascii_case("Changelog") || title.eq_ignore_ascii_case("Migration guide")
+}
+
+/// Error message for an H1 heading inside a block that is not a block title.
+///
+/// Such a heading ends the block, so the sections after it would be dropped
+/// without notice. `# esp-hal/I2S driver` in place of `## esp-hal/I2S driver` is
+/// a typical cause.
+fn unexpected_h1(title: &str) -> String {
+    format!(
+        "Invalid H1 heading `# {title}`. Section headings must be H2: `## crate` or \
+         `## crate/area` in `# Changelog`, `## crate/area` in `# Migration guide`."
+    )
+}
+
 /// Find or create a `PrSection` for the given crate/area pair.
 fn get_or_insert_section<'a>(
     sections: &'a mut Vec<PrSection>,
@@ -222,8 +239,11 @@ fn parse_changelog_subsection(text: &str, sections: &mut Vec<PrSection>) -> Resu
 
     for line in non_comment_lines(after) {
         let line = line.trim();
-        if line.starts_with("# ") {
-            break;
+        if let Some(h1) = line.strip_prefix("# ") {
+            if is_block_title(h1) {
+                break;
+            }
+            bail!("{}", unexpected_h1(h1));
         } else if let Some(h2) = line.strip_prefix("## ") {
             match parse_section_heading(h2) {
                 Some((crate_name, area)) => current = Some((crate_name, area)),
@@ -296,8 +316,11 @@ fn parse_migration_guide_block(body: &str, sections: &mut Vec<PrSection>) -> Res
     let mut current_lines: Vec<&str> = Vec::new();
 
     for line in non_comment_lines(after) {
-        if line.starts_with("# ") {
-            break;
+        if let Some(h1) = line.strip_prefix("# ") {
+            if is_block_title(h1) {
+                break;
+            }
+            bail!("{}", unexpected_h1(h1));
         } else if let Some(h2) = line.strip_prefix("## ") {
             flush_migration(sections, &current, &current_lines);
             current_lines.clear();
@@ -567,7 +590,10 @@ fn validate_changelog_subsection(after: &str, errors: &mut Vec<String>) {
 
     for line in non_comment_lines(after) {
         let line = line.trim();
-        if line.starts_with("# ") {
+        if let Some(h1) = line.strip_prefix("# ") {
+            if !is_block_title(h1) {
+                errors.push(unexpected_h1(h1));
+            }
             break;
         } else if let Some(h2) = line.strip_prefix("## ") {
             section_exempted = false;
@@ -635,7 +661,10 @@ pub fn validate(body: &str) -> Vec<String> {
         let mut awaiting_h3 = false;
 
         for line in non_comment_lines(after) {
-            if line.starts_with("# ") {
+            if let Some(h1) = line.strip_prefix("# ") {
+                if !is_block_title(h1) {
+                    errors.push(unexpected_h1(h1));
+                }
                 break;
             } else if let Some(h2) = line.strip_prefix("## ") {
                 in_section = false;
@@ -940,6 +969,67 @@ Replace all uses of `OldType` with `NewType`.
         // Missing crate name before slash — must not produce an empty crate_name
         assert_eq!(parse_section_heading("/Some area"), None);
         assert_eq!(parse_section_heading("  /  Some area"), None);
+    }
+
+    /// A section heading written as `# crate/area` instead of `## crate/area` ends
+    /// the block, which drops every section after it. Both the parser and the
+    /// validator must report it.
+    #[test]
+    fn rejects_h1_section_heading() {
+        let body = "\
+# Migration guide
+
+# esp-hal/I2S driver
+
+### I2S DMA now uses the DmaBuffer API
+
+I2S no longer uses manually passed DMA descriptors.
+";
+        let err = PrChangelog::parse(5603, body).unwrap_err().to_string();
+        assert!(
+            err.contains("Invalid H1 heading"),
+            "unexpected error: {err}"
+        );
+        assert!(
+            err.contains("# esp-hal/I2S driver"),
+            "unexpected error: {err}"
+        );
+
+        let errors = validate(body);
+        assert!(
+            errors.iter().any(|e| e.contains("Invalid H1 heading")),
+            "unexpected errors: {errors:?}"
+        );
+    }
+
+    /// The other block title is the only H1 that may follow a block.
+    #[test]
+    fn migration_guide_ends_at_changelog_heading() {
+        let body = "\
+# Migration guide
+
+## esp-hal/SPI
+
+### Title
+
+Keep this.
+
+# Changelog
+
+## esp-hal
+
+- Added: Must not be part of the migration guide.
+";
+        let cl = PrChangelog::parse(1, body).unwrap().unwrap();
+        let guide = cl
+            .sections
+            .iter()
+            .find_map(|s| s.migration_guide.as_deref())
+            .unwrap();
+        assert!(guide.contains("Keep this."));
+        assert!(!guide.contains("Must not be part"));
+        let errors = validate(body);
+        assert!(errors.is_empty(), "unexpected errors: {errors:?}");
     }
 
     /// A PR that only has a `# Migration guide` section for a crate must NOT be

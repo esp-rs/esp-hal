@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Redirecting...</title>
+<script>
+/*
+  nginx sends users here as …/latest/?path=<decoded remainder>. We merge `path` onto `base`
+  (../<semver>/, the version root) only when it looks like a rustdoc-relative path;
+  otherwise we open `base` + `fallback`, the version's landing page.
+
+  Fragments (#method.foo) never reach nginx, but browsers re-attach the original
+  fragment to the 301 Location, so it is available here as location.hash. Carry it
+  over explicitly: location.replace() with a fragment-less URL would drop it.
+*/
+(function () {
+  var base = "{{ base }}";
+  var fallback = "{{ fallback }}";
+  var pathFromQuery = new URLSearchParams(location.search).get("path");
+
+  /* Reject junk `?path=` values, otherwise we only open `base`. */
+  function isAllowedDocPath(path) {
+    if (!path.length) return false;
+
+    /* Leading slash or backslash at the start turns `base + path` into an absolute-style URL. */
+    if (path.startsWith("/") || path.startsWith("\\")) return false;
+    if (path.indexOf("..") !== -1) return false;
+    if (path.indexOf(":") !== -1) return false;
+    if (path.indexOf("//") !== -1) return false;
+
+    return /^[0-9A-Za-z./_-]+$/.test(path);
+  }
+
+  /* Deep page under `base`, or the version's landing page if `path` is missing / invalid. */
+  var hash = location.hash; /* "" or "#fragment"; safe to append, fragments are client-side only. */
+  if (pathFromQuery && isAllowedDocPath(pathFromQuery)) {
+    location.replace(base + pathFromQuery + hash);
+  } else {
+    location.replace(base + fallback + hash);
+  }
+})();
+</script>
+<noscript><meta http-equiv="refresh" content="0; url={{ base }}{{ fallback }}" /></noscript>
+</head>
+<body></body>
+</html>

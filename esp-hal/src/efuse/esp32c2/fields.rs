@@ -25,7 +25,7 @@ pub const DIS_DOWNLOAD_MANUAL_ENCRYPT: EfuseField = EfuseField::new(0, 1, 38, 1)
 pub const SPI_BOOT_CRYPT_CNT: EfuseField = EfuseField::new(0, 1, 39, 3);
 /// Flash encryption key length
 pub const XTS_KEY_LENGTH_256: EfuseField = EfuseField::new(0, 1, 42, 1);
-/// Set the default UARTboot message output mode
+/// Set the default UART boot message output mode
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 1, 43, 2);
 /// Set this bit to force ROM code to send a resume command during SPI boot
 pub const FORCE_SEND_RESUME: EfuseField = EfuseField::new(0, 1, 45, 1);

@@ -48,7 +48,7 @@ use crate::{
     system::GenericPeripheralGuard,
 };
 
-/// Clock source for the temperature sensor
+/// Clock source for the temperature sensor.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Copy, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -65,49 +65,47 @@ pub enum ClockSource {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
-    /// Clock source for the temperature sensor
+    /// Clock source for the temperature sensor.
     clock_source: ClockSource,
 }
 
-/// Temperature sensor configuration error
+/// Temperature sensor configuration error.
 #[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
 #[non_exhaustive]
 pub enum ConfigError {}
 
-/// Temperature value
-/// This struct stores the raw ADC value, and can be used to calculate the
-/// temperature in Celsius using the formula:
-/// `(raw_value * 0.4386) - (offset * 27.88) - 20.52`
+/// Stores the raw ADC value and can be used to calculate the temperature in Celsius using the
+/// formula: `(raw_value * 0.4386) - (offset * 27.88) - 20.52`.
 #[derive(Debug)]
 pub struct Temperature {
-    /// Raw ADC value
+    /// Raw ADC value.
     pub raw_value: u8,
 
-    /// Offset value - depends on the temperature range configured
+    /// Offset value - depends on the temperature range configured.
     pub offset: i8,
 }
 
 impl Temperature {
-    /// Create a new temperature value
+    /// Creates a new temperature value.
     #[inline]
     pub fn new(raw_value: u8, offset: i8) -> Self {
         Self { raw_value, offset }
     }
 
-    /// Get the temperature in Celsius
+    /// Returns the temperature in Celsius.
     #[inline]
     pub fn to_celsius(&self) -> f32 {
         (self.raw_value as f32) * 0.4386 - (self.offset as f32) * 27.88 - 20.52
     }
 
-    /// Get the temperature in Fahrenheit
+    /// Returns the temperature in Fahrenheit.
     #[inline]
     pub fn to_fahrenheit(&self) -> f32 {
         let celsius = self.to_celsius();
         (celsius * 1.8) + 32.0
     }
 
-    /// Get the temperature in Kelvin
+    /// Returns the temperature in Kelvin.
     #[inline]
     pub fn to_kelvin(&self) -> f32 {
         let celsius = self.to_celsius();
@@ -124,8 +122,9 @@ pub struct TemperatureSensor<'d> {
 }
 
 impl<'d> TemperatureSensor<'d> {
-    /// Create a new temperature sensor instance with configuration
-    /// The sensor will be automatically powered up
+    /// Creates a new temperature sensor instance with the given configuration.
+    ///
+    /// The sensor is automatically powered up.
     pub fn new(peripheral: TSENS<'d>, config: Config) -> Result<Self, ConfigError> {
         // NOTE: We need enable ApbSarAdc before enabling Tsens
         let apb_saradc_guard = GenericPeripheralGuard::new();
@@ -143,7 +142,7 @@ impl<'d> TemperatureSensor<'d> {
         Ok(tsens)
     }
 
-    /// Power up the temperature sensor
+    /// Powers up the temperature sensor.
     pub fn power_up(&self) {
         debug!("Power up");
         APB_SARADC::regs()
@@ -151,14 +150,14 @@ impl<'d> TemperatureSensor<'d> {
             .modify(|_, w| w.pu().set_bit());
     }
 
-    /// Power down the temperature sensor - useful if you want to save power
+    /// Powers down the temperature sensor to save power.
     pub fn power_down(&self) {
         APB_SARADC::regs()
             .tsens_ctrl()
             .modify(|_, w| w.pu().clear_bit());
     }
 
-    /// Change the temperature sensor configuration
+    /// Changes the temperature sensor configuration.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         // Set clock source
         APB_SARADC::regs().tsens_ctrl2().write(|w| {
@@ -169,7 +168,7 @@ impl<'d> TemperatureSensor<'d> {
         Ok(())
     }
 
-    /// Get the raw temperature value
+    /// Returns the raw temperature value.
     #[inline]
     pub fn get_temperature(&self) -> Temperature {
         let raw_value = APB_SARADC::regs().tsens_ctrl().read().out().bits();

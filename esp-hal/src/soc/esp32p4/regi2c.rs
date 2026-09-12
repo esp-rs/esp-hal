@@ -1,4 +1,7 @@
-use crate::rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c};
+use crate::{
+    peripherals::{LP_I2C_ANA_MST, LP_PERI},
+    rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c},
+};
 
 define_regi2c! {
     master: REGI2C_SDIO_PLL(0x62, 0) {}
@@ -19,7 +22,41 @@ define_regi2c! {
         reg: I2C_CPLL_OC_DIV_7_0(3) {}
         reg: I2C_CPLL_OC_DCUR(6) {}
     }
-    master: REGI2C_SAR_I2C(0x69, 0) {}
+    master: REGI2C_SAR_I2C(0x69, 0) {
+        reg: I2C_SAR_REG0(0) {
+            field: ADC_SAR1_INITIAL_CODE_LOW(7..0)
+        }
+        reg: I2C_SAR_REG1(1) {
+            field: ADC_SAR1_INITIAL_CODE_HIGH(3..0)
+        }
+        reg: I2C_SAR_REG2(2) {
+            field: ADC_SAR1_DREF(6..4),
+            field: ADC_SAR1_SAMPLE_CYCLE(2..0)
+        }
+        reg: I2C_SAR_REG3(3) {
+            field: ADC_SAR2_INITIAL_CODE_LOW(7..0)
+        }
+        reg: I2C_SAR_REG4(4) {
+            field: ADC_SAR2_INITIAL_CODE_HIGH(3..0)
+        }
+        reg: I2C_SAR_REG5(5) {
+            field: ADC_SAR2_DREF(6..4),
+            field: ADC_SAR2_SAMPLE_CYCLE(2..0)
+        }
+        reg: I2C_SAR_REG6(6) {
+            field: I2C_SARADC_TSENS_DAC(3..0)
+        }
+        reg: I2C_SAR_REG7(7) {
+            field: ADC_SAR2_ENCAL_GND(7..7),
+            field: ADC_SAR2_ENCAL_REF(6..6),
+            field: ADC_SAR1_ENCAL_GND(5..5),
+            field: ADC_SAR1_ENCAL_REF(4..4)
+        }
+        reg: I2C_SAR_REG9(9) {
+            field: I2C_SAR_ADC_ENT_VDD_GRP1(4..4),
+            field: I2C_SAR_ADC_DTEST_VDD_GRP1(3..0)
+        }
+    }
     master: REGI2C_BIAS(0x6a, 0) {}
     master: REGI2C_DIG_REG(0x6d, 0) {
         reg: I2C_DIG_REG9(9) {
@@ -49,7 +86,6 @@ const REGI2C_PLLA_MST_SEL: u16 = 1 << 8;
 const REGI2C_SAR_I2C_MST_SEL: u16 = 1 << 7;
 
 /// I2C control register bit fields
-const REGI2C_RTC_BUSY_BIT: u32 = 1 << 25;
 const REGI2C_RTC_WR_CNTL_BIT: u32 = 1 << 24;
 const REGI2C_RTC_DATA_SHIFT: u32 = 16;
 const REGI2C_RTC_DATA_MASK: u32 = 0xFF;
@@ -58,26 +94,27 @@ const REGI2C_RTC_ADDR_MASK: u32 = 0xFF;
 const REGI2C_RTC_SLAVE_ID_SHIFT: u32 = 0;
 const REGI2C_RTC_SLAVE_ID_MASK: u32 = 0xFF;
 
-/// LP_I2C_ANA_MST base address (from PAC: 0x5012_4000)
-/// I2C0_CTRL_REG is at offset 0x14
-const LP_I2C_ANA_MST_BASE: u32 = 0x5012_4000;
-const LP_I2C_ANA_MST_I2C0_CTRL_REG: u32 = LP_I2C_ANA_MST_BASE + 0x14;
-const LP_I2C_ANA_MST_ANA_CONF1_REG: u32 = LP_I2C_ANA_MST_BASE + 0x04;
-const LP_I2C_ANA_MST_ANA_CONF2_REG: u32 = LP_I2C_ANA_MST_BASE + 0x08;
-
-/// Select the I2C master for the given analog block.
+/// Selects the I2C master for the given analog block.
 fn regi2c_enable_block(block: u8) {
     // Enable I2C master clock
-    let lp_peri = unsafe { esp32p4::LP_PERI::steal() };
-    lp_peri
+    LP_PERI::regs()
         .clk_en()
         .modify(|_, w| w.ck_en_lp_i2cmst().set_bit());
 
+    // The master has no clock source after reset, so it never completes a
+    // transaction until the 160MHz source is selected.
+    // Ref: IDF `regi2c_ctrl_ll_master_configure_clock` (esp32p4).
+    LP_I2C_ANA_MST::regs()
+        .clk160m()
+        .modify(|_, w| w.clk_i2c_mst_sel_160m().set_bit());
+
     // Clear both conf registers first
-    unsafe {
-        (LP_I2C_ANA_MST_ANA_CONF2_REG as *mut u32).write_volatile(0);
-        (LP_I2C_ANA_MST_ANA_CONF1_REG as *mut u32).write_volatile(0);
-    }
+    LP_I2C_ANA_MST::regs()
+        .ana_conf2()
+        .modify(|_, w| unsafe { w.ana_conf2().bits(0) });
+    LP_I2C_ANA_MST::regs()
+        .ana_conf1()
+        .modify(|_, w| unsafe { w.ana_conf1().bits(0) });
 
     // Set the master select bit for this block
     let sel_bit: u32 = match block {
@@ -92,24 +129,25 @@ fn regi2c_enable_block(block: u8) {
         _ => return,
     };
 
-    unsafe {
-        let reg = LP_I2C_ANA_MST_ANA_CONF2_REG as *mut u32;
-        reg.write_volatile(reg.read_volatile() | sel_bit);
-    }
+    LP_I2C_ANA_MST::regs()
+        .ana_conf2()
+        .modify(|r, w| unsafe { w.ana_conf2().bits(r.ana_conf2().bits() | sel_bit) });
 }
 
-/// Wait for I2C bus to become idle.
+/// Waits for I2C bus to become idle.
 #[inline]
 fn wait_i2c_idle() {
-    unsafe {
-        let reg = LP_I2C_ANA_MST_I2C0_CTRL_REG as *const u32;
-        while reg.read_volatile() & REGI2C_RTC_BUSY_BIT != 0 {
-            core::hint::spin_loop();
-        }
+    while LP_I2C_ANA_MST::regs()
+        .i2c0_ctrl()
+        .read()
+        .i2c0_busy()
+        .bit_is_set()
+    {
+        core::hint::spin_loop();
     }
 }
 
-/// Read an analog I2C register.
+/// Reads an analog I2C register.
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     regi2c_enable_block(block);
     wait_i2c_idle();
@@ -118,17 +156,17 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     let cmd = ((block as u32 & REGI2C_RTC_SLAVE_ID_MASK) << REGI2C_RTC_SLAVE_ID_SHIFT)
         | ((reg_add as u32 & REGI2C_RTC_ADDR_MASK) << REGI2C_RTC_ADDR_SHIFT);
 
-    unsafe {
-        (LP_I2C_ANA_MST_I2C0_CTRL_REG as *mut u32).write_volatile(cmd);
-    }
+    LP_I2C_ANA_MST::regs()
+        .i2c0_ctrl()
+        .write(|w| unsafe { w.i2c0_ctrl().bits(cmd) });
     wait_i2c_idle();
 
     // Read data from bits [23:16]
-    let val = unsafe { (LP_I2C_ANA_MST_I2C0_CTRL_REG as *const u32).read_volatile() };
+    let val = LP_I2C_ANA_MST::regs().i2c0_ctrl().read().i2c0_ctrl().bits();
     ((val >> REGI2C_RTC_DATA_SHIFT) & REGI2C_RTC_DATA_MASK) as u8
 }
 
-/// Write an analog I2C register.
+/// Writes an analog I2C register.
 pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     regi2c_enable_block(block);
     wait_i2c_idle();
@@ -139,8 +177,8 @@ pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
         | REGI2C_RTC_WR_CNTL_BIT
         | ((data as u32 & REGI2C_RTC_DATA_MASK) << REGI2C_RTC_DATA_SHIFT);
 
-    unsafe {
-        (LP_I2C_ANA_MST_I2C0_CTRL_REG as *mut u32).write_volatile(cmd);
-    }
+    LP_I2C_ANA_MST::regs()
+        .i2c0_ctrl()
+        .write(|w| unsafe { w.i2c0_ctrl().bits(cmd) });
     wait_i2c_idle();
 }

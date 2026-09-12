@@ -131,20 +131,28 @@ pub(crate) fn collect_changelogs(
 
     let mut pr_changelogs: Vec<PrChangelog> = Vec::new();
     let mut skipped = 0usize;
+    let mut parse_errors: Vec<String> = Vec::new();
 
     for pr in prs {
         match PrChangelog::parse(pr.number, &pr.body) {
             Ok(Some(cl)) => pr_changelogs.push(cl),
             Ok(None) => skipped += 1,
-            Err(e) => {
-                log::warn!("PR #{}: parse error — {e}", pr.number);
-                skipped += 1;
-            }
+            Err(e) => parse_errors.push(format!("PR #{}: {e}", pr.number)),
         }
     }
 
     if skipped > 0 {
         log::info!("{skipped} PR(s) had no changelog entries and were skipped.");
+    }
+
+    // A malformed PR description must stop the harvest: entries after the error are
+    // lost, and a release built from them would be incomplete.
+    if !parse_errors.is_empty() {
+        bail!(
+            "{} PR description(s) could not be parsed:\n{}",
+            parse_errors.len(),
+            parse_errors.join("\n")
+        );
     }
 
     // Load each relevant crate's CHANGELOG.md, merge in the PR entries.

@@ -1,4 +1,4 @@
-use super::WakeTriggers;
+use super::SleepKind;
 use crate::{
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
     rtc_cntl::Rtc,
@@ -42,7 +42,7 @@ pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 2;
 pub const RTC_CNTL_DBG_ATTEN_DEEPSLEEP_ULTRA_LOW: u8 = 15;
 /// Power-up setting for other blocks.
 pub const OTHER_BLOCKS_POWERUP: u8 = 1;
-/// Wait cycles for other blocks.
+/// Waits cycles for other blocks.
 pub const OTHER_BLOCKS_WAIT: u16 = 1;
 /// WiFi power-up cycles.
 pub const WIFI_POWERUP_CYCLES: u8 = OTHER_BLOCKS_POWERUP;
@@ -92,7 +92,7 @@ bitfield::bitfield! {
     pub modem_pd_en, set_modem_pd_en: 5;
     /// power down CPU, but not restart when lightsleep.
     pub cpu_pd_en, set_cpu_pd_en: 6;
-    /// Power down Internal 8M oscillator
+    /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 7;
     /// power down digital peripherals
     pub dig_peri_pd_en, set_dig_peri_pd_en: 8;
@@ -234,6 +234,10 @@ impl RtcSleepConfig {
 
     pub(crate) fn is_deep_sleep(&self) -> bool {
         self.deep_slp()
+    }
+
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.set_deep_slp(kind == SleepKind::Deep);
     }
 
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
@@ -627,17 +631,25 @@ impl RtcSleepConfig {
         }
     }
 
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+    /// Configures the wakeup options and requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         unsafe {
             LPWR::regs()
                 .reset_state()
                 .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
 
             // set bits for what can wake us up
-            LPWR::regs().wakeup_state().modify(|_, w| {
-                w.wakeup_ena()
-                    .bits((wakeup_triggers.as_u32() as u16).into())
-            });
+            LPWR::regs()
+                .wakeup_state()
+                .modify(|_, w| w.wakeup_ena().bits(wakeup_mask));
+
+            // Set the bits of the sources that reject the sleep. The reject enables that `apply`
+            // wrote arm those sources.
+            LPWR::regs()
+                .slp_reject_conf()
+                .modify(|_, w| w.sleep_reject_ena().bits(reject_mask));
 
             LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
         }

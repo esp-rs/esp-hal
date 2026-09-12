@@ -12,13 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Unified the `#[main]` and `#[rtos_main]` macros into a single `#[main]` macro that can be used with both `esp-hal` and `esp-rtos` (#5541)
 
 ### Fixed
 
 
 ### Removed
 
+
+## [v0.23.0] - 2026-08-24
+
+### Added
+
+- `#[ram(unstable(dcache_reclaimed))]` to allow using memory not taken up by data cache (#5860)
+
+### Changed
+
+- Unified the `#[main]` and `#[rtos_main]` macros into a single `#[main]` macro that can be used with both `esp-hal` and `esp-rtos` (#5541)
+- `doc_replace` now accepts any value that expands to a string literal for its inline (`__placeholder__`) replacements, not only string literals. (#6119)
 
 ## [v0.22.0] - 2026-04-16
 
@@ -141,4 +151,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.20.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.19.0...esp-hal-procmacros-v0.20.0
 [v0.21.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.20.0...esp-hal-procmacros-v0.21.0
 [v0.22.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.21.0...esp-hal-procmacros-v0.22.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.22.0...HEAD
+[v0.23.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.22.0...esp-hal-procmacros-v0.23.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.23.0...HEAD

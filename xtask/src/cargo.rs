@@ -576,6 +576,12 @@ impl CargoCommandBatcher {
     }
 }
 
+impl Default for CargoCommandBatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for CargoCommandBatcher {
     fn drop(&mut self) {}
 }
@@ -590,13 +596,12 @@ pub struct CargoToml {
     pub manifest: toml_edit::DocumentMut,
 }
 
-const DEPENDENCY_KINDS: [&'static str; 3] =
-    ["dependencies", "dev-dependencies", "build-dependencies"];
+const DEPENDENCY_KINDS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
 impl CargoToml {
     /// Load and parse the Cargo.toml for the specified package in the given workspace.
     pub fn new(workspace: &Path, package: Package) -> Result<Self> {
-        let package_path = workspace.join(package.to_string());
+        let package_path = workspace.join(package.directory());
         let manifest_path = package_path.join("Cargo.toml");
         if !manifest_path.exists() {
             bail!(
@@ -612,16 +617,20 @@ impl CargoToml {
     }
 
     pub fn espressif_metadata(&self) -> Option<&Table> {
-        let Some(package) = self.manifest.get("package") else {
-            return None;
-        };
-        let Some(metadata) = package.get("metadata") else {
-            return None;
-        };
-        let Some(espressif) = metadata.get("espressif") else {
-            return None;
-        };
-        Some(espressif.as_table()?)
+        let package = self.manifest.get("package")?;
+        let metadata = package.get("metadata")?;
+        let espressif = metadata.get("espressif")?;
+        espressif.as_table()
+    }
+
+    pub fn espressif_metadata_bool(&self, key: &str) -> Option<bool> {
+        self.espressif_metadata()
+            .and_then(|table| table.get(key))
+            .map(|value| {
+                value
+                    .as_bool()
+                    .unwrap_or_else(|| panic!("{key} must be a boolean"))
+            })
     }
 
     /// Create a `CargoToml` instance from a manifest string.
@@ -653,7 +662,7 @@ impl CargoToml {
 
     /// Get the absolute path to the package directory.
     pub fn package_path(&self) -> PathBuf {
-        self.workspace.join(self.package.to_string())
+        self.workspace.join(self.package.directory())
     }
 
     /// Get the absolute path to the Cargo.toml file of the package.
@@ -759,10 +768,10 @@ impl CargoToml {
                     name
                 };
 
-                if let Ok(package) = Package::from_str(name, true) {
-                    if !dependencies.contains(&package) {
-                        dependencies.push(package);
-                    }
+                if let Ok(package) = Package::from_str(name, true)
+                    && !dependencies.contains(&package)
+                {
+                    dependencies.push(package);
                 }
             }
         });
@@ -778,7 +787,7 @@ impl CargoToml {
 
         self.visit_dependencies(|_, _, table| {
             // Update dependencies which specify a version:
-            match &mut table[&package_name] {
+            match &mut table[package_name] {
                 Item::Value(Value::String(table)) => {
                     // package = "version"
                     *table = Formatted::new(format_dependency_version(table.value(), version));
@@ -800,15 +809,14 @@ impl CargoToml {
                 Item::None => {
                     // alias = { package = "foo", version = "version" }
                     let update_renamed_dep = table.get_values().iter().find_map(|(k, p)| {
-                        if let Value::InlineTable(table) = p {
-                            if let Some(Value::String(name)) = &table.get("package") {
-                                if name.value() == &package_name {
-                                    // Return the actual key of this dependency, e.g.:
-                                    // `procmacros = { package = "esp-hal-procmacros" }`
-                                    //  ^^^^^^^^^^
-                                    return Some(k.last().unwrap().get().to_string());
-                                }
-                            }
+                        if let Value::InlineTable(table) = p
+                            && let Some(Value::String(name)) = &table.get("package")
+                            && name.value() == package_name
+                        {
+                            // Return the actual key of this dependency, e.g.:
+                            // `procmacros = { package = "esp-hal-procmacros" }`
+                            //  ^^^^^^^^^^
+                            return Some(k.last().unwrap().get().to_string());
                         }
 
                         None

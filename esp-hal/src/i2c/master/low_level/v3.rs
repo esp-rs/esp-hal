@@ -3,7 +3,7 @@ use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig, I2cInstance};
 
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
-/// i2c_ll_set_bus_timing in ESP-IDF
+/// i2c_ll_set_bus_timing in ESP-IDF.
 pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Result<(), ConfigError> {
     let timeout = clock_config.timeout;
     let bus_freq = clock_config.frequency.as_hz();
@@ -101,22 +101,7 @@ pub(super) fn read_fifo(register_block: &RegisterBlock) -> u8 {
 }
 
 pub(super) fn write_fifo(register_block: &RegisterBlock, data: u8) {
-    cfg_select! {
-        esp32p4 => {
-            // P4: data register is read-only (RX FIFO only). TX uses txfifo_start_addr.
-            // PAC txfifo_start_addr is also read-only in SVD, use direct MMIO.
-            // TODO: file an esp-pacs issue/PR so the P4 SVD marks the TX FIFO
-            // port writable like other chips' I2C PAC. Once that lands, this
-            // branch can collapse into the general `else` arm below.
-            let base = register_block as *const _ as usize;
-            unsafe {
-                ((base + 0x100) as *mut u32).write_volatile(data as u32);
-            }
-        }
-        _ => {
-            register_block
-                .data()
-                .write(|w| unsafe { w.fifo_rdata().bits(data) });
-        }
-    }
+    register_block
+        .data()
+        .write(|w| unsafe { w.fifo_rdata().bits(data) });
 }

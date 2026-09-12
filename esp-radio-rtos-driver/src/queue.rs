@@ -431,6 +431,10 @@ macro_rules! register_queue_implementation {
 /// This handle is used to interact with queues created by the driver implementation.
 #[repr(transparent)]
 pub struct QueueHandle(QueuePtr);
+
+unsafe impl Send for QueueHandle {}
+unsafe impl Sync for QueueHandle {}
+
 impl QueueHandle {
     /// Creates a new queue instance.
     #[inline]

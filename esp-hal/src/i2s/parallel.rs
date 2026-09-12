@@ -2,31 +2,31 @@
 //! # Parallel Interface (via I2S)
 //!
 //! ## Overview
-//! The I2S parallel interface allows for high-speed data transfer between the
-//! ESP32 and external devices. It is commonly used to external devices such as
-//! LED matrix, LCD display, and Printer. Only TX is implemented. Each
-//! unit can have up to 8 or 16 data signals (depending on your target hardware)
-//! plus 1 clock signal.
+//! The I2S parallel interface provides high-speed data transfer between the
+//! ESP32 and external devices. It is commonly used with devices such as LED
+//! matrices, LCD displays, and printers. Only TX is implemented. Each
+//! unit can have up to 8 or 16 data signals (depending on the target hardware)
+//! plus one clock signal.
 //!
 //! ## Notes
 //!
 //! Data output is interleaved:
-//! - 8bit: [A, B, C, D] is output as [C, D, A, B]  (i.e., swapped as 16bit words)
-//! - 16bit: [A, B, C, D] is output as [B, A, D, C] (i.e., 16bit words are swapped)
+//! - 8-bit: [A, B, C, D] is output as [C, D, A, B]  (i.e., swapped as 16-bit words)
+//! - 16-bit: [A, B, C, D] is output as [B, A, D, C] (i.e., 16-bit words are swapped)
 #![cfg_attr(esp32, doc = "")]
 #![cfg_attr(
     esp32,
-    doc = "I2S0 does not support true 8bit parallel output, so if you want to do 8bit"
+    doc = "I2S0 does not support true 8-bit parallel output, so if you want to do 8-bit"
 )]
 #![cfg_attr(
     esp32,
-    doc = "you should use I2S1.  If you have to use I2S0, it will only output the even"
+    doc = "you should use I2S1.  If you have to use I2S0, it only outputs the even"
 )]
-#![cfg_attr(esp32, doc = "bytes! so [A, B, C, D] will be output as [A, C]!!!!")]
+#![cfg_attr(esp32, doc = "bytes! so [A, B, C, D] is output as [A, C]!")]
 #![cfg_attr(esp32, doc = "")]
 //! ## Configuration
 //!
-//! The driver uses DMA (Direct Memory Access) for efficient data transfer and
+//! The driver uses DMA for efficient data transfer and
 //! supports various configurations, such as different data formats, standards
 //! (e.g., Philips) and pin configurations. It relies on other peripheral
 //! modules, such as
@@ -67,7 +67,7 @@
 //! let mut tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 //! for (i, data) in tx_buf.as_mut_slice().chunks_mut(4).enumerate() {
 //!     let offset = i * 4;
-//!     // i2s parallel driver expects the buffer to be interleaved
+//!     // I2S parallel driver expects the buffer to be interleaved
 //!     data[0] = (offset + 2) as u8;
 //!     data[1] = (offset + 3) as u8;
 //!     data[2] = offset as u8;
@@ -92,11 +92,14 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use enumset::{EnumSet, EnumSetType};
+
 use crate::{
     Async,
     Blocking,
     DriverMode,
     RegisterToggle,
+    clock::dividers::FractionalDivider,
     dma::{ChannelTx, DmaEligiblePeripheral, DmaError, DmaTxBuffer, asynch::DmaTxFuture},
     gpio::{
         OutputConfig,
@@ -104,6 +107,7 @@ use crate::{
         interconnect::{self, PeripheralOutput},
     },
     i2s::AnyI2s,
+    interrupt::InterruptHandler,
     pac::i2s0::RegisterBlock,
     peripherals::{I2S0, I2S1},
     system::PeripheralGuard,
@@ -118,6 +122,7 @@ pub trait TxPins<'d> {
 
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
+#[instability::unstable]
 pub struct TxSixteenBits<'d> {
     pins: [interconnect::OutputSignal<'d>; 16],
 }
@@ -183,13 +188,14 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
 
 /// Represents a group of 8 output pins configured for 8-bit parallel data
 /// transmission.
+#[instability::unstable]
 pub struct TxEightBits<'d> {
     pins: [interconnect::OutputSignal<'d>; 8],
 }
 
 impl<'d> TxEightBits<'d> {
     #[expect(clippy::too_many_arguments)]
-    /// Creates a new `TxSEightBits` instance with the provided output pins.
+    /// Creates a new [`TxEightBits`] instance with the provided output pins.
     pub fn new(
         pin_0: impl PeripheralOutput<'d>,
         pin_1: impl PeripheralOutput<'d>,
@@ -230,7 +236,84 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
     }
 }
 
-/// I2S Parallel Interface
+/// Interrupts from the I2S parallel peripheral.
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum I2sParallelInterrupt {
+    /// The DMA finishes the out descriptor chain (OUT_DONE).
+    Done,
+
+    /// The DMA uses a descriptor with the suc_eof flag set (OUT_EOF).
+    ///
+    /// The peripheral sets the OUT_EOF flag for every descriptor with suc_eof
+    /// set. This interrupt also works on a circular DMA chain. On a circular
+    /// chain, the transfer does not end. The peripheral does not set
+    /// OUT_TOTAL_EOF on a circular chain.
+    Eof,
+
+    /// The DMA gets a descriptor with an error (OUT_DSCR_ERR).
+    DescriptorError,
+
+    /// The DMA sends all the data of the transfer (OUT_TOTAL_EOF).
+    ///
+    /// On a circular DMA chain, the transfer does not end. The peripheral does
+    /// not set OUT_TOTAL_EOF on a circular chain. Use [`Self::Eof`] with a
+    /// circular chain.
+    TotalEof,
+}
+
+fn internal_listen(regs: &RegisterBlock, interrupts: EnumSet<I2sParallelInterrupt>, enable: bool) {
+    regs.int_ena().modify(|_, w| {
+        for interrupt in interrupts {
+            match interrupt {
+                I2sParallelInterrupt::Done => w.out_done().bit(enable),
+                I2sParallelInterrupt::Eof => w.out_eof().bit(enable),
+                I2sParallelInterrupt::DescriptorError => w.out_dscr_err().bit(enable),
+                I2sParallelInterrupt::TotalEof => w.out_total_eof().bit(enable),
+            };
+        }
+        w
+    });
+}
+
+fn internal_interrupts(regs: &RegisterBlock) -> EnumSet<I2sParallelInterrupt> {
+    let mut result = EnumSet::new();
+    let ints = regs.int_st().read();
+
+    if ints.out_done().bit() {
+        result.insert(I2sParallelInterrupt::Done);
+    }
+    if ints.out_eof().bit() {
+        result.insert(I2sParallelInterrupt::Eof);
+    }
+    if ints.out_dscr_err().bit() {
+        result.insert(I2sParallelInterrupt::DescriptorError);
+    }
+    if ints.out_total_eof().bit() {
+        result.insert(I2sParallelInterrupt::TotalEof);
+    }
+
+    result
+}
+
+fn internal_clear_interrupts(regs: &RegisterBlock, interrupts: EnumSet<I2sParallelInterrupt>) {
+    regs.int_clr().write(|w| {
+        for interrupt in interrupts {
+            match interrupt {
+                I2sParallelInterrupt::Done => w.out_done().clear_bit_by_one(),
+                I2sParallelInterrupt::Eof => w.out_eof().clear_bit_by_one(),
+                I2sParallelInterrupt::DescriptorError => w.out_dscr_err().clear_bit_by_one(),
+                I2sParallelInterrupt::TotalEof => w.out_total_eof().clear_bit_by_one(),
+            };
+        }
+        w
+    });
+}
+
+/// I2S parallel interface
+#[instability::unstable]
 pub struct I2sParallel<'d, Dm>
 where
     Dm: DriverMode,
@@ -238,6 +321,7 @@ where
     instance: AnyI2s<'d>,
     tx_channel: ChannelTx<Dm, I2sParallelTxErased<'d>>,
     _guard: PeripheralGuard,
+    _clk_guard: crate::i2s::master::I2sDirClkGuard,
 }
 
 impl<'d> I2sParallel<'d, Blocking> {
@@ -265,30 +349,77 @@ impl<'d> I2sParallel<'d, Blocking> {
         i2s.ws_signal().connect_to(&clock_pin);
 
         pins.configure(&i2s);
+        let clk_guard = crate::i2s::master::I2sDirClkGuard::request_tx(i2s.clock_instance());
         Self {
             instance: i2s,
             tx_channel: channel,
             _guard: guard,
+            _clk_guard: clk_guard,
         }
     }
 
-    /// Converts the I2S instance into async mode.
+    /// Converts the I2S parallel instance into [`Async`] mode.
     pub fn into_async(self) -> I2sParallel<'d, Async> {
         I2sParallel {
             instance: self.instance,
             tx_channel: self.tx_channel.into_async(),
             _guard: self._guard,
+            _clk_guard: self._clk_guard,
         }
+    }
+
+    /// Sets the interrupt handler for the I2S parallel peripheral.
+    ///
+    /// The new handler removes the old handler. This method does not turn on
+    /// the interrupt sources. Use [`Self::listen`] to turn on interrupt
+    /// sources.
+    #[instability::unstable]
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.instance.set_interrupt_handler(handler);
+    }
+
+    /// Turns on the given interrupt sources.
+    #[instability::unstable]
+    pub fn listen(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_listen(self.instance.regs(), interrupts.into(), true);
+    }
+
+    /// Turns off the given interrupt sources.
+    #[instability::unstable]
+    pub fn unlisten(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_listen(self.instance.regs(), interrupts.into(), false);
+    }
+
+    /// Returns the interrupt sources that are set.
+    #[instability::unstable]
+    pub fn interrupts(&mut self) -> EnumSet<I2sParallelInterrupt> {
+        internal_interrupts(self.instance.regs())
+    }
+
+    /// Clears the interrupt flags of the given interrupt sources.
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_clear_interrupts(self.instance.regs(), interrupts.into());
+    }
+}
+
+impl crate::private::Sealed for I2sParallel<'_, Blocking> {}
+
+#[instability::unstable]
+impl crate::interrupt::InterruptConfigurable for I2sParallel<'_, Blocking> {
+    fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
+        I2sParallel::set_interrupt_handler(self, handler);
     }
 }
 
 impl<'d> I2sParallel<'d, Async> {
-    /// Converts the I2S instance into async mode.
+    /// Converts the I2S parallel instance into [`Blocking`] mode.
     pub fn into_blocking(self) -> I2sParallel<'d, Blocking> {
         I2sParallel {
             instance: self.instance,
             tx_channel: self.tx_channel.into_blocking(),
             _guard: self._guard,
+            _clk_guard: self._clk_guard,
         }
     }
 }
@@ -297,7 +428,15 @@ impl<'d, Dm> I2sParallel<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Write data to the I2S peripheral
+    /// Starts a DMA transfer that writes the buffer to the I2S parallel
+    /// interface and returns an [`I2sParallelTransfer`] that can be used to
+    /// wait for the transfer to complete.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`DmaError`] when the buffer cannot be prepared for the
+    /// transfer or the transfer cannot be started. On error, the driver and
+    /// the buffer are returned together with the error.
     pub fn send<BUF: DmaTxBuffer>(
         mut self,
         mut data: BUF,
@@ -320,8 +459,9 @@ where
     }
 }
 
-/// Represents an ongoing (or potentially finished) transfer using the i2s
-/// parallel interface
+/// Represents an ongoing (or potentially finished) transfer using the I2S
+/// parallel interface.
+#[instability::unstable]
 pub struct I2sParallelTransfer<'d, BUF, Dm>
 where
     BUF: DmaTxBuffer,
@@ -336,12 +476,13 @@ where
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether the transfer is complete.
     pub fn is_done(&self) -> bool {
         self.i2s.instance.is_tx_done()
     }
 
-    /// Wait for the transfer to finish
+    /// Waits for the transfer to finish and returns the driver and the
+    /// buffer.
     pub fn wait(mut self) -> (I2sParallel<'d, Dm>, BUF::Final) {
         self.i2s.instance.tx_wait_done();
         let i2s = unsafe { ManuallyDrop::take(&mut self.i2s) };
@@ -356,11 +497,61 @@ where
     }
 }
 
+/// Interrupt management for an ongoing transfer.
+///
+/// The driver itself has been consumed by [`I2sParallel::send`], so these
+/// methods take `&self` and allow an interrupt handler to manage the
+/// interrupt sources through the transfer object.
+#[instability::unstable]
+impl<'d, BUF> I2sParallelTransfer<'d, BUF, Blocking>
+where
+    BUF: DmaTxBuffer,
+{
+    /// Sets the interrupt handler for the I2S parallel peripheral.
+    ///
+    /// The new handler removes the old handler. This method does not turn on
+    /// the interrupt sources. Use [`Self::listen`] to turn on interrupt
+    /// sources.
+    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+        self.i2s.instance.set_interrupt_handler(handler);
+    }
+
+    /// Turns on the given interrupt sources.
+    pub fn listen(&self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_listen(self.i2s.instance.regs(), interrupts.into(), true);
+    }
+
+    /// Turns off the given interrupt sources.
+    pub fn unlisten(&self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_listen(self.i2s.instance.regs(), interrupts.into(), false);
+    }
+
+    /// Clears the interrupt flags of the given interrupt sources.
+    pub fn clear_interrupts(&self, interrupts: impl Into<EnumSet<I2sParallelInterrupt>>) {
+        internal_clear_interrupts(self.i2s.instance.regs(), interrupts.into());
+    }
+
+    /// Returns the interrupt sources that are set.
+    pub fn interrupts(&self) -> EnumSet<I2sParallelInterrupt> {
+        internal_interrupts(self.i2s.instance.regs())
+    }
+}
+
 impl<BUF> I2sParallelTransfer<'_, BUF, Async>
 where
     BUF: DmaTxBuffer,
 {
-    /// Wait for the transfer to finish
+    /// Waits for [`Self::is_done`] to return true.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`DmaError`] when the transfer ends with a descriptor error.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// This method is cancellation safe. Dropping the future does not stop
+    /// the transfer, and the method can be called again to wait for the
+    /// transfer to complete.
     pub async fn wait_for_done(&mut self) -> Result<(), DmaError> {
         DmaTxFuture::new(&mut self.i2s.tx_channel).await
     }
@@ -415,70 +606,38 @@ pub struct I2sClockDividers {
     pub numerator: u32,
 }
 
-fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
+fn calculate_clock(
+    sample_rate: Rate,
+    data_bits: u8,
+    clock_source: crate::i2s::master::I2sClockSource,
+) -> I2sClockDividers {
     // this loosely corresponds to `i2s_std_calculate_clock` and
-    // `i2s_ll_tx_set_mclk` in esp-idf
-    //
-    // main difference is we are using fixed-point arithmetic here
-    // plus adjusted for parallel interface clocking
+    // `i2s_ll_tx_set_mclk` in esp-idf, adjusted for parallel interface clocking
 
-    let sclk = crate::soc::i2s_sclk_frequency();
-
-    let rate = sample_rate.as_hz();
-
-    let mclk = rate * 2;
+    let sclk = crate::i2s::master::source_frequency(clock_source);
+    let mclk = sample_rate.as_hz() * 2;
     let bclk_divider: u32 = if data_bits == 8 { 2 } else { 1 };
-    let mut mclk_divider = sclk / mclk;
 
-    let mut ma: u32;
-    let mut mb: u32;
-    let mut denominator: u32 = 0;
-    let mut numerator: u32 = 0;
-
-    let freq_diff = sclk.abs_diff(mclk * mclk_divider);
-
-    if freq_diff != 0 {
-        let decimal = freq_diff as u64 * 10000 / mclk as u64;
-        // Carry bit if the decimal is greater than 1.0 - 1.0 / (63.0 * 2) = 125.0 /
-        // 126.0
-        if decimal > 1250000 / 126 {
-            mclk_divider += 1;
-        } else {
-            let mut min: u32 = !0;
-
-            for a in 2..=crate::i2s::master::I2S_LL_MCLK_DIVIDER_MAX {
-                let b = (a as u64) * (freq_diff as u64 * 10000u64 / mclk as u64) + 5000;
-                ma = ((freq_diff as u64 * 10000u64 * a as u64) / 10000) as u32;
-                mb = (mclk as u64 * (b / 10000)) as u32;
-
-                if ma == mb {
-                    denominator = a as u32;
-                    numerator = (b / 10000) as u32;
-                    break;
-                }
-
-                if mb.abs_diff(ma) < min {
-                    denominator = a as u32;
-                    numerator = b as u32;
-                    min = mb.abs_diff(ma);
-                }
-            }
-        }
-    }
+    let divider = FractionalDivider::new(sclk, mclk, crate::i2s::master::mclk_max_denominator());
 
     I2sClockDividers {
-        mclk_divider,
+        mclk_divider: divider.integer,
         bclk_divider,
-        denominator,
-        numerator,
+        // An integer divider is described as `0 / 1`, not as `0 / 0`.
+        denominator: divider.denominator.max(1),
+        numerator: divider.numerator,
     }
 }
+
 #[doc(hidden)]
 pub trait PrivateInstance: crate::private::Sealed {
     fn regs(&self) -> &RegisterBlock;
     fn peripheral(&self) -> crate::system::Peripheral;
     fn ws_signal(&self) -> OutputSignal;
     fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal;
+    fn clock_instance(&self) -> crate::clock::ll::I2sInstance;
+
+    fn set_interrupt_handler(&self, handler: crate::interrupt::InterruptHandler);
 
     fn rx_reset(&self) {
         self.regs().conf().toggle(|w, bit| w.rx_reset().bit(bit));
@@ -556,25 +715,19 @@ pub trait PrivateInstance: crate::private::Sealed {
         });
     }
 
-    fn set_clock(&self, clock_settings: I2sClockDividers) {
-        self.regs().clkm_conf().modify(|r, w| unsafe {
-            w.bits(r.bits() | (property!("i2s.default_clock_source") << 21))
-            // select PLL_160M
-        });
-
-        #[cfg(esp32)]
-        self.regs()
-            .clkm_conf()
-            .modify(|_, w| w.clka_ena().clear_bit());
-
-        self.regs().clkm_conf().modify(|_, w| unsafe {
-            w.clk_en().set_bit();
-            w.clkm_div_num().bits(clock_settings.mclk_divider as u8)
-        });
-
-        self.regs().clkm_conf().modify(|_, w| unsafe {
-            w.clkm_div_a().bits(clock_settings.denominator as u8);
-            w.clkm_div_b().bits(clock_settings.numerator as u8)
+    fn set_clock(
+        &self,
+        clock_settings: I2sClockDividers,
+        clock_source: crate::i2s::master::I2sClockSource,
+    ) {
+        crate::clock::ll::ClockTree::with(|clocks| {
+            let config = crate::clock::ll::I2sMclkConfig::new(
+                clock_source,
+                clock_settings.mclk_divider,
+                clock_settings.denominator,
+                clock_settings.numerator,
+            );
+            self.clock_instance().configure_mclk(clocks, config);
         });
 
         self.regs().sample_rate_conf().modify(|_, w| unsafe {
@@ -584,7 +737,8 @@ pub trait PrivateInstance: crate::private::Sealed {
     }
 
     fn setup(&self, frequency: Rate, bits: u8) {
-        self.set_clock(calculate_clock(frequency, bits));
+        let clock_source = crate::i2s::master::I2sClockSource::default();
+        self.set_clock(calculate_clock(frequency, bits, clock_source), clock_source);
 
         // Initialize I2S dev
         self.rx_reset();
@@ -691,6 +845,15 @@ impl PrivateInstance for I2S0<'_> {
             other => panic!("Invalid I2S0 Dout pin {}", other),
         }
     }
+
+    fn set_interrupt_handler(&self, handler: crate::interrupt::InterruptHandler) {
+        self.disable_peri_interrupt_on_all_cores();
+        self.bind_peri_interrupt(handler);
+    }
+
+    fn clock_instance(&self) -> crate::clock::ll::I2sInstance {
+        crate::clock::ll::I2sInstance::I2s0
+    }
 }
 
 impl PrivateInstance for I2S1<'_> {
@@ -743,6 +906,15 @@ impl PrivateInstance for I2S1<'_> {
             other => panic!("Invalid I2S1 Dout pin {}", other),
         }
     }
+
+    fn set_interrupt_handler(&self, handler: crate::interrupt::InterruptHandler) {
+        self.disable_peri_interrupt_on_all_cores();
+        self.bind_peri_interrupt(handler);
+    }
+
+    fn clock_instance(&self) -> crate::clock::ll::I2sInstance {
+        crate::clock::ll::I2sInstance::I2s1
+    }
 }
 
 impl PrivateInstance for AnyI2s<'_> {
@@ -755,6 +927,8 @@ impl PrivateInstance for AnyI2s<'_> {
             fn peripheral(&self) -> crate::system::Peripheral;
             fn ws_signal(&self) -> OutputSignal;
             fn data_out_signal(&self, i: usize, bits: u8) -> OutputSignal ;
+            fn set_interrupt_handler(&self, handler: crate::interrupt::InterruptHandler);
+            fn clock_instance(&self) -> crate::clock::ll::I2sInstance;
         }
     }
 }
@@ -804,7 +978,11 @@ for_each_i2s! {
 }
 
 impl<'d> I2sParallel<'d, crate::Blocking> {
-    /// Create a new I2S Parallel Interface
+    /// Creates a new [`I2sParallel`] instance.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the DMA channel is not compatible with the I2S instance.
     pub fn new<I: Instance + 'd>(
         i2s: I,
         channel: impl I2sParallelDmaChannel<'d, I>,

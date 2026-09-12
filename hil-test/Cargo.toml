@@ -67,11 +67,20 @@ harness           = false
 required-features = ["embassy", "esp-alloc"]
 
 [[bin]]
+name              = "sdm"
+harness           = false
+required-features = ["unstable"]
+
+[[bin]]
 name              = "spi"
 harness           = false
 
 [[bin]]
 name              = "storage"
+harness           = false
+
+[[bin]]
+name              = "flash"
 harness           = false
 
 [[bin]]
@@ -112,8 +121,8 @@ trouble-host = { version = "0.7.0", features = [
 ], optional = true }
 
 primeorder          = { version = "0.13.0", default-features = false }
-crypto-bigint       = { version = "0.5.5", default-features = false }
-digest              = { version = "0.11.3", default-features = false }
+crypto-bigint       = { version = "0.7.5", default-features = false }
+digest              = { version = "0.11", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
 hex-literal         = "1.0.0"
@@ -121,8 +130,10 @@ nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 p384                = { version = "0.13.1", default-features = false, features = ["arithmetic"] }
-sha1                = { version = "0.11.0", default-features = false }
-sha2                = { version = "0.11.0", default-features = false }
+sha1                = { version = "0.11", default-features = false }
+sha2                = { version = "0.11", default-features = false }
+
+paste               = "1.0.15"
 
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
@@ -230,6 +241,15 @@ esp32s3 = [
     "esp-bootloader-esp-idf/esp32s3",
     "esp-metadata-generated/esp32s3",
     "esp-rtos?/esp32s3",
+]
+esp32s31 = [
+    "esp-hal/esp32s31",
+    "esp-alloc?/esp32s31",
+    "esp-radio?/esp32s31",
+    "esp-storage?/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-metadata-generated/esp32s31",
+    "esp-rtos?/esp32s31",
 ]
 
 psram = ["esp-alloc"]

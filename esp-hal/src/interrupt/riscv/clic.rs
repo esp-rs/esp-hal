@@ -73,7 +73,7 @@ pub(super) fn change_current_runlevel(level: RunLevel) -> u8 {
     current_runlevel
 }
 
-/// Get the current run level (the level below which interrupts are masked).
+/// Returns the current run level (the level below which interrupts are masked).
 pub(crate) fn mil() -> usize {
     mintstatus::read().mil()
 }

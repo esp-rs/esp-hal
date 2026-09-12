@@ -1,8 +1,4 @@
-//! Light- and deep-sleep support for the ESP32-P4 (chip revision v3.x / eco5).
-//!
-//! v1 scope: timer wakeup only, single core. Ported from the ESP32-C6 PMU sleep
-//! driver and adapted to the P4 PMU (DCDC, no wireless modem, no regdma
-//! retention) using the esp-idf `pmu_sleep.c` / `pmu_param.h` references.
+//! Light- and deep-sleep support for the ESP32-P4.
 
 use core::{
     ops::Not,
@@ -15,9 +11,9 @@ use crate::{
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
-        sleep::{Ext1WakeupSource, WakeTriggers, pmu_common::SleepTimeConfig},
+        sleep::{SleepKind, pmu_common::SleepTimeConfig},
     },
-    soc::clocks::{self, ClockTree, CpuRootClkConfig, LpSlowClkConfig},
+    soc::clocks::{self, ClockTree, CpuRootClkConfig},
 };
 
 // ----------------------------------------------------------------------------
@@ -101,7 +97,7 @@ fn usj_pad_backup_and_disable() {
     USJ_PAD_WAS_ENABLED.store(pad_enabled, Ordering::Relaxed);
 }
 
-/// Restore the USJ pad on wake. esp-idf `sleep_console_usj_pad_restore`.
+/// Restores the USJ pad on wake. esp-idf `sleep_console_usj_pad_restore`.
 fn usj_pad_restore() {
     usj_enable_bus_clock(true);
     usj_set_pad_enable(USJ_PAD_WAS_ENABLED.load(Ordering::Relaxed));
@@ -799,16 +795,16 @@ bitfield::bitfield! {
     pub u32, pd_xtal     , set_pd_xtal     : 10;
     /// Controls the power-down status of the fast RC oscillator.
     pub u32, pd_rc_fast  , set_pd_rc_fast  : 11;
-    /// Controls the power-down status of the 32kHz crystal oscillator.
+    /// Controls the power-down status of the 32 kHz crystal oscillator.
     pub u32, pd_xtal32k  , set_pd_xtal32k  : 12;
-    /// Controls the power-down status of the 32kHz RC oscillator.
+    /// Controls the power-down status of the 32 kHz RC oscillator.
     pub u32, pd_rc32k    , set_pd_rc32k    : 13;
     /// Controls the power-down status of the low-power peripheral domain.
     pub u32, pd_lp_periph, set_pd_lp_periph: 14;
 }
 
 impl PowerDownFlags {
-    /// Checks whether all memory groups are powered down.
+    /// Returns whether all memory groups are powered down.
     pub fn pd_mem(self) -> bool {
         self.pd_mem_g0() && self.pd_mem_g1() && self.pd_mem_g2() && self.pd_mem_g3()
     }
@@ -870,18 +866,23 @@ impl RtcSleepConfig {
         self.deep_slp()
     }
 
-    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
-        Ext1WakeupSource::wake_io_reset();
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.deep = kind == SleepKind::Deep;
     }
+
+    pub(crate) fn base_settings(_rtc: &Rtc<'_>) {}
 
     /// Finalize power-down flags, apply configuration based on the flags.
     pub(crate) fn apply(&mut self) {
-        let lp_slow_uses_xtal32k = ClockTree::with(|clocks| {
-            matches!(
-                clocks::lp_slow_clk_config(clocks),
-                Some(LpSlowClkConfig::Xtal32k)
-            )
-        });
+        let lp_slow_uses_xtal32k = cfg_select! {
+            use_xtal32k => ClockTree::with(|clocks| {
+                matches!(
+                    clocks::lp_slow_clk_config(clocks),
+                    Some(clocks::LpSlowClkConfig::Xtal32k)
+                )
+            }),
+            _ => false,
+        };
 
         if self.deep {
             self.pd_flags.set_pd_top(true);
@@ -908,35 +909,14 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures wakeup options and enters sleep.
+    /// Configures the wakeup options and requests the sleep.
+    ///
+    /// The caller waits for the result of the request. The return value is a guard that restores
+    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
     #[crate::ram]
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
-        // ESP32-P4 PMU wakeup-source bitmap (esp-idf `pmu_bit_defs.h`).
-        const PMU_SDIO_WAKEUP_EN: u32 = 1 << 0;
-        const PMU_GPIO_WAKEUP_EN: u32 = 1 << 2;
-        const PMU_USB_WAKEUP_EN: u32 = 1 << 3;
-        const PMU_UART1_WAKEUP_EN: u32 = 1 << 7;
-        const PMU_UART0_WAKEUP_EN: u32 = 1 << 8;
-        const PMU_EXT1_WAKEUP_EN: u32 = 1 << 12;
-        const PMU_LP_TIMER_WAKEUP_EN: u32 = 1 << 13;
-
-        const RTC_SLEEP_REJECT_MASK: u32 = PMU_EXT1_WAKEUP_EN
-            | PMU_GPIO_WAKEUP_EN
-            | PMU_LP_TIMER_WAKEUP_EN
-            | PMU_UART0_WAKEUP_EN
-            | PMU_UART1_WAKEUP_EN
-            | PMU_SDIO_WAKEUP_EN
-            | PMU_USB_WAKEUP_EN;
-
-        let wakeup_mask = wakeup_triggers.as_u32();
-        let reject_mask = if self.deep {
-            0
-        } else {
-            wakeup_mask & RTC_SLEEP_REJECT_MASK
-        };
-
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
         // Switch the CPU root clock to XTAL for the duration of sleep.
-        let _restore_clock_config = ClockTree::with(|clocks| {
+        let restore_clock_config = ClockTree::with(|clocks| {
             let old_cpu_root_clk = clocks.cpu_root_clk();
 
             clocks::configure_cpu_root_clk(clocks, CpuRootClkConfig::Xtal);
@@ -989,6 +969,15 @@ impl RtcSleepConfig {
             set_boot_from_lp_ram(true);
         }
 
+        // The wake stub itself restores the vector on a real wake, so this guard runs only if the
+        // hardware rejects the sleep. It points the vector back at the HP ROM, so that a later
+        // reset boots normally.
+        let restore_boot_vector = DropGuard::new((), move |_| {
+            if mspi_workaround {
+                set_boot_from_lp_ram(false);
+            }
+        });
+
         // like esp-idf pmu_sleep_start()
 
         // lp_aon_hal_inform_wakeup_type: on P4 RTC_SLEEP_MODE_REG is
@@ -998,12 +987,15 @@ impl RtcSleepConfig {
             .lp_store8()
             .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
 
+        // The wakeup enable field is bits 30:0 here, unlike the other PMU chips where it is the
+        // whole register. Bit 31 is reserved and reads 0, so a whole-register write is correct and
+        // saves the read.
         PMU::regs()
             .slp_wakeup_cntl2()
             .write(|w| unsafe { w.bits(wakeup_mask) });
 
         PMU::regs().slp_wakeup_cntl1().modify(|_, w| unsafe {
-            w.slp_reject_en().bit(true);
+            w.slp_reject_en().bit(reject_mask != 0);
             w.sleep_reject_ena().bits(reject_mask)
         });
 
@@ -1052,20 +1044,7 @@ impl RtcSleepConfig {
             .slp_wakeup_cntl0()
             .write(|w| w.sleep_req().bit(true));
 
-        // In deep sleep we never get here.
-        loop {
-            let int_raw = PMU::regs().int_raw().read();
-            if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                break;
-            }
-        }
-
-        // We only reach this point if the (deep) sleep was rejected: the wake
-        // stub itself restores the vector on a real wake. Point the vector back
-        // at the HP ROM so a later reset boots normally.
-        if mspi_workaround {
-            set_boot_from_lp_ram(false);
-        }
+        (restore_clock_config, restore_boot_vector)
     }
 
     /// Cleans up after sleep.
@@ -1078,7 +1057,8 @@ impl RtcSleepConfig {
             .imm_pad_hold_all()
             .write(|w| w.tie_low_pad_slp_sel().set_bit());
 
-        Ext1WakeupSource::wake_io_reset();
+        // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
+        // driver knows which pads it prepared.
 
         // Re-enumerate USB-Serial-JTAG (only disabled for light sleep; in deep
         // sleep we never reach here).

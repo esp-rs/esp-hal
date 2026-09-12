@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-metadata` to
+# If you modify a driver support status, run `cargo update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -12,6 +12,14 @@ target = "xtensa-esp32-none-elf"
 cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
+support_note = "Revisions below v3.0 are not supported."
+
+[device.mmu]
+page_size = 0x10000
+entry_num = 256
+
+[device.flash]
+support_status = "partial"
 
 [device.rom]
 has_crc_le  = true
@@ -24,6 +32,8 @@ multi_core_enabled = true
 memory_map = { ranges = [
     { name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 },
     { name = "dram2_uninit", start = 0x3FFE_7E30, end = 0x4000_0000 },
+    { name = "irom", start = 0x400D_0000, end = 0x4040_0000 },
+    { name = "drom", start = 0x3F40_0000, end = 0x3F80_0000 },
 ] }
 
 peripherals = [
@@ -33,32 +43,32 @@ peripherals = [
     { name = "DPORT" },
     { name = "SYSTEM", pac = "DPORT" },
     { name = "EFUSE", hidden = true },
-    { name = "ETH", virtual = true },
-    { name = "EMAC_DMA", hidden = true },
+    { name = "ETH", virtual = true, interrupts = { peri = "ETH_MAC" } },
+    { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
     { name = "EMAC_EXT", hidden = true },
-    { name = "EMAC_MAC", hidden = true },
+    { name = "EMAC_MAC", pac = "GMAC", hidden = true },
     { name = "FLASH_ENCRYPTION" },
     { name = "FRC_TIMER" },
     { name = "GPIO" },
-    { name = "GPIO_SD" },
+    { name = "GPIO_SD", clock_group = "SDM" },
     { name = "HINF" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
-    { name = "I2S1", interrupts = { peri = "I2S1" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
+    { name = "I2S1", interrupts = { peri = "I2S1" }, clock_group = "I2S" },
     { name = "IO_MUX" },
     { name = "LEDC" },
     { name = "MCPWM0", clock_group = "MCPWM" },
     { name = "MMU_TABLE", hidden = true },
     { name = "MCPWM1", clock_group = "MCPWM" },
     { name = "NRX" },
-    { name = "PCNT" },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_TIMER", pac = "RTC_CNTL" },
-    { name = "RTC_I2C" },
+    { name = "LP_I2C0", pac = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SDHOST" },
     { name = "SENS" },
@@ -87,8 +97,11 @@ peripherals = [
     { name = "DAC2", virtual = true },
     { name = "FLASH", virtual = true },
     { name = "PSRAM", virtual = true },
-    { name = "SW_INTERRUPT", virtual = true },
     { name = "TOUCH", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
 ]
 
 [device.soc.clocks]
@@ -149,10 +162,6 @@ engines = [
     }
 ]
 
-[device.lp_io]
-support_status = "partial"
-version = "esp32"
-
 [device.gpio]
 support_status = "supported"
 # {include gpio.toml}
@@ -172,6 +181,10 @@ i2c0_data_register_ahb_address = 0x6001301c
 
 [device.i2c_slave]
 support_status = { status = "not_supported", issue = 1909 }
+
+[device.lp_i2c_master]
+support_status = "not_supported"
+version = "esp32"
 
 [device.interrupts]
 support_status = "partial"
@@ -197,7 +210,8 @@ support_status = "partial"
 algo = { sha1 = 0, sha256 = 0, sha384 = 0, sha512 = 0 } # fake mode bits, ESP32 has separate register sets
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 8
 
 [device.spi_master]
 version = 1
@@ -249,7 +263,7 @@ timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
-support_status = "supported"
+support_status = { status = "supported", issue = 6138 }
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -263,14 +277,21 @@ support_status = "not_supported"
 
 [device.ethernet]
 support_status = "partial"
+rx_store_and_forward = true
+# Type-2 COE can mark valid frames as checksum errors (and CIC insertion
+# is also unreliable), so both directions stay in software.
+rx_checksum_offload = false
+tx_checksum_offload = false
+dma_burst_len = 32
 
 [device.camera]
 support_status = "not_supported"
 [device.rgb_display]
 support_status = "partial"
+output_lines = 24
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
@@ -278,7 +299,11 @@ apb_cycle_wait_num = 16 # TODO
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+ext1_version = 1
+pin_wakeup_version = 1
+deep_sleep_needs_gpio_isolation = true
 wakeup_sources = {
+    rejectable = ["Gpio", "Sdio"],
     Ext0 = 0,
     Ext1 = 1,
     Gpio = 2,
@@ -297,7 +322,6 @@ wakeup_sources = {
 ## Interfaces
 [device.i2s]
 version = 1
-default_clock_source = 2
 mclk_divider_bit_width = 6
 max_ws_width = 128
 instances = [
@@ -324,6 +348,7 @@ instances = [
         ws_rx = "I2S1I_WS",
         dout = ["I2S1O_DATA_23"],
         din = ["I2S1I_DATA_15"],
+        pdm_tx = true,
     },
 ]
 
@@ -332,6 +357,22 @@ version = 1
 channel_count = 8
 [device.mcpwm]
 [device.pcnt]
+instances = {
+    PCNT = {
+        sys_instance = "Pcnt",
+        interrupt = "PCNT",
+        units = [
+            { sig_ch0 = "PCNT0_SIG_CH0", sig_ch1 = "PCNT0_SIG_CH1", ctrl_ch0 = "PCNT0_CTRL_CH0", ctrl_ch1 = "PCNT0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_SIG_CH0", sig_ch1 = "PCNT1_SIG_CH1", ctrl_ch0 = "PCNT1_CTRL_CH0", ctrl_ch1 = "PCNT1_CTRL_CH1" },
+            { sig_ch0 = "PCNT2_SIG_CH0", sig_ch1 = "PCNT2_SIG_CH1", ctrl_ch0 = "PCNT2_CTRL_CH0", ctrl_ch1 = "PCNT2_CTRL_CH1" },
+            { sig_ch0 = "PCNT3_SIG_CH0", sig_ch1 = "PCNT3_SIG_CH1", ctrl_ch0 = "PCNT3_CTRL_CH0", ctrl_ch1 = "PCNT3_CTRL_CH1" },
+            { sig_ch0 = "PCNT4_SIG_CH0", sig_ch1 = "PCNT4_SIG_CH1", ctrl_ch0 = "PCNT4_CTRL_CH0", ctrl_ch1 = "PCNT4_CTRL_CH1" },
+            { sig_ch0 = "PCNT5_SIG_CH0", sig_ch1 = "PCNT5_SIG_CH1", ctrl_ch0 = "PCNT5_CTRL_CH0", ctrl_ch1 = "PCNT5_CTRL_CH1" },
+            { sig_ch0 = "PCNT6_SIG_CH0", sig_ch1 = "PCNT6_SIG_CH1", ctrl_ch0 = "PCNT6_CTRL_CH0", ctrl_ch1 = "PCNT6_CTRL_CH1" },
+            { sig_ch0 = "PCNT7_SIG_CH0", sig_ch1 = "PCNT7_SIG_CH1", ctrl_ch0 = "PCNT7_CTRL_CH0", ctrl_ch1 = "PCNT7_CTRL_CH1" },
+        ],
+    },
+}
 
 [device.sdmmc]
 support_status = "partial"
@@ -370,7 +411,7 @@ extmem_origin = 0x3F800000
 [device.lp_timer]
 
 [device.ulp_fsm]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 376 }
 
 ## Radio
 [device.wifi]

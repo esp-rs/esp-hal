@@ -1,14 +1,11 @@
 //! Wi-Fi access point.
 
-use alloc::string::String;
-use core::fmt;
-
 use procmacros::BuilderLite;
 
 #[cfg(feature = "unstable")]
 use super::CountryInfo;
 use super::{AuthenticationMethod, DisconnectReason, Protocols, SecondaryChannel, Ssid};
-use crate::{WifiError, sys::include::wifi_ap_record_t};
+use crate::{WifiError, sys::include::wifi_ap_record_t, wifi::AuthenticationMethodConfig};
 
 /// Information about a detected Wi-Fi access point.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
@@ -34,10 +31,10 @@ pub struct AccessPointInfo {
 }
 
 /// Configuration for a Wi-Fi access point.
-#[derive(Clone, PartialEq, Eq, BuilderLite, Hash)]
+#[derive(Clone, PartialEq, Eq, BuilderLite, Hash, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AccessPointConfig {
     /// The SSID of the access point.
-    #[builder_lite(skip_setter)]
     pub(crate) ssid: Ssid,
     /// Whether the SSID is hidden or visible.
     pub(crate) ssid_hidden: bool,
@@ -48,10 +45,7 @@ pub struct AccessPointConfig {
     /// The set of protocols supported by the access point.
     pub(crate) protocols: Protocols,
     /// The authentication method to be used by the access point.
-    pub(crate) auth_method: AuthenticationMethod,
-    /// The password for securing the access point (if applicable).
-    #[builder_lite(reference)]
-    pub(crate) password: String,
+    pub(crate) authentication: AuthenticationMethodConfig,
     /// The maximum number of connections allowed on the access point.
     /// When set, this number can be clipped to a true upper limit because
     /// ESPNow and access point connections share a common pool of hardware
@@ -67,19 +61,19 @@ pub struct AccessPointConfig {
 }
 
 impl AccessPointConfig {
-    /// Set the SSID of the access point.
-    pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
-        self.ssid = ssid.into();
-        self
-    }
-
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
+        // Soft-AP doesn't support WEP (nor WAPI/OWE, which
+        // `AuthenticationMethodConfig` doesn't include).
+        if matches!(self.authentication, AuthenticationMethodConfig::Wep(_)) {
+            warn!("WEP is not supported in access point mode.");
+            return Err(WifiError::Unsupported);
         }
 
-        if self.password.len() >= 64 {
-            return Err(WifiError::InvalidArguments);
+        if let Some(password) = self.authentication.password()
+            && password.is_empty()
+        {
+            warn!("Access point password is empty.");
+            return Err(WifiError::InvalidPassword);
         }
 
         if !(1..=10).contains(&self.dtim_period) {
@@ -93,64 +87,16 @@ impl AccessPointConfig {
 impl Default for AccessPointConfig {
     fn default() -> Self {
         Self {
-            ssid: "iot-device".into(),
+            ssid: "iot-device".try_into().expect("SSID length is valid"),
             ssid_hidden: false,
             channel: 1,
             secondary_channel: None,
             protocols: Protocols::default(),
-            auth_method: AuthenticationMethod::None,
-            password: String::new(),
+            authentication: AuthenticationMethodConfig::Open,
             max_connections: 255,
             dtim_period: 2,
             beacon_timeout: 300,
         }
-    }
-}
-
-impl fmt::Debug for AccessPointConfig {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AccessPointConfig")
-            .field("ssid", &self.ssid)
-            .field("ssid_hidden", &self.ssid_hidden)
-            .field("channel", &self.channel)
-            .field("secondary_channel", &self.secondary_channel)
-            .field("protocols", &self.protocols)
-            .field("auth_method", &self.auth_method)
-            .field("password", &"**REDACTED**")
-            .field("max_connections", &self.max_connections)
-            .field("dtim_period", &self.dtim_period)
-            .field("beacon_timeout", &self.beacon_timeout)
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for AccessPointConfig {
-    fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(
-            fmt,
-            "AccessPointConfig {{\
-            ssid: {}, \
-            ssid_hidden: {}, \
-            channel: {}, \
-            secondary_channel: {}, \
-            protocols: {}, \
-            auth_method: {}, \
-            password: **REDACTED**, \
-            max_connections: {}, \
-            dtim_period: {}, \
-            beacon_timeout: {} \
-            }}",
-            self.ssid.as_str(),
-            self.ssid_hidden,
-            self.channel,
-            self.secondary_channel,
-            self.protocols,
-            self.auth_method,
-            self.max_connections,
-            self.dtim_period,
-            self.beacon_timeout
-        );
     }
 }
 
@@ -194,12 +140,11 @@ pub enum EventInfo {
 
 #[allow(non_upper_case_globals)]
 pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
-    let str_len = record
-        .ssid
-        .iter()
-        .position(|&c| c == 0)
-        .unwrap_or(record.ssid.len());
-    let ssid = Ssid::from(&record.ssid[..str_len]);
+    // `record.ssid` is 33 bytes to always fit the NUL terminator of a
+    // maximum-length SSID - clamp to 32 in case the driver ever hands us one
+    // without it.
+    let str_len = record.ssid.iter().position(|&c| c == 0).unwrap_or(32);
+    let ssid = Ssid::try_from(&record.ssid[..str_len]).expect("SSID length is valid");
 
     AccessPointInfo {
         ssid,

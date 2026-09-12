@@ -18,7 +18,7 @@
 
 use crate::{
     peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, TIMG0},
-    soc::regi2c,
+    soc::{regi2c, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -53,8 +53,9 @@ impl CpuClock {
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
         apb_clk: Some(ApbClkConfig::new(ApbClkDivisor::_0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         timg_calibration_clock: None,
     };
     const PRESET_160: ClockConfig = ClockConfig {
@@ -69,8 +70,9 @@ impl CpuClock {
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
         apb_clk: Some(ApbClkConfig::new(ApbClkDivisor::_0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
         timg_calibration_clock: None,
     };
 }
@@ -208,6 +210,7 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 // XTAL32K_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     LP_CLKRST::regs().xtal32k().write(|w| unsafe {
         w.dac_xtal32k().bits(3);
@@ -462,6 +465,21 @@ fn enable_pll_f240m_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
+fn configure_iomux_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<IomuxFunctionClockConfig>,
+    new_config: IomuxFunctionClockConfig,
+) {
+    PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
+        w.iomux_func_clk_sel().bits(match new_config {
+            IomuxFunctionClockConfig::PllF80m => 1,
+            IomuxFunctionClockConfig::RcFastClk => 2,
+            IomuxFunctionClockConfig::XtalClk => 3,
+        });
+        w.iomux_func_clk_en().set_bit()
+    });
+}
+
 // LEDC_SCLK
 
 fn enable_ledc_sclk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -522,6 +540,7 @@ fn configure_lp_slow_clk_impl(
 ) {
     LP_CLKRST::regs().lp_clk_conf().modify(|_, w| unsafe {
         w.slow_clk_sel().bits(match new_config {
+            #[cfg(use_xtal32k)]
             LpSlowClkConfig::Xtal32k => 1,
             LpSlowClkConfig::RcSlow => 0,
             LpSlowClkConfig::OscSlow => 2,
@@ -545,6 +564,7 @@ fn configure_timg_calibration_clock_impl(
         w.rtc_cali_clk_sel().bits(match new_config {
             TimgCalibrationClockConfig::RcSlowClk => 0,
             TimgCalibrationClockConfig::RcFastDivClk => 1,
+            #[cfg(use_xtal32k)]
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
@@ -587,14 +607,14 @@ impl ParlIoInstance {
     fn configure_rx_clock_impl(
         self,
         _clocks: &mut ClockTree,
-        _old_config: Option<ParlIoRxClockConfig>,
-        new_config: ParlIoRxClockConfig,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
     ) {
         PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
             w.parl_clk_rx_sel().bits(match new_config {
-                ParlIoRxClockConfig::XtalClk => 0,
-                ParlIoRxClockConfig::RcFastClk => 2,
-                ParlIoRxClockConfig::PllF240m => 1,
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 2,
+                ParlIoClkConfig::PllF240m => 1,
             })
         });
     }
@@ -610,19 +630,28 @@ impl ParlIoInstance {
     fn configure_tx_clock_impl(
         self,
         _clocks: &mut ClockTree,
-        _old_config: Option<ParlIoTxClockConfig>,
-        new_config: ParlIoTxClockConfig,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
     ) {
         PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
             w.parl_clk_tx_sel().bits(match new_config {
-                ParlIoTxClockConfig::XtalClk => 0,
-                ParlIoTxClockConfig::RcFastClk => 2,
-                ParlIoTxClockConfig::PllF240m => 1,
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 2,
+                ParlIoClkConfig::PllF240m => 1,
             })
         });
     }
 }
 
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.function_clk_en().bit(en));
+    }
+}
 impl RmtInstance {
     // RMT_SCLK
 

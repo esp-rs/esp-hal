@@ -7,6 +7,21 @@ impl FlashStorage<'_> {
     /// Unaligned offsets and lengths are supported.
     ///
     /// If flash encryption is not enabled this will just read plaintext.
+    ///
+    /// # Note
+    ///
+    /// This function always allocates a [`Self::SECTOR_SIZE`]-byte buffer on
+    /// the stack. See the
+    /// [crate-level documentation](crate#buffer-alignment-and-stack-usage).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the read would extend past
+    /// the end of the flash.
+    #[cfg_attr(
+        multi_core,
+        doc = "Returns [`FlashStorageError::OtherCoreRunning`] if the other core is active, because this function changes the flash MMU and the cache."
+    )]
     pub fn read_encrypted(
         &mut self,
         offset: u32,
@@ -39,8 +54,23 @@ impl FlashStorage<'_> {
     /// Performs read-modify-write on affected sectors: reads the current encrypted
     /// content, merges the new bytes, erases the sector, then writes it back encrypted.
     ///
+    /// # Note
+    ///
+    /// This function always allocates a [`Self::SECTOR_SIZE`]-byte buffer on
+    /// the stack. See the
+    /// [crate-level documentation](crate#buffer-alignment-and-stack-usage).
+    ///
     /// # Errors
-    /// - [FlashStorageError::NotSupported] if flash encryption is not enabled
+    ///
+    /// Returns [`FlashStorageError::NotSupported`] if flash encryption is not
+    /// enabled.
+    ///
+    /// Returns [`FlashStorageError::OutOfBounds`] if the write would extend past
+    /// the end of the flash.
+    #[cfg_attr(
+        multi_core,
+        doc = "Returns [`FlashStorageError::OtherCoreRunning`] if the other core is active, because this function changes the flash MMU and the cache."
+    )]
     pub fn write_encrypted(
         &mut self,
         offset: u32,

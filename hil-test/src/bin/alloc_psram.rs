@@ -144,7 +144,7 @@ mod tests {
 #[embedded_test::tests]
 mod storage_tests {
     use esp_bootloader_esp_idf::partitions;
-    use esp_hal::peripherals::FLASH;
+    use esp_hal::{clock::CpuClock, peripherals::FLASH};
     use esp_storage::FlashStorage;
 
     struct Context<'a> {
@@ -153,7 +153,8 @@ mod storage_tests {
 
     #[init]
     fn init() -> Context<'static> {
-        let p = esp_hal::init(esp_hal::Config::default());
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
         Context { flash: p.FLASH }

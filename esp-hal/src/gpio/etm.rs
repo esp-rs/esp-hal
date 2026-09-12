@@ -99,7 +99,7 @@ pub struct Channels<'d> {
 }
 
 impl<'d> Channels<'d> {
-    /// Create a new instance
+    /// Creates a new instance.
     pub fn new(peripheral: GPIO_SD<'d>) -> Self {
         Self {
             _gpio_sd: peripheral,
@@ -138,11 +138,11 @@ impl Default for InputConfig {
     }
 }
 
-/// An ETM controlled GPIO event
+/// An ETM controlled GPIO event.
 pub struct EventChannel<const C: u8> {}
 
 impl<const C: u8> EventChannel<C> {
-    /// Trigger at rising edge
+    /// Triggers at rising edge.
     pub fn rising_edge<'d>(
         self,
         pin: impl Into<InputSignal<'d>>,
@@ -151,7 +151,7 @@ impl<const C: u8> EventChannel<C> {
         self.into_event(pin, pin_config, EventKind::Rising)
     }
 
-    /// Trigger at falling edge
+    /// Triggers at falling edge.
     pub fn falling_edge<'d>(
         self,
         pin: impl Into<InputSignal<'d>>,
@@ -160,7 +160,7 @@ impl<const C: u8> EventChannel<C> {
         self.into_event(pin, pin_config, EventKind::Falling)
     }
 
-    /// Trigger at any edge
+    /// Triggers at any edge.
     pub fn any_edge<'d>(
         self,
         pin: impl Into<InputSignal<'d>>,
@@ -225,7 +225,7 @@ impl crate::etm::EtmEvent for Event<'_> {
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OutputConfig {
-    /// Set to open-drain output
+    /// Sets to open-drain output.
     pub open_drain: bool,
     /// Only used when open-drain
     pub pull: Pull,
@@ -243,7 +243,7 @@ impl Default for OutputConfig {
     }
 }
 
-/// An ETM controlled GPIO task
+/// An ETM controlled GPIO task.
 pub struct TaskChannel<const C: u8> {}
 
 impl<const C: u8> TaskChannel<C> {

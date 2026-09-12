@@ -124,6 +124,24 @@ bitfield::bitfield! {
     pub u32, drv_b, set_drv_b: 31, 8;
 }
 
+/// Analog settings of the high-power system during sleep.
+#[derive(Clone, Copy, Default)]
+pub struct HpAnalog {
+    pub bias: AnalogBias,
+    pub regulator0: HpRegulator0,
+    pub regulator1: HpRegulator1,
+}
+
+/// Power settings of the high-power system during sleep.
+#[derive(Clone, Copy, Default)]
+pub struct HpSysPower {
+    pub dig_power: HpDigPower,
+    pub clk: HpClkPower,
+    pub xtal: XtalPower,
+}
+
+pub type HpSysCntlReg = HpSysCntl;
+
 bitfield::bitfield! {
     #[derive(Clone, Copy, Default)]
     pub struct HpBackup(u32);
@@ -453,6 +471,22 @@ bitfield::bitfield! {
     pub u8, drv_b, set_drv_b: 31, 28;
 }
 
+/// Power settings of the low-power system during sleep.
+#[derive(Clone, Copy, Default)]
+pub struct LpSysPower {
+    pub dig_power: LpDigPower,
+    pub clk_power: LpClkPower,
+    pub xtal: XtalPower,
+}
+
+/// Analog settings of the low-power system during sleep.
+#[derive(Clone, Copy, Default)]
+pub struct LpAnalog {
+    pub bias: AnalogBias,
+    pub regulator0: LpRegulator0,
+    pub regulator1: LpRegulator1,
+}
+
 #[derive(Clone, Copy, Default)]
 struct LpSystemPower {
     dig_power: LpDigPower,
@@ -603,7 +637,7 @@ fn modem_clock_domain_power_state_icg_map_init() {
         });
 }
 
-/// Select the WiFi LP clock after `ClockConfig::configure` has applied and
+/// Selects the WiFi LP clock after `ClockConfig::configure` has applied and
 /// acquired the configured LP clock source.
 pub(crate) fn configure_wifi_lp_clock(config: &ClockConfig) {
     let lpcon = MODEM_LPCON::regs();
@@ -616,10 +650,14 @@ pub(crate) fn configure_wifi_lp_clock(config: &ClockConfig) {
         w.clk_wifipwr_lp_sel_xtal32k().clear_bit();
         match source {
             LpSlowClkConfig::RcSlow => w.clk_wifipwr_lp_sel_osc_slow().set_bit(),
+            #[cfg(use_xtal32k)]
             LpSlowClkConfig::Xtal32k => w.clk_wifipwr_lp_sel_xtal32k().set_bit(),
         }
     });
-    if source == LpSlowClkConfig::Xtal32k {
+    if cfg_select! {
+        use_xtal32k => source == LpSlowClkConfig::Xtal32k,
+        _ => false,
+    } {
         // The WiFi 32 kHz selector feeds from the shared modem 32 kHz mux.
         // MODEM_CLOCK_XTAL32K_CODE is 0 on S31.
         lpcon
@@ -661,7 +699,7 @@ pub(crate) fn init(_config: &ClockConfig) {
 /// SOC Reset Reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ///
     /// In ESP-IDF this value (0x01) can *also* be `ChipBrownOut` or
     /// `ChipSuperWdt`, however that is not really compatible with Rust-style
@@ -685,7 +723,7 @@ pub enum SocResetReason {
     CpuSw         = 0x0C,
     /// RWDT resets digital core
     CpuRwdt       = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RWDT system reset
     SysRwdt       = 0x10,

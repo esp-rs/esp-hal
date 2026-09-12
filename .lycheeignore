@@ -18,5 +18,6 @@ releases/tag/$
 # Shield.io badges
 img\.shields\.io/badge/MSRV-
 
-# Ignore httpbin.org as it is often down/throttling in CI
+# Ignore sites that may not tolerate us spamming them
 http://httpbin\.org/
+https://stackoverflow\.com/

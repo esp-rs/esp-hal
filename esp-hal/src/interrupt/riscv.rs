@@ -18,6 +18,9 @@ pub use esp_riscv_rt::TrapFrame;
 #[cfg_attr(interrupt_controller = "clic", path = "riscv/clic.rs")]
 mod cpu_int;
 
+// The software-interrupt driver is the only caller on this architecture, and that driver is
+// unstable.
+#[cfg(feature = "unstable")]
 pub(crate) use riscv::interrupt::free;
 
 use crate::{
@@ -70,6 +73,7 @@ for_each_classified_interrupt!(
             /// Enumeration of CPU interrupts available for direct binding.
             #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
             #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+            #[instability::unstable]
             pub enum DirectBindableCpuInterrupt {
                 $(
                     #[doc = concat!(" Direct bindable CPU interrupt number ", stringify!($idx_in_class), ".")]
@@ -103,21 +107,21 @@ impl CpuInterrupt {
         VECTORED_CPU_INTERRUPT_RANGE.contains(&(self as u32))
     }
 
-    /// Enable the CPU interrupt
+    /// Enables the CPU interrupt.
     #[inline]
     #[instability::unstable]
     pub fn enable(self) {
         cpu_int::enable_cpu_interrupt_raw(self as u32);
     }
 
-    /// Clear the CPU interrupt status bit
+    /// Clears the CPU interrupt status bit.
     #[inline]
     #[instability::unstable]
     pub fn clear(self) {
         cpu_int::clear_raw(self as u32);
     }
 
-    /// Set the interrupt kind (i.e. level or edge) of an CPU interrupt
+    /// Sets the interrupt kind (i.e. level or edge) of an CPU interrupt.
     ///
     /// This is safe to call when the `vectored` feature is enabled. The
     /// vectored interrupt handler will take care of clearing edge interrupt
@@ -128,14 +132,14 @@ impl CpuInterrupt {
         cpu_int::set_kind_raw(self as u32, kind);
     }
 
-    /// Set the priority level of a CPU interrupt
+    /// Sets the priority level of a CPU interrupt.
     #[inline]
     #[instability::unstable]
     pub fn set_priority(self, priority: Priority) {
         cpu_int::set_priority_raw(self as u32, priority);
     }
 
-    /// Get interrupt priority for the CPU
+    /// Returns the interrupt priority for the CPU.
     #[inline]
     #[instability::unstable]
     pub fn priority(self) -> Priority {
@@ -228,7 +232,7 @@ impl Priority {
 }
 
 impl ElevatedRunLevel {
-    /// Returns the highest run level
+    /// Returns the highest run level.
     #[instability::unstable]
     pub const fn max() -> ElevatedRunLevel {
         Self::from_priority(Priority::max())
@@ -287,21 +291,21 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
     vector
 };
 
-/// Enable an interrupt by directly binding it to an available CPU interrupt
+/// Enables an interrupt by directly binding it to an available CPU interrupt.
 ///
-/// ⚠️ This installs a *raw trap handler*, the `handler` user provides is written directly into the
-/// CPU interrupt vector table. That means:
+/// ⚠️ This installs a *raw trap handler*: the provided `handler` is written
+/// directly into the CPU interrupt vector table. That means:
 ///
-/// - Provided handler will be used as an actual trap-handler
-/// - It is user's responsibility to:
-///   - Save and restore all registers they use.
+/// - The provided handler is used as an actual trap handler.
+/// - The caller must:
+///   - Save and restore all used registers.
 ///   - Clear the interrupt source if necessary.
 ///   - Return using the `mret` instruction.
-/// - The handler should be declared as naked function. The compiler will not insert a function
-///   prologue/epilogue for the user, normal Rust `fn` will result in an error.
+/// - The handler must be declared as a naked function. The compiler does not insert a function
+///   prologue or epilogue; a normal Rust `fn` results in an error
 ///
-/// Unless you are sure that you need such low-level control to achieve the lowest possible latency,
-/// you most likely want to use [`enable`][crate::interrupt::enable] instead.
+/// Unless low-level control is required for the lowest possible latency,
+/// [`enable`][crate::interrupt::enable] is usually preferable
 #[instability::unstable]
 pub fn enable_direct(
     interrupt: Interrupt,
@@ -398,7 +402,7 @@ fn encode_jal_x0(target: usize, pc: usize) -> u32 {
 
 // Runlevel APIs
 
-/// Get the current run level (the level below which interrupts are masked).
+/// Returns the current run level (the level below which interrupts are masked).
 pub(crate) fn current_raw_runlevel() -> u32 {
     cpu_int::current_runlevel() as u32
 }
@@ -408,9 +412,8 @@ pub(crate) fn current_raw_runlevel() -> u32 {
 ///
 /// # Safety
 ///
-/// This function must only be used to raise the runlevel and to restore it
-/// to a previous value. It must not be used to arbitrarily lower the
-/// runlevel.
+/// Must only be used to raise the runlevel and to restore it to a previous
+/// value. Must not be used to arbitrarily lower the runlevel.
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let previous = cpu_int::change_current_runlevel(level);
     unwrap!(RunLevel::try_from_u32(previous as u32))
@@ -418,30 +421,32 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
 
 fn cpu_wait_mode_on() -> bool {
     cfg_select! {
-        soc_has_pcr => {
-            crate::peripherals::PCR::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
-        }
-        soc_has_hp_sys => {
-            crate::peripherals::HP_SYS::regs().cpu_waiti_conf().read().cpu_wait_mode_force_on().bit_is_set()
-        }
-        _ => {
-            crate::peripherals::SYSTEM::regs()
-                .cpu_per_conf()
-                .read()
-                .cpu_wait_mode_force_on()
-                .bit_is_set()
-        }
+        soc_has_pcr => crate::peripherals::PCR::regs()
+            .cpu_waiti_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
+        soc_has_hp_sys => crate::peripherals::HP_SYS::regs()
+            .cpu_waiti_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
+        _ => crate::peripherals::SYSTEM::regs()
+            .cpu_per_conf()
+            .read()
+            .cpu_wait_mode_force_on()
+            .bit_is_set(),
     }
 }
 
-/// Wait for an interrupt to occur.
+/// Waits for an interrupt to occur.
 ///
-/// This function causes the current CPU core to execute its Wait For Interrupt
-/// (WFI or equivalent) instruction. After executing this function, the CPU core
-/// will stop execution until an interrupt occurs.
+/// Causes the current CPU core to execute its Wait For Interrupt (WFI or
+/// equivalent) instruction. After this call, the CPU core stops execution until
+/// an interrupt occurs.
 ///
-/// This function will return immediately when a debugger is attached, so it is intended to be
-/// called in a loop.
+/// Returns immediately when a debugger is attached; intended to be called in a
+/// loop.
 #[inline(always)]
 #[instability::unstable]
 pub fn wait_for_interrupt() {
@@ -458,11 +463,11 @@ pub(crate) fn priority_to_cpu_interrupt(_interrupt: Interrupt, level: Priority) 
     PRIORITY_TO_INTERRUPT[(level as usize) - 1]
 }
 
-/// Setup interrupts ready for vectoring
+/// Sets up interrupts ready for vectoring.
 ///
 /// # Safety
 ///
-/// This function must be called only during core startup.
+/// Must be called only during core startup.
 #[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
 pub(crate) unsafe fn init_vectoring() {
     use riscv::register::mtvec;
@@ -559,7 +564,7 @@ pub(crate) mod rt {
 
     /// # Safety
     ///
-    /// This function is called from an assembly trap handler.
+    /// Called from an assembly trap handler.
     #[doc(hidden)]
     #[unsafe(link_section = ".trap.rust")]
     #[unsafe(export_name = "_start_trap_rust_hal")]
@@ -604,9 +609,12 @@ pub(crate) mod rt {
                 let mcause = riscv::register::mcause::read();
             }
             _ => {
-                // Change the current runlevel so that interrupt handlers can access the correct runlevel.
+                // Change the current runlevel so that interrupt handlers can access the correct
+                // runlevel.
                 let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
-                let level = unsafe { change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio))) };
+                let level = unsafe {
+                    change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio)))
+                };
                 let prio = prio as u8;
             }
         }
@@ -639,9 +647,7 @@ pub(crate) mod rt {
                 // since it contains the former CPU priority. When executing `mret`,
                 // the hardware will restore the former threshold, from `mcause` to
                 // `mintstatus` CSR
-                unsafe {
-                    core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
-                }
+                unsafe { core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits()) }
             }
             _ => {
                 unsafe { change_current_runlevel(level) };

@@ -5,7 +5,7 @@ system_clocks = { clock_tree = [
     { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
 
     # Low-speed clocks
-    { name = "XTAL32K_CLK",  type = "source", output = "32768"   },
+    { name = "XTAL32K_CLK",  type = "source", output = "32768", cfg = "use_xtal32k" },
     { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
     { name = "RC_SLOW_CLK",  type = "source", output = "130_000" },
     # { name = "EXT32K_CLK",   type = "source", output = "32768" }, # currently unimplemented
@@ -46,23 +46,30 @@ system_clocks = { clock_tree = [
     ] },
     { name = "LP_SLOW_CLK", type = "mux", variants = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
-        { name = "XTAL32K",  outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
         #{ name = "EXT32K",   outputs = "EXT32K_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
     
     # Global peripheral-related clocks
+    { name = "CRYPTO_PLL_DIV", type = "generic", output = "PLL_CLK / 3" },
+
     { name = "CRYPTO_CLK", type = "mux", variants = [ # PCR_SEC_CONF
         { name = "XTAL",      outputs = "XTAL_CLK" },
         { name = "FOSC",      outputs = "RC_FAST_CLK" },
-        { name = "PLL_F480M", outputs = "PLL_CLK" },
+        { name = "PLL_F480M", outputs = "CRYPTO_PLL_DIV" },
+    ] },
+    { name = "IOMUX_FUNCTION_CLOCK", type = "mux", always_on = true, variants = [
+        { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
+        { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
+        { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
     ] },
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [ # PCR_32K_SEL / clk_tg_xtal32k
         { name = "OSC_SLOW_CLK",    outputs = "OSC_SLOW_CLK" },
         { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
         # EXT32K not modeled
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" },
-        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK" },
+        { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 ], template_groups = [
     { group = "UART", clocks = [
@@ -85,6 +92,9 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
         ] },
     ] },
+    { group = "SDM", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "IOMUX_FUNCTION_CLOCK" },
+    ] },
     { group = "RMT", clocks = [
         { name = "SCLK", type = "mux", variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
@@ -92,19 +102,50 @@ system_clocks = { clock_tree = [
             { name = "PLL_F80M",    outputs = "PLL_F80M", default = true },
         ] },
     ] },
-    { group = "PARL_IO", clocks = [
-        { name = "RX_CLOCK", type = "mux", variants = [
+    { group = "PARL_IO",
+      presets = {
+        CLK = {
+          type = "mux",
+          variants = [
             { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
             { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
             { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
-            # TODO: external clock
+            # TODO: external clock (TX and RX may differ)
+          ],
+        },
+      },
+      clocks = [
+        { name = "RX_CLOCK", preset = "CLK" },
+        { name = "TX_CLOCK", preset = "CLK" },
+      ],
+    },
+    { group = "I2S",
+      presets = {
+        CLK = {
+          type = "generic",
+          wake_locking = true,
+          output = "(sclk * div_a) / (div_num * div_a + div_b)",
+          params = {
+            sclk = [
+              { name = "XTAL",      outputs = "XTAL_CLK" },
+              { name = "PLL_F240M", outputs = "PLL_F240M" },
+              { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
+            ],
+            div_num = "1 ..= 255",
+            div_a   = "1 ..= 511",
+            div_b   = "0 ..= 511",
+          },
+        },
+      },
+      clocks = [
+        { name = "TX_CLK",   preset = "CLK" },
+        { name = "RX_CLK",   preset = "CLK" },
+        { name = "MCLK_OUT", type = "mux", variants = [
+          { name = "TX", outputs = "TX_CLK" },
+          { name = "RX", outputs = "RX_CLK", default = true },
         ] },
-        { name = "TX_CLOCK", type = "mux", variants = [
-            { name = "XTAL_CLK",    outputs = "XTAL_CLK" },
-            { name = "RC_FAST_CLK", outputs = "RC_FAST_CLK" },
-            { name = "PLL_F240M",   outputs = "PLL_F240M", default = true },
-        ] },
-    ] },
+      ],
+    },
     { group = "I2C", clocks = [
         { name = "FUNCTION_CLOCK", type = "generic", output = "sclk / (div_num + 1)", params = { sclk = [
             { name = "XTAL",    outputs = "XTAL_CLK", default = true },
@@ -113,8 +154,8 @@ system_clocks = { clock_tree = [
     ] },
     { group = "SPI", clocks = [
         { name = "FUNCTION_CLOCK", type = "mux", variants = [
-            { name = "XTAL",      outputs = "XTAL_CLK", default = true },
-            { name = "PLL_F160M", outputs = "PLL_F160M" },
+            { name = "XTAL",      outputs = "XTAL_CLK" },
+            { name = "PLL_F160M", outputs = "PLL_F160M", default = true },
             { name = "PLL_F120M", outputs = "PLL_F120M" },
             { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
         ] },
@@ -140,6 +181,7 @@ peripheral_clocks = { templates = [
     { name = "I2s0", template_params = { peripheral = "i2s" } },
     { name = "Pcnt" },
     { name = "Rmt" },
+    { name = "GpioSd", template_params = { clk_en_template = "crate::peripherals::GPIO_SD::regs().clock_gate().modify(|_, w| w.clk_en().bit(enable));", rst_template = "let _ = reset;" } },
     { name = "Systimer", keep_enabled = true }, # can be clocked from XTAL_CLK or RC_FAST_CLK, the latter has no divider?
     { name = "ApbSarAdc", template_params = { peripheral = "saradc", clk_en_field = "saradc_reg_clk_en", rst_field = "saradc_reg_rst_en" }, keep_enabled = true },
     { name = "ParlIo", template_params = { clk_en_field = "parl_clk_en", rst_field = "parl_rst_en" } },

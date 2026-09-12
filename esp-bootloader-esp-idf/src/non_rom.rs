@@ -1,4 +1,5 @@
 use crc::{Algorithm, Crc};
+#[cfg(feature = "validation")]
 use md5::Digest;
 
 static ALGO_CRC32_NORMAL: Algorithm<u32> = Algorithm {
@@ -30,10 +31,12 @@ impl Crc32 {
     }
 }
 
+#[cfg(feature = "validation")]
 pub struct Md5 {
     context: md5::Md5,
 }
 
+#[cfg(feature = "validation")]
 impl Md5 {
     pub fn new() -> Self {
         Self {

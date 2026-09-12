@@ -49,7 +49,7 @@ pub(crate) fn enable_ieee802154(en: bool) {
 
     regs!(MODEM_LPCON)
         .clk_conf()
-        .modify(|_, w| w.clk_coex_en().set_bit());
+        .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
 pub(crate) fn enable_bt(en: bool) {
@@ -83,6 +83,10 @@ pub(crate) fn reset_wifi_mac() {
 
 pub(crate) fn init_clocks() {
     // done in esp-hal
+}
+
+pub(crate) fn deinit_clocks() {
+    // nothing to do, `init_clocks` is a no-op
 }
 
 pub(crate) fn ble_rtc_clk_init() {

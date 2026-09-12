@@ -46,7 +46,7 @@ pub enum Error {
 /// Returned by [Trace::stop_trace]
 #[derive(Debug, Clone, Copy)]
 pub struct TraceResult {
-    /// Start index of the valid data
+    /// Starts index of the valid data.
     pub valid_start_index: usize,
     /// Length of the valid data
     pub valid_length: usize,
@@ -60,7 +60,7 @@ pub struct Trace<'d> {
 }
 
 impl<'d> Trace<'d> {
-    /// Construct a new instance
+    /// Creates a new instance.
     pub fn new(peripheral: TRACE0<'d>) -> Self {
         let guard = PeripheralGuard::new(peripheral.peripheral());
 
@@ -71,7 +71,7 @@ impl<'d> Trace<'d> {
         }
     }
 
-    /// Start tracing, writing data into the `buffer`
+    /// Starts tracing, writing data into the `buffer`.
     pub fn start_trace(&mut self, buffer: &'d mut [u8]) {
         let reg_block = self.peripheral.register_block();
 
@@ -107,9 +107,9 @@ impl<'d> Trace<'d> {
         reg_block.trigger().write(|w| w.on().set_bit());
     }
 
-    /// Stop tracing
+    /// Stops tracing.
     ///
-    /// Be aware that valid data might not start at index 0 and you need to
+    /// Be aware that valid data might not start at index 0 and the reader must
     /// account for wrapping when reading the data.
     pub fn stop_trace(&mut self) -> Result<TraceResult, Error> {
         let reg_block = self.peripheral.register_block();
@@ -199,7 +199,7 @@ impl<'d> Trace<'d> {
 /// Trace peripheral instance
 #[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
-    /// Get a reference to the peripheral's underlying register block
+    /// Returns a reference to the peripheral's underlying register block.
     fn register_block(&self) -> &RegisterBlock;
 
     /// Peripheral

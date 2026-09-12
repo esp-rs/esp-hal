@@ -151,7 +151,7 @@ pub trait QspiInstance: Instance {}
 pub struct Info {
     /// Pointer to the register block for this SPI instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with [`Self::register_block`] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// The system peripheral marker.
@@ -169,7 +169,7 @@ pub struct Info {
     pub sio_inputs: &'static [InputSignal],
     pub sio_outputs: &'static [OutputSignal],
 
-    /// Clock tree instance for this SPI peripheral.
+    /// Clocks tree instance for this SPI peripheral.
     pub clock_instance: crate::soc::clocks::SpiInstance,
 }
 
@@ -212,11 +212,12 @@ impl Driver {
         self.update();
     }
 
-    /// Initialize for full-duplex 1 bit mode
+    /// Initializes for full-duplex 1 bit mode.
     pub(super) fn init(&self) {
         version::enable_peripheral_clock(self);
 
         crate::soc::clocks::ClockTree::with(|clocks| {
+            #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
             self.info.clock_instance.configure_function_clock(
                 clocks,
                 crate::soc::clocks::SpiFunctionClockConfig::default(),
@@ -251,19 +252,19 @@ impl Driver {
         version::init_spi_data_mode(self, cmd_mode, address_mode, data_mode)
     }
 
-    /// Enable or disable listening for the given interrupts.
+    /// Enables or disables listening for the given interrupts.
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     pub(super) fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
         version::enable_listen(self, interrupts, enable);
     }
 
-    /// Gets asserted interrupts
+    /// Returns the asserted interrupts.
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     pub(super) fn interrupts(&self) -> EnumSet<SpiInterrupt> {
         version::interrupts(self)
     }
 
-    /// Resets asserted interrupts
+    /// Resets asserted interrupts.
     pub(super) fn clear_interrupts(&self, interrupts: EnumSet<SpiInterrupt>) {
         version::clear_interrupts(self, interrupts);
     }
@@ -273,6 +274,7 @@ impl Driver {
 
         let raw = config.raw_clock_reg_value()?;
         crate::soc::clocks::ClockTree::with(|clocks| {
+            #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
             self.info
                 .clock_instance
                 .configure_function_clock(clocks, config.clock_source);
@@ -355,7 +357,7 @@ impl Driver {
         }
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn write_one(&self, words: &[u8]) -> Result<(), Error> {
         if words.len() > FIFO_SIZE {
@@ -367,7 +369,7 @@ impl Driver {
         Ok(())
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn write(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
@@ -377,7 +379,7 @@ impl Driver {
         Ok(())
     }
 
-    /// Write bytes to SPI.
+    /// Writes bytes to SPI.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(FIFO_SIZE) {
@@ -387,11 +389,11 @@ impl Driver {
         Ok(())
     }
 
-    /// Read bytes from SPI.
+    /// Reads bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. This function doesn't
-    /// perform flushing. If you want to read the response to something you
-    /// have written before, consider using [`Self::transfer`] instead.
+    /// Sends out a stuffing byte for every byte to read. Does not perform
+    /// flushing. To read the response to a prior write, use [`Self::transfer`]
+    /// instead.
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn read(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
@@ -404,11 +406,10 @@ impl Driver {
         Ok(())
     }
 
-    /// Read bytes from SPI.
+    /// Reads bytes from SPI.
     ///
-    /// Sends out a stuffing byte for every byte to read. If you want to read
-    /// the response to something you have written before, consider using
-    /// [`Self::transfer`] instead.
+    /// Sends out a stuffing byte for every byte to read. To read the response to a
+    /// prior write, use [`Self::transfer`] instead
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) async fn read_async(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
@@ -421,12 +422,11 @@ impl Driver {
         Ok(())
     }
 
-    /// Read received bytes from SPI FIFO.
+    /// Reads received bytes from SPI FIFO.
     ///
-    /// Copies the contents of the SPI receive FIFO into `words`. This function
-    /// doesn't perform any data transfer. If you want to read the response to
-    /// something you have written before, consider using [`Self::transfer`]
-    /// instead.
+    /// Copies the contents of the SPI receive FIFO into `words`. Does not perform
+    /// any data transfer. To read the response to a prior write, use
+    /// [`Self::transfer`] instead
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     pub(super) fn read_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
         if words.len() > FIFO_SIZE {
@@ -972,7 +972,7 @@ for_each_spi_master! {
                 }
 
                 static INFO: Info = Info {
-                    register_block: crate::peripherals::$peri::regs(),
+                    register_block: crate::peripherals::$peri::ptr(),
                     peripheral: crate::system::Peripheral::$sys,
                     async_handler: irq_handler,
                     sclk: OutputSignal::$sclk,
@@ -1071,10 +1071,19 @@ impl Future for SpiFuture<'_> {
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.driver.busy() {
-            self.driver.state.waker.register(cx.waker());
-            self.driver.enable_listen(Self::EVENTS, true);
+        if !self.driver.busy() {
+            self.driver.clear_interrupts(Self::EVENTS);
+            return Poll::Ready(());
+        }
 
+        self.driver.state.waker.register(cx.waker());
+        self.driver.enable_listen(Self::EVENTS, true);
+
+        // On some chips the interrupt enable bit and the interrupt status bit are in the same
+        // register. If the transfer ends while we enable the interrupt, the read-modify-write
+        // clears the status bit, and the peripheral does not request an interrupt. Check the
+        // peripheral again to detect this case.
+        if self.driver.busy() {
             Poll::Pending
         } else {
             self.driver.clear_interrupts(Self::EVENTS);

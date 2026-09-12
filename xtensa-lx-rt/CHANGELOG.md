@@ -19,6 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.23.0] - 2026-08-24
+
+### Changed
+
+- updated defmt to 1.1 (#5752)
+
+### Fixed
+
+- exception/interrupt handlers now set the PS.UM bit (#6027)
+
 ## [v0.22.0] - 2026-04-16
 
 ### Changed
@@ -84,4 +94,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.20.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.19.0...xtensa-lx-rt-v0.20.0
 [v0.21.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.20.0...xtensa-lx-rt-v0.21.0
 [v0.22.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.21.0...xtensa-lx-rt-v0.22.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.22.0...HEAD
+[v0.23.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.22.0...xtensa-lx-rt-v0.23.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.23.0...HEAD

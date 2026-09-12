@@ -2,7 +2,7 @@
 #
 # Empty [`device.driver`] tables imply `partial` support status.
 #
-# If you modify a driver support status, run `cargo xtask update-metadata` to
+# If you modify a driver support status, run `cargo update-metadata` to
 # update the table in the esp-hal README.
 
 [device]
@@ -12,6 +12,13 @@ target = "xtensa-esp32s3-none-elf"
 cores  = 2
 datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf"
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
+
+[device.mmu]
+page_size = 0x10000
+entry_num = 384
+
+[device.flash]
+support_status = "partial"
 
 [device.rom]
 has_crc_le  = true
@@ -25,6 +32,8 @@ has_swd_watchdog = true
 memory_map = { ranges = [
     { name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 },
     { name = "dram2_uninit", start = 0x3FCD_B700, end = 0x3FCE_D710 },
+    { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x3C00_0000, end = 0x3E00_0000 },
 ] }
 
 peripherals = [
@@ -38,29 +47,29 @@ peripherals = [
     { name = "EXTMEM" },
     { name = "MMU_TABLE", hidden = true },
     { name = "GPIO" },
-    { name = "GPIO_SD" },
+    { name = "GPIO_SD", clock_group = "SDM" },
     { name = "HMAC" },
     { name = "I2C_ANA_MST" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
-    { name = "I2S0", interrupts = { peri = "I2S0" } },
-    { name = "I2S1", interrupts = { peri = "I2S1" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
+    { name = "I2S1", interrupts = { peri = "I2S1" }, clock_group = "I2S" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
-    { name = "LCD_CAM" },
+    { name = "LCD_CAM", clock_group = "LCD_CAM" },
     { name = "LEDC" },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_TIMER", pac = "RTC_CNTL" },
     { name = "MCPWM0", clock_group = "MCPWM" },
     { name = "MCPWM1", clock_group = "MCPWM" },
-    { name = "PCNT" },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PERI_BACKUP" },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "RTC_CNTL" },
-    { name = "RTC_I2C" },
+    { name = "LP_I2C0", pac = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SDHOST" },
     { name = "SENS" },
@@ -92,9 +101,12 @@ peripherals = [
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "PSRAM", virtual = true },
-    { name = "SW_INTERRUPT", virtual = true },
     { name = "ULP_RISCV_CORE", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
+    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR1", virtual = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
 ]
 
 [device.soc.clocks]
@@ -156,10 +168,6 @@ engines = [
     },
 ]
 
-[device.lp_io]
-support_status = "partial"
-version = "v2"
-
 [device.gpio]
 support_status = "supported"
 # {include gpio.toml}
@@ -196,6 +204,10 @@ has_pd_en = true
 [device.i2c_slave]
 support_status = { status = "not_supported", issue = 1909 }
 
+[device.lp_i2c_master]
+support_status = "partial"
+version = "rtc_i2c"
+
 [device.interrupts]
 support_status = "partial"
 status_registers = 4
@@ -223,10 +235,20 @@ memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
-algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
+algo = {
+    sha1 = 0,
+    sha224 = 1,
+    sha256 = 2,
+    sha384 = 3,
+    sha512 = 4,
+    sha512_224 = 5,
+    sha512_256 = 6,
+    sha512_t = 7,
+}
 
 [device.sdm]
-support_status = { status = "not_supported", issue = 2370 }
+support_status = "partial"
+channel_count = 8
 
 [device.spi_master]
 version = 3
@@ -301,7 +323,7 @@ support_status = { status = "not_supported", issue = 1905 }
 support_status = { status = "not_supported", issue = 884 }
 
 [device.rng]
-support_status = "partial"
+support_status = { status = "partial", issue = 5979 }
 trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 
@@ -309,7 +331,23 @@ apb_cycle_wait_num = 16 # TODO
 support_status = "partial"
 light_sleep = true
 deep_sleep = true
+ext1_version = 1
+pin_wakeup_version = 1
+deep_sleep_needs_gpio_isolation = true
 wakeup_sources = {
+    # A UART wake cannot reject a sleep.
+    rejectable = [
+        "Ext0",
+        "Ext1",
+        "Gpio",
+        "Timer",
+        "Sdio",
+        "Wifi",
+        "Touch",
+        "Bt",
+        "UlpRiscv",
+        "UlpRiscvTrap",
+    ],
     Ext0 = 0,
     Ext1 = 1,
     Gpio = 2,
@@ -333,8 +371,7 @@ wakeup_sources = {
 ## Interfaces
 [device.i2s]
 version = 2
-default_clock_source = 2
-mclk_divider_bit_width = 6
+mclk_divider_bit_width = 9
 max_ws_width = 128
 instances = [
     {
@@ -362,16 +399,32 @@ instances = [
         ws_rx = "I2S1I_WS",
         dout = ["I2S1O_SD"],
         din = ["I2S1I_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
     },
 ]
 
 [device.camera]
 [device.rgb_display]
+output_lines = 16
+
 [device.ledc]
 version = 2
 channel_count = 8
 [device.mcpwm]
 [device.pcnt]
+instances = {
+    PCNT = {
+        sys_instance = "Pcnt",
+        interrupt = "PCNT",
+        units = [
+            { sig_ch0 = "PCNT0_SIG_CH0", sig_ch1 = "PCNT0_SIG_CH1", ctrl_ch0 = "PCNT0_CTRL_CH0", ctrl_ch1 = "PCNT0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_SIG_CH0", sig_ch1 = "PCNT1_SIG_CH1", ctrl_ch0 = "PCNT1_CTRL_CH0", ctrl_ch1 = "PCNT1_CTRL_CH1" },
+            { sig_ch0 = "PCNT2_SIG_CH0", sig_ch1 = "PCNT2_SIG_CH1", ctrl_ch0 = "PCNT2_CTRL_CH0", ctrl_ch1 = "PCNT2_CTRL_CH1" },
+            { sig_ch0 = "PCNT3_SIG_CH0", sig_ch1 = "PCNT3_SIG_CH1", ctrl_ch0 = "PCNT3_CTRL_CH0", ctrl_ch1 = "PCNT3_CTRL_CH1" },
+        ],
+    },
+}
 
 [device.sdmmc]
 support_status = "partial"
@@ -425,7 +478,7 @@ octal_spi = true
 [device.systimer]
 [device.temp_sensor]
 [device.ulp_fsm]
-support_status = "not_supported"
+support_status = { status = "not_supported", issue = 376 }
 [device.ulp_riscv]
 [device.lp_timer]
 

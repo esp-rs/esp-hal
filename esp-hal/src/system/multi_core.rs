@@ -42,7 +42,7 @@ impl<const SIZE: usize> Default for Stack<SIZE> {
 
 #[allow(clippy::len_without_is_empty)]
 impl<const SIZE: usize> Stack<SIZE> {
-    /// Construct a stack of length SIZE, uninitialized
+    /// Creates a new stack of length SIZE, uninitialized.
     #[instability::unstable]
     pub const fn new() -> Stack<SIZE> {
         const {
@@ -80,7 +80,7 @@ pub(crate) static START_CORE1_FUNCTION: AtomicPtr<()> = AtomicPtr::new(core::ptr
 pub(crate) static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 pub(crate) static APP_CORE_STACK_GUARD: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 
-/// Will park the APP (second) core when dropped
+/// Will park the APP (second) core when dropped.
 #[must_use = "Dropping this guard will park the APP core"]
 #[instability::unstable]
 pub struct AppCoreGuard<'a> {
@@ -105,7 +105,8 @@ pub enum Error {
 #[procmacros::doc_replace]
 /// Control CPU Cores
 ///
-/// ## Examples
+/// # Examples
+///
 /// ```rust, no_run
 /// # {before_snippet}
 /// # use esp_hal::delay::Delay;
@@ -159,24 +160,24 @@ impl<'d> CpuControl<'d> {
         }
     }
 
-    /// Park the given core
+    /// Parks the given core.
     ///
     /// # Safety
     ///
-    /// The user must ensure that the core being parked is not the core which is
-    /// currently executing their code.
+    /// The caller must ensure that the core being parked is not the core which is
+    /// currently executing this code.
     #[instability::unstable]
     pub unsafe fn park_core(&mut self, core: Cpu) {
         unsafe { internal_park_core(core, true) };
     }
 
-    /// Unpark the given core
+    /// Unparks the given core.
     #[instability::unstable]
     pub fn unpark_core(&mut self, core: Cpu) {
         unsafe { internal_park_core(core, false) };
     }
 
-    /// Run the core1 closure.
+    /// Runs the core1 closure.
     #[inline(never)]
     pub(crate) unsafe fn start_core1_run<F>() -> !
     where
@@ -194,10 +195,10 @@ impl<'d> CpuControl<'d> {
         }
     }
 
-    /// Start the APP (second) core.
+    /// Starts the APP (second) core.
     ///
-    /// The second core will start running the closure `entry`. Note that if the
-    /// closure exits, the core will be parked.
+    /// The second core starts running the closure `entry`. If the closure exits, the core is
+    /// parked.
     ///
     /// Dropping the returned guard will park the core.
     #[instability::unstable]
@@ -225,10 +226,10 @@ impl<'d> CpuControl<'d> {
         self.start_app_core_with_stack_guard_offset(stack, stack_guard_offset, entry)
     }
 
-    /// Start the APP (second) core.
+    /// Starts the APP (second) core.
     ///
-    /// The second core will start running the closure `entry`. Note that if the
-    /// closure exits, the core will be parked.
+    /// The second core starts running the closure `entry`. If the closure exits, the core is
+    /// parked.
     ///
     /// Dropping the returned guard will park the core.
     #[instability::unstable]

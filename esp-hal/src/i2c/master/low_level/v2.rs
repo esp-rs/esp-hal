@@ -3,7 +3,7 @@ use crate::soc::clocks::{ClockTree, I2cFunctionClockConfig};
 
 /// Sets the frequency of the I2C interface by calculating and applying the
 /// associated timings - corresponds to i2c_ll_cal_bus_clk and
-/// i2c_ll_set_bus_timing in ESP-IDF
+/// i2c_ll_set_bus_timing in ESP-IDF.
 pub(super) fn set_frequency(driver: &Driver<'_>, clock_config: &Config) -> Result<(), ConfigError> {
     let timeout = clock_config.timeout;
     let bus_freq = clock_config.frequency.as_hz();

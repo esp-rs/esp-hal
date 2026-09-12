@@ -7,7 +7,7 @@
 //! - SDA => GPIO6
 //! - SCL => GPIO7
 
-//% CHIP_FILTER: ulp_riscv_driver_supported && soc_has_lp_i2c0
+//% CHIP_FILTER: ulp_riscv_driver_supported && lp_i2c_master_version == "lp_i2c"
 
 #![no_std]
 #![no_main]

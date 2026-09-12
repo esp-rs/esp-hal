@@ -2,12 +2,7 @@
 mod tests {
     use embassy_futures::select::select;
     use embassy_time::{Duration, Timer, with_timeout};
-    use esp_hal::{
-        clock::CpuClock,
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::Peripherals,
-        timer::timg::TimerGroup,
-    };
+    use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
     use esp_radio::ble::controller::BleConnector;
     use trouble_host::prelude::*;
 
@@ -22,8 +17,7 @@ mod tests {
     #[test]
     async fn ble_central_connects_to_peripheral(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
 
         let connector = BleConnector::new(p.BT, Default::default()).unwrap();
         let controller: ExternalController<_, 1> = ExternalController::new(connector);

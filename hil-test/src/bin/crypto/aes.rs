@@ -358,8 +358,46 @@ mod tests {
         );
     }
 
+    /// The crypto accelerators and the MCPWM peripherals share a clock, and its reference count.
     #[test]
-    #[cfg(not(esp32))]
+    #[cfg(soc_has_clock_node_crypto_pwm_clk)]
+    fn test_crypto_clock_shared_with_mcpwm() {
+        use esp_hal::{
+            clock::ll::{ClockTree, CryptoPwmClkConfig, McpwmInstance, crypto_pwm_clk_frequency},
+            mcpwm::{McPwm, PeripheralClockConfig},
+            time::Rate,
+        };
+
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        let mut aes = Aes::new(p.AES);
+
+        let clock_config = PeripheralClockConfig::with_frequency(Rate::from_mhz(32)).unwrap();
+        let mcpwm = McPwm::new(p.MCPWM0, clock_config);
+
+        hil_test::assert!(
+            ClockTree::with(|clocks| clocks.crypto_pwm_clk()) == Some(CryptoPwmClkConfig::Pll)
+        );
+        hil_test::assert_eq!(
+            McpwmInstance::Mcpwm0.function_clock_frequency(),
+            crypto_pwm_clk_frequency()
+        );
+        aes_ll_roundtrip::<16>(
+            &mut aes,
+            PLAINTEXT[0..16].try_into().unwrap(),
+            CIPHERTEXT_ECB_128[0..16].try_into().unwrap(),
+        );
+
+        core::mem::drop(mcpwm);
+
+        aes_ll_roundtrip::<16>(
+            &mut aes,
+            PLAINTEXT[0..16].try_into().unwrap(),
+            CIPHERTEXT_ECB_128[0..16].try_into().unwrap(),
+        );
+    }
+
+    #[test]
+    #[cfg(aes_supports_dma)]
     fn test_aes_dma_ecb() {
         use esp_hal::{
             aes::dma::AesDma,
@@ -428,8 +466,8 @@ mod tests {
         let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
         let dma_channel = cfg_select! {
-            esp32s2 => peripherals.DMA_CRYPTO,
-            esp32p4 => peripherals.DMA_AXI_CH0,
+            aes_dma_engine = "CRYPTO_DMA" => peripherals.DMA_CRYPTO,
+            aes_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
             _ => peripherals.DMA_CH0,
         };
 
@@ -600,12 +638,12 @@ mod work_queue_dma_tests {
 
         esp_alloc::heap_allocator!(size: 32 * 1024);
 
-        #[cfg(soc_has_psram)]
+        #[cfg(all(soc_has_psram, dma_can_access_psram))]
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
         let dma = cfg_select! {
-            esp32s2 => p.DMA_CRYPTO,
-            esp32p4 => p.DMA_AXI_CH0,
+            aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
+            aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
             _ => p.DMA_CH0,
         };
 
@@ -629,7 +667,7 @@ mod work_queue_dma_tests {
     }
 
     #[test]
-    #[cfg(soc_has_psram)]
+    #[cfg(all(soc_has_psram, dma_can_access_psram))]
     fn test_aes_dma_work_queue_psram(mut ctx: Context) {
         let _backend = ctx.aes.start();
 

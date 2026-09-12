@@ -46,7 +46,7 @@ pub trait Filter {
         Self::FILTER_TYPE
     }
 
-    /// Get the register level representation of the filter.
+    /// Returns the register level representation of the filter.
     fn to_registers(&self) -> [u8; 8];
 }
 
@@ -103,7 +103,7 @@ pub struct SingleStandardFilter {
 
 impl SingleStandardFilter {
     #[procmacros::doc_replace]
-    /// Create a new filter that matches against a single 11-bit standard id.
+    /// Creates a new filter that matches against a single 11-bit standard id.
     /// The filter can match against the packet's id, RTR bit, and first two
     /// bytes of the payload.
     ///
@@ -179,7 +179,6 @@ impl SingleStandardFilter {
     ///     false,
     ///     true,
     ///     [0x00, 0x00],
-    ///     [0x00, 0x00],
     /// );
     /// ```
     pub fn new_from_code_mask(
@@ -230,7 +229,7 @@ pub struct SingleExtendedFilter {
 }
 
 impl SingleExtendedFilter {
-    /// Create a filter that matches against a single 29-bit extended id.
+    /// Creates a new filter that matches against a single 29-bit extended id.
     ///
     /// The filter can match against the packet's id and the RTR bit.
     ///
@@ -318,7 +317,7 @@ pub struct DualStandardFilter {
 }
 
 impl DualStandardFilter {
-    /// Create a filter that matches against two standard 11-bit standard IDs.
+    /// Creates a new filter that matches against two standard 11-bit standard IDs.
     ///
     /// The first filter part can match a packet's id, RTR bit, and the first
     /// byte of the payload. The second filter part can match a packet's id
@@ -467,7 +466,7 @@ pub struct DualExtendedFilter {
 }
 
 impl DualExtendedFilter {
-    /// Create a filter that matches the first 16 bits of two 29-bit extended
+    /// Creates a new filter that matches the first 16 bits of two 29-bit extended
     /// IDs.
     ///
     /// # Examples
@@ -511,7 +510,7 @@ impl DualExtendedFilter {
             raw: code_mask_to_register_array(acceptance_code, acceptance_mask),
         }
     }
-    /// Create a new filter matching the first 16 bits of two 29-bit IDs.
+    /// Creates a new filter matching the first 16 bits of two 29-bit IDs.
     ///
     /// The masks indicate which bits of the code the filter should match
     /// against. Set bits in the mask indicate that the corresponding bit in

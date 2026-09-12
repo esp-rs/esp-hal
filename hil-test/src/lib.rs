@@ -81,6 +81,7 @@ macro_rules! i2c_pins {
             any(esp32s2, esp32s3) => ($peripherals.GPIO3, $peripherals.GPIO2),
             esp32 => ($peripherals.GPIO32, $peripherals.GPIO33),
             any(esp32c6, esp32c61) => ($peripherals.GPIO6, $peripherals.GPIO7),
+            esp32s31 => ($peripherals.GPIO7, $peripherals.GPIO6),
             esp32h2 => ($peripherals.GPIO12, $peripherals.GPIO22),
             esp32c2 => ($peripherals.GPIO18, $peripherals.GPIO9),
             any(esp32c5, esp32p4) => ($peripherals.GPIO2, $peripherals.GPIO3),
@@ -97,7 +98,7 @@ macro_rules! common_test_pins {
             any(esp32s2, esp32s3, esp32c5) => ($peripherals.GPIO9, $peripherals.GPIO10),
             esp32 => ($peripherals.GPIO2, $peripherals.GPIO4),
             esp32p4 => ($peripherals.GPIO5, $peripherals.GPIO6),
-            // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3
+            // esp32c6, esp32c61, esp32h2, esp32c2, esp32c3, esp32s31
             _ => ($peripherals.GPIO2, $peripherals.GPIO3),
         }
     }};
@@ -113,6 +114,7 @@ macro_rules! unconnected_pin {
             esp32c2 => $peripherals.GPIO8,
             esp32c5 => $peripherals.GPIO28,
             esp32p4 => $peripherals.GPIO35,
+            esp32s31 => $peripherals.GPIO61,
             // esp32c3, esp32c6, esp32c61, esp32h2
             _ => $peripherals.GPIO9,
         }
@@ -167,3 +169,84 @@ mod executor {
 pub use esp_rtos::embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
+
+/// Disables every watchdog timer with raw register writes.
+///
+/// This prevents the firmware reset loop if no debugger is attached. The function must not depend
+/// on esp-hal drivers, because a driver that is broken or half-initialized must not stop the tests
+/// from running.
+#[embedded_test::setup]
+fn disable_watchdogs_before_semihosting() {
+    cfg_select! {
+        soc_has_lp_wdt => {
+            use esp_hal::peripherals::LP_WDT;
+        }
+        _ => {
+            use esp_hal::peripherals::LPWR as LP_WDT;
+        }
+    }
+
+    // RWDT
+    let lp_wdt = LP_WDT::regs();
+    cfg_select! {
+        esp32p4 => {
+            lp_wdt.wprotect().write(|w| unsafe { w.bits(0x50D8_3AA1) });
+            lp_wdt.config0().write(|w| unsafe { w.bits(0) });
+            lp_wdt.wprotect().write(|w| unsafe { w.bits(0) });
+        }
+        _ => {
+            lp_wdt
+                .wdtwprotect()
+                .write(|w| unsafe { w.bits(0x50D8_3AA1) });
+            lp_wdt.wdtconfig0().write(|w| unsafe { w.bits(0) });
+            lp_wdt.wdtwprotect().write(|w| unsafe { w.bits(0) });
+        }
+    }
+
+    // SWD
+    #[cfg(soc_has_swd_watchdog)]
+    {
+        const SWD_WKEY: u32 = cfg_select! {
+            any(esp32c2, esp32c3, esp32s2, esp32s3) => 0x8F1D_312A,
+            _ => 0x50D8_3AA1,
+        };
+
+        lp_wdt
+            .swd_wprotect()
+            .write(|w| unsafe { w.swd_wkey().bits(SWD_WKEY) });
+        cfg_select! {
+            esp32p4 => lp_wdt
+                .swd_config()
+                .write(|w| w.swd_auto_feed_en().set_bit()),
+            _ => lp_wdt.swd_conf().write(|w| w.swd_auto_feed_en().set_bit()),
+        };
+        lp_wdt
+            .swd_wprotect()
+            .write(|w| unsafe { w.swd_wkey().bits(0) });
+    }
+
+    // MWDT
+    #[cfg(timergroup_timg0)]
+    {
+        let timg0 = esp_hal::peripherals::TIMG0::regs();
+        timg0
+            .wdtwprotect()
+            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1) });
+        timg0.wdtconfig0().modify(|_, w| w.wdt_en().clear_bit());
+        timg0
+            .wdtwprotect()
+            .write(|w| unsafe { w.wdt_wkey().bits(0) });
+    }
+
+    #[cfg(timergroup_timg1)]
+    {
+        let timg1 = esp_hal::peripherals::TIMG1::regs();
+        timg1
+            .wdtwprotect()
+            .write(|w| unsafe { w.wdt_wkey().bits(0x50D8_3AA1) });
+        timg1.wdtconfig0().modify(|_, w| w.wdt_en().clear_bit());
+        timg1
+            .wdtwprotect()
+            .write(|w| unsafe { w.wdt_wkey().bits(0) });
+    }
+}

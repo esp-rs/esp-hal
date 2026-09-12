@@ -15,18 +15,7 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32s2 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    // I2S uses the 160 MHz PLL tap, derived from either supported PLL frequency.
-    match clocks::pll_clk_frequency() {
-        320_000_000 => 320_000_000 / 2,
-        480_000_000 => 480_000_000 / 3,
-        _ => unreachable!(),
-    }
-}
-
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
@@ -66,11 +55,12 @@ pub(crate) const CONFIG_INSTRUCTION_CACHE_SIZE: usize = cfg_select! {
     instruction_cache_size_8kb => 0,
     instruction_cache_size_16kb => 1,
 };
-pub(crate) const CONFIG_DATA_CACHE_SIZE: usize = cfg_select! {
-    data_cache_size_0kb => 0, // doesn't matter according to esp-idf
-    data_cache_size_8kb => 0,
-    data_cache_size_16kb => 1,
-};
+pub(crate) const CONFIG_DATA_CACHE_SIZE: usize =
+    cfg_select! {
+        data_cache_size_0kb => 0, // doesn't matter according to esp-idf
+        data_cache_size_8kb => 0,
+        data_cache_size_16kb => 1,
+    };
 
 #[crate::ram]
 pub(crate) unsafe fn configure_cpu_caches() {
@@ -79,7 +69,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// Invalidate all cache items in ICache.
         fn Cache_Invalidate_ICache_All();
 
-        /// Set ICache modes: cache size, associate ways and cache line size.
+        /// Sets ICache modes: cache size, associate ways and cache line size.
         ///
         /// @param cache_size_t cache_size : the cache size, can be CACHE_SIZE_HALF and
         /// CACHE_SIZE_FULL
@@ -90,12 +80,12 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// CACHE_LINE_SIZE_16B, CACHE_LINE_SIZE_32B
         fn Cache_Set_ICache_Mode(cache_size: u32, ways: u32, cache_line_size: u32);
 
-        /// Resume ICache access for the cpu.
+        /// Resumes ICache access for the cpu.
         ///
         /// @param  uint32_t autoload : ICache will preload then.
         fn Cache_Resume_ICache(autoload: u32);
 
-        /// Allocate memory to used by ICache and DCache.
+        /// Allocates memory to used by ICache and DCache.
         ///
         /// [`sram0_layout`]: u32 the usage of first 8KB internal memory block,
         /// can be CACHE_MEMORY_INVALID,
@@ -111,7 +101,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
             sram3_layout: u32,
         );
 
-        /// Set DCache modes: cache size, associate ways and cache line size.
+        /// Sets DCache modes: cache size, associate ways and cache line size.
         ///
         /// [`cache_size`]: u32 the cache size, can be CACHE_SIZE_HALF and CACHE_SIZE_FULL
         /// [`ways`]: u32 the associate ways of cache, can only be CACHE_4WAYS_ASSOC
@@ -121,7 +111,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// Invalidate all cache items in DCache.
         fn Cache_Invalidate_DCache_All();
 
-        /// Enable DCache access for the cpu.
+        /// Enables DCache access for the cpu.
         ///
         /// @param  uint32_t autoload : DCache will preload then.
         fn Cache_Enable_DCache(autoload: u32);

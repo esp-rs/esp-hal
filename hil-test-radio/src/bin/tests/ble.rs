@@ -4,7 +4,7 @@
 //! central device and validates that scanning and connection establishment work
 //! against real peer hardware.
 
-//% CHIP_FILTER(has_wifi_ble): esp32c6
+//% CHIP_FILTER(has_wifi_ble): esp32c6 || esp32s3
 //% HARNESS-FIRMWARE(has_wifi_ble): ble_peripheral_support
 
 //% FEATURES: unstable esp-alloc embassy
@@ -29,11 +29,11 @@ fn init_heap() {
             use esp_hal::ram;
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 36 * 1024);
-        },
+        }
         any(esp32c5, esp32h2) => {
             esp_alloc::heap_allocator!(size: 72 * 1024);
-        },
-        _ => {},
+        }
+        _ => {}
     }
 }
 

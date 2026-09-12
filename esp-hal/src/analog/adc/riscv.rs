@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 cfg_select! {
-    esp32c6 => {
+    any(esp32c6, esp32c61) => {
         use Interrupt::APB_SARADC as InterruptSource;
     }
     _ => {
@@ -21,7 +21,7 @@ use procmacros::handler;
 
 pub use self::calibration::*;
 use super::{AdcCalSource, AdcConfig, Attenuation};
-#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2))]
+#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2))]
 use crate::efuse::AdcCalibUnit;
 use crate::{
     Async,
@@ -59,6 +59,9 @@ cfg_select! {
     esp32c5 => {
         pub(super) const NUM_ATTENS: usize = 6;
     }
+    esp32c61 => {
+        pub(super) const NUM_ATTENS: usize = 4;
+    }
     _ => {
         pub(super) const NUM_ATTENS: usize = 5;
     }
@@ -68,7 +71,7 @@ impl<ADCX> AdcConfig<ADCX>
 where
     ADCX: RegisterAccess,
 {
-    /// Calibrate ADC with specified attenuation and voltage source
+    /// Calibrates ADC with specified attenuation and voltage source.
     pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16
     where
         ADCX: super::CalibrationAccess,
@@ -115,25 +118,25 @@ where
 
 #[doc(hidden)]
 pub trait RegisterAccess {
-    /// Configure onetime sampling parameters
+    /// Configures one-time sampling parameters.
     fn config_onetime_sample(channel: u8, attenuation: u8);
 
-    /// Start onetime sampling
+    /// Starts one-time sampling.
     fn start_onetime_sample();
 
-    /// Check if sampling is done
+    /// Returns whether sampling is done.
     fn is_done() -> bool;
 
-    /// Read sample data
+    /// Reads sample data.
     fn read_data() -> u16;
 
-    /// Reset flags
+    /// Resets flags.
     fn reset();
 
-    /// Set up ADC hardware for calibration
+    /// Sets up ADC hardware for calibration.
     fn calibration_init();
 
-    /// Set calibration parameter to ADC hardware
+    /// Sets calibration parameter to ADC hardware.
     fn set_init_code(data: u16);
 }
 
@@ -178,25 +181,10 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .modify(|_, w| w.onetime_start().clear_bit());
     }
 
-    // Currently #[cfg] covers all supported RISC-V devices,
-    // but, for example, esp32p4 uses the value 4 instead of 1,
-    // so it is not standard across all RISC-V devices.
-    #[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32h2))]
     fn calibration_init() {
         // e.g.
         // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32c3/include/hal/adc_ll.h#L702
         regi2c::ADC_SAR1_DREF.write_field(1);
-    }
-
-    // ESP32-P4 uses DREF value 4 (same as S2/S3) not 1.
-    //      REGI2C_SAR_I2C (0x69) reg 2, bits [6:4] = DREF
-    #[cfg(esp32p4)]
-    fn calibration_init() {
-        use crate::soc::regi2c;
-        // REG2 bits [6:4] = ADC_SAR1_DREF; clear then set to 4
-        let val = regi2c::regi2c_read(regi2c::REGI2C_SAR_I2C, 0, 2);
-        let new_val = (val & !(0x7 << 4)) | (4 << 4);
-        regi2c::regi2c_write(regi2c::REGI2C_SAR_I2C, 0, 2, new_val);
     }
 
     fn set_init_code(data: u16) {
@@ -271,19 +259,8 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
             .modify(|_, w| w.onetime_start().clear_bit());
     }
 
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
     fn calibration_init() {
         regi2c::ADC_SAR2_DREF.write_field(1);
-    }
-
-    // ESP32-P4 uses DREF value 4 for ADC2 as well.
-    // REG5 bits [6:4] = ADC_SAR2_DREF
-    #[cfg(esp32p4)]
-    fn calibration_init() {
-        use crate::soc::regi2c;
-        let val = regi2c::regi2c_read(regi2c::REGI2C_SAR_I2C, 0, 5);
-        let new_val = (val & !(0x7 << 4)) | (4 << 4);
-        regi2c::regi2c_write(regi2c::REGI2C_SAR_I2C, 0, 5, new_val);
     }
 
     fn set_init_code(data: u16) {
@@ -325,8 +302,8 @@ impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configure a given ADC instance using the provided configuration, and
-    /// initialize the ADC for use
+    /// Configures a given ADC instance using the provided configuration, and
+    /// initializes the ADC for use.
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
@@ -365,9 +342,9 @@ where
         }
     }
 
-    /// Request that the ADC begin a conversion on the specified pin
+    /// Requests that the ADC begin a conversion on the specified pin.
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     pub fn read_oneshot<PIN, CS>(
@@ -469,8 +446,8 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
         crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 
-    #[cfg(esp32c5)]
-    fn cal_chan_compens(atten: Attenuation, channel: u16) -> Option<i32> {
+    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+    fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32> {
         crate::efuse::rtc_calib_get_chan_compens(AdcCalibUnit::ADC1, channel, atten)
     }
 }
@@ -494,7 +471,7 @@ impl<'d, ADCX> Adc<'d, ADCX, Async>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Reconfigures the ADC driver to operate in [`Blocking`] mode.
     pub fn into_blocking(self) -> Adc<'d, ADCX, Blocking> {
         if release_async_adc() {
             // Disable ADC interrupt on all cores if the last async ADC instance is disabled
@@ -511,9 +488,9 @@ where
         }
     }
 
-    /// Request that the ADC begin a conversion on the specified pin
+    /// Requests that the ADC begin a conversion on the specified pin.
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
@@ -567,12 +544,8 @@ pub(super) fn acquire_async_adc() {
 
 pub(super) fn release_async_adc() -> bool {
     cfg_select! {
-        all(adc_adc1, adc_adc2) => {
-            ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
-        }
-        _ => {
-            true
-        }
+        all(adc_adc1, adc_adc2) => ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1,
+        _ => true,
     }
 }
 
@@ -597,18 +570,18 @@ fn handle_async<ADCX: Instance>(_instance: ADCX) {
     ADCX::unlisten();
 }
 
-/// Enable asynchronous access.
+/// Enables asynchronous access.
 pub trait Instance: crate::private::Sealed {
-    /// Enable the ADC interrupt
+    /// Enables the ADC interrupt.
     fn listen();
 
-    /// Disable the ADC interrupt
+    /// Disables the ADC interrupt.
     fn unlisten();
 
-    /// Clear the ADC interrupt
+    /// Clears the ADC interrupt.
     fn clear_interrupt();
 
-    /// Obtain the waker for the ADC interrupt
+    /// Obtains the waker for the ADC interrupt.
     fn waker() -> &'static AtomicWaker;
 }
 

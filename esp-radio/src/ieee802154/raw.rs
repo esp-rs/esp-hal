@@ -16,7 +16,7 @@ use super::{
     pib::*,
 };
 use crate::{
-    radio_clocks::{clocks_ll::enable_ieee802154, init_radio_clocks},
+    radio_clocks::{clocks_ll::enable_ieee802154, deinit_radio_clocks, init_radio_clocks},
     sys::include::{
         ieee802154_coex_event_t,
         ieee802154_coex_event_t_IEEE802154_IDLE,
@@ -104,9 +104,25 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
+/// Gates off the 802.15.4 modem clocks and de-initializes the radio clocks
+/// when dropped.
+///
+/// Must be dropped only after the PHY guards: PHY teardown still requires the
+/// modem clocks.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct RadioClockGuard;
+
+impl Drop for RadioClockGuard {
+    fn drop(&mut self) {
+        enable_ieee802154(false);
+        deinit_radio_clocks();
+    }
+}
+
 pub(crate) fn esp_ieee802154_enable(
     radio: IEEE802154<'_>,
-) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
+) -> (PhyClockGuard<'_>, PhyInitGuard<'_>, RadioClockGuard) {
     init_radio_clocks();
     let phy_clock_guard = esp_phy::enable_phy_clock();
     enable_ieee802154(true);
@@ -117,7 +133,7 @@ pub(crate) fn esp_ieee802154_enable(
     ieee802154_mac_init(radio);
 
     info!("date={:x}", mac_date());
-    (phy_clock_guard, phy_init_guard)
+    (phy_clock_guard, phy_init_guard, RadioClockGuard)
 }
 
 fn esp_btbb_enable() {
@@ -125,7 +141,7 @@ fn esp_btbb_enable() {
 }
 
 fn ieee802154_mac_init(radio: IEEE802154<'_>) {
-    #[cfg(any(esp32c6, esp32c5))]
+    #[cfg(soc_has_wifi)]
     unsafe {
         unsafe extern "C" {
             static mut coex_pti_tab_ptr: u32;
@@ -615,6 +631,7 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
                 // auto tx ack for frame version 0b00 and 0b01
                 // Frame data already copied above. Defer rx_available()
                 // notification until ACK completes (isr_handle_ack_tx_done).
+                ack_config_pending_bit(frm);
                 state.state = Ieee802154State::TxAck;
                 *needs_next_op = false;
             } else if should_send_enhanced_ack(frm) {
@@ -801,6 +818,22 @@ fn isr_handle_tx_abort(tx_abort_reason: u32, needs_next_op: &mut bool) {
 
 fn freq_to_channel(freq: u8) -> u8 {
     (freq - 3) / 5 + 11
+}
+
+/// Provide the hardware with the frame-pending bit for the ACK it is about
+/// to send.
+///
+/// TODO: Revisit once a pending-address table is exposed by the driver.
+fn ack_config_pending_bit(frame: &[u8]) {
+    // The hardware inserts this value only into acks of version 0b00/0b01
+    // frames; 2015 enhanced ACKs carry it inside the software-built frame.
+    if frame_get_version(frame) <= FRAME_VERSION_1 {
+        // Until the driver exposes the pending-address table, claim pending
+        // for every poller in every mode: a spurious "pending" costs a
+        // sleepy device one idle receive window, while a wrong "nothing
+        // pending" makes it sleep through a frame queued for it.
+        set_pending_bit(true);
+    }
 }
 
 fn will_auto_send_ack(frame: &[u8]) -> bool {

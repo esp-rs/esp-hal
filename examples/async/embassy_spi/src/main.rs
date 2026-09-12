@@ -23,7 +23,6 @@ use esp_backtrace as _;
 use esp_hal::{
     dma_rx_buffer,
     dma_tx_buffer,
-    interrupt::software::SoftwareInterruptControl,
     spi::{
         Mode,
         master::{Config, Spi},
@@ -41,9 +40,8 @@ async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
 
     let sclk = peripherals.GPIO0;
     let miso = peripherals.GPIO2;
@@ -53,6 +51,7 @@ async fn main(_spawner: Spawner) {
     let dma_channel = cfg_select! {
         any(feature = "esp32", feature = "esp32s2") => peripherals.DMA_SPI2,
         feature = "esp32p4" => peripherals.DMA_AXI_CH0,
+        feature = "esp32s31" => peripherals.DMA_AXI_CH0,
         _ => peripherals.DMA_CH0,
     };
 
@@ -74,9 +73,13 @@ async fn main(_spawner: Spawner) {
     .with_buffers(dma_rx_buf, dma_tx_buf)
     .into_async();
 
-    let send_buffer = [0, 1, 2, 3, 4, 5, 6, 7];
+    let mut send_buffer = [0u8; 1024];
+    for i in 0..send_buffer.len() {
+        send_buffer[i] = (i % 255) as u8;
+    }
+
     loop {
-        let mut buffer = [0; 8];
+        let mut buffer = [0; 1024];
         esp_println::println!("Sending bytes");
         embedded_hal_async::spi::SpiBus::transfer(&mut spi, &mut buffer, &send_buffer)
             .await

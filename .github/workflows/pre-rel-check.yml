@@ -22,22 +22,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.6
+      - uses: ./.github/actions/setup-toolchains
         with:
-          version: 1.97.0.0
-
-      # Install the Rust stable toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: stable
-          components: rust-src
+          xtensa: "true"
+          riscv: "true"
 
       # Install the Rust nightly toolchain for RISC-V devices:
       - uses: ./.github/actions/setup-nightly
         with:
-          targets: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
+          targets: all
           components: rust-src
           alias: "true"
 
@@ -47,12 +40,15 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
+      # Warm the chip-metadata cache while crates.io is still reachable. A cold
+      # cache makes the later `build` step regenerate `esp-metadata-generated`,
+      # which builds the `esp-metadata` tool - and that host tool cannot resolve
+      # its dependencies (e.g. `prettyplease`) against the local registry.
+      - name: warm-metadata-cache
+        run: cargo update-metadata
+
       - name: init-local-registry
         run: |
-          # this example relies on a Cargo.lock file and won't compile after `cargo update` - for now lets remove it
-          # include it once that is resolved
-          rm -rf examples/async/embassy_usb_ethernet
-
           cargo xrel-check init
           cargo xrel-check update
           cargo xrel-check replace-path-deps
@@ -64,20 +60,21 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:compile-test') }}
         shell: bash
         run: |
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s2
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s3
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c2
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c3
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c5
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c6
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c61
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32p4
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32h2
+          cargo xtask build compile-tests all esp32 --toolchain esp
+          cargo xtask build compile-tests all esp32s2 --toolchain esp
+          cargo xtask build compile-tests all esp32s3 --toolchain esp
+          cargo xtask build compile-tests all esp32s31 --toolchain stable
+          cargo xtask build compile-tests all esp32c2 --toolchain stable
+          cargo xtask build compile-tests all esp32c3 --toolchain stable
+          cargo xtask build compile-tests all esp32c5 --toolchain stable
+          cargo xtask build compile-tests all esp32c6 --toolchain stable
+          cargo xtask build compile-tests all esp32c61 --toolchain stable
+          cargo xtask build compile-tests all esp32p4 --toolchain stable
+          cargo xtask build compile-tests all esp32h2 --toolchain stable
 
-      # Build the examples/qa-test/tests against the local registry. Gated on
+      # Build the examples/qa/tests against the local registry. Gated on
       # `release:registry:ci` so a release can opt out of this heavy check.
-      - name: try-build [examples/qa-test/tests]
+      - name: try-build [examples/qa/tests]
         if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:ci') }}
         shell: bash
         run: |
@@ -85,6 +82,7 @@ jobs:
           cargo xcheck ci esp32 --toolchain esp --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32s2 --toolchain esp --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32s3 --toolchain esp --steps=lp-examples,examples,qa-test,tests
+          cargo xcheck ci esp32s31 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32c2 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32c3 --toolchain stable --steps=lp-examples,examples,qa-test,tests
           cargo xcheck ci esp32c5 --toolchain stable --steps=lp-examples,examples,qa-test,tests

@@ -81,8 +81,8 @@ pub enum Release {
     Publish(PublishArgs),
     /// Generate git tags for all new package releases.
     TagReleases(TagReleasesArgs),
-    /// Update the MSRV (Badges in README.md, "rust-version" in Cargo.toml, the
-    /// toolchain used in CI)
+    /// Update the MSRV (Badges in README.md, "rust-version" in Cargo.toml). CI
+    /// derives its MSRV toolchain from esp-hal's "rust-version".
     #[cfg(feature = "release")]
     BumpMsrv(bump_msrv::BumpMsrvArgs),
 }

@@ -133,3 +133,109 @@ unsafe impl CoreAllocator for ExternalMemory {
         }
     }
 }
+
+/// A DMA-compatible allocator that uses internal memory only.
+///
+/// This allocator adjusts the allocation alignment and size to be safe for use with DMA.
+pub struct DmaCompatibleInternalMemory;
+
+fn align(layout: Layout, min_alignment: usize) -> Layout {
+    let alignment = layout.align().max(min_alignment);
+    Layout::from_size_align(layout.size().next_multiple_of(alignment), alignment).unwrap()
+}
+
+impl DmaCompatibleInternalMemory {
+    fn align(layout: Layout) -> Layout {
+        align(
+            layout,
+            cfg_select! {
+                soc_internal_memory_cached => 64,
+                _ => 4,
+            },
+        )
+    }
+}
+
+unsafe impl Allocator for DmaCompatibleInternalMemory {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        allocate_caps(
+            EnumSet::from(MemoryCapability::Internal),
+            Self::align(layout),
+        )
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe {
+            crate::HEAP.dealloc(ptr.as_ptr(), Self::align(layout));
+        }
+    }
+}
+
+#[cfg(feature = "nightly")]
+unsafe impl CoreAllocator for DmaCompatibleInternalMemory {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, CoreAllocError> {
+        allocate_caps(
+            EnumSet::from(MemoryCapability::Internal),
+            Self::align(layout),
+        )
+        .map_err(|_| CoreAllocError)
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe {
+            crate::HEAP.dealloc(ptr.as_ptr(), Self::align(layout));
+        }
+    }
+}
+
+/// A DMA-compatible allocator that uses external (PSRAM) memory only.
+///
+/// This allocator adjusts the allocation alignment and size to be safe for use with DMA.
+pub struct DmaCompatibleExternalMemory;
+
+impl DmaCompatibleExternalMemory {
+    fn align(layout: Layout) -> Layout {
+        // Pessimistic alignment based on maximum possible cache line size
+        // TODO: relax by stealing the `data-cache-size` config from esp-hal
+        align(
+            layout,
+            cfg_select! {
+                esp32p4 => 128,
+                any(esp32s3, esp32s31) => 64,
+                _ => 32,
+            },
+        )
+    }
+}
+
+unsafe impl Allocator for DmaCompatibleExternalMemory {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        allocate_caps(
+            EnumSet::from(MemoryCapability::External),
+            Self::align(layout),
+        )
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe {
+            crate::HEAP.dealloc(ptr.as_ptr(), Self::align(layout));
+        }
+    }
+}
+
+#[cfg(feature = "nightly")]
+unsafe impl CoreAllocator for DmaCompatibleExternalMemory {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, CoreAllocError> {
+        allocate_caps(
+            EnumSet::from(MemoryCapability::External),
+            Self::align(layout),
+        )
+        .map_err(|_| CoreAllocError)
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe {
+            crate::HEAP.dealloc(ptr.as_ptr(), Self::align(layout));
+        }
+    }
+}

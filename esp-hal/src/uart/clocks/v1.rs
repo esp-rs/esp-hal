@@ -4,7 +4,6 @@ use crate::clock::ll::{
     UartFunctionClockConfig,
     UartFunctionClockSclk,
     UartInstance,
-    UartMemClockConfig,
 };
 
 impl UartInstance {
@@ -72,15 +71,6 @@ impl UartInstance {
     // UART_MEM_CLOCK
 
     pub(crate) fn enable_mem_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    pub(crate) fn configure_mem_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartMemClockConfig>,
-        _new_config: UartMemClockConfig,
-    ) {
         // Nothing to do.
     }
 

@@ -16,12 +16,6 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    clocks::pll_f160m_clk_frequency()
-}
-
 pub(crate) unsafe fn configure_cpu_caches() {}
 
 pub(crate) fn pre_init() {}

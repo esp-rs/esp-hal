@@ -2,6 +2,8 @@
 //! is programmed by `EngineSession` on engine acquire.
 use super::*;
 
+pub fn chip_setup() {}
+
 /// Programs the shared module clock register (divider, source, phases).
 ///
 /// Field encodings differ per chip (see each chip's `sdmmc_ll`).

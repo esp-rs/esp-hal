@@ -42,6 +42,24 @@ pub(crate) fn init_clocks() {
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }
 
+pub(crate) fn deinit_clocks() {
+    // No `wifi_clk_en` restore: ESP-IDF's Wi-Fi disable mask
+    // (`SYSTEM_WIFI_CLK_WIFI_EN_M`) is 0 on this chip — its
+    // `periph_ll_wifi_module_disable_clk_set_rst` clears nothing.
+
+    // Power the BT domain back down, re-asserting the state cleared by
+    // `init_clocks` and mirroring ESP-IDF's `esp_bt_power_domain_off` (the
+    // Wi-Fi domain is powered down by `disable_wifi_power_domain`, which
+    // `deinit` calls first). Isolate before powering down.
+    regs!(RTC_CNTL)
+        .dig_iso()
+        .modify(|_, w| w.bt_force_iso().set_bit());
+
+    regs!(RTC_CNTL)
+        .dig_pwc()
+        .modify(|_, w| w.bt_force_pd().set_bit());
+}
+
 pub(crate) fn ble_rtc_clk_init() {
     // nothing for this target
 }

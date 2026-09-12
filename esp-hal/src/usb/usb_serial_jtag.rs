@@ -121,6 +121,7 @@
 use core::task::Poll;
 use core::{convert::Infallible, marker::PhantomData};
 
+use esp_sync::RawMutex;
 use procmacros::handler;
 
 use crate::{
@@ -173,7 +174,7 @@ where
         self.peripheral.register_block()
     }
 
-    /// Write data to the serial output in chunks of up to 64 bytes
+    /// Writes data to the serial output in chunks of up to 64 bytes.
     pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         for chunk in data.chunks(64) {
             for byte in chunk {
@@ -192,8 +193,8 @@ where
         Ok(())
     }
 
-    /// Write data to the serial output in a non-blocking manner
-    /// Requires manual flushing (automatically flushed every 64 bytes)
+    /// Writes data to the serial output in a non-blocking manner.
+    /// Requires manual flushing (automatically flushed every 64 bytes).
     pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
         if self
             .regs()
@@ -211,7 +212,7 @@ where
         }
     }
 
-    /// Flush the output FIFO and block until it has been sent
+    /// Flushes the output FIFO and blocks until it has been sent.
     pub fn flush_tx(&mut self) -> Result<(), Error> {
         self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
@@ -223,7 +224,7 @@ where
         Ok(())
     }
 
-    /// Flush the output FIFO but don't block if it isn't ready immediately
+    /// Flushes the output FIFO but does not block if it is not ready immediately.
     pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
         self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
@@ -252,7 +253,7 @@ where
         self.peripheral.register_block()
     }
 
-    /// Read a byte from the UART in a non-blocking manner
+    /// Reads a byte from USB Serial/JTAG in a non-blocking manner.
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         // Check if there are any bytes to read
         if self
@@ -270,7 +271,7 @@ where
         }
     }
 
-    /// Read all available bytes from the RX FIFO into the provided buffer and
+    /// Reads all available bytes from the RX FIFO into the provided buffer and
     /// returns the number of read bytes. Never blocks. May stop early if the
     /// number of bytes in the FIFO is larger than `buf`.
     pub fn drain_rx_fifo(&mut self, buf: &mut [u8]) -> usize {
@@ -285,21 +286,21 @@ where
         count
     }
 
-    /// Listen for RX-PACKET-RECV interrupts
+    /// Listens for RX-PACKET-RECV interrupts.
     pub fn listen_rx_packet_recv_interrupt(&mut self) {
         self.regs()
             .int_ena()
             .modify(|_, w| w.serial_out_recv_pkt().set_bit());
     }
 
-    /// Stop listening for RX-PACKET-RECV interrupts
+    /// Stops listening for RX-PACKET-RECV interrupts.
     pub fn unlisten_rx_packet_recv_interrupt(&mut self) {
         self.regs()
             .int_ena()
             .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
     }
 
-    /// Checks if RX-PACKET-RECV interrupt is set
+    /// Returns whether RX-PACKET-RECV interrupt is set.
     pub fn rx_packet_recv_interrupt_set(&mut self) -> bool {
         self.regs()
             .int_st()
@@ -308,7 +309,7 @@ where
             .bit_is_set()
     }
 
-    /// Reset RX-PACKET-RECV interrupt
+    /// Resets RX-PACKET-RECV interrupt.
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
         self.regs()
             .int_clr()
@@ -317,12 +318,12 @@ where
 }
 
 impl<'d> UsbSerialJtag<'d, Blocking> {
-    /// Create a new USB serial/JTAG instance with defaults
+    /// Creates a new USB serial/JTAG instance with defaults.
     pub fn new(usb_device: USB_DEVICE<'d>) -> Self {
         Self::new_inner(usb_device)
     }
 
-    /// Reconfigure the USB Serial JTAG peripheral to operate in asynchronous
+    /// Reconfigures the USB Serial JTAG peripheral to operate in asynchronous
     /// mode.
     pub fn into_async(mut self) -> UsbSerialJtag<'d, Async> {
         self.set_interrupt_handler(async_interrupt_handler);
@@ -389,63 +390,62 @@ where
             tx: UsbSerialJtagTx::new_inner(usb_device),
         }
     }
-    /// Split the USB Serial JTAG peripheral into a transmitter and receiver,
+    /// Splits the USB Serial JTAG peripheral into a transmitter and receiver,
     /// which is particularly useful when having two tasks correlating to
     /// transmitting and receiving.
     pub fn split(self) -> (UsbSerialJtagRx<'d, Dm>, UsbSerialJtagTx<'d, Dm>) {
         (self.rx, self.tx)
     }
 
-    /// Write data to the serial output in chunks of up to 64 bytes
+    /// Writes data to the serial output in chunks of up to 64 bytes.
     pub fn write(&mut self, data: &[u8]) -> Result<(), Error> {
         self.tx.write(data)
     }
 
-    /// Write data to the serial output in a non-blocking manner
-    /// Requires manual flushing (automatically flushed every 64 bytes)
+    /// Writes data to the serial output in a non-blocking manner.
+    /// Requires manual flushing (automatically flushed every 64 bytes).
     pub fn write_byte_nb(&mut self, word: u8) -> nb::Result<(), Error> {
         self.tx.write_byte_nb(word)
     }
 
-    /// Flush the output FIFO and block until it has been sent
+    /// Flushes the output FIFO and blocks until it has been sent.
     pub fn flush_tx(&mut self) -> Result<(), Error> {
         self.tx.flush_tx()
     }
 
-    /// Flush the output FIFO but don't block if it isn't ready immediately
+    /// Flushes the output FIFO but does not block if it is not ready immediately.
     pub fn flush_tx_nb(&mut self) -> nb::Result<(), Error> {
         self.tx.flush_tx_nb()
     }
 
-    /// Read a single byte but don't block if it isn't ready immediately
+    /// Reads a single byte but does not block if it is not ready immediately.
     pub fn read_byte(&mut self) -> nb::Result<u8, Error> {
         self.rx.read_byte()
     }
 
-    /// Listen for RX-PACKET-RECV interrupts
+    /// Listens for RX-PACKET-RECV interrupts.
     pub fn listen_rx_packet_recv_interrupt(&mut self) {
         self.rx.listen_rx_packet_recv_interrupt()
     }
 
-    /// Stop listening for RX-PACKET-RECV interrupts
+    /// Stops listening for RX-PACKET-RECV interrupts.
     pub fn unlisten_rx_packet_recv_interrupt(&mut self) {
         self.rx.unlisten_rx_packet_recv_interrupt()
     }
 
-    /// Checks if RX-PACKET-RECV interrupt is set
+    /// Returns whether RX-PACKET-RECV interrupt is set.
     pub fn rx_packet_recv_interrupt_set(&mut self) -> bool {
         self.rx.rx_packet_recv_interrupt_set()
     }
 
-    /// Reset RX-PACKET-RECV interrupt
+    /// Resets RX-PACKET-RECV interrupt.
     pub fn reset_rx_packet_recv_interrupt(&mut self) {
         self.rx.reset_rx_packet_recv_interrupt()
     }
 
     /// Registers an interrupt handler for the USB Serial JTAG peripheral.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
         self.rx.peripheral.disable_peri_interrupt_on_all_cores();
@@ -456,10 +456,10 @@ where
 /// USB Serial/JTAG peripheral instance
 #[doc(hidden)]
 pub trait Instance: crate::private::Sealed {
-    /// Get a reference to the peripheral's underlying register block
+    /// Returns a reference to the peripheral's underlying register block.
     fn register_block(&self) -> &RegisterBlock;
 
-    /// Disable all transmit interrupts for the peripheral
+    /// Disables all transmit interrupts for the peripheral.
     fn disable_tx_interrupts(&self) {
         self.register_block()
             .int_ena()
@@ -470,7 +470,7 @@ pub trait Instance: crate::private::Sealed {
             .write(|w| w.serial_in_empty().clear_bit_by_one());
     }
 
-    /// Disable all receive interrupts for the peripheral
+    /// Disables all receive interrupts for the peripheral.
     fn disable_rx_interrupts(&self) {
         self.register_block()
             .int_ena()
@@ -709,6 +709,10 @@ where
 // Static instance of the waker for each component of the peripheral:
 static WAKER_TX: AtomicWaker = AtomicWaker::new();
 static WAKER_RX: AtomicWaker = AtomicWaker::new();
+// TX and RX interrupts are enabled independently. Once either is enabled, its
+// handler can preempt the other side's INT_ENA read-modify-write and cause
+// stale enable bits to be restored. Serialize all INT_ENA updates.
+static INT_ENA_LOCK: RawMutex = RawMutex::new();
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct UsbSerialJtagWriteFuture<'d> {
@@ -719,10 +723,12 @@ impl<'d> UsbSerialJtagWriteFuture<'d> {
     fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_IN_EMPTY_INT
         // interrupt
-        peripheral
-            .register_block()
-            .int_ena()
-            .modify(|_, w| w.serial_in_empty().set_bit());
+        INT_ENA_LOCK.lock(|| {
+            peripheral
+                .register_block()
+                .int_ena()
+                .modify(|_, w| w.serial_in_empty().set_bit());
+        });
 
         Self { peripheral }
     }
@@ -762,10 +768,12 @@ impl<'d> UsbSerialJtagReadFuture<'d> {
     fn new(peripheral: USB_DEVICE<'d>) -> Self {
         // Set the interrupt enable bit for the USB_SERIAL_JTAG_SERIAL_OUT_RECV_PKT
         // interrupt
-        peripheral
-            .register_block()
-            .int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().set_bit());
+        INT_ENA_LOCK.lock(|| {
+            peripheral
+                .register_block()
+                .int_ena()
+                .modify(|_, w| w.serial_out_recv_pkt().set_bit());
+        });
 
         Self { peripheral }
     }
@@ -797,7 +805,7 @@ impl core::future::Future for UsbSerialJtagReadFuture<'_> {
 }
 
 impl<'d> UsbSerialJtag<'d, Async> {
-    /// Reconfigure the USB Serial JTAG peripheral to operate in blocking
+    /// Reconfigures the USB Serial JTAG peripheral to operate in blocking
     /// mode.
     pub fn into_blocking(self) -> UsbSerialJtag<'d, Blocking> {
         self.rx.peripheral.disable_peri_interrupt_on_all_cores();
@@ -817,6 +825,26 @@ impl<'d> UsbSerialJtag<'d, Async> {
 }
 
 impl UsbSerialJtagTx<'_, Async> {
+    async fn wait_tx_ready(&mut self) {
+        loop {
+            // Immediately after WR_DONE, DATA_FREE may still reflect the previous
+            // transfer's ready state. Wait for a new IN_EMPTY event before trusting it.
+            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
+
+            // A pending or early interrupt can wake the future before the FIFO is
+            // actually ready. Keep waiting until the hardware confirms readiness.
+            if self
+                .regs()
+                .ep1_conf()
+                .read()
+                .serial_in_ep_data_free()
+                .bit_is_set()
+            {
+                break;
+            }
+        }
+    }
+
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
         for chunk in words.chunks(64) {
             for byte in chunk {
@@ -826,22 +854,17 @@ impl UsbSerialJtagTx<'_, Async> {
             }
             self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
 
-            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
+            self.wait_tx_ready().await;
         }
 
         Ok(())
     }
 
     async fn flush_tx_async(&mut self) -> Result<(), Error> {
-        if self
-            .regs()
-            .ep1_conf()
-            .read()
-            .serial_in_ep_data_free()
-            .bit_is_clear()
-        {
-            UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;
-        }
+        // If write_async transfers a multiple of 64 bytes, flush needs to trigger sending a
+        // zero-length packet for the host to consider the transfer complete
+        self.regs().ep1_conf().modify(|_, w| w.wr_done().set_bit());
+        self.wait_tx_ready().await;
 
         Ok(())
     }
@@ -946,19 +969,26 @@ fn async_interrupt_handler() {
     let tx = interrupts.serial_in_empty().bit_is_set();
     let rx = interrupts.serial_out_recv_pkt().bit_is_set();
 
-    if tx {
-        usb.int_ena().modify(|_, w| w.serial_in_empty().clear_bit());
-    }
-    if rx {
-        usb.int_ena()
-            .modify(|_, w| w.serial_out_recv_pkt().clear_bit());
-    }
+    INT_ENA_LOCK.lock(|| {
+        usb.int_ena().modify(|_, w| {
+            if tx {
+                w.serial_in_empty().clear_bit();
+            }
+            if rx {
+                w.serial_out_recv_pkt().clear_bit();
+            }
+            w
+        });
+    });
 
     usb.int_clr().write(|w| {
-        w.serial_in_empty()
-            .clear_bit_by_one()
-            .serial_out_recv_pkt()
-            .clear_bit_by_one()
+        if tx {
+            w.serial_in_empty().clear_bit_by_one();
+        }
+        if rx {
+            w.serial_out_recv_pkt().clear_bit_by_one();
+        }
+        w
     });
 
     if rx {

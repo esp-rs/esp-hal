@@ -1,7 +1,7 @@
 use esp_hal::system::Cpu;
 
 use crate::{
-    scheduler::CpuState,
+    scheduler::{ActiveCores, CpuState},
     task::{TaskExt, TaskPtr, TaskQueue, TaskReadyQueueElement, TaskState},
 };
 
@@ -160,13 +160,13 @@ impl RunQueue {
     pub(crate) fn mark_task_ready(
         &mut self,
         _state: &[CpuState; Cpu::COUNT],
+        active_cores: ActiveCores,
         ready_task: TaskPtr,
     ) -> RunSchedulerOn {
         let priority = ready_task.priority(self);
         let priority_n = priority.get();
 
         ready_task.set_state(TaskState::Ready);
-        #[cfg(feature = "esp-radio")]
         {
             let mut ready_task = ready_task;
             if let Some(mut containing_queue) =
@@ -177,18 +177,11 @@ impl RunQueue {
         }
         self.ready_tasks[priority_n].push(ready_task);
 
-        cfg_select! {
-            multi_core => {
-                let run_on = if _state[1].initialized {
-                    self.select_scheduler_trigger_multi_core(_state, ready_task)
-                } else {
-                    self.select_scheduler_trigger_single_core(priority_n)
-                };
-            }
-            _ => {
-                let run_on = self.select_scheduler_trigger_single_core(priority_n);
-            }
-        }
+        let run_on = match active_cores {
+            #[cfg(multi_core)]
+            ActiveCores::All => self.select_scheduler_trigger_multi_core(_state, ready_task),
+            ActiveCores::Single(cpu) => self.select_scheduler_trigger_single_core(cpu, priority_n),
+        };
 
         self.ready_priority.mark_ready(priority);
 
@@ -240,11 +233,11 @@ impl RunQueue {
     }
 
     #[esp_hal::ram]
-    fn select_scheduler_trigger_single_core(&self, priority: usize) -> RunSchedulerOn {
+    fn select_scheduler_trigger_single_core(&self, cpu: Cpu, priority: usize) -> RunSchedulerOn {
         // Run the scheduler if the new priority is >= current maximum priority. This will trigger a
         // run even if the new task's priority is equal, to make sure time slicing is set up.
         if priority >= self.ready_priority.ready() {
-            RunSchedulerOn::RunOnCore(Cpu::ProCpu)
+            RunSchedulerOn::RunOnCore(cpu)
         } else {
             RunSchedulerOn::DontRun
         }
@@ -264,7 +257,8 @@ impl RunQueue {
                     Cpu::ProCpu => Cpu::AppCpu,
                 };
 
-                // Look iteratively through priority levels - this will ensure we can find a task even if all high priority tasks are pinned to the other CPU.
+                // Look iteratively through priority levels - this will ensure we can find a task
+                // even if all high priority tasks are pinned to the other CPU.
                 let mut priority_level = self.ready_priority;
 
                 let mut current_prio = current_prio;
@@ -283,7 +277,6 @@ impl RunQueue {
 
                     break;
                 }
-
             }
             _ => {
                 let popped = self.ready_tasks[current_prio].pop();

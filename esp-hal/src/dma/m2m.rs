@@ -215,7 +215,7 @@ where
 }
 
 impl<'d> Mem2Mem<'d, Blocking> {
-    /// Create a new [`Mem2Mem`] instance.
+    /// Creates a new [`Mem2Mem`] instance.
     pub fn new<CH>(
         channel: CH,
         #[cfg(dma_mem2mem_requires_peripheral)] peripheral: impl DmaEligiblePeripheral<CH::Erased>,
@@ -230,13 +230,13 @@ impl<'d> Mem2Mem<'d, Blocking> {
         Self::new_inner(channel, dma_peri)
     }
 
-    /// Create a new [`Mem2Mem`] instance.
+    /// Creates a new [`Mem2Mem`] instance.
     ///
     /// # Safety
     ///
-    /// You must ensure that you're not using DMA for the same peripheral and
-    /// that you're the only one using the peripheral. You must also ensure that
-    /// the peripheral is compatible with the channel.
+    /// The caller must ensure that DMA is not used for the same peripheral,
+    /// that this is the only user of the peripheral, and that the peripheral is
+    /// compatible with the channel.
     #[cfg(dma_mem2mem_requires_peripheral)]
     pub unsafe fn new_unsafe<CH>(channel: CH, peripheral: DmaPeripheral) -> Self
     where
@@ -245,7 +245,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
         Self::new_inner(channel, peripheral)
     }
 
-    /// Convert Mem2Mem to an async Mem2Mem.
+    /// Converts Mem2Mem to an async Mem2Mem.
     pub fn into_async(self) -> Mem2Mem<'d, Async> {
         Mem2Mem {
             rx: self.rx.into_async(),
@@ -297,7 +297,7 @@ where
 }
 
 impl<'d> Mem2MemRx<'d, Blocking> {
-    /// Convert Mem2MemRx to an async Mem2MemRx.
+    /// Converts Mem2MemRx to an async Mem2MemRx.
     pub fn into_async(self) -> Mem2MemRx<'d, Async> {
         Mem2MemRx {
             channel: self.channel.into_async(),
@@ -310,7 +310,7 @@ impl<'d, Dm> Mem2MemRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Start the RX half of a memory to memory transfer.
+    /// Starts the RX half of a memory to memory transfer.
     pub fn receive<BUF>(
         mut self,
         mut buf: BUF,
@@ -351,7 +351,7 @@ where
     BUF: DmaRxBuffer,
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         let done_interrupts = DmaRxInterrupt::DescriptorError | DmaRxInterrupt::DescriptorEmpty;
         !self
@@ -448,7 +448,7 @@ where
 }
 
 impl<'d> Mem2MemTx<'d, Blocking> {
-    /// Convert Mem2MemTx to an async Mem2MemTx.
+    /// Converts Mem2MemTx to an async Mem2MemTx.
     pub fn into_async(self) -> Mem2MemTx<'d, Async> {
         Mem2MemTx {
             channel: self.channel.into_async(),
@@ -461,7 +461,7 @@ impl<'d, Dm> Mem2MemTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Start the TX half of a memory to memory transfer.
+    /// Starts the TX half of a memory to memory transfer.
     pub fn send<BUF>(
         mut self,
         mut buf: BUF,
@@ -502,7 +502,7 @@ where
     BUF: DmaTxBuffer,
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         let done_interrupts = DmaTxInterrupt::DescriptorError | DmaTxInterrupt::TotalEof;
         !self
@@ -745,7 +745,7 @@ impl<Dm> SimpleMem2MemTransfer<'_, '_, Dm>
 where
     Dm: DriverMode,
 {
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         let State::Active(rx, tx) = &self.0.state else {
             unreachable!()
@@ -761,7 +761,7 @@ where
                 .contains(DmaRxInterrupt::SuccessfulEof)
     }
 
-    /// Wait for the transfer to finish.
+    /// Waits for the transfer to finish.
     pub fn wait(self) -> Result<(), DmaError> {
         while !self.is_done() {}
         Ok(())

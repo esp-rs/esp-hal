@@ -68,6 +68,30 @@ impl<'d> Flash<'d> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Flash storage abstraction.
+///
+/// This type can read and write any location on the SPI flash chip. For
+/// application data, it is recommended to reserve a dedicated
+#[cfg_attr(
+    not(feature = "emulation"),
+    doc = concat!(
+        "[partition](https://docs.espressif.com/projects/esp-idf/en/latest/",
+        esp_metadata_generated::chip!(),
+        "/api-guides/partition-tables.html)"
+    )
+)]
+#[cfg_attr(
+    feature = "emulation",
+    doc = "[partition](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/partition-tables.html)"
+)]
+/// instead of writing to arbitrary addresses. For partition-table helpers, see
+/// `esp-bootloader-esp-idf`.
+///
+/// Use [`FlashStorage::write_nor`] and [`FlashStorage::erase`] for low-level
+/// NOR flash semantics, or [`FlashStorage::write`] for read-modify-write with
+/// automatic sector erasure.
+///
+/// See the [crate-level documentation](crate#buffer-alignment-and-stack-usage)
+/// for stack usage.
 pub struct FlashStorage<'d> {
     pub(crate) capacity: usize,
     unlocked: bool,
@@ -92,10 +116,10 @@ impl<'d> FlashStorage<'d> {
         Self {
             capacity: chip_specific::get_flash_size() as usize,
             unlocked: false,
-            multi_core_strategy: cfg_select!(
+            multi_core_strategy: cfg_select! {
                 multi_core => MultiCoreStrategy::Error,
-                _ => MultiCoreStrategy::Ignore
-            ),
+                _ => MultiCoreStrategy::Ignore,
+            },
             _flash: flash,
         }
     }
@@ -183,7 +207,10 @@ impl<'d> FlashStorage<'d> {
         let initialized = unsafe {
             core::slice::from_raw_parts_mut(bytes.as_mut_ptr().cast::<u8>(), bytes.len())
         };
-        chip_specific::read_flash_encrypted(offset, initialized)
+        // Reading encrypted flash changes the flash MMU and the cache, which the other core must
+        // not use while this happens.
+        self.multi_core_strategy
+            .with(|| chip_specific::read_flash_encrypted(offset, initialized))
     }
 
     pub(crate) fn internal_write_encrypted(

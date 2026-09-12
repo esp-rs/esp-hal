@@ -17,12 +17,14 @@
 
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
+#[cfg(use_xtal32k)]
+use crate::peripherals::RTC_IO;
 use crate::{
     clock::RtcClock,
     efuse::VOL_LEVEL_HP_INV,
-    peripherals::{APB_CTRL, LPWR, RMT, RTC_IO, SYSTEM, TIMG0},
+    peripherals::{APB_CTRL, LPWR, RMT, SYSTEM, TIMG0},
     rtc_cntl::Rtc,
-    soc::regi2c,
+    soc::{regi2c, xtal32k},
     time::Rate,
 };
 
@@ -56,7 +58,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_4)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };
@@ -67,7 +69,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_2)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };
@@ -78,7 +80,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_2)),
         syscon_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };
@@ -136,20 +138,11 @@ fn detect_xtal_freq(clocks: &mut ClockTree) -> XtalClkConfig {
     // imprecise for reliable detection.
     const CALIBRATION_CYCLES: u32 = 10;
 
-    // The digital path for RC_FAST_D256 must be enabled for TIMG calibration to work.
-    LPWR::regs()
-        .clk_conf()
-        .modify(|_, w| w.dig_clk8m_d256_en().set_bit());
-
     let (xtal_cycles, calibration_clock_frequency) = RtcClock::measure_rtc_clock(
         clocks,
         TimgCalibrationClockConfig::RcFastDivClk,
         CALIBRATION_CYCLES,
     );
-
-    LPWR::regs()
-        .clk_conf()
-        .modify(|_, w| w.dig_clk8m_d256_en().clear_bit());
 
     let mhz = (calibration_clock_frequency * xtal_cycles / CALIBRATION_CYCLES).as_mhz();
 
@@ -370,6 +363,12 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
 // PLL_F160M_CLK
 
 fn enable_pll_f160m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+// PLL_D2_CLK
+
+fn enable_pll_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
@@ -595,6 +594,7 @@ fn enable_apb_clk_80m_impl(_clocks: &mut ClockTree, _en: bool) {
 
 // XTAL32K_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // RTCIO could be configured to allow an external oscillator to be used. We could model this
     // with a MUX, probably, but this is omitted for now for simplicity.
@@ -648,7 +648,9 @@ fn enable_rc_fast_div_clk_impl(_clocks: &mut ClockTree, en: bool) {
     LPWR::regs().clk_conf().modify(|_, w| {
         // Active-low: clear to enable, set to disable.
         w.enb_ck8m_div().bit(!en);
-        w.ck8m_div().div256()
+        w.ck8m_div().div256();
+        // TIMG calibration uses the digital RC_FAST_D256 path, not the analog divider output.
+        w.dig_clk8m_d256_en().bit(en)
     });
 }
 
@@ -671,6 +673,7 @@ fn configure_rtc_slow_clk_impl(
 ) {
     LPWR::regs().clk_conf().modify(|_, w| match new_config {
         RtcSlowClkConfig::RcSlow => w.ana_clk_rtc_sel().slow_ck(),
+        #[cfg(use_xtal32k)]
         RtcSlowClkConfig::Xtal32k => w.ana_clk_rtc_sel().ck_xtal_32k(),
         RtcSlowClkConfig::RcFast => w.ana_clk_rtc_sel().ck8m_d256_out(),
     });
@@ -728,6 +731,7 @@ fn configure_timg_calibration_clock_impl(
         w.rtc_cali_clk_sel().bits(match new_config {
             TimgCalibrationClockConfig::RcSlowClk => 0,
             TimgCalibrationClockConfig::RcFastDivClk => 1,
+            #[cfg(use_xtal32k)]
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
@@ -739,17 +743,15 @@ impl McpwmInstance {
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
         // Nothing to do.
     }
+}
 
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<McpwmFunctionClockConfig>,
-        _new_config: McpwmFunctionClockConfig,
-    ) {
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
         // Nothing to do.
     }
 }
-
 impl RmtInstance {
     // RMT_SCLK
 
