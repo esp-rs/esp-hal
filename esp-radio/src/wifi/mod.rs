@@ -7,8 +7,8 @@
 #![doc = concat!("- Station mode (aka STA mode or Wi-Fi client mode). ", chip_pretty!(), " connects to an access point.")]
 #![doc = concat!("- AP mode (aka Soft-AP mode or Access Point mode). Stations connect to the ", chip_pretty!(),".")]
 #![doc = concat!("- Station/AP-coexistence mode (", chip_pretty!(), " is concurrently an access point and a station connected to another access point).")]
-//! - Various security modes for the above (WPA, WPA2, ... Please note that WPA3 is currently not
-//!   supported)
+//! - Various security modes for the above (WPA, WPA2, WPA3-Personal, ...). WPA3-Personal (SAE) is
+//!   available for the station; the supplicant is built with SAE on mbedTLS crypto.
 //! - Scanning for access points (active & passive scanning).
 //! - Promiscuous mode for monitoring of IEEE802.11 Wi-Fi packets.
 //!
@@ -474,8 +474,8 @@ impl AuthenticationMethod {
             // return anything else.
             //
             // In fact from observation the drivers will return
-            // `wifi_auth_mode_t_WIFI_AUTH_OPEN` if the method is unsupported (e.g. any WPA3 in our
-            // case, since the supplicant isn't compiled to support it)
+            // `wifi_auth_mode_t_WIFI_AUTH_OPEN` if the method is unsupported by the supplicant
+            // build (that was the case for WPA3 before the supplicant was built with SAE).
             _ => AuthenticationMethod::None,
         }
     }
@@ -872,6 +872,19 @@ pub enum AuthenticationMethodConfig {
 
     /// WPA/WPA2 Personal authentication and password (supports both).
     WpaWpa2Personal(Password),
+
+    /// WPA3 Personal (SAE) authentication and password.
+    ///
+    /// As a station: joins WPA3-only access points (SAE with hunt-and-peck and
+    /// hash-to-element, PMF capable). Access point mode is not verified yet and is
+    /// rejected by [`AccessPointConfig`].
+    Wpa3Personal(Password),
+
+    /// WPA2/WPA3 Personal authentication and password (supports both).
+    ///
+    /// As a station: the weakest method accepted; a WPA2/WPA3 transition or a
+    /// WPA3-only access point is joined with SAE, a WPA2-only one with PSK.
+    Wpa2Wpa3Personal(Password),
 }
 
 impl AuthenticationMethodConfig {
@@ -882,6 +895,10 @@ impl AuthenticationMethodConfig {
             AuthenticationMethodConfig::Wpa(_) => AuthenticationMethod::Wpa,
             AuthenticationMethodConfig::Wpa2Personal(_) => AuthenticationMethod::Wpa2Personal,
             AuthenticationMethodConfig::WpaWpa2Personal(_) => AuthenticationMethod::WpaWpa2Personal,
+            AuthenticationMethodConfig::Wpa3Personal(_) => AuthenticationMethod::Wpa3Personal,
+            AuthenticationMethodConfig::Wpa2Wpa3Personal(_) => {
+                AuthenticationMethod::Wpa2Wpa3Personal
+            }
         }
     }
 
@@ -891,7 +908,9 @@ impl AuthenticationMethodConfig {
             AuthenticationMethodConfig::Wep(password)
             | AuthenticationMethodConfig::Wpa(password)
             | AuthenticationMethodConfig::Wpa2Personal(password)
-            | AuthenticationMethodConfig::WpaWpa2Personal(password) => Some(password.as_bytes()),
+            | AuthenticationMethodConfig::WpaWpa2Personal(password)
+            | AuthenticationMethodConfig::Wpa3Personal(password)
+            | AuthenticationMethodConfig::Wpa2Wpa3Personal(password) => Some(password.as_bytes()),
         }
     }
 }
