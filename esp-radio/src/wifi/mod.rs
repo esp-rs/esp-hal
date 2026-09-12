@@ -782,7 +782,13 @@ impl Ssid {
         })
     }
 
-    pub(crate) fn as_bytes(&self) -> &[u8] {
+    /// The SSID as raw bytes.
+    ///
+    /// An SSID is at most 32 bytes and is not required to be valid UTF-8
+    /// (the Wi-Fi standard allows arbitrary bytes). Use this to round-trip
+    /// an SSID that [`as_str`][Self::as_str] would otherwise lossily
+    /// truncate at the first invalid byte.
+    pub fn as_bytes(&self) -> &[u8] {
         &self.ssid[..self.len as usize]
     }
 
