@@ -84,6 +84,42 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         ] },
     ] },
+    # PCR.i2s_{tx,rx}_clkm_conf.i2s_{tx,rx}_clkm_sel, see `i2s_ll_tx_clk_set_src`. Source 3
+    # is an external clock on the MCLK pad, which the clock tree cannot describe.
+    { group = "I2S",
+      presets = {
+        CLK = {
+          type = "generic",
+          wake_locking = true,
+          output = "(sclk * div_a) / (div_num * div_a + div_b)",
+          params = {
+            sclk = [
+              { name = "XTAL",     outputs = "XTAL_CLK" },
+              { name = "PLL_F96M", outputs = "PLL_F96M_CLK", default = true },
+              { name = "XTAL_X2",  outputs = "XTAL_X2_CLK" },
+            ],
+            div_num = "1 ..= 255",
+            div_a   = "1 ..= 511",
+            div_b   = "0 ..= 511",
+          },
+        },
+      },
+      clocks = [
+        { name = "TX_CLK",   preset = "CLK" },
+        { name = "RX_CLK",   preset = "CLK" },
+        { name = "MCLK_OUT", type = "mux", variants = [
+          { name = "TX", outputs = "TX_CLK" },
+          { name = "RX", outputs = "RX_CLK", default = true },
+        ] },
+      ],
+    },
+    # PCR.i2cX_sclk_conf.i2cX_sclk_sel: 0 = XTAL, 1 = RC_FAST, see SOC_I2C_CLKS.
+    { group = "I2C", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", wake_locking = true, output = "sclk / (div_num + 1)", params = { sclk = [
+            { name = "XTAL",    outputs = "XTAL_CLK", default = true },
+            { name = "RC_FAST", outputs = "RC_FAST_CLK" },
+        ], div_num = "0 .. 0x100" } },
+    ] },
     # Sources: SOC_GPTIMER_CLKS and SOC_MWDT_CLKS. Like the other chips we default
     # to XTAL
     { group = "TIMG", clocks = [
