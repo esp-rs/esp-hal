@@ -91,15 +91,18 @@ fn writeback_data_cache() {
     while !cache.sync_ctrl().read().sync_done().bit_is_set() {}
 }
 
-/// Requests the sleep.
+/// Requests the sleep and returns whether the hardware rejected the request.
 ///
 /// The software retention path calls this through a function pointer after the critical frame is
 /// saved.
 #[inline(always)]
-pub(crate) fn request_sleep() {
+pub(crate) fn request_sleep() -> bool {
     #[cfg(soc_internal_memory_cached)]
     writeback_data_cache();
+
     PMU::regs()
         .slp_wakeup_cntl0()
         .write(|w| w.sleep_req().bit(true));
+
+    super::wait_for_sleep_result()
 }
