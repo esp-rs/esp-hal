@@ -46,7 +46,7 @@ fn pulse_wifibb_reset() {
 ///
 /// The driver asks for its clocks to be gated while it is still tearing down, and then writes Wi-Fi
 /// MAC registers. With these gated, the access hangs the CPU and debug connection.
-fn set_wifi_mac_clocks(en: bool) {
+pub(crate) fn set_wifi_mac_clocks(en: bool) {
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
         w.clk_wifi_apb_en().bit(en);
         w.clk_wifimac_en().bit(en)
