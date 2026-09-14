@@ -3,26 +3,35 @@
 //! esp-idf saves the CPU-domain device registers with plain loops, not with the PAU regdma engine
 //! (`esp32c6/sleep_cpu.c:237-341`).
 
-use core::{mem::offset_of, ptr, slice};
+use core::{mem::offset_of, ptr, ptr::NonNull, slice};
 
 use portable_atomic::{AtomicPtr, Ordering};
 
-use super::{
-    device_regs,
-    frames::chip::{
-        CriticalSleepFrame,
-        NonCriticalSleepFrame,
-        PMUFUNC_GOING_TO_SLEEP,
-        PMUFUNC_JUST_WOKE,
-    },
-};
 use crate::{
-    rtc_cntl::cpu_retention::{
-        device_regs::DeviceRegion,
-        frames::chip::{CRITICAL_FRAME_SIZE, NON_CRITICAL_FRAME_SIZE},
+    rtc_cntl::{
+        cpu_retention,
+        sleep::{self, RtcSleepConfig},
     },
     system::{self, Cpu},
 };
+
+mod device_regs;
+use device_regs::DeviceRegion;
+
+mod frames;
+use frames::chip::{
+    CRITICAL_FRAME_SIZE,
+    CriticalSleepFrame,
+    NON_CRITICAL_FRAME_SIZE,
+    NonCriticalSleepFrame,
+    PMUFUNC_GOING_TO_SLEEP,
+    PMUFUNC_JUST_WOKE,
+};
+
+// The rendezvous needs the IPC path, which `interrupt::ipc` gives to a
+// multi-core chip with the `rt` and the `unstable` features.
+#[cfg(all(multi_core, feature = "rt"))]
+pub(crate) mod rendezvous;
 
 // The wake stub is an `extern "C" fn()` with no argument, so the critical frame address of each
 // core lives here. Every core of a chip returns through the one wake stub register, so the restore
@@ -474,9 +483,9 @@ pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSl
 #[crate::ram]
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> bool) -> bool {
     // The rendezvous exists on a multi-core chip only, and this body is what it delegates to.
-    #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
-    if super::rendezvous::helper_enlisted() {
-        return super::rendezvous::sleep_retained(buffer, enter_sleep, wait);
+    #[cfg(all(multi_core, feature = "rt"))]
+    if rendezvous::helper_enlisted() {
+        return rendezvous::sleep_retained(buffer, enter_sleep, wait);
     }
 
     let core = system::raw_core();
@@ -621,3 +630,52 @@ pub(crate) const BLOCK_SIZE: usize =
 
 /// Bytes every core's frames need.
 pub(crate) const BUFFER_SIZE: usize = BLOCK_SIZE * Cpu::COUNT;
+
+/// Couples CPU power-down to the installed retention buffer, for a light sleep.
+///
+/// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
+/// cannot carry a power-down into a light sleep that has no retention memory.
+///
+/// A second running core must save itself, so the power-down also needs the rendezvous.
+#[cfg(feature = "rt")]
+pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
+    let allow_pd = buffer.is_some();
+
+    #[cfg(multi_core)]
+    let allow_pd = allow_pd && rendezvous::retention_allowed();
+
+    config.pd_flags.set_pd_cpu(allow_pd);
+}
+
+/// Requests the sleep, and retains the CPU across it if the sleep powers the CPU domain down.
+///
+/// The retained path returns twice, so it owns the request and the wait. A sleep that keeps the
+/// domain powered needs no frames, and it must not write them back: the registers still hold what
+/// a save would have read, and a restore repeats side effects such as an interrupt claim.
+#[crate::ram]
+pub(crate) fn enter_sleep_with_retention(
+    config: &RtcSleepConfig,
+    buffer: Option<NonNull<u8>>,
+) -> bool {
+    match buffer.filter(|_| config.pd_flags.pd_cpu()) {
+        Some(buffer) => cpu_retention::sleep_retained(
+            buffer.as_ptr(),
+            sleep::pmu_common::request_sleep,
+            sleep::wait_for_sleep_result,
+        ),
+        None => {
+            config.enter_sleep();
+            sleep::wait_for_sleep_result()
+        }
+    }
+}
+
+/// Finishes CPU retention after the sleep request returns.
+///
+/// The disarm is unconditional, because the tail of the sleep runs on a wake and on a rejected
+/// request. A stale stub address would otherwise outlive the sleep that armed it.
+pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, _rejected: bool) {
+    if buffer.is_some() {
+        cpu_retention::disarm_wake_stub();
+    }
+}
