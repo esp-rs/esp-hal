@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[cfg(soc_has_pmu)]
-mod pmu_common;
+pub(crate) mod pmu_common;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
@@ -66,6 +66,9 @@ pub enum LightSleep {
     /// Wait for an interrupt instead.
     Refused,
 }
+
+#[cfg(supports_cpu_power_down)]
+use crate::rtc_cntl::cpu_retention;
 
 /// The handler that answers whether this core still agrees to a light sleep, or null.
 ///
@@ -295,7 +298,7 @@ impl<'d> LowPower<'d> {
         #[cfg(cpu_retention = "software")]
         if kind == SleepKind::Light && crate::rtc_cntl::installed_buffer_ptr().is_some() {
             let engage = cfg_select! {
-                multi_core => crate::rtc_cntl::cpu_retention::rendezvous::engage(),
+                multi_core => cpu_retention::rendezvous::engage(),
                 _ => true,
             };
             if !engage {
@@ -341,7 +344,7 @@ impl<'d> LowPower<'d> {
         let retention_buffer = match kind {
             SleepKind::Light => {
                 let buffer = crate::rtc_cntl::installed_buffer_ptr();
-                sleep_impl::configure_cpu_retention(&mut config, buffer);
+                cpu_retention::configure_cpu_retention(&mut config, buffer);
                 buffer
             }
 
@@ -404,8 +407,9 @@ impl<'d> LowPower<'d> {
             // changed for the sleep only. The guard must therefore outlive the wait below.
             // ESP-IDF arms RTC_CNTL retention in `misc_modules_sleep_prepare`, before it arms the
             // wakeup sources.
+
             #[cfg(cpu_retention = "rtc_cntl")]
-            sleep_impl::prepare_cpu_retention(retention_buffer);
+            cpu_retention::prepare_cpu_retention(retention_buffer);
 
             #[allow(clippy::let_unit_value)]
             let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
@@ -414,7 +418,7 @@ impl<'d> LowPower<'d> {
                 cpu_retention = "software" => {
                     // The software chips save the CPU inside the request, so the request belongs to
                     // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
-                    let rejected = sleep_impl::enter_sleep_with_retention(&config, retention_buffer);
+                    let rejected = cpu_retention::enter_sleep_with_retention(&config, retention_buffer);
                 },
                 _ => {
                     config.enter_sleep();
@@ -434,13 +438,13 @@ impl<'d> LowPower<'d> {
         };
 
         #[cfg(supports_cpu_power_down)]
-        sleep_impl::finish_cpu_retention(retention_buffer, rejected);
+        cpu_retention::finish_cpu_retention(retention_buffer, rejected);
 
         // The helper waits for this store, so it must run before this core can request another
         // sleep.
         #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
         if kind == SleepKind::Light && retention_buffer.is_some() {
-            crate::rtc_cntl::cpu_retention::rendezvous::finish();
+            cpu_retention::rendezvous::finish();
         }
 
         config.finish_sleep();
@@ -505,7 +509,7 @@ fn park_other_cores() -> u8 {
     // A core that saves itself in the rendezvous must keep running, because a stalled core saves
     // nothing.
     #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
-    if crate::rtc_cntl::cpu_retention::rendezvous::helper_enlisted() {
+    if cpu_retention::rendezvous::helper_enlisted() {
         return 0;
     }
 
@@ -541,21 +545,23 @@ fn unpark_cores(parked: u8) {
 /// `pmu_sleep_start`.
 #[cfg(sleep_driver_supported)]
 #[crate::ram]
-fn wait_for_sleep_result() -> bool {
+pub(crate) fn wait_for_sleep_result() -> bool {
     loop {
         cfg_select! {
             soc_has_pmu => {
                 let int_raw = crate::peripherals::PMU::regs().int_raw().read();
-                if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                    return int_raw.soc_sleep_reject().bit_is_set();
-                }
+                let rejected = int_raw.soc_sleep_reject().bit_is_set();
+                let wakeup = int_raw.soc_wakeup().bit_is_set();
             }
             _ => {
                 let int_raw = LPWR::regs().int_raw().read();
-                if int_raw.slp_wakeup().bit_is_set() || int_raw.slp_reject().bit_is_set() {
-                    return int_raw.slp_reject().bit_is_set();
-                }
+                let rejected = int_raw.slp_reject().bit_is_set();
+                let wakeup = int_raw.slp_wakeup().bit_is_set();
             }
+        }
+
+        if wakeup || rejected {
+            return rejected;
         }
     }
 }
