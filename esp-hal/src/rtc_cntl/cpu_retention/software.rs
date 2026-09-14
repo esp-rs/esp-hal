@@ -469,7 +469,7 @@ pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSl
 #[crate::ram]
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> bool) -> bool {
     // The rendezvous exists on a multi-core chip only, and this body is what it delegates to.
-    #[cfg(all(multi_core, feature = "rt", feature = "unstable"))]
+    #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
     if super::rendezvous::helper_enlisted() {
         return super::rendezvous::sleep_retained(buffer, enter_sleep, wait);
     }

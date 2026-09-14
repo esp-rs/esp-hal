@@ -18,34 +18,6 @@ cfg_select! {
             feature = "rt"
         ))]
         pub(crate) mod rendezvous;
-
-        /// The answers of a chip that sleeps as one core.
-        #[cfg(not(all(multi_core, feature = "rt")))]
-        pub(crate) mod rendezvous {
-            /// One core has nothing to rendezvous with, so its caller always sleeps.
-            #[crate::ram]
-            pub(crate) fn engage() -> bool {
-                true
-            }
-
-            /// No core saves itself for another one, so the sleep path stalls the other core as before.
-            #[cfg(multi_core)]
-            #[crate::ram]
-            pub(crate) fn helper_enlisted() -> bool {
-                false
-            }
-
-            /// Without a rendezvous, a second running core cannot save itself, so the CPU domain must
-            /// keep its power.
-            #[cfg(multi_core)]
-            #[crate::ram]
-            pub(crate) fn retention_allowed() -> bool {
-                !crate::soc::cpu_control::is_running(crate::system::Cpu::AppCpu)
-            }
-
-            #[crate::ram]
-            pub(crate) fn finish() {}
-        }
     }
 
     _ => {}
