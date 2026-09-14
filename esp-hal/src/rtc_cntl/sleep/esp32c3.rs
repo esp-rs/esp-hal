@@ -714,6 +714,7 @@ const RETENTION_CONFIG_WORD3: u32 = 0xffff_ffff;
 ///
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
 /// cannot carry a power-down into a light sleep that has no retention memory.
+#[cfg(feature = "rt")]
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
     config.set_cpu_pd_en(buffer.is_some());
 }

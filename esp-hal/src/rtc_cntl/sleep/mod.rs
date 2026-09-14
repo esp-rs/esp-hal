@@ -184,6 +184,7 @@ impl<'d> LowPower<'d> {
     /// wakeup source limits the sleep to less time than the transition can catch. In these cases
     /// the chip never wakes again, and it gives no report of the cause.
     #[cfg(sleep_deep_sleep)]
+    #[cfg(feature = "rt")]
     pub fn sleep_deep(&mut self, config: RtcSleepConfig) -> ! {
         #[cfg(sleep_has_wakeup_source_timer)]
         if enabled_sources().contains(WakeupSource::Timer) {
@@ -218,6 +219,7 @@ impl<'d> LowPower<'d> {
     ///
     /// Panics if no wakeup source is enabled.
     #[cfg(sleep_deep_sleep)]
+    #[cfg(feature = "rt")]
     pub fn sleep_deep_with_rejection(&mut self, config: RtcSleepConfig) {
         self.sleep(config, SleepKind::Deep, true);
     }
@@ -242,6 +244,7 @@ impl<'d> LowPower<'d> {
     /// neither case. For the caller, a rejected sleep and a very short sleep have the same
     /// result.
     #[cfg(sleep_light_sleep)]
+    #[cfg(feature = "rt")]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) -> LightSleep {
         if self.sleep(config, SleepKind::Light, true) {
             LightSleep::Refused
@@ -260,6 +263,7 @@ impl<'d> LowPower<'d> {
     /// accept a rejection.
     #[cfg(sleep_driver_supported)]
     #[crate::ram]
+    #[cfg(feature = "rt")]
     fn sleep(&mut self, config: RtcSleepConfig, kind: SleepKind, allow_reject: bool) -> bool {
         // ESP-IDF runs `esp_light_sleep_start` inside `portENTER_CRITICAL(&light_sleep_lock)`.
         // A sleep ends when `wait_for_sleep_result` sees a wakeup or reject bit, so nothing in
@@ -272,6 +276,7 @@ impl<'d> LowPower<'d> {
 
     #[cfg(sleep_driver_supported)]
     #[crate::ram]
+    #[cfg(feature = "rt")]
     fn sleep_with_interrupts_disabled(
         &mut self,
         config: RtcSleepConfig,
@@ -288,11 +293,14 @@ impl<'d> LowPower<'d> {
         // acts as the helper of the other core when it loses the arbitration, and the sleep is
         // over when that call returns.
         #[cfg(cpu_retention = "software")]
-        if kind == SleepKind::Light
-            && crate::rtc_cntl::installed_buffer_ptr().is_some()
-            && !crate::rtc_cntl::cpu_retention::rendezvous::engage()
-        {
-            return;
+        if kind == SleepKind::Light && crate::rtc_cntl::installed_buffer_ptr().is_some() {
+            let engage = cfg_select! {
+                multi_core => crate::rtc_cntl::cpu_retention::rendezvous::engage(),
+                _ => true,
+            };
+            if !engage {
+                return;
+            }
         }
 
         // The hooks run before `apply`, so that a request to keep a power domain powered reaches
@@ -430,7 +438,7 @@ impl<'d> LowPower<'d> {
 
         // The helper waits for this store, so it must run before this core can request another
         // sleep.
-        #[cfg(cpu_retention = "software")]
+        #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
         if kind == SleepKind::Light && retention_buffer.is_some() {
             crate::rtc_cntl::cpu_retention::rendezvous::finish();
         }
@@ -496,7 +504,7 @@ impl<'d> LowPower<'d> {
 fn park_other_cores() -> u8 {
     // A core that saves itself in the rendezvous must keep running, because a stalled core saves
     // nothing.
-    #[cfg(cpu_retention = "software")]
+    #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
     if crate::rtc_cntl::cpu_retention::rendezvous::helper_enlisted() {
         return 0;
     }
