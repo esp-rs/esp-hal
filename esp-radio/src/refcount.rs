@@ -1,14 +1,16 @@
-use core::{ptr::null_mut, sync::atomic::Ordering};
+use core::{cell::UnsafeCell, ptr::null_mut, sync::atomic::Ordering};
 
 use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind, SemaphorePtr};
-use portable_atomic::{AtomicPtr, AtomicU32};
+use portable_atomic::AtomicPtr;
 
 /// Resource guard that handles initialization and deinitalization gracefully
 /// using [`esp_radio_rtos_driver`]'s API.
 pub(crate) struct Refcount {
-    counter: AtomicU32,
+    counter: UnsafeCell<u32>,
     sem: AtomicPtr<()>,
 }
+
+unsafe impl Sync for Refcount {}
 
 impl Drop for Refcount {
     fn drop(&mut self) {
@@ -22,7 +24,7 @@ impl Drop for Refcount {
 impl Refcount {
     pub const fn new() -> Self {
         Self {
-            counter: AtomicU32::new(0),
+            counter: UnsafeCell::new(0),
             sem: AtomicPtr::new(null_mut()),
         }
     }
@@ -53,30 +55,31 @@ impl Refcount {
         f(unsafe { SemaphoreHandle::ref_from_ptr(&sem) })
     }
 
-    fn lock<T>(&self, f: impl FnOnce() -> T) -> T {
+    fn lock<T>(&self, f: impl FnOnce(&mut u32) -> T) -> T {
         self.use_sem_or_init(|sem| {
             sem.take(None);
-            let ret = f();
+            let ret = f(unsafe { self.counter.get().as_mut_unchecked() });
             sem.give();
             ret
         })
     }
 
     pub fn increment(&self, on_first: impl FnOnce()) {
-        self.lock(|| {
-            if self.counter.fetch_add(1, Ordering::Relaxed) == 0 {
+        self.lock(|counter| {
+            if *counter == 0 {
                 on_first();
             }
+            *counter += 1;
         });
     }
 
     #[cfg(feature = "wifi")]
     pub fn try_increment<E>(&self, on_first: impl FnOnce() -> Result<(), E>) -> Result<bool, E> {
-        self.lock(|| {
-            if self.counter.fetch_add(1, Ordering::Relaxed) == 0 {
-                on_first()
-                    .inspect_err(|_| self.counter.store(0, Ordering::Relaxed))
-                    .map(|_| true)
+        self.lock(|counter| {
+            let prev = *counter;
+            *counter += 1;
+            if prev == 0 {
+                on_first().inspect_err(|_| *counter = 0).map(|_| true)
             } else {
                 Ok(false)
             }
@@ -84,10 +87,11 @@ impl Refcount {
     }
 
     pub fn decrement(&self, on_last: impl FnOnce()) {
-        self.lock(|| {
-            if self.counter.fetch_sub(1, Ordering::Relaxed) == 1 {
+        self.lock(|counter| {
+            if *counter == 0 {
                 on_last();
             }
+            *counter += 1;
         })
     }
 }
