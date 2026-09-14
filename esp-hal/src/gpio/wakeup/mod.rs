@@ -445,7 +445,7 @@ fn prepare_pad(pin: &Armed, deep: bool) {
 /// peripheral function that drove it. It therefore runs at sleep entry, on the chips that cannot
 /// hold a single pad through a deep sleep, and after the wakeup sources take the holds that they
 /// need.
-#[cfg(sleep_deep_sleep_needs_gpio_isolation)]
+#[cfg(all(sleep_deep_sleep_needs_gpio_isolation, feature = "rt"))]
 pub(crate) fn isolate_pads_for_deep_sleep() {
     use crate::{
         gpio::{AlternateFunction, OutputSignal, io_mux_reg},

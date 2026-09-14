@@ -756,6 +756,7 @@ impl RtcSleepConfig {
 /// cannot carry a power-down into a light sleep that has no retention memory.
 ///
 /// A second running core must save itself, so the power-down also needs the rendezvous.
+#[cfg(feature = "rt")]
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
     let allow_pd =
         buffer.is_some() && crate::rtc_cntl::cpu_retention::rendezvous::retention_allowed();
