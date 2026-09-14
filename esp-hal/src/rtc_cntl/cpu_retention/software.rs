@@ -8,7 +8,6 @@ use core::{mem::offset_of, ptr, slice};
 use portable_atomic::{AtomicPtr, Ordering};
 
 use super::{
-    chips,
     device_regs,
     frames::chip::{
         CriticalSleepFrame,
@@ -17,7 +16,13 @@ use super::{
         PMUFUNC_JUST_WOKE,
     },
 };
-use crate::system::{self, Cpu};
+use crate::{
+    rtc_cntl::cpu_retention::{
+        device_regs::DeviceRegion,
+        frames::chip::{CRITICAL_FRAME_SIZE, NON_CRITICAL_FRAME_SIZE},
+    },
+    system::{self, Cpu},
+};
 
 // The wake stub is an `extern "C" fn()` with no argument, so the critical frame address of each
 // core lives here. Every core of a chip returns through the one wake stub register, so the restore
@@ -410,7 +415,7 @@ impl CoreRetentionContext {
     pub(crate) fn new(buffer: *mut u8, core: usize) -> Self {
         // SAFETY: `install_cpu_retention_memory` checked the buffer against the size of every
         // block.
-        let buffer = unsafe { buffer.add(core * chips::BLOCK_SIZE) };
+        let buffer = unsafe { buffer.add(core * BLOCK_SIZE) };
         Self { buffer, core }
     }
 
@@ -419,8 +424,8 @@ impl CoreRetentionContext {
         // SAFETY: the buffer is installed and sized for this chip.
         unsafe {
             slice::from_raw_parts_mut(
-                self.buffer.add(chips::DEVICE_REGIONS_OFFSET) as *mut u32,
-                chips::DEVICE_REGION_WORDS,
+                self.buffer.add(DEVICE_REGIONS_OFFSET) as *mut u32,
+                DEVICE_REGION_WORDS,
             )
         }
     }
@@ -428,20 +433,20 @@ impl CoreRetentionContext {
     #[crate::ram]
     pub(crate) fn non_critical(&self) -> *mut NonCriticalSleepFrame {
         // SAFETY: the buffer is installed and sized for this chip.
-        unsafe { self.buffer.add(chips::NON_CRITICAL_FRAME_OFFSET) as *mut NonCriticalSleepFrame }
+        unsafe { self.buffer.add(NON_CRITICAL_FRAME_OFFSET) as *mut NonCriticalSleepFrame }
     }
 
     #[crate::ram]
     pub(crate) fn critical(&self) -> *mut CriticalSleepFrame {
         // SAFETY: the buffer is installed and sized for this chip.
-        unsafe { self.buffer.add(chips::CRITICAL_FRAME_OFFSET) as *mut CriticalSleepFrame }
+        unsafe { self.buffer.add(CRITICAL_FRAME_OFFSET) as *mut CriticalSleepFrame }
     }
 }
 
 /// Saves the device registers and the non-critical frame.
 #[crate::ram]
 pub(crate) fn save_pre_critical(ctx: &mut CoreRetentionContext) {
-    device_regs::save(&chips::regions(), ctx.device_frame());
+    device_regs::save(&regions(), ctx.device_frame());
     // SAFETY: the buffer is installed and sized for this chip.
     unsafe { ctx.non_critical().as_mut().unwrap().save() };
 }
@@ -497,7 +502,7 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
     if !rejected {
         // SAFETY: the frame was filled on this path before the sleep.
         unsafe { ctx.non_critical().as_mut().unwrap().restore() };
-        device_regs::restore(&chips::regions(), &*ctx.device_frame());
+        device_regs::restore(&regions(), &*ctx.device_frame());
     }
 
     rejected
@@ -507,12 +512,112 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
 #[crate::ram]
 pub(crate) fn disarm_wake_stub() {
     // SAFETY: the register is the retention word of this chip, and it holds no other state.
-    unsafe { chips::wake_stub_reg().write_volatile(0) };
+    unsafe { wake_stub_reg().write_volatile(0) };
 }
 
 #[crate::ram]
 pub(crate) fn arm_wake_stub() {
     let stub = critical_regs_restore as *const () as usize as u32;
     // SAFETY: the register is the retention word of this chip, and it holds no other state.
-    unsafe { chips::wake_stub_reg().write_volatile(stub) };
+    unsafe { wake_stub_reg().write_volatile(stub) };
 }
+
+/// `RTC_SLEEP_WAKE_STUB_ADDR_REG`: the word that holds the wake stub address across the sleep.
+#[inline(always)]
+pub(crate) fn wake_stub_reg() -> *mut u32 {
+    cfg_select! {
+        esp32s31 => {
+            crate::peripherals::LP_SYS::regs().lp_store(8).as_ptr()
+        }
+        esp32p4 => {
+            crate::peripherals::LP_AON::regs().lp_store8().as_ptr()
+        }
+        _ => {
+            crate::peripherals::LP_AON::regs().store8().as_ptr()
+        }
+    }
+}
+
+/// Runtime absolute address (as `u32`) of a named PAC register.
+macro_rules! reg {
+    ($peri:ident, [$($path:tt)+]) => {
+        unsafe { &*crate::pac::$peri::PTR }.$($path)+.as_ptr() as *const u32
+    };
+}
+
+macro_rules! saved_region_map {
+    ($(
+        $( #[cfg($cfg:tt)] )? {
+            $peri:ident, $start:tt, $count:expr
+        },
+    )*) => {
+        const REGION_COUNT: usize = 0 $(+ {
+            1 $( * cfg!($cfg) as usize )?
+        })*;
+
+        pub(crate) const DEVICE_REGION_WORDS: usize = 0 $(+ {
+            ($count) $( * cfg!($cfg) as usize )?
+        })*;
+
+        #[inline(always)]
+        pub(crate) fn regions() -> [DeviceRegion; REGION_COUNT] {
+            [
+                $(
+                    $(#[cfg($cfg)])?
+                    DeviceRegion::new(reg!($peri, $start), $count),
+                )*
+            ]
+        }
+    };
+}
+
+#[cfg(any(esp32h2, esp32c6))]
+saved_region_map! {
+    { INTPRI, [cpu_int_enable()], 45 },
+    { INTPRI, [rnd_eco_high()], 1 },
+    #[cfg(esp32c6)] // H2 onward this is read-only, no need to save
+    { EXTMEM, [l1_cache_ctrl()], 1 },
+    { EXTMEM, [l1_cache_wrap_around_ctrl()], 1 },
+    { PLIC_MX, [mxint_enable()], 38 },
+    { PLIC_MX, [mxint_conf()], 1 },
+    { PLIC_UX, [uxint_enable()], 38 },
+    { PLIC_UX, [uxint_conf()], 1 },
+    { CLINT, [msip()], 6 },
+    { CLINT, [usip()], 6 },
+}
+
+#[cfg(any(esp32c5, esp32c61))]
+saved_region_map! {
+    { CACHE, [cache_autoload_ctrl()], 5 },
+    { CLIC, [int_config()], 3 },
+    { CLIC, [int_ip(0)], 48 },
+    { CLINT, [msip()], 1 },
+    { CLINT, [mtimecmp()], 2 },
+    { CLINT, [mtimectl()], 1 },
+    { CLINT, [mtime()], 2 },
+}
+
+#[cfg(esp32p4)]
+saved_region_map! {
+    { CLIC, [int_config()], 3 },
+    { CLIC, [int_ip(0)], 48 },
+}
+
+// FIXME: find out why this isn't equivalent to P4
+#[cfg(esp32s31)]
+saved_region_map! {
+    { CLIC, [int_config()], 1 },
+    { CLIC, [int_thresh()], 1 },
+    { CLIC, [int_ip(0)], 48 },
+}
+
+pub(crate) const CRITICAL_FRAME_OFFSET: usize = 0;
+pub(crate) const NON_CRITICAL_FRAME_OFFSET: usize = CRITICAL_FRAME_OFFSET + CRITICAL_FRAME_SIZE;
+pub(crate) const DEVICE_REGIONS_OFFSET: usize = NON_CRITICAL_FRAME_OFFSET + NON_CRITICAL_FRAME_SIZE;
+
+/// Bytes one core's frames need, rounded up to the alignment of the buffer.
+pub(crate) const BLOCK_SIZE: usize =
+    (DEVICE_REGIONS_OFFSET + DEVICE_REGION_WORDS * 4).next_multiple_of(16);
+
+/// Bytes every core's frames need.
+pub(crate) const BUFFER_SIZE: usize = BLOCK_SIZE * Cpu::COUNT;
