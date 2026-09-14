@@ -13,7 +13,7 @@ use crate::rtc_cntl::sleep::LowPower;
 
 cfg_select! {
     cpu_retention = "software" => {
-        pub(crate) use super::chips::BUFFER_SIZE;
+        pub(crate) use super::software::BUFFER_SIZE;
     }
     _ => {
         pub(crate) const BUFFER_SIZE: usize = property!("sleep.cpu_retention_mem_size");

@@ -1,4 +1,4 @@
-use core::{ops::Not, ptr::NonNull};
+use core::ops::Not;
 
 use crate::{
     peripherals::{LP_AON, PMU},
@@ -6,7 +6,10 @@ use crate::{
     rtc_cntl::{
         Rtc,
         rtc::{HpSysCntlReg, HpSysPower, LpSysPower},
-        sleep::{SleepKind, pmu_common::SleepTimeConfig},
+        sleep::{
+            SleepKind,
+            pmu_common::{SleepTimeConfig, request_sleep},
+        },
     },
     soc::{
         clocks::{self, ClockTree, CpuClkConfig, HpRootClkConfig},
@@ -633,56 +636,5 @@ impl RtcSleepConfig {
     pub(crate) fn finish_sleep(&self) {
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
-    }
-}
-
-/// Couples CPU power-down to the installed retention buffer, for a light sleep.
-///
-/// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
-/// cannot carry a power-down into a light sleep that has no retention memory.
-#[cfg(feature = "rt")]
-pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
-    config.pd_flags.set_pd_cpu(buffer.is_some());
-}
-
-/// Requests the sleep.
-///
-/// The software retention path calls this through a function pointer after the critical frame is
-/// saved.
-#[crate::ram]
-pub(crate) fn request_sleep() {
-    PMU::regs()
-        .slp_wakeup_cntl0()
-        .write(|w| w.sleep_req().bit(true));
-}
-
-/// Requests the sleep, and retains the CPU across it if the program installed the memory.
-///
-/// The retained path returns twice, so it owns the request and the wait.
-#[crate::ram]
-pub(crate) fn enter_sleep_with_retention(
-    config: &RtcSleepConfig,
-    buffer: Option<NonNull<u8>>,
-) -> bool {
-    match buffer {
-        Some(buffer) => crate::rtc_cntl::cpu_retention::sleep_retained(
-            buffer.as_ptr(),
-            request_sleep,
-            super::wait_for_sleep_result,
-        ),
-        None => {
-            config.enter_sleep();
-            super::wait_for_sleep_result()
-        }
-    }
-}
-
-/// Finishes CPU retention after the sleep request returns.
-///
-/// The disarm is unconditional, because the tail of the sleep runs on a wake and on a rejected
-/// request. A stale stub address would otherwise outlive the sleep that armed it.
-pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, _rejected: bool) {
-    if buffer.is_some() {
-        crate::rtc_cntl::cpu_retention::disarm_wake_stub();
     }
 }
