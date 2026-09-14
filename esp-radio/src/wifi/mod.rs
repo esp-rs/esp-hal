@@ -2614,9 +2614,6 @@ impl Drop for WifiRefGuard {
                     warn!("Failed to cleanly deinit wifi: {:?}", e);
                 }
 
-                #[cfg(esp32s31)]
-                crate::radio_clocks::clocks_ll::set_wifi_mac_clocks(false);
-
                 #[cfg(rng_trng_supported)]
                 esp_hal::if_unstable_hal! {
                     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {

@@ -41,9 +41,6 @@ pub(crate) fn enable_phy(en: bool) {
         w.clk_coex_en().bit(en)
     });
 
-    // The Wi-Fi MAC and its APB clock are absent here: they belong to the Wi-Fi module, and the
-    // driver disables the PHY while it is still tearing ESP-NOW down, before it clears the MAC key
-    // entries.
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
         w.clk_wifibb_22m_en().bit(en);
         w.clk_fe_40m_en().bit(en);
