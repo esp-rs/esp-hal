@@ -25,7 +25,6 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::{Event, Input, InputConfig, Pull},
     peripherals,
-    ram,
     rtc_cntl::WakeLock,
     system::wakeup_cause,
     time::Instant,
@@ -38,7 +37,7 @@ cfg_select! {
     feature = "esp32s3" => {
         use esp_hal::rtc_cntl::CacheTagRetentionStorage;
 
-        #[ram(reclaimed, unstable(zeroed))]
+        #[esp_hal::ram(reclaimed, unstable(zeroed))]
         static CACHE_TAGMEM: CacheTagRetentionStorage = CacheTagRetentionStorage::new();
     }
     _ => {}
@@ -58,7 +57,7 @@ cfg_select! {
     ) => {
         use esp_hal::rtc_cntl::CpuRetentionStorage;
 
-        #[ram(reclaimed, unstable(zeroed))]
+        #[esp_hal::ram(reclaimed, unstable(zeroed))]
         static CPU_RETENTION_MEMORY: CpuRetentionStorage = CpuRetentionStorage::new();
     }
     _ => {}
@@ -140,6 +139,8 @@ async fn main(spawner: Spawner) {
 
     let timg0 = TimerGroup::new(p.TIMG0);
 
+    // ESP32, C2 and S2 have no CPU powerdown, but no need to complicate this any further.
+    #[allow(unused_mut)]
     let mut sleep = esp_rtos::sleep::configure(p.LPWR);
 
     #[cfg(any(
