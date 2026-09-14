@@ -78,11 +78,7 @@ pub(crate) fn prepare_cpu_retention(buffer: Option<NonNull<u8>>) {
 }
 
 /// Finishes CPU retention after the sleep request returns.
-pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, rejected: bool) {
-    if buffer.is_none() {
-        return;
-    }
-
+pub(crate) fn finish_cpu_retention(rejected: bool) {
     // Disarm on every exit, including a rejected request that never slept. A stale descriptor
     // would otherwise affect the next unretained sleep.
     disable_cpu_retention();

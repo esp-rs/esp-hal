@@ -669,8 +669,9 @@ impl RtcSleepConfig {
     ///
     /// The caller waits for the result of the request.
     #[inline(always)]
-    pub(crate) fn enter_sleep(&self) {
+    pub(crate) fn enter_sleep(&self) -> bool {
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
+        super::wait_for_sleep_result()
     }
 
     pub(crate) fn finish_sleep(&self) {
