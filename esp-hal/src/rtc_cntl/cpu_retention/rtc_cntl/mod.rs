@@ -4,6 +4,11 @@ use core::ptr::NonNull;
 
 use super::memory::BUFFER_SIZE;
 
+#[cfg_attr(esp32c3, path = "esp32c3.rs")]
+#[cfg_attr(esp32s3, path = "esp32s3.rs")]
+mod chip;
+pub(crate) use chip::*;
+
 /// Bytes the DMA descriptor takes at the head of a retention buffer.
 pub(crate) const DMA_LINK_SIZE: usize = 16;
 
