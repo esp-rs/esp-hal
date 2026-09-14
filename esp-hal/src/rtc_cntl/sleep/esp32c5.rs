@@ -865,13 +865,13 @@ impl RtcSleepConfig {
     /// Requests the sleep.
     ///
     /// The caller waits for the result of the request.
-    #[crate::ram]
+    #[inline(always)]
     pub(crate) fn enter_sleep(&self) {
         request_sleep();
     }
 
     /// Cleans up after sleep.
-    #[crate::ram]
+    #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
         // like esp-idf pmu_sleep_finish()
         // In "pd_cpu lightsleep" and "deepsleep" modes we never get here

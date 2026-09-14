@@ -100,7 +100,7 @@ fn writeback_data_cache() {
 ///
 /// The software retention path calls this through a function pointer after the critical frame is
 /// saved.
-#[crate::ram]
+#[inline(always)]
 pub(crate) fn request_sleep() {
     #[cfg(soc_internal_memory_cached)]
     writeback_data_cache();
