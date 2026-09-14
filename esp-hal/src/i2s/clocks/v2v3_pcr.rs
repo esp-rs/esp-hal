@@ -21,6 +21,11 @@ fn clk_sel(sclk: I2sClkSclk) -> u8 {
             I2sClkSclk::PllF96m => 1,
             I2sClkSclk::PllF64m => 2,
         },
+        esp32h4 => match sclk {
+            I2sClkSclk::Xtal => 0,
+            I2sClkSclk::PllF96m => 1,
+            I2sClkSclk::XtalX2 => 2,
+        },
     }
 }
 

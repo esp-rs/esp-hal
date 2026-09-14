@@ -73,9 +73,9 @@ peripherals = [
     { name = "HP_SYS" },
     { name = "HUK", interrupts = { peri = "HUK" } },
     { name = "I2C_ANA_MST" },
-    { name = "I2S0", interrupts = { peri = "I2S" } },
-    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
-    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true },
+    { name = "I2S0", interrupts = { peri = "I2S" }, clock_group = "I2S" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
+    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "INTPRI" },
@@ -177,19 +177,20 @@ support_status = "not_supported"
 combined_uart_selector_field = true
 
 [device.i2c_master]
-support_status = "not_supported"
+support_status = "partial"
 version = 4
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
     { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
 ]
 has_fsm_timeouts = true
-has_hw_bus_clear = true
+has_hw_bus_clear = true # I2C_SCL_SP_CONF_REG is present
 ll_intr_mask = 0x3ffff
+# TX and RX RAM are 32 x 8 bits each (TRM 27.4.11)
 fifo_size = 32
 has_bus_timeout_enable = true
 max_bus_timeout = 0x1F
-can_estimate_nack_reason = true
+can_estimate_nack_reason = true # txfifo_raddr is present
 has_conf_update = true
 has_reliable_fsm_reset = true
 has_arbitration_en = true
@@ -245,7 +246,7 @@ instances = [
 ]
 
 [device.i2s]
-support_status = "not_supported"
+support_status = "partial"
 version = 3
 mclk_divider_bit_width = 9
 max_ws_width = 512
@@ -437,7 +438,7 @@ engines = [
         name = "AHB_GDMA",
         max_priority = 5,
         # Mux IDs below include later peripherals; only list HAL drivers that are enabled.
-        drivers = ["spi_master"],
+        drivers = ["i2s", "spi_master"],
         # Peripheral selector values, TRM table 2.4-1.
         peripheral_instances = [
             { name = "SPI3", dma_id = 0 },
