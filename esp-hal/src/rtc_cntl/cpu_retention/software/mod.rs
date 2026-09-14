@@ -518,13 +518,13 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
 }
 
 /// Clears the wake stub address that [`arm_wake_stub`] wrote.
-#[crate::ram]
+#[inline(always)]
 pub(crate) fn disarm_wake_stub() {
     // SAFETY: the register is the retention word of this chip, and it holds no other state.
     unsafe { wake_stub_reg().write_volatile(0) };
 }
 
-#[crate::ram]
+#[inline(always)]
 pub(crate) fn arm_wake_stub() {
     let stub = critical_regs_restore as *const () as usize as u32;
     // SAFETY: the register is the retention word of this chip, and it holds no other state.
@@ -674,8 +674,7 @@ pub(crate) fn enter_sleep_with_retention(
 ///
 /// The disarm is unconditional, because the tail of the sleep runs on a wake and on a rejected
 /// request. A stale stub address would otherwise outlive the sleep that armed it.
+#[inline(always)]
 pub(crate) fn finish_cpu_retention(buffer: Option<NonNull<u8>>, _rejected: bool) {
-    if buffer.is_some() {
-        cpu_retention::disarm_wake_stub();
-    }
+    cpu_retention::disarm_wake_stub();
 }
