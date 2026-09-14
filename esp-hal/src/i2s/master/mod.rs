@@ -152,12 +152,10 @@
 //! let mut written = 0;
 //! let audio_sample_len = audio_sample.iter().len();
 //! while written < audio_sample_len {
-//!     let out_written = transfer.push_with(|out| {
-//!         let len = (audio_sample.len() - written).min(out.len());
-//!         out[..len].copy_from_slice(&audio_sample[written..written + len]);
-//!         len
-//!     });
-//!     written += out_written;
+//!     if transfer.available_bytes() > 0 {
+//!         let out_written = transfer.push(&audio_sample[written..]);
+//!         written += out_written;
+//!     }
 //! }
 //! ```
 //!
