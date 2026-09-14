@@ -679,6 +679,7 @@ impl RtcSleepConfig {
     /// Requests the sleep.
     ///
     /// The caller waits for the result of the request.
+    #[inline(always)]
     pub(crate) fn enter_sleep(&self) {
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
     }

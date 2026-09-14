@@ -1054,7 +1054,7 @@ impl RtcSleepConfig {
     /// Requests the sleep.
     ///
     /// The caller waits for the result of the request.
-    #[crate::ram]
+    #[inline(always)]
     pub(crate) fn enter_sleep(&self) {
         request_sleep();
     }
