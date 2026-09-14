@@ -151,7 +151,7 @@ const SYSCON_ROM_POWER_UP: u8 = 0x7;
 
 fn rtc_sleep_pu(val: bool) {
     let rtc_cntl = LPWR::regs();
-    let syscon = unsafe { &*esp32s3::APB_CTRL::ptr() };
+    let syscon = APB_CTRL::regs();
     let bb = unsafe { &*esp32s3::BB::ptr() };
     let nrx = unsafe { &*esp32s3::NRX::ptr() };
     let fe = unsafe { &*esp32s3::FE::ptr() };
@@ -258,10 +258,8 @@ impl RtcSleepConfig {
             rtc_cntl.ana_conf().modify(|_, w| w.pvtmon_pu().clear_bit());
 
             rtc_cntl.timer1().modify(|_, w| {
-                w.pll_buf_wait()
-                    .bits(RTC_CNTL_PLL_BUF_WAIT_DEFAULT)
-                    .ck8m_wait()
-                    .bits(RTC_CNTL_CK8M_WAIT_DEFAULT)
+                w.pll_buf_wait().bits(RTC_CNTL_PLL_BUF_WAIT_DEFAULT);
+                w.ck8m_wait().bits(RTC_CNTL_CK8M_WAIT_DEFAULT)
             });
 
             // Moved from rtc sleep to rtc init to save sleep function running time
@@ -354,12 +352,10 @@ impl RtcSleepConfig {
                 .modify(|_, w| w.xtl_force_pu().clear_bit());
 
             rtc_cntl.ana_conf().modify(|_, w| {
-                w
-                    // open sar_i2c protect function to avoid sar_i2c reset when rtc_ldo is low.
-                    // clear i2c_reset_protect pd force, need tested in low temperature.
-                    // NOTE: this bit is written again in esp-idf, but it's not clear why.
-                    .i2c_reset_por_force_pd()
-                    .clear_bit()
+                // open sar_i2c protect function to avoid sar_i2c reset when rtc_ldo is low.
+                // clear i2c_reset_protect pd force, need tested in low temperature.
+                // NOTE: this bit is written again in esp-idf, but it's not clear why.
+                w.i2c_reset_por_force_pd().clear_bit()
             });
 
             // cancel bbpll force pu if setting no force power up
@@ -417,9 +413,10 @@ impl RtcSleepConfig {
                 .dig_pwc()
                 .modify(|_, w| w.wifi_force_pu().clear_bit());
 
-            rtc_cntl
-                .dig_iso()
-                .modify(|_, w| w.bt_force_noiso().clear_bit().bt_force_iso().clear_bit());
+            rtc_cntl.dig_iso().modify(|_, w| {
+                w.bt_force_noiso().clear_bit();
+                w.bt_force_iso().clear_bit()
+            });
 
             rtc_cntl
                 .dig_pwc()
@@ -491,21 +488,18 @@ impl RtcSleepConfig {
                 w.wifi_force_noiso().clear_bit();
                 w.wifi_force_iso().clear_bit()
             });
-
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.wifi_force_pu().clear_bit().wifi_pd_en().set_bit());
         } else {
             rtc_cntl.options0().modify(|_, w| {
                 w.bbpll_force_pu().set_bit();
                 w.bbpll_i2c_force_pu().set_bit();
                 w.bb_i2c_force_pu().set_bit()
             });
-
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.wifi_force_pu().set_bit().wifi_pd_en().clear_bit());
         }
+
+        rtc_cntl.dig_pwc().modify(|_, w| {
+            w.wifi_force_pu().bit(self.modem_pd_en());
+            w.wifi_pd_en().bit(self.modem_pd_en())
+        });
 
         if self.cpu_pd_en() {
             rtc_cntl.dig_iso().modify(|_, w| {
@@ -513,9 +507,10 @@ impl RtcSleepConfig {
                 w.cpu_top_force_iso().clear_bit()
             });
 
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.cpu_top_force_pu().clear_bit().cpu_top_pd_en().set_bit());
+            rtc_cntl.dig_pwc().modify(|_, w| {
+                w.cpu_top_force_pu().clear_bit();
+                w.cpu_top_pd_en().set_bit()
+            });
         } else {
             rtc_cntl
                 .dig_pwc()
@@ -528,9 +523,10 @@ impl RtcSleepConfig {
                 w.dg_peri_force_iso().clear_bit()
             });
 
-            rtc_cntl
-                .dig_pwc()
-                .modify(|_, w| w.dg_peri_force_pu().clear_bit().dg_peri_pd_en().set_bit());
+            rtc_cntl.dig_pwc().modify(|_, w| {
+                w.dg_peri_force_pu().clear_bit();
+                w.dg_peri_pd_en().set_bit()
+            });
         } else {
             rtc_cntl
                 .dig_pwc()

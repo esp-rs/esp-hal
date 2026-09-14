@@ -278,8 +278,8 @@ fn rtc_sleep_pu(val: bool) {
 
     APB_CTRL::regs().mem_power_up().modify(|_r, w| unsafe {
         w.sram_power_up()
-            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 })
-            .rom_power_up()
+            .bits(if val { SYSCON_SRAM_POWER_UP } else { 0 });
+        w.rom_power_up()
             .bits(if val { SYSCON_ROM_POWER_UP } else { 0 })
     });
 }
@@ -364,36 +364,28 @@ impl RtcSleepConfig {
             let init_cfg = RtcInitConfig::default();
 
             rtc_cntl.timer3().modify(|_, w| {
-                w
-                    // set wifi timer
-                    .wifi_powerup_timer()
-                    .bits(init_cfg.wifi_powerup_cycles())
-                    .wifi_wait_timer()
-                    .bits(init_cfg.wifi_wait_cycles())
-                    // set bt timer
-                    .bt_powerup_timer()
-                    .bits(init_cfg.bt_powerup_cycles())
-                    .bt_wait_timer()
-                    .bits(init_cfg.bt_wait_cycles())
+                // set wifi timer
+                w.wifi_powerup_timer().bits(init_cfg.wifi_powerup_cycles());
+                w.wifi_wait_timer().bits(init_cfg.wifi_wait_cycles());
+                // set bt timer
+                w.bt_powerup_timer().bits(init_cfg.bt_powerup_cycles());
+                w.bt_wait_timer().bits(init_cfg.bt_wait_cycles())
             });
 
             rtc_cntl.timer4().modify(|_, w| {
                 w.cpu_top_powerup_timer()
-                    .bits(init_cfg.cpu_top_powerup_cycles())
-                    .cpu_top_wait_timer()
-                    .bits(init_cfg.cpu_top_wait_cycles())
-                    // set digital wrap timer
-                    .dg_wrap_powerup_timer()
-                    .bits(init_cfg.dg_wrap_powerup_cycles())
-                    .dg_wrap_wait_timer()
-                    .bits(init_cfg.dg_wrap_wait_cycles())
+                    .bits(init_cfg.cpu_top_powerup_cycles());
+                w.cpu_top_wait_timer().bits(init_cfg.cpu_top_wait_cycles());
+                // set digital wrap timer
+                w.dg_wrap_powerup_timer()
+                    .bits(init_cfg.dg_wrap_powerup_cycles());
+                w.dg_wrap_wait_timer().bits(init_cfg.dg_wrap_wait_cycles())
             });
 
             rtc_cntl.timer6().modify(|_, w| {
                 w.dg_peri_powerup_timer()
-                    .bits(init_cfg.dg_peri_powerup_cycles())
-                    .dg_peri_wait_timer()
-                    .bits(init_cfg.dg_peri_wait_cycles())
+                    .bits(init_cfg.dg_peri_powerup_cycles());
+                w.dg_peri_wait_timer().bits(init_cfg.dg_peri_wait_cycles())
             });
 
             // TODO: something about cali_ocode
@@ -454,21 +446,15 @@ impl RtcSleepConfig {
                 // cancel bbpll force pu if setting no force power up
 
                 rtc_cntl.options0().modify(|_, w| {
-                    w.bbpll_force_pu()
-                        .bit(cfg.bbpll_fpu())
-                        .bbpll_i2c_force_pu()
-                        .bit(cfg.bbpll_fpu())
-                        .bb_i2c_force_pu()
-                        .bit(cfg.bbpll_fpu())
+                    w.bbpll_force_pu().bit(cfg.bbpll_fpu());
+                    w.bbpll_i2c_force_pu().bit(cfg.bbpll_fpu());
+                    w.bb_i2c_force_pu().bit(cfg.bbpll_fpu())
                 });
 
                 rtc_cntl.rtc_cntl().modify(|_, w| {
-                    w.regulator_force_pu()
-                        .clear_bit()
-                        .dboost_force_pu()
-                        .clear_bit()
-                        .dboost_force_pd()
-                        .bit(cfg.rtc_dboost_fpd())
+                    w.regulator_force_pu().clear_bit();
+                    w.dboost_force_pu().clear_bit();
+                    w.dboost_force_pd().bit(cfg.rtc_dboost_fpd())
                 });
 
                 // If this mask is enabled, all soc memories cannot enter power down mode
@@ -485,29 +471,19 @@ impl RtcSleepConfig {
                 rtc_sleep_pu(false);
 
                 rtc_cntl.dig_pwc().modify(|_, w| {
-                    w.dg_wrap_force_pu()
-                        .clear_bit()
-                        .wifi_force_pu()
-                        .clear_bit()
-                        .bt_force_pu()
-                        .clear_bit()
-                        .cpu_top_force_pu()
-                        .clear_bit()
-                        .dg_peri_force_pu()
-                        .clear_bit()
+                    w.dg_wrap_force_pu().clear_bit();
+                    w.wifi_force_pu().clear_bit();
+                    w.bt_force_pu().clear_bit();
+                    w.cpu_top_force_pu().clear_bit();
+                    w.dg_peri_force_pu().clear_bit()
                 });
 
                 rtc_cntl.dig_iso().modify(|_, w| {
-                    w.dg_wrap_force_noiso()
-                        .clear_bit()
-                        .wifi_force_noiso()
-                        .clear_bit()
-                        .bt_force_noiso()
-                        .clear_bit()
-                        .cpu_top_force_noiso()
-                        .clear_bit()
-                        .dg_peri_force_noiso()
-                        .clear_bit()
+                    w.dg_wrap_force_noiso().clear_bit();
+                    w.wifi_force_noiso().clear_bit();
+                    w.bt_force_noiso().clear_bit();
+                    w.cpu_top_force_noiso().clear_bit();
+                    w.dg_peri_force_noiso().clear_bit()
                 });
 
                 // if SYSTEM_CPU_WAIT_MODE_FORCE_ON == 0 , the cpu clk will be closed when cpu
@@ -520,10 +496,8 @@ impl RtcSleepConfig {
                 // cancel digital PADS force no iso
 
                 rtc_cntl.dig_iso().modify(|_, w| {
-                    w.dg_pad_force_unhold()
-                        .clear_bit()
-                        .dg_pad_force_noiso()
-                        .clear_bit()
+                    w.dg_pad_force_unhold().clear_bit();
+                    w.dg_pad_force_noiso().clear_bit()
                 });
             }
 
