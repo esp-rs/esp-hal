@@ -1,7 +1,7 @@
 //! Allocator tests in DCache-reclaimed memory
 
 //% CHIP_FILTER: esp32s3
-//% ENV(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
+//% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: esp-alloc
 
 #![no_std]
