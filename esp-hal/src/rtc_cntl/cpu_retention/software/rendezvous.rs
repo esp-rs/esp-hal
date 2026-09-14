@@ -166,7 +166,7 @@ pub(crate) fn retention_allowed() -> bool {
 /// The initiator arms the wake stub for both cores, because the chip has one wake stub register,
 /// and the stub reads the frame of the core that runs it.
 #[crate::ram]
-pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> bool) -> bool {
+pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool {
     let core = system::raw_core();
     let other = other_core();
 
@@ -191,8 +191,7 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn(), wait: fn() -> b
     set_state(core, State::BackupDone);
     wait_for(other, State::BackupDone);
 
-    enter_sleep();
-    let rejected = wait();
+    let rejected = enter_sleep();
 
     if rejected {
         // This is the only store that releases the helper from its wait. A rejected request

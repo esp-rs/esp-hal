@@ -4,9 +4,8 @@ cfg_select! {
     cpu_retention = "software" => {
         mod software;
         pub(crate) use software::{
-            disarm_wake_stub,
-            enter_sleep_with_retention,
             finish_cpu_retention,
+            enter_sleep_with_retention,
             sleep_retained,
         };
         #[cfg(feature = "rt")]

@@ -870,8 +870,8 @@ impl RtcSleepConfig {
     ///
     /// The caller waits for the result of the request.
     #[inline(always)]
-    pub(crate) fn enter_sleep(&self) {
-        request_sleep();
+    pub(crate) fn enter_sleep(&self) -> bool {
+        request_sleep()
     }
 
     /// Cleans up after sleep.
