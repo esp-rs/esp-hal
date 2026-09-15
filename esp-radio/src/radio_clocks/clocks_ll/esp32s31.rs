@@ -42,10 +42,28 @@ fn pulse_wifibb_reset() {
         .modify(|_, w| w.rst_wifibb().clear_bit());
 }
 
+/// Force the Wi-Fi MAC clock and the APB clock reaching its registers on.
+///
+/// The driver requests a clock gate (`wifi_clock_disable`) while it is still
+/// tearing itself down, and then writes Wi-Fi MAC registers; gating there hangs
+/// the APB access and with it the debug connection. IDF hits the same ordering
+/// problem and ignores the request: the Wi-Fi arms of `modem_clock_impl.c` only
+/// gate while `MODEM_STATUS_WIFI_INITED` is clear, and `esp_wifi_deinit` clears
+/// that flag only after the driver has returned. Forcing the clocks on
+/// overrides the `clk_conf1` enables that `enable_wifi(false)` clears, so the
+/// force bits are what actually keeps them alive across teardown.
+fn force_wifi_mac_clocks(en: bool) {
+    regs!(MODEM_SYSCON).clk_conf_force_on().modify(|_, w| {
+        w.clk_wifimac_fo().bit(en);
+        w.clk_wifi_apb_fo().bit(en)
+    });
+}
+
 pub(crate) fn enable_wifi(en: bool) {
     if en {
         enable_soc_pll_source_cg();
         pulse_wifibb_reset();
+        force_wifi_mac_clocks(true);
     }
 
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
@@ -195,7 +213,11 @@ pub(crate) fn init_clocks() {
 }
 
 pub(crate) fn deinit_clocks() {
-    // nothing to do, `init_clocks` is a no-op
+    // `enable_wifi(false)` has already cleared the matching `clk_conf1` enables,
+    // so dropping the force bits here is what finally stops the Wi-Fi MAC
+    // clocks. This runs once every radio is down, which is the first point at
+    // which no driver can still be writing those registers.
+    force_wifi_mac_clocks(false);
 }
 
 /// IDF `btdm_lp` default: `CONFIG_BT_CTRL_LP_CLK_SRC_MAIN_XTAL` at 100 kHz.
