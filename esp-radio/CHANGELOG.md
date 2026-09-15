@@ -19,6 +19,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v1.0.0-beta.1] - 2026-09-15
+
+### Added
+
+- ESP32-S31 Wi-Fi and 802.15.4. (#6296)
+- Wi-Fi 6 support for ESP32-C5 (#6283)
+- HIL test `esp_now_survives_controller_drop` to verify Wi-Fi reference counting across controller drop and ESP-NOW teardown. (#6281)
+- Wi-Fi: Implemented `xarxa-driver` for the Wi-Fi `Interface`. (#6249)
+- `sta_disconnected_pm` and `espnow_max_encrypt_num` to `ControllerConfig` (#6144)
+- bt-hci-transport 0.1.0 implementation (#6030)
+- `PhyMode`, `RateConfig` (#5884)
+- Wifi: `esp_radio::wifi::ConnectionError` (#5872)
+
+### Changed
+
+- `WifiError::Failed` has been renamed to `WifiError::Other`. (#6309)
+- `ESP_NOW_MAX_DATA_LEN` is now `ESP_NOW_MAX_DATA_LEN_V1` and `ESP_NOW_MAX_DATA_LEN_V2` (#6285)
+- `WifiController::esp_now()` and `WifiController::sniffer()` return instances that no longer borrow the controller. Wi-Fi stays initialized until the instance is dropped. (#6281)
+- `EspNow`, `EspNowManager`, `EspNowSender`, `EspNowReceiver`, and `Sniffer` no longer carry a lifetime parameter. (#6281)
+- Updated Wi-Fi and BLE blobs to ESP-IDF `6.1-255-g4dbfecac7e3`. (#6271)
+- BLE: the BLE HCI implementation is now less wasteful about copying data. (#6257)
+- Enabling the `coex` feature without both `wifi` and `ble` now fails with a clear error instead of hard to decrypt compiler errors (and an easy to miss warning) (#6159)
+- `StationConfig` and `AccessPointConfig` now take authentication via `AuthenticationMethodConfig` instead of separate `auth_method` and `password` fields. (#6146)
+- Added a dedicated `Password` type. Oversized passwords are rejected instead of truncated. (#6146)
+- `Ssid` is constructed via `TryFrom`; oversized SSIDs are rejected instead of truncated. (#6146)
+- `sta_disconnected_pm` now defaults to `CONFIG_ESP_WIFI_STA_DISCONNECTED_PM_ENABLE`, previously it was always `false`. (#6144)
+- esp-radio can now be built with opt-level "z" (#5911)
+- Replaced `EspNow::set_rate` / `EspNowManager::set_rate` with `set_peer_rate(peer_address, RateConfig)` (#5884)
+- Wifi: `WifiController::connect_async` now returns `Result<sta::ConnectedInfo, ConnectionError>` (#5872)
+- Wifi: `WifiError::Disconnected` no longer carries the AP info. (#5872)
+- Update `bt-hci` to version 0.9 (#5821)
+- updated defmt to 1.1 (#5752)
+- `esp_radio::wifi::new()` is now `esp_radio::wifi::WifiController::new()`. (#5605)
+- `ConnectedStationInfo` renamed to `sta::ConnectedInfo` and moved to the `sta` module. (#5605)
+- `DisconnectedStationInfo` renamed to `sta::DisconnectedInfo` and moved to the `sta` module. (#5605)
+- `AccessPointStationConnectedInfo` renamed to `ap::ConnectedInfo` and moved to the `ap` module. (#5605)
+- `AccessPointStationDisconnectedInfo` renamed to `ap::DisconnectedInfo` and moved to the `ap` module. (#5605)
+- `AccessPointStationEventInfo` renamed to `ap::EventInfo` and moved to the `ap` module. (#5605)
+- `AccessPointConfig::max_connections` and `AccessPointConfig::dtim_period` setters are now gated behind the `unstable` feature. (#5605)
+
+### Fixed
+
+- Unknown or unmapped Wi-Fi driver error codes no longer panic in `WifiError::from_error_code`. They now map to `WifiError::Other`, and only truly unrecognised codes log a warning. (#6309)
+- BLE: BTDM devices no longer block when sending BLE packets through HCI (#6257)
+- `WifiController::disconnect_async` can now abort an in-progress connection attempt instead of returning `NotConnected`. (#6254)
+- fixed a possible deadlock during Wi-Fi initialization/deinitialization (#6222)
+- IEEE 802.15.4 documentation: coexistence with BLE is supported, coexistence with Wi‑Fi remains unsupported. (#6159)
+- 802.15.4 - unconditionally raise the pending bit in all ACKs so that SED children are not missing frames (#6090)
+- Power down the modem power domain and gate the modem clocks when the last radio driver is deinitialized. (#6074)
+- Gate the 802.15.4 modem clocks (including `clk_coex_en` on ESP32-C6) when the driver is dropped. (#6074)
+- ESP32-C2 dropping and re-creating WifiController left the radio inoperational (#6074)
+- The default BLE default TX power on ESP32-C3/S3 is now correctly set to +9dBm (#6036)
+- `WifiPhyRate` enum values (#5884)
+- Enable clocks for security engine for esp32h2. (#5852)
+- WifiController set_config only updates AP and STA config on changes (#5849)
+- Wi-Fi PHY enable/disable now toggles Wi-Fi RX state on combo modules, so restoring the combo-module PHY init no longer breaks Wi-Fi connectivity (#5776)
+- ESP-NOW/sniffer `RxControlInfo` RSSI and noise floor values by sign-extending raw 8-bit signed bitfields. (#5687)
+- Read the 802.15.4 AR (ack-request) bit and frame-version from the correct FCF octet. They were read one octet too high, misclassifying ack-required frames and breaking ACK handling for fragmented frames. (#5650)
+
 ## [v1.0.0-beta.0] - 2026-06-03
 
 ### Added
@@ -481,4 +540,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.16.0...esp-radio-v0.17.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...esp-radio-v0.18.0
 [v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.18.0...esp-radio-v1.0.0-beta.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v1.0.0-beta.0...HEAD
+[v1.0.0-beta.1]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v1.0.0-beta.0...esp-radio-v1.0.0-beta.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v1.0.0-beta.1...HEAD
