@@ -68,11 +68,10 @@ mod tests {
         static DONE: AtomicBool = AtomicBool::new(false);
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         esp_rtos::start_second_core::<8192>(
             p.CPU_CTRL,
-            p.FROM_CPU_INTR1,
             #[allow(static_mut_refs)]
             unsafe {
                 &mut crate::APP_CORE_STACK

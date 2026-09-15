@@ -21,7 +21,7 @@ use esp_hal::{
         SoftwareTimeout,
     },
     interrupt::Priority,
-    peripherals::FROM_CPU_INTR1,
+    peripherals::FROM_CPU_INTR2,
     time,
     timer::timg::TimerGroup,
 };
@@ -29,7 +29,7 @@ use esp_rtos::embassy::InterruptExecutor;
 use hil_test::mk_static;
 
 struct Context {
-    interrupt: FROM_CPU_INTR1<'static>,
+    interrupt: FROM_CPU_INTR2<'static>,
     i2c: I2c<'static, Blocking>,
 }
 
@@ -75,7 +75,7 @@ mod tests {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
         let (sda, scl) = hil_test::i2c_pins!(peripherals);
 
         // Test that the pin can be explicitly configured using Flex:
@@ -98,7 +98,7 @@ mod tests {
 
         Context {
             i2c,
-            interrupt: peripherals.FROM_CPU_INTR1,
+            interrupt: peripherals.FROM_CPU_INTR2,
         }
     }
 
@@ -352,7 +352,7 @@ mod tests {
         let mut i2c = ctx.i2c.into_async();
 
         let interrupt_executor =
-            mk_static!(InterruptExecutor<1>, InterruptExecutor::new(ctx.interrupt));
+            mk_static!(InterruptExecutor<2>, InterruptExecutor::new(ctx.interrupt));
 
         let spawner = interrupt_executor.start(Priority::Priority3);
 

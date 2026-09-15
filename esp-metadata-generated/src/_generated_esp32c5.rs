@@ -1292,6 +1292,7 @@ macro_rules! for_each_classified_interrupt {
         ([reserved 5] 6), ([reserved 6] 7), ([reserved 7] 8), ([reserved 8] 9),
         ([reserved 9] 10), ([reserved 10] 11), ([reserved 11] 12), ([reserved 12] 13),
         ([reserved 13] 14), ([reserved 14] 15)));
+        _for_each_inner_classified_interrupt!((context_switch));
     };
 }
 #[macro_export]

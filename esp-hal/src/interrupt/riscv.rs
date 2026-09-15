@@ -18,10 +18,21 @@ pub use esp_riscv_rt::TrapFrame;
 #[cfg_attr(interrupt_controller = "clic", path = "riscv/clic.rs")]
 mod cpu_int;
 
-// The software-interrupt driver is the only caller on this architecture, and that driver is
-// unstable.
-#[cfg(feature = "unstable")]
-pub(crate) use riscv::interrupt::free;
+// riscv::interrupt::free is not safe on C6/H2
+#[inline]
+pub(crate) fn free<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
+    let irq_token = unsafe { SingleCoreInterruptLock.enter() };
+
+    let r = f();
+
+    unsafe { SingleCoreInterruptLock.exit(irq_token) };
+
+    r
+}
 
 use crate::{
     interrupt::{PriorityError, RunLevel},
@@ -68,7 +79,13 @@ for_each_interrupt!(
 );
 
 for_each_classified_interrupt!(
-    (direct_bindable $( ([$class:ident $idx_in_class:literal] $n:literal) ),*) => {
+    (context_switch ([$class:ident $idx_in_class:literal] $n:literal)) => {
+        paste::paste! {
+            pub(crate) const IPC_INTERRUPT: CpuInterrupt = CpuInterrupt::[<Interrupt $n>];
+        }
+    };
+
+    (direct_bindable $( ([$class:ident $idx_in_class:literal] $n:literal) ),* ) => {
         paste::paste! {
             /// Enumeration of CPU interrupts available for direct binding.
             #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -305,7 +322,7 @@ pub(super) static PRIORITY_TO_INTERRUPT: [CpuInterrupt; VECTOR_COUNT] = const {
 ///   prologue or epilogue; a normal Rust `fn` results in an error
 ///
 /// Unless low-level control is required for the lowest possible latency,
-/// [`enable`][crate::interrupt::enable] is usually preferable
+/// [`enable`][crate::interrupt::enable] is usually preferable.
 #[instability::unstable]
 pub fn enable_direct(
     interrupt: Interrupt,
@@ -313,6 +330,22 @@ pub fn enable_direct(
     cpu_interrupt: DirectBindableCpuInterrupt,
     handler: unsafe extern "C" fn(),
 ) {
+    enable_direct_inner(interrupt, level, cpu_interrupt.into(), handler)
+}
+
+pub(crate) fn enable_direct_inner(
+    interrupt: Interrupt,
+    level: Priority,
+    cpu_interrupt: CpuInterrupt,
+    handler: unsafe extern "C" fn(),
+) {
+    bind_cpu_interrupt(cpu_interrupt, handler);
+    super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
+    enable_cpu_interrupt(cpu_interrupt, level);
+}
+
+/// Writes `handler` into the vector table entry of `cpu_interrupt`.
+pub(crate) fn bind_cpu_interrupt(cpu_interrupt: CpuInterrupt, handler: unsafe extern "C" fn()) {
     cfg_select! {
         interrupt_controller = "clic" => {
             let clic = unsafe { crate::soc::pac::CLIC::steal() };
@@ -369,8 +402,10 @@ pub fn enable_direct(
         // Invalidate the cache to make sure the CPU does not read from a stale instruction cache.
         crate::soc::cache_invalidate_icache_addr(mtvt_table as u32, 48 * 4);
     }
+}
 
-    super::map_raw(Cpu::current(), interrupt, cpu_interrupt as u32);
+/// Enables `cpu_interrupt` as a level-triggered interrupt at `level`.
+pub(crate) fn enable_cpu_interrupt(cpu_interrupt: CpuInterrupt, level: Priority) {
     cpu_int::set_priority_raw(cpu_interrupt as u32, level);
     cpu_int::set_kind_raw(cpu_interrupt as u32, InterruptKind::Level);
     cpu_int::enable_cpu_interrupt_raw(cpu_interrupt as u32);
@@ -475,6 +510,13 @@ pub(crate) unsafe fn init_vectoring() {
     unsafe extern "C" {
         static _vector_table: u32;
     }
+
+    // A machine software interrupt survives a CPU reset, so a request that the previous program
+    // raised would fire as soon as this core takes interrupts again.
+    #[cfg(soc_has_clint)]
+    crate::peripherals::CLINT::regs()
+        .msip()
+        .write(|w| w.msip().clear_bit());
 
     unsafe {
         let vec_table = (&raw const _vector_table).addr();
