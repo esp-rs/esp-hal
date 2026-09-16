@@ -16,6 +16,9 @@ chip-features-matter = true
 doc-config = { features = ["defmt"] }
 check-configs = [
     { features = [] },
+    { features = ["defmt"] },
+    { features = ["log-04"] },
+    { features = [], env = { ESP_PHY_CONFIG_PHY_ENABLE_USB = "false" }, if = 'soc_has_usb_device && soc_has_wifi' },
 ]
 clippy-configs = [
     { features = ["defmt"] },

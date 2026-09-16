@@ -380,7 +380,7 @@ controller = "npl"
 
 [device.phy]
 support_status = "partial"
-combo_module = true
+combo_module = false
 
 # ## Miscellaneous
 [device.systimer]

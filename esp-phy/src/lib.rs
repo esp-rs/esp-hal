@@ -208,23 +208,13 @@ impl PhyState {
         // turning Wi-Fi RX on/off via `set_wifi_rx_enabled` when it enables/disables the PHY.
         // This mirrors `esp_phy_load_cal_and_init` in ESP-IDF.
         cfg_select! {
-            esp32c5 => {
-                // C5 is intentionally excluded: ESP-IDF leaves `SOC_PHY_COMBO_MODULE` undefined
-                // for C5, so it doesn't call `phy_init_param_set` there. See:
-                // https://github.com/espressif/esp-idf/blob/7e3df61a/components/soc/esp32c5/include/soc/soc_caps.h#L658
-                // TODO: enable for C5.
-            }
             phy_combo_module => unsafe {
                 sys::include::phy_init_param_set(1);
             },
             _ => {}
         }
 
-        #[cfg(all(
-            phy_enable_usb,
-            any(soc_has_usb_fs, soc_has_usb_device),
-            not(any(esp32s2, esp32h2))
-        ))]
+        #[cfg(phy_enable_usb)]
         unsafe {
             // FIXME: we should be using from esp-wifi-sys, but the function is missing for C6
             // (CONFIG_ESP_PHY_ENABLE_USB is not defined)
@@ -451,15 +441,6 @@ pub fn disable_phy_with_wifi_rx() {
 /// On non-combo modules this is a no-op.
 fn set_wifi_rx_enabled(enabled: bool) {
     cfg_select! {
-        esp32c5 => {
-            // C5 is excluded for the same reason as `phy_init_param_set` (ESP-IDF leaves
-            // `SOC_PHY_COMBO_MODULE` undefined for C5, see:
-            // https://github.com/espressif/esp-idf/blob/7e3df61a/components/soc/esp32c5/include/soc/soc_caps.h#L658);
-            // its Wi-Fi adapter only calls `phy_wifi_enable_set` alongside a `set_bb_wdg`
-            // workaround we don't implement yet. TODO: enable for C5 once `set_bb_wdg`
-            // is handled.
-            let _ = enabled;
-        }
         phy_combo_module => unsafe {
             sys::include::phy_wifi_enable_set(enabled as u8);
         },

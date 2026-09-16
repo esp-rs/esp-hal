@@ -368,7 +368,7 @@ macro_rules! property {
         true
     };
     ("phy.combo_module") => {
-        true
+        false
     };
     ("rgb_display.output_lines") => {
         24
