@@ -341,7 +341,7 @@ macro_rules! property {
         true
     };
     ("phy.combo_module") => {
-        true
+        false
     };
     ("sdm.channel_count") => {
         4
