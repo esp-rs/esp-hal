@@ -44,7 +44,7 @@
 //!
 //! // THIS IS IMPORTANT FOR WIFI AND BLE: You MUST start the scheduler
 //! // before initializing the radio!
-//! esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+//! esp_rtos::start(timg0.timer0);
 #![cfg_attr(
     wifi_driver_supported,
     doc = r#"
@@ -365,7 +365,7 @@ pub(crate) fn deinit() {
     // only run once all radios are off: PHY teardown still needs the modem
     // clocks.
     #[cfg(feature = "ble")]
-    crate::radio_clocks::clocks_ll::enable_bt(false);
+    crate::radio_clocks::enable_bt(false);
     crate::common_adapter::disable_wifi_power_domain();
     crate::radio_clocks::deinit_radio_clocks();
 

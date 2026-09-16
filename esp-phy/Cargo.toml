@@ -16,6 +16,9 @@ chip-features-matter = true
 doc-config = { features = ["defmt"] }
 check-configs = [
     { features = [] },
+    { features = ["defmt"] },
+    { features = ["log-04"] },
+    { features = [], env = { ESP_PHY_CONFIG_PHY_ENABLE_USB = "false" }, if = 'soc_has_usb_device && soc_has_wifi' },
 ]
 clippy-configs = [
     { features = ["defmt"] },
@@ -32,7 +35,7 @@ bench = false
 
 document-features = "0.2"
 esp-hal = { version = "~1.2.0", path = "../esp-hal", default-features = false }
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated" }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
 esp-sync = { version = "0.3.0", path = "../esp-sync" }
 
 # Make sure these are aligned with esp-radio's dependencies, too!
@@ -58,14 +61,12 @@ esp32s2 = { version = "0.33", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.37", features = ["critical-section"], optional = true }
 esp32s31 = { version = "0.3", features = ["critical-section"], optional = true }
 
-embassy-sync = "0.8"
-
 defmt = { version = "1.1", optional = true }
 log-04 = { version = "0.4.27", package = "log", optional = true }
 
 [build-dependencies]
 esp-config   = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 #! ### Logging Feature Flags

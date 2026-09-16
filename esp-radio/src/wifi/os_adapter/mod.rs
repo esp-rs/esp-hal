@@ -886,7 +886,7 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    crate::radio_clocks::clocks_ll::enable_wifi(true);
+    crate::radio_clocks::enable_wifi(true);
 }
 
 /// **************************************************************************
@@ -907,7 +907,7 @@ pub unsafe extern "C" fn wifi_clock_disable() {
         trace!("wifi_clock_disable - no-op (wifi active, modem sleep)");
     } else {
         trace!("wifi_clock_disable - gating clocks (wifi deinit)");
-        crate::radio_clocks::clocks_ll::enable_wifi(false);
+        crate::radio_clocks::enable_wifi(false);
     }
 }
 

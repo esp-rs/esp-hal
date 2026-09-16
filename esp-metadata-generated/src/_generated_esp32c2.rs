@@ -647,21 +647,21 @@ macro_rules! for_each_interrupt {
         macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_interrupt!(([disabled 0] 0));
         _for_each_inner_interrupt!(([reserved 0] 1));
-        _for_each_inner_interrupt!(([direct_bindable 0] 2));
-        _for_each_inner_interrupt!(([direct_bindable 1] 3));
-        _for_each_inner_interrupt!(([direct_bindable 2] 4));
-        _for_each_inner_interrupt!(([direct_bindable 3] 5));
-        _for_each_inner_interrupt!(([direct_bindable 4] 6));
-        _for_each_inner_interrupt!(([direct_bindable 5] 7));
-        _for_each_inner_interrupt!(([direct_bindable 6] 8));
-        _for_each_inner_interrupt!(([direct_bindable 7] 9));
-        _for_each_inner_interrupt!(([direct_bindable 8] 10));
-        _for_each_inner_interrupt!(([direct_bindable 9] 11));
-        _for_each_inner_interrupt!(([direct_bindable 10] 12));
-        _for_each_inner_interrupt!(([direct_bindable 11] 13));
-        _for_each_inner_interrupt!(([direct_bindable 12] 14));
-        _for_each_inner_interrupt!(([direct_bindable 13] 15));
-        _for_each_inner_interrupt!(([direct_bindable 14] 16));
+        _for_each_inner_interrupt!(([context_switch 0] 2));
+        _for_each_inner_interrupt!(([direct_bindable 0] 3));
+        _for_each_inner_interrupt!(([direct_bindable 1] 4));
+        _for_each_inner_interrupt!(([direct_bindable 2] 5));
+        _for_each_inner_interrupt!(([direct_bindable 3] 6));
+        _for_each_inner_interrupt!(([direct_bindable 4] 7));
+        _for_each_inner_interrupt!(([direct_bindable 5] 8));
+        _for_each_inner_interrupt!(([direct_bindable 6] 9));
+        _for_each_inner_interrupt!(([direct_bindable 7] 10));
+        _for_each_inner_interrupt!(([direct_bindable 8] 11));
+        _for_each_inner_interrupt!(([direct_bindable 9] 12));
+        _for_each_inner_interrupt!(([direct_bindable 10] 13));
+        _for_each_inner_interrupt!(([direct_bindable 11] 14));
+        _for_each_inner_interrupt!(([direct_bindable 12] 15));
+        _for_each_inner_interrupt!(([direct_bindable 13] 16));
         _for_each_inner_interrupt!(([vector 0] 17)); _for_each_inner_interrupt!(([vector
         1] 18)); _for_each_inner_interrupt!(([vector 2] 19));
         _for_each_inner_interrupt!(([vector 3] 20)); _for_each_inner_interrupt!(([vector
@@ -673,11 +673,11 @@ macro_rules! for_each_interrupt {
         _for_each_inner_interrupt!(([vector 12] 29)); _for_each_inner_interrupt!(([vector
         13] 30)); _for_each_inner_interrupt!(([vector 14] 31));
         _for_each_inner_interrupt!((all([disabled 0] 0), ([reserved 0] 1),
-        ([direct_bindable 0] 2), ([direct_bindable 1] 3), ([direct_bindable 2] 4),
-        ([direct_bindable 3] 5), ([direct_bindable 4] 6), ([direct_bindable 5] 7),
-        ([direct_bindable 6] 8), ([direct_bindable 7] 9), ([direct_bindable 8] 10),
-        ([direct_bindable 9] 11), ([direct_bindable 10] 12), ([direct_bindable 11] 13),
-        ([direct_bindable 12] 14), ([direct_bindable 13] 15), ([direct_bindable 14] 16),
+        ([context_switch 0] 2), ([direct_bindable 0] 3), ([direct_bindable 1] 4),
+        ([direct_bindable 2] 5), ([direct_bindable 3] 6), ([direct_bindable 4] 7),
+        ([direct_bindable 5] 8), ([direct_bindable 6] 9), ([direct_bindable 7] 10),
+        ([direct_bindable 8] 11), ([direct_bindable 9] 12), ([direct_bindable 10] 13),
+        ([direct_bindable 11] 14), ([direct_bindable 12] 15), ([direct_bindable 13] 16),
         ([vector 0] 17), ([vector 1] 18), ([vector 2] 19), ([vector 3] 20), ([vector 4]
         21), ([vector 5] 22), ([vector 6] 23), ([vector 7] 24), ([vector 8] 25), ([vector
         9] 26), ([vector 10] 27), ([vector 11] 28), ([vector 12] 29), ([vector 13] 30),
@@ -690,20 +690,19 @@ macro_rules! for_each_classified_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_classified_interrupt { $(($pattern) => $code;)*
         ($other : tt) => {} } _for_each_inner_classified_interrupt!(([direct_bindable 0]
-        2)); _for_each_inner_classified_interrupt!(([direct_bindable 1] 3));
-        _for_each_inner_classified_interrupt!(([direct_bindable 2] 4));
-        _for_each_inner_classified_interrupt!(([direct_bindable 3] 5));
-        _for_each_inner_classified_interrupt!(([direct_bindable 4] 6));
-        _for_each_inner_classified_interrupt!(([direct_bindable 5] 7));
-        _for_each_inner_classified_interrupt!(([direct_bindable 6] 8));
-        _for_each_inner_classified_interrupt!(([direct_bindable 7] 9));
-        _for_each_inner_classified_interrupt!(([direct_bindable 8] 10));
-        _for_each_inner_classified_interrupt!(([direct_bindable 9] 11));
-        _for_each_inner_classified_interrupt!(([direct_bindable 10] 12));
-        _for_each_inner_classified_interrupt!(([direct_bindable 11] 13));
-        _for_each_inner_classified_interrupt!(([direct_bindable 12] 14));
-        _for_each_inner_classified_interrupt!(([direct_bindable 13] 15));
-        _for_each_inner_classified_interrupt!(([direct_bindable 14] 16));
+        3)); _for_each_inner_classified_interrupt!(([direct_bindable 1] 4));
+        _for_each_inner_classified_interrupt!(([direct_bindable 2] 5));
+        _for_each_inner_classified_interrupt!(([direct_bindable 3] 6));
+        _for_each_inner_classified_interrupt!(([direct_bindable 4] 7));
+        _for_each_inner_classified_interrupt!(([direct_bindable 5] 8));
+        _for_each_inner_classified_interrupt!(([direct_bindable 6] 9));
+        _for_each_inner_classified_interrupt!(([direct_bindable 7] 10));
+        _for_each_inner_classified_interrupt!(([direct_bindable 8] 11));
+        _for_each_inner_classified_interrupt!(([direct_bindable 9] 12));
+        _for_each_inner_classified_interrupt!(([direct_bindable 10] 13));
+        _for_each_inner_classified_interrupt!(([direct_bindable 11] 14));
+        _for_each_inner_classified_interrupt!(([direct_bindable 12] 15));
+        _for_each_inner_classified_interrupt!(([direct_bindable 13] 16));
         _for_each_inner_classified_interrupt!(([vector 0] 17));
         _for_each_inner_classified_interrupt!(([vector 1] 18));
         _for_each_inner_classified_interrupt!(([vector 2] 19));
@@ -720,17 +719,19 @@ macro_rules! for_each_classified_interrupt {
         _for_each_inner_classified_interrupt!(([vector 13] 30));
         _for_each_inner_classified_interrupt!(([vector 14] 31));
         _for_each_inner_classified_interrupt!(([reserved 0] 1));
-        _for_each_inner_classified_interrupt!((direct_bindable([direct_bindable 0] 2),
-        ([direct_bindable 1] 3), ([direct_bindable 2] 4), ([direct_bindable 3] 5),
-        ([direct_bindable 4] 6), ([direct_bindable 5] 7), ([direct_bindable 6] 8),
-        ([direct_bindable 7] 9), ([direct_bindable 8] 10), ([direct_bindable 9] 11),
-        ([direct_bindable 10] 12), ([direct_bindable 11] 13), ([direct_bindable 12] 14),
-        ([direct_bindable 13] 15), ([direct_bindable 14] 16)));
+        _for_each_inner_classified_interrupt!(([context_switch 0] 2));
+        _for_each_inner_classified_interrupt!((direct_bindable([direct_bindable 0] 3),
+        ([direct_bindable 1] 4), ([direct_bindable 2] 5), ([direct_bindable 3] 6),
+        ([direct_bindable 4] 7), ([direct_bindable 5] 8), ([direct_bindable 6] 9),
+        ([direct_bindable 7] 10), ([direct_bindable 8] 11), ([direct_bindable 9] 12),
+        ([direct_bindable 10] 13), ([direct_bindable 11] 14), ([direct_bindable 12] 15),
+        ([direct_bindable 13] 16)));
         _for_each_inner_classified_interrupt!((vector([vector 0] 17), ([vector 1] 18),
         ([vector 2] 19), ([vector 3] 20), ([vector 4] 21), ([vector 5] 22), ([vector 6]
         23), ([vector 7] 24), ([vector 8] 25), ([vector 9] 26), ([vector 10] 27),
         ([vector 11] 28), ([vector 12] 29), ([vector 13] 30), ([vector 14] 31)));
         _for_each_inner_classified_interrupt!((reserved([reserved 0] 1)));
+        _for_each_inner_classified_interrupt!((context_switch([context_switch 0] 2)));
     };
 }
 #[macro_export]
@@ -3904,7 +3905,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((WIFI));
-        _for_each_inner_peripheral!((FROM_CPU_INTR0(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR1(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR2(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR3(unstable)));
@@ -4075,10 +4075,9 @@ macro_rules! for_each_peripheral {
         (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TIMG0(unstable)), (UART0), (UART1), (XTS_AES(unstable)),
         (ADC1(unstable)), (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
-        (WIFI), (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
-        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, AhbGdmaChannel), (SHA,
-        Sha, 7, AhbGdmaChannel)));
+        (WIFI), (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
+        Spi2, 0, AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v1.0.0-beta.2] - 2026-09-16
+
+- Fixed S31 builds (#6341)
+
 ## [v1.0.0-beta.1] - 2026-09-15
 
 ### Added
@@ -541,4 +545,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.17.0...esp-radio-v0.18.0
 [v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v0.18.0...esp-radio-v1.0.0-beta.0
 [v1.0.0-beta.1]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v1.0.0-beta.0...esp-radio-v1.0.0-beta.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v1.0.0-beta.1...HEAD
+[v1.0.0-beta.2]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v1.0.0-beta.1...esp-radio-v1.0.0-beta.2
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-v1.0.0-beta.2...HEAD

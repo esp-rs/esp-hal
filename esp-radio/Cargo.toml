@@ -1,6 +1,6 @@
 [package]
 name = "esp-radio"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 edition = "2024"
 rust-version  = "1.95.0"
 description = "A driver for the radio peripherals found in Espressif microcontrollers for and bare-metal Rust"
@@ -69,7 +69,7 @@ docsplay = { version = "0.1", default-features = false }
 document-features  = "0.2"
 esp-alloc = { version = "0.11.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.8.0", path = "../esp-config" }
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated" }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "=0.1.5", path = "../esp-rom-sys" }
 esp-sync = { version = "0.3.0", path = "../esp-sync" }
 esp-phy = { version = "0.3.0", path = "../esp-phy/" }
@@ -121,7 +121,7 @@ log-04 = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
 esp-config = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
 esp-rtos = { version = "0.4.0", path = "../esp-rtos" }
