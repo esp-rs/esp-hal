@@ -62,7 +62,7 @@ pub fn software_reset() -> ! {
 }
 
 /// Set App cpu Entry code, code can be called in PRO CPU.
-#[cfg(any(esp32s3, esp32p4, esp32s31))]
+#[cfg(any(esp32s3, esp32h4, esp32p4, esp32s31))]
 #[inline(always)]
 pub fn ets_set_appcpu_boot_addr(boot_addr: u32) {
     unsafe extern "C" {
@@ -93,8 +93,9 @@ extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
             // just rely on RTC_CNTL_STORE4
             (regs!(RTC_CNTL).store4().read().bits() & 0xff) as i32
         }
-        any(esp32c5, esp32c61) => {
-            // PCR_CLK_XTAL_FREQ updates its value based on EFUSE_XTAL_48M_SEL.
+        any(esp32c5, esp32c61, esp32h4) => {
+            // PCR_CLK_XTAL_FREQ holds the XTAL frequency in MHz. On the ESP32-C5
+            // and ESP32-C61 it is updated based on EFUSE_XTAL_48M_SEL.
             regs!(PCR).sysclk_conf().read().clk_xtal_freq().bits() as i32
         }
         _ => {
