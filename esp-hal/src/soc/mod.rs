@@ -368,10 +368,11 @@ pub(crate) fn enable_pmp() {
     ) -> Result<(), PmpError> {
         let granularity = cfg_select! {
             // this limits the effectiveness for these targets
-            // we could adjust the linker scripts to honor the granularity but that would waste some memory
+            // we could adjust the linker scripts to honor the granularity but that
+            // would waste some memory
             //
             // TODO: #6311 will be the proper metadata backed implementation
-            any(esp32c5, esp32c61 , esp32p4 , esp32s31) => 128,
+            any(esp32c5, esp32c61, esp32p4, esp32s31) => 128,
             _ => 4,
         };
         let start_addr = start_addr.next_multiple_of(granularity);
