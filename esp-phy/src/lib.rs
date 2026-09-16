@@ -23,7 +23,7 @@
 mod fmt;
 pub(crate) mod reg_access;
 
-use core::{cell::Cell, marker::PhantomData};
+use core::marker::PhantomData;
 
 use esp_hal::system::Cpu;
 #[cfg(esp32)]
@@ -31,37 +31,32 @@ use esp_hal::time::{Duration, Instant};
 use esp_sync::{NonReentrantMutex, RawMutex};
 
 /// Tracks the number of references to the PHY clock.
-static PHY_CLOCK_REF_COUNTER: embassy_sync::blocking_mutex::Mutex<RawMutex, Cell<u8>> =
-    embassy_sync::blocking_mutex::Mutex::new(Cell::new(0));
+static PHY_CLOCK_REF_COUNTER: NonReentrantMutex<u8> = NonReentrantMutex::new(0);
 
 fn increase_phy_clock_ref_count_internal() {
-    PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
-        let phy_clock_ref_count = phy_clock_ref_counter.get();
+    PHY_CLOCK_REF_COUNTER.with(|refcount| {
+        let count = *refcount;
 
-        if phy_clock_ref_count == 0 {
+        if count == 0 {
             phy_clocks::enable_phy(true);
         }
-        let new_phy_clock_ref_count = unwrap!(
-            phy_clock_ref_count.checked_add(1),
-            "PHY clock ref count overflowed."
-        );
 
-        phy_clock_ref_counter.set(new_phy_clock_ref_count);
+        *refcount = unwrap!(count.checked_add(1), "PHY clock ref count overflowed.");
     })
 }
 
 fn decrease_phy_clock_ref_count_internal() {
-    PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
-        let new_phy_clock_ref_count = unwrap!(
-            phy_clock_ref_counter.get().checked_sub(1),
+    PHY_CLOCK_REF_COUNTER.with(|refcount| {
+        let count = unwrap!(
+            refcount.checked_sub(1),
             "PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used PhyController::decrease_phy_clock_ref_count incorrectly."
         );
 
-        if new_phy_clock_ref_count == 0 {
+        if count == 0 {
             phy_clocks::enable_phy(false);
         }
 
-        phy_clock_ref_counter.set(new_phy_clock_ref_count);
+        *refcount = count;
     })
 }
 
