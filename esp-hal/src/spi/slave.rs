@@ -165,15 +165,14 @@ pub mod dma {
     use enumset::enum_set;
 
     use super::*;
+    #[cfg(not(spi_slave_dma_engine = "SPI_DMA"))]
+    use crate::RegisterToggle;
     use crate::{
         DriverMode,
         dma::{Channel, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
         rtc_cntl::WakeLock,
         spi::Error,
     };
-
-    #[cfg(not(spi_slave_dma_engine = "SPI_DMA"))]
-    use crate::RegisterToggle;
 
     const MAX_DMA_SIZE: usize = 32768 - 32;
 
