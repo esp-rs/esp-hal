@@ -118,7 +118,7 @@ peripherals = [
     { name = "LP_CORE", virtual = true },
     { name = "TSENS", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR", modem_peri_timeout = "MODEM_PERI_TIMEOUT" }, stable = true },
-    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
     { name = "FROM_CPU_INTR1", virtual = true },
     { name = "FROM_CPU_INTR2", virtual = true },
     { name = "FROM_CPU_INTR3", virtual = true },
@@ -236,10 +236,8 @@ instances = [
 support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
-controller = { Riscv = { flavour = "plic", interrupts = 32, priority_levels = 15 } }
-# The PLIC priority threshold does not mask the machine software interrupt, so raising the run
-# level masks it in `mie` instead.
-context_switch_source = "clint"
+controller = { Riscv = { flavour = "plic", interrupts = 32, priority_levels = 15, context_switch_interrupt = true } }
+context_switch_source = "from_cpu" # clint doesn't seem to work on C6
 
 [device.rmt]
 support_status = "partial"

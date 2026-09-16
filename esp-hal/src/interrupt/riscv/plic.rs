@@ -66,9 +66,10 @@ pub(crate) fn change_current_runlevel(level: RunLevel) -> u8 {
 
     // The threshold does not mask the machine software interrupt, which carries the context
     // switch. That switch runs below every elevated run level, so `mie` masks it here instead.
+    #[cfg(context_switch_source = "clint")]
     match level {
-        RunLevel::Interrupt(_) => unsafe { core::arch::asm!("csrci mie, 0b1000") },
-        RunLevel::ThreadMode => unsafe { core::arch::asm!("csrsi mie, 0b1000") },
+        RunLevel::Interrupt(_) => unsafe { riscv::register::mie::clear_msoft() },
+        RunLevel::ThreadMode => unsafe { riscv::register::mie::set_msoft() },
     }
 
     // The CPU responds to interrupts `>= level`, but we want to also disable
