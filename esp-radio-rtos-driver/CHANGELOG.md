@@ -19,6 +19,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.4.2] - 2026-09-15
+
+### Added
+
+- Support for ESP32-S31 (#6296)
+- `QueueHandle` and `SemaphoreHandle` are now `Send` and `Sync` (#6222)
+- Configurable `CompatTimer` thread priority. (#5908)
+
+### Changed
+
+- Made `CompatTimer` const-generic (the thread priority) (#5908)
+- updated defmt to 1.1 (#5752)
+
+### Removed
+
+- `CompatTimer::new` (#5908)
+
 ## [v0.4.1] - 2026-09-01
 
 ### Added
@@ -85,4 +102,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.3.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.2.0...esp-radio-rtos-driver-v0.3.0
 [v0.4.0]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.3.0...esp-radio-rtos-driver-v0.4.0
 [v0.4.1]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.4.0...esp-radio-rtos-driver-v0.4.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.4.1...HEAD
+[v0.4.2]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.4.1...esp-radio-rtos-driver-v0.4.2
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-radio-rtos-driver-v0.4.2...HEAD
