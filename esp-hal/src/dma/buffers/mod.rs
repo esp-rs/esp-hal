@@ -2110,9 +2110,14 @@ fn build_descriptor_list_for_psram(
     // MIN_LAST_DMA_LEN data to work with.
     let has_aligned_data = data_len > BUF_LEN;
 
-    // Calculate byte offset to the start of the buffer
+    // Calculate byte offset to the start of the buffer. An already-aligned
+    // buffer needs no head at all: without the wrap, `offset == 0` asked for a
+    // whole `min_alignment` worth of bouncing, so a caller that had carefully
+    // aligned its destination still paid a copy buffer plus a descriptor on
+    // every transfer, and the CPU write-back landed on a cache line the
+    // invalidate below had just dropped.
     let offset = data_addr % min_alignment;
-    let head_to_copy = min_alignment - offset;
+    let head_to_copy = (min_alignment - offset) % min_alignment;
     let head_to_copy = if !has_aligned_data {
         BUF_LEN
     } else if head_to_copy > 0 && head_to_copy < MIN_LAST_DMA_LEN {
