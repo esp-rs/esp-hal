@@ -31,6 +31,34 @@ impl GenericProperty for SoftwareInterruptProperties {
     }
 }
 
+/// The interrupt that a CPU raises to switch tasks on itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextSwitchSource {
+    /// The `Software0` CPU-internal interrupt.
+    Software0,
+    /// The machine software interrupt of the CLINT.
+    Clint,
+    /// The `FROM_CPU_INTR0` peripheral interrupt.
+    FromCpu,
+    /// The inter-processor call, which the chip also uses for cross-core switches.
+    Ipc,
+}
+
+/// Generates the `context_switch_source` cfg.
+impl GenericProperty for ContextSwitchSource {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let source = match self {
+            Self::Software0 => "software0",
+            Self::Clint => "clint",
+            Self::FromCpu => "from_cpu",
+            Self::Ipc => "ipc",
+        };
+
+        Some(vec![format!("context_switch_source=\"{source}\"")])
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RiscvFlavour {
@@ -74,6 +102,12 @@ pub struct RiscvControllerProperties {
     interrupts: u32,
     /// Priority levels above 0
     priority_levels: u32,
+    /// Takes the first direct-bindable interrupt line for the context switch.
+    ///
+    /// A chip whose CPU raises its own machine software interrupt takes the switch in a CLINT
+    /// line instead, and leaves every direct-bindable line to applications.
+    #[serde(default)]
+    context_switch_interrupt: bool,
 }
 
 impl RiscvControllerProperties {
@@ -134,6 +168,7 @@ impl GenericProperty for InterruptControllerProperties {
             Reserved,
             Vector,
             Disabled,
+            ContextSwitch,
         }
 
         // interrupt number => class
@@ -155,10 +190,19 @@ impl GenericProperty for InterruptControllerProperties {
         assert_ne!(classes[properties.disabled_interrupt()], Class::Vector);
         classes[properties.disabled_interrupt()] = Class::Disabled;
 
+        if properties.context_switch_interrupt {
+            let first = classes
+                .iter()
+                .position(|class| *class == Class::Interrupt)
+                .expect("No interrupt line is free for the context switch");
+            classes[first] = Class::ContextSwitch;
+        }
+
         let mut all = vec![];
         let mut vector = vec![];
         let mut reserved = vec![];
         let mut direct_bindable = vec![];
+        let mut context_switch = vec![];
 
         for (i, class) in classes.iter().enumerate() {
             let intr_number = number(i);
@@ -166,13 +210,14 @@ impl GenericProperty for InterruptControllerProperties {
                 Class::Interrupt => direct_bindable.len(),
                 Class::Vector => vector.len(),
                 Class::Reserved => reserved.len(),
-                Class::Disabled => 0,
+                Class::Disabled | Class::ContextSwitch => 0,
             });
             let class_name = match class {
                 Class::Interrupt => format_ident!("direct_bindable"),
                 Class::Vector => format_ident!("vector"),
                 Class::Reserved => format_ident!("reserved"),
                 Class::Disabled => format_ident!("disabled"),
+                Class::ContextSwitch => format_ident!("context_switch"),
             };
 
             let tokens = quote! { [#class_name #idx_in_class] #intr_number };
@@ -182,6 +227,7 @@ impl GenericProperty for InterruptControllerProperties {
                 Class::Interrupt => direct_bindable.push(tokens),
                 Class::Vector => vector.push(tokens),
                 Class::Reserved => reserved.push(tokens),
+                Class::ContextSwitch => context_switch.push(tokens),
                 Class::Disabled => {}
             }
         }
@@ -193,6 +239,7 @@ impl GenericProperty for InterruptControllerProperties {
                 ("direct_bindable", &direct_bindable),
                 ("vector", &vector),
                 ("reserved", &reserved),
+                ("context_switch", &context_switch),
             ],
         );
 

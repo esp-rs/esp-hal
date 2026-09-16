@@ -143,7 +143,7 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 # Add the `embedded-test/defmt` feature for more verbose testing
-defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt"]
+defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 esp-radio-unstable = ["esp-radio/unstable"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
