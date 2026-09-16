@@ -11,5 +11,6 @@
 mod phy_clocks_ll;
 
 pub(crate) fn enable_phy(enable: bool) {
+    debug!("enable_phy({:?})", enable);
     phy_clocks_ll::enable_phy(enable);
 }
