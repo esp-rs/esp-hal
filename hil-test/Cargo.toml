@@ -214,6 +214,14 @@ esp32h2 = [
     "esp-metadata-generated/esp32h2",
     "esp-rtos?/esp32h2",
 ]
+esp32h4 = [
+    "esp-hal/esp32h4",
+    "esp-alloc?/esp32h4",
+    "esp-bootloader-esp-idf/esp32h4",
+    "esp-metadata-generated/esp32h4",
+    "esp-rtos?/esp32h4",
+    "esp-storage?/esp32h4",
+]
 esp32p4 = [
     "esp-hal/esp32p4",
     "esp-alloc?/esp32p4",
