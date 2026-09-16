@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [v1.0.0-beta.2] - 2026-09-16
 
+- Fixed S31 builds (#6341)
+
 ## [v1.0.0-beta.1] - 2026-09-15
 
 ### Added
