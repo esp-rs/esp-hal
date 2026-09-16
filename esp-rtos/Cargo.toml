@@ -73,7 +73,7 @@ xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
 esp-config             = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
 esp-hal = { version = "~1.2.0", path = "../esp-hal", features = ["unstable"] }
