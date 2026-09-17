@@ -1612,7 +1612,7 @@ pub(crate) mod asynch {
                 return Poll::Pending;
             };
 
-            self.tx.clear_interrupts();
+            self.tx.clear_out(interrupts);
 
             Poll::Ready(result)
         }
@@ -1698,7 +1698,7 @@ pub(crate) mod asynch {
                 return Poll::Pending;
             };
 
-            self.rx.clear_interrupts();
+            self.rx.clear_in(interrupts);
 
             Poll::Ready(result)
         }
