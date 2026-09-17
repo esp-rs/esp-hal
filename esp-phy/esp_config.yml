@@ -7,6 +7,9 @@ options:
       Turn off for best WiFi performance."
     default:
       - value: true
+        if: "soc_has_usb_device && soc_has_wifi"
+      - value: false
+    active: "soc_has_usb_device && soc_has_wifi"
 
   - name: phy_skip_calibration_after_deep_sleep
     description: "Use PHY_RF_CAL_NONE after deep sleep."
