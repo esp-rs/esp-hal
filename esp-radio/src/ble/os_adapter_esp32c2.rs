@@ -409,3 +409,138 @@ extern "C" fn LP_TIMER() {
 extern "C" fn BT_MAC() {
     ISR_INTERRUPT_4.dispatch();
 }
+
+const OS_MSYS_1_BLOCK_COUNT: i32 = 24;
+const SYSINIT_MSYS_1_MEMPOOL_SIZE: usize = 768;
+const SYSINIT_MSYS_1_MEMBLOCK_SIZE: i32 = 128;
+const OS_MSYS_2_BLOCK_COUNT: i32 = 24;
+const SYSINIT_MSYS_2_MEMPOOL_SIZE: usize = 1920;
+const SYSINIT_MSYS_2_MEMBLOCK_SIZE: i32 = 320;
+
+impl OsMempool {
+    const fn zeroed() -> Self {
+        Self {
+            mp_block_size: 0,
+            mp_num_blocks: 0,
+            mp_num_free: 0,
+            mp_min_free: 0,
+            mp_flags: 0,
+            mp_membuf_addr: 0,
+            next: core::ptr::null(),
+            first: core::ptr::null(),
+            name: core::ptr::null(),
+        }
+    }
+}
+
+unsafe extern "C" {
+    fn r_mem_init_mbuf_pool(
+        mem: *mut c_void,
+        mempool: *mut OsMempool,
+        mbuf_pool: *mut OsMbufPool,
+        num_blocks: i32,
+        block_size: i32,
+        name: *const u8,
+    ) -> i32;
+    fn r_os_msys_reset();
+    fn r_os_msys_register(mbuf_pool: *const OsMbufPool) -> i32;
+}
+
+impl OsMbufPool {
+    const fn zeroed() -> Self {
+        Self {
+            omp_databuf_len: 0,
+            omp_pool: core::ptr::null(),
+            next: core::ptr::null(),
+        }
+    }
+}
+
+type OsMembufT = u32;
+
+pub(crate) static mut OS_MSYS_INIT_1_DATA: *mut OsMembufT = core::ptr::null_mut();
+pub(crate) static mut OS_MSYS_INIT_1_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed();
+pub(crate) static mut OS_MSYS_INIT_1_MEMPOOL: OsMempool = OsMempool::zeroed();
+
+pub(crate) static mut OS_MSYS_INIT_2_DATA: *mut OsMembufT = core::ptr::null_mut();
+pub(crate) static mut OS_MSYS_INIT_2_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed();
+pub(crate) static mut OS_MSYS_INIT_2_MEMPOOL: OsMempool = OsMempool::zeroed();
+
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L218-L279>
+fn os_msys_buf_alloc() -> bool {
+    use core::mem::size_of;
+
+    use crate::compat::malloc::calloc;
+
+    unsafe {
+        OS_MSYS_INIT_1_DATA =
+            calloc(SYSINIT_MSYS_1_MEMPOOL_SIZE as u32, size_of::<OsMembufT>()).cast();
+        OS_MSYS_INIT_2_DATA =
+            calloc(SYSINIT_MSYS_2_MEMPOOL_SIZE as u32, size_of::<OsMembufT>()).cast();
+
+        if OS_MSYS_INIT_1_DATA.is_null() || OS_MSYS_INIT_2_DATA.is_null() {
+            os_msys_buf_free();
+            return false;
+        }
+
+        true
+    }
+}
+
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L281-L318>
+pub(super) fn os_msys_buf_free() {
+    use crate::compat::malloc::free;
+
+    unsafe {
+        // No C2 ROM revision exposes `os_mempool_unregister`, so drop every registered pool before
+        // releasing the memory it points at.
+        r_os_msys_reset();
+
+        if !OS_MSYS_INIT_1_DATA.is_null() {
+            free(OS_MSYS_INIT_1_DATA.cast());
+            OS_MSYS_INIT_1_DATA = core::ptr::null_mut();
+        }
+        if !OS_MSYS_INIT_2_DATA.is_null() {
+            free(OS_MSYS_INIT_2_DATA.cast());
+            OS_MSYS_INIT_2_DATA = core::ptr::null_mut();
+        }
+    }
+}
+
+pub(super) fn os_msys_init() {
+    static MSYS1: &[u8] = b"msys_1\0";
+    static MSYS2: &[u8] = b"msys_2\0";
+
+    unsafe {
+        let ret = os_msys_buf_alloc();
+        assert!(ret, "os_msys_buf_alloc failed");
+
+        r_os_msys_reset();
+
+        let rc = r_mem_init_mbuf_pool(
+            OS_MSYS_INIT_1_DATA.cast(),
+            &raw mut OS_MSYS_INIT_1_MEMPOOL,
+            &raw mut OS_MSYS_INIT_1_MBUF_POOL,
+            OS_MSYS_1_BLOCK_COUNT,
+            SYSINIT_MSYS_1_MEMBLOCK_SIZE,
+            MSYS1.as_ptr(),
+        );
+        assert!(rc == 0, "r_mem_init_mbuf_pool failed");
+
+        let rc = r_os_msys_register(&raw const OS_MSYS_INIT_1_MBUF_POOL);
+        assert!(rc == 0, "r_os_msys_register failed");
+
+        let rc = r_mem_init_mbuf_pool(
+            OS_MSYS_INIT_2_DATA.cast(),
+            &raw mut OS_MSYS_INIT_2_MEMPOOL,
+            &raw mut OS_MSYS_INIT_2_MBUF_POOL,
+            OS_MSYS_2_BLOCK_COUNT,
+            SYSINIT_MSYS_2_MEMBLOCK_SIZE,
+            MSYS2.as_ptr(),
+        );
+        assert!(rc == 0, "r_mem_init_mbuf_pool failed");
+
+        let rc = r_os_msys_register(&raw const OS_MSYS_INIT_2_MBUF_POOL);
+        assert!(rc == 0, "r_os_msys_register failed");
+    }
+}
