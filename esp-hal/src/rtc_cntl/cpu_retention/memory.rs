@@ -18,8 +18,8 @@ cfg_select! {
     _ => {
         pub(crate) const BUFFER_SIZE: usize = property!("sleep.cpu_retention_mem_size");
 
-        /// `repr(align)` takes a literal, so the buffer takes the strictest alignment of every chip. The
-        /// alignment then needs no check at run time.
+        /// `repr(align)` takes a literal, so the buffer takes the strictest alignment of every
+        /// chip. The alignment then needs no check at run time.
         const _: () = ::core::assert!(property!("sleep.cpu_retention_mem_align") <= 16);
 
         const MEM_START: usize = property!("sleep.cpu_retention_mem_start");
