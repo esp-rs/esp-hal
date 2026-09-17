@@ -36,6 +36,7 @@ INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
+INCLUDE "dram2.x"
 INCLUDE "metadata.x"
 INCLUDE "eh_frame.x"
 /* End of Shared sections */

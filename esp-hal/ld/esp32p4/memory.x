@@ -26,7 +26,13 @@ RESERVED_L2_CACHE = 0;
 
 MEMORY
 {
-    RAM : ORIGIN = 0x4FF00000 + RESERVED_L2_CACHE, LENGTH = 0x4FFAE000 - RESERVED_L2_CACHE - 0x4FF00000
+    RAM : ORIGIN = 0x4FF00000 + RESERVED_L2_CACHE, LENGTH = 0xADFC0 - RESERVED_L2_CACHE
+
+    /* Memory available after the 2nd stage bootloader finishes.
+       Upper bound is __stack_app = 0x4ffbefc0.
+       Source: esp-idf C:\_Espressif\esp-idf\components\bootloader\subproject\main\ld\esp32p4\bootloader.memory.ld.in
+    */
+    dram2_seg ( RW ): ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4ffbefc0 - (ORIGIN(RAM) + LENGTH(RAM))
 
     /* External flash (XIP via cache); +0x20 skips the IDF app image header. */
     ROM : ORIGIN = 0x40000000 + 0x20, LENGTH = 0x400000 - 0x20
