@@ -28,7 +28,10 @@ impl Handler {
                 core::mem::transmute::<*const c_void, unsafe extern "C" fn(*mut c_void)>(f)
             };
             let arg = self.arg.load(Ordering::Relaxed);
-            trace!("calling {:x} with {:x}", f as usize, arg as usize);
+            trace!(
+                "calling interrupt handler {:x} with {:x}",
+                f as usize, arg as usize
+            );
             unsafe { func(arg) };
             trace!("{:x} done", f as usize);
         }

@@ -34,6 +34,7 @@ use crate::{
             queue_send_to_front,
             queue_try_receive_from_isr,
             queue_try_send_to_back_from_isr,
+            queue_try_send_to_front_from_isr,
         },
         semaphore,
     },
@@ -42,7 +43,7 @@ use crate::{
         c_types::{c_char, c_void},
         include::*,
     },
-    time::{blob_ticks_to_millis, millis_to_blob_ticks},
+    time::{blob_ticks_to_micros, blob_ticks_to_millis, millis_to_blob_ticks},
 };
 
 #[cfg_attr(esp32s31, path = "os_adapter_esp32s31.rs")]
@@ -337,6 +338,16 @@ fn bt_controller_deinit() {
     BT_ACTIVE.store(false, Ordering::Relaxed);
     set_controller_status(esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_IDLE);
     unsafe {
+        // `r_ble_controller_init` registers the two coex callbacks, but
+        // `r_ble_controller_deinit` frees their environment without
+        // unregistering them. The next `coex_enable` / `coex_disable` from
+        // Wi-Fi would run them against a NULL environment.
+        #[cfg(feature = "coex")]
+        {
+            coex_register_ble_cb(0, core::ptr::null_mut());
+            coex_register_ble_cb(1, core::ptr::null_mut());
+        }
+
         r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
         ble_stack_deinit();
         r_btdm_hci_fc_env_deinit();
@@ -485,13 +496,8 @@ fn esp_bt_controller_disable() -> esp_err_t {
 
 #[unsafe(no_mangle)]
 extern "C" fn e_btdm_lp_modem_clock_set(enable: bool) {
-    // IDF `e_btdm_lp_modem_clock_set`: disable is ignored while the
-    // controller is active (`s_bt_active`). The blob toggles this around
-    // every HCI command; gating here stops the LP timer and scan.
-    if !enable && BT_ACTIVE.load(Ordering::Relaxed) {
-        return;
-    }
-    crate::radio_clocks::clocks_ll::enable_bt(enable);
+    trace!("e_btdm_lp_modem_clock_set {:?}", enable);
+    // crate::radio_clocks::clocks_ll::enable_bt_clocks(enable);
 }
 
 #[unsafe(no_mangle)]
@@ -534,18 +540,13 @@ extern "C" fn wr_btdm_external_bb_get_tx_pwr_table(length: *mut u8, _modem_cfg: 
 // The controller's view of coexistence, mirroring IDF `btdm_coex.c`. Without
 // the `coex` feature these keep the values IDF returns with
 // `CONFIG_SW_COEXIST_ENABLE` off.
-//
-// Only that second half is live today: `esp-radio/build.rs` rejects `coex` on
-// the ESP32-S31, the only chip using this controller, so nothing compiles the
-// `coex` arms below. They are groundwork for when S31 coexistence works, and
-// nothing checks them in the meantime - expect to fix them up rather than
-// flip the feature on.
 
 // Declared `extern` in IDF `btdm_coex.c` rather than in a coex header, so
 // esp-wifi-sys does not generate bindings for them.
 #[cfg(feature = "coex")]
 unsafe extern "C" {
     fn coex_register_ble_cb(ty: u8, func: *mut c_void) -> i32;
+    fn coex_ble_idle_time_inform(start_offset: u32, duration: u32);
 }
 
 #[unsafe(no_mangle)]
@@ -668,12 +669,13 @@ extern "C" fn wr_btdm_coex_iso_start_int_handle(_handle: u16, _duration: u32) {}
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_coex_iso_end_int_handle(_handle: u16, _duration: u32) {}
 
-// TODO: forward this to `coex_ble_idle_time_inform` once S31 coex is worth
-// re-testing. Reporting BLE's idle windows starved Wi-Fi badly enough that DNS
-// timed out, and the signature is the least certain of the set: IDF declares
-// the function in `btdm_coex.c` alone, with no header anywhere.
 #[unsafe(no_mangle)]
-extern "C" fn wr_btdm_coex_ble_idle_time_inform(_start_offset: u32, _duration: u32) {}
+extern "C" fn wr_btdm_coex_ble_idle_time_inform(_start_offset: u32, _duration: u32) {
+    cfg_select! {
+        feature = "coex" => unsafe { coex_ble_idle_time_inform(_start_offset, _duration) },
+        _ => {},
+    }
+}
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_coex_register_ble_cb(_ty: u32, _func: *mut c_void) -> i32 {
@@ -869,7 +871,7 @@ fn in_isr() -> bool {
     !crate::hal::interrupt::RunLevel::current().is_thread()
 }
 
-#[ram]
+#[inline(always)]
 fn event_inner(ev: *mut BtdmOsalPtr) -> &'static mut Event {
     let ev = unwrap!(unsafe { ev.as_ref() }, "event is null");
     unwrap!(
@@ -888,6 +890,7 @@ fn free_ptr(ptr: *mut c_void) {
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_eventq_init(evq: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_eventq_init {:?}", evq);
     let evq = unwrap!(unsafe { evq.as_mut() }, "eventq is null");
     if !evq.ptr.is_null() {
         return;
@@ -901,6 +904,7 @@ extern "C" fn wr_btdm_osal_eventq_init(evq: *mut BtdmOsalPtr) {
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_eventq_deinit(evq: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_eventq_deinit {:?}", evq);
     let evq = unwrap!(unsafe { evq.as_mut() }, "eventq is null");
     queue_delete(evq.ptr)
 }
@@ -908,45 +912,32 @@ extern "C" fn wr_btdm_osal_eventq_deinit(evq: *mut BtdmOsalPtr) {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_eventq_get(evq: *mut BtdmOsalPtr, tmo: u32) -> *mut BtdmOsalPtr {
+    trace!("wr_btdm_osal_eventq_get {:?} {}", evq, tmo);
     let evq = unwrap!(unsafe { evq.as_mut() }, "eventq is null");
 
-    let mut ev = BtdmOsalPtr::default();
+    let mut ev = core::ptr::null_mut::<BtdmOsalPtr>();
     let received = if in_isr() {
         if tmo != 0 {
             return core::ptr::null_mut();
         }
         queue_try_receive_from_isr(evq.ptr, (&raw mut ev).cast(), core::ptr::null_mut())
     } else {
-        queue_receive(evq.ptr, (&raw mut ev).cast(), tmo)
+        queue_receive(evq.ptr, (&raw mut ev).cast(), blob_ticks_to_micros(tmo))
     };
 
     if received != 0 {
-        if let Some(inner) = unsafe { ev.ptr.cast::<Event>().as_mut() } {
+        if let Some(inner) = unsafe { (*ev).ptr.cast::<Event>().as_mut() } {
             inner.queued = false;
         }
-        ev.ptr.cast()
-    } else {
-        core::ptr::null_mut()
     }
+
+    ev
 }
 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_eventq_put(evq: *mut BtdmOsalPtr, ev: *mut BtdmOsalPtr) {
-    let evq = unwrap!(unsafe { evq.as_mut() }, "eventq is null");
-
-    let ret = if in_isr() {
-        queue_try_send_to_back_from_isr(evq.ptr, (&raw const ev).cast(), core::ptr::null_mut())
-    } else {
-        queue_send_to_front(evq.ptr, (&raw const ev).cast(), OSI_FUNCS_TIME_BLOCKING)
-    };
-
-    assert_ne!(ret, 0);
-}
-
-#[unsafe(no_mangle)]
-#[ram]
-extern "C" fn wr_btdm_osal_eventq_put_to_front(evq: *mut BtdmOsalPtr, ev: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_eventq_put {:?} {:?}", evq, ev);
     let evq = unwrap!(unsafe { evq.as_mut() }, "eventq is null");
 
     let ret = if in_isr() {
@@ -960,7 +951,23 @@ extern "C" fn wr_btdm_osal_eventq_put_to_front(evq: *mut BtdmOsalPtr, ev: *mut B
 
 #[unsafe(no_mangle)]
 #[ram]
+extern "C" fn wr_btdm_osal_eventq_put_to_front(evq: *mut BtdmOsalPtr, ev: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_eventq_put_to_front {:?} {:?}", evq, ev);
+    let evq = unwrap!(unsafe { evq.as_mut() }, "eventq is null");
+
+    let ret = if in_isr() {
+        queue_try_send_to_front_from_isr(evq.ptr, (&raw const ev).cast(), core::ptr::null_mut())
+    } else {
+        queue_send_to_front(evq.ptr, (&raw const ev).cast(), OSI_FUNCS_TIME_BLOCKING)
+    };
+
+    assert_ne!(ret, 0);
+}
+
+#[unsafe(no_mangle)]
+#[ram]
 extern "C" fn wr_btdm_osal_eventq_remove(evq: *mut BtdmOsalPtr, ev: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_eventq_remove {:?} {:?}", evq, ev);
     let evq = unwrap!(unsafe { evq.as_mut() }, "eventq is null");
     let inner = event_inner(ev);
 
@@ -980,9 +987,9 @@ extern "C" fn wr_btdm_osal_eventq_is_empty(evq: *mut BtdmOsalPtr) -> bool {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_event_run(ev: *mut BtdmOsalPtr) {
-    trace!("wr_btdm_osal_event_run");
+    trace!("wr_btdm_osal_event_run {:?}", ev);
     if let Some(func) = event_inner(ev).fn_ptr {
-        trace!("calling {:#x}", func as usize);
+        trace!("calling event handler {:#x}", func as usize);
         unsafe { func(ev) };
     }
 }
@@ -994,6 +1001,8 @@ extern "C" fn wr_btdm_osal_event_init(
     func: Option<EventFn>,
     arg: *mut c_void,
 ) {
+    let func_p = func.map(|f| f as usize).unwrap_or(0);
+    trace!("creating event with handler {:#x}", func_p);
     let ev = unwrap!(unsafe { ev.as_mut() }, "event is null");
     if ev.ptr.is_null() {
         ev.ptr = alloc::<Event>().cast();
@@ -1012,6 +1021,7 @@ extern "C" fn wr_btdm_osal_event_init(
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_event_deinit(ev: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_event_deinit {:?}", ev);
     let ev = unwrap!(unsafe { ev.as_mut() }, "event is null");
     if !ev.ptr.is_null() {
         free_ptr(ev.ptr);
@@ -1022,6 +1032,7 @@ extern "C" fn wr_btdm_osal_event_deinit(ev: *mut BtdmOsalPtr) {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_event_reset(ev: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_event_reset {:?}", ev);
     let ev = unwrap!(unsafe { ev.as_ref() }, "event is null");
     if let Some(inner) = unsafe { ev.ptr.cast::<Event>().as_mut() } {
         inner.queued = false;
@@ -1031,23 +1042,27 @@ extern "C" fn wr_btdm_osal_event_reset(ev: *mut BtdmOsalPtr) {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_event_is_queued(ev: *mut BtdmOsalPtr) -> bool {
+    trace!("wr_btdm_osal_event_is_queued {:?}", ev);
     event_inner(ev).queued
 }
 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_event_get_arg(ev: *mut BtdmOsalPtr) -> *mut c_void {
+    trace!("wr_btdm_osal_event_get_arg {:?}", ev);
     event_inner(ev).arg
 }
 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_event_set_arg(ev: *mut BtdmOsalPtr, arg: *mut c_void) {
+    trace!("wr_btdm_osal_event_set_arg {:?} {:?}", ev, arg);
     event_inner(ev).arg = arg;
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_mutex_init(mu: *mut BtdmOsalPtr) -> i32 {
+    trace!("wr_btdm_osal_mutex_init {:?}", mu);
     let mu = unwrap!(unsafe { mu.as_mut() }, "mutex is null");
     if mu.ptr.is_null() {
         mu.ptr = mutex::mutex_create(true);
@@ -1061,6 +1076,7 @@ extern "C" fn wr_btdm_osal_mutex_init(mu: *mut BtdmOsalPtr) -> i32 {
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_mutex_deinit(mu: *mut BtdmOsalPtr) -> i32 {
+    trace!("wr_btdm_osal_mutex_deinit {:?}", mu);
     let mu = unwrap!(unsafe { mu.as_mut() }, "mutex is null");
     if mu.ptr.is_null() {
         return BTDM_OSAL_INVALID_PARM;
@@ -1073,12 +1089,13 @@ extern "C" fn wr_btdm_osal_mutex_deinit(mu: *mut BtdmOsalPtr) -> i32 {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_mutex_pend(mu: *mut BtdmOsalPtr, timeout: u32) -> i32 {
+    trace!("wr_btdm_osal_mutex_pend {:?} {}", mu, timeout);
     let mu = unwrap!(unsafe { mu.as_ref() }, "mutex is null");
     if mu.ptr.is_null() || in_isr() {
         return BTDM_OSAL_INVALID_PARM;
     }
 
-    if mutex::mutex_lock_with_timeout(mu.ptr, timeout) != 0 {
+    if mutex::mutex_lock_with_timeout(mu.ptr, blob_ticks_to_micros(timeout)) != 0 {
         BTDM_OSAL_OK
     } else {
         BTDM_OSAL_TIMEOUT
@@ -1088,16 +1105,21 @@ extern "C" fn wr_btdm_osal_mutex_pend(mu: *mut BtdmOsalPtr, timeout: u32) -> i32
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_mutex_release(mu: *mut BtdmOsalPtr) -> i32 {
+    trace!("wr_btdm_osal_mutex_release {:?}", mu);
     let mu = unwrap!(unsafe { mu.as_ref() }, "mutex is null");
     if mu.ptr.is_null() || in_isr() {
         return BTDM_OSAL_INVALID_PARM;
     }
-    mutex::mutex_unlock(mu.ptr);
-    BTDM_OSAL_OK
+    if mutex::mutex_unlock(mu.ptr) != 0 {
+        BTDM_OSAL_OK
+    } else {
+        BTDM_OSAL_TIMEOUT
+    }
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_sem_init(sem: *mut BtdmOsalPtr, tokens: u16) -> i32 {
+    trace!("wr_btdm_osal_sem_init {:?} {:?}", sem, tokens);
     let sem = unwrap!(unsafe { sem.as_mut() }, "sem is null");
     if sem.ptr.is_null() {
         sem.ptr = semaphore::sem_create(128, tokens as u32);
@@ -1111,6 +1133,7 @@ extern "C" fn wr_btdm_osal_sem_init(sem: *mut BtdmOsalPtr, tokens: u16) -> i32 {
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_sem_deinit(sem: *mut BtdmOsalPtr) -> i32 {
+    trace!("wr_btdm_osal_sem_deinit {:?}", sem);
     let sem = unwrap!(unsafe { sem.as_mut() }, "sem is null");
     if sem.ptr.is_null() {
         return BTDM_OSAL_INVALID_PARM;
@@ -1123,6 +1146,7 @@ extern "C" fn wr_btdm_osal_sem_deinit(sem: *mut BtdmOsalPtr) -> i32 {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_sem_pend(sem: *mut BtdmOsalPtr, timeout: u32) -> i32 {
+    trace!("wr_btdm_osal_sem_pend {:?} {}", sem, timeout);
     let sem = unwrap!(unsafe { sem.as_ref() }, "sem is null");
     if sem.ptr.is_null() {
         return BTDM_OSAL_INVALID_PARM;
@@ -1135,7 +1159,7 @@ extern "C" fn wr_btdm_osal_sem_pend(sem: *mut BtdmOsalPtr, timeout: u32) -> i32 
 
         semaphore::sem_try_take_from_isr(sem.ptr, core::ptr::null_mut())
     } else {
-        semaphore::sem_take(sem.ptr, timeout)
+        semaphore::sem_take(sem.ptr, blob_ticks_to_micros(timeout))
     };
     if taken != 0 {
         BTDM_OSAL_OK
@@ -1147,21 +1171,27 @@ extern "C" fn wr_btdm_osal_sem_pend(sem: *mut BtdmOsalPtr, timeout: u32) -> i32 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_sem_release(sem: *mut BtdmOsalPtr) -> i32 {
+    trace!("wr_btdm_osal_sem_release {:?}", sem);
     let sem = unwrap!(unsafe { sem.as_ref() }, "sem is null");
     if sem.ptr.is_null() {
         return BTDM_OSAL_INVALID_PARM;
     }
-    if in_isr() {
-        semaphore::sem_try_give_from_isr(sem.ptr, core::ptr::null_mut());
+    let given = if in_isr() {
+        semaphore::sem_try_give_from_isr(sem.ptr, core::ptr::null_mut())
     } else {
-        semaphore::sem_give(sem.ptr);
+        semaphore::sem_give(sem.ptr)
+    };
+    if given != 0 {
+        BTDM_OSAL_OK
+    } else {
+        BTDM_OSAL_TIMEOUT
     }
-    BTDM_OSAL_OK
 }
 
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_sem_get_count(sem: *mut BtdmOsalPtr) -> u16 {
+    trace!("wr_btdm_osal_sem_get_count {:?}", sem);
     let Some(sem) = (unsafe { sem.as_ref() }) else {
         return 0;
     };
@@ -1171,7 +1201,7 @@ extern "C" fn wr_btdm_osal_sem_get_count(sem: *mut BtdmOsalPtr) -> u16 {
     semaphore::sem_count(sem.ptr) as u16
 }
 
-#[ram]
+#[inline(always)]
 fn callout_inner(co: *mut BtdmOsalPtr) -> &'static mut Callout {
     let co = unwrap!(unsafe { co.as_ref() }, "callout is null");
     unwrap!(
@@ -1198,6 +1228,10 @@ extern "C" fn wr_btdm_osal_callout_init(
     ev_cb: Option<EventFn>,
     ev_arg: *mut c_void,
 ) -> i32 {
+    trace!(
+        "wr_btdm_osal_callout_init co={:#x} evq={:#x}",
+        co as usize, evq as usize
+    );
     let co = unwrap!(unsafe { co.as_mut() }, "callout is null");
     if co.ptr.is_null() {
         let callout = alloc::<Callout>();
@@ -1205,9 +1239,7 @@ extern "C" fn wr_btdm_osal_callout_init(
             return -1;
         }
         unsafe {
-            (*callout).evq = evq;
             (*callout).ev.ptr = core::ptr::null_mut();
-            wr_btdm_osal_event_init(&raw mut (*callout).ev, ev_cb, ev_arg);
             compat::timer_compat::compat_timer_setfn(
                 &raw mut (*callout).timer,
                 callout_timer_cb,
@@ -1215,18 +1247,20 @@ extern "C" fn wr_btdm_osal_callout_init(
             );
         }
         co.ptr = callout.cast();
-    } else {
-        let callout = co.ptr.cast::<Callout>();
-        unsafe {
-            (*callout).evq = evq;
-            wr_btdm_osal_event_init(&raw mut (*callout).ev, ev_cb, ev_arg);
-        }
     }
+
+    let callout = co.ptr.cast::<Callout>();
+    unsafe {
+        (*callout).evq = evq;
+        wr_btdm_osal_event_init(&raw mut (*callout).ev, ev_cb, ev_arg);
+    }
+
     0
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_callout_deinit(co: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_callout_deinit co={:#x}", co as usize);
     let co = unwrap!(unsafe { co.as_mut() }, "callout is null");
     if co.ptr.is_null() {
         return;
@@ -1245,19 +1279,24 @@ extern "C" fn wr_btdm_osal_callout_deinit(co: *mut BtdmOsalPtr) {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_callout_reset(co: *mut BtdmOsalPtr, ticks: u32) -> i32 {
+    trace!(
+        "wr_btdm_osal_callout_reset co={:#x} ticks={}",
+        co as usize, ticks
+    );
     let callout = callout_inner(co);
     compat::timer_compat::compat_timer_disarm(&raw mut callout.timer);
     if !callout.evq.is_null() {
         wr_btdm_osal_eventq_remove(callout.evq, &raw mut callout.ev);
     }
-    let ticks = ticks.max(1);
-    callout.expiry_ms = wr_btdm_osal_time_get().wrapping_add(ticks);
-    compat::timer_compat::compat_timer_arm(&raw mut callout.timer, ticks, false);
+    let millis = blob_ticks_to_millis(ticks.max(1));
+    callout.expiry_ms = wr_btdm_osal_time_get().wrapping_add(millis);
+    compat::timer_compat::compat_timer_arm(&raw mut callout.timer, millis, false);
     BTDM_OSAL_OK
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_callout_mem_reset(co: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_callout_mem_reset co={:#x}", co as usize);
     let callout = callout_inner(co);
     wr_btdm_osal_event_reset(&raw mut callout.ev);
 }
@@ -1265,6 +1304,7 @@ extern "C" fn wr_btdm_osal_callout_mem_reset(co: *mut BtdmOsalPtr) {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_callout_stop(co: *mut BtdmOsalPtr) {
+    trace!("wr_btdm_osal_callout_stop co={:#x}", co as usize);
     let Some(co) = (unsafe { co.as_ref() }) else {
         return;
     };
@@ -1280,6 +1320,7 @@ extern "C" fn wr_btdm_osal_callout_stop(co: *mut BtdmOsalPtr) {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_callout_is_active(co: *mut BtdmOsalPtr) -> bool {
+    trace!("wr_btdm_osal_callout_is_active co={:#x}", co as usize);
     let callout = callout_inner(co);
     compat::timer_compat::compat_timer_is_active(&raw mut callout.timer)
 }
@@ -1287,6 +1328,7 @@ extern "C" fn wr_btdm_osal_callout_is_active(co: *mut BtdmOsalPtr) -> bool {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_callout_get_ticks(co: *mut BtdmOsalPtr) -> u32 {
+    trace!("wr_btdm_osal_callout_get_ticks co={:#x}", co as usize);
     let callout = callout_inner(co);
     callout.expiry_ms
 }
@@ -1294,6 +1336,10 @@ extern "C" fn wr_btdm_osal_callout_get_ticks(co: *mut BtdmOsalPtr) -> u32 {
 #[unsafe(no_mangle)]
 #[ram]
 extern "C" fn wr_btdm_osal_callout_remaining_ticks(co: *mut BtdmOsalPtr, now: u32) -> u32 {
+    trace!(
+        "wr_btdm_osal_callout_remaining_ticks co={:#x} now={}",
+        co as usize, now
+    );
     let callout = callout_inner(co);
     if !compat::timer_compat::compat_timer_is_active(&raw mut callout.timer) {
         return 0;
@@ -1303,6 +1349,10 @@ extern "C" fn wr_btdm_osal_callout_remaining_ticks(co: *mut BtdmOsalPtr, now: u3
 
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_callout_set_arg(co: *mut BtdmOsalPtr, arg: *mut c_void) {
+    trace!(
+        "wr_btdm_osal_callout_set_arg co={:#x} arg={:#x}",
+        co as usize, arg as usize
+    );
     let callout = callout_inner(co);
     wr_btdm_osal_event_set_arg(&raw mut callout.ev, arg);
 }
@@ -1391,7 +1441,6 @@ extern "C" fn wr_btdm_osal_task_create(
     let name_str = unsafe { str_from_c(name) };
     unsafe {
         let task_func = transmute::<*mut c_void, extern "C" fn(*mut c_void)>(fn_ptr);
-        let current = Cpu::current() as u32;
         // Sleeping waits (usleep) let embassy main run even at the blob
         // priority. Ready yield-loops at prio 29 starve main.
         let task = crate::preempt::task_create(
@@ -1399,7 +1448,7 @@ extern "C" fn wr_btdm_osal_task_create(
             task_func,
             arg,
             priority.min(crate::preempt::max_task_priority()),
-            if core_id == current {
+            if core_id < Cpu::COUNT as u32 {
                 Some(core_id)
             } else {
                 None
@@ -1490,13 +1539,4 @@ extern "C" fn wr_btdm_osal_srand(_seed: u32) {}
 #[unsafe(no_mangle)]
 extern "C" fn wr_btdm_osal_rand() -> i32 {
     unsafe { crate::common_adapter::random() as i32 }
-}
-
-#[unsafe(no_mangle)]
-extern "C" fn wr_btdm_osal_ets_delay_us(us: u32) {
-    // IDF uses a busy-wait. `usleep` would deschedule and hit
-    // `schedule_wakeup` from the controller's delay path.
-    let start = crate::hal::time::Instant::now();
-    let wait = crate::hal::time::Duration::from_micros(us as u64);
-    while crate::hal::time::Instant::now() < start + wait {}
 }

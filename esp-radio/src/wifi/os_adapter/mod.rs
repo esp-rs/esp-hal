@@ -847,9 +847,9 @@ pub unsafe extern "C" fn phy_enable() {
 #[allow(clippy::unnecessary_cast)]
 pub unsafe extern "C" fn phy_update_country_info(country: *const c_char) -> c_int {
     unsafe {
-        // not implemented in original code
+        // FIXME
         trace!("phy_update_country_info {}", str_from_c(country.cast()));
-        -1
+        0
     }
 }
 

@@ -4,12 +4,13 @@ use super::*;
 use crate::{
     ble::InvalidConfigError,
     hal::{
-        interrupt::{self, InterruptHandler, Priority},
+        interrupt::{self, Priority},
         peripherals::Interrupt,
+        ram,
         system::Cpu,
     },
     interrupt_dispatch::Handler,
-    sys::include::esp_bt_controller_config_t,
+    sys::{c_types::c_void, include::esp_bt_controller_config_t},
 };
 
 static ISR_INTERRUPT_MAC: Handler = Handler::new();
@@ -22,34 +23,14 @@ static ISR_INTERRUPT_BLE_SEC: Handler = Handler::new();
 
 /// The interrupts the controller may ask for, each with the slot holding its
 /// handler and the trampoline that dispatches from that slot.
-const BLE_INTERRUPTS: &[(Interrupt, &Handler, extern "C" fn())] = &[
-    (Interrupt::MODEM_BT_MAC, &ISR_INTERRUPT_MAC, MODEM_BT_MAC),
-    (
-        Interrupt::MODEM_BT_MAC_INT1,
-        &ISR_INTERRUPT_MAC_INT1,
-        MODEM_BT_MAC_INT1,
-    ),
-    (Interrupt::MODEM_BT_BB, &ISR_INTERRUPT_BB, MODEM_BT_BB),
-    (
-        Interrupt::MODEM_BT_BB_NMI,
-        &ISR_INTERRUPT_BB_NMI,
-        MODEM_BT_BB_NMI,
-    ),
-    (
-        Interrupt::MODEM_LP_TIMER,
-        &ISR_INTERRUPT_LP_TIMER,
-        MODEM_LP_TIMER,
-    ),
-    (
-        Interrupt::MODEM_BLE_TIMER,
-        &ISR_INTERRUPT_BLE_TIMER,
-        MODEM_BLE_TIMER,
-    ),
-    (
-        Interrupt::MODEM_BLE_SEC,
-        &ISR_INTERRUPT_BLE_SEC,
-        MODEM_BLE_SEC,
-    ),
+const BLE_INTERRUPTS: &[(Interrupt, &Handler)] = &[
+    (Interrupt::MODEM_BT_MAC, &ISR_INTERRUPT_MAC),
+    (Interrupt::MODEM_BT_MAC_INT1, &ISR_INTERRUPT_MAC_INT1),
+    (Interrupt::MODEM_BT_BB, &ISR_INTERRUPT_BB),
+    (Interrupt::MODEM_BT_BB_NMI, &ISR_INTERRUPT_BB_NMI),
+    (Interrupt::MODEM_LP_TIMER, &ISR_INTERRUPT_LP_TIMER),
+    (Interrupt::MODEM_BLE_TIMER, &ISR_INTERRUPT_BLE_TIMER),
+    (Interrupt::MODEM_BLE_SEC, &ISR_INTERRUPT_BLE_SEC),
 ];
 
 /// Antenna Selection
@@ -270,8 +251,8 @@ pub(crate) fn disable_sleep_mode() {}
 
 pub(super) unsafe fn osal_intr_alloc(
     source: u32,
-    func: unsafe extern "C" fn(*mut crate::sys::c_types::c_void),
-    arg: *mut crate::sys::c_types::c_void,
+    func: unsafe extern "C" fn(*mut c_void),
+    arg: *mut c_void,
 ) -> i32 {
     trace!(
         "btdm osal_intr_alloc source={} fn={:?} arg={:?}",
@@ -283,19 +264,20 @@ pub(super) unsafe fn osal_intr_alloc(
     let entry = u8::try_from(source)
         .ok()
         .and_then(|source| Interrupt::try_from(source).ok())
-        .and_then(|source| BLE_INTERRUPTS.iter().find(|(int, _, _)| *int == source));
+        .and_then(|source| BLE_INTERRUPTS.iter().find(|(int, _)| *int == source));
 
-    let Some(&(int, slot, trampoline)) = entry else {
+    let Some(&(int, slot)) = entry else {
         panic!("Unsupported BLE interrupt source {}", source);
     };
 
-    slot.set(func as *const crate::sys::c_types::c_void, arg);
-    interrupt::bind_handler(int, InterruptHandler::new(trampoline, Priority::Priority1));
+    slot.set(func as *const c_void, arg);
+
+    interrupt::enable(int, Priority::Priority3);
     0
 }
 
 pub(crate) fn shutdown_ble_isr() {
-    for &(int, _, _) in BLE_INTERRUPTS {
+    for &(int, _) in BLE_INTERRUPTS {
         for core in Cpu::all() {
             interrupt::disable(core, int);
         }
@@ -303,43 +285,43 @@ pub(crate) fn shutdown_ble_isr() {
 }
 
 #[unsafe(no_mangle)]
-#[crate::hal::ram]
+#[ram]
 extern "C" fn MODEM_BT_MAC() {
     ISR_INTERRUPT_MAC.dispatch();
 }
 
 #[unsafe(no_mangle)]
-#[crate::hal::ram]
+#[ram]
 extern "C" fn MODEM_BT_BB() {
     ISR_INTERRUPT_BB.dispatch();
 }
 
 #[unsafe(no_mangle)]
-#[crate::hal::ram]
+#[ram]
 extern "C" fn MODEM_BT_BB_NMI() {
     ISR_INTERRUPT_BB_NMI.dispatch();
 }
 
 #[unsafe(no_mangle)]
-#[crate::hal::ram]
+#[ram]
 extern "C" fn MODEM_LP_TIMER() {
     ISR_INTERRUPT_LP_TIMER.dispatch();
 }
 
 #[unsafe(no_mangle)]
-#[crate::hal::ram]
+#[ram]
 extern "C" fn MODEM_BLE_TIMER() {
     ISR_INTERRUPT_BLE_TIMER.dispatch();
 }
 
 #[unsafe(no_mangle)]
-#[crate::hal::ram]
+#[ram]
 extern "C" fn MODEM_BLE_SEC() {
     ISR_INTERRUPT_BLE_SEC.dispatch();
 }
 
 #[unsafe(no_mangle)]
-#[crate::hal::ram]
+#[ram]
 extern "C" fn MODEM_BT_MAC_INT1() {
     ISR_INTERRUPT_MAC_INT1.dispatch();
 }
