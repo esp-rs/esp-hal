@@ -673,7 +673,7 @@ extern "C" fn wr_btdm_coex_iso_end_int_handle(_handle: u16, _duration: u32) {}
 extern "C" fn wr_btdm_coex_ble_idle_time_inform(_start_offset: u32, _duration: u32) {
     cfg_select! {
         feature = "coex" => unsafe { coex_ble_idle_time_inform(_start_offset, _duration) },
-        _ => {},
+        _ => {}
     }
 }
 
