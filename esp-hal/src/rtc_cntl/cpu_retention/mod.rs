@@ -3,15 +3,15 @@
 cfg_select! {
     cpu_retention = "software" => {
         mod software;
-        pub(crate) use software::{
-            finish_cpu_retention,
-            enter_sleep_with_retention,
-            sleep_retained,
-        };
         #[cfg(feature = "rt")]
         pub(crate) use software::configure_cpu_retention;
         #[cfg(all(multi_core, feature = "rt"))]
         pub(crate) use software::rendezvous;
+        pub(crate) use software::{
+            enter_sleep_with_retention,
+            finish_cpu_retention,
+            sleep_retained,
+        };
     }
 
     cpu_retention = "rtc_cntl" => {
