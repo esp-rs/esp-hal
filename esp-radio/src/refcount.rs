@@ -55,8 +55,28 @@ impl Refcount {
         f(unsafe { SemaphoreHandle::ref_from_ptr(&sem) })
     }
 
+    fn try_use_sem<T>(&self, f: impl FnOnce(&SemaphoreHandle) -> T) -> Option<T> {
+        if self.sem.load(Ordering::Relaxed).is_null() {
+            core::hint::cold_path();
+
+            None
+        } else {
+            let sem = unsafe { SemaphorePtr::new_unchecked(self.sem.load(Ordering::Acquire)) };
+            Some(f(unsafe { SemaphoreHandle::ref_from_ptr(&sem) }))
+        }
+    }
+
     fn lock<T>(&self, f: impl FnOnce(&mut u32) -> T) -> T {
         self.use_sem_or_init(|sem| {
+            sem.take(None);
+            let ret = f(unsafe { self.counter.get().as_mut_unchecked() });
+            sem.give();
+            ret
+        })
+    }
+
+    fn try_lock<T>(&self, f: impl FnOnce(&mut u32) -> T) -> Option<T> {
+        self.try_use_sem(|sem| {
             sem.take(None);
             let ret = f(unsafe { self.counter.get().as_mut_unchecked() });
             sem.give();
@@ -69,7 +89,7 @@ impl Refcount {
             if *counter == 0 {
                 on_first();
             }
-            *counter += 1;
+            *counter = counter.checked_add(1).expect("refcount overflow");
         });
     }
 
@@ -77,7 +97,8 @@ impl Refcount {
     pub fn try_increment<E>(&self, on_first: impl FnOnce() -> Result<(), E>) -> Result<bool, E> {
         self.lock(|counter| {
             let prev = *counter;
-            *counter += 1;
+            *counter = counter.checked_add(1).expect("refcount overflow");
+
             if prev == 0 {
                 on_first().inspect_err(|_| *counter = 0).map(|_| true)
             } else {
@@ -87,11 +108,12 @@ impl Refcount {
     }
 
     pub fn decrement(&self, on_last: impl FnOnce()) {
-        self.lock(|counter| {
+        self.try_lock(|counter| {
             if *counter == 0 {
                 on_last();
             }
-            *counter += 1;
+            *counter = counter.checked_sub(1).expect("decrementing count of zero");
         })
+        .expect("decrementing before any successful increment")
     }
 }
