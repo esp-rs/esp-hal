@@ -1,11 +1,16 @@
 use alloc::boxed::Box;
-use core::ptr::{NonNull, addr_of, addr_of_mut};
+use core::{
+    ptr::{NonNull, addr_of_mut},
+    task::Poll,
+};
 
 use esp_phy::PhyInitGuard;
 use esp_sync::RawMutex;
 use portable_atomic::{AtomicBool, Ordering};
 
 use super::{Config, ReceivedPacket};
+#[cfg(feature = "coex")]
+use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
     ble::{
@@ -41,20 +46,20 @@ unsafe extern "C" {
     fn btdm_osi_funcs_register(osi_funcs: *const osi_funcs_s) -> i32;
     fn btdm_controller_get_compile_version() -> *const c_char;
 
-    #[cfg(any(esp32c3, esp32s3))]
-    fn btdm_controller_init(config_opts: *const esp_bt_controller_config_t) -> i32;
-
-    #[cfg(esp32)]
     fn btdm_controller_init(
-        config_mask: u32,
-        config_opts: *const esp_bt_controller_config_t,
+        #[cfg(esp32)] config_mask: u32,
+        config_opts: *mut esp_bt_controller_config_t,
     ) -> i32;
 
     fn btdm_controller_enable(mode: esp_bt_mode_t);
+    fn btdm_controller_deinit();
 
     fn API_vhci_host_check_send_available() -> bool;
     fn API_vhci_host_send_packet(data: *const u8, len: u16);
     fn API_vhci_host_register_callback(vhci_host_callbac: *const VhciHostCallbacks) -> i32;
+
+    #[cfg(esp32)]
+    fn btdm_rf_bb_init_phase2();
 
     #[cfg(not(esp32))]
     fn coex_pti_v2();
@@ -150,12 +155,12 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 }
 
 unsafe extern "C" fn task_create(
-    func: *mut crate::sys::c_types::c_void,
+    func: *mut c_void,
     name_ptr: *const c_char,
     stack_depth: u32,
-    param: *mut crate::sys::c_types::c_void,
+    param: *mut c_void,
     prio: u32,
-    handle: *mut crate::sys::c_types::c_void,
+    handle: *mut c_void,
     core_id: u32,
 ) -> i32 {
     let name = unsafe { str_from_c(name_ptr) };
@@ -165,10 +170,7 @@ unsafe extern "C" fn task_create(
     );
 
     unsafe {
-        let task_func = core::mem::transmute::<
-            *mut crate::sys::c_types::c_void,
-            extern "C" fn(*mut crate::sys::c_types::c_void),
-        >(func);
+        let task_func = core::mem::transmute::<*mut c_void, extern "C" fn(*mut c_void)>(func);
 
         let task = crate::preempt::task_create(
             name,
@@ -255,19 +257,19 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
     todo!();
 }
 
-unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
-    trace!("coex_schm_status_bit_set {} {}", _typ, status);
+unsafe extern "C" fn coex_schm_status_bit_set(typ: i32, status: i32) {
+    trace!("coex_schm_status_bit_set {} {}", typ, status);
     #[cfg(feature = "coex")]
     unsafe {
-        crate::sys::include::coex_schm_status_bit_set(_typ as u32, status as u32)
+        include::coex_schm_status_bit_set(typ as u32, status as u32)
     };
 }
 
-unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
-    trace!("coex_schm_status_bit_clear {} {}", _typ, status);
+unsafe extern "C" fn coex_schm_status_bit_clear(typ: i32, status: i32) {
+    trace!("coex_schm_status_bit_clear {} {}", typ, status);
     #[cfg(feature = "coex")]
     unsafe {
-        crate::sys::include::coex_schm_status_bit_clear(_typ as u32, status as u32)
+        include::coex_schm_status_bit_clear(typ as u32, status as u32)
     };
 }
 
@@ -292,10 +294,7 @@ unsafe extern "C" fn interrupt_l3_restore() {
 }
 
 #[cfg(esp32)]
-unsafe extern "C" fn custom_queue_create(
-    _len: u32,
-    _item_size: u32,
-) -> *mut crate::sys::c_types::c_void {
+unsafe extern "C" fn custom_queue_create(_len: u32, _item_size: u32) -> *mut c_void {
     todo!();
 }
 
@@ -320,7 +319,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         let mut cfg = ble_os_adapter_chip_specific::create_ble_config(config);
 
-        let res = btdm_osi_funcs_register(addr_of!(G_OSI_FUNCS));
+        let res = btdm_osi_funcs_register(&G_OSI_FUNCS);
         assert!(res == 0, "btdm_osi_funcs_register returned {}", res);
 
         #[cfg(feature = "coex")]
@@ -330,37 +329,35 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         }
 
         let version = btdm_controller_get_compile_version();
-        let version_str = str_from_c(version);
-        debug!("BT controller compile version {}", version_str);
+        debug!("BT controller compile version {}", str_from_c(version));
 
         ble_os_adapter_chip_specific::bt_periph_module_enable();
 
         ble_os_adapter_chip_specific::disable_sleep_mode();
 
-        #[cfg(any(esp32c3, esp32s3))]
-        let res = btdm_controller_init(&mut cfg as *mut esp_bt_controller_config_t);
-
-        #[cfg(esp32)]
         let res = btdm_controller_init(
-            (1 << 3) | (1 << 4),
-            &mut cfg as *mut esp_bt_controller_config_t,
-        ); // see btdm_config_mask_load for mask
-
+            #[cfg(esp32)]
+            {
+                // see btdm_config_mask_load for mask
+                // const BTDM_CFG_BT_DATA_RELEASE: u32 = 1 << 0;
+                // const BTDM_CFG_HCI_UART: u32 = 1 << 1;
+                // const BTDM_CFG_CONTROLLER_RUN_APP_CPU: u32 = 1 << 2;
+                const BTDM_CFG_SCAN_DUPLICATE_OPTIONS: u32 = 1 << 3;
+                const BTDM_CFG_SEND_ADV_RESERVED_SIZE: u32 = 1 << 4;
+                // const BTDM_CFG_BLE_FULL_SCAN_SUPPORTED: u32 = 1 << 5;
+                BTDM_CFG_SCAN_DUPLICATE_OPTIONS | BTDM_CFG_SEND_ADV_RESERVED_SIZE
+            },
+            &mut cfg,
+        );
         assert!(res == 0, "btdm_controller_init returned {}", res);
 
-        debug!("The btdm_controller_init was initialized");
-
         #[cfg(feature = "coex")]
-        crate::sys::include::coex_enable();
+        include::coex_enable();
 
         phy_init_guard = esp_phy::enable_phy();
 
         cfg_select! {
             esp32 => {
-                unsafe extern "C" {
-                    fn btdm_rf_bb_init_phase2();
-                }
-
                 btdm_rf_bb_init_phase2();
                 coex_bt_high_prio();
             }
@@ -368,9 +365,6 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
                 coex_pti_v2();
             }
         }
-
-        #[cfg(feature = "coex")]
-        coex_enable();
 
         btdm_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
 
@@ -386,10 +380,6 @@ pub(crate) fn ble_deinit() {
     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
         esp_hal::Internal::conjure()
     });
-
-    unsafe extern "C" {
-        fn btdm_controller_deinit();
-    }
 
     unsafe {
         btdm_controller_deinit();
@@ -418,9 +408,9 @@ pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
         if PACKET_IN_FLIGHT.load(Ordering::Acquire)
             || unsafe { !API_vhci_host_check_send_available() }
         {
-            core::task::Poll::Pending
+            Poll::Pending
         } else {
-            core::task::Poll::Ready(())
+            Poll::Ready(())
         }
     })
     .await;

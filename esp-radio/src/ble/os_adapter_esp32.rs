@@ -188,7 +188,7 @@ extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: 
             patch: 0,
         };
         if coex_version_get_value(&mut version) == 0 {
-            info!(
+            debug!(
                 "COEX Version {}.{}.{}",
                 version.major, version.minor, version.patch
             );
