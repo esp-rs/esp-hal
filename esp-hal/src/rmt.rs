@@ -2453,7 +2453,7 @@ mod chip_specific {
     pub const MAX_TX_LOOPCOUNT: u16 = {
         // TODO: unify naming in PAC
         cfg_select! {
-            any(esp32p4, esp32s31) => {
+            esp32p4 => {
                 max_from_register_spec!(u16, ch_tx_lim, CH_TX_LIM_SPEC, TX_LOOP_NUM_CH_W)
             }
             _ => {
