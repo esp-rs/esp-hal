@@ -1521,11 +1521,7 @@ mod half_duplex_write_psram {
         dma_rx_buffer,
         gpio::{Flex, interconnect::InputSignal},
         pcnt::{channel::EdgeMode, unit::Unit},
-        spi::{
-            Mode,
-            master::{Address, Command, Config, DataMode, Spi, SpiDma},
-        },
-        time::Rate,
+        spi::master::{Address, Command, DataMode, Spi, SpiDma},
     };
 
     use super::*;

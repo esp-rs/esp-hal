@@ -778,6 +778,51 @@ impl CargoToml {
         dependencies
     }
 
+    /// Returns each in-repo dependency with its version requirement string,
+    /// across the normal, build, and target-specific dependency sections.
+    ///
+    /// `dev-dependencies` are excluded: they are not part of the published
+    /// crate, so they neither enter a released crate's dependency tree nor
+    /// constrain what downstream users resolve.
+    ///
+    /// Dependencies without a `version` (e.g. git-only) are skipped, and renamed
+    /// dependencies (`alias = { package = "real-name" }`) resolve to the real
+    /// crate. A crate may appear more than once if depended on from several
+    /// sections.
+    pub fn repo_dependency_requirements(&mut self) -> Vec<(Package, String)> {
+        let mut dependencies = Vec::new();
+        self.visit_dependencies(|_, dependency_kind, table| {
+            if dependency_kind == "dev-dependencies" {
+                return;
+            }
+            for (key, value) in table.iter() {
+                let (name, version) = match value {
+                    // package = "version"
+                    Item::Value(Value::String(version)) => (key, Some(version.value().to_string())),
+                    // package = { version = "version", package = "real-name" }
+                    Item::Value(Value::InlineTable(t)) => {
+                        let name = t.get("package").and_then(|p| p.as_str()).unwrap_or(key);
+                        let version = t.get("version").and_then(|v| v.as_str()).map(String::from);
+                        (name, version)
+                    }
+                    // [dependencies.package]
+                    // version = "version"
+                    Item::Table(t) => {
+                        let name = t.get("package").and_then(|p| p.as_str()).unwrap_or(key);
+                        let version = t.get("version").and_then(|v| v.as_str()).map(String::from);
+                        (name, version)
+                    }
+                    _ => (key, None),
+                };
+
+                if let (Ok(package), Some(version)) = (Package::from_str(name, true), version) {
+                    dependencies.push((package, version));
+                }
+            }
+        });
+        dependencies
+    }
+
     pub(crate) fn change_version_of_dependency(
         &mut self,
         package_name: &str,
@@ -932,6 +977,47 @@ mod tests {
                 "previous={previous}, new={new}"
             );
         }
+    }
+
+    #[test]
+    fn repo_dependency_requirements_excludes_dev_dependencies() {
+        // A dev-dependency (esp-radio -> esp-rtos in reality) must not be
+        // reported as a release dependency; normal and build dependencies are.
+        let manifest = r#"
+            [package]
+            name = "esp-radio"
+            version = "1.0.0"
+
+            [dependencies]
+            esp-hal = { version = "1.2.0", path = "../esp-hal" }
+
+            [build-dependencies]
+            esp-config = { version = "0.8.0", path = "../esp-config" }
+
+            [dev-dependencies]
+            esp-rtos = { version = "0.3.0", path = "../esp-rtos" }
+        "#;
+
+        let mut toml =
+            CargoToml::from_str(&std::path::PathBuf::new(), Package::EspRadio, manifest).unwrap();
+        let deps = toml
+            .repo_dependency_requirements()
+            .into_iter()
+            .map(|(pkg, _)| pkg)
+            .collect::<Vec<_>>();
+
+        assert!(
+            deps.contains(&Package::EspHal),
+            "normal dep missing: {deps:?}"
+        );
+        assert!(
+            deps.contains(&Package::EspConfig),
+            "build dep missing: {deps:?}"
+        );
+        assert!(
+            !deps.contains(&Package::EspRtos),
+            "dev dep should be excluded: {deps:?}"
+        );
     }
 
     #[test]

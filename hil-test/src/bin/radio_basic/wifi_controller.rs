@@ -17,7 +17,7 @@ mod tests {
     #[test]
     async fn wifi_starts_with_trng_enabled(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let _source = esp_hal::rng::TrngSource::new(p.RNG, p.ADC1);
 
@@ -30,7 +30,7 @@ mod tests {
     #[timeout(15)]
     async fn test_scan_doesnt_leak(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        esp_rtos::start(timg0.timer0, p.FROM_CPU_INTR0);
+        esp_rtos::start(timg0.timer0);
 
         let mut controller =
             esp_radio::wifi::WifiController::new(p.WIFI, Default::default()).unwrap();

@@ -1,4 +1,4 @@
-use std::{path::Path, process::Command};
+use std::{collections::HashMap, path::Path, process::Command};
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
@@ -9,7 +9,7 @@ use crate::{
     commands::{
         VersionBump,
         checker::generate_baseline,
-        release::plan::{PackagePlan, Plan},
+        release::plan::{PackagePlan, Plan, validate_release_closure},
         update_package,
     },
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
@@ -60,6 +60,16 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             plan.packages[0].bump
         );
     }
+
+    // The plan is hand-edited between `plan` and here (packages get removed), so
+    // re-check that what remains still forms a self-consistent release before
+    // touching any files.
+    let releasing = plan
+        .packages
+        .iter()
+        .map(|p| (p.package, p.new_version.clone()))
+        .collect::<HashMap<_, _>>();
+    validate_release_closure(workspace, &releasing)?;
 
     // Preflight: validate every package up front, before touching any files, so
     // a mismatched version or other plan error aborts without leaving the
