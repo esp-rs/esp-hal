@@ -1,4 +1,4 @@
-﻿//! Software CPU retention across a light sleep.
+//! Software CPU retention across a light sleep.
 //!
 //! esp-idf saves the CPU-domain device registers with plain loops, not with the PAU regdma engine
 //! (`esp32c6/sleep_cpu.c:237-341`).
@@ -534,15 +534,9 @@ pub(crate) fn arm_wake_stub() {
 #[inline(always)]
 pub(crate) fn wake_stub_reg() -> *mut u32 {
     cfg_select! {
-        esp32s31 => {
-            crate::peripherals::LP_SYS::regs().lp_store(8).as_ptr()
-        }
-        esp32p4 => {
-            crate::peripherals::LP_AON::regs().lp_store8().as_ptr()
-        }
-        _ => {
-            crate::peripherals::LP_AON::regs().store8().as_ptr()
-        }
+        esp32s31 => crate::peripherals::LP_SYS::regs().lp_store(8).as_ptr(),
+        esp32p4 => crate::peripherals::LP_AON::regs().lp_store8().as_ptr(),
+        _ => crate::peripherals::LP_AON::regs().store8().as_ptr(),
     }
 }
 
