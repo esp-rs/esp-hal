@@ -407,16 +407,6 @@ impl<'d> LowPower<'d> {
 
         sleep_uart_prepare();
 
-        // Last, because this step takes the pads away from the peripherals that drove them. The
-        // wakeup sources have their holds now, and no later step needs a pad.
-        #[cfg(any(
-            sleep_deep_sleep_needs_gpio_isolation,
-            gpio_need_soft_isolate_during_pd
-        ))]
-        if kind == SleepKind::Deep {
-            gpio::wakeup::isolate_pads_for_deep_sleep();
-        }
-
         // Latch the systimer value *before* sleeping. The systimer keeps running during
         // the sleep enter/exit sequences, so we must not advance from the post-wake
         // value (that would count the enter/exit time twice). Instead we set an absolute
@@ -445,6 +435,16 @@ impl<'d> LowPower<'d> {
 
             #[allow(clippy::let_unit_value)]
             let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
+
+            // Last, because this step takes the pads away from the peripherals that drove them. The
+            // wakeup sources have their holds now, and no later step needs a pad.
+            #[cfg(any(
+                sleep_deep_sleep_needs_gpio_isolation,
+                gpio_need_soft_isolate_during_pd
+            ))]
+            if kind == SleepKind::Deep {
+                gpio::wakeup::isolate_pads_for_deep_sleep();
+            }
 
             let rejected = cfg_select! {
                 cpu_retention = "software" => {
