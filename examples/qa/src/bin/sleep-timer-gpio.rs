@@ -6,10 +6,10 @@
 //!
 //! Wiring
 //!
-//! | Function           | ESP32 | ESP32-S2/S3 | ESP32-C2/C3 | ESP32-C5/C6/C61/P4 | ESP32-H2 |
-//! | ------------------ | ----- | ----------- | ----------- | ------------------ | -------- |
-//! | Wake on low level  | GPIO2 | GPIO17      | GPIO2       | GPIO2              | GPIO9    |
-//! | Wake on high level | GPIO4 | GPIO18      | GPIO3       | GPIO3              | GPIO10   |
+//! | Function           | ESP32 | ESP32-S2/S3 | ESP32-C2/C3/C5/C6/C61/P4/S31 | ESP32-H2 |
+//! | ------------------ | ----- | ----------- | ---------------------------- | -------- |
+//! | Wake on low level  | GPIO2 | GPIO17      | GPIO2                        | GPIO9    |
+//! | Wake on high level | GPIO4 | GPIO18      | GPIO3                        | GPIO10   |
 //!
 //! Each pin idles at the level that does not wake the chip. Pull the low-level pin to ground, or
 //! the high-level pin to 3V3, to end the sleep.
