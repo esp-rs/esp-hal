@@ -1,13 +1,14 @@
 use alloc::vec::Vec;
 use core::{
     mem::transmute,
-    ptr::{NonNull, addr_of, addr_of_mut},
+    ptr::{NonNull, addr_of_mut},
 };
 
 use esp_phy::PhyInitGuard;
 
-use super::*;
+use super::{Config, ReceivedPacket};
 use crate::{
+    ble::{HCI_OUT_COLLECTOR, HciOutCollector},
     compat::{self, OSI_FUNCS_TIME_BLOCKING, common::str_from_c, queue},
     hal::time::Instant,
     sys::{c_types::*, include::*},
@@ -528,7 +529,7 @@ pub(crate) struct npl_funcs_t {
     p_ble_npl_hw_is_in_critical: Option<unsafe extern "C" fn() -> u8>,
 }
 
-static mut G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
+static G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
     p_ble_npl_os_started: Some(ble_npl_os_started),
     p_ble_npl_get_current_task_id: Some(ble_npl_get_current_task_id),
     p_ble_npl_eventq_init: Some(ble_npl_eventq_init),
@@ -1033,11 +1034,11 @@ unsafe extern "C" fn ble_npl_callout_init(
         unsafe {
             let new_callout =
                 crate::compat::malloc::calloc(1, core::mem::size_of::<Callout>()) as *mut Callout;
-            ble_npl_event_init(addr_of_mut!((*new_callout).events), func, args);
+            ble_npl_event_init(&raw mut (*new_callout).events, func, args);
             (*callout).dummy = new_callout as i32;
 
             crate::compat::timer_compat::compat_timer_setfn(
-                addr_of_mut!((*new_callout).timer_handle),
+                &raw mut (*new_callout).timer_handle,
                 callout_timer_callback_wrapper,
                 callout as *mut c_void,
             );
@@ -1053,9 +1054,9 @@ unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
 
     unsafe {
         if !(*co).eventq.is_null() {
-            ble_npl_eventq_put((*co).eventq.cast_mut(), addr_of!((*co).events));
+            ble_npl_eventq_put((*co).eventq.cast_mut(), &raw const (*co).events);
         } else {
-            ble_npl_event_run(addr_of!((*co).events));
+            ble_npl_event_run(&raw const (*co).events);
         }
     }
 }
@@ -1126,7 +1127,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         ble_os_adapter_chip_specific::disable_sleep_mode();
 
-        let res = esp_register_npl_funcs(core::ptr::addr_of!(G_NPL_FUNCS));
+        let res = esp_register_npl_funcs(&G_NPL_FUNCS);
         assert!(res == 0, "esp_register_npl_funcs returned {}", res);
 
         // not really using  here ... remove it?
@@ -1245,7 +1246,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
     data.push(len as u8);
     data.extend_from_slice(payload);
 
-    dump_packet_info(&data);
+    super::dump_packet_info(&data);
 
     super::BT_STATE.with(|state| {
         state.rx_queue.push_back(ReceivedPacket {
@@ -1310,7 +1311,7 @@ fn send_packet(packet: &[u8]) {
     const DATA_TYPE_COMMAND: u8 = 1;
     const DATA_TYPE_ACL: u8 = 2;
 
-    dump_packet_info(packet);
+    super::dump_packet_info(packet);
 
     super::BT_STATE.with(|_state| unsafe {
         if packet[0] == DATA_TYPE_COMMAND {
