@@ -116,6 +116,64 @@ where
     }
 }
 
+/// Clocks the ADC digital controller the way ESP-IDF's oneshot driver does.
+///
+/// The SAR clock is divided down from this clock, and the calibration data in eFuse was
+/// characterized at the frequency ESP-IDF picks. Programming the dividers explicitly also keeps
+/// the results independent of what the bootloader left behind - it clocks the ADC too, to seed
+/// the RNG.
+///
+/// See `adc_oneshot_hal_setup` and `ADC_LL_CLKM_DIV_*_DEFAULT` in
+/// <https://github.com/espressif/esp-idf/blob/v5.5/components/hal/adc_oneshot_hal.c>
+fn configure_clock() {
+    // controller_clk = source / (DIV_NUM + DIV_A / DIV_B + 1)
+    #[cfg(esp32h2)]
+    const DIV: (u8, u8, u8) = (18, 5, 1);
+    #[cfg(not(esp32h2))]
+    const DIV: (u8, u8, u8) = (15, 1, 0);
+
+    let (div_num, div_b, div_a) = DIV;
+
+    // The ESP32-C2 and ESP32-C3 keep the divider in the ADC itself, and only support APB as the
+    // source. The other chips take the PLL output via the PCR - 80 MHz, or 96 MHz on the
+    // ESP32-H2.
+    #[cfg(any(esp32c2, esp32c3))]
+    APB_SARADC::regs().clkm_conf().modify(|_, w| unsafe {
+        w.clk_sel().bits(2);
+        w.clkm_div_num().bits(div_num);
+        w.clkm_div_b().bits(div_b);
+        w.clkm_div_a().bits(div_a)
+    });
+
+    #[cfg(not(any(esp32c2, esp32c3)))]
+    {
+        // The PLL is source 1 on the ESP32-C6 and ESP32-H2, but source 2 on the ESP32-C5 and
+        // ESP32-C61 - there, 1 selects the imprecise RC_FAST oscillator instead.
+        #[cfg(any(esp32c5, esp32c61))]
+        const PLL: u8 = 2;
+        #[cfg(not(any(esp32c5, esp32c61)))]
+        const PLL: u8 = 1;
+
+        crate::peripherals::PCR::regs()
+            .saradc_clkm_conf()
+            .modify(|_, w| unsafe {
+                w.saradc_clkm_sel().bits(PLL);
+                w.saradc_clkm_div_num().bits(div_num);
+                w.saradc_clkm_div_b().bits(div_b);
+                w.saradc_clkm_div_a().bits(div_a)
+            });
+    }
+}
+
+/// Reads `Dout0` from eFuse, falling back to a measurement against internal ground.
+fn hw_init_code<ADCX>(atten: Attenuation) -> u16
+where
+    ADCX: super::AdcCalEfuse + super::CalibrationAccess,
+{
+    ADCX::init_code(atten)
+        .unwrap_or_else(|| AdcConfig::<ADCX>::adc_calibrate(atten, AdcCalSource::Gnd))
+}
+
 #[doc(hidden)]
 pub trait RegisterAccess {
     /// Configures one-time sampling parameters.
@@ -138,6 +196,13 @@ pub trait RegisterAccess {
 
     /// Sets calibration parameter to ADC hardware.
     fn set_init_code(data: u16);
+
+    /// Returns the hardware calibration code (`Dout0`) for `atten`.
+    ///
+    /// The hardware subtracts this code before the result is truncated to 12 bits, so it has to
+    /// be programmed for every conversion regardless of the calibration scheme - otherwise the
+    /// usable output range shrinks by the ADC's zero-voltage offset.
+    fn hw_init_code(atten: Attenuation) -> u16;
 }
 
 #[cfg(adc_adc1)]
@@ -192,6 +257,10 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
 
         regi2c::ADC_SAR1_INITIAL_CODE_HIGH.write_field(msb);
         regi2c::ADC_SAR1_INITIAL_CODE_LOW.write_field(lsb);
+    }
+
+    fn hw_init_code(atten: Attenuation) -> u16 {
+        hw_init_code::<Self>(atten)
     }
 }
 
@@ -269,6 +338,10 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
         regi2c::ADC_SAR2_INITIAL_CODE_HIGH.write_field(msb as _);
         regi2c::ADC_SAR2_INITIAL_CODE_LOW.write_field(lsb as _);
     }
+
+    fn hw_init_code(atten: Attenuation) -> u16 {
+        hw_init_code::<Self>(atten)
+    }
 }
 
 #[cfg(adc_adc2)]
@@ -293,6 +366,8 @@ impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
 pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
     _adc: ADCX,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
+    /// Hardware calibration code per attenuation, indexed by [`Attenuation`].
+    init_codes: [u16; 4],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _phantom: PhantomData<(Dm, &'d mut ())>,
@@ -307,16 +382,32 @@ where
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
+        configure_clock();
+
         APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
-            w.start_force().set_bit();
-            w.start().set_bit();
+            // The conversions below are triggered through `onetime_start`, so the software start
+            // of the digital controller has to stay off - a concurrently running controller
+            // disturbs the sampling and biases the results low.
+            w.start_force().clear_bit();
+            w.start().clear_bit();
             w.sar_clk_gated().set_bit();
+            // Run the SAR at the digital controller clock, like ESP-IDF does.
+            w.sar_clk_div().bits(1);
             w.xpd_sar_force().bits(0b11)
         });
+
+        // Determining the calibration code can involve measuring the ADC, so do it once here
+        // instead of on every conversion.
+        ADCX::calibration_init();
+        let mut init_codes = [0; 4];
+        for atten in config.attenuations.iter().flatten() {
+            init_codes[*atten as usize] = ADCX::hw_init_code(*atten);
+        }
 
         Adc {
             _adc: adc_instance,
             attenuations: config.attenuations,
+            init_codes,
             active_channel: None,
             _guard: guard,
             _phantom: PhantomData,
@@ -336,6 +427,7 @@ where
         Adc {
             _adc: self._adc,
             attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
             _guard: self._guard,
             _phantom: PhantomData,
@@ -373,12 +465,13 @@ where
             // If no conversions are in progress, start a new one for given channel
             self.active_channel = Some(pin.pin.adc_channel());
 
-            // Set ADC unit calibration according used scheme for pin
-            ADCX::calibration_init();
-            ADCX::set_init_code(pin.cal_scheme.adc_cal());
-
             let channel = self.active_channel.unwrap();
-            let attenuation = self.attenuations[channel as usize].unwrap() as u8;
+            let attenuation = self.attenuations[channel as usize].unwrap();
+
+            ADCX::calibration_init();
+            ADCX::set_init_code(self.init_codes[attenuation as usize]);
+
+            let attenuation = attenuation as u8;
             ADCX::config_onetime_sample(channel, attenuation);
             ADCX::start_onetime_sample();
 
@@ -482,6 +575,7 @@ where
         Adc {
             _adc: self._adc,
             attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
             _guard: self._guard,
             _phantom: PhantomData,
@@ -500,15 +594,14 @@ where
         CS: super::AdcCalScheme<ADCX>,
     {
         let channel = pin.pin.adc_channel();
-        if self.attenuations[channel as usize].is_none() {
+        let Some(attenuation) = self.attenuations[channel as usize] else {
             panic!("Channel {} is not configured reading!", channel);
-        }
+        };
 
-        // Set ADC unit calibration according used scheme for pin
         ADCX::calibration_init();
-        ADCX::set_init_code(pin.cal_scheme.adc_cal());
+        ADCX::set_init_code(self.init_codes[attenuation as usize]);
 
-        let attenuation = self.attenuations[channel as usize].unwrap() as u8;
+        let attenuation = attenuation as u8;
         ADCX::config_onetime_sample(channel, attenuation);
         ADCX::start_onetime_sample();
 

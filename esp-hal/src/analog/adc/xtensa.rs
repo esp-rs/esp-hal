@@ -89,6 +89,15 @@ where
     }
 }
 
+/// Reads `Dout0` from eFuse, falling back to a measurement against internal ground.
+fn hw_init_code<ADCX>(atten: Attenuation) -> u16
+where
+    ADCX: super::AdcCalEfuse + super::CalibrationAccess,
+{
+    ADCX::init_code(atten)
+        .unwrap_or_else(|| AdcConfig::<ADCX>::adc_calibrate(atten, AdcCalSource::Gnd))
+}
+
 #[doc(hidden)]
 pub trait RegisterAccess {
     fn set_attenuation(channel: usize, attenuation: u8);
@@ -116,6 +125,13 @@ pub trait RegisterAccess {
 
     /// Sets calibration parameter to ADC hardware.
     fn set_init_code(data: u16);
+
+    /// Returns the hardware calibration code (`Dout0`) for `atten`.
+    ///
+    /// The hardware subtracts this code before the result is truncated, so it has to be
+    /// programmed regardless of the calibration scheme - otherwise the usable output range
+    /// shrinks by the ADC's zero-voltage offset.
+    fn hw_init_code(atten: Attenuation) -> u16;
 
     /// Resets flags.
     fn reset();
@@ -199,6 +215,10 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
 
         regi2c::ADC_SAR1_INITIAL_CODE_HIGH.write_field(msb);
         regi2c::ADC_SAR1_INITIAL_CODE_LOW.write_field(lsb);
+    }
+
+    fn hw_init_code(atten: Attenuation) -> u16 {
+        hw_init_code::<Self>(atten)
     }
 
     fn reset() {
@@ -319,6 +339,10 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
         regi2c::ADC_SAR2_INITIAL_CODE_LOW.write_field(lsb);
     }
 
+    fn hw_init_code(atten: Attenuation) -> u16 {
+        hw_init_code::<Self>(atten)
+    }
+
     fn reset() {
         let adc = APB_SARADC::regs();
         let sensors = SENS::regs();
@@ -354,8 +378,12 @@ impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: ADC,
+    attenuations: [Option<Attenuation>; NUM_ATTENS],
+    /// Hardware calibration code per attenuation, indexed by [`Attenuation`].
+    init_codes: [u16; 4],
     active_channel: Option<u8>,
-    last_init_code: u16,
+    /// The code currently programmed into the hardware, if any.
+    last_init_code: Option<u16>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
@@ -421,10 +449,19 @@ where
             .sar_amp_ctrl2()
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
 
+        // Determining the calibration code can involve measuring the ADC, so do it once here,
+        // now that the unit is powered up, instead of on every conversion.
+        let mut init_codes = [0; 4];
+        for atten in attenuations.iter().flatten() {
+            init_codes[*atten as usize] = ADCX::hw_init_code(*atten);
+        }
+
         Adc {
             _adc: adc_instance,
+            attenuations,
+            init_codes,
             active_channel: None,
-            last_init_code: 0,
+            last_init_code: None,
             _guard: guard,
             _phantom: PhantomData,
         }
@@ -441,6 +478,8 @@ where
 
         Adc {
             _adc: self._adc,
+            attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
             last_init_code: self.last_init_code,
             _guard: self._guard,
@@ -545,15 +584,19 @@ where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
-        // Set ADC unit calibration according used scheme for pin
-        let init_code = pin.cal_scheme.adc_cal();
-        if self.last_init_code != init_code {
+        let channel = pin.pin.adc_channel();
+        let Some(attenuation) = self.attenuations[channel as usize] else {
+            panic!("Channel {} is not configured reading!", channel);
+        };
+
+        let init_code = self.init_codes[attenuation as usize];
+        if self.last_init_code != Some(init_code) {
             ADCX::calibration_init();
             ADCX::set_init_code(init_code);
-            self.last_init_code = init_code;
+            self.last_init_code = Some(init_code);
         }
 
-        ADCX::set_en_pad(pin.pin.adc_channel());
+        ADCX::set_en_pad(channel);
 
         ADCX::clear_start_sample();
         ADCX::start_sample();
@@ -576,6 +619,8 @@ where
         }
         Adc {
             _adc: self._adc,
+            attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
             last_init_code: self.last_init_code,
             _guard: self._guard,
