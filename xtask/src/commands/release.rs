@@ -7,6 +7,8 @@ pub mod changelog_preview;
 #[cfg(feature = "release")]
 pub mod execute_plan;
 #[cfg(feature = "release")]
+pub(crate) mod new_stable_api;
+#[cfg(feature = "release")]
 pub mod plan;
 #[cfg(feature = "release")]
 pub mod post_release;

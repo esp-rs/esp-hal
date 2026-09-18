@@ -40,9 +40,14 @@ reqwest = { version = "0.12.12", features = [
 
 # This pulls a gazillion crates - don't include it by default
 cargo-semver-checks = { version = "0.46.0", optional = true }
+public-api = { version = "0.52.2", optional = true, default-features = false }
+# Must resolve to the same version `public-api` depends on. If the two diverge,
+# cargo links both copies and the `Id`s we take out of `public-api` no longer
+# typecheck against the `Crate` we deserialize ourselves.
+rustdoc-types = { version = "=0.59.0", optional = true }
 
 flate2 = { version = "1.1.1", optional = true }
-temp-file = { version = "0.1.9", optional = true }
+tempfile = { version = "3", optional = true }
 
 # MCP server support
 inventory        = { version = "0.3", optional = true }
@@ -58,8 +63,8 @@ tempfile = "3"
 [features]
 deploy-docs  = ["dep:reqwest", "dep:kuchikiki"]
 preview-docs = ["dep:opener", "dep:rocket"]
-semver-checks = [ "dep:cargo-semver-checks", "dep:flate2", "dep:temp-file", "dep:regex", "dep:zip" ]
-release = ["semver-checks", "dep:opener", "dep:regex"]
+semver-checks = [ "dep:cargo-semver-checks", "dep:flate2", "dep:tempfile", "dep:regex", "dep:zip" ]
+release = ["semver-checks", "dep:opener", "dep:regex", "dep:public-api", "dep:rustdoc-types", "serde_json/unbounded_depth"]
 report = ["dep:regex"]
 rel-check = ["dep:regex"]
 mcp = ["dep:inventory", "dep:rmcp", "dep:schemars", "dep:tokio", "dep:xtask-mcp-macros"]
