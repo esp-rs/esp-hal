@@ -630,13 +630,13 @@ unsafe extern "C" fn ble_npl_hw_exit_critical(mask: u32) {
     trace!("ble_npl_hw_exit_critical {}", mask);
     unsafe {
         let token = esp_sync::RestoreState::new(mask);
-        crate::ESP_RADIO_LOCK.release(token);
+        super::ESP_RADIO_LOCK.release(token);
     }
 }
 
 unsafe extern "C" fn ble_npl_hw_enter_critical() -> u32 {
     trace!("ble_npl_hw_enter_critical");
-    unsafe { crate::ESP_RADIO_LOCK.acquire().inner() }
+    unsafe { super::ESP_RADIO_LOCK.acquire().inner() }
 }
 
 unsafe extern "C" fn ble_npl_hw_set_isr(_no: i32, _mask: u32) {

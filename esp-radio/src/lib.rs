@@ -260,9 +260,6 @@ unstable_module! {
 
 pub(crate) mod common_adapter;
 
-#[cfg(all(feature = "ble", bt_controller = "npl"))]
-pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
-
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
 const _: () = {
