@@ -129,6 +129,7 @@ pub mod sleep;
 #[cfg_attr(esp32c6, path = "rtc/esp32c6.rs")]
 #[cfg_attr(esp32c61, path = "rtc/esp32c61.rs")]
 #[cfg_attr(esp32h2, path = "rtc/esp32h2.rs")]
+#[cfg_attr(esp32h4, path = "rtc/esp32h4.rs")]
 #[cfg_attr(esp32p4, path = "rtc/esp32p4.rs")]
 #[cfg_attr(esp32s2, path = "rtc/esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "rtc/esp32s3.rs")]

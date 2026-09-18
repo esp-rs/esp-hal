@@ -259,7 +259,7 @@ use core::marker::PhantomData;
 
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
-#[cfg_attr(esp32s31, allow(unused))]
+#[cfg_attr(any(esp32s31, esp32h4), allow(unused))]
 pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
