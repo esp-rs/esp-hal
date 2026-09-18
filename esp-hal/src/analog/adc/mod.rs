@@ -47,6 +47,9 @@
 //! ## Implementation State
 //!
 //!  - [ADC calibration is not implemented for all targets].
+//!  - The ESP32-C3 has an ADC2 in silicon, but it is not exposed: its digital controller is
+//!    erratic, the chip has no RTC controller to read it with instead, and ESP-IDF refuses to use
+//!    it by default for the same reason. GPIO5 is therefore not an ADC pin here.
 //!  - The ESP32-S31 has no calibration scheme. ESP-IDF does not define the calibration eFuses or
 //!    the curve fitting coefficients for this chip yet.
 //!  - The ESP32-S31 SAR ADC has one attenuation setting, so the attenuation given to
@@ -61,11 +64,17 @@ use core::marker::PhantomData;
 
 use crate::gpio::AnalogPin;
 
+// A chip lands in a file by the ADC controller it has, not by its CPU architecture: the RISC-V
+// ESP32-P4 drives the same RTC-style controller as the Xtensa ESP32-S2 and ESP32-S3, while the
+// chips in `dig_ctrl.rs` have no RTC controller and convert through the digital one instead.
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32p4, path = "p4.rs")]
 #[cfg_attr(esp32s31, path = "s31.rs")]
-#[cfg_attr(all(riscv, not(any(esp32p4, esp32s31))), path = "riscv.rs")]
-#[cfg_attr(any(esp32s2, esp32s3), path = "xtensa.rs")]
+#[cfg_attr(any(esp32s2, esp32s3), path = "s2_s3.rs")]
+#[cfg_attr(
+    any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2),
+    path = "dig_ctrl.rs"
+)]
 #[cfg(feature = "unstable")]
 mod implementation;
 
@@ -91,16 +100,9 @@ pub enum Attenuation {
     _11dB  = 0b11,
 }
 
-/// Calibration source of the ADC.
-#[cfg(not(esp32))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum AdcCalSource {
-    /// Use Ground as the calibration source
-    Gnd,
-    /// Use Vref as the calibration source
-    Ref,
-}
+/// The number of [`Attenuation`] variants, and in turn the length of tables indexed by one.
+#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+const ATTENUATION_COUNT: usize = 4;
 
 /// An I/O pin which can be read using the ADC.
 pub struct AdcPin<PIN, ADCX, CS = ()> {
@@ -205,14 +207,84 @@ impl<ADCX> Default for AdcConfig<ADCX> {
 #[doc(hidden)]
 #[cfg(feature = "unstable")]
 pub trait CalibrationAccess: RegisterAccess {
-    const ADC_CAL_CNT_MAX: u16;
-    const ADC_CAL_CHANNEL: u16;
     const ADC_VAL_MASK: u16;
+
+    /// Whether the unit can measure a calibration source instead of a pad.
+    ///
+    /// The ESP32-C5 cannot: ESP-IDF leaves `SOC_ADC_SELF_HW_CALI_SUPPORTED` undefined for it
+    /// and does not compile `adc_hal_self_calibration` there at all. Calibration on that chip
+    /// therefore depends entirely on the eFuse data.
+    const SUPPORTS_SELF_CALIBRATION: bool = true;
 
     fn enable_vdef(enable: bool);
 
-    /// Enables internal calibration voltage source.
-    fn connect_cal(source: AdcCalSource, enable: bool);
+    /// Disconnects the unit from its pad and ties the input to internal ground.
+    ///
+    /// Ground is the only calibration source ESP-IDF uses: `adc_hal_self_calibration` is always
+    /// called with `internal_gnd` set, and `adc_ll_calibration_prepare` drives nothing but
+    /// `ENCAL_GND`. Its `internal_gnd = false` branch measures the external pad rather than an
+    /// internal reference.
+    fn connect_gnd(enable: bool);
+
+    /// Points the unit at the calibration source instead of a pad, and programs
+    /// `atten` where the hardware looks for it while no pad is selected.
+    ///
+    /// See `cal_setup` in
+    /// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>.
+    fn setup_calibration(atten: Attenuation);
+}
+
+/// Number of times the search below is repeated. The extremes are discarded and the rest averaged.
+#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+const ADC_CAL_TIMES: u32 = 10;
+
+/// One past the highest initial code. The field is twelve bits wide on every chip.
+#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+const ADC_CAL_OFFSET_RANGE: u16 = 4096;
+
+/// Finds the initial code that cancels out the calibration source the unit is currently connected
+/// to.
+///
+/// The initial code shifts the SAR's transfer curve down, so the reading drops to zero once the
+/// code reaches the source, and finding that step is an ordinary bisection. Noise moves the step
+/// by a code or two between runs, hence the repetitions.
+///
+/// `measure` converts once and returns the result, leaving the initial code alone.
+///
+/// Port of `adc_hal_self_calibration` in
+/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>
+#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+fn search_init_code<ADCX: CalibrationAccess>(mut measure: impl FnMut() -> u16) -> u16 {
+    let mut sum = 0;
+    let mut lowest = u16::MAX;
+    let mut highest = 0;
+
+    for _ in 0..ADC_CAL_TIMES {
+        // `low` still reads non-zero, `high` already reads zero.
+        let mut low = 0;
+        let mut high = ADC_CAL_OFFSET_RANGE;
+
+        while high - low > 1 {
+            let code = (low + high) / 2;
+            ADCX::set_init_code(code);
+
+            if measure() == 0 {
+                high = code;
+            } else {
+                low = code;
+            }
+        }
+
+        sum += u32::from(high);
+        lowest = lowest.min(high);
+        highest = highest.max(high);
+    }
+
+    let count = ADC_CAL_TIMES - 2;
+    let trimmed = sum - u32::from(lowest) - u32::from(highest);
+
+    // ESP-IDF rounds this mean to nearest rather than truncating it.
+    ((trimmed + count / 2) / count) as u16
 }
 
 /// A helper trait to get the ADC channel of a compatible GPIO pin.
@@ -238,11 +310,6 @@ pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
         Self::new_cal(atten)
     }
 
-    /// Returns the basic ADC bias value.
-    fn adc_cal(&self) -> u16 {
-        0
-    }
-
     /// Converts ADC value.
     fn adc_val(&self, val: u16) -> u16 {
         val
@@ -255,9 +322,48 @@ impl<ADCX> AdcCalScheme<ADCX> for () {
     fn new_cal(_atten: Attenuation) -> Self {}
 }
 
+/// Returns the attenuation channel `channel` was configured with.
+#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+fn channel_attenuation(attenuations: &[Option<Attenuation>], channel: u8) -> Attenuation {
+    match attenuations[channel as usize] {
+        Some(attenuation) => attenuation,
+        None => panic!("Channel {channel} is not configured for reading"),
+    }
+}
+
+/// Returns the hardware calibration code (`Dout0`) for every configured attenuation.
+///
+/// The hardware subtracts this code from the conversion result before truncating it, so it has
+/// to be programmed regardless of the calibration scheme in use - otherwise the usable output
+/// range shrinks by the ADC's zero-voltage offset. ESP-IDF likewise fills a per-attenuation
+/// table once (`adc_calc_hw_calibration_code`) and reprograms it on every conversion.
+///
+/// Determining a code can involve measuring the ADC, and that measurement programs channel 0's
+/// attenuation, so the caller has to apply the configured attenuations afterwards.
+#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+fn hw_init_codes<ADCX>(attenuations: &[Option<Attenuation>]) -> [u16; ATTENUATION_COUNT]
+where
+    ADCX: AdcCalEfuse + CalibrationAccess,
+{
+    let mut init_codes = [0; ATTENUATION_COUNT];
+
+    for atten in attenuations.iter().flatten() {
+        init_codes[*atten as usize] = ADCX::init_code(*atten).unwrap_or_else(|| {
+            if ADCX::SUPPORTS_SELF_CALIBRATION {
+                AdcConfig::<ADCX>::adc_calibrate(*atten)
+            } else {
+                0
+            }
+        });
+    }
+
+    init_codes
+}
+
 /// A helper trait to get access to ADC calibration efuses.
 #[cfg(not(any(esp32, esp32s31)))]
-trait AdcCalEfuse {
+#[doc(hidden)]
+pub trait AdcCalEfuse {
     /// Returns the ADC calibration init code.
     ///
     /// Returns digital value for zero voltage for a given attenuation.
@@ -276,7 +382,7 @@ trait AdcCalEfuse {
     /// Returns the ADC channel specific calibration.
     ///
     /// Returns digital per channel offset from reference voltage.
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
     fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32>;
 }
 

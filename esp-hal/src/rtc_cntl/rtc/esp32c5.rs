@@ -9,6 +9,31 @@ use crate::{
     },
 };
 
+/// Trims the RTC bandgap to the code measured for this die in the factory.
+///
+/// The SAR ADC's reference derives from that bandgap, so an untrimmed one reads as a gain error
+/// against ESP-IDF.
+///
+/// ESP-IDF only does this coming out of a power-on reset; on any other reset the RTC domain still
+/// holds the trim. Unversioned blocks carry no measured code, and are calibrated by a software
+/// sweep that is not implemented here.
+///
+/// See `esp_ocode_calib_init` in
+/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32c5/ocode_init.c>
+fn calibrate_ocode() {
+    // `efuse_hal_blk_version`, which ESP-IDF compares against 1 here, packs the two fields as
+    // `major * 100 + minor`, so any block carrying a version at all passes.
+    let unversioned = crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MAJOR) == 0
+        && crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MINOR) == 0;
+
+    if crate::system::reset_reason() != Some(SocResetReason::ChipPowerOn) || unversioned {
+        return;
+    }
+
+    regi2c::I2C_ULP_EXT_CODE.write_reg(crate::efuse::read_field_le::<u8>(crate::efuse::OCODE));
+    regi2c::I2C_ULP_IR_FORCE_CODE.write_field(1);
+}
+
 fn pmu_power_domain_force_default() {
     // for bypass reserved power domain
 
@@ -1001,6 +1026,8 @@ pub(crate) fn init(config: &ClockConfig) {
     LpSystemInit::init_default();
 
     pmu_power_domain_force_default();
+
+    calibrate_ocode();
 
     // esp_perip_clk_init()
     modem_clock_domain_power_state_icg_map_init();

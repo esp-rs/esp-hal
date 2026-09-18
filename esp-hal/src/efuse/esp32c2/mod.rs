@@ -61,11 +61,7 @@ pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u1
 
     // see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_table.csv#L94>
     let diff_code0: u16 = super::read_field_le(ADC1_INIT_CODE_ATTEN0);
-    let code0 = if diff_code0 & (1 << 7) != 0 {
-        2160 - (diff_code0 & 0x7f)
-    } else {
-        2160 + diff_code0
-    };
+    let code0 = (2160 + super::sign_magnitude(diff_code0 as u32, 7)) as u16;
 
     if matches!(atten, Attenuation::_0dB) {
         return Some(code0);
@@ -103,11 +99,7 @@ pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
 
     // see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_table.csv#L96>
     let diff_code0: u16 = super::read_field_le(ADC1_CAL_VOL_ATTEN0);
-    let code0 = if diff_code0 & (1 << 7) != 0 {
-        1540 - (diff_code0 & 0x7f)
-    } else {
-        1540 + diff_code0
-    };
+    let code0 = (1540 + super::sign_magnitude(diff_code0 as u32, 7)) as u16;
 
     if matches!(atten, Attenuation::_0dB) {
         return Some(code0);
@@ -115,11 +107,9 @@ pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
 
     // see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_table.csv#L97>
     let diff_code11: u16 = super::read_field_le(ADC1_CAL_VOL_ATTEN3);
-    let code11 = if diff_code0 & (1 << 5) != 0 {
-        code0 - (diff_code11 & 0x1f)
-    } else {
-        code0 + diff_code11
-    } - 123;
+    // The diff is subtracted from the attenuation-0 reference point, so a negative diff raises
+    // the code.
+    let code11 = (code0 as i32 - super::sign_magnitude(diff_code11 as u32, 5) - 123) as u16;
 
     Some(code11)
 }

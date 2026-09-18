@@ -11,7 +11,7 @@ use portable_atomic::{AtomicU32, Ordering};
 use procmacros::handler;
 
 pub use self::calibration::*;
-use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
+use super::{AdcCalScheme, AdcChannel, AdcConfig, AdcPin, Attenuation};
 use crate::{
     Async,
     Blocking,
@@ -31,8 +31,6 @@ mod calibration;
 pub(super) const NUM_ATTENS: usize = 8;
 
 const ADC_VAL_MASK: u16 = 0xfff;
-const ADC_CAL_CNT_MAX: u16 = 32;
-const ADC_CAL_CHANNEL: u16 = 15;
 
 /// Powers the SAR up by software, instead of leaving it to the FSM.
 const FORCE_XPD_SAR_PU: u8 = 3;
@@ -41,51 +39,54 @@ impl<ADCX> AdcConfig<ADCX>
 where
     ADCX: RegisterAccess,
 {
-    /// Calibrates ADC with specified attenuation and voltage source.
-    pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16
+    /// Measures the initial code that cancels the unit's zero-voltage offset at `atten`.
+    pub fn adc_calibrate(atten: Attenuation) -> u16
     where
         ADCX: super::CalibrationAccess,
     {
-        let mut adc_max: u16 = 0;
-        let mut adc_min: u16 = u16::MAX;
-        let mut adc_sum: u32 = 0;
+        // A calibration scheme measures the ADC while building itself, which happens before
+        // `Adc::new` runs, so the unit cannot be assumed to be clocked and powered yet.
+        init_hardware::<ADCX>();
 
         ADCX::enable_vdef(true);
 
         // Start sampling
-        ADCX::set_en_pad(ADCX::ADC_CAL_CHANNEL as u8);
-        ADCX::set_attenuation(ADCX::ADC_CAL_CHANNEL as usize, atten as u8);
+        ADCX::setup_calibration(atten);
 
         // Connect calibration source
-        ADCX::connect_cal(source, true);
+        ADCX::connect_gnd(true);
 
         ADCX::calibration_init();
-        ADCX::set_init_code(0);
-
-        for _ in 0..ADCX::ADC_CAL_CNT_MAX {
-            // Trigger ADC sampling
+        let cal_val = super::search_init_code::<ADCX>(|| {
+            // Clearing the done flag up front, rather than after the read, keeps a conversion left
+            // over from the previous code from being mistaken for this one's result.
+            ADCX::reset();
             ADCX::start_sample();
-
-            // Wait until ADC sampling is done
             while !ADCX::is_done() {}
 
-            let adc = ADCX::read_data() & ADCX::ADC_VAL_MASK;
-
-            ADCX::reset();
-
-            adc_sum += adc as u32;
-            adc_max = adc.max(adc_max);
-            adc_min = adc.min(adc_min);
-        }
-
-        let cal_val =
-            (adc_sum - adc_max as u32 - adc_min as u32) as u16 / (ADCX::ADC_CAL_CNT_MAX - 2);
+            ADCX::read_data() & ADCX::ADC_VAL_MASK
+        });
+        ADCX::reset();
 
         // Disconnect calibration source
-        ADCX::connect_cal(source, false);
+        ADCX::connect_gnd(false);
 
         cal_val
     }
+}
+
+/// Clocks the RTC controller and powers the unit up.
+///
+/// Writes nothing that depends on previous state, so it is safe to run more than once.
+fn init_hardware<ADCX: RegisterAccess>() {
+    // The RTC controller lives in the LP domain and has its own clock gate.
+    LP_PERI::regs()
+        .clk_en()
+        .modify(|_, w| w.ck_en_lp_adc().set_bit());
+
+    ADCX::set_rtc_controller();
+    ADCX::set_sar_clk_div();
+    ADCX::power_up();
 }
 
 #[doc(hidden)]
@@ -109,6 +110,14 @@ pub trait RegisterAccess {
 
     /// Powers the SAR up.
     fn power_up();
+
+    /// Runs the SAR at the clock divider ESP-IDF's one-shot reads use.
+    ///
+    /// The reset default halves the clock, which is what ESP-IDF picks only for its low-power work
+    /// mode.
+    ///
+    /// See `adc_ll_set_sar_clk_div` and `ADC_LL_SAR_CLK_DIV_DEFAULT`.
+    fn set_sar_clk_div();
 
     /// Sets up ADC hardware for calibration.
     fn calibration_init();
@@ -177,6 +186,12 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .modify(|_, w| unsafe { w.force_xpd_sar1().bits(FORCE_XPD_SAR_PU) });
     }
 
+    fn set_sar_clk_div() {
+        LP_ADC::regs()
+            .reader1_ctrl()
+            .modify(|_, w| unsafe { w.sar1_clk_div().bits(1) });
+    }
+
     fn calibration_init() {
         // https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/esp_hal_ana_conv/esp32p4/include/hal/adc_ll.h#L727
         regi2c::ADC_SAR1_DREF.write_field(4);
@@ -204,19 +219,24 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
 
 #[cfg(adc_adc1)]
 impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
-    const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
-    const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
         regi2c::ADC_SAR1_DREF.write_field(enable as u8);
     }
 
-    fn connect_cal(source: AdcCalSource, enable: bool) {
-        match source {
-            AdcCalSource::Gnd => regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as u8),
-            AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_REF.write_field(enable as u8),
-        }
+    fn connect_gnd(enable: bool) {
+        regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as u8);
+    }
+
+    fn setup_calibration(atten: Attenuation) {
+        // With no pad selected the hardware falls back to channel 0's attenuation, so
+        // that is where `cal_setup` programs it. Selecting the pseudo-channel the
+        // digital controller uses would shift past the register instead.
+        LP_ADC::regs()
+            .meas1_ctrl2()
+            .modify(|_, w| unsafe { w.sar1_en_pad().bits(0) });
+        Self::set_attenuation(0, atten as u8);
     }
 }
 
@@ -286,6 +306,12 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
             .modify(|_, w| unsafe { w.force_xpd_sar2().bits(FORCE_XPD_SAR_PU) });
     }
 
+    fn set_sar_clk_div() {
+        LP_ADC::regs()
+            .reader2_ctrl()
+            .modify(|_, w| unsafe { w.sar2_clk_div().bits(1) });
+    }
+
     fn calibration_init() {
         regi2c::ADC_SAR2_DREF.write_field(4);
     }
@@ -312,19 +338,21 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
 
 #[cfg(adc_adc2)]
 impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
-    const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
-    const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
         regi2c::ADC_SAR2_DREF.write_field(enable as u8);
     }
 
-    fn connect_cal(source: AdcCalSource, enable: bool) {
-        match source {
-            AdcCalSource::Gnd => regi2c::ADC_SAR2_ENCAL_GND.write_field(enable as u8),
-            AdcCalSource::Ref => regi2c::ADC_SAR2_ENCAL_REF.write_field(enable as u8),
-        }
+    fn connect_gnd(enable: bool) {
+        regi2c::ADC_SAR2_ENCAL_GND.write_field(enable as u8);
+    }
+
+    fn setup_calibration(atten: Attenuation) {
+        LP_ADC::regs()
+            .meas2_ctrl2()
+            .modify(|_, w| unsafe { w.sar2_en_pad().bits(0) });
+        Self::set_attenuation(0, atten as u8);
     }
 }
 
@@ -341,6 +369,10 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn cal_code(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
+
+    fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32> {
+        crate::efuse::rtc_calib_get_chan_compens(AdcCalibUnit::ADC1, channel.into(), atten)
+    }
 }
 
 #[cfg(adc_adc2)]
@@ -356,13 +388,19 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn cal_code(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC2, atten)
     }
+
+    fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32> {
+        crate::efuse::rtc_calib_get_chan_compens(AdcCalibUnit::ADC2, channel.into(), atten)
+    }
 }
 
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: ADC,
+    attenuations: [Option<Attenuation>; NUM_ATTENS],
+    /// Hardware calibration code per attenuation, indexed by [`Attenuation`].
+    init_codes: [u16; super::ATTENUATION_COUNT],
     active_channel: Option<u8>,
-    last_init_code: u16,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
@@ -377,15 +415,16 @@ where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
-        // Set ADC unit calibration according used scheme for pin
-        let init_code = pin.cal_scheme.adc_cal();
-        if self.last_init_code != init_code {
-            ADCX::calibration_init();
-            ADCX::set_init_code(init_code);
-            self.last_init_code = init_code;
-        }
+        let channel = pin.pin.adc_channel();
+        let attenuation = super::channel_attenuation(&self.attenuations, channel);
 
-        ADCX::set_en_pad(pin.pin.adc_channel());
+        // Reprogrammed for every conversion, like `adc_set_hw_calibration_code`: the
+        // regi2c block is shared with the PHY, so the code cannot be assumed to survive
+        // between reads.
+        ADCX::calibration_init();
+        ADCX::set_init_code(self.init_codes[attenuation as usize]);
+
+        ADCX::set_en_pad(channel);
 
         ADCX::clear_start_sample();
         ADCX::start_sample();
@@ -398,27 +437,33 @@ where
 {
     /// Configures a given ADC instance using the provided configuration, and
     /// initializes the ADC for use.
-    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self
+    where
+        ADCX: super::AdcCalEfuse + super::CalibrationAccess,
+    {
         let guard = GenericPeripheralGuard::new();
 
-        // The RTC controller lives in the LP domain and has its own clock gate.
-        LP_PERI::regs()
-            .clk_en()
-            .modify(|_, w| w.ck_en_lp_adc().set_bit());
+        let attenuations = config.attenuations;
 
-        for (channel, attenuation) in config.attenuations.iter().enumerate() {
+        init_hardware::<ADCX>();
+
+        let init_codes = super::hw_init_codes::<ADCX>(&attenuations);
+
+        for (channel, attenuation) in attenuations.iter().enumerate() {
             if let Some(attenuation) = attenuation {
                 ADCX::set_attenuation(channel, *attenuation as u8);
             }
         }
 
-        ADCX::set_rtc_controller();
-        ADCX::power_up();
+        // The bootloader runs conversions of its own to seed the RNG, so the done flag can
+        // already be set here and would make the first read return a stale result.
+        ADCX::reset();
 
         Adc {
             _adc: adc_instance,
+            attenuations,
+            init_codes,
             active_channel: None,
-            last_init_code: 0,
             _guard: guard,
             _phantom: PhantomData,
         }
@@ -500,8 +545,9 @@ where
 
         Adc {
             _adc: self._adc,
+            attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
-            last_init_code: self.last_init_code,
             _guard: self._guard,
             _phantom: PhantomData,
         }
@@ -533,8 +579,9 @@ where
         }
         Adc {
             _adc: self._adc,
+            attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
-            last_init_code: self.last_init_code,
             _guard: self._guard,
             _phantom: PhantomData,
         }

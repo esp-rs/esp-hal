@@ -76,10 +76,25 @@ fn enable_refgen() {
     });
 }
 
+/// Powers both SAR units up, matching `sar_ctrl_ll_set_power_mode`.
+///
+/// The power bits are shared - `SOC_ADC_SHARED_POWER` - so both units come up
+/// together no matter which one is being read.
+fn power_on_sar_units() {
+    enable_refgen();
+
+    APB_SARADC::regs()
+        .ctrl0()
+        .modify(|_, w| unsafe { w.xpd_sar1_force().bits(FORCE_XPD_SAR_PU) });
+    APB_SARADC::regs()
+        .ctrl1()
+        .modify(|_, w| unsafe { w.xpd_sar2_force().bits(FORCE_XPD_SAR_PU) });
+}
+
 #[doc(hidden)]
 pub trait RegisterAccess {
-    /// Powers the SAR up and puts the unit into single-conversion mode.
-    fn enable();
+    /// Prepares the unit for a one-shot conversion.
+    fn prepare();
 
     /// Programs the single-entry pattern table with the given channel.
     fn program_pattern(channel: u8);
@@ -95,19 +110,41 @@ pub trait RegisterAccess {
 
     /// Clears the done flag and stops triggering.
     fn reset();
+
+    /// Starts one conversion on `channel`.
+    ///
+    /// The done flag does not have to be cleared first: [`Self::reset`] does that at the end of
+    /// every conversion, and once more while the driver is built.
+    fn start(channel: u8) {
+        Self::prepare();
+        Self::program_pattern(channel);
+        Self::start_sample();
+    }
+
+    /// Runs one blocking conversion on `channel`.
+    fn sample(channel: u8) -> u16 {
+        Self::start(channel);
+
+        while !Self::is_done() {}
+
+        let converted_value = Self::read_data();
+        Self::reset();
+        converted_value
+    }
 }
 
 #[cfg(adc_adc1)]
 impl RegisterAccess for crate::peripherals::ADC1<'_> {
-    fn enable() {
+    fn prepare() {
         APB_SARADC::regs()
             .ctrl2()
             .modify(|_, w| w.timer_en().clear_bit());
 
-        enable_refgen();
+        power_on_sar_units();
 
-        APB_SARADC::regs().ctrl0().modify(|_, w| unsafe {
-            w.xpd_sar1_force().bits(FORCE_XPD_SAR_PU);
+        // Only this unit's trigger mode is touched, so a driver for the other unit
+        // keeps its own state - `adc_oneshot_ll_enable` is per unit too.
+        APB_SARADC::regs().ctrl0().modify(|_, w| {
             w.sar1_continue_mode_en().clear_bit();
             w.sar1_trigger_stop().set_bit()
         });
@@ -167,15 +204,14 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
 
 #[cfg(adc_adc2)]
 impl RegisterAccess for crate::peripherals::ADC2<'_> {
-    fn enable() {
+    fn prepare() {
         APB_SARADC::regs()
             .ctrl2()
             .modify(|_, w| w.timer_en().clear_bit());
 
-        enable_refgen();
+        power_on_sar_units();
 
-        APB_SARADC::regs().ctrl1().modify(|_, w| unsafe {
-            w.xpd_sar2_force().bits(FORCE_XPD_SAR_PU);
+        APB_SARADC::regs().ctrl1().modify(|_, w| {
             w.sar2_continue_mode_en().clear_bit();
             w.sar2_trigger_stop().set_bit()
         });
@@ -262,7 +298,8 @@ where
             .ctrl_date()
             .modify(|_, w| w.clk_en().set_bit());
 
-        ADCX::enable();
+        ADCX::prepare();
+        ADCX::reset();
 
         Adc {
             _adc: adc_instance,
@@ -298,15 +335,7 @@ where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
-        ADCX::program_pattern(pin.pin.adc_channel());
-        ADCX::start_sample();
-
-        while !ADCX::is_done() {}
-
-        let converted_value = ADCX::read_data();
-        ADCX::reset();
-
-        converted_value
+        ADCX::sample(pin.pin.adc_channel())
     }
 
     /// Requests that the ADC begin a conversion on the specified pin.
@@ -336,8 +365,7 @@ where
             // If no conversions are in progress, start a new one for given channel
             self.active_channel = Some(pin.pin.adc_channel());
 
-            ADCX::program_pattern(pin.pin.adc_channel());
-            ADCX::start_sample();
+            ADCX::start(pin.pin.adc_channel());
         }
 
         if !ADCX::is_done() {
@@ -399,8 +427,7 @@ where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
     {
-        ADCX::program_pattern(pin.pin.adc_channel());
-        ADCX::start_sample();
+        ADCX::start(pin.pin.adc_channel());
 
         AdcFuture::<ADCX>::new(self).await;
 

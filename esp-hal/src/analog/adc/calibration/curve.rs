@@ -91,28 +91,29 @@ where
         }
     }
 
-    fn adc_cal(&self) -> u16 {
-        self.line.adc_cal()
-    }
-
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.line.adc_val(val);
 
-        // Calculate polynomial error using Horner's method to prevent overflow.
-        // Horner's evaluates: err = coeff[0] + val*(coeff[1] + val*(coeff[2] + ...))
-        // This avoids computing val^n which causes overflow when multiplied by coefficients.
+        // ESP-IDF truncates each polynomial term toward zero before summing them:
+        // `get_reading_error` divides the absolute-valued terms, then applies the
+        // signs. Truncating the summed polynomial once instead - e.g. with Horner's
+        // method - loses the terms' fractional parts together rather than
+        // separately, which shifts the result by up to 1 mV per term.
+        //
+        // The products need i128: the highest-order term (ESP32-S3, x^4) times its
+        // coefficient does not fit an i64.
         let err = if val == 0 || self.coeff.is_empty() {
             0
         } else {
-            let val_i64 = val as i64;
-            let mut poly = 0i64;
+            let mut var: i128 = 1; // val^i
+            let mut err: i128 = 0;
 
-            // Iterate coefficients in reverse order for Horner's method
-            for &coeff in self.coeff.iter().rev() {
-                poly = poly * val_i64 + coeff;
+            for &coeff in self.coeff {
+                err += var * i128::from(coeff) / i128::from(COEFF_MUL);
+                var *= i128::from(val);
             }
 
-            (poly / COEFF_MUL) as i32
+            err as i32
         };
 
         (val as i32 - err) as u16

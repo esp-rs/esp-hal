@@ -10,8 +10,6 @@ pub use fields::*;
 pub enum AdcCalibUnit {
     /// Selects efuse calibration data for ADC1.
     ADC1,
-    /// Selects efuse calibration data for ADC2.
-    ADC2,
 }
 
 /// Returns whether SPI boot encryption is enabled.
@@ -39,18 +37,6 @@ pub fn block_version() -> (u8, u8) {
         super::read_field_le::<u8>(BLK_VERSION_MAJOR),
         super::read_field_le::<u8>(BLK_VERSION_MINOR),
     )
-}
-
-/// Returns a signed value from the raw data from eFuse.
-///
-/// `sign_bit` is the index of the sign bit, starting from 0.
-fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
-    let sign_mask = 1u32 << sign_bit;
-    if data & sign_mask != 0 {
-        -((data & !sign_mask) as i32)
-    } else {
-        data as i32
-    }
 }
 
 /// Returns the version of RTC calibration block.
@@ -109,7 +95,7 @@ pub fn rtc_calib_get_chan_compens(
         _ => ADC1_INIT_CODE_ATTEN0_CH6,
     });
 
-    Some(get_signed_val(chan_diff, 3) * (4 - atten as i32))
+    Some(super::sign_magnitude(chan_diff, 3) * (4 - atten as i32))
 }
 
 /// Returns the ADC reference point voltage for specified attenuation in millivolts.
@@ -153,7 +139,7 @@ pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
         2850
     };
 
-    Some((chk_offset + get_signed_val(cal_vol as u32, 9)) as u16)
+    Some((chk_offset + super::sign_magnitude(cal_vol as u32, 9)) as u16)
 }
 
 /// Returns the major hardware revision.

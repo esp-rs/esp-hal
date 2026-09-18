@@ -14,19 +14,15 @@ use core::{
     task::{Context, Poll},
 };
 
-// We only have to count on devices that have multiple ADCs sharing the same interrupt
-#[cfg(all(adc_adc1, adc_adc2))]
-use portable_atomic::{AtomicU32, Ordering};
 use procmacros::handler;
 
 pub use self::calibration::*;
-use super::{AdcCalSource, AdcConfig, Attenuation};
-#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2))]
-use crate::efuse::AdcCalibUnit;
+use super::{AdcConfig, Attenuation};
 use crate::{
     Async,
     Blocking,
     asynch::AtomicWaker,
+    efuse::AdcCalibUnit,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripherals::{APB_SARADC, Interrupt},
     rtc_cntl::WakeLock,
@@ -41,14 +37,7 @@ mod calibration;
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c3/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c6/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h2/include/soc/regi2c_saradc.h
-cfg_select! {
-    adc_adc1 => {
-        const ADC_VAL_MASK: u16 = 0xfff;
-        const ADC_CAL_CNT_MAX: u16 = 32;
-        const ADC_CAL_CHANNEL: u16 = 15;
-    }
-    _ => {}
-}
+const ADC_VAL_MASK: u16 = 0xfff;
 
 // The number of analog IO pins, and in turn the number of attentuations,
 // depends on which chip is being used
@@ -71,49 +60,168 @@ impl<ADCX> AdcConfig<ADCX>
 where
     ADCX: RegisterAccess,
 {
-    /// Calibrates ADC with specified attenuation and voltage source.
-    pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16
+    /// Measures the initial code that cancels the unit's zero-voltage offset at `atten`.
+    pub fn adc_calibrate(atten: Attenuation) -> u16
     where
         ADCX: super::CalibrationAccess,
     {
-        let mut adc_max: u16 = 0;
-        let mut adc_min: u16 = u16::MAX;
-        let mut adc_sum: u32 = 0;
+        // A calibration scheme measures the ADC while building itself, which happens before
+        // `Adc::new` runs, so the unit cannot be assumed to be clocked and powered yet.
+        init_hardware();
 
         ADCX::enable_vdef(true);
 
         // Start sampling
-        ADCX::config_onetime_sample(ADC_CAL_CHANNEL as u8, atten as u8);
+        ADCX::setup_calibration(atten);
 
         // Connect calibration source
-        ADCX::connect_cal(source, true);
+        ADCX::connect_gnd(true);
 
         ADCX::calibration_init();
-        for _ in 0..ADC_CAL_CNT_MAX {
-            ADCX::set_init_code(0);
-
-            // Trigger ADC sampling
-            ADCX::start_onetime_sample();
-
-            // Wait until ADC sampling is done
-            while !ADCX::is_done() {}
-
-            let adc = ADCX::read_data() & ADC_VAL_MASK;
-
-            ADCX::reset();
-
-            adc_sum += adc as u32;
-            adc_max = adc.max(adc_max);
-            adc_min = adc.min(adc_min);
-        }
-
-        let cal_val = (adc_sum - adc_max as u32 - adc_min as u32) as u16 / (ADC_CAL_CNT_MAX - 2);
+        let cal_val = super::search_init_code::<ADCX>(read_cal_channel::<ADCX>);
+        ADCX::reset();
 
         // Disconnect calibration source
-        ADCX::connect_cal(source, false);
+        ADCX::connect_gnd(false);
 
         cal_val
     }
+}
+
+/// Converts the connected calibration source once.
+///
+/// Clearing the done flag before the trigger keeps it from coming back up from a conversion that
+/// was still in flight; a stale result would send the search off in the wrong direction.
+///
+/// The trigger goes the other way around than it does for a pad conversion: ESP-IDF puts the low
+/// period up front here, holds it for a fixed five microseconds rather than the delay it computes
+/// there, and leaves the level asserted. It also reads the result without waiting out
+/// [`settle_after_done`] - which would make the ESP32-H2 read zero, so we wait.
+///
+/// See `read_cal_channel` in
+/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>
+fn read_cal_channel<ADCX: RegisterAccess>() -> u16 {
+    ADCX::reset();
+
+    ADCX::set_onetime_start(false);
+    crate::rom::ets_delay_us(5);
+    ADCX::set_onetime_start(true);
+
+    while !ADCX::is_done() {}
+    settle_after_done();
+
+    ADCX::read_data() & ADC_VAL_MASK
+}
+
+/// Clocks and powers the SAR ADC up, the way ESP-IDF's oneshot driver does.
+///
+/// The SAR clock is divided down from the digital controller clock, and the calibration data in
+/// eFuse was characterized at the frequency ESP-IDF picks. Programming the dividers explicitly
+/// also keeps the results independent of what the bootloader left behind - it clocks the ADC
+/// too, to seed the RNG.
+///
+/// Writes nothing that depends on previous state, so it is safe to run more than once.
+///
+/// See `adc_oneshot_hal_setup` and `ADC_LL_CLKM_DIV_*_DEFAULT` in
+/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_oneshot_hal.c>
+fn init_hardware() {
+    // controller_clk = source / (DIV_NUM + DIV_A / DIV_B + 1)
+    // The ESP32-H2 divides its faster source further, landing at the same 5 MHz as the other chips.
+    #[cfg(esp32h2)]
+    const DIV: (u8, u8, u8) = (18, 5, 1);
+    #[cfg(not(esp32h2))]
+    const DIV: (u8, u8, u8) = (15, 1, 0);
+
+    let (div_num, div_b, div_a) = DIV;
+
+    // The ESP32-C2 and ESP32-C3 keep the divider in the ADC itself, and only support APB as the
+    // source. The other chips take the PLL output via the PCR - 80 MHz, or 96 MHz on the
+    // ESP32-H2.
+    #[cfg(any(esp32c2, esp32c3))]
+    APB_SARADC::regs().clkm_conf().modify(|_, w| unsafe {
+        w.clk_sel().bits(2);
+        w.clkm_div_num().bits(div_num);
+        w.clkm_div_b().bits(div_b);
+        w.clkm_div_a().bits(div_a)
+    });
+
+    #[cfg(not(any(esp32c2, esp32c3)))]
+    {
+        // The PLL is source 1 on the ESP32-C6 and ESP32-H2, but source 2 on the ESP32-C5 and
+        // ESP32-C61 - there, 1 selects the imprecise RC_FAST oscillator instead.
+        #[cfg(any(esp32c5, esp32c61))]
+        const PLL: u8 = 2;
+        #[cfg(not(any(esp32c5, esp32c61)))]
+        const PLL: u8 = 1;
+
+        // The peripheral guard only enables the bus clock (`saradc_reg_clk_en`); the
+        // controller runs off a separate function clock that has to be enabled here.
+        // See `adc_ll_enable_func_clock`.
+        crate::peripherals::PCR::regs()
+            .saradc_clkm_conf()
+            .modify(|_, w| unsafe {
+                w.saradc_clkm_en().set_bit();
+                w.saradc_clkm_sel().bits(PLL);
+                w.saradc_clkm_div_num().bits(div_num);
+                w.saradc_clkm_div_b().bits(div_b);
+                w.saradc_clkm_div_a().bits(div_a)
+            });
+    }
+
+    APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
+        // Conversions are triggered through `onetime_start`, so the software start of the
+        // digital controller has to stay off - a concurrently running controller disturbs the
+        // sampling and biases the results low.
+        w.start_force().clear_bit();
+        w.start().clear_bit();
+        w.sar_clk_gated().set_bit();
+        // Run the SAR at the digital controller clock, like ESP-IDF does.
+        #[cfg(not(any(esp32c5, esp32c61, esp32h2)))]
+        w.sar_clk_div().bits(1);
+        w.xpd_sar_force().bits(0b11)
+    });
+
+    // The ESP32-C5, ESP32-C61 and ESP32-H2 moved that divider into the PCR; `APB_SARADC_CTRL` keeps
+    // a field of the same name that the hardware no longer uses. Writing only that one leaves the
+    // SAR at the divider of 15 the bootloader's RNG seeding leaves behind - its teardown restores
+    // the controller divider but not this one.
+    //
+    // See `adc_ll_digi_set_clk_div`.
+    #[cfg(any(esp32c5, esp32c61, esp32h2))]
+    crate::peripherals::PCR::regs()
+        .sar_clk_div()
+        .modify(|_, w| unsafe { w.sar1_clk_div_num().bits(1) });
+}
+
+/// Triggers a single conversion.
+///
+/// The controller converts on the step of `onetime_start`, so one rising edge per conversion is
+/// all it needs. The level stays asserted until `reset` clears it after the read - the way
+/// ESP-IDF's calibration read does it. Pulsing the bit like ESP-IDF's pad-conversion path does
+/// risks the digital controller missing the step: it needs three of its own clock cycles to
+/// capture the level, and at the 5 MHz `init_hardware` configures, a pulse only two register
+/// writes wide is never seen on the ESP32-H2.
+///
+/// Matching ESP-IDF's pulse exactly - assert, wait 3 us, de-assert, wait 3 us - was measured on
+/// the ESP32-C3 to roughly double the gain error against ESP-IDF rather than remove it, so the
+/// remaining difference is not the trigger shape.
+///
+/// See `adc_hal_onetime_start` and `read_cal_channel` in
+/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_oneshot_hal.c>
+fn start_onetime_sample<ADCX: RegisterAccess>() {
+    ADCX::set_onetime_start(true);
+}
+
+/// Waits for the conversion result to become readable after the done flag has come up.
+///
+/// The ESP32-H2 needs five SAR clock cycles here or it reports zero. `init_hardware` leaves the SAR
+/// at the 5 MHz digital controller clock, which makes that one microsecond per cycle.
+///
+/// See `ADC_LL_DELAY_CYCLE_AFTER_DONE_SIGNAL`, which is zero on every other chip here.
+#[inline]
+fn settle_after_done() {
+    #[cfg(esp32h2)]
+    crate::rom::ets_delay_us(5);
 }
 
 #[doc(hidden)]
@@ -121,8 +229,11 @@ pub trait RegisterAccess {
     /// Configures one-time sampling parameters.
     fn config_onetime_sample(channel: u8, attenuation: u8);
 
-    /// Starts one-time sampling.
-    fn start_onetime_sample();
+    /// Drives the `onetime_start` trigger level.
+    ///
+    /// Callers go through [`start_onetime_sample`], which raises it once per conversion; `reset`
+    /// lowers it again after the read.
+    fn set_onetime_start(enable: bool);
 
     /// Returns whether sampling is done.
     fn is_done() -> bool;
@@ -140,20 +251,28 @@ pub trait RegisterAccess {
     fn set_init_code(data: u16);
 }
 
-#[cfg(adc_adc1)]
 impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
+            // The channel, the attenuation and the trigger are one set of fields that the arm
+            // bits steer at one SAR or the other, so an ADC2 left armed by the bootloader - it
+            // samples the ADC to seed the RNG - would convert alongside this one and load the
+            // bias both SARs share. That only applies to the ESP32-C3, the one chip here whose
+            // ADC2 exists in silicon, and no driver arms it because it is not exposed - but
+            // disarm it anyway, the way ESP-IDF does before every conversion.
+            //
+            // See `adc_oneshot_ll_disable_all_unit`.
+            w.saradc2_onetime_sample().clear_bit();
             w.saradc1_onetime_sample().set_bit();
             w.onetime_channel().bits(channel);
             w.onetime_atten().bits(attenuation)
         });
     }
 
-    fn start_onetime_sample() {
+    fn set_onetime_start(enable: bool) {
         APB_SARADC::regs()
             .onetime_sample()
-            .modify(|_, w| w.onetime_start().set_bit());
+            .modify(|_, w| w.onetime_start().bit(enable));
     }
 
     fn is_done() -> bool {
@@ -175,10 +294,15 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .int_clr()
             .write(|w| w.adc1_done().clear_bit_by_one());
 
-        // Disable ADC sampling
-        APB_SARADC::regs()
-            .onetime_sample()
-            .modify(|_, w| w.onetime_start().clear_bit());
+        // Disarm both units along with the trigger. Leaving a unit armed keeps its SAR selected
+        // for one-time sampling between conversions; ESP-IDF disarms after every result it reads.
+        //
+        // See `adc_oneshot_ll_disable_all_unit`.
+        APB_SARADC::regs().onetime_sample().modify(|_, w| {
+            w.onetime_start().clear_bit();
+            w.saradc2_onetime_sample().clear_bit();
+            w.saradc1_onetime_sample().clear_bit()
+        });
     }
 
     fn calibration_init() {
@@ -195,97 +319,23 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(adc_adc1)]
 impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
-    const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
-    const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
+    const SUPPORTS_SELF_CALIBRATION: bool = !cfg!(esp32c5);
 
     fn enable_vdef(enable: bool) {
         regi2c::ADC_SAR1_DREF.write_field(enable as _);
     }
 
-    fn connect_cal(source: AdcCalSource, enable: bool) {
-        match source {
-            AdcCalSource::Gnd => regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as _),
-            #[cfg(not(esp32h2))]
-            AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_REF.write_field(enable as _),
-            // For the ESP32-H2 ground and internal reference voltage are mutually exclusive and
-            // you can toggle between them.
-            //
-            // See: <https://github.com/espressif/esp-idf/blob/5c51472e82a58098dda8d40a1c4f250c374fc900/components/hal/esp32h2/include/hal/adc_ll.h#L645>
-            #[cfg(esp32h2)]
-            AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_GND.write_field(!enable as _),
-        }
-    }
-}
-
-#[cfg(adc_adc2)]
-impl RegisterAccess for crate::peripherals::ADC2<'_> {
-    fn config_onetime_sample(channel: u8, attenuation: u8) {
-        APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
-            w.saradc2_onetime_sample().set_bit();
-            w.onetime_channel().bits(channel);
-            w.onetime_atten().bits(attenuation)
-        });
+    fn connect_gnd(enable: bool) {
+        regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as _);
     }
 
-    fn start_onetime_sample() {
-        APB_SARADC::regs()
-            .onetime_sample()
-            .modify(|_, w| w.onetime_start().set_bit());
-    }
-
-    fn is_done() -> bool {
-        APB_SARADC::regs().int_raw().read().adc2_done().bit()
-    }
-
-    fn read_data() -> u16 {
-        APB_SARADC::regs()
-            .sar2data_status()
-            .read()
-            .saradc2_data()
-            .bits() as u16
-            & 0xfff
-    }
-
-    fn reset() {
-        APB_SARADC::regs()
-            .int_clr()
-            .write(|w| w.adc2_done().clear_bit_by_one());
-
-        APB_SARADC::regs()
-            .onetime_sample()
-            .modify(|_, w| w.onetime_start().clear_bit());
-    }
-
-    fn calibration_init() {
-        regi2c::ADC_SAR2_DREF.write_field(1);
-    }
-
-    fn set_init_code(data: u16) {
-        let [msb, lsb] = data.to_be_bytes();
-
-        regi2c::ADC_SAR2_INITIAL_CODE_HIGH.write_field(msb as _);
-        regi2c::ADC_SAR2_INITIAL_CODE_LOW.write_field(lsb as _);
-    }
-}
-
-#[cfg(adc_adc2)]
-impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
-    const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
-    const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
-    const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
-
-    fn enable_vdef(enable: bool) {
-        regi2c::ADC_SAR2_DREF.write_field(enable as _);
-    }
-
-    fn connect_cal(source: AdcCalSource, enable: bool) {
-        match source {
-            AdcCalSource::Gnd => regi2c::ADC_SAR2_ENCAL_GND.write_field(enable as _),
-            AdcCalSource::Ref => regi2c::ADC_SAR2_ENCAL_REF.write_field(enable as _),
-        }
+    fn setup_calibration(atten: Attenuation) {
+        // `adc_oneshot_ll_disable_channel` deselects every pad by writing
+        // `(unit << 3) | 0xf` to the channel field. The attenuation is shared by all
+        // channels on these chips, so programming it is enough.
+        Self::config_onetime_sample(0xf, atten as u8);
     }
 }
 
@@ -293,6 +343,8 @@ impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
 pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
     _adc: ADCX,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
+    /// Hardware calibration code per attenuation, indexed by [`Attenuation`].
+    init_codes: [u16; super::ATTENUATION_COUNT],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _phantom: PhantomData<(Dm, &'d mut ())>,
@@ -304,19 +356,24 @@ where
 {
     /// Configures a given ADC instance using the provided configuration, and
     /// initializes the ADC for use.
-    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self
+    where
+        ADCX: super::AdcCalEfuse + super::CalibrationAccess,
+    {
         let guard = GenericPeripheralGuard::new();
 
-        APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
-            w.start_force().set_bit();
-            w.start().set_bit();
-            w.sar_clk_gated().set_bit();
-            w.xpd_sar_force().bits(0b11)
-        });
+        init_hardware();
+
+        let init_codes = super::hw_init_codes::<ADCX>(&config.attenuations);
+
+        // The bootloader runs conversions of its own to seed the RNG, so the done flag can
+        // already be set here and would make the first read return a stale result.
+        ADCX::reset();
 
         Adc {
             _adc: adc_instance,
             attenuations: config.attenuations,
+            init_codes,
             active_channel: None,
             _guard: guard,
             _phantom: PhantomData,
@@ -325,7 +382,6 @@ where
 
     /// Reconfigures the ADC driver to operate in asynchronous mode.
     pub fn into_async(mut self) -> Adc<'d, ADCX, Async> {
-        acquire_async_adc();
         self.set_interrupt_handler(adc_interrupt_handler);
 
         // Reset interrupt flags and disable oneshot reading to normalize state before
@@ -336,6 +392,7 @@ where
         Adc {
             _adc: self._adc,
             attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
             _guard: self._guard,
             _phantom: PhantomData,
@@ -355,40 +412,25 @@ where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
     {
-        if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
-            panic!(
-                "Channel {} is not configured reading!",
-                pin.pin.adc_channel()
-            );
-        }
+        let channel = pin.pin.adc_channel();
+        let attenuation = super::channel_attenuation(&self.attenuations, channel);
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != pin.pin.adc_channel() {
+            if active_channel != channel {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(pin.pin.adc_channel());
+            self.active_channel = Some(channel);
 
-            // Set ADC unit calibration according used scheme for pin
             ADCX::calibration_init();
-            ADCX::set_init_code(pin.cal_scheme.adc_cal());
+            ADCX::set_init_code(self.init_codes[attenuation as usize]);
 
-            let channel = self.active_channel.unwrap();
-            let attenuation = self.attenuations[channel as usize].unwrap() as u8;
-            ADCX::config_onetime_sample(channel, attenuation);
-            ADCX::start_onetime_sample();
-
-            // see https://github.com/espressif/esp-idf/blob/b4268c874a4cf8fcf7c0c4153cffb76ad2ddda4e/components/hal/adc_oneshot_hal.c#L105-L107
-            // the delay might be a bit generous but longer delay seem to not cause problems
-            #[cfg(esp32c6)]
-            {
-                crate::rom::ets_delay_us(40);
-                ADCX::start_onetime_sample();
-            }
+            ADCX::config_onetime_sample(channel, attenuation as u8);
+            start_onetime_sample::<ADCX>();
         }
 
         // Wait for ADC to finish conversion
@@ -396,6 +438,7 @@ where
         if !conversion_finished {
             return Err(nb::Error::WouldBlock);
         }
+        settle_after_done();
 
         // Get converted value
         let converted_value = ADCX::read_data();
@@ -403,16 +446,6 @@ where
 
         // Postprocess converted value according to calibration scheme used for pin
         let converted_value = pin.cal_scheme.adc_val(converted_value);
-
-        // There is a hardware limitation. If the APB clock frequency is high, the step
-        // of this reg signal: ``onetime_start`` may not be captured by the
-        // ADC digital controller (when its clock frequency is too slow). A rough
-        // estimate for this step should be at least 3 ADC digital controller
-        // clock cycle.
-        //
-        // This limitation will be removed in hardware future versions.
-        // We reset ``onetime_start`` in `reset` and assume enough time has passed until
-        // the next sample is requested.
 
         // Mark that no conversions are currently in progress
         self.active_channel = None;
@@ -432,7 +465,6 @@ impl<ADCX> InterruptConfigurable for Adc<'_, ADCX, Blocking> {
     }
 }
 
-#[cfg(adc_adc1)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
@@ -452,36 +484,21 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(adc_adc2)]
-impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
-    fn init_code(atten: Attenuation) -> Option<u16> {
-        crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)
-    }
-
-    fn cal_mv(atten: Attenuation) -> u16 {
-        crate::efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC2, atten)
-    }
-
-    fn cal_code(atten: Attenuation) -> Option<u16> {
-        crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC2, atten)
-    }
-}
-
 impl<'d, ADCX> Adc<'d, ADCX, Async>
 where
     ADCX: RegisterAccess + 'd,
 {
     /// Reconfigures the ADC driver to operate in [`Blocking`] mode.
     pub fn into_blocking(self) -> Adc<'d, ADCX, Blocking> {
-        if release_async_adc() {
-            // Disable ADC interrupt on all cores if the last async ADC instance is disabled
-            for cpu in crate::system::Cpu::all() {
-                crate::interrupt::disable(cpu, InterruptSource);
-            }
+        // Every chip handled by this driver has a single ADC unit, so no other driver can be
+        // sharing the interrupt and it is always safe to disable it here.
+        for cpu in crate::system::Cpu::all() {
+            crate::interrupt::disable(cpu, InterruptSource);
         }
         Adc {
             _adc: self._adc,
             attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
             _guard: self._guard,
             _phantom: PhantomData,
@@ -500,32 +517,20 @@ where
         CS: super::AdcCalScheme<ADCX>,
     {
         let channel = pin.pin.adc_channel();
-        if self.attenuations[channel as usize].is_none() {
-            panic!("Channel {} is not configured reading!", channel);
-        }
+        let attenuation = super::channel_attenuation(&self.attenuations, channel);
 
-        // Set ADC unit calibration according used scheme for pin
         ADCX::calibration_init();
-        ADCX::set_init_code(pin.cal_scheme.adc_cal());
+        ADCX::set_init_code(self.init_codes[attenuation as usize]);
 
-        let attenuation = self.attenuations[channel as usize].unwrap() as u8;
-        ADCX::config_onetime_sample(channel, attenuation);
-        ADCX::start_onetime_sample();
+        ADCX::config_onetime_sample(channel, attenuation as u8);
+        start_onetime_sample::<ADCX>();
 
         // Wait for ADC to finish conversion and get value
         let adc_ready_future = AdcFuture::new(self);
         adc_ready_future.await;
-        let converted_value = ADCX::read_data();
+        settle_after_done();
 
-        // There is a hardware limitation. If the APB clock frequency is high, the step
-        // of this reg signal: ``onetime_start`` may not be captured by the
-        // ADC digital controller (when its clock frequency is too slow). A rough
-        // estimate for this step should be at least 3 ADC digital controller
-        // clock cycle.
-        //
-        // This limitation will be removed in hardware future versions.
-        // We reset ``onetime_start`` in `reset` and assume enough time has passed until
-        // the next sample is requested.
+        let converted_value = ADCX::read_data();
 
         ADCX::reset();
 
@@ -534,34 +539,13 @@ where
     }
 }
 
-#[cfg(all(adc_adc1, adc_adc2))]
-static ASYNC_ADC_COUNT: AtomicU32 = AtomicU32::new(0);
-
-pub(super) fn acquire_async_adc() {
-    #[cfg(all(adc_adc1, adc_adc2))]
-    ASYNC_ADC_COUNT.fetch_add(1, Ordering::Relaxed);
-}
-
-pub(super) fn release_async_adc() -> bool {
-    cfg_select! {
-        all(adc_adc1, adc_adc2) => ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1,
-        _ => true,
-    }
-}
-
 #[handler]
 pub(crate) fn adc_interrupt_handler() {
     let saradc = APB_SARADC::regs();
     let interrupt_status = saradc.int_st().read();
 
-    #[cfg(adc_adc1)]
     if interrupt_status.adc1_done().bit_is_set() {
         unsafe { handle_async(crate::peripherals::ADC1::steal()) }
-    }
-
-    #[cfg(adc_adc2)]
-    if interrupt_status.adc2_done().bit_is_set() {
-        unsafe { handle_async(crate::peripherals::ADC2::steal()) }
     }
 }
 
@@ -585,7 +569,6 @@ pub trait Instance: crate::private::Sealed {
     fn waker() -> &'static AtomicWaker;
 }
 
-#[cfg(adc_adc1)]
 impl Instance for crate::peripherals::ADC1<'_> {
     fn listen() {
         APB_SARADC::regs()
@@ -603,33 +586,6 @@ impl Instance for crate::peripherals::ADC1<'_> {
         APB_SARADC::regs()
             .int_clr()
             .write(|w| w.adc1_done().clear_bit_by_one());
-    }
-
-    fn waker() -> &'static AtomicWaker {
-        static WAKER: AtomicWaker = AtomicWaker::new();
-
-        &WAKER
-    }
-}
-
-#[cfg(adc_adc2)]
-impl Instance for crate::peripherals::ADC2<'_> {
-    fn listen() {
-        APB_SARADC::regs()
-            .int_ena()
-            .modify(|_, w| w.adc2_done().set_bit());
-    }
-
-    fn unlisten() {
-        APB_SARADC::regs()
-            .int_ena()
-            .modify(|_, w| w.adc2_done().clear_bit());
-    }
-
-    fn clear_interrupt() {
-        APB_SARADC::regs()
-            .int_clr()
-            .write(|w| w.adc2_done().clear_bit_by_one());
     }
 
     fn waker() -> &'static AtomicWaker {

@@ -37,10 +37,13 @@ define_regi2c! {
             field: ADC_SAR_DTEST_RTC(1..0)
         }
     }
+    // ESP-IDF spells this master both `I2C_BOD` and `I2C_ULP`; they are the same block.
     master: REGI2C_BOD(0x61, 1) {
         reg: I2C_BOD_REG5(5) {
+            field: I2C_ULP_IR_FORCE_CODE(6..6),
             field: I2C_BOD_REG_THRESHOLD(2..0)
         }
+        reg: I2C_ULP_EXT_CODE(6) {}
     }
     master: REGI2C_BBPLL(0x66, 1) {
         reg: I2C_BBPLL_REG0(0) {

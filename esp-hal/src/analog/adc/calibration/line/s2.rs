@@ -94,10 +94,6 @@ where
         }
     }
 
-    fn adc_cal(&self) -> u16 {
-        self.basic.adc_cal()
-    }
-
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.basic.adc_val(val) as i64;
         let voltage = (val * self.coeff_a as i64 / (COEFF_A_SCALING / COEFF_B_SCALING)
