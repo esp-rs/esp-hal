@@ -21,6 +21,8 @@ impl core::error::Error for InvalidConfigError {}
 // Expose chip-specific configuration types
 pub use porting::chip_specific::*;
 
+pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
 unstable_module! {
     pub mod controller;
 }

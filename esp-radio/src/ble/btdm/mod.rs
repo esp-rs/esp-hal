@@ -5,8 +5,7 @@ use core::{
 };
 
 use esp_phy::PhyInitGuard;
-use esp_sync::RawMutex;
-use portable_atomic::{AtomicBool, Ordering};
+use portable_atomic::{AtomicBool, AtomicU32, Ordering};
 
 use super::{Config, ReceivedPacket};
 #[cfg(feature = "coex")]
@@ -97,35 +96,28 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-// This is fine, we're only accessing it inside a critical section (protected by INTERRUPT_LOCK).
-static mut G_INTER_FLAGS: heapless::Vec<esp_sync::RestoreState, 10> = heapless::Vec::new();
-
-static INTERRUPT_LOCK: RawMutex = RawMutex::new();
+static CRITICAL_NEST: AtomicU32 = AtomicU32::new(0);
+static CRITICAL_TOKEN: AtomicU32 = AtomicU32::new(0);
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
-    #[allow(static_mut_refs)]
-    unsafe {
-        let flags = unwrap!(
-            G_INTER_FLAGS.pop(),
-            "interrupt_enable called without prior interrupt_disable"
-        );
-        trace!("interrupt_enable {:?}", flags);
-        INTERRUPT_LOCK.release(flags);
+    trace!("interrupt_enable");
+    if CRITICAL_NEST.fetch_sub(1, Ordering::Release) == 1 {
+        let last = CRITICAL_TOKEN.load(Ordering::Relaxed);
+
+        unsafe {
+            super::ESP_RADIO_LOCK.release(esp_sync::RestoreState::new(last));
+        }
     }
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    #[allow(static_mut_refs)]
-    unsafe {
-        let flags = INTERRUPT_LOCK.acquire();
-        unwrap!(
-            G_INTER_FLAGS.push(flags),
-            "interrupt_disable was called too many times"
-        );
-        trace!("interrupt_disable {:?}", flags);
+    let last = CRITICAL_NEST.fetch_add(1, Ordering::Release);
+    if last == 0 {
+        let token = unsafe { super::ESP_RADIO_LOCK.acquire().inner() };
+        CRITICAL_TOKEN.store(token, Ordering::Relaxed);
     }
 }
 

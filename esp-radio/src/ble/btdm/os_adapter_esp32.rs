@@ -163,11 +163,11 @@ unsafe extern "C" fn set_isr13(n: i32, handler: unsafe extern "C" fn(), arg: *co
 }
 
 unsafe extern "C" fn interrupt_l3_disable() {
-    unimplemented!("interrupt_l3_disable");
+    unsafe { super::interrupt_disable() }
 }
 
 unsafe extern "C" fn interrupt_l3_restore() {
-    unimplemented!("interrupt_l3_restore");
+    unsafe { super::interrupt_enable() }
 }
 
 unsafe extern "C" fn custom_queue_create(_len: u32, _item_size: u32) -> *mut c_void {
