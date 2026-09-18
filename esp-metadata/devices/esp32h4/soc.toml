@@ -18,6 +18,9 @@ support_note = "In early stages of development."
 page_size = 0x10000
 entry_num = 512
 
+[device.flash]
+support_status = "not_supported"
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -134,28 +137,215 @@ peripherals = [
 [device.soc.clocks]
 # {include clocks.toml}
 
-[device.ecdsa]
-support_status = { status = "not_supported", issue = 5444 }
-
 [device.gpio]
 support_status = "partial"
 # {include gpio.toml}
 
 # The CSR interface is identical to the C6/H2 one (see `dedic_gpio_cpu_ll.h`), but each core has
 # its own set of 8 channels: CPU_GPIO_0..7 belong to core 0, CPU_GPIO_8..15 to core 1.
+[device.dedicated_gpio]
+version = "riscv_v1"
+support_status = "partial"
+channels = [
+    ["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
+    ["CPU_GPIO_8", "CPU_GPIO_9", "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
+]
+
+[device.io_mux]
+
+# GPIO0-5 are also LP pads, but ESP-IDF does not describe the LP IO MUX for this chip yet.
+[device.lp_io]
+support_status = "not_supported"
+version = "esp32h2"
+
+[device.uart]
+support_status = "not_supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
+ram_size = 128
+version = 2
+peripheral_controls_mem_clk = true
+has_sclk_enable = true
+
+[device.uhci]
+support_status = "not_supported"
+combined_uart_selector_field = true
+
+[device.i2c_master]
+support_status = "not_supported"
+version = 4
+instances = [
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+    { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
+]
+has_fsm_timeouts = true
+has_hw_bus_clear = true
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0x1F
+can_estimate_nack_reason = true
+has_conf_update = true
+has_reliable_fsm_reset = true
+has_arbitration_en = true
+has_tx_fifo_watermark = true
+bus_timeout_is_exponential = true
+has_pd_en = true
+
 [device.i2c_slave]
 support_status = { status = "not_supported", issue = 1909 }
 
-[device.interrupts]
-support_status = "partial"
-# 98 interrupt sources => ceil(98/32) = 4 status words
-status_registers = 4
-software_interrupt_count = 4
-controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
-context_switch_source = "ipc"
+[device.spi_master]
+support_status = "not_supported"
+version = 3
+fifo_size = 64
+has_app_interrupts = true
+has_dma_segmented_transfer = true
+instances = [
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"],
+        cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "FSPI3CLK",
+        sio = ["FSPI3D", "FSPI3Q", "FSPI3WP", "FSPI3HD"],
+        cs = ["FSPI3CS0", "FSPI3CS1", "FSPI3CS2"]
+    },
+]
 
-[device.hmac]
-support_status = { status = "not_supported", issue = 5166 }
+[device.spi_slave]
+support_status = "not_supported"
+instances = [
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        mosi = "FSPID",
+        miso = "FSPIQ",
+        cs = "FSPICS0"
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "FSPI3CLK",
+        mosi = "FSPI3D",
+        miso = "FSPI3Q",
+        cs = "FSPI3CS0"
+    },
+]
+
+[device.i2s]
+support_status = "not_supported"
+version = 3
+mclk_divider_bit_width = 9
+max_ws_width = 512
+clock_configured_by_pcr = true
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        mclk = "I2S_MCLK",
+        bclk = "I2SO_BCK",
+        ws = "I2SO_WS",
+        bclk_rx = "I2SI_BCK",
+        ws_rx = "I2SI_WS",
+        dout = ["I2SO_SD", "I2SO_SD1"],
+        din = ["I2SI_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
+        pcm2pdm = true,
+    },
+]
+
+[device.parl_io]
+support_status = "not_supported"
+version = 2
+
+[device.rmt]
+support_status = "not_supported"
+ram_start = 0x6001e400
+channel_ram_size = 48
+channels = ["Tx", "Tx", "Rx", "Rx"]
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
+
+[device.twai]
+support_status = "not_supported"
+
+[device.canfd]
+support_status = "not_supported"
+
+[device.usb_otg]
+support_status = "not_supported"
+fifo_depth_words = 256
+
+[device.usb_serial_jtag]
+
+[device.bt]
+support_status = "not_supported"
+controller = "npl"
+
+[device.ieee802154]
+support_status = "not_supported"
+
+[device.phy]
+support_status = "not_supported"
+
+[device.asrc]
+support_status = "not_supported"
+
+[device.adc]
+support_status = "not_supported"
+
+[device.avc]
+support_status = "not_supported"
+
+[device.temp_sensor]
+support_status = "not_supported"
+
+[device.touch]
+support_status = "not_supported"
+
+[device.ledc]
+support_status = "not_supported"
+version = 3
+channel_count = 8
+
+[device.mcpwm]
+support_status = "not_supported"
+
+[device.pcnt]
+support_status = "not_supported"
+instances = {
+    PCNT = {
+        sys_instance = "Pcnt",
+        interrupt = "PCNT",
+        units = [
+            { sig_ch0 = "PCNT0_SIG_CH0", sig_ch1 = "PCNT0_SIG_CH1", ctrl_ch0 = "PCNT0_CTRL_CH0", ctrl_ch1 = "PCNT0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_SIG_CH0", sig_ch1 = "PCNT1_SIG_CH1", ctrl_ch0 = "PCNT1_CTRL_CH0", ctrl_ch1 = "PCNT1_CTRL_CH1" },
+            { sig_ch0 = "PCNT2_SIG_CH0", sig_ch1 = "PCNT2_SIG_CH1", ctrl_ch0 = "PCNT2_CTRL_CH0", ctrl_ch1 = "PCNT2_CTRL_CH1" },
+            { sig_ch0 = "PCNT3_SIG_CH0", sig_ch1 = "PCNT3_SIG_CH1", ctrl_ch0 = "PCNT3_CTRL_CH0", ctrl_ch1 = "PCNT3_CTRL_CH1" },
+        ],
+    },
+}
+
+[device.lp_timer]
+
+[device.sdm]
+support_status = "not_supported"
+channel_count = 4
 
 [device.systimer]
 
@@ -165,3 +355,113 @@ instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 # see esp-idf components/esp_hw_support/port/esp32h4/rtc_time.c
 rc_fast_calibration = { divider = 32, min_rev = 0 }
+
+[device.aes]
+support_status = "not_supported"
+has_split_text_registers = true
+endianness_configurable = false
+dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
+key_length = { options = [
+    { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
+    { bits = 256, encrypt_mode = 2, decrypt_mode = 6 }
+] }
+
+[device.ecdsa]
+support_status = { status = "not_supported", issue = 5444 }
+
+[device.ecc]
+support_status = "not_supported"
+working_modes = [
+    { id = 0, mode = "affine_point_multiplication" },
+    { id = 2, mode = "affine_point_verification" },
+    { id = 3, mode = "affine_point_verification_and_multiplication" },
+    { id = 4, mode = "jacobian_point_multiplication" },
+    { id = 5, mode = "affine_point_addition" },
+    { id = 6, mode = "jacobian_point_verification" },
+    { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" },
+    { id = 8, mode = "modular_addition" },
+    { id = 9, mode = "modular_subtraction" },
+    { id = 10, mode = "modular_multiplication" },
+    { id = 11, mode = "modular_division" },
+]
+curves = [
+    { id = 0, curve = 192 },
+    { id = 1, curve = 256 },
+    { id = 2, curve = 384 },
+]
+separate_jacobian_point_memory = true
+has_memory_clock_gate = true
+supports_enhanced_security = true
+
+[device.hmac]
+support_status = { status = "not_supported", issue = 5166 }
+
+[device.key_manager]
+support_status = "not_supported"
+
+[device.rng]
+support_status = { status = "partial", issue = 5979 }
+trng_supported = false
+apb_cycle_wait_num = 16
+
+[device.sha]
+support_status = "not_supported"
+algo = {
+    sha1 = 0,
+    sha224 = 1,
+    sha256 = 2,
+    sha384 = 3,
+    sha512 = 4,
+    sha512_224 = 5,
+    sha512_256 = 6,
+    sha512_t = 7,
+}
+
+[device.sleep]
+support_status = "not_supported"
+
+[device.assist_debug]
+support_status = "not_supported"
+
+[device.dma]
+support_status = "not_supported"
+gdma_version = 3
+separate_in_out_interrupts = true
+engines = [
+    {
+        name = "AHB_GDMA",
+        max_priority = 5,
+        drivers = ["aes", "i2s", "parl_io", "sha", "spi_master", "spi_slave", "uhci"],
+        peripheral_instances = [
+            { name = "SPI3", dma_id = 0 },
+            { name = "SPI2", dma_id = 1 },
+            { name = "UHCI0", dma_id = 2 },
+            { name = "I2S0", dma_id = 3 },
+            { name = "AES", dma_id = 4 },
+            { name = "SHA", dma_id = 7 },
+            { name = "PARL_IO", dma_id = 9 },
+        ],
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, mem2mem_id = 10, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+            { name = "DMA_CH1", mem2mem = true, mem2mem_id = 11, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+            { name = "DMA_CH2", mem2mem = true, mem2mem_id = 12, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+            { name = "DMA_CH3", mem2mem = true, mem2mem_id = 13, interrupt_in = "DMA_IN_CH3", interrupt_out = "DMA_OUT_CH3" },
+            { name = "DMA_CH4", mem2mem = true, mem2mem_id = 14, interrupt_in = "DMA_IN_CH4", interrupt_out = "DMA_OUT_CH4" },
+        ]
+    },
+]
+
+[device.etm]
+support_status = "not_supported"
+
+[device.interrupts]
+support_status = "partial"
+# 98 interrupt sources => ceil(98/32) = 4 status words
+status_registers = 4
+software_interrupt_count = 4
+controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
+context_switch_source = "ipc"
+
+[device.psram]
+support_status = "not_supported"
+extmem_origin = 0x4200_0000
