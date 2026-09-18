@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v1.2.2] - 2026-09-18
+
+### Changed
+
+- Bumped the ESP32-S31 PAC to 0.3. ESP32-S31 RMT now uses the standard register path instead of the SVD-name overlay. (#6354)
+
+### Fixed
+
+- SPI slave: GDMA SPI slave transfers no longer lose the first bytes when the (#6350)
+- esp32s2 cpu driven transfer fail after dma transfer (#6349)
+- dma-psram-access not needed first min-alignment head_copy for aligned data (#6349)
+- C61: Immediate crashes when using a recent 2nd stage bootloader (#6346)
+- ESP32-P4 memory layout now avoids bootloader-reserved memory and defines `ram(reclaimed)`. (#6316)
+
 ## [v1.2.1] - 2026-09-08
 
 ### Fixed
@@ -1897,4 +1911,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v1.2.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.1.0...esp-hal-v1.2.0-rc.0
 [v1.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0-rc.0...esp-hal-v1.2.0
 [v1.2.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.0...esp-hal-v1.2.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.1...HEAD
+[v1.2.2]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.1...esp-hal-v1.2.2
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.2.2...HEAD
