@@ -39,7 +39,6 @@ pub enum CpuClock {
 
 impl CpuClock {
     const PRESET_32: ClockConfig = ClockConfig {
-        xtal_clk: None,
         hp_root_clk: Some(HpRootClkConfig::Xtal),
         cpu_clk: Some(CpuClkConfig::new(CpuClkDivisor::_0)),
         ahb_clk: Some(AhbClkConfig::new(0)),
@@ -50,7 +49,6 @@ impl CpuClock {
         iomux_function_clock: Some(IomuxFunctionClockConfig::PllF48m),
     };
     const PRESET_96: ClockConfig = ClockConfig {
-        xtal_clk: None,
         hp_root_clk: Some(HpRootClkConfig::Pll),
         cpu_clk: Some(CpuClkConfig::new(CpuClkDivisor::_0)),
         // AHB_CLK may not exceed 32 MHz, see rtc_clk_cpu_freq_to_pll_mhz().
@@ -87,11 +85,7 @@ impl ClockConfig {
         }
     }
 
-    pub(crate) fn configure(mut self, clocks: &mut ClockTree) {
-        if self.xtal_clk.is_none() {
-            self.xtal_clk = Some(XtalClkConfig::_32);
-        }
-
+    pub(crate) fn configure(self, clocks: &mut ClockTree) {
         // HP_ROOT_CLK and the CPU, AHB and APB dividers share one update signal. Write the
         // complete configuration before latching it, applying each change separately would
         // temporarily overclock the buses.
@@ -125,16 +119,6 @@ fn update_bus_clocks() {
         .bus_clock_update()
         .bit_is_set()
     {}
-}
-
-// XTAL_CLK
-
-fn configure_xtal_clk_impl(
-    _clocks: &mut ClockTree,
-    _old_config: Option<XtalClkConfig>,
-    _config: XtalClkConfig,
-) {
-    // Nothing to do here.
 }
 
 // PLL_F96M_CLK

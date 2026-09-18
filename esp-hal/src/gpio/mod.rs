@@ -1642,7 +1642,7 @@ impl<'lt> AnyPin<'lt> {
                     });
             }
 
-            #[cfg(esp32p4)]
+            #[cfg(any(esp32h4, esp32p4))]
             fn disable_usb_fs_pads(_gpionum: u8) {
                 crate::peripherals::USB_WRAP::regs()
                     .otg_conf()
@@ -1660,7 +1660,7 @@ impl<'lt> AnyPin<'lt> {
                 ($gpio:ident) => {
                     if self.number() == crate::peripherals::$gpio::NUMBER {
                         cfg_select! {
-                            esp32p4 => {
+                            any(esp32h4, esp32p4) => {
                                 disable_usb_fs_pads(crate::peripherals::$gpio::NUMBER);
                             }
                             _ => {
