@@ -399,14 +399,6 @@ macro_rules! for_each_sw_interrupt {
 /// ```rust, no_run
 /// // XTAL_CLK
 ///
-/// fn configure_xtal_clk_impl(
-///     _clocks: &mut ClockTree,
-///     _old_config: Option<XtalClkConfig>,
-///     _new_config: XtalClkConfig,
-/// ) {
-///     todo!()
-/// }
-///
 /// // PLL_F96M_CLK
 ///
 /// fn enable_pll_f96m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -601,20 +593,6 @@ macro_rules! define_clock_tree_types {
         pub enum TimgInstance {
             Timg0 = 0,
             Timg1 = 1,
-        }
-        /// Selects the output frequency of `XTAL_CLK`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        pub enum XtalClkConfig {
-            /// 32 MHz
-            _32,
-        }
-        impl XtalClkConfig {
-            pub fn value(&self) -> u32 {
-                match self {
-                    XtalClkConfig::_32 => 32000000,
-                }
-            }
         }
         /// The list of clock signals that the `IOMUX_FUNCTION_CLOCK` multiplexer can output.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -817,7 +795,6 @@ macro_rules! define_clock_tree_types {
         }
         /// Represents the device's clock tree.
         pub struct ClockTree {
-            xtal_clk: Option<XtalClkConfig>,
             iomux_function_clock: Option<IomuxFunctionClockConfig>,
             hp_root_clk: Option<HpRootClkConfig>,
             cpu_clk: Option<CpuClkConfig>,
@@ -845,10 +822,6 @@ macro_rules! define_clock_tree_types {
             /// Locks the clock tree for exclusive access.
             pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                 CLOCK_TREE.with(f)
-            }
-            /// Returns the current configuration of the XTAL_CLK clock tree node
-            pub fn xtal_clk(&self) -> Option<XtalClkConfig> {
-                self.xtal_clk
             }
             /// Returns the current configuration of the IOMUX_FUNCTION_CLOCK clock tree node
             pub fn iomux_function_clock(&self) -> Option<IomuxFunctionClockConfig> {
@@ -901,7 +874,6 @@ macro_rules! define_clock_tree_types {
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
-                xtal_clk: None,
                 iomux_function_clock: None,
                 hp_root_clk: None,
                 cpu_clk: None,
@@ -925,8 +897,6 @@ macro_rules! define_clock_tree_types {
                 timg_function_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
             });
-        static XTAL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
-            ::core::sync::atomic::AtomicU32::new(0);
         static HP_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static CPU_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -947,22 +917,10 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static IOMUX_FUNCTION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
-        pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
-            let old_config = clocks.xtal_clk.replace(config);
-            refresh_xtal_clk_downstream(clocks);
-            configure_xtal_clk_impl(clocks, old_config, config);
-        }
-        pub fn xtal_clk_config(clocks: &mut ClockTree) -> Option<XtalClkConfig> {
-            clocks.xtal_clk
-        }
         fn request_xtal_clk(_clocks: &mut ClockTree) {}
         fn release_xtal_clk(_clocks: &mut ClockTree) {}
-        #[allow(unused_variables)]
-        pub fn xtal_clk_config_frequency(clocks: &mut ClockTree, config: XtalClkConfig) -> u32 {
-            config.value()
-        }
         pub fn xtal_clk_frequency() -> u32 {
-            XTAL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+            (32 * 1000000)
         }
         pub fn request_pll_f96m_clk(clocks: &mut ClockTree) {
             trace!("Requesting PLL_F96M_CLK");
@@ -1706,8 +1664,6 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[instability::unstable]
         pub struct ClockConfig {
-            /// `XTAL_CLK` configuration.
-            pub xtal_clk: Option<XtalClkConfig>,
             /// `IOMUX_FUNCTION_CLOCK` configuration.
             pub iomux_function_clock: Option<IomuxFunctionClockConfig>,
             /// `HP_ROOT_CLK` configuration.
@@ -1727,9 +1683,6 @@ macro_rules! define_clock_tree_types {
         }
         impl ClockConfig {
             fn apply(&self, clocks: &mut ClockTree) {
-                if let Some(config) = self.xtal_clk {
-                    configure_xtal_clk(clocks, config);
-                }
                 if let Some(config) = self.hp_root_clk {
                     configure_hp_root_clk(clocks, config);
                 }
@@ -1765,21 +1718,6 @@ macro_rules! define_clock_tree_types {
             *refcount = refcount.saturating_sub(1);
             let last = *refcount == 0;
             last
-        }
-        fn refresh_xtal_clk_downstream(clocks: &mut ClockTree) {
-            if let Some(config) = clocks.xtal_clk {
-                XTAL_CLK_FREQ_CACHE.store(
-                    xtal_clk_config_frequency(clocks, config),
-                    ::core::sync::atomic::Ordering::Release,
-                );
-            }
-            refresh_hp_root_clk_downstream(clocks);
-            refresh_lp_fast_clk_downstream(clocks);
-            refresh_iomux_function_clock_downstream(clocks);
-            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
-                refresh_timg_function_clock_downstream(clocks, child_instance);
-                refresh_timg_wdt_clock_downstream(clocks, child_instance);
-            }
         }
         fn refresh_hp_root_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.hp_root_clk {
@@ -2374,20 +2312,48 @@ macro_rules! for_each_peripheral {
         GPIO39 <= virtual())); _for_each_inner_peripheral!((@ peri_type #[doc =
         "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC(APB_ADC : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "ASRC peripheral singleton"] ASRC <= ASRC(ASRC_CHNL0 : { bind_chnl0_interrupt,
+        enable_chnl0_interrupt, disable_chnl0_interrupt }, ASRC_CHNL1 : {
+        bind_chnl1_interrupt, enable_chnl1_interrupt, disable_chnl1_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "BUS_MONITOR peripheral singleton"] BUS_MONITOR <= BUS_MONITOR(BUS_MONITOR : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "CACHE peripheral singleton"] CACHE <= CACHE(CACHE : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "CLIC peripheral singleton"]
+        CLIC <= CLIC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "CLINT_OTHER_CORE peripheral singleton"] CLINT_OTHER_CORE <= CLINT_OTHER_CORE()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "CPU_APM peripheral singleton"] CPU_APM <= CPU_APM() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "DMA peripheral singleton"] DMA
         <= DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "ECC peripheral singleton"] ECC <= ECC(ECC : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EFUSE peripheral singleton"]
-        EFUSE <= EFUSE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ECDSA peripheral singleton"]
+        ECDSA <= ECDSA(ECDSA : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ETM peripheral singleton"] ETM
+        <= SOC_ETM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO_SD peripheral singleton"]
         GPIO_SD <= GPIO_SD() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_SYS peripheral singleton"]
-        HP_SYS <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        = "HMAC peripheral singleton"] HMAC <= HMAC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_APM peripheral singleton"]
+        HP_APM <= HP_APM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "HP_SYS peripheral singleton"] HP_SYS <= HP_SYS() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HUK peripheral singleton"] HUK
+        <= HUK(HUK : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST <= I2C_ANA_MST() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "I2S0 peripheral singleton"]
         I2S0 <= I2S0(I2S : { bind_peri_interrupt, enable_peri_interrupt,
@@ -2401,24 +2367,34 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
-        "CLINT_OTHER_CORE peripheral singleton"] CLINT_OTHER_CORE <= CLINT_OTHER_CORE()
-        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTPRI peripheral singleton"] INTPRI <= INTPRI() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "IO_MUX peripheral singleton"]
         IO_MUX <= IO_MUX() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "LEDC peripheral singleton"] LEDC <= LEDC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "LPWR peripheral singleton"]
-        LPWR <= LP_CLKRST() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "LP_ANA peripheral singleton"] LP_ANA <= LP_ANA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_AON peripheral singleton"]
-        LP_AON <= LP_AON() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "KEYMNG peripheral singleton"] KEYMNG <= KEYMNG(KM : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LEDC peripheral singleton"]
+        LEDC <= LEDC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "LPWR peripheral singleton"] LPWR <= LP_CLKRST() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_ANA peripheral singleton"]
+        LP_ANA <= LP_ANA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "LP_AON peripheral singleton"] LP_AON <= LP_AON() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_GPIO peripheral singleton"]
+        LP_GPIO <= LP_GPIO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "LP_IO_MUX peripheral singleton"] LP_IO_MUX <= LP_IO_MUX() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "LP_PERI peripheral singleton"]
         LP_PERI <= LP_PERI() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
-        = "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        = "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "LP_WDT peripheral singleton"]
+        LP_WDT <= LP_WDT() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0(MCPWM0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "MCPWM1 peripheral singleton"]
+        MCPWM1 <= MCPWM1(MCPWM1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "MEM_MONITOR peripheral singleton"] MEM_MONITOR <= MEM_MONITOR()
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "MODEM_LPCON peripheral singleton"] MODEM_LPCON <= MODEM_LPCON() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "MODEM_SYSCON peripheral singleton"] MODEM_SYSCON <= MODEM_SYSCON() (unstable)));
@@ -2426,11 +2402,16 @@ macro_rules! for_each_peripheral {
         PARL_IO <= PARL_IO(PARL_IO_RX : { bind_rx_interrupt, enable_rx_interrupt,
         disable_rx_interrupt }, PARL_IO_TX : { bind_tx_interrupt, enable_tx_interrupt,
         disable_tx_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "PCNT peripheral singleton"] PCNT <= PCNT(PCNT : { bind_peri_interrupt,
+        #[doc = "PAU peripheral singleton"] PAU <= PAU(PAU : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "PCR peripheral singleton"] PCR
-        <= PCR() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "PMU peripheral singleton"] PMU <= PMU() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "PCNT peripheral singleton"]
+        PCNT <= PCNT(PCNT : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "PCR peripheral singleton"] PCR <= PCR() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "PMU peripheral singleton"] PMU
+        <= PMU(PMU : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "PVT peripheral singleton"] PVT <= PVT() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RMT peripheral singleton"] RMT
         <= RMT(RMT : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
         }) (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -2450,9 +2431,19 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "SYSTEM peripheral singleton"]
         SYSTEM <= PCR() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG0 peripheral singleton"]
-        TIMG0 <= TIMG0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TEE peripheral singleton"] TEE
+        <= TEE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG1 peripheral singleton"]
+        TIMG1 <= TIMG1() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TOUCH peripheral singleton"] TOUCH <= TOUCH(TOUCH : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "TOUCH_AON peripheral singleton"] TOUCH_AON <= TOUCH_AON() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TWAI0 peripheral singleton"]
+        TWAI0 <= TWAI0(TWAI0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }, TWAI0_TIMER : { bind_timer_interrupt,
+        enable_timer_interrupt, disable_timer_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "UART0 peripheral singleton"]
         UART0 <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -2463,11 +2454,19 @@ macro_rules! for_each_peripheral {
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "IPC peripheral singleton"] IPC
-        <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "USB_FS peripheral singleton"] USB_FS <= USB0(USB_OTG11 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "USB_WRAP peripheral singleton"]
+        USB_WRAP <= USB_WRAP() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "ZERO_DET peripheral singleton"] ZERO_DET <= ZERO_DET(ZERO_DET : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
+        CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "IPC peripheral singleton"] IPC <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
+        FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)));
@@ -2497,35 +2496,54 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((GPIO36)); _for_each_inner_peripheral!((GPIO37));
         _for_each_inner_peripheral!((GPIO38)); _for_each_inner_peripheral!((GPIO39));
         _for_each_inner_peripheral!((AES(unstable)));
+        _for_each_inner_peripheral!((APB_SARADC(unstable)));
+        _for_each_inner_peripheral!((ASRC(unstable)));
+        _for_each_inner_peripheral!((BUS_MONITOR(unstable)));
+        _for_each_inner_peripheral!((CACHE(unstable)));
+        _for_each_inner_peripheral!((CLIC(unstable)));
+        _for_each_inner_peripheral!((CLINT(unstable)));
+        _for_each_inner_peripheral!((CLINT_OTHER_CORE(unstable)));
+        _for_each_inner_peripheral!((CPU_APM(unstable)));
         _for_each_inner_peripheral!((DMA(unstable)));
         _for_each_inner_peripheral!((ECC(unstable)));
+        _for_each_inner_peripheral!((ECDSA(unstable)));
+        _for_each_inner_peripheral!((ETM(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((GPIO_SD(unstable)));
+        _for_each_inner_peripheral!((HMAC(unstable)));
         _for_each_inner_peripheral!((HP_APM(unstable)));
         _for_each_inner_peripheral!((HP_SYS(unstable)));
+        _for_each_inner_peripheral!((HUK(unstable)));
         _for_each_inner_peripheral!((I2C_ANA_MST(unstable)));
         _for_each_inner_peripheral!((I2S0(unstable)));
         _for_each_inner_peripheral!((I2C0)); _for_each_inner_peripheral!((I2C1));
         _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE1(unstable)));
-        _for_each_inner_peripheral!((CLINT(unstable)));
-        _for_each_inner_peripheral!((CLINT_OTHER_CORE(unstable)));
         _for_each_inner_peripheral!((INTPRI(unstable)));
         _for_each_inner_peripheral!((IO_MUX(unstable)));
+        _for_each_inner_peripheral!((KEYMNG(unstable)));
         _for_each_inner_peripheral!((LEDC(unstable)));
         _for_each_inner_peripheral!((LPWR(unstable)));
         _for_each_inner_peripheral!((LP_ANA(unstable)));
         _for_each_inner_peripheral!((LP_AON(unstable)));
         _for_each_inner_peripheral!((LP_CLKRST(unstable)));
+        _for_each_inner_peripheral!((LP_GPIO(unstable)));
+        _for_each_inner_peripheral!((LP_IO_MUX(unstable)));
         _for_each_inner_peripheral!((LP_PERI(unstable)));
+        _for_each_inner_peripheral!((LP_TEE(unstable)));
         _for_each_inner_peripheral!((LP_WDT(unstable)));
+        _for_each_inner_peripheral!((MCPWM0(unstable)));
+        _for_each_inner_peripheral!((MCPWM1(unstable)));
+        _for_each_inner_peripheral!((MEM_MONITOR(unstable)));
         _for_each_inner_peripheral!((MODEM_LPCON(unstable)));
         _for_each_inner_peripheral!((MODEM_SYSCON(unstable)));
         _for_each_inner_peripheral!((PARL_IO(unstable)));
+        _for_each_inner_peripheral!((PAU(unstable)));
         _for_each_inner_peripheral!((PCNT(unstable)));
         _for_each_inner_peripheral!((PCR(unstable)));
         _for_each_inner_peripheral!((PMU(unstable)));
+        _for_each_inner_peripheral!((PVT(unstable)));
         _for_each_inner_peripheral!((RMT(unstable)));
         _for_each_inner_peripheral!((RNG(unstable)));
         _for_each_inner_peripheral!((SHA(unstable)));
@@ -2535,11 +2553,18 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((SPI2)); _for_each_inner_peripheral!((SPI3));
         _for_each_inner_peripheral!((SYSTEM(unstable)));
         _for_each_inner_peripheral!((SYSTIMER(unstable)));
+        _for_each_inner_peripheral!((TEE(unstable)));
         _for_each_inner_peripheral!((TIMG0(unstable)));
         _for_each_inner_peripheral!((TIMG1(unstable)));
+        _for_each_inner_peripheral!((TOUCH(unstable)));
+        _for_each_inner_peripheral!((TOUCH_AON(unstable)));
+        _for_each_inner_peripheral!((TWAI0(unstable)));
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
         _for_each_inner_peripheral!((UHCI0(unstable)));
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
+        _for_each_inner_peripheral!((USB_FS(unstable)));
+        _for_each_inner_peripheral!((ZERO_DET(unstable)));
+        _for_each_inner_peripheral!((ADC1(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
         _for_each_inner_peripheral!((IPC(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
@@ -2675,49 +2700,85 @@ macro_rules! for_each_peripheral {
         "GPIO39 peripheral singleton"] GPIO39 <= virtual()), (@ peri_type #[doc =
         "AES peripheral singleton"] AES <= AES(AES : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "DMA peripheral singleton"] DMA <= DMA() (unstable)), (@ peri_type #[doc =
-        "ECC peripheral singleton"] ECC <= ECC(ECC : { bind_peri_interrupt,
+        = "APB_SARADC peripheral singleton"] APB_SARADC <= APB_SARADC(APB_ADC : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "ASRC peripheral singleton"] ASRC <=
+        ASRC(ASRC_CHNL0 : { bind_chnl0_interrupt, enable_chnl0_interrupt,
+        disable_chnl0_interrupt }, ASRC_CHNL1 : { bind_chnl1_interrupt,
+        enable_chnl1_interrupt, disable_chnl1_interrupt }) (unstable)), (@ peri_type
+        #[doc = "BUS_MONITOR peripheral singleton"] BUS_MONITOR <=
+        BUS_MONITOR(BUS_MONITOR : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "CACHE peripheral singleton"] CACHE <= CACHE(CACHE : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)), (@ peri_type #[doc
-        = "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)), (@ peri_type #[doc =
+        = "CLIC peripheral singleton"] CLIC <= CLIC() (unstable)), (@ peri_type #[doc =
+        "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)), (@ peri_type #[doc =
+        "CLINT_OTHER_CORE peripheral singleton"] CLINT_OTHER_CORE <= CLINT_OTHER_CORE()
+        (unstable)), (@ peri_type #[doc = "CPU_APM peripheral singleton"] CPU_APM <=
+        CPU_APM() (unstable)), (@ peri_type #[doc = "DMA peripheral singleton"] DMA <=
+        DMA() (unstable)), (@ peri_type #[doc = "ECC peripheral singleton"] ECC <=
+        ECC(ECC : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "ECDSA peripheral singleton"] ECDSA <=
+        ECDSA(ECDSA : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)), (@ peri_type #[doc =
+        "ETM peripheral singleton"] ETM <= SOC_ETM() (unstable)), (@ peri_type #[doc =
+        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)), (@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)),
         (@ peri_type #[doc = "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_SD()
+        (unstable)), (@ peri_type #[doc = "HMAC peripheral singleton"] HMAC <= HMAC()
         (unstable)), (@ peri_type #[doc = "HP_APM peripheral singleton"] HP_APM <=
         HP_APM() (unstable)), (@ peri_type #[doc = "HP_SYS peripheral singleton"] HP_SYS
-        <= HP_SYS() (unstable)), (@ peri_type #[doc = "I2C_ANA_MST peripheral singleton"]
-        I2C_ANA_MST <= I2C_ANA_MST() (unstable)), (@ peri_type #[doc =
-        "I2S0 peripheral singleton"] I2S0 <= I2S0(I2S : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
-        = "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
+        <= HP_SYS() (unstable)), (@ peri_type #[doc = "HUK peripheral singleton"] HUK <=
+        HUK(HUK : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "I2C_ANA_MST peripheral singleton"] I2C_ANA_MST
+        <= I2C_ANA_MST() (unstable)), (@ peri_type #[doc = "I2S0 peripheral singleton"]
+        I2S0 <= I2S0(I2S : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "I2C0 peripheral singleton"] I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
         "I2C1 peripheral singleton"] I2C1 <= I2C1(I2C_EXT1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
         "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
         (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE1 peripheral singleton"]
         INTERRUPT_CORE1 <= INTERRUPT_CORE1() (unstable)), (@ peri_type #[doc =
-        "CLINT peripheral singleton"] CLINT <= CLINT() (unstable)), (@ peri_type #[doc =
-        "CLINT_OTHER_CORE peripheral singleton"] CLINT_OTHER_CORE <= CLINT_OTHER_CORE()
-        (unstable)), (@ peri_type #[doc = "INTPRI peripheral singleton"] INTPRI <=
-        INTPRI() (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX
-        <= IO_MUX() (unstable)), (@ peri_type #[doc = "LEDC peripheral singleton"] LEDC
-        <= LEDC() (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR <=
+        "INTPRI peripheral singleton"] INTPRI <= INTPRI() (unstable)), (@ peri_type #[doc
+        = "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)), (@ peri_type
+        #[doc = "KEYMNG peripheral singleton"] KEYMNG <= KEYMNG(KM : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "LEDC peripheral singleton"] LEDC <= LEDC()
+        (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR <=
         LP_CLKRST() (unstable)), (@ peri_type #[doc = "LP_ANA peripheral singleton"]
         LP_ANA <= LP_ANA() (unstable)), (@ peri_type #[doc =
         "LP_AON peripheral singleton"] LP_AON <= LP_AON() (unstable)), (@ peri_type #[doc
         = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)), (@
-        peri_type #[doc = "LP_PERI peripheral singleton"] LP_PERI <= LP_PERI()
-        (unstable)), (@ peri_type #[doc = "LP_WDT peripheral singleton"] LP_WDT <=
-        LP_WDT() (unstable)), (@ peri_type #[doc = "MODEM_LPCON peripheral singleton"]
-        MODEM_LPCON <= MODEM_LPCON() (unstable)), (@ peri_type #[doc =
+        peri_type #[doc = "LP_GPIO peripheral singleton"] LP_GPIO <= LP_GPIO()
+        (unstable)), (@ peri_type #[doc = "LP_IO_MUX peripheral singleton"] LP_IO_MUX <=
+        LP_IO_MUX() (unstable)), (@ peri_type #[doc = "LP_PERI peripheral singleton"]
+        LP_PERI <= LP_PERI() (unstable)), (@ peri_type #[doc =
+        "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)), (@ peri_type #[doc
+        = "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)), (@ peri_type
+        #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0(MCPWM0 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "MCPWM1 peripheral singleton"] MCPWM1 <=
+        MCPWM1(MCPWM1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "MEM_MONITOR peripheral singleton"] MEM_MONITOR <= MEM_MONITOR() (unstable)), (@
+        peri_type #[doc = "MODEM_LPCON peripheral singleton"] MODEM_LPCON <=
+        MODEM_LPCON() (unstable)), (@ peri_type #[doc =
         "MODEM_SYSCON peripheral singleton"] MODEM_SYSCON <= MODEM_SYSCON() (unstable)),
         (@ peri_type #[doc = "PARL_IO peripheral singleton"] PARL_IO <=
         PARL_IO(PARL_IO_RX : { bind_rx_interrupt, enable_rx_interrupt,
         disable_rx_interrupt }, PARL_IO_TX : { bind_tx_interrupt, enable_tx_interrupt,
         disable_tx_interrupt }) (unstable)), (@ peri_type #[doc =
-        "PCNT peripheral singleton"] PCNT <= PCNT(PCNT : { bind_peri_interrupt,
+        "PAU peripheral singleton"] PAU <= PAU(PAU : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "PCNT peripheral singleton"] PCNT <= PCNT(PCNT : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "PCR peripheral singleton"] PCR <= PCR() (unstable)), (@ peri_type #[doc =
-        "PMU peripheral singleton"] PMU <= PMU() (unstable)), (@ peri_type #[doc =
+        "PMU peripheral singleton"] PMU <= PMU(PMU : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
+        = "PVT peripheral singleton"] PVT <= PVT() (unstable)), (@ peri_type #[doc =
         "RMT peripheral singleton"] RMT <= RMT(RMT : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "RNG peripheral singleton"] RNG <= RNG() (unstable)), (@ peri_type #[doc =
@@ -2732,8 +2793,16 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
         peri_type #[doc = "SYSTEM peripheral singleton"] SYSTEM <= PCR() (unstable)), (@
         peri_type #[doc = "SYSTIMER peripheral singleton"] SYSTIMER <= SYSTIMER()
+        (unstable)), (@ peri_type #[doc = "TEE peripheral singleton"] TEE <= TEE()
         (unstable)), (@ peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0()
         (unstable)), (@ peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <= TIMG1()
+        (unstable)), (@ peri_type #[doc = "TOUCH peripheral singleton"] TOUCH <=
+        TOUCH(TOUCH : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "TOUCH_AON peripheral singleton"] TOUCH_AON <= TOUCH_AON() (unstable)), (@
+        peri_type #[doc = "TWAI0 peripheral singleton"] TWAI0 <= TWAI0(TWAI0 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt }, TWAI0_TIMER
+        : { bind_timer_interrupt, enable_timer_interrupt, disable_timer_interrupt })
         (unstable)), (@ peri_type #[doc = "UART0 peripheral singleton"] UART0 <=
         UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (@ peri_type #[doc = "UART1 peripheral singleton"]
@@ -2742,6 +2811,13 @@ macro_rules! for_each_peripheral {
         UHCI0 <= UHCI0() (unstable)), (@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "USB_FS peripheral singleton"] USB_FS <=
+        USB0(USB_OTG11 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "USB_WRAP peripheral singleton"] USB_WRAP <= USB_WRAP() (unstable)), (@ peri_type
+        #[doc = "ZERO_DET peripheral singleton"] ZERO_DET <= ZERO_DET(ZERO_DET : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (@ peri_type #[doc = "ADC1 peripheral singleton"] ADC1 <= virtual()
         (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"] CPU_CTRL <=
         virtual() (unstable)), (@ peri_type #[doc = "IPC peripheral singleton"] IPC <=
         virtual() (unstable)), (@ peri_type #[doc = "FLASH peripheral singleton"] FLASH
@@ -2757,23 +2833,29 @@ macro_rules! for_each_peripheral {
         (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19), (GPIO20),
         (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27), (GPIO28),
         (GPIO29), (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36),
-        (GPIO37), (GPIO38), (GPIO39), (AES(unstable)), (DMA(unstable)), (ECC(unstable)),
+        (GPIO37), (GPIO38), (GPIO39), (AES(unstable)), (APB_SARADC(unstable)),
+        (ASRC(unstable)), (BUS_MONITOR(unstable)), (CACHE(unstable)), (CLIC(unstable)),
+        (CLINT(unstable)), (CLINT_OTHER_CORE(unstable)), (CPU_APM(unstable)),
+        (DMA(unstable)), (ECC(unstable)), (ECDSA(unstable)), (ETM(unstable)),
         (GPIO(unstable)), (GPIO_DEDICATED(unstable)), (GPIO_SD(unstable)),
-        (HP_APM(unstable)), (HP_SYS(unstable)), (I2C_ANA_MST(unstable)),
-        (I2S0(unstable)), (I2C0), (I2C1), (INTERRUPT_CORE0(unstable)),
-        (INTERRUPT_CORE1(unstable)), (CLINT(unstable)), (CLINT_OTHER_CORE(unstable)),
-        (INTPRI(unstable)), (IO_MUX(unstable)), (LEDC(unstable)), (LPWR(unstable)),
+        (HMAC(unstable)), (HP_APM(unstable)), (HP_SYS(unstable)), (HUK(unstable)),
+        (I2C_ANA_MST(unstable)), (I2S0(unstable)), (I2C0), (I2C1),
+        (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)), (INTPRI(unstable)),
+        (IO_MUX(unstable)), (KEYMNG(unstable)), (LEDC(unstable)), (LPWR(unstable)),
         (LP_ANA(unstable)), (LP_AON(unstable)), (LP_CLKRST(unstable)),
-        (LP_PERI(unstable)), (LP_WDT(unstable)), (MODEM_LPCON(unstable)),
-        (MODEM_SYSCON(unstable)), (PARL_IO(unstable)), (PCNT(unstable)), (PCR(unstable)),
-        (PMU(unstable)), (RMT(unstable)), (RNG(unstable)), (SHA(unstable)),
-        (RTC_TIMER(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3),
-        (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
-        (CPU_CTRL(unstable)), (IPC(unstable)), (FLASH(unstable)),
-        (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
-        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
-        _for_each_inner_peripheral!((dma_eligible));
+        (LP_GPIO(unstable)), (LP_IO_MUX(unstable)), (LP_PERI(unstable)),
+        (LP_TEE(unstable)), (LP_WDT(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)),
+        (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
+        (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)), (PCR(unstable)),
+        (PMU(unstable)), (PVT(unstable)), (RMT(unstable)), (RNG(unstable)),
+        (SHA(unstable)), (RTC_TIMER(unstable)), (SPI0(unstable)), (SPI1(unstable)),
+        (SPI2), (SPI3), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)),
+        (TIMG0(unstable)), (TIMG1(unstable)), (TOUCH(unstable)), (TOUCH_AON(unstable)),
+        (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
+        (USB_FS(unstable)), (ZERO_DET(unstable)), (ADC1(unstable)), (CPU_CTRL(unstable)),
+        (IPC(unstable)), (FLASH(unstable)), (FROM_CPU_INTR0(unstable)),
+        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
@@ -2905,23 +2987,36 @@ macro_rules! for_each_gpio {
 macro_rules! for_each_analog_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_analog_function { $(($pattern) => $code;)* ($other :
-        tt) => {} } _for_each_inner_analog_function!((XTAL_32K_N, GPIO4));
+        tt) => {} } _for_each_inner_analog_function!((ZCD0, GPIO0));
+        _for_each_inner_analog_function!((ZCD1, GPIO1));
+        _for_each_inner_analog_function!((ZCD2, GPIO2));
+        _for_each_inner_analog_function!((ZCD3, GPIO3));
+        _for_each_inner_analog_function!((XTAL_32K_N, GPIO4));
         _for_each_inner_analog_function!((XTAL_32K_P, GPIO5));
         _for_each_inner_analog_function!((USJ_DM, GPIO13));
         _for_each_inner_analog_function!((USJ_DP, GPIO14));
+        _for_each_inner_analog_function!((USB_FS_DM, GPIO21));
+        _for_each_inner_analog_function!((USB_FS_DP, GPIO22));
         _for_each_inner_analog_function!((ADC1_CH0, GPIO28));
         _for_each_inner_analog_function!((ADC1_CH1, GPIO29));
         _for_each_inner_analog_function!((ADC1_CH2, GPIO30));
         _for_each_inner_analog_function!((ADC1_CH3, GPIO31));
         _for_each_inner_analog_function!((ADC1_CH4, GPIO32));
+        _for_each_inner_analog_function!(((ZCD0, ZCDn, 0), GPIO0));
+        _for_each_inner_analog_function!(((ZCD1, ZCDn, 1), GPIO1));
+        _for_each_inner_analog_function!(((ZCD2, ZCDn, 2), GPIO2));
+        _for_each_inner_analog_function!(((ZCD3, ZCDn, 3), GPIO3));
         _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO28));
         _for_each_inner_analog_function!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO29));
         _for_each_inner_analog_function!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO30));
         _for_each_inner_analog_function!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO31));
         _for_each_inner_analog_function!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32));
-        _for_each_inner_analog_function!((all(XTAL_32K_N, GPIO4), (XTAL_32K_P, GPIO5),
-        (USJ_DM, GPIO13), (USJ_DP, GPIO14), (ADC1_CH0, GPIO28), (ADC1_CH1, GPIO29),
-        (ADC1_CH2, GPIO30), (ADC1_CH3, GPIO31), (ADC1_CH4, GPIO32)));
+        _for_each_inner_analog_function!((all(ZCD0, GPIO0), (ZCD1, GPIO1), (ZCD2, GPIO2),
+        (ZCD3, GPIO3), (XTAL_32K_N, GPIO4), (XTAL_32K_P, GPIO5), (USJ_DM, GPIO13),
+        (USJ_DP, GPIO14), (USB_FS_DM, GPIO21), (USB_FS_DP, GPIO22), (ADC1_CH0, GPIO28),
+        (ADC1_CH1, GPIO29), (ADC1_CH2, GPIO30), (ADC1_CH3, GPIO31), (ADC1_CH4, GPIO32)));
+        _for_each_inner_analog_function!((ZCDn((ZCD0, ZCDn, 0), GPIO0), ((ZCD1, ZCDn, 1),
+        GPIO1), ((ZCD2, ZCDn, 2), GPIO2), ((ZCD3, ZCDn, 3), GPIO3)));
         _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0), GPIO28),
         ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO29), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO30),
         ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO31), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32)));
@@ -3055,6 +3150,18 @@ macro_rules! for_each_iomux_function {
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! gpio_for_signal {
+    (ZCD0 $(, $_fallback:literal)?) => {
+        "GPIO0"
+    };
+    (ZCD1 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (ZCD2 $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
+    (ZCD3 $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
     (XTAL_32K_N $(, $_fallback:literal)?) => {
         "GPIO4"
     };
@@ -3084,6 +3191,12 @@ macro_rules! gpio_for_signal {
     };
     (FSPICS0 $(, $_fallback:literal)?) => {
         "GPIO20"
+    };
+    (USB_FS_DM $(, $_fallback:literal)?) => {
+        "GPIO21"
+    };
+    (USB_FS_DP $(, $_fallback:literal)?) => {
+        "GPIO22"
     };
     (U0RXD $(, $_fallback:literal)?) => {
         "GPIO23"

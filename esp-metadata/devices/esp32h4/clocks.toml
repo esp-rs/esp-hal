@@ -1,6 +1,6 @@
 system_clocks = { clock_tree = [
     # High-speed clock sources.
-    { name = "XTAL_CLK",     type = "source",  values = "32",     output = "VALUE * 1_000_000", always_on = true },
+    { name = "XTAL_CLK",     type = "source",                    output = "32 * 1_000_000",    always_on = true },
     { name = "PLL_F96M_CLK", type = "derived", from = "XTAL_CLK", output = "96_000_000" },
     { name = "PLL_F48M_CLK", type = "generic",                    output = "PLL_F96M_CLK / 2" },
 
@@ -103,10 +103,10 @@ peripheral_clocks = { templates = [
     { name = "Ledc" },
     # Besides the function clock that drives the glitch filter, the PCNT has a separate register
     # clock. Register accesses are dropped while it is gated, and both boot disabled.
-    { name = "Pcnt", template_params = { clk_en_template = "{{default_clk_en_template}} {{reg_clk_en_template}}", reg_clk_en_template = "{{control}}::regs().pcnt_conf().modify(|_, w| w.pcnt_reg_clk_en().bit(enable));", rst_template = "{{control}}::regs().pcnt_conf().modify(|_, w| { w.pcnt_rst_en().bit(reset); w.pcnt_reg_rst_en().bit(reset) });" } },
+    { name = "Pcnt", template_params = { clk_en_template = "{{default_clk_en_template}} {{control}}::regs().pcnt_conf().modify(|_, w| w.pcnt_reg_clk_en().bit(enable));", rst_template = "{{control}}::regs().pcnt_conf().modify(|_, w| { w.pcnt_rst_en().bit(reset); w.pcnt_reg_rst_en().bit(reset) });" } },
     # The channel RAM boots powered down and reads return zeros. ESP-IDF's `rmt_hal_init` only
     # withdraws the low power request, the power itself stays under hardware control.
-    { name = "Rmt", template_params = { clk_en_template = "{{default_clk_en_template}} {{mem_pu_template}}", mem_pu_template = "{{control}}::regs().rmt_mem_lp_ctrl().modify(|_, w| w.rmt_mem_lp_en().bit(!enable));" } },
+    { name = "Rmt", template_params = { clk_en_template = "{{default_clk_en_template}} {{control}}::regs().rmt_mem_lp_ctrl().modify(|_, w| w.rmt_mem_lp_en().bit(!enable));" } },
     { name = "Sha" },
     { name = "Spi2", template_params = { peripheral = "spi2" } },
     { name = "Spi3", template_params = { peripheral = "spi3" } },
