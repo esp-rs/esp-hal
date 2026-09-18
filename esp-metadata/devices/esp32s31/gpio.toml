@@ -2,6 +2,8 @@ version = 3
 has_input_sync = true
 # PIN_FUNC_GPIO = 1 (from io_mux_reg.h)
 gpio_function = 1
+# SOC_GPIO_NEED_SOFT_ISOLATE_DURING_PD
+need_soft_isolate_during_pd = true
 # From gpio_reg.h: 0x80 = constantly high, 0xC0 = constantly low
 constant_0_input = 0xc0
 constant_1_input = 0x80

@@ -88,6 +88,9 @@ macro_rules! property {
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
     };
+    ("gpio.need_soft_isolate_during_pd") => {
+        true
+    };
     ("gpio.has_bank_1") => {
         true
     };
@@ -8190,6 +8193,81 @@ macro_rules! gpio_for_signal {
     };
     ($_signal:ident, $fallback:literal) => {
         $fallback
+    };
+}
+/// This macro can be used to generate code for each digital GPIO that deep-sleep entry
+/// isolates when `gpio.need_soft_isolate_during_pd` is set.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+///
+/// The list excludes low-power pads and pads that interface with flash or PSRAM. Isolating
+/// a memory-interface pad cuts instruction fetch.
+///
+/// This macro has one option for its "Individual matcher" case:
+///
+/// Syntax: `($n:literal)`
+///
+/// Macro fragments:
+///
+/// - `$n`: the number of the GPIO. For `GPIO8`, `$n` is 8.
+///
+/// Example data: `(8)`
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_gpio_soft_isolate {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_gpio_soft_isolate { $(($pattern) => $code;)* ($other
+        : tt) => {} } _for_each_inner_gpio_soft_isolate!((8));
+        _for_each_inner_gpio_soft_isolate!((9));
+        _for_each_inner_gpio_soft_isolate!((10));
+        _for_each_inner_gpio_soft_isolate!((11));
+        _for_each_inner_gpio_soft_isolate!((12));
+        _for_each_inner_gpio_soft_isolate!((13));
+        _for_each_inner_gpio_soft_isolate!((14));
+        _for_each_inner_gpio_soft_isolate!((15));
+        _for_each_inner_gpio_soft_isolate!((16));
+        _for_each_inner_gpio_soft_isolate!((17));
+        _for_each_inner_gpio_soft_isolate!((18));
+        _for_each_inner_gpio_soft_isolate!((19));
+        _for_each_inner_gpio_soft_isolate!((20));
+        _for_each_inner_gpio_soft_isolate!((21));
+        _for_each_inner_gpio_soft_isolate!((22));
+        _for_each_inner_gpio_soft_isolate!((23));
+        _for_each_inner_gpio_soft_isolate!((24));
+        _for_each_inner_gpio_soft_isolate!((25));
+        _for_each_inner_gpio_soft_isolate!((33));
+        _for_each_inner_gpio_soft_isolate!((34));
+        _for_each_inner_gpio_soft_isolate!((35));
+        _for_each_inner_gpio_soft_isolate!((36));
+        _for_each_inner_gpio_soft_isolate!((37));
+        _for_each_inner_gpio_soft_isolate!((38));
+        _for_each_inner_gpio_soft_isolate!((39));
+        _for_each_inner_gpio_soft_isolate!((40));
+        _for_each_inner_gpio_soft_isolate!((42));
+        _for_each_inner_gpio_soft_isolate!((43));
+        _for_each_inner_gpio_soft_isolate!((44));
+        _for_each_inner_gpio_soft_isolate!((45));
+        _for_each_inner_gpio_soft_isolate!((46));
+        _for_each_inner_gpio_soft_isolate!((47));
+        _for_each_inner_gpio_soft_isolate!((48));
+        _for_each_inner_gpio_soft_isolate!((49));
+        _for_each_inner_gpio_soft_isolate!((50));
+        _for_each_inner_gpio_soft_isolate!((51));
+        _for_each_inner_gpio_soft_isolate!((52));
+        _for_each_inner_gpio_soft_isolate!((53));
+        _for_each_inner_gpio_soft_isolate!((54));
+        _for_each_inner_gpio_soft_isolate!((55));
+        _for_each_inner_gpio_soft_isolate!((56));
+        _for_each_inner_gpio_soft_isolate!((57));
+        _for_each_inner_gpio_soft_isolate!((58));
+        _for_each_inner_gpio_soft_isolate!((59));
+        _for_each_inner_gpio_soft_isolate!((60));
+        _for_each_inner_gpio_soft_isolate!((61));
+        _for_each_inner_gpio_soft_isolate!((all(8), (9), (10), (11), (12), (13), (14),
+        (15), (16), (17), (18), (19), (20), (21), (22), (23), (24), (25), (33), (34),
+        (35), (36), (37), (38), (39), (40), (42), (43), (44), (45), (46), (47), (48),
+        (49), (50), (51), (52), (53), (54), (55), (56), (57), (58), (59), (60), (61)));
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.

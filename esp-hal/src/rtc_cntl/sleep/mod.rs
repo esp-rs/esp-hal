@@ -409,7 +409,10 @@ impl<'d> LowPower<'d> {
 
         // Last, because this step takes the pads away from the peripherals that drove them. The
         // wakeup sources have their holds now, and no later step needs a pad.
-        #[cfg(sleep_deep_sleep_needs_gpio_isolation)]
+        #[cfg(any(
+            sleep_deep_sleep_needs_gpio_isolation,
+            gpio_need_soft_isolate_during_pd
+        ))]
         if kind == SleepKind::Deep {
             gpio::wakeup::isolate_pads_for_deep_sleep();
         }

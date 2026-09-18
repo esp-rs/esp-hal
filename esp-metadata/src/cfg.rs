@@ -361,6 +361,15 @@ driver_configs![
                 remap_iomux_pin_registers: bool,
                 #[serde(default)] // currently 0 in all devices
                 func_in_sel_offset: u32,
+                /// Whether the digital pads must be isolated in software when a power domain that
+                /// feeds them is powered down (`SOC_GPIO_NEED_SOFT_ISOLATE_DURING_PD` in ESP-IDF).
+                ///
+                /// This is independent of `sleep.deep_sleep_needs_gpio_isolation`. That flag covers
+                /// chips that cannot hold a single pad through a deep sleep. This flag covers chips
+                /// that can hold a pad, but still leak current unless software disconnects the
+                /// unused digital pads.
+                #[serde(default)]
+                need_soft_isolate_during_pd: bool,
 
                 #[serde(flatten)]
                 pins_and_signals: GpioPinsAndSignals,
