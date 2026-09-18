@@ -135,10 +135,8 @@ pub mod checker {
     }
 
     /// Walk each supported chip, build current rustdoc JSON, and fold the bump.
-    ///
-    /// `stop_on_major` skips remaining chips once a major bump is required
-    /// (`xsemver-checks`). Listing newly stable API needs every chip, so `plan`
-    /// passes `false`.
+    /// `stop_on_major` skips the remaining chips once a major bump is required,
+    /// which callers that need every chip's document must not do.
     fn for_each_chip_update<F>(
         workspace: &Path,
         package: Package,
@@ -193,10 +191,7 @@ pub mod checker {
         for_each_chip_update(workspace, package, chips, true, |_, _| Ok(()))
     }
 
-    /// Minimum bump plus the current rustdoc JSON path for each chip visited.
-    ///
-    /// Does not stop on Major: callers that also list newly stable API still
-    /// need the remaining chips.
+    /// Minimum bump plus the current rustdoc JSON path for every supported chip.
     pub fn package_docs(
         workspace: &Path,
         package: Package,
@@ -204,7 +199,15 @@ pub mod checker {
     ) -> anyhow::Result<(ReleaseType, Vec<(Chip, PathBuf)>)> {
         let mut docs = Vec::new();
         let bump = for_each_chip_update(workspace, package, chips, false, |chip, path| {
-            docs.push((chip, path));
+            // `build_doc_json` writes to `<target>/<triple>/doc/<pkg>.json` and
+            // several chips share a triple, so each document needs its own copy.
+            let dest = workspace
+                .join("target/semver-current-doc")
+                .join(package.to_string())
+                .join(format!("{chip}.json"));
+            fs::create_dir_all(dest.parent().expect("dest has a parent"))?;
+            fs::copy(&path, &dest)?;
+            docs.push((chip, dest));
             Ok(())
         })?;
         Ok((bump, docs))

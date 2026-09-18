@@ -62,6 +62,16 @@ Notes:
   `release:registry:compile-test`, and `release:registry:ci`. Those labels drive
   the `cargo update` checks in the `pre-release-checks` workflow.
 - Run `post-release` only for the final stable release.
+- `plan` fills in `new_stable_api` for semver-checked packages, comparing the
+  rustdoc JSON of the tag matching the in-tree version against the working tree,
+  and falling back to the semver baseline when that tag cannot be documented.
+  Both sides are built with the features in the package's `semver-config`. Paths
+  in the list are `public-api` Display output, not rustdoc definition sites.
+- `--api-base-package <pkg> --api-base-version <x.y.z>` compares that package
+  against another release instead. Needed on `main` when patch releases were cut
+  from a backport branch, since main's own last release does not contain them. A
+  tag from a different release line lists items published there as new. The
+  chosen tag is recorded as `new_stable_api_base` in the plan.
 
 ## Kickoff
 
