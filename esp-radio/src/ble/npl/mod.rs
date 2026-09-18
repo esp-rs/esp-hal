@@ -20,11 +20,10 @@ use crate::{
 #[cfg_attr(esp32c6, path = "os_adapter_esp32c6.rs")]
 #[cfg_attr(esp32c61, path = "os_adapter_esp32c61.rs")]
 #[cfg_attr(esp32h2, path = "os_adapter_esp32h2.rs")]
-pub(crate) mod ble_os_adapter_chip_specific;
+pub(crate) mod chip_specific;
+mod os_mempool;
 
 const EVENT_QUEUE_SIZE: usize = 16;
-
-const TIME_FOREVER: u32 = crate::compat::OSI_FUNCS_TIME_BLOCKING;
 
 const BLE_HCI_TRANS_BUF_CMD: i32 = 3;
 
@@ -345,7 +344,7 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
         0x20250825
     },
 
-    esp_intr_alloc: Some(ble_os_adapter_chip_specific::esp_intr_alloc),
+    esp_intr_alloc: Some(chip_specific::esp_intr_alloc),
     esp_intr_free: Some(esp_intr_free),
     malloc: Some(crate::ble::malloc),
     free: Some(crate::ble::free),
@@ -368,9 +367,9 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
     ecc_gen_key_pair: Some(ecc_gen_key_pair),
     ecc_gen_dh_key: Some(ecc_gen_dh_key),
     #[cfg(any(esp32c6, esp32h2))]
-    esp_reset_modem: Some(ble_os_adapter_chip_specific::reset_modem),
+    esp_reset_modem: Some(chip_specific::reset_modem),
     #[cfg(esp32c2)]
-    esp_reset_rpa_moudle: Some(ble_os_adapter_chip_specific::esp_reset_rpa_moudle),
+    esp_reset_rpa_moudle: Some(chip_specific::esp_reset_rpa_moudle),
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: None,
     magic: 0xA5A5A5A5,
@@ -624,8 +623,7 @@ unsafe extern "C" fn ble_npl_hw_is_in_critical() -> u8 {
 }
 
 unsafe extern "C" fn ble_npl_get_time_forever() -> u32 {
-    trace!("ble_npl_get_time_forever");
-    TIME_FOREVER
+    OSI_FUNCS_TIME_BLOCKING
 }
 
 unsafe extern "C" fn ble_npl_hw_exit_critical(mask: u32) {
@@ -1100,9 +1098,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             g_ble_plf_log_level = 10;
         }
 
-        self::ble_os_adapter_chip_specific::ble_rtc_clk_init();
+        self::chip_specific::ble_rtc_clk_init();
 
-        let cfg = ble_os_adapter_chip_specific::create_ble_config(config);
+        let cfg = chip_specific::create_ble_config(config);
 
         let res = esp_register_ext_funcs(&G_OSI_FUNCS as *const ExtFuncsT);
         assert!(res == 0, "esp_register_ext_funcs returned {}", res);
@@ -1123,9 +1121,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             assert!(res == 0, "coex_init failed");
         }
 
-        ble_os_adapter_chip_specific::bt_periph_module_enable();
+        chip_specific::bt_periph_module_enable();
 
-        ble_os_adapter_chip_specific::disable_sleep_mode();
+        chip_specific::disable_sleep_mode();
 
         let res = esp_register_npl_funcs(&G_NPL_FUNCS);
         assert!(res == 0, "esp_register_npl_funcs returned {}", res);
@@ -1147,7 +1145,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         // Initialize the global memory pool
         #[cfg(esp32c2)]
-        ble_os_adapter_chip_specific::os_msys_init();
+        chip_specific::os_msys_init();
 
         phy_init_guard = esp_phy::enable_phy();
 
@@ -1223,7 +1221,7 @@ pub(crate) fn ble_deinit() {
         assert!(res == 0, "ble_controller_deinit returned {}", res);
 
         #[cfg(esp32c2)]
-        ble_os_adapter_chip_specific::os_msys_buf_free();
+        chip_specific::os_msys_buf_free();
 
         esp_unregister_npl_funcs();
         esp_unregister_ext_funcs();

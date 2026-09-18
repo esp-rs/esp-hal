@@ -123,7 +123,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     is_in_isr: Some(is_in_isr),
     cause_sw_intr_to_core: None,
     malloc: Some(crate::ble::malloc),
-    malloc_internal: Some(crate::ble::malloc_internal),
+    malloc_internal: Some(super::malloc_internal),
     free: Some(crate::ble::free),
     read_efuse_mac: Some(super::read_efuse_mac),
     srand: Some(super::srand),
@@ -149,7 +149,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     esp_hw_power_down: Some(esp_hw_power_down),
     esp_hw_power_up: Some(esp_hw_power_up),
     ets_backup_dma_copy: Some(ets_backup_dma_copy),
-    malloc_retention: Some(crate::ble::malloc_retention),
+    malloc_retention: Some(malloc_retention),
     ets_delay_us: Some(ets_delay_us_wrapper),
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
     coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
@@ -157,6 +157,12 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     get_time_us: Some(get_time_us_wrapper),
     assert: Some(assert_wrapper),
 };
+
+pub(crate) unsafe extern "C" fn malloc_retention(size: u32) -> *mut crate::sys::c_types::c_void {
+    // IDF uses heap_caps_malloc(size, MALLOC_CAP_RETENTION). We have no retention
+    // heap, so fall back to the same internal allocator as malloc_internal.
+    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
+}
 
 extern "C" fn get_time_us_wrapper() -> u64 {
     // Get time in microseconds since boot
