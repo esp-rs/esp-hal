@@ -9,7 +9,7 @@
 
 use core::ptr;
 
-use crate::ble::npl::OsMempool;
+use crate::ble::ble::OsMempool;
 
 const OS_OK: i32 = 0;
 const OS_INVALID_PARM: i32 = 3;

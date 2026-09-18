@@ -13,11 +13,7 @@ use super::{Config, ReceivedPacket};
 use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
-    ble::{
-        HCI_OUT_COLLECTOR,
-        HciOutCollector,
-        btdm::ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s},
-    },
+    ble::{HCI_OUT_COLLECTOR, HciOutCollector},
     compat::common::str_from_c,
     hal::ram,
     sys::{c_types::*, include::*},
@@ -27,6 +23,8 @@ use crate::{
 #[cfg_attr(esp32s3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
 pub(crate) mod ble_os_adapter_chip_specific;
+
+use ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s};
 
 static PACKET_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 static PACKET_SENT_WAKER: AtomicWaker = AtomicWaker::new();
@@ -257,45 +255,9 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
     todo!();
 }
 
-unsafe extern "C" fn coex_schm_status_bit_set(typ: i32, status: i32) {
-    trace!("coex_schm_status_bit_set {} {}", typ, status);
-    #[cfg(feature = "coex")]
-    unsafe {
-        include::coex_schm_status_bit_set(typ as u32, status as u32)
-    };
-}
-
-unsafe extern "C" fn coex_schm_status_bit_clear(typ: i32, status: i32) {
-    trace!("coex_schm_status_bit_clear {} {}", typ, status);
-    #[cfg(feature = "coex")]
-    unsafe {
-        include::coex_schm_status_bit_clear(typ as u32, status as u32)
-    };
-}
-
 #[ram]
 unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
     unsafe { crate::common_adapter::read_mac(mac as *mut _, 2) }
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn set_isr13(n: i32, handler: unsafe extern "C" fn(), arg: *const ()) -> i32 {
-    unsafe { ble_os_adapter_chip_specific::set_isr(n, handler, arg) }
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn interrupt_l3_disable() {
-    // info!("unimplemented interrupt_l3_disable");
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn interrupt_l3_restore() {
-    //  info!("unimplemented interrupt_l3_restore");
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn custom_queue_create(_len: u32, _item_size: u32) -> *mut c_void {
-    todo!();
 }
 
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
