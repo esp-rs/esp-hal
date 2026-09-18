@@ -61,7 +61,6 @@ peripherals = [
     { name = "HP_SYS_CLKRST" },
     { name = "I2C0", interrupts = { peri = "I2C0" }, clock_group = "I2C", stable = true },
     { name = "I2C1", interrupts = { peri = "I2C1" }, clock_group = "I2C", stable = true },
-    { name = "IEEE802154", interrupts = { mac = "MODEM_ZB_MAC" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "IO_MUX" },
@@ -112,7 +111,6 @@ peripherals = [
     { name = "FLASH", virtual = true },
     { name = "PSRAM", virtual = true, clock_group = "PSRAM" },
     { name = "GPIO_DEDICATED", virtual = true },
-    { name = "WIFI", virtual = true, interrupts = { bb = "MODEM_WIFI_BB", mac = "MODEM_WIFI_MAC", pwr = "MODEM_WIFI_PWR" }, stable = true },
     { name = "CPU_CTRL", virtual = true },
     { name = "FROM_CPU_INTR0", virtual = true },
     { name = "FROM_CPU_INTR1", virtual = true },
@@ -404,6 +402,7 @@ support_status = "not_supported"
 [device.i2s]
 support_status = "not_supported"
 [device.ieee802154]
+support_status = "not_supported"
 [device.key_manager]
 support_status = "not_supported"
 [device.mcpwm]
@@ -474,18 +473,16 @@ slot_config = [
 
 ## Radio
 [device.wifi]
-support_status = "partial"
-mac_version = 3
-has_wifi6 = true
-csi_supported = true
+support_status = "not_supported"
+mac_version = 1 # FIXME: placeholder
+csi_supported = true # FIXME: placeholder
 
 [device.bt]
 support_status = "not_supported"
 controller = "npl" # FIXME: placeholder
 
 [device.phy]
-support_status = "partial"
-combo_module = true
+support_status = "not_supported"
 
 [device.ledc]
 support_status = "not_supported"

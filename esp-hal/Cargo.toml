@@ -120,7 +120,7 @@ esp32c61 = { version = "0.4", features = ["critical-section"], optional = true }
 esp32h2 = { version = "0.20", features = ["critical-section"], optional = true }
 esp32s2 = { version = "0.32", features = ["critical-section"], optional = true }
 esp32s3 = { version = "0.36", features = ["critical-section"], optional = true }
-esp32s31 = { version = "0.2", features = ["critical-section"], optional = true }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true }
 esp32p4 = { version = "0.3",  features = ["critical-section"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
