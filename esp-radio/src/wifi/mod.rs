@@ -803,7 +803,7 @@ impl Ssid {
     /// The SSID as a string slice.
     ///
     /// An SSID is not required to be valid UTF-8; the result stops at the
-    /// first invalid byte. Use [`as_bytes`][Self::as_bytes] for the full bytes.
+    /// first invalid byte. Use `as_bytes` for the full bytes.
     pub fn as_str(&self) -> &str {
         let part = &self.ssid[..self.len as usize];
         match str::from_utf8(part) {
