@@ -1,10 +1,9 @@
 //! Bluetooth Low Energy HCI interface
 
-#[cfg(bt_controller = "btdm")]
-pub(crate) mod btdm;
+#[cfg_attr(bt_controller = "btdm", path = "btdm.rs")]
+#[cfg_attr(bt_controller = "npl", path = "npl.rs")]
+pub(crate) mod ble;
 
-#[cfg(bt_controller = "npl")]
-pub(crate) mod npl;
 #[cfg(bt_controller = "npl")]
 mod os_mempool;
 
@@ -25,11 +24,6 @@ impl core::error::Error for InvalidConfigError {}
 
 // Expose chip-specific configuration types
 pub use ble::ble_os_adapter_chip_specific::*;
-
-#[cfg(bt_controller = "btdm")]
-use self::btdm as ble;
-#[cfg(bt_controller = "npl")]
-use self::npl as ble;
 
 unstable_module! {
     pub mod controller;
