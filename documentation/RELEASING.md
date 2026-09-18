@@ -64,6 +64,15 @@ Notes:
   registry on every release PR. Add `release:registry:skip-ci` to the PR to skip
   the heavier examples/qa/tests build.
 - Run `post-release` only for the final stable release.
+- `plan` fills in `new_stable_api` for semver-checked packages, diffing the
+  package's API baselines against the working tree. Both sides use the features
+  in the package's `semver-config`. Each entry is an object with `item` and
+  `chips`; paths in `item` are `public-api` Display output, not rustdoc
+  definition sites. Chips without a baseline are skipped and listed in
+`new_stable_api_unchecked_chips`. If the comparison fails for a chip that
+does have a baseline, `plan` exits with an error. Baselines are regenerated
+after a breaking change, so items stabilized before the last regeneration
+are not listed.
 
 ## Kickoff
 
