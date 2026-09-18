@@ -782,7 +782,11 @@ impl Ssid {
         })
     }
 
-    pub(crate) fn as_bytes(&self) -> &[u8] {
+    /// The SSID as raw bytes.
+    ///
+    /// An SSID is at most 32 bytes and is not required to be valid UTF-8.
+    #[instability::unstable]
+    pub fn as_bytes(&self) -> &[u8] {
         &self.ssid[..self.len as usize]
     }
 
@@ -797,6 +801,9 @@ impl Ssid {
     }
 
     /// The SSID as a string slice.
+    ///
+    /// An SSID is not required to be valid UTF-8; the result stops at the
+    /// first invalid byte. Use `as_bytes` for the full bytes.
     pub fn as_str(&self) -> &str {
         let part = &self.ssid[..self.len as usize];
         match str::from_utf8(part) {
