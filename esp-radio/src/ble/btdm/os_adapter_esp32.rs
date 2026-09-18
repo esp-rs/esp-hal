@@ -83,7 +83,7 @@ pub(super) struct osi_funcs_s {
     coex_wifi_channel_get: Option<unsafe extern "C" fn(*mut u8, *mut u8) -> i32>,
     coex_register_wifi_channel_change_callback:
         Option<unsafe extern "C" fn(unsafe extern "C" fn()) -> i32>,
-    set_isr13: Option<unsafe extern "C" fn(i32, unsafe extern "C" fn(), *const ()) -> i32>,
+    set_isr_l3: Option<unsafe extern "C" fn(i32, unsafe extern "C" fn(), *const ()) -> i32>,
     interrupt_l3_disable: Option<unsafe extern "C" fn()>,
     interrupt_l3_restore: Option<unsafe extern "C" fn()>,
     custom_queue_create: Option<unsafe extern "C" fn(u32, u32) -> *mut c_void>,
@@ -149,7 +149,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     coex_schm_curr_phase_get: Some(coex_schm_curr_phase_get),
     coex_wifi_channel_get: Some(coex_wifi_channel_get),
     coex_register_wifi_channel_change_callback: Some(coex_register_wifi_channel_change_callback),
-    set_isr13: Some(set_isr13),
+    set_isr_l3: Some(set_isr_l3),
     interrupt_l3_disable: Some(interrupt_l3_disable),
     interrupt_l3_restore: Some(interrupt_l3_restore),
     custom_queue_create: Some(custom_queue_create),
@@ -158,7 +158,8 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     magic: 0xfadebead,
 };
 
-unsafe extern "C" fn set_isr13(n: i32, handler: unsafe extern "C" fn(), arg: *const ()) -> i32 {
+unsafe extern "C" fn set_isr_l3(n: i32, handler: unsafe extern "C" fn(), arg: *const ()) -> i32 {
+    trace!("set_isr_l3 called {} {:?} {:?}", n, handler, arg);
     unsafe { set_isr(n, handler, arg) }
 }
 
