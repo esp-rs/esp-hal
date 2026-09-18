@@ -366,6 +366,7 @@ is_lp_sys = true
 mac_version = 3
 has_5g = true
 csi_supported = true
+has_wifi6 = true
 
 [device.bt]
 support_status = "partial"

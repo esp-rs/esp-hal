@@ -332,7 +332,7 @@ macro_rules! property {
         "npl"
     };
     ("wifi.has_wifi6") => {
-        false
+        true
     };
     ("wifi.mac_version") => {
         3
