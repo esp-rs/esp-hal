@@ -121,7 +121,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     is_in_isr: Some(is_in_isr),
     cause_sw_intr_to_core: Some(super::cause_sw_intr_to_core),
     malloc: Some(crate::ble::malloc),
-    malloc_internal: Some(crate::ble::malloc_internal),
+    malloc_internal: Some(super::malloc_internal),
     free: Some(crate::ble::free),
     read_efuse_mac: Some(super::read_efuse_mac),
     srand: Some(super::srand),

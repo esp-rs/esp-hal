@@ -22,9 +22,13 @@ use crate::{
 #[cfg_attr(esp32c3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32s3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
-pub(crate) mod ble_os_adapter_chip_specific;
+pub(crate) mod chip_specific;
 
-use ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s};
+use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
+
+pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
+    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
+}
 
 static PACKET_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 static PACKET_SENT_WAKER: AtomicWaker = AtomicWaker::new();
@@ -277,9 +281,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         }
 
         // esp32_bt_controller_init
-        ble_os_adapter_chip_specific::btdm_controller_mem_init();
+        chip_specific::btdm_controller_mem_init();
 
-        let mut cfg = ble_os_adapter_chip_specific::create_ble_config(config);
+        let mut cfg = chip_specific::create_ble_config(config);
 
         let res = btdm_osi_funcs_register(&G_OSI_FUNCS);
         assert!(res == 0, "btdm_osi_funcs_register returned {}", res);
@@ -293,9 +297,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         let version = btdm_controller_get_compile_version();
         debug!("BT controller compile version {}", str_from_c(version));
 
-        ble_os_adapter_chip_specific::bt_periph_module_enable();
+        chip_specific::bt_periph_module_enable();
 
-        ble_os_adapter_chip_specific::disable_sleep_mode();
+        chip_specific::disable_sleep_mode();
 
         let res = btdm_controller_init(
             #[cfg(esp32)]
@@ -385,16 +389,12 @@ fn send_packet(packet: &[u8]) {
         PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
 
         #[cfg(all(esp32, feature = "coex"))]
-        ble_os_adapter_chip_specific::async_wakeup_request(
-            ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-        );
+        chip_specific::async_wakeup_request(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
 
         API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
 
         #[cfg(all(esp32, feature = "coex"))]
-        ble_os_adapter_chip_specific::async_wakeup_request_end(
-            ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-        );
+        chip_specific::async_wakeup_request_end(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
     }
 
     trace!("sent vhci host packet");
