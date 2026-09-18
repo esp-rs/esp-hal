@@ -76,12 +76,7 @@ pub mod checker {
     use crate::{
         Package,
         metadata::Chip,
-        semver_check::{
-            baseline_stem,
-            build_prepared_doc_json,
-            minimum_update,
-            workspace_rom_symbols,
-        },
+        semver_check::{baseline_stem, build_prepared_doc_json, minimum_update},
     };
 
     /// Generate the API baselines for the specified packages and chips.
@@ -102,13 +97,8 @@ pub mod checker {
                 let package_name = package.to_string();
                 let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
-                let current_path = build_prepared_doc_json(
-                    package,
-                    chip,
-                    &package_path,
-                    None,
-                    &workspace_rom_symbols(workspace),
-                )?;
+                let current_path =
+                    build_prepared_doc_json(workspace, package, chip, &package_path)?;
 
                 let to_path = PathBuf::from(&package_path).join(format!(
                     "api-baseline/{}.json.gz",
@@ -134,21 +124,12 @@ pub mod checker {
         Ok(())
     }
 
-    /// Walk each supported chip, build current rustdoc JSON, and fold the bump.
-    ///
-    /// `stop_on_major` skips remaining chips once a major bump is required
-    /// (`xsemver-checks`). Listing newly stable API needs every chip, so `plan`
-    /// passes `false`.
-    fn for_each_chip_update<F>(
+    /// Determine the minimum required version bump for the specified package and chips.
+    pub fn min_package_update(
         workspace: &Path,
         package: Package,
         chips: &[Chip],
-        stop_on_major: bool,
-        mut on_chip: F,
-    ) -> anyhow::Result<ReleaseType>
-    where
-        F: FnMut(Chip, PathBuf) -> anyhow::Result<()>,
-    {
+    ) -> anyhow::Result<ReleaseType> {
         fn stricter(a: ReleaseType, b: ReleaseType) -> ReleaseType {
             fn index_of(rt: ReleaseType) -> usize {
                 match rt {
@@ -162,19 +143,17 @@ pub mod checker {
         }
 
         let mut highest_result = ReleaseType::Patch;
-
         for chip in chips {
             if !package.supports_chip(*chip) {
                 continue;
             }
+            let result = minimum_update(workspace, package, *chip)?;
 
-            let (result, current_path) = minimum_update(workspace, package, *chip)?;
-            on_chip(*chip, current_path)?;
+            if result == ReleaseType::Major {
+                return Ok(result);
+            }
 
             highest_result = stricter(highest_result, result);
-            if stop_on_major && result == ReleaseType::Major {
-                return Ok(ReleaseType::Major);
-            }
 
             if !package.chip_features_matter() {
                 break;
@@ -182,32 +161,6 @@ pub mod checker {
         }
 
         Ok(highest_result)
-    }
-
-    /// Return the minimum required version bump for the next release.
-    pub fn min_package_update(
-        workspace: &Path,
-        package: Package,
-        chips: &[Chip],
-    ) -> anyhow::Result<ReleaseType> {
-        for_each_chip_update(workspace, package, chips, true, |_, _| Ok(()))
-    }
-
-    /// Minimum bump plus the current rustdoc JSON path for each chip visited.
-    ///
-    /// Does not stop on Major: callers that also list newly stable API still
-    /// need the remaining chips.
-    pub fn package_docs(
-        workspace: &Path,
-        package: Package,
-        chips: &[Chip],
-    ) -> anyhow::Result<(ReleaseType, Vec<(Chip, PathBuf)>)> {
-        let mut docs = Vec::new();
-        let bump = for_each_chip_update(workspace, package, chips, false, |chip, path| {
-            docs.push((chip, path));
-            Ok(())
-        })?;
-        Ok((bump, docs))
     }
 
     /// Check for breaking changes in the specified packages and chips.
