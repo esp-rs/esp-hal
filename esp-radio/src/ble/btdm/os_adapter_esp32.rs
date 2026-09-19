@@ -2,20 +2,12 @@ use core::ptr::addr_of_mut;
 
 use procmacros::BuilderLite;
 
-use super::*;
 use crate::{
     ble::InvalidConfigError,
     common_adapter::*,
     hal::{interrupt::Priority, peripherals::BT},
     interrupt_dispatch::Handler,
-    sys::include::{
-        esp_bt_controller_config_t,
-        esp_bt_mode_t,
-        esp_bt_mode_t_ESP_BT_MODE_BLE,
-        esp_bt_mode_t_ESP_BT_MODE_BTDM,
-        esp_bt_mode_t_ESP_BT_MODE_CLASSIC_BT,
-        esp_bt_mode_t_ESP_BT_MODE_IDLE,
-    },
+    sys::{c_types::*, include::*},
 };
 
 static ISR_INTERRUPT_5: Handler = Handler::new();
@@ -83,15 +75,15 @@ pub(super) struct osi_funcs_s {
     coex_bb_reset_lock: Option<unsafe extern "C" fn() -> u32>,
     coex_bb_reset_unlock: Option<unsafe extern "C" fn(u32)>,
     coex_schm_register_btdm_callback: Option<unsafe extern "C" fn(unsafe extern "C" fn()) -> i32>,
-    coex_schm_status_bit_clear: Option<unsafe extern "C" fn(i32, i32)>,
-    coex_schm_status_bit_set: Option<unsafe extern "C" fn(i32, i32)>,
+    coex_schm_status_bit_clear: Option<unsafe extern "C" fn(u32, u32)>,
+    coex_schm_status_bit_set: Option<unsafe extern "C" fn(u32, u32)>,
     coex_schm_interval_get: Option<unsafe extern "C" fn() -> u32>,
     coex_schm_curr_period_get: Option<unsafe extern "C" fn() -> u8>,
     coex_schm_curr_phase_get: Option<unsafe extern "C" fn() -> *mut c_void>,
     coex_wifi_channel_get: Option<unsafe extern "C" fn(*mut u8, *mut u8) -> i32>,
     coex_register_wifi_channel_change_callback:
         Option<unsafe extern "C" fn(unsafe extern "C" fn()) -> i32>,
-    set_isr13: Option<unsafe extern "C" fn(i32, unsafe extern "C" fn(), *const ()) -> i32>,
+    set_isr_l3: Option<unsafe extern "C" fn(i32, unsafe extern "C" fn(), *const ()) -> i32>,
     interrupt_l3_disable: Option<unsafe extern "C" fn()>,
     interrupt_l3_restore: Option<unsafe extern "C" fn()>,
     custom_queue_create: Option<unsafe extern "C" fn(u32, u32) -> *mut c_void>,
@@ -104,44 +96,44 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     version: 0x00010005,
     set_isr: Some(set_isr),
     ints_on: Some(ints_on),
-    interrupt_disable: Some(interrupt_disable),
-    interrupt_restore: Some(interrupt_enable),
-    task_yield: Some(task_yield),
-    task_yield_from_isr: Some(task_yield_from_isr),
+    interrupt_disable: Some(super::interrupt_disable),
+    interrupt_restore: Some(super::interrupt_enable),
+    task_yield: Some(super::task_yield),
+    task_yield_from_isr: Some(super::task_yield_from_isr),
     semphr_create: Some(semphr_create),
     semphr_delete: Some(semphr_delete),
     semphr_take_from_isr: Some(semphr_take_from_isr),
     semphr_give_from_isr: Some(semphr_give_from_isr),
     semphr_take: Some(semphr_take),
     semphr_give: Some(semphr_give),
-    mutex_create: Some(mutex_create),
-    mutex_delete: Some(mutex_delete),
-    mutex_lock: Some(mutex_lock),
-    mutex_unlock: Some(mutex_unlock),
+    mutex_create: Some(super::mutex_create),
+    mutex_delete: Some(super::mutex_delete),
+    mutex_lock: Some(super::mutex_lock),
+    mutex_unlock: Some(super::mutex_unlock),
     queue_create: Some(queue_create),
     queue_delete: Some(queue_delete),
     queue_send: Some(queue_send),
     queue_send_from_isr: Some(queue_send_from_isr),
     queue_recv: Some(queue_recv),
     queue_recv_from_isr: Some(queue_recv_from_isr),
-    task_create: Some(task_create),
-    task_delete: Some(task_delete),
+    task_create: Some(super::task_create),
+    task_delete: Some(super::task_delete),
     is_in_isr: Some(is_in_isr),
-    cause_sw_intr_to_core: Some(cause_sw_intr_to_core),
+    cause_sw_intr_to_core: Some(super::cause_sw_intr_to_core),
     malloc: Some(crate::ble::malloc),
-    malloc_internal: Some(crate::ble::malloc_internal),
+    malloc_internal: Some(super::malloc_internal),
     free: Some(crate::ble::free),
-    read_efuse_mac: Some(read_efuse_mac),
-    srand: Some(crate::ble::btdm::srand),
-    rand: Some(crate::ble::btdm::rand),
-    btdm_lpcycles_2_hus: Some(btdm_lpcycles_2_hus),
-    btdm_hus_2_lpcycles: Some(btdm_hus_2_lpcycles),
-    btdm_sleep_check_duration: Some(btdm_sleep_check_duration),
-    btdm_sleep_enter_phase1: Some(btdm_sleep_enter_phase1),
-    btdm_sleep_enter_phase2: Some(btdm_sleep_enter_phase2),
-    btdm_sleep_exit_phase1: Some(btdm_sleep_exit_phase1),
-    btdm_sleep_exit_phase2: Some(btdm_sleep_exit_phase2),
-    btdm_sleep_exit_phase3: Some(btdm_sleep_exit_phase3),
+    read_efuse_mac: Some(super::read_efuse_mac),
+    srand: Some(super::srand),
+    rand: Some(super::rand),
+    btdm_lpcycles_2_hus: Some(super::btdm_lpcycles_2_hus),
+    btdm_hus_2_lpcycles: Some(super::btdm_hus_2_lpcycles),
+    btdm_sleep_check_duration: Some(super::btdm_sleep_check_duration),
+    btdm_sleep_enter_phase1: Some(super::btdm_sleep_enter_phase1),
+    btdm_sleep_enter_phase2: Some(super::btdm_sleep_enter_phase2),
+    btdm_sleep_exit_phase1: Some(super::btdm_sleep_exit_phase1),
+    btdm_sleep_exit_phase2: Some(super::btdm_sleep_exit_phase2),
+    btdm_sleep_exit_phase3: Some(super::btdm_sleep_exit_phase3),
     coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
     coex_bt_wakeup_request_end: Some(coex_bt_wakeup_request_end),
     coex_bt_request: Some(coex_bt_request),
@@ -157,7 +149,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     coex_schm_curr_phase_get: Some(coex_schm_curr_phase_get),
     coex_wifi_channel_get: Some(coex_wifi_channel_get),
     coex_register_wifi_channel_change_callback: Some(coex_register_wifi_channel_change_callback),
-    set_isr13: Some(set_isr13),
+    set_isr_l3: Some(set_isr_l3),
     interrupt_l3_disable: Some(interrupt_l3_disable),
     interrupt_l3_restore: Some(interrupt_l3_restore),
     custom_queue_create: Some(custom_queue_create),
@@ -165,6 +157,23 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     patch_apply: Some(patch_apply),
     magic: 0xfadebead,
 };
+
+unsafe extern "C" fn set_isr_l3(n: i32, handler: unsafe extern "C" fn(), arg: *const ()) -> i32 {
+    trace!("set_isr_l3 called {} {:?} {:?}", n, handler, arg);
+    unsafe { set_isr(n, handler, arg) }
+}
+
+unsafe extern "C" fn interrupt_l3_disable() {
+    unsafe { super::interrupt_disable() }
+}
+
+unsafe extern "C" fn interrupt_l3_restore() {
+    unsafe { super::interrupt_enable() }
+}
+
+unsafe extern "C" fn custom_queue_create(_len: u32, _item_size: u32) -> *mut c_void {
+    todo!();
+}
 
 extern "C" fn patch_apply() {
     trace!("patch apply");
