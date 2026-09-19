@@ -57,7 +57,10 @@ pub enum SocResetReason {
 ///   - TOP: power_pd_top_cntl (system top-level)
 ///   - CNNT: power_pd_cnnt_cntl (connectivity, eco5 new -- replaces hpaon/hpcpu/hpwifi)
 ///   - HPMEM: power_pd_hpmem_cntl (HP memory)
+///   - CPU: power_pd_hp_cpu_cntl (the CPU that a light sleep with retention powers down)
 ///   - LPPERI: power_pd_lpperi_cntl (LP peripherals, eco5 new)
+///
+/// esp-idf clears the same flags for TOP, CNNT, HPMEM and CPU (`esp32p4/pmu_init.c:142-160`).
 fn pmu_power_domain_force_default() {
     let pmu = PMU::regs();
 
@@ -89,6 +92,17 @@ fn pmu_power_domain_force_default() {
         w.force_hp_mem_no_reset().bit(false);
         w.force_hp_mem_no_iso().bit(false);
         w.force_hp_mem_pd().bit(false)
+    });
+
+    // PMU_HP_PD_CPU. A force flag here keeps the CPU domain powered through a sleep that asks for
+    // the power-down, so a light sleep with CPU retention needs this clear.
+    pmu.power_pd_hp_cpu_cntl().modify(|_, w| {
+        w.force_hp_cpu_reset().bit(false);
+        w.force_hp_cpu_iso().bit(false);
+        w.force_hp_cpu_pu().bit(false);
+        w.force_hp_cpu_no_reset().bit(false);
+        w.force_hp_cpu_no_iso().bit(false);
+        w.force_hp_cpu_pd().bit(false)
     });
 
     // PMU_LP_PD_LPPERI (eco5 new)

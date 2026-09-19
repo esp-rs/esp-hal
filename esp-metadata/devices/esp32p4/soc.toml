@@ -61,6 +61,7 @@ peripherals = [
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "LP_I2C_ANA_MST" },
+    { name = "CACHE", hidden = true },
     { name = "CLIC" },
     { name = "CLINT" },
     { name = "CLINT_OTHER_CORE" },
@@ -77,6 +78,7 @@ peripherals = [
     { name = "LP_WDT" },
     { name = "LPWR", pac = "LP_SYS" },
     { name = "PMU" },
+    { name = "PAU" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
@@ -482,6 +484,11 @@ wakeup_sources = {
     Ext1 = 12,
     Timer = 13,
 }
+
+[device.sleep.retention]
+cpu_retention = "software"
+cpu_retention_frame = "p4"
+supports_top_power_down = true
 
 [device.spi_slave]
 support_status = "partial"

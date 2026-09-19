@@ -11,7 +11,10 @@ use crate::{
     rtc_cntl::{
         Rtc,
         rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
-        sleep::{SleepKind, pmu_common::SleepTimeConfig},
+        sleep::{
+            SleepKind,
+            pmu_common::{SleepTimeConfig, request_sleep},
+        },
     },
     soc::clocks::{self, ClockTree, CpuRootClkConfig},
 };
@@ -780,7 +783,10 @@ bitfield::bitfield! {
     /// Controls the power-down status of the high-performance peripheral domain.
     pub u32, pd_hp_periph, set_pd_hp_periph: 3;
     /// Controls the power-down status of the CPU power domain.
-    pub u32, pd_cpu      , set_pd_cpu      : 4;
+    ///
+    /// Crate-private, because a light sleep needs CPU retention to power this domain down. A
+    /// power-down without retention loses the CPU state.
+    pub(crate) u32, pd_cpu, set_pd_cpu: 4;
     /// Controls the power-down status of the high-performance always-on domain.
     pub u32, pd_hp_aon   , set_pd_hp_aon   : 5;
     /// Controls the power-down status of memory group 0.
@@ -909,10 +915,11 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures the wakeup options and requests the sleep.
+    /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// The caller waits for the result of the request. The return value is a guard that restores
-    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
+    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
+    /// sleep ends.
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
         // Switch the CPU root clock to XTAL for the duration of sleep.
@@ -1040,11 +1047,15 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode.
 
-        PMU::regs()
-            .slp_wakeup_cntl0()
-            .write(|w| w.sleep_req().bit(true));
-
         (restore_clock_config, restore_boot_vector)
+    }
+
+    /// Requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    #[inline(always)]
+    pub(crate) fn enter_sleep(&self) -> bool {
+        request_sleep()
     }
 
     /// Cleans up after sleep.

@@ -14,6 +14,8 @@
 //!    * `ULP (Ultra-Low Power)` wake
 //!    * `BT (Bluetooth) wake` - light sleep only
 
+use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
+
 use crate::{
     gpio,
     peripherals::LPWR,
@@ -21,7 +23,7 @@ use crate::{
 };
 
 #[cfg(soc_has_pmu)]
-mod pmu_common;
+pub(crate) mod pmu_common;
 
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
@@ -42,6 +44,44 @@ mod timer;
 
 mod wakeup;
 pub(crate) use wakeup::*;
+
+#[cfg(supports_cpu_power_down)]
+use crate::rtc_cntl::cpu_retention;
+
+/// The handler that answers whether this core still agrees to a light sleep, or null.
+///
+/// Only the rendezvous of the software retention path reads this, which is why the read lives
+/// there.
+#[cfg(all(multi_core, sleep_driver_supported))]
+pub(crate) static CAN_SLEEP_HANDLER: portable_atomic::AtomicPtr<()> =
+    portable_atomic::AtomicPtr::new(core::ptr::null_mut());
+
+/// The parts of the sleep path that an RTOS fills in.
+#[cfg(all(multi_core, sleep_driver_supported))]
+#[doc(hidden)]
+#[instability::unstable]
+pub mod __rtos_implementation {
+    use portable_atomic::Ordering;
+
+    /// Registers the function that answers whether the core that runs it agrees to a light sleep.
+    ///
+    /// A light sleep that powers the CPU domain down needs every running core to save itself, so
+    /// one core requests the sleep and the other core joins it. The core that requests the sleep
+    /// decides for itself. The other core answers this function, and a `false` answer stops the
+    /// sleep.
+    ///
+    /// The answer holds for the whole sleep. The core that gives it has its interrupts disabled
+    /// already, so nothing can give that core work while the sleep runs.
+    ///
+    /// # Safety
+    ///
+    /// The handler runs in an interrupt handler, with interrupts disabled and with the caches of
+    /// the sleep path. It must return, it must take no lock that a core can hold across a sleep,
+    /// and it must stay callable for the life of the program.
+    pub unsafe fn set_can_sleep_handler(handler: fn() -> bool) {
+        super::CAN_SLEEP_HANDLER.store(handler as *mut (), Ordering::Release);
+    }
+}
 
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
@@ -118,6 +158,7 @@ impl<'d> LowPower<'d> {
     /// if the armed wakeup deadline is too near for the sleep transition to catch it. In both
     /// cases the chip never wakes again, and it gives no report of the cause.
     #[cfg(sleep_deep_sleep)]
+    #[cfg(feature = "rt")]
     pub fn sleep_deep(&mut self, config: RtcSleepConfig) -> ! {
         #[cfg(sleep_has_wakeup_source_timer)]
         if enabled_sources().contains(WakeupSource::Timer) {
@@ -148,6 +189,7 @@ impl<'d> LowPower<'d> {
     ///
     /// Panics if no wakeup source is enabled.
     #[cfg(sleep_deep_sleep)]
+    #[cfg(feature = "rt")]
     pub fn sleep_deep_with_rejection(&mut self, config: RtcSleepConfig) {
         self.sleep(config, SleepKind::Deep, true);
     }
@@ -162,6 +204,7 @@ impl<'d> LowPower<'d> {
     /// reports neither case. For the caller, a refused sleep, a rejected sleep and a very short
     /// sleep have the same result.
     #[cfg(sleep_light_sleep)]
+    #[cfg(feature = "rt")]
     pub fn sleep_light(&mut self, config: RtcSleepConfig) {
         self.sleep(config, SleepKind::Light, true);
     }
@@ -169,17 +212,66 @@ impl<'d> LowPower<'d> {
     /// Calculates the sleep configuration from the wakeup-enable mask, and enters the sleep.
     #[cfg(sleep_driver_supported)]
     #[crate::ram]
+    #[cfg(feature = "rt")]
     fn sleep(&mut self, config: RtcSleepConfig, kind: SleepKind, allow_reject: bool) {
+        // ESP-IDF runs `esp_light_sleep_start` inside `portENTER_CRITICAL(&light_sleep_lock)`.
+        // A sleep ends when `wait_for_sleep_result` sees a wakeup or reject bit, so nothing in
+        // this path needs interrupts.
+        let irq_token = unsafe { SingleCoreInterruptLock.enter() };
+        self.sleep_with_interrupts_disabled(config, kind, allow_reject);
+        unsafe { SingleCoreInterruptLock.exit(irq_token) };
+    }
+
+    #[cfg(sleep_driver_supported)]
+    #[crate::ram]
+    #[cfg(feature = "rt")]
+    fn sleep_with_interrupts_disabled(
+        &mut self,
+        config: RtcSleepConfig,
+        kind: SleepKind,
+        allow_reject: bool,
+    ) {
         let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
 
         let mut config = config;
         config.set_sleep_kind(kind);
+
+        // A chip that retains the CPU in software needs every running core to save itself, so the
+        // rendezvous comes first, before any step that a return would have to undo. This core
+        // acts as the helper of the other core when it loses the arbitration, and the sleep is
+        // over when that call returns.
+        #[cfg(cpu_retention = "software")]
+        if kind == SleepKind::Light && crate::rtc_cntl::installed_buffer_ptr().is_some() {
+            let engage = cfg_select! {
+                multi_core => cpu_retention::rendezvous::engage(),
+                _ => true,
+            };
+            if !engage {
+                return;
+            }
+        }
 
         // The hooks run before `apply`, so that a request to keep a power domain powered reaches
         // the hardware. They also run before the last read of the mask, because a hook can
         // enable another source. The GPIO hook does this while it allocates its pins to the
         // paths.
         run_entry_hooks(&mut config);
+
+        // Retention serves light sleep only. Deep sleep resets the chip, so it has no CPU state to
+        // bring back, and an armed descriptor would outlive the sleep in the RTC domain. esp-idf
+        // arms retention from its light sleep path alone.
+        #[cfg(supports_cpu_power_down)]
+        let retention_buffer = match kind {
+            SleepKind::Light => {
+                let buffer = crate::rtc_cntl::installed_buffer_ptr();
+                cpu_retention::configure_cpu_retention(&mut config, buffer);
+                buffer
+            }
+
+            // A deep sleep keeps what `RtcSleepConfig::deep` asked for, because the wake resets
+            // the chip and keeps no CPU state to lose.
+            SleepKind::Deep => None,
+        };
 
         config.apply();
 
@@ -215,12 +307,35 @@ impl<'d> LowPower<'d> {
         let before = rtc.time_since_boot_raw();
 
         let _uart0_sclk_guard = crate::system::ensure_uart0_sclk_enabled();
+
+        #[cfg(multi_core)]
+        let parked = match kind {
+            SleepKind::Light => park_other_cores(),
+            // A deep sleep resets the chip, so the other core needs no stall, and nothing thaws
+            // it afterwards.
+            SleepKind::Deep => 0,
+        };
+
         let rejected = {
             // A chip can keep a guard for the length of the sleep, to restore what sleep entry
             // changed for the sleep only. The guard must therefore outlive the wait below.
+            // ESP-IDF arms RTC_CNTL retention in `misc_modules_sleep_prepare`, before it arms the
+            // wakeup sources.
+
+            #[cfg(cpu_retention = "rtc_cntl")]
+            cpu_retention::prepare_cpu_retention(retention_buffer);
+
             #[allow(clippy::let_unit_value)]
             let _sleep_guard = config.start_sleep(wakeup_mask, reject_mask);
-            let rejected = wait_for_sleep_result();
+
+            let rejected = cfg_select! {
+                cpu_retention = "software" => {
+                    // The software chips save the CPU inside the request, so the request belongs to
+                    // them. ESP-IDF wraps `pmu_sleep_start` the same way (`sleep_modes.c:963-964`).
+                    cpu_retention::enter_sleep_with_retention(&config, retention_buffer)
+                }
+                _ => config.enter_sleep(),
+            };
 
             if config.is_deep_sleep() && !rejected {
                 // The chip is entering deep sleep, and the wake resets it. Because RTC is in a
@@ -233,7 +348,20 @@ impl<'d> LowPower<'d> {
             rejected
         };
 
+        #[cfg(supports_cpu_power_down)]
+        if kind == SleepKind::Light && retention_buffer.is_some() {
+            cpu_retention::finish_cpu_retention(rejected);
+
+            // The helper waits for this store, so it must run before this core
+            // can request another sleep.
+            #[cfg(all(cpu_retention = "software", multi_core))]
+            cpu_retention::rendezvous::finish();
+        }
+
         config.finish_sleep();
+
+        #[cfg(multi_core)]
+        unpark_cores(parked);
 
         let after = rtc.time_since_boot_raw();
 
@@ -259,6 +387,57 @@ impl<'d> LowPower<'d> {
     }
 }
 
+/// Hardware-stalls the other running cores for the length of a light sleep, or thaws them.
+///
+/// A stall is enough where the retention DMA saves the CPU domain, because the domain holds every
+/// core and the hardware brings the stalled core back with this one. esp-idf stalls the other core
+/// the same way and adds nothing more (`sleep_modes.c`, where the SMP retention work is gated on
+/// `SOC_PM_CPU_RETENTION_BY_SW`).
+///
+/// FIXME: a stall freezes the other core wherever it stands, which can be inside an interrupt
+/// handler that holds a cross-core lock, such as the clock tree, the peripheral reference counts,
+/// or the UART locks that this path takes. This core then spins for that lock for ever, because the
+/// frozen core cannot release it.
+///
+/// A chip that retains the CPU in software needs more than a stall, because each core saves
+/// itself, and a frozen core saves nothing. The rendezvous of that path keeps the other core
+/// running, so this function stalls nothing while a helper is enlisted.
+///
+/// Returns the cores that it stalled, as a bit for each [`Cpu`], for [`unpark_cores`]. A core that
+/// the program stalled before the sleep stays stalled after it.
+#[cfg(all(multi_core, sleep_driver_supported))]
+#[crate::ram]
+fn park_other_cores() -> u8 {
+    // A core that saves itself in the rendezvous must keep running, because a stalled core saves
+    // nothing.
+    #[cfg(all(cpu_retention = "software", multi_core, feature = "rt"))]
+    if cpu_retention::rendezvous::helper_enlisted() {
+        return 0;
+    }
+
+    let mut parked = 0;
+    for cpu in crate::system::Cpu::other() {
+        if crate::soc::cpu_control::is_running(cpu) {
+            // SAFETY: [`unpark_cores`] runs before this function returns to its caller.
+            unsafe { crate::soc::cpu_control::internal_park_core(cpu, true) };
+            parked |= 1 << cpu as u8;
+        }
+    }
+    parked
+}
+
+/// Thaws the cores that [`park_other_cores`] stalled.
+#[cfg(all(multi_core, sleep_driver_supported))]
+#[crate::ram]
+fn unpark_cores(parked: u8) {
+    for cpu in crate::system::Cpu::other() {
+        if parked & (1 << cpu as u8) != 0 {
+            // SAFETY: this core stalled that core for the sleep, and the sleep is over.
+            unsafe { crate::soc::cpu_control::internal_park_core(cpu, false) };
+        }
+    }
+}
+
 /// Waits for the hardware to report the result of the sleep request, and returns whether the
 /// hardware rejected the request.
 ///
@@ -267,21 +446,24 @@ impl<'d> LowPower<'d> {
 /// only report of that case. ESP-IDF waits in the same place, in `rtc_sleep_start` and in
 /// `pmu_sleep_start`.
 #[cfg(sleep_driver_supported)]
-fn wait_for_sleep_result() -> bool {
+#[inline(always)]
+pub(crate) fn wait_for_sleep_result() -> bool {
     loop {
         cfg_select! {
             soc_has_pmu => {
                 let int_raw = crate::peripherals::PMU::regs().int_raw().read();
-                if int_raw.soc_wakeup().bit_is_set() || int_raw.soc_sleep_reject().bit_is_set() {
-                    return int_raw.soc_sleep_reject().bit_is_set();
-                }
+                let rejected = int_raw.soc_sleep_reject().bit_is_set();
+                let wakeup = int_raw.soc_wakeup().bit_is_set();
             }
             _ => {
                 let int_raw = LPWR::regs().int_raw().read();
-                if int_raw.slp_wakeup().bit_is_set() || int_raw.slp_reject().bit_is_set() {
-                    return int_raw.slp_reject().bit_is_set();
-                }
+                let rejected = int_raw.slp_reject().bit_is_set();
+                let wakeup = int_raw.slp_wakeup().bit_is_set();
             }
+        }
+
+        if wakeup || rejected {
+            return rejected;
         }
     }
 }

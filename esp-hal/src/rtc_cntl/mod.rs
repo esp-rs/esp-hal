@@ -118,9 +118,40 @@ use crate::{
     peripherals::Interrupt,
 };
 use crate::{peripherals::RTC_TIMER, system::Cpu, time::Duration};
-// only include sleep where it's been implemented
-#[cfg(sleep_driver_supported)]
-pub mod sleep;
+
+unstable_module! {
+    // only include sleep where it's been implemented
+    #[cfg(sleep_driver_supported)]
+    pub mod sleep;
+}
+
+cfg_select! {
+    supports_cpu_power_down => {
+        mod cpu_retention;
+        pub(crate) use cpu_retention::installed_buffer_ptr;
+        #[instability::unstable]
+        pub use cpu_retention::memory::{
+            CpuRetentionMemory,
+            CpuRetentionMemoryError,
+            CpuRetentionStorage,
+        };
+    }
+    _ => {}
+}
+
+cfg_select! {
+    supports_tagmem_power_down => {
+        #[path = "cpu_retention/tagmem.rs"]
+        mod tagmem;
+        #[instability::unstable]
+        pub use tagmem::{
+            CacheTagRetentionMemory,
+            CacheTagRetentionMemoryError,
+            CacheTagRetentionStorage,
+        };
+    }
+    _ => {}
+}
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
 #[cfg_attr(esp32c2, path = "rtc/esp32c2.rs")]
