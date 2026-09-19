@@ -582,12 +582,14 @@ fn configure_iomux_function_clock_impl(
 impl TimgInstance {
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
         match self {
-            TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
-                .timergrp0_ctrl0()
-                .modify(|_, w| w.t0_clk_en().bit(en).t1_clk_en().bit(en)),
-            TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
-                .timergrp1_ctrl0()
-                .modify(|_, w| w.t0_clk_en().bit(en).t1_clk_en().bit(en)),
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs().timergrp0_ctrl0().modify(|_, w| {
+                w.t0_clk_en().bit(en);
+                w.t1_clk_en().bit(en)
+            }),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs().timergrp1_ctrl0().modify(|_, w| {
+                w.t0_clk_en().bit(en);
+                w.t1_clk_en().bit(en)
+            }),
         };
     }
     fn configure_function_clock_impl(
@@ -596,38 +598,23 @@ impl TimgInstance {
         _old: Option<TimgFunctionClockConfig>,
         new: TimgFunctionClockConfig,
     ) {
+        let bits = match new {
+            TimgFunctionClockConfig::XtalClk => 0,
+            TimgFunctionClockConfig::RcFastClk => 1,
+            TimgFunctionClockConfig::PllF80m => 2,
+        };
         match self {
             TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
                 .timergrp0_ctrl0()
                 .modify(|_, w| unsafe {
-                    w.t0_src_sel()
-                        .bits(match new {
-                            TimgFunctionClockConfig::XtalClk => 0,
-                            TimgFunctionClockConfig::RcFastClk => 1,
-                            TimgFunctionClockConfig::PllF80m => 2,
-                        })
-                        .t1_src_sel()
-                        .bits(match new {
-                            TimgFunctionClockConfig::XtalClk => 0,
-                            TimgFunctionClockConfig::RcFastClk => 1,
-                            TimgFunctionClockConfig::PllF80m => 2,
-                        })
+                    w.t0_src_sel().bits(bits);
+                    w.t1_src_sel().bits(bits)
                 }),
             TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
                 .timergrp1_ctrl0()
                 .modify(|_, w| unsafe {
-                    w.t0_src_sel()
-                        .bits(match new {
-                            TimgFunctionClockConfig::XtalClk => 0,
-                            TimgFunctionClockConfig::RcFastClk => 1,
-                            TimgFunctionClockConfig::PllF80m => 2,
-                        })
-                        .t1_src_sel()
-                        .bits(match new {
-                            TimgFunctionClockConfig::XtalClk => 0,
-                            TimgFunctionClockConfig::RcFastClk => 1,
-                            TimgFunctionClockConfig::PllF80m => 2,
-                        })
+                    w.t0_src_sel().bits(bits);
+                    w.t1_src_sel().bits(bits)
                 }),
         };
     }
@@ -648,25 +635,18 @@ impl TimgInstance {
         _old: Option<TimgWdtClockConfig>,
         new: TimgWdtClockConfig,
     ) {
+        let bits = match new {
+            TimgWdtClockConfig::XtalClk => 0,
+            TimgWdtClockConfig::RcFastClk => 1,
+            TimgWdtClockConfig::PllF80m => 2,
+        };
         match self {
             TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
                 .timergrp0_ctrl0()
-                .modify(|_, w| unsafe {
-                    w.wdt_src_sel().bits(match new {
-                        TimgWdtClockConfig::XtalClk => 0,
-                        TimgWdtClockConfig::RcFastClk => 1,
-                        TimgWdtClockConfig::PllF80m => 2,
-                    })
-                }),
+                .modify(|_, w| unsafe { w.wdt_src_sel().bits(bits) }),
             TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
                 .timergrp1_ctrl0()
-                .modify(|_, w| unsafe {
-                    w.wdt_src_sel().bits(match new {
-                        TimgWdtClockConfig::XtalClk => 0,
-                        TimgWdtClockConfig::RcFastClk => 1,
-                        TimgWdtClockConfig::PllF80m => 2,
-                    })
-                }),
+                .modify(|_, w| unsafe { w.wdt_src_sel().bits(bits) }),
         };
     }
 }
