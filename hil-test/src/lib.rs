@@ -104,6 +104,42 @@ macro_rules! common_test_pins {
     }};
 }
 
+// A pair of connected LP pads.
+#[macro_export]
+macro_rules! lp_test_pins {
+    ($peripherals:expr) => {{
+        cfg_select! {
+            esp32c5 => ($peripherals.GPIO4, $peripherals.GPIO5),
+            esp32h2 => ($peripherals.GPIO10, $peripherals.GPIO11),
+            // The pair of every other board is the one of `common_test_pins!`.
+            _ => $crate::common_test_pins!($peripherals),
+        }
+    }};
+}
+
+// A pair of connected HP pads.
+//
+// On the C2 the second pin is an LP pad, because the board has no second free HP pad. It only
+// observes the first one, so the pad under test is still HP.
+//
+// The ESP32 is missing, the devkit we use has no free HP pad at all.
+#[macro_export]
+macro_rules! hp_test_pins {
+    ($peripherals:expr) => {{
+        cfg_select! {
+            esp32c2 => ($peripherals.GPIO10, $peripherals.GPIO0),
+            esp32c3 => ($peripherals.GPIO6, $peripherals.GPIO7),
+            any(esp32c6, esp32c61) => ($peripherals.GPIO22, $peripherals.GPIO23),
+            esp32p4 => ($peripherals.GPIO46, $peripherals.GPIO53),
+            esp32s2 => ($peripherals.GPIO37, $peripherals.GPIO38),
+            esp32s3 => ($peripherals.GPIO40, $peripherals.GPIO41),
+            esp32s31 => ($peripherals.GPIO8, $peripherals.GPIO44),
+            // The HP pair of the C5 and of the H2 is the one of `common_test_pins!`.
+            any(esp32c5, esp32h2) => $crate::common_test_pins!($peripherals),
+        }
+    }};
+}
+
 // A GPIO that's not connected to anything. We use the BOOT pin for this, but
 // beware: it has a pullup.
 #[macro_export]
