@@ -138,6 +138,24 @@ mod timers_executors {
         run_test_oneshot_timer(timg0.timer0.reborrow());
     }
 
+    /// The S31 TIMG source must be PLL_F80M. With the reset XTAL source, a
+    /// 100 ms alarm takes about 200 ms because the timer prescaler is two.
+    #[test]
+    #[cfg(esp32s31)]
+    fn test_s31_timg_clock_rate(peripherals: Peripherals) {
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        let mut timer = OneShotTimer::new(timg0.timer0);
+
+        let start = time::Instant::now();
+        timer.delay_millis(100);
+        let elapsed = (time::Instant::now() - start).as_micros();
+
+        assert!(
+            (95_000..150_000).contains(&elapsed),
+            "S31 TIMG0 delay was {elapsed} us"
+        );
+    }
+
     #[test]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_oneshot_systimer(peripherals: Peripherals) {
