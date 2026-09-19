@@ -18,6 +18,7 @@ use crate::{
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripherals::{APB_SARADC, Interrupt, LP_PERI},
     rtc_cntl::WakeLock,
+    soc::regi2c::{ADC_SAR1_SAMPLE_CYCLE, ADC_SAR2_SAMPLE_CYCLE},
     system::{GenericPeripheralGuard, Peripheral},
 };
 
@@ -64,6 +65,12 @@ const FORCE_XPD_SAR_PU: u8 = 3;
 /// `components/esp_hal_ana_conv/esp32s31/include/hal/adc_ll.h`.
 const CLK_DIV_NUM: u8 = 4;
 
+/// Cycles between starting the sensor and receiving data.
+///
+/// See `ADC_LL_SAMPLE_CYCLE_DEFAULT` in
+/// `components/esp_hal_ana_conv/esp32s31/include/hal/adc_ll.h`.
+const SAMPLE_CYCLE: u8 = 2;
+
 /// Digital controller clock source select value for XTAL.
 const CLK_SRC_XTAL: u8 = 1;
 
@@ -76,10 +83,35 @@ fn enable_refgen() {
     });
 }
 
+/// Powers both SAR units up, matching `sar_periph_ctrl_adc_oneshot_power_acquire`.
+fn power_on_sar_units() {
+    enable_refgen();
+
+    APB_SARADC::regs().ctrl0().modify(|_, w| unsafe {
+        w.xpd_sar1_force().bits(FORCE_XPD_SAR_PU);
+        w.sar1_continue_mode_en().clear_bit();
+        w.sar1_trigger_stop().set_bit()
+    });
+    APB_SARADC::regs().ctrl1().modify(|_, w| unsafe {
+        w.xpd_sar2_force().bits(FORCE_XPD_SAR_PU);
+        w.sar2_continue_mode_en().clear_bit();
+        w.sar2_trigger_stop().set_bit()
+    });
+}
+
+/// Programs the regi2c SARADC timing registers once at init.
+fn configure_analog() {
+    ADC_SAR1_SAMPLE_CYCLE.write_field(SAMPLE_CYCLE);
+    ADC_SAR2_SAMPLE_CYCLE.write_field(SAMPLE_CYCLE);
+}
+
 #[doc(hidden)]
 pub trait RegisterAccess {
-    /// Powers the SAR up and puts the unit into single-conversion mode.
-    fn enable();
+    /// Clears a stale conversion-done flag before starting a new sample.
+    fn clear_event();
+
+    /// Prepares the unit for a one-shot conversion.
+    fn prepare();
 
     /// Programs the single-entry pattern table with the given channel.
     fn program_pattern(channel: u8);
@@ -95,22 +127,35 @@ pub trait RegisterAccess {
 
     /// Clears the done flag and stops triggering.
     fn reset();
+
+    /// Runs one blocking conversion on `channel`.
+    fn sample(channel: u8) -> u16 {
+        Self::clear_event();
+        Self::prepare();
+        Self::program_pattern(channel);
+        Self::start_sample();
+
+        while !Self::is_done() {}
+
+        let converted_value = Self::read_data();
+        Self::reset();
+        converted_value
+    }
 }
 
 #[cfg(adc_adc1)]
 impl RegisterAccess for crate::peripherals::ADC1<'_> {
-    fn enable() {
+    fn clear_event() {
+        APB_SARADC::regs()
+            .int_clr()
+            .write(|w| w.sar1_done().clear_bit_by_one());
+    }
+
+    fn prepare() {
         APB_SARADC::regs()
             .ctrl2()
             .modify(|_, w| w.timer_en().clear_bit());
-
-        enable_refgen();
-
-        APB_SARADC::regs().ctrl0().modify(|_, w| unsafe {
-            w.xpd_sar1_force().bits(FORCE_XPD_SAR_PU);
-            w.sar1_continue_mode_en().clear_bit();
-            w.sar1_trigger_stop().set_bit()
-        });
+        power_on_sar_units();
     }
 
     fn program_pattern(channel: u8) {
@@ -167,18 +212,17 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
 
 #[cfg(adc_adc2)]
 impl RegisterAccess for crate::peripherals::ADC2<'_> {
-    fn enable() {
+    fn clear_event() {
+        APB_SARADC::regs()
+            .int_clr()
+            .write(|w| w.sar2_done().clear_bit_by_one());
+    }
+
+    fn prepare() {
         APB_SARADC::regs()
             .ctrl2()
             .modify(|_, w| w.timer_en().clear_bit());
-
-        enable_refgen();
-
-        APB_SARADC::regs().ctrl1().modify(|_, w| unsafe {
-            w.xpd_sar2_force().bits(FORCE_XPD_SAR_PU);
-            w.sar2_continue_mode_en().clear_bit();
-            w.sar2_trigger_stop().set_bit()
-        });
+        power_on_sar_units();
     }
 
     fn program_pattern(channel: u8) {
@@ -262,7 +306,9 @@ where
             .ctrl_date()
             .modify(|_, w| w.clk_en().set_bit());
 
-        ADCX::enable();
+        configure_analog();
+        ADCX::prepare();
+        ADCX::reset();
 
         Adc {
             _adc: adc_instance,
@@ -298,15 +344,7 @@ where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
-        ADCX::program_pattern(pin.pin.adc_channel());
-        ADCX::start_sample();
-
-        while !ADCX::is_done() {}
-
-        let converted_value = ADCX::read_data();
-        ADCX::reset();
-
-        converted_value
+        ADCX::sample(pin.pin.adc_channel())
     }
 
     /// Requests that the ADC begin a conversion on the specified pin.
@@ -336,6 +374,8 @@ where
             // If no conversions are in progress, start a new one for given channel
             self.active_channel = Some(pin.pin.adc_channel());
 
+            ADCX::clear_event();
+            ADCX::prepare();
             ADCX::program_pattern(pin.pin.adc_channel());
             ADCX::start_sample();
         }
@@ -399,6 +439,8 @@ where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
     {
+        ADCX::clear_event();
+        ADCX::prepare();
         ADCX::program_pattern(pin.pin.adc_channel());
         ADCX::start_sample();
 
