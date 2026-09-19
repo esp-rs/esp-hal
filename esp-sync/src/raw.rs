@@ -35,7 +35,7 @@ impl RawLock for SingleCoreInterruptLock {
     #[inline]
     unsafe fn enter(&self) -> RestoreState {
         cfg_select! {
-            esp32p4 => {
+            any(esp32p4, esp32s31) => {
                 // TODO: any with zcmp
                 // ESP32-P4 (v3.2/ECO7 etc.) Zcmp hardware bug workaround (IDF-14279 / DIG-661):
                 // Clearing mstatus.mie alone does not fully mask CLIC interrupts -- an
@@ -96,7 +96,7 @@ impl RawLock for SingleCoreInterruptLock {
         let token = token.inner();
 
         cfg_select! {
-            esp32p4 => {
+            any(esp32p4, esp32s31) => {
                 if (token & 0b1000) != 0 {
                     unsafe {
                         riscv::interrupt::enable();

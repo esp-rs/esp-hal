@@ -5,19 +5,14 @@ use core::{
 };
 
 use esp_phy::PhyInitGuard;
-use esp_sync::RawMutex;
-use portable_atomic::{AtomicBool, Ordering};
+use portable_atomic::{AtomicBool, AtomicU32, Ordering};
 
 use super::{Config, ReceivedPacket};
 #[cfg(feature = "coex")]
 use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
-    ble::{
-        HCI_OUT_COLLECTOR,
-        HciOutCollector,
-        btdm::ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s},
-    },
+    ble::{HCI_OUT_COLLECTOR, HciOutCollector},
     compat::common::str_from_c,
     hal::ram,
     sys::{c_types::*, include::*},
@@ -26,7 +21,13 @@ use crate::{
 #[cfg_attr(esp32c3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32s3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
-pub(crate) mod ble_os_adapter_chip_specific;
+pub(crate) mod chip_specific;
+
+use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
+
+pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
+    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
+}
 
 static PACKET_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 static PACKET_SENT_WAKER: AtomicWaker = AtomicWaker::new();
@@ -95,35 +96,28 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-// This is fine, we're only accessing it inside a critical section (protected by INTERRUPT_LOCK).
-static mut G_INTER_FLAGS: heapless::Vec<esp_sync::RestoreState, 10> = heapless::Vec::new();
-
-static INTERRUPT_LOCK: RawMutex = RawMutex::new();
+static CRITICAL_NEST: AtomicU32 = AtomicU32::new(0);
+static CRITICAL_TOKEN: AtomicU32 = AtomicU32::new(0);
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
-    #[allow(static_mut_refs)]
-    unsafe {
-        let flags = unwrap!(
-            G_INTER_FLAGS.pop(),
-            "interrupt_enable called without prior interrupt_disable"
-        );
-        trace!("interrupt_enable {:?}", flags);
-        INTERRUPT_LOCK.release(flags);
+    trace!("interrupt_enable");
+    if CRITICAL_NEST.fetch_sub(1, Ordering::Release) == 1 {
+        let last = CRITICAL_TOKEN.load(Ordering::Relaxed);
+
+        unsafe {
+            super::ESP_RADIO_LOCK.release(esp_sync::RestoreState::new(last));
+        }
     }
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    #[allow(static_mut_refs)]
-    unsafe {
-        let flags = INTERRUPT_LOCK.acquire();
-        unwrap!(
-            G_INTER_FLAGS.push(flags),
-            "interrupt_disable was called too many times"
-        );
-        trace!("interrupt_disable {:?}", flags);
+    let last = CRITICAL_NEST.fetch_add(1, Ordering::Release);
+    if last == 0 {
+        let token = unsafe { super::ESP_RADIO_LOCK.acquire().inner() };
+        CRITICAL_TOKEN.store(token, Ordering::Relaxed);
     }
 }
 
@@ -257,45 +251,9 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
     todo!();
 }
 
-unsafe extern "C" fn coex_schm_status_bit_set(typ: i32, status: i32) {
-    trace!("coex_schm_status_bit_set {} {}", typ, status);
-    #[cfg(feature = "coex")]
-    unsafe {
-        include::coex_schm_status_bit_set(typ as u32, status as u32)
-    };
-}
-
-unsafe extern "C" fn coex_schm_status_bit_clear(typ: i32, status: i32) {
-    trace!("coex_schm_status_bit_clear {} {}", typ, status);
-    #[cfg(feature = "coex")]
-    unsafe {
-        include::coex_schm_status_bit_clear(typ as u32, status as u32)
-    };
-}
-
 #[ram]
 unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
     unsafe { crate::common_adapter::read_mac(mac as *mut _, 2) }
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn set_isr13(n: i32, handler: unsafe extern "C" fn(), arg: *const ()) -> i32 {
-    unsafe { ble_os_adapter_chip_specific::set_isr(n, handler, arg) }
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn interrupt_l3_disable() {
-    // info!("unimplemented interrupt_l3_disable");
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn interrupt_l3_restore() {
-    //  info!("unimplemented interrupt_l3_restore");
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn custom_queue_create(_len: u32, _item_size: u32) -> *mut c_void {
-    todo!();
 }
 
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
@@ -315,9 +273,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         }
 
         // esp32_bt_controller_init
-        ble_os_adapter_chip_specific::btdm_controller_mem_init();
+        chip_specific::btdm_controller_mem_init();
 
-        let mut cfg = ble_os_adapter_chip_specific::create_ble_config(config);
+        let mut cfg = chip_specific::create_ble_config(config);
 
         let res = btdm_osi_funcs_register(&G_OSI_FUNCS);
         assert!(res == 0, "btdm_osi_funcs_register returned {}", res);
@@ -331,9 +289,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         let version = btdm_controller_get_compile_version();
         debug!("BT controller compile version {}", str_from_c(version));
 
-        ble_os_adapter_chip_specific::bt_periph_module_enable();
+        chip_specific::bt_periph_module_enable();
 
-        ble_os_adapter_chip_specific::disable_sleep_mode();
+        chip_specific::disable_sleep_mode();
 
         let res = btdm_controller_init(
             #[cfg(esp32)]
@@ -423,16 +381,12 @@ fn send_packet(packet: &[u8]) {
         PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
 
         #[cfg(all(esp32, feature = "coex"))]
-        ble_os_adapter_chip_specific::async_wakeup_request(
-            ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-        );
+        chip_specific::async_wakeup_request(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
 
         API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
 
         #[cfg(all(esp32, feature = "coex"))]
-        ble_os_adapter_chip_specific::async_wakeup_request_end(
-            ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-        );
+        chip_specific::async_wakeup_request_end(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
     }
 
     trace!("sent vhci host packet");

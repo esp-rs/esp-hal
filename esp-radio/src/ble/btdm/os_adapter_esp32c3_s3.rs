@@ -1,6 +1,5 @@
 use procmacros::BuilderLite;
 
-use super::*;
 #[cfg(multi_core)]
 use crate::hal::system::Cpu;
 use crate::{
@@ -8,6 +7,7 @@ use crate::{
     common_adapter::*,
     hal::{interrupt::Priority, peripherals::BT},
     interrupt_dispatch::Handler,
+    sys::{c_types::*, include::*},
 };
 
 static ISR_INTERRUPT_5: Handler = Handler::new();
@@ -73,8 +73,8 @@ pub(super) struct osi_funcs_s {
     coex_wifi_sleep_set: Option<unsafe extern "C" fn(i32)>,
     coex_core_ble_conn_dyn_prio_get: Option<unsafe extern "C" fn(*mut i32, *mut i32) -> i32>,
     coex_schm_register_btdm_callback: Option<unsafe extern "C" fn(*mut c_void) -> i32>,
-    coex_schm_status_bit_set: Option<unsafe extern "C" fn(i32, i32)>,
-    coex_schm_status_bit_clear: Option<unsafe extern "C" fn(i32, i32)>,
+    coex_schm_status_bit_set: Option<unsafe extern "C" fn(u32, u32)>,
+    coex_schm_status_bit_clear: Option<unsafe extern "C" fn(u32, u32)>,
     coex_schm_interval_get: Option<unsafe extern "C" fn() -> u32>,
     coex_schm_curr_period_get: Option<unsafe extern "C" fn() -> u8>,
     coex_schm_curr_phase_get: Option<unsafe extern "C" fn() -> *mut c_void>,
@@ -98,44 +98,44 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     interrupt_alloc: Some(interrupt_set),
     interrupt_free: Some(interrupt_clear),
     interrupt_handler_set: Some(interrupt_handler_set),
-    interrupt_disable: Some(interrupt_disable),
-    interrupt_restore: Some(interrupt_enable),
-    task_yield: Some(task_yield),
-    task_yield_from_isr: Some(task_yield_from_isr),
+    interrupt_disable: Some(super::interrupt_disable),
+    interrupt_restore: Some(super::interrupt_enable),
+    task_yield: Some(super::task_yield),
+    task_yield_from_isr: Some(super::task_yield_from_isr),
     semphr_create: Some(semphr_create),
     semphr_delete: Some(semphr_delete),
     semphr_take_from_isr: Some(semphr_take_from_isr),
     semphr_give_from_isr: Some(semphr_give_from_isr),
     semphr_take: Some(semphr_take),
     semphr_give: Some(semphr_give),
-    mutex_create: Some(mutex_create),
-    mutex_delete: Some(mutex_delete),
-    mutex_lock: Some(mutex_lock),
-    mutex_unlock: Some(mutex_unlock),
+    mutex_create: Some(super::mutex_create),
+    mutex_delete: Some(super::mutex_delete),
+    mutex_lock: Some(super::mutex_lock),
+    mutex_unlock: Some(super::mutex_unlock),
     queue_create: Some(queue_create),
     queue_delete: Some(queue_delete),
     queue_send: Some(queue_send),
     queue_send_from_isr: Some(queue_send_from_isr),
     queue_recv: Some(queue_recv),
     queue_recv_from_isr: Some(queue_recv_from_isr),
-    task_create: Some(task_create),
-    task_delete: Some(task_delete),
+    task_create: Some(super::task_create),
+    task_delete: Some(super::task_delete),
     is_in_isr: Some(is_in_isr),
     cause_sw_intr_to_core: None,
     malloc: Some(crate::ble::malloc),
-    malloc_internal: Some(crate::ble::malloc_internal),
+    malloc_internal: Some(super::malloc_internal),
     free: Some(crate::ble::free),
-    read_efuse_mac: Some(read_efuse_mac),
-    srand: Some(crate::ble::btdm::srand),
-    rand: Some(crate::ble::btdm::rand),
-    btdm_lpcycles_2_hus: Some(btdm_lpcycles_2_hus),
-    btdm_hus_2_lpcycles: Some(btdm_hus_2_lpcycles),
-    btdm_sleep_check_duration: Some(btdm_sleep_check_duration),
-    btdm_sleep_enter_phase1: Some(btdm_sleep_enter_phase1),
-    btdm_sleep_enter_phase2: Some(btdm_sleep_enter_phase2),
-    btdm_sleep_exit_phase1: Some(btdm_sleep_exit_phase1),
-    btdm_sleep_exit_phase2: Some(btdm_sleep_exit_phase2),
-    btdm_sleep_exit_phase3: Some(btdm_sleep_exit_phase3),
+    read_efuse_mac: Some(super::read_efuse_mac),
+    srand: Some(super::srand),
+    rand: Some(super::rand),
+    btdm_lpcycles_2_hus: Some(super::btdm_lpcycles_2_hus),
+    btdm_hus_2_lpcycles: Some(super::btdm_hus_2_lpcycles),
+    btdm_sleep_check_duration: Some(super::btdm_sleep_check_duration),
+    btdm_sleep_enter_phase1: Some(super::btdm_sleep_enter_phase1),
+    btdm_sleep_enter_phase2: Some(super::btdm_sleep_enter_phase2),
+    btdm_sleep_exit_phase1: Some(super::btdm_sleep_exit_phase1),
+    btdm_sleep_exit_phase2: Some(super::btdm_sleep_exit_phase2),
+    btdm_sleep_exit_phase3: Some(super::btdm_sleep_exit_phase3),
     coex_wifi_sleep_set: Some(coex_wifi_sleep_set),
     coex_core_ble_conn_dyn_prio_get: Some(coex_core_ble_conn_dyn_prio_get),
     coex_schm_register_btdm_callback: Some(coex_schm_register_btdm_callback),
@@ -149,7 +149,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     esp_hw_power_down: Some(esp_hw_power_down),
     esp_hw_power_up: Some(esp_hw_power_up),
     ets_backup_dma_copy: Some(ets_backup_dma_copy),
-    malloc_retention: Some(crate::ble::malloc_retention),
+    malloc_retention: Some(malloc_retention),
     ets_delay_us: Some(ets_delay_us_wrapper),
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
     coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
@@ -157,6 +157,12 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     get_time_us: Some(get_time_us_wrapper),
     assert: Some(assert_wrapper),
 };
+
+pub(crate) unsafe extern "C" fn malloc_retention(size: u32) -> *mut crate::sys::c_types::c_void {
+    // IDF uses heap_caps_malloc(size, MALLOC_CAP_RETENTION). We have no retention
+    // heap, so fall back to the same internal allocator as malloc_internal.
+    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
+}
 
 extern "C" fn get_time_us_wrapper() -> u64 {
     // Get time in microseconds since boot
