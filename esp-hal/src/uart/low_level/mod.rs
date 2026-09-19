@@ -1,7 +1,8 @@
 use core::task::Poll;
 
 use enumset::{EnumSet, EnumSetType};
-use portable_atomic::AtomicBool;
+use esp_sync::RawMutex;
+use portable_atomic::{AtomicBool, Ordering};
 
 #[cfg(feature = "unstable")]
 use super::BaudrateTolerance;
@@ -23,7 +24,7 @@ use super::{
 #[cfg(sleep_driver_supported)]
 use super::{WakeConfigError, WakeupConfig};
 use crate::{
-    asynch::AtomicWaker,
+    asynch::{AtomicWaker, InterruptAffinity},
     gpio::{InputSignal, OutputSignal},
     handler,
     interrupt::InterruptHandler,
@@ -127,7 +128,8 @@ impl core::future::Future for UartRxFuture {
         } else {
             self.state.rx_waker.register(cx.waker());
             if !self.registered {
-                self.uart.enable_listen_rx(self.events, true);
+                self.uart
+                    .enable_listen_rx_async(self.state, self.events, true);
                 self.registered = true;
             }
             Poll::Pending
@@ -137,10 +139,10 @@ impl core::future::Future for UartRxFuture {
 
 impl Drop for UartRxFuture {
     fn drop(&mut self) {
-        // Although the isr disables the interrupt that occurred directly, we need to
-        // disable the other interrupts (= the ones that did not occur), as
-        // soon as this future goes out of scope.
-        self.uart.enable_listen_rx(self.events, false);
+        if self.registered {
+            self.uart
+                .enable_listen_rx_async(self.state, self.events, false);
+        }
     }
 }
 
@@ -177,7 +179,8 @@ impl core::future::Future for UartTxFuture {
         } else {
             self.state.tx_waker.register(cx.waker());
             if !self.registered {
-                self.uart.enable_listen_tx(self.events, true);
+                self.uart
+                    .enable_listen_tx_async(self.state, self.events, true);
                 self.registered = true;
             }
             Poll::Pending
@@ -187,10 +190,10 @@ impl core::future::Future for UartTxFuture {
 
 impl Drop for UartTxFuture {
     fn drop(&mut self) {
-        // Although the isr disables the interrupt that occurred directly, we need to
-        // disable the other interrupts (= the ones that did not occur), as
-        // soon as this future goes out of scope.
-        self.uart.enable_listen_tx(self.events, false);
+        if self.registered {
+            self.uart
+                .enable_listen_tx_async(self.state, self.events, false);
+        }
     }
 }
 
@@ -212,9 +215,11 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
         | interrupts.brk_det().bit_is_set();
     let tx_wake = interrupts.tx_done().bit_is_set() | interrupts.txfifo_empty().bit_is_set();
 
-    uart.regs()
-        .int_ena()
-        .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
+    state.mutex.lock(|| {
+        uart.regs()
+            .int_ena()
+            .modify(|r, w| unsafe { w.bits(r.bits() & !interrupt_bits) });
+    });
 
     if tx_wake {
         state.tx_waker.wake();
@@ -222,6 +227,25 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
     if rx_wake {
         state.rx_waker.wake();
     }
+}
+
+/// Stops the peripheral from requesting the async interrupt, and unmaps that interrupt.
+///
+/// [`InterruptAffinity::tear_down`] runs this on the core that services the interrupt. No lock:
+/// the driver runs no future while it tears the async mode down.
+#[ram]
+pub(super) fn handle_teardown(
+    info: &'static Info,
+    state: &'static State,
+    unmap_interrupt: impl FnOnce(),
+) {
+    info.regs().int_ena().write(|w| unsafe { w.bits(0) });
+    info.regs().int_clr().write(|w| unsafe { w.bits(!0) });
+
+    unmap_interrupt();
+
+    // Last, because this releases the core that waits in `tear_down`.
+    state.affinity.release();
 }
 
 /// A peripheral singleton compatible with the UART driver.
@@ -264,6 +288,10 @@ pub struct Info {
     /// Interrupt handler for the asynchronous operations of this UART instance.
     pub async_handler: InterruptHandler,
 
+    /// Stops the peripheral from requesting the async interrupt. See
+    /// [`InterruptAffinity::tear_down`] for what it must do.
+    pub async_teardown: fn(),
+
     /// TX pin
     pub tx_signal: OutputSignal,
 
@@ -296,6 +324,42 @@ pub struct State {
 
     /// Stores whether the TX half is configured for async operation.
     pub is_tx_async: AtomicBool,
+
+    /// Serializes what the TX half, the RX half and the async interrupt handler share. The two
+    /// halves are separate objects, so they run on different cores even when neither is async.
+    ///
+    /// Under the lock:
+    /// - `int_ena`, on the async paths only: the futures and the async interrupt handler.
+    /// - `conf1`, in both modes: `rxfifo_full_thrhd` and `txfifo_empty_thrhd`, which the two
+    ///   `apply_config` methods write.
+    /// - [`Self::is_rx_async`] and [`Self::is_tx_async`], so that two halves that change mode at
+    ///   once agree on which of them binds the handler and which tears it down.
+    pub mutex: RawMutex,
+
+    /// The core that services the async interrupt.
+    pub affinity: InterruptAffinity,
+}
+
+/// One half of a UART driver.
+#[derive(Clone, Copy)]
+pub(super) enum Half {
+    Rx,
+    Tx,
+}
+
+impl State {
+    /// Returns the flag that marks one half async. Take [`Self::mutex`] to change it.
+    pub(super) fn is_async(&self, half: Half) -> &AtomicBool {
+        match half {
+            Half::Rx => &self.is_rx_async,
+            Half::Tx => &self.is_tx_async,
+        }
+    }
+
+    /// Returns whether both halves are blocking. Call under [`Self::mutex`].
+    pub(super) fn is_blocking(&self) -> bool {
+        !self.is_rx_async.load(Ordering::Relaxed) && !self.is_tx_async.load(Ordering::Relaxed)
+    }
 }
 
 impl Info {
@@ -384,15 +448,25 @@ impl Info {
         Ok(())
     }
 
-    pub(super) fn enable_listen_tx(&self, events: EnumSet<TxEvent>, enable: bool) {
-        self.regs().int_ena().modify(|_, w| {
-            for event in events {
-                match event {
-                    TxEvent::Done => w.tx_done().bit(enable),
-                    TxEvent::FiFoEmpty => w.txfifo_empty().bit(enable),
-                };
-            }
-            w
+    /// Enables or disables the TX events that drive a future.
+    ///
+    /// Takes [`State::mutex`], because the async interrupt handler writes the same register.
+    pub(super) fn enable_listen_tx_async(
+        &self,
+        state: &State,
+        events: EnumSet<TxEvent>,
+        enable: bool,
+    ) {
+        state.mutex.lock(|| {
+            self.regs().int_ena().modify(|_, w| {
+                for event in events {
+                    match event {
+                        TxEvent::Done => w.tx_done().bit(enable),
+                        TxEvent::FiFoEmpty => w.txfifo_empty().bit(enable),
+                    };
+                }
+                w
+            });
         });
     }
 
@@ -423,22 +497,32 @@ impl Info {
         });
     }
 
-    pub(super) fn enable_listen_rx(&self, events: EnumSet<RxEvent>, enable: bool) {
-        self.regs().int_ena().modify(|_, w| {
-            for event in events {
-                match event {
-                    RxEvent::FifoFull => w.rxfifo_full().bit(enable),
-                    RxEvent::BreakDetected => w.brk_det().bit(enable),
-                    RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
+    /// Enables or disables the RX events that drive a future.
+    ///
+    /// Takes [`State::mutex`], because the async interrupt handler writes the same register.
+    pub(super) fn enable_listen_rx_async(
+        &self,
+        state: &State,
+        events: EnumSet<RxEvent>,
+        enable: bool,
+    ) {
+        state.mutex.lock(|| {
+            self.regs().int_ena().modify(|_, w| {
+                for event in events {
+                    match event {
+                        RxEvent::FifoFull => w.rxfifo_full().bit(enable),
+                        RxEvent::BreakDetected => w.brk_det().bit(enable),
+                        RxEvent::CmdCharDetected => w.at_cmd_char_det().bit(enable),
 
-                    RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
-                    RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
-                    RxEvent::GlitchDetected => w.glitch_det().bit(enable),
-                    RxEvent::FrameError => w.frm_err().bit(enable),
-                    RxEvent::ParityError => w.parity_err().bit(enable),
-                };
-            }
-            w
+                        RxEvent::FifoOvf => w.rxfifo_ovf().bit(enable),
+                        RxEvent::FifoTout => w.rxfifo_tout().bit(enable),
+                        RxEvent::GlitchDetected => w.glitch_det().bit(enable),
+                        RxEvent::FrameError => w.frm_err().bit(enable),
+                        RxEvent::ParityError => w.parity_err().bit(enable),
+                    };
+                }
+                w
+            });
         });
     }
 
@@ -500,14 +584,20 @@ impl Info {
     ///
     /// [`ConfigError::RxFifoThresholdNotSupported`] if the provided value is zero
     /// or exceeds [`Info::RX_FIFO_MAX_THRHD`].
-    pub(super) fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
+    pub(super) fn set_rx_fifo_full_threshold(
+        &self,
+        state: &State,
+        threshold: u16,
+    ) -> Result<(), ConfigError> {
         if threshold == 0 || threshold > Self::RX_FIFO_MAX_THRHD {
             return Err(ConfigError::RxFifoThresholdNotSupported);
         }
 
-        self.regs()
-            .conf1()
-            .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold as _) });
+        state.mutex.lock(|| {
+            self.regs()
+                .conf1()
+                .modify(|_, w| unsafe { w.rxfifo_full_thrhd().bits(threshold as _) });
+        });
 
         Ok(())
     }
@@ -524,14 +614,20 @@ impl Info {
     ///
     /// [`ConfigError::TxFifoThresholdNotSupported`] if the provided value exceeds
     /// [`Info::TX_FIFO_MAX_THRHD`].
-    pub(super) fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
+    pub(super) fn set_tx_fifo_empty_threshold(
+        &self,
+        state: &State,
+        threshold: u16,
+    ) -> Result<(), ConfigError> {
         if threshold > Self::TX_FIFO_MAX_THRHD {
             return Err(ConfigError::TxFifoThresholdNotSupported);
         }
 
-        self.regs()
-            .conf1()
-            .modify(|_, w| unsafe { w.txfifo_empty_thrhd().bits(threshold as _) });
+        state.mutex.lock(|| {
+            self.regs()
+                .conf1()
+                .modify(|_, w| unsafe { w.txfifo_empty_thrhd().bits(threshold as _) });
+        });
 
         Ok(())
     }
@@ -904,11 +1000,21 @@ macro_rules! impl_instance {
                     intr_handler(&PERIPHERAL, &STATE);
                 }
 
+                #[ram]
+                fn teardown_handler() {
+                    handle_teardown(&PERIPHERAL, &STATE, || {
+                        unsafe { crate::peripherals::$inst::steal() }
+                            .disable_peri_interrupt_on_all_cores()
+                    });
+                }
+
                 static STATE: State = State {
                     tx_waker: AtomicWaker::new(),
                     rx_waker: AtomicWaker::new(),
                     is_rx_async: AtomicBool::new(false),
                     is_tx_async: AtomicBool::new(false),
+                    mutex: RawMutex::new(),
+                    affinity: InterruptAffinity::new(),
                 };
 
                 static PERIPHERAL: Info = Info {
@@ -916,6 +1022,7 @@ macro_rules! impl_instance {
                     peripheral: crate::system::Peripheral::$peri,
                     clock_instance: clocks::UartInstance::$peri,
                     async_handler: irq_handler,
+                    async_teardown: teardown_handler,
                     tx_signal: OutputSignal::$txd,
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,

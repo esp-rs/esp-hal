@@ -10,6 +10,7 @@ use core::{
 };
 
 use enumset::{EnumSet, enum_set};
+use esp_sync::RawMutex;
 
 use super::{
     Address,
@@ -25,7 +26,7 @@ use super::{
     any,
 };
 use crate::{
-    asynch::AtomicWaker,
+    asynch::{AtomicWaker, InterruptAffinity},
     clock::ll::SpiInstance,
     gpio::{InputSignal, OutputSignal},
     handler,
@@ -90,10 +91,22 @@ impl<'d> SpiWrapper<'d> {
             self.state().pins()
         }
     }
+
+    /// Returns the peripheral to a state where it requests no async interrupt, and where the
+    /// caller can rebind the interrupt handler.
+    ///
+    /// Does nothing if the driver is not async.
+    pub(super) fn tear_down_async(&self) {
+        self.state().affinity.tear_down(self.info().async_teardown);
+
+        // The teardown unmaps the interrupt, but only if the driver was async.
+        self.disable_peri_interrupt_on_all_cores();
+    }
 }
 
 impl Drop for SpiWrapper<'_> {
     fn drop(&mut self) {
+        self.tear_down_async();
         unsafe {
             // SAFETY: we "own" the state, we are allowed to deinit it
             self.spi.state().deinit();
@@ -159,6 +172,10 @@ pub struct Info {
 
     /// Interrupt handler for the asynchronous operations.
     pub async_handler: InterruptHandler,
+
+    /// Stops the peripheral from requesting the async interrupt. See
+    /// [`InterruptAffinity::tear_down`] for what it must do.
+    pub async_teardown: fn(),
 
     /// SCLK signal.
     pub sclk: OutputSignal,
@@ -256,6 +273,15 @@ impl Driver {
     #[cfg_attr(not(feature = "unstable"), allow(dead_code))]
     pub(super) fn enable_listen(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
         version::enable_listen(self, interrupts, enable);
+    }
+
+    /// Enables or disables listening for the interrupts of an async operation.
+    ///
+    /// Takes [`State::mutex`], because the async interrupt handler writes the same register.
+    fn enable_listen_async(&self, interrupts: EnumSet<SpiInterrupt>, enable: bool) {
+        self.state
+            .mutex
+            .lock(|| version::enable_listen(self, interrupts, enable));
     }
 
     /// Returns the asserted interrupts.
@@ -971,10 +997,19 @@ for_each_spi_master! {
                     handle_async(&INFO, &STATE)
                 }
 
+                #[ram]
+                fn teardown_handler() {
+                    handle_teardown(&INFO, &STATE, || {
+                        unsafe { crate::peripherals::$peri::steal() }
+                            .disable_peri_interrupt_on_all_cores()
+                    })
+                }
+
                 static INFO: Info = Info {
                     register_block: crate::peripherals::$peri::ptr(),
                     peripheral: crate::system::Peripheral::$sys,
                     async_handler: irq_handler,
+                    async_teardown: teardown_handler,
                     sclk: OutputSignal::$sclk,
                     cs: &[$(OutputSignal::$cs),+],
                     sio_inputs: &[$(InputSignal::$sio),*],
@@ -984,6 +1019,8 @@ for_each_spi_master! {
 
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
+                    mutex: RawMutex::new(),
+                    affinity: InterruptAffinity::new(),
                     pins: UnsafeCell::new(MaybeUninit::uninit()),
                     min_async_transfer_size: AtomicUsize::new(0),
 
@@ -1009,6 +1046,20 @@ for_each_spi_master! {
 #[doc(hidden)]
 pub struct State {
     pub(super) waker: AtomicWaker,
+
+    /// Serializes the read-modify-write of the interrupt enable bits between an async future and
+    /// the async interrupt handler, which run on different cores if the driver moved to another
+    /// core. A lost read-modify-write there loses a wakeup, or drops the enable bit of another
+    /// event.
+    ///
+    /// Only the async paths take this, through [`Driver::enable_listen_async`]. Clearing a status
+    /// bit needs no lock, because the driver clears status bits only while the interrupt is
+    /// disabled.
+    mutex: RawMutex,
+
+    /// The core that services the async interrupt.
+    pub(super) affinity: InterruptAffinity,
+
     pins: UnsafeCell<MaybeUninit<SpiPinGuard>>,
     pub(super) min_async_transfer_size: AtomicUsize,
 
@@ -1051,10 +1102,35 @@ unsafe impl Sync for State {}
 #[ram]
 pub(super) fn handle_async(info: &'static Info, state: &'static State) {
     let driver = Driver { info, state };
-    if driver.interrupts().contains(SpiInterrupt::TransferDone) {
-        driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
-        state.waker.wake();
+    if !driver.interrupts().contains(SpiInterrupt::TransferDone) {
+        return;
     }
+
+    driver.enable_listen_async(SpiInterrupt::TransferDone.into(), false);
+
+    // Waking runs executor code, which takes locks of its own, so it runs outside the lock of
+    // this driver.
+    state.waker.wake();
+}
+
+/// Stops the peripheral from requesting the async interrupt, and unmaps that interrupt.
+///
+/// [`InterruptAffinity::tear_down`] runs this on the core that services the interrupt. No lock:
+/// the driver runs no future while it tears the async mode down.
+#[ram]
+pub(super) fn handle_teardown(
+    info: &'static Info,
+    state: &'static State,
+    unmap_interrupt: impl FnOnce(),
+) {
+    let driver = Driver { info, state };
+    driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
+    driver.clear_interrupts(SpiInterrupt::TransferDone.into());
+
+    unmap_interrupt();
+
+    // Last, because this releases the core that waits in `tear_down`.
+    state.affinity.release();
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
@@ -1077,7 +1153,7 @@ impl Future for SpiFuture<'_> {
         }
 
         self.driver.state.waker.register(cx.waker());
-        self.driver.enable_listen(Self::EVENTS, true);
+        self.driver.enable_listen_async(Self::EVENTS, true);
 
         // On some chips the interrupt enable bit and the interrupt status bit are in the same
         // register. If the transfer ends while we enable the interrupt, the read-modify-write
@@ -1094,6 +1170,6 @@ impl Future for SpiFuture<'_> {
 
 impl Drop for SpiFuture<'_> {
     fn drop(&mut self) {
-        self.driver.enable_listen(Self::EVENTS, false);
+        self.driver.enable_listen_async(Self::EVENTS, false);
     }
 }

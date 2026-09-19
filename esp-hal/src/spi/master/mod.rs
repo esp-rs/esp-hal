@@ -751,6 +751,8 @@ impl<'d> Spi<'d, Blocking> {
     /// See the [`Async`] documentation for an example on how to use this
     /// method.
     pub fn into_async(mut self) -> Spi<'d, Async> {
+        // Claim before the handler can run.
+        self.spi.state().affinity.claim();
         self.set_interrupt_handler(self.spi.info().async_handler);
         Spi {
             spi: self.spi,
@@ -797,7 +799,7 @@ impl<'d> Spi<'d, Async> {
     /// See the [`Blocking`] documentation for an example on how to use this
     /// method.
     pub fn into_blocking(self) -> Spi<'d, Blocking> {
-        self.spi.disable_peri_interrupt_on_all_cores();
+        self.spi.tear_down_async();
         Spi {
             spi: self.spi,
             _mode: PhantomData,
