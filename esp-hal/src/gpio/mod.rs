@@ -544,9 +544,9 @@ for_each_analog_function! {
                             w.fun_wpd().clear_bit()
                         });
 
-                        GPIO::regs()
-                            .enable_w1tc()
-                            .write(|w| unsafe { w.bits(1 << self.number()) });
+                        let bank = crate::gpio::low_level::bank(self.number());
+                        let bit = 1 << (self.number() - bank.offset());
+                        bank.write_out_en_clear(bit);
                     }
                 }
             }
