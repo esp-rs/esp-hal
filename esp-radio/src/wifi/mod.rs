@@ -85,6 +85,7 @@ use crate::{
     RadioRefGuard,
     asynch::AtomicWaker,
     hal::ram,
+    refcount::Refcount,
     sys::{
         c_types,
         include::{self, *},
@@ -94,7 +95,7 @@ use crate::{
 pub mod ap;
 
 unstable_module!(
-    #[cfg(all(feature = "csi", wifi_csi_supported))]
+    #[cfg(feature = "csi")]
     #[cfg_attr(docsrs, doc(cfg(feature = "csi")))]
     pub mod csi;
     pub mod event;
@@ -109,6 +110,8 @@ pub mod sta;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
 
+#[cfg(not(esp32))]
+mod ftm_calibration;
 mod internal;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
@@ -416,9 +419,9 @@ impl AuthenticationMethod {
             AuthenticationMethod::Wpa3EntSuiteB192Bit => {
                 include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192
             }
-            AuthenticationMethod::Wpa3ExtPsk => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK,
-            AuthenticationMethod::Wpa3ExtPskMixed => {
-                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE
+            // Deprecated Ext-PSK variants have no dedicated IDF auth mode.
+            AuthenticationMethod::Wpa3ExtPsk | AuthenticationMethod::Wpa3ExtPskMixed => {
+                include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK
             }
             AuthenticationMethod::Dpp => include::wifi_auth_mode_t_WIFI_AUTH_DPP,
             AuthenticationMethod::Wpa3Enterprise => {
@@ -454,10 +457,9 @@ impl AuthenticationMethod {
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENT_192 => {
                 AuthenticationMethod::Wpa3EntSuiteB192Bit
             }
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK => AuthenticationMethod::Wpa3ExtPsk,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_EXT_PSK_MIXED_MODE => {
-                AuthenticationMethod::Wpa3ExtPskMixed
-            }
+            // Unused IDF auth-mode slots; same as the Ext-PSK write path.
+            include::wifi_auth_mode_t_WIFI_AUTH_DUMMY_1
+            | include::wifi_auth_mode_t_WIFI_AUTH_DUMMY_2 => AuthenticationMethod::Wpa3Personal,
             include::wifi_auth_mode_t_WIFI_AUTH_DPP => AuthenticationMethod::Dpp,
             include::wifi_auth_mode_t_WIFI_AUTH_WPA3_ENTERPRISE => {
                 AuthenticationMethod::Wpa3Enterprise
@@ -780,7 +782,11 @@ impl Ssid {
         })
     }
 
-    pub(crate) fn as_bytes(&self) -> &[u8] {
+    /// The SSID as raw bytes.
+    ///
+    /// An SSID is at most 32 bytes and is not required to be valid UTF-8.
+    #[instability::unstable]
+    pub fn as_bytes(&self) -> &[u8] {
         &self.ssid[..self.len as usize]
     }
 
@@ -795,6 +801,9 @@ impl Ssid {
     }
 
     /// The SSID as a string slice.
+    ///
+    /// An SSID is not required to be valid UTF-8; the result stops at the
+    /// first invalid byte. Use `as_bytes` for the full bytes.
     pub fn as_str(&self) -> &str {
         let part = &self.ssid[..self.len as usize];
         match str::from_utf8(part) {
@@ -1068,8 +1077,8 @@ pub enum WifiError {
     /// Passed arguments are invalid.
     InvalidArguments,
 
-    /// Generic failure - not further specified.
-    Failed,
+    /// An unspecified error occurred in the radio driver.
+    Other,
 
     /// Out of memory.
     OutOfMemory,
@@ -1086,17 +1095,42 @@ pub enum WifiError {
 
 impl WifiError {
     fn from_error_code(code: i32) -> Self {
-        if crate::sys::include::ESP_FAIL == code {
-            return WifiError::Failed;
+        use crate::sys::include::*;
+
+        // `ESP_FAIL` is a generic, unspecified failure. Map it to the opaque
+        // `Other` variant.
+        if code == ESP_FAIL {
+            return WifiError::Other;
         }
 
         match code as u32 {
-            crate::sys::include::ESP_ERR_NO_MEM => WifiError::OutOfMemory,
-            crate::sys::include::ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
-            crate::sys::include::ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
-            crate::sys::include::ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
-            crate::sys::include::ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
-            _ => panic!("Unknown error code: {}", code),
+            // Meaningful, public mappings. These are ordinary outcomes, so they
+            // are returned without any logging.
+            ESP_ERR_NO_MEM => WifiError::OutOfMemory,
+            ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
+            ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
+            ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
+            ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
+
+            // Known driver state-machine and timeout codes. These occur in
+            // perfectly normal operation.
+            ESP_ERR_WIFI_NOT_INIT
+            | ESP_ERR_WIFI_NOT_STARTED
+            | ESP_ERR_WIFI_STATE
+            | ESP_ERR_WIFI_CONN
+            | ESP_ERR_WIFI_STOP_STATE
+            | ESP_ERR_WIFI_TIMEOUT => WifiError::Other,
+
+            // Any code we don't recognise: warn so it can be reported, then fall
+            // back to the opaque variant. We must never panic here - an
+            // unexpected code from the driver should not bring down the firmware.
+            _ => {
+                warn!(
+                    "Unmapped Wi-Fi error code: {}. Please open an issue at <https://github.com/esp-rs/esp-hal/issues>.",
+                    code
+                );
+                WifiError::Other
+            }
         }
     }
 }
@@ -1148,13 +1182,13 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
         esp_wifi_result!(esp_wifi_set_tx_done_cb(Some(esp_wifi_tx_done_cb)))?;
 
         esp_wifi_result!(esp_wifi_internal_reg_rxcb(
-            esp_interface_t_ESP_IF_WIFI_STA,
+            wifi_interface_t_WIFI_IF_STA,
             Some(recv_cb_sta)
         ))?;
 
         // until we support APSTA we just register the same callback for AP and station
         esp_wifi_result!(esp_wifi_internal_reg_rxcb(
-            esp_interface_t_ESP_IF_WIFI_AP,
+            wifi_interface_t_WIFI_IF_AP,
             Some(recv_cb_ap)
         ))?;
 
@@ -1661,8 +1695,8 @@ pub enum Bandwidth {
 impl Bandwidth {
     fn to_raw(self) -> wifi_bandwidth_t {
         match self {
-            Bandwidth::_20MHz => wifi_bandwidth_t_WIFI_BW_HT20,
-            Bandwidth::_40MHz => wifi_bandwidth_t_WIFI_BW_HT40,
+            Bandwidth::_20MHz => wifi_bandwidth_t_WIFI_BW20,
+            Bandwidth::_40MHz => wifi_bandwidth_t_WIFI_BW40,
             Bandwidth::_80MHz => wifi_bandwidth_t_WIFI_BW80,
             Bandwidth::_160MHz => wifi_bandwidth_t_WIFI_BW160,
             Bandwidth::_80_80MHz => wifi_bandwidth_t_WIFI_BW80_BW80,
@@ -1671,8 +1705,8 @@ impl Bandwidth {
 
     fn from_raw(raw: wifi_bandwidth_t) -> Self {
         match raw {
-            raw if raw == wifi_bandwidth_t_WIFI_BW_HT20 => Bandwidth::_20MHz,
-            raw if raw == wifi_bandwidth_t_WIFI_BW_HT40 => Bandwidth::_40MHz,
+            raw if raw == wifi_bandwidth_t_WIFI_BW20 => Bandwidth::_20MHz,
+            raw if raw == wifi_bandwidth_t_WIFI_BW40 => Bandwidth::_40MHz,
             raw if raw == wifi_bandwidth_t_WIFI_BW80 => Bandwidth::_80MHz,
             raw if raw == wifi_bandwidth_t_WIFI_BW160 => Bandwidth::_160MHz,
             raw if raw == wifi_bandwidth_t_WIFI_BW80_BW80 => Bandwidth::_80_80MHz,
@@ -2041,17 +2075,11 @@ fn dump_packet_info(_buffer: &mut [u8]) {
 
 macro_rules! esp_wifi_result {
     ($value:expr) => {{
-        use num_traits::FromPrimitive;
         let result = $value;
         if result != $crate::sys::include::ESP_OK as i32 {
-            let error = unwrap!(FromPrimitive::from_i32(result));
-            warn!(
-                "{} returned an error: {:?} ({}). If this error is unmapped, please open an issue at <https://github.com/esp-rs/esp-hal/issues>.",
-                stringify!($value),
-                error,
-                result
-            );
-            Err(WifiError::from_error_code(error))
+            // `from_error_code` decides how to classify and (only for truly
+            // unmapped codes) log the result, so we don't warn here.
+            Err(WifiError::from_error_code(result))
         } else {
             Ok::<(), WifiError>(())
         }
@@ -2565,35 +2593,55 @@ impl ControllerConfig {
     }
 }
 
+static WIFI_REFCOUNT: Refcount = Refcount::new();
+
+/// Keeps Wi-Fi initialized until the last guard is dropped.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) struct WifiRefGuard {
+    _radio_guard: RadioRefGuard,
+}
+
+impl Clone for WifiRefGuard {
+    fn clone(&self) -> Self {
+        let _radio_guard = RadioRefGuard::new();
+        WIFI_REFCOUNT.increment(|| {});
+        Self { _radio_guard }
+    }
+}
+
+impl Drop for WifiRefGuard {
+    fn drop(&mut self) {
+        WIFI_REFCOUNT.decrement(|| {
+            state::locked(|| {
+                set_access_point_state(WifiAccessPointState::Uninitialized);
+                set_station_state(WifiStationState::Uninitialized);
+
+                if let Err(e) = crate::wifi::wifi_deinit() {
+                    warn!("Failed to cleanly deinit wifi: {:?}", e);
+                }
+
+                #[cfg(rng_trng_supported)]
+                esp_hal::if_unstable_hal! {
+                    esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+                        esp_hal::Internal::conjure()
+                    });
+                }
+            })
+        });
+    }
+}
+
 /// Wi-Fi controller.
 ///
-/// When the controller is dropped, the Wi-Fi driver is
-/// deinitialized and Wi-Fi is stopped.
+/// When the controller is dropped, the Wi-Fi driver is deinitialized and Wi-Fi
+/// is stopped unless an ESP-NOW or sniffer instance created from it is still
+/// alive. In that case, Wi-Fi keeps running until that instance is dropped too.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct WifiController<'d> {
-    _guard: RadioRefGuard,
+    _guard: WifiRefGuard,
     _phantom: PhantomData<&'d ()>,
-}
-
-impl Drop for WifiController<'_> {
-    fn drop(&mut self) {
-        state::locked(|| {
-            set_access_point_state(WifiAccessPointState::Uninitialized);
-            set_station_state(WifiStationState::Uninitialized);
-
-            if let Err(e) = crate::wifi::wifi_deinit() {
-                warn!("Failed to cleanly deinit wifi: {:?}", e);
-            }
-
-            #[cfg(rng_trng_supported)]
-            esp_hal::if_unstable_hal! {
-                esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
-                    esp_hal::Internal::conjure()
-                });
-            }
-        })
-    }
 }
 
 impl<'d> WifiController<'d> {
@@ -2610,7 +2658,8 @@ impl<'d> WifiController<'d> {
     /// Create a Wi-Fi controller. The default initial configuration is
     /// [`Config::Station`]`(`[`StationConfig::default()`]`)`.
     ///
-    /// Dropping the controller will deinitialize / stop Wi-Fi.
+    /// Dropping the controller deinitializes Wi-Fi unless an ESP-NOW or sniffer
+    /// instance created from it is still alive.
     ///
     /// Create [`Interface`]s separately via [`Interface::station()`] /
     /// [`Interface::access_point()`].
@@ -2632,8 +2681,6 @@ impl<'d> WifiController<'d> {
         device: crate::hal::peripherals::WIFI<'d>,
         config: ControllerConfig,
     ) -> Result<Self, WifiError> {
-        let _guard = RadioRefGuard::new();
-
         config.validate();
 
         event::enable_wifi_events(
@@ -2648,60 +2695,79 @@ impl<'d> WifiController<'d> {
                 | WifiEvent::ScanDone,
         );
 
-        unsafe {
-            internal::G_CONFIG = wifi_init_config_t {
-                osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+        let radio_guard = RadioRefGuard::new();
 
-                wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
-                static_rx_buf_num: config.static_rx_buf_num as _,
-                dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
-                tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
-                static_tx_buf_num: config.static_tx_buf_num as _,
-                dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
-                rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
-                rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
-                cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
-                csi_enable: cfg!(feature = "csi") as i32,
-                ampdu_rx_enable: config.ampdu_rx_enable as _,
-                ampdu_tx_enable: config.ampdu_tx_enable as _,
-                amsdu_tx_enable: config.amsdu_tx_enable as _,
-                nvs_enable: 0,
-                nano_enable: 0,
-                rx_ba_win: config.rx_ba_win as _,
-                wifi_task_core_id: Cpu::current() as _,
-                beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
-                mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
-                feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
-                sta_disconnected_pm: config.sta_disconnected_pm as _,
-                espnow_max_encrypt_num: config.espnow_max_encrypt_num as _,
-
-                tx_hetb_queue_num: 3,
-                dump_hesigb_enable: false,
-
-                magic: WIFI_INIT_CONFIG_MAGIC as i32,
-            };
-        }
-
-        DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
-        DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
-
-        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
-
-        crate::wifi::wifi_init(device)?;
-
-        // At some point the "High-speed ADC" entropy source became available.
-        #[cfg(rng_trng_supported)]
-        esp_hal::if_unstable_hal! {
+        let first = WIFI_REFCOUNT.try_increment(|| -> Result<(), WifiError> {
             unsafe {
-                esp_hal::rng::TrngSource::increase_entropy_source_counter()
-            };
+                internal::G_CONFIG = wifi_init_config_t {
+                    osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+
+                    wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
+                    static_rx_buf_num: config.static_rx_buf_num as _,
+                    dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
+                    tx_buf_type: crate::sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
+                    static_tx_buf_num: config.static_tx_buf_num as _,
+                    dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
+                    rx_mgmt_buf_type: crate::sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF
+                        as i32,
+                    rx_mgmt_buf_num: crate::sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF
+                        as i32,
+                    cache_tx_buf_num: crate::sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
+                    csi_enable: cfg!(feature = "csi") as i32,
+                    ampdu_rx_enable: config.ampdu_rx_enable as _,
+                    ampdu_tx_enable: config.ampdu_tx_enable as _,
+                    amsdu_tx_enable: config.amsdu_tx_enable as _,
+                    nvs_enable: 0,
+                    nano_enable: 0,
+                    rx_ba_win: config.rx_ba_win as _,
+                    wifi_task_core_id: Cpu::current() as _,
+                    beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
+                    mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
+                    feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
+                    sta_disconnected_pm: config.sta_disconnected_pm as _,
+                    espnow_max_encrypt_num: config.espnow_max_encrypt_num as _,
+
+                    tx_hetb_queue_num: 3,
+                    dump_hesigb_enable: false,
+
+                    // WIFI_INIT_CONFIG_DEFAULT: both are off unless the matching sdkconfig is set.
+                    privacy_enhancements: false,
+                    rmac_auto_reset_int: 0,
+
+                    magic: WIFI_INIT_CONFIG_MAGIC as i32,
+                };
+            }
+
+            DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+            DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
+
+            TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
+
+            crate::wifi::wifi_init(device)?;
+
+            #[cfg(rng_trng_supported)]
+            esp_hal::if_unstable_hal! {
+                unsafe {
+                    esp_hal::rng::TrngSource::increase_entropy_source_counter()
+                };
+            }
+
+            Ok(())
+        })?;
+
+        if !first {
+            warn!(
+                "Wi-Fi is already initialized; init-only ControllerConfig settings were ignored: \
+                 static_rx_buf_num, dynamic_rx_buf_num, static_tx_buf_num, dynamic_tx_buf_num, \
+                 rx_queue_size, tx_queue_size, rx_ba_win, espnow_max_encrypt_num, \
+                 ampdu_rx_enable, ampdu_tx_enable, amsdu_tx_enable"
+            );
         }
 
-        // Only create WifiController after we've enabled TRNG - otherwise returning an
-        // error from this function will cause panic because WifiController::drop tries
-        // to disable the TRNG.
         let mut controller = WifiController {
-            _guard,
+            _guard: WifiRefGuard {
+                _radio_guard: radio_guard,
+            },
             _phantom: Default::default(),
         };
 
@@ -2719,30 +2785,36 @@ impl<'d> WifiController<'d> {
 }
 
 impl WifiController<'_> {
-    /// Returns an ESP-NOW instance tied to this controller's lifetime.
+    /// Returns an ESP-NOW instance independent of this controller.
+    ///
+    /// Wi-Fi stays initialized, configured, and running until the instance is
+    /// dropped.
     ///
     /// # Panics
     ///
     /// Panics if an ESP-NOW instance already exists.
-    #[cfg(all(feature = "esp-now", feature = "unstable"))]
+    #[cfg(feature = "esp-now")]
     #[instability::unstable]
-    pub fn esp_now(&self) -> crate::esp_now::EspNow<'_> {
-        crate::esp_now::EspNow::new_internal()
+    pub fn esp_now(&self) -> crate::esp_now::EspNow {
+        crate::esp_now::EspNow::new_internal(self._guard.clone())
     }
 
-    /// Returns a sniffer instance tied to this controller's lifetime.
+    /// Returns a sniffer instance independent of this controller.
+    ///
+    /// Wi-Fi stays initialized, configured, and running until the instance is
+    /// dropped.
     ///
     /// # Panics
     ///
     /// Panics if a sniffer instance already exists.
-    #[cfg(all(feature = "sniffer", feature = "unstable"))]
+    #[cfg(feature = "sniffer")]
     #[instability::unstable]
-    pub fn sniffer(&self) -> Sniffer<'_> {
-        Sniffer::new()
+    pub fn sniffer(&self) -> Sniffer {
+        Sniffer::new(self._guard.clone())
     }
 
     /// Set CSI configuration and register the receiving callback.
-    #[cfg(all(feature = "csi", feature = "unstable"))]
+    #[cfg(feature = "csi")]
     #[instability::unstable]
     pub fn set_csi(
         &mut self,
@@ -3458,7 +3530,7 @@ ignored."
     /// Subscribe to events.
     ///
     /// # Errors
-    /// This returns [WifiError::Failed] if no more subscriptions are available.
+    /// This returns [WifiError::Other] if no more subscriptions are available.
     /// Consider increasing the internal event channel subscriber count in this case.
     #[instability::unstable]
     pub fn subscribe<'a>(&'a self) -> Result<event::EventSubscriber<'a>, WifiError> {
@@ -3466,7 +3538,7 @@ ignored."
             return Ok(event::EventSubscriber::new(subscriber));
         }
 
-        Err(WifiError::Failed)
+        Err(WifiError::Other)
     }
 
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
@@ -3498,8 +3570,10 @@ ignored."
                 sae_pwe_h2e: 0,
                 csa_count: 3,
                 dtim_period: config.dtim_period,
-                transition_disable: 0,
-                sae_ext: 0,
+                _bitfield_align_1: [0; 0],
+                // transition_disable, sae_ext, wpa3_compatible_mode, reserved.
+                // wpa3_compatible_mode is opt-in: enabling it overrides AP authmode.
+                _bitfield_1: wifi_ap_config_t::new_bitfield_1(0, 0, 0, 0),
                 bss_max_idle_cfg: include::wifi_bss_max_idle_config_t {
                     period: 0,
                     protected_keep_alive: false,

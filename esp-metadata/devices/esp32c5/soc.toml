@@ -17,6 +17,9 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c5_t
 page_size = 0x10000
 entry_num = 512
 
+[device.flash]
+support_status = "partial"
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -254,6 +257,7 @@ support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
 controller = { Riscv = { flavour = "clic", interrupts = 48, priority_levels = 8 } }
+context_switch_source = "clint"
 
 [device.rmt]
 support_status = "partial"
@@ -370,6 +374,7 @@ is_lp_sys = true
 mac_version = 3
 has_5g = true
 csi_supported = true
+has_wifi6 = true
 
 [device.bt]
 support_status = "partial"
@@ -379,7 +384,7 @@ controller = "npl"
 
 [device.phy]
 support_status = "partial"
-combo_module = true
+combo_module = false
 
 # ## Miscellaneous
 [device.systimer]

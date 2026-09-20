@@ -7,8 +7,10 @@
 #[cfg_attr(esp32h2, path = "phy_clocks_ll_esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "phy_clocks_ll_esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "phy_clocks_ll_esp32s3.rs")]
+#[cfg_attr(esp32s31, path = "phy_clocks_ll_esp32s31.rs")]
 mod phy_clocks_ll;
 
 pub(crate) fn enable_phy(enable: bool) {
+    debug!("enable_phy({:?})", enable);
     phy_clocks_ll::enable_phy(enable);
 }

@@ -255,7 +255,6 @@ impl_wifi_event!(
     AccessPointCredential,
     wifi_event_sta_wps_er_success_t__bindgen_ty_1
 );
-impl_wifi_event!(FineTimingMeasurementReportEntry, wifi_ftm_report_entry_t);
 
 impl AccessPointStationConnected<'_> {
     /// Get the MAC address of the connected station.
@@ -419,43 +418,6 @@ impl StationWifiProtectedStatusEnrolleePin<'_> {
     }
 }
 
-impl FineTimingMeasurementReportEntry<'_> {
-    /// Gets the Dialog Token of the FTM frame.
-    pub fn dialog_token(&self) -> u8 {
-        self.0.dlog_token
-    }
-
-    /// Gets the Received Signal Strength Indicator (RSSI) of the FTM frame.
-    pub fn rssi(&self) -> i8 {
-        self.0.rssi
-    }
-
-    /// Gets the Round Trip Time (RTT) in picoseconds.
-    pub fn rtt(&self) -> u32 {
-        self.0.rtt
-    }
-
-    /// Gets T1: Time of departure of the FTM frame from the Responder (in picoseconds).
-    pub fn t1(&self) -> u64 {
-        self.0.t1
-    }
-
-    /// Gets T2: Time of arrival of the FTM frame at the Initiator (in picoseconds).
-    pub fn t2(&self) -> u64 {
-        self.0.t2
-    }
-
-    /// Gets T3: Time of departure of the ACK from the Initiator (in picoseconds).
-    pub fn t3(&self) -> u64 {
-        self.0.t3
-    }
-
-    /// Gets T4: Time of arrival of the ACK at the Responder (in picoseconds).
-    pub fn t4(&self) -> u64 {
-        self.0.t4
-    }
-}
-
 impl FineTimingMeasurementReport<'_> {
     /// Get the MAC address of the FTM peer.
     pub fn peer_mac(&self) -> &[u8] {
@@ -488,20 +450,55 @@ impl FineTimingMeasurementReport<'_> {
     }
 
     /// Returns an iterator over the detailed FTM report entries.
-    pub fn entries(&self) -> impl Iterator<Item = FineTimingMeasurementReportEntry<'_>> + '_ {
-        let ptr = self.0.ftm_report_data;
+    ///
+    /// Entries are copied via `esp_wifi_ftm_get_report`, which frees the
+    /// driver's report. The first fetch (including [`EventInfo`] construction)
+    /// consumes it; later calls return an empty iterator. The iterator is also
+    /// empty if there are no entries or if the driver fails to copy them.
+    pub fn entries(&self) -> impl Iterator<Item = FineTimingMeasurementReportInfo> {
+        self.load_entries().into_iter()
+    }
+
+    fn load_entries(&self) -> alloc::vec::Vec<FineTimingMeasurementReportInfo> {
         let len = self.0.ftm_report_num_entries as usize;
+        if len == 0 {
+            return alloc::vec::Vec::new();
+        }
 
-        // Return an empty slice when there are no entries.
-        let entries_slice = if ptr.is_null() || len == 0 {
-            &[]
-        } else {
-            // Otherwise, it's the slice from the data.
-            // Can we trust the C API to provide a valid pointer and length?
-            unsafe { core::slice::from_raw_parts(ptr, len) }
-        };
+        let mut buf = alloc::vec![
+            crate::sys::include::wifi_ftm_report_entry_t {
+                dlog_token: 0,
+                rssi: 0,
+                rtt: 0,
+                t1: 0,
+                t2: 0,
+                t3: 0,
+                t4: 0,
+                ppm: 0,
+            };
+            len
+        ];
 
-        entries_slice.iter().map(FineTimingMeasurementReportEntry)
+        // Frees the driver's report; a later call cannot retrieve the same entries.
+        let rc =
+            unsafe { crate::sys::include::esp_wifi_ftm_get_report(buf.as_mut_ptr(), len as u8) };
+        if rc != 0 {
+            warn!("esp_wifi_ftm_get_report failed: {}", rc);
+            return alloc::vec::Vec::new();
+        }
+
+        buf.into_iter()
+            .map(|entry| FineTimingMeasurementReportInfo {
+                dlog_token: entry.dlog_token,
+                rssi: entry.rssi,
+                rtt: entry.rtt,
+                t1: entry.t1,
+                t2: entry.t2,
+                t3: entry.t3,
+                t4: entry.t4,
+                ppm: entry.ppm,
+            })
+            .collect()
     }
 }
 
@@ -655,8 +652,8 @@ impl NeighborAwarenessNetworkingReceive<'_> {
     }
 
     /// Get Peer Service Info.
-    pub fn peer_svc_info(&self) -> &[u8; 64] {
-        &self.0.peer_svc_info
+    pub fn peer_svc_info(&self) -> &[u8] {
+        unsafe { self.0.ssi.as_slice(self.0.ssi_len as usize) }
     }
 }
 
@@ -682,8 +679,8 @@ impl NeighborDiscoveryProtocolIndication<'_> {
     }
 
     /// Get Service Specific Info.
-    pub fn svc_info(&self) -> &[u8; 64] {
-        &self.0.svc_info
+    pub fn svc_info(&self) -> &[u8] {
+        unsafe { self.0.ssi.as_slice(self.0.ssi_len as usize) }
     }
 }
 
@@ -714,8 +711,8 @@ impl NeighborDiscoveryProtocolConfirmation<'_> {
     }
 
     /// Get Service Specific Info.
-    pub fn svc_info(&self) -> &[u8; 64] {
-        &self.0.svc_info
+    pub fn svc_info(&self) -> &[u8] {
+        unsafe { self.0.ssi.as_slice(self.0.ssi_len as usize) }
     }
 }
 
@@ -761,7 +758,7 @@ impl HomeChannelChange<'_> {
 impl StationNeighborRep<'_> {
     /// Get the Neighbor Report received from the access point.
     pub fn report(&self) -> &[u8] {
-        &self.0.report[..self.0.report_len as usize]
+        unsafe { self.0.n_report.as_slice(self.0.report_len as usize) }
     }
 
     /// Get the length of report.
@@ -789,6 +786,8 @@ pub struct FineTimingMeasurementReportInfo {
     pub t3: u64,
     /// Time of arrival of ACK at FTM Responder in pSec
     pub t4: u64,
+    /// Clock frequency offset in parts per million between local and peer device
+    pub ppm: i16,
 }
 
 /// Credential info record.
@@ -1178,18 +1177,7 @@ impl EventInfo {
                     rtt_raw: ev.rtt_raw(),
                     rtt_est: ev.rtt_est(),
                     dist_est: ev.dist_est(),
-                    entries: Collection(ev
-                        .entries()
-                        .map(|entry| FineTimingMeasurementReportInfo {
-                            dlog_token: entry.dialog_token(),
-                            rssi: entry.rssi(),
-                            rtt: entry.rtt(),
-                            t1: entry.t1(),
-                            t2: entry.t2(),
-                            t3: entry.t3(),
-                            t4: entry.t4(),
-                        })
-                        .collect()),
+                    entries: Collection(ev.entries().collect()),
                 })
             }
             WifiEvent::StationBasicServiceSetReceivedSignalStrengthIndicatorLow => {

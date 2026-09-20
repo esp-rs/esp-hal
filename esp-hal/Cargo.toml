@@ -50,7 +50,7 @@ bench = false
 test  = false
 
 [dependencies]
-bytemuck                 = "1.24"
+bytemuck                 = { version = "1.24", features = ["zeroable_maybe_uninit"] }
 critical-section         = { version = "1", features = ["restore-state-u32"], optional = true }
 embedded-hal             = "1.0.0"
 embedded-hal-async       = "1.0.0"
@@ -72,7 +72,7 @@ instability              = "0.3.12"
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 
 esp-config               = { version = "0.8.0", path = "../esp-config" }
-esp-metadata-generated   = { version = "0.5.1", path = "../esp-metadata-generated" }
+esp-metadata-generated   = { version = "0.6.0", path = "../esp-metadata-generated" }
 esp-sync                 = { version = "0.3.0", path = "../esp-sync" }
 procmacros               = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
@@ -112,17 +112,17 @@ ufmt-write               = { version = "0.1", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.41", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c3 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c5 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c6 = { version = "0.24", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c61 = { version = "0.4", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32h2 = { version = "0.20", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32s2 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32s3 = { version = "0.36", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32s31 = { version = "0.2", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32p4 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
+esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }
@@ -133,7 +133,7 @@ xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 xtensa-lx-rt     = { version = "0.23.0", path = "../xtensa-lx-rt", optional = true }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 esp-config   = { version = "0.8.0", path = "../esp-config", features = ["build"] }
 somni-template = "0.3.1"
 

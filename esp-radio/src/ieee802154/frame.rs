@@ -47,15 +47,13 @@ pub struct ReceivedFrame {
 }
 
 pub(crate) fn frame_is_ack_required(frame: &[u8]) -> bool {
-    if frame.len() <= FRAME_AR_OFFSET {
-        return false;
-    }
-    (frame[FRAME_AR_OFFSET] & FRAME_AR_BIT) != 0
+    frame
+        .get(FRAME_AR_OFFSET)
+        .is_some_and(|fcf| fcf & FRAME_AR_BIT != 0)
 }
 
 pub(crate) fn frame_get_version(frame: &[u8]) -> u8 {
-    if frame.len() <= FRAME_VERSION_OFFSET {
-        return 0;
-    }
-    frame[FRAME_VERSION_OFFSET] & FRAME_VERSION_MASK
+    frame
+        .get(FRAME_VERSION_OFFSET)
+        .map_or(0, |fcf| fcf & FRAME_VERSION_MASK)
 }

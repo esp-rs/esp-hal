@@ -21,6 +21,8 @@ pub(crate) use esp32h2 as pac;
 pub(crate) use esp32s2 as pac;
 #[cfg(esp32s3)]
 pub(crate) use esp32s3 as pac;
+#[cfg(esp32s31)]
+pub(crate) use esp32s31 as pac;
 
 /// Get a peripheral register block reference from the PAC.
 macro_rules! regs {

@@ -13,6 +13,7 @@ This guide outlines the contribution workflow, from reporting issues and submitt
     *   [Testing Your Contributions]
     *   [Commit Your Updates]
 *   [Pull Request: From Submission to Merge]
+*   [Merge Freezes]
 *   [Your PR is merged!]
 
 [New Contributor Guide]: #new-contributor-guide
@@ -22,6 +23,7 @@ This guide outlines the contribution workflow, from reporting issues and submitt
 [Testing Your Contributions]: #testing-your-contributions
 [Commit your updates]: #commit-your-updates
 [Pull Request: From Submission to Merge]: #pull-request-from-submission-to-merge
+[Merge Freezes]: #merge-freezes
 [Your PR is merged!]: #your-pr-is-merged
 
 ## New Contributor Guide
@@ -138,6 +140,19 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts
 
+
+## Merge Freezes
+
+Around a release we stop merging into `main`, so that what gets published is
+tested in isolation from new changes.
+
+A "freeze" is an open issue labelled `merge-freeze`, pinned so that everyone can
+see it. Anyone with write access starts a freeze by opening or reopening that
+issue and lifts it by closing it. Review and CI carry on as usual, only the
+merge queue rejects pull requests targeting `main` while it is open.
+
+To land a release blocker anyway, label the pull request with
+`merge-freeze-exempt`. Such merge gets recorded on the freeze issue.
 
 ## Changelog and Migration Guide Entries
 

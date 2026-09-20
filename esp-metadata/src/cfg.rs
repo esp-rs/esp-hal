@@ -1033,6 +1033,7 @@ driver_configs![
             properties: {
                 status_registers: u32,
                 controller: InterruptControllerProperties,
+                context_switch_source: ContextSwitchSource,
                 #[serde(flatten)]
                 software_interrupt_properties: SoftwareInterruptProperties,
             }
@@ -1047,6 +1048,11 @@ driver_configs![
                 /// Total number of MMU table entries.
                 entry_num: u32,
             }
+        },
+        FlashProperties {
+            driver: flash,
+            name: "Flash",
+            properties: {}
         },
         PsramProperties {
             driver: psram,

@@ -33,30 +33,30 @@ bench = false
 embedded-storage       = { version = "0.3.1", optional = true }
 procmacros             = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 esp-hal                = { version = "~1.2.0", path = "../esp-hal", default-features = false, optional = true }
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated" }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
 
 # Optional dependencies
 esp-sync         = { version = "0.3.0", path = "../esp-sync", optional = true }
 esp-rom-sys      = { version = "0.1.5", path = "../esp-rom-sys", optional = true }
 defmt  = { version = "1.1", optional = true }
 
-esp32   = { version = "0.41", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c2 = { version = "0.30", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c3 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c5 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c6 = { version = "0.24", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32c61 = { version = "0.4", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32h2 = { version = "0.20", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32s2 = { version = "0.32", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32s3 = { version = "0.36", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32s31 = { version = "0.2", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
-esp32p4 = { version = "0.3",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "06599476" }
+esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
 
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2"
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["critical-section"]

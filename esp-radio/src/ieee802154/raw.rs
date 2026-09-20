@@ -16,7 +16,7 @@ use super::{
     pib::*,
 };
 use crate::{
-    radio_clocks::{clocks_ll::enable_ieee802154, deinit_radio_clocks, init_radio_clocks},
+    radio_clocks::{deinit_radio_clocks, enable_ieee802154, init_radio_clocks},
     sys::include::{
         ieee802154_coex_event_t,
         ieee802154_coex_event_t_IEEE802154_IDLE,
@@ -141,7 +141,7 @@ fn esp_btbb_enable() {
 }
 
 fn ieee802154_mac_init(radio: IEEE802154<'_>) {
-    #[cfg(any(esp32c6, esp32c5))]
+    #[cfg(soc_has_wifi)]
     unsafe {
         unsafe extern "C" {
             static mut coex_pti_tab_ptr: u32;

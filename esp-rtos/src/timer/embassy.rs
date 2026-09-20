@@ -56,7 +56,10 @@ impl embassy_time_driver::Driver for EmbassyTimeDriver {
             if embassy_timer_queue.schedule_wake(at, waker) {
                 // Next wakeup time became shorter, re-arm the timer.
                 let mut scheduler = global_state.scheduler();
-                let time_driver = unwrap!(scheduler.time_driver.as_mut());
+                let time_driver = unwrap!(
+                    scheduler.time_driver.as_mut(),
+                    "The scheduler has not been started. Make sure to call `esp_rtos::start()` before using async features",
+                );
 
                 time_driver
                     .timer_queue

@@ -17,6 +17,9 @@ trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c6_t
 page_size = 0x10000
 entry_num = 256
 
+[device.flash]
+support_status = "partial"
+
 [device.rom]
 has_crc_le  = true
 has_crc_be  = true
@@ -41,6 +44,7 @@ peripherals = [
     { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
     { name = "ATOMIC" },
+    { name = "CLINT", hidden = true },
     { name = "DMA" },
     { name = "DS" },
     { name = "ECC" },
@@ -114,7 +118,7 @@ peripherals = [
     { name = "LP_CORE", virtual = true },
     { name = "TSENS", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR", modem_peri_timeout = "MODEM_PERI_TIMEOUT" }, stable = true },
-    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
     { name = "FROM_CPU_INTR1", virtual = true },
     { name = "FROM_CPU_INTR2", virtual = true },
     { name = "FROM_CPU_INTR3", virtual = true },
@@ -232,7 +236,8 @@ instances = [
 support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
-controller = { Riscv = { flavour = "plic", interrupts = 32, priority_levels = 15 } }
+controller = { Riscv = { flavour = "plic", interrupts = 32, priority_levels = 15, context_switch_interrupt = true } }
+context_switch_source = "clint"
 
 [device.rmt]
 support_status = "partial"

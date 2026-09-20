@@ -159,6 +159,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 
         (false, false, false, false, false, false, false) => Ok(".data"),
         (false, false, false, true, false, false, false) => Ok(".dram2_uninit"),
+        (false, false, false, true, false, false, true) => Ok(".dram2_uninit.bss"),
         (false, false, false, false, true, false, false) => Ok(".dcache_reclaimed_uninit"),
 
         (false, true, false, false, false, false, false) => Ok(".rtc_fast.data"),

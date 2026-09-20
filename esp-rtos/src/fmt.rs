@@ -252,6 +252,7 @@ macro_rules! unwrap {
 
 #[cold]
 #[inline(never)]
+#[track_caller]
 #[cfg(not(feature = "defmt"))]
 pub(crate) fn __unwrap_failed(arg: &str, e: impl ::core::fmt::Debug) -> ! {
     ::core::panic!("unwrap of `{}` failed: {:?}", arg, e);
@@ -259,6 +260,7 @@ pub(crate) fn __unwrap_failed(arg: &str, e: impl ::core::fmt::Debug) -> ! {
 
 #[cold]
 #[inline(never)]
+#[track_caller]
 #[cfg(not(feature = "defmt"))]
 pub(crate) fn __unwrap_failed_with_message(
     arg: &str,

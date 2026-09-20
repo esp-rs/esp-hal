@@ -4,12 +4,12 @@ use core::{
     ptr::{NonNull, addr_of, addr_of_mut},
 };
 
-use esp_hal::time::Instant;
 use esp_phy::PhyInitGuard;
 
 use super::*;
 use crate::{
     compat::{self, OSI_FUNCS_TIME_BLOCKING, common::str_from_c, queue},
+    hal::time::Instant,
     sys::{c_types::*, include::*},
     time::{blob_ticks_to_micros, blob_ticks_to_millis, millis_to_blob_ticks},
 };
@@ -24,19 +24,6 @@ pub(crate) mod ble_os_adapter_chip_specific;
 const EVENT_QUEUE_SIZE: usize = 16;
 
 const TIME_FOREVER: u32 = crate::compat::OSI_FUNCS_TIME_BLOCKING;
-
-#[cfg(esp32c2)]
-const OS_MSYS_1_BLOCK_COUNT: i32 = 24;
-#[cfg(esp32c2)]
-const SYSINIT_MSYS_1_MEMPOOL_SIZE: usize = 768;
-#[cfg(esp32c2)]
-const SYSINIT_MSYS_1_MEMBLOCK_SIZE: i32 = 128;
-#[cfg(esp32c2)]
-const OS_MSYS_2_BLOCK_COUNT: i32 = 24;
-#[cfg(esp32c2)]
-const SYSINIT_MSYS_2_MEMPOOL_SIZE: usize = 1920;
-#[cfg(esp32c2)]
-const SYSINIT_MSYS_2_MEMBLOCK_SIZE: i32 = 320;
 
 const BLE_HCI_TRANS_BUF_CMD: i32 = 3;
 
@@ -59,50 +46,30 @@ struct Event {
     queued: bool,
 }
 
-#[cfg(esp32c2)]
-type OsMembufT = u32;
-
 /// Memory pool
 #[repr(C)]
 pub(crate) struct OsMempool {
     /// Size of the memory blocks, in bytes.
-    mp_block_size: u32,
+    pub(crate) mp_block_size: u32,
     /// The number of memory blocks.
-    mp_num_blocks: u16,
+    pub(crate) mp_num_blocks: u16,
     /// The number of free blocks left
-    mp_num_free: u16,
+    pub(crate) mp_num_free: u16,
     /// The lowest number of free blocks seen
-    mp_min_free: u16,
+    pub(crate) mp_min_free: u16,
     /// Bitmap of OS_MEMPOOL_F_[...] values.
-    mp_flags: u8,
+    pub(crate) mp_flags: u8,
     /// Address of memory buffer used by pool
-    mp_membuf_addr: u32,
+    pub(crate) mp_membuf_addr: u32,
 
     // STAILQ_ENTRY(os_mempool) mp_list;
-    next: *const OsMempool,
+    pub(crate) next: *const OsMempool,
 
     // SLIST_HEAD(,os_memblock);
-    first: *const c_void,
+    pub(crate) first: *const c_void,
 
     /// Name for memory block
-    name: *const u8,
-}
-
-#[cfg(esp32c2)]
-impl OsMempool {
-    const fn zeroed() -> Self {
-        Self {
-            mp_block_size: 0,
-            mp_num_blocks: 0,
-            mp_num_free: 0,
-            mp_min_free: 0,
-            mp_flags: 0,
-            mp_membuf_addr: 0,
-            next: core::ptr::null(),
-            first: core::ptr::null(),
-            name: core::ptr::null(),
-        }
-    }
+    pub(crate) name: *const u8,
 }
 
 /// A mbuf pool from which to allocate mbufs. This contains a pointer to the os
@@ -120,17 +87,6 @@ pub(crate) struct OsMbufPool {
 
     // STAILQ_ENTRY(os_mbuf_pool) omp_next;
     next: *const OsMbufPool,
-}
-
-#[cfg(esp32c2)]
-impl OsMbufPool {
-    const fn zeroed() -> Self {
-        Self {
-            omp_databuf_len: 0,
-            omp_pool: core::ptr::null(),
-            next: core::ptr::null(),
-        }
-    }
 }
 
 /// Chained memory buffer.
@@ -155,28 +111,74 @@ pub(crate) struct OsMbuf {
     om_databuf: u32,
 }
 
-#[cfg(esp32c2)]
-pub(crate) static mut OS_MSYS_INIT_1_DATA: *mut OsMembufT = core::ptr::null_mut();
-#[cfg(esp32c2)]
-pub(crate) static mut OS_MSYS_INIT_1_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed();
-#[cfg(esp32c2)]
-pub(crate) static mut OS_MSYS_INIT_1_MEMPOOL: OsMempool = OsMempool::zeroed();
-
-#[cfg(esp32c2)]
-pub(crate) static mut OS_MSYS_INIT_2_DATA: *mut OsMembufT = core::ptr::null_mut();
-#[cfg(esp32c2)]
-pub(crate) static mut OS_MSYS_INIT_2_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed();
-#[cfg(esp32c2)]
-pub(crate) static mut OS_MSYS_INIT_2_MEMPOOL: OsMempool = OsMempool::zeroed();
-
 unsafe extern "C" {
+    cfg_select! {
+        esp32c2 => {
+            fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
+            fn ble_controller_deinit() -> i32;
+            fn ble_controller_enable(mode: u8) -> i32;
+            fn ble_controller_disable();
+            fn ble_get_npl_element_info(
+                cfg: *const esp_bt_controller_config_t,
+                npl_info: *const BleNplCountInfoT,
+            ) -> i32;
+            fn esp_ble_ll_set_public_addr(addr: *const u8);
+        }
+        _ => {
+            fn esp_ble_register_bb_funcs() -> i32;
+            fn r_ble_controller_disable() -> i32;
+            fn r_ble_controller_deinit() -> i32;
+            fn r_ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
+            fn r_ble_controller_enable(mode: u8) -> i32;
+            fn r_ble_get_npl_element_info(
+                cfg: *const esp_bt_controller_config_t,
+                npl_info: *const BleNplCountInfoT,
+            ) -> i32;
+            fn r_esp_ble_ll_set_public_addr(addr: *const u8);
+            fn scan_stack_initEnv() -> i32;
+            fn scan_stack_deinitEnv();
+
+            fn r_esp_ble_msys_init(
+                msys_size1: u16,
+                msys_size2: u16,
+                msys_cnt1: u16,
+                msys_cnt2: u16,
+                from_heap: u8,
+            ) -> i32;
+
+            fn base_stack_initEnv() -> i32;
+            fn conn_stack_initEnv() -> i32;
+            fn adv_stack_initEnv() -> i32;
+            fn extAdv_stack_initEnv() -> i32;
+            fn sync_stack_initEnv() -> i32;
+
+            fn base_stack_enable() -> i32;
+            fn adv_stack_enable() -> i32;
+            fn extAdv_stack_enable() -> i32;
+            fn scan_stack_enable() -> i32;
+            fn sync_stack_enable() -> i32;
+
+            fn base_stack_deinitEnv() -> i32;
+            fn conn_stack_deinitEnv() -> i32;
+            fn adv_stack_deinitEnv() -> i32;
+            fn extAdv_stack_deinitEnv() -> i32;
+            fn sync_stack_deinitEnv() -> i32;
+
+            fn base_stack_disable() -> i32;
+            fn adv_stack_disable() -> i32;
+            fn extAdv_stack_disable() -> i32;
+            fn scan_stack_disable() -> i32;
+            fn sync_stack_disable() -> i32;
+        }
+    }
+
     // Sends ACL data from host to controller.
     //
     // om                    The ACL data packet to send.
     //
     // 0 on success;
     // A BLE_ERR_[...] error code on failure.
-    pub(crate) fn r_ble_hci_trans_hs_acl_tx(om: *const OsMbuf) -> i32;
+    fn r_ble_hci_trans_hs_acl_tx(om: *const OsMbuf) -> i32;
 
     // Sends an HCI command from the host to the controller.
     //
@@ -185,52 +187,15 @@ unsafe extern "C" {
     //
     // 0 on success;
     // A BLE_ERR_[...] error code on failure.
-    pub(crate) fn r_ble_hci_trans_hs_cmd_tx(cmd: *const u8) -> i32;
+    fn r_ble_hci_trans_hs_cmd_tx(cmd: *const u8) -> i32;
+    fn esp_unregister_ext_funcs();
+    fn esp_register_ext_funcs(funcs: *const ExtFuncsT) -> i32;
+    fn esp_register_npl_funcs(funcs: *const npl_funcs_t) -> i32;
+    fn esp_unregister_npl_funcs();
 
-    #[cfg(esp32c2)]
-    pub(crate) fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
+    fn bt_bb_v2_init_cmplx(value: u8);
 
-    #[cfg(not(esp32c2))]
-    pub(crate) fn r_ble_controller_disable() -> i32;
-
-    #[cfg(not(esp32c2))]
-    pub(crate) fn r_ble_controller_deinit() -> i32;
-
-    #[cfg(esp32c2)]
-    pub(crate) fn ble_controller_deinit() -> i32;
-
-    #[cfg(not(esp32c2))]
-    pub(crate) fn r_ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32;
-
-    #[cfg(esp32c2)]
-    pub(crate) fn ble_controller_enable(mode: u8) -> i32;
-
-    #[cfg(not(esp32c2))]
-    pub(crate) fn r_ble_controller_enable(mode: u8) -> i32;
-
-    pub(crate) fn esp_unregister_ext_funcs();
-
-    pub(crate) fn esp_register_ext_funcs(funcs: *const ExtFuncsT) -> i32;
-
-    pub(crate) fn esp_register_npl_funcs(funcs: *const npl_funcs_t) -> i32;
-
-    pub(crate) fn esp_unregister_npl_funcs();
-
-    #[cfg(esp32c2)]
-    pub(crate) fn ble_get_npl_element_info(
-        cfg: *const esp_bt_controller_config_t,
-        npl_info: *const BleNplCountInfoT,
-    ) -> i32;
-
-    #[cfg(not(esp32c2))]
-    pub(crate) fn r_ble_get_npl_element_info(
-        cfg: *const esp_bt_controller_config_t,
-        npl_info: *const BleNplCountInfoT,
-    ) -> i32;
-
-    pub(crate) fn bt_bb_v2_init_cmplx(value: u8);
-
-    pub(crate) fn r_ble_hci_trans_cfg_hs(
+    fn r_ble_hci_trans_cfg_hs(
         // ble_hci_trans_rx_cmd_fn
         evt: Option<unsafe extern "C" fn(cmd: *const u8, arg: *const c_void) -> i32>,
         evt_arg: *const c_void,
@@ -239,48 +204,82 @@ unsafe extern "C" {
         acl_arg: *const c_void,
     );
 
-    #[cfg(esp32c2)]
-    pub(crate) fn esp_ble_ll_set_public_addr(addr: *const u8);
+    #[cfg(feature = "coex")]
+    fn ble_osi_coex_funcs_register(coex_funcs: *const OsiCoexFuncsT) -> i32;
 
-    #[cfg(not(esp32c2))]
-    pub(crate) fn r_esp_ble_ll_set_public_addr(addr: *const u8);
+    fn r_os_msys_get_pkthdr(dsize: u16, user_hdr_len: u16) -> *mut OsMbuf;
+    fn r_os_mbuf_append(om: *mut OsMbuf, src: *const u8, len: u16) -> i32;
+    fn r_os_mbuf_free_chain(om: *mut OsMbuf) -> i32;
+    fn r_ble_hci_trans_init(m: u8);
+    fn r_ble_hci_trans_buf_alloc(typ: i32) -> *const u8;
+    fn r_ble_hci_trans_buf_free(buf: *const u8);
+    fn coex_pti_v2();
+}
 
-    #[cfg(esp32c2)]
-    pub(crate) fn r_mem_init_mbuf_pool(
-        mem: *const c_void,
-        mempool: *const OsMempool,
-        mbuf_pool: *const OsMbufPool,
-        num_blocks: i32,
-        block_size: i32,
-        name: *const u8,
-    ) -> i32;
+#[cfg(not(esp32c2))]
+fn ble_controller_init(cfg: *const esp_bt_controller_config_t) -> i32 {
+    unsafe {
+        let res = esp_ble_register_bb_funcs();
+        assert!(res == 0, "esp_ble_register_bb_funcs returned {}", res);
 
-    #[cfg(esp32c2)]
-    pub(crate) fn r_os_msys_reset();
+        let res = r_ble_controller_init(cfg);
+        assert!(res == 0, "ble_controller_init returned {}", res);
 
-    #[cfg(esp32c2)]
-    pub(crate) fn r_os_msys_register(mbuf_pool: *const OsMbufPool) -> i32;
+        let res = base_stack_initEnv();
+        assert!(res == 0, "base_stack_initEnv returned {}", res);
 
-    #[allow(unused)]
-    pub(crate) fn ble_osi_coex_funcs_register(coex_funcs: *const OsiCoexFuncsT) -> i32;
+        let res = adv_stack_initEnv();
+        assert!(res == 0, "adv_stack_initEnv returned {}", res);
 
-    pub(crate) fn r_os_msys_get_pkthdr(dsize: u16, user_hdr_len: u16) -> *mut OsMbuf;
+        let res = extAdv_stack_initEnv();
+        assert!(res == 0, "extAdv_stack_initEnv returned {}", res);
 
-    pub(crate) fn r_os_mbuf_append(om: *mut OsMbuf, src: *const u8, len: u16) -> i32;
+        let res = scan_stack_initEnv();
+        assert!(res == 0, "scan_stack_initEnv returned {}", res);
 
-    pub(crate) fn r_os_mbuf_free_chain(om: *mut OsMbuf) -> i32;
+        let res = conn_stack_initEnv();
+        assert!(res == 0, "conn_stack_initEnv returned {}", res);
 
-    pub(crate) fn r_ble_hci_trans_buf_alloc(typ: i32) -> *const u8;
+        let res = sync_stack_initEnv();
+        assert!(res == 0, "sync_stack_initEnv returned {}", res);
 
-    pub(crate) fn r_ble_hci_trans_buf_free(buf: *const u8);
+        let res = r_esp_ble_msys_init(256, 320, 12, 24, 1);
+        assert!(res == 0, "esp_ble_msys_init returned {}", res);
 
-    pub(crate) fn coex_pti_v2();
+        let res = base_stack_enable();
+        assert!(res == 0, "base_stack_enable returned {}", res);
 
-    #[cfg(not(esp32c2))]
-    pub(crate) fn scan_stack_initEnv() -> i32;
+        let res = adv_stack_enable();
+        assert!(res == 0, "adv_stack_enable returned {}", res);
 
-    #[cfg(not(esp32c2))]
-    pub(crate) fn scan_stack_deinitEnv();
+        let res = extAdv_stack_enable();
+        assert!(res == 0, "extAdv_stack_enable returned {}", res);
+
+        let res = scan_stack_enable();
+        assert!(res == 0, "scan_stack_enable returned {}", res);
+
+        let res = sync_stack_enable();
+        assert!(res == 0, "sync_stack_enable returned {}", res);
+    }
+    0
+}
+
+#[cfg(not(esp32c2))]
+fn ble_controller_deinit() -> i32 {
+    unsafe {
+        sync_stack_disable();
+        scan_stack_disable();
+        extAdv_stack_disable();
+        adv_stack_disable();
+        base_stack_disable();
+        conn_stack_deinitEnv();
+        sync_stack_deinitEnv();
+        scan_stack_deinitEnv();
+        extAdv_stack_deinitEnv();
+        adv_stack_deinitEnv();
+        base_stack_deinitEnv();
+        r_ble_controller_deinit()
+    }
 }
 
 #[repr(C)]
@@ -345,7 +344,7 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
         0x20250825
     },
 
-    esp_intr_alloc: Some(self::ble_os_adapter_chip_specific::esp_intr_alloc),
+    esp_intr_alloc: Some(ble_os_adapter_chip_specific::esp_intr_alloc),
     esp_intr_free: Some(esp_intr_free),
     malloc: Some(crate::ble::malloc),
     free: Some(crate::ble::free),
@@ -368,9 +367,9 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
     ecc_gen_key_pair: Some(ecc_gen_key_pair),
     ecc_gen_dh_key: Some(ecc_gen_dh_key),
     #[cfg(any(esp32c6, esp32h2))]
-    esp_reset_modem: Some(self::ble_os_adapter_chip_specific::reset_modem),
+    esp_reset_modem: Some(ble_os_adapter_chip_specific::reset_modem),
     #[cfg(esp32c2)]
-    esp_reset_rpa_moudle: Some(self::ble_os_adapter_chip_specific::esp_reset_rpa_moudle),
+    esp_reset_rpa_moudle: Some(ble_os_adapter_chip_specific::esp_reset_rpa_moudle),
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: None,
     magic: 0xA5A5A5A5,
@@ -430,10 +429,8 @@ unsafe extern "C" fn task_delete(task: *mut c_void) {
 }
 
 unsafe extern "C" fn osi_assert(ln: u32, fn_name: *const c_void, param1: u32, param2: u32) {
-    unsafe {
-        let name_str = str_from_c(fn_name as _);
-        panic!("ASSERT {}:{} {} {}", name_str, ln, param1, param2);
-    }
+    let name_str = unsafe { str_from_c(fn_name as _) };
+    panic!("ASSERT {}:{} {} {}", name_str, ln, param1, param2);
 }
 
 unsafe extern "C" fn esp_intr_free(_ret_handle: *mut *mut c_void) -> i32 {
@@ -579,6 +576,7 @@ static mut G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
 };
 
 #[repr(C)]
+#[cfg(feature = "coex")]
 /// Contains pointers to functions used for BLE coexistence with Wi-Fi.
 pub(crate) struct OsiCoexFuncsT {
     magic: u32,
@@ -590,7 +588,7 @@ pub(crate) struct OsiCoexFuncsT {
     coex_schm_status_bit_clear: Option<unsafe extern "C" fn(_type: u32, status: u32)>,
 }
 
-#[allow(unused)]
+#[cfg(feature = "coex")]
 static G_COEX_FUNCS: OsiCoexFuncsT = OsiCoexFuncsT {
     magic: 0xFADEBEAD,
     version: 0x00010006,
@@ -1131,6 +1129,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         let res = esp_register_npl_funcs(core::ptr::addr_of!(G_NPL_FUNCS));
         assert!(res == 0, "esp_register_npl_funcs returned {}", res);
 
+        // not really using  here ... remove it?
         let npl_info = BleNplCountInfoT {
             evt_count: 0,
             evtq_count: 0,
@@ -1138,28 +1137,16 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             sem_count: 0,
             mutex_count: 0,
         };
-        #[cfg(esp32c2)]
-        let res = ble_get_npl_element_info(
-            &cfg as *const esp_bt_controller_config_t,
-            &npl_info as *const BleNplCountInfoT,
-        );
-        #[cfg(not(esp32c2))]
-        let res = r_ble_get_npl_element_info(
-            &cfg as *const esp_bt_controller_config_t,
-            &npl_info as *const BleNplCountInfoT,
-        );
+
+        let res = cfg_select! {
+            esp32c2 => ble_get_npl_element_info(&cfg, &npl_info),
+            _ => r_ble_get_npl_element_info(&cfg, &npl_info),
+        };
         assert!(res == 0, "ble_get_npl_element_info returned {}", res);
 
-        // not really using npl_info here ... remove it?
-
+        // Initialize the global memory pool
         #[cfg(esp32c2)]
-        {
-            // Initialize the global memory pool
-            let ret = os_msys_buf_alloc();
-            assert!(ret, "os_msys_buf_alloc failed");
-
-            os_msys_init();
-        }
+        ble_os_adapter_chip_specific::os_msys_init();
 
         phy_init_guard = esp_phy::enable_phy();
 
@@ -1170,89 +1157,12 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         #[cfg(feature = "coex")]
         {
-            let rc = ble_osi_coex_funcs_register(&G_COEX_FUNCS as *const OsiCoexFuncsT);
+            let rc = ble_osi_coex_funcs_register(&G_COEX_FUNCS);
             assert!(rc == 0, "ble_osi_coex_funcs_register returned {}", rc);
         }
 
-        #[cfg(not(esp32c2))]
-        {
-            unsafe extern "C" {
-                fn esp_ble_register_bb_funcs() -> i32;
-            }
-            let res = esp_ble_register_bb_funcs();
-            assert!(res == 0, "esp_ble_register_bb_funcs returned {}", res);
-        }
-
-        #[cfg(esp32c2)]
-        let res = ble_controller_init(&cfg as *const esp_bt_controller_config_t);
-        #[cfg(not(esp32c2))]
-        let res = r_ble_controller_init(&cfg as *const esp_bt_controller_config_t);
-
+        let res = ble_controller_init(&cfg);
         assert!(res == 0, "ble_controller_init returned {}", res);
-
-        #[cfg(not(esp32c2))]
-        {
-            unsafe extern "C" {
-                fn r_esp_ble_msys_init(
-                    msys_size1: u16,
-                    msys_size2: u16,
-                    msys_cnt1: u16,
-                    msys_cnt2: u16,
-                    from_heap: u8,
-                ) -> i32;
-
-                fn base_stack_initEnv() -> i32;
-                fn conn_stack_initEnv() -> i32;
-                fn adv_stack_initEnv() -> i32;
-                fn extAdv_stack_initEnv() -> i32;
-                fn sync_stack_initEnv() -> i32;
-
-                fn base_stack_enable() -> i32;
-                fn adv_stack_enable() -> i32;
-                fn extAdv_stack_enable() -> i32;
-                fn scan_stack_enable() -> i32;
-                fn sync_stack_enable() -> i32;
-            }
-
-            let res = base_stack_initEnv();
-            assert!(res == 0, "base_stack_initEnv returned {}", res);
-
-            let res = adv_stack_initEnv();
-            assert!(res == 0, "adv_stack_initEnv returned {}", res);
-
-            let res = extAdv_stack_initEnv();
-            assert!(res == 0, "extAdv_stack_initEnv returned {}", res);
-
-            #[cfg(not(esp32c2))]
-            {
-                let res = scan_stack_initEnv();
-                assert!(res == 0, "scan_stack_initEnv returned {}", res);
-            }
-
-            let res = conn_stack_initEnv();
-            assert!(res == 0, "conn_stack_initEnv returned {}", res);
-
-            let res = sync_stack_initEnv();
-            assert!(res == 0, "sync_stack_initEnv returned {}", res);
-
-            let res = r_esp_ble_msys_init(256, 320, 12, 24, 1);
-            assert!(res == 0, "esp_ble_msys_init returned {}", res);
-
-            let res = base_stack_enable();
-            assert!(res == 0, "base_stack_enable returned {}", res);
-
-            let res = adv_stack_enable();
-            assert!(res == 0, "adv_stack_enable returned {}", res);
-
-            let res = extAdv_stack_enable();
-            assert!(res == 0, "extAdv_stack_enable returned {}", res);
-
-            let res = scan_stack_enable();
-            assert!(res == 0, "scan_stack_enable returned {}", res);
-
-            let res = sync_stack_enable();
-            assert!(res == 0, "sync_stack_enable returned {}", res);
-        }
 
         #[cfg(feature = "coex")]
         crate::sys::include::coex_enable();
@@ -1261,14 +1171,11 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         crate::common_adapter::read_mac(mac.as_mut_ptr(), 2);
         mac.reverse();
 
-        #[cfg(esp32c2)]
-        esp_ble_ll_set_public_addr(&mac as *const u8);
-        #[cfg(not(esp32c2))]
-        r_esp_ble_ll_set_public_addr(&mac as *const u8);
+        cfg_select! {
+            esp32c2 => esp_ble_ll_set_public_addr(mac.as_ptr()),
+            _ => r_esp_ble_ll_set_public_addr(mac.as_ptr()),
+        };
 
-        unsafe extern "C" {
-            fn r_ble_hci_trans_init(m: u8);
-        }
         r_ble_hci_trans_init(0);
 
         r_ble_hci_trans_cfg_hs(
@@ -1278,10 +1185,11 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             core::ptr::null(),
         );
 
-        #[cfg(esp32c2)]
-        let res = ble_controller_enable(1); // 1 = BLE
-        #[cfg(not(esp32c2))]
-        let res = r_ble_controller_enable(1); // 1 = BLE
+        const BLE: u8 = 1;
+        let res = cfg_select! {
+            esp32c2 => ble_controller_enable(BLE),
+            _ => r_ble_controller_enable(BLE),
+        };
         assert!(res == 0, "ble_controller_enable returned {}", res);
     }
 
@@ -1301,150 +1209,23 @@ pub(crate) fn ble_deinit() {
         esp_hal::Internal::conjure()
     });
 
-    #[cfg(not(esp32c2))]
-    unsafe extern "C" {
-        fn base_stack_deinitEnv() -> i32;
-        fn conn_stack_deinitEnv() -> i32;
-        fn adv_stack_deinitEnv() -> i32;
-        fn extAdv_stack_deinitEnv() -> i32;
-        fn sync_stack_deinitEnv() -> i32;
-
-        fn base_stack_disable() -> i32;
-        fn adv_stack_disable() -> i32;
-        fn extAdv_stack_disable() -> i32;
-        fn scan_stack_disable() -> i32;
-        fn sync_stack_disable() -> i32;
-    }
-
-    #[cfg(esp32c2)]
-    unsafe extern "C" {
-        fn ble_controller_disable();
-    }
-
     unsafe {
         // HCI deinit
-        npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
+        r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
 
-        #[cfg(not(esp32c2))]
-        {
-            npl::r_ble_controller_disable();
-            sync_stack_disable();
-            scan_stack_disable();
-            extAdv_stack_disable();
-            adv_stack_disable();
-            base_stack_disable();
-            conn_stack_deinitEnv();
-            sync_stack_deinitEnv();
-            scan_stack_deinitEnv();
-            extAdv_stack_deinitEnv();
-            adv_stack_deinitEnv();
-            base_stack_deinitEnv();
-        }
+        cfg_select! {
+            esp32c2 => ble_controller_disable(),
+            _ => r_ble_controller_disable(),
+        };
 
-        #[cfg(esp32c2)]
-        {
-            ble_controller_disable();
-        }
-
-        #[cfg(not(esp32c2))]
-        let res = npl::r_ble_controller_deinit();
-
-        #[cfg(esp32c2)]
-        let res = npl::ble_controller_deinit();
-
+        let res = ble_controller_deinit();
         assert!(res == 0, "ble_controller_deinit returned {}", res);
 
         #[cfg(esp32c2)]
-        os_msys_buf_free();
+        ble_os_adapter_chip_specific::os_msys_buf_free();
 
-        npl::esp_unregister_npl_funcs();
-
-        npl::esp_unregister_ext_funcs();
-    }
-}
-
-// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L218-L279>
-#[cfg(esp32c2)]
-fn os_msys_buf_alloc() -> bool {
-    unsafe {
-        OS_MSYS_INIT_1_DATA = crate::compat::malloc::calloc(
-            1,
-            core::mem::size_of::<OsMembufT>() * SYSINIT_MSYS_1_MEMPOOL_SIZE,
-        ) as *mut u32;
-        OS_MSYS_INIT_2_DATA = crate::compat::malloc::calloc(
-            1,
-            core::mem::size_of::<OsMembufT>() * SYSINIT_MSYS_2_MEMPOOL_SIZE,
-        ) as *mut u32;
-
-        if OS_MSYS_INIT_1_DATA.is_null() || OS_MSYS_INIT_2_DATA.is_null() {
-            os_msys_buf_free();
-            return false;
-        }
-
-        true
-    }
-}
-
-// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L281-L318>
-#[cfg(esp32c2)]
-fn os_msys_buf_free() {
-    unsafe {
-        // No C2 ROM revision exposes `os_mempool_unregister`, so drop every registered pool before
-        // releasing the memory it points at.
-        r_os_msys_reset();
-
-        if !OS_MSYS_INIT_1_DATA.is_null() {
-            crate::compat::malloc::free(OS_MSYS_INIT_1_DATA.cast());
-            OS_MSYS_INIT_1_DATA = core::ptr::null_mut();
-        }
-        if !OS_MSYS_INIT_2_DATA.is_null() {
-            crate::compat::malloc::free(OS_MSYS_INIT_2_DATA.cast());
-            OS_MSYS_INIT_2_DATA = core::ptr::null_mut();
-        }
-    }
-}
-
-#[cfg(esp32c2)]
-fn os_msys_init() {
-    static MSYS1: &[u8] = b"msys_1\0";
-    static MSYS2: &[u8] = b"msys_2\0";
-
-    unsafe {
-        r_os_msys_reset();
-
-        let rc = r_mem_init_mbuf_pool(
-            OS_MSYS_INIT_1_DATA as *const c_void,
-            addr_of!(OS_MSYS_INIT_1_MEMPOOL),
-            addr_of!(OS_MSYS_INIT_1_MBUF_POOL),
-            OS_MSYS_1_BLOCK_COUNT,
-            SYSINIT_MSYS_1_MEMBLOCK_SIZE,
-            MSYS1 as *const _ as *const u8,
-        );
-        if rc != 0 {
-            panic!("r_mem_init_mbuf_pool failed");
-        }
-
-        let rc = r_os_msys_register(addr_of!(OS_MSYS_INIT_1_MBUF_POOL));
-        if rc != 0 {
-            panic!("r_os_msys_register failed");
-        }
-
-        let rc = r_mem_init_mbuf_pool(
-            OS_MSYS_INIT_2_DATA as *const c_void,
-            addr_of!(OS_MSYS_INIT_2_MEMPOOL),
-            addr_of!(OS_MSYS_INIT_2_MBUF_POOL),
-            OS_MSYS_2_BLOCK_COUNT,
-            SYSINIT_MSYS_2_MEMBLOCK_SIZE,
-            MSYS2 as *const _ as *const u8,
-        );
-        if rc != 0 {
-            panic!("r_mem_init_mbuf_pool failed");
-        }
-
-        let rc = r_os_msys_register(addr_of!(OS_MSYS_INIT_2_MBUF_POOL));
-        if rc != 0 {
-            panic!("r_os_msys_register failed");
-        }
+        esp_unregister_npl_funcs();
+        esp_unregister_ext_funcs();
     }
 }
 
@@ -1549,9 +1330,7 @@ fn send_packet(packet: &[u8]) {
             let om = r_os_msys_get_pkthdr(packet.len() as u16, ACL_DATA_MBUF_LEADINGSPACE as u16);
 
             let res = r_os_mbuf_append(om, packet.as_ptr().offset(1), (packet.len() - 1) as u16);
-            if res != 0 {
-                panic!("r_os_mbuf_append returned {}", res);
-            }
+            assert!(res == 0, "r_os_mbuf_append returned {}", res);
 
             // this modification of the ACL data packet makes it getting sent and
             // received by the other side

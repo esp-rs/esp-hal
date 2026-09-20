@@ -44,7 +44,7 @@
 //!
 //! // THIS IS IMPORTANT FOR WIFI AND BLE: You MUST start the scheduler
 //! // before initializing the radio!
-//! esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+//! esp_rtos::start(timg0.timer0);
 #![cfg_attr(
     wifi_driver_supported,
     doc = r#"
@@ -204,6 +204,8 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32s2::*;
     #[cfg(esp32s3)]
     pub use esp_wifi_sys_esp32s3::*;
+    #[cfg(esp32s31)]
+    pub use esp_wifi_sys_esp32s31::*;
 }
 
 use crate::refcount::Refcount;
@@ -234,6 +236,8 @@ macro_rules! unstable_module {
 
 mod asynch;
 mod compat;
+#[cfg(esp32s31)]
+mod compiler_rt_abi;
 mod interrupt_dispatch;
 mod radio_clocks;
 mod refcount;
@@ -361,7 +365,7 @@ pub(crate) fn deinit() {
     // only run once all radios are off: PHY teardown still needs the modem
     // clocks.
     #[cfg(feature = "ble")]
-    crate::radio_clocks::clocks_ll::enable_bt(false);
+    crate::radio_clocks::enable_bt(false);
     crate::common_adapter::disable_wifi_power_domain();
     crate::radio_clocks::deinit_radio_clocks();
 
@@ -399,7 +403,7 @@ static RADIO_REFCOUNT: Refcount = Refcount::new();
 impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         debug!("Creating RadioRefGuard");
 
         RADIO_REFCOUNT.increment(init);

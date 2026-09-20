@@ -84,6 +84,10 @@ name              = "storage"
 harness           = false
 
 [[bin]]
+name              = "flash"
+harness           = false
+
+[[bin]]
 name              = "uart"
 harness           = false
 
@@ -143,7 +147,7 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 # Add the `embedded-test/defmt` feature for more verbose testing
-defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt"]
+defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 esp-radio-unstable = ["esp-radio/unstable"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
@@ -245,7 +249,7 @@ esp32s3 = [
 esp32s31 = [
     "esp-hal/esp32s31",
     "esp-alloc?/esp32s31",
-    # "esp-radio?/esp32s31",
+    "esp-radio?/esp32s31",
     "esp-storage?/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",
     "esp-metadata-generated/esp32s31",

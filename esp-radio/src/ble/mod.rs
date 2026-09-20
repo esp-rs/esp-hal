@@ -5,6 +5,8 @@ pub(crate) mod btdm;
 
 #[cfg(bt_controller = "npl")]
 pub(crate) mod npl;
+#[cfg(bt_controller = "npl")]
+mod os_mempool;
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::mem::MaybeUninit;
@@ -39,6 +41,13 @@ pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::sys::c_types::c
 
 #[cfg(any(esp32, esp32c3, esp32s3))]
 pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
+    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
+}
+
+#[cfg(any(esp32c3, esp32s3))]
+pub(crate) unsafe extern "C" fn malloc_retention(size: u32) -> *mut crate::sys::c_types::c_void {
+    // IDF uses heap_caps_malloc(size, MALLOC_CAP_RETENTION). We have no retention
+    // heap, so fall back to the same internal allocator as malloc_internal.
     unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
 }
 

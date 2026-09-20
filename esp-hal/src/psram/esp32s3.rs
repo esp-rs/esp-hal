@@ -113,7 +113,7 @@ pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     const START_PAGE: u32 = 0;
 
     unsafe extern "C" {
-        fn Cache_Suspend_DCache();
+        fn Cache_Suspend_DCache() -> u32;
 
         fn Cache_Resume_DCache(param: u32);
 

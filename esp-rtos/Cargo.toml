@@ -12,9 +12,10 @@ license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 chip-features-matter = true
-doc-config = { features = ["esp-hal/unstable", "embassy", "esp-radio"] }
+doc-config = { features = ["esp-hal/unstable", "embassy", "esp-radio", "defmt"] }
 check-configs = [
     { features = ["esp-hal/unstable"] },
+    { features = ["esp-hal/unstable", "alloc"] },
     { features = ["esp-hal/unstable", "esp-alloc"] },
     { features = ["esp-hal/unstable", "esp-radio"] },
     { features = ["esp-hal/unstable", "esp-radio", "embassy"] },
@@ -51,7 +52,7 @@ embassy-sync = "0.8"
 esp-alloc = { version = "0.11.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.8.0", path = "../esp-config" }
 esp-sync = { version = "0.3.0", path = "../esp-sync" }
-esp-radio-rtos-driver = { version = "0.4.1", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
+esp-radio-rtos-driver = { version = "0.4.2", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
 macros = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
 
@@ -72,7 +73,7 @@ xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
 esp-config             = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
 esp-hal = { version = "~1.2.0", path = "../esp-hal", features = ["unstable"] }
@@ -87,18 +88,18 @@ embassy = ["dep:embassy-time-driver", "dep:embassy-executor", "dep:embassy-time-
 ## Enable esp-radio support.
 esp-radio = ["alloc", "dep:esp-radio-rtos-driver"]
 
-# Not documented because we don't currently expose anything that requires alloc, but isn't related to esp-radio.
-# TODO: make this public once we actually have alloc-based APIs.
-alloc = ["dep:allocator-api2", "dep:esp-radio-rtos-driver", "defmt?/alloc"]
-
-## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
+## Enable APIs that dynamically allocate memory, such as spawning a thread on a heap-allocated stack.
 ##
-## Memory allocation is required by `esp-radio`. If you choose to not enable
-## this feature, you need to provide implementations for the following functions:
+## Memory allocation is required by `esp-radio`.
+##
+## Without `esp-alloc` you must provide the following functions:
 ## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
 ## - `pub extern "C" fn free_internal(ptr: *mut u8)`
-## 
+##
 ## Note that the untyped nature of the allocator functions means that esp-alloc is likely the more memory efficient option.
+alloc = ["dep:allocator-api2", "defmt?/alloc"]
+
+## Enable the use of the `esp-alloc` crate for dynamic memory allocation. Also enables `alloc`.
 esp-alloc = ["alloc", "dep:esp-alloc"]
 
 ## Enable [`rtos-trace`](https://crates.io/crates/rtos-trace) support.
