@@ -178,6 +178,8 @@ extern_coex_fns! {
 }
 
 coex_fns! {
+    fn coex_schm_status_bit_set(typ: u32, status: u32);
+    fn coex_schm_status_bit_clear(typ: u32, status: u32);
     fn coex_schm_interval_get() -> u32;
     fn coex_schm_curr_period_get() -> u8;
     fn coex_schm_curr_phase_get() -> *mut c_void;
