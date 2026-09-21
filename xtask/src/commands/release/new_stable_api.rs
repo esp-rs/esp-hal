@@ -7,6 +7,7 @@ use std::{
 use anyhow::{Context, Error};
 use public_api::{PublicApi, PublicItem, diff::PublicApiDiff};
 use rustdoc_types::{Crate, GenericArgs, Id, Impl, ItemEnum, Type};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     Package,
@@ -14,8 +15,12 @@ use crate::{
     semver_check::{baseline_gz, build_prepared_doc_json, decompress_gz},
 };
 
-/// Visible in `new_stable_api` when a chip's comparison did not happen.
-const COMPARISON_FAILED: &str = "<comparison failed — see log>";
+/// One `new_stable_api` entry.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct NewStableItem {
+    pub item: String,
+    pub chips: BTreeSet<Chip>,
+}
 
 struct Reference {
     /// Which side the comparison ran against, for the log line.
@@ -27,12 +32,14 @@ struct Reference {
 ///
 /// `base_tag` overrides the release compared against, which is otherwise the
 /// tag matching the package's in-tree version.
+///
+/// Returns the items and the chips that produced no comparison result.
 pub(crate) fn newly_stable(
     workspace: &Path,
     package: Package,
     current_docs: &[(Chip, PathBuf)],
     base_tag: Option<&str>,
-) -> anyhow::Result<Vec<String>> {
+) -> anyhow::Result<(Vec<NewStableItem>, BTreeSet<Chip>)> {
     // Tag sources are extracted outside the repo so cargo does not treat the tree
     // as part of the outer workspace. One directory per run, so that concurrent
     // `plan` invocations do not delete each other's checkouts.
@@ -42,15 +49,17 @@ pub(crate) fn newly_stable(
         .context("Failed to create a scratch directory for the release tag sources")?;
 
     let mut newly_stable: BTreeMap<String, BTreeSet<Chip>> = BTreeMap::new();
-    let mut with_reference = 0usize;
+    let mut unchecked_chips = BTreeSet::new();
 
     for (chip, current_path) in current_docs {
         let Some(reference) = reference_doc(workspace, scratch.path(), package, *chip, base_tag)?
         else {
-            log::info!("No tag or baseline rustdoc for {package} {chip} - skipping new stable API");
+            log::info!(
+                "Not checking new stable API for {package} {chip}: no tag or baseline rustdoc"
+            );
+            unchecked_chips.insert(*chip);
             continue;
         };
-        with_reference += 1;
 
         match new_stable_items(&reference, current_path, *chip) {
             Ok(items) => {
@@ -58,49 +67,21 @@ pub(crate) fn newly_stable(
                     newly_stable.entry(item).or_default().insert(*chip);
                 }
             }
-            // An empty list and a comparison that never happened look the same in
-            // the plan file, so the failure has to show up in the list itself.
             Err(error) => {
                 log::error!(
                     "Could not compare {package} {chip} against the last release: {error:#}"
                 );
-                newly_stable
-                    .entry(COMPARISON_FAILED.to_string())
-                    .or_default()
-                    .insert(*chip);
+                unchecked_chips.insert(*chip);
             }
         }
     }
 
-    if with_reference == 0 && !current_docs.is_empty() {
-        log::error!(
-            "Could not compare {package} against the last release on any chip - the empty \
-             new_stable_api list would be a false all-clear"
-        );
-        for (chip, _) in current_docs {
-            newly_stable
-                .entry(COMPARISON_FAILED.to_string())
-                .or_default()
-                .insert(*chip);
-        }
-    }
-
-    Ok(format_entries(newly_stable))
-}
-
-/// `item [chip, chip]` per entry, chips in `Chip` declaration order.
-fn format_entries(newly_stable: BTreeMap<String, BTreeSet<Chip>>) -> Vec<String> {
-    newly_stable
+    let items = newly_stable
         .into_iter()
-        .map(|(item, chips)| {
-            let chips = chips
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("{item} [{chips}]")
-        })
-        .collect()
+        .map(|(item, chips)| NewStableItem { item, chips })
+        .collect();
+
+    Ok((items, unchecked_chips))
 }
 
 /// Return the stable public API items present in `current` but not in `reference`.
@@ -582,24 +563,18 @@ mod tests {
     }
 
     #[test]
-    fn format_entries_orders_chips_and_keeps_the_failure_marker() {
-        let newly_stable = BTreeMap::from([
-            (
-                CTS_CONFIG_ENUM.to_string(),
-                BTreeSet::from([Chip::Esp32s31, Chip::Esp32, Chip::Esp32c6]),
-            ),
-            (
-                COMPARISON_FAILED.to_string(),
-                BTreeSet::from([Chip::Esp32c2]),
-            ),
-        ]);
+    fn new_stable_item_serializes_item_and_chips_as_separate_keys() {
+        let entry = NewStableItem {
+            item: CTS_CONFIG_ENUM.to_string(),
+            chips: BTreeSet::from([Chip::Esp32s31, Chip::Esp32, Chip::Esp32c6]),
+        };
 
         assert_eq!(
-            format_entries(newly_stable),
-            vec![
-                format!("{COMPARISON_FAILED} [esp32c2]"),
-                format!("{CTS_CONFIG_ENUM} [esp32, esp32c6, esp32s31]"),
-            ]
+            serde_json::to_value(&entry).unwrap(),
+            serde_json::json!({
+                "item": CTS_CONFIG_ENUM,
+                "chips": ["esp32", "esp32c6", "esp32s31"],
+            })
         );
     }
 }

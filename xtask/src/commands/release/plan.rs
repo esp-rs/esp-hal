@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     io::Write,
     path::Path,
     process::Command,
@@ -21,7 +21,7 @@ use crate::{
         VersionBump,
         checker::package_docs,
         do_version_bump,
-        release::{changelog_preview, new_stable_api, registry::RegistrySnapshot},
+        release::{changelog_preview, new_stable_api, new_stable_api::NewStableItem, registry::RegistrySnapshot},
     },
     git::{BackportInfo, current_branch, parse_backport_branch},
     metadata::Chip,
@@ -69,7 +69,11 @@ pub struct PackagePlan {
     /// Public items stable now but not at the last release. `None` if the
     /// package is not semver-checked. `execute-plan` ignores it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub new_stable_api: Option<Vec<String>>,
+    pub new_stable_api: Option<Vec<NewStableItem>>,
+    /// Chips with no comparison result, so an empty `new_stable_api` is not an
+    /// all-clear for them.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub new_stable_api_unchecked_chips: BTreeSet<Chip>,
     /// Tag `new_stable_api` was computed against, when it was not the tag
     /// matching `current_version`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -349,6 +353,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 
                 let new_version = do_version_bump(&current_version, &bump).unwrap();
                 let tag_name = package.tag(&new_version);
+                let (new_stable_api, unchecked_chips) = newly_stable.unzip();
 
                 PackagePlan {
                     package,
@@ -357,7 +362,8 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                     new_version,
                     tag_name,
                     bump,
-                    new_stable_api: newly_stable,
+                    new_stable_api,
+                    new_stable_api_unchecked_chips: unchecked_chips.unwrap_or_default(),
                     new_stable_api_base: api_base_tag(package).map(str::to_string),
                 }
             })
@@ -425,12 +431,12 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // For semver-checked packages, `new_stable_api` lists public items that are stable now but were
 // not in the last release's API. Review it: an item you did not mean to stabilize is much
 // easier to remove before the release than after. Only the roots are listed, so a stabilized
-// enum appears once rather than once per variant or impl, and each entry ends with the chips
-// it is new for. An entry naming only a chip or two is usually not a stabilization at all:
-// the item was already stable elsewhere and that chip has only just gained the peripheral.
-// A `<comparison failed — see log>` entry means an empty reading is not trustworthy.
-// The list is informational and `execute-plan` ignores it. See documentation/RELEASING.md
-// for what the comparison can and cannot see.
+// enum appears once rather than once per variant or impl. Each entry has `item` and `chips`;
+// an entry naming only a chip or two is usually not a stabilization at all: the item was
+// already stable elsewhere and that chip has only just gained the peripheral.
+// `new_stable_api_unchecked_chips` names chips with no comparison result, so an empty list
+// is not an all-clear for them. The list is informational and `execute-plan` ignores it.
+// See documentation/RELEASING.md for what the comparison can and cannot see.
 //
 // CHANGELOG NOTE
 // When you run `cargo xrelease execute-plan`, changelog entries from recently

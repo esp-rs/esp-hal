@@ -65,8 +65,10 @@ Notes:
 - `plan` fills in `new_stable_api` for semver-checked packages, comparing the
   rustdoc JSON of the tag matching the in-tree version against the working tree,
   and falling back to the semver baseline when that tag cannot be documented.
-  Both sides are built with the features in the package's `semver-config`. Paths
-  in the list are `public-api` Display output, not rustdoc definition sites.
+  Both sides are built with the features in the package's `semver-config`. Each
+  entry is an object with `item` and `chips`. Paths in `item` are `public-api`
+  Display output, not rustdoc definition sites. Chips with no comparison result
+  are listed in `new_stable_api_unchecked_chips`.
 - `--api-base-package <pkg> --api-base-version <x.y.z>` compares that package
   against another release instead. Needed on `main` when patch releases were cut
   from a backport branch, since main's own last release does not contain them. A
