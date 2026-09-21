@@ -1,8 +1,5 @@
 use alloc::boxed::Box;
-use core::{
-    ptr::{NonNull, addr_of_mut},
-    task::Poll,
-};
+use core::{ptr::NonNull, task::Poll};
 
 use esp_phy::PhyInitGuard;
 use portable_atomic::{AtomicBool, AtomicU32, Ordering};
@@ -12,7 +9,6 @@ use super::{Config, ReceivedPacket};
 use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
-    ble::{HCI_OUT_COLLECTOR, HciOutCollector},
     compat::common::str_from_c,
     hal::ram,
     sys::{c_types::*, include::*},
@@ -259,7 +255,6 @@ unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let phy_init_guard;
     unsafe {
-        (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
         // turn on logging
         #[allow(static_mut_refs)]
         #[cfg(feature = "print-logs-from-driver")]
@@ -345,21 +340,17 @@ pub(crate) fn ble_deinit() {
     // Disabling the PHY happens automatically, when the BLEController gets dropped.
 }
 
-/// Sends HCI data to the BLE controller.
-///
-/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
-/// caller must offer the remaining bytes again.
-pub(crate) fn send_hci(data: &[u8]) -> usize {
+pub(crate) fn send(data: &[u8]) {
     // make sure the packet buffer doesn't get touched until sent
     while PACKET_IN_FLIGHT.load(Ordering::Acquire) {}
     while unsafe { !API_vhci_host_check_send_available() } {
         trace!("can_send is false");
     }
 
-    super::collect_and_send(data, send_packet)
+    send_packet(data)
 }
 
-pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
+pub(crate) async fn send_async(data: &[u8]) {
     // make sure the packet buffer doesn't get touched until sent
     core::future::poll_fn(|cx| {
         PACKET_SENT_WAKER.register(cx.waker());
@@ -373,7 +364,7 @@ pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
     })
     .await;
 
-    super::collect_and_send(data, send_packet)
+    send_packet(data)
 }
 
 fn send_packet(packet: &[u8]) {

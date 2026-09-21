@@ -19,7 +19,6 @@ use portable_atomic::AtomicBool;
 
 use super::{Config, ReceivedPacket};
 use crate::{
-    ble::{HCI_OUT_COLLECTOR, HciOutCollector},
     compat::{
         self,
         common::str_from_c,
@@ -771,34 +770,31 @@ fn send_hci_packet(packet: &[u8]) {
 }
 
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
-    let phy_init_guard;
+    chip_specific::btdm_controller_mem_init();
+
+    let mut cfg = chip_specific::create_ble_config(config);
+
+    #[cfg(feature = "coex")]
     unsafe {
-        (*&raw mut HCI_OUT_COLLECTOR).write(HciOutCollector::new());
-
-        chip_specific::btdm_controller_mem_init();
-
-        let mut cfg = chip_specific::create_ble_config(config);
-
-        #[cfg(feature = "coex")]
-        {
-            let res = crate::wifi::coex_init();
-            assert!(res == 0, "coex_init failed");
-        }
-
-        chip_specific::bt_periph_module_enable();
-        chip_specific::disable_sleep_mode();
-
-        phy_init_guard = esp_phy::enable_phy();
-
-        let res = esp_bt_controller_init(&mut cfg);
-        assert!(res == 0, "esp_bt_controller_init returned {}", res);
-
-        #[cfg(feature = "coex")]
-        crate::sys::include::coex_enable();
-
-        let res = esp_bt_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
-        assert!(res == 0, "esp_bt_controller_enable returned {}", res);
+        let res = crate::wifi::coex_init();
+        assert!(res == 0, "coex_init failed");
     }
+
+    chip_specific::bt_periph_module_enable();
+    chip_specific::disable_sleep_mode();
+
+    let phy_init_guard = esp_phy::enable_phy();
+
+    let res = esp_bt_controller_init(&mut cfg);
+    assert!(res == 0, "esp_bt_controller_init returned {}", res);
+
+    #[cfg(feature = "coex")]
+    unsafe {
+        crate::sys::include::coex_enable();
+    }
+
+    let res = esp_bt_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
+    assert!(res == 0, "esp_bt_controller_enable returned {}", res);
 
     #[cfg(rng_trng_supported)]
     unsafe {
@@ -818,16 +814,12 @@ pub(crate) fn ble_deinit() {
     let _ = esp_bt_controller_deinit();
 }
 
-/// Sends HCI data to the BLE controller.
-///
-/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
-/// caller must offer the remaining bytes again.
-pub(crate) fn send_hci(data: &[u8]) -> usize {
-    super::collect_and_send(data, send_hci_packet)
+pub(crate) fn send(data: &[u8]) {
+    send_hci_packet(data)
 }
 
-pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
-    super::collect_and_send(data, send_hci_packet)
+pub(crate) async fn send_async(data: &[u8]) {
+    send_hci_packet(data)
 }
 
 // -------------------------------------------------------------------------
@@ -925,10 +917,10 @@ extern "C" fn wr_btdm_osal_eventq_get(evq: *mut BtdmOsalPtr, tmo: u32) -> *mut B
         queue_receive(evq.ptr, (&raw mut ev).cast(), blob_ticks_to_micros(tmo))
     };
 
-    if received != 0 {
-        if let Some(inner) = unsafe { (*ev).ptr.cast::<Event>().as_mut() } {
-            inner.queued = false;
-        }
+    if received != 0
+        && let Some(inner) = unsafe { (*ev).ptr.cast::<Event>().as_mut() }
+    {
+        inner.queued = false;
     }
 
     ev

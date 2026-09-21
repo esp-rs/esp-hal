@@ -5,11 +5,10 @@
 #[cfg_attr(bt_controller = "btdm2", path = "btdm2/mod.rs")]
 pub(crate) mod porting;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
-use core::mem::MaybeUninit;
 
 use docsplay::Display;
 use esp_sync::NonReentrantMutex;
-pub(crate) use porting::{ble_deinit, ble_init, send_hci, send_hci_async};
+pub(crate) use porting::{ble_deinit, ble_init};
 
 /// An error that is returned when the configuration is invalid.
 #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -51,8 +50,6 @@ static BT_STATE: NonReentrantMutex<BleState> = NonReentrantMutex::new(BleState {
     partial_read: None,
 });
 
-static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
-
 #[derive(PartialEq, Debug)]
 enum HciOutType {
     Unknown,
@@ -68,7 +65,7 @@ const MAX_HCI_PACKET_LEN: usize = 259;
 /// The byte-stream write APIs put no constraint on where the caller splits a packet, and one
 /// write can hold several packets. The collector takes only the bytes that the packet in progress
 /// still needs, so that it never runs past a packet boundary.
-struct HciOutCollector {
+pub(crate) struct HciOutCollector {
     data: [u8; MAX_HCI_PACKET_LEN],
     index: usize,
     ready: bool,
@@ -76,7 +73,7 @@ struct HciOutCollector {
 }
 
 impl HciOutCollector {
-    fn new() -> HciOutCollector {
+    pub(crate) const fn new() -> HciOutCollector {
         HciOutCollector {
             data: [0u8; MAX_HCI_PACKET_LEN],
             index: 0,
@@ -177,24 +174,43 @@ impl HciOutCollector {
     fn packet(&self) -> &[u8] {
         &self.data[0..self.index]
     }
-}
 
-/// Collects bytes of the host's stream, and passes the packet to `send` once it is complete.
-///
-/// This behaves like a byte-stream write: it handles at most one packet, and returns the number
-/// of bytes it took from `data`. Bytes that belong to the next packet stay in `data`, so the
-/// caller offers the rest in a later call. A non-empty `data` always yields a non-zero count.
-pub(crate) fn collect_and_send(data: &[u8], send: impl FnOnce(&[u8])) -> usize {
-    let hci_out = unsafe { (*core::ptr::addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
+    pub(crate) fn write(&mut self, buf: &[u8]) -> usize {
+        let taken = self.push(buf);
 
-    let taken = hci_out.push(data);
+        if self.is_ready() {
+            porting::send(self.packet());
+            self.reset();
+        }
 
-    if hci_out.is_ready() {
-        send(hci_out.packet());
-        hci_out.reset();
+        taken
     }
 
-    taken
+    pub(crate) async fn write_async(&mut self, buf: &[u8]) -> usize {
+        let taken = self.push(buf);
+
+        if self.is_ready() {
+            porting::send_async(self.packet()).await;
+            self.reset();
+        }
+
+        taken
+    }
+}
+
+impl embedded_io_07::ErrorType for HciOutCollector {
+    type Error = controller::BleConnectorError;
+}
+
+impl embedded_io_async_07::Write for HciOutCollector {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        Ok(self.write_async(buf).await)
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        // nothing to do
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
