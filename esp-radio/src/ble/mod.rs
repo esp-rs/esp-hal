@@ -1,19 +1,14 @@
 //! Bluetooth Low Energy HCI interface
 
-#[cfg(bt_controller = "btdm")]
-pub(crate) mod btdm;
-
-#[cfg(bt_controller = "npl")]
-pub(crate) mod npl;
-#[cfg(bt_controller = "npl")]
-mod os_mempool;
-
+#[cfg_attr(bt_controller = "btdm", path = "btdm/mod.rs")]
+#[cfg_attr(bt_controller = "npl", path = "npl/mod.rs")]
+pub(crate) mod porting;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::mem::MaybeUninit;
 
-pub(crate) use ble::{ble_deinit, ble_init, send_hci, send_hci_async};
 use docsplay::Display;
 use esp_sync::NonReentrantMutex;
+pub(crate) use porting::{ble_deinit, ble_init, send_hci, send_hci_async};
 
 /// An error that is returned when the configuration is invalid.
 #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -24,12 +19,9 @@ pub struct InvalidConfigError;
 impl core::error::Error for InvalidConfigError {}
 
 // Expose chip-specific configuration types
-pub use ble::ble_os_adapter_chip_specific::*;
+pub use porting::chip_specific::*;
 
-#[cfg(bt_controller = "btdm")]
-use self::btdm as ble;
-#[cfg(bt_controller = "npl")]
-use self::npl as ble;
+pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 unstable_module! {
     pub mod controller;
@@ -37,18 +29,6 @@ unstable_module! {
 
 pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::sys::c_types::c_void {
     unsafe { crate::compat::malloc::malloc(size as usize).cast() }
-}
-
-#[cfg(any(esp32, esp32c3, esp32s3))]
-pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
-    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
-}
-
-#[cfg(any(esp32c3, esp32s3))]
-pub(crate) unsafe extern "C" fn malloc_retention(size: u32) -> *mut crate::sys::c_types::c_void {
-    // IDF uses heap_caps_malloc(size, MALLOC_CAP_RETENTION). We have no retention
-    // heap, so fall back to the same internal allocator as malloc_internal.
-    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
 }
 
 pub(crate) unsafe extern "C" fn free(ptr: *mut crate::sys::c_types::c_void) {
