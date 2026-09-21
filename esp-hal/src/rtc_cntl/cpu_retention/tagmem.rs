@@ -183,22 +183,24 @@ impl LowPower<'_> {
     ///
     /// Returns [`CacheTagRetentionMemoryError`] if the driver holds a buffer already, or if the
     /// buffer is not inside the range that the retention DMA reaches. The
-    /// [`#[ram(reclaimed)]`][crate::ram] attribute places a static inside that range.
+    /// [`#[ram(reclaimed, unstable(zeroed))]`][crate::ram] attribute places a static inside that
+    /// range.
     ///
     /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::rtc_cntl::{CacheTagRetentionMemory, CpuRetentionMemory, sleep::LowPower};
+    /// use esp_hal::rtc_cntl::{CacheTagRetentionStorage, CpuRetentionStorage, sleep::LowPower};
     ///
-    /// // A program adds `#[ram(reclaimed)]` to both statics, to place them in the range that the
-    /// // retention DMA reaches.
-    /// static mut RETENTION: CpuRetentionMemory = CpuRetentionMemory::new();
-    /// static mut TAG_MEMORY: CacheTagRetentionMemory = CacheTagRetentionMemory::new();
+    /// // #[esp_hal::ram(reclaimed, unstable(zeroed))]
+    /// static RETENTION: CpuRetentionStorage = CpuRetentionStorage::new();
+    ///
+    /// // #[esp_hal::ram(reclaimed, unstable(zeroed))]
+    /// static TAG_MEMORY: CacheTagRetentionStorage = CacheTagRetentionStorage::new();
     ///
     /// let mut lpwr = LowPower::new(peripherals.LPWR);
-    /// lpwr.install_cpu_retention_memory(unsafe { &mut *(&raw mut RETENTION) })?;
-    /// lpwr.install_cache_tag_retention_memory(unsafe { &mut *(&raw mut TAG_MEMORY) })?;
+    /// lpwr.install_cpu_retention_memory(RETENTION.take())?;
+    /// lpwr.install_cache_tag_retention_memory(TAG_MEMORY.take())?;
     /// # {after_snippet}
     /// ```
     ///

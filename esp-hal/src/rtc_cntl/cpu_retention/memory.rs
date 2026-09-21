@@ -131,8 +131,8 @@ impl LowPower<'_> {
     ///
     /// Returns [`CpuRetentionMemoryError`] if the driver holds a buffer already, or if the buffer
     /// is not inside the range that retention needs. The
-    /// [`#[ram(reclaimed)]`][crate::ram] attribute places a static inside that range on DMA
-    /// chips.
+    /// [`#[ram(reclaimed, unstable(zeroed))]`][crate::ram] attribute places a static inside that
+    /// range on DMA chips.
     ///
     /// # Examples
     ///
@@ -140,7 +140,7 @@ impl LowPower<'_> {
     /// # {before_snippet}
     /// use esp_hal::rtc_cntl::{CpuRetentionStorage, sleep::LowPower};
     ///
-    /// #[ram(reclaimed, unstable(zeroed))]
+    /// // #[esp_hal::ram(reclaimed, unstable(zeroed))]
     /// static RETENTION: CpuRetentionStorage = CpuRetentionStorage::new();
     ///
     /// let mut lpwr = LowPower::new(peripherals.LPWR);
