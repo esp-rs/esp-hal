@@ -2,6 +2,7 @@ use clap::Subcommand;
 
 #[cfg(feature = "release")]
 pub mod bump_msrv;
+#[cfg(feature = "release")]
 pub mod bump_version;
 pub mod changelog_preview;
 #[cfg(feature = "release")]
@@ -13,10 +14,12 @@ pub mod post_release;
 pub mod publish;
 #[cfg(feature = "release")]
 pub mod publish_plan;
+#[cfg(feature = "release")]
 pub mod registry;
 pub mod semver_check;
 pub mod tag_releases;
 
+#[cfg(feature = "release")]
 pub use bump_version::*;
 pub use changelog_preview::*;
 #[cfg(feature = "release")]
@@ -78,6 +81,7 @@ pub enum Release {
     /// - Check if the changelog can be finalized
     /// - Update the version in the changelog
     /// - Replaces `{{currentVersion}}` markers in source files and the migration guide.
+    #[cfg(feature = "release")]
     BumpVersion(BumpVersionArgs),
     /// Attempt to publish the specified package.
     Publish(PublishArgs),

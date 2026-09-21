@@ -103,16 +103,13 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
         pre: args.pre,
     };
 
+    // Even a manual bump must not land on a version crates.io already holds.
+    let registry = RegistrySnapshot::fetch(args.packages.iter().copied())?;
+
     // Bump the version for each given package:
     for package in args.packages {
         let mut package = CargoToml::new(workspace, package)?;
-        update_package(
-            &mut package,
-            &bump,
-            &RegistrySnapshot::default(),
-            false,
-            false,
-        )?;
+        update_package(&mut package, &bump, &registry, false, false)?;
     }
 
     Ok(())
@@ -120,8 +117,7 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
 
 /// Update the specified package by bumping its version, updating its changelog,
 ///
-/// The bump steps over version numbers `registry` reports as taken. An empty
-/// snapshot bumps without consulting crates.io.
+/// The bump steps over version numbers `registry` reports as taken.
 ///
 /// `skip_dependent_rewrites` skips rewriting intra-workspace path-dep version
 /// requirements on sibling crates. Set this on backport patch releases: those

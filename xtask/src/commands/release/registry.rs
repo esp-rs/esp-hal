@@ -2,10 +2,7 @@
 
 use std::{collections::HashMap, time::Duration};
 
-#[cfg(feature = "release")]
-use anyhow::Context;
-use anyhow::{Result, bail};
-#[cfg(feature = "release")]
+use anyhow::{Context, Result, bail};
 use tame_index::{
     IndexKrate,
     IndexLocation,
@@ -21,7 +18,6 @@ use crate::{
 };
 
 /// Pull the version numbers out of one index entry.
-#[cfg(feature = "release")]
 fn versions_of(krate: &IndexKrate) -> Vec<semver::Version> {
     krate
         .versions
@@ -45,7 +41,6 @@ pub struct RegistrySnapshot {
     taken: HashMap<Package, Vec<semver::Version>>,
 }
 
-#[cfg(feature = "release")]
 impl RegistrySnapshot {
     /// Look up every package in one batch.
     pub fn fetch(packages: impl IntoIterator<Item = Package>) -> Result<Self> {
@@ -94,9 +89,7 @@ impl RegistrySnapshot {
             Ok(Self { taken })
         })
     }
-}
 
-impl RegistrySnapshot {
     /// Whether crates.io has seen this exact number. Yanked releases stay in
     /// the index and keep their number reserved forever.
     fn is_taken(&self, package: Package, version: &semver::Version) -> bool {
@@ -166,7 +159,6 @@ mod tests {
     /// JSON, one object per published version. Only the fields the parser
     /// requires are filled in. This is the only way to express the yanked flag,
     /// which the index carries but [`RegistrySnapshot`] deliberately drops.
-    #[cfg(feature = "release")]
     fn index_snapshot(versions: &[(&str, bool)]) -> RegistrySnapshot {
         let cksum = "0".repeat(64);
         let raw = versions
@@ -278,7 +270,6 @@ mod tests {
         assert_eq!(free.to_string(), "0.2.0");
     }
 
-    #[cfg(feature = "release")]
     #[test]
     fn yanked_version_from_index_data_is_taken() {
         // The esp-sync index as it stood when esp-rs/esp-hal#5385 was filed,
@@ -296,7 +287,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "release")]
     #[test]
     fn live_release_is_stepped_over() {
         // A number held by a resolvable release is as unavailable as a yanked
@@ -313,7 +303,6 @@ mod tests {
     /// The only coverage of [`RegistrySnapshot::fetch`], so it queries the real
     /// index. Both assertions are stable: crates.io never frees a published
     /// number, yanked or not.
-    #[cfg(feature = "release")]
     #[test]
     fn live_index_reports_the_yanked_esp_sync_release() {
         let snapshot = RegistrySnapshot::fetch([Package::EspSync]).unwrap();

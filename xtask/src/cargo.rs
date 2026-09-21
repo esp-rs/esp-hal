@@ -823,6 +823,8 @@ impl CargoToml {
         dependencies
     }
 
+    /// Only the release commands rewrite dependency requirements.
+    #[cfg_attr(not(feature = "release"), allow(dead_code))]
     pub(crate) fn change_version_of_dependency(
         &mut self,
         package_name: &str,
@@ -884,6 +886,7 @@ impl CargoToml {
     }
 }
 
+#[cfg_attr(not(feature = "release"), allow(dead_code))]
 fn format_dependency_version(previous: &str, new: &semver::Version) -> String {
     // we can expect the version specified in a TOML to be valid
     let previous = semver::VersionReq::parse(previous).unwrap();
