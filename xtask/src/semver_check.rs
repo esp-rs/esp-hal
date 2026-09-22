@@ -27,13 +27,7 @@ pub fn minimum_update(
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
-    let current_path = build_prepared_doc_json(
-        package,
-        &chip,
-        &package_path,
-        None,
-        &workspace_rom_symbols(workspace),
-    )?;
+    let current_path = build_prepared_doc_json(workspace, package, &chip, &package_path)?;
 
     let Some(baseline_path_gz) = baseline_gz(workspace, package, chip)? else {
         log::warn!(
@@ -44,7 +38,7 @@ pub fn minimum_update(
         return Ok((ReleaseType::Patch, current_path));
     };
     let baseline_path =
-        tempfile::NamedTempFile::new().context("Failed to create a temporary file")?;
+        temp_file::TempFile::new().with_context(|| format!("Failed to create a TempFile!"))?;
     decompress_gz(&baseline_path_gz, baseline_path.path())?;
 
     let mut semver_check = Check::new(Rustdoc::from_path(current_path.clone()));
@@ -99,10 +93,6 @@ pub(crate) fn baseline_gz(
     Ok(Some(baseline_path_gz))
 }
 
-pub(crate) fn workspace_rom_symbols(workspace: &Path) -> PathBuf {
-    workspace.join("esp-rom-sys/src/generated_rom_symbols.rs")
-}
-
 pub(crate) fn decompress_gz(src: &Path, dest: &Path) -> Result<(), Error> {
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent)?;
@@ -114,18 +104,17 @@ pub(crate) fn decompress_gz(src: &Path, dest: &Path) -> Result<(), Error> {
 }
 
 /// `prepare_semver_check`, build rustdoc JSON, then `clean_semver_check`, which
-/// runs even when the build fails. `rom_symbols_path` is the workspace copy for
-/// in-tree builds, or the extracted-tag copy for an old release.
+/// runs even when the build fails.
 pub(crate) fn build_prepared_doc_json(
+    workspace: &Path,
     package: Package,
     chip: &Chip,
     package_path: &PathBuf,
-    target_dir: Option<&Path>,
-    rom_symbols_path: &Path,
 ) -> Result<PathBuf, Error> {
     package.prepare_semver_check(package_path, chip)?;
-    let result = build_doc_json(package, chip, package_path, target_dir);
-    if let Err(cleanup) = package.clean_semver_check(rom_symbols_path) {
+    let result = build_doc_json(package, chip, package_path);
+    let rom_symbols_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
+    if let Err(cleanup) = package.clean_semver_check(&rom_symbols_path) {
         // A build failure is what the caller can act on, so it is not replaced.
         if result.is_err() {
             log::warn!("Failed to clean up after building the doc JSON: {cleanup:#}");
@@ -136,18 +125,14 @@ pub(crate) fn build_prepared_doc_json(
     result
 }
 
-/// Build the rustdoc JSON of `package` for `chip`, under `target_dir` when given
-/// and the package's own `target` otherwise. The override is for documenting
-/// sources checked out elsewhere, such as an old release tag.
+/// Build the rustdoc JSON of `package` for `chip`.
 pub(crate) fn build_doc_json(
     package: Package,
     chip: &Chip,
     package_path: &PathBuf,
-    target_dir: Option<&Path>,
 ) -> Result<PathBuf, Error> {
-    let target_path = if let Some(target) = target_dir {
-        target.to_path_buf()
-    } else if let Ok(target) = std::env::var("CARGO_TARGET_DIR") {
+    let target_dir = std::env::var("CARGO_TARGET_DIR");
+    let target_path = if let Ok(target) = target_dir {
         PathBuf::from(target)
     } else {
         PathBuf::from(package_path).join("target")
@@ -197,18 +182,11 @@ pub(crate) fn build_doc_json(
         "RUSTDOCFLAGS",
         "--cfg docsrs --cfg not_really_docsrs --cfg semver_checks",
     );
-    // Pinned so that cargo writes where we are about to look for the JSON.
-    cargo_builder.add_env_var("CARGO_TARGET_DIR", &target_path.display().to_string());
 
     let command = CargoCommandBatcher::build_one_for_cargo(&cargo_builder);
     log::debug!("{command:#?}");
     let cargo_command = command.command.clone();
     crate::cargo::run_with_env(&command.command, package_path, command.env_vars, false)
         .with_context(|| format!("Failed to run `cargo rustdoc` with {cargo_command:?}",))?;
-    anyhow::ensure!(
-        current_path.exists(),
-        "cargo rustdoc succeeded but did not write {}",
-        current_path.display()
-    );
     Ok(current_path)
 }

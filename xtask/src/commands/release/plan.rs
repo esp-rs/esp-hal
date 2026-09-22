@@ -21,7 +21,12 @@ use crate::{
         VersionBump,
         checker::package_docs,
         do_version_bump,
-        release::{changelog_preview, new_stable_api, new_stable_api::NewStableItem, registry::RegistrySnapshot},
+        release::{
+            changelog_preview,
+            new_stable_api,
+            new_stable_api::NewStableItem,
+            registry::RegistrySnapshot,
+        },
     },
     git::{BackportInfo, current_branch, parse_backport_branch},
     metadata::Chip,
@@ -44,16 +49,6 @@ pub struct PlanArgs {
     /// names the conflict.
     #[arg(long, value_enum)]
     exclude: Vec<Package>,
-
-    /// Package whose `new_stable_api` base is overridden. With
-    /// `--api-base-version`, compares against that release instead of the tag
-    /// matching the package's in-tree version.
-    #[arg(long, value_enum, requires = "api_base_version")]
-    api_base_package: Option<Package>,
-
-    /// Release version for `--api-base-package`.
-    #[arg(long, requires = "api_base_package")]
-    api_base_version: Option<String>,
 }
 
 /// A package in the release plan.
@@ -66,7 +61,7 @@ pub struct PackagePlan {
     pub tag_name: String,
     /// The version bump that will be applied to the package.
     pub bump: VersionBump,
-    /// Public items stable now but not at the last release. `None` if the
+    /// Public items stable now but not in the API baseline. `None` if the
     /// package is not semver-checked. `execute-plan` ignores it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub new_stable_api: Option<Vec<NewStableItem>>,
@@ -74,10 +69,6 @@ pub struct PackagePlan {
     /// all-clear for them.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub new_stable_api_unchecked_chips: BTreeSet<Chip>,
-    /// Tag `new_stable_api` was computed against, when it was not the tag
-    /// matching `current_version`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub new_stable_api_base: Option<String>,
 }
 
 /// A release plan is a list of packages and their version increments.
@@ -153,27 +144,6 @@ impl Plan {
 /// Generate a release plan for the specified packages.
 pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     let (current_branch, backport) = ensure_main_branch(args.allow_non_main)?;
-
-    // Resolved before any rustdoc is built, so a bad value fails in a second
-    // rather than after minutes of document building.
-    let api_base = match (args.api_base_package, args.api_base_version.as_deref()) {
-        (Some(package), Some(version)) => {
-            ensure!(
-                package.is_semver_checked(),
-                "{package} is not semver-checked, so it has no new stable API to compare"
-            );
-            let version = semver::Version::parse(version)
-                .with_context(|| format!("Invalid --api-base-version '{version}'"))?;
-            Some((package, package.tag(&version)))
-        }
-        _ => None,
-    };
-    let api_base_tag = |target: Package| {
-        api_base
-            .as_ref()
-            .filter(|(package, _)| *package == target)
-            .map(|(_, tag)| tag.as_str())
-    };
 
     // On a backport branch, scope to exactly the backport package. Each
     // backport branch serves a single package; dependencies have their own
@@ -255,7 +225,6 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                     workspace,
                     package,
                     &current_docs,
-                    api_base_tag(package),
                 )?);
                 amount
             } else {
@@ -364,7 +333,6 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                     bump,
                     new_stable_api,
                     new_stable_api_unchecked_chips: unchecked_chips.unwrap_or_default(),
-                    new_stable_api_base: api_base_tag(package).map(str::to_string),
                 }
             })
         })
@@ -426,17 +394,6 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // Starting a pre-release cycle from a stable version without also setting
 // `base` is an error, as it would produce a version lower than the current
 // one.
-//
-// NEW STABLE API
-// For semver-checked packages, `new_stable_api` lists public items that are stable now but were
-// not in the last release's API. Review it: an item you did not mean to stabilize is much
-// easier to remove before the release than after. Only the roots are listed, so a stabilized
-// enum appears once rather than once per variant or impl. Each entry has `item` and `chips`;
-// an entry naming only a chip or two is usually not a stabilization at all: the item was
-// already stable elsewhere and that chip has only just gained the peripheral.
-// `new_stable_api_unchecked_chips` names chips with no comparison result, so an empty list
-// is not an all-clear for them. The list is informational and `execute-plan` ignores it.
-// See documentation/RELEASING.md for what the comparison can and cannot see.
 //
 // CHANGELOG NOTE
 // When you run `cargo xrelease execute-plan`, changelog entries from recently
@@ -1161,6 +1118,8 @@ mod tests {
             tag_name: package.tag(&new_version),
             new_version,
             bump,
+            new_stable_api: None,
+            new_stable_api_unchecked_chips: BTreeSet::new(),
         }
     }
 

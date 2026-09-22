@@ -50,7 +50,7 @@ rustdoc-types = { version = "=0.59.0", optional = true }
 tame-index = { version = "0.25", features = ["sparse"], optional = true }
 
 flate2 = { version = "1.1.1", optional = true }
-tempfile = { version = "3", optional = true }
+temp-file = { version = "0.1.9", optional = true }
 
 # MCP server support
 inventory        = { version = "0.3", optional = true }
@@ -66,7 +66,7 @@ tempfile = "3"
 [features]
 deploy-docs  = ["dep:reqwest", "dep:kuchikiki"]
 preview-docs = ["dep:opener", "dep:rocket"]
-semver-checks = [ "dep:cargo-semver-checks", "dep:flate2", "dep:tempfile", "dep:regex", "dep:zip" ]
+semver-checks = [ "dep:cargo-semver-checks", "dep:flate2", "dep:temp-file", "dep:regex", "dep:zip" ]
 release = ["semver-checks", "dep:opener", "dep:regex", "dep:tame-index", "dep:public-api", "dep:rustdoc-types", "serde_json/unbounded_depth"]
 report = ["dep:regex"]
 rel-check = ["dep:regex"]

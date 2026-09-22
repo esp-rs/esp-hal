@@ -76,12 +76,7 @@ pub mod checker {
     use crate::{
         Package,
         metadata::Chip,
-        semver_check::{
-            baseline_stem,
-            build_prepared_doc_json,
-            minimum_update,
-            workspace_rom_symbols,
-        },
+        semver_check::{baseline_stem, build_prepared_doc_json, minimum_update},
     };
 
     /// Generate the API baselines for the specified packages and chips.
@@ -102,13 +97,8 @@ pub mod checker {
                 let package_name = package.to_string();
                 let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
-                let current_path = build_prepared_doc_json(
-                    package,
-                    chip,
-                    &package_path,
-                    None,
-                    &workspace_rom_symbols(workspace),
-                )?;
+                let current_path =
+                    build_prepared_doc_json(workspace, package, chip, &package_path)?;
 
                 let to_path = PathBuf::from(&package_path).join(format!(
                     "api-baseline/{}.json.gz",

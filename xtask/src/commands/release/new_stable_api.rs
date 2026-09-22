@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Package,
     metadata::Chip,
-    semver_check::{baseline_gz, build_prepared_doc_json, decompress_gz},
+    semver_check::{baseline_gz, decompress_gz},
 };
 
 /// One `new_stable_api` entry.
@@ -22,46 +22,30 @@ pub struct NewStableItem {
     pub chips: BTreeSet<Chip>,
 }
 
-struct Reference {
-    /// Which side the comparison ran against, for the log line.
-    kind: &'static str,
-    path: PathBuf,
-}
-
-/// Public items stable in `current_docs` but not at the last release.
-///
-/// `base_tag` overrides the release compared against, which is otherwise the
-/// tag matching the package's in-tree version.
+/// Public items stable in `current_docs` but not in the API baseline.
 ///
 /// Returns the items and the chips that produced no comparison result.
 pub(crate) fn newly_stable(
     workspace: &Path,
     package: Package,
     current_docs: &[(Chip, PathBuf)],
-    base_tag: Option<&str>,
 ) -> anyhow::Result<(Vec<NewStableItem>, BTreeSet<Chip>)> {
-    // Tag sources are extracted outside the repo so cargo does not treat the tree
-    // as part of the outer workspace. One directory per run, so that concurrent
-    // `plan` invocations do not delete each other's checkouts.
-    let scratch = tempfile::Builder::new()
-        .prefix("esp-hal-semver-release-")
-        .tempdir()
-        .context("Failed to create a scratch directory for the release tag sources")?;
-
     let mut newly_stable: BTreeMap<String, BTreeSet<Chip>> = BTreeMap::new();
     let mut unchecked_chips = BTreeSet::new();
 
     for (chip, current_path) in current_docs {
-        let Some(reference) = reference_doc(workspace, scratch.path(), package, *chip, base_tag)?
-        else {
-            log::info!(
-                "Not checking new stable API for {package} {chip}: no tag or baseline rustdoc"
-            );
+        let Some(baseline_gz_path) = baseline_gz(workspace, package, *chip)? else {
+            log::info!("Not checking new stable API for {package} {chip}: no API baseline");
             unchecked_chips.insert(*chip);
             continue;
         };
+        let baseline = workspace
+            .join("target/semver-baseline-doc")
+            .join(package.to_string())
+            .join(format!("{chip}.json"));
+        decompress_gz(&baseline_gz_path, &baseline)?;
 
-        match new_stable_items(&reference, current_path, *chip) {
+        match new_stable_items(&baseline, current_path, *chip) {
             Ok(items) => {
                 for item in items {
                     newly_stable.entry(item).or_default().insert(*chip);
@@ -69,7 +53,7 @@ pub(crate) fn newly_stable(
             }
             Err(error) => {
                 log::error!(
-                    "Could not compare {package} {chip} against the last release: {error:#}"
+                    "Could not compare {package} {chip} against the API baseline: {error:#}"
                 );
                 unchecked_chips.insert(*chip);
             }
@@ -84,23 +68,22 @@ pub(crate) fn newly_stable(
     Ok((items, unchecked_chips))
 }
 
-/// Return the stable public API items present in `current` but not in `reference`.
+/// Return the stable public API items present in `current` but not in `baseline`.
 fn new_stable_items(
-    reference: &Reference,
+    baseline: &Path,
     current: &Path,
     chip: Chip,
 ) -> Result<BTreeSet<String>, Error> {
     let current_crate = rustdoc_crate(current)?;
-    let reference_api = public_api_from_rustdoc(&reference.path)?;
+    let baseline_api = public_api_from_rustdoc(baseline)?;
     let current_api = public_api_from_rustdoc(current)?;
 
-    let reference_count = reference_api.items().count();
+    let baseline_count = baseline_api.items().count();
     let current_count = current_api.items().count();
     anyhow::ensure!(
-        reference_count > 0,
-        "Could not extract any API item from the {} at {}",
-        reference.kind,
-        reference.path.display()
+        baseline_count > 0,
+        "Could not extract any API item from the baseline rustdoc at {}",
+        baseline.display()
     );
     anyhow::ensure!(
         current_count > 0,
@@ -108,13 +91,12 @@ fn new_stable_items(
         current.display()
     );
 
-    let diff = PublicApiDiff::between(reference_api, current_api);
+    let diff = PublicApiDiff::between(baseline_api, current_api);
     let added: Vec<AddedItem> = diff.added.into_iter().map(AddedItem::from).collect();
     let added_count = added.len();
     let reported = roots_only(&current_crate, added);
     log::info!(
-        "{chip}: compared against the {}, {added_count} added, {} reported",
-        reference.kind,
+        "{chip}: compared against the API baseline, {added_count} added, {} reported",
         reported.len()
     );
     Ok(reported)
@@ -212,158 +194,6 @@ fn resolved_id(ty: &Type) -> Option<Id> {
         Type::ResolvedPath(path) => Some(path.id),
         _ => None,
     }
-}
-
-/// Last-release rustdoc JSON for `package`/`chip`.
-///
-/// Prefers a tag rustdoc (cached under `target/semver-release-doc`), then the
-/// semver baseline.
-fn reference_doc(
-    workspace: &Path,
-    scratch: &Path,
-    package: Package,
-    chip: Chip,
-    base_tag: Option<&str>,
-) -> Result<Option<Reference>, Error> {
-    if let Some(path) = release_tag_doc(workspace, scratch, package, chip, base_tag) {
-        return Ok(Some(Reference {
-            kind: "release tag",
-            path,
-        }));
-    }
-
-    // Falling back is right for the derived tag and wrong for a requested one,
-    // which would silently change what the list is measured against.
-    if let Some(tag) = base_tag {
-        anyhow::bail!("Could not build the {tag} API document for {chip}; see the log above");
-    }
-
-    let Some(baseline_path_gz) = baseline_gz(workspace, package, chip)? else {
-        return Ok(None);
-    };
-
-    let dest = workspace
-        .join("target/semver-release-doc/baseline")
-        .join(package.to_string())
-        .join(format!("{chip}.json"));
-    decompress_gz(&baseline_path_gz, &dest)?;
-    Ok(Some(Reference {
-        kind: "semver baseline",
-        path: dest,
-    }))
-}
-
-/// Rustdoc JSON of `package` as of the last release tag, or `None` to fall back
-/// to the semver baseline. The baseline is regenerated from `main` on a breaking
-/// change, so it absorbs mid-cycle accidents; the tag does not move.
-fn release_tag_doc(
-    workspace: &Path,
-    scratch: &Path,
-    package: Package,
-    chip: Chip,
-    base_tag: Option<&str>,
-) -> Option<PathBuf> {
-    let tag = match base_tag {
-        Some(tag) => tag.to_string(),
-        None => package.tag(&crate::package_version(workspace, package).ok()?),
-    };
-    let doc_path = workspace
-        .join("target/semver-release-doc")
-        .join(&tag)
-        .join(format!("{chip}.json"));
-
-    if doc_path.exists() {
-        log::info!("Reusing cached {tag} API document for {chip}");
-        return Some(doc_path);
-    }
-
-    match build_release_tag_doc(workspace, scratch, package, chip, &tag, &doc_path) {
-        Ok(()) => Some(doc_path),
-        Err(error) => {
-            log::warn!(
-                "Could not build the {tag} API document for {chip} ({error:#}) - comparing new \
-                 stable API against the semver baseline instead, which may hide items stabilized \
-                 before the baseline was last regenerated"
-            );
-            None
-        }
-    }
-}
-
-fn run(command: &mut std::process::Command) -> Result<(), Error> {
-    let status = command
-        .status()
-        .with_context(|| format!("Failed to run {command:?}"))?;
-    anyhow::ensure!(status.success(), "{command:?} failed with {status}");
-    Ok(())
-}
-
-fn build_release_tag_doc(
-    workspace: &Path,
-    scratch: &Path,
-    package: Package,
-    chip: Chip,
-    tag: &str,
-    doc_path: &Path,
-) -> Result<(), Error> {
-    // The whole tree is extracted, not just the package, so that the tag's root
-    // `Cargo.toml` and `.cargo/config.toml` come along.
-    let source_path = scratch.join("src").join(tag);
-    let package_path = crate::windows_safe_path(&source_path.join(package.to_string()));
-
-    if !package_path.exists() {
-        fs::remove_dir_all(&source_path).ok();
-        fs::create_dir_all(&source_path)?;
-
-        let archive = source_path.join("source.tar");
-        let archive_tag = || {
-            run(std::process::Command::new("git")
-                .current_dir(workspace)
-                .args(["archive", "--format=tar", "--output"])
-                .arg(&archive)
-                .arg(tag))
-        };
-
-        if archive_tag().is_err() {
-            let upstream = crate::git::get_remote_name_for(crate::UPSTREAM_REPO)?;
-            log::info!("Tag {tag} may not be present locally, fetching it from {upstream}");
-            run(std::process::Command::new("git")
-                .current_dir(workspace)
-                .arg("fetch")
-                .arg(upstream)
-                .arg(format!("refs/tags/{tag}:refs/tags/{tag}"))
-                .args(["--no-tags", "--quiet"]))?;
-            archive_tag()?;
-        }
-
-        run(std::process::Command::new("tar")
-            .arg("-xf")
-            .arg(&archive)
-            .arg("-C")
-            .arg(&source_path))?;
-
-        fs::remove_file(&archive).ok();
-    }
-
-    anyhow::ensure!(
-        package_path.exists(),
-        "{package} does not exist at {tag}, so there is nothing to compare against"
-    );
-
-    let target_path = scratch.join("target").join(tag);
-    let rom_symbols = source_path.join("esp-rom-sys/src/generated_rom_symbols.rs");
-    let built = build_prepared_doc_json(
-        package,
-        &chip,
-        &package_path,
-        Some(&target_path),
-        &rom_symbols,
-    )?;
-
-    fs::create_dir_all(doc_path.parent().expect("doc path has a parent"))?;
-    fs::copy(built, doc_path)?;
-
-    Ok(())
 }
 
 #[cfg(test)]
