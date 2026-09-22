@@ -456,7 +456,7 @@ fn parse_chips_from_annotation(
 }
 
 /// Load all examples by finding all packages in the given path, and parsing their metadata.
-pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
+pub fn load_cargo_toml(examples_path: &Path, package: Package) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
     let mut packages = crate::find_packages(examples_path)?;
@@ -487,18 +487,22 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
             format!("Failed to parse annotations in {}", main_rs_path.display())
         })?;
 
-        // If the annotation requires chips that are not declared in Cargo.toml, bail.
-        if let Some(ref required) = chips_from_annotations {
-            let missing = required
-                .iter()
-                .filter(|c| !cargo_chips.contains(c))
-                .collect::<Vec<_>>();
-            if !missing.is_empty() {
-                anyhow::bail!(
-                    "{}: chips {missing:?} are required by the annotation but missing from Cargo.toml",
-                    package_path.display()
-                );
-            }
+        // Without a CHIP_FILTER an example is expected to build for every chip, otherwise a newly
+        // added chip silently drops out of its coverage.
+        let missing: Vec<Chip> = Chip::iter()
+            .filter(|chip| match &chips_from_annotations {
+                Some(annotated) => annotated.contains(chip),
+                None => package != Package::CompileTests,
+            })
+            .filter(|chip| !cargo_chips.contains(chip))
+            .collect();
+
+        if !missing.is_empty() {
+            bail!(
+                "{}: chips {missing:?} are missing from Cargo.toml. Add them, or narrow the set with a \
+                 `//% CHIP_FILTER:` annotation.",
+                package_path.display()
+            );
         }
 
         let chips = cargo_chips.into_iter().filter(|c| {
@@ -533,7 +537,7 @@ pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
 pub fn load_package(workspace: &Path, package: Package) -> Result<Vec<Metadata>> {
     let root = windows_safe_path(&workspace.join(package.directory()));
     if package.contains_standalone_projects() {
-        return load_cargo_toml(&root);
+        return load_cargo_toml(&root, package);
     }
 
     let bins = match package {
