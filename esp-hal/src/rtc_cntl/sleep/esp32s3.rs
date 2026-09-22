@@ -28,6 +28,8 @@ pub const RTC_CNTL_DBIAS_1V25: u8 = 30;
 pub const RTC_CNTL_DBIAS_1V30: u8 = 31;
 /// Default monitor debug attenuation value.
 pub const RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT: u8 = 0;
+/// Light sleep debug attenuation setting that keeps the voltage up.
+const RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP: u8 = 0;
 /// ULP co-processor touch start wait time during sleep, set to maximum.
 pub const RTC_CNTL_ULPCP_TOUCH_START_WAIT_IN_SLEEP: u16 = 0xFF;
 /// ULP co-processor touch start wait time default value.
@@ -544,14 +546,25 @@ impl RtcSleepConfig {
             rtc_cntl.pwc().modify(|_, w| w.pd_en().clear_bit());
         }
 
+        // Like `rtc_sleep_get_default_config`: a crystal that stays on through a light sleep needs
+        // the bias current and the voltage of the active mode.
+        let xtal_on = self.xtal_fpu() && !self.deep_slp();
+        let bias_sleep_slp = self.bias_sleep_slp() && !xtal_on;
+        let pd_cur_slp = self.pd_cur_slp() && !xtal_on;
+        let dbg_atten_slp = if xtal_on {
+            RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP
+        } else {
+            self.dbg_atten_slp()
+        };
+
         unsafe {
             regi2c::I2C_DIG_REG_EXT_RTC_DREG_SLEEP.write_field(self.rtc_dbias_slp());
             regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(self.dig_dbias_slp());
 
             rtc_cntl.bias_conf().modify(|_, w| {
-                w.dbg_atten_deep_slp().bits(self.dbg_atten_slp());
-                w.bias_sleep_deep_slp().bit(self.bias_sleep_slp());
-                w.pd_cur_deep_slp().bit(self.pd_cur_slp());
+                w.dbg_atten_deep_slp().bits(dbg_atten_slp);
+                w.bias_sleep_deep_slp().bit(bias_sleep_slp);
+                w.pd_cur_deep_slp().bit(pd_cur_slp);
                 w.dbg_atten_monitor()
                     .bits(RTC_CNTL_DBG_ATTEN_MONITOR_DEFAULT);
                 w.bias_sleep_monitor().bit(self.bias_sleep_monitor());
