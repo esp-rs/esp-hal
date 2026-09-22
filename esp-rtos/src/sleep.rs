@@ -6,7 +6,7 @@ use esp_hal::{
     peripherals::LPWR,
     rtc_cntl::{
         WakeLock,
-        sleep::{LowPower, RtcSleepConfig},
+        sleep::{LightSleep, LowPower, RtcSleepConfig},
     },
     time::{Duration, Instant},
 };
@@ -63,8 +63,9 @@ impl DeepSleep {
 /// - all cores are idle,
 /// - the next wakeup is at least `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` microseconds away.
 ///
-/// If all hold, it calls [`LowPower::sleep_light`] for the next wakeup; otherwise
-/// it falls back to `WFI`. The minimum-residency threshold is configurable via the
+/// If all hold, it calls [`LowPower::sleep_light`] for the next wakeup. A wakeup source can
+/// refuse that sleep. The hook then falls back to `WFI`, as it does when a check above fails.
+/// The minimum-residency threshold is configurable via the
 /// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
 ///
 /// On multi-core chips, the core that commits to sleep hardware-stalls the other core(s)
@@ -164,16 +165,18 @@ extern "C" fn auto_light_sleep_hook() -> ! {
                 _ => {}
             }
 
-            // The driver of each other wakeup source enables it. A listening pin wakes the chip
-            // because it listens, and this hook cannot know which pins listen. If no source is
-            // enabled, the call refuses the sleep and returns immediately. The code then reaches
-            // the same `WFI` that this hook would select.
-            lpwr.sleep_light(RtcSleepConfig::default());
+            // Each driver enables the wakeup source it owns. This hook does not know which
+            // sources are enabled. `sleep_light` returns immediately when none are enabled.
+            // It also returns immediately when a source refuses the sleep. Do not call it
+            // again here. The refusal is still true, and a retry would spin. `WFI` below
+            // waits for an interrupt.
+            let result = lpwr.sleep_light(RtcSleepConfig::default());
 
-            // The alarm timer was gated during light sleep, so its pre-armed alarm is
-            // stale. Force a re-arm against the restored time base so the tick handler
-            // fires promptly and drains the timer queue.
-            time_driver.rearm(crate::now());
+            // The alarm timer is gated only while the chip is in light sleep. A refusal leaves
+            // the timer running, so its alarm is still valid.
+            if result == LightSleep::Ended {
+                time_driver.rearm(crate::now());
+            }
 
             // Trigger the scheduler on the other core to prevent it from putting
             // the system back to sleep immediately.
