@@ -250,7 +250,7 @@ fn ble_stack_init(cfg: *mut esp_bt_controller_config_t) -> i32 {
         // C6 IDF sets this to `s_bt_lpclk_freq` for MAIN_XTAL (100 kHz).
         // porting_btdm's S31 stub still hardcodes 32000; the HW divider we
         // program is 100 kHz. Advertising enable busy-waits on cputime.
-        (*cfg).ble.rtc_freq = crate::radio_clocks::clocks_ll::BT_LPCLK_HZ;
+        (*cfg).ble.rtc_freq = lpclk_hz();
 
         let res = esp_ble_register_bb_funcs();
         if res != 0 {
@@ -264,7 +264,7 @@ fn ble_stack_init(cfg: *mut esp_bt_controller_config_t) -> i32 {
             return res;
         }
 
-        r_esp_ble_change_rtc_freq(crate::radio_clocks::clocks_ll::BT_LPCLK_HZ as u32);
+        r_esp_ble_change_rtc_freq(lpclk_hz() as u32);
 
         let res = r_esp_ble_msys_init(
             CONFIG_BT_LE_MSYS_1_BLOCK_SIZE as u16,
@@ -367,8 +367,6 @@ fn esp_bt_controller_init(cfg: *mut esp_bt_controller_config_t) -> esp_err_t {
         EVENTQ_DEPTH.store(eventq_depth(cfg), Ordering::Relaxed);
 
         crate::radio_clocks::clocks_ll::enable_bt(true);
-        // IDF `btdm_lp_init` → `r_btdm_hal_rtc_freq_set(s_bt_lpclk_freq)`.
-        r_btdm_hal_rtc_freq_set(crate::radio_clocks::clocks_ll::BT_LPCLK_HZ);
 
         let res = r_btdm_task_init(&raw mut (*cfg).btdm);
         if res != 0 {
@@ -376,6 +374,8 @@ fn esp_bt_controller_init(cfg: *mut esp_bt_controller_config_t) -> esp_err_t {
             bt_controller_deinit();
             return ESP_FAIL as _;
         }
+
+        btdm_lp_init();
 
         // IDF `esp_bt_controller_init`: after `r_btdm_task_init` /
         // `btdm_lp_init`, before `ble_stack_init`.
@@ -756,7 +756,61 @@ fn send_hci_packet(packet: &[u8]) {
     }
 }
 
+fn lpclk_hz() -> u64 {
+    u64::from(super::lp_clk::frequency_hz())
+}
+
+#[ram]
+unsafe extern "C" fn btdm_lp_sleep_cb(_enable_tick: u32, _arg: *mut c_void) {
+    // The callbacks are registered during controller init. IDF guards them with `s_bt_active` so
+    // that the PHY stays up until the controller is enabled.
+    if controller_status() != esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_ENABLED {
+        return;
+    }
+    super::modem_phy_release();
+}
+
+#[ram]
+unsafe extern "C" fn btdm_lp_wake_up_cb(_arg: *mut c_void) {
+    super::modem_phy_acquire();
+}
+
+/// IDF `btdm_lp_init`. Runs after `r_btdm_task_init`, before `ble_stack_init`.
+///
+/// `r_btdm_task_init` initializes the hardware environment that holds the low-power clock
+/// frequency, so the frequency has to be set after it.
+unsafe fn btdm_lp_init() {
+    unsafe extern "C" {
+        fn r_btdm_sleep_set_sleep_cb(
+            sleep_cb: unsafe extern "C" fn(u32, *mut c_void),
+            wakeup_cb: unsafe extern "C" fn(*mut c_void),
+            sleep_arg: *mut c_void,
+            wakeup_arg: *mut c_void,
+            us_to_enabled: u32,
+        );
+    }
+
+    // IDF `BTDM_RTC_DELAY_US_MODEM_SLEEP`: how long the controller needs to enable the PHY.
+    const RTC_DELAY_US_MODEM_SLEEP: u32 = 1500;
+
+    unsafe {
+        if super::modem_sleep_enabled() {
+            r_btdm_sleep_set_sleep_cb(
+                btdm_lp_sleep_cb,
+                btdm_lp_wake_up_cb,
+                core::ptr::null_mut(),
+                core::ptr::null_mut(),
+                RTC_DELAY_US_MODEM_SLEEP,
+            );
+        }
+
+        r_btdm_hal_rtc_freq_set(lpclk_hz());
+    }
+}
+
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
+    super::set_modem_sleep(config.modem_sleep());
+    super::lp_clk::request();
     chip_specific::btdm_controller_mem_init();
 
     let mut cfg = chip_specific::create_ble_config(config);
@@ -792,6 +846,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    super::modem_phy_acquire();
+    super::set_modem_sleep(false);
+
     #[cfg(rng_trng_supported)]
     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
         esp_hal::Internal::conjure()
@@ -799,6 +856,8 @@ pub(crate) fn ble_deinit() {
 
     let _ = esp_bt_controller_disable();
     let _ = esp_bt_controller_deinit();
+
+    super::lp_clk::release();
 }
 
 pub(crate) fn send(data: &[u8]) {

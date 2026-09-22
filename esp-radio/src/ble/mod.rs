@@ -1,5 +1,7 @@
 //! Bluetooth Low Energy HCI interface
 
+mod lp_clk;
+
 #[cfg_attr(bt_controller = "btdm", path = "btdm/mod.rs")]
 #[cfg_attr(bt_controller = "npl", path = "npl/mod.rs")]
 #[cfg_attr(bt_controller = "btdm2", path = "btdm2/mod.rs")]
@@ -30,6 +32,35 @@ pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new()
 #[cfg(any(bt_controller = "npl", bt_controller = "btdm2"))]
 pub(crate) fn in_isr() -> bool {
     !crate::hal::interrupt::RunLevel::current().is_thread()
+}
+
+static MODEM_SLEEP: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
+static MODEM_PHY_OFF: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
+
+pub(crate) fn set_modem_sleep(enabled: bool) {
+    MODEM_SLEEP.store(enabled, portable_atomic::Ordering::Relaxed);
+}
+
+#[allow(dead_code, reason = "The ESP32 BTDM adapter reads this flag")]
+pub(crate) fn modem_sleep_enabled() -> bool {
+    MODEM_SLEEP.load(portable_atomic::Ordering::Relaxed)
+}
+
+/// Drops the extra PHY reference taken around controller sleep.
+///
+/// The controller's [`esp_phy::PhyInitGuard`] stays alive. This pairs with
+/// [`modem_phy_acquire`].
+pub(crate) fn modem_phy_release() {
+    if !MODEM_PHY_OFF.swap(true, portable_atomic::Ordering::SeqCst) {
+        esp_phy::disable_phy();
+    }
+}
+
+/// Restores the PHY reference if sleep left it off.
+pub(crate) fn modem_phy_acquire() {
+    if MODEM_PHY_OFF.swap(false, portable_atomic::Ordering::SeqCst) {
+        core::mem::forget(esp_phy::enable_phy());
+    }
 }
 
 unstable_module! {

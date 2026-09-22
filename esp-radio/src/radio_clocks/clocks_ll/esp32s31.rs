@@ -1,5 +1,3 @@
-use core::sync::atomic::{AtomicBool, Ordering};
-
 pub(crate) fn enable_wifi(en: bool) {
     regs!(MODEM_SYSCON)
         .clk_conf1()
@@ -86,46 +84,8 @@ pub(crate) fn deinit_clocks() {
     // nothing to do, `init_clocks` is a no-op
 }
 
-/// IDF `btdm_lp` default: `CONFIG_BT_CTRL_LP_CLK_SRC_MAIN_XTAL` at 100 kHz.
-pub(crate) const BT_LPCLK_HZ: u64 = 100_000;
-
-/// Select the BLE RTC / modem LP timer clock.
-///
-/// IDF `btdm_lp_timer_clk_init` + `modem_clock_select_lp_clock_source(PERIPH_BT_MODULE)`.
-/// Without a source and `clk_lp_timer_en`, the controller accepts HCI scan
-/// enable but never schedules radio windows.
 pub(crate) fn ble_rtc_clk_init() {
-    static INITED: AtomicBool = AtomicBool::new(false);
-
-    if INITED.swap(true, Ordering::SeqCst) {
-        return;
-    }
-    let xtal_hz = esp_hal::clock::xtal_clock().as_hz();
-    let divider = (xtal_hz / BT_LPCLK_HZ as u32).saturating_sub(1) as u16;
-
-    regs!(MODEM_LPCON)
-        .test_conf()
-        .modify(|_, w| w.clk_en().set_bit());
-
-    regs!(MODEM_LPCON).lp_timer_conf().modify(|_, w| {
-        w.clk_lp_timer_sel_osc_slow().clear_bit();
-        w.clk_lp_timer_sel_osc_fast().clear_bit();
-        w.clk_lp_timer_sel_xtal32k().clear_bit();
-        w.clk_lp_timer_sel_xtal().set_bit();
-        unsafe { w.clk_lp_timer_div_num().bits(divider) }
-    });
-
-    // IDF `modem_lpcon_ll_reset_ble_rtc_timer`.
-    regs!(MODEM_LPCON)
-        .rst_conf()
-        .modify(|_, w| w.rst_lp_timer().set_bit());
-    regs!(MODEM_LPCON)
-        .rst_conf()
-        .modify(|_, w| w.rst_lp_timer().clear_bit());
-
-    regs!(MODEM_LPCON)
-        .clk_conf()
-        .modify(|_, w| w.clk_lp_timer_en().set_bit());
+    // `BLE_LP_CLK` is programmed by the clock tree.
 }
 
 pub(crate) fn reset_rpa() {

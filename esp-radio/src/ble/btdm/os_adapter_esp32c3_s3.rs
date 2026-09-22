@@ -364,6 +364,12 @@ pub enum CcaMode {
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
+    /// Enables controller modem sleep.
+    ///
+    /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
+    /// Set this before the controller starts. The default is off.
+    modem_sleep: bool,
+
     /// The priority of the RTOS task.
     task_priority: u8,
 
@@ -466,6 +472,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            modem_sleep: false,
             task_priority: crate::preempt::max_task_priority()
                 .saturating_sub(2)
                 .min(255) as u8,
@@ -531,7 +538,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         bluetooth_mode: esp_bt_mode_t_ESP_BT_MODE_BLE as _,
 
         ble_max_act: config.max_connections,
-        sleep_mode: 0,
+        sleep_mode: u8::from(config.modem_sleep),
         sleep_clock: 0,
         ble_st_acl_tx_buf_nb: 0,
         ble_hw_cca_check: 0,
