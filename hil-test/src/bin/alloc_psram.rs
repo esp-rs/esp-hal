@@ -1,13 +1,12 @@
 //! Allocator and PSRAM-related tests
 
-//% CHIP_FILTER(llff, tlsf): psram_driver_supported && !soc_has_flash
-//% CHIP_FILTER(llff_with_storage, tlsf_with_storage): psram_driver_supported && soc_has_flash
-//% ENV(llff, llff_with_storage): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
-//% ENV(tlsf, tlsf_with_storage): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
+//% CHIP_FILTER(llff, tlsf): psram_driver_supported
+//% ENV(llff): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
+//% ENV(tlsf): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 // The default 64KB leaves nothing to reclaim, see the dcache_reclaimed tests below.
 //% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: unstable esp-alloc/nightly
-//% FEATURES(llff_with_storage, tlsf_with_storage): esp-storage
+//% FEATURES-IF(soc_has_flash): esp-storage
 
 #![no_std]
 #![no_main]
