@@ -16,7 +16,7 @@ use core::{
 
 use esp_phy::PhyInitGuard;
 
-use super::{Config, ReceivedPacket};
+use super::{Config, ReceivedPacket, in_isr};
 use crate::{
     compat::{
         self,
@@ -844,10 +844,6 @@ struct Callout {
     evq: *mut BtdmOsalPtr,
     ev: BtdmOsalPtr,
     expiry_ms: u32,
-}
-
-fn in_isr() -> bool {
-    !crate::hal::interrupt::RunLevel::current().is_thread()
 }
 
 #[inline(always)]
