@@ -6,8 +6,16 @@
 //! the battery level characteristic, as well as receive notifications when
 //! the battery level changes.
 //!
-//! The example also has a flag to enable or disable modem sleep, which can be
-//! a useful tool to reduce power consumption.
+//! The example also shows how to save power. Change these constants to compare:
+//!
+//! - `MODEM_SLEEP` lets the controller turn the radio off between its events.
+//! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
+//!   sleeps only while the controller sleeps, and only on the ESP32-C3 and ESP32-S3. On the other
+//!   chips, BLE keeps the chip awake. The ESP32 can sleep only with a 32 kHz crystal as the BLE
+//!   low-power clock.
+//!
+//! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
+//! the output.
 
 //% CHIP_FILTER: bt_driver_supported
 
@@ -29,8 +37,11 @@ use trouble_host::prelude::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-// Set to true to enable modem sleep.
-const ENABLE_MODEM_SLEEP: bool = false;
+/// Whether the controller turns the radio off between its events.
+const MODEM_SLEEP: bool = true;
+/// Whether the chip enters automatic light sleep when all tasks are idle. Requires
+/// [`MODEM_SLEEP`] to be enabled. The chip sleeps only on the ESP32-C3 and ESP32-S3.
+const LIGHT_SLEEP: bool = true;
 
 #[esp_hal::main]
 async fn main(_s: Spawner) {
@@ -56,11 +67,16 @@ async fn main(_s: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0);
+    if LIGHT_SLEEP {
+        let sleep = esp_rtos::sleep::configure(peripherals.LPWR);
+        esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
+    } else {
+        esp_rtos::start(timg0.timer0);
+    }
 
     let connector = BleConnector::new(
         peripherals.BT,
-        esp_radio::ble::Config::default().with_modem_sleep(ENABLE_MODEM_SLEEP),
+        esp_radio::ble::Config::default().with_modem_sleep(MODEM_SLEEP),
     )
     .unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);
