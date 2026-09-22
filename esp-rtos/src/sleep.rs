@@ -65,6 +65,8 @@ impl DeepSleep {
 ///
 /// If all hold, it calls [`LowPower::sleep_light`] for the next wakeup. A wakeup source can
 /// refuse that sleep. The hook then falls back to `WFI`, as it does when a check above fails.
+/// A wakeup source can also bound the sleep. The driver clamps the wake timer inside the sleep
+/// call, after this hook has armed the next scheduler wakeup. The sooner of the two wins.
 /// The minimum-residency threshold is configurable via the
 /// `ESP_RTOS_CONFIG_LIGHT_SLEEP_MIN_US` build-time option (default `1000`).
 ///
@@ -136,7 +138,9 @@ extern "C" fn auto_light_sleep_hook() -> ! {
 
             // The deadline stays until other code clears it, so each pass writes it, also a pass
             // that makes no sleep. A deadline from an earlier pass expires, and the
-            // next sleep then returns immediately.
+            // next sleep then returns immediately. A wakeup source can shorten this deadline
+            // inside `sleep_light`, or arm the timer when this hook cleared it. This call stays
+            // the scheduler's request. `sleep_light` restores it.
             if next_wakeup == u64::MAX {
                 lpwr.clear_wakeup_deadline();
             } else {

@@ -15,6 +15,7 @@ use esp_sync::NonReentrantMutex;
 use crate::{
     rtc_cntl::{WakeupSource, sleep::RtcSleepConfig},
     soc::clocks::ClockSource,
+    time::Duration,
 };
 
 /// Which sleep the chip is entering.
@@ -47,19 +48,21 @@ pub(crate) enum SleepResource {
 /// The sleep configuration, as the entry hook of a wakeup source can see it.
 ///
 /// A hook can only relax the sleep. It can keep a power domain powered, keep a clock running,
-/// or refuse a light sleep. The caller of the sleep function selects how much of the chip to
-/// power down. A wakeup source only adds the resources that it needs, or it refuses the sleep.
-/// It cannot request a power-down, stop a clock, or cancel a refusal.
+/// refuse a light sleep, or shorten the sleep. The caller of the sleep function selects how much
+/// of the chip to power down, and it arms the wake timer. A wakeup source only adds the resources
+/// that it needs, refuses the sleep, or sets a shorter limit. It cannot request a power-down, stop
+/// a clock, cancel a refusal, or lengthen a limit.
 ///
 /// Each request is idempotent. The order of the hooks cannot change the result. The source with
-/// the strongest request wins. One refusal is enough.
+/// the strongest request wins. One refusal is enough. The shortest limit wins.
 ///
-/// Keep this property. A method that requests a power-down, stops a clock, or cancels a refusal
-/// removes it.
+/// Keep this property. A method that requests a power-down, stops a clock, cancels a refusal, or
+/// lengthens a limit removes it.
 pub(crate) struct WrappedSleepConfig<'a> {
     config: &'a mut RtcSleepConfig,
     clocks: EnumSet<ClockSource>,
     refused: bool,
+    limit: Option<Duration>,
 }
 
 impl<'a> WrappedSleepConfig<'a> {
@@ -68,6 +71,7 @@ impl<'a> WrappedSleepConfig<'a> {
             config,
             clocks: EnumSet::empty(),
             refused: false,
+            limit: None,
         }
     }
 
@@ -139,6 +143,37 @@ impl<'a> WrappedSleepConfig<'a> {
         self.refused = true;
     }
 
+    /// Limits this sleep to `duration`.
+    ///
+    /// The duration starts when the driver programs the wake timer, after every hook has run. The
+    /// shortest request wins. A later hook cannot make it longer.
+    ///
+    /// The driver clamps the wake timer to the limit. When the timer wakeup source is not enabled,
+    /// the limit enables it for this sleep. Nothing else wakes the chip at the limit. After a
+    /// light sleep the driver restores the timer. A deadline the caller armed stays armed. A timer
+    /// that only the limit enabled is disabled again.
+    ///
+    /// The limit applies to deep sleep as well. The wake resets the chip. Read
+    /// [`Self::is_deep_sleep`] when the hook should bound only one kind of sleep.
+    ///
+    /// A duration that the sleep transition cannot catch does not start the sleep. A light sleep
+    /// then returns as if it had ended. A deep sleep without rejection panics, because it cannot
+    /// return and the chip does not wake. This is not a refusal. Use [`Self::reject_sleep`] to
+    /// refuse a light sleep. A duration of zero is too short to sleep.
+    // No call out of this function, other than inlined methods. `#[ram]` does not inline it, and
+    // a sleep-entry hook runs with the flash potentially inaccessible.
+    #[expect(dead_code, reason = "no wakeup source limits a sleep yet")]
+    #[crate::ram]
+    pub(crate) fn limit_sleep(&mut self, duration: Duration) {
+        let already_shorter = match self.limit {
+            Some(current) => current.as_micros() <= duration.as_micros(),
+            None => false,
+        };
+        if !already_shorter {
+            self.limit = Some(duration);
+        }
+    }
+
     /// Prevents the power-down of every clock source a hook asked for.
     ///
     /// The set is what makes the requests of the hooks independent of their order.
@@ -189,7 +224,8 @@ impl<'a> WrappedSleepConfig<'a> {
 ///
 /// The configuration already holds the kind of the sleep, so a hook that needs it asks
 /// [`WrappedSleepConfig::is_deep_sleep`]. A hook refuses a light sleep with
-/// [`WrappedSleepConfig::reject_sleep`].
+/// [`WrappedSleepConfig::reject_sleep`]. A hook bounds the sleep with
+/// [`WrappedSleepConfig::limit_sleep`].
 pub(crate) type SleepEntryHook = fn(&mut WrappedSleepConfig<'_>);
 
 /// Runs after a light sleep.
@@ -287,11 +323,27 @@ pub(crate) fn reject_mask() -> u32 {
     mask() & property!("sleep.rejectable_mask")
 }
 
+/// What the entry hooks asked for, other than power domains and clocks.
+///
+/// The clock requests reach the configuration before this value is returned, and so does the
+/// wake timer. The refusal does not, because only the caller knows what to do with it.
+pub(crate) struct SleepEntry {
+    /// A hook called [`WrappedSleepConfig::reject_sleep`].
+    pub(crate) refused: bool,
+
+    /// How [`WrappedSleepConfig::limit_sleep`] changed the wake timer.
+    ///
+    /// `None` when no hook set a limit. The caller restores the timer on every path that does not
+    /// sleep, and after a light sleep.
+    #[cfg(sleep_has_wakeup_source_timer)]
+    pub(crate) clamp: Option<super::timer::LimitClamp>,
+}
+
 /// Runs the sleep-entry hook of every enabled source.
 ///
-/// Returns whether a hook called [`WrappedSleepConfig::reject_sleep`]. One call is enough.
-/// The caller ignores the result for a deep sleep. The wake resets the chip, so there is no
-/// caller to report the refusal to.
+/// One [`WrappedSleepConfig::reject_sleep`] is enough. The caller ignores the refusal for a deep
+/// sleep. The wake resets the chip, so there is no caller to report the refusal to. The shortest
+/// [`WrappedSleepConfig::limit_sleep`] wins.
 ///
 /// The mask as read at sleep entry selects the hooks. A hook can enable another source. The GPIO
 /// hook does this, because it selects between the `ext0`, `ext1` and per-pin paths. The caller
@@ -300,7 +352,7 @@ pub(crate) fn reject_mask() -> u32 {
 ///
 /// The caller writes the kind of the sleep to the configuration before this call, so that the hooks
 /// can read it.
-pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) -> bool {
+pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) -> SleepEntry {
     let mut wrapped = WrappedSleepConfig::new(config);
 
     for source in enabled_sources() {
@@ -310,14 +362,30 @@ pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) -> bool {
         }
     }
 
+    // The clamp writes the comparator, so it runs after every hook has asked for its limit. A
+    // source that the clamp enables has not run its entry hook. It runs here, where the requests
+    // of a hook still reach the configuration.
+    #[cfg(sleep_has_wakeup_source_timer)]
+    let clamp = wrapped.limit.map(|limit| {
+        let clamp = super::timer::clamp_to_limit(limit);
+        clamp.apply_entry_hook(&mut wrapped);
+        clamp
+    });
+
     wrapped.apply_clock_requests();
-    wrapped.refused
+
+    SleepEntry {
+        refused: wrapped.refused,
+        #[cfg(sleep_has_wakeup_source_timer)]
+        clamp,
+    }
 }
 
 /// Runs the post-wake hook of every enabled source.
 ///
 /// A light sleep calls this after the wake. A refused light sleep calls it too, so an entry hook
-/// can undo a pad change. A deep sleep does not call this.
+/// can undo a pad change. A sleep that a limit ends before it starts calls it for the same reason.
+/// A deep sleep that resets the chip does not call this.
 pub(crate) fn run_exit_hooks() {
     for source in enabled_sources() {
         let hook = HOOKS.with(|hooks| hooks.exit[source as usize]);
