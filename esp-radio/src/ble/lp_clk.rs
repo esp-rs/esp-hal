@@ -3,7 +3,12 @@
 //! The tree reports the divided output frequency. An RC source has no calibrated rate, so selecting
 //! one panics here.
 
-use esp_hal::clock::ll::{self, BleLpClkConfig};
+use enumset::EnumSet;
+use esp_hal::{
+    clock::ll::{self, BleLpClkConfig, ClockSource},
+    rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig},
+};
+use portable_atomic::{AtomicU32, Ordering};
 
 /// BTDM blob parameters for the selected low-power clock.
 #[cfg(bt_controller = "btdm")]
@@ -31,6 +36,49 @@ pub(crate) fn request() {
 /// Releases the request taken by [`request`].
 pub(crate) fn release() {
     ll::ClockTree::with(ll::release_ble_lp_clk);
+}
+
+/// The source that `BLE_LP_CLK` runs on, as the bits of an [`EnumSet`].
+static WAKE_CLOCK: AtomicU32 = AtomicU32::new(0);
+
+/// Claims the `Bt` wakeup source, so that the chip can sleep while the controller sleeps.
+///
+/// Call this only with modem sleep on, after the controller is enabled.
+pub(crate) fn claim_wake_source() {
+    let root = ll::ClockTree::with(ll::ble_lp_clk_root_source);
+    WAKE_CLOCK.store(
+        root.map_or(0, |source| EnumSet::only(source).as_u32()),
+        Ordering::Relaxed,
+    );
+    WakeupSource::Bt.enable_with_hooks(Some(sleep_entry), None);
+}
+
+/// Releases the claim taken by [`claim_wake_source`].
+///
+/// Call this before the controller is disabled.
+pub(crate) fn release_wake_source() {
+    WakeupSource::Bt.disable();
+}
+
+fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
+    // The controller does not survive a deep sleep, so it needs no clock through one.
+    if config.is_deep_sleep() {
+        return;
+    }
+
+    // The controller holds the PHY while it is awake, and it then runs on clocks that light sleep
+    // stops.
+    let awake = !super::MODEM_PHY_OFF.load(Ordering::Relaxed);
+    #[cfg(bt_controller = "btdm")]
+    let awake = awake || super::porting::hci_packet_in_flight();
+    if awake {
+        config.reject_sleep();
+        return;
+    }
+
+    for source in EnumSet::<ClockSource>::from_u32_truncated(WAKE_CLOCK.load(Ordering::Relaxed)) {
+        config.keep_clock_running(source);
+    }
 }
 
 fn reject_rc(config: BleLpClkConfig) {

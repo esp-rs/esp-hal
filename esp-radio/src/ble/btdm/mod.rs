@@ -341,6 +341,14 @@ fn end_controller_hci_wake() {
     unsafe { btdm_in_wakeup_requesting_set(false) };
 }
 
+/// Returns whether the controller has not yet taken the last HCI packet.
+///
+/// The send path requests a controller wake, and the controller takes the PHY again only later.
+/// Until then, the PHY reference shows a sleeping controller.
+pub(super) fn hci_packet_in_flight() -> bool {
+    PACKET_IN_FLIGHT.load(Ordering::Acquire)
+}
+
 #[ram]
 unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
     unsafe { crate::common_adapter::read_mac(mac as *mut _, 2) }
@@ -426,12 +434,17 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
     }
 
+    if config.modem_sleep() {
+        super::lp_clk::claim_wake_source();
+    }
+
     // At some point the "High-speed ADC" entropy source became available.
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
     phy_init_guard
 }
 
 pub(crate) fn ble_deinit() {
+    super::lp_clk::release_wake_source();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 

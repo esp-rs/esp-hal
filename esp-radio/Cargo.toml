@@ -307,7 +307,7 @@ sniffer = ["wifi", "__has_unstable_feature_enabled"]
 ## Enable BLE support.
 ##
 ## ⚠️ This feature is considered unstable.
-ble = ["esp-hal/__bluetooth", "dep:bt-hci", "dep:bt-hci-transport", "__has_unstable_feature_enabled"]
+ble = ["esp-hal/__bluetooth", "dep:bt-hci", "dep:bt-hci-transport", "dep:enumset", "__has_unstable_feature_enabled"]
 #DOC_ENDIF
 
 #DOC_IF has("bt_driver_supported") && has("wifi_driver_supported")
