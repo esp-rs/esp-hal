@@ -1288,6 +1288,10 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         assert!(res == 0, "ble_controller_enable returned {}", res);
     }
 
+    if config.modem_sleep() {
+        super::lp_clk::claim_wake_source();
+    }
+
     // At some point the "High-speed ADC" entropy source became available.
     #[cfg(rng_trng_supported)]
     unsafe {
@@ -1299,6 +1303,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    super::lp_clk::release_wake_source();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 

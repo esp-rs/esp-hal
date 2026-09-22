@@ -837,6 +837,10 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let res = esp_bt_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
     assert!(res == 0, "esp_bt_controller_enable returned {}", res);
 
+    if config.modem_sleep() {
+        super::lp_clk::claim_wake_source();
+    }
+
     #[cfg(rng_trng_supported)]
     unsafe {
         esp_hal::rng::TrngSource::increase_entropy_source_counter()
@@ -846,6 +850,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    super::lp_clk::release_wake_source();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 
