@@ -29,18 +29,18 @@ test  = false
 
 [dependencies]
 document-features   = "0.2"
-esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
-esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "66ded26" }
+esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
+esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "c29264b" }
 
 [build-dependencies]
 esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
