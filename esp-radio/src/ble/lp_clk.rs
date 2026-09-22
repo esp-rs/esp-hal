@@ -3,12 +3,16 @@
 //! The tree reports the divided output frequency. An RC source has no calibrated rate, so selecting
 //! one panics here.
 
-use enumset::EnumSet;
-use esp_hal::{
-    clock::ll::{self, BleLpClkConfig, ClockSource},
-    rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig},
+use esp_hal::clock::ll::{self, BleLpClkConfig};
+#[cfg(bt_controller = "btdm")]
+use {
+    enumset::EnumSet,
+    esp_hal::{
+        clock::ll::ClockSource,
+        rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig},
+    },
+    portable_atomic::{AtomicU32, Ordering},
 };
-use portable_atomic::{AtomicU32, Ordering};
 
 /// BTDM blob parameters for the selected low-power clock.
 #[cfg(bt_controller = "btdm")]
@@ -38,12 +42,27 @@ pub(crate) fn release() {
     ll::ClockTree::with(ll::release_ble_lp_clk);
 }
 
+/// Returns whether the chip can light-sleep while the controller sleeps.
+///
+/// Only the BTDM controllers support light sleep. ESP32 needs a 32 kHz crystal for it, because it
+/// cannot light-sleep with the main crystal as the controller clock.
+pub(crate) fn light_sleep_supported() -> bool {
+    cfg_select! {
+        esp32 => ll::ClockTree::with(ll::ble_lp_clk_root_source) != Some(ClockSource::XtalClk),
+        bt_controller = "btdm" => true,
+        _ => false,
+    }
+}
+
 /// The source that `BLE_LP_CLK` runs on, as the bits of an [`EnumSet`].
+#[cfg(bt_controller = "btdm")]
 static WAKE_CLOCK: AtomicU32 = AtomicU32::new(0);
 
 /// Claims the `Bt` wakeup source, so that the chip can sleep while the controller sleeps.
 ///
-/// Call this only with modem sleep on, after the controller is enabled.
+/// Call this only with modem sleep on, after the controller is enabled, and only when
+/// [`light_sleep_supported`] returns `true`. Otherwise the radio wake lock stays.
+#[cfg(bt_controller = "btdm")]
 pub(crate) fn claim_wake_source() {
     let root = ll::ClockTree::with(ll::ble_lp_clk_root_source);
     WAKE_CLOCK.store(
@@ -56,10 +75,12 @@ pub(crate) fn claim_wake_source() {
 /// Releases the claim taken by [`claim_wake_source`].
 ///
 /// Call this before the controller is disabled.
+#[cfg(bt_controller = "btdm")]
 pub(crate) fn release_wake_source() {
     WakeupSource::Bt.disable();
 }
 
+#[cfg(bt_controller = "btdm")]
 fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     // The controller does not survive a deep sleep, so it needs no clock through one.
     if config.is_deep_sleep() {
@@ -69,12 +90,18 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     // The controller holds the PHY while it is awake, and it then runs on clocks that light sleep
     // stops.
     let awake = !super::MODEM_PHY_OFF.load(Ordering::Relaxed);
-    #[cfg(bt_controller = "btdm")]
-    let awake = awake || super::porting::hci_packet_in_flight();
-    if awake {
+    if awake || super::porting::hci_packet_in_flight() {
         config.reject_sleep();
         return;
     }
+
+    // The controller wakes on its own timer, but the chip must be awake before it does.
+    let remaining = super::porting::time_until_controller_wakes();
+    if remaining.as_micros() == 0 {
+        config.reject_sleep();
+        return;
+    }
+    config.limit_sleep(remaining);
 
     for source in EnumSet::<ClockSource>::from_u32_truncated(WAKE_CLOCK.load(Ordering::Relaxed)) {
         config.keep_clock_running(source);
