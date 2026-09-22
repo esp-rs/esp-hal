@@ -98,8 +98,10 @@ impl RegistrySnapshot {
             .is_some_and(|versions| versions.contains(version))
     }
 
-    /// Move `planned` on by one step if crates.io already holds it. Two
-    /// collisions in a row are left to a reviewer.
+    /// Move `planned` on until crates.io does not hold it.
+    ///
+    /// A backport branch can publish several patches without bumping `main`,
+    /// so the next release from `main` may need more than one step.
     pub fn next_free_version(
         &self,
         package: Package,
@@ -114,18 +116,25 @@ impl RegistrySnapshot {
             Some(ref pre) => VersionBump::pre(pre.clone()),
             None => VersionBump::patch(),
         };
-        let next = do_version_bump(planned, &step)?;
 
-        if self.is_taken(package, &next) {
-            bail!(
-                "crates.io already holds both {package} {planned} and {next}. Change the bump \
-                 of {package} in the release plan to pick a version."
-            );
+        let attempts = self.taken.get(&package).map_or(0, Vec::len);
+        let mut candidate = planned.clone();
+
+        for _ in 0..attempts {
+            candidate = do_version_bump(&candidate, &step)?;
+
+            if !self.is_taken(package, &candidate) {
+                log::warn!(
+                    "crates.io already holds {package} {planned}, moving the release to {candidate}."
+                );
+                return Ok(candidate);
+            }
         }
 
-        log::warn!("crates.io already holds {package} {planned}, moving the release to {next}.");
-
-        Ok(next)
+        bail!(
+            "crates.io holds every version for {package} from {planned} to {candidate}. Change \
+             the bump of {package} to pick a version."
+        )
     }
 }
 
@@ -187,18 +196,6 @@ mod tests {
         assert_eq!(free.to_string(), expected);
     }
 
-    #[track_caller]
-    fn assert_no_free_version(planned: &str, bump: VersionBump, snapshot: &RegistrySnapshot) {
-        let planned = planned.parse().unwrap();
-        let error = snapshot
-            .next_free_version(Package::EspSync, &planned, &bump)
-            .expect_err("expected no free version");
-        assert!(
-            error.to_string().contains("already holds both"),
-            "unexpected error: {error}"
-        );
-    }
-
     #[test]
     fn free_version_is_left_alone() {
         assert_free(
@@ -227,16 +224,20 @@ mod tests {
     }
 
     #[test]
-    fn consecutive_taken_versions_are_left_to_a_reviewer() {
-        assert_no_free_version(
+    fn consecutive_taken_versions_are_all_skipped() {
+        // Same shape as esp-hal on main after two patches from esp-hal-1.2.x:
+        // the in-tree version sits behind more than one published number.
+        assert_free(
             "0.2.0",
             VersionBump::minor(),
-            &snapshot(&["0.2.0", "0.2.1"]),
+            &snapshot(&["0.2.0", "0.2.1", "0.2.2", "0.2.3"]),
+            "0.2.4",
         );
-        assert_no_free_version(
+        assert_free(
             "1.1.0-beta.3",
             VersionBump::pre("beta"),
-            &snapshot(&["1.1.0-beta.3", "1.1.0-beta.4"]),
+            &snapshot(&["1.1.0-beta.3", "1.1.0-beta.4", "1.1.0-beta.5"]),
+            "1.1.0-beta.6",
         );
     }
 
