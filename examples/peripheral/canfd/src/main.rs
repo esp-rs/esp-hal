@@ -31,7 +31,7 @@ const IS_FIRST_SENDER: bool = true;
 
 use esp_backtrace as _;
 use esp_hal::{
-    canfd::{CanFd, Config, Frame, TxBufferState},
+    canfd::{CanFd, Config, Frame, StandardId, TxBufferState},
     delay::Delay,
     main,
 };
@@ -69,7 +69,10 @@ fn main() -> ! {
     // A CAN FD frame with 64 bytes of payload, sent with the data phase at the
     // FD bit rate.
     let payload: [u8; 64] = core::array::from_fn(|i| i as u8);
-    let frame = Frame::new_fd(0x123, false, true, &payload).unwrap();
+    let id = StandardId::new(0x123).unwrap();
+    let frame = Frame::new_fd(id, &payload)
+        .unwrap()
+        .with_bit_rate_switch(true);
 
     if IS_FIRST_SENDER {
         send(&mut canfd, &frame);

@@ -1,31 +1,42 @@
 //! Low-level register access for the CTU CAN FD core.
 //!
 //! Ported from ESP-IDF's [`twaifd_ll.h`](https://github.com/espressif/esp-idf/blob/96f54947e08c196cf71c0588243dfc8e33807acc/components/esp_hal_twai/esp32c5/include/hal/twaifd_ll.h).
-//!
-//! Register semantics follow the **ESP32-C5 TRM v1.1, chapter 38**, which every
-//! bare "TRM" reference below means. Chapter and section numbers are specific to
-//! that manual: the ESP32-H4 and ESP32-S31 carry the same core but number their
-//! chapters differently. Where the TRM and the ESP-IDF headers disagree, the TRM
-//! wins and the difference is noted at the site.
+//! "TRM" below means the ESP32-C5 TRM v1.1, chapter 38.
 
-use crate::pac::twai0::RegisterBlock;
+use embedded_can::{ExtendedId, Id, StandardId};
+
+use crate::pac::twai0::{
+    RegisterBlock,
+    mode_settings::{MODE_SETTINGS_SPEC, RTRTH_W},
+    tx_priority::{TX_PRIORITY_SPEC, TXT1P_W},
+};
 
 /// Words in a frame buffer: 1 format + 1 identifier + 2 timestamp + 16 data.
 pub(super) const FRAME_WORDS: usize = 20;
-
-/// Largest DLC code a CAN FD frame can carry.
+/// Largest data length code of CAN FD.
 pub(super) const MAX_DLC: u8 = 15;
-/// Largest payload a CAN FD frame can carry, in bytes.
+/// Largest payload of a CAN FD frame, in bytes.
 pub(super) const MAX_DATA_LEN: usize = 64;
-/// Largest payload a classic CAN frame can carry, in bytes.
+/// Largest payload of a classic CAN frame, in bytes.
 pub(super) const CLASSIC_MAX_DATA_LEN: usize = 8;
 
 /// Mask of the 11-bit base identifier.
 pub(super) const STD_ID_MASK: u32 = 0x0000_07FF;
 /// Mask of the 29-bit extended identifier.
 pub(super) const EXT_ID_MASK: u32 = 0x1FFF_FFFF;
-/// Bit position of the base identifier inside the frame buffer's identifier word.
+/// Bit position of the base identifier inside the identifier word.
 const IDENTIFIER_BASE_SHIFT: u32 = 18;
+
+/// Largest value a register field of `width` bits can hold.
+const fn field_max(width: u8) -> u8 {
+    ((1u16 << width) - 1) as u8
+}
+
+/// Largest retransmission limit the `RTRTH` field can hold.
+pub const MAX_RETRANSMIT_LIMIT: u8 = field_max(<RTRTH_W<'static, MODE_SETTINGS_SPEC>>::WIDTH);
+
+/// Largest TX buffer priority the `TXTnP` fields can hold.
+pub const MAX_TX_PRIORITY: u8 = field_max(<TXT1P_W<'static, TX_PRIORITY_SPEC>>::WIDTH);
 
 /// Hardware limits for one set of bit timing parameters.
 ///
@@ -56,8 +67,6 @@ pub const NOMINAL_TIMING_LIMITS: TimingLimits = TimingLimits {
 };
 
 /// Limits for the data phase bit timing.
-///
-/// The FD phase segments are narrower fields than the nominal ones.
 pub const FD_TIMING_LIMITS: TimingLimits = TimingLimits {
     baud_rate_prescaler: (1, 255),
     propagation_segment: (1, 63),
@@ -82,18 +91,11 @@ pub struct Timing {
     pub sync_jump_width: u8,
 }
 
-/// Largest retransmission limit the four-bit `RTRTH` field can hold
-/// (TRM 38.3.8.4).
-pub const MAX_RETRANSMIT_LIMIT: u8 = 15;
-
 impl Timing {
     /// Returns whether every parameter fits the given limits.
     ///
-    /// Covers the per-field ranges and the two combined constraints of TRM
-    /// 38.3.7.7. Those constraints are expressed in minimal time quanta, that
-    /// is, in system clock periods, so the prescaler is part of them. A bit
-    /// timing that satisfies every individual range can still violate them, and
-    /// the hardware would then sample wrongly.
+    /// Also checks the two constraints of TRM 38.3.7.7, which are expressed in
+    /// system clock periods and therefore include the prescaler.
     pub const fn is_valid(&self, limits: &TimingLimits) -> bool {
         // Phase_Seg2 >= 2 minimal time quanta.
         if (self.baud_rate_prescaler as u32) * (self.phase_segment_2 as u32) < 2 {
@@ -147,11 +149,7 @@ pub enum SspSource {
     MeasuredPlusOffset = 0,
     /// Secondary sampling is disabled.
     Disabled           = 1,
-    /// The configured offset alone.
-    ///
-    /// Not used by the driver: without the measured delay, the offset would
-    /// have to include the transceiver loop delay, which the hardware can
-    /// measure on its own. Kept so the enum covers the whole field.
+    /// The configured offset alone. Not used by the driver.
     #[allow(dead_code)]
     OffsetOnly         = 2,
 }
@@ -182,9 +180,7 @@ pub enum TxBufferState {
 
 impl TxBufferState {
     fn from_bits(bits: u8) -> Self {
-        // TRM 38.22, TWAIFD_TX_STATUS_REG. Note that "empty" is 0x8 and 0x0
-        // means the buffer is not implemented; ESP-IDF's header only names
-        // 0x4/0x6/0x7, so these codes come from the TRM.
+        // Codes from TRM 38.22; ESP-IDF's header only names 0x4/0x6/0x7.
         match bits {
             0x0 => Self::NotExist,
             0x1 => Self::Ready,
@@ -206,10 +202,8 @@ impl TxBufferState {
 
 /// Fault confinement state (TRM 38.3.10).
 ///
-/// These are the three states the hardware reports, matching ISO 11898-1. The
-/// error warning limit is deliberately not among them: reaching it does not
-/// change the confinement state, it only raises a flag, which
-/// [`super::CanFd::error_warning`] reports.
+/// The error warning limit is not a state of its own; see
+/// [`super::CanFd::error_warning`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ErrorState {
@@ -235,25 +229,15 @@ pub enum TimestampPoint {
 /// Every bit of `MODE_SETTINGS` the driver configures, applied in one write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub(super) struct ModeSettings {
-    /// Receives only, never driving a dominant bit.
     pub listen_only: bool,
-    /// Treats a frame as transmitted even without an ACK.
     pub self_test: bool,
-    /// Routes transmitted frames back into the RX buffer.
     pub loopback: bool,
-    /// Accepts CAN FD frames.
     pub fd_enabled: bool,
-    /// Handles protocol exceptions.
     pub protocol_exception: bool,
-    /// Advances the RX read pointer on each read of `RX_DATA`.
     pub rx_auto_increment: bool,
-    /// Applies the acceptance filters.
     pub filters_enabled: bool,
-    /// Moves every TX buffer to "TX failed" on bus-off.
     pub bus_off_tx_fail: bool,
-    /// Drops received request frames.
     pub drop_request_frames: bool,
-    /// Transmits only when the time base reaches a frame's trigger time.
     pub time_triggered_tx: bool,
     /// Retransmission attempts, or `None` to retry forever.
     pub retransmit_limit: Option<u8>,
@@ -392,8 +376,8 @@ impl ErrorPosition {
 /// Details of the last bus error the core captured.
 ///
 /// The registers behind this are not cleared, so the value is only meaningful
-/// after the core has actually reported a bus error. Out of reset it reads as
-/// [`BusErrorKind::Bit`] at [`ErrorPosition::Other`].
+/// after a bus error. Out of reset it reads as [`BusErrorKind::Bit`] at
+/// [`ErrorPosition::Other`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ErrorCapture {
@@ -403,135 +387,89 @@ pub struct ErrorCapture {
     pub position: ErrorPosition,
 }
 
+/// The format and identifier fields of a frame to transmit.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct FrameHeader {
+    pub id: Id,
+    pub request: bool,
+    pub fd: bool,
+    pub bit_rate_switch: bool,
+    pub dlc: u8,
+}
+
 /// A frame in the layout the hardware TX and RX buffers use.
 ///
 /// Word 0 is the format word, word 1 the identifier, words 2 and 3 the
 /// timestamp, and words 4..20 the payload.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct FrameBuffer {
-    pub(super) words: [u32; FRAME_WORDS],
+pub(super) struct FrameBuffer {
+    words: [u32; FRAME_WORDS],
 }
 
-impl core::fmt::Debug for FrameBuffer {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let used = 4 + self.data_len().div_ceil(4);
-        f.debug_struct("FrameBuffer")
-            .field("id", &format_args!("{:#x}", self.id()))
-            .field("extended", &self.is_extended())
-            .field("request", &self.is_request())
-            .field("fd", &self.is_fd())
-            .field("bit_rate_switch", &self.is_bit_rate_switched())
-            .field("dlc", &self.dlc())
-            .field("len", &self.data_len())
-            .field("timestamp", &self.timestamp())
-            .field("words", &&self.words[..used.min(FRAME_WORDS)])
-            .finish()
-    }
-}
-
-#[cfg(feature = "defmt")]
-impl defmt::Format for FrameBuffer {
-    fn format(&self, f: defmt::Formatter<'_>) {
-        let used = (4 + self.data_len().div_ceil(4)).min(FRAME_WORDS);
-        defmt::write!(
-            f,
-            "FrameBuffer {{ id: {=u32:#x}, extended: {}, request: {}, fd: {}, brs: {}, dlc: {=u8}, len: {=usize}, timestamp: {=u64}, words: {=[?]} }}",
-            self.id(),
-            self.is_extended(),
-            self.is_request(),
-            self.is_fd(),
-            self.is_bit_rate_switched(),
-            self.dlc(),
-            self.data_len(),
-            self.timestamp(),
-            &self.words[..used]
-        )
-    }
-}
-
-impl Default for FrameBuffer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// The payload is viewed as bytes in place, which relies on the word layout
+// matching the wire order.
+const _: () = core::assert!(cfg!(target_endian = "little"));
 
 impl FrameBuffer {
     const DATA_WORD_OFFSET: usize = 4;
 
-    /// Creates an all-zero frame buffer.
-    pub const fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self {
             words: [0; FRAME_WORDS],
         }
     }
 
-    /// Returns the data length code.
-    pub fn dlc(&self) -> u8 {
+    pub(super) fn dlc(&self) -> u8 {
         (self.words[0] & 0xF) as u8
     }
 
-    /// Returns whether the frame is a request frame.
-    ///
-    /// CAN FD has no request frames, so this is only meaningful when
-    /// [`Self::is_fd`] returns `false`.
-    pub fn is_request(&self) -> bool {
+    pub(super) fn is_request(&self) -> bool {
         self.words[0] & (1 << 5) != 0
     }
 
-    /// Returns whether the frame uses a 29-bit identifier.
-    pub fn is_extended(&self) -> bool {
+    pub(super) fn is_extended(&self) -> bool {
         self.words[0] & (1 << 6) != 0
     }
 
-    /// Returns whether the frame is in CAN FD format.
-    pub fn is_fd(&self) -> bool {
+    pub(super) fn is_fd(&self) -> bool {
         self.words[0] & (1 << 7) != 0
     }
 
-    /// Returns whether the data phase is sent at the FD bit rate.
-    pub fn is_bit_rate_switched(&self) -> bool {
+    pub(super) fn is_bit_rate_switched(&self) -> bool {
         self.words[0] & (1 << 9) != 0
     }
 
-    /// Returns the error state indicator of the transmitting node.
-    pub fn error_state_indicator(&self) -> bool {
+    pub(super) fn error_state_indicator(&self) -> bool {
         self.words[0] & (1 << 10) != 0
     }
 
     /// Number of words that follow word 0 for this frame.
     ///
-    /// This is CTU CAN FD's RWCNT (read word count) field. ESP-IDF's
-    /// `twaifd_struct.h` mislabels it as a re-transmission counter, while its own
-    /// RX read loop uses it as a word count, which is what the hardware means.
-    pub(super) fn word_count(&self) -> u8 {
+    /// The RWCNT field. ESP-IDF's `twaifd_struct.h` mislabels it as a
+    /// retransmission counter; its own RX loop uses it as a word count.
+    fn word_count(&self) -> u8 {
         ((self.words[0] >> 11) & 0x1F) as u8
     }
 
-    /// Returns the frame identifier.
-    pub fn id(&self) -> u32 {
+    pub(super) fn id(&self) -> Id {
         if self.is_extended() {
-            self.words[1] & EXT_ID_MASK
+            // Masked to the field width, so the value is always in range.
+            Id::Extended(unsafe { ExtendedId::new_unchecked(self.words[1] & EXT_ID_MASK) })
         } else {
-            (self.words[1] >> IDENTIFIER_BASE_SHIFT) & STD_ID_MASK
+            let raw = (self.words[1] >> IDENTIFIER_BASE_SHIFT) & STD_ID_MASK;
+            Id::Standard(unsafe { StandardId::new_unchecked(raw as u16) })
         }
     }
 
-    /// Returns the timestamp captured for a received frame, or the trigger time
-    /// of a frame queued in time-triggered transmission mode.
-    pub fn timestamp(&self) -> u64 {
+    pub(super) fn timestamp(&self) -> u64 {
         (self.words[2] as u64) | ((self.words[3] as u64) << 32)
     }
 
     /// Returns the payload length in bytes.
     ///
-    /// Only CAN FD frames use the extended data length codes. A classic frame
-    /// with a DLC above 8 still carries 8 bytes, per CAN 2.0, so decoding it
-    /// with the FD table would report a length the frame does not have and
-    /// hand back bytes that were never received.
-    ///
-    /// A request frame carries no payload at all; its DLC is the length being
-    /// asked for, which [`Self::requested_len`] reports.
-    pub fn data_len(&self) -> usize {
+    /// Only CAN FD frames use the extended data length codes; a classic frame
+    /// with a DLC above 8 still carries 8 bytes. A request frame carries none.
+    pub(super) fn data_len(&self) -> usize {
         if self.is_request() {
             return 0;
         }
@@ -544,57 +482,39 @@ impl FrameBuffer {
     }
 
     /// Returns the payload length a request frame asks for, in bytes.
-    ///
-    /// Meaningless unless [`Self::is_request`] returns `true`.
-    pub fn requested_len(&self) -> usize {
+    pub(super) fn requested_len(&self) -> usize {
         (dlc_to_len(self.dlc()) as usize).min(CLASSIC_MAX_DATA_LEN)
     }
 
-    /// Copies the payload into `buf` and returns its length in bytes.
-    pub fn data(&self, buf: &mut [u8; MAX_DATA_LEN]) -> usize {
-        let len = self.data_len();
-        for (i, byte) in buf.iter_mut().enumerate().take(len) {
-            let word = self.words[Self::DATA_WORD_OFFSET + i / 4];
-            *byte = (word >> (8 * (i % 4))) as u8;
-        }
-        len
+    /// Returns the payload.
+    pub(super) fn data(&self) -> &[u8] {
+        let words = &self.words[Self::DATA_WORD_OFFSET..];
+        // Little-endian words hold the payload in wire order, checked above.
+        let bytes =
+            unsafe { core::slice::from_raw_parts(words.as_ptr().cast::<u8>(), words.len() * 4) };
+        &bytes[..self.data_len()]
     }
 
     /// Builds a frame buffer ready to be written to a TX buffer.
-    ///
-    /// `dlc` must already be encoded; use [`len_to_dlc`] to derive it from a
-    /// payload length.
-    #[allow(clippy::too_many_arguments)]
-    pub fn build(
-        id: u32,
-        extended: bool,
-        rtr: bool,
-        fd: bool,
-        brs: bool,
-        dlc: u8,
-        data: &[u8],
-        trigger_time: u64,
-    ) -> Self {
-        debug_assert!(dlc <= MAX_DLC);
+    pub(super) fn build(header: FrameHeader, data: &[u8]) -> Self {
+        debug_assert!(header.dlc <= MAX_DLC);
         debug_assert!(data.len() <= MAX_DATA_LEN);
 
         let mut frame = Self::new();
 
-        frame.words[0] = (dlc as u32 & 0xF)
-            | ((rtr as u32) << 5)
-            | ((extended as u32) << 6)
-            | ((fd as u32) << 7)
-            | ((brs as u32) << 9);
-
-        frame.words[1] = if extended {
-            id & EXT_ID_MASK
-        } else {
-            (id & STD_ID_MASK) << IDENTIFIER_BASE_SHIFT
+        let (id, extended) = match header.id {
+            Id::Standard(id) => ((u32::from(id.as_raw())) << IDENTIFIER_BASE_SHIFT, false),
+            Id::Extended(id) => (id.as_raw(), true),
         };
 
-        // Writing zero here transmits as soon as the bus is idle (TRM 38.3.8.2).
-        frame.words[2] = trigger_time as u32;
-        frame.words[3] = (trigger_time >> 32) as u32;
+        frame.words[0] = (header.dlc as u32 & 0xF)
+            | ((header.request as u32) << 5)
+            | ((extended as u32) << 6)
+            | ((header.fd as u32) << 7)
+            | ((header.bit_rate_switch as u32) << 9);
+        frame.words[1] = id;
+        // Words 2 and 3 are the trigger time; zero transmits as soon as the
+        // bus is idle (TRM 38.3.8.2).
 
         for (i, &byte) in data.iter().enumerate() {
             frame.words[Self::DATA_WORD_OFFSET + i / 4] |= (byte as u32) << (8 * (i % 4));
@@ -604,16 +524,8 @@ impl FrameBuffer {
     }
 }
 
-/// Converts a CAN FD data length code to a payload length in bytes.
-///
-/// A data length code is four bits, so `dlc` is at most 15. A larger value is
-/// treated as 15, which is 64 bytes.
-///
-/// # Panics
-///
-/// With debug assertions enabled, when `dlc` is larger than 15.
-pub const fn dlc_to_len(dlc: u8) -> u8 {
-    core::debug_assert!(dlc <= MAX_DLC, "a data length code is four bits");
+/// Converts a data length code to a payload length in bytes.
+pub(super) const fn dlc_to_len(dlc: u8) -> u8 {
     match dlc {
         0..=8 => dlc,
         9..=12 => (dlc - 8) * 4 + 8,
@@ -623,20 +535,9 @@ pub const fn dlc_to_len(dlc: u8) -> u8 {
     }
 }
 
-/// Converts a payload length in bytes to the smallest CAN FD data length code
-/// that can carry it.
-///
-/// A CAN FD frame carries at most 64 bytes. A larger `len` is treated as 64
-/// and maps to the code 15.
-///
-/// # Panics
-///
-/// With debug assertions enabled, when `len` is larger than 64.
-pub const fn len_to_dlc(len: u8) -> u8 {
-    core::debug_assert!(
-        len as usize <= MAX_DATA_LEN,
-        "a frame carries at most 64 bytes"
-    );
+/// Converts a payload length in bytes to the smallest data length code that
+/// can carry it.
+pub(super) const fn len_to_dlc(len: u8) -> u8 {
     match len {
         0..=8 => len,
         9..=24 => (len - 8).div_ceil(4) + 8,
@@ -646,34 +547,26 @@ pub const fn len_to_dlc(len: u8) -> u8 {
     }
 }
 
-/// Low-level accessor for one CAN FD controller.
-pub(super) struct Ll {
+/// Register access for one CAN FD controller.
+pub(super) struct Driver {
     regs: *const RegisterBlock,
 }
 
-// SAFETY: the pointer addresses a memory-mapped register block that exists for
-// the whole life of the program, so it can be used from any context. Without
-// these the drivers holding an `Ll` could not be moved into a task or shared
-// with an interrupt handler through a `static`. Whether concurrent access is
-// sound is decided one level up: the drivers only read through `&self`, and
-// everything that writes takes `&mut self`.
-unsafe impl Send for Ll {}
-unsafe impl Sync for Ll {}
+// The pointer addresses a memory-mapped register block.
+unsafe impl Send for Driver {}
+unsafe impl Sync for Driver {}
 
-impl Ll {
+impl Driver {
     pub(super) fn new(regs: *const RegisterBlock) -> Self {
         Self { regs }
     }
 
     fn r(&self) -> &RegisterBlock {
-        // SAFETY: `regs` points at a live peripheral register block for as long as
-        // the driver holds the peripheral.
         unsafe { &*self.regs }
     }
 
     // ---------------------------------------------------------------- identity
 
-    /// Device ID reported by the core. Reads `0xCAFD` on a working core.
     pub(super) fn device_id(&self) -> u16 {
         self.r().device_id_version().read().device_id().bits()
     }
@@ -691,44 +584,31 @@ impl Ll {
         self.r().mode_settings().modify(|_, w| w.rst().set_bit());
     }
 
-    /// Enables or disables the controller.
-    ///
-    /// Most mode bits may only be changed while disabled.
     pub(super) fn enable(&self, enable: bool) {
         self.r().mode_settings().modify(|_, w| w.ena().bit(enable));
     }
 
-    /// Whether the controller is enabled.
     pub(super) fn is_enabled(&self) -> bool {
         self.r().mode_settings().read().ena().bit_is_set()
     }
 
     // -------------------------------------------------------------------- mode
 
-    /// Applies every mode setting in one write.
-    ///
-    /// `MODE_SETTINGS` holds all of these bits, so they are written together
-    /// rather than through a read-modify-write cycle each.
-    ///
-    /// Only valid while the controller is disabled.
+    /// Applies every mode setting in one write. Only valid while disabled.
     pub(super) fn apply_mode_settings(&self, settings: &ModeSettings) {
         debug_assert!(!self.is_enabled(), "mode may only change while disabled");
 
         self.r().mode_settings().modify(|_, w| {
-            // `listen_only` drives three bits together: the ESP32-C5 needs `rom`
-            // and `acf` alongside `bmm` to work around errata 0v2 issue 5
-            // (esp-idf#17461).
+            // Listen-only needs `rom` and `acf` alongside `bmm` on the
+            // ESP32-C5 (errata 0v2 issue 5, esp-idf#17461).
             w.bmm().bit(settings.listen_only);
             w.rom().bit(settings.listen_only);
             w.acf().bit(settings.listen_only);
             w.stm().bit(settings.self_test);
             w.ilbp().bit(settings.loopback);
-            // Whether a frame is FD is then decided per frame by its FDF bit.
             w.fde().bit(settings.fd_enabled);
             w.pex().bit(settings.protocol_exception);
-            // read_rx_frame depends on the read pointer advancing automatically.
             w.rxbam().bit(settings.rx_auto_increment);
-            // Individual filters keep their own enables; this is the group switch.
             w.afm().bit(settings.filters_enabled);
             w.tbfbo().bit(settings.bus_off_tx_fail);
             w.fdrf().bit(settings.drop_request_frames);
@@ -745,7 +625,6 @@ impl Ll {
 
     // ------------------------------------------------------------- bit timing
 
-    /// Programs the nominal (arbitration phase) bit timing.
     pub(super) fn set_nominal_timing(&self, timing: &Timing) {
         self.r().btr().write(|w| unsafe {
             w.brp().bits(timing.baud_rate_prescaler);
@@ -756,7 +635,6 @@ impl Ll {
         });
     }
 
-    /// Programs the data phase bit timing used by bit-rate-switched FD frames.
     pub(super) fn set_fd_timing(&self, timing: &Timing) {
         self.r().btr_fd().write(|w| unsafe {
             w.brp_fd().bits(timing.baud_rate_prescaler);
@@ -767,10 +645,7 @@ impl Ll {
         });
     }
 
-    /// Places the secondary sample point.
-    ///
-    /// `offset` is in function clock cycles, not time quanta, so a caller working
-    /// in quanta must multiply by the prescaler first.
+    /// Places the secondary sample point. `offset` is in function clock cycles.
     pub(super) fn set_secondary_sample_point(&self, source: SspSource, offset: u8) {
         self.r().trv_delay_ssp_cfg().modify(|_, w| unsafe {
             w.ssp_src().bits(source as u8);
@@ -779,15 +654,12 @@ impl Ll {
     }
 
     /// Transmitter delay measured by the hardware, in function clock cycles.
-    ///
-    /// Includes the core's own two cycles of input delay.
     pub(super) fn transmitter_delay(&self) -> u8 {
         self.r().trv_delay_ssp_cfg().read().trv_delay_value().bits()
     }
 
     // -------------------------------------------------------------- TX buffers
 
-    /// Number of TX buffers the hardware provides.
     pub(super) fn tx_buffer_count(&self) -> u8 {
         self.r()
             .tx_command_txtb_info()
@@ -796,11 +668,7 @@ impl Ll {
             .bits()
     }
 
-    /// State of one TX buffer.
-    ///
-    /// The caller is responsible for the index being one the hardware has: the
-    /// states share a single register, four bits each (TRM 38.22), so a larger
-    /// index reads whatever the shift lands on.
+    /// State of one TX buffer. `index` must be below [`Self::tx_buffer_count`].
     pub(super) fn tx_buffer_state(&self, index: u8) -> TxBufferState {
         debug_assert!(index < self.tx_buffer_count());
 
@@ -808,11 +676,7 @@ impl Ll {
         TxBufferState::from_bits(((raw >> (4 * index as u32)) & 0xF) as u8)
     }
 
-    /// Writes a frame into a TX buffer.
-    ///
-    /// The buffer must be in a writable state; see [`TxBufferState::is_writable`].
-    /// The PAC models the four buffers this core has (TRM 38.3.8), and the
-    /// caller keeps `index` below [`Ll::tx_buffer_count`].
+    /// Writes a frame into a TX buffer, which must be writable.
     pub(super) fn write_tx_buffer(&self, index: u8, frame: &FrameBuffer) {
         debug_assert!(index < 4, "the PAC models four TX buffers");
         let regs = self.r();
@@ -826,17 +690,14 @@ impl Ll {
         }
     }
 
-    /// Arms a TX buffer for transmission.
     pub(super) fn set_tx_ready(&self, index: u8) {
         self.tx_command(index, |w| w.txcr().set_bit());
     }
 
-    /// Requests that a TX buffer be aborted.
     pub(super) fn set_tx_abort(&self, index: u8) {
         self.tx_command(index, |w| w.txca().set_bit());
     }
 
-    /// Returns a TX buffer to the empty state.
     pub(super) fn set_tx_empty(&self, index: u8) {
         self.tx_command(index, |w| w.txce().set_bit());
     }
@@ -862,8 +723,6 @@ impl Ll {
         });
     }
 
-    /// Sets a TX buffer's arbitration priority. Higher wins; ties go to the
-    /// lower buffer index.
     pub(super) fn set_tx_priority(&self, index: u8, priority: u8) {
         self.r().tx_priority().modify(|_, w| unsafe {
             match index {
@@ -891,40 +750,27 @@ impl Ll {
         self.r().rx_mem_info().read().rx_free().bits()
     }
 
-    /// Number of complete frames waiting in the RX buffer.
     pub(super) fn rx_frame_count(&self) -> u16 {
         self.r().rx_status_rx_settings().read().rxfrc().bits()
     }
 
-    /// Returns whether the RX buffer has dropped a frame for lack of space.
-    ///
-    /// This is the sticky overrun flag of TRM 38.3.9.4, cleared by
-    /// [`Ll::clear_overrun`]. Not to be confused with `RXMOF`, which TRM
-    /// 38.3.9.6 defines as "the read pointer is in the middle of a frame" and
-    /// which is about recovering from a failed read, not about overrun.
+    /// Whether the RX buffer has dropped a frame for lack of space (TRM 38.3.9.4).
     pub(super) fn rx_overrun(&self) -> bool {
         self.r().status().read().dor().bit_is_set()
     }
 
-    /// Returns whether an error counter has reached the error warning limit.
-    ///
-    /// This is a threshold flag, not a fault confinement state: a node at the
-    /// warning limit is still error-active (TRM 38.3.10).
+    /// Whether an error counter has reached the error warning limit.
     pub(super) fn error_warning(&self) -> bool {
         self.r().status().read().ewl().bit_is_set()
     }
 
-    /// Selects when a received frame is timestamped.
     pub(super) fn set_timestamp_point(&self, point: TimestampPoint) {
         self.r()
             .rx_status_rx_settings()
             .modify(|_, w| w.rtsop().bit(point == TimestampPoint::StartOfFrame));
     }
 
-    /// Reads one frame out of the RX buffer.
-    ///
-    /// Requires RX auto-increment mode; see [`Ll::enable_rx_auto_increment`].
-    /// The first word carries the count of words that follow.
+    /// Reads one frame out of the RX buffer. Requires RX auto-increment mode.
     pub(super) fn read_rx_frame(&self) -> FrameBuffer {
         let mut frame = FrameBuffer::new();
         let rx_data = self.r().rx_data();
@@ -940,29 +786,24 @@ impl Ll {
 
     // ---------------------------------------------------------------- commands
 
-    /// Discards the RX buffer contents and resets its pointers and frame counter.
     pub(super) fn flush_rx(&self) {
         self.r().command().write(|w| w.rrb().set_bit());
     }
 
-    /// Clears the RX buffer overrun flag.
     pub(super) fn clear_overrun(&self) {
         self.r().command().write(|w| w.cdo().set_bit());
     }
 
     /// Requests error counter reset, which is how a bus-off node rejoins.
     ///
-    /// TRM register 38.3 says this has no effect unless the controller is
-    /// bus-off for a reason other than being disabled. It does not hold:
-    /// measured on an ESP32-C5, a request made while the controller is
-    /// error-active is remembered and reintegrates it the next time it goes
-    /// bus-off, which is the sticky behavior TRM 38.3.4 describes instead.
-    /// Callers must check the state themselves.
+    /// TRM register 38.3 says this has no effect outside bus-off. Measured on an
+    /// ESP32-C5, a request made while error-active is remembered and
+    /// reintegrates the controller the next time it goes bus-off, so callers
+    /// must check the state themselves.
     pub(super) fn request_bus_off_recovery(&self) {
         self.r().command().write(|w| w.ercrst().set_bit());
     }
 
-    /// Resets the RX and TX traffic counters.
     pub(super) fn reset_traffic_counters(&self) {
         self.r()
             .command()
@@ -971,21 +812,17 @@ impl Ll {
 
     // ------------------------------------------------------------------ errors
 
-    /// Receive error counter.
     pub(super) fn rec(&self) -> u16 {
         self.r().rec_tec().read().rec_val().bits()
     }
 
-    /// Transmit error counter.
     pub(super) fn tec(&self) -> u16 {
         self.r().rec_tec().read().tec_val().bits()
     }
 
-    /// Current fault confinement state.
     pub(super) fn error_state(&self) -> ErrorState {
         let r = self.r().ewl_erp_fault_state().read();
-        // Checked most severe first: the hardware can assert more than one of
-        // these while a transition settles.
+        // More than one bit can be set while a transition settles.
         if r.bof().bit_is_set() {
             ErrorState::BusOff
         } else if r.erp().bit_is_set() {
@@ -995,62 +832,44 @@ impl Ll {
         }
     }
 
-    /// Sets the error warning limit.
-    ///
-    /// TRM 38.3.10: the limit fields are only writable in test mode, since
-    /// moving them takes the controller outside ISO 11898-1. The caller is
-    /// responsible for enabling test mode while the controller is disabled;
-    /// `enable_test_mode` does that.
+    /// Sets the error warning limit. Only writable in test mode (TRM 38.3.10).
     pub(super) fn set_error_warning_limit(&self, limit: u8) {
-        debug_assert!(
-            self.r().mode_settings().read().tstm().bit_is_set(),
-            "the error warning limit is only writable in test mode"
-        );
+        debug_assert!(self.r().mode_settings().read().tstm().bit_is_set());
         self.r()
             .ewl_erp_fault_state()
             .modify(|_, w| unsafe { w.ew_limit().bits(limit) });
     }
 
-    /// Enables test mode, which makes the error counters and their limits
-    /// writable (TRM 38.3.10). Only valid while the controller is disabled.
+    /// Enables test mode. Only valid while the controller is disabled.
     pub(super) fn enable_test_mode(&self, enable: bool) {
-        debug_assert!(
-            !self.is_enabled(),
-            "test mode may only change while disabled"
-        );
+        debug_assert!(!self.is_enabled());
         self.r().mode_settings().modify(|_, w| w.tstm().bit(enable));
     }
 
     // -------------------------------------------------------------- interrupts
 
-    /// Enables the interrupt sources set in `mask`.
     pub(super) fn enable_interrupts(&self, mask: u32) {
         self.r().int_ena_set().write(|w| unsafe { w.bits(mask) });
     }
 
-    /// Disables the interrupt sources set in `mask`.
     pub(super) fn disable_interrupts(&self, mask: u32) {
         self.r().int_ena_clr().write(|w| unsafe { w.bits(mask) });
     }
 
-    /// Reads the masked interrupt status.
     pub(super) fn interrupt_status(&self) -> u32 {
         self.r().int_stat().read().bits()
     }
 
-    /// Clears the interrupt sources set in `mask`.
     pub(super) fn clear_interrupts(&self, mask: u32) {
         self.r().int_stat().write(|w| unsafe { w.bits(mask) });
     }
 
     // ------------------------------------------------------------------ counters
 
-    /// Number of frames received since the counter was last reset.
     pub(super) fn rx_traffic_counter(&self) -> u32 {
         self.r().rx_fr_ctr().read().val().bits()
     }
 
-    /// Number of frames transmitted since the counter was last reset.
     pub(super) fn tx_traffic_counter(&self) -> u32 {
         self.r().tx_fr_ctr().read().tx_ctr_val().bits()
     }
@@ -1059,9 +878,8 @@ impl Ll {
 
     /// Sets a mask filter's acceptance code and mask.
     ///
-    /// Both are compared against the identifier word, which holds a base
-    /// identifier in bits 28..18 and an extended identifier in bits 28..0, so a
-    /// standard-identifier filter is shifted up (TRM 38.3.9.9).
+    /// The identifier word holds a base identifier in bits 28..18 and an
+    /// extended one in bits 28..0 (TRM 38.3.9.9).
     pub(super) fn set_mask_filter(&self, filter: MaskFilter, extended: bool, code: u32, mask: u32) {
         let (code, mask) = if extended {
             (code & EXT_ID_MASK, mask & EXT_ID_MASK)
@@ -1102,8 +920,8 @@ impl Ll {
 
     /// Sets the identifier range the range filter accepts.
     ///
-    /// For a standard-identifier range the low 18 bits of the upper bound are
-    /// set so the whole base identifier is covered (TRM 38.3.9.10).
+    /// For a base identifier range the low 18 bits of the upper bound are set,
+    /// so the whole base identifier is covered (TRM 38.3.9.10).
     pub(super) fn set_range_filter(&self, extended: bool, low: u32, high: u32) {
         let (low, high) = if extended {
             (low & EXT_ID_MASK, high & EXT_ID_MASK)
@@ -1122,8 +940,6 @@ impl Ll {
     }
 
     /// Sets which frame kinds each filter accepts.
-    ///
-    /// A filter given [`FrameKinds::NONE`] is disabled.
     pub(super) fn set_filter_kinds(
         &self,
         a: FrameKinds,
@@ -1132,15 +948,13 @@ impl Ll {
         range: FrameKinds,
     ) {
         let bits = a.bits() | (b.bits() << 4) | (c.bits() << 8) | (range.bits() << 12);
-        // The upper half of this register is read-only "filter supported"
-        // status, so writing zeroes there is ignored and the register does not
-        // need to be read back first.
+        // The upper half of the register is read-only status.
         self.r()
             .filter_control_filter_status()
             .write(|w| unsafe { w.bits(bits) });
     }
 
-    /// Which filters this core actually implements, as `(a, b, c, range)`.
+    /// Which filters this core implements, as `(a, b, c, range)`.
     pub(super) fn filters_supported(&self) -> (bool, bool, bool, bool) {
         let r = self.r().filter_control_filter_status().read();
         (
@@ -1153,7 +967,6 @@ impl Ll {
 
     // ----------------------------------------------------------- error capture
 
-    /// Details of the last bus error.
     pub(super) fn error_capture(&self) -> ErrorCapture {
         let r = self.r().err_capt_retr_ctr_alc_ts_info().read();
         ErrorCapture {
@@ -1162,7 +975,6 @@ impl Ll {
         }
     }
 
-    /// Retransmission attempts made for the current frame.
     pub(super) fn retransmit_count(&self) -> u8 {
         self.r()
             .err_capt_retr_ctr_alc_ts_info()
@@ -1179,7 +991,6 @@ impl Ll {
 
     // ------------------------------------------------------- timestamp counter
 
-    /// Width of the timestamp counter in bits.
     pub(super) fn timer_bit_width(&self) -> u8 {
         self.r()
             .err_capt_retr_ctr_alc_ts_info()
@@ -1189,34 +1000,24 @@ impl Ll {
             + 1
     }
 
-    /// Force-enables the timer's register configuration clock.
     pub(super) fn timer_enable_config_clock(&self, enable: bool) {
         self.r()
             .timer_clk_en()
             .modify(|_, w| w.clk_en().bit(enable));
     }
 
-    /// Starts or stops the timestamp counter.
     pub(super) fn timer_enable(&self, enable: bool) {
         self.r().timer_cfg().modify(|_, w| w.timer_ce().bit(enable));
     }
 
-    /// Sets whether the counter counts up.
     pub(super) fn timer_count_up(&self, up: bool) {
         self.r().timer_cfg().modify(|_, w| w.timer_up_dn().bit(up));
     }
 
-    /// Sets the timer prescaler.
+    /// Sets the timer prescaler to `divider` function clock cycles per tick.
     ///
-    /// `divider` is the number of function clock cycles per tick; the register
-    /// holds one less than that.
-    ///
-    /// TRM 38.13 names this field `TIMER_STEP` and describes it as a count step
-    /// of `TIMER_STEP + 1`, which reads like an increment added on every clock
-    /// cycle rather than a divider. It is a divider: measured on an ESP32-C5
-    /// against an 80 MHz function clock, field values 0, 1 and 3 make the
-    /// counter advance at 80, 40 and 20 MHz respectively, and the counter takes
-    /// every intermediate value rather than stepping in multiples.
+    /// TRM 38.13 describes `TIMER_STEP` as a count step; measured on an
+    /// ESP32-C5 it is a divider of `TIMER_STEP + 1`.
     pub(super) fn timer_set_divider(&self, divider: u16) {
         debug_assert!(divider >= 1);
         self.r()
@@ -1224,16 +1025,11 @@ impl Ll {
             .modify(|_, w| unsafe { w.timer_step().bits(divider - 1) });
     }
 
-    /// Clears the timestamp counter.
     pub(super) fn timer_clear(&self) {
         self.r().timer_cfg().modify(|_, w| w.timer_clr().set_bit());
     }
 
-    /// Makes the counter free-running over its whole width.
-    ///
-    /// The pre-load and count-to values (TRM 38.14 to 38.17) bound the counter;
-    /// programming them explicitly keeps the timestamps from depending on
-    /// whatever a previous user of the peripheral left behind.
+    /// Makes the counter free-running over its whole width (TRM 38.14 to 38.17).
     pub(super) fn timer_set_free_running(&self) {
         self.r()
             .timer_ld_val_l()
@@ -1249,10 +1045,8 @@ impl Ll {
             .write(|w| unsafe { w.timer_ct_val_h().bits(u32::MAX) });
     }
 
-    /// Current timestamp counter value.
     pub(super) fn timer_count(&self) -> u64 {
-        // The counter keeps running, so re-read the high word if the low word
-        // wrapped between the two reads.
+        // Re-read the high word if the low word wrapped between the reads.
         loop {
             let high = self.r().timestamp_high().read().bits();
             let low = self.r().timestamp_low().read().bits();
