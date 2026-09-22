@@ -5,7 +5,7 @@
 //! - When the master writes to the slave, the slave prints the received data.
 //! - When the master reads from the slave, the slave responds by sending back a message.
 
-//% CHIP_FILTER: esp32c3 || esp32c6
+//% CHIP_FILTER: i2c_slave_driver_supported
 
 #![no_std]
 #![no_main]
