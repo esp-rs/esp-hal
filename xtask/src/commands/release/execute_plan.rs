@@ -9,7 +9,10 @@ use crate::{
     commands::{
         VersionBump,
         checker::generate_baseline,
-        release::plan::{PackagePlan, Plan, validate_release_closure},
+        release::{
+            plan::{PackagePlan, Plan, validate_release_closure},
+            registry::RegistrySnapshot,
+        },
         update_package,
     },
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
@@ -121,6 +124,9 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         println!("Dry run: would merge PR changelog entries into CHANGELOG.md / MIGRATING-*.md");
     }
 
+    // The bumps are re-derived here, so they are re-checked against the index
+    let registry = RegistrySnapshot::fetch(plan.packages.iter().map(|step| step.package))?;
+
     // Make code changes. Re-read each manifest from disk instead of reusing the
     // preflight copies: earlier steps in this loop may have rewritten this
     // package's dependency versions on disk, and saving a stale in-memory copy
@@ -141,6 +147,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         let new_version = update_package(
             &mut package,
             &step.bump,
+            &registry,
             !args.no_dry_run,
             skip_dependent_rewrites,
         )?;
