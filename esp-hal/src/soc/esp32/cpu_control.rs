@@ -6,11 +6,9 @@
 //! and managing the APP (second) CPU core on the `ESP32` chip. It is used to
 //! start and stop program execution on the APP core.
 
-use core::sync::atomic::Ordering;
-
 use crate::{
     peripherals::{DPORT, LPWR, SPI0},
-    system::{Cpu, multi_core::*},
+    system::Cpu,
 };
 
 pub(crate) unsafe fn internal_park_core(core: Cpu, park: bool) {
@@ -165,56 +163,4 @@ pub(crate) fn start_core1(entry_point: *const u32) {
     dport_control
         .appcpu_ctrl_a()
         .modify(|_, w| w.appcpu_resetting().clear_bit());
-}
-
-pub(crate) fn start_core1_init<F>() -> !
-where
-    F: FnOnce(),
-{
-    // disables interrupts
-    unsafe {
-        xtensa_lx::interrupt::set_mask(0);
-    }
-
-    // reset cycle compare registers
-    xtensa_lx::timer::set_ccompare0(0);
-    xtensa_lx::timer::set_ccompare1(0);
-    xtensa_lx::timer::set_ccompare2(0);
-
-    unsafe extern "C" {
-        static mut _init_start: u32;
-    }
-
-    // set vector table and stack pointer
-    unsafe {
-        xtensa_lx::set_vecbase(&raw const _init_start);
-        xtensa_lx::set_stack_pointer(APP_CORE_STACK_TOP.load(Ordering::Acquire));
-
-        #[cfg(all(feature = "rt", stack_guard_monitoring))]
-        {
-            let stack_guard = APP_CORE_STACK_GUARD.load(Ordering::Acquire);
-            stack_guard.write_volatile(esp_config::esp_config_int!(
-                u32,
-                "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-            ));
-            // setting 0 effectively disables the functionality
-            crate::debugger::set_stack_watchpoint(stack_guard as usize);
-        }
-    }
-
-    // The ROM has already handed off to us; clear the AppCpu boot address so a
-    // subsequent reset doesn't see a stale entry point. Matches IDF's
-    // `call_start_cpu1`.
-    DPORT::regs()
-        .appcpu_ctrl_d()
-        .write(|w| unsafe { w.appcpu_boot_addr().bits(0) });
-
-    // Do not call setup_interrupts as that would disable peripheral interrupts, too.
-    unsafe { crate::interrupt::init_vectoring() };
-
-    // Trampoline to run from the new stack.
-    // start_core1_run should _NEVER_ be inlined
-    // as we rely on the function call to use
-    // the new stack.
-    unsafe { CpuControl::start_core1_run::<F>() }
 }
