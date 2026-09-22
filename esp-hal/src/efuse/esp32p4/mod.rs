@@ -37,8 +37,7 @@ pub fn block_version() -> (u8, u8) {
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L21>
 #[instability::unstable]
 pub fn rtc_calib_version() -> u8 {
-    // ESP-IDF compares `major * 100 + minor` against 1, so any non-zero block version
-    // selects calibration version 1.
+    // Any non-zero block version selects calibration version 1.
     let (major, minor) = block_version();
     if major > 0 || minor > 0 { 1 } else { 0 }
 }

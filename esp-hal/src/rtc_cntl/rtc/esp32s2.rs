@@ -6,17 +6,10 @@ pub(crate) fn init(_config: &ClockConfig) {
     calibrate_ocode();
 }
 
-/// Trims the RTC bandgap to the code measured for this die in the factory.
-///
-/// The SAR ADC's reference derives from that bandgap, so an untrimmed one reads as a gain error
-/// against ESP-IDF.
-///
-/// ESP-IDF only does this coming out of a power-on reset; on any other reset the RTC domain still
-/// holds the trim. Blocks other than version 2 carry no measured code, and are calibrated by a
-/// software sweep that is not implemented here.
-///
-/// See `set_ocode_by_efuse` in
-/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32s2/rtc_init.c>
+// Trims the RTC bandgap using eFuse calibration data.
+//
+// See `set_ocode_by_efuse` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32s2/rtc_init.c>
 fn calibrate_ocode() {
     if crate::system::reset_reason() != Some(SocResetReason::ChipPowerOn)
         || crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MINOR) != 2
@@ -24,8 +17,6 @@ fn calibrate_ocode() {
         return;
     }
 
-    // Unlike the other chips, this one stores the code as an offset from 93 in sign-magnitude form
-    // rather than as the code itself.
     let ocode = crate::efuse::sign_magnitude(crate::efuse::ocode().into(), 6) + 93;
 
     regi2c::I2C_ULP_EXT_CODE.write_reg(ocode as u8);

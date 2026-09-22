@@ -6,7 +6,7 @@ use crate::analog::adc::{AdcCalBasic, AdcCalEfuse, AdcCalScheme, Attenuation, Ca
 /// Gain is stored as a `u32`, but is really a fixed-point number.
 const GAIN_SCALE: u32 = 1 << 16;
 
-/// Line fitting ADC calibration scheme
+/// Line fitting ADC calibration scheme.
 ///
 /// This scheme implements gain correction based on reference points, and
 /// returns readings in mV.
@@ -15,7 +15,7 @@ const GAIN_SCALE: u32 = 1 << 16;
 /// mean raw digital ADC value. Those values are stored in eFuse bit fields for each supported
 /// attenuation, and there is no way to establish them at runtime: the ADC can only be switched to
 /// internal ground, which gives the zero-voltage offset rather than a second point to derive a
-/// gain from. ESP-IDF likewise refuses to build this scheme without the eFuse data.
+/// gain from.
 ///
 /// This scheme also includes basic calibration ([`AdcCalBasic`]).
 ///

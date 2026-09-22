@@ -8,7 +8,7 @@ const COEFF_B_SCALING: i64 = 1024;
 const V_HIGH: [i64; 4] = [600, 800, 1000, 2000];
 const V_LOW: i64 = 250;
 
-/// Line fitting ADC calibration scheme
+/// Line fitting ADC calibration scheme.
 ///
 /// ESP32-S2 uses two-point characterization (eFuse calibration v1) or
 /// one-point characterization (v2). Readings are in mV.

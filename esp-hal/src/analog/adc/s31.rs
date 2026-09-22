@@ -76,10 +76,9 @@ fn enable_refgen() {
     });
 }
 
-/// Powers both SAR units up, matching `sar_ctrl_ll_set_power_mode`.
-///
-/// The power bits are shared - `SOC_ADC_SHARED_POWER` - so both units come up
-/// together no matter which one is being read.
+// Powers both SAR units up.
+//
+// The power bits are shared, so both units come up together.
 fn power_on_sar_units() {
     enable_refgen();
 
@@ -279,8 +278,7 @@ impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configures a given ADC instance using the provided configuration, and
-    /// initializes the ADC for use.
+    /// Creates a new ADC instance with the given configuration.
     ///
     /// The ESP32-S31 SAR ADC has a single attenuation setting, so the
     /// attenuation given per pin has no effect.

@@ -47,11 +47,10 @@
 //! ## Implementation State
 //!
 //!  - [ADC calibration is not implemented for all targets].
-//!  - The ESP32-C3 has an ADC2 in silicon, but it is not exposed: its digital controller is
-//!    erratic, the chip has no RTC controller to read it with instead, and ESP-IDF refuses to use
-//!    it by default for the same reason. GPIO5 is therefore not an ADC pin here.
-//!  - The ESP32-S31 has no calibration scheme. ESP-IDF does not define the calibration eFuses or
-//!    the curve fitting coefficients for this chip yet.
+//!  - The ESP32-C3 has an ADC2 in silicon, but it is not exposed due to hardware errata in its
+//!    digital controller. GPIO5 is therefore not an ADC pin on ESP32-C3.
+//!  - The ESP32-S31 has no calibration scheme: calibration eFuses and curve fitting coefficients
+//!    are not available for this chip.
 //!  - The ESP32-S31 SAR ADC has one attenuation setting, so the attenuation given to
 //!    [`AdcConfig::enable_pin`] has no effect.
 //!  - The ESP32-S31 SAR is differential and its result is the weighted sum of 17 redundant
@@ -209,25 +208,18 @@ impl<ADCX> Default for AdcConfig<ADCX> {
 pub trait CalibrationAccess: RegisterAccess {
     const ADC_VAL_MASK: u16;
 
-    /// Whether the unit can measure a calibration source instead of a pad.
+    /// Returns whether the unit can measure a calibration source instead of a pad.
     ///
-    /// The ESP32-C5 cannot: ESP-IDF leaves `SOC_ADC_SELF_HW_CALI_SUPPORTED` undefined for it
-    /// and does not compile `adc_hal_self_calibration` there at all. Calibration on that chip
-    /// therefore depends entirely on the eFuse data.
+    /// Hardware self-calibration is not supported on ESP32-C5, where calibration depends on eFuse
+    /// data.
     const SUPPORTS_SELF_CALIBRATION: bool = true;
 
     fn enable_vdef(enable: bool);
 
     /// Disconnects the unit from its pad and ties the input to internal ground.
-    ///
-    /// Ground is the only calibration source ESP-IDF uses: `adc_hal_self_calibration` is always
-    /// called with `internal_gnd` set, and `adc_ll_calibration_prepare` drives nothing but
-    /// `ENCAL_GND`. Its `internal_gnd = false` branch measures the external pad rather than an
-    /// internal reference.
     fn connect_gnd(enable: bool);
 
-    /// Points the unit at the calibration source instead of a pad, and programs
-    /// `atten` where the hardware looks for it while no pad is selected.
+    /// Configures the unit for calibration at the specified attenuation.
     ///
     /// See `cal_setup` in
     /// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>.
@@ -251,8 +243,8 @@ const ADC_CAL_OFFSET_RANGE: u16 = 4096;
 ///
 /// `measure` converts once and returns the result, leaving the initial code alone.
 ///
-/// Port of `adc_hal_self_calibration` in
-/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>
+/// See `adc_hal_self_calibration` in
+/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>.
 #[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
 fn search_init_code<ADCX: CalibrationAccess>(mut measure: impl FnMut() -> u16) -> u16 {
     let mut sum = 0;
@@ -283,7 +275,7 @@ fn search_init_code<ADCX: CalibrationAccess>(mut measure: impl FnMut() -> u16) -
     let count = ADC_CAL_TIMES - 2;
     let trimmed = sum - u32::from(lowest) - u32::from(highest);
 
-    // ESP-IDF rounds this mean to nearest rather than truncating it.
+    // Round to nearest.
     ((trimmed + count / 2) / count) as u16
 }
 
@@ -331,15 +323,14 @@ fn channel_attenuation(attenuations: &[Option<Attenuation>], channel: u8) -> Att
     }
 }
 
-/// Returns the hardware calibration code (`Dout0`) for every configured attenuation.
-///
-/// The hardware subtracts this code from the conversion result before truncating it, so it has
-/// to be programmed regardless of the calibration scheme in use - otherwise the usable output
-/// range shrinks by the ADC's zero-voltage offset. ESP-IDF likewise fills a per-attenuation
-/// table once (`adc_calc_hw_calibration_code`) and reprograms it on every conversion.
-///
-/// Determining a code can involve measuring the ADC, and that measurement programs channel 0's
-/// attenuation, so the caller has to apply the configured attenuations afterwards.
+// Returns the hardware calibration code (`Dout0`) for every configured attenuation.
+//
+// The hardware subtracts this code from the conversion result before truncating it, so it has
+// to be programmed regardless of the calibration scheme in use - otherwise the usable output
+// range shrinks by the ADC's zero-voltage offset.
+//
+// Determining a code can involve measuring the ADC, and that measurement programs channel 0's
+// attenuation, so the caller has to apply the configured attenuations afterwards.
 #[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
 fn hw_init_codes<ADCX>(attenuations: &[Option<Attenuation>]) -> [u16; ATTENUATION_COUNT]
 where

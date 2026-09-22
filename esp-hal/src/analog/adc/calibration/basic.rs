@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 
 use crate::analog::adc::{AdcCalEfuse, AdcCalScheme, Attenuation, CalibrationAccess};
 
-/// Basic ADC calibration scheme
+/// Basic ADC calibration scheme.
 ///
 /// The zero-voltage bias (`Dout0`) is applied by the driver for every
 /// conversion, whether or not a calibration scheme is in use, because the

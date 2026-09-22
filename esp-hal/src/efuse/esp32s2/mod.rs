@@ -294,14 +294,10 @@ fn rtc_calib_tag(version: u8, unit: u8, atten: Attenuation, param: RtcCalibParam
     Some(offset + unit * 4 + atten)
 }
 
-/// Reads the RTC bandgap trim measured for this die in the factory.
-///
-/// ESP-IDF's eFuse table carries no entry for this one, so the two halves are read out of the
-/// block directly and joined, the way `efuse_ll_get_ocode` does it.
-///
-/// These bits only hold the trim on a version 2 block. Version 1 spends them on `ADC_CALIB` and
-/// `RTCCALIB_V1IDX_A10H`, whose version 2 replacements start above them at bit 147 - so callers
-/// must check the block version first.
+// Reads the RTC bandgap trim from eFuse block 2.
+//
+// See `efuse_ll_get_ocode` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/hal/esp32s2/include/hal/efuse_ll.h>
 pub(crate) fn ocode() -> u8 {
     const OCODE1: crate::efuse::EfuseField = crate::efuse::EfuseField::new(2, 4, 128, 4);
     const OCODE2: crate::efuse::EfuseField = crate::efuse::EfuseField::new(2, 4, 144, 3);

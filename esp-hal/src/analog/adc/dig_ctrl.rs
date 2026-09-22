@@ -88,18 +88,10 @@ where
     }
 }
 
-/// Converts the connected calibration source once.
-///
-/// Clearing the done flag before the trigger keeps it from coming back up from a conversion that
-/// was still in flight; a stale result would send the search off in the wrong direction.
-///
-/// The trigger goes the other way around than it does for a pad conversion: ESP-IDF puts the low
-/// period up front here, holds it for a fixed five microseconds rather than the delay it computes
-/// there, and leaves the level asserted. It also reads the result without waiting out
-/// [`settle_after_done`] - which would make the ESP32-H2 read zero, so we wait.
-///
-/// See `read_cal_channel` in
-/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>
+// Converts the connected calibration source once.
+//
+// See `read_cal_channel` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>
 fn read_cal_channel<ADCX: RegisterAccess>() -> u16 {
     ADCX::reset();
 
@@ -113,17 +105,10 @@ fn read_cal_channel<ADCX: RegisterAccess>() -> u16 {
     ADCX::read_data() & ADC_VAL_MASK
 }
 
-/// Clocks and powers the SAR ADC up, the way ESP-IDF's oneshot driver does.
-///
-/// The SAR clock is divided down from the digital controller clock, and the calibration data in
-/// eFuse was characterized at the frequency ESP-IDF picks. Programming the dividers explicitly
-/// also keeps the results independent of what the bootloader left behind - it clocks the ADC
-/// too, to seed the RNG.
-///
-/// Writes nothing that depends on previous state, so it is safe to run more than once.
-///
-/// See `adc_oneshot_hal_setup` and `ADC_LL_CLKM_DIV_*_DEFAULT` in
-/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_oneshot_hal.c>
+// Configures clocks and powers up the SAR ADC.
+//
+// See `adc_oneshot_hal_setup` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_oneshot_hal.c>
 fn init_hardware() {
     // controller_clk = source / (DIV_NUM + DIV_A / DIV_B + 1)
     // The ESP32-H2 divides its faster source further, landing at the same 5 MHz as the other chips.
@@ -175,17 +160,12 @@ fn init_hardware() {
         w.start_force().clear_bit();
         w.start().clear_bit();
         w.sar_clk_gated().set_bit();
-        // Run the SAR at the digital controller clock, like ESP-IDF does.
         #[cfg(not(any(esp32c5, esp32c61, esp32h2)))]
         w.sar_clk_div().bits(1);
         w.xpd_sar_force().bits(0b11)
     });
 
-    // The ESP32-C5, ESP32-C61 and ESP32-H2 moved that divider into the PCR; `APB_SARADC_CTRL` keeps
-    // a field of the same name that the hardware no longer uses. Writing only that one leaves the
-    // SAR at the divider of 15 the bootloader's RNG seeding leaves behind - its teardown restores
-    // the controller divider but not this one.
-    //
+    // The ESP32-C5, ESP32-C61, and ESP32-H2 configure the divider in PCR.
     // See `adc_ll_digi_set_clk_div`.
     #[cfg(any(esp32c5, esp32c61, esp32h2))]
     crate::peripherals::PCR::regs()
@@ -193,21 +173,10 @@ fn init_hardware() {
         .modify(|_, w| unsafe { w.sar1_clk_div_num().bits(1) });
 }
 
-/// Triggers a single conversion.
-///
-/// The controller converts on the step of `onetime_start`, so one rising edge per conversion is
-/// all it needs. The level stays asserted until `reset` clears it after the read - the way
-/// ESP-IDF's calibration read does it. Pulsing the bit like ESP-IDF's pad-conversion path does
-/// risks the digital controller missing the step: it needs three of its own clock cycles to
-/// capture the level, and at the 5 MHz `init_hardware` configures, a pulse only two register
-/// writes wide is never seen on the ESP32-H2.
-///
-/// Matching ESP-IDF's pulse exactly - assert, wait 3 us, de-assert, wait 3 us - was measured on
-/// the ESP32-C3 to roughly double the gain error against ESP-IDF rather than remove it, so the
-/// remaining difference is not the trigger shape.
-///
-/// See `adc_hal_onetime_start` and `read_cal_channel` in
-/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_oneshot_hal.c>
+// Triggers a single conversion.
+//
+// See `adc_hal_onetime_start` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_oneshot_hal.c>
 fn start_onetime_sample<ADCX: RegisterAccess>() {
     ADCX::set_onetime_start(true);
 }
@@ -254,13 +223,7 @@ pub trait RegisterAccess {
 impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
-            // The channel, the attenuation and the trigger are one set of fields that the arm
-            // bits steer at one SAR or the other, so an ADC2 left armed by the bootloader - it
-            // samples the ADC to seed the RNG - would convert alongside this one and load the
-            // bias both SARs share. That only applies to the ESP32-C3, the one chip here whose
-            // ADC2 exists in silicon, and no driver arms it because it is not exposed - but
-            // disarm it anyway, the way ESP-IDF does before every conversion.
-            //
+            // Disarm ADC2 before configuring ADC1.
             // See `adc_oneshot_ll_disable_all_unit`.
             w.saradc2_onetime_sample().clear_bit();
             w.saradc1_onetime_sample().set_bit();
@@ -294,9 +257,7 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .int_clr()
             .write(|w| w.adc1_done().clear_bit_by_one());
 
-        // Disarm both units along with the trigger. Leaving a unit armed keeps its SAR selected
-        // for one-time sampling between conversions; ESP-IDF disarms after every result it reads.
-        //
+        // Disarm both units along with the trigger.
         // See `adc_oneshot_ll_disable_all_unit`.
         APB_SARADC::regs().onetime_sample().modify(|_, w| {
             w.onetime_start().clear_bit();
@@ -354,8 +315,7 @@ impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configures a given ADC instance using the provided configuration, and
-    /// initializes the ADC for use.
+    /// Creates a new ADC instance with the given configuration.
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self
     where
         ADCX: super::AdcCalEfuse + super::CalibrationAccess,
@@ -404,6 +364,10 @@ where
     /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel was not configured in [`AdcConfig`].
     pub fn read_oneshot<PIN, CS>(
         &mut self,
         pin: &mut super::AdcPin<PIN, ADCX, CS>,
@@ -510,6 +474,10 @@ where
     /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel was not configured in [`AdcConfig`].
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
     where
         ADCX: Instance,

@@ -111,10 +111,7 @@ pub trait RegisterAccess {
     /// Powers the SAR up.
     fn power_up();
 
-    /// Runs the SAR at the clock divider ESP-IDF's one-shot reads use.
-    ///
-    /// The reset default halves the clock, which is what ESP-IDF picks only for its low-power work
-    /// mode.
+    /// Configures the SAR clock divider.
     ///
     /// See `adc_ll_set_sar_clk_div` and `ADC_LL_SAR_CLK_DIV_DEFAULT`.
     fn set_sar_clk_div();
@@ -418,9 +415,8 @@ where
         let channel = pin.pin.adc_channel();
         let attenuation = super::channel_attenuation(&self.attenuations, channel);
 
-        // Reprogrammed for every conversion, like `adc_set_hw_calibration_code`: the
-        // regi2c block is shared with the PHY, so the code cannot be assumed to survive
-        // between reads.
+        // Reprogrammed for every conversion: the regi2c block is shared with the PHY,
+        // so the code cannot be assumed to survive between reads.
         ADCX::calibration_init();
         ADCX::set_init_code(self.init_codes[attenuation as usize]);
 
@@ -435,8 +431,7 @@ impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configures a given ADC instance using the provided configuration, and
-    /// initializes the ADC for use.
+    /// Creates a new ADC instance with the given configuration.
     pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self
     where
         ADCX: super::AdcCalEfuse + super::CalibrationAccess,
@@ -471,6 +466,10 @@ where
 
     /// Starts and waits for a conversion on the specified pin and returns the
     /// result.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel was not configured in [`AdcConfig`].
     pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
     where
         PIN: AdcChannel,
@@ -494,6 +493,10 @@ where
     /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel was not configured in [`AdcConfig`].
     pub fn read_oneshot<PIN, CS>(
         &mut self,
         pin: &mut super::AdcPin<PIN, ADCX, CS>,
@@ -592,6 +595,10 @@ where
     /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel was not configured in [`AdcConfig`].
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
     where
         ADCX: Instance,

@@ -15,23 +15,23 @@ const COEFF_MUL: i64 = 1 << 52;
 /// the type, this is a fixed-point number with 52 fractional bits.
 type CurveCoeff = i64;
 
-/// Polynomial coefficients for specified attenuation.
+/// Polynomial coefficients for a specified attenuation.
 pub struct CurveCoeffs {
-    /// Attenuation
+    /// Attenuation.
     atten: Attenuation,
-    /// Polynomial coefficients
+    /// Polynomial coefficients.
     coeff: &'static [CurveCoeff],
 }
 
 type CurvesCoeffs = &'static [CurveCoeffs];
 
-/// Marker trait for ADC which support curve fitting
+/// Marker trait for ADCs that support curve fitting.
 ///
 /// See also [`AdcCalCurve`].
 pub trait AdcHasCurveCal {
     /// Coefficients for calculating the reading voltage error.
     ///
-    /// A sets of coefficients for each attenuation.
+    /// A set of coefficients for each attenuation.
     const CURVES_COEFFS: CurvesCoeffs;
 
     /// Coefficients for the eFuse calibration version on this chip.
@@ -40,7 +40,7 @@ pub trait AdcHasCurveCal {
     }
 }
 
-/// Curve fitting ADC calibration scheme
+/// Curve fitting ADC calibration scheme.
 ///
 /// This scheme implements polynomial error correction using predefined
 /// coefficient sets for each attenuation. It returns readings in mV.
@@ -94,11 +94,8 @@ where
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.line.adc_val(val);
 
-        // ESP-IDF truncates each polynomial term toward zero before summing them:
-        // `get_reading_error` divides the absolute-valued terms, then applies the
-        // signs. Truncating the summed polynomial once instead - e.g. with Horner's
-        // method - loses the terms' fractional parts together rather than
-        // separately, which shifts the result by up to 1 mV per term.
+        // Truncate each polynomial term before summing to match integer division
+        // in the curve-fitting reference model.
         //
         // The products need i128: the highest-order term (ESP32-S3, x^4) times its
         // coefficient does not fit an i64.
