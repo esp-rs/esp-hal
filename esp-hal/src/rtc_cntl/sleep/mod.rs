@@ -260,6 +260,8 @@ impl<'d> LowPower<'d> {
             return false;
         }
 
+        // The PMU chips write the configuration when the sleep starts.
+        #[cfg(not(soc_has_pmu))]
         config.apply();
 
         // A sleep with no wakeup source never ends. No counter overflow ends it either.
