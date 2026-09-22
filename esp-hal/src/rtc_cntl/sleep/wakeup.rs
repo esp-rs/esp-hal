@@ -9,9 +9,13 @@
 //! A driver can also register hooks in the call that sets its mask bit. Use them to do work at
 //! sleep entry, or to restore state after a light sleep.
 
+use enumset::EnumSet;
 use esp_sync::NonReentrantMutex;
 
-use crate::rtc_cntl::{WakeupSource, sleep::RtcSleepConfig};
+use crate::{
+    rtc_cntl::{WakeupSource, sleep::RtcSleepConfig},
+    soc::clocks::ClockSource,
+};
 
 /// Which sleep the chip is entering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,14 +26,13 @@ pub(crate) enum SleepKind {
     Deep,
 }
 
-/// A resource that a wakeup source needs powered while the chip sleeps.
+/// A power domain that a wakeup source needs powered while the chip sleeps.
 ///
-/// The names are the same for all chips. A request for a resource that the target chip does not
+/// The names are the same for all chips. A request for a domain that the target chip does not
 /// have, or that it cannot power down, does nothing.
+///
+/// A clock is not a domain. Ask for one with [`WrappedSleepConfig::keep_clock_running`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// The requested resources are different on each chip, and no wakeup source requests an oscillator
-// yet.
-#[allow(dead_code, reason = "the names are the same for all chips")]
 pub(crate) enum SleepResource {
     /// The low-power peripherals, including the RTC IO pads.
     LpPeripherals,
@@ -37,14 +40,6 @@ pub(crate) enum SleepResource {
     LpMemory,
     /// The high-performance peripherals, including the digital GPIO pads.
     HpPeripherals,
-    /// The main crystal oscillator.
-    Xtal,
-    /// The fast RC oscillator.
-    RcFast,
-    /// The 32 kHz crystal oscillator.
-    Xtal32k,
-    /// The 32 kHz RC oscillator.
-    Rc32k,
 }
 
 /// The sleep configuration, as the entry hook of a wakeup source can see it.
@@ -57,11 +52,15 @@ pub(crate) enum SleepResource {
 /// Keep this property. A method that sets a power-down bit removes it.
 pub(crate) struct WrappedSleepConfig<'a> {
     config: &'a mut RtcSleepConfig,
+    clocks: EnumSet<ClockSource>,
 }
 
 impl<'a> WrappedSleepConfig<'a> {
     pub(crate) fn new(config: &'a mut RtcSleepConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            clocks: EnumSet::empty(),
+        }
     }
 
     /// Returns whether the chip is entering deep sleep, which resets it when it wakes.
@@ -101,31 +100,58 @@ impl<'a> WrappedSleepConfig<'a> {
                     _ => _config.set_dig_peri_pd_en(false),
                 }
             }
-            SleepResource::Xtal => {
-                cfg_select! {
-                    soc_has_pmu => _config.pd_flags.set_pd_xtal(false),
-                    // This flag has the opposite sense. It forces the crystal on.
-                    _ => _config.set_xtal_fpu(true),
+        }
+    }
+
+    /// Keeps `source` running during the sleep.
+    ///
+    /// Ask a clock tree node which source it runs on, and name the answer. A source that the chip
+    /// keeps running anyway, or that it cannot power down, needs nothing.
+    pub(crate) fn keep_clock_running(&mut self, source: ClockSource) {
+        self.clocks.insert(source);
+    }
+
+    /// Prevents the power-down of every clock source a hook asked for.
+    ///
+    /// The set is what makes the requests of the hooks independent of their order.
+    fn apply_clock_requests(&mut self) {
+        // One function for all chips, like `keep_alive`.
+        let _config = &mut self.config;
+        for source in self.clocks {
+            match source {
+                ClockSource::XtalClk => {
+                    cfg_select! {
+                        soc_has_pmu => _config.pd_flags.set_pd_xtal(false),
+                        // This flag has the opposite sense. It forces the crystal on.
+                        _ => _config.set_xtal_fpu(true),
+                    }
                 }
-            }
-            SleepResource::RcFast => {
-                cfg_select! {
-                    soc_has_pmu => _config.pd_flags.set_pd_rc_fast(false),
-                    _ => _config.set_int_8m_pd_en(false),
+                ClockSource::RcFastClk => {
+                    cfg_select! {
+                        soc_has_pmu => _config.pd_flags.set_pd_rc_fast(false),
+                        _ => _config.set_int_8m_pd_en(false),
+                    }
                 }
-            }
-            SleepResource::Xtal32k => {
-                cfg_select! {
-                    soc_has_pmu => _config.pd_flags.set_pd_xtal32k(false),
-                    _ => {}
+                #[cfg(use_xtal32k)]
+                ClockSource::Xtal32kClk => {
+                    cfg_select! {
+                        soc_has_pmu => _config.pd_flags.set_pd_xtal32k(false),
+                        _ => {}
+                    }
                 }
-            }
-            SleepResource::Rc32k => {
-                cfg_select! {
-                    esp32h2 => {}
-                    soc_has_pmu => _config.pd_flags.set_pd_rc32k(false),
-                    _ => {}
+                #[cfg(soc_has_clock_node_rc32k_clk)]
+                ClockSource::Rc32kClk => {
+                    cfg_select! {
+                        // esp32h2 has no separate flag for the 32 kHz RC oscillator.
+                        esp32h2 => {}
+                        _ => _config.pd_flags.set_pd_rc32k(false),
+                    }
                 }
+                // The slow RC oscillator runs in the always-on domain, and the external 32 kHz
+                // oscillator arrives on a pad, so neither has a power-down to prevent.
+                #[cfg(soc_has_clock_node_osc_slow_clk)]
+                ClockSource::OscSlowClk => {}
+                ClockSource::RcSlowClk => {}
             }
         }
     }
@@ -246,6 +272,8 @@ pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) {
             hook(&mut wrapped);
         }
     }
+
+    wrapped.apply_clock_requests();
 }
 
 /// Runs the post-wake hook of every enabled source. Only a light sleep calls this.
