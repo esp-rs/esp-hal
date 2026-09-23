@@ -152,10 +152,9 @@ mod impls {
         }
     }
 
-    #[cfg(any(esp32c3, esp32p4, esp32s3))]
+    #[cfg(adc_adc2)]
     impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
         const CURVES_COEFFS: CurvesCoeffs = cfg_select! {
-            esp32c3 => CURVES_COEFFS1,
             esp32p4 => CURVES_COEFFS2,
             esp32s3 => CURVES_COEFFS2,
         };
