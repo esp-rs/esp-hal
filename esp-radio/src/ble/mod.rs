@@ -23,6 +23,15 @@ pub use porting::chip_specific::*;
 
 pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
+/// Returns whether the caller runs in an interrupt handler.
+///
+/// The controller calls some of the OS glue from its interrupt handlers. Those calls must not
+/// block, so they use the try-variant of the operation.
+#[cfg(any(bt_controller = "npl", bt_controller = "btdm2"))]
+pub(crate) fn in_isr() -> bool {
+    !crate::hal::interrupt::RunLevel::current().is_thread()
+}
+
 unstable_module! {
     pub mod controller;
 }

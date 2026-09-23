@@ -3,7 +3,7 @@ use core::{mem::transmute, ptr::NonNull};
 
 use esp_phy::PhyInitGuard;
 
-use super::{Config, ReceivedPacket};
+use super::{Config, ReceivedPacket, in_isr};
 use crate::{
     compat::{self, OSI_FUNCS_TIME_BLOCKING, common::str_from_c, queue},
     hal::time::Instant,
@@ -522,6 +522,8 @@ pub(crate) struct npl_funcs_t {
     p_ble_npl_hw_exit_critical: Option<unsafe extern "C" fn(mask: u32)>,
     p_ble_npl_get_time_forever: Option<unsafe extern "C" fn() -> u32>,
     p_ble_npl_hw_is_in_critical: Option<unsafe extern "C" fn() -> u8>,
+    p_ble_npl_eventq_put_to_front:
+        Option<unsafe extern "C" fn(queue: *mut ble_npl_eventq, event: *const ble_npl_event)>,
 }
 
 static G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
@@ -569,6 +571,7 @@ static G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
     p_ble_npl_hw_exit_critical: Some(ble_npl_hw_exit_critical),
     p_ble_npl_get_time_forever: Some(ble_npl_get_time_forever),
     p_ble_npl_hw_is_in_critical: Some(ble_npl_hw_is_in_critical),
+    p_ble_npl_eventq_put_to_front: Some(ble_npl_eventq_put_to_front),
 };
 
 #[repr(C)]
@@ -936,6 +939,19 @@ unsafe extern "C" fn ble_npl_eventq_remove(
 unsafe extern "C" fn ble_npl_eventq_put(queue: *mut ble_npl_eventq, event: *const ble_npl_event) {
     trace!("ble_npl_eventq_put {:?} {:?}", queue, event);
 
+    unsafe { eventq_insert(queue, event, false) }
+}
+
+unsafe extern "C" fn ble_npl_eventq_put_to_front(
+    queue: *mut ble_npl_eventq,
+    event: *const ble_npl_event,
+) {
+    trace!("ble_npl_eventq_put_to_front {:?} {:?}", queue, event);
+
+    unsafe { eventq_insert(queue, event, true) }
+}
+
+unsafe fn eventq_insert(queue: *mut ble_npl_eventq, event: *const ble_npl_event, front: bool) {
     let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
@@ -949,13 +965,29 @@ unsafe extern "C" fn ble_npl_eventq_put(queue: *mut ble_npl_eventq, event: *cons
     }
 
     let wrapper = unwrap!(unsafe { queue.as_mut() }, "queue wrapper is null");
-
+    let handle = wrapper.dummy as _;
     // Store the pointer to the ble_npl_event in the queue - this is what we'll need to dequeue.
-    queue::queue_send_to_back(
-        wrapper.dummy as _,
-        (&raw const event).cast(),
-        OSI_FUNCS_TIME_BLOCKING,
-    );
+    let item = (&raw const event).cast();
+
+    let sent = if in_isr() {
+        if front {
+            queue::queue_try_send_to_front_from_isr(handle, item, core::ptr::null_mut())
+        } else {
+            queue::queue_try_send_to_back_from_isr(handle, item, core::ptr::null_mut())
+        }
+    } else if front {
+        queue::queue_send_to_front(handle, item, OSI_FUNCS_TIME_BLOCKING)
+    } else {
+        queue::queue_send_to_back(handle, item, OSI_FUNCS_TIME_BLOCKING)
+    };
+
+    if sent == 0 {
+        // The queue is full. Mark the event unqueued so that the controller can post it again.
+        trace!("Event queue is full, event dropped");
+        unsafe {
+            (*evt).queued = false;
+        }
+    }
 }
 
 unsafe extern "C" fn ble_npl_eventq_get(
@@ -966,13 +998,18 @@ unsafe extern "C" fn ble_npl_eventq_get(
 
     let mut evt = core::ptr::null_mut::<ble_npl_event>();
     let wrapper = unwrap!(unsafe { queue.as_mut() }, "queue wrapper is null");
+    let item = (&raw mut evt).cast();
 
-    if queue::queue_receive(
-        wrapper.dummy as _,
-        (&raw mut evt).cast(),
-        blob_ticks_to_micros(timeout),
-    ) == 1
-    {
+    let received = if in_isr() {
+        if timeout != 0 {
+            return core::ptr::null();
+        }
+        queue::queue_try_receive_from_isr(wrapper.dummy as _, item, core::ptr::null_mut())
+    } else {
+        queue::queue_receive(wrapper.dummy as _, item, blob_ticks_to_micros(timeout))
+    };
+
+    if received != 0 {
         trace!("got {:x}", evt as usize);
         unsafe {
             let evt = (*evt).dummy as *mut Event;
