@@ -15,7 +15,6 @@ use core::{
 };
 
 use esp_phy::PhyInitGuard;
-use portable_atomic::AtomicBool;
 
 use super::{Config, ReceivedPacket};
 use crate::{
@@ -54,9 +53,6 @@ const ACL_DATA_MBUF_LEADINGSPACE: usize = 4;
 
 static CONTROLLER_STATUS: AtomicU32 =
     AtomicU32::new(esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_IDLE);
-/// IDF `s_bt_active`. While set, `e_btdm_lp_modem_clock_set(false)` is a
-/// no-op so the blob cannot gate MAC/BB clocks between HCI commands.
-static BT_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// Out-parameter of `r_ble_ll_get_npl_element_info`: how many OSAL elements of
 /// each kind the controller needs. IDF pre-allocates a pool per kind; we
@@ -334,7 +330,6 @@ fn ble_stack_disable() {
 }
 
 fn bt_controller_deinit() {
-    BT_ACTIVE.store(false, Ordering::Relaxed);
     set_controller_status(esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_IDLE);
     unsafe {
         // `r_ble_controller_init` registers the two coex callbacks, but
@@ -440,18 +435,12 @@ fn esp_bt_controller_enable(_mode: esp_bt_mode_t) -> esp_err_t {
         return ESP_ERR_INVALID_STATE as _;
     }
 
-    // IDF `btdm_lp_reset(true)` sets `s_bt_active`, then `esp_phy_enable`
-    // + `esp_btbb_enable`, before `r_btdm_task_enable`. PHY is already
-    // held by `ble_init`; re-init BB here so TX (advertising) is armed.
-    BT_ACTIVE.store(true, Ordering::Relaxed);
-
     unsafe {
         bt_bb_v2_init_cmplx(1);
 
         let res = ble_stack_enable();
         if res != 0 {
             warn!("ble_stack_enable failed {}", res);
-            BT_ACTIVE.store(false, Ordering::Relaxed);
             let _ = esp_bt_controller_disable();
             return ESP_FAIL as _;
         }
@@ -459,7 +448,6 @@ fn esp_bt_controller_enable(_mode: esp_bt_mode_t) -> esp_err_t {
         let res = r_btdm_hci_fc_enable();
         if res != 0 {
             warn!("r_btdm_hci_fc_enable failed {}", res);
-            BT_ACTIVE.store(false, Ordering::Relaxed);
             let _ = esp_bt_controller_disable();
             return ESP_FAIL as _;
         }
@@ -467,7 +455,6 @@ fn esp_bt_controller_enable(_mode: esp_bt_mode_t) -> esp_err_t {
         let res = r_btdm_task_enable();
         if res != 0 {
             warn!("r_btdm_task_enable failed {}", res);
-            BT_ACTIVE.store(false, Ordering::Relaxed);
             let _ = esp_bt_controller_disable();
             return ESP_FAIL as _;
         }
@@ -488,7 +475,6 @@ fn esp_bt_controller_disable() -> esp_err_t {
         r_btdm_hci_fc_disable();
         ble_stack_disable();
     }
-    BT_ACTIVE.store(false, Ordering::Relaxed);
     set_controller_status(esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_INITED);
     0
 }
