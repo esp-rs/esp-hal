@@ -41,6 +41,17 @@ pub(crate) fn enable_branch_predictor() {
     }
 }
 
+#[cfg(feature = "unstable")]
+pub(crate) fn disable_branch_predictor() {
+    // Clears the bits set by `enable_branch_predictor`.
+    const MHCR_RS: u32 = 1 << 4;
+    const MHCR_BFE: u32 = 1 << 5;
+    const MHCR_BTB: u32 = 1 << 12;
+    unsafe {
+        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+    }
+}
+
 const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;
 const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;

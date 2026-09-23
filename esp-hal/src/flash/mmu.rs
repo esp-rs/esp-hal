@@ -144,14 +144,12 @@ pub(super) fn read_flash_encrypted(offset: u32, data: &mut [u32]) -> Result<(), 
 /// every cache that can hold the line is included.
 #[cfg(not(any(esp32, esp32p4, esp32s31)))]
 fn invalidate_cache(vaddr: u32, size: u32) {
-    unsafe extern "C" {
-        fn Cache_Invalidate_Addr(addr: u32, size: u32);
-    }
-    unsafe {
-        Cache_Invalidate_Addr(vaddr, size);
-    }
+    unsafe { crate::soc::cache_invalidate_addr(vaddr, size) }
 }
 
+// Not `soc::cache_invalidate_addr`: it only covers the L1 D-cache (plus L2 on
+// the P4) for DMA buffers, while flash is also cached by the L1 I-caches. On
+// the P4, adding `soc::cache_invalidate_icache_addr` would invalidate L2 twice.
 #[cfg(any(esp32p4, esp32s31))]
 fn invalidate_cache(vaddr: u32, size: u32) {
     const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;

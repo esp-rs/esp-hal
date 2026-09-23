@@ -49,8 +49,9 @@ impl CacheGuard {
     /// external-memory caches.
     #[ram]
     pub(super) fn suspend() -> Self {
+        // Runs while the cache is still on, so it may live in flash.
         #[cfg(soc_cpu_has_branch_predictor)]
-        disable_branch_predictor();
+        crate::soc::disable_branch_predictor();
 
         let inner = suspend_caches();
         Self { inner }
@@ -76,31 +77,9 @@ impl Drop for CacheGuard {
     fn drop(&mut self) {
         resume_caches(&self.inner);
 
+        // Runs once the cache is back on, so it may live in flash.
         #[cfg(soc_cpu_has_branch_predictor)]
-        enable_branch_predictor();
-    }
-}
-
-#[cfg(soc_cpu_has_branch_predictor)]
-#[inline(always)]
-fn disable_branch_predictor() {
-    // MHCR (0x7c1): RS, BFE, BTB. Same bits as `soc::enable_branch_predictor`.
-    const MHCR_RS: u32 = 1 << 4;
-    const MHCR_BFE: u32 = 1 << 5;
-    const MHCR_BTB: u32 = 1 << 12;
-    unsafe {
-        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
-    }
-}
-
-#[cfg(soc_cpu_has_branch_predictor)]
-#[inline(always)]
-fn enable_branch_predictor() {
-    const MHCR_RS: u32 = 1 << 4;
-    const MHCR_BFE: u32 = 1 << 5;
-    const MHCR_BTB: u32 = 1 << 12;
-    unsafe {
-        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+        crate::soc::enable_branch_predictor();
     }
 }
 
