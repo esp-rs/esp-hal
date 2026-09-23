@@ -14,15 +14,10 @@ use crate::{
 // See `esp_ocode_calib_init` in
 // <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32c61/ocode_init.c>
 fn calibrate_ocode() {
-    let unversioned = crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MAJOR) == 0
-        && crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MINOR) == 0;
-
-    if crate::system::reset_reason() != Some(SocResetReason::ChipPowerOn) || unversioned {
-        return;
-    }
-
-    regi2c::I2C_ULP_EXT_CODE.write_reg(crate::efuse::read_field_le::<u8>(crate::efuse::OCODE));
-    regi2c::I2C_ULP_IR_FORCE_CODE.write_field(1);
+    super::calibrate_ocode(|| {
+        (crate::efuse::block_version() != (0, 0))
+            .then(|| crate::efuse::read_field_le::<u8>(crate::efuse::OCODE))
+    });
 }
 
 fn pmu_power_domain_force_default() {

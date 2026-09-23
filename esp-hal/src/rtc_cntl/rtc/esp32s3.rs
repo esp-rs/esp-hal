@@ -1,6 +1,6 @@
 use strum::FromRepr;
 
-use crate::soc::{clocks::ClockConfig, regi2c};
+use crate::soc::clocks::ClockConfig;
 
 pub(crate) fn init(_config: &ClockConfig) {
     calibrate_ocode();
@@ -11,14 +11,10 @@ pub(crate) fn init(_config: &ClockConfig) {
 // See `set_ocode_by_efuse` in
 // <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32s3/rtc_init.c>
 fn calibrate_ocode() {
-    if crate::system::reset_reason() != Some(SocResetReason::ChipPowerOn)
-        || crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MAJOR) != 1
-    {
-        return;
-    }
-
-    regi2c::I2C_ULP_EXT_CODE.write_reg(crate::efuse::read_field_le::<u8>(crate::efuse::OCODE));
-    regi2c::I2C_ULP_IR_FORCE_CODE.write_field(1);
+    super::calibrate_ocode(|| {
+        (crate::efuse::block_version().0 == 1)
+            .then(|| crate::efuse::read_field_le::<u8>(crate::efuse::OCODE))
+    });
 }
 
 // Terminology:

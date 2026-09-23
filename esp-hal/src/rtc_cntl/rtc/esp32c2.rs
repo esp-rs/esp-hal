@@ -41,20 +41,14 @@ pub(crate) fn init(_config: &ClockConfig) {
 // See `set_ocode_by_efuse` in
 // <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32c2/rtc_init.c>
 fn calibrate_ocode() {
-    let unversioned = crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MAJOR) == 0
-        && crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MINOR) == 0;
-
-    if crate::system::reset_reason() != Some(SocResetReason::ChipPowerOn) || unversioned {
-        return;
-    }
-
-    let ocode = crate::efuse::sign_magnitude(
-        crate::efuse::read_field_le::<u8>(crate::efuse::OCODE).into(),
-        6,
-    ) + 100;
-
-    regi2c::I2C_ULP_EXT_CODE.write_reg(ocode as u8);
-    regi2c::I2C_ULP_IR_FORCE_CODE.write_field(1);
+    super::calibrate_ocode(|| {
+        (crate::efuse::block_version() != (0, 0)).then(|| {
+            (crate::efuse::sign_magnitude(
+                crate::efuse::read_field_le::<u8>(crate::efuse::OCODE).into(),
+                6,
+            ) + 100) as u8
+        })
+    });
 }
 
 fn set_rtc_dig_dbias() {}
