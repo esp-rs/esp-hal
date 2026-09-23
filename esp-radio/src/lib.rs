@@ -238,6 +238,8 @@ mod asynch;
 mod compat;
 #[cfg(esp32s31)]
 mod compiler_rt_abi;
+#[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm2")))]
+mod drop_guard;
 mod interrupt_dispatch;
 mod radio_clocks;
 mod refcount;

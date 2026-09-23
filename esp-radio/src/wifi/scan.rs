@@ -6,6 +6,7 @@ use esp_hal::time::Duration;
 use procmacros::BuilderLite;
 
 use crate::{
+    drop_guard::DropGuard,
     sys::include,
     wifi::{
         Ssid,
@@ -125,7 +126,7 @@ impl<'d> ScanResults<'d> {
         // returns an error.
         let mut this = Self {
             remaining: 0,
-            _drop_guard: FreeApListOnDrop,
+            _drop_guard: free_ap_list_on_drop(),
             _marker: PhantomData,
         };
 
@@ -162,21 +163,10 @@ impl Iterator for ScanResults<'_> {
 }
 
 /// AP list on-drop guard.
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub(super) struct FreeApListOnDrop;
+pub(super) type FreeApListOnDrop = DropGuard<(), fn(())>;
 
-impl FreeApListOnDrop {
-    /// Do not automatically free the AP list when the guard is dropped.
-    pub fn defuse(self) {
-        core::mem::forget(self);
-    }
-}
-
-impl Drop for FreeApListOnDrop {
-    fn drop(&mut self) {
-        unsafe {
-            include::esp_wifi_clear_ap_list();
-        }
-    }
+pub(super) fn free_ap_list_on_drop() -> FreeApListOnDrop {
+    DropGuard::new((), |_| unsafe {
+        include::esp_wifi_clear_ap_list();
+    })
 }

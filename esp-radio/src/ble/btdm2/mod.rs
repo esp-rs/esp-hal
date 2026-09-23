@@ -36,6 +36,7 @@ use crate::{
         },
         semaphore,
     },
+    drop_guard::DropGuard,
     hal::{ram, system::Cpu},
     sys::{
         c_types::{c_char, c_void},
@@ -435,30 +436,30 @@ fn esp_bt_controller_enable(_mode: esp_bt_mode_t) -> esp_err_t {
         return ESP_ERR_INVALID_STATE as _;
     }
 
-    unsafe {
-        bt_bb_v2_init_cmplx(1);
+    unsafe { bt_bb_v2_init_cmplx(1) };
 
-        let res = ble_stack_enable();
-        if res != 0 {
-            warn!("ble_stack_enable failed {}", res);
-            let _ = esp_bt_controller_disable();
-            return ESP_FAIL as _;
-        }
-
-        let res = r_btdm_hci_fc_enable();
-        if res != 0 {
-            warn!("r_btdm_hci_fc_enable failed {}", res);
-            let _ = esp_bt_controller_disable();
-            return ESP_FAIL as _;
-        }
-
-        let res = r_btdm_task_enable();
-        if res != 0 {
-            warn!("r_btdm_task_enable failed {}", res);
-            let _ = esp_bt_controller_disable();
-            return ESP_FAIL as _;
-        }
+    let res = ble_stack_enable();
+    if res != 0 {
+        warn!("ble_stack_enable failed {}", res);
+        return ESP_FAIL as _;
     }
+    let ble_stack = DropGuard::new((), |_| ble_stack_disable());
+
+    let res = unsafe { r_btdm_hci_fc_enable() };
+    if res != 0 {
+        warn!("r_btdm_hci_fc_enable failed {}", res);
+        return ESP_FAIL as _;
+    }
+    let hci_fc = DropGuard::new((), |_| unsafe { r_btdm_hci_fc_disable() });
+
+    let res = unsafe { r_btdm_task_enable() };
+    if res != 0 {
+        warn!("r_btdm_task_enable failed {}", res);
+        return ESP_FAIL as _;
+    }
+
+    hci_fc.defuse();
+    ble_stack.defuse();
 
     set_controller_status(esp_bt_controller_status_t_ESP_BT_CONTROLLER_STATUS_ENABLED);
     0

@@ -77,7 +77,7 @@ use self::sta::eap::EapStationConfig;
 use self::{
     ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
-    scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
+    scan::{ScanConfig, ScanResults, ScanTypeConfig, free_ap_list_on_drop},
     sta::StationConfig,
     state::*,
 };
@@ -3292,7 +3292,7 @@ ignored."
         esp_wifi_result!(wifi_start_scan(false, *config))?;
 
         // Prevents memory leak if `scan_async`'s future is dropped.
-        let guard = FreeApListOnDrop;
+        let guard = free_ap_list_on_drop();
 
         loop {
             let event = subscriber.next_message_pure().await;
