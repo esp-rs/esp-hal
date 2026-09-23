@@ -1,14 +1,10 @@
 use alloc::vec::Vec;
-use core::{
-    mem::transmute,
-    ptr::{NonNull, addr_of_mut},
-};
+use core::{mem::transmute, ptr::NonNull};
 
 use esp_phy::PhyInitGuard;
 
 use super::{Config, ReceivedPacket};
 use crate::{
-    ble::{HCI_OUT_COLLECTOR, HciOutCollector},
     compat::{self, OSI_FUNCS_TIME_BLOCKING, common::str_from_c, queue},
     hal::time::Instant,
     sys::{c_types::*, include::*},
@@ -1084,8 +1080,6 @@ pub(crate) struct BleNplCountInfoT {
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let phy_init_guard;
     unsafe {
-        (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
-
         // turn on logging
         #[allow(static_mut_refs)]
         #[cfg(all(feature = "print-logs-from-driver", esp32c2))]
@@ -1289,20 +1283,12 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     0
 }
 
-/// Sends HCI data to the Bluetooth controller.
-///
-/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
-/// caller must offer the remaining bytes again.
-pub(crate) fn send_hci(data: &[u8]) -> usize {
-    super::collect_and_send(data, send_packet)
+pub(crate) fn send(data: &[u8]) {
+    send_packet(data)
 }
 
-/// Sends HCI data to the Bluetooth controller.
-///
-/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
-/// caller must offer the remaining bytes again.
-pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
-    super::collect_and_send(data, send_packet)
+pub(crate) async fn send_async(data: &[u8]) {
+    send_packet(data)
 }
 
 fn send_packet(packet: &[u8]) {
@@ -1311,7 +1297,7 @@ fn send_packet(packet: &[u8]) {
 
     super::dump_packet_info(packet);
 
-    super::BT_STATE.with(|_state| unsafe {
+    unsafe {
         if packet[0] == DATA_TYPE_COMMAND {
             let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
             core::ptr::copy_nonoverlapping(
@@ -1343,5 +1329,5 @@ fn send_packet(packet: &[u8]) {
         } else {
             warn!("Unknown packet kind {} dropped", packet[0]);
         }
-    });
+    }
 }

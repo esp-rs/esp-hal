@@ -356,6 +356,7 @@ fn init_tracing() {
     }
 }
 
+#[track_caller]
 fn assert_thread_mode(function: &str) {
     assert!(
         esp_hal::interrupt::RunLevel::current().is_thread(),
