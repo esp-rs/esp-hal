@@ -2273,20 +2273,30 @@ pub(crate) mod xarxa {
     }
 }
 
-/// Power saving mode settings for the modem.
+/// Power saving mode of the Wi-Fi modem in Station mode.
+///
+/// In power save, the station tells the access point that it sleeps. The access point keeps the
+/// frames for the station, and the station wakes up only to receive beacons. Between the beacons,
+/// the modem turns off the radio. The CPU keeps running.
+///
+/// Power save increases the receive latency and decreases the throughput. For this reason, the
+/// default is [`PowerSaveMode::None`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[non_exhaustive]
 pub enum PowerSaveMode {
-    /// No power saving.
+    /// No power saving. The radio stays on.
     #[default]
     None,
-    /// Minimum power save mode. In this mode, station wakes up to receive beacon every DTIM
-    /// period.
+    /// Minimum power save mode. The station wakes up to receive every DTIM beacon.
+    ///
+    /// The receive latency increases by up to one DTIM period.
     Minimum,
-    /// Maximum power save mode. In this mode, interval to receive beacons is determined by the
-    /// `listen_interval` config option.
+    /// Maximum power save mode. The station wakes up once every listen interval, see
+    /// [`StationConfig::with_listen_interval`](sta::StationConfig::with_listen_interval).
+    ///
+    /// The receive latency increases by up to one listen interval.
     Maximum,
 }
 
@@ -2881,6 +2891,9 @@ impl WifiController<'_> {
 
     #[procmacros::doc_replace]
     /// Configures modem power saving.
+    ///
+    /// The different power saving options trade off power consumption and receive latency. See
+    /// [`PowerSaveMode`] for more information.
     ///
     /// ## Example
     ///
