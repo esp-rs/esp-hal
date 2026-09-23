@@ -21,7 +21,7 @@ The CI will:
 
 1. Trigger appropriate workflow.
 2. Post a comment with a link to the triggered HIL run.
-3. Edit that comment later with a status update (succeeded / failed / cancelled / still running).
+3. Edit that comment when the run finishes with a status update (succeeded / failed / cancelled), and re-edit that same update whenever the run is re-run.
 
 In further commands, the feedback from the bot will be identical.
 
