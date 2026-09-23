@@ -31,13 +31,9 @@ type CurvesCoeffs = &'static [CurveCoeffs];
 pub trait AdcHasCurveCal {
     /// Coefficients for calculating the reading voltage error.
     ///
-    /// A set of coefficients for each attenuation.
-    const CURVES_COEFFS: CurvesCoeffs;
-
-    /// Coefficients for the eFuse calibration version on this chip.
-    fn curves_coeffs() -> CurvesCoeffs {
-        Self::CURVES_COEFFS
-    }
+    /// A set of coefficients for each attenuation, selected for the eFuse
+    /// calibration version on this chip.
+    fn curves_coeffs() -> CurvesCoeffs;
 }
 
 /// Curve fitting ADC calibration scheme.
@@ -138,21 +134,21 @@ mod impls {
     use super::*;
 
     impl AdcHasCurveCal for crate::peripherals::ADC1<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
-
-        #[cfg(esp32c6)]
         fn curves_coeffs() -> CurvesCoeffs {
+            #[cfg(esp32c6)]
             if crate::efuse::rtc_calib_version() == 2 {
-                CURVES_COEFFS1_V2
-            } else {
-                CURVES_COEFFS1
+                return CURVES_COEFFS1_V2;
             }
+
+            CURVES_COEFFS1
         }
     }
 
     #[cfg(adc_adc2)]
     impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS2;
+        fn curves_coeffs() -> CurvesCoeffs {
+            CURVES_COEFFS2
+        }
     }
 
     coeff_tables! {
