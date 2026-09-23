@@ -1,7 +1,15 @@
 use bitfield::Bit;
 
 use super::Info;
-use crate::i2s::master::{BitOrder, Config, ConfigError, Endianness, Polarity, UnitConfig};
+use crate::i2s::master::{
+    Alignment,
+    BitOrder,
+    Config,
+    ConfigError,
+    Endianness,
+    Polarity,
+    UnitConfig,
+};
 
 impl Info {
     pub(crate) fn set_tx_bclk(&self, bclk_divider: u32) {
@@ -86,7 +94,7 @@ impl Info {
             w.tx_ws_idle_pol()
                 .bit(config.ws_polarity == Polarity::ActiveHigh);
             w.tx_chan_mod().bits(0);
-            w.tx_left_align().set_bit()
+            w.tx_left_align().bit(config.alignment() == Alignment::Left)
         });
 
         self.regs().tx_tdm_ctrl().modify(|_, w| unsafe {
@@ -146,7 +154,7 @@ impl Info {
             w.rx_bit_order().bit(config.bit_order == BitOrder::LsbFirst);
             w.rx_ws_idle_pol()
                 .bit(config.ws_polarity == Polarity::ActiveHigh);
-            w.rx_left_align().set_bit()
+            w.rx_left_align().bit(config.alignment() == Alignment::Left)
         });
 
         self.regs().rx_tdm_ctrl().modify(|_, w| unsafe {
