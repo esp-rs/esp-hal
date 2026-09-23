@@ -2,7 +2,6 @@
 //!
 //! PINS
 //! GPIO4 for ADC1, GPIO43 on the ESP32-S31, GPIO20 on the ESP32-P4
-//! ONLY ESP32-C3: GPIO5 for ADC2
 //!
 //! Note that the S31 ADC is differential with a maximum raw value of 4393,
 //! so measuring GND will return about 2198.
@@ -52,28 +51,11 @@ async fn main(_spawner: Spawner) {
 
     let mut adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();
 
-    cfg_select! {
-        feature = "esp32c3" => {
-            let mut adc2_config = AdcConfig::new();
-            let analog_pin2 = peripherals.GPIO5;
-            let mut pin2 = adc2_config.enable_pin(analog_pin2, Attenuation::_11dB);
-            let mut adc2 = Adc::new(peripherals.ADC2, adc2_config).into_async();
-        }
-        _ => {}
-    }
-
     let delay = Delay::new();
 
     loop {
         let adc1_value: u16 = adc1.read_oneshot(&mut pin1).await;
         println!("ADC1 value: {}", adc1_value);
-        cfg_select! {
-            feature = "esp32c3" => {
-                let adc2_value: u16 = adc2.read_oneshot(&mut pin2).await;
-                println!("ADC2 value: {}", adc2_value);
-            }
-            _ => {}
-        }
         delay.delay_millis(1000);
     }
 }

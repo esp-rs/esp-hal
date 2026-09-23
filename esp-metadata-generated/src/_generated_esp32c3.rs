@@ -4942,14 +4942,12 @@ macro_rules! for_each_peripheral {
         "XTS_AES peripheral singleton"] XTS_AES <= XTS_AES() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "ADC1 peripheral singleton"]
         ADC1 <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "ADC2 peripheral singleton"] ADC2 <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "BT peripheral singleton"] BT <=
-        virtual(BT_BB : { bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt },
-        RWBLE : { bind_rwble_interrupt, enable_rwble_interrupt, disable_rwble_interrupt
-        }, RWBT : { bind_rwbt_interrupt, enable_rwbt_interrupt, disable_rwbt_interrupt })
-        (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "FLASH peripheral singleton"] FLASH <= virtual() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        "BT peripheral singleton"] BT <= virtual(BT_BB : { bind_bb_interrupt,
+        enable_bb_interrupt, disable_bb_interrupt }, RWBLE : { bind_rwble_interrupt,
+        enable_rwble_interrupt, disable_rwble_interrupt }, RWBT : { bind_rwbt_interrupt,
+        enable_rwbt_interrupt, disable_rwbt_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "FLASH peripheral singleton"]
+        FLASH <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "GPIO_DEDICATED peripheral singleton"] GPIO_DEDICATED <= virtual() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "TSENS peripheral singleton"]
         TSENS <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -5021,7 +5019,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((USB_DEVICE(unstable)));
         _for_each_inner_peripheral!((XTS_AES(unstable)));
         _for_each_inner_peripheral!((ADC1(unstable)));
-        _for_each_inner_peripheral!((ADC2(unstable)));
         _for_each_inner_peripheral!((BT(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
@@ -5216,7 +5213,6 @@ macro_rules! for_each_peripheral {
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
         "XTS_AES peripheral singleton"] XTS_AES <= XTS_AES() (unstable)), (@ peri_type
         #[doc = "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)), (@ peri_type
-        #[doc = "ADC2 peripheral singleton"] ADC2 <= virtual() (unstable)), (@ peri_type
         #[doc = "BT peripheral singleton"] BT <= virtual(BT_BB : { bind_bb_interrupt,
         enable_bb_interrupt, disable_bb_interrupt }, RWBLE : { bind_rwble_interrupt,
         enable_rwble_interrupt, disable_rwble_interrupt }, RWBT : { bind_rwbt_interrupt,
@@ -5248,9 +5244,9 @@ macro_rules! for_each_peripheral {
         (SENSITIVE(unstable)), (SHA(unstable)), (SPI0(unstable)), (SPI1(unstable)),
         (SPI2), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TIMG0(unstable)),
         (TIMG1(unstable)), (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)),
-        (USB_DEVICE(unstable)), (XTS_AES(unstable)), (ADC1(unstable)), (ADC2(unstable)),
-        (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (TSENS(unstable)),
-        (WIFI), (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (USB_DEVICE(unstable)), (XTS_AES(unstable)), (ADC1(unstable)), (BT(unstable)),
+        (FLASH(unstable)), (GPIO_DEDICATED(unstable)), (TSENS(unstable)), (WIFI),
+        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
         (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
         Spi2, 0, AhbGdmaChannel), (UHCI0, Uhci0, 2, AhbGdmaChannel), (I2S0, I2s0, 3,
         AhbGdmaChannel), (AES, Aes, 6, AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel),
@@ -5364,7 +5360,6 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!((ADC1_CH2, GPIO2));
         _for_each_inner_analog_function!((ADC1_CH3, GPIO3));
         _for_each_inner_analog_function!((ADC1_CH4, GPIO4));
-        _for_each_inner_analog_function!((ADC2_CH0, GPIO5));
         _for_each_inner_analog_function!((USJ_DM, GPIO18));
         _for_each_inner_analog_function!((USJ_DP, GPIO19));
         _for_each_inner_analog_function!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO0));
@@ -5372,14 +5367,12 @@ macro_rules! for_each_analog_function {
         _for_each_inner_analog_function!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO2));
         _for_each_inner_analog_function!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3));
         _for_each_inner_analog_function!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO4));
-        _for_each_inner_analog_function!(((ADC2_CH0, ADCn_CHm, 2, 0), GPIO5));
         _for_each_inner_analog_function!((all(ADC1_CH0, GPIO0), (ADC1_CH1, GPIO1),
-        (ADC1_CH2, GPIO2), (ADC1_CH3, GPIO3), (ADC1_CH4, GPIO4), (ADC2_CH0, GPIO5),
-        (USJ_DM, GPIO18), (USJ_DP, GPIO19)));
-        _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0, ADCn_CHm, 1, 0), GPIO0),
-        ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO1), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO2),
-        ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO4),
-        ((ADC2_CH0, ADCn_CHm, 2, 0), GPIO5)));
+        (ADC1_CH2, GPIO2), (ADC1_CH3, GPIO3), (ADC1_CH4, GPIO4), (USJ_DM, GPIO18),
+        (USJ_DP, GPIO19))); _for_each_inner_analog_function!((ADCn_CHm((ADC1_CH0,
+        ADCn_CHm, 1, 0), GPIO0), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO1), ((ADC1_CH2,
+        ADCn_CHm, 1, 2), GPIO2), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3), ((ADC1_CH4,
+        ADCn_CHm, 1, 4), GPIO4)));
     };
 }
 /// This macro can be used to generate code for each LP function of each GPIO.
@@ -5572,9 +5565,6 @@ macro_rules! gpio_for_signal {
         "GPIO5"
     };
     (FSPIWP $(, $_fallback:literal)?) => {
-        "GPIO5"
-    };
-    (ADC2_CH0 $(, $_fallback:literal)?) => {
         "GPIO5"
     };
     (LP_GPIO5 $(, $_fallback:literal)?) => {
