@@ -319,7 +319,7 @@ impl<ADCX> AdcCalScheme<ADCX> for () {
 fn channel_attenuation(attenuations: &[Option<Attenuation>], channel: u8) -> Attenuation {
     match attenuations[channel as usize] {
         Some(attenuation) => attenuation,
-        None => panic!("Channel {channel} is not configured for reading"),
+        None => panic!("Channel {} is not configured for reading", channel),
     }
 }
 
