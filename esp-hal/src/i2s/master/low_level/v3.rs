@@ -64,9 +64,9 @@ impl Info {
         self.regs().tx_conf1().modify(|_, w| unsafe {
             #[allow(clippy::useless_conversion)]
             w.tx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
-            w.tx_bits_mod().bits(config.data_format.data_bits() - 1);
+            w.tx_bits_mod().bits(config.data_format.channel_bits() - 1);
             w.tx_tdm_chan_bits()
-                .bits(config.data_format.channel_bits() - 1);
+                .bits(config.data_format.data_bits() - 1);
             w.tx_half_sample_bits()
                 .bits((config.data_format.data_bits() * config.channels.count) / 2 - 1)
         });
@@ -85,7 +85,8 @@ impl Info {
             w.tx_bit_order().bit(config.bit_order == BitOrder::LsbFirst);
             w.tx_ws_idle_pol()
                 .bit(config.ws_polarity == Polarity::ActiveHigh);
-            w.tx_chan_mod().bits(0)
+            w.tx_chan_mod().bits(0);
+            w.tx_left_align().set_bit()
         });
 
         self.regs().tx_tdm_ctrl().modify(|_, w| unsafe {
@@ -125,9 +126,9 @@ impl Info {
         self.regs().rx_conf1().modify(|_, w| unsafe {
             #[allow(clippy::useless_conversion)]
             w.rx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
-            w.rx_bits_mod().bits(config.data_format.data_bits() - 1);
+            w.rx_bits_mod().bits(config.data_format.channel_bits() - 1);
             w.rx_tdm_chan_bits()
-                .bits(config.data_format.channel_bits() - 1);
+                .bits(config.data_format.data_bits() - 1);
             w.rx_half_sample_bits()
                 .bits((config.data_format.data_bits() * config.channels.count) / 2 - 1)
         });
@@ -144,7 +145,8 @@ impl Info {
                 .bit(config.endianness == Endianness::BigEndian);
             w.rx_bit_order().bit(config.bit_order == BitOrder::LsbFirst);
             w.rx_ws_idle_pol()
-                .bit(config.ws_polarity == Polarity::ActiveHigh)
+                .bit(config.ws_polarity == Polarity::ActiveHigh);
+            w.rx_left_align().set_bit()
         });
 
         self.regs().rx_tdm_ctrl().modify(|_, w| unsafe {
