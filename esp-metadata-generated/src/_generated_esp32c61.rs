@@ -1918,8 +1918,29 @@ macro_rules! define_clock_tree_types {
                 enable_rc_fast_clk_impl(clocks, false);
             }
         }
-        pub fn rc_fast_clk_frequency() -> u32 {
+        static RC_FAST_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(rc_fast_clk_nominal_frequency());
+        pub const fn rc_fast_clk_nominal_frequency() -> u32 {
             17500000
+        }
+        pub fn rc_fast_clk_frequency() -> u32 {
+            RC_FAST_CLK_FREQUENCY.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn set_rc_fast_clk_frequency(clocks: &mut ClockTree, frequency: u32) {
+            if !(8750000..=26250000).contains(&frequency) {
+                warn!(
+                    "Ignoring out-of-range RC_FAST_CLK frequency: {} Hz",
+                    frequency
+                );
+                return;
+            }
+            debug!(
+                "Updating RC_FAST_CLK frequency to {} Hz (nominal {} Hz)",
+                frequency,
+                rc_fast_clk_nominal_frequency()
+            );
+            RC_FAST_CLK_FREQUENCY.store(frequency, ::core::sync::atomic::Ordering::Release);
+            refresh_rc_fast_clk_downstream(clocks);
         }
         pub fn request_pll_clk(clocks: &mut ClockTree) {
             trace!("Requesting PLL_CLK");
@@ -1994,8 +2015,29 @@ macro_rules! define_clock_tree_types {
                 enable_rc_slow_clk_impl(clocks, false);
             }
         }
-        pub fn rc_slow_clk_frequency() -> u32 {
+        static RC_SLOW_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(rc_slow_clk_nominal_frequency());
+        pub const fn rc_slow_clk_nominal_frequency() -> u32 {
             136000
+        }
+        pub fn rc_slow_clk_frequency() -> u32 {
+            RC_SLOW_CLK_FREQUENCY.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn set_rc_slow_clk_frequency(clocks: &mut ClockTree, frequency: u32) {
+            if !(68000..=204000).contains(&frequency) {
+                warn!(
+                    "Ignoring out-of-range RC_SLOW_CLK frequency: {} Hz",
+                    frequency
+                );
+                return;
+            }
+            debug!(
+                "Updating RC_SLOW_CLK frequency to {} Hz (nominal {} Hz)",
+                frequency,
+                rc_slow_clk_nominal_frequency()
+            );
+            RC_SLOW_CLK_FREQUENCY.store(frequency, ::core::sync::atomic::Ordering::Release);
+            refresh_rc_slow_clk_downstream(clocks);
         }
         pub fn request_pll_f20m(clocks: &mut ClockTree) {
             trace!("Requesting PLL_F20M");
@@ -3404,6 +3446,33 @@ macro_rules! define_clock_tree_types {
             ] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
             }
+        }
+        fn refresh_rc_fast_clk_downstream(clocks: &mut ClockTree) {
+            refresh_hp_root_clk_downstream(clocks);
+            refresh_lp_fast_clk_downstream(clocks);
+            refresh_crypto_clk_downstream(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
+            for child_instance in [I2cInstance::I2c0] {
+                refresh_i2c_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [SpiInstance::Spi2] {
+                refresh_spi_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [TimgInstance::Timg0, TimgInstance::Timg1] {
+                refresh_timg_function_clock_downstream(clocks, child_instance);
+                refresh_timg_wdt_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [
+                UartInstance::Uart0,
+                UartInstance::Uart1,
+                UartInstance::Uart2,
+            ] {
+                refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+        }
+        fn refresh_rc_slow_clk_downstream(clocks: &mut ClockTree) {
+            refresh_lp_slow_clk_downstream(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
         }
         fn refresh_hp_root_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.hp_root_clk {

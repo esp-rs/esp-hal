@@ -455,6 +455,15 @@ impl ClockTreeNodeInstance {
         format_ident!("{}_FREQ_CACHE", self.node_ident_base())
     }
 
+    fn adjusted_frequency_static_name(&self) -> Ident {
+        format_ident!("{}_FREQUENCY", self.node_ident_base())
+    }
+
+    /// Returns true if the node needs a function that refreshes its downstream frequency caches.
+    fn has_refresh_downstream_function(&self) -> bool {
+        self.is_configurable() || self.node.adjustable_range().is_some()
+    }
+
     pub(super) fn refresh_downstream_function_name(&self) -> Ident {
         format_ident!(
             "refresh_{}_downstream",
@@ -709,6 +718,45 @@ impl ClockTreeNodeInstance {
 
                         pub fn #frequency_function_name(#(#receiver)*) -> u32 {
                             #cache_load
+                        }
+                    }
+                } else if let Some((min, max)) = self.node.adjustable_range() {
+                    let static_name = self.adjusted_frequency_static_name();
+                    let nominal_function_name = self.suffix_function("nominal_frequency");
+                    let set_function_name = self.prefix_function("set");
+                    let set_function_name = format_ident!("{set_function_name}_frequency");
+                    let refresh_fn = self.refresh_downstream_function_name();
+                    let out_of_range_msg = format!(
+                        "Ignoring out-of-range {} frequency: {{}} Hz",
+                        self.name_str()
+                    );
+                    let update_msg = format!(
+                        "Updating {} frequency to {{}} Hz (nominal {{}} Hz)",
+                        self.name_str()
+                    );
+                    let min = number(min);
+                    let max = number(max);
+
+                    quote! {
+                        static #static_name: ::core::sync::atomic::AtomicU32 =
+                            ::core::sync::atomic::AtomicU32::new(#nominal_function_name());
+
+                        pub const fn #nominal_function_name() -> u32 {
+                            #frequency_function_impl
+                        }
+
+                        pub fn #frequency_function_name() -> u32 {
+                            #static_name.load(::core::sync::atomic::Ordering::Acquire)
+                        }
+
+                        pub fn #set_function_name(clocks: &mut ClockTree, frequency: u32) {
+                            if !(#min..=#max).contains(&frequency) {
+                                warn!(#out_of_range_msg, frequency);
+                                return;
+                            }
+                            debug!(#update_msg, frequency, #nominal_function_name());
+                            #static_name.store(frequency, ::core::sync::atomic::Ordering::Release);
+                            #refresh_fn(clocks);
                         }
                     }
                 } else {
@@ -1147,7 +1195,7 @@ impl SystemClocks {
             let Some(node) = tree.try_get_node(&node_name) else {
                 continue;
             };
-            if !node.is_configurable() {
+            if !node.has_refresh_downstream_function() {
                 continue;
             }
 

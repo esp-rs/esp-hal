@@ -1503,23 +1503,16 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
 pub unsafe extern "C" fn slowclk_cal_get() -> u32 {
     trace!("slowclk_cal_get");
 
-    // TODO not hardcode this
+    // esp-hal stores the RTC slow clock period in STORE1, in microseconds, with 19 fractional
+    // bits. The Wi-Fi driver expects 12 fractional bits.
+    const RTC_CLK_CAL_FRACT: u32 = 19;
+    const WIFI_LIGHT_SLEEP_CLK_WIDTH: u32 = 12;
 
-    #[cfg(esp32s2)]
-    return 44462;
+    let period = cfg_select! {
+        esp32s31 => regs!(LP_SYS).lp_store(1).read().bits(),
+        soc_has_lp_aon => regs!(LP_AON).store1().read().bits(),
+        _ => regs!(RTC_CNTL).store1().read().bits(),
+    };
 
-    #[cfg(esp32s3)]
-    return 44462;
-
-    #[cfg(esp32c3)]
-    return 28639;
-
-    #[cfg(esp32c2)]
-    return 28639;
-
-    #[cfg(any(esp32c6, esp32h2, esp32c5, esp32c61, esp32s31))]
-    return 0;
-
-    #[cfg(esp32)]
-    return 28639;
+    period >> (RTC_CLK_CAL_FRACT - WIFI_LIGHT_SLEEP_CLK_WIDTH)
 }

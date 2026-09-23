@@ -1,13 +1,13 @@
 system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source", values = "40",      output = "VALUE * 1_000_000", always_on = true },
-    { name = "RC_FAST_CLK", type = "source",                     output = "17_500_000" },
+    { name = "RC_FAST_CLK", type = "source",                     output = "17_500_000", adjustable = "8_750_000..=26_250_000" },
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "480_000_000" },
 
     # Low-speed clocks
     { name = "XTAL32K_CLK",  type = "source", output = "32768", cfg = "use_xtal32k" },
     { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
-    { name = "RC_SLOW_CLK",  type = "source", output = "136_000" },
+    { name = "RC_SLOW_CLK",  type = "source", output = "136_000", adjustable = "68_000..=204_000" },
 
     # PLL divider taps
     { name = "PLL_F20M",  type = "generic", output = "PLL_CLK / 24" },
