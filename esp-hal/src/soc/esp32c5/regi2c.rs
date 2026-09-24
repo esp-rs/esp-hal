@@ -142,7 +142,9 @@ define_regi2c! {
         }
         reg: I2C_SAR_REG8(8) {
             field: ADC_SAR2_ENCAL_GND(3..3),
-            field: ADC_SAR1_ENCAL_GND(1..1)
+            field: ADC_SAR2_EN_TOUT(2..2),
+            field: ADC_SAR1_ENCAL_GND(1..1),
+            field: ADC_SAR1_EN_TOUT(0..0)
         }
     }
 }
