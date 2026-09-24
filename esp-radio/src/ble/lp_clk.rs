@@ -4,7 +4,7 @@
 //! one panics here.
 
 use esp_hal::clock::ll::{self, BleLpClkConfig};
-#[cfg(any(bt_controller = "btdm", esp32c2, esp32c5, esp32c6, esp32h2))]
+#[cfg(any(bt_controller = "btdm", bt_controller = "npl"))]
 use {
     enumset::EnumSet,
     esp_hal::{
@@ -44,25 +44,25 @@ pub(crate) fn release() {
 
 /// Returns whether the chip can light-sleep while the controller sleeps.
 ///
-/// The ESP32-C61 and the ESP32-S31 do not support light sleep yet. ESP32 needs a 32 kHz crystal for
-/// it, because it cannot light-sleep with the main crystal as the controller clock.
+/// The ESP32-S31 does not support light sleep yet. ESP32 needs a 32 kHz crystal for it, because it
+/// cannot light-sleep with the main crystal as the controller clock.
 pub(crate) fn light_sleep_supported() -> bool {
     cfg_select! {
         esp32 => ll::ClockTree::with(ll::ble_lp_clk_root_source) != Some(ClockSource::XtalClk),
-        any(bt_controller = "btdm", esp32c2, esp32c5, esp32c6, esp32h2) => true,
+        any(bt_controller = "btdm", bt_controller = "npl") => true,
         _ => false,
     }
 }
 
 /// The source that `BLE_LP_CLK` runs on, as the bits of an [`EnumSet`].
-#[cfg(any(bt_controller = "btdm", esp32c2, esp32c5, esp32c6, esp32h2))]
+#[cfg(any(bt_controller = "btdm", bt_controller = "npl"))]
 static WAKE_CLOCK: AtomicU32 = AtomicU32::new(0);
 
 /// Claims the `Bt` wakeup source, so that the chip can sleep while the controller sleeps.
 ///
 /// Call this only with modem sleep on, after the controller is enabled, and only when
 /// [`light_sleep_supported`] returns `true`. Otherwise the radio wake lock stays.
-#[cfg(any(bt_controller = "btdm", esp32c2, esp32c5, esp32c6, esp32h2))]
+#[cfg(any(bt_controller = "btdm", bt_controller = "npl"))]
 pub(crate) fn claim_wake_source() {
     let root = ll::ClockTree::with(ll::ble_lp_clk_root_source);
     WAKE_CLOCK.store(
@@ -75,12 +75,12 @@ pub(crate) fn claim_wake_source() {
 /// Releases the claim taken by [`claim_wake_source`].
 ///
 /// Call this before the controller is disabled.
-#[cfg(any(bt_controller = "btdm", esp32c2, esp32c5, esp32c6, esp32h2))]
+#[cfg(any(bt_controller = "btdm", bt_controller = "npl"))]
 pub(crate) fn release_wake_source() {
     WakeupSource::Bt.disable();
 }
 
-#[cfg(any(bt_controller = "btdm", esp32c2, esp32c5, esp32c6, esp32h2))]
+#[cfg(any(bt_controller = "btdm", bt_controller = "npl"))]
 fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     // The controller does not survive a deep sleep, so it needs no clock through one.
     if config.is_deep_sleep() {
@@ -109,7 +109,7 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
         }
         // The BLE timer wakes the chip through the `Bt` source. The controller refuses the sleep
         // when its next event is too close.
-        any(esp32c5, esp32c6, esp32h2) => {
+        any(esp32c5, esp32c6, esp32c61, esp32h2) => {
             if super::porting::controller_skips_light_sleep() {
                 config.reject_sleep();
                 return;

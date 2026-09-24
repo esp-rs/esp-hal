@@ -10,8 +10,8 @@
 //!
 //! - `MODEM_SLEEP` lets the controller turn the radio off between its events.
 //! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
-//!   sleeps only while the controller sleeps. On the ESP32-C61 and the ESP32-S31, BLE keeps the
-//!   chip awake. The ESP32 can sleep only with a 32 kHz crystal as the BLE low-power clock.
+//!   sleeps only while the controller sleeps. On the ESP32-S31, BLE keeps the chip awake. The ESP32
+//!   can sleep only with a 32 kHz crystal as the BLE low-power clock.
 //!
 //! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
 //! the output.
@@ -39,7 +39,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 /// Whether the controller turns the radio off between its events.
 const MODEM_SLEEP: bool = true;
 /// Whether the chip enters automatic light sleep when all tasks are idle. Requires
-/// [`MODEM_SLEEP`] to be enabled. On the ESP32-C61 and the ESP32-S31, BLE keeps the chip awake.
+/// [`MODEM_SLEEP`] to be enabled. On the ESP32-S31, BLE keeps the chip awake.
 const LIGHT_SLEEP: bool = true;
 
 #[esp_hal::main]
