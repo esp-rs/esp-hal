@@ -411,6 +411,14 @@ impl RtcClock {
             }
         };
 
+        
+        #[cfg(esp32h4)]
+        let cali_value = if rtc_clock == TimgCalibrationClockConfig::RcSlowClk {
+            cali_value * property!("timergroup.rc_slow_calibration_multiplier")
+        } else {
+            cali_value
+        };
+
         TIMG0::regs()
             .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());

@@ -1,6 +1,6 @@
 //! # System Control
 
-#![cfg_attr(any(esp32s31, esp32h4), allow(dead_code))]
+#![allow(dead_code)]
 
 use esp_sync::NonReentrantMutex;
 

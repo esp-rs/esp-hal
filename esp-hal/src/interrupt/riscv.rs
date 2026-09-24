@@ -456,12 +456,14 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
 
 fn cpu_wait_mode_on() -> bool {
     cfg_select! {
-        // Separate bit per core, cannot unify with soc_has_pcr case.
-        esp32h4 => crate::peripherals::PCR::regs()
-            .cpu_waiti_conf()
-            .read()
-            .cpu0_wait_mode_force_on()
-            .bit_is_set(),
+        // Each core gates its own WAITI clock, cannot unify with soc_has_pcr case.
+        esp32h4 => {
+            let conf = crate::peripherals::PCR::regs().cpu_waiti_conf().read();
+            match Cpu::current() {
+                Cpu::ProCpu => conf.cpu0_wait_mode_force_on().bit_is_set(),
+                Cpu::AppCpu => conf.cpu1_wait_mode_force_on().bit_is_set(),
+            }
+        }
         soc_has_pcr => crate::peripherals::PCR::regs()
             .cpu_waiti_conf()
             .read()

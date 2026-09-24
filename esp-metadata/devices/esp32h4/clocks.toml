@@ -58,11 +58,10 @@ system_clocks = { clock_tree = [
 
     # PCR.timg_cali_clk_conf.timg_cali_clk_sel: 1 = XTAL32K, 3 = RC_SLOW,
     # 4 = TIMG_SECURE_CLK, where RC_FAST sits behind a /32 divider.
-    # RC_SLOW is tapped before the /4 divider, so it is not LP_SLOW_CLK.
-    # TODO: multiply the result by 4 in the HAL when LP_SLOW_CLK is RC_SLOW_D4,
-    # like rtc_clk_cal_internal() does.
+    # The RC_SLOW input is tapped before the /4 divider, so the mux measures RC_SLOW_D4_CLK four
+    # cycles at a time. `timergroup.rc_slow_calibration` scales the result accordingly.
     { name = "TIMG_CALIBRATION_CLOCK", type = "mux", wake_locking = true, variants = [
-        { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_CLK" },
+        { name = "RC_SLOW_CLK",     outputs = "RC_SLOW_D4_CLK" },
         { name = "RC_FAST_DIV_CLK", outputs = "RC_FAST_CLK" },
         { name = "XTAL32K_CLK",     outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },

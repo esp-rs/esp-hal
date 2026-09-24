@@ -864,6 +864,8 @@ driver_configs![
 
                 #[serde(default)]
                 rc_fast_calibration: Option<RcFastCalibrationProperties>,
+                #[serde(default)]
+                rc_slow_calibration: Option<RcSlowCalibrationProperties>,
             }
         },
     ]
@@ -1087,6 +1089,10 @@ driver_configs![
                 cpu_has_branch_predictor: bool,
                 #[serde(default)]
                 cpu_has_csr_pc: bool,
+                // Interrupts can fire mid-instruction while mstatus.mie is cleared, masking them
+                // requires raising the interrupt threshold as well.
+                #[serde(default)]
+                cpu_has_zcmp_workaround: bool,
                 #[serde(default)]
                 multi_core_enabled: bool,
                 #[serde(default)]

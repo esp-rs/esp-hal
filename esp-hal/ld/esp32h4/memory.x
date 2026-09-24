@@ -37,11 +37,4 @@ MEMORY
 
     /* Instruction and Data ROM */
     ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20
-
-    /* The LP (RTC) memory at 0x50000000..0x50004000 is not usable by
-       applications: SOC_RTC_FAST_MEM_SUPPORTED is not defined for this chip
-       (esp-idf soc_caps.h, IDF-12313), so the second stage bootloader rejects
-       any segment loaded there ("bad load address range", see
-       components/esp_image_verify/src/esp_image_format.c).
-    */
 }

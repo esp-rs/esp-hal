@@ -35,9 +35,8 @@ impl RawLock for SingleCoreInterruptLock {
     #[inline]
     unsafe fn enter(&self) -> RestoreState {
         cfg_select! {
-            any(esp32p4, esp32s31) => {
-                // TODO: any with zcmp
-                // ESP32-P4 (v3.2/ECO7 etc.) Zcmp hardware bug workaround (IDF-14279 / DIG-661):
+            soc_cpu_has_zcmp_workaround => {
+                // Zcmp hardware bug workaround (IDF-14279 / DIG-661):
                 // Clearing mstatus.mie alone does not fully mask CLIC interrupts -- an
                 // interrupt can still fire mid-instruction on cm.push (and possibly on
                 // other multi-cycle sequences). Fix: raise mintthresh (CSR 0x347) to 0xFF
@@ -96,13 +95,13 @@ impl RawLock for SingleCoreInterruptLock {
         let token = token.inner();
 
         cfg_select! {
-            any(esp32p4, esp32s31) => {
+            soc_cpu_has_zcmp_workaround => {
                 if (token & 0b1000) != 0 {
                     unsafe {
                         riscv::interrupt::enable();
                     }
                 }
-                // Restore mintthresh AFTER re-enabling mie (P4 Zcmp workaround, see enter()).
+                // Restore mintthresh AFTER re-enabling mie (Zcmp workaround, see enter()).
                 let old_mintthresh = (token >> 8) & 0xff;
                 unsafe {
                     core::arch::asm!(

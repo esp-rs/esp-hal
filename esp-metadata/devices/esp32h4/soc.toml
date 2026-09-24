@@ -30,6 +30,7 @@ has_md5_bsd = true
 multi_core_enabled = true
 cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
+cpu_has_zcmp_workaround = true
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x3f
 has_swd_watchdog = true
@@ -118,9 +119,6 @@ peripherals = [
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
     { name = "UHCI0" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
-    # The PAC exposes a second OTG FS core at 0x6007_f000, but only one of the two is usable: the
-    # chip has a single OTG interrupt, and of its two FS PHYs one is hardwired to the USB
-    # Serial/JTAG, leaving PHY1 (GPIO21/22) for the core below.
     { name = "USB_FS", pac = "USB0", interrupts = { peri = "USB_OTG11" } },
     { name = "USB_WRAP", hidden = true },
     { name = "ZERO_DET", interrupts = { peri = "ZERO_DET" } }, # the analog comparator
@@ -355,6 +353,11 @@ instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 # see esp-idf components/esp_hw_support/port/esp32h4/rtc_time.c
 rc_fast_calibration = { divider = 32, min_rev = 0 }
+# The calibration mux taps RC_SLOW ahead of the /4 divider that produces LP_SLOW_CLK, so we
+# counted four input cycles per cycle of the clock we want to measure. esp-idf scales
+# `cal_val` the same way, see rtc_clk_cal_internal() in
+# components/esp_hw_support/port/esp32h4/rtc_time.c.
+rc_slow_calibration = { multiplier = 4 }
 
 [device.aes]
 support_status = "not_supported"
