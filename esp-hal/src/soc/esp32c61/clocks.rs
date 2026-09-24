@@ -107,6 +107,16 @@ fn configure_xtal_clk_impl(
     // Nothing to do here.
 }
 
+/// Configures and calibrates the BBPLL again.
+///
+/// The BBPLL loses its analog configuration while the PMU powers it down, for example in a light
+/// sleep. ESP-IDF configures it again before it uses the PLL after a wake.
+pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
+    if clocks.pll_clk_refcount > 0 {
+        enable_pll_clk_impl(clocks, true);
+    }
+}
+
 fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
         PMU::regs().imm_hp_ck_power().write(|w| {
@@ -282,6 +292,21 @@ fn configure_hp_root_clk_impl(
             HpRootClkConfig::PllF160m => 2,
         })
     });
+
+    bus_clock_update();
+}
+
+/// Applies the new `soc_clk_sel`, `cpu_div_num` and `ahb_div_num` values.
+fn bus_clock_update() {
+    PCR::regs()
+        .bus_clk_update()
+        .write(|w| w.bus_clock_update().set_bit());
+    while PCR::regs()
+        .bus_clk_update()
+        .read()
+        .bus_clock_update()
+        .bit_is_set()
+    {}
 }
 
 // CPU_CLK
@@ -299,9 +324,7 @@ fn configure_cpu_clk_impl(
         .cpu_freq_conf()
         .modify(|_, w| unsafe { w.cpu_div_num().bits(new_config.divisor() as u8) });
 
-    PCR::regs()
-        .bus_clk_update()
-        .write(|w| w.bus_clock_update().set_bit());
+    bus_clock_update();
 }
 
 // AHB_CLK
@@ -319,9 +342,7 @@ fn configure_ahb_clk_impl(
         .ahb_freq_conf()
         .modify(|_, w| unsafe { w.ahb_div_num().bits(new_config.divisor() as u8) });
 
-    PCR::regs()
-        .bus_clk_update()
-        .write(|w| w.bus_clock_update().set_bit());
+    bus_clock_update();
 }
 
 // APB_CLK

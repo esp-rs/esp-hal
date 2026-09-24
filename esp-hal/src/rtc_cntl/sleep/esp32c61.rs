@@ -782,6 +782,7 @@ impl RtcSleepConfig {
             // Restore the old clock settings when we return
             DropGuard::new((), move |_| {
                 ClockTree::with(|clocks| {
+                    crate::soc::clocks::reconfigure_pll(clocks);
                     if let Some(old_root) = old_root {
                         clocks::configure_hp_root_clk(clocks, old_root);
                     }
