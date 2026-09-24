@@ -108,6 +108,10 @@ pub mod scan;
 pub mod sta;
 
 pub(crate) mod os_adapter;
+esp_hal::if_unstable_hal! {
+    #[cfg(not(esp32))]
+    pub(crate) mod sleep;
+}
 pub(crate) mod state;
 
 #[cfg(not(esp32))]
@@ -2308,6 +2312,10 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
             PowerSaveMode::Maximum => crate::sys::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM,
         })
     })?;
+    esp_hal::if_unstable_hal! {
+        #[cfg(not(esp32))]
+        sleep::set_power_save(ps != PowerSaveMode::None);
+    }
     Ok(())
 }
 
@@ -2612,9 +2620,17 @@ pub(crate) struct WifiRefGuard {
     _radio_guard: RadioRefGuard,
 }
 
+/// Wi-Fi refuses the unsafe sleeps itself, except on ESP32, which has no hardware TSF.
+fn wifi_radio_guard() -> RadioRefGuard {
+    cfg_select! {
+        esp32 => RadioRefGuard::new(),
+        _ => RadioRefGuard::without_wake_lock(),
+    }
+}
+
 impl Clone for WifiRefGuard {
     fn clone(&self) -> Self {
-        let _radio_guard = RadioRefGuard::new();
+        let _radio_guard = wifi_radio_guard();
         WIFI_REFCOUNT.increment(|| {});
         Self { _radio_guard }
     }
@@ -2626,6 +2642,11 @@ impl Drop for WifiRefGuard {
             state::locked(|| {
                 set_access_point_state(WifiAccessPointState::Uninitialized);
                 set_station_state(WifiStationState::Uninitialized);
+
+                esp_hal::if_unstable_hal! {
+                    #[cfg(not(esp32))]
+                    sleep::release_wake_source();
+                }
 
                 if let Err(e) = crate::wifi::wifi_deinit() {
                     warn!("Failed to cleanly deinit wifi: {:?}", e);
@@ -2705,7 +2726,7 @@ impl<'d> WifiController<'d> {
                 | WifiEvent::ScanDone,
         );
 
-        let radio_guard = RadioRefGuard::new();
+        let radio_guard = wifi_radio_guard();
 
         let first = WIFI_REFCOUNT.try_increment(|| -> Result<(), WifiError> {
             unsafe {
@@ -2754,6 +2775,11 @@ impl<'d> WifiController<'d> {
             TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
 
             crate::wifi::wifi_init(device)?;
+
+            esp_hal::if_unstable_hal! {
+                #[cfg(not(esp32))]
+                sleep::claim_wake_source();
+            }
 
             #[cfg(rng_trng_supported)]
             esp_hal::if_unstable_hal! {
@@ -3092,6 +3118,11 @@ impl WifiController<'_> {
                 self.apply_sta_eap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)?;
             }
+        }
+
+        esp_hal::if_unstable_hal! {
+            #[cfg(not(esp32))]
+            sleep::set_station_only(mode == wifi_mode_t_WIFI_MODE_STA);
         }
 
         if previous_mode != mode {
