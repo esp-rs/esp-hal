@@ -391,12 +391,11 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     crate::radio_clocks::clocks_ll::reset_rpa();
 }
 
-// Provide the symbol for < eco4 to make the linker happy
+// The controller library reads and writes this variable. The ROM of ESP32-C2 < eco4 does not
+// supply it.
 #[unsafe(no_mangle)]
-unsafe fn g_ble_lll_rfmgmt_env_p() -> *mut c_void {
-    // prevent "undefined symbol: g_ble_lll_rfmgmt_env_p" for ESP32-C2 < eco4
-    unreachable!()
-}
+#[allow(non_upper_case_globals)]
+static mut g_ble_lll_rfmgmt_env_p: *mut c_void = core::ptr::null_mut();
 
 pub(crate) fn shutdown_ble_isr() {
     unsafe {
