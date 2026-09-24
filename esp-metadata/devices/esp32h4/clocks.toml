@@ -14,12 +14,12 @@ system_clocks = { clock_tree = [
     ] },
 
     { name = "XTAL_X2_CLK",  type = "derived", from = "XTAL_CLK", output = "64_000_000" },
-    { name = "RC_FAST_CLK",  type = "source",                     output = "20_000_000" },
+    { name = "RC_FAST_CLK",  type = "source",                     output = "20_000_000", adjustable = "10_000_000..=30_000_000" },
 
     # Low-speed clocks
     { name = "XTAL32K_CLK",    type = "source",  output = "32768", cfg = "use_xtal32k" },
     { name = "OSC_SLOW_CLK",   type = "source",  output = "32768" },
-    { name = "RC_SLOW_CLK",    type = "source",  output = "600_000" },
+    { name = "RC_SLOW_CLK",    type = "source",  output = "600_000", adjustable = "300_000..=900_000" },
     # Fixed divider, see rtc_clk_slow_freq_get_hz().
     { name = "RC_SLOW_D4_CLK", type = "generic", output = "RC_SLOW_CLK / 4" },
 
