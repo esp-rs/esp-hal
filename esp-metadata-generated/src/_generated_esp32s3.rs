@@ -2795,8 +2795,29 @@ macro_rules! define_clock_tree_types {
                 enable_rc_fast_clk_impl(clocks, false);
             }
         }
-        pub fn rc_fast_clk_frequency() -> u32 {
+        static RC_FAST_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(rc_fast_clk_nominal_frequency());
+        pub const fn rc_fast_clk_nominal_frequency() -> u32 {
             17500000
+        }
+        pub fn rc_fast_clk_frequency() -> u32 {
+            RC_FAST_CLK_FREQUENCY.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn set_rc_fast_clk_frequency(clocks: &mut ClockTree, frequency: u32) {
+            if !(8750000..=26250000).contains(&frequency) {
+                warn!(
+                    "Ignoring out-of-range RC_FAST_CLK frequency: {} Hz",
+                    frequency
+                );
+                return;
+            }
+            debug!(
+                "Updating RC_FAST_CLK frequency to {} Hz (nominal {} Hz)",
+                frequency,
+                rc_fast_clk_nominal_frequency()
+            );
+            RC_FAST_CLK_FREQUENCY.store(frequency, ::core::sync::atomic::Ordering::Release);
+            refresh_rc_fast_clk_downstream(clocks);
         }
         #[cfg(use_xtal32k)]
         pub fn request_xtal32k_clk(clocks: &mut ClockTree) {
@@ -2832,8 +2853,29 @@ macro_rules! define_clock_tree_types {
                 enable_rc_slow_clk_impl(clocks, false);
             }
         }
-        pub fn rc_slow_clk_frequency() -> u32 {
+        static RC_SLOW_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(rc_slow_clk_nominal_frequency());
+        pub const fn rc_slow_clk_nominal_frequency() -> u32 {
             136000
+        }
+        pub fn rc_slow_clk_frequency() -> u32 {
+            RC_SLOW_CLK_FREQUENCY.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn set_rc_slow_clk_frequency(clocks: &mut ClockTree, frequency: u32) {
+            if !(68000..=204000).contains(&frequency) {
+                warn!(
+                    "Ignoring out-of-range RC_SLOW_CLK frequency: {} Hz",
+                    frequency
+                );
+                return;
+            }
+            debug!(
+                "Updating RC_SLOW_CLK frequency to {} Hz (nominal {} Hz)",
+                frequency,
+                rc_slow_clk_nominal_frequency()
+            );
+            RC_SLOW_CLK_FREQUENCY.store(frequency, ::core::sync::atomic::Ordering::Release);
+            refresh_rc_slow_clk_downstream(clocks);
         }
         pub fn request_rc_fast_div_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_FAST_DIV_CLK");
@@ -4591,6 +4633,30 @@ macro_rules! define_clock_tree_types {
                 refresh_lcd_cam_lcd_clock_downstream(clocks, child_instance);
                 refresh_lcd_cam_cam_clock_downstream(clocks, child_instance);
             }
+        }
+        fn refresh_rc_fast_clk_downstream(clocks: &mut ClockTree) {
+            refresh_system_pre_div_in_downstream(clocks);
+            refresh_rc_fast_clk_div_n_downstream(clocks);
+            refresh_rtc_slow_clk_downstream(clocks);
+            refresh_low_power_clk_downstream(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
+            for child_instance in [I2cInstance::I2c0, I2cInstance::I2c1] {
+                refresh_i2c_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [RmtInstance::Rmt] {
+                refresh_rmt_sclk_downstream(clocks, child_instance);
+            }
+            for child_instance in [
+                UartInstance::Uart0,
+                UartInstance::Uart1,
+                UartInstance::Uart2,
+            ] {
+                refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+        }
+        fn refresh_rc_slow_clk_downstream(clocks: &mut ClockTree) {
+            refresh_rtc_slow_clk_downstream(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
         }
         fn refresh_system_pre_div_in_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.system_pre_div_in {

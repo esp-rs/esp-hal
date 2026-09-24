@@ -171,6 +171,12 @@ heading, group entries using H2 headings. Changelog H2 headings may use just the
 crate name (e.g. `## esp-hal`), while migration guide H2 headings _must_ include
 an area (e.g. `## esp-hal/SPI driver`).
 
+Only published crates can have changelog entries. CI rejects sections for crates
+with `publish = false` in their `Cargo.toml` (e.g. `esp-metadata`, `xtask`,
+`hil-test`). Published crates with `changelog-exempt = true` under
+`[package.metadata.espressif]` (e.g. `esp-metadata-generated`) do not need a
+section.
+
 ```markdown
 # Changelog
 
@@ -214,7 +220,7 @@ as the **sole** item in its `# Changelog` section:
 ```markdown
 # Changelog
 
-## esp-metadata
+## esp-hal
 
 - No changelog necessary.
 ```

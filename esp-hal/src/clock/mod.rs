@@ -47,11 +47,10 @@
 
 #[cfg(soc_has_clock_node_lp_slow_clk)]
 use clocks::LpSlowClkConfig;
-#[cfg(all(not(esp32s2), soc_has_clock_node_rtc_slow_clk))]
+#[cfg(soc_has_clock_node_rtc_slow_clk)]
 use clocks::RtcSlowClkConfig;
 #[cfg(soc_has_clock_node_timg_function_clock)]
 use clocks::TimgFunctionClockConfig;
-use portable_atomic::AtomicU32;
 
 pub(crate) mod dividers;
 
@@ -458,9 +457,13 @@ pub(crate) fn calibrate_rtc_slow_clock() {
         esp32s2 => {
             // Can directly measure output of the RTC_SLOW mux
             let slow_clk = TimgCalibrationClockConfig::RtcClk;
+            let rc_slow_selected =
+                unwrap!(ClockTree::with(clocks::rtc_slow_clk_config)) == RtcSlowClkConfig::RcSlow;
         }
         soc_has_clock_node_rtc_slow_clk => {
-            let slow_clk = match unwrap!(ClockTree::with(clocks::rtc_slow_clk_config)) {
+            let slow_clk_config = unwrap!(ClockTree::with(clocks::rtc_slow_clk_config));
+            let rc_slow_selected = slow_clk_config == RtcSlowClkConfig::RcSlow;
+            let slow_clk = match slow_clk_config {
                 RtcSlowClkConfig::RcFast => TimgCalibrationClockConfig::RcFastDivClk,
                 RtcSlowClkConfig::RcSlow => TimgCalibrationClockConfig::RcSlowClk,
                 #[cfg(use_xtal32k)]
@@ -470,7 +473,9 @@ pub(crate) fn calibrate_rtc_slow_clock() {
             };
         }
         soc_has_clock_node_lp_slow_clk => {
-            let slow_clk = match unwrap!(ClockTree::with(clocks::lp_slow_clk_config)) {
+            let slow_clk_config = unwrap!(ClockTree::with(clocks::lp_slow_clk_config));
+            let rc_slow_selected = slow_clk_config == LpSlowClkConfig::RcSlow;
+            let slow_clk = match slow_clk_config {
                 // on S31, clock can not be calibrated to get OSC_SLOW actual frequency
                 #[cfg(all(not(esp32s31), use_xtal32k))]
                 LpSlowClkConfig::OscSlow => TimgCalibrationClockConfig::Xtal32kClk, //?
@@ -495,21 +500,41 @@ pub(crate) fn calibrate_rtc_slow_clock() {
     };
 
     reg.write(|w| unsafe { w.bits(cal_val) });
-}
 
-static RC_FAST_CAL_VAL: AtomicU32 = AtomicU32::new(0);
+    if rc_slow_selected && cal_val != 0 {
+        let frequency = ((1_000_000u64 << RtcClock::CAL_FRACT) / cal_val as u64) as u32;
+
+        ClockTree::with(|clocks| clocks::set_rc_slow_clk_frequency(clocks, frequency));
+    }
+}
 
 #[cfg(soc_has_clock_node_timg_calibration_clock)]
 pub(crate) fn calibrate_rtc_fast_clock() {
     // Clock is in order of 10 MHz
     const FAST_CLK_SRC_CAL_CYCLES: u32 = 128;
 
-    let cal_val = RtcClock::calibrate(
-        TimgCalibrationClockConfig::RcFastDivClk,
-        FAST_CLK_SRC_CAL_CYCLES,
-    );
+    ClockTree::with(|clocks| {
+        let (xtal_cycles, calibration_clock_frequency) = RtcClock::measure_rtc_clock(
+            clocks,
+            TimgCalibrationClockConfig::RcFastDivClk,
+            #[cfg(soc_has_clock_node_timg_function_clock)]
+            TimgFunctionClockConfig::XtalClk,
+            FAST_CLK_SRC_CAL_CYCLES,
+        );
 
-    RC_FAST_CAL_VAL.store(cal_val, core::sync::atomic::Ordering::Relaxed);
+        if xtal_cycles == 0 {
+            warn!("RC_FAST_CLK calibration failed");
+            return;
+        }
+
+        // On some chips, the calibration input is RC_FAST_CLK divided by 256.
+        let divider = clocks::rc_fast_clk_frequency() / calibration_clock_frequency.as_hz();
+        let frequency =
+            (clocks::xtal_clk_frequency() as u64 * FAST_CLK_SRC_CAL_CYCLES as u64 * divider as u64
+                / xtal_cycles as u64) as u32;
+
+        clocks::set_rc_fast_clk_frequency(clocks, frequency);
+    });
 }
 
 #[cfg(not(soc_has_clock_node_timg_calibration_clock))]
@@ -541,12 +566,6 @@ pub(crate) fn rtc_slow_cal_period() -> u32 {
     };
 
     reg.read().bits()
-}
-
-/// Reads the calibrated RTC fast clock period from memory.
-#[cfg_attr(not(soc_has_pmu), expect(dead_code))]
-pub(crate) fn rtc_fast_cal_period() -> u32 {
-    RC_FAST_CAL_VAL.load(core::sync::atomic::Ordering::Relaxed)
 }
 
 /// Converts RTC slow clock ticks to microseconds using the calibrated period.

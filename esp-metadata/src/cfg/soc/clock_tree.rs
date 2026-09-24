@@ -459,6 +459,12 @@ pub(crate) trait ClockTreeNodeType: Any {
         Bounds::UNKNOWN
     }
 
+    /// Returns the range (`min`, `max`) that the node's frequency can be adjusted to at runtime,
+    /// or `None` if the node is not adjustable.
+    fn adjustable_range(&self) -> Option<(u32, u32)> {
+        None
+    }
+
     /// Returns which clock nodes' configurations are affected when this node is configured.
     // TODO: pass instance to apply template naming scheme to returned clocks
     // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)

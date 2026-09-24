@@ -82,6 +82,11 @@ pub struct Source {
     #[serde(default)]
     values: Option<ValuesExpression>,
 
+    /// The range (`min..=max`) that the frequency of a fixed source can be adjusted to at
+    /// runtime, e.g. after it has been measured.
+    #[serde(default)]
+    adjustable: Option<ValuesExpression>,
+
     output: OutputExpression,
 }
 
@@ -106,7 +111,15 @@ impl ClockTreeNodeType for Source {
             variables.insert("VALUE", values.bounds());
         }
 
-        self.output.0.bounds_in_tree(&variables, instance, tree)
+        let bounds = self.output.0.bounds_in_tree(&variables, instance, tree);
+        match self.adjustable_range() {
+            Some((min, max)) => bounds.union(Bounds::new(min as u64, max as u64)),
+            None => bounds,
+        }
+    }
+
+    fn adjustable_range(&self) -> Option<(u32, u32)> {
+        self.adjustable.as_ref().and_then(|range| range.as_range())
     }
 
     fn always_on(&self) -> bool {
@@ -123,9 +136,24 @@ impl ClockTreeNodeType for Source {
 
     fn validate_source_data(
         &self,
-        _instance: &ClockTreeNodeInstance,
+        instance: &ClockTreeNodeInstance,
         _ctx: &ValidationContext<'_>,
     ) -> Result<()> {
+        if let Some(range) = self.adjustable.as_ref() {
+            anyhow::ensure!(
+                range.as_range().is_some(),
+                "`adjustable` must be a single range (`min..=max`)"
+            );
+            anyhow::ensure!(
+                !self.is_configurable(),
+                "`adjustable` is only supported on fixed sources"
+            );
+            anyhow::ensure!(
+                instance.properties.receiver.is_none(),
+                "`adjustable` is not supported on clock group nodes"
+            );
+        }
+
         Ok(())
     }
 
@@ -379,6 +407,10 @@ impl ClockTreeNodeType for DerivedClockSource {
             ctx.has_clock(instance, &self.from),
             "Clock `{}` is not defined",
             self.from
+        );
+        anyhow::ensure!(
+            self.source_options.adjustable.is_none(),
+            "`adjustable` is not supported on derived sources"
         );
 
         self.source_options.validate_source_data(instance, ctx)
