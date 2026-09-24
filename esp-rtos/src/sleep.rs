@@ -164,6 +164,92 @@ pub fn sleep_hist() -> [u64; 8] {
     core::array::from_fn(|i| SLEEP_HIST[i].load(core::sync::atomic::Ordering::Relaxed))
 }
 
+/// Attributes timer-queue task wakeups by task priority, so a bench can see WHICH tasks are
+/// waking the system (the "remaining wakers"). Buckets: [prio 0 = app/thread executor,
+/// prio 1-2 = LoRa hp-thread / esp-radio timer thread, prio 3-15, prio 16-31 = BTDM
+/// controller task]. Only counts wakeups delivered via the RTOS timer queue (embassy
+/// `Timer` expirations / scheduled task wakeups), not direct hardware-IRQ wakeups.
+static WAKE_BY_PRIO: [portable_atomic::AtomicU64; 4] =
+    [const { portable_atomic::AtomicU64::new(0) }; 4];
+
+pub(crate) fn note_timer_wake(prio: usize) {
+    let b = if prio == 0 {
+        0
+    } else if prio <= 2 {
+        1
+    } else if prio <= 15 {
+        2
+    } else {
+        3
+    };
+    WAKE_BY_PRIO[b].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// Snapshot of timer-queue wakeups by priority bucket (see [`WAKE_BY_PRIO`]).
+pub fn wake_by_prio() -> [u64; 4] {
+    core::array::from_fn(|i| WAKE_BY_PRIO[i].load(core::sync::atomic::Ordering::Relaxed))
+}
+
+/// The HARDWARE wakeup cause after each committed light sleep, read from the RTC/PMU wakeup
+/// status. This is the DEFINITIVE "what woke the SoC": buckets [Timer, Bt, Gpio, Uart, Ext1,
+/// Other/none]. Timer = a scheduled deadline (embassy or esp-rtos); Bt = the BLE controller;
+/// the rest = peripheral pads / UART RX.
+static WAKE_CAUSE: [portable_atomic::AtomicU64; 6] =
+    [const { portable_atomic::AtomicU64::new(0) }; 6];
+
+fn note_wake_cause() {
+    use esp_hal::rtc_cntl::WakeupSource as S;
+    let r = esp_hal::rtc_cntl::wakeup_cause();
+    let b = if r.contains(S::Timer) {
+        0
+    } else if r.contains(S::Bt) {
+        1
+    } else if r.contains(S::Gpio) {
+        2
+    } else if r.contains(S::Uart0) || r.contains(S::Uart1) {
+        3
+    } else if r.contains(S::Ext1) {
+        4
+    } else {
+        5
+    };
+    WAKE_CAUSE[b].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// Snapshot of the hardware wakeup-cause counters (see [`WAKE_CAUSE`]).
+pub fn wake_cause() -> [u64; 6] {
+    core::array::from_fn(|i| WAKE_CAUSE[i].load(core::sync::atomic::Ordering::Relaxed))
+}
+
+/// Histogram of the delays EMBASSY tasks schedule (`Timer::after` etc.), so a bench can see
+/// each task's period (one hot fast timer vs many slow ones). Buckets (ms): [<4, 4-16,
+/// 16-64, 64-256, 256-1024, >=1024].
+static SCHED_HIST: [portable_atomic::AtomicU64; 6] =
+    [const { portable_atomic::AtomicU64::new(0) }; 6];
+
+pub(crate) fn note_sched(delay_us: u64) {
+    let ms = delay_us / 1000;
+    let b = if ms < 4 {
+        0
+    } else if ms < 16 {
+        1
+    } else if ms < 64 {
+        2
+    } else if ms < 256 {
+        3
+    } else if ms < 1024 {
+        4
+    } else {
+        5
+    };
+    SCHED_HIST[b].fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+}
+
+/// Snapshot of the embassy scheduled-delay histogram (see [`SCHED_HIST`]).
+pub fn sched_hist() -> [u64; 6] {
+    core::array::from_fn(|i| SCHED_HIST[i].load(core::sync::atomic::Ordering::Relaxed))
+}
+
 pub fn configure(lpwr: LPWR<'static>) -> Sleep {
     Sleep {
         #[cfg(sleep_deep_sleep)]
@@ -285,6 +371,7 @@ extern "C" fn auto_light_sleep_hook() -> ! {
             let before = crate::now();
             hist_bump(next_wakeup.saturating_sub(before));
             lpwr.sleep_light(cfg);
+            note_wake_cause();
             diag_count(DIAG_SLEPT);
             DIAG[DIAG_SLEPT_US].fetch_add(
                 crate::now().saturating_sub(before),

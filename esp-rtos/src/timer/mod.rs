@@ -60,6 +60,7 @@ impl TimerQueue {
             let ready = wakeup_at <= now;
 
             if ready {
+                crate::sleep::note_timer_wake(task.priority.get());
                 on_task_ready(task_ptr);
             } else {
                 self.push(task_ptr, wakeup_at);

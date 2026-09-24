@@ -32,6 +32,7 @@ impl TimerQueue {
 
     fn schedule_wake(&mut self, at: u64, waker: &Waker) -> bool {
         if self.queue.schedule_wake(at, waker) {
+            crate::sleep::note_sched(at.saturating_sub(crate::now()));
             self.next_wakeup = self.next_wakeup.min(at);
             true
         } else {
