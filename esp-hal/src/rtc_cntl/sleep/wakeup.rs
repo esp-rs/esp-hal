@@ -34,8 +34,8 @@ pub(crate) enum SleepKind {
 ///
 /// A clock is not a domain. Ask for one with [`WrappedSleepConfig::keep_clock_running`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// Each chip has its own set of domains, so a chip leaves some of these unused.
-#[expect(dead_code, reason = "the names are the same for all chips")]
+// The names are the same for all chips, and each chip uses a different subset.
+#[allow(dead_code, reason = "the names are the same for all chips")]
 pub(crate) enum SleepResource {
     /// The low-power peripherals, including the RTC IO pads.
     LpPeripherals,
@@ -58,7 +58,8 @@ pub(crate) enum SleepResource {
 ///
 /// Keep this property. A method that requests a power-down, stops a clock, cancels a refusal, or
 /// lengthens a limit removes it.
-pub(crate) struct WrappedSleepConfig<'a> {
+#[instability::unstable]
+pub struct WrappedSleepConfig<'a> {
     config: &'a mut RtcSleepConfig,
     clocks: EnumSet<ClockSource>,
     refused: bool,
@@ -76,7 +77,8 @@ impl<'a> WrappedSleepConfig<'a> {
     }
 
     /// Returns whether the chip is entering deep sleep, which resets it when it wakes.
-    pub(crate) fn is_deep_sleep(&self) -> bool {
+    #[instability::unstable]
+    pub fn is_deep_sleep(&self) -> bool {
         self.config.is_deep_sleep()
     }
 
@@ -119,8 +121,8 @@ impl<'a> WrappedSleepConfig<'a> {
     ///
     /// Ask a clock tree node which source it runs on, and name the answer. A source that the chip
     /// keeps running anyway, or that it cannot power down, needs nothing.
-    #[expect(dead_code, reason = "no wakeup source needs a clock yet")]
-    pub(crate) fn keep_clock_running(&mut self, source: ClockSource) {
+    #[instability::unstable]
+    pub fn keep_clock_running(&mut self, source: ClockSource) {
         self.clocks.insert(source);
     }
 
@@ -133,13 +135,10 @@ impl<'a> WrappedSleepConfig<'a> {
     /// the refusal to. Read [`Self::is_deep_sleep`] when other work in the hook depends on the
     /// kind of sleep.
     ///
-    /// [`reject_mask`] is the hardware rejection of a source that is already asserted. This call
-    /// is the software refusal.
-    // No call out of this function. `#[ram]` does not inline it, and a sleep-entry hook runs
-    // with the flash potentially inaccessible.
-    #[expect(dead_code, reason = "no wakeup source refuses a sleep yet")]
-    #[crate::ram]
-    pub(crate) fn reject_sleep(&mut self) {
+    /// The hardware also rejects a sleep when an enabled source is already asserted at sleep
+    /// entry. This call is the software refusal.
+    #[instability::unstable]
+    pub fn reject_sleep(&mut self) {
         self.refused = true;
     }
 
@@ -160,10 +159,7 @@ impl<'a> WrappedSleepConfig<'a> {
     /// then returns as if it had ended. A deep sleep without rejection panics, because it cannot
     /// return and the chip does not wake. This is not a refusal. Use [`Self::reject_sleep`] to
     /// refuse a light sleep. A duration of zero is too short to sleep.
-    // No call out of this function, other than inlined methods. `#[ram]` does not inline it, and
-    // a sleep-entry hook runs with the flash potentially inaccessible.
     #[expect(dead_code, reason = "no wakeup source limits a sleep yet")]
-    #[crate::ram]
     pub(crate) fn limit_sleep(&mut self, duration: Duration) {
         let already_shorter = match self.limit {
             Some(current) => current.as_micros() <= duration.as_micros(),
@@ -223,17 +219,22 @@ impl<'a> WrappedSleepConfig<'a> {
 /// Runs at sleep entry, before the sleep configuration reaches hardware.
 ///
 /// The configuration already holds the kind of the sleep, so a hook that needs it asks
-/// [`WrappedSleepConfig::is_deep_sleep`]. A hook refuses a light sleep with
-/// [`WrappedSleepConfig::reject_sleep`]. A hook bounds the sleep with
-/// [`WrappedSleepConfig::limit_sleep`].
-pub(crate) type SleepEntryHook = fn(&mut WrappedSleepConfig<'_>);
+/// [`WrappedSleepConfig::is_deep_sleep`]. A hook keeps a clock running with
+/// [`WrappedSleepConfig::keep_clock_running`]. A hook refuses a light sleep with
+/// [`WrappedSleepConfig::reject_sleep`].
+///
+/// The hook can run with interrupts disabled, for example from automatic light sleep. Do not
+/// allocate, take a blocking lock, or log in it.
+#[instability::unstable]
+pub type SleepEntryHook = fn(&mut WrappedSleepConfig<'_>);
 
 /// Runs after a light sleep.
 ///
 /// It also runs when a hook refuses a light sleep. An entry hook may already have changed a pad,
 /// and the exit hook puts that pad back. A deep sleep resets the chip, which runs the
 /// initialization again.
-pub(crate) type SleepExitHook = fn();
+#[instability::unstable]
+pub type SleepExitHook = fn();
 
 for_each_wakeup_source! {
     (all $( ($variant:ident, $bit:literal) ),*) => {
@@ -279,15 +280,16 @@ impl WakeupSource {
     /// first call. One driver owns each source, so only that driver can replace its own hooks.
     /// A call for a source that is already enabled does this.
     ///
-    /// Both hooks run with the flash accessible. The entry hook runs before esp-hal writes the
-    /// sleep configuration to hardware, and the exit hook runs after the wake sequence restores
-    /// it. Both hooks are part of sleep entry, so keep them short. Give them the
-    /// [`ram`][crate::ram] attribute, to keep the flash out of the sleep path.
-    pub(crate) fn enable_with_hooks(
-        self,
-        entry: Option<SleepEntryHook>,
-        exit: Option<SleepExitHook>,
-    ) {
+    /// Both hooks run with the flash accessible, so they need no [`ram`][crate::ram] attribute. The
+    /// entry hook runs before esp-hal writes the sleep configuration to hardware, and the exit hook
+    /// runs after the wake sequence restores it. Both hooks are part of sleep entry, so keep them
+    /// short.
+    ///
+    /// Only the driver that owns the source calls this. esp-hal owns the sources of its own
+    /// drivers, for example the timer source. A call for such a source replaces the hooks of that
+    /// driver, and the driver then does not work through a sleep.
+    #[instability::unstable]
+    pub fn enable_with_hooks(self, entry: Option<SleepEntryHook>, exit: Option<SleepExitHook>) {
         HOOKS.with(|hooks| {
             hooks.entry[self as usize] = entry;
             hooks.exit[self as usize] = exit;
@@ -297,7 +299,10 @@ impl WakeupSource {
     }
 
     /// Disables this source, and removes its hooks.
-    pub(crate) fn disable(self) {
+    ///
+    /// Only the driver that owns the source calls this, as for [`Self::enable_with_hooks`].
+    #[instability::unstable]
+    pub fn disable(self) {
         HOOKS.with(|hooks| {
             hooks.entry[self as usize] = None;
             hooks.exit[self as usize] = None;

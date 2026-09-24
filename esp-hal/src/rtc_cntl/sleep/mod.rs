@@ -42,6 +42,8 @@ mod timer;
 
 mod wakeup;
 pub(crate) use wakeup::*;
+#[instability::unstable]
+pub use wakeup::{SleepEntryHook, SleepExitHook, WrappedSleepConfig};
 
 /// The result of a light sleep.
 #[cfg(sleep_light_sleep)]
