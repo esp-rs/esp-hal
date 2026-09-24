@@ -724,7 +724,6 @@ pub fn generate_build_command(
     if !features.is_empty() {
         log::info!("  Features:      {}", features.join(", "));
     }
-    features.push(chip.to_string());
 
     // A standalone project is a directory with its own manifest, anything else is a source file
     // inside the package.
@@ -735,6 +734,13 @@ pub fn generate_build_command(
     } else {
         package_path.to_path_buf()
     };
+
+    // Host-package and self-contained builds enable the bare chip feature;
+    // metadata-driven compile-tests have no per-chip `[features]` table and carry
+    // the chip through forwarded `<dep>/<chip>` features, so it must not be added.
+    if !standalone_project || firmware::project_has_chip_feature_table(&cwd) {
+        features.push(chip.to_string());
+    }
 
     let mut builder = CargoArgsBuilder::new(app.output_file_name())
         .manifest_path(cwd.join("Cargo.toml"))
@@ -1381,12 +1387,14 @@ mod tests {
     }
 
     #[test]
-    fn chip_coverage_missing_chip_is_an_error_for_examples_but_not_compile_tests() {
+    fn chip_coverage_missing_chip_is_an_error_for_feature_table_projects() {
         let omitted = Chip::Esp32c61;
-        let dir = tempfile::TempDir::new().unwrap();
-        let project = dir.path().join("missing-chip");
-        fs::create_dir_all(project.join("src")).unwrap();
 
+        // A project with a `[features]` chip table and no CHIP_FILTER must list every chip,
+        // otherwise a newly added chip silently drops out of its coverage.
+        let with_table = tempfile::TempDir::new().unwrap();
+        let project = with_table.path().join("with-features");
+        fs::create_dir_all(project.join("src")).unwrap();
         let mut features = String::from("[features]\n");
         for chip in Chip::iter() {
             if chip != omitted {
@@ -1396,10 +1404,17 @@ mod tests {
         fs::write(project.join("Cargo.toml"), features).unwrap();
         fs::write(project.join("src").join("main.rs"), "fn main() {}\n").unwrap();
 
-        let err = crate::firmware::load_cargo_toml(dir.path(), Package::Examples).unwrap_err();
+        let err = crate::firmware::load_cargo_toml(with_table.path()).unwrap_err();
         assert!(format!("{err:#}").contains(&format!("{omitted:?}")));
 
-        crate::firmware::load_cargo_toml(dir.path(), Package::CompileTests).unwrap();
+        // A project without a `[features]` table (compile-tests shape) is exempt: its chips ride
+        // on CHIP_FILTER and forwarded `<dep>/<chip>` features, not a per-chip table.
+        let without_table = tempfile::TempDir::new().unwrap();
+        let project = without_table.path().join("without-features");
+        fs::create_dir_all(project.join("src")).unwrap();
+        fs::write(project.join("Cargo.toml"), "[dependencies]\n").unwrap();
+        fs::write(project.join("src").join("main.rs"), "fn main() {}\n").unwrap();
+        crate::firmware::load_cargo_toml(without_table.path()).unwrap();
     }
 
     #[test]
