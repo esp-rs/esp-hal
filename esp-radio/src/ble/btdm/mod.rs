@@ -310,9 +310,11 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
     let phy_restored = super::modem_phy_acquire();
     cfg_select! {
         // The RF can be off since the last baseband initialization.
-        esp32 => if phy_restored {
-            unsafe { btdm_rf_bb_init_phase2() };
-        },
+        esp32 => {
+            if phy_restored {
+                unsafe { btdm_rf_bb_init_phase2() };
+            }
+        }
         _ => {
             let _ = phy_restored;
             unsafe { while btdm_sleep_clock_sync() != 0 {} }
