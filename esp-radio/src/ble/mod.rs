@@ -57,10 +57,14 @@ pub(crate) fn modem_phy_release() {
 }
 
 /// Restores the PHY reference if sleep left it off.
-pub(crate) fn modem_phy_acquire() {
-    if MODEM_PHY_OFF.swap(false, portable_atomic::Ordering::SeqCst) {
+///
+/// Returns `true` if the reference was restored.
+pub(crate) fn modem_phy_acquire() -> bool {
+    let restore = MODEM_PHY_OFF.swap(false, portable_atomic::Ordering::SeqCst);
+    if restore {
         core::mem::forget(esp_phy::enable_phy());
     }
+    restore
 }
 
 unstable_module! {

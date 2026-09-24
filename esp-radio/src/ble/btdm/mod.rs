@@ -211,6 +211,7 @@ static LP_CYCLE_US: AtomicU32 = AtomicU32::new(1 << LP_CYCLE_US_FRAC);
 unsafe extern "C" {
     fn btdm_lpclk_select_src(sel: u32) -> bool;
     fn btdm_lpclk_set_div(div: u32) -> bool;
+    #[cfg(not(esp32))]
     fn btdm_sleep_clock_sync() -> u8;
     fn btdm_controller_enable_sleep(enable: bool);
     fn btdm_wakeup_request();
@@ -306,8 +307,17 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
     if !super::modem_sleep_enabled() {
         return;
     }
-    super::modem_phy_acquire();
-    unsafe { while btdm_sleep_clock_sync() != 0 {} }
+    let phy_restored = super::modem_phy_acquire();
+    cfg_select! {
+        // The RF can be off since the last baseband initialization.
+        esp32 => if phy_restored {
+            unsafe { btdm_rf_bb_init_phase2() };
+        },
+        _ => {
+            let _ = phy_restored;
+            unsafe { while btdm_sleep_clock_sync() != 0 {} }
+        }
+    }
 }
 
 fn wake_controller_for_hci() {
