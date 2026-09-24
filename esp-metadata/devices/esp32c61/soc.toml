@@ -236,7 +236,7 @@ supports_top_power_down = true
 
 [device.rng]
 support_status = { status = "partial", issue = 5981 }
-trng_supported = false  # TODO
+trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = true
 

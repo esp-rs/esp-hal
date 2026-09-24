@@ -7,6 +7,7 @@
 
 crate::unstable_module! {
     pub mod clocks;
+    pub mod trng;
 }
 pub(crate) mod regi2c;
 
@@ -31,6 +32,9 @@ pub(crate) fn pre_init() {
     crate::peripherals::PCR::regs()
         .reset_event_bypass()
         .modify(|_, w| w.reset_event_bypass().clear_bit());
+
+    // Mirrors ESP-IDF's `init_rng`, see <https://github.com/espressif/esp-idf/blob/8d7d8aef588/components/esp_hw_support/hw_random.c#L114-L120>
+    trng::rng_ll_enable();
 }
 
 pub(crate) fn enable_branch_predictor() {
