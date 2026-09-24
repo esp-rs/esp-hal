@@ -1114,9 +1114,10 @@ pub(crate) struct BleNplCountInfoT {
     mutex_count: u16,
 }
 
-#[cfg(esp32c6)]
+#[cfg(any(esp32c2, esp32c6))]
 unsafe extern "C" {
     fn r_ble_rtc_wake_up_state_clr();
+    #[cfg(esp32c6)]
     fn r_ble_lll_sleep_should_skip_light_sleep_check() -> bool;
 }
 
@@ -1128,7 +1129,7 @@ pub(super) fn controller_skips_light_sleep() -> bool {
 
 #[crate::hal::ram]
 unsafe extern "C" fn controller_sleep_cb(_enable_tick: u32, _arg: *mut c_void) {
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c2, esp32c6))]
     unsafe {
         r_ble_rtc_wake_up_state_clr()
     };
@@ -1137,8 +1138,9 @@ unsafe extern "C" fn controller_sleep_cb(_enable_tick: u32, _arg: *mut c_void) {
 
 #[crate::hal::ram]
 unsafe extern "C" fn controller_wakeup_cb(_arg: *mut c_void) {
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c2, esp32c6))]
     unsafe {
+        #[cfg(esp32c6)]
         r_ble_rtc_wake_up_state_clr();
 
         // The controller passes its `bt_wakeup_params_t`. Bit 31 tells it that the BLE timer
@@ -1325,12 +1327,13 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         assert!(res == 0, "ble_controller_enable returned {}", res);
     }
 
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c2, esp32c6))]
     if config.modem_sleep() {
         super::lp_clk::claim_wake_source();
     } else {
         // The wake lock prevents automatic light sleep, but the application can still call
         // `LowPower::sleep_light` while the PHY is on.
+        #[cfg(esp32c6)]
         esp_hal::rtc_cntl::WakeupSource::Bt.enable_with_hooks(Some(keep_bbpll), None);
     }
 
@@ -1353,7 +1356,7 @@ fn keep_bbpll(config: &mut esp_hal::rtc_cntl::sleep::WrappedSleepConfig<'_>) {
 }
 
 pub(crate) fn ble_deinit() {
-    #[cfg(esp32c6)]
+    #[cfg(any(esp32c2, esp32c6))]
     super::lp_clk::release_wake_source();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
