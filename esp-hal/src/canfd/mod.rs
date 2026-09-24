@@ -998,6 +998,16 @@ impl<Dm: DriverMode> CanFdRx<'_, Dm> {
     pub fn clear_rx_overrun(&mut self) {
         self.driver.clear_overrun();
     }
+
+    /// Returns the current fault confinement state; see [`CanFd::error_state`].
+    pub fn error_state(&self) -> ErrorState {
+        self.driver.error_state()
+    }
+
+    /// Returns the receive and transmit error counters, as `(rec, tec)`.
+    pub fn error_counters(&self) -> (u16, u16) {
+        (self.driver.rec(), self.driver.tec())
+    }
 }
 
 impl CanFdRx<'_, Async> {
@@ -1113,6 +1123,36 @@ impl<Dm: DriverMode> CanFdTx<'_, Dm> {
         if index < self.tx_buffers {
             self.driver
                 .set_tx_priority(index, priority.min(MAX_TX_PRIORITY));
+        }
+    }
+
+    /// Returns the current fault confinement state; see [`CanFd::error_state`].
+    ///
+    /// On bus-off every armed TX buffer fails, so a transmission that ends in
+    /// [`Error::TransmitFailed`] can be told apart from an exhausted
+    /// retransmission limit here.
+    pub fn error_state(&self) -> ErrorState {
+        self.driver.error_state()
+    }
+
+    /// Returns the receive and transmit error counters, as `(rec, tec)`.
+    pub fn error_counters(&self) -> (u16, u16) {
+        (self.driver.rec(), self.driver.tec())
+    }
+
+    /// Requests that a bus-off controller rejoin the bus.
+    ///
+    /// Does nothing unless the controller is bus-off. Rejoining takes 128
+    /// occurrences of 11 recessive bits, as ISO 11898-1 requires. Leaving the
+    /// bus with [`CanFd::stop`] and joining it again with [`CanFd::start`] also
+    /// clears the bus-off state, after ordinary integration.
+    ///
+    /// The state is checked here because the hardware remembers a request made
+    /// while error-active and then rejoins on its own the next time it goes
+    /// bus-off (measured on an ESP32-C5; TRM register 38.3 says otherwise).
+    pub fn request_bus_off_recovery(&mut self) {
+        if self.driver.error_state() == ErrorState::BusOff {
+            self.driver.request_bus_off_recovery();
         }
     }
 }
@@ -1786,20 +1826,10 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         (self.bus.driver.rec(), self.bus.driver.tec())
     }
 
-    /// Requests that a bus-off controller rejoin the bus.
-    ///
-    /// Does nothing unless the controller is bus-off. Rejoining takes 128
-    /// occurrences of 11 recessive bits, as ISO 11898-1 requires. Leaving the
-    /// bus with [`CanFd::stop`] and joining it again with [`CanFd::start`] also
-    /// clears the bus-off state, after ordinary integration.
-    ///
-    /// The state is checked here because the hardware remembers a request made
-    /// while error-active and then rejoins on its own the next time it goes
-    /// bus-off (measured on an ESP32-C5; TRM register 38.3 says otherwise).
+    /// Requests that a bus-off controller rejoin the bus; see
+    /// [`CanFdTx::request_bus_off_recovery`].
     pub fn request_bus_off_recovery(&mut self) {
-        if self.bus.driver.error_state() == ErrorState::BusOff {
-            self.bus.driver.request_bus_off_recovery();
-        }
+        self.tx_half().request_bus_off_recovery();
     }
 
     /// Sets the error warning limit, which defaults to 96.

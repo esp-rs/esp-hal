@@ -1596,6 +1596,35 @@ mod fault_tests {
     }
 
     #[test]
+    fn a_split_transmitter_sees_bus_off_and_recovers(mut ctx: Context) {
+        drive_to(&mut ctx, 256);
+
+        let (rx, mut tx) = ctx.node.split();
+        assert_eq!(tx.error_state(), ErrorState::BusOff);
+        assert_eq!(rx.error_state(), ErrorState::BusOff);
+        assert!(tx.error_counters().1 >= 256);
+
+        let began = Instant::now();
+        tx.request_bus_off_recovery();
+        while tx.error_state() != ErrorState::Active {
+            assert!(
+                began.elapsed() < Duration::from_millis(100),
+                "the controller never rejoined the bus"
+            );
+        }
+        assert_eq!(rx.error_counters(), (0, 0));
+
+        let index = tx
+            .transmit(&Frame::new(std(0x123), &[0xAB; 8]).unwrap())
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_millis(100);
+        while !tx.tx_buffer_state(index).is_writable() {
+            assert!(Instant::now() < deadline, "the frame never finished");
+        }
+        assert_eq!(tx.tx_buffer_state(index), TxBufferState::Ok);
+    }
+
+    #[test]
     fn a_recovery_request_made_while_active_does_nothing(mut ctx: Context) {
         // The hardware would remember an early request and rejoin on its own.
         ctx.node.request_bus_off_recovery();
