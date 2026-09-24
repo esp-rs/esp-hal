@@ -1,4 +1,13 @@
 //! A bluetooth battery service example built using Embassy and trouBLE.
+//!
+//! The example demonstrates how to use the trouBLE library to create a BLE
+//! peripheral that implements the Battery Service (BAS) GATT service.
+//! It advertises itself and allows a central device to connect and read
+//! the battery level characteristic, as well as receive notifications when
+//! the battery level changes.
+//!
+//! The example also has a flag to enable or disable modem sleep, which can be
+//! a useful tool to reduce power consumption.
 
 //% CHIP_FILTER: bt_driver_supported
 
@@ -10,23 +19,50 @@ use embassy_futures::{join::join, select::select};
 use embassy_time::Timer;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
+use esp_hal::{
+    clock::{ClockConfig, CpuClock},
+    timer::timg::TimerGroup,
+};
 use esp_radio::ble::controller::BleConnector;
 use log::{info, warn};
 use trouble_host::prelude::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+// Set to true to enable modem sleep.
+const ENABLE_MODEM_SLEEP: bool = false;
+
 #[esp_hal::main]
 async fn main(_s: Spawner) {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
+
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock({
+        #[cfg_attr(feature = "esp32c2", allow(unused_mut))]
+        let mut config = ClockConfig::from(CpuClock::max());
+
+        #[cfg(not(feature = "esp32c2"))]
+        {
+            use esp_hal::clock::ll::BleLpClkConfig;
+
+            // For now, only Xtal can be selected if modem-sleep is enabled.
+            // This is our default anyway, a safe choice even in light sleep,
+            // although it can raise the sleep current a bit.
+            config.ble_lp_clk = Some(BleLpClkConfig::Xtal);
+        }
+
+        config
+    }));
+
     esp_alloc::heap_allocator!(size: 72 * 1024);
+
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    let bluetooth = peripherals.BT;
-    let connector = BleConnector::new(bluetooth, Default::default()).unwrap();
+    let connector = BleConnector::new(
+        peripherals.BT,
+        esp_radio::ble::Config::default().with_modem_sleep(ENABLE_MODEM_SLEEP),
+    )
+    .unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);
 
     ble_bas_peripheral_run(controller).await;
