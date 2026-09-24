@@ -1,0 +1,26 @@
+[package]
+name    = "hal"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Pins track the current lines: older ones predate esp32p4/esp32s31, which this
+# project must cover.
+[dependencies]
+esp-hal = { version = "1.2" }
+esp-backtrace = { version = "0.20", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { version = "0.6" }
+esp-println = { version = "0.18" }
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1
+
+[package.metadata.cargo-machete]
+# esp-println is pulled in only as esp-backtrace's print backend.
+ignored = ["esp-println"]

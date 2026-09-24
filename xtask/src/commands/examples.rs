@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use super::{build::build_examples, run::run_examples, select};
 use crate::{Package, cargo::CargoAction, metadata::Chip};
@@ -33,7 +33,7 @@ pub fn examples(
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
     let examples = if package.contains_standalone_projects() {
-        crate::firmware::load_cargo_toml(&package_path, package).with_context(|| {
+        crate::firmware::load_cargo_toml(&package_path).with_context(|| {
             format!(
                 "Failed to load specified examples from {}",
                 package_path.display()
@@ -52,6 +52,30 @@ pub fn examples(
         .into_iter()
         .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
+
+    // Guard only CompileTests; examples/ coverage is legitimately sparse.
+    if package == Package::CompileTests && examples.is_empty() {
+        bail!(
+            "No compile-test project selects chip '{chip}'. Every chip must be covered by at \
+             least one project under compile-tests/ (the `hal` project covers all chips)."
+        );
+    }
+
+    // Skip projects whose forwarded `<dep>/<chip>` feature will not resolve on a
+    // published dependency line that predates the chip.
+    if package == Package::CompileTests && matches!(action, CargoAction::Build(_)) {
+        let mut supported = Vec::with_capacity(examples.len());
+        for ex in examples {
+            if crate::firmware::compile_test_project_supports_chip(
+                workspace,
+                ex.example_path(),
+                chip,
+            )? {
+                supported.push(ex);
+            }
+        }
+        examples = supported;
+    }
 
     examples.sort_by_key(|a| a.binary_name());
 
