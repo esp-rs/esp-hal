@@ -1,9 +1,10 @@
 //! Dispatch `build` / `run` / `check` / `test` after token resolution.
 
-use std::path::Path;
+use std::{io::IsTerminal as _, path::Path};
 
 use anyhow::{Result, bail};
 use clap::Args;
+use inquire::Select;
 use strum::IntoEnumIterator as _;
 
 use super::{check::CheckPackagesArgs, examples::examples, tests::tests};
@@ -158,7 +159,7 @@ pub fn dispatch(
     if !lib_packages.is_empty() {
         check_libs(CheckPackagesArgs {
             packages: lib_packages,
-            chips: chips_or_all(&resolution.chips),
+            chips: chips_or_all(&resolution.chips)?,
             toolchain: args.toolchain.clone(),
         })?;
     }
@@ -184,7 +185,7 @@ fn dispatch_defaults(
         ),
         Verb::Check if resolution.names.is_empty() => check_libs(CheckPackagesArgs {
             packages: Package::iter().collect(),
-            chips: chips_or_all(&resolution.chips),
+            chips: chips_or_all(&resolution.chips)?,
             toolchain: args.toolchain.clone(),
         }),
         Verb::Check | Verb::Build | Verb::Run => {
@@ -225,12 +226,27 @@ fn dispatch_defaults(
     }
 }
 
-fn chips_or_all(chips: &[Chip]) -> Vec<Chip> {
-    if chips.is_empty() {
-        Chip::iter().collect()
+/// The chips to check crates for: the ones that were named, the connected one, or all of them.
+fn chips_or_all(chips: &[Chip]) -> Result<Vec<Chip>> {
+    if !chips.is_empty() {
+        Ok(chips.to_vec())
+    } else if let Some(chip) = connected_chip()? {
+        Ok(vec![chip])
     } else {
-        chips.to_vec()
+        Ok(Chip::iter().collect())
     }
+}
+
+/// The connected chip, for `check`, which drives none itself. Only looked for from a terminal:
+/// scripts and CI jobs keep checking every chip.
+fn connected_chip() -> Result<Option<Chip>> {
+    if !std::io::stdin().is_terminal() {
+        return Ok(None);
+    }
+    if let Some(chip) = crate::detect::with_probe_rs()? {
+        return Ok(Some(chip));
+    }
+    crate::detect::with_espflash()
 }
 
 fn is_example_package(package: Package) -> bool {
@@ -270,8 +286,8 @@ fn source_package(workspace: &Path, name: &str) -> Package {
 
 /// Complete a partial name, so `sdmmc` becomes `sdmmc_sd_async`.
 ///
-/// A name that already names something is returned as it came. A partial one has to fit a single
-/// example or test, otherwise there is nothing to complete it to.
+/// `-` and `_` are interchangeable, so `sleep_timer` finds `sleep-timer`. A name that fits several
+/// binaries, or none, gets a selector in a terminal, with the name typed into its filter.
 fn expand_name(workspace: &Path, verb: Verb, packages: &[Package], name: &str) -> Result<String> {
     if name.eq_ignore_ascii_case("all") || name.contains("::") {
         return Ok(name.to_owned());
@@ -291,8 +307,7 @@ fn expand_name(workspace: &Path, verb: Verb, packages: &[Package], name: &str) -
             .collect()
     };
 
-    let wanted = name.to_lowercase();
-    let mut fits: Vec<String> = Vec::new();
+    let mut candidates: Vec<String> = Vec::new();
 
     for package in searched {
         let Ok(firmware) = firmware::load_package(workspace, package) else {
@@ -303,21 +318,63 @@ fn expand_name(workspace: &Path, verb: Verb, packages: &[Package], name: &str) -
         }
         // One entry per supported chip, so the same name turns up more than once.
         for candidate in firmware.iter().map(|meta| meta.binary_name()) {
-            if candidate.to_lowercase().contains(&wanted) && !fits.contains(&candidate) {
-                fits.push(candidate);
+            if !candidates.contains(&candidate) {
+                candidates.push(candidate);
             }
         }
     }
 
-    match fits.len() {
-        // Nothing fits, so leave the name alone and let the package have its say about it.
-        0 => Ok(name.to_owned()),
-        1 => {
-            log::info!("'{name}' selected '{}'", fits[0]);
-            Ok(fits.remove(0))
-        }
-        _ => bail!("'{name}' fits several: {}", fits.join(", ")),
+    let wanted = normalize_name(name);
+    let fits: Vec<&String> = match candidates
+        .iter()
+        .find(|candidate| normalize_name(candidate) == wanted)
+    {
+        // `spi` names a test of its own, so it is not the `spi_slave` a fragment would find.
+        Some(named) => vec![named],
+        None => candidates
+            .iter()
+            .filter(|candidate| normalize_name(candidate).contains(&wanted))
+            .collect(),
+    };
+
+    if let [fit] = fits[..] {
+        log::info!("'{name}' selected '{fit}'");
+        return Ok(fit.clone());
     }
+
+    if !std::io::stdin().is_terminal() {
+        if fits.is_empty() {
+            // Nothing fits, so leave the name alone and let the package have its say about it.
+            return Ok(name.to_owned());
+        }
+        let fits = fits.iter().map(|fit| fit.as_str()).collect::<Vec<_>>();
+        bail!("'{name}' fits several: {}", fits.join(", "));
+    }
+
+    let nothing_fits = fits.is_empty();
+    let message = if nothing_fits {
+        format!("Nothing is called '{name}', select one:")
+    } else {
+        format!("'{name}' fits several, select one:")
+    };
+    candidates.sort();
+
+    // Not `select`: the filter narrows by the same rule the fits above do, and starts out with the
+    // name in it, unless that name is one that narrows to nothing.
+    let mut prompt = Select::new(&message, candidates).with_scorer(&|input, _, candidate, _| {
+        normalize_name(candidate)
+            .contains(&normalize_name(input))
+            .then_some(0)
+    });
+    if !nothing_fits {
+        prompt = prompt.with_starting_filter_input(name);
+    }
+    Ok(prompt.prompt()?)
+}
+
+/// Names that differ only in how they separate words are the same name.
+fn normalize_name(name: &str) -> String {
+    name.to_lowercase().replace('-', "_")
 }
 
 fn dispatch_examples(
@@ -398,12 +455,13 @@ fn required_chips(verb: Verb, chips: &[Chip]) -> Result<Vec<Chip>> {
         return Ok(chips.to_vec());
     }
 
-    // Only the verbs that drive a board detect one, each with the tool it is about to use.
-    // `build` and `check` never touch hardware, so they ask instead of poking every serial port.
+    // The verbs that drive a device detect it with the tool they are about to use. `build` never
+    // touches hardware, so it asks instead of poking every serial port.
     let inferred = match verb {
-        Verb::Run => crate::detect::with_espflash(),
-        Verb::Test => crate::detect::with_probe_rs(),
-        Verb::Build | Verb::Check => None,
+        Verb::Run => crate::detect::with_espflash()?,
+        Verb::Test => crate::detect::with_probe_rs()?,
+        Verb::Check => connected_chip()?,
+        Verb::Build => None,
     };
     if let Some(chip) = inferred {
         return Ok(vec![chip]);

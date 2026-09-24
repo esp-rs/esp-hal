@@ -60,7 +60,7 @@ pub fn resolve(mut input: ResolveInput) -> Resolution {
     }
 }
 
-/// `esp32-c6` and `ESP32C6` name the same chip as `esp32c6`.
+/// `esp32-c6`, `ESP32C6` and `c6` name the same chip as `esp32c6`.
 fn chip_from_token(token: &str) -> Option<Chip> {
     let mut normalized = token.trim().to_owned();
     normalized.retain(|c| c != '-');
@@ -74,6 +74,15 @@ mod tests {
     fn package_aliases_and_names_both_work() {
         let packages = resolve(ResolveInput::from_tokens(["qa", "hil-test-radio"])).packages;
         assert_eq!(packages, vec![Package::QaTest, Package::HilTestRadio]);
+    }
+
+    #[test]
+    fn chips_can_be_shortened() {
+        let chips = resolve(ResolveInput::from_tokens(["p4", "C3", "esp32", "s31"])).chips;
+        assert_eq!(
+            chips,
+            vec![Chip::Esp32p4, Chip::Esp32c3, Chip::Esp32, Chip::Esp32s31]
+        );
     }
 
     #[test]
