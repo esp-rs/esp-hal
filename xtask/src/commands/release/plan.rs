@@ -11,7 +11,6 @@ use clap::Args;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
-use toml_edit::{Item, Value};
 
 use crate::{
     Package,
@@ -196,11 +195,22 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     let mut update_amounts = vec![];
     let all_chips = Chip::iter().collect::<Vec<_>>();
 
+    // Resolve the changed/unchanged status of every package up front so a
+    // missing release tag surfaces as an error here rather than being swallowed
+    // by the lazy callback below.
+    let mut changed_status = HashMap::new();
+    for package in sorted.iter().copied() {
+        changed_status.insert(
+            package,
+            package_changed_since_last_release(workspace, package)?,
+        );
+    }
+
     let changed = collect_changed_packages(
         &sorted,
         // Read direct dependencies out of Cargo.toml
         &|p| CargoToml::new(workspace, p).unwrap().repo_dependencies(),
-        &|p| package_changed_since_last_release(workspace, p),
+        &|p| changed_status[&p],
     );
 
     for package in sorted.iter().copied() {
@@ -215,24 +225,11 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                     other => other,
                 }
             } else {
-                let forever_unstable = if let Some(metadata) =
-                    package_tomls[&package].espressif_metadata()
-                    && let Some(Item::Value(forever_unstable)) = metadata.get("forever-unstable")
-                {
-                    // Special case: some packages are perma-unstable, meaning they won't ever have
-                    // a stable release. For these packages, we always use a
-                    // patch release.
-                    if let Value::Boolean(forever_unstable) = forever_unstable {
-                        *forever_unstable.value()
-                    } else {
-                        log::warn!(
-                            "Invalid value for 'forever-unstable' in metadata - must be a boolean"
-                        );
-                        true
-                    }
-                } else {
-                    false
-                };
+                // Perma-unstable packages never get a stable release, so they always take a
+                // patch bump.
+                let forever_unstable = package_tomls[&package]
+                    .espressif_metadata_bool("forever-unstable")
+                    .unwrap_or(false);
 
                 if forever_unstable {
                     ReleaseType::Patch
@@ -326,11 +323,14 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // before validating that what remains is a self-consistent release.
     apply_exclusions(workspace, &mut plan_packages, &args.exclude)?;
 
-    let releasing = plan_packages
-        .iter()
-        .map(|p| (p.package, p.new_version.clone()))
-        .collect::<HashMap<_, _>>();
-    validate_release_closure(workspace, &releasing)?;
+    // Refuse a plan that is wrong on paper (published requirements, manifest
+    // drift) and surface stale-dependency warnings before writing the file.
+    let warnings = validate_plan(workspace, &plan_packages)?;
+    print_stale_dependency_warnings(&warnings);
+
+    // Report which chips each compile-test project covers. Report-only: a gap here
+    // never blocks the plan (it surfaces at build time instead).
+    print_compile_test_coverage(workspace);
 
     let mut plan = Plan {
         base: current_branch,
@@ -492,32 +492,22 @@ pub fn ensure_main_branch(allow_non_main: bool) -> Result<(String, Option<Backpo
     Ok((current_branch, backport))
 }
 
-fn package_changed_since_last_release(workspace: &Path, package: Package) -> bool {
-    let toml = CargoToml::new(workspace, package).expect("Failed to load Cargo.toml");
+fn package_changed_since_last_release(workspace: &Path, package: Package) -> Result<bool> {
+    let toml = CargoToml::new(workspace, package)?;
 
     let last_version: semver::Version = toml.package_version();
-
     let last_tag = package.tag(&last_version);
-    let mut commits = commits_since_tag(workspace, &toml.package_path(), &last_tag);
 
-    if commits == 0 {
-        // Try to look up the last tag in the git history and retry.
-        let last_tag = Command::new("git")
-            .args(["describe", "--tags", "--abbrev=0"])
-            .current_dir(workspace)
-            .output()
-            .expect("Failed to get last tag");
-        let last_tag = String::from_utf8_lossy(&last_tag.stdout);
-        let last_tag = last_tag.trim();
+    ensure!(
+        crate::git::ref_exists(workspace, &last_tag)?,
+        "Cannot determine whether {package} changed since its last release: the tag {last_tag} \
+         does not exist. Every published package must be tagged at its current version."
+    );
 
-        if !last_tag.is_empty() {
-            commits = commits_since_tag(workspace, &toml.package_path(), last_tag);
-        }
-    }
-
+    let commits = commits_since_tag(workspace, &toml.package_path(), &last_tag);
     log::trace!("{package}: {commits} commits since last release");
 
-    commits > 0
+    Ok(commits > 0)
 }
 
 fn commits_since_tag(workspace: &Path, package_path: &Path, tag: &str) -> usize {
@@ -587,8 +577,8 @@ fn build_dependents(workspace: &Path) -> Result<HashMap<Package, Vec<Package>>> 
 /// Remove the excluded packages from `plan_packages`, along with any package
 /// that becomes private to the excluded set (every published dependent removed).
 ///
-/// Version consistency of what remains is left to [`validate_release_closure`],
-/// so exclusions that stay compatible are allowed and only genuine
+/// Version consistency of what remains is left to [`validate_plan`], so
+/// exclusions that stay compatible are allowed and only genuine
 /// incompatibilities are rejected.
 fn apply_exclusions(
     workspace: &Path,
@@ -675,73 +665,151 @@ fn compute_exclusion_removals(
     removed
 }
 
-/// Validate that the set of packages being released is self-consistent.
-///
-/// Guards against a "diamond": a crate that is *not* being released lands in a
-/// released crate's dependency tree while requiring an incompatible version of
-/// another crate that *is* being released. Classic case: releasing a breaking
-/// `xtensa-lx 0.13 -> 0.14` without `esp-hal`, so anything depending on the
-/// frozen `esp-hal` pulls `xtensa-lx 0.13` alongside the new `0.14`.
-///
-/// `releasing` maps each released package to its new version. Released packages
-/// are skipped as violation sources: the tooling rewrites their requirements to
-/// the new versions anyway.
-pub fn validate_release_closure(
-    workspace: &Path,
-    releasing: &HashMap<Package, semver::Version>,
-) -> Result<()> {
-    // Forward in-repo dependency graph, keeping each edge's version requirement.
-    let mut deps_of: HashMap<Package, Vec<(Package, String)>> = HashMap::new();
-    for pkg in Package::iter().filter(|p| !p.contains_standalone_projects()) {
-        deps_of.insert(
-            pkg,
-            CargoToml::new(workspace, pkg)?.repo_dependency_requirements(),
-        );
-    }
-
-    let violations = release_closure_violations(&deps_of, releasing);
-    if !violations.is_empty() {
-        bail!(
-            "The release plan is not self-consistent. The following crates are not being \
-             released but would be pulled into a released crate's dependency tree while \
-             requiring an incompatible version of a crate that IS being released:\n{}\n\nAdd the \
-             listed crate(s) to the plan, or remove from the plan the crate(s) they conflict \
-             with.",
-            violations.join("\n")
-        );
-    }
-
-    Ok(())
+/// A plan crate that depends on a frozen in-repo crate carrying commits since
+/// its release tag. Whether those commits are actually needed is decided by the
+/// registry check, so this is surfaced as a warning, not an error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaleDependency {
+    /// The plan crate doing the depending.
+    pub package: Package,
+    /// The frozen in-repo dependency with unreleased commits.
+    pub dependency: Package,
+    /// The frozen dependency's release tag.
+    pub tag: String,
+    /// Number of commits touching the dependency's directory since its tag.
+    pub commits: usize,
 }
 
-/// Pure core of [`validate_release_closure`]: given the forward dependency
-/// graph (each edge carrying its version requirement) and the packages being
-/// released (with their new versions), return the sorted list of consistency
-/// violations. An empty result means the release is self-consistent.
-fn release_closure_violations(
-    deps_of: &HashMap<Package, Vec<(Package, String)>>,
-    releasing: &HashMap<Package, semver::Version>,
-) -> Vec<String> {
-    // Everything reachable (downward) from the released packages, i.e. what
-    // will actually be pulled into a released crate's build.
-    let mut reachable = releasing.keys().copied().collect::<HashSet<_>>();
-    let mut stack = reachable.iter().copied().collect::<Vec<_>>();
-    while let Some(pkg) = stack.pop() {
-        for (dep, _) in deps_of.get(&pkg).into_iter().flatten() {
-            if reachable.insert(*dep) {
-                stack.push(*dep);
+/// Run every planner gate against a finalized set of plan packages, refusing a
+/// plan that is wrong on paper and returning the non-blocking stale-dependency
+/// warnings.
+///
+/// A frozen crate (published, not in the plan, not a standalone-project
+/// collection) is read from its release tag, never the working tree, which
+/// `bump_crate_version` rewrites for every workspace crate.
+pub fn validate_plan(workspace: &Path, packages: &[PackagePlan]) -> Result<Vec<StaleDependency>> {
+    let in_plan = packages.iter().map(|p| p.package).collect::<HashSet<_>>();
+    let releasing = packages
+        .iter()
+        .map(|p| (p.package, p.new_version.clone()))
+        .collect::<HashMap<_, _>>();
+
+    let mut frozen_reqs: HashMap<Package, Vec<(Package, String)>> = HashMap::new();
+    let mut drift_errors = Vec::new();
+    for pkg in Package::iter().filter(|p| p.is_published() && !p.contains_standalone_projects()) {
+        if in_plan.contains(&pkg) {
+            continue;
+        }
+
+        let mut tree = CargoToml::new(workspace, pkg)?;
+        let tag = pkg.tag(&tree.package_version());
+        ensure!(
+            crate::git::ref_exists(workspace, &tag)?,
+            "Cannot validate the release: frozen package {pkg} has no release tag {tag}."
+        );
+
+        let mut at_tag = CargoToml::at_ref(workspace, pkg, &tag)?;
+        frozen_reqs.insert(pkg, at_tag.repo_dependency_requirements());
+
+        let tree_deps = tree.dependency_requirements();
+        let tag_deps = at_tag.dependency_requirements();
+        if tree_deps != tag_deps {
+            drift_errors.push(format_manifest_drift(pkg, &tag, &tree_deps, &tag_deps));
+        }
+    }
+
+    let violations = release_closure_violations(&frozen_reqs, &releasing);
+    ensure!(
+        violations.is_empty(),
+        "The release plan is refused: the following frozen crates' published manifests reject a \
+         planned version. Add the named crate(s) to the plan so their requirements are raised, \
+         or remove the crate(s) they conflict with.\n{}",
+        violations.join("\n")
+    );
+
+    ensure!(
+        drift_errors.is_empty(),
+        "The release plan is refused: the following frozen crates' working-tree manifests differ \
+         from their release tags. A frozen crate must match what was published; add each listed \
+         crate to the plan so the change is released.\n\n{}",
+        drift_errors.join("\n\n")
+    );
+
+    // Non-blocking: a plan crate depending on a frozen in-repo crate with
+    // commits since its tag. The registry check decides if they are needed.
+    let mut deps_of: HashMap<Package, Vec<Package>> = HashMap::new();
+    for step in packages {
+        let mut toml = CargoToml::new(workspace, step.package)?;
+        let deps = toml
+            .repo_dependency_requirements()
+            .into_iter()
+            .map(|(dep, _)| dep)
+            .filter(|dep| !in_plan.contains(dep) && dep.is_published())
+            .collect::<Vec<_>>();
+        deps_of.insert(step.package, deps);
+    }
+
+    let mut to_check = deps_of.values().flatten().copied().collect::<Vec<_>>();
+    to_check.sort();
+    to_check.dedup();
+
+    let mut stale: HashMap<Package, (usize, String)> = HashMap::new();
+    for dep in to_check {
+        let dep_toml = CargoToml::new(workspace, dep)?;
+        let dep_tag = dep.tag(&dep_toml.package_version());
+        ensure!(
+            crate::git::ref_exists(workspace, &dep_tag)?,
+            "Cannot check {dep} for staleness: its release tag {dep_tag} does not exist."
+        );
+        let commits = commits_since_tag(workspace, &dep_toml.package_path(), &dep_tag);
+        if commits > 0 {
+            stale.insert(dep, (commits, dep_tag));
+        }
+    }
+
+    let plan_crates = packages.iter().map(|p| p.package).collect::<Vec<_>>();
+    Ok(stale_dependency_warnings(&plan_crates, &deps_of, &stale))
+}
+
+/// Pure core of the stale-dependency warning: pair each plan crate with its
+/// dependencies that carry commits since their release. `deps_of` holds each
+/// plan crate's out-of-plan published dependencies; `stale` maps a dependency
+/// with unreleased commits to its `(commit count, tag)`.
+fn stale_dependency_warnings(
+    plan_crates: &[Package],
+    deps_of: &HashMap<Package, Vec<Package>>,
+    stale: &HashMap<Package, (usize, String)>,
+) -> Vec<StaleDependency> {
+    let mut warnings = Vec::new();
+    for &package in plan_crates {
+        let mut deps = deps_of.get(&package).cloned().unwrap_or_default();
+        deps.sort();
+        deps.dedup();
+        for dep in deps {
+            if let Some((commits, tag)) = stale.get(&dep) {
+                warnings.push(StaleDependency {
+                    package,
+                    dependency: dep,
+                    tag: tag.clone(),
+                    commits: *commits,
+                });
             }
         }
     }
+    warnings
+}
 
-    // For every *frozen* crate that is nonetheless reachable, its requirement on
-    // any released crate must accept that crate's new version.
+/// Pure core of the upward closure walk: for every frozen crate (mapped to its
+/// published requirements) each requirement on a plan crate must accept that
+/// crate's planned version. Returns the sorted list of violations; empty means
+/// consistent.
+fn release_closure_violations(
+    frozen_reqs: &HashMap<Package, Vec<(Package, String)>>,
+    releasing: &HashMap<Package, semver::Version>,
+) -> Vec<String> {
     let mut violations = Vec::new();
-    for pkg in &reachable {
-        if releasing.contains_key(pkg) {
-            continue;
-        }
-        for (dep, req) in deps_of.get(pkg).into_iter().flatten() {
+    for (frozen, reqs) in frozen_reqs {
+        for (dep, req) in reqs {
             let Some(new_version) = releasing.get(dep) else {
                 continue;
             };
@@ -750,8 +818,8 @@ fn release_closure_violations(
                 .unwrap_or(false);
             if !accepted {
                 violations.push(format!(
-                    "  - {pkg} (not in the plan) requires {dep} \"{req}\", which does not accept \
-                     the planned {dep} {new_version}"
+                    "  - {frozen} (frozen) requires {dep} \"{req}\" in its published manifest, \
+                     which does not accept the planned {dep} {new_version}"
                 ));
             }
         }
@@ -760,6 +828,104 @@ fn release_closure_violations(
     violations.sort();
     violations.dedup();
     violations
+}
+
+/// Render a manifest-drift error for one frozen crate: the requirements that
+/// differ between its working tree and its release tag.
+fn format_manifest_drift(
+    pkg: Package,
+    tag: &str,
+    tree_deps: &[(String, String)],
+    tag_deps: &[(String, String)],
+) -> String {
+    let tree_map = tree_deps.iter().cloned().collect::<HashMap<_, _>>();
+    let tag_map = tag_deps.iter().cloned().collect::<HashMap<_, _>>();
+
+    let mut names = tree_map
+        .keys()
+        .chain(tag_map.keys())
+        .cloned()
+        .collect::<Vec<_>>();
+    names.sort();
+    names.dedup();
+
+    let mut lines = vec![format!("{pkg} (frozen at {tag}) has drifted:")];
+    for name in names {
+        match (tag_map.get(&name), tree_map.get(&name)) {
+            (Some(published), Some(tree)) if published != tree => {
+                lines.push(format!(
+                    "    - {name}: {published:?} (tag) -> {tree:?} (working tree)"
+                ));
+            }
+            (Some(published), None) => {
+                lines.push(format!(
+                    "    - {name}: {published:?} (tag) removed in working tree"
+                ));
+            }
+            (None, Some(tree)) => {
+                lines.push(format!("    - {name}: added in working tree as {tree:?}"));
+            }
+            _ => {}
+        }
+    }
+    lines.join("\n")
+}
+
+/// Print the compile-test chip coverage table. Report-only; a failure to read
+/// it is logged and swallowed so it can never block a plan.
+fn print_compile_test_coverage(workspace: &Path) {
+    match crate::firmware::compile_test_coverage(workspace) {
+        Ok(coverage) => {
+            println!("\nCompile-test chip coverage:");
+            println!(
+                "{}",
+                crate::firmware::format_compile_test_coverage(&coverage)
+            );
+        }
+        Err(e) => log::warn!("Could not compute compile-test coverage: {e}"),
+    }
+}
+
+/// Print stale-dependency warnings to stdout, grouped by plan crate.
+pub fn print_stale_dependency_warnings(warnings: &[StaleDependency]) {
+    if warnings.is_empty() {
+        return;
+    }
+    println!("\nStale-dependency warnings:");
+    for line in format_stale_dependency_warnings(warnings) {
+        println!("{line}");
+    }
+    println!(
+        "These dependencies have commits since their last release. The registry check decides \
+         whether the release needs them."
+    );
+}
+
+/// Format stale-dependency warnings as lines grouped under each plan crate, for
+/// both the plan output and the PR body.
+pub fn format_stale_dependency_warnings(warnings: &[StaleDependency]) -> Vec<String> {
+    let mut by_package: HashMap<Package, Vec<&StaleDependency>> = HashMap::new();
+    for w in warnings {
+        by_package.entry(w.package).or_default().push(w);
+    }
+
+    let mut packages = by_package.keys().copied().collect::<Vec<_>>();
+    packages.sort();
+
+    let mut lines = Vec::new();
+    for package in packages {
+        lines.push(format!("- {package}:"));
+        let mut deps = by_package.remove(&package).unwrap();
+        deps.sort_by_key(|w| w.dependency);
+        for w in deps {
+            let plural = if w.commits == 1 { "commit" } else { "commits" };
+            lines.push(format!(
+                "  - {} has {} {plural} since {}",
+                w.dependency, w.commits, w.tag
+            ));
+        }
+    }
+    lines
 }
 
 /// Merge PR changelog and migration guide entries from recently-merged PRs
@@ -1123,9 +1289,24 @@ mod tests {
         assert_eq!(plan[1].tag_name, "esp-hal-v1.2.0");
     }
 
+    /// Keep only the requirements of crates that are frozen (not in the
+    /// release), mirroring how [`validate_plan`] reads the upward walk's input
+    /// from the tags of crates left out of the plan.
+    fn frozen_reqs_from(
+        deps_of: &HashMap<Package, Vec<(Package, String)>>,
+        releasing: &HashMap<Package, semver::Version>,
+    ) -> HashMap<Package, Vec<(Package, String)>> {
+        deps_of
+            .iter()
+            .filter(|(pkg, _)| !releasing.contains_key(pkg))
+            .map(|(pkg, reqs)| (*pkg, reqs.clone()))
+            .collect()
+    }
+
     #[test]
     fn closure_full_release_is_consistent() {
-        // Everything is released, so no frozen crate can hold a stale requirement.
+        // Everything is released, so nothing is frozen and no published
+        // requirement can reject a planned version.
         let releasing = HashMap::from([
             (Package::EspRadio, ver("1.0.0-beta.1")),
             (Package::EspRtos, ver("0.4.0")),
@@ -1136,13 +1317,15 @@ mod tests {
             (Package::EspAlloc, ver("0.11.0")),
             (Package::XtensaLx, ver("0.14.0")),
         ]);
-        assert!(release_closure_violations(&xtensa_deps_of(), &releasing).is_empty());
+        let frozen = frozen_reqs_from(&xtensa_deps_of(), &releasing);
+        assert!(release_closure_violations(&frozen, &releasing).is_empty());
     }
 
     #[test]
-    fn closure_excluding_radio_leaf_is_consistent() {
-        // esp-radio (and its private esp-phy) dropped. Nothing released depends
-        // on them, so they never enter a released crate's dependency tree.
+    fn closure_freezing_radio_while_bumping_its_deps_is_rejected() {
+        // Drop esp-radio (and its private esp-phy) but bump the crates it
+        // depends on. The frozen esp-radio's published manifest still requires
+        // the old esp-alloc / esp-radio-rtos-driver, so the upward walk refuses.
         let releasing = HashMap::from([
             (Package::EspRtos, ver("0.4.0")),
             (Package::EspHal, ver("1.2.0-rc.1")),
@@ -1151,19 +1334,27 @@ mod tests {
             (Package::EspAlloc, ver("0.11.0")),
             (Package::XtensaLx, ver("0.14.0")),
         ]);
-        assert!(release_closure_violations(&xtensa_deps_of(), &releasing).is_empty());
+        let frozen = frozen_reqs_from(&xtensa_deps_of(), &releasing);
+        let violations = release_closure_violations(&frozen, &releasing);
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("esp-radio") && v.contains("esp-alloc")),
+            "expected an esp-radio/esp-alloc violation, got: {violations:?}"
+        );
     }
 
     #[test]
     fn closure_frozen_esp_hal_with_bumped_xtensa_is_rejected() {
-        // Bump xtensa-lx (breaking) but freeze esp-hal: esp-rtos would pull the
-        // frozen esp-hal (xtensa-lx 0.13) alongside the new xtensa-lx 0.14.
+        // Bump xtensa-lx (breaking) but freeze esp-hal: esp-hal's published
+        // manifest requires xtensa-lx 0.13, which rejects the planned 0.14.
         let releasing = HashMap::from([
             (Package::XtensaLx, ver("0.14.0")),
             (Package::EspSync, ver("0.4.0")),
             (Package::EspRtos, ver("0.4.0")),
         ]);
-        let violations = release_closure_violations(&xtensa_deps_of(), &releasing);
+        let frozen = frozen_reqs_from(&xtensa_deps_of(), &releasing);
+        let violations = release_closure_violations(&frozen, &releasing);
         assert!(
             violations
                 .iter()
@@ -1209,32 +1400,190 @@ mod tests {
     #[test]
     fn closure_releasing_radio_over_frozen_lower_stack_is_ok() {
         // Release esp-radio while freezing esp-phy and the whole lower stack:
-        // esp-radio keeps depending on the already-published versions, which is
-        // consistent because none of those frozen crates' deps are bumped.
+        // none of the frozen crates' deps are bumped, so no published
+        // requirement is violated.
         let releasing = HashMap::from([
             (Package::EspRadio, ver("1.0.0-beta.1")),
             (Package::EspRtos, ver("0.4.0")),
             (Package::EspRadioRtosDriver, ver("0.4.0")),
             (Package::EspAlloc, ver("0.11.0")),
         ]);
-        assert!(release_closure_violations(&xtensa_deps_of(), &releasing).is_empty());
+        let frozen = frozen_reqs_from(&xtensa_deps_of(), &releasing);
+        assert!(release_closure_violations(&frozen, &releasing).is_empty());
     }
 
     #[test]
     fn closure_freezing_esp_phy_while_bumping_esp_sync_is_rejected() {
-        // Bump esp-sync but freeze esp-phy: released esp-radio pulls the frozen
-        // esp-phy (which still requires esp-sync 0.3) alongside the new esp-sync
-        // 0.4.
+        // Bump esp-sync but freeze esp-phy: esp-phy's published manifest still
+        // requires esp-sync 0.3, which rejects the planned 0.4.
         let releasing = HashMap::from([
             (Package::EspRadio, ver("1.0.0-beta.1")),
             (Package::EspSync, ver("0.4.0")),
         ]);
-        let violations = release_closure_violations(&xtensa_deps_of(), &releasing);
+        let frozen = frozen_reqs_from(&xtensa_deps_of(), &releasing);
+        let violations = release_closure_violations(&frozen, &releasing);
         assert!(
             violations
                 .iter()
                 .any(|v| v.contains("esp-phy") && v.contains("esp-sync")),
             "expected an esp-phy/esp-sync violation, got: {violations:?}"
+        );
+    }
+
+    /// The #6341 graph: frozen esp-hal and esp-config require
+    /// esp-metadata-generated ^0.5 in their published manifests.
+    fn emg_deps_of() -> HashMap<Package, Vec<(Package, String)>> {
+        HashMap::from([
+            (
+                Package::EspHal,
+                vec![(Package::EspMetadataGenerated, "0.5".to_string())],
+            ),
+            (
+                Package::EspConfig,
+                vec![(Package::EspMetadataGenerated, "0.5".to_string())],
+            ),
+        ])
+    }
+
+    #[test]
+    fn releasing_emg_alone_is_refused_by_frozen_dependents() {
+        // #6341: bumping esp-metadata-generated to 0.6.0 while esp-hal and
+        // esp-config stay frozen at ^0.5 must be refused, since their published
+        // manifests reject 0.6.0.
+        let releasing = HashMap::from([(Package::EspMetadataGenerated, ver("0.6.0"))]);
+        let frozen = frozen_reqs_from(&emg_deps_of(), &releasing);
+        let violations = release_closure_violations(&frozen, &releasing);
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("esp-hal") && v.contains("esp-metadata-generated")),
+            "expected an esp-hal/esp-metadata-generated violation, got: {violations:?}"
+        );
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.contains("esp-config") && v.contains("esp-metadata-generated")),
+            "expected an esp-config/esp-metadata-generated violation, got: {violations:?}"
+        );
+    }
+
+    #[test]
+    fn releasing_emg_with_its_dependents_is_accepted() {
+        // Adding esp-hal and esp-config to the plan unfreezes them, so nothing
+        // constrains esp-metadata-generated.
+        let releasing = HashMap::from([
+            (Package::EspMetadataGenerated, ver("0.6.0")),
+            (Package::EspConfig, ver("0.9.0")),
+            (Package::EspHal, ver("1.3.0")),
+        ]);
+        let frozen = frozen_reqs_from(&emg_deps_of(), &releasing);
+        assert!(release_closure_violations(&frozen, &releasing).is_empty());
+    }
+
+    #[test]
+    fn edited_bump_changes_the_version_the_check_sees() {
+        // A frozen esp-hal requiring esp-metadata-generated ^0.5. Editing the
+        // bump from minor to patch changes the planned version the closure walk
+        // evaluates, flipping the outcome.
+        let frozen = HashMap::from([(
+            Package::EspHal,
+            vec![(Package::EspMetadataGenerated, "0.5".to_string())],
+        )]);
+        let current = ver("0.5.1");
+
+        let minor = do_version_bump(&current, &VersionBump::minor()).unwrap();
+        assert_eq!(minor, ver("0.6.0"));
+        let releasing = HashMap::from([(Package::EspMetadataGenerated, minor)]);
+        assert!(
+            !release_closure_violations(&frozen, &releasing).is_empty(),
+            "a minor bump to 0.6.0 must be rejected by ^0.5"
+        );
+
+        let patch = do_version_bump(&current, &VersionBump::patch()).unwrap();
+        assert_eq!(patch, ver("0.5.2"));
+        let releasing = HashMap::from([(Package::EspMetadataGenerated, patch)]);
+        assert!(
+            release_closure_violations(&frozen, &releasing).is_empty(),
+            "a patch bump to 0.5.2 must be accepted by ^0.5"
+        );
+    }
+
+    #[test]
+    fn manifest_drift_lists_only_changed_requirements() {
+        // Published tag required emg ^0.5 and an unchanged external dep; the
+        // working tree drifted emg to ^0.6.
+        let tag = vec![
+            ("embassy-time".to_string(), "0.5".to_string()),
+            ("esp-metadata-generated".to_string(), "0.5".to_string()),
+        ];
+        let tree = vec![
+            ("embassy-time".to_string(), "0.5".to_string()),
+            ("esp-metadata-generated".to_string(), "0.6".to_string()),
+        ];
+        let msg = format_manifest_drift(Package::EspHal, "esp-hal-v1.2.1", &tree, &tag);
+        assert!(msg.contains("esp-metadata-generated"), "got: {msg}");
+        assert!(msg.contains("0.5") && msg.contains("0.6"), "got: {msg}");
+        assert!(
+            !msg.contains("embassy-time"),
+            "unchanged deps must not be listed, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn stale_dependency_warns_for_frozen_dep_with_commits() {
+        // #6334 (esp-radio beta.1): esp-radio is released while
+        // esp-metadata-generated stays frozen with commits since its tag (the
+        // S31 Wi-Fi metadata), so the planner warns. esp-hal has no new commits,
+        // so it is not flagged.
+        let deps_of = HashMap::from([(
+            Package::EspRadio,
+            vec![Package::EspMetadataGenerated, Package::EspHal],
+        )]);
+        let stale = HashMap::from([(
+            Package::EspMetadataGenerated,
+            (3usize, "esp-metadata-generated-v0.5.1".to_string()),
+        )]);
+
+        let warnings = stale_dependency_warnings(&[Package::EspRadio], &deps_of, &stale);
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(warnings[0].package, Package::EspRadio);
+        assert_eq!(warnings[0].dependency, Package::EspMetadataGenerated);
+        assert_eq!(warnings[0].commits, 3);
+        assert_eq!(warnings[0].tag, "esp-metadata-generated-v0.5.1");
+    }
+
+    #[test]
+    fn stale_dependency_warnings_group_by_package() {
+        // #6334 (esp-radio beta.1): esp-radio is released against a frozen
+        // esp-metadata-generated 0.5.1 that has commits since its tag (the S31
+        // Wi-Fi metadata), so the planner warns rather than refusing.
+        let warnings = vec![
+            StaleDependency {
+                package: Package::EspRadio,
+                dependency: Package::EspMetadataGenerated,
+                tag: "esp-metadata-generated-v0.5.1".to_string(),
+                commits: 3,
+            },
+            StaleDependency {
+                package: Package::EspRadio,
+                dependency: Package::EspHal,
+                tag: "esp-hal-v1.2.1".to_string(),
+                commits: 1,
+            },
+        ];
+        let lines = format_stale_dependency_warnings(&warnings);
+        assert_eq!(lines[0], "- esp-radio:");
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("esp-hal") && l.contains("1 commit since")),
+            "got: {lines:?}"
+        );
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.contains("esp-metadata-generated") && l.contains("3 commits since")),
+            "got: {lines:?}"
         );
     }
 }
