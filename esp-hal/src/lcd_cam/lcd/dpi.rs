@@ -125,7 +125,10 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use enumset::{EnumSet, EnumSetType};
+
 use crate::{
+    Async,
     Blocking,
     DriverMode,
     dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer},
@@ -135,6 +138,9 @@ use crate::{
         ByteOrder,
         ClockError,
         ErasedTxChannel,
+        Instance,
+        LCD_VSYNC_WAKER,
+        LcdCamInterrupt,
         LcdDmaTxChannel,
         lcd::{ClockConfig, ClockMode, DelayMode, Lcd},
         ll,
@@ -142,6 +148,17 @@ use crate::{
     pac,
     time::Rate,
 };
+
+/// LCD interrupt sources relevant to an RGB/DPI transfer.
+///
+/// These sources can be polled without enabling the CPU interrupt.
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum DpiInterrupt {
+    /// The LCD has started outputting a new frame.
+    Vsync,
+}
 
 /// Errors that can occur when configuring the DPI peripheral.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -475,6 +492,8 @@ where
         next_frame_en: bool,
         mut buf: TX,
     ) -> Result<DpiTransfer<'d, TX, Dm>, (DmaError, Self, TX)> {
+        Instance::clear_interrupts(LcdCamInterrupt::LcdVsync.into());
+
         // Reset before DMA start. AXI-GDMA can fill the LCD AFIFO immediately; a later
         // FIFO reset would drop the first pixels of the frame.
         self.regs()
@@ -520,6 +539,32 @@ pub struct DpiTransfer<'d, BUF: DmaTxBuffer, Dm: DriverMode> {
 }
 
 impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
+    /// Returns the asserted LCD interrupt sources for this transfer.
+    ///
+    /// Each source is a latched flag, so repeated events before clearing are
+    /// reported as one. This reads raw status and does not require interrupt
+    /// listening to be enabled.
+    #[instability::unstable]
+    pub fn interrupts(&mut self) -> EnumSet<DpiInterrupt> {
+        let sources = Instance::interrupts();
+        let mut interrupts = EnumSet::new();
+        if sources.contains(LcdCamInterrupt::LcdVsync) {
+            interrupts.insert(DpiInterrupt::Vsync);
+        }
+        interrupts
+    }
+
+    /// Clears the selected LCD interrupt sources.
+    #[instability::unstable]
+    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<DpiInterrupt>>) {
+        let interrupts = interrupts.into();
+        let mut sources = EnumSet::new();
+        if interrupts.contains(DpiInterrupt::Vsync) {
+            sources.insert(LcdCamInterrupt::LcdVsync);
+        }
+        Instance::clear_interrupts(sources);
+    }
+
     /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.dpi.regs().lcd_user().read().lcd_start().bit_is_clear()
@@ -580,6 +625,67 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
 
         // Stop the DMA
         self.dpi.tx_channel.stop_transfer();
+    }
+}
+
+impl<BUF: DmaTxBuffer> DpiTransfer<'_, BUF, Blocking> {
+    /// Waits for a pending LCD VSYNC event and clears it.
+    ///
+    /// If a VSYNC event is already pending, this returns immediately. The
+    /// transfer must remain active for another VSYNC to occur. Clear
+    /// [`DpiInterrupt::Vsync`] with [`Self::clear_interrupts`] first to wait for
+    /// a fresh event.
+    #[instability::unstable]
+    pub fn wait_for_vsync(&mut self) {
+        let vsync = LcdCamInterrupt::LcdVsync;
+        while !Instance::interrupts().contains(vsync) {
+            core::hint::spin_loop();
+        }
+        Instance::clear_interrupts(vsync.into());
+    }
+}
+
+impl<BUF: DmaTxBuffer> DpiTransfer<'_, BUF, Async> {
+    /// Waits for the next pending LCD VSYNC event and clears it.
+    ///
+    /// If a VSYNC event is already pending, this returns immediately. The
+    /// transfer must remain active for another VSYNC to occur. Clear
+    /// [`DpiInterrupt::Vsync`] with [`Self::clear_interrupts`] first to wait for
+    /// a fresh event.
+    #[instability::unstable]
+    pub async fn wait_for_vsync(&mut self) {
+        use core::{
+            future::Future,
+            pin::Pin,
+            task::{Context, Poll},
+        };
+
+        #[must_use = "futures do nothing unless you `.await` or poll them"]
+        struct VsyncFuture;
+
+        impl Future for VsyncFuture {
+            type Output = ();
+
+            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+                let vsync = LcdCamInterrupt::LcdVsync;
+                if Instance::interrupts().contains(vsync) {
+                    Instance::clear_interrupts(vsync.into());
+                    Poll::Ready(())
+                } else {
+                    LCD_VSYNC_WAKER.register(cx.waker());
+                    Instance::listen(vsync.into());
+                    Poll::Pending
+                }
+            }
+        }
+
+        impl Drop for VsyncFuture {
+            fn drop(&mut self) {
+                Instance::unlisten(LcdCamInterrupt::LcdVsync.into());
+            }
+        }
+
+        VsyncFuture.await
     }
 }
 
