@@ -525,6 +525,21 @@ pub fn cpu_clock() -> Rate {
 /// Does not change core voltage: lowering the clock is safe; raising it above what the
 /// boot-time voltage sustains may be unstable.
 pub fn set_cpu_clock(clock: CpuClock) {
+    #[cfg(esp32s3)]
+    {
+        let div = match clock {
+            CpuClock::_80MHz => 0,
+            CpuClock::_160MHz => 1,
+            CpuClock::_240MHz => 2,
+        };
+        critical_section::with(|_| {
+            crate::peripherals::SYSTEM::regs().cpu_per_conf().modify(|_, w| {
+                unsafe { w.cpuperiod_sel().bits(div) }
+            });
+            esp_rom_sys::rom::ets_update_cpu_frequency_rom(clock as u32);
+        });
+    }
+    #[cfg(not(esp32s3))]
     ClockTree::with(|clocks| {
         ClockConfig::from(clock).configure(clocks);
     });

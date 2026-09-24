@@ -96,21 +96,15 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     if data.len() >= 4 && data[0] == 0x04 {
         match data[1] {
             0x05 => {
-                if BLE_CONN_COUNT.load(core::sync::atomic::Ordering::Relaxed) > 0
-                    && BLE_CONN_COUNT.fetch_sub(1, core::sync::atomic::Ordering::Relaxed) == 1
-                {
-                    // last connection gone → advertising only; drop the Bt wake source.
-                    #[cfg(any(esp32c3, esp32s3))]
-                    esp_hal::rtc_cntl::sleep::disable_bt_wakeup();
+                if BLE_CONN_COUNT.load(core::sync::atomic::Ordering::Relaxed) > 0 {
+                    BLE_CONN_COUNT.fetch_sub(1, core::sync::atomic::Ordering::Relaxed);
                 }
             }
             0x3E if data.len() >= 5 && matches!(data[3], 0x01 | 0x0A) && data[4] == 0x00 => {
-                if BLE_CONN_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed) == 0 {
-                    // first connection → arm the Bt wake source as the event backstop.
-                    #[cfg(any(esp32c3, esp32s3))]
-                    if SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
-                        esp_hal::rtc_cntl::sleep::enable_bt_wakeup();
-                    }
+                BLE_CONN_COUNT.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
+                #[cfg(any(esp32c3, esp32s3))]
+                if SLEEP_CLOCK_LIGHT_SLEEP.load(core::sync::atomic::Ordering::Relaxed) {
+                    esp_hal::rtc_cntl::sleep::enable_bt_wakeup();
                 }
             }
             _ => {}
@@ -570,11 +564,10 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             // doubles as the controller's per-event lock: enter_phase2 releases it in each
             // gap and exit_phase3 re-acquires it, so the SoC only light-sleeps between events.
             // Without one, that lock stays held for the controller's lifetime.
-            // The Bt light-sleep wake source is armed per-CONNECTION (in notify_host_recv),
-            // NOT here: during idle advertising the controller runs autonomously on the
-            // kept-alive XTAL and does not need to wake the SoC, so leaving Bt-wake off there
-            // avoids fragmenting the advertising sleep gap with per-event wakeups.
-            let _ = light_sleep;
+            #[cfg(any(esp32c3, esp32s3))]
+            if light_sleep {
+                esp_hal::rtc_cntl::sleep::enable_bt_wakeup();
+            }
             debug!(
                 "btdm modem-sleep lpclk sel={} div={} lpcycle_us={} light_sleep={} sel_ok={} div_ok={}",
                 sel, div, lpcycle_us, light_sleep, sel_ok, div_ok
