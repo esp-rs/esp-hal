@@ -10,10 +10,3 @@ xrelease = "run --package esp-devtool --features=release -- release"
 xrel-check = "run --package esp-devtool --features=rel-check -- rel-check"
 xmcp       = "run --package esp-devtool --features=mcp -- mcp"
 install-xtask = "install --path ./xtask --all-features"
-
-# TEMPORARY: RNG/TRNG PAC changes, remove once merged into esp-rs/esp-pacs.
-[patch."https://github.com/esp-rs/esp-pacs.git"]
-esp32c5  = { git = "https://github.com/JurajSadel/esp-pacs", branch = "rng-trng-cleanup" }
-esp32c61 = { git = "https://github.com/JurajSadel/esp-pacs", branch = "rng-trng-cleanup" }
-esp32c6  = { git = "https://github.com/JurajSadel/esp-pacs", branch = "rng-trng-cleanup" }
-esp32h2  = { git = "https://github.com/JurajSadel/esp-pacs", branch = "rng-trng-cleanup" }
