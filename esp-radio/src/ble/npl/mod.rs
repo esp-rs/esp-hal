@@ -1114,7 +1114,66 @@ pub(crate) struct BleNplCountInfoT {
     mutex_count: u16,
 }
 
+#[crate::hal::ram]
+unsafe extern "C" fn controller_sleep_cb(_enable_tick: u32, _arg: *mut c_void) {
+    super::modem_phy_release();
+}
+
+#[crate::hal::ram]
+unsafe extern "C" fn controller_wakeup_cb(_arg: *mut c_void) {
+    super::modem_phy_acquire();
+}
+
+fn register_modem_sleep() {
+    unsafe extern "C" {
+        #[cfg(not(esp32c2))]
+        fn r_ble_lll_sleep_set_sleep_cb(
+            sleep_cb: unsafe extern "C" fn(u32, *mut c_void),
+            wakeup_cb: unsafe extern "C" fn(*mut c_void),
+            sleep_arg: *mut c_void,
+            wakeup_arg: *mut c_void,
+            us_to_enabled: u32,
+        );
+        #[cfg(esp32c2)]
+        fn r_ble_lll_rfmgmt_set_sleep_cb(
+            sleep_cb: unsafe extern "C" fn(u32, *mut c_void),
+            wakeup_cb: unsafe extern "C" fn(*mut c_void),
+            sleep_arg: *mut c_void,
+            wakeup_arg: *mut c_void,
+            us_to_enabled: u32,
+        );
+    }
+
+    // ESP-IDF modem-sleep PHY enable delay. C2 adds `BLE_RTC_DELAY_US` (1800) to 500.
+    let delay_us = cfg_select! {
+        esp32c2 => 2_300,
+        esp32h2 => 1_500,
+        _ => 500,
+    };
+
+    unsafe {
+        cfg_select! {
+            esp32c2 => r_ble_lll_rfmgmt_set_sleep_cb(
+                controller_sleep_cb,
+                controller_wakeup_cb,
+                core::ptr::null_mut(),
+                core::ptr::null_mut(),
+                delay_us,
+            ),
+            _ => r_ble_lll_sleep_set_sleep_cb(
+                controller_sleep_cb,
+                controller_wakeup_cb,
+                core::ptr::null_mut(),
+                core::ptr::null_mut(),
+                delay_us,
+            ),
+        }
+    }
+}
+
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
+    super::set_modem_sleep(config.modem_sleep());
+
     let phy_init_guard;
     unsafe {
         // turn on logging
@@ -1130,6 +1189,8 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         }
 
         self::chip_specific::ble_rtc_clk_init();
+
+        super::lp_clk::request();
 
         let cfg = chip_specific::create_ble_config(config);
 
@@ -1194,6 +1255,10 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         let res = ble_controller_init(&cfg);
         assert!(res == 0, "ble_controller_init returned {}", res);
 
+        if config.modem_sleep() {
+            register_modem_sleep();
+        }
+
         #[cfg(feature = "coex")]
         crate::sys::include::coex_enable();
 
@@ -1234,6 +1299,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    super::modem_phy_acquire();
+    super::set_modem_sleep(false);
+
     #[cfg(rng_trng_supported)]
     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
         esp_hal::Internal::conjure()
@@ -1257,6 +1325,8 @@ pub(crate) fn ble_deinit() {
         esp_unregister_npl_funcs();
         esp_unregister_ext_funcs();
     }
+
+    super::lp_clk::release();
 }
 
 unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i32 {

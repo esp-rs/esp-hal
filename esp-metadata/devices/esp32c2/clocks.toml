@@ -52,6 +52,12 @@ system_clocks = { clock_tree = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST",  outputs = "RC_FAST_DIV_CLK" },
     ] },
+    # BLE RTC timer (MODEM_CLKRST). The crystal input is divided by 5 in hardware.
+    { name = "BLE_LP_XTAL_CLK", type = "generic", output = "XTAL_CLK / 5" },
+    { name = "BLE_LP_CLK", type = "generic", output = "sclk / (divisor + 1)", params = { sclk = [
+        { name = "XTAL", outputs = "BLE_LP_XTAL_CLK", default = true },
+        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+    ], divisor = "0 ..= 255" } },
     { name = "RTC_FAST_CLK", type = "mux", variants = [ # RTC_CNTL_FAST_CLK_RTC_SEL
         { name = "XTAL", outputs = "XTAL_DIV_CLK" },
         { name = "RC",   outputs = "RC_FAST_CLK_DIV_N" },

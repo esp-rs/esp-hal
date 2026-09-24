@@ -205,46 +205,140 @@ unsafe extern "C" fn rand() -> i32 {
     unsafe { crate::common_adapter::random() as i32 }
 }
 
+const LP_CYCLE_US_FRAC: u32 = 19;
+static LP_CYCLE_US: AtomicU32 = AtomicU32::new(1 << LP_CYCLE_US_FRAC);
+
+unsafe extern "C" {
+    fn btdm_lpclk_select_src(sel: u32) -> bool;
+    fn btdm_lpclk_set_div(div: u32) -> bool;
+    #[cfg(not(esp32))]
+    fn btdm_sleep_clock_sync() -> u8;
+    fn btdm_controller_enable_sleep(enable: bool);
+    fn btdm_wakeup_request();
+    fn btdm_in_wakeup_requesting_set(set: bool);
+    fn btdm_power_state_active() -> bool;
+
+    #[cfg(feature = "coex")]
+    fn coex_update_lpclk_interval();
+}
+
+fn program_btdm_lpclk() {
+    let params = super::lp_clk::btdm();
+    LP_CYCLE_US.store(params.lpcycle_us, Ordering::Relaxed);
+    unsafe {
+        let selected = btdm_lpclk_select_src(params.select);
+        let divided = btdm_lpclk_set_div(params.divider);
+        assert!(selected && divided, "btdm_lpclk_select_src/set_div failed");
+        #[cfg(feature = "coex")]
+        coex_update_lpclk_interval();
+    }
+}
+
 #[ram]
-unsafe extern "C" fn btdm_lpcycles_2_hus(_cycles: u32, _error_corr: u32) -> u32 {
-    todo!();
+unsafe extern "C" fn btdm_lpcycles_2_hus(cycles: u32, error_corr: u32) -> u32 {
+    let lpcycle_us = LP_CYCLE_US.load(Ordering::Relaxed).max(1);
+    cfg_select! {
+        esp32 => {
+            let _ = error_corr;
+            let us = u64::from(lpcycle_us) * u64::from(cycles);
+            ((us + (1 << (LP_CYCLE_US_FRAC - 1))) >> LP_CYCLE_US_FRAC) as u32
+        }
+        _ => {
+            let error_corr = error_corr as *mut u32;
+            let mut local = if error_corr.is_null() {
+                0
+            } else {
+                unsafe { u64::from(*error_corr) }
+            };
+            let mut res = u64::from(lpcycle_us) * u64::from(cycles) * 2;
+            local += res;
+            res = local >> LP_CYCLE_US_FRAC;
+            local -= res << LP_CYCLE_US_FRAC;
+            if !error_corr.is_null() {
+                unsafe { *error_corr = local as u32 };
+            }
+            res as u32
+        }
+    }
 }
 
 #[ram]
 unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
-    const RTC_CLK_CAL_FRACT: u32 = 19;
-    let g_btdm_lpcycle_us_frac = RTC_CLK_CAL_FRACT;
-    let g_btdm_lpcycle_us = 2 << (g_btdm_lpcycle_us_frac);
-
-    // Converts a duration in half us into a number of low power clock cycles.
-    let cycles: u64 = ((us as u64) << g_btdm_lpcycle_us_frac) / (g_btdm_lpcycle_us as u64);
-    trace!("btdm_hus_2_lpcycles {} {}", us, cycles);
-
-    cycles as u32
+    let lpcycle_us = u64::from(LP_CYCLE_US.load(Ordering::Relaxed).max(1));
+    let cycles = (u64::from(us) << LP_CYCLE_US_FRAC) / lpcycle_us;
+    cfg_select! {
+        esp32 => cycles as u32,
+        _ => (cycles >> 1) as u32,
+    }
 }
 
-unsafe extern "C" fn btdm_sleep_check_duration(_slot_cnt: i32) -> i32 {
-    todo!();
+#[ram]
+unsafe extern "C" fn btdm_sleep_check_duration(slot_cnt: i32) -> i32 {
+    if !super::modem_sleep_enabled() {
+        return 0;
+    }
+
+    let (min_sleep, wake_delay) = cfg_select! {
+        esp32 => (12, 4),
+        _ => (24, 8),
+    };
+    let slot_cnt = slot_cnt as *mut i32;
+    let slots = unsafe { *slot_cnt };
+    if slots < min_sleep {
+        return 0;
+    }
+    unsafe { *slot_cnt = slots - wake_delay };
+    1
 }
 
-unsafe extern "C" fn btdm_sleep_enter_phase1(_lpcycles: i32) {
-    todo!();
-}
+unsafe extern "C" fn btdm_sleep_enter_phase1(_lpcycles: i32) {}
 
 unsafe extern "C" fn btdm_sleep_enter_phase2() {
-    todo!();
+    if super::modem_sleep_enabled() {
+        super::modem_phy_release();
+    }
 }
 
-unsafe extern "C" fn btdm_sleep_exit_phase1() {
-    todo!();
-}
+unsafe extern "C" fn btdm_sleep_exit_phase1() {}
 
-unsafe extern "C" fn btdm_sleep_exit_phase2() {
-    todo!();
-}
+unsafe extern "C" fn btdm_sleep_exit_phase2() {}
 
 unsafe extern "C" fn btdm_sleep_exit_phase3() {
-    todo!();
+    if !super::modem_sleep_enabled() {
+        return;
+    }
+    let phy_restored = super::modem_phy_acquire();
+    cfg_select! {
+        // The RF can be off since the last baseband initialization.
+        esp32 => {
+            if phy_restored {
+                unsafe { btdm_rf_bb_init_phase2() };
+            }
+        }
+        _ => {
+            let _ = phy_restored;
+            unsafe { while btdm_sleep_clock_sync() != 0 {} }
+        }
+    }
+}
+
+fn wake_controller_for_hci() {
+    if !super::modem_sleep_enabled() {
+        return;
+    }
+    unsafe {
+        btdm_in_wakeup_requesting_set(true);
+        if !btdm_power_state_active() {
+            btdm_wakeup_request();
+        }
+    }
+}
+
+fn end_controller_hci_wake() {
+    if !super::modem_sleep_enabled() {
+        return;
+    }
+    unsafe { btdm_in_wakeup_requesting_set(false) };
 }
 
 #[ram]
@@ -253,6 +347,10 @@ unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
 }
 
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
+    super::set_modem_sleep(config.modem_sleep());
+    super::lp_clk::request();
+    program_btdm_lpclk();
+
     let phy_init_guard;
     unsafe {
         // turn on logging
@@ -321,6 +419,10 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         btdm_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
 
+        if config.modem_sleep() {
+            btdm_controller_enable_sleep(true);
+        }
+
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
     }
 
@@ -330,6 +432,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    super::modem_phy_acquire();
+    super::set_modem_sleep(false);
+
     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
         esp_hal::Internal::conjure()
     });
@@ -337,6 +442,8 @@ pub(crate) fn ble_deinit() {
     unsafe {
         btdm_controller_deinit();
     }
+
+    super::lp_clk::release();
     // Disabling the PHY happens automatically, when the BLEController gets dropped.
 }
 
@@ -371,6 +478,8 @@ fn send_packet(packet: &[u8]) {
     unsafe {
         PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
 
+        wake_controller_for_hci();
+
         #[cfg(all(esp32, feature = "coex"))]
         chip_specific::async_wakeup_request(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
 
@@ -378,6 +487,8 @@ fn send_packet(packet: &[u8]) {
 
         #[cfg(all(esp32, feature = "coex"))]
         chip_specific::async_wakeup_request_end(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
+
+        end_controller_hci_wake();
     }
 
     trace!("sent vhci host packet");

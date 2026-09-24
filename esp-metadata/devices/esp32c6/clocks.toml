@@ -67,6 +67,13 @@ system_clocks = { clock_tree = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
+    # BLE RTC timer (MODEM_LPCON). Independent of LP_SLOW_CLK.
+    { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "100_000" },
+    { name = "BLE_LP_CLK", type = "mux", variants = [
+        { name = "XTAL",    outputs = "BLE_LP_XTAL_CLK" },
+        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+        { name = "XTAL32K", outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
+    ] },
     # LP_DYN_SLOW_CLK is LP_SLOW_CLK
     # LP_DYN_FAST_CLK is automatically managed based on power mode. Not sure how to model it, some LP peripherals need it.
 

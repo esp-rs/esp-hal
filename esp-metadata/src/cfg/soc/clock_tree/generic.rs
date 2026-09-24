@@ -732,14 +732,14 @@ impl ClockTreeNodeType for Generic {
             match param {
                 NodeParameter::Value(_) => {
                     quote! {
-                        pub(crate) fn #param_name(self) -> u32 {
+                        pub fn #param_name(self) -> u32 {
                             self.#param_name as u32
                         }
                     }
                 }
                 NodeParameter::Source(_) => {
                     quote! {
-                        pub(crate) fn #param_name(self) -> #param_ty {
+                        pub fn #param_name(self) -> #param_ty {
                             self.#param_name
                         }
                     }

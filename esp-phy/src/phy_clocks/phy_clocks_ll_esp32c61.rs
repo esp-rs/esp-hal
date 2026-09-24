@@ -34,3 +34,9 @@ pub(crate) fn enable_phy(en: bool) {
         w.clk_fe_adc_en().bit(en)
     });
 }
+
+/// `MODEM_SYSCON.clk_conf`: `clk_modem_sec_apb_en`.
+pub(crate) const CALIBRATION_CLK_CONF_MASK: u32 = 1 << 28;
+/// `MODEM_SYSCON.clk_conf1`: `clk_wifibb_*_en` (bits 0-8), `clk_wifi_apb_en`, `clk_bt_apb_en` and
+/// `clk_btbb_en`.
+pub(crate) const CALIBRATION_CLK_CONF1_MASK: u32 = 0x1ff | 1 << 10 | 1 << 16 | 1 << 17;

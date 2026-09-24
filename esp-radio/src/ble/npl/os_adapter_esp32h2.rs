@@ -99,6 +99,12 @@ impl TxPower {
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
+    /// Enables controller modem sleep.
+    ///
+    /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
+    /// Set this before the controller starts. The default is off.
+    modem_sleep: bool,
+
     /// The priority of the RTOS task.
     task_priority: u8,
 
@@ -218,6 +224,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            modem_sleep: false,
             task_priority: crate::preempt::max_task_priority()
                 .saturating_sub(2)
                 .min(255) as u8,
@@ -286,7 +293,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_rsp_dup_list_count: config.ll_rsp_dup_list_count,
         ble_ll_adv_dup_list_count: config.ll_adv_dup_list_count,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
-        rtc_freq: 32000,
+        rtc_freq: u64::from(super::super::lp_clk::frequency_hz()),
         ble_ll_sca: CONFIG_BT_LE_LL_SCA as _,
         ble_ll_scan_phy_number: if CONFIG_BT_LE_LL_CFG_FEAT_LE_CODED_PHY != 0 {
             2
@@ -315,7 +322,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         enable_bqb_test: config.bqb_test as u8,
         enable_tx_cca: config.cca as u8,
         cca_rssi_thresh: (256 - config.cca_threshold as u32) as u8,
-        sleep_en: 0,
+        sleep_en: u8::from(config.modem_sleep),
         coex_phy_coded_tx_rx_time_limit: CONFIG_BT_LE_COEX_PHY_CODED_TX_RX_TLIM_EFF as _,
         dis_scan_backoff: config.dis_scan_backoff as u8,
         ble_scan_classify_filter_enable: 1,

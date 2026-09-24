@@ -282,6 +282,12 @@ static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
+    /// Enables controller modem sleep.
+    ///
+    /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
+    /// Set this before the controller starts. The default is off.
+    modem_sleep: bool,
+
     /// The priority of the RTOS task.
     task_priority: u8,
 
@@ -330,6 +336,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            modem_sleep: false,
             task_priority: crate::preempt::max_task_priority()
                 .saturating_sub(2)
                 .min(255) as u8,
@@ -467,9 +474,16 @@ pub(crate) fn disable_sleep_mode() {
     }
 
     const BTDM_MODEM_SLEEP_MODE_NONE: u8 = 0;
+    const BTDM_MODEM_SLEEP_MODE_ORIG: u8 = 1;
+
+    let mode = if crate::ble::modem_sleep_enabled() {
+        BTDM_MODEM_SLEEP_MODE_ORIG
+    } else {
+        BTDM_MODEM_SLEEP_MODE_NONE
+    };
 
     unsafe {
-        btdm_controller_set_sleep_mode(BTDM_MODEM_SLEEP_MODE_NONE);
+        btdm_controller_set_sleep_mode(mode);
     }
 }
 

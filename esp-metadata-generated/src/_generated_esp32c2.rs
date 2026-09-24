@@ -422,6 +422,13 @@ macro_rules! property {
         ::soc::clocks::RtcSlowClkConfig::RcSlow, crate
         ::soc::clocks::RtcSlowClkConfig::RcFast]
     };
+    ("clock_tree.ble_lp_clk.sclk") => {
+        [crate ::soc::clocks::BleLpClkSclk::Xtal, crate
+        ::soc::clocks::BleLpClkSclk::RcSlow]
+    };
+    ("clock_tree.ble_lp_clk.divisor") => {
+        (0, 255)
+    };
     ("clock_tree.rtc_fast_clk") => {
         [crate ::soc::clocks::RtcFastClkConfig::Xtal, crate
         ::soc::clocks::RtcFastClkConfig::Rc]
@@ -971,6 +978,26 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // BLE_LP_XTAL_CLK
+///
+/// fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// // BLE_LP_CLK
+///
+/// fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_ble_lp_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<BleLpClkConfig>,
+///     _new_config: BleLpClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // RTC_FAST_CLK
 ///
 /// fn enable_rtc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1191,7 +1218,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1226,7 +1253,7 @@ macro_rules! define_clock_tree_types {
             pub const fn new(divisor: CpuPllDivDivisor) -> Self {
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1290,7 +1317,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1304,6 +1331,45 @@ macro_rules! define_clock_tree_types {
             RcSlow,
             /// Selects `RC_FAST_DIV_CLK`.
             RcFast,
+        }
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum BleLpClkSclk {
+            #[default]
+            /// Selects `BLE_LP_XTAL_CLK`.
+            Xtal,
+            /// Selects `RC_SLOW_CLK`.
+            RcSlow,
+        }
+        /// Configures the `BLE_LP_CLK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = sclk / (divisor + 1)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct BleLpClkConfig {
+            sclk: BleLpClkSclk,
+            divisor: u32,
+        }
+        impl BleLpClkConfig {
+            /// Creates a new configuration for the BLE_LP_CLK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 255).
+            pub const fn new(sclk: BleLpClkSclk, divisor: u32) -> Self {
+                ::core::assert!(
+                    divisor <= 255,
+                    "`BLE_LP_CLK` divisor must be between 0 and 255 (inclusive)."
+                );
+                Self { sclk, divisor }
+            }
+            pub fn sclk(self) -> BleLpClkSclk {
+                self.sclk
+            }
+            pub fn divisor(self) -> u32 {
+                self.divisor as u32
+            }
         }
         /// The list of clock signals that the `RTC_FAST_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1378,10 +1444,10 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { sclk, div_num }
             }
-            pub(crate) fn sclk(self) -> I2cFunctionClockSclk {
+            pub fn sclk(self) -> I2cFunctionClockSclk {
                 self.sclk
             }
-            pub(crate) fn div_num(self) -> u32 {
+            pub fn div_num(self) -> u32 {
                 self.div_num as u32
             }
         }
@@ -1449,10 +1515,10 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { sclk, div_num }
             }
-            pub(crate) fn sclk(self) -> UartFunctionClockSclk {
+            pub fn sclk(self) -> UartFunctionClockSclk {
                 self.sclk
             }
-            pub(crate) fn div_num(self) -> u32 {
+            pub fn div_num(self) -> u32 {
                 self.div_num as u32
             }
         }
@@ -1490,10 +1556,10 @@ macro_rules! define_clock_tree_types {
                     integral,
                 }
             }
-            pub(crate) fn fractional(self) -> u32 {
+            pub fn fractional(self) -> u32 {
                 self.fractional as u32
             }
-            pub(crate) fn integral(self) -> u32 {
+            pub fn integral(self) -> u32 {
                 self.integral as u32
             }
         }
@@ -1509,6 +1575,7 @@ macro_rules! define_clock_tree_types {
             cpu_clk: Option<CpuClkConfig>,
             rc_fast_clk_div_n: Option<RcFastClkDivNConfig>,
             rtc_slow_clk: Option<RtcSlowClkConfig>,
+            ble_lp_clk: Option<BleLpClkConfig>,
             rtc_fast_clk: Option<RtcFastClkConfig>,
             low_power_clk: Option<LowPowerClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
@@ -1527,6 +1594,7 @@ macro_rules! define_clock_tree_types {
             mspi_clk_refcount: u32,
             pll_40m_refcount: u32,
             pll_60m_refcount: u32,
+            ble_lp_clk_refcount: u32,
             rtc_fast_clk_refcount: u32,
             low_power_clk_refcount: u32,
             uart_mem_clk_refcount: u32,
@@ -1583,6 +1651,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the RTC_SLOW_CLK clock tree node
             pub fn rtc_slow_clk(&self) -> Option<RtcSlowClkConfig> {
                 self.rtc_slow_clk
+            }
+            /// Returns the current configuration of the BLE_LP_CLK clock tree node
+            pub fn ble_lp_clk(&self) -> Option<BleLpClkConfig> {
+                self.ble_lp_clk
             }
             /// Returns the current configuration of the RTC_FAST_CLK clock tree node
             pub fn rtc_fast_clk(&self) -> Option<RtcFastClkConfig> {
@@ -1641,6 +1713,7 @@ macro_rules! define_clock_tree_types {
                 cpu_clk: None,
                 rc_fast_clk_div_n: None,
                 rtc_slow_clk: None,
+                ble_lp_clk: None,
                 rtc_fast_clk: None,
                 low_power_clk: None,
                 timg_calibration_clock: None,
@@ -1659,6 +1732,7 @@ macro_rules! define_clock_tree_types {
                 mspi_clk_refcount: 0,
                 pll_40m_refcount: 0,
                 pll_60m_refcount: 0,
+                ble_lp_clk_refcount: 0,
                 rtc_fast_clk_refcount: 0,
                 low_power_clk_refcount: 0,
                 uart_mem_clk_refcount: 0,
@@ -1684,6 +1758,8 @@ macro_rules! define_clock_tree_types {
         static RC_FAST_CLK_DIV_N_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static RTC_SLOW_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static BLE_LP_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static RTC_FAST_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -2407,6 +2483,84 @@ macro_rules! define_clock_tree_types {
                 RtcSlowClkConfig::RcFast => rc_fast_div_clk_frequency(),
             }
         }
+        pub fn request_ble_lp_xtal_clk(clocks: &mut ClockTree) {
+            trace!("Requesting BLE_LP_XTAL_CLK");
+            trace!("Enabling BLE_LP_XTAL_CLK");
+            request_xtal_clk(clocks);
+            enable_ble_lp_xtal_clk_impl(clocks, true);
+        }
+        pub fn release_ble_lp_xtal_clk(clocks: &mut ClockTree) {
+            trace!("Releasing BLE_LP_XTAL_CLK");
+            trace!("Disabling BLE_LP_XTAL_CLK");
+            enable_ble_lp_xtal_clk_impl(clocks, false);
+            release_xtal_clk(clocks);
+        }
+        pub fn ble_lp_xtal_clk_frequency() -> u32 {
+            (xtal_clk_frequency() / 5)
+        }
+        pub fn ble_lp_xtal_clk_source_frequency() -> u32 {
+            xtal_clk_frequency()
+        }
+        pub fn configure_ble_lp_clk(clocks: &mut ClockTree, config: BleLpClkConfig) {
+            let old_config = clocks.ble_lp_clk.replace(config);
+            refresh_ble_lp_clk_downstream(clocks);
+            if clocks.ble_lp_clk_refcount > 0 {
+                match config.sclk {
+                    BleLpClkSclk::Xtal => request_ble_lp_xtal_clk(clocks),
+                    BleLpClkSclk::RcSlow => request_rc_slow_clk(clocks),
+                }
+                configure_ble_lp_clk_impl(clocks, old_config, config);
+                if let Some(old_config) = old_config {
+                    match old_config.sclk {
+                        BleLpClkSclk::Xtal => release_ble_lp_xtal_clk(clocks),
+                        BleLpClkSclk::RcSlow => release_rc_slow_clk(clocks),
+                    }
+                }
+            } else {
+                configure_ble_lp_clk_impl(clocks, old_config, config);
+            }
+        }
+        pub fn ble_lp_clk_config(clocks: &mut ClockTree) -> Option<BleLpClkConfig> {
+            clocks.ble_lp_clk
+        }
+        pub fn request_ble_lp_clk(clocks: &mut ClockTree) {
+            trace!("Requesting BLE_LP_CLK");
+            if increment_reference_count(&mut clocks.ble_lp_clk_refcount) {
+                trace!("Enabling BLE_LP_CLK");
+                match unwrap!(clocks.ble_lp_clk).sclk {
+                    BleLpClkSclk::Xtal => request_ble_lp_xtal_clk(clocks),
+                    BleLpClkSclk::RcSlow => request_rc_slow_clk(clocks),
+                }
+                enable_ble_lp_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_ble_lp_clk(clocks: &mut ClockTree) {
+            trace!("Releasing BLE_LP_CLK");
+            if decrement_reference_count(&mut clocks.ble_lp_clk_refcount) {
+                trace!("Disabling BLE_LP_CLK");
+                enable_ble_lp_clk_impl(clocks, false);
+                match unwrap!(clocks.ble_lp_clk).sclk {
+                    BleLpClkSclk::Xtal => release_ble_lp_xtal_clk(clocks),
+                    BleLpClkSclk::RcSlow => release_rc_slow_clk(clocks),
+                }
+            }
+        }
+        #[allow(unused_variables)]
+        pub fn ble_lp_clk_config_frequency(clocks: &mut ClockTree, config: BleLpClkConfig) -> u32 {
+            (match config.sclk {
+                BleLpClkSclk::Xtal => ble_lp_xtal_clk_frequency(),
+                BleLpClkSclk::RcSlow => rc_slow_clk_frequency(),
+            } / (config.divisor() + 1))
+        }
+        pub fn ble_lp_clk_frequency() -> u32 {
+            BLE_LP_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn ble_lp_clk_source_frequency(sclk: BleLpClkSclk) -> u32 {
+            match sclk {
+                BleLpClkSclk::Xtal => ble_lp_xtal_clk_frequency(),
+                BleLpClkSclk::RcSlow => rc_slow_clk_frequency(),
+            }
+        }
         pub fn configure_rtc_fast_clk(clocks: &mut ClockTree, new_selector: RtcFastClkConfig) {
             let old_selector = clocks.rtc_fast_clk.replace(new_selector);
             refresh_rtc_fast_clk_downstream(clocks);
@@ -3120,6 +3274,8 @@ macro_rules! define_clock_tree_types {
             pub rc_fast_clk_div_n: Option<RcFastClkDivNConfig>,
             /// `RTC_SLOW_CLK` configuration.
             pub rtc_slow_clk: Option<RtcSlowClkConfig>,
+            /// `BLE_LP_CLK` configuration.
+            pub ble_lp_clk: Option<BleLpClkConfig>,
             /// `RTC_FAST_CLK` configuration.
             pub rtc_fast_clk: Option<RtcFastClkConfig>,
             /// `LOW_POWER_CLK` configuration.
@@ -3146,6 +3302,9 @@ macro_rules! define_clock_tree_types {
                 }
                 if let Some(config) = self.rtc_slow_clk {
                     configure_rtc_slow_clk(clocks, config);
+                }
+                if let Some(config) = self.ble_lp_clk {
+                    configure_ble_lp_clk(clocks, config);
                 }
                 if let Some(config) = self.rtc_fast_clk {
                     configure_rtc_fast_clk(clocks, config);
@@ -3177,6 +3336,7 @@ macro_rules! define_clock_tree_types {
             }
             refresh_system_pre_div_in_downstream(clocks);
             refresh_cpu_pll_div_downstream(clocks);
+            refresh_ble_lp_clk_downstream(clocks);
             refresh_rtc_fast_clk_downstream(clocks);
             refresh_low_power_clk_downstream(clocks);
             for child_instance in [I2cInstance::I2c0] {
@@ -3208,6 +3368,7 @@ macro_rules! define_clock_tree_types {
         }
         fn refresh_rc_slow_clk_downstream(clocks: &mut ClockTree) {
             refresh_rtc_slow_clk_downstream(clocks);
+            refresh_ble_lp_clk_downstream(clocks);
             refresh_timg_calibration_clock_downstream(clocks);
         }
         fn refresh_system_pre_div_in_downstream(clocks: &mut ClockTree) {
@@ -3275,6 +3436,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
             refresh_low_power_clk_downstream(clocks);
+        }
+        fn refresh_ble_lp_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.ble_lp_clk {
+                BLE_LP_CLK_FREQ_CACHE.store(
+                    ble_lp_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
         }
         fn refresh_rtc_fast_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.rtc_fast_clk {

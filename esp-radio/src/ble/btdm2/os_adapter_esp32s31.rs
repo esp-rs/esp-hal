@@ -101,6 +101,12 @@ impl TxPower {
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
+    /// Enables controller modem sleep.
+    ///
+    /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
+    /// Set this before the controller starts. The default is off.
+    modem_sleep: bool,
+
     /// The priority of the RTOS task.
     task_priority: u8,
     /// The stack size of the RTOS task.
@@ -124,6 +130,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            modem_sleep: false,
             task_priority: crate::preempt::max_task_priority()
                 .saturating_sub(2)
                 .min(255) as u8,
@@ -164,8 +171,8 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_rsp_dup_list_count: CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT as u16,
         ble_ll_adv_dup_list_count: CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT as u16,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
-        rtc_freq: crate::radio_clocks::clocks_ll::BT_LPCLK_HZ,
-        ble_ll_sca: CONFIG_BT_LE_LL_SCA as u16,
+        rtc_freq: super::super::lp_clk::frequency_hz() as u64,
+        ble_ll_sca: CONFIG_BT_LE_LL_SCA as _,
         ble_ll_scan_phy_number: BLE_LL_SCAN_PHY_NUMBER_N as u8,
         ble_ll_conn_def_auth_pyld_tmo: BLE_LL_CONN_DEF_AUTH_PYLD_TMO_N as u16,
         ble_ll_jitter_usecs: BLE_LL_JITTER_USECS_N as u8,
@@ -189,7 +196,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         enable_bqb_test: 0,
         enable_tx_cca: DEFAULT_BT_LE_TX_CCA_ENABLED as u8,
         cca_rssi_thresh: (256 - DEFAULT_BT_LE_CCA_RSSI_THRESH) as u8,
-        sleep_en: 0,
+        sleep_en: u8::from(config.modem_sleep),
         coex_phy_coded_tx_rx_time_limit: if cfg!(feature = "coex") {
             config.limit_time_for_coded_phy_connection as u8
         } else {
@@ -228,7 +235,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         task_run_cpu: config.task_cpu as u8,
         hci_cmd_num: CONFIG_BT_CTRL_HCI_CMD_NUM as u8,
         hci_conn_num: config.max_connections,
-        sleep_en: 0,
+        sleep_en: u8::from(config.modem_sleep),
         version_num: 0,
         bluetooth_mode: esp_bt_mode_t_ESP_BT_MODE_BLE as u8,
         magic: BTDM_CONFIG_MAGIC_VALUE,

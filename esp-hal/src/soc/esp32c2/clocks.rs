@@ -19,7 +19,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
     clock::RtcClock,
-    peripherals::{I2C_ANA_MST, LPWR, SYSTEM, TIMG0},
+    peripherals::{I2C_ANA_MST, LPWR, MODEM_CLKRST, SYSTEM, TIMG0},
     rtc_cntl::Rtc,
     soc::regi2c,
     time::Rate,
@@ -52,6 +52,8 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        // The divisor follows the detected crystal. `configure` fills it in.
+        ble_lp_clk: None,
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
         timg_calibration_clock: None,
@@ -63,6 +65,8 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        // The divisor follows the detected crystal. `configure` fills it in.
+        ble_lp_clk: None,
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
         timg_calibration_clock: None,
@@ -109,6 +113,21 @@ impl ClockConfig {
             let xtal = detect_xtal_freq(clocks);
             debug!("Auto-detected XTAL frequency: {}", xtal.value());
             self.xtal_clk = Some(xtal);
+        }
+
+        if self.ble_lp_clk.is_none() {
+            let xtal_hz = unwrap!(self.xtal_clk).value();
+            // 26 MHz crystals run the timer at 40 kHz. 40 MHz crystals run it at 32 kHz.
+            // BLE_LP_XTAL_CLK already divides the crystal by 5.
+            let target_hz = if xtal_hz == 26_000_000 {
+                40_000
+            } else {
+                32_000
+            };
+            self.ble_lp_clk = Some(BleLpClkConfig::new(
+                BleLpClkSclk::Xtal,
+                xtal_hz / (5 * target_hz) - 1,
+            ));
         }
 
         self.apply(clocks);
@@ -662,4 +681,33 @@ impl TimgInstance {
                 .bit(new_config == TimgWdtClockConfig::XtalClk)
         });
     }
+}
+
+fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // The divide-by-5 crystal input has no clock gate.
+}
+
+fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
+
+fn configure_ble_lp_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<BleLpClkConfig>,
+    new_config: BleLpClkConfig,
+) {
+    let sclk = new_config.sclk();
+
+    MODEM_CLKRST::regs()
+        .modem_lp_timer_conf()
+        .modify(|_, w| unsafe {
+            w.lp_timer_sel_xtal32k().clear_bit();
+            w.lp_timer_sel_xtal().bit(sclk == BleLpClkSclk::Xtal);
+            w.lp_timer_sel_8m().clear_bit();
+            w.lp_timer_sel_rtc_slow().bit(sclk == BleLpClkSclk::RcSlow);
+            w.lp_timer_clk_div_num().bits(new_config.divisor() as u8)
+        });
+
+    MODEM_CLKRST::regs().etm_clk_conf().modify(|_, w| {
+        w.etm_clk_active().set_bit();
+        w.etm_clk_sel().clear_bit()
+    });
 }
