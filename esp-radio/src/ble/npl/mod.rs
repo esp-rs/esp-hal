@@ -1288,6 +1288,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         assert!(res == 0, "ble_controller_enable returned {}", res);
     }
 
+    #[cfg(esp32c6)]
+    esp_hal::rtc_cntl::WakeupSource::Bt.enable_with_hooks(Some(keep_bbpll), None);
+
     // At some point the "High-speed ADC" entropy source became available.
     #[cfg(rng_trng_supported)]
     unsafe {
@@ -1298,7 +1301,15 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     phy_init_guard
 }
 
+/// The controller cannot transmit after a light sleep that turned the BBPLL off.
+#[cfg(esp32c6)]
+fn keep_bbpll(config: &mut esp_hal::rtc_cntl::sleep::WrappedSleepConfig<'_>) {
+    config.keep_bbpll_powered();
+}
+
 pub(crate) fn ble_deinit() {
+    #[cfg(esp32c6)]
+    esp_hal::rtc_cntl::WakeupSource::Bt.disable();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 
