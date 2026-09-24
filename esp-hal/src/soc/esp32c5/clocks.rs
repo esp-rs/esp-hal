@@ -674,3 +674,39 @@ impl TimgInstance {
             });
     }
 }
+
+impl TwaiInstance {
+    // TWAI_FUNCTION_CLOCK
+
+    pub(crate) fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        match self {
+            TwaiInstance::Twai0 => PCR::regs()
+                .twai0_func_clk_conf()
+                .modify(|_, w| w.twai0_func_clk_en().bit(en)),
+            TwaiInstance::Twai1 => PCR::regs()
+                .twai1_func_clk_conf()
+                .modify(|_, w| w.twai1_func_clk_en().bit(en)),
+        };
+    }
+
+    pub(crate) fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<TwaiFunctionClockConfig>,
+        new_config: TwaiFunctionClockConfig,
+    ) {
+        // ESP32-C5 TRM 38.3.1: 0 = XTAL_CLK (reset default), 1 = PLL_F80M_CLK.
+        let sel = match new_config {
+            TwaiFunctionClockConfig::Xtal => false,
+            TwaiFunctionClockConfig::PllF80m => true,
+        };
+        match self {
+            TwaiInstance::Twai0 => PCR::regs()
+                .twai0_func_clk_conf()
+                .modify(|_, w| w.twai0_func_clk_sel().bit(sel)),
+            TwaiInstance::Twai1 => PCR::regs()
+                .twai1_func_clk_conf()
+                .modify(|_, w| w.twai1_func_clk_sel().bit(sel)),
+        };
+    }
+}

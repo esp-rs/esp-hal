@@ -160,6 +160,13 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST",   outputs = "RC_FAST_CLK" },
         ] },
     ] },
+    { group = "TWAI", clocks = [
+        # TRM 38.3.1: XTAL is recommended for data rates <= 5 Mbit/s, PLL_F80M above.
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "PLL_F80M", outputs = "PLL_F80M", default = true },
+        ] },
+    ] },
 ] }
 
 peripheral_clocks = { templates = [
@@ -193,4 +200,6 @@ peripheral_clocks = { templates = [
     { name = "Rsa" },
     { name = "Ecc" },
     { name = "UsbDevice", keep_enabled = true },
+    { name = "Twai0" },
+    { name = "Twai1" },
 ] }
