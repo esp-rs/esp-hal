@@ -10,9 +10,9 @@
 //!
 //! - `MODEM_SLEEP` lets the controller turn the radio off between its events.
 //! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
-//!   sleeps only while the controller sleeps, and only on the ESP32-C2, ESP32-C3, ESP32-C6 and
-//!   ESP32-S3. On the other chips, BLE keeps the chip awake. The ESP32 can sleep only with a 32 kHz
-//!   crystal as the BLE low-power clock.
+//!   sleeps only while the controller sleeps, and only on the ESP32-C2, ESP32-C3, ESP32-C5,
+//!   ESP32-C6 and ESP32-S3. On the other chips, BLE keeps the chip awake. The ESP32 can sleep only
+//!   with a 32 kHz crystal as the BLE low-power clock.
 //!
 //! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
 //! the output.
@@ -40,8 +40,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 /// Whether the controller turns the radio off between its events.
 const MODEM_SLEEP: bool = true;
 /// Whether the chip enters automatic light sleep when all tasks are idle. Requires
-/// [`MODEM_SLEEP`] to be enabled. The chip sleeps only on the ESP32-C2, ESP32-C3, ESP32-C6 and
-/// ESP32-S3.
+/// [`MODEM_SLEEP`] to be enabled. The chip sleeps only on the ESP32-C2, ESP32-C3, ESP32-C5,
+/// ESP32-C6 and ESP32-S3.
 const LIGHT_SLEEP: bool = true;
 
 #[esp_hal::main]
