@@ -1114,22 +1114,22 @@ pub(crate) struct BleNplCountInfoT {
     mutex_count: u16,
 }
 
-#[cfg(any(esp32c2, esp32c5, esp32c6))]
+#[cfg(any(esp32c2, esp32c5, esp32c6, esp32h2))]
 unsafe extern "C" {
     fn r_ble_rtc_wake_up_state_clr();
-    #[cfg(any(esp32c5, esp32c6))]
+    #[cfg(any(esp32c5, esp32c6, esp32h2))]
     fn r_ble_lll_sleep_should_skip_light_sleep_check() -> bool;
 }
 
 /// Returns whether the controller refuses a light sleep, because its next event is too close.
-#[cfg(any(esp32c5, esp32c6))]
+#[cfg(any(esp32c5, esp32c6, esp32h2))]
 pub(super) fn controller_skips_light_sleep() -> bool {
     unsafe { r_ble_lll_sleep_should_skip_light_sleep_check() }
 }
 
 #[crate::hal::ram]
 unsafe extern "C" fn controller_sleep_cb(_enable_tick: u32, _arg: *mut c_void) {
-    #[cfg(any(esp32c2, esp32c5, esp32c6))]
+    #[cfg(any(esp32c2, esp32c5, esp32c6, esp32h2))]
     unsafe {
         r_ble_rtc_wake_up_state_clr()
     };
@@ -1138,9 +1138,9 @@ unsafe extern "C" fn controller_sleep_cb(_enable_tick: u32, _arg: *mut c_void) {
 
 #[crate::hal::ram]
 unsafe extern "C" fn controller_wakeup_cb(_arg: *mut c_void) {
-    #[cfg(any(esp32c2, esp32c5, esp32c6))]
+    #[cfg(any(esp32c2, esp32c5, esp32c6, esp32h2))]
     unsafe {
-        #[cfg(any(esp32c5, esp32c6))]
+        #[cfg(any(esp32c5, esp32c6, esp32h2))]
         r_ble_rtc_wake_up_state_clr();
 
         // The controller passes its `bt_wakeup_params_t`. Bit 31 tells it that the BLE timer
@@ -1181,13 +1181,14 @@ fn register_modem_sleep() {
         );
     }
 
-    // ESP-IDF modem-sleep PHY enable delay. C2 adds `BLE_RTC_DELAY_US` (1800) to 500. The C5 and
-    // C6 use the light-sleep delay, because the chip can light-sleep while the controller sleeps.
+    // ESP-IDF modem-sleep PHY enable delay. C2 adds `BLE_RTC_DELAY_US` (1800) to 500. The C5, C6
+    // and H2 use the light-sleep delay, because the chip can light-sleep while the controller
+    // sleeps.
     let delay_us = cfg_select! {
         esp32c2 => 2_300,
         esp32c5 => 2_500,
         esp32c6 => 3_200,
-        esp32h2 => 1_500,
+        esp32h2 => 5_100,
         _ => 500,
     };
 
@@ -1328,7 +1329,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         assert!(res == 0, "ble_controller_enable returned {}", res);
     }
 
-    #[cfg(any(esp32c2, esp32c5, esp32c6))]
+    #[cfg(any(esp32c2, esp32c5, esp32c6, esp32h2))]
     if config.modem_sleep() {
         super::lp_clk::claim_wake_source();
     } else {
@@ -1357,7 +1358,7 @@ fn keep_bbpll(config: &mut esp_hal::rtc_cntl::sleep::WrappedSleepConfig<'_>) {
 }
 
 pub(crate) fn ble_deinit() {
-    #[cfg(any(esp32c2, esp32c5, esp32c6))]
+    #[cfg(any(esp32c2, esp32c5, esp32c6, esp32h2))]
     super::lp_clk::release_wake_source();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
