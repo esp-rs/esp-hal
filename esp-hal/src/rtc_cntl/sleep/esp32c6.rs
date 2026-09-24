@@ -234,8 +234,9 @@ impl PowerSleepConfig {
             self.hp_sys.clk.set_i2c_iso_en(true);
             self.hp_sys.clk.set_i2c_retention(true);
         } else {
-            // Keep the BBPLL, and the analog I2C buses that configure it, as in the `HP_MODEM`
-            // power state. BLE cannot transmit after the wake without them.
+            // A radio asked to keep the BBPLL, and the analog I2C buses that configure it, as in
+            // the `HP_MODEM` power state. BLE cannot transmit after the wake without
+            // them.
             self.hp_sys.clk.set_i2c_iso_en(false);
             self.hp_sys.clk.set_i2c_retention(false);
             self.hp_sys.clk.set_xpd_bb_i2c(true);
