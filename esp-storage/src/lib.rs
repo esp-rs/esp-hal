@@ -1,6 +1,12 @@
 //! `esp-storage` contains API functions related to reading, writing and erasing memory for data in
 //! the external flash.
 //!
+//! <section class="warning">
+//!
+//! Deprecated. Please, use [`esp_hal::flash`] for raw flash I/O.
+//!
+//! </section>
+//!
 //! For higher-level functionality which works with partitions defined in the partition table, see
 //! `esp-bootloader-esp-idf`.
 //!
