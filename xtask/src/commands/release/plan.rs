@@ -206,7 +206,11 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     for package in sorted.iter().copied() {
         let amount = if changed[&package] {
             let mut amount = if package.is_semver_checked() {
-                min_package_update(workspace, package, &all_chips)?
+                // Patch releases of semver-checked crates are cut from their backport branch.
+                match min_package_update(workspace, package, &all_chips)? {
+                    ReleaseType::Patch => ReleaseType::Minor,
+                    other => other,
+                }
             } else {
                 let forever_unstable = if let Some(metadata) =
                     package_tomls[&package].espressif_metadata()
