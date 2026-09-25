@@ -71,6 +71,9 @@ are an error listing them.
 nothing, so it takes whichever of the two finds a device, and only looks from a terminal — scripts
 and CI jobs keep checking every chip. `build` never looks at hardware at all.
 
+When an example fails, `run` offers a retry. A retry looks at the connected board again, so a
+devkit swapped in meanwhile is picked up, and a different chip starts the command over for it.
+
 `check` with no example or test name and nothing connected checks every published crate on every
 chip. To build every HIL test for a chip, write `all` or omit the test name: `build tests esp32c6`.
 

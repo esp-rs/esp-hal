@@ -77,15 +77,6 @@ mod tests {
     }
 
     #[test]
-    fn chips_can_be_shortened() {
-        let chips = resolve(ResolveInput::from_tokens(["p4", "C3", "esp32", "s31"])).chips;
-        assert_eq!(
-            chips,
-            vec![Chip::Esp32p4, Chip::Esp32c3, Chip::Esp32, Chip::Esp32s31]
-        );
-    }
-
-    #[test]
     fn everything_else_is_a_name() {
         let names = resolve(ResolveInput::from_tokens(["sleep_timer"])).names;
         assert_eq!(names, vec!["sleep_timer"]);

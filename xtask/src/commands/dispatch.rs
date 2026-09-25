@@ -237,8 +237,8 @@ fn chips_or_all(chips: &[Chip]) -> Result<Vec<Chip>> {
     }
 }
 
-/// The connected chip, for `check`, which drives none itself. Only looked for from a terminal:
-/// scripts and CI jobs keep checking every chip.
+/// The connected chip, for `check`. Only looked for in a terminal, so scripts and CI jobs keep
+/// checking every chip.
 fn connected_chip() -> Result<Option<Chip>> {
     if !std::io::stdin().is_terminal() {
         return Ok(None);
@@ -359,8 +359,7 @@ fn expand_name(workspace: &Path, verb: Verb, packages: &[Package], name: &str) -
     };
     candidates.sort();
 
-    // Not `select`: the filter narrows by the same rule the fits above do, and starts out with the
-    // name in it, unless that name is one that narrows to nothing.
+    // Not the shared `select` helper: this prompt needs its own filter and a pre-filled name.
     let mut prompt = Select::new(&message, candidates).with_scorer(&|input, _, candidate, _| {
         normalize_name(candidate)
             .contains(&normalize_name(input))
@@ -396,18 +395,30 @@ fn dispatch_examples(
         names.iter().cloned().map(Some).collect()
     };
 
-    for chip in required_chips(verb, chips)? {
-        for name in &names {
-            examples(
-                workspace,
-                package,
-                chip,
-                name.as_deref(),
-                action.clone(),
-                args.debug,
-                args.toolchain.as_deref(),
-                args.timings,
-            )?;
+    for mut chip in required_chips(verb, chips)? {
+        loop {
+            let result = names.iter().try_for_each(|name| {
+                examples(
+                    workspace,
+                    package,
+                    chip,
+                    name.as_deref(),
+                    action.clone(),
+                    args.debug,
+                    args.toolchain.as_deref(),
+                    args.timings,
+                )
+            });
+            // A retry that found another chip connected runs the examples for that one.
+            if let Err(error) = &result
+                && let Some(&connected) = error.downcast_ref::<Chip>()
+            {
+                log::info!("Starting over for {connected}");
+                chip = connected;
+                continue;
+            }
+            result?;
+            break;
         }
     }
     Ok(())

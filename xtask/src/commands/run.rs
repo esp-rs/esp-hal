@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Context as _, Result, anyhow, bail};
 use clap::Args;
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
@@ -500,7 +500,16 @@ pub fn run_examples(
                         let key = console.read_key();
 
                         match key {
-                            Ok(console::Key::Char('r')) => break,
+                            Ok(console::Key::Char('r')) => {
+                                // A retry looks again, so a board swapped in meanwhile is the one
+                                // to run on. Another chip is for the caller to start over for.
+                                if let Some(connected) = crate::detect::with_espflash()?
+                                    && connected != chip
+                                {
+                                    return Err(anyhow!(connected));
+                                }
+                                break;
+                            }
                             Ok(console::Key::Char('s')) => {
                                 skip = true;
                                 break;
