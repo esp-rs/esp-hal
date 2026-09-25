@@ -349,7 +349,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
 }
 
 pub(crate) fn bt_periph_module_enable() {
-    crate::radio_clocks::clocks_ll::enable_bt(true);
+    crate::radio_clocks::enable_bt(true);
 }
 
 pub(crate) fn disable_sleep_mode() {
