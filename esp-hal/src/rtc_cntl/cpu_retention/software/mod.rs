@@ -54,6 +54,9 @@ macro_rules! critical_regs_asm {
     // because an access traps while the unit is off. The bit needs no undo: `mstatus` is in the
     // frame, and the restore writes it back after the FPU registers. A core that had the unit off
     // saves and restores register values that no later code can read.
+    //
+    // `global_asm!` does not always inherit the F extension of the target (an `opt-level = 2`
+    // build rejects `fsw`), so the FPU block turns it on itself.
     (
         fpu,
         save_extra: [$($save_extra:literal),* $(,)?],
@@ -65,6 +68,8 @@ macro_rules! critical_regs_asm {
                 $($save_extra,)*
                 "li t2, {fpu_enable}",
                 "csrs mstatus, t2",
+                ".option push",
+                ".option arch, +f",
                 "fsw ft0, {fpu_ft0}(t0)",
                 "fsw ft1, {fpu_ft1}(t0)",
                 "fsw ft2, {fpu_ft2}(t0)",
@@ -99,11 +104,14 @@ macro_rules! critical_regs_asm {
                 "fsw ft11, {fpu_ft11}(t0)",
                 "csrr t2, fcsr",
                 "sw t2, {fpu_fcsr}(t0)",
+                ".option pop",
             ],
             restore_extra: [
                 $($restore_extra,)*
                 "li t2, {fpu_enable}",
                 "csrs mstatus, t2",
+                ".option push",
+                ".option arch, +f",
                 "flw ft0, {fpu_ft0}(t0)",
                 "flw ft1, {fpu_ft1}(t0)",
                 "flw ft2, {fpu_ft2}(t0)",
@@ -138,6 +146,7 @@ macro_rules! critical_regs_asm {
                 "flw ft11, {fpu_ft11}(t0)",
                 "lw t2, {fpu_fcsr}(t0)",
                 "csrw fcsr, t2",
+                ".option pop",
             ],
             $($operand = const $value,)*
             fpu_enable = const 1 << 13,
