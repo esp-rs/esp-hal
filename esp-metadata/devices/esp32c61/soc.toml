@@ -209,6 +209,7 @@ support_status = { status = "not_supported", issue = 5419 }
 [device.sleep]
 support_status = "partial"
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 ext1_version = 2
 pin_wakeup_version = 3
@@ -350,11 +351,13 @@ support_status = { status = "not_supported", issue = 5421 }
 support_status = "partial"
 has_wifi6 = true
 mac_version = 3
+requires_fast_cpu = true
 csi_supported = true
 
 [device.bt]
 support_status = "partial"
 controller = "npl"
+requires_fast_cpu = true
 
 [device.phy]
 support_status = "partial"

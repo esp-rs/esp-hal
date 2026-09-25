@@ -260,20 +260,19 @@ fn configure_hp_root_clk_impl(
 // Idle frequency scaling. These functions write the registers, but do not change the
 // configuration that the clock tree stores.
 
-/// Switches the CPU clock to XTAL_CLK. Returns `false` if the CPU clock does not come from the
-/// PLL.
+/// Returns whether the CPU clock comes from the PLL.
 #[cfg(idle_frequency_scaling)]
-pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
-    if !matches!(
+pub(crate) fn cpu_clock_from_pll(clocks: &mut ClockTree) -> bool {
+    matches!(
         clocks.hp_root_clk(),
         Some(HpRootClkConfig::Pll96 | HpRootClkConfig::Pll64)
-    ) {
-        return false;
-    }
+    )
+}
 
+/// Switches the CPU clock to XTAL_CLK.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) {
     configure_hp_root_clk_impl(clocks, None, HpRootClkConfig::Xtal);
-
-    true
 }
 
 /// Restores the CPU clock that the clock tree configures.

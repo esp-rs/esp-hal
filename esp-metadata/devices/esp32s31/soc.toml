@@ -223,6 +223,7 @@ is_lp_sys = false
 [device.sleep]
 support_status = "partial"
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 ext1_version = 3
 pin_wakeup_version = 3
@@ -564,6 +565,7 @@ csi_supported = true
 support_status = "partial"
 # IDF `porting_btdm` (nested config + `esp_*` VHCI), not the ESP32/C3/S3 OSI table
 controller = "btdm2"
+requires_fast_cpu = true
 
 [device.phy]
 support_status = "partial"
@@ -581,6 +583,7 @@ ram_size = 20 # FIXME: placeholder
 [device.psram]
 support_status = "partial"
 extmem_origin = 0x5000_0000
+idle_low_speed_switch = true
 octal_spi = true
 
 [device.pixel_accelerator]

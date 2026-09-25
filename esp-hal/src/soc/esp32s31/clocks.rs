@@ -417,19 +417,19 @@ fn configure_cpu_root_clk_impl(
 // CPU_CLK frequency, so changing the CPU_CLK divider here could make MEM_CLK exceed 160 MHz after
 // the restore.
 
-/// Switches the CPU clock to XTAL_CLK. Returns `false` if the CPU clock does not come from a PLL.
+/// Returns whether the CPU clock comes from a PLL.
 #[cfg(idle_frequency_scaling)]
-pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
-    if !matches!(
+pub(crate) fn cpu_clock_from_pll(clocks: &mut ClockTree) -> bool {
+    matches!(
         clocks.cpu_root_clk(),
         Some(CpuRootClkConfig::Cpll | CpuRootClkConfig::PllF240m)
-    ) {
-        return false;
-    }
+    )
+}
 
+/// Switches the CPU clock to XTAL_CLK.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) {
     configure_cpu_root_clk_impl(clocks, None, CpuRootClkConfig::Xtal);
-
-    true
 }
 
 /// Restores the CPU clock that the clock tree configures.

@@ -345,24 +345,19 @@ fn configure_soc_root_clk_impl(
 // Idle frequency scaling. These functions write the registers, but do not change the
 // configuration that the clock tree stores.
 
-/// Switches the CPU clock to XTAL_CLK. Returns `false` if the CPU clock does not come from the
-/// PLL.
+/// Returns whether the CPU clock comes from the PLL.
 #[cfg(idle_frequency_scaling)]
-pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
-    if clocks.soc_root_clk() != Some(SocRootClkConfig::Pll) {
-        return false;
-    }
+pub(crate) fn cpu_clock_from_pll(clocks: &mut ClockTree) -> bool {
+    clocks.soc_root_clk() == Some(SocRootClkConfig::Pll)
+}
 
-    configure_cpu_ls_div_impl(clocks, None, CpuLsDivConfig::new(CpuLsDivDivisor::_0));
-    configure_ahb_ls_div_impl(clocks, None, AhbLsDivConfig::new(AhbLsDivDivisor::_0));
-    configure_mspi_fast_ls_clk_impl(
-        clocks,
-        None,
-        MspiFastLsClkConfig::new(MspiFastLsClkDivisor::_0),
-    );
+/// Switches the CPU clock to XTAL_CLK.
+///
+/// The CPU, AHB, and MSPI clocks then come from the LS dividers, which keep the configured value
+/// or their reset value (divide by 1).
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) {
     configure_soc_root_clk_impl(clocks, None, SocRootClkConfig::Xtal);
-
-    true
 }
 
 /// Restores the CPU clock that the clock tree configures.

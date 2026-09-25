@@ -46,6 +46,9 @@ impl CpuFrequencyLock {
     }
 
     /// Returns whether at least one CPU frequency lock is currently held.
+    ///
+    /// Also returns `true` when the CPU clock never changes, because the option is disabled or
+    /// the chip does not support it.
     #[instability::unstable]
     pub fn is_active() -> bool {
         cfg_select! {
@@ -80,6 +83,32 @@ impl Drop for CpuFrequencyLock {
 static CLOCK_LOWERED: AtomicBool = AtomicBool::new(false);
 #[cfg(all(idle_frequency_scaling, multi_core))]
 static IDLE_CORES: AtomicUsize = AtomicUsize::new(0);
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+static PSRAM_LOWERED: AtomicBool = AtomicBool::new(false);
+
+/// Runs `f` while the other running cores are stalled.
+///
+/// The PSRAM speed change freezes the cache. An access to flash or PSRAM from another core would
+/// then block the cache for all cores.
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+fn with_other_cores_stalled<R>(f: impl FnOnce() -> R) -> R {
+    cfg_select! {
+        multi_core => {
+            use crate::{soc::cpu_control, system::Cpu};
+
+            let stalled = Cpu::other().find(|&cpu| cpu_control::is_running(cpu));
+            if let Some(cpu) = stalled {
+                unsafe { cpu_control::internal_park_core(cpu, true) };
+            }
+            let result = f();
+            if let Some(cpu) = stalled {
+                unsafe { cpu_control::internal_park_core(cpu, false) };
+            }
+            result
+        }
+        _ => f(),
+    }
+}
 
 /// Executes `wfi`, with the CPU clock from XTAL_CLK if possible.
 ///
@@ -113,8 +142,16 @@ pub(crate) fn wait_for_interrupt() {
         if all_cores_idle
             && !CpuFrequencyLock::is_active()
             && !CLOCK_LOWERED.load(Ordering::Relaxed)
-            && clocks::switch_cpu_clock_to_xtal(tree)
+            && clocks::cpu_clock_from_pll(tree)
         {
+            // PSRAM slows down before the CPU clock, and speeds up after it.
+            #[cfg(psram_idle_low_speed_switch)]
+            PSRAM_LOWERED.store(
+                with_other_cores_stalled(crate::psram::implem::low_speed::enter),
+                Ordering::Relaxed,
+            );
+
+            clocks::switch_cpu_clock_to_xtal(tree);
             CLOCK_LOWERED.store(true, Ordering::Relaxed);
         }
     });
@@ -127,6 +164,11 @@ pub(crate) fn wait_for_interrupt() {
 
         if CLOCK_LOWERED.swap(false, Ordering::Relaxed) {
             clocks::restore_cpu_clock(tree);
+
+            #[cfg(psram_idle_low_speed_switch)]
+            if PSRAM_LOWERED.swap(false, Ordering::Relaxed) {
+                with_other_cores_stalled(crate::psram::implem::low_speed::exit);
+            }
         }
     });
 

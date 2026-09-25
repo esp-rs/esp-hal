@@ -465,6 +465,7 @@ channel_count = 8
 [device.sleep]
 support_status = "partial"
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 ext1_version = 3
 pin_wakeup_version = 3
@@ -546,6 +547,7 @@ algo = {
 
 [device.psram]
 extmem_origin = 0x4800_0000
+idle_low_speed_switch = true
 hex_spi = true
 octal_spi = true
 
