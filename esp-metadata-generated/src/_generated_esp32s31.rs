@@ -337,6 +337,9 @@ macro_rules! property {
     ("bt.controller") => {
         "btdm2"
     };
+    ("bt.requires_fast_cpu") => {
+        true
+    };
     ("wifi.has_wifi6") => {
         true
     };
@@ -357,6 +360,9 @@ macro_rules! property {
     };
     ("wifi.has_ftm") => {
         true
+    };
+    ("wifi.requires_fast_cpu") => {
+        false
     };
     ("ethernet.mii_via_gpio_matrix") => {
         true
@@ -511,6 +517,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.idle_frequency_scaling") => {
+        true
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -558,6 +567,9 @@ macro_rules! property {
     };
     ("psram.extmem_origin", str) => {
         stringify!(1342177280)
+    };
+    ("psram.idle_low_speed_switch") => {
+        true
     };
     ("rom.has_crc_le") => {
         true

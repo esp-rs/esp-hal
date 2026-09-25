@@ -235,6 +235,9 @@ macro_rules! property {
     ("bt.controller") => {
         "npl"
     };
+    ("bt.requires_fast_cpu") => {
+        false
+    };
     ("wifi.has_wifi6") => {
         false
     };
@@ -255,6 +258,9 @@ macro_rules! property {
     };
     ("wifi.has_ftm") => {
         true
+    };
+    ("wifi.requires_fast_cpu") => {
+        false
     };
     ("phy.combo_module") => {
         true
@@ -357,6 +363,9 @@ macro_rules! property {
     };
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
+    };
+    ("sleep.idle_frequency_scaling") => {
+        false
     };
     ("assist_debug.has_sp_monitor") => {
         true
