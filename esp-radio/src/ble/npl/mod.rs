@@ -1324,11 +1324,6 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
     if config.modem_sleep() {
         super::lp_clk::claim_wake_source();
-    } else {
-        // The wake lock prevents automatic light sleep, but the application can still call
-        // `LowPower::sleep_light` while the PHY is on.
-        #[cfg(esp32c6)]
-        esp_hal::rtc_cntl::WakeupSource::Bt.enable_with_hooks(Some(keep_bbpll), None);
     }
 
     // At some point the "High-speed ADC" entropy source became available.
@@ -1339,14 +1334,6 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
     debug!("The ble_controller_init was initialized");
     phy_init_guard
-}
-
-/// The controller cannot transmit after a light sleep that turned the BBPLL off while the PHY was
-/// on. With modem sleep, the controller turns the PHY off before the chip can sleep, and the PHY
-/// enable after the wake restores it.
-#[cfg(esp32c6)]
-fn keep_bbpll(config: &mut esp_hal::rtc_cntl::sleep::WrappedSleepConfig<'_>) {
-    config.keep_bbpll_powered();
 }
 
 pub(crate) fn ble_deinit() {

@@ -27,7 +27,7 @@ pub(crate) enum SleepKind {
     Deep,
 }
 
-/// A power domain or an analog block that a wakeup source needs powered while the chip sleeps.
+/// A power domain that a wakeup source needs powered while the chip sleeps.
 ///
 /// The names are the same for all chips. A request for a domain that the target chip does not
 /// have, or that it cannot power down, does nothing.
@@ -43,8 +43,6 @@ pub(crate) enum SleepResource {
     LpMemory,
     /// The high-performance peripherals, including the digital GPIO pads.
     HpPeripherals,
-    /// The BBPLL and the analog I2C buses that configure it.
-    Bbpll,
 }
 
 /// The sleep configuration, as the entry hook of a wakeup source can see it.
@@ -116,23 +114,7 @@ impl<'a> WrappedSleepConfig<'a> {
                     _ => _config.set_dig_peri_pd_en(false),
                 }
             }
-            SleepResource::Bbpll => {
-                cfg_select! {
-                    esp32c6 => _config.pd_flags.set_pd_bbpll(false),
-                    _ => {}
-                }
-            }
         }
-    }
-
-    /// Keeps the BBPLL, and the analog I2C buses that configure it, powered during a light sleep.
-    ///
-    /// A radio that needs the PLL immediately after the wake asks for this. It costs about 2 mA
-    /// of sleep current on the ESP32-C6. Only the ESP32-C6 honors the request. Other chips ignore
-    /// it.
-    #[instability::unstable]
-    pub fn keep_bbpll_powered(&mut self) {
-        self.keep_alive(SleepResource::Bbpll);
     }
 
     /// Keeps `source` running during the sleep.
