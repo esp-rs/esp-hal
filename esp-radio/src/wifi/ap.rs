@@ -69,6 +69,17 @@ impl AccessPointConfig {
             return Err(WifiError::Unsupported);
         }
 
+        // The supplicant is built with SAE for the station; a WPA3 soft-AP has not
+        // been verified, so refuse it rather than let it fail silently.
+        if matches!(
+            self.authentication,
+            AuthenticationMethodConfig::Wpa3Personal(_)
+                | AuthenticationMethodConfig::Wpa2Wpa3Personal(_)
+        ) {
+            warn!("WPA3 is not supported in access point mode yet.");
+            return Err(WifiError::Unsupported);
+        }
+
         if let Some(password) = self.authentication.password()
             && password.is_empty()
         {
