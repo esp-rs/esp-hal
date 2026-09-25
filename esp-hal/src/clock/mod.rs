@@ -53,6 +53,12 @@ use clocks::RtcSlowClkConfig;
 use clocks::TimgFunctionClockConfig;
 
 pub(crate) mod dividers;
+mod idle;
+
+#[instability::unstable]
+pub use idle::CpuFrequencyLock;
+#[cfg(idle_frequency_scaling)]
+pub(crate) use idle::wait_for_interrupt;
 
 /// # Low-level clock control
 ///
