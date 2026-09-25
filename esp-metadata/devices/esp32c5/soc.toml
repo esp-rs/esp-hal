@@ -30,6 +30,7 @@ cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x1f
+cpu_pmp_granularity = 128
 
 has_swd_watchdog = true
 

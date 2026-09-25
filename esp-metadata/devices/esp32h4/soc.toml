@@ -33,6 +33,10 @@ cpu_has_csr_pc = false
 cpu_has_zcmp_workaround = true
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x3f
+# ESP-IDF does not define SOC_CPU_PMP_REGION_GRANULARITY for this chip yet. Measured on hardware
+# by writing all ones into a free `pmpaddr` and reading it back: the lowest five bits are hardwired
+# to zero.
+cpu_pmp_granularity = 128
 has_swd_watchdog = true
 
 # SRAM_SEG_START = 0x40810000, SRAM_SEG_END = 0x4084F350
@@ -69,9 +73,9 @@ peripherals = [
     { name = "HP_SYS" },
     { name = "HUK", interrupts = { peri = "HUK" } },
     { name = "I2C_ANA_MST" },
-    { name = "I2S0", interrupts = { peri = "I2S" } },
-    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true },
-    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true },
+    { name = "I2S0", interrupts = { peri = "I2S" }, clock_group = "I2S" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
+    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "INTPRI" },
@@ -104,8 +108,8 @@ peripherals = [
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "SPI0" },
     { name = "SPI1" },
-    { name = "SPI2", interrupts = { peri = "GPSPI2" }, stable = true },
-    { name = "SPI3", interrupts = { peri = "GPSPI3" }, stable = true },
+    { name = "SPI2", interrupts = { peri = "GPSPI2" }, stable = true, clock_group = "SPI" },
+    { name = "SPI3", interrupts = { peri = "GPSPI3" }, stable = true, clock_group = "SPI" },
     { name = "SYSTEM", pac = "PCR" },
     { name = "SYSTIMER" },
     { name = "TEE" },
@@ -115,8 +119,8 @@ peripherals = [
     { name = "TOUCH_AON" },
     # The single TWAI controller is a CAN-FD, the PAC just keeps the TWAI0 name.
     { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" } },
-    { name = "UART0", interrupts = { peri = "UART0" }, stable = true },
-    { name = "UART1", interrupts = { peri = "UART1" }, stable = true },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "USB_FS", pac = "USB0", interrupts = { peri = "USB_OTG11" } },
@@ -144,14 +148,13 @@ support_status = "partial"
 # its own set of 8 channels: CPU_GPIO_0..7 belong to core 0, CPU_GPIO_8..15 to core 1.
 [device.dedicated_gpio]
 version = "riscv_v1"
-support_status = "not_supported"
+support_status = "partial"
 channels = [
     ["CPU_GPIO_0", "CPU_GPIO_1", "CPU_GPIO_2",  "CPU_GPIO_3",  "CPU_GPIO_4",  "CPU_GPIO_5",  "CPU_GPIO_6",  "CPU_GPIO_7" ],
     ["CPU_GPIO_8", "CPU_GPIO_9", "CPU_GPIO_10", "CPU_GPIO_11", "CPU_GPIO_12", "CPU_GPIO_13", "CPU_GPIO_14", "CPU_GPIO_15"],
 ]
 
 [device.io_mux]
-support_status = "not_supported"
 
 # GPIO0-5 are also LP pads, but ESP-IDF does not describe the LP IO MUX for this chip yet.
 [device.lp_io]
@@ -159,7 +162,7 @@ support_status = "not_supported"
 version = "esp32h2"
 
 [device.uart]
-support_status = "not_supported"
+support_status = "partial"
 instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
@@ -174,19 +177,20 @@ support_status = "not_supported"
 combined_uart_selector_field = true
 
 [device.i2c_master]
-support_status = "not_supported"
+support_status = "partial"
 version = 4
 instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
     { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
 ]
 has_fsm_timeouts = true
-has_hw_bus_clear = true
+has_hw_bus_clear = true # I2C_SCL_SP_CONF_REG is present
 ll_intr_mask = 0x3ffff
+# TX and RX RAM are 32 x 8 bits each (TRM 27.4.11)
 fifo_size = 32
 has_bus_timeout_enable = true
 max_bus_timeout = 0x1F
-can_estimate_nack_reason = true
+can_estimate_nack_reason = true # txfifo_raddr is present
 has_conf_update = true
 has_reliable_fsm_reset = true
 has_arbitration_en = true
@@ -198,7 +202,7 @@ has_pd_en = true
 support_status = { status = "not_supported", issue = 1909 }
 
 [device.spi_master]
-support_status = "not_supported"
+support_status = "partial"
 version = 3
 fifo_size = 64
 has_app_interrupts = true
@@ -242,7 +246,7 @@ instances = [
 ]
 
 [device.i2s]
-support_status = "not_supported"
+support_status = "partial"
 version = 3
 mclk_divider_bit_width = 9
 max_ws_width = 512
@@ -289,7 +293,6 @@ support_status = "not_supported"
 fifo_depth_words = 256
 
 [device.usb_serial_jtag]
-support_status = "not_supported"
 
 [device.bt]
 support_status = "not_supported"
@@ -427,14 +430,16 @@ support_status = "not_supported"
 support_status = "not_supported"
 
 [device.dma]
-support_status = "not_supported"
+support_status = "partial"
 gdma_version = 3
 separate_in_out_interrupts = true
 engines = [
     {
         name = "AHB_GDMA",
         max_priority = 5,
-        drivers = ["aes", "i2s", "parl_io", "sha", "spi_master", "spi_slave", "uhci"],
+        # Mux IDs below include later peripherals; only list HAL drivers that are enabled.
+        drivers = ["i2s", "spi_master"],
+        # Peripheral selector values, TRM table 2.4-1.
         peripheral_instances = [
             { name = "SPI3", dma_id = 0 },
             { name = "SPI2", dma_id = 1 },
@@ -444,6 +449,7 @@ engines = [
             { name = "SHA", dma_id = 7 },
             { name = "PARL_IO", dma_id = 9 },
         ],
+        # 10 ~ 15 are the "dummy" selectors used for memory-to-memory transfers.
         channels = [
             { name = "DMA_CH0", mem2mem = true, mem2mem_id = 10, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
             { name = "DMA_CH1", mem2mem = true, mem2mem_id = 11, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
