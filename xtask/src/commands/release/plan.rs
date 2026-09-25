@@ -206,7 +206,10 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     for package in sorted.iter().copied() {
         let amount = if changed[&package] {
             let mut amount = if package.is_semver_checked() {
-                // Patch releases of semver-checked crates are cut from their backport branch.
+                // `min_package_update` only sees what the stable API requires: Major for breaking
+                // changes, Minor for deprecations and `#[must_use]`, Patch for everything else,
+                // including new API and unstable changes. Semver-checked crates cut patch releases
+                // from their backport branch, so `main` releases at least Minor.
                 match min_package_update(workspace, package, &all_chips)? {
                     ReleaseType::Patch => ReleaseType::Minor,
                     other => other,
