@@ -62,6 +62,13 @@ Notes:
   `release:registry:compile-test`, and `release:registry:ci`. Those labels drive
   the `cargo update` checks in the `pre-release-checks` workflow.
 - Run `post-release` only for the final stable release.
+- `plan` fills in `new_stable_api` for semver-checked packages, diffing the
+  package's API baselines against the working tree. Both sides use the features
+  in the package's `semver-config`. Each entry is an object with `item` and
+  `chips`; paths in `item` are `public-api` Display output, not rustdoc
+  definition sites. Chips with no baseline are listed in
+  `new_stable_api_unchecked_chips`. Baselines are regenerated after a breaking
+  change, so items stabilized before the last regeneration are not listed.
 
 ## Kickoff
 

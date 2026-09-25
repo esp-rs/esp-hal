@@ -14,52 +14,34 @@ use crate::{
     metadata::{Chip, Config},
 };
 
-/// Return the minimum required bump for the next release.
+/// Return the minimum required bump for the next release and the current
+/// rustdoc JSON path.
 /// Even if nothing changed this will be [ReleaseType::Patch]
 pub fn minimum_update(
     workspace: &Path,
     package: Package,
     chip: Chip,
-) -> Result<ReleaseType, Error> {
+) -> Result<(ReleaseType, PathBuf), Error> {
     log::info!("Package = {}, Chip = {}", package, chip);
 
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
-    package.prepare_semver_check(&package_path, &chip)?;
+    let current_path = build_prepared_doc_json(workspace, package, &chip, &package_path)?;
 
-    let current_path = build_doc_json(package, &chip, &package_path)?;
-
-    let dest_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
-    package.clean_semver_check(&dest_path)?;
-
-    let file_name = if package.chip_features_matter() {
-        chip.to_string()
-    } else {
-        "api".to_string()
-    };
-
-    let baseline_path_gz =
-        PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
-    if !baseline_path_gz.exists() {
-        download_baselines(&workspace, vec![package])?;
-    }
-    if package.chip_features_matter() && !baseline_path_gz.exists() {
+    let Some(baseline_path_gz) = baseline_gz(workspace, package, chip)? else {
         log::warn!(
             "No baseline found for package '{}', chip '{}' — skipping semver check for this chip",
             package,
             chip
         );
-        return Ok(ReleaseType::Patch);
-    }
+        return Ok((ReleaseType::Patch, current_path));
+    };
     let baseline_path =
         temp_file::TempFile::new().with_context(|| format!("Failed to create a TempFile!"))?;
-    let buffer = Vec::new();
-    let mut decoder = flate2::write::GzDecoder::new(buffer);
-    decoder.write_all(&(fs::read(&baseline_path_gz)?))?;
-    fs::write(baseline_path.path(), decoder.finish()?)?;
+    decompress_gz(&baseline_path_gz, baseline_path.path())?;
 
-    let mut semver_check = Check::new(Rustdoc::from_path(current_path));
+    let mut semver_check = Check::new(Rustdoc::from_path(current_path.clone()));
     semver_check.set_baseline(Rustdoc::from_path(baseline_path.path()));
     let mut cfg = GlobalConfig::new();
     cfg.set_log_level(Some(log::Level::Info));
@@ -77,16 +59,79 @@ pub fn minimum_update(
         }
     }
 
-    Ok(min_required_update)
+    Ok((min_required_update, current_path))
 }
 
+/// `{chip}` when chip features change the API, otherwise `api`.
+pub(crate) fn baseline_stem(package: Package, chip: Chip) -> String {
+    if package.chip_features_matter() {
+        chip.to_string()
+    } else {
+        "api".to_string()
+    }
+}
+
+/// Gzipped semver baseline for `package`/`chip`, downloading the package's
+/// baselines if they are absent. `None` when chip features matter and that
+/// chip has no baseline.
+pub(crate) fn baseline_gz(
+    workspace: &Path,
+    package: Package,
+    chip: Chip,
+) -> Result<Option<PathBuf>, Error> {
+    let package_path = crate::windows_safe_path(&workspace.join(package.to_string()));
+    let baseline_path_gz = package_path.join(format!(
+        "api-baseline/{}.json.gz",
+        baseline_stem(package, chip)
+    ));
+    if !baseline_path_gz.exists() {
+        download_baselines(workspace, vec![package])?;
+    }
+    if package.chip_features_matter() && !baseline_path_gz.exists() {
+        return Ok(None);
+    }
+    Ok(Some(baseline_path_gz))
+}
+
+pub(crate) fn decompress_gz(src: &Path, dest: &Path) -> Result<(), Error> {
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut decoder = flate2::write::GzDecoder::new(Vec::new());
+    decoder.write_all(&fs::read(src)?)?;
+    fs::write(dest, decoder.finish()?)?;
+    Ok(())
+}
+
+/// `prepare_semver_check`, build rustdoc JSON, then `clean_semver_check`, which
+/// runs even when the build fails.
+pub(crate) fn build_prepared_doc_json(
+    workspace: &Path,
+    package: Package,
+    chip: &Chip,
+    package_path: &PathBuf,
+) -> Result<PathBuf, Error> {
+    package.prepare_semver_check(package_path, chip)?;
+    let result = build_doc_json(package, chip, package_path);
+    let rom_symbols_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
+    if let Err(cleanup) = package.clean_semver_check(&rom_symbols_path) {
+        // A build failure is what the caller can act on, so it is not replaced.
+        if result.is_err() {
+            log::warn!("Failed to clean up after building the doc JSON: {cleanup:#}");
+        } else {
+            return Err(cleanup);
+        }
+    }
+    result
+}
+
+/// Build the rustdoc JSON of `package` for `chip`.
 pub(crate) fn build_doc_json(
     package: Package,
     chip: &Chip,
     package_path: &PathBuf,
 ) -> Result<PathBuf, Error> {
     let target_dir = std::env::var("CARGO_TARGET_DIR");
-
     let target_path = if let Ok(target) = target_dir {
         PathBuf::from(target)
     } else {

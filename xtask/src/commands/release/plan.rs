@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap, HashSet},
     io::Write,
     path::Path,
     process::Command,
@@ -19,9 +19,14 @@ use crate::{
     cargo::CargoToml,
     commands::{
         VersionBump,
-        checker::min_package_update,
+        checker::package_docs,
         do_version_bump,
-        release::{changelog_preview, registry::RegistrySnapshot},
+        release::{
+            changelog_preview,
+            new_stable_api,
+            new_stable_api::NewStableItem,
+            registry::RegistrySnapshot,
+        },
     },
     git::{BackportInfo, current_branch, parse_backport_branch},
     metadata::Chip,
@@ -56,6 +61,14 @@ pub struct PackagePlan {
     pub tag_name: String,
     /// The version bump that will be applied to the package.
     pub bump: VersionBump,
+    /// Public items stable now but not in the API baseline. `None` if the
+    /// package is not semver-checked. `execute-plan` ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub new_stable_api: Option<Vec<NewStableItem>>,
+    /// Chips with no comparison result, so an empty `new_stable_api` is not an
+    /// all-clear for them.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub new_stable_api_unchecked_chips: BTreeSet<Chip>,
 }
 
 /// A release plan is a list of packages and their version increments.
@@ -204,9 +217,16 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     );
 
     for package in sorted.iter().copied() {
+        let mut newly_stable = None;
         let amount = if changed[&package] {
             let mut amount = if package.is_semver_checked() {
-                min_package_update(workspace, package, &all_chips)?
+                let (amount, current_docs) = package_docs(workspace, package, &all_chips)?;
+                newly_stable = Some(new_stable_api::newly_stable(
+                    workspace,
+                    package,
+                    &current_docs,
+                )?);
+                amount
             } else {
                 let forever_unstable = if let Some(metadata) =
                     package_tomls[&package].espressif_metadata()
@@ -251,7 +271,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
             None
         };
 
-        update_amounts.push((package, amount));
+        update_amounts.push((package, amount, newly_stable));
     }
 
     // Generate plan file. The plan should include, as an ordered list, the packages
@@ -266,7 +286,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 
     let mut plan_packages = update_amounts
         .into_iter()
-        .filter_map(|(package, bump)| {
+        .filter_map(|(package, bump, newly_stable)| {
             bump.map(|b| {
                 let current_version = package_tomls[&package].package_version();
 
@@ -302,6 +322,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 
                 let new_version = do_version_bump(&current_version, &bump).unwrap();
                 let tag_name = package.tag(&new_version);
+                let (new_stable_api, unchecked_chips) = newly_stable.unzip();
 
                 PackagePlan {
                     package,
@@ -310,6 +331,8 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                     new_version,
                     tag_name,
                     bump,
+                    new_stable_api,
+                    new_stable_api_unchecked_chips: unchecked_chips.unwrap_or_default(),
                 }
             })
         })
@@ -1095,6 +1118,8 @@ mod tests {
             tag_name: package.tag(&new_version),
             new_version,
             bump,
+            new_stable_api: None,
+            new_stable_api_unchecked_chips: BTreeSet::new(),
         }
     }
 
