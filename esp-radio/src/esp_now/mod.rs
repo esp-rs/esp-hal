@@ -9,19 +9,22 @@
 //!
 //! For more information see <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html>
 
-use alloc::{boxed::Box, collections::vec_deque::VecDeque};
+use alloc::{boxed::Box, vec};
 use core::{
+    cell::UnsafeCell,
     fmt::Debug,
     marker::PhantomData,
+    mem::{ManuallyDrop, MaybeUninit},
+    ptr::NonNull,
     task::{Context, Poll},
 };
 
+use bbqueue::{BBQueue, prod_cons::framed::FramedGrantR, traits::storage::Storage};
 use docsplay::Display;
 use esp_hal::time::Duration;
-use esp_sync::NonReentrantMutex;
+use esp_radio_rtos_driver::semaphore::{SemaphoreHandle, SemaphoreKind};
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
-use super::*;
 #[cfg(feature = "csi")]
 use crate::wifi::csi::CsiConfig;
 use crate::{
@@ -30,8 +33,6 @@ use crate::{
     wifi::{RxControlInfo, WifiError, WifiRefGuard},
 };
 
-const RECEIVE_QUEUE_SIZE: usize = 10;
-
 /// Maximum ESP-NOW v1.0 payload length.
 pub const ESP_NOW_MAX_DATA_LEN_V1: usize = crate::sys::include::ESP_NOW_MAX_DATA_LEN as _;
 
@@ -39,16 +40,103 @@ pub const ESP_NOW_MAX_DATA_LEN_V1: usize = crate::sys::include::ESP_NOW_MAX_DATA
 pub const ESP_NOW_MAX_DATA_LEN_V2: usize = crate::sys::include::ESP_NOW_MAX_DATA_LEN_V2 as _;
 
 /// Broadcast address
-pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
+pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8; 6];
 
-struct EspNowState {
-    // Stores received packets until dequeued by the user
-    rx_queue: VecDeque<ReceivedData>,
+#[cfg(target_has_atomic = "ptr")]
+type Coord = bbqueue::traits::coordination::cas::AtomicCoord;
+
+#[cfg(not(target_has_atomic = "ptr"))]
+type Coord = bbqueue::traits::coordination::cs::CsCoord;
+
+type Queue = BBQueue<QueueStorage, Coord, bbqueue::traits::notifier::polling::Polling>;
+
+/// Storage for a queue
+#[instability::unstable]
+pub struct QueueStorage {
+    data: NonNull<[u8]>,
+    is_a_box: bool,
 }
 
-static STATE: NonReentrantMutex<EspNowState> = NonReentrantMutex::new(EspNowState {
-    rx_queue: VecDeque::new(),
-});
+impl Default for QueueStorage {
+    fn default() -> Self {
+        Self::boxed(4096)
+    }
+}
+
+impl QueueStorage {
+    /// Boxed variant
+    #[instability::unstable]
+    pub fn boxed(len: usize) -> Self {
+        Self {
+            data: NonNull::from_mut(Box::leak(vec![0; len].into_boxed_slice())),
+            is_a_box: true,
+        }
+    }
+    /// Slice variant
+    #[instability::unstable]
+    pub fn slice(s: &'static mut [u8]) -> Self {
+        Self {
+            is_a_box: false,
+            data: NonNull::from_mut(s),
+        }
+    }
+}
+
+impl Drop for QueueStorage {
+    fn drop(&mut self) {
+        if self.is_a_box {
+            drop(unsafe { Box::from_raw(self.data.as_ptr()) });
+        }
+    }
+}
+
+#[instability::unstable]
+impl Storage for QueueStorage {
+    unsafe fn ptr_len(&self) -> (NonNull<u8>, usize) {
+        (self.data.cast(), self.data.len())
+    }
+}
+
+struct EspNowState {
+    /// Stores received packets until dequeued by the user
+    rx_queue: UnsafeCell<MaybeUninit<Queue>>,
+    /// Necessary to avoid dropping state while a cb is running
+    cb_mtx: UnsafeCell<MaybeUninit<SemaphoreHandle>>,
+}
+
+// SAFETY: bbqueue is SPSC, P is rcv_cb and C is user app
+unsafe impl Sync for EspNowState {}
+
+impl EspNowState {
+    unsafe fn queue(&self) -> &Queue {
+        unsafe { self.rx_queue.get().as_ref_unchecked().assume_init_ref() }
+    }
+
+    unsafe fn set_queue(&self, q: Queue) {
+        unsafe { self.rx_queue.get().as_mut_unchecked().write(q) };
+    }
+
+    unsafe fn drop_queue(&self) {
+        unsafe { self.rx_queue.get().as_mut_unchecked().assume_init_drop() }
+    }
+
+    unsafe fn cb_mtx(&self) -> &SemaphoreHandle {
+        unsafe { STATE.cb_mtx.get().as_ref_unchecked().assume_init_ref() }
+    }
+
+    unsafe fn drop_cb_mtx(&self) {
+        unsafe { self.cb_mtx.get().as_mut_unchecked().assume_init_drop() }
+    }
+
+    unsafe fn set_cb_mtx(&self, cb_mtx: SemaphoreHandle) {
+        unsafe { self.cb_mtx.get().as_mut_unchecked().write(cb_mtx) };
+    }
+}
+
+static STATE: EspNowState = EspNowState {
+    rx_queue: UnsafeCell::new(MaybeUninit::uninit()),
+    cb_mtx: UnsafeCell::new(MaybeUninit::uninit()),
+};
 
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
@@ -299,34 +387,42 @@ pub struct ReceiveInfo {
 
 /// Stores information about the received data, including the packet content and
 /// associated information.
-#[derive(Clone)]
 #[instability::unstable]
-pub struct ReceivedData {
-    data: Box<[u8]>,
-    /// Information about the received packet.
-    pub info: ReceiveInfo,
+pub struct ReceivedData<'a> {
+    g: ManuallyDrop<FramedGrantR<&'a Queue>>,
 }
 
-impl ReceivedData {
+impl<'a> Drop for ReceivedData<'a> {
+    fn drop(&mut self) {
+        unsafe { ManuallyDrop::take(&mut self.g) }.release()
+    }
+}
+
+impl ReceivedData<'_> {
     /// Returns the received payload.
     #[instability::unstable]
     pub fn data(&self) -> &[u8] {
-        &self.data
+        unsafe { self.g.get_unchecked(size_of::<ReceiveInfo>()..) }
+    }
+
+    #[instability::unstable]
+    pub fn info(&self) -> ReceiveInfo {
+        unsafe { self.g.as_ptr().cast::<ReceiveInfo>().read_unaligned() }
     }
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for ReceivedData {
+impl<'a> defmt::Format for ReceivedData<'a> {
     fn format(&self, fmt: defmt::Formatter<'_>) {
-        defmt::write!(fmt, "ReceivedData {}, Info {}", &self.data[..], &self.info,)
+        defmt::write!(fmt, "ReceivedData {}, Info {}", &self.data(), &self.info(),)
     }
 }
 
-impl Debug for ReceivedData {
+impl<'a> Debug for ReceivedData<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ReceivedData")
             .field("data", &self.data())
-            .field("info", &self.info)
+            .field("info", &self.info())
             .finish()
     }
 }
@@ -691,8 +787,14 @@ pub struct EspNowReceiver {
 impl EspNowReceiver {
     /// Receives data from the ESP-NOW queue.
     #[instability::unstable]
-    pub fn receive(&self) -> Option<ReceivedData> {
-        STATE.with(|state| state.rx_queue.pop_front())
+    pub fn receive(&mut self) -> Option<ReceivedData<'_>> {
+        unsafe { STATE.queue() }
+            .framed_consumer()
+            .read()
+            .ok()
+            .map(|g| ReceivedData {
+                g: ManuallyDrop::new(g),
+            })
     }
 }
 
@@ -746,6 +848,12 @@ impl Drop for EspNowRc {
             unsafe {
                 esp_now_unregister_recv_cb();
                 esp_now_deinit();
+
+                // make sure rcv cb cannot access state while we're dropping stuff
+                STATE.cb_mtx().take(None);
+
+                STATE.drop_queue();
+                STATE.drop_cb_mtx();
             }
         }
     }
@@ -772,7 +880,7 @@ pub struct EspNow {
 }
 
 impl EspNow {
-    pub(crate) fn new_internal(guard: WifiRefGuard) -> EspNow {
+    pub(crate) fn new_internal(guard: WifiRefGuard, rx_queue_storage: QueueStorage) -> EspNow {
         let espnow_rc = EspNowRc::new(guard);
         let esp_now = EspNow {
             manager: EspNowManager {
@@ -785,6 +893,10 @@ impl EspNow {
         };
 
         check_error_expect!({ esp_now_init() }, "esp-now-init failed");
+        unsafe {
+            STATE.set_queue(Queue::new_with_storage(rx_queue_storage));
+            STATE.set_cb_mtx(SemaphoreHandle::new(SemaphoreKind::Mutex));
+        }
         check_error_expect!(
             { esp_now_register_recv_cb(Some(rcv_cb)) },
             "receiving callback failed"
@@ -913,7 +1025,7 @@ impl EspNow {
 
     /// Receive data.
     #[instability::unstable]
-    pub fn receive(&self) -> Option<ReceivedData> {
+    pub fn receive(&mut self) -> Option<ReceivedData<'_>> {
         self.receiver.receive()
     }
 }
@@ -932,6 +1044,11 @@ unsafe extern "C" fn rcv_cb(
     data: *const u8,
     data_len: i32,
 ) {
+    // `EspNowRc` is dropping
+    if !unsafe { STATE.cb_mtx() }.try_take() {
+        return;
+    }
+
     let src = unsafe {
         [
             (*esp_now_info).src_addr.offset(0).read(),
@@ -962,18 +1079,28 @@ unsafe extern "C" fn rcv_cb(
         dst_address: dst,
         rx_control,
     };
-    let slice = unsafe { core::slice::from_raw_parts(data, data_len as usize) };
 
-    STATE.with(|state| {
-        let data = Box::from(slice);
+    let data_len = data_len as usize;
 
-        if state.rx_queue.len() >= RECEIVE_QUEUE_SIZE {
-            state.rx_queue.pop_front();
+    if let Ok(g_len) = (size_of::<ReceiveInfo>() + data_len).try_into()
+        && let Ok(mut g) = unsafe { STATE.queue() }.framed_producer().grant(g_len)
+    {
+        unsafe {
+            core::ptr::write_unaligned(g.as_mut_ptr().cast(), info);
+
+            core::ptr::copy_nonoverlapping(
+                data,
+                g.as_mut_ptr().add(size_of::<ReceiveInfo>()),
+                data_len,
+            );
         }
 
-        state.rx_queue.push_back(ReceivedData { data, info });
+        g.commit(g_len);
+
         ESP_NOW_RX_WAKER.wake();
-    });
+    }
+
+    unsafe { STATE.cb_mtx() }.give();
 }
 
 impl EspNowReceiver {
@@ -1069,14 +1196,16 @@ impl core::future::Future for SendFuture<'_, '_> {
 #[instability::unstable]
 pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver>);
 
-impl core::future::Future for ReceiveFuture<'_> {
-    type Output = ReceivedData;
+impl<'a> core::future::Future for ReceiveFuture<'a> {
+    type Output = ReceivedData<'a>;
 
     fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ESP_NOW_RX_WAKER.register(cx.waker());
 
-        if let Some(data) = STATE.with(|state| state.rx_queue.pop_front()) {
-            Poll::Ready(data)
+        if let Ok(g) = unsafe { STATE.queue() }.framed_consumer().read() {
+            Poll::Ready(ReceivedData {
+                g: ManuallyDrop::new(g),
+            })
         } else {
             Poll::Pending
         }

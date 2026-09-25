@@ -14,7 +14,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_radio::esp_now::{BROADCAST_ADDRESS, PeerInfo};
+use esp_radio::esp_now::{BROADCAST_ADDRESS, PeerInfo, QueueStorage};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -32,7 +32,7 @@ async fn main(_spawner: Spawner) -> ! {
     let wifi = peripherals.WIFI;
     let controller = esp_radio::wifi::WifiController::new(wifi, Default::default()).unwrap();
 
-    let mut esp_now = controller.esp_now();
+    let mut esp_now = controller.esp_now(QueueStorage::boxed(5000));
     esp_now.set_channel(11).unwrap();
 
     println!("esp-now version {}", esp_now.version().unwrap());
@@ -41,20 +41,23 @@ async fn main(_spawner: Spawner) -> ! {
     loop {
         let res = select(ticker.next(), async {
             let r = esp_now.receive_async().await;
+            let info = r.info();
             println!("Received {:?}", r);
-            if r.info.dst_address == BROADCAST_ADDRESS {
-                if !esp_now.peer_exists(&r.info.src_address) {
+            drop(r);
+
+            if info.dst_address == BROADCAST_ADDRESS {
+                if !esp_now.peer_exists(&info.src_address) {
                     esp_now
                         .add_peer(PeerInfo {
                             interface: esp_radio::esp_now::EspNowWifiInterface::Station,
-                            peer_address: r.info.src_address,
+                            peer_address: info.src_address,
                             lmk: None,
                             channel: None,
                             encrypt: false,
                         })
                         .unwrap();
                 }
-                let status = esp_now.send_async(&r.info.src_address, b"Hello Peer").await;
+                let status = esp_now.send_async(&info.src_address, b"Hello Peer").await;
                 println!("Send hello to peer status: {:?}", status);
             }
         })
