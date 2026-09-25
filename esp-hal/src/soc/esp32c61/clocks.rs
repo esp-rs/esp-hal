@@ -309,6 +309,34 @@ fn bus_clock_update() {
     {}
 }
 
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+//
+// CPU_CLK must stay an integer multiple of AHB_CLK, and AHB_CLK must not exceed XTAL_CLK.
+
+/// Switches the CPU clock to XTAL_CLK. Returns `false` if the CPU clock does not come from the
+/// PLL.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) -> bool {
+    if clocks.hp_root_clk() != Some(HpRootClkConfig::PllF160m) {
+        return false;
+    }
+
+    configure_hp_root_clk_impl(clocks, None, HpRootClkConfig::Xtal);
+    configure_cpu_clk_impl(clocks, None, CpuClkConfig::new(0));
+    configure_ahb_clk_impl(clocks, None, AhbClkConfig::new(0));
+
+    true
+}
+
+/// Restores the CPU clock that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    configure_ahb_clk_impl(clocks, None, unwrap!(clocks.ahb_clk()));
+    configure_cpu_clk_impl(clocks, None, unwrap!(clocks.cpu_clk()));
+    configure_hp_root_clk_impl(clocks, None, unwrap!(clocks.hp_root_clk()));
+}
+
 // CPU_CLK
 
 fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
