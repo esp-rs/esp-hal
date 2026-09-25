@@ -86,7 +86,7 @@ pub(super) struct osi_funcs_s {
     malloc_retention: Option<unsafe extern "C" fn(u32) -> *mut c_void>,
     ets_delay_us: Option<unsafe extern "C" fn(u32)>,
     btdm_rom_table_ready: Option<unsafe extern "C" fn()>,
-    coex_bt_wakeup_request: Option<unsafe extern "C" fn()>,
+    coex_bt_wakeup_request: Option<unsafe extern "C" fn() -> bool>,
     coex_bt_wakeup_request_end: Option<unsafe extern "C" fn()>,
     get_time_us: Option<unsafe extern "C" fn() -> u64>,
     assert: Option<unsafe extern "C" fn()>,
@@ -152,8 +152,8 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     malloc_retention: Some(malloc_retention),
     ets_delay_us: Some(ets_delay_us_wrapper),
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
-    coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
-    coex_bt_wakeup_request_end: Some(coex_bt_wakeup_request_end),
+    coex_bt_wakeup_request: Some(super::coex_bt_wakeup_request),
+    coex_bt_wakeup_request_end: Some(super::coex_bt_wakeup_request_end),
     get_time_us: Some(get_time_us_wrapper),
     assert: Some(assert_wrapper),
 };
@@ -194,30 +194,6 @@ extern "C" fn coex_schm_register_btdm_callback(_callback: *mut c_void) -> i32 {
             coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, _callback)
         },
         _ => 0,
-    }
-}
-
-extern "C" fn coex_bt_wakeup_request() {
-    trace!("coex_bt_wakeup_request");
-
-    unsafe extern "C" {
-        fn btdm_wakeup_request();
-    }
-
-    unsafe {
-        btdm_wakeup_request();
-    }
-}
-
-extern "C" fn coex_bt_wakeup_request_end() {
-    trace!("coex_bt_wakeup_request_end");
-
-    unsafe extern "C" {
-        fn btdm_in_wakeup_requesting_set(set: bool);
-    }
-
-    unsafe {
-        btdm_in_wakeup_requesting_set(false);
     }
 }
 

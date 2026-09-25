@@ -134,8 +134,8 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     btdm_sleep_exit_phase1: Some(super::btdm_sleep_exit_phase1),
     btdm_sleep_exit_phase2: Some(super::btdm_sleep_exit_phase2),
     btdm_sleep_exit_phase3: Some(super::btdm_sleep_exit_phase3),
-    coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
-    coex_bt_wakeup_request_end: Some(coex_bt_wakeup_request_end),
+    coex_bt_wakeup_request: Some(super::coex_bt_wakeup_request),
+    coex_bt_wakeup_request_end: Some(super::coex_bt_wakeup_request_end),
     coex_bt_request: Some(coex_bt_request),
     coex_bt_release: Some(coex_bt_release),
     coex_register_bt_cb: Some(coex_register_bt_cb),
@@ -489,35 +489,6 @@ pub(crate) fn disable_sleep_mode() {
     }
 }
 
-pub(crate) unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
-    trace!("coex_bt_wakeup_request");
-
-    // This should really be
-    // ```rust,norun
-    // #[cfg(feature = "coex")]
-    // return async_wakeup_request(BTDM_ASYNC_WAKEUP_REQ_COEX);
-    // #[cfg(not(feature = "coex"))]
-    // true
-    // ```
-    //
-    // But doing the right thing here keeps BT from working.
-    // In a similar scenario this function isn't called in ESP-IDF.
-    true
-}
-
-pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
-    trace!("coex_bt_wakeup_request_end");
-
-    // This should really be
-    // ```rust,norun
-    // #[cfg(feature = "coex")]
-    // async_wakeup_request_end(BTDM_ASYNC_WAKEUP_REQ_COEX);
-    // ```
-    //
-    // But doing the right thing here keeps BT from working.
-    // In a similar scenario this function isn't called in ESP-IDF.
-}
-
 extern_coex_fns! {
     fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32;
     fn coex_bt_release(event: u32) -> i32;
@@ -594,96 +565,6 @@ pub(crate) unsafe extern "C" fn ints_on(mask: u32) {
     trace!("chip_ints_on esp32 {:b}", mask);
     unsafe {
         crate::hal::xtensa_lx::interrupt::enable_mask(mask);
-    }
-}
-
-#[cfg(feature = "coex")]
-pub(crate) const BTDM_ASYNC_WAKEUP_REQ_HCI: i32 = 0;
-
-#[cfg(feature = "coex")]
-pub(crate) const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
-
-// const BTDM_ASYNC_WAKEUP_REQMAX: i32 = 2;
-
-/// **************************************************************************
-/// Name: async_wakeup_request
-///
-/// Description:
-///   Request the BLE Controller to wakeup
-///
-/// Input Parameters:
-///   event - the event that triggered the wakeup
-///
-/// Returned Value:
-///   true if request lock is needed, false otherwise
-///
-/// *************************************************************************
-#[cfg(feature = "coex")]
-pub(crate) fn async_wakeup_request(event: i32) -> bool {
-    trace!("async_wakeup_request {}", event);
-
-    unsafe extern "C" {
-        fn btdm_in_wakeup_requesting_set(set: bool);
-
-        fn btdm_power_state_active() -> bool;
-
-        fn btdm_wakeup_request();
-    }
-
-    match event {
-        e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => {
-            unsafe {
-                btdm_in_wakeup_requesting_set(true);
-            }
-            false
-        }
-        e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => {
-            unsafe {
-                btdm_in_wakeup_requesting_set(true);
-            }
-
-            if !unsafe { btdm_power_state_active() } {
-                unsafe {
-                    btdm_wakeup_request();
-                }
-                true
-            } else {
-                false
-            }
-        }
-        _ => false,
-    }
-}
-
-/// **************************************************************************
-/// Name: async_wakeup_request_end
-///
-/// Description:
-///   Finish a wakeup request
-///
-/// Input Parameters:
-///   event - the event that triggered the wakeup
-///
-/// Returned Value:
-///   true if request lock is needed, false otherwise
-///
-/// *************************************************************************
-#[cfg(feature = "coex")]
-pub(crate) fn async_wakeup_request_end(event: i32) {
-    trace!("async_wakeup_request_end {}", event);
-
-    let request_lock = match event {
-        e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => true,
-        e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => false,
-        _ => return,
-    };
-
-    unsafe extern "C" {
-        fn btdm_in_wakeup_requesting_set(set: bool);
-    }
-
-    if request_lock {
-        unsafe { btdm_in_wakeup_requesting_set(false) };
     }
 }
 

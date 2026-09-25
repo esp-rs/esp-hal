@@ -363,12 +363,32 @@ fn wake_controller_for_hci() {
     if !super::modem_sleep_enabled() {
         return;
     }
+    // `btdm_in_wakeup_requesting_set(true)` takes a lock, and only
+    // `btdm_in_wakeup_requesting_set(false)` releases it. Do not nest the calls.
     unsafe {
         btdm_in_wakeup_requesting_set(true);
         if !btdm_power_state_active() {
             btdm_wakeup_request();
         }
     }
+}
+
+/// Wakes the controller for a coex scheduler event.
+///
+/// Returns `true` if the controller sleeps. The controller then handles the event after it wakes.
+unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
+    trace!("coex_bt_wakeup_request");
+
+    let wake = super::modem_sleep_enabled() && unsafe { !btdm_power_state_active() };
+    if wake {
+        unsafe { btdm_wakeup_request() };
+    }
+    wake
+}
+
+unsafe extern "C" fn coex_bt_wakeup_request_end() {
+    trace!("coex_bt_wakeup_request_end");
+    // Nothing to release: `coex_bt_wakeup_request` does not take the wakeup-requesting lock.
 }
 
 fn end_controller_hci_wake() {
@@ -529,15 +549,7 @@ fn send_packet(packet: &[u8]) {
         PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
 
         wake_controller_for_hci();
-
-        #[cfg(all(esp32, feature = "coex"))]
-        chip_specific::async_wakeup_request(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
-
         API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
-
-        #[cfg(all(esp32, feature = "coex"))]
-        chip_specific::async_wakeup_request_end(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
-
         end_controller_hci_wake();
     }
 
