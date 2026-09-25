@@ -161,6 +161,24 @@ pub fn read_bit(field: EfuseField) -> bool {
     read_field_le::<u8>(field) != 0
 }
 
+/// Decodes a sign-magnitude number, where bit `sign_bit` carries the sign and the bits below it
+/// carry the magnitude.
+///
+/// The RTC calibration fields store their differences this way rather than in two's complement,
+/// so a raw read has to be converted before it can be added to a reference point.
+#[allow(
+    dead_code,
+    reason = "not every chip has sign-magnitude calibration fields"
+)]
+pub(crate) fn sign_magnitude(value: u32, sign_bit: u32) -> i32 {
+    let sign_mask = 1 << sign_bit;
+    if value & sign_mask != 0 {
+        -((value & !sign_mask) as i32)
+    } else {
+        value as i32
+    }
+}
+
 /// Overrides the base MAC address used by [`interface_mac_address`].
 ///
 /// After a successful call, [`interface_mac_address`] will derive

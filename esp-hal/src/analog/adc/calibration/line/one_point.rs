@@ -1,34 +1,28 @@
 use core::marker::PhantomData;
 
 use super::AdcHasLineCal;
-use crate::analog::adc::{
-    AdcCalBasic,
-    AdcCalEfuse,
-    AdcCalScheme,
-    AdcCalSource,
-    AdcConfig,
-    Attenuation,
-    CalibrationAccess,
-};
+use crate::analog::adc::{AdcCalBasic, AdcCalEfuse, AdcCalScheme, Attenuation, CalibrationAccess};
 
 /// Gain is stored as a `u32`, but is really a fixed-point number.
 const GAIN_SCALE: u32 = 1 << 16;
 
-/// Line fitting ADC calibration scheme
+/// Line fitting ADC calibration scheme.
 ///
 /// This scheme implements gain correction based on reference points, and
 /// returns readings in mV.
 ///
 /// A reference point is a pair of a reference voltage and the corresponding
-/// mean raw digital ADC value. Such values are usually stored in efuse bit
-/// fields for each supported attenuation.
-///
-/// Also it can be measured in runtime by connecting ADC to reference voltage
-/// internally but this method is not so good because actual reference voltage
-/// may vary in range 1.0..=1.2 V. Currently this method is used as a fallback
-/// (with 1.1 V by default) when calibration data is missing.
+/// mean raw digital ADC value. Those values are stored in eFuse bit fields for each supported
+/// attenuation, and there is no way to establish them at runtime: the ADC can only be switched to
+/// internal ground, which gives the zero-voltage offset rather than a second point to derive a
+/// gain from.
 ///
 /// This scheme also includes basic calibration ([`AdcCalBasic`]).
+///
+/// # Panics
+///
+/// Panics if the chip carries no line-fitting calibration data in eFuse, or if that data gives a
+/// reference point of zero.
 #[derive(Clone, Copy)]
 pub struct AdcCalLine<ADCX> {
     basic: AdcCalBasic<ADCX>,
@@ -56,26 +50,23 @@ where
     fn new_cal_with_channel(atten: Attenuation, channel: u8) -> Self {
         let basic = AdcCalBasic::<ADCX>::new_cal_with_channel(atten, channel);
 
-        // Try get the reference point (Dout, Vin) from efuse
-        // Dout means mean raw ADC value when specified Vin applied to input.
-        let (code, mv) = ADCX::cal_code(atten)
-            .map(|code| (code, ADCX::cal_mv(atten)))
-            .unwrap_or_else(|| {
-                // As a fallback try to calibrate using reference voltage source.
-                // This method is not too good because actual reference voltage may varies
-                // in range 1000..=1200 mV and this value currently cannot be read from efuse.
-                (
-                    AdcConfig::<ADCX>::adc_calibrate(atten, AdcCalSource::Ref),
-                    1100, // use 1100 mV as a middle of typical reference voltage range
-                )
-            });
+        // Get the reference point (Dout, Vin) from efuse. Dout means mean raw ADC value when
+        // specified Vin applied to input.
+        // `cal_mv` goes first: it rejects attenuations without a reference point on the ESP32-C2.
+        let mv = ADCX::cal_mv(atten);
+        let Some(code) = ADCX::cal_code(atten) else {
+            panic!("This chip needs eFuse calibration data for line fitting")
+        };
+
+        // Guards the division below, which would otherwise divide by zero.
+        assert!(code != 0, "ADC calibration reference point is zero");
 
         // Estimate the (assumed) linear relationship between the measured raw value and
         // the voltage with the previously done measurement when the chip was
         // manufactured.
         //
-        // Note that the constant term is zero because the basic calibration takes care
-        // of it already.
+        // Note that the constant term is zero because the driver programs the
+        // zero-voltage bias for every conversion.
         let gain = mv as u32 * GAIN_SCALE / code as u32;
 
         Self {
@@ -83,10 +74,6 @@ where
             gain,
             _phantom: PhantomData,
         }
-    }
-
-    fn adc_cal(&self) -> u16 {
-        self.basic.adc_cal()
     }
 
     fn adc_val(&self, val: u16) -> u16 {

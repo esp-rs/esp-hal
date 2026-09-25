@@ -135,6 +135,25 @@ pub mod sleep;
 #[cfg_attr(esp32s31, path = "rtc/esp32s31.rs")]
 pub(crate) mod rtc;
 
+// Trims the RTC bandgap using eFuse calibration data.
+//
+// The trim only needs to be applied on power-on; the analog domain retains it
+// across other resets, so the eFuses are not read again on those paths.
+//
+// `ocode` returns the trim value to apply, or `None` if the eFuses hold no
+// usable calibration data.
+#[cfg(any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32s2, esp32s3))]
+pub(crate) fn calibrate_ocode(ocode: impl FnOnce() -> Option<u8>) {
+    if crate::system::reset_reason() != Some(SocResetReason::ChipPowerOn) {
+        return;
+    }
+
+    if let Some(ocode) = ocode() {
+        crate::soc::regi2c::I2C_ULP_EXT_CODE.write_reg(ocode);
+        crate::soc::regi2c::I2C_ULP_IR_FORCE_CODE.write_field(1);
+    }
+}
+
 cfg_select! {
     esp32s31 => {
         use crate::peripherals::{LP_SYS as LP_AON, LP_WDT};

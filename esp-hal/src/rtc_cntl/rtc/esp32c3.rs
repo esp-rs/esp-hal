@@ -54,7 +54,16 @@ pub(crate) fn init(_config: &ClockConfig) {
     regi2c::I2C_ULP_IR_FORCE_XPD_CK.write_field(0);
 }
 
-fn calibrate_ocode() {}
+// Trims the RTC bandgap using eFuse calibration data.
+//
+// See `set_ocode_by_efuse` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32c3/rtc_init.c>
+fn calibrate_ocode() {
+    super::calibrate_ocode(|| {
+        (crate::efuse::block_version().0 == 1)
+            .then(|| crate::efuse::read_field_le::<u8>(crate::efuse::OCODE))
+    });
+}
 
 fn set_rtc_dig_dbias() {}
 

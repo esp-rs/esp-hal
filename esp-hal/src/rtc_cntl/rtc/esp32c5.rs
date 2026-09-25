@@ -9,6 +9,22 @@ use crate::{
     },
 };
 
+// Trims the RTC bandgap using eFuse calibration data.
+//
+// See `esp_ocode_calib_init` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32c5/ocode_init.c>
+fn calibrate_ocode() {
+    super::calibrate_ocode(|| {
+        let chip = crate::efuse::chip_revision().combined();
+        let (major, minor) = crate::efuse::block_version();
+        let blk = u16::from(major) * 100 + u16::from(minor);
+
+        // v0.1 chips and v1.0+ chips got the ocode in different block versions.
+        ((chip == 1 && blk >= 1) || (chip >= 100 && blk >= 2))
+            .then(|| crate::efuse::read_field_le::<u8>(crate::efuse::OCODE))
+    });
+}
+
 fn pmu_power_domain_force_default() {
     // for bypass reserved power domain
 
@@ -1001,6 +1017,8 @@ pub(crate) fn init(config: &ClockConfig) {
     LpSystemInit::init_default();
 
     pmu_power_domain_force_default();
+
+    calibrate_ocode();
 
     // esp_perip_clk_init()
     modem_clock_domain_power_state_icg_map_init();

@@ -15,32 +15,28 @@ const COEFF_MUL: i64 = 1 << 52;
 /// the type, this is a fixed-point number with 52 fractional bits.
 type CurveCoeff = i64;
 
-/// Polynomial coefficients for specified attenuation.
+/// Polynomial coefficients for a specified attenuation.
 pub struct CurveCoeffs {
-    /// Attenuation
+    /// Attenuation.
     atten: Attenuation,
-    /// Polynomial coefficients
+    /// Polynomial coefficients.
     coeff: &'static [CurveCoeff],
 }
 
 type CurvesCoeffs = &'static [CurveCoeffs];
 
-/// Marker trait for ADC which support curve fitting
+/// Marker trait for ADCs that support curve fitting.
 ///
 /// See also [`AdcCalCurve`].
 pub trait AdcHasCurveCal {
     /// Coefficients for calculating the reading voltage error.
     ///
-    /// A sets of coefficients for each attenuation.
-    const CURVES_COEFFS: CurvesCoeffs;
-
-    /// Coefficients for the eFuse calibration version on this chip.
-    fn curves_coeffs() -> CurvesCoeffs {
-        Self::CURVES_COEFFS
-    }
+    /// A set of coefficients for each attenuation, selected for the eFuse
+    /// calibration version on this chip.
+    fn curves_coeffs() -> CurvesCoeffs;
 }
 
-/// Curve fitting ADC calibration scheme
+/// Curve fitting ADC calibration scheme.
 ///
 /// This scheme implements polynomial error correction using predefined
 /// coefficient sets for each attenuation. It returns readings in mV.
@@ -91,28 +87,26 @@ where
         }
     }
 
-    fn adc_cal(&self) -> u16 {
-        self.line.adc_cal()
-    }
-
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.line.adc_val(val);
 
-        // Calculate polynomial error using Horner's method to prevent overflow.
-        // Horner's evaluates: err = coeff[0] + val*(coeff[1] + val*(coeff[2] + ...))
-        // This avoids computing val^n which causes overflow when multiplied by coefficients.
+        // Truncate each polynomial term before summing to match integer division
+        // in the curve-fitting reference model.
+        //
+        // The products need i128: the highest-order term (ESP32-S3, x^4) times its
+        // coefficient does not fit an i64.
         let err = if val == 0 || self.coeff.is_empty() {
             0
         } else {
-            let val_i64 = val as i64;
-            let mut poly = 0i64;
+            let mut var: i128 = 1; // val^i
+            let mut err: i128 = 0;
 
-            // Iterate coefficients in reverse order for Horner's method
-            for &coeff in self.coeff.iter().rev() {
-                poly = poly * val_i64 + coeff;
+            for &coeff in self.coeff {
+                err += var * i128::from(coeff) / i128::from(COEFF_MUL);
+                var *= i128::from(val);
             }
 
-            (poly / COEFF_MUL) as i32
+            err as i32
         };
 
         (val as i32 - err) as u16
@@ -140,21 +134,21 @@ mod impls {
     use super::*;
 
     impl AdcHasCurveCal for crate::peripherals::ADC1<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
-
-        #[cfg(esp32c6)]
         fn curves_coeffs() -> CurvesCoeffs {
+            #[cfg(esp32c6)]
             if crate::efuse::rtc_calib_version() == 2 {
-                CURVES_COEFFS1_V2
-            } else {
-                CURVES_COEFFS1
+                return CURVES_COEFFS1_V2;
             }
+
+            CURVES_COEFFS1
         }
     }
 
     #[cfg(adc_adc2)]
     impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS2;
+        fn curves_coeffs() -> CurvesCoeffs {
+            CURVES_COEFFS2
+        }
     }
 
     coeff_tables! {
@@ -214,7 +208,7 @@ mod impls {
         #[cfg(esp32c6)]
         CURVES_COEFFS1 [
             _0dB => [
-                -0.0487166399931449,
+                -0.487166399931449,
                 0.0006436483033201,
                 0.0000030410131806,
             ],
@@ -243,7 +237,7 @@ mod impls {
                 0.0015630376830615,
             ],
             _2p5dB => [
-                -0.1090569589734153,
+                -1.090569589734153,
                 0.0013859487941542,
             ],
             _6dB => [
@@ -386,7 +380,7 @@ mod impls {
             _6dB => [
                 -0.9452499397020617,
                 -0.0200996773954387,
-                0.00000259011467956,
+                0.0000259011467956,
             ],
             _11dB => [
                 1.2247719764336924,
