@@ -590,6 +590,10 @@ fn configure_low_power_clk_impl(
     _old_config: Option<LowPowerClkConfig>,
     new_config: LowPowerClkConfig,
 ) {
+    // The divider resets to 255. The Wi-Fi light sleep timer expects the undivided clock.
+    SYSTEM::regs()
+        .bt_lpck_div_int()
+        .modify(|_, w| unsafe { w.bt_lpck_div_num().bits(0) });
     SYSTEM::regs().bt_lpck_div_frac().modify(|_, w| {
         w.lpclk_sel_8m()
             .bit(new_config == LowPowerClkConfig::RcFast);
