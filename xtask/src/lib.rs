@@ -1240,9 +1240,109 @@ pub(crate) fn run_command_with_output_timeout(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+
     use strum::IntoEnumIterator;
 
     use super::*;
+
+    fn split_chip_suffix(name: &str) -> Option<(&str, String)> {
+        // `esp32` is a suffix of `esp32c5`, so the longest match is the right one.
+        let chip = Chip::iter()
+            .map(|chip| chip.to_string())
+            .filter(|chip| name.ends_with(chip.as_str()))
+            .max_by_key(String::len)?;
+
+        Some((&name[..name.len() - chip.len()], chip))
+    }
+
+    /// Chips that the manifest declares a dependency for, grouped by shared prefix.
+    fn declared_chip_dependencies(toml: &mut CargoToml) -> BTreeMap<String, BTreeSet<String>> {
+        let mut declared = BTreeMap::<String, BTreeSet<_>>::new();
+
+        toml.visit_dependencies(|_, _, table| {
+            for (name, _) in table.iter() {
+                if let Some((prefix, chip)) = split_chip_suffix(name) {
+                    declared.entry(prefix.to_owned()).or_default().insert(chip);
+                }
+            }
+        });
+
+        declared
+    }
+
+    /// Chips that each feature forwards to, keyed by feature, prefix and forwarded feature.
+    fn forwarded_chip_features(
+        toml: &CargoToml,
+    ) -> BTreeMap<(String, String, String), BTreeSet<String>> {
+        let mut forwarded = BTreeMap::<_, BTreeSet<_>>::new();
+
+        let Some(Item::Table(features)) = toml.manifest.get("features") else {
+            return forwarded;
+        };
+
+        for (feature, entries) in features.iter() {
+            let Item::Value(Value::Array(entries)) = entries else {
+                continue;
+            };
+
+            for entry in entries {
+                let Some((dependency, forwarded_feature)) =
+                    entry.as_str().and_then(|entry| entry.split_once('/'))
+                else {
+                    continue;
+                };
+
+                let dependency = dependency.strip_suffix('?').unwrap_or(dependency);
+                let Some((prefix, chip)) = split_chip_suffix(dependency) else {
+                    continue;
+                };
+
+                forwarded
+                    .entry((
+                        feature.to_owned(),
+                        prefix.to_owned(),
+                        forwarded_feature.to_owned(),
+                    ))
+                    .or_default()
+                    .insert(chip);
+            }
+        }
+
+        forwarded
+    }
+
+    /// A feature that forwards to a per-chip dependency must do so for every chip, otherwise
+    /// the feature silently does nothing on the chips that were left out.
+    #[test]
+    fn chip_coverage_dependency_features_are_forwarded() {
+        let mut problems = Vec::new();
+
+        for package in Package::iter() {
+            let mut toml = package.toml();
+            let Some(toml) = toml.as_mut() else {
+                continue;
+            };
+
+            let declared = declared_chip_dependencies(toml);
+
+            for ((feature, prefix, forwarded_feature), chips) in forwarded_chip_features(toml) {
+                let Some(declared) = declared.get(&prefix) else {
+                    continue;
+                };
+
+                let missing = declared.difference(&chips).collect::<Vec<_>>();
+
+                if !missing.is_empty() {
+                    problems.push(format!(
+                        "{package}: feature `{feature}` forwards `{prefix}<chip>?/{forwarded_feature}`, but not for {missing:?}"
+                    ));
+                }
+            }
+        }
+
+        assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
 
     #[test]
     fn packages_are_either_crates_or_collections_of_standalone_projects() {
@@ -1268,6 +1368,38 @@ mod tests {
 
         assert_eq!(Package::QaTest.to_string(), "qa-test");
         assert_eq!(Package::QaTest.directory(), "examples/qa");
+    }
+
+    #[test]
+    fn chip_coverage_standalone_projects_declare_required_chips() {
+        let workspace = repo_root_for_tests();
+
+        for package in [Package::Examples, Package::CompileTests] {
+            crate::firmware::load_package(&workspace, package)
+                .unwrap_or_else(|err| panic!("failed to load '{package}': {err}"));
+        }
+    }
+
+    #[test]
+    fn chip_coverage_missing_chip_is_an_error_for_examples_but_not_compile_tests() {
+        let omitted = Chip::Esp32c61;
+        let dir = tempfile::TempDir::new().unwrap();
+        let project = dir.path().join("missing-chip");
+        fs::create_dir_all(project.join("src")).unwrap();
+
+        let mut features = String::from("[features]\n");
+        for chip in Chip::iter() {
+            if chip != omitted {
+                features.push_str(&format!("{chip} = []\n"));
+            }
+        }
+        fs::write(project.join("Cargo.toml"), features).unwrap();
+        fs::write(project.join("src").join("main.rs"), "fn main() {}\n").unwrap();
+
+        let err = crate::firmware::load_cargo_toml(dir.path(), Package::Examples).unwrap_err();
+        assert!(format!("{err:#}").contains(&format!("{omitted:?}")));
+
+        crate::firmware::load_cargo_toml(dir.path(), Package::CompileTests).unwrap();
     }
 
     #[test]

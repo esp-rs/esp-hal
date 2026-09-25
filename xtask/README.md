@@ -141,6 +141,10 @@ single backport package, and forces Patch bumps. No `--allow-non-main` needed.
 package where `Package::has_host_tests` finds a `#[test]` function under
 `src/**/*.rs`.
 
+Manifest consistency tests (for example `cargo test chip_coverage`) live in the
+`xtask` crate itself. CI covers them with `cd xtask && cargo test --features release`
+in the same `host-tests` job. Run that locally the same way.
+
 **Detection is not enough.** Each package with host tests also needs a match arm
 in `run_host_tests` (`xtask/src/lib.rs`). Without it, xtask fails with
 `Instructions for host testing were not provided for: '<package>'` even though

@@ -33,7 +33,7 @@ pub fn examples(
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
     let examples = if package.contains_standalone_projects() {
-        crate::firmware::load_cargo_toml(&package_path).with_context(|| {
+        crate::firmware::load_cargo_toml(&package_path, package).with_context(|| {
             format!(
                 "Failed to load specified examples from {}",
                 package_path.display()
