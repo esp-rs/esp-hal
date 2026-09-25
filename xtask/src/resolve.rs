@@ -60,7 +60,7 @@ pub fn resolve(mut input: ResolveInput) -> Resolution {
     }
 }
 
-/// `esp32-c6` and `ESP32C6` name the same chip as `esp32c6`.
+/// `esp32-c6`, `ESP32C6` and `c6` name the same chip as `esp32c6`.
 fn chip_from_token(token: &str) -> Option<Chip> {
     let mut normalized = token.trim().to_owned();
     normalized.retain(|c| c != '-');

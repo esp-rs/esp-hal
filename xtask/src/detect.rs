@@ -8,6 +8,7 @@
 
 use std::{fmt, io::IsTerminal, process::Command, str::FromStr, time::Duration};
 
+use anyhow::Result;
 use inquire::Select;
 use serde::Deserialize;
 
@@ -17,27 +18,32 @@ const SHORT_TIMEOUT: Duration = Duration::from_secs(10);
 const ESPFLASH_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// Infer the chip via `espflash`, used by `run` because it resets the board anyway.
-pub fn with_espflash() -> Option<Chip> {
+pub fn with_espflash() -> Result<Option<Chip>> {
     pick_connected(detect_via_espflash())
 }
 
 /// Infer the chip via `probe-rs`, used by `test` because it runs through the probe anyway.
-pub fn with_probe_rs() -> Option<Chip> {
+pub fn with_probe_rs() -> Result<Option<Chip>> {
     pick_connected(detect_via_probe_rs())
 }
 
-fn pick_connected(devices: Vec<ConnectedDevice>) -> Option<Chip> {
+fn pick_connected(devices: Vec<ConnectedDevice>) -> Result<Option<Chip>> {
     let device = match devices.len() {
-        0 => return None,
+        0 => return Ok(None),
         1 => devices.into_iter().next().unwrap(),
-        _ => pick_device(devices)?,
+        _ => match pick_device(devices)? {
+            Some(device) => device,
+            None => return Ok(None),
+        },
     };
     export_connection(&device);
     log::info!("Using connected chip {device}");
-    Some(device.chip)
+    Ok(Some(device.chip))
 }
 
-fn pick_device(devices: Vec<ConnectedDevice>) -> Option<ConnectedDevice> {
+/// `Ok(None)` when there is nobody to ask. Cancelling the prompt is an answer of its own, and stops
+/// the command rather than leaving it to guess.
+fn pick_device(devices: Vec<ConnectedDevice>) -> Result<Option<ConnectedDevice>> {
     let summary = devices
         .iter()
         .map(|device| device.to_string())
@@ -47,11 +53,11 @@ fn pick_device(devices: Vec<ConnectedDevice>) -> Option<ConnectedDevice> {
         log::info!(
             "Multiple ESP devices connected ({summary}). Pass the chip name, or run from a terminal to pick one."
         );
-        return None;
+        return Ok(None);
     }
-    Select::new("Select the connected chip:", devices)
-        .prompt()
-        .ok()
+    Ok(Some(
+        Select::new("Select the connected chip:", devices).prompt()?,
+    ))
 }
 
 fn export_connection(device: &ConnectedDevice) {

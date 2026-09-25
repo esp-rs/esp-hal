@@ -24,13 +24,14 @@ Commands:
 ```
 
 `build` / `run` / `check` / `test` take free-form tokens (chip, crate, example, test, or a package
-alias like `examples` / `qa` / `tests`) in any order. There is no `--chip` flag: write `esp32c6`.
+alias like `examples` / `qa` / `tests`) in any order. There is no `--chip` flag: write `esp32c6`,
+or `c6` for short.
 A crate name is only a token `check` acts on, the other three want firmware: examples or HIL tests.
 `--package` exists for callers that want to be explicit and accepts the same names and aliases the
 tokens do, so `build qa all esp32c6` and `build all --package qa-test esp32c6` are the same command.
 
 `lint`, `ci`, `doc`, `doc-tests` and `check-global-symbols` take the chip the same way,
-as a bare name. The one exception is `semver-check`, which takes `--chips`, it has a subcommand of
+as a bare name, shortened or not. The one exception is `semver-check`, which takes `--chips`, it has a subcommand of
 its own, and clap cannot tell a trailing chip name from it.
 
 `lint` and `doc` read crates from their tokens too, so `doc esp-hal esp-radio
@@ -60,13 +61,21 @@ caller with no terminal — a script, a CI job, an agent — gets an error namin
 of a build. The chip name behaves the same way when it is missing.
 
 A name may be a binary name, a relative path (`ota/update`), or a fragment that fits one of them:
-`build sdmmc` finds `sdmmc_sd_async`. A fragment fitting several is an error listing them.
+`build sdmmc` finds `sdmmc_sd_async`. `-` and `_` are interchangeable, so `run sleep_timer` finds
+`sleep-timer`. A name that fits several binaries, or none, opens a selector over every binary the
+command can act on, with the name already typed into its filter. Without a terminal, several fits
+are an error listing them.
 
-Only `run` and `test` infer the chip from a connected device, because they are the ones that talk to
-it. `build` and `check` compile for whatever chip you name and never look at hardware.
+`run`, `test` and `check` infer the chip from a connected device when it is not named. `run` and
+`test` use the tool they are about to drive it with, `espflash` and `probe-rs`. `check` drives
+nothing, so it takes whichever of the two finds a device, and only looks from a terminal — scripts
+and CI jobs keep checking every chip. `build` never looks at hardware at all.
 
-`check` with no example or test name checks every published crate on every chip. To build every HIL
-test for a chip, write `all` or omit the test name: `build tests esp32c6`.
+When an example fails, `run` offers a retry. A retry looks at the connected board again, so a
+devkit swapped in meanwhile is picked up, and a different chip starts the command over for it.
+
+`check` with no example or test name and nothing connected checks every published crate on every
+chip. To build every HIL test for a chip, write `all` or omit the test name: `build tests esp32c6`.
 
 ### Compiling a crate
 
