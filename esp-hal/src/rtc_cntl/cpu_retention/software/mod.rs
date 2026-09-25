@@ -491,12 +491,6 @@ pub(crate) fn save_critical_frame(ctx: &CoreRetentionContext) -> *mut CriticalSl
 /// (`esp32c6/sleep_cpu.c:317-341`).
 #[crate::ram]
 pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool {
-    // The rendezvous exists on a multi-core chip only, and this body is what it delegates to.
-    #[cfg(all(multi_core, feature = "rt"))]
-    if rendezvous::helper_enlisted() {
-        return rendezvous::sleep_retained(buffer, enter_sleep);
-    }
-
     let core = system::raw_core();
     let mut ctx = CoreRetentionContext::new(buffer, core);
     save_pre_critical(&mut ctx);
@@ -509,6 +503,12 @@ pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool
         arm_wake_stub();
         enter_sleep()
     } else {
+        // The wake holds the APP CPU in reset. A core that waits in the rendezvous comes back
+        // through the wake stub once it runs again.
+        #[cfg(all(multi_core, feature = "rt"))]
+        if rendezvous::helper_saved() {
+            crate::soc::cpu_control::restart_core1_after_wake();
+        }
         false
     };
 
@@ -612,6 +612,7 @@ saved_region_map! {
 saved_region_map! {
     { CLIC, [int_config()], 3 },
     { CLIC, [int_ip(0)], 48 },
+    { CLINT, [msip()], 1 },
 }
 
 // FIXME: find out why this isn't equivalent to P4
@@ -620,6 +621,7 @@ saved_region_map! {
     { CLIC, [int_config()], 1 },
     { CLIC, [int_thresh()], 1 },
     { CLIC, [int_ip(0)], 48 },
+    { CLINT, [msip()], 1 },
 }
 
 pub(crate) const CRITICAL_FRAME_OFFSET: usize = 0;
@@ -638,15 +640,11 @@ pub(crate) const BUFFER_SIZE: usize = BLOCK_SIZE * Cpu::COUNT;
 /// The bit is written and not only set, so that a configuration from [`RtcSleepConfig::deep`]
 /// cannot carry a power-down into a light sleep that has no retention memory.
 ///
-/// A second running core must save itself, so the power-down also needs the rendezvous.
+/// A second running core must save itself, so the power-down also needs the rendezvous. The sleep
+/// path engages it before this call, and does not get here if the other core stays out.
 #[cfg(feature = "rt")]
 pub(crate) fn configure_cpu_retention(config: &mut RtcSleepConfig, buffer: Option<NonNull<u8>>) {
-    let allow_pd = buffer.is_some();
-
-    #[cfg(multi_core)]
-    let allow_pd = allow_pd && rendezvous::retention_allowed();
-
-    config.pd_flags.set_pd_cpu(allow_pd);
+    config.pd_flags.set_pd_cpu(buffer.is_some());
 }
 
 /// Requests the sleep, and retains the CPU across it if the sleep powers the CPU domain down.

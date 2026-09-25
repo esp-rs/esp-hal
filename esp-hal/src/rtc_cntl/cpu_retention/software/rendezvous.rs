@@ -1,18 +1,21 @@
 //! The rendezvous that lets both cores retain themselves across a light sleep.
 //!
 //! Software retention means that each core saves itself, so a stalled core comes back with
-//! garbage. One core requests the sleep, and the other core saves itself in the same window and
-//! then waits for the sleep to end. This module mirrors the state machine of
-//! `esp32s31/sleep_cpu.c`.
+//! garbage. The PRO CPU requests every light sleep, and the APP CPU saves itself in the same window
+//! and then waits for the sleep to end. A light sleep that the APP CPU asks for starts on the PRO
+//! CPU too: the APP CPU kicks the PRO CPU, which requests the sleep from its IPC handler, and the
+//! APP CPU takes its part of the handshake from its own call.
+//!
+//! The handshake is one shared [`Phase`]. Every transition has one writer, except the ways out of
+//! [`Phase::Wanted`] and [`Phase::Requested`], which both cores take with a compare-and-swap.
 
-use core::ptr;
+use core::{cell::UnsafeCell, mem::MaybeUninit, ptr};
 
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
-use portable_atomic::{AtomicBool, AtomicU8, Ordering};
+use portable_atomic::{AtomicU8, Ordering};
 
 use super::{
     CoreRetentionContext,
-    arm_wake_stub,
     device_regs,
     frames::chip::PMUFUNC_GOING_TO_SLEEP,
     save_critical_frame,
@@ -20,58 +23,90 @@ use super::{
 };
 use crate::{
     interrupt::ipc::Ipc,
-    peripherals::IPC,
+    peripherals::{IPC, LPWR},
+    rtc_cntl::sleep::{LowPower, RtcSleepConfig, SleepKind},
     soc::cpu_control,
-    system::{self, Cpu},
+    system::Cpu,
     time::implem as raw_time,
 };
 
-/// How long [`engage`] waits for the helper to start its backup.
+/// How long a core waits for the other core to answer.
 ///
 /// esp-idf waits without a bound, because it delivers the helper routine in a high-priority
 /// interrupt that a critical section cannot mask. esp-hal has no such path: the IPC interrupt runs
-/// at the lowest priority, so a core that holds a critical section of its own cannot answer it.
-const ENLIST_TIMEOUT_US: u64 = 1_000;
+/// at the lowest priority, so a core that holds a critical section of its own cannot answer it. A
+/// request without an answer refuses the sleep.
+const ANSWER_TIMEOUT_US: u64 = 1_000;
 
-/// No core holds the initiator slot.
-const INITIATOR_NONE: u8 = u8::MAX;
-
-/// The step that one core has reached, from `smp_retention_state_t`.
+/// The step that the rendezvous has reached.
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum State {
+enum Phase {
+    /// No sleep uses the rendezvous.
     Idle,
-    BackupStart,
-    BackupDone,
-    RestoreStart,
-    RestoreDone,
 
-    /// The sleep did not happen, which releases the core that waits for it.
-    SkipRetention,
+    /// The APP CPU asks for a sleep, and waits for the PRO CPU to take the request.
+    Wanted,
+
+    /// The PRO CPU took the request of the APP CPU, and prepares the sleep.
+    Taken,
+
+    /// The PRO CPU asks the APP CPU to save itself.
+    Requested,
+
+    /// The APP CPU refused the sleep.
+    Refused,
+
+    /// The APP CPU took the request, and saves itself.
+    Joined,
+
+    /// The APP CPU saved itself, and waits for the sleep to end.
+    Saved,
+
+    /// The sleep is over, or it never started. The APP CPU restores itself if it lost power.
+    Resume,
+
+    /// The APP CPU is back, and waits for the PRO CPU to finish the sleep.
+    Done,
 }
 
-static STATES: [AtomicU8; Cpu::COUNT] = [const { AtomicU8::new(State::Idle as u8) }; Cpu::COUNT];
+static PHASE: AtomicU8 = AtomicU8::new(Phase::Idle as u8);
 
-/// The core that requests the sleep, or [`INITIATOR_NONE`].
-static INITIATOR: AtomicU8 = AtomicU8::new(INITIATOR_NONE);
+/// The configuration of the sleep that the APP CPU asks for.
+struct SleepConfig(UnsafeCell<MaybeUninit<RtcSleepConfig>>);
 
-/// Whether the core of each entry must run the helper routine.
+// SAFETY: the APP CPU writes the configuration before it moves the phase to `Wanted`, and the PRO
+// CPU reads it only after it moved the phase from `Wanted` to `Taken`.
+unsafe impl Sync for SleepConfig {}
+
+static SLEEP_CONFIG: SleepConfig = SleepConfig(UnsafeCell::new(MaybeUninit::uninit()));
+
+/// Takes a sleep that the APP CPU asks for, so that the light sleep that the PRO CPU starts
+/// answers it.
 ///
-/// The initiator sets the entry of the other core before it raises the IPC interrupt, and the
-/// helper takes it. A doorbell that arrives after the sleep therefore finds nothing to do.
-static REQUEST: [AtomicBool; Cpu::COUNT] = [const { AtomicBool::new(false) }; Cpu::COUNT];
+/// Runs on the PRO CPU, before a light sleep.
+#[inline(always)]
+pub(crate) fn take_request() {
+    swap_phase(Phase::Wanted, Phase::Taken);
+}
 
-/// Whether the initiator has a helper that saved itself and waits for the sleep.
-static HELPER_ENLISTED: AtomicBool = AtomicBool::new(false);
+/// Lets the APP CPU return from a light sleep, which the PRO CPU has finished.
+///
+/// This answers the request that [`take_request`] took, and releases the APP CPU from the
+/// rendezvous. Runs on the PRO CPU, after a light sleep.
+#[inline(always)]
+pub(crate) fn release_app_cpu() {
+    // No compare-and-swap needed: the APP CPU never writes the phase while it is `Taken` or `Done`.
+    if matches!(phase(), Phase::Taken | Phase::Done) {
+        PHASE.store(Phase::Idle as u8, Ordering::Release);
+    }
+}
 
-/// Brings the other core into the rendezvous, and returns whether the caller sleeps.
+/// Brings the APP CPU into the rendezvous, and returns whether the PRO CPU sleeps.
 ///
-/// A return of `false` means that the other core requested the sleep, and that this core saved
-/// itself, lost its power, and came back. The sleep is over, so the caller must return without a
-/// sleep of its own.
-///
-/// The caller must run with interrupts disabled, which is what stops a doorbell from arriving
-/// while this core acts as the helper.
+/// Runs on the PRO CPU, with interrupts disabled. A `false` return means that the APP CPU refused
+/// the sleep, or that it did not answer in time. Nothing needs an undo then. A `true` return needs
+/// [`finish`], whether the sleep happens or not.
 #[crate::ram]
 pub(crate) fn engage() -> bool {
     if !cpu_control::is_running(Cpu::AppCpu) {
@@ -80,162 +115,160 @@ pub(crate) fn engage() -> bool {
         return true;
     }
 
-    let core = system::raw_core();
-    let other = other_core();
-
-    if INITIATOR
-        .compare_exchange(
-            INITIATOR_NONE,
-            core as u8,
-            Ordering::AcqRel,
-            Ordering::Acquire,
-        )
-        .is_err()
-    {
-        // The other core asked first. This core cannot answer the doorbell, because it holds
-        // interrupts off for the sleep path, so it runs the helper routine here instead. The
-        // request flag is cleared afterwards, when the initiator has certainly set it, so that
-        // the doorbell that arrives later finds nothing to do.
-        run_helper();
-        REQUEST[core].store(false, Ordering::Release);
-        return false;
-    }
-
-    // The state must reach `BackupStart` before the doorbell, because that is what the helper
-    // waits for.
-    wait_for(other, State::Idle);
-    set_state(core, State::BackupStart);
-    REQUEST[other].store(true, Ordering::Release);
-
-    // Only a function that the program posts can make this call wait, because the rendezvous
-    // posts one function, and two posts of the same function coalesce.
-    Ipc::new(unsafe { IPC::steal() }).call_function(other_cpu(), helper_entry);
-
-    let enlisted = {
-        let deadline = raw_time::raw_counter() + raw_time::us_to_ticks(ENLIST_TIMEOUT_US);
-        loop {
-            match state_of(other) {
-                State::BackupStart => break Enlisted::Joined,
-                State::SkipRetention => break Enlisted::Refused,
-                _ if raw_time::raw_counter() >= deadline => break Enlisted::NoAnswer,
-                _ => core::hint::spin_loop(),
-            }
+    // The APP CPU can move the phase between `Idle` and `Wanted` meanwhile, so the swap retries.
+    let app_cpu_waits = loop {
+        let current = phase();
+        debug_assert!(matches!(
+            current,
+            Phase::Idle | Phase::Wanted | Phase::Taken
+        ));
+        if swap_phase(current, Phase::Requested) {
+            break current != Phase::Idle;
         }
     };
 
-    match enlisted {
-        Enlisted::Joined => {
-            HELPER_ENLISTED.store(true, Ordering::Release);
-            true
-        }
-        Enlisted::Refused => {
-            // The other core has work of its own, so the system must not sleep. The helper waits
-            // for this store before it leaves its routine.
-            REQUEST[other].store(false, Ordering::Release);
-            set_state(core, State::Idle);
-            release_initiator(core);
-            false
-        }
-        Enlisted::NoAnswer => {
-            // `SkipRetention` stays until [`finish`], so that a helper which took the request flag
-            // before this store leaves its routine, instead of waiting for a sleep that keeps the
-            // CPU domain powered.
-            REQUEST[other].store(false, Ordering::Release);
-            set_state(core, State::SkipRetention);
-            true
+    // An APP CPU that asked for a sleep waits for it with interrupts disabled, and reads the phase
+    // itself. It could not take the doorbell anyway.
+    if !app_cpu_waits {
+        // Only this function posts to the APP CPU, so the post merges with a pending doorbell
+        // instead of waiting for it.
+        Ipc::new(unsafe { IPC::steal() }).call_function(Cpu::AppCpu, helper_entry);
+    }
+
+    let deadline = raw_time::raw_counter() + raw_time::us_to_ticks(ANSWER_TIMEOUT_US);
+    loop {
+        match phase() {
+            Phase::Saved => return true,
+            Phase::Refused => {
+                PHASE.store(Phase::Idle as u8, Ordering::Release);
+                return false;
+            }
+            // Once the APP CPU took the request, it saves itself without a further answer, so
+            // the timeout covers the request only.
+            Phase::Requested if raw_time::raw_counter() >= deadline => {
+                if swap_phase(Phase::Requested, Phase::Idle) {
+                    return false;
+                }
+            }
+            _ => core::hint::spin_loop(),
         }
     }
 }
 
-/// Returns whether a helper saved itself and waits for this core to request the sleep.
+/// Returns whether the APP CPU saved itself and waits for the sleep to end.
 #[inline(always)]
-pub(crate) fn helper_enlisted() -> bool {
-    HELPER_ENLISTED.load(Ordering::Acquire)
+pub(crate) fn helper_saved() -> bool {
+    phase() == Phase::Saved
 }
 
-/// Returns whether the sleep can power the CPU domain down.
+/// Lets the APP CPU restore itself, and waits until it is back.
 ///
-/// A sleep that powers the domain down needs every running core to save itself.
-#[inline(always)]
-pub(crate) fn retention_allowed() -> bool {
-    !cpu_control::is_running(Cpu::AppCpu) || helper_enlisted()
-}
-
-/// Saves and restores the CPU domain of the initiator, and requests the sleep.
-///
-/// The initiator arms the wake stub for both cores, because the chip has one wake stub register,
-/// and the stub reads the frame of the core that runs it.
-#[crate::ram]
-pub(crate) fn sleep_retained(buffer: *mut u8, enter_sleep: fn() -> bool) -> bool {
-    let core = system::raw_core();
-    let other = other_core();
-
-    let mut ctx = CoreRetentionContext::new(buffer, core);
-    save_pre_critical(&mut ctx);
-    let frame = save_critical_frame(&ctx);
-
-    // The wake stub writes this word while the compiler believes that nothing did.
-    // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
-    let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
-    let woke = pmufunc & 3 != PMUFUNC_GOING_TO_SLEEP;
-
-    if woke {
-        cpu_control::restart_core1_after_wake();
-        set_state(core, State::RestoreStart);
-        restore(&mut ctx);
-        set_state(core, State::RestoreDone);
-        return false;
-    }
-
-    arm_wake_stub();
-    set_state(core, State::BackupDone);
-    wait_for(other, State::BackupDone);
-
-    let rejected = enter_sleep();
-
-    if rejected {
-        // This is the only store that releases the helper from its wait. A rejected request
-        // leaves both frames alone, for the reason that `software::sleep_retained` gives: the
-        // registers still hold what the save read.
-        set_state(core, State::SkipRetention);
-    }
-
-    rejected
-}
-
-/// Waits for the helper to finish, and returns the rendezvous to [`State::Idle`].
+/// Runs on the PRO CPU after [`engage`] returned `true`, and does nothing if the APP CPU is not in
+/// the rendezvous. After a power-down wake the APP CPU passes the wake stub, so the stub must stay
+/// armed until this function returns. The APP CPU returns only after [`release_app_cpu`], once the
+/// PRO CPU has restored the time base and recorded the wakeup cause.
 #[crate::ram]
 pub(crate) fn finish() {
-    let core = system::raw_core();
-    if state_of(core) == State::RestoreDone {
-        wait_for(other_core(), State::RestoreDone);
+    if !helper_saved() {
+        return;
     }
 
-    HELPER_ENLISTED.store(false, Ordering::Release);
-    set_state(core, State::Idle);
-    release_initiator(core);
+    PHASE.store(Phase::Resume as u8, Ordering::Release);
+    while phase() != Phase::Done {
+        core::hint::spin_loop();
+    }
 }
 
-/// Gives the initiator slot back, if this core holds it.
-#[inline(always)]
-fn release_initiator(core: usize) {
-    let _ = INITIATOR.compare_exchange(
-        core as u8,
-        INITIATOR_NONE,
-        Ordering::AcqRel,
-        Ordering::Acquire,
-    );
+/// Asks the PRO CPU for a light sleep, and takes the part of the APP CPU in it.
+///
+/// Runs on the APP CPU, with interrupts disabled. Returns when the sleep is over, when the PRO CPU
+/// refused it, or when the PRO CPU did not take the request in time.
+#[crate::ram]
+pub(crate) fn sleep_from_app_cpu(config: RtcSleepConfig) {
+    let mut deadline = None;
+    loop {
+        match phase() {
+            Phase::Idle => match deadline {
+                // The PRO CPU answered the request without the rendezvous, or refused it.
+                Some(_) => return,
+                None => {
+                    // SAFETY: the phase is not `Wanted`, so the PRO CPU does not read the
+                    // configuration.
+                    unsafe { (*SLEEP_CONFIG.0.get()).write(config) };
+                    if swap_phase(Phase::Idle, Phase::Wanted) {
+                        // Only this function posts to the PRO CPU, so the post never waits.
+                        Ipc::new(unsafe { IPC::steal() }).call_function(Cpu::ProCpu, kick_entry);
+                        deadline = Some(
+                            raw_time::raw_counter() + raw_time::us_to_ticks(ANSWER_TIMEOUT_US),
+                        );
+                    }
+                }
+            },
+            // Every sleep that the PRO CPU requests needs this core, the one it requests for this
+            // call and one it requests on its own.
+            Phase::Requested => {
+                if swap_phase(Phase::Requested, Phase::Joined) {
+                    run_helper();
+                    return;
+                }
+            }
+            Phase::Wanted => {
+                if deadline.is_some_and(|deadline| raw_time::raw_counter() >= deadline)
+                    && swap_phase(Phase::Wanted, Phase::Idle)
+                {
+                    return;
+                }
+            }
+            _ => core::hint::spin_loop(),
+        }
+    }
 }
 
-/// Takes the request of this core, and runs the helper routine.
-#[inline(always)]
+/// Takes the request of the APP CPU, and requests the sleep for it.
+#[crate::ram]
+fn kick_entry() {
+    // The answer of `can_sleep` holds for the whole sleep, so nothing may give this core work
+    // between the two.
+    let irq_token = unsafe { SingleCoreInterruptLock.enter() };
+
+    // A kick of a request that the APP CPU withdrew, or that an earlier sleep answered, finds the
+    // phase moved on.
+    if swap_phase(Phase::Wanted, Phase::Taken) {
+        if can_sleep() {
+            // SAFETY: the APP CPU wrote the configuration before it set `Wanted`.
+            let config = unsafe { (*SLEEP_CONFIG.0.get()).assume_init() };
+            LowPower::new(unsafe { LPWR::steal() }).sleep(config, SleepKind::Light, true);
+        } else {
+            PHASE.store(Phase::Idle as u8, Ordering::Release);
+        }
+    }
+
+    unsafe { SingleCoreInterruptLock.exit(irq_token) };
+}
+
+/// Takes the doorbell of the PRO CPU.
+#[crate::ram]
 fn helper_entry() {
-    if REQUEST[system::raw_core()].swap(false, Ordering::AcqRel) {
-        run_helper();
+    // The answer of `can_sleep` holds for the whole sleep, so nothing may give this core work
+    // between the two.
+    let irq_token = unsafe { SingleCoreInterruptLock.enter() };
+
+    // A doorbell of a request that the PRO CPU withdrew finds the phase moved on.
+    if phase() == Phase::Requested {
+        let join = can_sleep();
+        let next = if join { Phase::Joined } else { Phase::Refused };
+        if swap_phase(Phase::Requested, next) && join {
+            run_helper();
+        }
     }
+
+    unsafe { SingleCoreInterruptLock.exit(irq_token) };
 }
 
-/// Saves this core, waits for the sleep to end, then restores this core.
+/// Saves the APP CPU, waits for the sleep to end, then restores the APP CPU if it lost power.
+///
+/// The caller holds interrupts disabled, so that no handler runs between the two frames, and it
+/// moved the phase to [`Phase::Joined`].
 ///
 /// The branch predictor starts cache requests of its own, so it must be off while the CPU domain
 /// has no power. esp-idf turns it off for this routine only, and not for the single-core path.
@@ -243,117 +276,64 @@ fn helper_entry() {
 fn run_helper() {
     crate::soc::disable_branch_predictor();
 
-    // Interrupts stay off for the whole routine, so that no handler runs between the two frames.
-    // esp-idf disables them later, before its critical frame only.
-    let irq_token = unsafe { SingleCoreInterruptLock.enter() };
+    // SAFETY: the PRO CPU starts the rendezvous for a sleep that retains the CPU only, so the
+    // memory of the frames is installed.
+    let buffer = unsafe { crate::rtc_cntl::installed_buffer_ptr().unwrap_unchecked() };
+    let mut ctx = CoreRetentionContext::new(buffer.as_ptr(), Cpu::AppCpu as usize);
+    save_pre_critical(&mut ctx);
+    let frame = save_critical_frame(&ctx);
 
-    let core = system::raw_core();
-    let other = other_core();
-
-    // The answer holds for the whole sleep, because the interrupts of this core are off from here
-    // until the sleep is over, and nothing else can give this core work.
-    let can_sleep = {
-        let handler = crate::rtc_cntl::sleep::CAN_SLEEP_HANDLER.load(Ordering::Acquire);
-        match handler.is_null() {
-            true => true,
-            // SAFETY: `set_can_sleep_handler` takes a `fn() -> bool`, and this is that pointer.
-            false => unsafe { core::mem::transmute::<*mut (), fn() -> bool>(handler)() },
-        }
-    };
-
-    if !can_sleep {
-        set_state(core, State::SkipRetention);
+    // The wake stub writes this word while the compiler believes that nothing did.
+    // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
+    let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
+    if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
+        // The CPU domain can lose power from here on. This core then comes back through the wake
+        // stub, after the PRO CPU released it from reset. This core does not arm the wake stub:
+        // the PRO CPU arms it for both cores.
+        PHASE.store(Phase::Saved as u8, Ordering::Release);
     } else {
-        let skip_retention = loop {
-            match state_of(core) {
-                State::SkipRetention => break true,
-                State::BackupStart => break false,
-                _ => core::hint::spin_loop(),
-            }
-        };
-
-        if !skip_retention {
-            set_state(core, State::BackupStart);
-
-            // SAFETY: the rendezvous runs for a sleep that retains the CPU, so the memory of the
-            // frames is installed.
-            let buffer = unsafe { crate::rtc_cntl::installed_buffer_ptr().unwrap_unchecked() };
-            let mut ctx = CoreRetentionContext::new(buffer.as_ptr(), core);
-            save_pre_critical(&mut ctx);
-            let frame = save_critical_frame(&ctx);
-
-            // SAFETY: `save_critical_frame` returns the frame pointer that it was given.
-            let pmufunc = unsafe { ptr::read_volatile(&raw const (*frame).pmufunc) };
-            if pmufunc & 3 == PMUFUNC_GOING_TO_SLEEP {
-                set_state(core, State::BackupDone);
-                // Either the CPU domain loses power here, or the initiator reports that the
-                // hardware rejected the request. This core does not arm the wake
-                // stub: the initiator arms it for both cores.
-                wait_for(other, State::SkipRetention);
-            } else {
-                cpu_control::restart_core1_after_wake();
-                set_state(core, State::RestoreStart);
-                restore(&mut ctx);
-                set_state(core, State::RestoreDone);
-            }
-        }
+        // The wake stub restored the critical frame already.
+        // SAFETY: the frame holds what this core saved before the sleep.
+        unsafe { ctx.non_critical().as_ref().unwrap().restore() };
+        device_regs::restore(&super::regions(), ctx.device_frame());
     }
 
-    wait_for(other, State::Idle);
-    set_state(core, State::Idle);
+    while phase() != Phase::Resume {
+        core::hint::spin_loop();
+    }
+    PHASE.store(Phase::Done as u8, Ordering::Release);
 
-    unsafe { SingleCoreInterruptLock.exit(irq_token) };
+    // The PRO CPU can start the next sleep right after it releases this core, so this core waits
+    // for the phase to leave `Done`, and not for a particular phase.
+    while phase() == Phase::Done {
+        core::hint::spin_loop();
+    }
+
     crate::soc::enable_branch_predictor();
 }
 
-/// Restores the frames that memory kept. The wake stub restored the critical frame already.
+/// Returns whether the core that runs this function agrees to a light sleep.
 #[inline(always)]
-fn restore(ctx: &mut CoreRetentionContext) {
-    // SAFETY: the frame holds what this core saved before the sleep.
-    unsafe { ctx.non_critical().as_ref().unwrap().restore() };
-    device_regs::restore(&super::regions(), ctx.device_frame());
-}
-
-/// Returns the index of the core that this core shares the rendezvous with.
-#[inline(always)]
-fn other_core() -> usize {
-    other_cpu() as usize
+fn can_sleep() -> bool {
+    let handler = crate::rtc_cntl::sleep::CAN_SLEEP_HANDLER.load(Ordering::Acquire);
+    // SAFETY: `set_can_sleep_handler` takes a `fn() -> bool`, and this is that pointer.
+    handler.is_null() || unsafe { core::mem::transmute::<*mut (), fn() -> bool>(handler)() }
 }
 
 #[inline(always)]
-fn other_cpu() -> Cpu {
-    match system::raw_core() {
-        0 => Cpu::AppCpu,
-        _ => Cpu::ProCpu,
-    }
+fn phase() -> Phase {
+    // SAFETY: every write to `PHASE` writes a `Phase`.
+    unsafe { core::mem::transmute::<u8, Phase>(PHASE.load(Ordering::Acquire)) }
 }
 
 #[inline(always)]
-fn state_of(core: usize) -> State {
-    // SAFETY: `set_state` is the only writer, and it writes a `State`.
-    unsafe { core::mem::transmute::<u8, State>(STATES[core].load(Ordering::Acquire)) }
-}
-
-#[inline(always)]
-fn set_state(core: usize, state: State) {
-    STATES[core].store(state as u8, Ordering::Release);
-}
-
-#[inline(always)]
-fn wait_for(core: usize, state: State) {
-    while state_of(core) != state {
-        core::hint::spin_loop();
-    }
-}
-
-/// What the helper answered to the doorbell.
-enum Enlisted {
-    /// The helper started its backup, so the sleep can power the CPU domain down.
-    Joined,
-
-    /// The helper has work of its own, so the sleep must not happen.
-    Refused,
-
-    /// The helper did not answer inside [`ENLIST_TIMEOUT_US`].
-    NoAnswer,
+fn swap_phase(current: Phase, new: Phase) -> bool {
+    PHASE
+        .compare_exchange(
+            current as u8,
+            new as u8,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        )
+        .is_ok()
 }
