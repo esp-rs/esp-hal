@@ -43,8 +43,9 @@ where
     where
         ADCX: super::CalibrationAccess,
     {
-        // A calibration scheme measures the ADC while building itself, which happens before
-        // `Adc::new` runs, so the unit cannot be assumed to be powered up yet.
+        // This can be called without an `Adc`, so it cannot rely on `Adc::new` having powered up
+        // the unit.
+        let _guard = GenericPeripheralGuard::<{ Peripheral::ApbSarAdc as u8 }>::new();
         init_hardware::<ADCX>();
 
         ADCX::enable_vdef(true);
