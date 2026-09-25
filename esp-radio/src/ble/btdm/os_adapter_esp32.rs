@@ -285,7 +285,9 @@ pub struct Config {
     /// Enables controller modem sleep.
     ///
     /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
-    /// Set this before the controller starts. The default is off.
+    /// While the controller sleeps, the chip can also enter automatic light
+    /// sleep, but only when `BLE_LP_CLK` runs from a 32 kHz crystal. Set this
+    /// before the controller starts. The default is off.
     modem_sleep: bool,
 
     /// The priority of the RTOS task.

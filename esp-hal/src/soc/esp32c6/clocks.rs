@@ -131,6 +131,16 @@ fn configure_xtal_clk_impl(
 
 // PLL_CLK
 
+/// Configures and calibrates the BBPLL again.
+///
+/// The BBPLL loses its analog configuration while the PMU powers it down, for example in a light
+/// sleep. ESP-IDF configures it again before it uses the PLL after a wake.
+pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
+    if clocks.pll_clk_refcount > 0 {
+        enable_pll_clk_impl(clocks, true);
+    }
+}
+
 fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
         // TODO: these are WT fields, PAC should be fixed accordingly
@@ -330,6 +340,30 @@ fn configure_soc_root_clk_impl(
             SocRootClkConfig::RcFast => 2,
         })
     });
+}
+
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+
+/// Returns whether the CPU clock comes from the PLL.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn cpu_clock_from_pll(clocks: &mut ClockTree) -> bool {
+    clocks.soc_root_clk() == Some(SocRootClkConfig::Pll)
+}
+
+/// Switches the CPU clock to XTAL_CLK.
+///
+/// The CPU, AHB, and MSPI clocks then come from the LS dividers, which keep the configured value
+/// or their reset value (divide by 1).
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) {
+    configure_soc_root_clk_impl(clocks, None, SocRootClkConfig::Xtal);
+}
+
+/// Restores the CPU clock that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    configure_soc_root_clk_impl(clocks, None, unwrap!(clocks.soc_root_clk()));
 }
 
 // CPU_HS_DIV

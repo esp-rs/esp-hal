@@ -141,35 +141,107 @@ pub(super) fn set_bus_clock(clock: u32) -> bool {
         return false;
     }
 
-    let div = (source_mhz / clock) as u8;
+    write_bus_clock_divider((source_mhz / clock) as u8);
 
-    if div <= 1 {
-        MEMSPI2::regs().sram_clk().write(|w| unsafe {
-            w.sclk_equ_sysclk().set_bit();
-            w.sclkcnt_n().bits(0);
-            w.sclkcnt_h().bits(0);
-            w.sclkcnt_l().bits(0)
-        });
-        MEMSPI3::regs().clock().write(|w| unsafe {
-            w.clk_equ_sysclk().set_bit();
-            w.clkcnt_n().bits(0);
-            w.clkcnt_h().bits(0);
-            w.clkcnt_l().bits(0)
-        });
-    } else {
-        MEMSPI2::regs().sram_clk().write(|w| unsafe {
-            w.sclkcnt_n().bits(div - 1);
-            w.sclkcnt_h().bits(div / 2 - 1);
-            w.sclkcnt_l().bits(div - 1)
-        });
-        MEMSPI3::regs().clock().write(|w| unsafe {
-            w.clkcnt_n().bits(div - 1);
-            w.clkcnt_h().bits(div / 2 - 1);
-            w.clkcnt_l().bits(div - 1)
-        });
-    };
+    #[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+    low_speed::set_divider(source_mhz, clock);
 
     true
+}
+
+/// Returns the value of MSPI2 `SRAM_CLK` and MSPI3 `CLOCK` for a bus clock divider. Both
+/// registers have the same layout.
+const fn bus_clock_bits(div: u8) -> u32 {
+    const EQU_SYSCLK: u32 = 1 << 31;
+    if div <= 1 {
+        EQU_SYSCLK
+    } else {
+        let n = (div - 1) as u32;
+        let h = (div / 2 - 1) as u32;
+        (n << 16) | (h << 8) | n
+    }
+}
+
+fn write_bus_clock_divider(div: u8) {
+    let bits = bus_clock_bits(div);
+    MEMSPI2::regs().sram_clk().write(|w| unsafe { w.bits(bits) });
+    MEMSPI3::regs().clock().write(|w| unsafe { w.bits(bits) });
+}
+
+/// The PSRAM low-speed mode, used while the CPU clock comes from XTAL_CLK.
+///
+/// The AXI bus clock must not be slower than the PSRAM clock, otherwise writes can overflow the
+/// MSPI FIFO. Only the bus clock changes: the latency and dummy settings count cycles, so the
+/// values for the configured speed are also correct at the lower speed.
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+pub(crate) mod low_speed {
+    use core::sync::atomic::{AtomicU32, Ordering};
+
+    use crate::peripherals::{MEMSPI2, MEMSPI3};
+
+    /// The PSRAM clock in the low-speed mode, in MHz. ESP-IDF uses the same value.
+    const LOW_SPEED_MHZ: u32 = 20;
+
+    /// The bus clock register value of the low-speed mode, or 0 if PSRAM does not change its
+    /// speed.
+    static LOW_SPEED_BITS: AtomicU32 = AtomicU32::new(0);
+
+    /// The bus clock register value of the configured speed.
+    static SAVED_BITS: AtomicU32 = AtomicU32::new(0);
+
+    pub(super) fn set_divider(source_mhz: u32, clock_mhz: u32) {
+        let bits = if clock_mhz > LOW_SPEED_MHZ {
+            super::bus_clock_bits(source_mhz.div_ceil(LOW_SPEED_MHZ) as u8)
+        } else {
+            0
+        };
+        LOW_SPEED_BITS.store(bits, Ordering::Relaxed);
+    }
+
+    /// Switches PSRAM to the low speed. Returns `false` if PSRAM does not change its speed.
+    ///
+    /// The other cores must be stalled.
+    pub(crate) fn enter() -> bool {
+        let bits = LOW_SPEED_BITS.load(Ordering::Relaxed);
+        if bits == 0 {
+            return false;
+        }
+
+        SAVED_BITS.store(MEMSPI2::regs().sram_clk().read().bits(), Ordering::Relaxed);
+        unsafe { write_bus_clock_frozen(bits) };
+
+        true
+    }
+
+    /// Restores the PSRAM speed that [`enter`] changed.
+    ///
+    /// The other cores must be stalled.
+    pub(crate) fn exit() {
+        unsafe { write_bus_clock_frozen(SAVED_BITS.load(Ordering::Relaxed)) };
+    }
+
+    /// Writes the bus clock registers of both controllers while the cache is frozen.
+    ///
+    /// While the cache is frozen, no code may run from flash, so the register writes are
+    /// assembly instructions, and every value is ready before the freeze.
+    #[crate::ram]
+    unsafe fn write_bus_clock_frozen(bits: u32) {
+        let mspi2 = MEMSPI2::regs().sram_clk().as_ptr();
+        let mspi3 = MEMSPI3::regs().clock().as_ptr();
+
+        crate::soc::freeze_ext_mem_cache();
+        unsafe {
+            core::arch::asm!(
+                "sw {bits}, 0({mspi2})",
+                "sw {bits}, 0({mspi3})",
+                bits = in(reg) bits,
+                mspi2 = in(reg) mspi2,
+                mspi3 = in(reg) mspi3,
+                options(nostack),
+            );
+        }
+        crate::soc::unfreeze_ext_mem_cache();
+    }
 }
 
 /// Enables DLL timing calibration for both controllers.

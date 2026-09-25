@@ -35,13 +35,36 @@ pub(crate) fn set_station_only(station_only: bool) {
 
 /// The blob takes this lock while it must stay awake, for example during a scan or while it waits
 /// for a beacon.
+///
+/// While the lock is held, the CPU clock also stays at its configured frequency.
 pub(crate) fn acquire_sleep_lock() {
     SLEEP_LOCK.fetch_add(1, Ordering::Relaxed);
+    #[cfg(wifi_requires_fast_cpu)]
+    esp_hal::clock::CpuFrequencyLock::acquire();
 }
 
 /// Releases the lock taken by [`acquire_sleep_lock`].
 pub(crate) fn release_sleep_lock() {
-    let _ = SLEEP_LOCK.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1));
+    if SLEEP_LOCK
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1))
+        .is_ok()
+    {
+        #[cfg(wifi_requires_fast_cpu)]
+        esp_hal::clock::CpuFrequencyLock::release();
+    }
+}
+
+/// Releases the locks that the blob still holds.
+///
+/// Call this after `esp_wifi_deinit`.
+pub(crate) fn clear_sleep_lock() {
+    let held = SLEEP_LOCK.swap(0, Ordering::Relaxed);
+    #[cfg(wifi_requires_fast_cpu)]
+    for _ in 0..held {
+        esp_hal::clock::CpuFrequencyLock::release();
+    }
+    #[cfg(not(wifi_requires_fast_cpu))]
+    let _ = held;
 }
 
 /// Claims the `Wifi` wakeup source, so that the chip can sleep while the station is in power

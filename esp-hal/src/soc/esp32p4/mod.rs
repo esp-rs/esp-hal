@@ -46,6 +46,46 @@ const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 const CACHE_MAP_L2_CACHE: u32 = 1 << 5;
 
+// The ROM cache function table, up to the freeze functions. See `cache_internal_stub_table` in
+// ESP-IDF `esp_rom/esp32p4/include/esp32p4/rom/cache.h`.
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+#[repr(C)]
+struct CacheInternalStubTable {
+    _unused: [usize; 20],
+    freeze_l2_cache_enable: unsafe extern "C" fn(mode: u32),
+    freeze_l2_cache_disable: unsafe extern "C" fn(),
+}
+
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+unsafe extern "C" {
+    static rom_cache_internal_table_ptr: *const CacheInternalStubTable;
+    fn Cache_WriteBack_All(map: u32) -> i32;
+}
+
+/// Freezes the L2 cache, which caches the external memory. An access to flash or PSRAM stalls
+/// until [`unfreeze_ext_mem_cache`].
+///
+/// The caller must run from RAM, and the other core must be stalled.
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+#[inline(always)]
+pub(crate) fn freeze_ext_mem_cache() {
+    // `CACHE_FREEZE_ACK_BUSY`: a cache miss stalls the requester.
+    const ACK_BUSY: u32 = 0;
+    unsafe {
+        // ESP-IDF writes back the internal memory cache first, to prevent an automatic writeback
+        // into the frozen cache.
+        Cache_WriteBack_All(CACHE_MAP_L1_DCACHE);
+        ((*rom_cache_internal_table_ptr).freeze_l2_cache_enable)(ACK_BUSY);
+    }
+}
+
+/// Releases the freeze of [`freeze_ext_mem_cache`].
+#[cfg(all(idle_frequency_scaling, psram_idle_low_speed_switch))]
+#[inline(always)]
+pub(crate) fn unfreeze_ext_mem_cache() {
+    unsafe { ((*rom_cache_internal_table_ptr).freeze_l2_cache_disable)() };
+}
+
 /// Cache buses that back the value at `addr`.
 fn cache_l2_bus(addr: u32) -> u32 {
     let internal = memory_range!("DRAM").contains(&addr);
