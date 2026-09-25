@@ -189,6 +189,23 @@ fn enable_bbpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
+        // Power the PLL up before the calibration, which cannot end without it. The PMU state
+        // must agree: a sleep that the PMU rejects does not apply the `HP_ACTIVE` state again.
+        PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
+            w.tie_high_xpd_pll().set_bit();
+            w.tie_high_xpd_pll_i2c().set_bit()
+        });
+        PMU::regs()
+            .imm_hp_ck_power_1()
+            .modify(|_, w| w.tie_high_global_pll_icg().set_bit());
+        HP_ALIVE_SYS::regs()
+            .hp_clk_ctrl()
+            .modify(|_, w| w.hp_cpll_300m_clk_en().set_bit());
+        PMU::regs().hp_active_hp_ck_power().modify(|_, w| {
+            w.hp_active_xpd_pll_i2c().set_bit();
+            w.hp_active_xpd_pll().set_bit()
+        });
+
         HP_SYS_CLKRST::regs()
             .ana_pll_ctrl0()
             .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
@@ -204,22 +221,22 @@ fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
         HP_SYS_CLKRST::regs()
             .ana_pll_ctrl0()
             .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
-
-        PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
-            w.tie_high_xpd_pll().set_bit();
-            w.tie_high_xpd_pll_i2c().set_bit();
-            w.tie_high_global_pll_icg().set_bit()
-        });
     } else {
+        PMU::regs()
+            .imm_hp_ck_power_1()
+            .modify(|_, w| w.tie_low_global_pll_icg().set_bit());
         PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
-            w.tie_low_global_pll_icg().set_bit();
             w.tie_low_xpd_pll().set_bit();
             w.tie_low_xpd_pll_i2c().set_bit()
         });
+        HP_ALIVE_SYS::regs()
+            .hp_clk_ctrl()
+            .modify(|_, w| w.hp_cpll_300m_clk_en().clear_bit());
+        PMU::regs().hp_active_hp_ck_power().modify(|_, w| {
+            w.hp_active_xpd_pll_i2c().clear_bit();
+            w.hp_active_xpd_pll().clear_bit()
+        });
     }
-    HP_ALIVE_SYS::regs()
-        .hp_clk_ctrl()
-        .modify(|_, w| w.hp_cpll_300m_clk_en().bit(en));
 }
 
 // MPLL_CLK

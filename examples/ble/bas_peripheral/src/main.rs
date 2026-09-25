@@ -6,8 +6,18 @@
 //! the battery level characteristic, as well as receive notifications when
 //! the battery level changes.
 //!
-//! The example also has a flag to enable or disable modem sleep, which can be
-//! a useful tool to reduce power consumption.
+//! The example also shows how to save power. Change these constants to compare:
+//!
+//! - `MODEM_SLEEP` lets the controller turn the radio off between its events.
+//! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
+//!   sleeps only while the controller sleeps. The ESP32 can sleep only with a 32 kHz crystal as the
+//!   BLE low-power clock.
+//! - `CPU_POWERDOWN` lets light sleep power the CPU down, and retains its state in RAM. This saves
+//!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
+//!   -H2, -S3 and -S31 support this. On other chips the constant has no effect.
+//!
+//! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
+//! the output.
 
 //% CHIP_FILTER: bt_driver_supported
 
@@ -29,8 +39,53 @@ use trouble_host::prelude::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-// Set to true to enable modem sleep.
-const ENABLE_MODEM_SLEEP: bool = false;
+/// Whether the controller turns the radio off between its events.
+const MODEM_SLEEP: bool = true;
+/// Whether the chip enters automatic light sleep when all tasks are idle. Requires
+/// [`MODEM_SLEEP`] to be enabled.
+const LIGHT_SLEEP: bool = true;
+/// Whether light sleep powers the CPU down. Requires [`LIGHT_SLEEP`] to be enabled.
+const CPU_POWERDOWN: bool = true;
+
+// An example reads no chip capability, so this condition lists the chips that support CPU
+// power-down.
+cfg_select! {
+    any(
+        feature = "esp32c3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32h2",
+        feature = "esp32s3",
+        feature = "esp32s31",
+    ) => {
+        fn enable_cpu_powerdown(sleep: &mut esp_rtos::sleep::Sleep) {
+            use esp_hal::rtc_cntl::CpuRetentionStorage;
+
+            // The memory that the bootloader used is otherwise unused after boot.
+            #[esp_hal::ram(reclaimed, unstable(zeroed))]
+            static CPU_RETENTION_MEMORY: CpuRetentionStorage = CpuRetentionStorage::new();
+
+            sleep
+                .enable_cpu_powerdown(CPU_RETENTION_MEMORY.take())
+                .unwrap();
+
+            // Keeping the cache tags makes the wake faster, because the cache stays warm.
+            #[cfg(feature = "esp32s3")]
+            {
+                use esp_hal::rtc_cntl::CacheTagRetentionStorage;
+
+                #[esp_hal::ram(reclaimed, unstable(zeroed))]
+                static CACHE_TAGMEM: CacheTagRetentionStorage = CacheTagRetentionStorage::new();
+
+                sleep.keep_cache_tags(CACHE_TAGMEM.take()).unwrap();
+            }
+        }
+    }
+    _ => {
+        fn enable_cpu_powerdown(_sleep: &mut esp_rtos::sleep::Sleep) {}
+    }
+}
 
 #[esp_hal::main]
 async fn main(_s: Spawner) {
@@ -56,11 +111,19 @@ async fn main(_s: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0);
+    if LIGHT_SLEEP {
+        let mut sleep = esp_rtos::sleep::configure(peripherals.LPWR);
+        if CPU_POWERDOWN {
+            enable_cpu_powerdown(&mut sleep);
+        }
+        esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
+    } else {
+        esp_rtos::start(timg0.timer0);
+    }
 
     let connector = BleConnector::new(
         peripherals.BT,
-        esp_radio::ble::Config::default().with_modem_sleep(ENABLE_MODEM_SLEEP),
+        esp_radio::ble::Config::default().with_modem_sleep(MODEM_SLEEP),
     )
     .unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);

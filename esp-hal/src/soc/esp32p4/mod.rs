@@ -28,16 +28,23 @@ pub(crate) fn pre_init() {
     }
 }
 
+const MHCR_RS: u32 = 1 << 4;
+const MHCR_BFE: u32 = 1 << 5;
+const MHCR_BTB: u32 = 1 << 12;
+const MHCR_BRANCH_PREDICTOR: u32 = MHCR_RS | MHCR_BFE | MHCR_BTB;
+
 pub(crate) fn enable_branch_predictor() {
-    // Enable branch predictor
-    // Note that the branch predictor will start cache requests and needs to be disabled when
-    // the cache is disabled.
-    // MHCR: CSR 0x7c1
-    const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
-    const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
-    const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
+    // MHCR: CSR 0x7c1 — sourced from `components/riscv/include/riscv/rv_utils.h`. The predictor
+    // starts cache requests of its own, so it must be off while the cache is off.
     unsafe {
-        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
+    }
+}
+
+#[cfg(feature = "rt")]
+pub(crate) fn disable_branch_predictor() {
+    unsafe {
+        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
     }
 }
 
