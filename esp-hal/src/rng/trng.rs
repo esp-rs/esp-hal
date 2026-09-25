@@ -129,7 +129,7 @@ pub enum TrngError {
 }
 
 #[cfg_attr(docsrs, procmacros::doc_replace(
-    "analog_pin" => gpio_for_signal!(ADC1_CH4),
+    "analog_pin" => gpio_for_signal!(ADC1_CH3),
 ))]
 /// True Random Number Generator (TRNG)
 ///

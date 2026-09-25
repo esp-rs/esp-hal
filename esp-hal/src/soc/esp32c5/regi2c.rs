@@ -135,13 +135,15 @@ define_regi2c! {
         }
         reg: I2C_SAR_REG6(6) {}
         reg: I2C_SAR_REG7(7) {
-            field: ADC_SAR2_ENCAL_GND(7..7),
-            field: ADC_SAR2_ENCAL_REF(6..6),
-            field: ADC_SAR1_ENCAL_GND(5..5),
-            field: ADC_SAR1_ENCAL_REF(4..4),
-            field: ADC_SAR_ENT_RTC(3..3),
+            field: ADC_SAR_ENT_PERIF(6..6),
             field: ADC_SAR_ENT_TSENS(2..2),
             field: ADC_SAR_DTEST_RTC(1..0)
+        }
+        reg: I2C_SAR_REG8(8) {
+            field: ADC_SAR2_ENCAL_GND(3..3),
+            field: ADC_SAR2_EN_TOUT(2..2),
+            field: ADC_SAR1_ENCAL_GND(1..1),
+            field: ADC_SAR1_EN_TOUT(0..0)
         }
     }
 }

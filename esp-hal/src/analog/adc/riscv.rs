@@ -208,8 +208,13 @@ impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     fn connect_cal(source: AdcCalSource, enable: bool) {
         match source {
             AdcCalSource::Gnd => regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as _),
-            #[cfg(not(esp32h2))]
+            #[cfg(not(any(esp32c5, esp32h2)))]
             AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_REF.write_field(enable as _),
+            // The ESP32-C5 has no `ENCAL_REF` bit, the internal reference is routed via `EN_TOUT`.
+            //
+            // See: <https://github.com/espressif/esp-idf/blob/8d7d8aef588/components/esp_hal_ana_conv/esp32c5/include/hal/adc_ll.h#L924-L932>
+            #[cfg(esp32c5)]
+            AdcCalSource::Ref => regi2c::ADC_SAR1_EN_TOUT.write_field(enable as _),
             // For the ESP32-H2 ground and internal reference voltage are mutually exclusive and
             // you can toggle between them.
             //
