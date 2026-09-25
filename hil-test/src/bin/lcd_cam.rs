@@ -16,7 +16,8 @@ use esp_hal::pcnt::{
 };
 use esp_hal::{
     Async,
-    dma::{DmaChannel, DmaRxBuf, DmaTxBuf},
+    dma::{DmaChannel, DmaLoopBuf, DmaRxBuf, DmaTxBuf},
+    dma_loop_buffer,
     dma_rx_buffer,
     dma_tx_buffer,
     gpio::Level,
@@ -27,7 +28,7 @@ use esp_hal::{
             ClockMode,
             Phase,
             Polarity,
-            dpi::{self, Dpi, Format, FrameTiming},
+            dpi::{self, Dpi, DpiInterrupt, Format, FrameTiming},
             i8080::{Command, Config, I8080},
         },
     },
@@ -37,6 +38,34 @@ use esp_hal::{
 use hil_test as _;
 
 const DATA_SIZE: usize = 1024 * 10;
+
+fn dpi_test_config() -> dpi::Config {
+    dpi::Config::default()
+        .with_clock_mode(ClockMode {
+            polarity: Polarity::IdleHigh,
+            phase: Phase::ShiftLow,
+        })
+        .with_frequency(Rate::from_khz(500))
+        .with_format(Format {
+            enable_2byte_mode: false,
+            ..Default::default()
+        })
+        .with_timing(FrameTiming {
+            horizontal_total_width: 65,
+            hsync_width: 5,
+            horizontal_blank_front_porch: 10,
+            horizontal_active_width: 50,
+            vertical_total_height: 65,
+            vsync_width: 5,
+            vertical_blank_front_porch: 10,
+            vertical_active_height: 50,
+            hsync_position: 0,
+        })
+        .with_vsync_idle_level(Level::High)
+        .with_hsync_idle_level(Level::High)
+        .with_de_idle_level(Level::Low)
+        .with_disable_black_region(false)
+}
 
 cfg_select! {
     lcd_cam_dma_engine = "AHB_GDMA" => {
@@ -418,33 +447,7 @@ mod camera_tests {
             },
         };
 
-        let config = dpi::Config::default()
-            .with_clock_mode(ClockMode {
-                polarity: Polarity::IdleHigh,
-                phase: Phase::ShiftLow,
-            })
-            .with_frequency(Rate::from_khz(500))
-            .with_format(Format {
-                enable_2byte_mode: false,
-                ..Default::default()
-            })
-            .with_timing(FrameTiming {
-                horizontal_total_width: 65,
-                hsync_width: 5,
-                horizontal_blank_front_porch: 10,
-                horizontal_active_width: 50,
-                vertical_total_height: 65,
-                vsync_width: 5,
-                vertical_blank_front_porch: 10,
-                vertical_active_height: 50,
-                hsync_position: 0,
-            })
-            .with_vsync_idle_level(Level::High)
-            .with_hsync_idle_level(Level::High)
-            .with_de_idle_level(Level::Low)
-            .with_disable_black_region(false);
-
-        let dpi = Dpi::new(lcd_cam.lcd, tx_channel, config)
+        let dpi = Dpi::new(lcd_cam.lcd, tx_channel, dpi_test_config())
             .unwrap()
             .with_vsync(vsync_out)
             .with_hsync(hsync_out)
@@ -494,5 +497,85 @@ mod camera_tests {
         (_, dma_tx_buf) = dpi_transfer.stop();
 
         hil_test::assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
+    }
+
+    #[test]
+    fn test_dpi_vsync_blocking(ctx: Context) {
+        let peripherals = ctx.peripherals;
+        let dma = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let dpi = Dpi::new(lcd_cam.lcd, dma, dpi_test_config()).unwrap();
+        drop(lcd_cam.cam);
+        let mut transfer = dpi
+            .send(true, dma_loop_buffer!(2500))
+            .map_err(|e| e.0)
+            .unwrap();
+
+        transfer.clear_interrupts(DpiInterrupt::Vsync);
+        transfer.wait_for_vsync();
+        transfer.wait_for_vsync();
+
+        let _ = transfer.stop();
+    }
+}
+
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod dpi_async_tests {
+    use core::{future::Future, task::Poll};
+
+    use super::*;
+
+    struct Context<'d> {
+        lcd_cam: LcdCam<'d, Async>,
+        dma: DmaChannelInstance<'d>,
+        dma_buf: DmaLoopBuf,
+    }
+
+    #[init]
+    async fn init() -> Context<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let dma = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+
+        Context {
+            lcd_cam: LcdCam::new(peripherals.LCD_CAM).into_async(),
+            dma,
+            dma_buf: dma_loop_buffer!(2500),
+        }
+    }
+
+    #[test]
+    async fn test_dpi_vsync(ctx: Context<'static>) {
+        let dpi = Dpi::new(ctx.lcd_cam.lcd, ctx.dma, dpi_test_config()).unwrap();
+        drop(ctx.lcd_cam.cam);
+        let mut transfer = dpi.send(true, ctx.dma_buf).map_err(|e| e.0).unwrap();
+
+        while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
+            core::hint::spin_loop();
+        }
+        transfer.clear_interrupts(DpiInterrupt::Vsync);
+        {
+            let mut wait = core::pin::pin!(transfer.wait_for_vsync());
+            let first_poll = core::future::poll_fn(|cx| Poll::Ready(wait.as_mut().poll(cx))).await;
+            hil_test::assert!(first_poll.is_pending());
+        }
+        transfer.wait_for_vsync().await;
+        transfer.wait_for_vsync().await;
+
+        while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
+            core::hint::spin_loop();
+        }
+        {
+            let mut wait = core::pin::pin!(transfer.wait_for_vsync());
+            let first_poll = core::future::poll_fn(|cx| Poll::Ready(wait.as_mut().poll(cx))).await;
+            hil_test::assert!(first_poll.is_ready());
+        }
+
+        let _ = transfer.stop();
     }
 }
