@@ -113,7 +113,7 @@ impl CpuClock {
         cfg_select! {
             esp32c2 => Self::_120MHz,
             any(esp32c3, esp32c6, esp32c61) => Self::_160MHz,
-            esp32h2 => Self::_96MHz,
+            any(esp32h2, esp32h4) => Self::_96MHz,
             esp32p4 => Self::_400MHz,
             esp32s31 => Self::_320MHz,
             _ => Self::_240MHz,
@@ -411,6 +411,13 @@ impl RtcClock {
             }
         };
 
+        #[cfg(esp32h4)]
+        let cali_value = if rtc_clock == TimgCalibrationClockConfig::RcSlowClk {
+            cali_value * property!("timergroup.rc_slow_calibration_multiplier")
+        } else {
+            cali_value
+        };
+
         TIMG0::regs()
             .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());
@@ -504,7 +511,11 @@ pub(crate) fn calibrate_rtc_slow_clock() {
     if rc_slow_selected && cal_val != 0 {
         let frequency = ((1_000_000u64 << RtcClock::CAL_FRACT) / cal_val as u64) as u32;
 
-        ClockTree::with(|clocks| clocks::set_rc_slow_clk_frequency(clocks, frequency));
+        // On some chips, the calibrated clock is RC_SLOW_CLK divided down.
+        let divider = clocks::rc_slow_clk_frequency()
+            / clocks::timg_calibration_clock_source_frequency(slow_clk);
+
+        ClockTree::with(|clocks| clocks::set_rc_slow_clk_frequency(clocks, frequency * divider));
     }
 }
 
