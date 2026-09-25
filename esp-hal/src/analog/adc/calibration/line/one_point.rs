@@ -52,10 +52,11 @@ where
 
         // Get the reference point (Dout, Vin) from efuse. Dout means mean raw ADC value when
         // specified Vin applied to input.
+        // `cal_mv` goes first: it rejects attenuations without a reference point on the ESP32-C2.
+        let mv = ADCX::cal_mv(atten);
         let Some(code) = ADCX::cal_code(atten) else {
             panic!("This chip needs eFuse calibration data for line fitting")
         };
-        let mv = ADCX::cal_mv(atten);
 
         // Guards the division below, which would otherwise divide by zero.
         assert!(code != 0, "ADC calibration reference point is zero");

@@ -59,6 +59,12 @@ pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u1
         return None;
     }
 
+    // Only 0 dB and 11 dB have hardware calibration data. ESP-IDF programs no offset for the
+    // others rather than self-calibrating them.
+    if matches!(atten, Attenuation::_2p5dB | Attenuation::_6dB) {
+        return Some(0);
+    }
+
     // see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_table.csv#L94>
     let diff_code0: u16 = super::read_field_le(ADC1_INIT_CODE_ATTEN0);
     let code0 = (2160 + super::sign_magnitude(diff_code0 as u32, 7)) as u16;
@@ -94,6 +100,11 @@ pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
     let version = rtc_calib_version();
 
     if version != 1 {
+        return None;
+    }
+
+    // Only 0 dB and 11 dB have a reference point.
+    if matches!(atten, Attenuation::_2p5dB | Attenuation::_6dB) {
         return None;
     }
 
