@@ -115,7 +115,7 @@ esp-sync           = { path = "../esp-sync" }
 esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 portable-atomic    = "1.11"
-static_cell        = { version = "2.1.0" }
+static_cell        = { version = "2.1.1" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
 trouble-host = { version = "0.7.0", features = [
