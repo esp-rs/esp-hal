@@ -1,7 +1,15 @@
 use bitfield::Bit;
 
 use super::Info;
-use crate::i2s::master::{BitOrder, Config, ConfigError, Endianness, Polarity, UnitConfig};
+use crate::i2s::master::{
+    Alignment,
+    BitOrder,
+    Config,
+    ConfigError,
+    Endianness,
+    Polarity,
+    UnitConfig,
+};
 
 impl Info {
     pub(crate) fn set_tx_bclk(&self, bclk_divider: u32) {

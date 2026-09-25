@@ -772,6 +772,7 @@ pub enum Polarity {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Represent left/right alignment
 pub enum Alignment {
     #[default]
