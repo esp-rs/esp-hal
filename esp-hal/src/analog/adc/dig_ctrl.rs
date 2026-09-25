@@ -67,6 +67,7 @@ where
     {
         // A calibration scheme measures the ADC while building itself, which happens before
         // `Adc::new` runs, so the unit cannot be assumed to be clocked and powered yet.
+        let _clock = FunctionClockGuard::new();
         init_hardware();
 
         ADCX::enable_vdef(true);
@@ -172,6 +173,30 @@ fn init_hardware() {
     crate::peripherals::PCR::regs()
         .sar_clk_div()
         .modify(|_, w| unsafe { w.sar1_clk_div_num().bits(1) });
+}
+
+/// Keeps the PLL output that `init_hardware` selects as the controller clock running.
+///
+/// Nothing else necessarily requests that clock, and the bootloader may leave it gated.
+struct FunctionClockGuard;
+
+impl FunctionClockGuard {
+    fn new() -> Self {
+        #[cfg(any(esp32c5, esp32c6, esp32c61))]
+        crate::clock::ll::ClockTree::with(crate::clock::ll::request_pll_f80m);
+        #[cfg(esp32h2)]
+        crate::clock::ll::ClockTree::with(crate::clock::ll::request_pll_f96m_clk);
+        Self
+    }
+}
+
+impl Drop for FunctionClockGuard {
+    fn drop(&mut self) {
+        #[cfg(any(esp32c5, esp32c6, esp32c61))]
+        crate::clock::ll::ClockTree::with(crate::clock::ll::release_pll_f80m);
+        #[cfg(esp32h2)]
+        crate::clock::ll::ClockTree::with(crate::clock::ll::release_pll_f96m_clk);
+    }
 }
 
 // Triggers a single conversion.
@@ -333,6 +358,7 @@ pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
     init_codes: [u16; super::ATTENUATION_COUNT],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
+    _clock: FunctionClockGuard,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
@@ -346,6 +372,7 @@ where
         ADCX: super::AdcCalEfuse + super::CalibrationAccess,
     {
         let guard = GenericPeripheralGuard::new();
+        let clock = FunctionClockGuard::new();
 
         init_hardware();
 
@@ -361,6 +388,7 @@ where
             init_codes,
             active_channel: None,
             _guard: guard,
+            _clock: clock,
             _phantom: PhantomData,
         }
     }
@@ -380,6 +408,7 @@ where
             init_codes: self.init_codes,
             active_channel: self.active_channel,
             _guard: self._guard,
+            _clock: self._clock,
             _phantom: PhantomData,
         }
     }
@@ -490,6 +519,7 @@ where
             init_codes: self.init_codes,
             active_channel: self.active_channel,
             _guard: self._guard,
+            _clock: self._clock,
             _phantom: PhantomData,
         }
     }

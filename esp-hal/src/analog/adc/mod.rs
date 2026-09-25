@@ -339,7 +339,14 @@ where
     let mut init_codes = [0; ATTENUATION_COUNT];
 
     for atten in attenuations.iter().flatten() {
-        init_codes[*atten as usize] = ADCX::init_code(*atten).unwrap_or_else(|| {
+        // Boards with calibration eFuses never reach the self-calibration fallback, so HIL
+        // tests ignore the eFuses to exercise it.
+        #[cfg(not(__test_adc_self_cal))]
+        let efuse_code = ADCX::init_code(*atten);
+        #[cfg(__test_adc_self_cal)]
+        let efuse_code = None;
+
+        init_codes[*atten as usize] = efuse_code.unwrap_or_else(|| {
             if ADCX::SUPPORTS_SELF_CALIBRATION {
                 AdcConfig::<ADCX>::adc_calibrate(*atten)
             } else {
