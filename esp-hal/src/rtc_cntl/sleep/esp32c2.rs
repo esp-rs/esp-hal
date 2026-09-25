@@ -192,8 +192,6 @@ bitfield::bitfield! {
     pub wifi_pd_en, set_wifi_pd_en: 5;
     /// power down BT
     pub bt_pd_en, set_bt_pd_en: 6;
-    /// power down CPU, but not restart when lightsleep.
-    pub cpu_pd_en, set_cpu_pd_en: 7;
     /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 8;
     /// power down digital peripherals
@@ -323,7 +321,6 @@ impl RtcSleepConfig {
         cfg.set_rtc_peri_pd_en(true);
         cfg.set_wifi_pd_en(true);
         cfg.set_bt_pd_en(true);
-        cfg.set_cpu_pd_en(true);
         cfg.set_int_8m_pd_en(true);
 
         cfg.set_dig_peri_pd_en(true);
@@ -488,7 +485,18 @@ impl RtcSleepConfig {
         }
 
         unsafe {
-            assert!(!self.pd_cur_slp() || self.bias_sleep_slp());
+            // Like `rtc_sleep_get_default_config`: a crystal that stays on through a light sleep
+            // needs the bias current and the voltage of the active mode.
+            let xtal_on = self.xtal_fpu() && !self.deep_slp();
+            let bias_sleep_slp = self.bias_sleep_slp() && !xtal_on;
+            let pd_cur_slp = self.pd_cur_slp() && !xtal_on;
+            let dbg_atten_slp = if xtal_on {
+                RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP
+            } else {
+                self.dbg_atten_slp()
+            };
+
+            assert!(!pd_cur_slp || bias_sleep_slp);
 
             regi2c::I2C_DIG_REG_EXT_RTC_DREG_SLEEP.write_field(self.rtc_dbias_slp());
             regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(self.dig_dbias_slp());
@@ -503,9 +511,9 @@ impl RtcSleepConfig {
             });
 
             rtc_cntl.bias_conf().modify(|_, w| {
-                w.dbg_atten_deep_slp().bits(self.dbg_atten_slp());
-                w.bias_sleep_deep_slp().bit(self.bias_sleep_slp());
-                w.pd_cur_deep_slp().bit(self.pd_cur_slp())
+                w.dbg_atten_deep_slp().bits(dbg_atten_slp);
+                w.bias_sleep_deep_slp().bit(bias_sleep_slp);
+                w.pd_cur_deep_slp().bit(pd_cur_slp)
             });
 
             if self.deep_slp() {
@@ -567,9 +575,9 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures the wakeup options and requests the sleep.
+    /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// The caller waits for the result of the request.
+    /// [`Self::enter_sleep`] requests the sleep after this call.
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         // set bits for what can wake us up
         LPWR::regs()
@@ -581,8 +589,15 @@ impl RtcSleepConfig {
         LPWR::regs()
             .slp_reject_conf()
             .modify(|_, w| unsafe { w.sleep_reject_ena().bits(reject_mask) });
+    }
 
+    /// Requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    #[inline(always)]
+    pub(crate) fn enter_sleep(&self) -> bool {
         LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
+        super::wait_for_sleep_result()
     }
 
     pub(crate) fn finish_sleep(&self) {

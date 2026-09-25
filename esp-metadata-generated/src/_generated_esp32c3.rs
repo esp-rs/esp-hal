@@ -88,6 +88,9 @@ macro_rules! property {
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
     };
+    ("gpio.need_soft_isolate_during_pd") => {
+        false
+    };
     ("gpio.has_bank_1") => {
         false
     };
@@ -411,6 +414,18 @@ macro_rules! property {
     };
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
+    };
+    ("sleep.cpu_retention_mem_size") => {
+        1744
+    };
+    ("sleep.cpu_retention_mem_align") => {
+        16
+    };
+    ("sleep.cpu_retention_mem_start") => {
+        1070333952
+    };
+    ("sleep.cpu_retention_mem_end") => {
+        1070465024
     };
     ("assist_debug.has_sp_monitor") => {
         true

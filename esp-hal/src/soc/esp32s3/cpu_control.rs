@@ -75,6 +75,7 @@ pub fn is_running(core: Cpu) -> bool {
     is_stalled != 0x86
 }
 
+#[cfg(feature = "unstable")]
 pub(crate) fn start_core1(entry_point: *const u32) {
     let system_control = SYSTEM::regs();
 

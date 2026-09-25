@@ -227,10 +227,8 @@ impl HpSystemInit {
         power.clk_power.set_xpd_bb_i2c(true);
         power.clk_power.set_xpd_cpll_i2c(true);
         power.clk_power.set_xpd_bbpll_i2c(true);
-        power.clk_power.set_xpd_mpll_i2c(true);
         power.clk_power.set_xpd_cpll(true);
         power.clk_power.set_xpd_bbpll(true);
-        power.clk_power.set_xpd_mpll(true);
         power.xtal.set_xpd_xtal(true);
 
         let mut icg_modem = HpIcgModem::default();

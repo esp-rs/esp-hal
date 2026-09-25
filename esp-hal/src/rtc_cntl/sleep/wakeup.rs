@@ -159,8 +159,8 @@ impl<'a> WrappedSleepConfig<'a> {
     /// then returns as if it had ended. A deep sleep without rejection panics, because it cannot
     /// return and the chip does not wake. This is not a refusal. Use [`Self::reject_sleep`] to
     /// refuse a light sleep. A duration of zero is too short to sleep.
-    #[expect(dead_code, reason = "no wakeup source limits a sleep yet")]
-    pub(crate) fn limit_sleep(&mut self, duration: Duration) {
+    #[instability::unstable]
+    pub fn limit_sleep(&mut self, duration: Duration) {
         let already_shorter = match self.limit {
             Some(current) => current.as_micros() <= duration.as_micros(),
             None => false,

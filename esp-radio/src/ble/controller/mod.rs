@@ -71,7 +71,13 @@ impl<'d> BleConnector<'d> {
         device: crate::hal::peripherals::BT<'d>,
         config: Config,
     ) -> Result<BleConnector<'d>, BleInitError> {
-        let _guard = RadioRefGuard::new();
+        // With modem sleep, the claimed `Bt` wakeup source refuses the sleeps that are not safe.
+        // The driver claims it only where light sleep works with the controller.
+        let _guard = if config.modem_sleep() && crate::ble::lp_clk::light_sleep_supported() {
+            RadioRefGuard::without_wake_lock()
+        } else {
+            RadioRefGuard::new()
+        };
 
         config.validate()?;
 
