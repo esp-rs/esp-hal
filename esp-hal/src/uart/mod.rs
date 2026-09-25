@@ -64,6 +64,7 @@ use embedded_hal_async::delay::DelayNs;
 use enumset::{EnumSet, EnumSetType};
 pub use low_level::Instance;
 use low_level::{
+    Half,
     Info,
     RxEvent,
     State,
@@ -133,6 +134,49 @@ impl AnyUart<'_> {
         self.info().clear_interrupts(EnumSet::all());
 
         self.bind_peri_interrupt(handler);
+    }
+}
+
+/// Marks a half as async, and binds the async interrupt handler if no half is async yet.
+fn claim_async(uart: &AnyUart<'_>, half: Half) {
+    let (info, state) = uart.parts();
+    state.mutex.lock(|| {
+        if state.is_blocking() {
+            state.affinity.claim();
+            uart.set_interrupt_handler(info.async_handler);
+        }
+        state.is_async(half).store(true, Ordering::Relaxed);
+    });
+}
+
+/// Tears the async mode of one half down, and the async mode of the peripheral once the other
+/// half is blocking too.
+struct UartAsyncTeardownGuard {
+    info: &'static Info,
+    state: &'static State,
+    half: Half,
+}
+
+impl UartAsyncTeardownGuard {
+    fn new(uart: &AnyUart<'_>, half: Half) -> Self {
+        let (info, state) = uart.parts();
+        Self { info, state, half }
+    }
+}
+
+impl Drop for UartAsyncTeardownGuard {
+    fn drop(&mut self) {
+        let last = self.state.mutex.lock(|| {
+            self.state
+                .is_async(self.half)
+                .store(false, Ordering::Relaxed);
+            self.state.is_blocking()
+        });
+
+        // Outside the lock: `tear_down` waits for the other core, which may be blocked on it.
+        if last {
+            self.state.affinity.tear_down(self.info.async_teardown);
+        }
     }
 }
 
@@ -635,6 +679,7 @@ where
             rx: UartRx {
                 uart: unsafe { self.uart.clone_unchecked() },
                 phantom: PhantomData,
+                async_teardown: None,
                 guard: rx_guard,
                 peri_clock_guard: peri_clock_guard.clone(),
                 // Receiving data continuously, the peripheral can't let the system sleep.
@@ -644,6 +689,7 @@ where
             tx: UartTx {
                 uart: self.uart,
                 phantom: PhantomData,
+                async_teardown: None,
                 guard: tx_guard,
                 peri_clock_guard,
                 rts_pin,
@@ -682,6 +728,8 @@ pub struct Uart<'d, Dm: DriverMode> {
 pub struct UartTx<'d, Dm: DriverMode> {
     uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
+    /// Before the guards that stop the clock: the teardown writes registers.
+    async_teardown: Option<UartAsyncTeardownGuard>,
     guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
     rts_pin: PinGuard,
@@ -694,6 +742,8 @@ pub struct UartTx<'d, Dm: DriverMode> {
 pub struct UartRx<'d, Dm: DriverMode> {
     uart: AnyUart<'d>,
     phantom: PhantomData<Dm>,
+    /// Before the guards that stop the clock: the teardown writes registers.
+    async_teardown: Option<UartAsyncTeardownGuard>,
     guard: PeripheralGuard,
     peri_clock_guard: UartClockGuard<'d>,
     // Receiving data continuously, the peripheral can't let the system sleep.
@@ -786,15 +836,13 @@ impl<'d> UartTx<'d, Blocking> {
     /// Reconfigures the driver to operate in [`Async`] mode.
     #[instability::unstable]
     pub fn into_async(self) -> UartTx<'d, Async> {
-        if !self.uart.state().is_rx_async.load(Ordering::Acquire) {
-            self.uart
-                .set_interrupt_handler(self.uart.info().async_handler);
-        }
-        self.uart.state().is_tx_async.store(true, Ordering::Release);
+        claim_async(&self.uart, Half::Tx);
+        let async_teardown = Some(UartAsyncTeardownGuard::new(&self.uart, Half::Tx));
 
         UartTx {
             uart: self.uart,
             phantom: PhantomData,
+            async_teardown,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             rts_pin: self.rts_pin,
@@ -808,17 +856,13 @@ impl<'d> UartTx<'d, Async> {
     /// Reconfigures the driver to operate in [`Blocking`] mode.
     #[instability::unstable]
     pub fn into_blocking(self) -> UartTx<'d, Blocking> {
-        self.uart
-            .state()
-            .is_tx_async
-            .store(false, Ordering::Release);
-        if !self.uart.state().is_rx_async.load(Ordering::Acquire) {
-            self.uart.disable_peri_interrupt_on_all_cores();
-        }
+        // Tears the async mode down.
+        drop(self.async_teardown);
 
         UartTx {
             uart: self.uart,
             phantom: PhantomData,
+            async_teardown: None,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             rts_pin: self.rts_pin,
@@ -961,7 +1005,7 @@ where
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
             .info()
-            .set_tx_fifo_empty_threshold(config.tx.fifo_empty_threshold)?;
+            .set_tx_fifo_empty_threshold(self.uart.state(), config.tx.fifo_empty_threshold)?;
         self.uart.info().txfifo_reset();
         Ok(())
     }
@@ -1160,15 +1204,13 @@ impl<'d> UartRx<'d, Blocking> {
     /// Reconfigures the driver to operate in [`Async`] mode.
     #[instability::unstable]
     pub fn into_async(self) -> UartRx<'d, Async> {
-        if !self.uart.state().is_tx_async.load(Ordering::Acquire) {
-            self.uart
-                .set_interrupt_handler(self.uart.info().async_handler);
-        }
-        self.uart.state().is_rx_async.store(true, Ordering::Release);
+        claim_async(&self.uart, Half::Rx);
+        let async_teardown = Some(UartAsyncTeardownGuard::new(&self.uart, Half::Rx));
 
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
+            async_teardown,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             _wake_lock: self._wake_lock,
@@ -1181,17 +1223,13 @@ impl<'d> UartRx<'d, Async> {
     /// Reconfigures the driver to operate in [`Blocking`] mode.
     #[instability::unstable]
     pub fn into_blocking(self) -> UartRx<'d, Blocking> {
-        self.uart
-            .state()
-            .is_rx_async
-            .store(false, Ordering::Release);
-        if !self.uart.state().is_tx_async.load(Ordering::Acquire) {
-            self.uart.disable_peri_interrupt_on_all_cores();
-        }
+        // Tears the async mode down.
+        drop(self.async_teardown);
 
         UartRx {
             uart: self.uart,
             phantom: PhantomData,
+            async_teardown: None,
             guard: self.guard,
             peri_clock_guard: self.peri_clock_guard,
             _wake_lock: self._wake_lock,
@@ -1221,9 +1259,10 @@ impl<'d> UartRx<'d, Async> {
             // for more data than the buffer. We'll restore the original value after the
             // future resolved.
             let info = self.uart.info();
-            unwrap!(info.set_rx_fifo_full_threshold(max_threshold));
+            let state = self.uart.state();
+            unwrap!(info.set_rx_fifo_full_threshold(state, max_threshold));
             let _guard = DropGuard::new((), |_| {
-                unwrap!(info.set_rx_fifo_full_threshold(current_threshold));
+                unwrap!(info.set_rx_fifo_full_threshold(state, current_threshold));
             });
 
             // Wait for space or event
@@ -1395,7 +1434,7 @@ where
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.uart
             .info()
-            .set_rx_fifo_full_threshold(config.rx.fifo_full_threshold)?;
+            .set_rx_fifo_full_threshold(self.uart.state(), config.rx.fifo_full_threshold)?;
         self.uart
             .info()
             .set_rx_timeout(config.rx.timeout, self.uart.info().current_symbol_length())?;

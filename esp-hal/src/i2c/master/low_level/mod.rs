@@ -21,29 +21,38 @@ pub(super) struct I2cFuture<'a> {
 
 impl<'a> I2cFuture<'a> {
     pub fn new(events: EnumSet<Event>, driver: Driver<'a>, deadline: Option<Instant>) -> Self {
-        driver.regs().int_ena().modify(|_, w| {
-            for event in events {
-                match event {
-                    Event::EndDetect => w.end_detect().set_bit(),
-                    Event::TxComplete => w.trans_complete().set_bit(),
-                    #[cfg(i2c_master_has_tx_fifo_watermark)]
-                    Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
-                };
-            }
+        let this = Self::new_blocking(events, driver, deadline);
+        this.listen();
+        this
+    }
 
-            w.arbitration_lost().set_bit();
-            w.time_out().set_bit();
-            w.nack().set_bit();
-            #[cfg(i2c_master_has_fsm_timeouts)]
-            {
-                w.scl_main_st_to().set_bit();
-                w.scl_st_to().set_bit();
-            }
+    /// Enables the interrupts that drive this future.
+    ///
+    /// The handler disables what fired, so no counterpart of this exists.
+    fn listen(&self) {
+        self.driver.state.mutex.lock(|| {
+            self.driver.regs().int_ena().modify(|_, w| {
+                for event in self.events {
+                    match event {
+                        Event::EndDetect => w.end_detect().set_bit(),
+                        Event::TxComplete => w.trans_complete().set_bit(),
+                        #[cfg(i2c_master_has_tx_fifo_watermark)]
+                        Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
+                    };
+                }
 
-            w
+                w.arbitration_lost().set_bit();
+                w.time_out().set_bit();
+                w.nack().set_bit();
+                #[cfg(i2c_master_has_fsm_timeouts)]
+                {
+                    w.scl_main_st_to().set_bit();
+                    w.scl_st_to().set_bit();
+                }
+
+                w
+            });
         });
-
-        Self::new_blocking(events, driver, deadline)
     }
 
     pub fn new_blocking(
@@ -133,11 +142,44 @@ impl Drop for I2cFuture<'_> {
 
 #[ram]
 pub(super) fn async_handler(info: &Info, state: &State) {
-    // Disable all interrupts. The I2C Future will check events based on the
-    // interrupt status bits.
-    info.regs().int_ena().write(|w| unsafe { w.bits(0) });
+    let wake = state.mutex.lock(|| {
+        let pending = info.regs().int_st().read().bits();
+        if pending == 0 {
+            return false;
+        }
 
-    state.waker.wake();
+        // Disable the interrupts that fired. The I2C Future will check events based on the
+        // interrupt status bits.
+        info.regs()
+            .int_ena()
+            .modify(|r, w| unsafe { w.bits(r.bits() & !pending) });
+        true
+    });
+
+    // Waking runs executor code, which takes locks of its own, so it runs outside the lock of
+    // this driver.
+    if wake {
+        state.waker.wake();
+    }
+}
+
+/// Stops the peripheral from requesting the async interrupt, and unmaps that interrupt.
+///
+/// [`InterruptAffinity::tear_down`] runs this on the core that services the interrupt. No lock:
+/// the driver runs no future while it tears the async mode down.
+#[ram]
+pub(super) fn handle_teardown(
+    info: &'static Info,
+    state: &'static State,
+    unmap_interrupt: impl FnOnce(),
+) {
+    info.regs().int_ena().write(|w| unsafe { w.bits(0) });
+    info.regs().int_clr().write(|w| unsafe { w.bits(!0) });
+
+    unmap_interrupt();
+
+    // Last, because this releases the core that waits in `tear_down`.
+    state.affinity.release();
 }
 
 /// Sets the filter with a supplied threshold in clock cycles for which a
@@ -273,6 +315,10 @@ pub struct Info {
 
     /// Interrupt handler for the asynchronous operations of this I2C instance.
     pub async_handler: InterruptHandler,
+
+    /// Stops the peripheral from requesting the async interrupt. See
+    /// [`InterruptAffinity::tear_down`] for what it must do.
+    pub async_teardown: fn(),
 
     /// SCL output signal.
     pub scl_output: OutputSignal,
@@ -1840,25 +1886,36 @@ impl Future for ClearBusFuture<'_> {
 pub struct State {
     /// Waker for the asynchronous operations.
     pub waker: AtomicWaker,
+
+    /// Serializes the read-modify-write of `int_ena` between an async future and the async
+    /// interrupt handler, which run on different cores if the driver moved to another core. A
+    /// lost read-modify-write there loses a wakeup, or drops the enable bit of another event.
+    ///
+    /// Only the async paths take this. Clearing a status bit needs no lock, because `int_clr` is
+    /// write-only.
+    pub mutex: RawMutex,
+
+    /// The core that services the async interrupt.
+    pub affinity: InterruptAffinity,
 }
 
 /// A peripheral singleton compatible with the I2C master driver.
 pub trait Instance: crate::private::Sealed + any::Degrade {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
-    fn parts(&self) -> (&Info, &State);
+    fn parts(&self) -> (&'static Info, &'static State);
 
     /// Returns the peripheral data describing this instance.
     #[doc(hidden)]
     #[inline(always)]
-    fn info(&self) -> &Info {
+    fn info(&self) -> &'static Info {
         self.parts().0
     }
 
     /// Returns the peripheral state for this instance.
     #[doc(hidden)]
     #[inline(always)]
-    fn state(&self) -> &State {
+    fn state(&self) -> &'static State {
         self.parts().1
     }
 }
@@ -1918,15 +1975,25 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 for_each_i2c_master!(
     ($id:literal, $inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
-            fn parts(&self) -> (&Info, &State) {
+            fn parts(&self) -> (&'static Info, &'static State) {
                 #[handler]
                 #[ram]
                 pub(super) fn irq_handler() {
                     async_handler(&PERIPHERAL, &STATE);
                 }
 
+                #[ram]
+                fn teardown_handler() {
+                    handle_teardown(&PERIPHERAL, &STATE, || {
+                        unsafe { crate::peripherals::$inst::steal() }
+                            .disable_peri_interrupt_on_all_cores()
+                    });
+                }
+
                 static STATE: State = State {
                     waker: AtomicWaker::new(),
+                    mutex: RawMutex::new(),
+                    affinity: InterruptAffinity::new(),
                 };
 
                 static PERIPHERAL: Info = Info {
@@ -1935,6 +2002,7 @@ for_each_i2c_master!(
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
                     async_handler: irq_handler,
+                    async_teardown: teardown_handler,
                     scl_output: OutputSignal::$scl,
                     scl_input: InputSignal::$scl,
                     sda_output: OutputSignal::$sda,
@@ -1958,7 +2026,7 @@ crate::any_peripheral! {
 }
 
 impl Instance for AnyI2c<'_> {
-    fn parts(&self) -> (&Info, &State) {
+    fn parts(&self) -> (&'static Info, &'static State) {
         any::delegate!(self, i2c => { i2c.parts() })
     }
 }
