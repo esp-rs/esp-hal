@@ -192,11 +192,6 @@ bitfield::bitfield! {
     pub wifi_pd_en, set_wifi_pd_en: 5;
     /// power down BT
     pub bt_pd_en, set_bt_pd_en: 6;
-    /// power down CPU, but not restart when lightsleep.
-    ///
-    /// Crate-private, because esp-hal has no CPU retention for this chip. Only deep sleep, which
-    /// keeps no CPU state, powers the CPU domain down.
-    pub(crate) cpu_pd_en, set_cpu_pd_en: 7;
     /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 8;
     /// power down digital peripherals
@@ -326,7 +321,6 @@ impl RtcSleepConfig {
         cfg.set_rtc_peri_pd_en(true);
         cfg.set_wifi_pd_en(true);
         cfg.set_bt_pd_en(true);
-        cfg.set_cpu_pd_en(true);
         cfg.set_int_8m_pd_en(true);
 
         cfg.set_dig_peri_pd_en(true);
