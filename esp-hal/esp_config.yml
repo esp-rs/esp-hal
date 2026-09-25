@@ -249,7 +249,7 @@ options:
       increases the interrupt latency. Hold a `CpuFrequencyLock` to keep the CPU clock unchanged."
     default:
       - value: false
-    active: "esp32c5 || esp32c6 || esp32c61 || esp32h2 || esp32s31"
+    active: "sleep_idle_frequency_scaling"
 
 checks:
   - "ESP_HAL_CONFIG_STACK_GUARD_OFFSET % 4 == 0"
