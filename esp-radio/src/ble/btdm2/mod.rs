@@ -771,8 +771,31 @@ unsafe extern "C" fn btdm_lp_sleep_cb(_enable_tick: u32, _arg: *mut c_void) {
 }
 
 #[ram]
-unsafe extern "C" fn btdm_lp_wake_up_cb(_arg: *mut c_void) {
+unsafe extern "C" fn btdm_lp_wake_up_cb(arg: *mut c_void) {
+    // The controller passes its `btdm_lp_wakeup_params_t`. Bit 31 tells it that the BLE timer
+    // ended the light sleep.
+    const BT_WAKEUP: u32 = 1 << 31;
+    let params = arg.cast::<u32>();
     super::modem_phy_acquire();
+    if !params.is_null() {
+        let by_bt = esp_hal::rtc_cntl::wakeup_cause().contains(esp_hal::rtc_cntl::WakeupSource::Bt);
+        unsafe {
+            let value = params.read_volatile();
+            params.write_volatile(if by_bt {
+                value | BT_WAKEUP
+            } else {
+                value & !BT_WAKEUP
+            });
+        }
+    }
+}
+
+/// Returns whether the controller refuses a light sleep, because its next event is too close.
+pub(super) fn controller_skips_light_sleep() -> bool {
+    unsafe extern "C" {
+        fn r_btdm_sleep_should_skip_light_sleep_check() -> bool;
+    }
+    unsafe { r_btdm_sleep_should_skip_light_sleep_check() }
 }
 
 /// IDF `btdm_lp_init`. Runs after `r_btdm_task_init`, before `ble_stack_init`.
@@ -790,8 +813,9 @@ unsafe fn btdm_lp_init() {
         );
     }
 
-    // IDF `BTDM_RTC_DELAY_US_MODEM_SLEEP`: how long the controller needs to enable the PHY.
-    const RTC_DELAY_US_MODEM_SLEEP: u32 = 1500;
+    // IDF `BTDM_RTC_DELAY_US_LIGHT_SLEEP`: how long the controller needs to enable the PHY, when
+    // the chip can light-sleep while the controller sleeps.
+    const RTC_DELAY_US_LIGHT_SLEEP: u32 = 1800;
 
     unsafe {
         if super::modem_sleep_enabled() {
@@ -800,7 +824,7 @@ unsafe fn btdm_lp_init() {
                 btdm_lp_wake_up_cb,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
-                RTC_DELAY_US_MODEM_SLEEP,
+                RTC_DELAY_US_LIGHT_SLEEP,
             );
         }
 
@@ -837,6 +861,10 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
     let res = esp_bt_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
     assert!(res == 0, "esp_bt_controller_enable returned {}", res);
 
+    if config.modem_sleep() {
+        super::lp_clk::claim_wake_source();
+    }
+
     #[cfg(rng_trng_supported)]
     unsafe {
         esp_hal::rng::TrngSource::increase_entropy_source_counter()
@@ -846,6 +874,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    super::lp_clk::release_wake_source();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 

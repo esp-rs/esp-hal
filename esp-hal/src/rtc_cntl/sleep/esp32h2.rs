@@ -73,7 +73,9 @@ impl DigitalSleepConfig {
 
                 cfg
             },
-            icg_func: 0xffff_ffff, // TODO: ESP-IDF determines this using get_sleep_clock_icg_flags
+            // ESP-IDF ungates only the clocks that `esp_sleep_clock_config` requested. No esp-hal
+            // driver needs a digital clock during light sleep.
+            icg_func: 0,
             deep_sleep: false,
         }
     }

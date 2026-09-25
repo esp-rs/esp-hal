@@ -230,18 +230,8 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_aon_pd_en(pd_flags.pd_hp_aon());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
-        if pd_flags.pd_modem() || pd_flags.pd_bbpll() {
-            self.hp_sys.clk.set_i2c_iso_en(true);
-            self.hp_sys.clk.set_i2c_retention(true);
-        } else {
-            // Keep the BBPLL, and the analog I2C buses that configure it, as in the `HP_MODEM`
-            // power state. BLE cannot transmit after the wake without them.
-            self.hp_sys.clk.set_i2c_iso_en(false);
-            self.hp_sys.clk.set_i2c_retention(false);
-            self.hp_sys.clk.set_xpd_bb_i2c(true);
-            self.hp_sys.clk.set_xpd_bbpll_i2c(true);
-            self.hp_sys.clk.set_xpd_bbpll(true);
-        }
+        self.hp_sys.clk.set_i2c_iso_en(true);
+        self.hp_sys.clk.set_i2c_retention(true);
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
 
@@ -618,9 +608,6 @@ bitfield::bitfield! {
     pub u32, pd_rc32k    , set_pd_rc32k    : 13;
     /// Controls the power-down status of the low-power peripheral domain.
     pub u32, pd_lp_periph, set_pd_lp_periph: 14;
-    /// Controls the power-down status of the BBPLL and the analog I2C buses that configure it,
-    /// while the modem domain stays powered.
-    pub u32, pd_bbpll    , set_pd_bbpll    : 15;
 }
 
 impl PowerDownFlags {
@@ -725,7 +712,6 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
             self.pd_flags.set_pd_rc32k(true);
             self.pd_flags.set_pd_rc_fast(true);
-            self.pd_flags.set_pd_bbpll(true);
         } else {
             // Light sleep: the digital domain (CPU, RAM, peripherals) stays powered
             // and only clock-gated, so execution resumes in place. To cut power we
@@ -737,7 +723,6 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
-            self.pd_flags.set_pd_bbpll(true);
         }
     }
 
@@ -754,6 +739,7 @@ impl RtcSleepConfig {
             // Restore the old clock settings when we return
             DropGuard::new((), move |_| {
                 ClockTree::with(|clocks| {
+                    crate::soc::clocks::reconfigure_pll(clocks);
                     if let Some(old_root) = old_root {
                         clocks::configure_soc_root_clk(clocks, old_root);
                     }

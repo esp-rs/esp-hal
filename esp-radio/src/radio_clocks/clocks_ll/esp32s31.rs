@@ -2,6 +2,10 @@ pub(crate) fn enable_wifi(en: bool) {
     regs!(MODEM_SYSCON)
         .clk_conf1()
         .modify(|_, w| w.clk_wifimac_en().bit(en));
+
+    // The radios share the coexistence clock, as in ESP-IDF's `COEXIST_CLOCK_DEPS`, and the other
+    // radios can be active while Wi-Fi dozes.
+    enable_coex(en);
 }
 
 pub(crate) fn enable_ieee802154(en: bool) {
@@ -10,6 +14,20 @@ pub(crate) fn enable_ieee802154(en: bool) {
         w.clk_zb_apb_en().bit(en);
         w.clk_zbmac_en().bit(en)
     });
+    enable_coex(en);
+}
+
+fn enable_coex(en: bool) {
+    fn enable(en: bool) {
+        regs!(MODEM_LPCON)
+            .clk_conf()
+            .modify(|_, w| w.clk_coex_en().bit(en));
+    }
+
+    use crate::radio_clocks::Refcount;
+
+    static REFCOUNT: Refcount = Refcount::new();
+    REFCOUNT.update(en, enable);
 }
 
 pub(crate) fn enable_bt_ieee802154_common(en: bool) {
@@ -47,6 +65,7 @@ pub(crate) fn enable_bt(en: bool) {
     }
 
     enable_bt_ieee802154_common(en);
+    enable_coex(en);
 }
 
 /// IDF `hal/esp32s31/include/hal/trng_ll.h` `trng_ll_enable`.
