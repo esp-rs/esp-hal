@@ -93,7 +93,8 @@ where
 // See `read_cal_channel` in
 // <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>
 fn read_cal_channel<ADCX: RegisterAccess>() -> u16 {
-    ADCX::reset();
+    // Only the done flag - `reset` would disarm the unit `setup_calibration` armed.
+    ADCX::clear_done();
 
     ADCX::set_onetime_start(false);
     crate::rom::ets_delay_us(5);
@@ -210,7 +211,10 @@ pub trait RegisterAccess {
     /// Reads sample data.
     fn read_data() -> u16;
 
-    /// Resets flags.
+    /// Clears the conversion-done flag.
+    fn clear_done();
+
+    /// Clears the done flag and ends the one-shot session.
     fn reset();
 
     /// Sets up ADC hardware for calibration.
@@ -222,6 +226,13 @@ pub trait RegisterAccess {
 
 impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
+        #[cfg(esp32c6)]
+        let was_armed = APB_SARADC::regs()
+            .onetime_sample()
+            .read()
+            .saradc1_onetime_sample()
+            .bit();
+
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
             // Disarm ADC2 before configuring ADC1.
             // See `adc_oneshot_ll_disable_all_unit`.
@@ -230,6 +241,13 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             w.onetime_channel().bits(channel);
             w.onetime_atten().bits(attenuation)
         });
+
+        // The ESP32-C6 channel selection needs 50 µs to settle after arming ADC1, which is why
+        // `reset` leaves it armed there. See `adc_oneshot_ll_enable`.
+        #[cfg(esp32c6)]
+        if !was_armed {
+            crate::rom::ets_delay_us(50);
+        }
     }
 
     fn set_onetime_start(enable: bool) {
@@ -251,18 +269,25 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             & 0xfff
     }
 
-    fn reset() {
-        // Clear ADC1 sampling done interrupt bit
+    fn clear_done() {
         APB_SARADC::regs()
             .int_clr()
             .write(|w| w.adc1_done().clear_bit_by_one());
+    }
 
-        // Disarm both units along with the trigger.
+    fn reset() {
+        Self::clear_done();
+
+        // Disarm both units along with the trigger - except on the ESP32-C6, which keeps
+        // ADC1 armed for the whole one-shot session.
         // See `adc_oneshot_ll_disable_all_unit`.
         APB_SARADC::regs().onetime_sample().modify(|_, w| {
-            w.onetime_start().clear_bit();
-            w.saradc2_onetime_sample().clear_bit();
-            w.saradc1_onetime_sample().clear_bit()
+            #[cfg(not(esp32c6))]
+            {
+                w.saradc2_onetime_sample().clear_bit();
+                w.saradc1_onetime_sample().clear_bit();
+            }
+            w.onetime_start().clear_bit()
         });
     }
 
