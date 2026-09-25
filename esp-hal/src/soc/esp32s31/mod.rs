@@ -27,6 +27,17 @@ pub(crate) fn enable_branch_predictor() {
     }
 }
 
+#[cfg(feature = "unstable")]
+pub(crate) fn disable_branch_predictor() {
+    // Clears the bits set by `enable_branch_predictor`.
+    const MHCR_RS: u32 = 1 << 4;
+    const MHCR_BFE: u32 = 1 << 5;
+    const MHCR_BTB: u32 = 1 << 12;
+    unsafe {
+        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+    }
+}
+
 #[cfg(feature = "rt")]
 pub(crate) fn riscv_preinit() {}
 
