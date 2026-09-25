@@ -44,6 +44,7 @@ use crate::{
             ClockTreeNodeType,
             Expression,
             RejectExpression,
+            RootSource,
             SourceFrequencySignature,
             ValidationContext,
             ValuesExpression,
@@ -128,6 +129,14 @@ impl ClockTreeNodeType for Source {
 
     fn wake_locking(&self) -> bool {
         self.wake_locking
+    }
+
+    fn root_source(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> RootSource {
+        RootSource::Itself
     }
 
     fn rustc_cfg(&self) -> Option<&str> {
@@ -396,6 +405,14 @@ impl ClockTreeNodeType for DerivedClockSource {
     ) -> Vec<String> {
         // Note: Group-local derived clock are not supported.
         vec![self.from.clone()]
+    }
+
+    fn root_source(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> RootSource {
+        RootSource::PassThrough(self.from.clone())
     }
 
     fn validate_source_data(

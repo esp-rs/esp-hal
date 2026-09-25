@@ -2455,6 +2455,151 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
+        /// The clock sources of the device.
+        ///
+        /// A clock source is a node of the clock tree that other nodes derive their output
+        /// from. Ask a node which source it runs on with its `..._root_source` function.
+        #[derive(Debug, enumset::EnumSetType)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum ClockSource {
+            /// `XTAL_CLK`.
+            XtalClk,
+            /// `RC_FAST_CLK`.
+            RcFastClk,
+            #[cfg(use_xtal32k)]
+            /// `XTAL32K_CLK`.
+            Xtal32kClk,
+            /// `OSC_SLOW_CLK`.
+            OscSlowClk,
+            /// `RC_SLOW_CLK`.
+            RcSlowClk,
+        }
+        /// Returns the clock source that `XTAL_CLK` currently runs on.
+        pub fn xtal_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::XtalClk)
+        }
+        /// Returns the clock source that `PLL_F96M_CLK` currently runs on.
+        pub fn pll_f96m_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `PLL_F64M_CLK` currently runs on.
+        pub fn pll_f64m_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            pll_f96m_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `PLL_F48M_CLK` currently runs on.
+        pub fn pll_f48m_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            pll_f96m_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `RC_FAST_CLK` currently runs on.
+        pub fn rc_fast_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::RcFastClk)
+        }
+        /// Returns the clock source that `IOMUX_FUNCTION_CLOCK` currently runs on.
+        pub fn iomux_function_clock_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.iomux_function_clock?;
+            match config {
+                IomuxFunctionClockConfig::XtalClk => xtal_clk_root_source(clocks),
+                IomuxFunctionClockConfig::PllF48m => pll_f48m_clk_root_source(clocks),
+            }
+        }
+        #[cfg(use_xtal32k)]
+        /// Returns the clock source that `XTAL32K_CLK` currently runs on.
+        pub fn xtal32k_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::Xtal32kClk)
+        }
+        /// Returns the clock source that `OSC_SLOW_CLK` currently runs on.
+        pub fn osc_slow_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::OscSlowClk)
+        }
+        /// Returns the clock source that `RC_SLOW_CLK` currently runs on.
+        pub fn rc_slow_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::RcSlowClk)
+        }
+        #[cfg(use_xtal32k)]
+        /// Returns the clock source that `PLL_LP_CLK` currently runs on.
+        pub fn pll_lp_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal32k_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `HP_ROOT_CLK` currently runs on.
+        pub fn hp_root_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.hp_root_clk?;
+            match config {
+                HpRootClkConfig::Pll96 => pll_f96m_clk_root_source(clocks),
+                HpRootClkConfig::Pll64 => pll_f64m_clk_root_source(clocks),
+                HpRootClkConfig::Xtal => xtal_clk_root_source(clocks),
+                HpRootClkConfig::RcFast => rc_fast_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `CPU_CLK` currently runs on.
+        pub fn cpu_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            hp_root_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `AHB_CLK` currently runs on.
+        pub fn ahb_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            hp_root_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `APB_CLK` currently runs on.
+        pub fn apb_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            ahb_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `XTAL_D2_CLK` currently runs on.
+        pub fn xtal_d2_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `LP_FAST_CLK` currently runs on.
+        pub fn lp_fast_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.lp_fast_clk?;
+            match config {
+                LpFastClkConfig::RcFastClk => rc_fast_clk_root_source(clocks),
+                #[cfg(use_xtal32k)]
+                LpFastClkConfig::PllLpClk => pll_lp_clk_root_source(clocks),
+                LpFastClkConfig::XtalD2Clk => xtal_d2_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `LP_SLOW_CLK` currently runs on.
+        pub fn lp_slow_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.lp_slow_clk?;
+            match config {
+                #[cfg(use_xtal32k)]
+                LpSlowClkConfig::Xtal32k => xtal32k_clk_root_source(clocks),
+                LpSlowClkConfig::RcSlow => rc_slow_clk_root_source(clocks),
+                LpSlowClkConfig::OscSlow => osc_slow_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `BLE_LP_XTAL_CLK` currently runs on.
+        pub fn ble_lp_xtal_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `BLE_LP_CLK` currently runs on.
+        pub fn ble_lp_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.ble_lp_clk?;
+            match config {
+                BleLpClkConfig::Xtal => ble_lp_xtal_clk_root_source(clocks),
+                BleLpClkConfig::RcSlow => rc_slow_clk_root_source(clocks),
+                #[cfg(use_xtal32k)]
+                BleLpClkConfig::Xtal32k => xtal32k_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `CRYPTO_CLK` currently runs on.
+        pub fn crypto_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.crypto_clk?;
+            match config {
+                CryptoClkConfig::Xtal => xtal_clk_root_source(clocks),
+                CryptoClkConfig::RcFast => rc_fast_clk_root_source(clocks),
+                CryptoClkConfig::PllF64m => pll_f64m_clk_root_source(clocks),
+                CryptoClkConfig::PllF96m => pll_f96m_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `TIMG_CALIBRATION_CLOCK` currently runs on.
+        pub fn timg_calibration_clock_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.timg_calibration_clock?;
+            match config {
+                TimgCalibrationClockConfig::RcSlowClk => lp_slow_clk_root_source(clocks),
+                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_clk_root_source(clocks),
+                #[cfg(use_xtal32k)]
+                TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_root_source(clocks),
+            }
+        }
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
             let old_config = clocks.xtal_clk.replace(config);
             refresh_xtal_clk_downstream(clocks);

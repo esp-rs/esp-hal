@@ -439,6 +439,15 @@ impl ClockTreeNodeInstance {
         self.suffix_function("source_frequency")
     }
 
+    fn root_source_function_name(&self) -> Ident {
+        self.suffix_function("root_source")
+    }
+
+    /// Returns the name this node has as a variant of the `ClockSource` enum.
+    fn clock_source_variant_name(&self) -> Ident {
+        format_ident!("{}", self.name().to_case(Case::Pascal))
+    }
+
     fn config_apply_function_name(&self) -> Ident {
         self.prefix_function("configure")
     }
@@ -1288,6 +1297,123 @@ impl SystemClocks {
             }
         }
 
+        // The clock source each node runs on. Sleep code keeps the answer powered, so that a
+        // peripheral which must keep running through a sleep does not have to know what feeds it.
+        let mut clock_source_variants: Vec<TokenStream> = vec![];
+        let mut root_source_fns: Vec<TokenStream> = vec![];
+        let mut resolvable_nodes: HashSet<String> = HashSet::new();
+
+        for node_name in tree.dependency_graph.iter() {
+            let Some(node) = tree.try_get_node(&node_name) else {
+                continue;
+            };
+
+            // A node of a template group has one configuration per instance, and nothing needs a
+            // clock of one through a sleep yet.
+            if node.properties.receiver.is_some() {
+                continue;
+            }
+
+            let cfg_attr = node.rustc_cfg_attr();
+            let fn_name = node.root_source_function_name();
+            let docline = format!(
+                " Returns the clock source that `{}` currently runs on.",
+                node.name_str()
+            );
+
+            // Resolve an upstream node to the call that answers for it, or give up if that node
+            // has no answer itself.
+            let upstream_call = |name: &str| {
+                let upstream = node.resolve_node(tree, name);
+                resolvable_nodes
+                    .contains(upstream.name_str())
+                    .then(|| upstream.root_source_function_name())
+            };
+
+            // A source answers without reading the tree.
+            let mut param = quote! { clocks };
+
+            let body = match node.node.root_source(node, tree) {
+                clock_tree::RootSource::Itself => {
+                    let variant = node.clock_source_variant_name();
+                    let docline = format!(" `{}`.", node.name_str());
+                    clock_source_variants.push(quote! {
+                        #cfg_attr
+                        #[doc = #docline]
+                        #variant,
+                    });
+
+                    param = quote! { _clocks };
+                    quote! { Some(ClockSource::#variant) }
+                }
+                clock_tree::RootSource::PassThrough(upstream) => {
+                    let Some(call) = upstream_call(&upstream) else {
+                        continue;
+                    };
+                    quote! { #call(clocks) }
+                }
+                // A selector with a single option has no configuration to read.
+                clock_tree::RootSource::Selector { arms, .. } if !node.is_configurable() => {
+                    let [arm] = arms.as_slice() else {
+                        continue;
+                    };
+                    let Some(call) = upstream_call(&arm.upstream) else {
+                        continue;
+                    };
+                    quote! { #call(clocks) }
+                }
+                clock_tree::RootSource::Selector { subject, arms } => {
+                    let mut branches = Vec::with_capacity(arms.len());
+                    for arm in arms.iter() {
+                        let Some(call) = upstream_call(&arm.upstream) else {
+                            break;
+                        };
+                        let cfg_attr = &arm.cfg_attr;
+                        let pattern = &arm.pattern;
+                        branches.push(quote! { #cfg_attr #pattern => #call(clocks), });
+                    }
+                    if branches.len() != arms.len() {
+                        continue;
+                    }
+
+                    let config_field = node.properties.indexed_config_accessor();
+                    quote! {
+                        let config = #config_field?;
+                        match #subject {
+                            #(#branches)*
+                        }
+                    }
+                }
+                clock_tree::RootSource::Unknown => continue,
+            };
+
+            resolvable_nodes.insert(node.name_str().clone());
+            root_source_fns.push(quote! {
+                #cfg_attr
+                #[doc = #docline]
+                pub fn #fn_name(#param: &mut ClockTree) -> Option<ClockSource> {
+                    #body
+                }
+            });
+        }
+
+        // A chip without a clock tree has no sources to name, and an empty enum is not useful.
+        let clock_sources = (!clock_source_variants.is_empty()).then(|| {
+            quote! {
+                /// The clock sources of the device.
+                ///
+                /// A clock source is a node of the clock tree that other nodes derive their output
+                /// from. Ask a node which source it runs on with its `..._root_source` function.
+                #[derive(Debug, enumset::EnumSetType)]
+                #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+                pub enum ClockSource {
+                    #(#clock_source_variants)*
+                }
+
+                #(#root_source_fns)*
+            }
+        });
+
         Ok(quote! {
             #[macro_export]
             /// ESP-HAL must provide implementation for the following functions:
@@ -1325,6 +1451,8 @@ impl SystemClocks {
                         });
 
                     #(#freq_cache_statics)*
+
+                    #clock_sources
 
                     #(#clock_tree_node_impls)*
 

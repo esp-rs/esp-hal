@@ -176,8 +176,6 @@ mod coex_utils;
 mod fmt;
 pub(crate) mod reg_access;
 
-use core::marker::PhantomData;
-
 use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
@@ -308,7 +306,6 @@ pub(crate) fn init() {
                 "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
             );
         }
-        esp_hal::rtc_cntl::WakeLock::acquire();
     }
 
     if !preempt::initialized() {
@@ -382,8 +379,6 @@ pub(crate) fn deinit() {
         // Allow using `ADC2` again
         #[cfg(esp32)]
         hal::analog::adc::release_adc2(unsafe { esp_hal::Internal::conjure() });
-
-        esp_hal::rtc_cntl::WakeLock::release();
     }
 
     debug!("Radio deinitialized");
@@ -394,7 +389,7 @@ pub(crate) fn deinit() {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct RadioRefGuard {
-    _private: PhantomData<()>,
+    wake_lock: bool,
 }
 
 static RADIO_REFCOUNT: Refcount = Refcount::new();
@@ -402,13 +397,31 @@ static RADIO_REFCOUNT: Refcount = Refcount::new();
 impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
+    ///
+    /// The guard keeps the chip out of automatic light sleep while it exists.
+    #[cfg(any(feature = "ble", all(feature = "wifi", esp32)))]
     pub(crate) fn new() -> Self {
+        Self::create(true)
+    }
+
+    /// Like [`Self::new`], but the chip can sleep while the guard exists.
+    ///
+    /// The driver must refuse the sleeps that are not safe for it.
+    #[cfg(all(feature = "wifi", not(esp32)))]
+    pub(crate) fn without_wake_lock() -> Self {
+        Self::create(false)
+    }
+
+    fn create(wake_lock: bool) -> Self {
         debug!("Creating RadioRefGuard");
 
         RADIO_REFCOUNT.increment(init);
-        RadioRefGuard {
-            _private: PhantomData,
+        if wake_lock {
+            esp_hal::if_unstable_hal! {
+                esp_hal::rtc_cntl::WakeLock::acquire();
+            }
         }
+        RadioRefGuard { wake_lock }
     }
 }
 
@@ -418,6 +431,11 @@ impl Drop for RadioRefGuard {
         debug!("Dropping RadioRefGuard");
 
         RADIO_REFCOUNT.decrement(deinit);
+        if self.wake_lock {
+            esp_hal::if_unstable_hal! {
+                esp_hal::rtc_cntl::WakeLock::release();
+            }
+        }
     }
 }
 

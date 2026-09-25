@@ -764,7 +764,11 @@ pub unsafe extern "C" fn dport_access_stall_other_cpu_end_wrap() {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_pm_sleep_lock_acquire() {
-    trace!("wifi_pm_sleep_lock_acquire - no-op")
+    trace!("wifi_pm_sleep_lock_acquire");
+    esp_hal::if_unstable_hal! {
+        #[cfg(not(esp32))]
+        super::sleep::acquire_sleep_lock();
+    }
 }
 /// **************************************************************************
 /// Name: wifi_pm_sleep_lock_release
@@ -774,7 +778,11 @@ pub unsafe extern "C" fn wifi_pm_sleep_lock_acquire() {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_pm_sleep_lock_release() {
-    trace!("wifi_pm_sleep_lock_release - no-op")
+    trace!("wifi_pm_sleep_lock_release");
+    esp_hal::if_unstable_hal! {
+        #[cfg(not(esp32))]
+        super::sleep::release_sleep_lock();
+    }
 }
 
 #[cfg(wifi_has_wifi6)]
@@ -835,6 +843,24 @@ pub unsafe extern "C" fn phy_enable() {
     trace!("phy_enable");
     // Wi-Fi modem enable: also sets Wi-Fi RX (unlike the common-clock gate).
     esp_phy::enable_phy_with_wifi_rx();
+
+    // ESP-IDF turns off the baseband idle check (maximum 139 ms) to prevent an unexpected
+    // RXTXPANIC.
+    #[cfg(any(esp32c5, esp32c61, esp32s31))]
+    unsafe {
+        unsafe extern "C" {
+            fn set_bb_wdg(
+                busy_chk: bool,
+                srch_chk: bool,
+                max_busy: u16,
+                max_srch: u16,
+                rst_en: bool,
+                int_en: bool,
+                clr: bool,
+            );
+        }
+        set_bb_wdg(true, false, 0x18, 0xaa, false, false, false);
+    }
 }
 
 /// **************************************************************************

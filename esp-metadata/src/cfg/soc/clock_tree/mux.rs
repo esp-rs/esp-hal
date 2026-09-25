@@ -13,6 +13,8 @@ use crate::cfg::{
         Bounds,
         ClockTreeNodeType,
         ConfiguresExpression,
+        RootSource,
+        RootSourceArm,
         SourceFrequencySignature,
         ValidationContext,
         config_type_name,
@@ -181,6 +183,31 @@ impl ClockTreeNodeType for Multiplexer {
         self.variants
             .iter()
             .any(|variant| !variant.configures.is_empty())
+    }
+
+    fn root_source(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> RootSource {
+        let ty_name = instance.config_type_name();
+        let arms = self
+            .variants
+            .iter()
+            .map(|variant| {
+                let name = variant.config_enum_variant_name();
+                RootSourceArm {
+                    cfg_attr: variant.cfg_attr(),
+                    pattern: quote! { #ty_name::#name },
+                    upstream: variant.outputs.clone(),
+                }
+            })
+            .collect();
+
+        RootSource::Selector {
+            subject: quote! { config },
+            arms,
+        }
     }
 
     fn node_source_frequency_impl(
