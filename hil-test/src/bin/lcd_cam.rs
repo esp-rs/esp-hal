@@ -361,6 +361,34 @@ mod camera_tests {
     }
 
     #[test]
+    fn test_camera_configuration(ctx: Context) {
+        let peripherals = ctx.peripherals;
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let dma_channel = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+        let config = cam::Config::default();
+        let mut camera = Camera::new(
+            lcd_cam.cam,
+            dma_channel,
+            config.with_vsync_filter_threshold(cam::VsyncFilterThreshold::Three),
+        )
+        .unwrap();
+        let regs = esp_hal::peripherals::LCD_CAM::regs();
+        let initial_ctrl = regs.cam_ctrl().read();
+
+        hil_test::assert!(initial_ctrl.cam_vs_eof_en().bit_is_set());
+        hil_test::assert_eq!(initial_ctrl.cam_vsync_filter_thres().bits(), 2);
+
+        camera.apply_config(&config).unwrap();
+        let updated_ctrl = regs.cam_ctrl().read();
+        hil_test::assert_eq!(updated_ctrl.cam_vsync_filter_thres().bits(), 0);
+        #[cfg(esp32s3)]
+        hil_test::assert!(updated_ctrl.cam_clk_sel().bits() != 0);
+    }
+
+    #[test]
     fn test_camera_can_receive_from_rgb(ctx: Context) {
         let peripherals = ctx.peripherals;
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
