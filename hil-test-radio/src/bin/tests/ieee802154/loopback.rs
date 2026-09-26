@@ -115,4 +115,61 @@ mod tests {
             "did not receive an echoed frame from the peer board"
         );
     }
+
+    /// `stop_receive` right after a transmission lets the transmission and its
+    /// ACK complete, and then keeps the receiver off, so the echo that the peer
+    /// sends back is not received.
+    #[test]
+    async fn stop_receive_drops_frames(p: Peripherals) {
+        let mut ieee802154 = start_radio(p);
+
+        let mut acked = false;
+        for seq in 0..30u8 {
+            ieee802154.transmit(&data_frame(seq, true), false).ok();
+            ieee802154.stop_receive();
+
+            Timer::after(Duration::from_millis(100)).await;
+            if ieee802154.get_ack_frame().is_some() {
+                acked = true;
+                break;
+            }
+        }
+
+        assert!(acked, "stop_receive aborted the transmission or its ACK");
+
+        // Give the peer time to echo the acknowledged frame.
+        Timer::after(Duration::from_millis(200)).await;
+        assert!(
+            ieee802154.received().is_none(),
+            "received a frame while the receiver was stopped"
+        );
+    }
+
+    /// `start_receive` turns the receiver on again after `stop_receive`.
+    #[test]
+    async fn start_receive_resumes_after_stop_receive(p: Peripherals) {
+        let mut ieee802154 = start_radio(p);
+        ieee802154.stop_receive();
+        ieee802154.start_receive();
+
+        let mut echoed = false;
+        'outer: for seq in 0..30u8 {
+            ieee802154.transmit(&data_frame(seq, true), false).ok();
+
+            for _ in 0..20 {
+                Timer::after(Duration::from_millis(20)).await;
+                if let Some(Ok(received)) = ieee802154.received()
+                    && received.frame.payload.as_slice() == PAYLOAD
+                {
+                    echoed = true;
+                    break 'outer;
+                }
+            }
+        }
+
+        assert!(
+            echoed,
+            "did not receive an echoed frame after start_receive"
+        );
+    }
 }
