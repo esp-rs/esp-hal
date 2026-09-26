@@ -5,6 +5,16 @@
 //!
 //! This gets an IP address via DHCP and performs an HTTP GET request
 //! using the reqwless HTTP client.
+//!
+//! The example also shows how to save power. Change these constants to compare:
+//!
+//! - `POWER_SAVE` selects the Wi-Fi modem power save mode. With power save, the radio is off
+//!   between beacons.
+//! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
+//!   sleeps only while the station is in power save. On the ESP32, Wi-Fi keeps the chip awake.
+//!
+//! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
+//! the output.
 
 //% CHIP_FILTER: wifi_driver_supported
 
@@ -28,6 +38,7 @@ use esp_radio::wifi::{
     Config,
     ControllerConfig,
     Interface,
+    PowerSaveMode,
     WifiController,
     scan::ScanConfig,
     sta::StationConfig,
@@ -74,6 +85,14 @@ macro_rules! mk_static {
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
+/// The Wi-Fi modem power save mode. [`PowerSaveMode::None`] keeps the radio on and prevents
+/// light-sleep.
+const POWER_SAVE: PowerSaveMode = PowerSaveMode::Minimum;
+/// Whether the chip enters automatic light sleep when all tasks are idle. Requires [`POWER_SAVE`]
+/// to be enabled. The chip sleeps only while the station is in power save. On the ESP32, Wi-Fi
+/// keeps the chip awake.
+const LIGHT_SLEEP: bool = true;
+
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
@@ -84,7 +103,12 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+    if LIGHT_SLEEP {
+        let sleep = esp_rtos::sleep::configure(peripherals.LPWR);
+        esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
+    } else {
+        esp_rtos::start(timg0.timer0);
+    }
 
     let station_config = Config::Station(
         StationConfig::default()
@@ -101,6 +125,7 @@ async fn main(spawner: Spawner) -> ! {
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
+    controller.set_power_saving(POWER_SAVE).unwrap();
     println!("Wifi configured and started!");
 
     let config = embassy_net::Config::dhcpv4(Default::default());

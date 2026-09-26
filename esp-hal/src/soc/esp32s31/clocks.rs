@@ -13,7 +13,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
 
 use crate::{
-    peripherals::{HP_ALIVE_SYS, HP_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, PMU},
+    peripherals::{HP_ALIVE_SYS, HP_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, MODEM_LPCON, PMU},
     soc::xtal32k,
 };
 
@@ -46,6 +46,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
@@ -61,6 +62,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
@@ -76,6 +78,7 @@ impl CpuClock {
         apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
         lp_fast_clk: Some(LpFastClkConfig::RcFast),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         crypto_clk: Some(CryptoClkConfig::PllF240m),
         iomux_function_clock: Some(IomuxFunctionClockConfig::new(
             IomuxFunctionClockSource::PllF80m,
@@ -580,28 +583,74 @@ fn configure_iomux_function_clock_impl(
 }
 
 impl TimgInstance {
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // TODO: Control the selected timer's function-clock gate.
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        match self {
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs().timergrp0_ctrl0().modify(|_, w| {
+                w.t0_clk_en().bit(en);
+                w.t1_clk_en().bit(en)
+            }),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs().timergrp1_ctrl0().modify(|_, w| {
+                w.t0_clk_en().bit(en);
+                w.t1_clk_en().bit(en)
+            }),
+        };
     }
     fn configure_function_clock_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<TimgFunctionClockConfig>,
-        _new: TimgFunctionClockConfig,
+        new: TimgFunctionClockConfig,
     ) {
-        // TODO: Configure the selected timer's function-clock source.
+        let bits = match new {
+            TimgFunctionClockConfig::XtalClk => 0,
+            TimgFunctionClockConfig::RcFastClk => 1,
+            TimgFunctionClockConfig::PllF80m => 2,
+        };
+        match self {
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
+                .timergrp0_ctrl0()
+                .modify(|_, w| unsafe {
+                    w.t0_src_sel().bits(bits);
+                    w.t1_src_sel().bits(bits)
+                }),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
+                .timergrp1_ctrl0()
+                .modify(|_, w| unsafe {
+                    w.t0_src_sel().bits(bits);
+                    w.t1_src_sel().bits(bits)
+                }),
+        };
     }
 
-    fn enable_wdt_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // TODO: Control the selected timer group's watchdog-clock gate.
+    fn enable_wdt_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        match self {
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
+                .timergrp0_ctrl0()
+                .modify(|_, w| w.wdt_clk_en().bit(en)),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
+                .timergrp1_ctrl0()
+                .modify(|_, w| w.wdt_clk_en().bit(en)),
+        };
     }
     fn configure_wdt_clock_impl(
         self,
         _clocks: &mut ClockTree,
         _old: Option<TimgWdtClockConfig>,
-        _new: TimgWdtClockConfig,
+        new: TimgWdtClockConfig,
     ) {
-        // TODO: Configure the selected timer group's watchdog-clock source.
+        let bits = match new {
+            TimgWdtClockConfig::XtalClk => 0,
+            TimgWdtClockConfig::RcFastClk => 1,
+            TimgWdtClockConfig::PllF80m => 2,
+        };
+        match self {
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
+                .timergrp0_ctrl0()
+                .modify(|_, w| unsafe { w.wdt_src_sel().bits(bits) }),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
+                .timergrp1_ctrl0()
+                .modify(|_, w| unsafe { w.wdt_src_sel().bits(bits) }),
+        };
     }
 }
 
@@ -749,4 +798,62 @@ impl LcdCamInstance {
                 w.clk_div_numerator().bits(new_config.div_b() as u8)
             });
     }
+}
+
+// BLE_LP_XTAL_CLK
+
+fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+// BLE_LP_CLK
+
+fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_lp_timer_en().bit(en));
+}
+
+fn configure_ble_lp_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<BleLpClkConfig>,
+    new_config: BleLpClkConfig,
+) {
+    let divisor = match new_config {
+        BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
+        _ => 0,
+    };
+    let sel_xtal32k = cfg_select! {
+        use_xtal32k => new_config == BleLpClkConfig::Xtal32k,
+        _ => false,
+    };
+
+    MODEM_LPCON::regs()
+        .test_conf()
+        .modify(|_, w| w.clk_en().set_bit());
+
+    MODEM_LPCON::regs().lp_timer_conf().modify(|_, w| unsafe {
+        w.clk_lp_timer_sel_osc_slow()
+            .bit(new_config == BleLpClkConfig::RcSlow);
+        w.clk_lp_timer_sel_osc_fast().clear_bit();
+        w.clk_lp_timer_sel_xtal()
+            .bit(new_config == BleLpClkConfig::Xtal);
+        w.clk_lp_timer_sel_xtal32k().bit(sel_xtal32k);
+        w.clk_lp_timer_div_num().bits(divisor as u16)
+    });
+
+    if sel_xtal32k {
+        // 0 routes XTAL32K to the modem 32 kHz input.
+        MODEM_LPCON::regs()
+            .modem_32k_clk_conf()
+            .modify(|_, w| unsafe { w.clk_modem_32k_sel().bits(0) });
+    }
+
+    // IDF `modem_lpcon_ll_reset_ble_rtc_timer`.
+    MODEM_LPCON::regs()
+        .rst_conf()
+        .modify(|_, w| w.rst_lp_timer().set_bit());
+    MODEM_LPCON::regs()
+        .rst_conf()
+        .modify(|_, w| w.rst_lp_timer().clear_bit());
 }

@@ -2,6 +2,7 @@ use clap::Subcommand;
 
 #[cfg(feature = "release")]
 pub mod bump_msrv;
+#[cfg(feature = "release")]
 pub mod bump_version;
 pub mod changelog_preview;
 #[cfg(feature = "release")]
@@ -13,9 +14,12 @@ pub mod post_release;
 pub mod publish;
 #[cfg(feature = "release")]
 pub mod publish_plan;
+#[cfg(feature = "release")]
+pub mod registry;
 pub mod semver_check;
 pub mod tag_releases;
 
+#[cfg(feature = "release")]
 pub use bump_version::*;
 pub use changelog_preview::*;
 #[cfg(feature = "release")]
@@ -39,8 +43,9 @@ pub const PLACEHOLDER: &str = "{{currentVersion}}";
 #[derive(Debug, Subcommand)]
 pub enum Release {
     /// Create a release plan. This is the first step in the release process.
-    /// Accepts zero or more package names. If no package names are
-    /// specified, all packages are included.
+    /// The plan always covers every published package; use `--exclude` to leave
+    /// specific packages out (along with any dependency that becomes private to
+    /// the excluded set).
     ///
     /// The result of this command is a json file that can be customized to
     /// control what and how gets released.
@@ -76,6 +81,7 @@ pub enum Release {
     /// - Check if the changelog can be finalized
     /// - Update the version in the changelog
     /// - Replaces `{{currentVersion}}` markers in source files and the migration guide.
+    #[cfg(feature = "release")]
     BumpVersion(BumpVersionArgs),
     /// Attempt to publish the specified package.
     Publish(PublishArgs),

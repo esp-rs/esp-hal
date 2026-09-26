@@ -771,6 +771,17 @@ pub enum Polarity {
     ActiveLow,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Represent left/right alignment
+pub enum Alignment {
+    #[default]
+    /// Left aligned
+    Left,
+    /// Right aligned
+    Right,
+}
+
 /// I2S channels configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1025,6 +1036,17 @@ impl TdmConfig {
             ..self
         }
     }
+
+    /// Assigns the given value to the `alignment` field in both units.
+    #[cfg(not(i2s_version = "1"))]
+    #[must_use]
+    pub fn with_alignment(self, alignment: Alignment) -> Self {
+        Self {
+            rx_config: self.rx_config.with_alignment(alignment),
+            tx_config: self.tx_config.with_alignment(alignment),
+            ..self
+        }
+    }
 }
 
 #[allow(clippy::derivable_impls)]
@@ -1082,6 +1104,10 @@ pub struct TdmUnitConfig {
     /// Bit order of the data.
     #[cfg(not(i2s_version = "1"))]
     bit_order: BitOrder,
+
+    /// Alignment of channel in data. Only relevant if channel width is less than data width.
+    #[cfg(not(i2s_version = "1"))]
+    alignment: Alignment,
 }
 
 /// Alias for [`TdmUnitConfig`] (TDM mode unit configuration).
@@ -1105,6 +1131,8 @@ impl TdmUnitConfig {
             endianness: Endianness::LittleEndian,
             #[cfg(not(i2s_version = "1"))]
             bit_order: BitOrder::MsbFirst,
+            #[cfg(not(i2s_version = "1"))]
+            alignment: Alignment::Left,
         }
     }
 

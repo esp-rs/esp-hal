@@ -51,6 +51,8 @@ macro_rules! i2s_instance_resources {
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
+    #[cfg(not(i2s_version = "1"))]
+    use esp_hal::i2s::master::Alignment;
     use esp_hal::{
         Async,
         delay::Delay,
@@ -698,6 +700,125 @@ mod tests {
         }
     }
 
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn run_test_i2s0_loopback_data_formats(
+        tx_data_format: DataFormat,
+        rx_data_format: DataFormat,
+        tx_alignment: Alignment,
+        rx_alignment: Alignment,
+        mut expected: &[u8],
+    ) {
+        use core::cmp::min;
+
+        use esp_hal::i2s::master::{Endianness, TdmUnitConfig};
+
+        let (i2s, dma_channel, dout): (AnyI2s, AnyI2sDmaChannel, AnyPin) =
+            i2s_instance_resources!(I2S0);
+        let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
+
+        let rx_buffer = dma_rx_stream_buffer!(BUFFER_SIZE, 128);
+        let tx_buffer = dma_tx_stream_buffer!(BUFFER_SIZE, 128);
+
+        let i2s = I2s::new(
+            i2s,
+            dma_channel,
+            TdmConfig::default()
+                .with_signal_loopback(true)
+                .with_tx_config(
+                    TdmUnitConfig::new_tdm_philips()
+                        .with_sample_rate(Rate::from_hz(16000))
+                        .with_data_format(tx_data_format)
+                        // By using big-endian we maintain the byte ordering between the
+                        // representation in memory and in the i2s stream (the naming is very
+                        // confusing here). This simplifies the loopback test.
+                        .with_endianness(Endianness::BigEndian)
+                        // Ensures that all the data goes out to i2s stream unchanged
+                        .with_channels(Channels::STEREO)
+                        .with_alignment(tx_alignment),
+                )
+                .with_rx_config(
+                    TdmUnitConfig::new_tdm_philips()
+                        .with_sample_rate(Rate::from_hz(16000))
+                        .with_data_format(rx_data_format)
+                        // By using big-endian we maintain the byte ordering between the
+                        // representation in memory and in the i2s stream (the naming is very
+                        // confusing here). This simplifies the loopback test.
+                        .with_endianness(Endianness::BigEndian)
+                        // Ensures that all the data fron the i2s stream comes back in
+                        .with_channels(Channels::STEREO)
+                        .with_alignment(rx_alignment),
+                ),
+        )
+        .unwrap()
+        .into_async();
+
+        let (din, dout) = unsafe { dout.split() };
+
+        let i2s_tx = i2s
+            .i2s_tx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_dout(dout)
+            .build();
+
+        let i2s_rx = i2s
+            .i2s_rx
+            .with_bclk(NoPin)
+            .with_ws(NoPin)
+            .with_din(din)
+            .build();
+
+        let mut rx_transfer = i2s_rx.read(rx_buffer).ok().unwrap();
+        spawner.spawn(writer(tx_buffer, i2s_tx).unwrap());
+
+        let mut buffer = [0u8; 8];
+        while !expected.is_empty() {
+            rx_transfer.wait_for_available_async().await.unwrap();
+            let len = min(buffer.len(), expected.len());
+            let n = rx_transfer.pop(&mut buffer[..len]);
+            assert_eq!(&buffer[..n], &expected[..n]);
+            expected = &expected[n..];
+        }
+    }
+
+    // For the tests where we change the tx data format we want to keep rx on Data8Channel8 so
+    // that we capture all the data
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn run_test_data_formats_tx(
+        data_format: DataFormat,
+        alignment: Alignment,
+        expected: &[u8],
+    ) {
+        use esp_hal::i2s::master::Alignment;
+
+        run_test_i2s0_loopback_data_formats(
+            data_format,
+            DataFormat::Data8Channel8,
+            alignment,
+            Alignment::Left,
+            expected,
+        )
+        .await;
+    }
+
+    // For the tests where we change the rx data format we want to keep tx on Data32Channel32 so
+    // that we know we're sending all the data
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn run_test_data_formats_rx(
+        data_format: DataFormat,
+        alignment: Alignment,
+        expected: &[u8],
+    ) {
+        run_test_i2s0_loopback_data_formats(
+            DataFormat::Data32Channel32,
+            data_format,
+            Alignment::Left,
+            alignment,
+            expected,
+        )
+        .await;
+    }
+
     #[test]
     #[cfg(soc_has_i2s0)]
     async fn test_i2s_loopback_async_i2s0() {
@@ -871,6 +992,173 @@ mod tests {
     fn test_i2s_rx_half_sample_bits_regression_i2s0() {
         let (i2s, dma_channel, _) = i2s_instance_resources!(I2S0);
         run_test_i2s_rx_half_sample_bits_regression(i2s, dma_channel);
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_rx_32() {
+        run_test_data_formats_rx(
+            DataFormat::Data32Channel32,
+            Alignment::Left,
+            &[1, 6, 11, 16, 21, 26, 31, 36],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_rx_32_24_left() {
+        run_test_data_formats_rx(
+            DataFormat::Data32Channel24,
+            Alignment::Left,
+            &[1, 6, 11, 21, 26, 31, 41, 46],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_rx_32_16_left() {
+        run_test_data_formats_rx(
+            DataFormat::Data32Channel16,
+            Alignment::Left,
+            &[1, 6, 21, 26, 41, 46, 61, 66],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_rx_32_16_right() {
+        run_test_data_formats_rx(
+            DataFormat::Data32Channel16,
+            Alignment::Right,
+            &[11, 16, 31, 36, 51, 56, 71, 76],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_rx_32_8_left() {
+        run_test_data_formats_rx(
+            DataFormat::Data32Channel8,
+            Alignment::Left,
+            &[1, 21, 41, 61, 81, 101, 8, 28],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_rx_16() {
+        run_test_data_formats_rx(
+            DataFormat::Data16Channel16,
+            Alignment::Left,
+            &[1, 6, 11, 16, 21, 26, 31, 36],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_rx_16_8_left() {
+        run_test_data_formats_rx(
+            DataFormat::Data16Channel8,
+            Alignment::Left,
+            &[1, 11, 21, 31, 41, 51, 61, 71],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_rx_8() {
+        run_test_data_formats_rx(
+            DataFormat::Data8Channel8,
+            Alignment::Left,
+            &[1, 6, 11, 16, 21, 26, 31, 36],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_tx_32_24_left() {
+        run_test_data_formats_tx(
+            DataFormat::Data32Channel24,
+            Alignment::Left,
+            &[1, 6, 11, 0, 16, 21, 26, 0],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_tx_32_16_left() {
+        run_test_data_formats_tx(
+            DataFormat::Data32Channel16,
+            Alignment::Left,
+            &[1, 6, 0, 0, 11, 16, 0, 0],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_tx_32_16_right() {
+        use esp_hal::i2s::master::Alignment;
+
+        run_test_data_formats_tx(
+            DataFormat::Data32Channel16,
+            Alignment::Right,
+            &[0, 0, 1, 6, 0, 0, 11, 16],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_tx_32_8_left() {
+        run_test_data_formats_tx(
+            DataFormat::Data32Channel8,
+            Alignment::Left,
+            &[1, 0, 0, 0, 6, 0, 0, 0],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_tx_16() {
+        run_test_data_formats_tx(
+            DataFormat::Data16Channel16,
+            Alignment::Left,
+            &[1, 6, 11, 16, 21, 26, 31, 36],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_tx_16_8_left() {
+        run_test_data_formats_tx(
+            DataFormat::Data16Channel8,
+            Alignment::Left,
+            &[1, 0, 6, 0, 11, 0, 16, 0],
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(all(soc_has_i2s0, not(i2s_version = "1")))]
+    async fn test_tx_8() {
+        run_test_data_formats_tx(
+            DataFormat::Data8Channel8,
+            Alignment::Left,
+            &[1, 6, 11, 16, 21, 26, 31, 36],
+        )
+        .await;
     }
 }
 

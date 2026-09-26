@@ -3,7 +3,7 @@ system_clocks = { clock_tree = [
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480",                   output = "VALUE * 1_000_000" }, # TODO reject = "VALUE == 320_000_000 && CPU_PLL_DIV_OUT == 240_000_000"
     { name = "APLL_CLK",    type = "derived", from = "PLL_CLK",  values = "16_000_000 ..= 128_000_000", output = "VALUE" },
     { name = "PLL_F160M_CLK", type = "derived", from = "PLL_CLK", output = "160_000_000" },
-    { name = "RC_FAST_CLK", type = "source",  output = "8_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
+    { name = "RC_FAST_CLK", type = "source",  output = "8_000_000", adjustable = "4_000_000..=12_000_000" }, # this is supposed to be adjustable using RTC_CNTL_CK8M_DIV_SEL
 
     # Represents SEL0 = 1, 3
     { name = "CPU_PLL_DIV_IN", type = "mux", variants = [
@@ -50,7 +50,7 @@ system_clocks = { clock_tree = [
 
     # Low-speed clocks
     { name = "XTAL32K_CLK",     type = "source",  output = "32768", cfg = "use_xtal32k" },
-    { name = "RC_SLOW_CLK",     type = "source",  output = "90_000" },
+    { name = "RC_SLOW_CLK",     type = "source",  output = "90_000", adjustable = "45_000..=135_000" },
     { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" },
     { name = "XTAL_DIV_CLK",    type = "generic", output = "XTAL_CLK / 4" }, # source: esp-idf SOC_RTC_FAST_CLK_SRC_XTAL_D4
 

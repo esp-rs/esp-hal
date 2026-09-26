@@ -52,6 +52,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
         timg_calibration_clock: None,
@@ -64,6 +65,7 @@ impl CpuClock {
         cpu_clk: Some(CpuClkConfig::Pll),
         rc_fast_clk_div_n: Some(RcFastClkDivNConfig::new(0)),
         rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         low_power_clk: Some(LowPowerClkConfig::RtcSlow),
         timg_calibration_clock: None,
@@ -530,6 +532,10 @@ fn configure_low_power_clk_impl(
     _old_config: Option<LowPowerClkConfig>,
     new_config: LowPowerClkConfig,
 ) {
+    // The divider resets to 255. The Wi-Fi light sleep timer expects the undivided clock.
+    SYSTEM::regs()
+        .bt_lpck_div_int()
+        .modify(|_, w| unsafe { w.bt_lpck_div_num().bits(0) });
     SYSTEM::regs().bt_lpck_div_frac().modify(|_, w| {
         w.lpclk_sel_8m()
             .bit(new_config == LowPowerClkConfig::RcFast);
@@ -677,4 +683,24 @@ impl TimgInstance {
                 .bit(new_config == TimgWdtClockConfig::XtalClk)
         });
     }
+}
+
+// BLE_LP_XTAL_CLK
+
+fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+// BLE_LP_CLK
+
+fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+fn configure_ble_lp_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<BleLpClkConfig>,
+    _new_config: BleLpClkConfig,
+) {
+    // The BTDM controller programs the source and divider.
 }

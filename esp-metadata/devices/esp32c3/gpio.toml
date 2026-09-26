@@ -9,7 +9,9 @@ pins = [
     { pin =  2, functions = { 2 = "FSPIQ" }, limitations = ["strapping"], analog = { 1 = "ADC1_CH2" }, lp = { 0 = "LP_GPIO2" } },
     { pin =  3,                                                           analog = { 1 = "ADC1_CH3" }, lp = { 0 = "LP_GPIO3" } },
     { pin =  4, functions = { 0 = "MTMS", 2 = "FSPIHD"  },                analog = { 1 = "ADC1_CH4" }, lp = { 0 = "LP_GPIO4" } },
-    { pin =  5, functions = { 0 = "MTDI", 2 = "FSPIWP"  },                analog = { 1 = "ADC2_CH0" }, lp = { 0 = "LP_GPIO5" } },
+    # GPIO5 is ADC2_CH0, which is left out because ADC2 is unusable on this chip - see
+    # `[device.adc]` in soc.toml.
+    { pin =  5, functions = { 0 = "MTDI", 2 = "FSPIWP"  },                                             lp = { 0 = "LP_GPIO5" } },
     { pin =  6, functions = { 0 = "MTCK", 2 = "FSPICLK" } },
     { pin =  7, functions = { 0 = "MTDO", 2 = "FSPID"   } },
     { pin =  8,                                            limitations = ["strapping"] },

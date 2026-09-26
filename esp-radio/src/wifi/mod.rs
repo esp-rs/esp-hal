@@ -77,7 +77,7 @@ use self::sta::eap::EapStationConfig;
 use self::{
     ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
-    scan::{FreeApListOnDrop, ScanConfig, ScanResults, ScanTypeConfig},
+    scan::{ScanConfig, ScanResults, ScanTypeConfig, free_ap_list_on_drop},
     sta::StationConfig,
     state::*,
 };
@@ -108,6 +108,10 @@ pub mod scan;
 pub mod sta;
 
 pub(crate) mod os_adapter;
+esp_hal::if_unstable_hal! {
+    #[cfg(not(esp32))]
+    pub(crate) mod sleep;
+}
 pub(crate) mod state;
 
 #[cfg(not(esp32))]
@@ -782,7 +786,11 @@ impl Ssid {
         })
     }
 
-    pub(crate) fn as_bytes(&self) -> &[u8] {
+    /// The SSID as raw bytes.
+    ///
+    /// An SSID is at most 32 bytes and is not required to be valid UTF-8.
+    #[instability::unstable]
+    pub fn as_bytes(&self) -> &[u8] {
         &self.ssid[..self.len as usize]
     }
 
@@ -797,6 +805,9 @@ impl Ssid {
     }
 
     /// The SSID as a string slice.
+    ///
+    /// An SSID is not required to be valid UTF-8; the result stops at the
+    /// first invalid byte. Use `as_bytes` for the full bytes.
     pub fn as_str(&self) -> &str {
         let part = &self.ssid[..self.len as usize];
         match str::from_utf8(part) {
@@ -2266,20 +2277,30 @@ pub(crate) mod xarxa {
     }
 }
 
-/// Power saving mode settings for the modem.
+/// Power saving mode of the Wi-Fi modem in Station mode.
+///
+/// In power save, the station tells the access point that it sleeps. The access point keeps the
+/// frames for the station, and the station wakes up only to receive beacons. Between the beacons,
+/// the modem turns off the radio. The CPU keeps running.
+///
+/// Power save increases the receive latency and decreases the throughput. For this reason, the
+/// default is [`PowerSaveMode::None`].
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[non_exhaustive]
 pub enum PowerSaveMode {
-    /// No power saving.
+    /// No power saving. The radio stays on.
     #[default]
     None,
-    /// Minimum power save mode. In this mode, station wakes up to receive beacon every DTIM
-    /// period.
+    /// Minimum power save mode. The station wakes up to receive every DTIM beacon.
+    ///
+    /// The receive latency increases by up to one DTIM period.
     Minimum,
-    /// Maximum power save mode. In this mode, interval to receive beacons is determined by the
-    /// `listen_interval` config option.
+    /// Maximum power save mode. The station wakes up once every listen interval, see
+    /// [`StationConfig::with_listen_interval`](sta::StationConfig::with_listen_interval).
+    ///
+    /// The receive latency increases by up to one listen interval.
     Maximum,
 }
 
@@ -2291,6 +2312,10 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
             PowerSaveMode::Maximum => crate::sys::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM,
         })
     })?;
+    esp_hal::if_unstable_hal! {
+        #[cfg(not(esp32))]
+        sleep::set_power_save(ps != PowerSaveMode::None);
+    }
     Ok(())
 }
 
@@ -2595,9 +2620,17 @@ pub(crate) struct WifiRefGuard {
     _radio_guard: RadioRefGuard,
 }
 
+/// Wi-Fi refuses the unsafe sleeps itself, except on ESP32, which has no hardware TSF.
+fn wifi_radio_guard() -> RadioRefGuard {
+    cfg_select! {
+        esp32 => RadioRefGuard::new(),
+        _ => RadioRefGuard::without_wake_lock(),
+    }
+}
+
 impl Clone for WifiRefGuard {
     fn clone(&self) -> Self {
-        let _radio_guard = RadioRefGuard::new();
+        let _radio_guard = wifi_radio_guard();
         WIFI_REFCOUNT.increment(|| {});
         Self { _radio_guard }
     }
@@ -2609,6 +2642,11 @@ impl Drop for WifiRefGuard {
             state::locked(|| {
                 set_access_point_state(WifiAccessPointState::Uninitialized);
                 set_station_state(WifiStationState::Uninitialized);
+
+                esp_hal::if_unstable_hal! {
+                    #[cfg(not(esp32))]
+                    sleep::release_wake_source();
+                }
 
                 if let Err(e) = crate::wifi::wifi_deinit() {
                     warn!("Failed to cleanly deinit wifi: {:?}", e);
@@ -2688,7 +2726,7 @@ impl<'d> WifiController<'d> {
                 | WifiEvent::ScanDone,
         );
 
-        let radio_guard = RadioRefGuard::new();
+        let radio_guard = wifi_radio_guard();
 
         let first = WIFI_REFCOUNT.try_increment(|| -> Result<(), WifiError> {
             unsafe {
@@ -2737,6 +2775,11 @@ impl<'d> WifiController<'d> {
             TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
 
             crate::wifi::wifi_init(device)?;
+
+            esp_hal::if_unstable_hal! {
+                #[cfg(not(esp32))]
+                sleep::claim_wake_source();
+            }
 
             #[cfg(rng_trng_supported)]
             esp_hal::if_unstable_hal! {
@@ -2874,6 +2917,9 @@ impl WifiController<'_> {
 
     #[procmacros::doc_replace]
     /// Configures modem power saving.
+    ///
+    /// The different power saving options trade off power consumption and receive latency. See
+    /// [`PowerSaveMode`] for more information.
     ///
     /// ## Example
     ///
@@ -3072,6 +3118,11 @@ impl WifiController<'_> {
                 self.apply_sta_eap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)?;
             }
+        }
+
+        esp_hal::if_unstable_hal! {
+            #[cfg(not(esp32))]
+            sleep::set_station_only(mode == wifi_mode_t_WIFI_MODE_STA);
         }
 
         if previous_mode != mode {
@@ -3285,7 +3336,7 @@ ignored."
         esp_wifi_result!(wifi_start_scan(false, *config))?;
 
         // Prevents memory leak if `scan_async`'s future is dropped.
-        let guard = FreeApListOnDrop;
+        let guard = free_ap_list_on_drop();
 
         loop {
             let event = subscriber.next_message_pure().await;

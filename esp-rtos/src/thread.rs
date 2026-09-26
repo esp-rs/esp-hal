@@ -35,7 +35,7 @@
 //! static STACK: ConstStaticCell<Stack<4096>> = ConstStaticCell::new(Stack::new());
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+//! esp_rtos::start(timg0.timer0);
 //!
 //! let offset = 10;
 //! let handle = ThreadSpawner::from_static(STACK.take())

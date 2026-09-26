@@ -373,6 +373,9 @@ macro_rules! property {
     ("soc.cpu_has_csr_pc") => {
         true
     };
+    ("soc.cpu_has_zcmp_workaround") => {
+        false
+    };
     ("soc.multi_core_enabled") => {
         false
     };
@@ -421,6 +424,13 @@ macro_rules! property {
         [crate ::soc::clocks::RtcSlowClkConfig::OscSlow, crate
         ::soc::clocks::RtcSlowClkConfig::RcSlow, crate
         ::soc::clocks::RtcSlowClkConfig::RcFast]
+    };
+    ("clock_tree.ble_lp_clk.sclk") => {
+        [crate ::soc::clocks::BleLpClkSclk::Xtal, crate
+        ::soc::clocks::BleLpClkSclk::RcSlow]
+    };
+    ("clock_tree.ble_lp_clk.divisor") => {
+        (0, 255)
     };
     ("clock_tree.rtc_fast_clk") => {
         [crate ::soc::clocks::RtcFastClkConfig::Xtal, crate
@@ -647,21 +657,21 @@ macro_rules! for_each_interrupt {
         macro_rules! _for_each_inner_interrupt { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_interrupt!(([disabled 0] 0));
         _for_each_inner_interrupt!(([reserved 0] 1));
-        _for_each_inner_interrupt!(([direct_bindable 0] 2));
-        _for_each_inner_interrupt!(([direct_bindable 1] 3));
-        _for_each_inner_interrupt!(([direct_bindable 2] 4));
-        _for_each_inner_interrupt!(([direct_bindable 3] 5));
-        _for_each_inner_interrupt!(([direct_bindable 4] 6));
-        _for_each_inner_interrupt!(([direct_bindable 5] 7));
-        _for_each_inner_interrupt!(([direct_bindable 6] 8));
-        _for_each_inner_interrupt!(([direct_bindable 7] 9));
-        _for_each_inner_interrupt!(([direct_bindable 8] 10));
-        _for_each_inner_interrupt!(([direct_bindable 9] 11));
-        _for_each_inner_interrupt!(([direct_bindable 10] 12));
-        _for_each_inner_interrupt!(([direct_bindable 11] 13));
-        _for_each_inner_interrupt!(([direct_bindable 12] 14));
-        _for_each_inner_interrupt!(([direct_bindable 13] 15));
-        _for_each_inner_interrupt!(([direct_bindable 14] 16));
+        _for_each_inner_interrupt!(([context_switch 0] 2));
+        _for_each_inner_interrupt!(([direct_bindable 0] 3));
+        _for_each_inner_interrupt!(([direct_bindable 1] 4));
+        _for_each_inner_interrupt!(([direct_bindable 2] 5));
+        _for_each_inner_interrupt!(([direct_bindable 3] 6));
+        _for_each_inner_interrupt!(([direct_bindable 4] 7));
+        _for_each_inner_interrupt!(([direct_bindable 5] 8));
+        _for_each_inner_interrupt!(([direct_bindable 6] 9));
+        _for_each_inner_interrupt!(([direct_bindable 7] 10));
+        _for_each_inner_interrupt!(([direct_bindable 8] 11));
+        _for_each_inner_interrupt!(([direct_bindable 9] 12));
+        _for_each_inner_interrupt!(([direct_bindable 10] 13));
+        _for_each_inner_interrupt!(([direct_bindable 11] 14));
+        _for_each_inner_interrupt!(([direct_bindable 12] 15));
+        _for_each_inner_interrupt!(([direct_bindable 13] 16));
         _for_each_inner_interrupt!(([vector 0] 17)); _for_each_inner_interrupt!(([vector
         1] 18)); _for_each_inner_interrupt!(([vector 2] 19));
         _for_each_inner_interrupt!(([vector 3] 20)); _for_each_inner_interrupt!(([vector
@@ -673,11 +683,11 @@ macro_rules! for_each_interrupt {
         _for_each_inner_interrupt!(([vector 12] 29)); _for_each_inner_interrupt!(([vector
         13] 30)); _for_each_inner_interrupt!(([vector 14] 31));
         _for_each_inner_interrupt!((all([disabled 0] 0), ([reserved 0] 1),
-        ([direct_bindable 0] 2), ([direct_bindable 1] 3), ([direct_bindable 2] 4),
-        ([direct_bindable 3] 5), ([direct_bindable 4] 6), ([direct_bindable 5] 7),
-        ([direct_bindable 6] 8), ([direct_bindable 7] 9), ([direct_bindable 8] 10),
-        ([direct_bindable 9] 11), ([direct_bindable 10] 12), ([direct_bindable 11] 13),
-        ([direct_bindable 12] 14), ([direct_bindable 13] 15), ([direct_bindable 14] 16),
+        ([context_switch 0] 2), ([direct_bindable 0] 3), ([direct_bindable 1] 4),
+        ([direct_bindable 2] 5), ([direct_bindable 3] 6), ([direct_bindable 4] 7),
+        ([direct_bindable 5] 8), ([direct_bindable 6] 9), ([direct_bindable 7] 10),
+        ([direct_bindable 8] 11), ([direct_bindable 9] 12), ([direct_bindable 10] 13),
+        ([direct_bindable 11] 14), ([direct_bindable 12] 15), ([direct_bindable 13] 16),
         ([vector 0] 17), ([vector 1] 18), ([vector 2] 19), ([vector 3] 20), ([vector 4]
         21), ([vector 5] 22), ([vector 6] 23), ([vector 7] 24), ([vector 8] 25), ([vector
         9] 26), ([vector 10] 27), ([vector 11] 28), ([vector 12] 29), ([vector 13] 30),
@@ -690,20 +700,19 @@ macro_rules! for_each_classified_interrupt {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_classified_interrupt { $(($pattern) => $code;)*
         ($other : tt) => {} } _for_each_inner_classified_interrupt!(([direct_bindable 0]
-        2)); _for_each_inner_classified_interrupt!(([direct_bindable 1] 3));
-        _for_each_inner_classified_interrupt!(([direct_bindable 2] 4));
-        _for_each_inner_classified_interrupt!(([direct_bindable 3] 5));
-        _for_each_inner_classified_interrupt!(([direct_bindable 4] 6));
-        _for_each_inner_classified_interrupt!(([direct_bindable 5] 7));
-        _for_each_inner_classified_interrupt!(([direct_bindable 6] 8));
-        _for_each_inner_classified_interrupt!(([direct_bindable 7] 9));
-        _for_each_inner_classified_interrupt!(([direct_bindable 8] 10));
-        _for_each_inner_classified_interrupt!(([direct_bindable 9] 11));
-        _for_each_inner_classified_interrupt!(([direct_bindable 10] 12));
-        _for_each_inner_classified_interrupt!(([direct_bindable 11] 13));
-        _for_each_inner_classified_interrupt!(([direct_bindable 12] 14));
-        _for_each_inner_classified_interrupt!(([direct_bindable 13] 15));
-        _for_each_inner_classified_interrupt!(([direct_bindable 14] 16));
+        3)); _for_each_inner_classified_interrupt!(([direct_bindable 1] 4));
+        _for_each_inner_classified_interrupt!(([direct_bindable 2] 5));
+        _for_each_inner_classified_interrupt!(([direct_bindable 3] 6));
+        _for_each_inner_classified_interrupt!(([direct_bindable 4] 7));
+        _for_each_inner_classified_interrupt!(([direct_bindable 5] 8));
+        _for_each_inner_classified_interrupt!(([direct_bindable 6] 9));
+        _for_each_inner_classified_interrupt!(([direct_bindable 7] 10));
+        _for_each_inner_classified_interrupt!(([direct_bindable 8] 11));
+        _for_each_inner_classified_interrupt!(([direct_bindable 9] 12));
+        _for_each_inner_classified_interrupt!(([direct_bindable 10] 13));
+        _for_each_inner_classified_interrupt!(([direct_bindable 11] 14));
+        _for_each_inner_classified_interrupt!(([direct_bindable 12] 15));
+        _for_each_inner_classified_interrupt!(([direct_bindable 13] 16));
         _for_each_inner_classified_interrupt!(([vector 0] 17));
         _for_each_inner_classified_interrupt!(([vector 1] 18));
         _for_each_inner_classified_interrupt!(([vector 2] 19));
@@ -720,17 +729,19 @@ macro_rules! for_each_classified_interrupt {
         _for_each_inner_classified_interrupt!(([vector 13] 30));
         _for_each_inner_classified_interrupt!(([vector 14] 31));
         _for_each_inner_classified_interrupt!(([reserved 0] 1));
-        _for_each_inner_classified_interrupt!((direct_bindable([direct_bindable 0] 2),
-        ([direct_bindable 1] 3), ([direct_bindable 2] 4), ([direct_bindable 3] 5),
-        ([direct_bindable 4] 6), ([direct_bindable 5] 7), ([direct_bindable 6] 8),
-        ([direct_bindable 7] 9), ([direct_bindable 8] 10), ([direct_bindable 9] 11),
-        ([direct_bindable 10] 12), ([direct_bindable 11] 13), ([direct_bindable 12] 14),
-        ([direct_bindable 13] 15), ([direct_bindable 14] 16)));
+        _for_each_inner_classified_interrupt!(([context_switch 0] 2));
+        _for_each_inner_classified_interrupt!((direct_bindable([direct_bindable 0] 3),
+        ([direct_bindable 1] 4), ([direct_bindable 2] 5), ([direct_bindable 3] 6),
+        ([direct_bindable 4] 7), ([direct_bindable 5] 8), ([direct_bindable 6] 9),
+        ([direct_bindable 7] 10), ([direct_bindable 8] 11), ([direct_bindable 9] 12),
+        ([direct_bindable 10] 13), ([direct_bindable 11] 14), ([direct_bindable 12] 15),
+        ([direct_bindable 13] 16)));
         _for_each_inner_classified_interrupt!((vector([vector 0] 17), ([vector 1] 18),
         ([vector 2] 19), ([vector 3] 20), ([vector 4] 21), ([vector 5] 22), ([vector 6]
         23), ([vector 7] 24), ([vector 8] 25), ([vector 9] 26), ([vector 10] 27),
         ([vector 11] 28), ([vector 12] 29), ([vector 13] 30), ([vector 14] 31)));
         _for_each_inner_classified_interrupt!((reserved([reserved 0] 1)));
+        _for_each_inner_classified_interrupt!((context_switch([context_switch 0] 2)));
     };
 }
 #[macro_export]
@@ -970,6 +981,26 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // BLE_LP_XTAL_CLK
+///
+/// fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// // BLE_LP_CLK
+///
+/// fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_ble_lp_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<BleLpClkConfig>,
+///     _new_config: BleLpClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // RTC_FAST_CLK
 ///
 /// fn enable_rtc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1190,7 +1221,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1225,7 +1256,7 @@ macro_rules! define_clock_tree_types {
             pub const fn new(divisor: CpuPllDivDivisor) -> Self {
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1289,7 +1320,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1303,6 +1334,45 @@ macro_rules! define_clock_tree_types {
             RcSlow,
             /// Selects `RC_FAST_DIV_CLK`.
             RcFast,
+        }
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum BleLpClkSclk {
+            #[default]
+            /// Selects `BLE_LP_XTAL_CLK`.
+            Xtal,
+            /// Selects `RC_SLOW_CLK`.
+            RcSlow,
+        }
+        /// Configures the `BLE_LP_CLK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = sclk / (divisor + 1)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct BleLpClkConfig {
+            sclk: BleLpClkSclk,
+            divisor: u32,
+        }
+        impl BleLpClkConfig {
+            /// Creates a new configuration for the BLE_LP_CLK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 255).
+            pub const fn new(sclk: BleLpClkSclk, divisor: u32) -> Self {
+                ::core::assert!(
+                    divisor <= 255,
+                    "`BLE_LP_CLK` divisor must be between 0 and 255 (inclusive)."
+                );
+                Self { sclk, divisor }
+            }
+            pub fn sclk(self) -> BleLpClkSclk {
+                self.sclk
+            }
+            pub fn divisor(self) -> u32 {
+                self.divisor as u32
+            }
         }
         /// The list of clock signals that the `RTC_FAST_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1377,10 +1447,10 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { sclk, div_num }
             }
-            pub(crate) fn sclk(self) -> I2cFunctionClockSclk {
+            pub fn sclk(self) -> I2cFunctionClockSclk {
                 self.sclk
             }
-            pub(crate) fn div_num(self) -> u32 {
+            pub fn div_num(self) -> u32 {
                 self.div_num as u32
             }
         }
@@ -1448,10 +1518,10 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { sclk, div_num }
             }
-            pub(crate) fn sclk(self) -> UartFunctionClockSclk {
+            pub fn sclk(self) -> UartFunctionClockSclk {
                 self.sclk
             }
-            pub(crate) fn div_num(self) -> u32 {
+            pub fn div_num(self) -> u32 {
                 self.div_num as u32
             }
         }
@@ -1489,10 +1559,10 @@ macro_rules! define_clock_tree_types {
                     integral,
                 }
             }
-            pub(crate) fn fractional(self) -> u32 {
+            pub fn fractional(self) -> u32 {
                 self.fractional as u32
             }
-            pub(crate) fn integral(self) -> u32 {
+            pub fn integral(self) -> u32 {
                 self.integral as u32
             }
         }
@@ -1508,6 +1578,7 @@ macro_rules! define_clock_tree_types {
             cpu_clk: Option<CpuClkConfig>,
             rc_fast_clk_div_n: Option<RcFastClkDivNConfig>,
             rtc_slow_clk: Option<RtcSlowClkConfig>,
+            ble_lp_clk: Option<BleLpClkConfig>,
             rtc_fast_clk: Option<RtcFastClkConfig>,
             low_power_clk: Option<LowPowerClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
@@ -1526,6 +1597,7 @@ macro_rules! define_clock_tree_types {
             mspi_clk_refcount: u32,
             pll_40m_refcount: u32,
             pll_60m_refcount: u32,
+            ble_lp_clk_refcount: u32,
             rtc_fast_clk_refcount: u32,
             low_power_clk_refcount: u32,
             uart_mem_clk_refcount: u32,
@@ -1582,6 +1654,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the RTC_SLOW_CLK clock tree node
             pub fn rtc_slow_clk(&self) -> Option<RtcSlowClkConfig> {
                 self.rtc_slow_clk
+            }
+            /// Returns the current configuration of the BLE_LP_CLK clock tree node
+            pub fn ble_lp_clk(&self) -> Option<BleLpClkConfig> {
+                self.ble_lp_clk
             }
             /// Returns the current configuration of the RTC_FAST_CLK clock tree node
             pub fn rtc_fast_clk(&self) -> Option<RtcFastClkConfig> {
@@ -1640,6 +1716,7 @@ macro_rules! define_clock_tree_types {
                 cpu_clk: None,
                 rc_fast_clk_div_n: None,
                 rtc_slow_clk: None,
+                ble_lp_clk: None,
                 rtc_fast_clk: None,
                 low_power_clk: None,
                 timg_calibration_clock: None,
@@ -1658,6 +1735,7 @@ macro_rules! define_clock_tree_types {
                 mspi_clk_refcount: 0,
                 pll_40m_refcount: 0,
                 pll_60m_refcount: 0,
+                ble_lp_clk_refcount: 0,
                 rtc_fast_clk_refcount: 0,
                 low_power_clk_refcount: 0,
                 uart_mem_clk_refcount: 0,
@@ -1684,6 +1762,8 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static RTC_SLOW_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
+        static BLE_LP_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
         static RTC_FAST_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static LOW_POWER_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -1708,6 +1788,171 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static MSPI_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
+        /// The clock sources of the device.
+        ///
+        /// A clock source is a node of the clock tree that other nodes derive their output
+        /// from. Ask a node which source it runs on with its `..._root_source` function.
+        #[derive(Debug, enumset::EnumSetType)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum ClockSource {
+            /// `XTAL_CLK`.
+            XtalClk,
+            /// `RC_FAST_CLK`.
+            RcFastClk,
+            /// `OSC_SLOW_CLK`.
+            OscSlowClk,
+            /// `RC_SLOW_CLK`.
+            RcSlowClk,
+        }
+        /// Returns the clock source that `XTAL_CLK` currently runs on.
+        pub fn xtal_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::XtalClk)
+        }
+        /// Returns the clock source that `PLL_CLK` currently runs on.
+        pub fn pll_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `RC_FAST_CLK` currently runs on.
+        pub fn rc_fast_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::RcFastClk)
+        }
+        /// Returns the clock source that `OSC_SLOW_CLK` currently runs on.
+        pub fn osc_slow_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::OscSlowClk)
+        }
+        /// Returns the clock source that `RC_SLOW_CLK` currently runs on.
+        pub fn rc_slow_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::RcSlowClk)
+        }
+        /// Returns the clock source that `RC_FAST_DIV_CLK` currently runs on.
+        pub fn rc_fast_div_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            rc_fast_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `SYSTEM_PRE_DIV_IN` currently runs on.
+        pub fn system_pre_div_in_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.system_pre_div_in?;
+            match config {
+                SystemPreDivInConfig::Xtal => xtal_clk_root_source(clocks),
+                SystemPreDivInConfig::RcFast => rc_fast_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `SYSTEM_PRE_DIV` currently runs on.
+        pub fn system_pre_div_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            system_pre_div_in_root_source(clocks)
+        }
+        /// Returns the clock source that `CPU_PLL_DIV` currently runs on.
+        pub fn cpu_pll_div_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            pll_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `CPU_CLK` currently runs on.
+        pub fn cpu_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.cpu_clk?;
+            match config {
+                CpuClkConfig::Xtal => system_pre_div_root_source(clocks),
+                CpuClkConfig::RcFast => system_pre_div_root_source(clocks),
+                CpuClkConfig::Pll => cpu_pll_div_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `PLL_40M` currently runs on.
+        pub fn pll_40m_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            cpu_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `PLL_60M` currently runs on.
+        pub fn pll_60m_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            cpu_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `PLL_80M` currently runs on.
+        pub fn pll_80m_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            cpu_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `CPU_DIV2` currently runs on.
+        pub fn cpu_div2_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            cpu_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `RC_FAST_CLK_DIV_N` currently runs on.
+        pub fn rc_fast_clk_div_n_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            rc_fast_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `XTAL_DIV_CLK` currently runs on.
+        pub fn xtal_div_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `RTC_SLOW_CLK` currently runs on.
+        pub fn rtc_slow_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.rtc_slow_clk?;
+            match config {
+                RtcSlowClkConfig::OscSlow => osc_slow_clk_root_source(clocks),
+                RtcSlowClkConfig::RcSlow => rc_slow_clk_root_source(clocks),
+                RtcSlowClkConfig::RcFast => rc_fast_div_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `BLE_LP_XTAL_CLK` currently runs on.
+        pub fn ble_lp_xtal_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `BLE_LP_CLK` currently runs on.
+        pub fn ble_lp_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.ble_lp_clk?;
+            match config.sclk() {
+                BleLpClkSclk::Xtal => ble_lp_xtal_clk_root_source(clocks),
+                BleLpClkSclk::RcSlow => rc_slow_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `RTC_FAST_CLK` currently runs on.
+        pub fn rtc_fast_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.rtc_fast_clk?;
+            match config {
+                RtcFastClkConfig::Xtal => xtal_div_clk_root_source(clocks),
+                RtcFastClkConfig::Rc => rc_fast_clk_div_n_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `LOW_POWER_CLK` currently runs on.
+        pub fn low_power_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.low_power_clk?;
+            match config {
+                LowPowerClkConfig::Xtal => xtal_clk_root_source(clocks),
+                LowPowerClkConfig::RcFast => rc_fast_clk_root_source(clocks),
+                LowPowerClkConfig::OscSlow => osc_slow_clk_root_source(clocks),
+                LowPowerClkConfig::RtcSlow => rtc_slow_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `UART_MEM_CLK` currently runs on.
+        pub fn uart_mem_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `TIMG_CALIBRATION_CLOCK` currently runs on.
+        pub fn timg_calibration_clock_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.timg_calibration_clock?;
+            match config {
+                TimgCalibrationClockConfig::RcSlowClk => rc_slow_clk_root_source(clocks),
+                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_root_source(clocks),
+                TimgCalibrationClockConfig::Osc32kClk => osc_slow_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `APB_CLK` currently runs on.
+        pub fn apb_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.apb_clk?;
+            match config {
+                ApbClkConfig::Pll40m => pll_40m_root_source(clocks),
+                ApbClkConfig::Cpu => cpu_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `CRYPTO_CLK` currently runs on.
+        pub fn crypto_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.crypto_clk?;
+            match config {
+                CryptoClkConfig::Pll80m => pll_80m_root_source(clocks),
+                CryptoClkConfig::Cpu => cpu_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `MSPI_CLK` currently runs on.
+        pub fn mspi_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.mspi_clk?;
+            match config {
+                MspiClkConfig::CpuDiv2 => cpu_div2_root_source(clocks),
+                MspiClkConfig::Cpu => cpu_clk_root_source(clocks),
+            }
+        }
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
             let old_config = clocks.xtal_clk.replace(config);
             refresh_xtal_clk_downstream(clocks);
@@ -1757,8 +2002,29 @@ macro_rules! define_clock_tree_types {
                 enable_rc_fast_clk_impl(clocks, false);
             }
         }
-        pub fn rc_fast_clk_frequency() -> u32 {
+        static RC_FAST_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(rc_fast_clk_nominal_frequency());
+        pub const fn rc_fast_clk_nominal_frequency() -> u32 {
             17500000
+        }
+        pub fn rc_fast_clk_frequency() -> u32 {
+            RC_FAST_CLK_FREQUENCY.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn set_rc_fast_clk_frequency(clocks: &mut ClockTree, frequency: u32) {
+            if !(8750000..=26250000).contains(&frequency) {
+                warn!(
+                    "Ignoring out-of-range RC_FAST_CLK frequency: {} Hz",
+                    frequency
+                );
+                return;
+            }
+            debug!(
+                "Updating RC_FAST_CLK frequency to {} Hz (nominal {} Hz)",
+                frequency,
+                rc_fast_clk_nominal_frequency()
+            );
+            RC_FAST_CLK_FREQUENCY.store(frequency, ::core::sync::atomic::Ordering::Release);
+            refresh_rc_fast_clk_downstream(clocks);
         }
         pub fn request_osc_slow_clk(clocks: &mut ClockTree) {
             trace!("Requesting OSC_SLOW_CLK");
@@ -1791,8 +2057,29 @@ macro_rules! define_clock_tree_types {
                 enable_rc_slow_clk_impl(clocks, false);
             }
         }
-        pub fn rc_slow_clk_frequency() -> u32 {
+        static RC_SLOW_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(rc_slow_clk_nominal_frequency());
+        pub const fn rc_slow_clk_nominal_frequency() -> u32 {
             136000
+        }
+        pub fn rc_slow_clk_frequency() -> u32 {
+            RC_SLOW_CLK_FREQUENCY.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn set_rc_slow_clk_frequency(clocks: &mut ClockTree, frequency: u32) {
+            if !(68000..=204000).contains(&frequency) {
+                warn!(
+                    "Ignoring out-of-range RC_SLOW_CLK frequency: {} Hz",
+                    frequency
+                );
+                return;
+            }
+            debug!(
+                "Updating RC_SLOW_CLK frequency to {} Hz (nominal {} Hz)",
+                frequency,
+                rc_slow_clk_nominal_frequency()
+            );
+            RC_SLOW_CLK_FREQUENCY.store(frequency, ::core::sync::atomic::Ordering::Release);
+            refresh_rc_slow_clk_downstream(clocks);
         }
         pub fn request_rc_fast_div_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_FAST_DIV_CLK");
@@ -2362,6 +2649,84 @@ macro_rules! define_clock_tree_types {
                 RtcSlowClkConfig::OscSlow => osc_slow_clk_frequency(),
                 RtcSlowClkConfig::RcSlow => rc_slow_clk_frequency(),
                 RtcSlowClkConfig::RcFast => rc_fast_div_clk_frequency(),
+            }
+        }
+        pub fn request_ble_lp_xtal_clk(clocks: &mut ClockTree) {
+            trace!("Requesting BLE_LP_XTAL_CLK");
+            trace!("Enabling BLE_LP_XTAL_CLK");
+            request_xtal_clk(clocks);
+            enable_ble_lp_xtal_clk_impl(clocks, true);
+        }
+        pub fn release_ble_lp_xtal_clk(clocks: &mut ClockTree) {
+            trace!("Releasing BLE_LP_XTAL_CLK");
+            trace!("Disabling BLE_LP_XTAL_CLK");
+            enable_ble_lp_xtal_clk_impl(clocks, false);
+            release_xtal_clk(clocks);
+        }
+        pub fn ble_lp_xtal_clk_frequency() -> u32 {
+            (xtal_clk_frequency() / 5)
+        }
+        pub fn ble_lp_xtal_clk_source_frequency() -> u32 {
+            xtal_clk_frequency()
+        }
+        pub fn configure_ble_lp_clk(clocks: &mut ClockTree, config: BleLpClkConfig) {
+            let old_config = clocks.ble_lp_clk.replace(config);
+            refresh_ble_lp_clk_downstream(clocks);
+            if clocks.ble_lp_clk_refcount > 0 {
+                match config.sclk {
+                    BleLpClkSclk::Xtal => request_ble_lp_xtal_clk(clocks),
+                    BleLpClkSclk::RcSlow => request_rc_slow_clk(clocks),
+                }
+                configure_ble_lp_clk_impl(clocks, old_config, config);
+                if let Some(old_config) = old_config {
+                    match old_config.sclk {
+                        BleLpClkSclk::Xtal => release_ble_lp_xtal_clk(clocks),
+                        BleLpClkSclk::RcSlow => release_rc_slow_clk(clocks),
+                    }
+                }
+            } else {
+                configure_ble_lp_clk_impl(clocks, old_config, config);
+            }
+        }
+        pub fn ble_lp_clk_config(clocks: &mut ClockTree) -> Option<BleLpClkConfig> {
+            clocks.ble_lp_clk
+        }
+        pub fn request_ble_lp_clk(clocks: &mut ClockTree) {
+            trace!("Requesting BLE_LP_CLK");
+            if increment_reference_count(&mut clocks.ble_lp_clk_refcount) {
+                trace!("Enabling BLE_LP_CLK");
+                match unwrap!(clocks.ble_lp_clk).sclk {
+                    BleLpClkSclk::Xtal => request_ble_lp_xtal_clk(clocks),
+                    BleLpClkSclk::RcSlow => request_rc_slow_clk(clocks),
+                }
+                enable_ble_lp_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_ble_lp_clk(clocks: &mut ClockTree) {
+            trace!("Releasing BLE_LP_CLK");
+            if decrement_reference_count(&mut clocks.ble_lp_clk_refcount) {
+                trace!("Disabling BLE_LP_CLK");
+                enable_ble_lp_clk_impl(clocks, false);
+                match unwrap!(clocks.ble_lp_clk).sclk {
+                    BleLpClkSclk::Xtal => release_ble_lp_xtal_clk(clocks),
+                    BleLpClkSclk::RcSlow => release_rc_slow_clk(clocks),
+                }
+            }
+        }
+        #[allow(unused_variables)]
+        pub fn ble_lp_clk_config_frequency(clocks: &mut ClockTree, config: BleLpClkConfig) -> u32 {
+            (match config.sclk {
+                BleLpClkSclk::Xtal => ble_lp_xtal_clk_frequency(),
+                BleLpClkSclk::RcSlow => rc_slow_clk_frequency(),
+            } / (config.divisor() + 1))
+        }
+        pub fn ble_lp_clk_frequency() -> u32 {
+            BLE_LP_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn ble_lp_clk_source_frequency(sclk: BleLpClkSclk) -> u32 {
+            match sclk {
+                BleLpClkSclk::Xtal => ble_lp_xtal_clk_frequency(),
+                BleLpClkSclk::RcSlow => rc_slow_clk_frequency(),
             }
         }
         pub fn configure_rtc_fast_clk(clocks: &mut ClockTree, new_selector: RtcFastClkConfig) {
@@ -3077,6 +3442,8 @@ macro_rules! define_clock_tree_types {
             pub rc_fast_clk_div_n: Option<RcFastClkDivNConfig>,
             /// `RTC_SLOW_CLK` configuration.
             pub rtc_slow_clk: Option<RtcSlowClkConfig>,
+            /// `BLE_LP_CLK` configuration.
+            pub ble_lp_clk: Option<BleLpClkConfig>,
             /// `RTC_FAST_CLK` configuration.
             pub rtc_fast_clk: Option<RtcFastClkConfig>,
             /// `LOW_POWER_CLK` configuration.
@@ -3103,6 +3470,9 @@ macro_rules! define_clock_tree_types {
                 }
                 if let Some(config) = self.rtc_slow_clk {
                     configure_rtc_slow_clk(clocks, config);
+                }
+                if let Some(config) = self.ble_lp_clk {
+                    configure_ble_lp_clk(clocks, config);
                 }
                 if let Some(config) = self.rtc_fast_clk {
                     configure_rtc_fast_clk(clocks, config);
@@ -3134,6 +3504,7 @@ macro_rules! define_clock_tree_types {
             }
             refresh_system_pre_div_in_downstream(clocks);
             refresh_cpu_pll_div_downstream(clocks);
+            refresh_ble_lp_clk_downstream(clocks);
             refresh_rtc_fast_clk_downstream(clocks);
             refresh_low_power_clk_downstream(clocks);
             for child_instance in [I2cInstance::I2c0] {
@@ -3149,6 +3520,24 @@ macro_rules! define_clock_tree_types {
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
             }
+        }
+        fn refresh_rc_fast_clk_downstream(clocks: &mut ClockTree) {
+            refresh_system_pre_div_in_downstream(clocks);
+            refresh_rc_fast_clk_div_n_downstream(clocks);
+            refresh_rtc_slow_clk_downstream(clocks);
+            refresh_low_power_clk_downstream(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
+            for child_instance in [I2cInstance::I2c0] {
+                refresh_i2c_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
+                refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+        }
+        fn refresh_rc_slow_clk_downstream(clocks: &mut ClockTree) {
+            refresh_rtc_slow_clk_downstream(clocks);
+            refresh_ble_lp_clk_downstream(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
         }
         fn refresh_system_pre_div_in_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.system_pre_div_in {
@@ -3215,6 +3604,14 @@ macro_rules! define_clock_tree_types {
                 );
             }
             refresh_low_power_clk_downstream(clocks);
+        }
+        fn refresh_ble_lp_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.ble_lp_clk {
+                BLE_LP_CLK_FREQ_CACHE.store(
+                    ble_lp_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
         }
         fn refresh_rtc_fast_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.rtc_fast_clk {
@@ -3904,7 +4301,6 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((FLASH(unstable)));
         _for_each_inner_peripheral!((GPIO_DEDICATED(unstable)));
         _for_each_inner_peripheral!((WIFI));
-        _for_each_inner_peripheral!((FROM_CPU_INTR0(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR1(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR2(unstable)));
         _for_each_inner_peripheral!((FROM_CPU_INTR3(unstable)));
@@ -4075,10 +4471,9 @@ macro_rules! for_each_peripheral {
         (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SYSTEM(unstable)),
         (SYSTIMER(unstable)), (TIMG0(unstable)), (UART0), (UART1), (XTS_AES(unstable)),
         (ADC1(unstable)), (BT(unstable)), (FLASH(unstable)), (GPIO_DEDICATED(unstable)),
-        (WIFI), (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
-        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
-        _for_each_inner_peripheral!((dma_eligible(SPI2, Spi2, 0, AhbGdmaChannel), (SHA,
-        Sha, 7, AhbGdmaChannel)));
+        (WIFI), (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
+        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI2,
+        Spi2, 0, AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

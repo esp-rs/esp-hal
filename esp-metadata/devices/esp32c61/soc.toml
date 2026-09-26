@@ -128,6 +128,7 @@ support_status = "partial"
 status_registers = 3
 software_interrupt_count = 4
 controller = { Riscv = { flavour = "clic", interrupts = 32, priority_levels = 8 } }
+context_switch_source = "clint"
 
 [device.timergroup]
 support_status = "partial"

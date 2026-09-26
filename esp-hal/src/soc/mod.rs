@@ -14,6 +14,7 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32c6, path = "esp32c6/mod.rs")]
 #[cfg_attr(esp32c61, path = "esp32c61/mod.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2/mod.rs")]
+#[cfg_attr(esp32h4, path = "esp32h4/mod.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
@@ -366,6 +367,18 @@ pub(crate) fn enable_pmp() {
         end_addr: u32,
         permission: u8,
     ) -> Result<(), PmpError> {
+        let granularity = cfg_select! {
+            // this limits the effectiveness for these targets
+            // we could adjust the linker scripts to honor the granularity but that
+            // would waste some memory
+            //
+            // TODO: #6311 will be the proper metadata backed implementation
+            any(esp32c5, esp32c61, esp32p4, esp32s31) => 128,
+            _ => 4,
+        };
+        let start_addr = start_addr.next_multiple_of(granularity);
+        let end_addr = end_addr & !(granularity - 1);
+
         if start_addr >= end_addr {
             return Err(PmpError::InvalidRange);
         }

@@ -52,7 +52,7 @@ embassy-sync = "0.8"
 esp-alloc = { version = "0.11.0", path = "../esp-alloc", optional = true, default-features = false }
 esp-config = { version = "0.8.0", path = "../esp-config" }
 esp-sync = { version = "0.3.0", path = "../esp-sync" }
-esp-radio-rtos-driver = { version = "0.4.1", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
+esp-radio-rtos-driver = { version = "0.4.2", path = "../esp-radio-rtos-driver", features = ["ipc-implementations"], optional = true }
 macros = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 portable-atomic = { version = "1.11", default-features = false }
 
@@ -73,7 +73,7 @@ xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
 esp-config             = { version = "0.8.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.5.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [dev-dependencies]
 esp-hal = { version = "~1.2.0", path = "../esp-hal", features = ["unstable"] }
@@ -156,6 +156,13 @@ esp32h2 = [
     "esp-alloc?/esp32h2",
     "esp-metadata-generated/esp32h2",
     "esp-rom-sys/esp32h2",
+]
+##
+esp32h4 = [
+    "esp-hal/esp32h4",
+    "esp-alloc?/esp32h4",
+    "esp-metadata-generated/esp32h4",
+    "esp-rom-sys/esp32h4",
 ]
 ##
 esp32p4 = [

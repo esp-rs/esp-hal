@@ -16,7 +16,7 @@ use super::{
     pib::*,
 };
 use crate::{
-    radio_clocks::{clocks_ll::enable_ieee802154, deinit_radio_clocks, init_radio_clocks},
+    radio_clocks::{deinit_radio_clocks, enable_ieee802154, init_radio_clocks},
     sys::include::{
         ieee802154_coex_event_t,
         ieee802154_coex_event_t_IEEE802154_IDLE,

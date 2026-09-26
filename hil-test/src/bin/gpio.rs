@@ -58,7 +58,7 @@ struct Context {
     dedicated_gpio: DedicatedGpio<'static>,
 
     #[cfg(feature = "unstable")]
-    int1: esp_hal::peripherals::FROM_CPU_INTR1<'static>,
+    int1: esp_hal::peripherals::FROM_CPU_INTR2<'static>,
     #[cfg(all(multi_core, feature = "unstable"))]
     cpu_ctrl: esp_hal::peripherals::CPU_CTRL<'static>,
     #[cfg(all(multi_core, feature = "unstable"))]
@@ -161,8 +161,8 @@ mod tests {
         let int1 = {
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
-            esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
-            peripherals.FROM_CPU_INTR1
+            esp_rtos::start(timg0.timer0);
+            peripherals.FROM_CPU_INTR2
         };
 
         Context {
@@ -374,7 +374,7 @@ mod tests {
     async fn gpio_interrupt_enabled_on_other_core(mut ctx: Context) {
         let io_set_up = &*mk_static!(Signal::<CriticalSectionRawMutex, ()>, Signal::new());
 
-        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.int1, ctx.app_core_stack, move || {
+        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.app_core_stack, move || {
             // Set the interrupt handler for GPIO.
             ctx.io.set_interrupt_handler(interrupt_handler);
             io_set_up.signal(());
@@ -535,44 +535,6 @@ mod tests {
         assert_eq!(test_gpio2.is_set_low(), true);
     }
 
-    #[test]
-    #[cfg(all(feature = "unstable", lp_io_driver_supported))]
-    fn creating_a_driver_releases_the_hold_of_a_pad(mut ctx: Context) {
-        let probe = Input::new(
-            ctx.test_gpio2.reborrow(),
-            InputConfig::default().with_pull(Pull::None),
-        );
-
-        // A program that held the pad while it drove a high level.
-        {
-            let mut pin = Flex::new(ctx.test_gpio1.reborrow());
-            pin.apply_output_config(&OutputConfig::default());
-            pin.set_output_enable(true);
-            pin.set_high();
-
-            pin.set_pad_hold(true);
-            assert!(pin.is_pad_held(), "the pad does not report its hold");
-
-            pin.set_low();
-            ctx.delay.delay_millis(1);
-            assert_eq!(
-                probe.level(),
-                Level::High,
-                "the hold does not keep the level of the pad"
-            );
-        }
-
-        let mut pin = Flex::new(ctx.test_gpio1.reborrow());
-        pin.apply_output_config(&OutputConfig::default());
-        pin.set_output_enable(true);
-        pin.set_low();
-
-        assert!(!pin.is_pad_held(), "the pad still reports a hold");
-
-        ctx.delay.delay_millis(1);
-        assert_eq!(probe.level(), Level::Low, "the pad is still held");
-    }
-
     // Tests touch pin (GPIO2) as AnyPin and Output
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
@@ -616,7 +578,7 @@ mod tests {
         use esp_rtos::embassy::InterruptExecutor;
         use static_cell::StaticCell;
 
-        static INTERRUPT_EXECUTOR: StaticCell<InterruptExecutor<1>> = StaticCell::new();
+        static INTERRUPT_EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
         let interrupt_executor = INTERRUPT_EXECUTOR.init(InterruptExecutor::new(ctx.int1));
 
         let spawner = interrupt_executor.start(Priority::max());
@@ -690,17 +652,12 @@ mod tests {
         const CORE1_STACK_SIZE: usize = 8192;
         let app_core_stack = mk_static!(Stack<CORE1_STACK_SIZE>, Stack::new());
 
-        esp_rtos::start_second_core(
-            unsafe { CPU_CTRL::steal() },
-            ctx.int1,
-            app_core_stack,
-            move || {
-                let executor = mk_static!(Executor, Executor::new());
-                executor.run(|spawner| {
-                    spawner.spawn(edge_counter_task(in_pin, input_pin_listening).unwrap());
-                });
-            },
-        );
+        esp_rtos::start_second_core(unsafe { CPU_CTRL::steal() }, app_core_stack, move || {
+            let executor = mk_static!(Executor, Executor::new());
+            executor.run(|spawner| {
+                spawner.spawn(edge_counter_task(in_pin, input_pin_listening).unwrap());
+            });
+        });
 
         // Now drive the OutputPin and assert that the other core saw exactly as many
         // edges as we generated here.
@@ -789,7 +746,7 @@ mod tests {
 
         // creating the driver at core1, and then use it at core
         // this should panic
-        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.int1, ctx.app_core_stack, move || {
+        esp_rtos::start_second_core(ctx.cpu_ctrl, ctx.app_core_stack, move || {
             let input = Input::new(pin1, InputConfig::default().with_pull(Pull::Down));
             let driver = DedicatedGpioInput::new(ctx.dedicated_gpio.channel1.input, input);
 
@@ -917,6 +874,93 @@ mod tests {
                 }
             };
         }
+    }
+}
+
+// LP and HP pads have separate hold implementations, so each needs a connected pair of its own.
+#[cfg(all(feature = "unstable", lp_io_driver_supported))]
+#[embedded_test::tests(default_timeout = 3)]
+mod pad_hold {
+    use esp_hal::{
+        delay::Delay,
+        gpio::{AnyPin, Flex, Input, InputConfig, Level, OutputConfig, Pin, Pull},
+    };
+
+    struct Context {
+        lp_pad: AnyPin<'static>,
+        lp_probe: AnyPin<'static>,
+        #[cfg(not(esp32))]
+        hp_pad: AnyPin<'static>,
+        #[cfg(not(esp32))]
+        hp_probe: AnyPin<'static>,
+        delay: Delay,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (lp_pad, lp_probe) = hil_test::lp_test_pins!(peripherals);
+        #[cfg(not(esp32))]
+        let (hp_pad, hp_probe) = hil_test::hp_test_pins!(peripherals);
+
+        Context {
+            lp_pad: lp_pad.degrade(),
+            lp_probe: lp_probe.degrade(),
+            #[cfg(not(esp32))]
+            hp_pad: hp_pad.degrade(),
+            #[cfg(not(esp32))]
+            hp_probe: hp_probe.degrade(),
+            delay: Delay::new(),
+        }
+    }
+
+    fn creating_a_driver_releases_the_hold(
+        mut pad: AnyPin<'static>,
+        probe: AnyPin<'static>,
+        delay: Delay,
+    ) {
+        let probe = Input::new(probe, InputConfig::default().with_pull(Pull::None));
+
+        // A program that held the pad while it drove a high level.
+        {
+            let mut pin = Flex::new(pad.reborrow());
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
+            pin.set_high();
+
+            pin.set_pad_hold(true);
+            assert!(pin.is_pad_held(), "the pad does not report its hold");
+
+            pin.set_low();
+            delay.delay_millis(1);
+            assert_eq!(
+                probe.level(),
+                Level::High,
+                "the hold does not keep the level of the pad"
+            );
+        }
+
+        let mut pin = Flex::new(pad.reborrow());
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+        pin.set_low();
+
+        assert!(!pin.is_pad_held(), "the pad still reports a hold");
+
+        delay.delay_millis(1);
+        assert_eq!(probe.level(), Level::Low, "the pad is still held");
+    }
+
+    #[test]
+    fn creating_a_driver_releases_the_hold_of_an_lp_pad(ctx: Context) {
+        creating_a_driver_releases_the_hold(ctx.lp_pad, ctx.lp_probe, ctx.delay);
+    }
+
+    #[test]
+    #[cfg(not(esp32))]
+    fn creating_a_driver_releases_the_hold_of_an_hp_pad(ctx: Context) {
+        creating_a_driver_releases_the_hold(ctx.hp_pad, ctx.hp_probe, ctx.delay);
     }
 }
 

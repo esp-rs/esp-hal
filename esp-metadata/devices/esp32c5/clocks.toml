@@ -2,12 +2,12 @@ system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  values = "40, 48", output = "VALUE * 1_000_000", always_on = true }, # TODO: not user-configurable
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "480_000_000" },
-    { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
+    { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000", adjustable = "10_000_000..=30_000_000" },
 
     # Low-speed clocks
     { name = "XTAL32K_CLK",  type = "source", output = "32768", cfg = "use_xtal32k" },
     { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
-    { name = "RC_SLOW_CLK",  type = "source", output = "130_000" },
+    { name = "RC_SLOW_CLK",  type = "source", output = "130_000", adjustable = "65_000..=195_000" },
     # { name = "EXT32K_CLK",   type = "source", output = "32768" }, # currently unimplemented
 
     # PLL divider taps
@@ -50,7 +50,14 @@ system_clocks = { clock_tree = [
         #{ name = "EXT32K",   outputs = "EXT32K_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
-    
+    # BLE RTC timer (MODEM_LPCON). Independent of LP_SLOW_CLK.
+    { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "100_000" },
+    { name = "BLE_LP_CLK", type = "mux", variants = [
+        { name = "XTAL",    outputs = "BLE_LP_XTAL_CLK" },
+        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+        { name = "XTAL32K", outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
+    ] },
+
     # Global peripheral-related clocks
     { name = "CRYPTO_PLL_DIV", type = "generic", output = "PLL_CLK / 3" },
 

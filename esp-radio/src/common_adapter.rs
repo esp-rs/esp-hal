@@ -11,7 +11,10 @@ use crate::{
 };
 
 #[ram]
-#[cfg(any(feature = "coex", all(feature = "ble", bt_controller = "btdm")))]
+#[cfg(any(
+    feature = "coex",
+    all(feature = "ble", any(bt_controller = "btdm", bt_controller = "btdm2"))
+))]
 pub(crate) unsafe extern "C" fn is_in_isr() -> i32 {
     !hal::interrupt::RunLevel::current().is_thread() as i32
 }

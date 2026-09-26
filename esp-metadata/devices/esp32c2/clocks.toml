@@ -2,11 +2,11 @@ system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  values = "26, 40", output = "VALUE * 1_000_000", always_on = true },
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", output = "480_000_000" },
-    { name = "RC_FAST_CLK", type = "source",                     output = "17_500_000" },
+    { name = "RC_FAST_CLK", type = "source",                     output = "17_500_000", adjustable = "8_750_000..=26_250_000" },
 
     # Low-speed clocks
     { name = "OSC_SLOW_CLK",    type = "source",  output = "32768" }, # external slow clock from GPIO0
-    { name = "RC_SLOW_CLK",     type = "source",  output = "136_000" }, # adjustable via RTC_CNTL_ANA_CLK_DIV
+    { name = "RC_SLOW_CLK",     type = "source",  output = "136_000", adjustable = "68_000..=204_000" }, # adjustable via RTC_CNTL_ANA_CLK_DIV
     { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" }, # 256 is just the default value? RTC_CNTL_FOSC_DIV
 
     # CPU clock source dividers
@@ -52,6 +52,12 @@ system_clocks = { clock_tree = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST",  outputs = "RC_FAST_DIV_CLK" },
     ] },
+    # BLE RTC timer (MODEM_CLKRST). The crystal input is divided by 5 in hardware.
+    { name = "BLE_LP_XTAL_CLK", type = "generic", output = "XTAL_CLK / 5" },
+    { name = "BLE_LP_CLK", type = "generic", output = "sclk / (divisor + 1)", params = { sclk = [
+        { name = "XTAL", outputs = "BLE_LP_XTAL_CLK", default = true },
+        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+    ], divisor = "0 ..= 255" } },
     { name = "RTC_FAST_CLK", type = "mux", variants = [ # RTC_CNTL_FAST_CLK_RTC_SEL
         { name = "XTAL", outputs = "XTAL_DIV_CLK" },
         { name = "RC",   outputs = "RC_FAST_CLK_DIV_N" },

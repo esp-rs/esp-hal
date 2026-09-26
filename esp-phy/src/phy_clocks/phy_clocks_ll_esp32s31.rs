@@ -18,7 +18,7 @@ pub(crate) fn enable_phy(en: bool) {
             w.clk_modem_apb_st_map().bits(6);
             w.clk_modem_peri_st_map().bits(4);
             w.clk_wifi_st_map().bits(6);
-            w.clk_bt_st_map().bits(4);
+            w.clk_bt_st_map().bits(6);
             w.clk_fe_st_map().bits(6);
             w.clk_zb_st_map().bits(4)
         });
@@ -35,31 +35,38 @@ pub(crate) fn enable_phy(en: bool) {
     regs!(MODEM_SYSCON)
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_sel_160m().bit(en));
-
+    // `clk_wifipwr_en` stays on after the first enable. It drives the timer that wakes the modem
+    // for the next beacon, and the PHY is disabled at every doze.
     regs!(MODEM_LPCON).clk_conf().modify(|_, w| {
-        w.clk_i2c_mst_en().bit(en);
-        w.clk_coex_en().bit(en)
+        w.clk_coex_en().bit(en);
+        if en {
+            w.clk_wifipwr_en().set_bit();
+        }
+        w
     });
-
-    regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
-        w.clk_wifi_apb_en().bit(en);
-        w.clk_wifibb_22m_en().bit(en);
-        w.clk_fe_40m_en().bit(en);
-        w.clk_fe_80m_en().bit(en);
-        w.clk_wifibb_44m_en().bit(en);
-        w.clk_wifimac_en().bit(en)
-    });
-
-    regs!(MODEM_SYSCON)
-        .clk_conf1()
-        .modify(|r, w| unsafe { w.bits(r.bits() | 0x1fb) });
 
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
         w.clk_fe_apb_en().bit(en);
+        w.clk_fe_20m_en().bit(en);
+        w.clk_fe_40m_en().bit(en);
         w.clk_fe_80m_en().bit(en);
         w.clk_fe_160m_en().bit(en);
         w.clk_fe_dac_en().bit(en);
         w.clk_fe_pwdet_adc_en().bit(en);
-        w.clk_fe_adc_en().bit(en)
+        w.clk_fe_adc_en().bit(en);
+
+        // Treat this as shared, BLE needs it.
+        // Must be kept enabled or many things fail.
+        w.clk_wifi_apb_en().bit(true);
+        w.clk_wifibb_80x1_en().bit(true);
+
+        w.clk_wifibb_160x1_en().bit(en);
+        w.clk_wifibb_40x1_en().bit(en);
+        w.clk_wifibb_80x_en().bit(en);
+        w.clk_wifibb_40x_en().bit(en);
+        w.clk_wifibb_80m_en().bit(en);
+        w.clk_wifibb_44m_en().bit(en);
+        w.clk_wifibb_40m_en().bit(en);
+        w.clk_wifibb_22m_en().bit(en)
     });
 }

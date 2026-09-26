@@ -1,6 +1,6 @@
 [package]
 name          = "esp-metadata-generated"
-version       = "0.5.1"
+version       = "0.6.0"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "Generated metadata for Espressif devices"
@@ -29,6 +29,7 @@ esp32c5 = ["_device-selected"]
 esp32c6 = ["_device-selected"]
 esp32c61 = ["_device-selected"]
 esp32h2 = ["_device-selected"]
+esp32h4 = ["_device-selected"]
 esp32p4 = ["_device-selected"]
 esp32s2 = ["_device-selected"]
 esp32s3 = ["_device-selected"]

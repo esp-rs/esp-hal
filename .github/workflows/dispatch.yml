@@ -244,11 +244,6 @@ jobs:
       needs.auth.outputs.allowed == 'true' &&
       startsWith(github.event.comment.body, '/hil ')
     runs-on: ubuntu-latest
-    outputs:
-      run_id: ${{ steps.find-run.outputs.run_id }}
-      comment_id: ${{ steps.comment.outputs.comment-id }}
-      kind: ${{ steps.mode.outputs.kind }}
-      max_polls: ${{ steps.mode.outputs.max_polls }}
     steps:
       - uses: actions/checkout@v6 # for `require`
         with:
@@ -263,31 +258,23 @@ jobs:
             const chips = require('./.github/chips.json');
             const body = context.payload.comment.body;
 
-            // Even a quick run can legitimately take well over 15 minutes once
-            // queueing is counted, and a full one always does, so give every
-            // mode the same 45 minute budget (180 * 15s).
-            let mode, selected, kind, maxPolls = 180, error = '';
+            let mode, selected, error = '';
             if (body.startsWith('/hil quick')) {
               mode = 'quick';
               selected = chips.filter(c => c.quick).map(c => c.soc).join(' ');
-              kind = 'HIL (quick)';
             } else if (body.startsWith('/hil full')) {
               mode = 'full';
               selected = chips.map(c => c.soc).join(' ');
-              kind = 'HIL (full)';
             } else {
               mode = 'chips';
               const res = parseChips(body);
               selected = res.chips;
-              kind = 'HIL (per-chip)';
               error = res.error;
             }
 
             core.setOutput('selector', mode === 'chips' ? selected : mode);
             core.setOutput('mode', mode);
             core.setOutput('chips', selected);
-            core.setOutput('kind', kind);
-            core.setOutput('max_polls', String(maxPolls));
             core.setOutput('error', error);
             core.setOutput('tests', parseTests(body));
             core.setOutput('package', parsePackage(body));
@@ -325,7 +312,7 @@ jobs:
           script: |
             const { findHilRun } = require('./.github/scripts/hil-find-run.js');
 
-            const { runId, body } = await findHilRun({
+            const { body } = await findHilRun({
               github,
               context,
               pr: context.payload.issue.number,
@@ -333,40 +320,14 @@ jobs:
               distinctId: '${{ env.DISTINCT_ID }}',
             });
 
-            core.setOutput('run_id', runId);
             core.setOutput('body', body);
 
       - name: Confirm in PR
         if: steps.mode.outputs.chips != ''
-        id: comment
         uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.issue.number }}
           body: ${{ steps.find-run.outputs.body }}
-
-  hil-status:
-    needs: hil
-    if: needs.hil.outputs.run_id != '' && needs.hil.outputs.comment_id != ''
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6 # for `require`
-        with:
-          fetch-depth: 1
-
-      - name: Wait for HIL run and update comment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { pollRun } = require('./.github/scripts/hil-status.js');
-
-            await pollRun({
-              github,
-              context,
-              runId: Number('${{ needs.hil.outputs.run_id }}'),
-              commentId: Number('${{ needs.hil.outputs.comment_id }}'),
-              kind: '${{ needs.hil.outputs.kind }}',
-              maxPolls: Number('${{ needs.hil.outputs.max_polls }}'),
-            });
 
   hil-deny:
     needs: auth

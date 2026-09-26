@@ -83,13 +83,12 @@ peripherals = [
     { name = "XTS_AES" },
 
     { name = "ADC1", virtual = true },
-    { name = "ADC2", virtual = true },
     { name = "BT", virtual = true, interrupts = { rwbt = "RWBT", rwble = "RWBLE", bb = "BT_BB" } },
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "TSENS", virtual = true },
     { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
-    { name = "FROM_CPU_INTR0", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
     { name = "FROM_CPU_INTR1", virtual = true },
     { name = "FROM_CPU_INTR2", virtual = true },
     { name = "FROM_CPU_INTR3", virtual = true },
@@ -100,9 +99,14 @@ peripherals = [
 
 [device.adc]
 support_status = "partial"
+# ADC2 is deliberately absent. Its digital controller is broken on this chip and the chip has no
+# RTC ADC controller to fall back on, so there is no way to read it reliably. ESP-IDF refuses to
+# create a one-shot unit for it unless `CONFIG_ADC_ONESHOT_FORCE_USE_ADC2_ON_C3` is set.
+#
+# See `SOC_ADC_DIG_SUPPORTED_UNIT` in `components/soc/esp32c3/include/soc/soc_caps.h`, and the
+# ESP32-C3 series SoC errata.
 instances = [
     { name = "adc1" },
-    { name = "adc2" },
 ]
 
 [device.aes]
@@ -183,7 +187,9 @@ instances = [
 support_status = "partial"
 status_registers = 2
 software_interrupt_count = 4
-controller = { Riscv = { flavour = "basic", interrupts = 32, priority_levels = 15 } }
+controller = { Riscv = { flavour = "basic", interrupts = 32, priority_levels = 15, context_switch_interrupt = true } }
+# The CPU has no CLINT.
+context_switch_source = "from_cpu"
 
 [device.rmt]
 support_status = "partial"

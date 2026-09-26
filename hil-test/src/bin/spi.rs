@@ -1521,11 +1521,7 @@ mod half_duplex_write_psram {
         dma_rx_buffer,
         gpio::{Flex, interconnect::InputSignal},
         pcnt::{channel::EdgeMode, unit::Unit},
-        spi::{
-            Mode,
-            master::{Address, Command, Config, DataMode, Spi, SpiDma},
-        },
-        time::Rate,
+        spi::master::{Address, Command, DataMode, Spi, SpiDma},
     };
 
     use super::*;
@@ -1869,6 +1865,57 @@ mod read {
         .unwrap();
 
         assert_eq!(buffer.as_slice(), &[0xFF; DMA_BUFFER_SIZE]);
+    }
+
+    /// A DMA transfer must not leave the descriptor link armed.
+    ///
+    /// PDMA chips (ESP32, ESP32-S2) have no DMA enable bit in `dma_conf`: the
+    /// peripheral reads from the descriptors instead of the FIFO for as long as
+    /// a link is armed, so `disable_dma` has to clear them. Without that, the
+    /// CPU-driven transfer that follows a DMA transfer is routed into the
+    /// previous transfer's descriptors: the received data lands in the DMA
+    /// buffer and the CPU reads back the bytes it just wrote into the FIFO.
+    ///
+    /// Note that a plain loopback cannot catch this. There the CPU transfer
+    /// reads back what it wrote whether or not the link is stale, which is why
+    /// this drives MISO to a level of its own and flips it between the two
+    /// transfers. A transfer that is really sampling the pin follows the flip;
+    /// one that is reading a stale FIFO cannot, and echoes `CPU_TX` instead.
+    #[test]
+    #[cfg(spi_master_supports_dma)]
+    fn cpu_transfer_works_after_dma_transfer(mut ctx: Context) {
+        const CPU_LEN: usize = 4;
+        const DMA_LEN: usize = 64;
+        /// Distinct from both mirror levels, so a stale FIFO cannot look like a
+        /// correctly sampled pin.
+        const CPU_TX: [u8; CPU_LEN] = [0xde, 0xad, 0xbe, 0xef];
+
+        // Transfers shorter than this are driven by the CPU.
+        ctx.spi
+            .apply_config(&half_duplex_config().with_min_async_transfer_size(CPU_LEN + 1))
+            .unwrap();
+
+        let mut spi = ctx.spi.with_dma(ctx.dma_channel).with_buffers(
+            dma_rx_buffer!(DMA_LEN).unwrap(),
+            dma_tx_buffer!(DMA_LEN).unwrap(),
+        );
+
+        for (dma_level, cpu_level) in [(Level::Low, Level::High), (Level::High, Level::Low)] {
+            let dma_expected = if dma_level == Level::High { 0xFF } else { 0x00 };
+            let cpu_expected = if cpu_level == Level::High { 0xFF } else { 0x00 };
+
+            // Long enough to go through DMA, which arms the link.
+            ctx.miso_mirror.set_level(dma_level);
+            let mut dma_rx = [0xAA; DMA_LEN];
+            spi.transfer(&mut dma_rx, &[0x00; DMA_LEN]).unwrap();
+            assert_eq!(dma_rx.as_slice(), &[dma_expected; DMA_LEN]);
+
+            // Below the threshold, so this one goes through the FIFO.
+            ctx.miso_mirror.set_level(cpu_level);
+            let mut cpu_rx = [0xAA; CPU_LEN];
+            spi.transfer(&mut cpu_rx, &CPU_TX).unwrap();
+            assert_eq!(cpu_rx.as_slice(), &[cpu_expected; CPU_LEN]);
+        }
     }
 
     #[test]

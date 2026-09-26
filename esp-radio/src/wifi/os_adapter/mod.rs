@@ -764,7 +764,11 @@ pub unsafe extern "C" fn dport_access_stall_other_cpu_end_wrap() {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_pm_sleep_lock_acquire() {
-    trace!("wifi_pm_sleep_lock_acquire - no-op")
+    trace!("wifi_pm_sleep_lock_acquire");
+    esp_hal::if_unstable_hal! {
+        #[cfg(not(esp32))]
+        super::sleep::acquire_sleep_lock();
+    }
 }
 /// **************************************************************************
 /// Name: wifi_pm_sleep_lock_release
@@ -774,7 +778,11 @@ pub unsafe extern "C" fn wifi_pm_sleep_lock_acquire() {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_pm_sleep_lock_release() {
-    trace!("wifi_pm_sleep_lock_release - no-op")
+    trace!("wifi_pm_sleep_lock_release");
+    esp_hal::if_unstable_hal! {
+        #[cfg(not(esp32))]
+        super::sleep::release_sleep_lock();
+    }
 }
 
 #[cfg(wifi_has_wifi6)]
@@ -835,6 +843,24 @@ pub unsafe extern "C" fn phy_enable() {
     trace!("phy_enable");
     // Wi-Fi modem enable: also sets Wi-Fi RX (unlike the common-clock gate).
     esp_phy::enable_phy_with_wifi_rx();
+
+    // ESP-IDF turns off the baseband idle check (maximum 139 ms) to prevent an unexpected
+    // RXTXPANIC.
+    #[cfg(any(esp32c5, esp32c61, esp32s31))]
+    unsafe {
+        unsafe extern "C" {
+            fn set_bb_wdg(
+                busy_chk: bool,
+                srch_chk: bool,
+                max_busy: u16,
+                max_srch: u16,
+                rst_en: bool,
+                int_en: bool,
+                clr: bool,
+            );
+        }
+        set_bb_wdg(true, false, 0x18, 0xaa, false, false, false);
+    }
 }
 
 /// **************************************************************************
@@ -847,9 +873,9 @@ pub unsafe extern "C" fn phy_enable() {
 #[allow(clippy::unnecessary_cast)]
 pub unsafe extern "C" fn phy_update_country_info(country: *const c_char) -> c_int {
     unsafe {
-        // not implemented in original code
+        // FIXME
         trace!("phy_update_country_info {}", str_from_c(country.cast()));
-        -1
+        0
     }
 }
 
@@ -886,7 +912,7 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    crate::radio_clocks::clocks_ll::enable_wifi(true);
+    crate::radio_clocks::enable_wifi(true);
 }
 
 /// **************************************************************************
@@ -904,7 +930,7 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
-    crate::radio_clocks::clocks_ll::enable_wifi(false);
+    crate::radio_clocks::enable_wifi(false);
 }
 
 /// **************************************************************************
@@ -1503,23 +1529,16 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
 pub unsafe extern "C" fn slowclk_cal_get() -> u32 {
     trace!("slowclk_cal_get");
 
-    // TODO not hardcode this
+    // esp-hal stores the RTC slow clock period in STORE1, in microseconds, with 19 fractional
+    // bits. The Wi-Fi driver expects 12 fractional bits.
+    const RTC_CLK_CAL_FRACT: u32 = 19;
+    const WIFI_LIGHT_SLEEP_CLK_WIDTH: u32 = 12;
 
-    #[cfg(esp32s2)]
-    return 44462;
+    let period = cfg_select! {
+        esp32s31 => regs!(LP_SYS).lp_store(1).read().bits(),
+        soc_has_lp_aon => regs!(LP_AON).store1().read().bits(),
+        _ => regs!(RTC_CNTL).store1().read().bits(),
+    };
 
-    #[cfg(esp32s3)]
-    return 44462;
-
-    #[cfg(esp32c3)]
-    return 28639;
-
-    #[cfg(esp32c2)]
-    return 28639;
-
-    #[cfg(any(esp32c6, esp32h2, esp32c5, esp32c61, esp32s31))]
-    return 0;
-
-    #[cfg(esp32)]
-    return 28639;
+    period >> (RTC_CLK_CAL_FRACT - WIFI_LIGHT_SLEEP_CLK_WIDTH)
 }
