@@ -51,6 +51,10 @@ struct IeeeState {
     /// isr_handle_ack_rx_done and stop_rx_ack). Cleared at the start of
     /// each transmit.
     ack_frame: Option<RawReceived>,
+    /// Set by [`ieee802154_sleep`] while a frame or its ACK is still on the
+    /// air, so that the operation completes and `next_operation` then stays
+    /// idle instead of re-enabling RX.
+    sleep_pending: bool,
 }
 
 static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
@@ -59,6 +63,7 @@ static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
     rx_queue_size: 10,
     pending_tx: None,
     ack_frame: None,
+    sleep_pending: false,
 });
 
 unsafe extern "C" {
@@ -224,6 +229,8 @@ static mut TX_FRAME: *const u8 = core::ptr::null();
 
 pub fn ieee802154_transmit(frame: *const u8, cca: bool) -> i32 {
     STATE.with(|state| {
+        state.sleep_pending = false;
+
         // TX deferral: don't abort in-flight frame reception or ACK transmission.
         // Matches the C driver's ieee802154_transmit() which defers to pending_tx.
         if state.state == Ieee802154State::TxAck
@@ -261,6 +268,8 @@ fn transmit_internal(state: &mut IeeeState, frame: *const u8, cca: bool) {
 
 pub fn ieee802154_receive() -> i32 {
     STATE.with(|state| {
+        state.sleep_pending = false;
+
         if state.state == Ieee802154State::Receive || state.state == Ieee802154State::TxAck {
             // already in rx or tx_ack state, don't abort current operation
             return;
@@ -270,6 +279,37 @@ pub fn ieee802154_receive() -> i32 {
         enable_rx();
 
         state.state = Ieee802154State::Receive;
+    });
+
+    0 // ESP-OK
+}
+
+// https://github.com/espressif/esp-idf/blob/30aaf64524299d3bde422ca9a2848090d1bc5d0f/components/ieee802154/driver/esp_ieee802154_dev.c#L1074-L1084
+/// Matches the C driver's `ieee802154_sleep`, except for `IEEE802154_RF_DISABLE`:
+/// the PHY stays enabled for the lifetime of the driver.
+///
+/// Unlike the C driver, an operation that has a frame on the air (a transmit,
+/// its ACK wait, an ACK being sent, or a frame being received) is not aborted:
+/// this driver hands a received frame to the upper layer before its ACK is
+/// sent, so a sleep request can arrive mid-ACK. Aborting then would lose the
+/// frame or its ACK. The operation completes, and `next_operation` stays idle.
+pub fn ieee802154_sleep() -> i32 {
+    STATE.with(|state| {
+        let on_air = match state.state {
+            Ieee802154State::Idle => false,
+            Ieee802154State::Receive => is_current_rx_frame(),
+            Ieee802154State::Transmit
+            | Ieee802154State::TxAck
+            | Ieee802154State::RxAck
+            | Ieee802154State::TxEnhAck => true,
+        };
+
+        if on_air || state.pending_tx.is_some() {
+            state.sleep_pending = true;
+        } else {
+            stop_current_operation_inner(state);
+            state.state = Ieee802154State::Idle;
+        }
     });
 
     0 // ESP-OK
@@ -489,6 +529,8 @@ fn next_operation_inner(state: &mut IeeeState) {
         // Clear any stale RX abort events created during deferral
         clear_events(Event::RxAbort as u16);
         transmit_internal(state, pending.frame, pending.cca);
+    } else if core::mem::take(&mut state.sleep_pending) {
+        set_cmd(Command::Stop);
     } else if ieee802154_pib_get_rx_when_idle() {
         enable_rx();
         state.state = Ieee802154State::Receive;
