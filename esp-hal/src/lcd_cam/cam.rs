@@ -230,7 +230,6 @@ impl<'d> Camera<'d> {
             }
         });
 
-        // Preserve the camera clock fields in CAM_CTRL on ESP32-S3.
         self.regs().cam_ctrl().modify(|_, w| unsafe {
             w.cam_vsync_filter_thres().bits(
                 config
