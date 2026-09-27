@@ -65,6 +65,25 @@
 //!
 //! # {after_snippet}
 //! ```
+//!
+//! ## Asynchronous Reception
+//!
+//! [`Camera::into_async`] enables DMA interrupt-driven EOF waits. The EOF
+//! boundary is selected by [`Config::with_eof_mode`]. Call
+//! [`CameraTransfer::stop`] after waiting to return the camera and buffer.
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! # use esp_hal::{dma_rx_buffer, lcd_cam::{LcdCam, cam::{Camera, Config, EofMode}}};
+//! # let camera = Camera::new(LcdCam::new(peripherals.LCD_CAM).cam,
+//! #     peripherals.__dma_channel__, Config::default().with_eof_mode(EofMode::ByteLen(2499)))?;
+//! # let buffer = dma_rx_buffer!(2500).unwrap();
+//! let camera = camera.into_async();
+//! let mut transfer = camera.receive(buffer).map_err(|(error, _, _)| error)?;
+//! transfer.wait_for_dma_eof().await?;
+//! let (camera, buffer) = transfer.stop();
+//! # {after_snippet}
+//! ```
 
 use core::{
     mem::ManuallyDrop,
@@ -72,8 +91,10 @@ use core::{
 };
 
 use crate::{
+    Async,
     Blocking,
-    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer},
+    DriverMode,
+    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, DmaRxInterrupt, asynch::DmaRxFuture},
     gpio::{
         InputConfig,
         InputSignal,
@@ -175,12 +196,12 @@ impl Drop for Cam<'_> {
 }
 
 /// Represents the camera interface with DMA support.
-pub struct Camera<'d> {
+pub struct Camera<'d, Dm: DriverMode = Blocking> {
     cam: Cam<'d>,
-    rx_channel: ChannelRx<Blocking, ErasedRxChannel<'d>>,
+    rx_channel: ChannelRx<Dm, ErasedRxChannel<'d>>,
 }
 
-impl<'d> Camera<'d> {
+impl<'d> Camera<'d, Blocking> {
     /// Creates a new `Camera` instance with DMA support.
     pub fn new(
         cam: Cam<'d>,
@@ -197,6 +218,26 @@ impl<'d> Camera<'d> {
         Ok(this)
     }
 
+    /// Reconfigures the DMA channel for asynchronous operation.
+    pub fn into_async(self) -> Camera<'d, Async> {
+        Camera {
+            cam: self.cam,
+            rx_channel: self.rx_channel.into_async(),
+        }
+    }
+}
+
+impl<'d> Camera<'d, Async> {
+    /// Reconfigures the DMA channel for blocking operation.
+    pub fn into_blocking(self) -> Camera<'d, Blocking> {
+        Camera {
+            cam: self.cam,
+            rx_channel: self.rx_channel.into_blocking(),
+        }
+    }
+}
+
+impl<Dm: DriverMode> Camera<'_, Dm> {
     fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
         self.cam.lcd_cam.register_block()
     }
@@ -274,7 +315,7 @@ impl<'d> Camera<'d> {
     }
 }
 
-impl<'d> Camera<'d> {
+impl<'d, Dm: DriverMode> Camera<'d, Dm> {
     /// Configures the master clock (MCLK) pin for the camera interface.
     pub fn with_master_clock(self, mclk: impl PeripheralOutput<'d>) -> Self {
         let mclk = mclk.into();
@@ -427,7 +468,7 @@ impl<'d> Camera<'d> {
     pub fn receive<BUF: DmaRxBuffer>(
         mut self,
         mut buf: BUF,
-    ) -> Result<CameraTransfer<'d, BUF>, (DmaError, Self, BUF)> {
+    ) -> Result<CameraTransfer<'d, BUF, Dm>, (DmaError, Self, BUF)> {
         // Reset Camera control unit and Async Rx FIFO
         self.regs()
             .cam_ctrl1()
@@ -467,18 +508,20 @@ impl<'d> Camera<'d> {
         Ok(CameraTransfer {
             camera: ManuallyDrop::new(self),
             buffer_view: ManuallyDrop::new(buf.into_view()),
+            eof_result: None,
         })
     }
 }
 
 /// Represents an ongoing (or potentially stopped) transfer from the Camera to a
 /// DMA buffer.
-pub struct CameraTransfer<'d, BUF: DmaRxBuffer> {
-    camera: ManuallyDrop<Camera<'d>>,
+pub struct CameraTransfer<'d, BUF: DmaRxBuffer, Dm: DriverMode = Blocking> {
+    camera: ManuallyDrop<Camera<'d, Dm>>,
     buffer_view: ManuallyDrop<BUF::View>,
+    eof_result: Option<Result<(), DmaError>>,
 }
 
-impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
+impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> CameraTransfer<'d, BUF, Dm> {
     /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         // This peripheral doesn't really "complete". As long the camera (or anything
@@ -506,7 +549,7 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(mut self) -> (Camera<'d>, BUF::Final) {
+    pub fn stop(mut self) -> (Camera<'d, Dm>, BUF::Final) {
         self.stop_peripherals();
         let (camera, view) = self.release();
         (camera, BUF::from_view(view))
@@ -517,7 +560,7 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
     /// The camera does not really "finish" its transfer, so this typically
     /// waits for a DMA error. Call [`Self::stop`] once the needed data is
     /// available.
-    pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d>, BUF::Final) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
         // Stop the DMA as it doesn't know that the camera has stopped.
@@ -525,18 +568,21 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
 
         // Note: There is no "done" interrupt to clear.
 
-        let (camera, view) = self.release();
-
-        let result = if camera.rx_channel.has_error() {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
+        let errors = DmaRxInterrupt::DescriptorError
+            | DmaRxInterrupt::DescriptorEmpty
+            | DmaRxInterrupt::ErrorEof;
+        let interrupts = self.camera.rx_channel.pending_in_interrupts();
+        let result = match self.eof_result {
+            Some(Err(error)) => Err(error),
+            _ if !interrupts.is_disjoint(errors) => Err(DmaError::DescriptorError),
+            _ => Ok(()),
         };
+        let (camera, view) = self.release();
 
         (result, camera, BUF::from_view(view))
     }
 
-    fn release(mut self) -> (Camera<'d>, BUF::View) {
+    fn release(mut self) -> (Camera<'d, Dm>, BUF::View) {
         // SAFETY: Since forget is called on self, we know that self.camera and
         // self.buffer_view won't be touched again.
         let result = unsafe {
@@ -560,7 +606,36 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
     }
 }
 
-impl<BUF: DmaRxBuffer> Deref for CameraTransfer<'_, BUF> {
+impl<BUF: DmaRxBuffer> CameraTransfer<'_, BUF, Async> {
+    /// Waits for a DMA EOF or receive error in this transfer.
+    ///
+    /// The EOF boundary is configured by [`Config::with_eof_mode`].
+    /// Reception can start partway through a frame, so EOF alone does not
+    /// guarantee that a complete frame has been received.
+    ///
+    /// This does not stop the camera or DMA. Call [`Self::stop`] to return
+    /// the camera and buffer. Subsequent calls return the same result immediately.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DmaError::DescriptorError`] if DMA reports an invalid
+    /// descriptor, descriptor exhaustion, or an error EOF.
+    /// Receive errors take precedence over a pending EOF.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// Dropping the future does not stop the camera or DMA. The wait can be retried.
+    pub async fn wait_for_dma_eof(&mut self) -> Result<(), DmaError> {
+        if let Some(result) = self.eof_result {
+            return result;
+        }
+        let result = DmaRxFuture::new(&mut self.camera.rx_channel).await;
+        self.eof_result = Some(result);
+        result
+    }
+}
+
+impl<BUF: DmaRxBuffer, Dm: DriverMode> Deref for CameraTransfer<'_, BUF, Dm> {
     type Target = BUF::View;
 
     fn deref(&self) -> &Self::Target {
@@ -568,13 +643,13 @@ impl<BUF: DmaRxBuffer> Deref for CameraTransfer<'_, BUF> {
     }
 }
 
-impl<BUF: DmaRxBuffer> DerefMut for CameraTransfer<'_, BUF> {
+impl<BUF: DmaRxBuffer, Dm: DriverMode> DerefMut for CameraTransfer<'_, BUF, Dm> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<BUF: DmaRxBuffer> Drop for CameraTransfer<'_, BUF> {
+impl<BUF: DmaRxBuffer, Dm: DriverMode> Drop for CameraTransfer<'_, BUF, Dm> {
     fn drop(&mut self) {
         self.stop_peripherals();
 
