@@ -38,3 +38,15 @@ pub(crate) fn pre_init() {
         .func_ctrl()
         .write(|w| unsafe { w.bits(0x0) });
 }
+
+/// Invalidate a specific range of addresses in the cache.
+#[cfg(feature = "unstable")]
+#[crate::ram]
+pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_Invalidate_Addr(addr, size);
+    }
+}
