@@ -25,7 +25,7 @@ use esp_hal::{
         ExtendedId,
         Frame,
         FrameError,
-        FrameKinds,
+        FrameFormats,
         Id,
         MaskFilter,
         MaskFilterConfig,
@@ -320,17 +320,10 @@ mod blocking_tests {
     #[test]
     fn mask_filter_accepts_and_rejects(mut ctx: Context<Blocking>) {
         // Accept 0x220..=0x22F.
-        ctx.canfd
-            .set_mask_filter(
-                MaskFilter::A,
-                &MaskFilterConfig {
-                    id: 0x220,
-                    mask: 0x7F0,
-                    extended: false,
-                    accepts: FrameKinds::ALL,
-                },
-            )
-            .unwrap();
+        ctx.canfd.set_mask_filter(
+            MaskFilter::A,
+            &MaskFilterConfig::standard(std(0x220), std(0x7F0)),
+        );
         ctx.canfd.disable_mask_filter(MaskFilter::B);
         ctx.canfd.disable_mask_filter(MaskFilter::C);
         ctx.canfd.disable_range_filter();
@@ -345,13 +338,7 @@ mod blocking_tests {
     fn range_filter_accepts_and_rejects(mut ctx: Context<Blocking>) {
         ctx.canfd.disable_mask_filter(MaskFilter::A);
         ctx.canfd
-            .set_range_filter(&RangeFilterConfig {
-                low: 0x400,
-                high: 0x40F,
-                extended: false,
-                accepts: FrameKinds::ALL,
-            })
-            .unwrap();
+            .set_range_filter(&RangeFilterConfig::standard(std(0x400), std(0x40F)));
 
         assert!(accepted(&mut ctx.canfd, std(0x400)), "0x400 must pass");
         assert!(accepted(&mut ctx.canfd, std(0x408)), "0x408 must pass");
@@ -364,22 +351,10 @@ mod blocking_tests {
 
     #[test]
     fn filters_can_reject_fd_frames_alone(mut ctx: Context<Blocking>) {
-        ctx.canfd
-            .set_mask_filter(
-                MaskFilter::A,
-                &MaskFilterConfig {
-                    id: 0,
-                    mask: 0,
-                    extended: false,
-                    accepts: FrameKinds {
-                        classic_standard: true,
-                        classic_extended: true,
-                        fd_standard: false,
-                        fd_extended: false,
-                    },
-                },
-            )
-            .unwrap();
+        ctx.canfd.set_mask_filter(
+            MaskFilter::A,
+            &MaskFilterConfig::standard(std(0), std(0)).with_formats(FrameFormats::Classic),
+        );
         ctx.canfd.disable_range_filter();
 
         assert!(accepted(&mut ctx.canfd, std(0x123)), "classic must pass");
@@ -453,7 +428,8 @@ mod blocking_tests {
     fn a_clean_bus_reports_no_errors(mut ctx: Context<Blocking>) {
         round_trip(&mut ctx.canfd, &Frame::new(std(0x321), &[7; 8]).unwrap());
 
-        assert_eq!(ctx.canfd.error_counters(), (0, 0));
+        assert_eq!(ctx.canfd.receive_error_count(), 0);
+        assert_eq!(ctx.canfd.transmit_error_count(), 0);
         assert_eq!(ctx.canfd.error_state(), esp_hal::canfd::ErrorState::Active);
     }
 
@@ -619,56 +595,48 @@ mod blocking_tests {
     }
 
     #[test]
-    fn filter_identifiers_that_do_not_fit_the_format_are_refused(mut ctx: Context<Blocking>) {
-        // The filter registers hold 11 or 29 bits; a wider value would be
-        // masked on the way in and match something else.
-        let too_large = MaskFilterConfig {
-            id: 0x800,
-            mask: 0x7FF,
-            extended: false,
-            accepts: FrameKinds::ALL,
-        };
-        assert_eq!(
-            ctx.canfd.set_mask_filter(MaskFilter::A, &too_large),
-            Err(ConfigError::FilterIdTooLarge)
-        );
-        assert_eq!(
-            ctx.canfd.set_mask_filter(
-                MaskFilter::A,
-                &MaskFilterConfig {
-                    mask: 0x800,
-                    ..too_large
-                }
-            ),
-            Err(ConfigError::FilterIdTooLarge)
-        );
-        assert_eq!(
-            ctx.canfd.set_range_filter(&RangeFilterConfig {
-                low: 0x400,
-                high: 0x2000_0000,
-                extended: true,
-                accepts: FrameKinds::ALL,
-            }),
-            Err(ConfigError::FilterIdTooLarge)
-        );
+    fn a_filter_matches_only_its_identifier_format(mut ctx: Context<Blocking>) {
+        // A base identifier sits in the top 11 bits of the identifier word, so
+        // an extended identifier with the same top bits matches the same code
+        // and mask. Only the format the filter was set up for tells them apart.
+        let top_bits = ext(0x7FF << 18);
 
-        ctx.canfd
-            .set_mask_filter(
-                MaskFilter::A,
-                &MaskFilterConfig {
-                    id: 0x7FF,
-                    mask: 0x7FF,
-                    extended: false,
-                    accepts: FrameKinds::ALL,
-                },
-            )
-            .unwrap();
+        ctx.canfd.set_mask_filter(
+            MaskFilter::A,
+            &MaskFilterConfig::standard(std(0x7FF), StandardId::MAX),
+        );
         ctx.canfd.disable_mask_filter(MaskFilter::B);
         ctx.canfd.disable_mask_filter(MaskFilter::C);
         ctx.canfd.disable_range_filter();
 
         assert!(accepted(&mut ctx.canfd, std(0x7FF)), "0x7FF must pass");
         assert!(!accepted(&mut ctx.canfd, std(0x000)), "0x000 must not");
+        assert!(
+            !accepted(&mut ctx.canfd, top_bits),
+            "an extended identifier must not pass a standard filter"
+        );
+
+        ctx.canfd.set_mask_filter(
+            MaskFilter::A,
+            &MaskFilterConfig::extended(top_bits, ExtendedId::MAX),
+        );
+        assert!(
+            accepted(&mut ctx.canfd, top_bits),
+            "the extended one must pass"
+        );
+        assert!(
+            !accepted(&mut ctx.canfd, std(0x7FF)),
+            "a standard identifier must not pass an extended filter"
+        );
+
+        ctx.canfd.disable_mask_filter(MaskFilter::A);
+        ctx.canfd
+            .set_range_filter(&RangeFilterConfig::standard(std(0x7FF), std(0x7FF)));
+        assert!(accepted(&mut ctx.canfd, std(0x7FF)), "0x7FF must pass");
+        assert!(
+            !accepted(&mut ctx.canfd, top_bits),
+            "an extended identifier must not pass a standard range"
+        );
 
         ctx.canfd.accept_all();
     }
@@ -838,8 +806,10 @@ mod two_node_tests {
             "0x100 has the lower identifier and should have won"
         );
 
-        assert_eq!(ctx.node0.error_counters(), (0, 0), "node0");
-        assert_eq!(ctx.node1.error_counters(), (0, 0), "node1");
+        assert_eq!(ctx.node0.receive_error_count(), 0, "node0 REC");
+        assert_eq!(ctx.node0.transmit_error_count(), 0, "node0 TEC");
+        assert_eq!(ctx.node1.receive_error_count(), 0, "node1 REC");
+        assert_eq!(ctx.node1.transmit_error_count(), 0, "node1 TEC");
     }
 }
 
@@ -1278,8 +1248,10 @@ mod contention_tests {
         }
 
         assert_eq!(ctx.peer.receive().unwrap().payload(), second.payload());
-        assert_eq!(ctx.node.error_counters(), (0, 0));
-        assert_eq!(ctx.peer.error_counters(), (0, 0));
+        assert_eq!(ctx.node.receive_error_count(), 0);
+        assert_eq!(ctx.node.transmit_error_count(), 0);
+        assert_eq!(ctx.peer.receive_error_count(), 0);
+        assert_eq!(ctx.peer.transmit_error_count(), 0);
     }
 
     #[test]
@@ -1311,7 +1283,8 @@ mod contention_tests {
         });
 
         // Reaching this line is the assertion.
-        assert_eq!(ctx.peer.error_counters(), (0, 0));
+        assert_eq!(ctx.peer.receive_error_count(), 0);
+        assert_eq!(ctx.peer.transmit_error_count(), 0);
     }
 
     #[test]
@@ -1455,10 +1428,11 @@ mod contention_tests {
         Timer::after_millis(150).await;
 
         assert_eq!(
-            ctx.peer.error_counters(),
-            (0, 0),
+            ctx.peer.receive_error_count(),
+            0,
             "dropping the transmitter corrupted the frame the peer was receiving"
         );
+        assert_eq!(ctx.peer.transmit_error_count(), 0);
         assert_eq!(ctx.peer.receive().unwrap().payload(), &[0x55; 64]);
     }
 }
@@ -1534,7 +1508,7 @@ mod fault_tests {
             assert_eq!(wait_tx(&ctx.node, index), TxBufferState::Failed);
 
             let state = ctx.node.error_state();
-            let (_, tec) = ctx.node.error_counters();
+            let tec = ctx.node.transmit_error_count();
 
             if state == ErrorState::Passive {
                 seen_passive = true;
@@ -1550,9 +1524,9 @@ mod fault_tests {
         }
 
         panic!(
-            "injection never reached TEC {}: {:?}",
+            "injection never reached TEC {}: {}",
             target_tec,
-            ctx.node.error_counters()
+            ctx.node.transmit_error_count()
         );
     }
 
@@ -1586,7 +1560,8 @@ mod fault_tests {
             "rejoined in {} us, too fast to have waited out reintegration",
             began.elapsed().as_micros()
         );
-        assert_eq!(ctx.node.error_counters(), (0, 0));
+        assert_eq!(ctx.node.receive_error_count(), 0);
+        assert_eq!(ctx.node.transmit_error_count(), 0);
 
         let index = ctx
             .node
@@ -1602,7 +1577,7 @@ mod fault_tests {
         let (rx, mut tx) = ctx.node.split();
         assert_eq!(tx.error_state(), ErrorState::BusOff);
         assert_eq!(rx.error_state(), ErrorState::BusOff);
-        assert!(tx.error_counters().1 >= 256);
+        assert!(tx.transmit_error_count() >= 256);
 
         let began = Instant::now();
         tx.request_bus_off_recovery();
@@ -1612,7 +1587,8 @@ mod fault_tests {
                 "the controller never rejoined the bus"
             );
         }
-        assert_eq!(rx.error_counters(), (0, 0));
+        assert_eq!(rx.receive_error_count(), 0);
+        assert_eq!(rx.transmit_error_count(), 0);
 
         let index = tx
             .transmit(&Frame::new(std(0x123), &[0xAB; 8]).unwrap())

@@ -17,9 +17,10 @@
 //! The controller stays off the bus until [`CanFd::start`] is called, so the
 //! pins can be assigned first.
 //!
-//! Received frames pass through three mask filters and one range filter. Each
-//! filter accepts a configurable set of [`FrameKinds`], so classic and CAN FD
-//! frames can be filtered separately.
+//! Received frames pass through three mask filters and one range filter; see
+//! [`MaskFilterConfig`] and [`RangeFilterConfig`]. Each filter matches either
+//! standard or extended identifiers, and accepts classic CAN frames, CAN FD
+//! frames or both, as set by [`FrameFormats`].
 //!
 //! ## Usage
 //!
@@ -49,6 +50,36 @@
 //! let id = StandardId::new(0x123).unwrap();
 //! let frame = Frame::new_fd(id, &[0xAA; 64])?.with_bit_rate_switch(true);
 //! canfd.transmit(&frame)?;
+//! # Ok(())
+//! # }
+//! ```
+//! 
+//! ### Receiving a range of identifiers
+//!
+//! Filter A accepts every frame out of reset. Configure it to accept only
+//! CAN FD frames with the standard identifiers 0x120–0x12F.
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! use esp_hal::canfd::{
+//!     CanFd,
+//!     Config,
+//!     FrameFormats,
+//!     MaskFilter,
+//!     MaskFilterConfig,
+//!     StandardId,
+//! };
+//!
+//! let mut canfd = CanFd::new(peripherals.TWAI0, Config::default())?
+//!     .with_rx(peripherals.GPIO9)
+//!     .with_tx(peripherals.GPIO8);
+//!
+//! let id = StandardId::new(0x120).unwrap();
+//! let mask = StandardId::new(0x7F0).unwrap();
+//! canfd.set_mask_filter(
+//!     MaskFilter::A,
+//!     &MaskFilterConfig::standard(id, mask).with_formats(FrameFormats::Fd),
+//! );
+//! canfd.start()?;
 //! # Ok(())
 //! # }
 //! ```
@@ -96,7 +127,7 @@ pub use ll::{
     ErrorPosition,
     ErrorState,
     FD_TIMING_LIMITS,
-    FrameKinds,
+    FrameFormats,
     MAX_RETRANSMIT_LIMIT,
     MAX_TX_PRIORITY,
     MaskFilter,
@@ -108,11 +139,10 @@ pub use ll::{
 use ll::{
     CLASSIC_MAX_DATA_LEN,
     Driver,
-    EXT_ID_MASK,
     FrameBuffer,
     FrameHeader,
+    FrameKinds,
     MAX_DATA_LEN,
-    STD_ID_MASK,
     SspSource,
     TimestampPoint,
     len_to_dlc,
@@ -248,10 +278,6 @@ pub enum ConfigError {
     /// The transceiver setting cannot change after a pin is assigned, because
     /// it decides how that pin is driven.
     TransceiverModeLocked,
-    /// A filter was given an identifier that does not fit the frame format.
-    ///
-    /// A base identifier is 11 bits and an extended one 29.
-    FilterIdTooLarge,
 }
 
 impl core::error::Error for ConfigError {}
@@ -277,7 +303,6 @@ impl core::fmt::Display for ConfigError {
             Self::TransceiverModeLocked => {
                 "Whether a transceiver is in the way cannot be changed once a pin is assigned"
             }
-            Self::FilterIdTooLarge => "A filter identifier does not fit the frame format",
         };
         f.write_str(message)
     }
@@ -488,38 +513,100 @@ impl Config {
     }
 }
 
-/// Configuration of one mask filter.
+/// Configuration of one mask filter; see [`CanFd::set_mask_filter`].
 ///
-/// A frame is accepted when its identifier matches `id` in every bit set in
-/// `mask`. A `mask` of zero therefore accepts every identifier.
+/// A frame is accepted when its identifier has the filter's format and matches
+/// the filter's identifier in every bit set in the mask. A mask of
+/// [`StandardId::MAX`] or [`ExtendedId::MAX`] compares every bit, and a mask of
+/// zero accepts every identifier of the format.
+///
+/// The filter accepts classic CAN and CAN FD frames by default; see
+/// [`MaskFilterConfig::with_formats`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MaskFilterConfig {
-    /// Identifier to match.
-    pub id: u32,
-    /// Which identifier bits are compared. Zero matches everything.
-    pub mask: u32,
-    /// Whether `id` and `mask` are 29-bit extended identifiers.
-    pub extended: bool,
-    /// Which frame kinds this filter accepts.
-    pub accepts: FrameKinds,
+    id: u32,
+    mask: u32,
+    extended: bool,
+    formats: FrameFormats,
 }
 
-/// Configuration of the range filter.
+impl MaskFilterConfig {
+    /// Matches standard identifiers against `id`, in the bits set in `mask`.
+    pub fn standard(id: StandardId, mask: StandardId) -> Self {
+        Self {
+            id: id.as_raw() as u32,
+            mask: mask.as_raw() as u32,
+            extended: false,
+            formats: FrameFormats::Both,
+        }
+    }
+
+    /// Matches extended identifiers against `id`, in the bits set in `mask`.
+    pub fn extended(id: ExtendedId, mask: ExtendedId) -> Self {
+        Self {
+            id: id.as_raw(),
+            mask: mask.as_raw(),
+            extended: true,
+            formats: FrameFormats::Both,
+        }
+    }
+
+    /// Sets which frame formats the filter accepts.
+    pub fn with_formats(self, formats: FrameFormats) -> Self {
+        Self { formats, ..self }
+    }
+
+    fn kinds(&self) -> FrameKinds {
+        FrameKinds::new(self.extended, self.formats)
+    }
+}
+
+/// Configuration of the range filter; see [`CanFd::set_range_filter`].
 ///
-/// Accepts identifiers in `low..=high`. A `low` above `high` is an empty
-/// range, which accepts nothing.
+/// A frame is accepted when its identifier has the filter's format and lies in
+/// `low..=high`. A `low` above `high` is an empty range, which accepts nothing.
+///
+/// The filter accepts classic CAN and CAN FD frames by default; see
+/// [`RangeFilterConfig::with_formats`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RangeFilterConfig {
-    /// Lower bound, included.
-    pub low: u32,
-    /// Upper bound, included.
-    pub high: u32,
-    /// Whether the bounds are 29-bit extended identifiers.
-    pub extended: bool,
-    /// Which frame kinds this filter accepts.
-    pub accepts: FrameKinds,
+    low: u32,
+    high: u32,
+    extended: bool,
+    formats: FrameFormats,
+}
+
+impl RangeFilterConfig {
+    /// Matches standard identifiers in `low..=high`.
+    pub fn standard(low: StandardId, high: StandardId) -> Self {
+        Self {
+            low: low.as_raw() as u32,
+            high: high.as_raw() as u32,
+            extended: false,
+            formats: FrameFormats::Both,
+        }
+    }
+
+    /// Matches extended identifiers in `low..=high`.
+    pub fn extended(low: ExtendedId, high: ExtendedId) -> Self {
+        Self {
+            low: low.as_raw(),
+            high: high.as_raw(),
+            extended: true,
+            formats: FrameFormats::Both,
+        }
+    }
+
+    /// Sets which frame formats the filter accepts.
+    pub fn with_formats(self, formats: FrameFormats) -> Self {
+        Self { formats, ..self }
+    }
+
+    fn kinds(&self) -> FrameKinds {
+        FrameKinds::new(self.extended, self.formats)
+    }
 }
 
 /// A CAN FD frame.
@@ -863,6 +950,21 @@ impl embedded_can::Error for BusErrorKind {
     }
 }
 
+impl core::error::Error for BusErrorKind {}
+
+impl core::fmt::Display for BusErrorKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Bit => f.write_str("The transmitted bit did not match the bit sampled back"),
+            Self::Crc => f.write_str("The CRC of the frame did not match"),
+            Self::Form => f.write_str("A fixed-form field held an illegal value"),
+            Self::Ack => f.write_str("No node acknowledged the frame"),
+            Self::Stuff => f.write_str("A stuffing rule was violated"),
+            Self::Unknown(code) => write!(f, "Unknown bus error code {code}"),
+        }
+    }
+}
+
 /// A CAN FD controller.
 pub struct CanFd<'d, Dm: DriverMode = Blocking> {
     // Drop order matters: the controller leaves the bus before its clocks are
@@ -982,10 +1084,14 @@ impl<Dm: DriverMode> CanFdRx<'_, Dm> {
         self.driver.flush_rx();
     }
 
-    /// Returns the size and the free space of the RX buffer, as `(size, free)`
-    /// in 32-bit words.
-    pub fn rx_buffer_words(&self) -> (u16, u16) {
-        (self.driver.rx_buffer_size(), self.driver.rx_free_words())
+    /// Returns the size of the RX buffer in 32-bit words.
+    pub fn rx_buffer_size_words(&self) -> u16 {
+        self.driver.rx_buffer_size()
+    }
+
+    /// Returns the free space in the RX buffer in 32-bit words.
+    pub fn rx_buffer_free_words(&self) -> u16 {
+        self.driver.rx_free_words()
     }
 
     /// Returns whether the RX buffer has overrun and dropped a frame
@@ -1004,9 +1110,14 @@ impl<Dm: DriverMode> CanFdRx<'_, Dm> {
         self.driver.error_state()
     }
 
-    /// Returns the receive and transmit error counters, as `(rec, tec)`.
-    pub fn error_counters(&self) -> (u16, u16) {
-        (self.driver.rec(), self.driver.tec())
+    /// Returns the receive error counter.
+    pub fn receive_error_count(&self) -> u16 {
+        self.driver.rec()
+    }
+
+    /// Returns the transmit error counter.
+    pub fn transmit_error_count(&self) -> u16 {
+        self.driver.tec()
     }
 }
 
@@ -1135,9 +1246,14 @@ impl<Dm: DriverMode> CanFdTx<'_, Dm> {
         self.driver.error_state()
     }
 
-    /// Returns the receive and transmit error counters, as `(rec, tec)`.
-    pub fn error_counters(&self) -> (u16, u16) {
-        (self.driver.rec(), self.driver.tec())
+    /// Returns the receive error counter.
+    pub fn receive_error_count(&self) -> u16 {
+        self.driver.rec()
+    }
+
+    /// Returns the transmit error counter.
+    pub fn transmit_error_count(&self) -> u16 {
+        self.driver.tec()
     }
 
     /// Requests that a bus-off controller rejoin the bus.
@@ -1352,13 +1468,7 @@ impl<'d> CanFd<'d, Blocking> {
                 wake_lock: None,
             },
             config,
-            // The reset value: filter A accepts everything, the rest are off.
-            filter_kinds: [
-                FrameKinds::ALL,
-                FrameKinds::NONE,
-                FrameKinds::NONE,
-                FrameKinds::NONE,
-            ],
+            filter_kinds: RESET_FILTER_KINDS,
             pins_bound: false,
             _mode: PhantomData,
             twai,
@@ -1631,6 +1741,34 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         }
     }
 
+    /// Leaves the bus, following the de-initialization sequence in TRM 38.3.6.
+    ///
+    /// Every TX buffer returns to the empty state without its memory being
+    /// cleared, and the RX buffer is flushed.
+    ///
+    /// While the controller is on the bus, the driver holds a [`WakeLock`],
+    /// because Light-sleep mode gates the function clock. Leaving the bus
+    /// releases the lock. A running timestamp counter does not advance during
+    /// sleep.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::AbortTimeout`] when a transmission does not settle. The
+    /// controller stays on the bus in that case.
+    pub fn stop(&mut self) -> Result<(), Error> {
+        self.bus.quiesce()?;
+        self.bus.disable();
+        Ok(())
+    }
+
+    /// Returns whether the controller is on the bus.
+    ///
+    /// This is true between a successful [`CanFd::start`] and the next
+    /// [`CanFd::stop`] or [`CanFd::apply_config`].
+    pub fn is_started(&self) -> bool {
+        self.bus.driver.is_enabled()
+    }
+
     /// Returns the identity of the core.
     pub fn identity(&self) -> Identity {
         let (major, minor) = self.bus.driver.version();
@@ -1641,9 +1779,9 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         }
     }
 
-    /// Returns the number of TX buffers the hardware provides.
-    pub fn tx_buffer_count(&self) -> u8 {
-        self.bus.tx_buffers
+    /// Returns the frequency of the controller's function clock, in Hz.
+    pub fn function_clock_frequency(&self) -> u32 {
+        self.twai.info().clock_instance.function_clock_frequency()
     }
 
     /// Splits the controller into a receiving and a transmitting half.
@@ -1683,37 +1821,11 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.split().1
     }
 
-    /// Returns the frequency of the controller's function clock, in Hz.
-    pub fn function_clock_frequency(&self) -> u32 {
-        self.twai.info().clock_instance.function_clock_frequency()
-    }
+    // ---------------------------------------------------------------------- TX
 
-    /// Leaves the bus, following the de-initialization sequence in TRM 38.3.6.
-    ///
-    /// Every TX buffer returns to the empty state without its memory being
-    /// cleared, and the RX buffer is flushed.
-    ///
-    /// While the controller is on the bus, the driver holds a [`WakeLock`],
-    /// because Light-sleep mode gates the function clock. Leaving the bus
-    /// releases the lock. A running timestamp counter does not advance during
-    /// sleep.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::AbortTimeout`] when a transmission does not settle. The
-    /// controller stays on the bus in that case.
-    pub fn stop(&mut self) -> Result<(), Error> {
-        self.bus.quiesce()?;
-        self.bus.disable();
-        Ok(())
-    }
-
-    /// Returns whether the controller is on the bus.
-    ///
-    /// This is true between a successful [`CanFd::start`] and the next
-    /// [`CanFd::stop`] or [`CanFd::apply_config`].
-    pub fn is_started(&self) -> bool {
-        self.bus.driver.is_enabled()
+    /// Returns the number of TX buffers the hardware provides.
+    pub fn tx_buffer_count(&self) -> u8 {
+        self.bus.tx_buffers
     }
 
     /// Queues a frame in the first free TX buffer and arms it.
@@ -1770,25 +1882,7 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.tx_half().set_tx_priority(index, priority);
     }
 
-    /// Returns the size and the free space of the RX buffer, as `(size, free)`
-    /// in 32-bit words.
-    pub fn rx_buffer_words(&self) -> (u16, u16) {
-        (
-            self.bus.driver.rx_buffer_size(),
-            self.bus.driver.rx_free_words(),
-        )
-    }
-
-    /// Returns whether the RX buffer has overrun and dropped a frame
-    /// (TRM 38.3.9.4).
-    pub fn rx_overrun(&self) -> bool {
-        self.bus.driver.rx_overrun()
-    }
-
-    /// Clears the RX buffer overrun flag.
-    pub fn clear_rx_overrun(&mut self) {
-        self.bus.driver.clear_overrun();
-    }
+    // ---------------------------------------------------------------------- RX
 
     /// Returns the number of complete frames waiting in the RX buffer.
     pub fn rx_frame_count(&self) -> u16 {
@@ -1803,6 +1897,34 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
     pub fn receive(&mut self) -> Result<Frame, Error> {
         self.rx_half().receive()
     }
+
+    /// Discards everything in the RX buffer.
+    pub fn flush_rx(&mut self) {
+        self.bus.driver.flush_rx();
+    }
+
+    /// Returns the size of the RX buffer in 32-bit words.
+    pub fn rx_buffer_size_words(&self) -> u16 {
+        self.bus.driver.rx_buffer_size()
+    }
+
+    /// Returns the free space in the RX buffer in 32-bit words.
+    pub fn rx_buffer_free_words(&self) -> u16 {
+        self.bus.driver.rx_free_words()
+    }
+
+    /// Returns whether the RX buffer has overrun and dropped a frame
+    /// (TRM 38.3.9.4).
+    pub fn rx_overrun(&self) -> bool {
+        self.bus.driver.rx_overrun()
+    }
+
+    /// Clears the RX buffer overrun flag.
+    pub fn clear_rx_overrun(&mut self) {
+        self.bus.driver.clear_overrun();
+    }
+
+    // ------------------------------------------------------------------ errors
 
     /// Returns the current fault confinement state.
     ///
@@ -1821,9 +1943,14 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.bus.driver.error_warning()
     }
 
-    /// Returns the receive and transmit error counters, as `(rec, tec)`.
-    pub fn error_counters(&self) -> (u16, u16) {
-        (self.bus.driver.rec(), self.bus.driver.tec())
+    /// Returns the receive error counter.
+    pub fn receive_error_count(&self) -> u16 {
+        self.bus.driver.rec()
+    }
+
+    /// Returns the transmit error counter.
+    pub fn transmit_error_count(&self) -> u16 {
+        self.bus.driver.tec()
     }
 
     /// Requests that a bus-off controller rejoin the bus; see
@@ -1850,53 +1977,37 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         Ok(())
     }
 
+    // -------------------------------------------------------- traffic counters
+
     /// Resets the received and transmitted frame counters.
     pub fn reset_traffic_counters(&mut self) {
         self.bus.driver.reset_traffic_counters();
     }
 
-    /// Returns the numbers of frames received and transmitted since the
-    /// counters were last reset, as `(rx, tx)`.
-    pub fn traffic_counters(&self) -> (u32, u32) {
-        (
-            self.bus.driver.rx_traffic_counter(),
-            self.bus.driver.tx_traffic_counter(),
-        )
+    /// Returns the number of frames received since the traffic counters were
+    /// last reset.
+    pub fn rx_traffic_count(&self) -> u32 {
+        self.bus.driver.rx_traffic_counter()
     }
 
-    /// Discards everything in the RX buffer.
-    pub fn flush_rx(&mut self) {
-        self.bus.driver.flush_rx();
+    /// Returns the number of frames transmitted since the traffic counters
+    /// were last reset.
+    pub fn tx_traffic_count(&self) -> u32 {
+        self.bus.driver.tx_traffic_counter()
     }
 
     // ----------------------------------------------------------------- filters
 
-    /// Configures one mask filter.
+    /// Configures one mask filter and enables it.
     ///
     /// A frame reaches the RX buffer if it passes at least one enabled filter
-    /// (TRM 38.3.9.8). Out of reset, filter A accepts every frame.
-    ///
-    /// # Errors
-    ///
-    /// [`ConfigError::FilterIdTooLarge`] when the identifier or the mask does
-    /// not fit the identifier of the chosen format.
-    pub fn set_mask_filter(
-        &mut self,
-        filter: MaskFilter,
-        config: &MaskFilterConfig,
-    ) -> Result<(), ConfigError> {
-        check_filter_id(config.id, config.extended)?;
-        check_filter_id(config.mask, config.extended)?;
-
-        self.write_mask_filter(filter, config);
-        Ok(())
-    }
-
-    fn write_mask_filter(&mut self, filter: MaskFilter, config: &MaskFilterConfig) {
+    /// (TRM 38.3.9.8). Out of reset, filter A accepts every frame; see
+    /// [`CanFd::accept_all`].
+    pub fn set_mask_filter(&mut self, filter: MaskFilter, config: &MaskFilterConfig) {
         self.bus
             .driver
             .set_mask_filter(filter, config.extended, config.id, config.mask);
-        self.filter_kinds[Self::mask_filter_index(filter)] = config.accepts;
+        self.filter_kinds[Self::mask_filter_index(filter)] = config.kinds();
         self.apply_filter_kinds();
     }
 
@@ -1906,22 +2017,13 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.apply_filter_kinds();
     }
 
-    /// Configures the range filter.
-    ///
-    /// # Errors
-    ///
-    /// [`ConfigError::FilterIdTooLarge`] when either bound does not fit the
-    /// identifier of the chosen format.
-    pub fn set_range_filter(&mut self, config: &RangeFilterConfig) -> Result<(), ConfigError> {
-        check_filter_id(config.low, config.extended)?;
-        check_filter_id(config.high, config.extended)?;
-
+    /// Configures the range filter and enables it.
+    pub fn set_range_filter(&mut self, config: &RangeFilterConfig) {
         self.bus
             .driver
             .set_range_filter(config.extended, config.low, config.high);
-        self.filter_kinds[RANGE_FILTER_INDEX] = config.accepts;
+        self.filter_kinds[RANGE_FILTER_INDEX] = config.kinds();
         self.apply_filter_kinds();
-        Ok(())
     }
 
     /// Disables the range filter.
@@ -1931,24 +2033,15 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
     }
 
     /// Accepts every frame, by giving filter A a zero mask and disabling the rest.
+    ///
+    /// This is the one filter setting that matches standard and extended
+    /// identifiers at once.
     pub fn accept_all(&mut self) {
-        self.write_mask_filter(
-            MaskFilter::A,
-            &MaskFilterConfig {
-                id: 0,
-                mask: 0,
-                extended: false,
-                accepts: FrameKinds::ALL,
-            },
-        );
-        self.disable_mask_filter(MaskFilter::B);
-        self.disable_mask_filter(MaskFilter::C);
-        self.disable_range_filter();
-    }
-
-    /// Returns which filters this core implements, as `(a, b, c, range)`.
-    pub fn filters_supported(&self) -> (bool, bool, bool, bool) {
-        self.bus.driver.filters_supported()
+        // A zero mask passes any identifier word, so the format only decides
+        // how the zeros are shifted.
+        self.bus.driver.set_mask_filter(MaskFilter::A, false, 0, 0);
+        self.filter_kinds = RESET_FILTER_KINDS;
+        self.apply_filter_kinds();
     }
 
     fn mask_filter_index(filter: MaskFilter) -> usize {
@@ -1980,10 +2073,15 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.bus.driver.retransmit_count()
     }
 
-    /// Returns the error counters of the nominal and data phases, as
-    /// `(nominal, fd)`.
-    pub fn phase_error_counters(&self) -> (u16, u16) {
-        self.bus.driver.special_error_counters()
+    /// Returns the number of errors detected at the nominal bit rate.
+    pub fn nominal_error_count(&self) -> u16 {
+        self.bus.driver.nominal_error_count()
+    }
+
+    /// Returns the number of errors detected at the data bit rate, in the data
+    /// phase of bit-rate-switched frames.
+    pub fn fd_error_count(&self) -> u16 {
+        self.bus.driver.fd_error_count()
     }
 
     /// Returns the transmitter delay the core measured, in function clock
@@ -2147,6 +2245,15 @@ impl Instance for AnyCanFd<'_> {
 /// Index of the range filter in `CanFd::filter_kinds`.
 const RANGE_FILTER_INDEX: usize = 3;
 
+/// The reset value of `CanFd::filter_kinds`: filter A accepts everything, the
+/// rest are off.
+const RESET_FILTER_KINDS: [FrameKinds; 4] = [
+    FrameKinds::ALL,
+    FrameKinds::NONE,
+    FrameKinds::NONE,
+    FrameKinds::NONE,
+];
+
 /// Function clock periods the timestamp prescaler takes to wrap, measured on
 /// an ESP32-C5.
 const PRESCALER_PERIOD: u32 = 1 << 16;
@@ -2194,14 +2301,6 @@ fn integration_timeout(nominal: &Timing, fd: &Timing, function_clock_hz: u32) ->
     } else {
         derived
     }
-}
-
-fn check_filter_id(id: u32, extended: bool) -> Result<(), ConfigError> {
-    let limit = if extended { EXT_ID_MASK } else { STD_ID_MASK };
-    if id > limit {
-        return Err(ConfigError::FilterIdTooLarge);
-    }
-    Ok(())
 }
 
 /// Function clock periods one bit takes in the slower of the two phases.

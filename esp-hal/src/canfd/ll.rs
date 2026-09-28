@@ -45,34 +45,46 @@ pub const MAX_TX_PRIORITY: u8 = field_max(<TXT1P_W<'static, TX_PRIORITY_SPEC>>::
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct TimingLimits {
-    /// Inclusive bounds on the prescaler.
-    pub baud_rate_prescaler: (u8, u8),
-    /// Inclusive bounds on the propagation segment.
-    pub propagation_segment: (u8, u8),
-    /// Inclusive bounds on phase segment 1.
-    pub phase_segment_1: (u8, u8),
-    /// Inclusive bounds on phase segment 2.
-    pub phase_segment_2: (u8, u8),
-    /// Inclusive bounds on the synchronization jump width.
-    pub sync_jump_width: (u8, u8),
+    /// Smallest value of each parameter, included.
+    pub min: Timing,
+    /// Largest value of each parameter, included.
+    pub max: Timing,
 }
 
 /// Limits for the nominal (arbitration phase) bit timing.
 pub const NOMINAL_TIMING_LIMITS: TimingLimits = TimingLimits {
-    baud_rate_prescaler: (1, 255),
-    propagation_segment: (1, 127),
-    phase_segment_1: (0, 63),
-    phase_segment_2: (1, 63),
-    sync_jump_width: (1, 31),
+    min: Timing {
+        baud_rate_prescaler: 1,
+        propagation_segment: 1,
+        phase_segment_1: 0,
+        phase_segment_2: 1,
+        sync_jump_width: 1,
+    },
+    max: Timing {
+        baud_rate_prescaler: 255,
+        propagation_segment: 127,
+        phase_segment_1: 63,
+        phase_segment_2: 63,
+        sync_jump_width: 31,
+    },
 };
 
 /// Limits for the data phase bit timing.
 pub const FD_TIMING_LIMITS: TimingLimits = TimingLimits {
-    baud_rate_prescaler: (1, 255),
-    propagation_segment: (1, 63),
-    phase_segment_1: (0, 31),
-    phase_segment_2: (1, 31),
-    sync_jump_width: (1, 31),
+    min: Timing {
+        baud_rate_prescaler: 1,
+        propagation_segment: 1,
+        phase_segment_1: 0,
+        phase_segment_2: 1,
+        sync_jump_width: 1,
+    },
+    max: Timing {
+        baud_rate_prescaler: 255,
+        propagation_segment: 63,
+        phase_segment_1: 31,
+        phase_segment_2: 31,
+        sync_jump_width: 31,
+    },
 };
 
 /// Bit timing parameters for one phase (nominal or data).
@@ -109,16 +121,17 @@ impl Timing {
             return false;
         }
 
-        self.baud_rate_prescaler >= limits.baud_rate_prescaler.0
-            && self.baud_rate_prescaler <= limits.baud_rate_prescaler.1
-            && self.propagation_segment >= limits.propagation_segment.0
-            && self.propagation_segment <= limits.propagation_segment.1
-            && self.phase_segment_1 >= limits.phase_segment_1.0
-            && self.phase_segment_1 <= limits.phase_segment_1.1
-            && self.phase_segment_2 >= limits.phase_segment_2.0
-            && self.phase_segment_2 <= limits.phase_segment_2.1
-            && self.sync_jump_width >= limits.sync_jump_width.0
-            && self.sync_jump_width <= limits.sync_jump_width.1
+        let (min, max) = (&limits.min, &limits.max);
+        self.baud_rate_prescaler >= min.baud_rate_prescaler
+            && self.baud_rate_prescaler <= max.baud_rate_prescaler
+            && self.propagation_segment >= min.propagation_segment
+            && self.propagation_segment <= max.propagation_segment
+            && self.phase_segment_1 >= min.phase_segment_1
+            && self.phase_segment_1 <= max.phase_segment_1
+            && self.phase_segment_2 >= min.phase_segment_2
+            && self.phase_segment_2 <= max.phase_segment_2
+            && self.sync_jump_width >= min.sync_jump_width
+            && self.sync_jump_width <= max.sync_jump_width
     }
 
     /// Returns the total bit time in time quanta, including the sync segment.
@@ -129,7 +142,7 @@ impl Timing {
     }
 
     /// Returns the bit rate in bits per second for a given function clock.
-    pub const fn bitrate(&self, clock_hz: u32) -> u32 {
+    pub const fn bit_rate(&self, clock_hz: u32) -> u32 {
         clock_hz / (self.baud_rate_prescaler as u32 * self.total_quanta())
     }
 
@@ -255,25 +268,33 @@ pub enum MaskFilter {
     C,
 }
 
-/// Which kinds of frame a filter accepts.
-///
-/// A filter with none of these set is disabled (TRM 38.3.9.8).
+/// Frame formats a filter accepts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct FrameKinds {
-    /// Classic CAN frames with an 11-bit identifier.
-    pub classic_standard: bool,
-    /// Classic CAN frames with a 29-bit identifier.
-    pub classic_extended: bool,
-    /// CAN FD frames with an 11-bit identifier.
-    pub fd_standard: bool,
-    /// CAN FD frames with a 29-bit identifier.
-    pub fd_extended: bool,
+pub enum FrameFormats {
+    /// Classic CAN frames only.
+    Classic,
+    /// CAN FD frames only.
+    Fd,
+    /// Both classic CAN and CAN FD frames.
+    #[default]
+    Both,
+}
+
+/// Which kinds of frame a filter accepts, as the hardware encodes it.
+///
+/// A filter with none of these set is disabled (TRM 38.3.9.8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct FrameKinds {
+    classic_standard: bool,
+    classic_extended: bool,
+    fd_standard: bool,
+    fd_extended: bool,
 }
 
 impl FrameKinds {
     /// Accepts every kind of frame.
-    pub const ALL: Self = Self {
+    pub(super) const ALL: Self = Self {
         classic_standard: true,
         classic_extended: true,
         fd_standard: true,
@@ -281,12 +302,28 @@ impl FrameKinds {
     };
 
     /// Accepts nothing, which disables the filter.
-    pub const NONE: Self = Self {
+    pub(super) const NONE: Self = Self {
         classic_standard: false,
         classic_extended: false,
         fd_standard: false,
         fd_extended: false,
     };
+
+    /// Accepts the given frame formats, with identifiers of one format only.
+    ///
+    /// The identifier format decides between base and extended, and only
+    /// classic and FD vary, as in ESP-IDF's
+    /// [`twai_hal_configure_mask_filter`](https://github.com/espressif/esp-idf/blob/96f54947e08c196cf71c0588243dfc8e33807acc/components/esp_hal_twai/twai_hal_v2.c#L118-L131).
+    pub(super) fn new(extended: bool, formats: FrameFormats) -> Self {
+        let classic = formats != FrameFormats::Fd;
+        let fd = formats != FrameFormats::Classic;
+        Self {
+            classic_standard: classic && !extended,
+            classic_extended: classic && extended,
+            fd_standard: fd && !extended,
+            fd_extended: fd && extended,
+        }
+    }
 
     fn bits(self) -> u32 {
         (self.classic_standard as u32)
@@ -343,7 +380,7 @@ pub enum ErrorPosition {
     Crc,
     /// CRC delimiter, ACK field or ACK delimiter.
     Ack,
-    /// End of frame field.
+    /// End-of-frame field.
     EndOfFrame,
     /// During an error frame.
     ErrorFrame,
@@ -623,7 +660,7 @@ impl Driver {
         });
     }
 
-    // ------------------------------------------------------------- bit timing
+    // -------------------------------------------------------------- bit timing
 
     pub(super) fn set_nominal_timing(&self, timing: &Timing) {
         self.r().btr().write(|w| unsafe {
@@ -864,7 +901,7 @@ impl Driver {
         self.r().int_stat().write(|w| unsafe { w.bits(mask) });
     }
 
-    // ------------------------------------------------------------------ counters
+    // ---------------------------------------------------------------- counters
 
     pub(super) fn rx_traffic_counter(&self) -> u32 {
         self.r().rx_fr_ctr().read().val().bits()
@@ -954,17 +991,6 @@ impl Driver {
             .write(|w| unsafe { w.bits(bits) });
     }
 
-    /// Which filters this core implements, as `(a, b, c, range)`.
-    pub(super) fn filters_supported(&self) -> (bool, bool, bool, bool) {
-        let r = self.r().filter_control_filter_status().read();
-        (
-            r.sfa().bit_is_set(),
-            r.sfb().bit_is_set(),
-            r.sfc().bit_is_set(),
-            r.sfr().bit_is_set(),
-        )
-    }
-
     // ----------------------------------------------------------- error capture
 
     pub(super) fn error_capture(&self) -> ErrorCapture {
@@ -983,10 +1009,12 @@ impl Driver {
             .bits()
     }
 
-    /// Error counters for the nominal and data phases, as `(nominal, fd)`.
-    pub(super) fn special_error_counters(&self) -> (u16, u16) {
-        let r = self.r().err_norm_err_fd().read();
-        (r.err_norm_val().bits(), r.err_fd_val().bits())
+    pub(super) fn nominal_error_count(&self) -> u16 {
+        self.r().err_norm_err_fd().read().err_norm_val().bits()
+    }
+
+    pub(super) fn fd_error_count(&self) -> u16 {
+        self.r().err_norm_err_fd().read().err_fd_val().bits()
     }
 
     // ------------------------------------------------------- timestamp counter

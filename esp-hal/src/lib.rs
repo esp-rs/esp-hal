@@ -372,6 +372,8 @@ unstable_driver! {
     pub mod aes;
     #[cfg(assist_debug_driver_supported)]
     pub mod assist_debug;
+    #[cfg(canfd_driver_supported)]
+    pub mod canfd;
     pub mod delay;
     #[cfg(ecc_driver_supported)]
     pub mod ecc;
@@ -407,8 +409,6 @@ unstable_driver! {
     pub mod trace;
     #[cfg(soc_has_tsens)]
     pub mod tsens;
-    #[cfg(canfd_driver_supported)]
-    pub mod canfd;
     #[cfg(twai_driver_supported)]
     pub mod twai;
     #[cfg(any(
