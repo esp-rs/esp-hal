@@ -69,7 +69,9 @@ where
         // and powered the unit.
         let _guard = GenericPeripheralGuard::<{ Peripheral::ApbSarAdc as u8 }>::new();
         let _clock = FunctionClockGuard::new();
+        let sar_power = SarPowerGuard::new();
         init_hardware();
+        sar_power.force_on();
 
         ADCX::enable_vdef(true);
 
@@ -200,11 +202,102 @@ impl Drop for FunctionClockGuard {
     }
 }
 
+/// Keeps the SAR powered while a radio is running.
+///
+/// Radio initialization hands SAR power to the PHY's power detector (PWDET), which powers the SAR
+/// down between its own measurements - conversions then saturate. Like ESP-IDF, the driver
+/// overrides that through `PWDET_CONF` while the ADC is in use, and hands control back to the
+/// power detector when the last guard drops. On the ESP32-C2 and ESP32-C3 the power detector does
+/// not control the SAR, so this does nothing there.
+///
+/// See `s_sar_power_acquire` in
+/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32c6/sar_periph_ctrl.c>
+struct SarPowerGuard;
+
+cfg_select! {
+    any(esp32c5, esp32c6, esp32c61, esp32h2) => {
+        static SAR_POWER_REFS: esp_sync::NonReentrantMutex<u8> =
+            esp_sync::NonReentrantMutex::new(0);
+
+        impl SarPowerGuard {
+            fn new() -> Self {
+                SAR_POWER_REFS.with(|refs| *refs += 1);
+                Self
+            }
+
+            /// Forces the SAR on.
+            ///
+            /// Radio initialization rewrites `PWDET_CONF`, so this has to run before every
+            /// conversion rather than once when the guard is created.
+            fn force_on(&self) {
+                SAR_POWER_REFS.with(|_| force_sar_power(true));
+            }
+        }
+
+        impl Drop for SarPowerGuard {
+            fn drop(&mut self) {
+                SAR_POWER_REFS.with(|refs| {
+                    *refs -= 1;
+                    if *refs == 0 {
+                        force_sar_power(false);
+                    }
+                });
+            }
+        }
+
+        /// Sets or releases the power detector's override of SAR power.
+        ///
+        /// `PWDET_CONF` is clocked by the modem front-end APB clock, which the radio gates while
+        /// its PHY is off, and writes are dropped while it is gated. The clock is enabled only
+        /// around the write, so the radio finds it the way it left it. Callers hold
+        /// `SAR_POWER_REFS`, a critical section, which keeps the radio from reconfiguring the
+        /// clock in between.
+        ///
+        /// See `sar_ctrl_ll_set_power_mode_from_pwdet` in
+        /// <https://github.com/espressif/esp-idf/blob/v6.1/components/hal/esp32c6/include/hal/sar_ctrl_ll.h>
+        fn force_sar_power(force: bool) {
+            // The PACs do not describe the power detector.
+            const PWDET_CONF: *mut u32 = cfg_select! {
+                esp32c61 => 0x600A_0808 as *mut u32,
+                _ => 0x600A_0810 as *mut u32,
+            };
+            const SAR_POWER_FORCE: u32 = 1 << 24;
+            const SAR_POWER_CNTL: u32 = 1 << 23;
+
+            let clk_conf1 = crate::peripherals::MODEM_SYSCON::regs().clk_conf1();
+            let fe_apb_clock_enabled = clk_conf1.read().clk_fe_apb_en().bit();
+            clk_conf1.modify(|_, w| w.clk_fe_apb_en().set_bit());
+
+            unsafe {
+                let conf = PWDET_CONF.read_volatile();
+                let conf = if force {
+                    conf | SAR_POWER_FORCE | SAR_POWER_CNTL
+                } else {
+                    conf & !SAR_POWER_FORCE
+                };
+                PWDET_CONF.write_volatile(conf);
+            }
+
+            clk_conf1.modify(|_, w| w.clk_fe_apb_en().bit(fe_apb_clock_enabled));
+        }
+    }
+    _ => {
+        impl SarPowerGuard {
+            fn new() -> Self {
+                Self
+            }
+
+            fn force_on(&self) {}
+        }
+    }
+}
+
 // Triggers a single conversion.
 //
 // See `adc_hal_onetime_start` in
 // <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_oneshot_hal.c>
-fn start_onetime_sample<ADCX: RegisterAccess>() {
+fn start_onetime_sample<ADCX: RegisterAccess>(sar_power: &SarPowerGuard) {
+    sar_power.force_on();
     ADCX::set_onetime_start(true);
 }
 
@@ -360,6 +453,7 @@ pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _clock: FunctionClockGuard,
+    sar_power: SarPowerGuard,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
@@ -374,6 +468,7 @@ where
     {
         let guard = GenericPeripheralGuard::new();
         let clock = FunctionClockGuard::new();
+        let sar_power = SarPowerGuard::new();
 
         init_hardware();
 
@@ -390,6 +485,7 @@ where
             active_channel: None,
             _guard: guard,
             _clock: clock,
+            sar_power,
             _phantom: PhantomData,
         }
     }
@@ -410,6 +506,7 @@ where
             active_channel: self.active_channel,
             _guard: self._guard,
             _clock: self._clock,
+            sar_power: self.sar_power,
             _phantom: PhantomData,
         }
     }
@@ -449,7 +546,7 @@ where
             ADCX::set_init_code(self.init_codes[attenuation as usize]);
 
             ADCX::config_onetime_sample(channel, attenuation as u8);
-            start_onetime_sample::<ADCX>();
+            start_onetime_sample::<ADCX>(&self.sar_power);
         }
 
         // Wait for ADC to finish conversion
@@ -521,6 +618,7 @@ where
             active_channel: self.active_channel,
             _guard: self._guard,
             _clock: self._clock,
+            sar_power: self.sar_power,
             _phantom: PhantomData,
         }
     }
@@ -547,7 +645,7 @@ where
         ADCX::set_init_code(self.init_codes[attenuation as usize]);
 
         ADCX::config_onetime_sample(channel, attenuation as u8);
-        start_onetime_sample::<ADCX>();
+        start_onetime_sample::<ADCX>(&self.sar_power);
 
         // Wait for ADC to finish conversion and get value
         let adc_ready_future = AdcFuture::new(self);

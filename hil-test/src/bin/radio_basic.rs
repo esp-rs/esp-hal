@@ -58,6 +58,11 @@ mod ble_controller;
 #[cfg(feature = "esp-radio")]
 mod wifi_controller;
 
+#[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+#[path = "radio_basic/adc.rs"]
+#[cfg(feature = "esp-radio-unstable")]
+mod adc;
+
 #[cfg(soc_has_wifi)]
 #[path = "radio_basic/esp_now_config.rs"]
 #[cfg(feature = "esp-radio-unstable")]
