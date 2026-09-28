@@ -11,20 +11,21 @@ use bt_hci::{
 };
 use bt_hci_transport::{PacketKind, PacketToController, PacketToHost};
 use docsplay::Display;
+use embassy_sync::mutex::Mutex;
 use esp_phy::PhyInitGuard;
+use esp_sync::RawMutex;
 
 use crate::{
     RadioRefGuard,
     asynch::AtomicWaker,
     ble::{
         Config,
+        HciOutCollector,
         InvalidConfigError,
         have_hci_packet,
         have_hci_read_data,
         read_hci,
         read_next,
-        send_hci,
-        send_hci_async,
         take_next,
     },
 };
@@ -52,6 +53,9 @@ pub struct BleConnector<'d> {
     _phy_init_guard: PhyInitGuard<'d>,
     _device: crate::hal::peripherals::BT<'d>,
     _guard: RadioRefGuard,
+    /// The `Transport` implementations write through a shared reference, so they need the mutex to
+    /// get at the writer.
+    hci_writer: Mutex<RawMutex, HciOutCollector>,
 }
 
 impl Drop for BleConnector<'_> {
@@ -75,6 +79,7 @@ impl<'d> BleConnector<'d> {
             _phy_init_guard: crate::ble::ble_init(&config),
             _device: device,
             _guard,
+            hci_writer: Mutex::new(HciOutCollector::new()),
         })
     }
 
@@ -117,7 +122,7 @@ impl<'d> BleConnector<'d> {
     /// Returns the number of bytes written, which is at most one packet.
     #[instability::unstable]
     pub fn write(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        Ok(send_hci(buf))
+        Ok(self.hci_writer.get_mut().write(buf))
     }
 
     /// Write to HCI asynchronously.
@@ -125,7 +130,7 @@ impl<'d> BleConnector<'d> {
     /// Returns the number of bytes written, which is at most one packet.
     #[instability::unstable]
     pub async fn write_async(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        Ok(send_hci_async(buf).await)
+        Ok(self.hci_writer.get_mut().write_async(buf).await)
     }
 }
 
@@ -280,27 +285,6 @@ impl core::future::Future for HciPacketReadyEventFuture {
     }
 }
 
-/// The HCI output of the BLE controller.
-///
-/// The transport implementations use this zero-sized writer to serialize packets directly into the
-/// controller.
-struct HciWriter;
-
-impl embedded_io_07::ErrorType for HciWriter {
-    type Error = BleConnectorError;
-}
-
-impl embedded_io_async_07::Write for HciWriter {
-    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        Ok(send_hci_async(buf).await)
-    }
-
-    async fn flush(&mut self) -> Result<(), Self::Error> {
-        // nothing to do
-        Ok(())
-    }
-}
-
 impl<E: embedded_io_07::Error> From<bt_hci_transport::ReadHciError<E>> for BleConnectorError {
     fn from(_e: bt_hci_transport::ReadHciError<E>) -> Self {
         BleConnectorError::Unknown
@@ -343,8 +327,9 @@ impl bt_hci::transport::Transport for BleConnector<'_> {
 
     /// Write a complete HCI packet from the tx buffer
     async fn write<T: HostToControllerPacket>(&self, val: &T) -> Result<(), Self::Error> {
+        let mut writer = self.hci_writer.lock().await;
         bt_hci::transport::WithIndicator::new(val)
-            .write_hci_async(HciWriter)
+            .write_hci_async(&mut *writer)
             .await
     }
 }
@@ -363,8 +348,9 @@ impl bt_hci_transport::Transport for BleConnector<'_> {
 
     /// Write a complete HCI packet from the tx buffer
     async fn write<P: PacketToController>(&self, tx: &P) -> Result<(), Self::Error> {
+        let mut writer = self.hci_writer.lock().await;
         bt_hci_transport::WithIndicator::new(tx)
-            .write_hci_async(HciWriter)
+            .write_hci_async(&mut *writer)
             .await
     }
 }

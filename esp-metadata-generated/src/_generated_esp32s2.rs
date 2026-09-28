@@ -475,6 +475,9 @@ macro_rules! property {
     ("soc.cpu_has_csr_pc") => {
         false
     };
+    ("soc.cpu_has_zcmp_workaround") => {
+        false
+    };
     ("soc.multi_core_enabled") => {
         false
     };
@@ -1602,7 +1605,7 @@ macro_rules! define_clock_tree_types {
             pub const fn new(divisor: CpuPllDivDivisor) -> Self {
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1637,7 +1640,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1689,7 +1692,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1715,7 +1718,7 @@ macro_rules! define_clock_tree_types {
                 );
                 Self { divisor }
             }
-            pub(crate) fn divisor(self) -> u32 {
+            pub fn divisor(self) -> u32 {
                 self.divisor as u32
             }
         }
@@ -1795,7 +1798,7 @@ macro_rules! define_clock_tree_types {
             pub const fn new(sclk: I2cFunctionClockSclk) -> Self {
                 Self { sclk }
             }
-            pub(crate) fn sclk(self) -> I2cFunctionClockSclk {
+            pub fn sclk(self) -> I2cFunctionClockSclk {
                 self.sclk
             }
         }
@@ -1852,16 +1855,16 @@ macro_rules! define_clock_tree_types {
                     div_b,
                 }
             }
-            pub(crate) fn sclk(self) -> I2sMclkSclk {
+            pub fn sclk(self) -> I2sMclkSclk {
                 self.sclk
             }
-            pub(crate) fn div_num(self) -> u32 {
+            pub fn div_num(self) -> u32 {
                 self.div_num as u32
             }
-            pub(crate) fn div_a(self) -> u32 {
+            pub fn div_a(self) -> u32 {
                 self.div_a as u32
             }
-            pub(crate) fn div_b(self) -> u32 {
+            pub fn div_b(self) -> u32 {
                 self.div_b as u32
             }
         }
@@ -1915,7 +1918,7 @@ macro_rules! define_clock_tree_types {
             pub const fn new(sclk: UartFunctionClockSclk) -> Self {
                 Self { sclk }
             }
-            pub(crate) fn sclk(self) -> UartFunctionClockSclk {
+            pub fn sclk(self) -> UartFunctionClockSclk {
                 self.sclk
             }
         }
@@ -1954,10 +1957,10 @@ macro_rules! define_clock_tree_types {
                     integral,
                 }
             }
-            pub(crate) fn fractional(self) -> u32 {
+            pub fn fractional(self) -> u32 {
                 self.fractional as u32
             }
-            pub(crate) fn integral(self) -> u32 {
+            pub fn integral(self) -> u32 {
                 self.integral as u32
             }
         }
@@ -2197,6 +2200,162 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
+        /// The clock sources of the device.
+        ///
+        /// A clock source is a node of the clock tree that other nodes derive their output
+        /// from. Ask a node which source it runs on with its `..._root_source` function.
+        #[derive(Debug, enumset::EnumSetType)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum ClockSource {
+            /// `XTAL_CLK`.
+            XtalClk,
+            /// `RC_FAST_CLK`.
+            RcFastClk,
+            #[cfg(use_xtal32k)]
+            /// `XTAL32K_CLK`.
+            Xtal32kClk,
+            /// `RC_SLOW_CLK`.
+            RcSlowClk,
+        }
+        /// Returns the clock source that `XTAL_CLK` currently runs on.
+        pub fn xtal_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::XtalClk)
+        }
+        /// Returns the clock source that `PLL_CLK` currently runs on.
+        pub fn pll_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `APLL_CLK` currently runs on.
+        pub fn apll_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            pll_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `PLL_F160M_CLK` currently runs on.
+        pub fn pll_f160m_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            pll_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `RC_FAST_CLK` currently runs on.
+        pub fn rc_fast_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::RcFastClk)
+        }
+        /// Returns the clock source that `CPU_PLL_DIV_IN` currently runs on.
+        pub fn cpu_pll_div_in_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.cpu_pll_div_in?;
+            match config {
+                CpuPllDivInConfig::Pll => pll_clk_root_source(clocks),
+                CpuPllDivInConfig::Apll => apll_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `CPU_PLL_DIV` currently runs on.
+        pub fn cpu_pll_div_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            cpu_pll_div_in_root_source(clocks)
+        }
+        /// Returns the clock source that `SYSTEM_PRE_DIV_IN` currently runs on.
+        pub fn system_pre_div_in_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.system_pre_div_in?;
+            match config {
+                SystemPreDivInConfig::Xtal => xtal_clk_root_source(clocks),
+                SystemPreDivInConfig::RcFast => rc_fast_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `SYSTEM_PRE_DIV` currently runs on.
+        pub fn system_pre_div_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            system_pre_div_in_root_source(clocks)
+        }
+        /// Returns the clock source that `REF_TICK_XTAL` currently runs on.
+        pub fn ref_tick_xtal_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `REF_TICK_CK8M` currently runs on.
+        pub fn ref_tick_ck8m_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            rc_fast_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `CPU_CLK` currently runs on.
+        pub fn cpu_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.cpu_clk?;
+            match config {
+                CpuClkConfig::Xtal => system_pre_div_root_source(clocks),
+                CpuClkConfig::RcFast => system_pre_div_root_source(clocks),
+                CpuClkConfig::Apll => cpu_pll_div_root_source(clocks),
+                CpuClkConfig::Pll => cpu_pll_div_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `APB_CLK_CPU_DIV2` currently runs on.
+        pub fn apb_clk_cpu_div2_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            cpu_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `APB_CLK_80M` currently runs on.
+        pub fn apb_clk_80m_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            cpu_clk_root_source(clocks)
+        }
+        #[cfg(use_xtal32k)]
+        /// Returns the clock source that `XTAL32K_CLK` currently runs on.
+        pub fn xtal32k_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::Xtal32kClk)
+        }
+        /// Returns the clock source that `RC_SLOW_CLK` currently runs on.
+        pub fn rc_slow_clk_root_source(_clocks: &mut ClockTree) -> Option<ClockSource> {
+            Some(ClockSource::RcSlowClk)
+        }
+        /// Returns the clock source that `RC_FAST_DIV_CLK` currently runs on.
+        pub fn rc_fast_div_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            rc_fast_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `XTAL_DIV_CLK` currently runs on.
+        pub fn xtal_div_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `RTC_SLOW_CLK` currently runs on.
+        pub fn rtc_slow_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.rtc_slow_clk?;
+            match config {
+                #[cfg(use_xtal32k)]
+                RtcSlowClkConfig::Xtal32k => xtal32k_clk_root_source(clocks),
+                RtcSlowClkConfig::RcSlow => rc_slow_clk_root_source(clocks),
+                RtcSlowClkConfig::RcFast => rc_fast_div_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `RTC_FAST_CLK` currently runs on.
+        pub fn rtc_fast_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.rtc_fast_clk?;
+            match config {
+                RtcFastClkConfig::Xtal => xtal_div_clk_root_source(clocks),
+                RtcFastClkConfig::Rc => rc_fast_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `UART_MEM_CLK` currently runs on.
+        pub fn uart_mem_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `TIMG_CALIBRATION_CLOCK` currently runs on.
+        pub fn timg_calibration_clock_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.timg_calibration_clock?;
+            match config {
+                TimgCalibrationClockConfig::RtcClk => rtc_slow_clk_root_source(clocks),
+                TimgCalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_root_source(clocks),
+                #[cfg(use_xtal32k)]
+                TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `APB_CLK` currently runs on.
+        pub fn apb_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.apb_clk?;
+            match config {
+                ApbClkConfig::Pll => apb_clk_80m_root_source(clocks),
+                ApbClkConfig::Apll => apb_clk_cpu_div2_root_source(clocks),
+                ApbClkConfig::Xtal => cpu_clk_root_source(clocks),
+                ApbClkConfig::RcFast => cpu_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `REF_TICK` currently runs on.
+        pub fn ref_tick_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.ref_tick?;
+            match config {
+                RefTickConfig::Pll => ref_tick_xtal_root_source(clocks),
+                RefTickConfig::Apll => ref_tick_xtal_root_source(clocks),
+                RefTickConfig::Xtal => ref_tick_xtal_root_source(clocks),
+                RefTickConfig::RcFast => ref_tick_ck8m_root_source(clocks),
+            }
+        }
         pub fn configure_xtal_clk(clocks: &mut ClockTree, config: XtalClkConfig) {
             let old_config = clocks.xtal_clk.replace(config);
             refresh_xtal_clk_downstream(clocks);
@@ -2314,8 +2473,29 @@ macro_rules! define_clock_tree_types {
                 enable_rc_fast_clk_impl(clocks, false);
             }
         }
-        pub fn rc_fast_clk_frequency() -> u32 {
+        static RC_FAST_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(rc_fast_clk_nominal_frequency());
+        pub const fn rc_fast_clk_nominal_frequency() -> u32 {
             8000000
+        }
+        pub fn rc_fast_clk_frequency() -> u32 {
+            RC_FAST_CLK_FREQUENCY.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn set_rc_fast_clk_frequency(clocks: &mut ClockTree, frequency: u32) {
+            if !(4000000..=12000000).contains(&frequency) {
+                warn!(
+                    "Ignoring out-of-range RC_FAST_CLK frequency: {} Hz",
+                    frequency
+                );
+                return;
+            }
+            debug!(
+                "Updating RC_FAST_CLK frequency to {} Hz (nominal {} Hz)",
+                frequency,
+                rc_fast_clk_nominal_frequency()
+            );
+            RC_FAST_CLK_FREQUENCY.store(frequency, ::core::sync::atomic::Ordering::Release);
+            refresh_rc_fast_clk_downstream(clocks);
         }
         pub fn configure_cpu_pll_div_in(clocks: &mut ClockTree, new_selector: CpuPllDivInConfig) {
             let old_selector = clocks.cpu_pll_div_in.replace(new_selector);
@@ -2842,8 +3022,29 @@ macro_rules! define_clock_tree_types {
             trace!("Disabling RC_SLOW_CLK");
             enable_rc_slow_clk_impl(clocks, false);
         }
-        pub fn rc_slow_clk_frequency() -> u32 {
+        static RC_SLOW_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(rc_slow_clk_nominal_frequency());
+        pub const fn rc_slow_clk_nominal_frequency() -> u32 {
             90000
+        }
+        pub fn rc_slow_clk_frequency() -> u32 {
+            RC_SLOW_CLK_FREQUENCY.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn set_rc_slow_clk_frequency(clocks: &mut ClockTree, frequency: u32) {
+            if !(45000..=135000).contains(&frequency) {
+                warn!(
+                    "Ignoring out-of-range RC_SLOW_CLK frequency: {} Hz",
+                    frequency
+                );
+                return;
+            }
+            debug!(
+                "Updating RC_SLOW_CLK frequency to {} Hz (nominal {} Hz)",
+                frequency,
+                rc_slow_clk_nominal_frequency()
+            );
+            RC_SLOW_CLK_FREQUENCY.store(frequency, ::core::sync::atomic::Ordering::Release);
+            refresh_rc_slow_clk_downstream(clocks);
         }
         pub fn request_rc_fast_div_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_FAST_DIV_CLK");
@@ -3720,6 +3921,13 @@ macro_rules! define_clock_tree_types {
                 refresh_i2s_mclk_downstream(clocks, child_instance);
             }
         }
+        fn refresh_rc_fast_clk_downstream(clocks: &mut ClockTree) {
+            refresh_system_pre_div_in_downstream(clocks);
+            refresh_ref_tick_ck8m_downstream(clocks);
+            refresh_rtc_slow_clk_downstream(clocks);
+            refresh_rtc_fast_clk_downstream(clocks);
+            refresh_timg_calibration_clock_downstream(clocks);
+        }
         fn refresh_cpu_pll_div_in_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.cpu_pll_div_in {
                 CPU_PLL_DIV_IN_FREQ_CACHE.store(
@@ -3782,6 +3990,9 @@ macro_rules! define_clock_tree_types {
                 );
             }
             refresh_apb_clk_downstream(clocks);
+        }
+        fn refresh_rc_slow_clk_downstream(clocks: &mut ClockTree) {
+            refresh_rtc_slow_clk_downstream(clocks);
         }
         fn refresh_rtc_slow_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.rtc_slow_clk {

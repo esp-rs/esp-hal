@@ -1,19 +1,14 @@
 use crate::{
-    clock::{
-        RtcClock,
-        calibrate_rtc_fast_clock,
-        calibrate_rtc_slow_clock,
-        rtc_fast_cal_period,
-        rtc_slow_cal_period,
-    },
+    clock::{RtcClock, calibrate_rtc_fast_clock, calibrate_rtc_slow_clock, rtc_slow_cal_period},
     rtc_cntl::sleep::PowerDownFlags,
+    soc::clocks,
 };
 
 #[derive(Clone, Copy)]
 pub(super) struct SleepTimeConfig {
     pub sleep_time_adjustment: u32,
     pub slowclk_period: u32,
-    pub fastclk_period: u32,
+    pub fastclk_frequency: u32,
 }
 
 impl SleepTimeConfig {
@@ -22,7 +17,7 @@ impl SleepTimeConfig {
             calibrate_rtc_fast_clock();
         }
 
-        rtc_fast_cal_period()
+        clocks::rc_fast_clk_frequency()
     }
 
     fn rtc_clk_cal_slow(deep: bool) -> u32 {
@@ -37,7 +32,7 @@ impl SleepTimeConfig {
         Self {
             sleep_time_adjustment: 0,
             slowclk_period: Self::rtc_clk_cal_slow(deep),
-            fastclk_period: Self::rtc_clk_cal_fast(deep),
+            fastclk_frequency: Self::rtc_clk_cal_fast(deep),
         }
     }
 
@@ -69,6 +64,6 @@ impl SleepTimeConfig {
     }
 
     pub fn us_to_fastclk(&self, us: u32) -> u32 {
-        (us << RtcClock::CAL_FRACT) / self.fastclk_period
+        (us as u64 * self.fastclk_frequency as u64 / 1_000_000) as u32
     }
 }

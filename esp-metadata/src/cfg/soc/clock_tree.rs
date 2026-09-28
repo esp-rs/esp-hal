@@ -98,6 +98,35 @@ pub(crate) struct Function {
     pub implementation: TokenStream,
 }
 
+/// One arm of a [`RootSource::Selector`].
+pub(crate) struct RootSourceArm {
+    /// The `#[cfg(...)]` of the selected option, if it has one.
+    pub cfg_attr: TokenStream,
+    /// The configuration value that selects this arm.
+    pub pattern: TokenStream,
+    /// The name of the node this arm selects.
+    pub upstream: String,
+}
+
+/// How a clock tree node reaches the clock source it runs on.
+pub(crate) enum RootSource {
+    /// The node is a clock source.
+    Itself,
+
+    /// The node always runs on the output of one other node.
+    PassThrough(String),
+
+    /// The node's configuration selects which other node it runs on.
+    Selector {
+        /// The value to match, with the node's configuration in scope as `config`.
+        subject: TokenStream,
+        arms: Vec<RootSourceArm>,
+    },
+
+    /// The node cannot answer.
+    Unknown,
+}
+
 pub(crate) enum SourceFrequencySignature {
     Skip,
     Parameterless(TokenStream),
@@ -459,6 +488,12 @@ pub(crate) trait ClockTreeNodeType: Any {
         Bounds::UNKNOWN
     }
 
+    /// Returns the range (`min`, `max`) that the node's frequency can be adjusted to at runtime,
+    /// or `None` if the node is not adjustable.
+    fn adjustable_range(&self) -> Option<(u32, u32)> {
+        None
+    }
+
     /// Returns which clock nodes' configurations are affected when this node is configured.
     // TODO: pass instance to apply template naming scheme to returned clocks
     // (e.g. FUNCTION_CLOCK -> UART0_FUNCTION_CLOCK)
@@ -472,6 +507,19 @@ pub(crate) trait ClockTreeNodeType: Any {
         _tree: &ProcessedClockData,
     ) -> Vec<String> {
         vec![]
+    }
+
+    /// Returns how the node reaches the clock source it runs on.
+    ///
+    /// Sleep code needs this to keep a clock running through a sleep: it asks a node for the source
+    /// it currently runs on, and keeps that source powered. The default implementation has no
+    /// answer, which leaves the node without a getter.
+    fn root_source(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> RootSource {
+        RootSource::Unknown
     }
 
     fn always_on(&self) -> bool {

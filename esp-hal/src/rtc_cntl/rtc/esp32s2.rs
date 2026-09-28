@@ -2,7 +2,20 @@ use strum::FromRepr;
 
 use crate::soc::clocks::ClockConfig;
 
-pub(crate) fn init(_config: &ClockConfig) {}
+pub(crate) fn init(_config: &ClockConfig) {
+    calibrate_ocode();
+}
+
+// Trims the RTC bandgap using eFuse calibration data.
+//
+// See `set_ocode_by_efuse` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32s2/rtc_init.c>
+fn calibrate_ocode() {
+    super::calibrate_ocode(|| {
+        (crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MINOR) == 2)
+            .then(|| (crate::efuse::sign_magnitude(crate::efuse::ocode().into(), 6) + 93) as u8)
+    });
+}
 
 // Terminology:
 //

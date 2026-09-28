@@ -9,9 +9,14 @@
 //! A driver can also register hooks in the call that sets its mask bit. Use them to do work at
 //! sleep entry, or to restore state after a light sleep.
 
+use enumset::EnumSet;
 use esp_sync::NonReentrantMutex;
 
-use crate::rtc_cntl::{WakeupSource, sleep::RtcSleepConfig};
+use crate::{
+    rtc_cntl::{WakeupSource, sleep::RtcSleepConfig},
+    soc::clocks::ClockSource,
+    time::Duration,
+};
 
 /// Which sleep the chip is entering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,13 +27,14 @@ pub(crate) enum SleepKind {
     Deep,
 }
 
-/// A resource that a wakeup source needs powered while the chip sleeps.
+/// A power domain that a wakeup source needs powered while the chip sleeps.
 ///
-/// The names are the same for all chips. A request for a resource that the target chip does not
+/// The names are the same for all chips. A request for a domain that the target chip does not
 /// have, or that it cannot power down, does nothing.
+///
+/// A clock is not a domain. Ask for one with [`WrappedSleepConfig::keep_clock_running`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-// The requested resources are different on each chip, and no wakeup source requests an oscillator
-// yet.
+// The names are the same for all chips, and each chip uses a different subset.
 #[allow(dead_code, reason = "the names are the same for all chips")]
 pub(crate) enum SleepResource {
     /// The low-power peripherals, including the RTC IO pads.
@@ -37,35 +43,42 @@ pub(crate) enum SleepResource {
     LpMemory,
     /// The high-performance peripherals, including the digital GPIO pads.
     HpPeripherals,
-    /// The main crystal oscillator.
-    Xtal,
-    /// The fast RC oscillator.
-    RcFast,
-    /// The 32 kHz crystal oscillator.
-    Xtal32k,
-    /// The 32 kHz RC oscillator.
-    Rc32k,
 }
 
 /// The sleep configuration, as the entry hook of a wakeup source can see it.
 ///
-/// A hook can only prevent a power-down. It cannot request one, because the caller of the sleep
-/// function selects how much of the chip to power down, and a wakeup source only adds the resources
-/// that it needs. A hook thus clears bits, which is idempotent and commutative. The order of the
-/// hooks cannot change the result, and the source with the highest demand wins.
+/// A hook can only relax the sleep. It can keep a power domain powered, keep a clock running,
+/// refuse a light sleep, or shorten the sleep. The caller of the sleep function selects how much
+/// of the chip to power down, and it arms the wake timer. A wakeup source only adds the resources
+/// that it needs, refuses the sleep, or sets a shorter limit. It cannot request a power-down, stop
+/// a clock, cancel a refusal, or lengthen a limit.
 ///
-/// Keep this property. A method that sets a power-down bit removes it.
-pub(crate) struct WrappedSleepConfig<'a> {
+/// Each request is idempotent. The order of the hooks cannot change the result. The source with
+/// the strongest request wins. One refusal is enough. The shortest limit wins.
+///
+/// Keep this property. A method that requests a power-down, stops a clock, cancels a refusal, or
+/// lengthens a limit removes it.
+#[instability::unstable]
+pub struct WrappedSleepConfig<'a> {
     config: &'a mut RtcSleepConfig,
+    clocks: EnumSet<ClockSource>,
+    refused: bool,
+    limit: Option<Duration>,
 }
 
 impl<'a> WrappedSleepConfig<'a> {
     pub(crate) fn new(config: &'a mut RtcSleepConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            clocks: EnumSet::empty(),
+            refused: false,
+            limit: None,
+        }
     }
 
     /// Returns whether the chip is entering deep sleep, which resets it when it wakes.
-    pub(crate) fn is_deep_sleep(&self) -> bool {
+    #[instability::unstable]
+    pub fn is_deep_sleep(&self) -> bool {
         self.config.is_deep_sleep()
     }
 
@@ -101,31 +114,103 @@ impl<'a> WrappedSleepConfig<'a> {
                     _ => _config.set_dig_peri_pd_en(false),
                 }
             }
-            SleepResource::Xtal => {
-                cfg_select! {
-                    soc_has_pmu => _config.pd_flags.set_pd_xtal(false),
-                    // This flag has the opposite sense. It forces the crystal on.
-                    _ => _config.set_xtal_fpu(true),
+        }
+    }
+
+    /// Keeps `source` running during the sleep.
+    ///
+    /// Ask a clock tree node which source it runs on, and name the answer. A source that the chip
+    /// keeps running anyway, or that it cannot power down, needs nothing.
+    #[instability::unstable]
+    pub fn keep_clock_running(&mut self, source: ClockSource) {
+        self.clocks.insert(source);
+    }
+
+    /// Refuses a light sleep.
+    ///
+    /// Call this when software state makes the sleep unsafe and the hardware cannot see that
+    /// state. One call is enough. A later hook cannot cancel it.
+    ///
+    /// A deep sleep ignores the call. The wake resets the chip, so there is no caller to report
+    /// the refusal to. Read [`Self::is_deep_sleep`] when other work in the hook depends on the
+    /// kind of sleep.
+    ///
+    /// The hardware also rejects a sleep when an enabled source is already asserted at sleep
+    /// entry. This call is the software refusal.
+    #[instability::unstable]
+    pub fn reject_sleep(&mut self) {
+        self.refused = true;
+    }
+
+    /// Limits this sleep to `duration`.
+    ///
+    /// The duration starts when the driver programs the wake timer, after every hook has run. The
+    /// shortest request wins. A later hook cannot make it longer.
+    ///
+    /// The driver clamps the wake timer to the limit. When the timer wakeup source is not enabled,
+    /// the limit enables it for this sleep. Nothing else wakes the chip at the limit. After a
+    /// light sleep the driver restores the timer. A deadline the caller armed stays armed. A timer
+    /// that only the limit enabled is disabled again.
+    ///
+    /// The limit applies to deep sleep as well. The wake resets the chip. Read
+    /// [`Self::is_deep_sleep`] when the hook should bound only one kind of sleep.
+    ///
+    /// A duration that the sleep transition cannot catch does not start the sleep. A light sleep
+    /// then returns as if it had ended. A deep sleep without rejection panics, because it cannot
+    /// return and the chip does not wake. This is not a refusal. Use [`Self::reject_sleep`] to
+    /// refuse a light sleep. A duration of zero is too short to sleep.
+    #[expect(dead_code, reason = "no wakeup source limits a sleep yet")]
+    pub(crate) fn limit_sleep(&mut self, duration: Duration) {
+        let already_shorter = match self.limit {
+            Some(current) => current.as_micros() <= duration.as_micros(),
+            None => false,
+        };
+        if !already_shorter {
+            self.limit = Some(duration);
+        }
+    }
+
+    /// Prevents the power-down of every clock source a hook asked for.
+    ///
+    /// The set is what makes the requests of the hooks independent of their order.
+    fn apply_clock_requests(&mut self) {
+        // One function for all chips, like `keep_alive`.
+        let _config = &mut self.config;
+        for source in self.clocks {
+            match source {
+                ClockSource::XtalClk => {
+                    cfg_select! {
+                        soc_has_pmu => _config.pd_flags.set_pd_xtal(false),
+                        // This flag has the opposite sense. It forces the crystal on.
+                        _ => _config.set_xtal_fpu(true),
+                    }
                 }
-            }
-            SleepResource::RcFast => {
-                cfg_select! {
-                    soc_has_pmu => _config.pd_flags.set_pd_rc_fast(false),
-                    _ => _config.set_int_8m_pd_en(false),
+                ClockSource::RcFastClk => {
+                    cfg_select! {
+                        soc_has_pmu => _config.pd_flags.set_pd_rc_fast(false),
+                        _ => _config.set_int_8m_pd_en(false),
+                    }
                 }
-            }
-            SleepResource::Xtal32k => {
-                cfg_select! {
-                    soc_has_pmu => _config.pd_flags.set_pd_xtal32k(false),
-                    _ => {}
+                #[cfg(use_xtal32k)]
+                ClockSource::Xtal32kClk => {
+                    cfg_select! {
+                        soc_has_pmu => _config.pd_flags.set_pd_xtal32k(false),
+                        _ => {}
+                    }
                 }
-            }
-            SleepResource::Rc32k => {
-                cfg_select! {
-                    esp32h2 => {}
-                    soc_has_pmu => _config.pd_flags.set_pd_rc32k(false),
-                    _ => {}
+                #[cfg(soc_has_clock_node_rc32k_clk)]
+                ClockSource::Rc32kClk => {
+                    cfg_select! {
+                        // esp32h2 has no separate flag for the 32 kHz RC oscillator.
+                        esp32h2 => {}
+                        _ => _config.pd_flags.set_pd_rc32k(false),
+                    }
                 }
+                // The slow RC oscillator runs in the always-on domain, and the external 32 kHz
+                // oscillator arrives on a pad, so neither has a power-down to prevent.
+                #[cfg(soc_has_clock_node_osc_slow_clk)]
+                ClockSource::OscSlowClk => {}
+                ClockSource::RcSlowClk => {}
             }
         }
     }
@@ -134,11 +219,22 @@ impl<'a> WrappedSleepConfig<'a> {
 /// Runs at sleep entry, before the sleep configuration reaches hardware.
 ///
 /// The configuration already holds the kind of the sleep, so a hook that needs it asks
-/// [`WrappedSleepConfig::is_deep_sleep`].
-pub(crate) type SleepEntryHook = fn(&mut WrappedSleepConfig<'_>);
+/// [`WrappedSleepConfig::is_deep_sleep`]. A hook keeps a clock running with
+/// [`WrappedSleepConfig::keep_clock_running`]. A hook refuses a light sleep with
+/// [`WrappedSleepConfig::reject_sleep`].
+///
+/// The hook can run with interrupts disabled, for example from automatic light sleep. Do not
+/// allocate, take a blocking lock, or log in it.
+#[instability::unstable]
+pub type SleepEntryHook = fn(&mut WrappedSleepConfig<'_>);
 
-/// Runs after a light sleep. A deep sleep resets the chip, which runs the initialization again.
-pub(crate) type SleepExitHook = fn();
+/// Runs after a light sleep.
+///
+/// It also runs when a hook refuses a light sleep. An entry hook may already have changed a pad,
+/// and the exit hook puts that pad back. A deep sleep resets the chip, which runs the
+/// initialization again.
+#[instability::unstable]
+pub type SleepExitHook = fn();
 
 for_each_wakeup_source! {
     (all $( ($variant:ident, $bit:literal) ),*) => {
@@ -184,15 +280,16 @@ impl WakeupSource {
     /// first call. One driver owns each source, so only that driver can replace its own hooks.
     /// A call for a source that is already enabled does this.
     ///
-    /// Both hooks run with the flash accessible. The entry hook runs before esp-hal writes the
-    /// sleep configuration to hardware, and the exit hook runs after the wake sequence restores
-    /// it. Both hooks are part of sleep entry, so keep them short. Give them the
-    /// [`ram`][crate::ram] attribute, to keep the flash out of the sleep path.
-    pub(crate) fn enable_with_hooks(
-        self,
-        entry: Option<SleepEntryHook>,
-        exit: Option<SleepExitHook>,
-    ) {
+    /// Both hooks run with the flash accessible, so they need no [`ram`][crate::ram] attribute. The
+    /// entry hook runs before esp-hal writes the sleep configuration to hardware, and the exit hook
+    /// runs after the wake sequence restores it. Both hooks are part of sleep entry, so keep them
+    /// short.
+    ///
+    /// Only the driver that owns the source calls this. esp-hal owns the sources of its own
+    /// drivers, for example the timer source. A call for such a source replaces the hooks of that
+    /// driver, and the driver then does not work through a sleep.
+    #[instability::unstable]
+    pub fn enable_with_hooks(self, entry: Option<SleepEntryHook>, exit: Option<SleepExitHook>) {
         HOOKS.with(|hooks| {
             hooks.entry[self as usize] = entry;
             hooks.exit[self as usize] = exit;
@@ -202,7 +299,10 @@ impl WakeupSource {
     }
 
     /// Disables this source, and removes its hooks.
-    pub(crate) fn disable(self) {
+    ///
+    /// Only the driver that owns the source calls this, as for [`Self::enable_with_hooks`].
+    #[instability::unstable]
+    pub fn disable(self) {
         HOOKS.with(|hooks| {
             hooks.entry[self as usize] = None;
             hooks.exit[self as usize] = None;
@@ -228,7 +328,27 @@ pub(crate) fn reject_mask() -> u32 {
     mask() & property!("sleep.rejectable_mask")
 }
 
+/// What the entry hooks asked for, other than power domains and clocks.
+///
+/// The clock requests reach the configuration before this value is returned, and so does the
+/// wake timer. The refusal does not, because only the caller knows what to do with it.
+pub(crate) struct SleepEntry {
+    /// A hook called [`WrappedSleepConfig::reject_sleep`].
+    pub(crate) refused: bool,
+
+    /// How [`WrappedSleepConfig::limit_sleep`] changed the wake timer.
+    ///
+    /// `None` when no hook set a limit. The caller restores the timer on every path that does not
+    /// sleep, and after a light sleep.
+    #[cfg(sleep_has_wakeup_source_timer)]
+    pub(crate) clamp: Option<super::timer::LimitClamp>,
+}
+
 /// Runs the sleep-entry hook of every enabled source.
+///
+/// One [`WrappedSleepConfig::reject_sleep`] is enough. The caller ignores the refusal for a deep
+/// sleep. The wake resets the chip, so there is no caller to report the refusal to. The shortest
+/// [`WrappedSleepConfig::limit_sleep`] wins.
 ///
 /// The mask as read at sleep entry selects the hooks. A hook can enable another source. The GPIO
 /// hook does this, because it selects between the `ext0`, `ext1` and per-pin paths. The caller
@@ -237,7 +357,7 @@ pub(crate) fn reject_mask() -> u32 {
 ///
 /// The caller writes the kind of the sleep to the configuration before this call, so that the hooks
 /// can read it.
-pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) {
+pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) -> SleepEntry {
     let mut wrapped = WrappedSleepConfig::new(config);
 
     for source in enabled_sources() {
@@ -246,9 +366,31 @@ pub(crate) fn run_entry_hooks(config: &mut RtcSleepConfig) {
             hook(&mut wrapped);
         }
     }
+
+    // The clamp writes the comparator, so it runs after every hook has asked for its limit. A
+    // source that the clamp enables has not run its entry hook. It runs here, where the requests
+    // of a hook still reach the configuration.
+    #[cfg(sleep_has_wakeup_source_timer)]
+    let clamp = wrapped.limit.map(|limit| {
+        let clamp = super::timer::clamp_to_limit(limit);
+        clamp.apply_entry_hook(&mut wrapped);
+        clamp
+    });
+
+    wrapped.apply_clock_requests();
+
+    SleepEntry {
+        refused: wrapped.refused,
+        #[cfg(sleep_has_wakeup_source_timer)]
+        clamp,
+    }
 }
 
-/// Runs the post-wake hook of every enabled source. Only a light sleep calls this.
+/// Runs the post-wake hook of every enabled source.
+///
+/// A light sleep calls this after the wake. A refused light sleep calls it too, so an entry hook
+/// can undo a pad change. A sleep that a limit ends before it starts calls it for the same reason.
+/// A deep sleep that resets the chip does not call this.
 pub(crate) fn run_exit_hooks() {
     for source in enabled_sources() {
         let hook = HOOKS.with(|hooks| hooks.exit[source as usize]);

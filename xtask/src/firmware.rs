@@ -206,6 +206,10 @@ struct MetaLine {
 ///
 /// - `//% METADATA_KEY: value` or
 /// - `//% METADATA_KEY(config_name_1, config_name_2, ...): value`.
+///
+/// `ENV-IF(expr)` and `FEATURES-IF(expr)` overlay env or features on existing
+/// configurations. `expr` is a `CHIP_FILTER` expression; unlike `ENV(name)` it does not
+/// create a new configuration binary.
 fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
     let Some((key, value)) = line.trim_start_matches("//%").split_once(':') else {
         bail!("Metadata line is missing ':': {}", line);
@@ -281,6 +285,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
         };
 
         let mut configurations = HashMap::<String, Configuration>::new();
+        let mut env_overlays: Vec<(Vec<Chip>, String, String)> = Vec::new();
+        let mut feature_overlays: Vec<(Vec<Chip>, Vec<String>)> = Vec::new();
 
         // Unless specified, an example is assumed to be valid for all chips.
         for (line_no, line) in text
@@ -309,31 +315,38 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                 }
                 // Cargo features to enable for the current configuration.
                 "FEATURES" => {
-                    let mut values = meta_line
-                        .value
-                        .split_ascii_whitespace()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>();
-
-                    // Sort the features so they are in a deterministic order:
-                    values.sort();
-
+                    let values = parse_feature_list(&meta_line.value);
                     relevant_metadata.apply(|meta| meta.features.extend_from_slice(&values));
+                }
+                // Same language as CHIP_FILTER. Adds these features on matching chips.
+                "FEATURES-IF" => {
+                    if meta_line.config_names.is_empty() {
+                        bail!("FEATURES-IF needs a chip expression in parentheses");
+                    }
+                    feature_overlays.push((
+                        parse_chips(&meta_line.config_names.join(" || "))?,
+                        parse_feature_list(&meta_line.value),
+                    ));
                 }
                 // esp-config env vars, one per line
                 "ENV" => {
-                    let (env_var, value) = meta_line
-                        .value
-                        .split_once('=')
-                        .with_context(|| "CONFIG metadata must be in the form 'CONFIG=VALUE'")?;
-
-                    let env_var = env_var.trim();
-                    let value = value.trim();
-
+                    let (env_var, value) = parse_env_assignment(&meta_line.value)?;
                     relevant_metadata.apply(|meta| {
-                        meta.esp_config
-                            .insert(env_var.to_string(), value.to_string());
+                        meta.esp_config.insert(env_var.clone(), value.clone());
                     });
+                }
+                // Same language as CHIP_FILTER. Adds or replaces that one variable on
+                // matching chips, does not create a configuration.
+                "ENV-IF" => {
+                    if meta_line.config_names.is_empty() {
+                        bail!("ENV-IF needs a chip expression in parentheses");
+                    }
+                    let (env_var, value) = parse_env_assignment(&meta_line.value)?;
+                    env_overlays.push((
+                        parse_chips(&meta_line.config_names.join(" || "))?,
+                        env_var,
+                        value,
+                    ));
                 }
                 // Tags by which the user can filter examples.
                 "TAG" => {
@@ -397,6 +410,22 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             configuration.features.sort();
 
             for chip in configuration.chips.as_deref().unwrap_or(&[]) {
+                let mut features = configuration.features.clone();
+                for (chips, extra) in &feature_overlays {
+                    if chips.contains(chip) {
+                        features.extend(extra.iter().cloned());
+                    }
+                }
+                features.sort();
+                features.dedup();
+
+                let mut env_vars = configuration.esp_config.clone();
+                for (chips, key, value) in &env_overlays {
+                    if chips.contains(chip) {
+                        env_vars.insert(key.clone(), value.clone());
+                    }
+                }
+
                 examples.push(Metadata {
                     // File properties
                     example_path: path.clone(),
@@ -405,11 +434,11 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     // Configuration
                     chip: *chip,
                     configuration_name: configuration.name.clone(),
-                    features: configuration.features.clone(),
+                    features,
                     tag: configuration.tag.clone(),
                     harness_firmware: configuration.harness_firmware.clone(),
                     support_firmware: configuration.support_firmware.unwrap_or(false),
-                    env_vars: configuration.esp_config.clone(),
+                    env_vars,
                     cargo_config: configuration.cargo_config.clone(),
                 })
             }
@@ -560,6 +589,22 @@ pub fn find_test_by_name<'a>(tests: &'a [Metadata], name: &str) -> Option<&'a Me
             || test.output_file_name() == name
             || test.name_with_configuration() == name
     })
+}
+
+fn parse_env_assignment(value: &str) -> Result<(String, String)> {
+    let (env_var, value) = value
+        .split_once('=')
+        .with_context(|| "CONFIG metadata must be in the form 'CONFIG=VALUE'")?;
+    Ok((env_var.trim().to_string(), value.trim().to_string()))
+}
+
+fn parse_feature_list(value: &str) -> Vec<String> {
+    let mut values = value
+        .split_ascii_whitespace()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    values.sort();
+    values
 }
 
 fn parse_bool(value: &str) -> Result<bool> {

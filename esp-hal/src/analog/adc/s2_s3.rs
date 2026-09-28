@@ -8,7 +8,7 @@ use portable_atomic::{AtomicU32, Ordering};
 use procmacros::{handler, ram};
 
 pub use self::calibration::*;
-use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
+use super::{AdcCalScheme, AdcChannel, AdcConfig, AdcPin, Attenuation};
 use crate::{
     Async,
     Blocking,
@@ -28,13 +28,9 @@ pub(super) const NUM_ATTENS: usize = 10;
 cfg_select! {
     esp32s2 => {
         const ADC_VAL_MASK: u16 = 0x1fff;
-        const ADC_CAL_CNT_MAX: u16 = 32;
-        const ADC_CAL_CHANNEL: u16 = 15;
     }
     esp32s3 => {
         const ADC_VAL_MASK: u16 = 0xfff;
-        const ADC_CAL_CNT_MAX: u16 = 32;
-        const ADC_CAL_CHANNEL: u16 = 15;
     }
 }
 
@@ -42,51 +38,92 @@ impl<ADCX> AdcConfig<ADCX>
 where
     ADCX: RegisterAccess,
 {
-    /// Calibrates ADC with specified attenuation and voltage source.
-    pub fn adc_calibrate(atten: Attenuation, source: AdcCalSource) -> u16
+    /// Measures the initial code that cancels the unit's zero-voltage offset at `atten`.
+    pub fn adc_calibrate(atten: Attenuation) -> u16
     where
         ADCX: super::CalibrationAccess,
     {
-        let mut adc_max: u16 = 0;
-        let mut adc_min: u16 = u16::MAX;
-        let mut adc_sum: u32 = 0;
+        // This can be called without an `Adc`, so it cannot rely on `Adc::new` having powered up
+        // the unit.
+        let _guard = GenericPeripheralGuard::<{ Peripheral::ApbSarAdc as u8 }>::new();
+        init_hardware::<ADCX>();
 
         ADCX::enable_vdef(true);
 
         // Start sampling
-        ADCX::set_en_pad(ADCX::ADC_CAL_CHANNEL as u8);
-        ADCX::set_attenuation(ADCX::ADC_CAL_CHANNEL as usize, atten as u8);
+        ADCX::setup_calibration(atten);
 
         // Connect calibration source
-        ADCX::connect_cal(source, true);
+        ADCX::connect_gnd(true);
 
         ADCX::calibration_init();
-        ADCX::set_init_code(0);
-
-        for _ in 0..ADCX::ADC_CAL_CNT_MAX {
-            // Trigger ADC sampling
+        let cal_val = super::search_init_code::<ADCX>(|| {
+            // Clearing the done flag up front, rather than after the read, keeps a conversion left
+            // over from the previous code from being mistaken for this one's result.
+            ADCX::reset();
             ADCX::start_sample();
-
-            // Wait until ADC sampling is done
             while !ADCX::is_done() {}
 
-            let adc = ADCX::read_data() & ADCX::ADC_VAL_MASK;
-
-            ADCX::reset();
-
-            adc_sum += adc as u32;
-            adc_max = adc.max(adc_max);
-            adc_min = adc.min(adc_min);
-        }
-
-        let cal_val =
-            (adc_sum - adc_max as u32 - adc_min as u32) as u16 / (ADCX::ADC_CAL_CNT_MAX - 2);
+            ADCX::read_data() & ADCX::ADC_VAL_MASK
+        });
+        ADCX::reset();
 
         // Disconnect calibration source
-        ADCX::connect_cal(source, false);
+        ADCX::connect_gnd(false);
 
         cal_val
     }
+}
+
+/// Routes the unit to the RTC controller and powers it up.
+///
+/// Writes nothing that depends on previous state, so it is safe to run more than once.
+fn init_hardware<ADCX: RegisterAccess>() {
+    let sensors = SENS::regs();
+
+    // Set controller to RTC
+    ADCX::clear_dig_force();
+    ADCX::set_start_force();
+    ADCX::set_en_pad_force();
+    sensors.sar_hall_ctrl().modify(|_, w| {
+        w.xpd_hall_force().set_bit();
+        w.hall_phase_force().set_bit()
+    });
+
+    // Set power to SW power on
+    #[cfg(esp32s2)]
+    sensors
+        .sar_meas1_ctrl1()
+        .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
+
+    #[cfg(esp32s3)]
+    sensors
+        .sar_peri_clk_gate_conf()
+        .modify(|_, w| w.saradc_clk_en().set_bit());
+
+    sensors.sar_power_xpd_sar().modify(|_, w| unsafe {
+        w.sarclk_en().set_bit();
+        w.force_xpd_sar().bits(0b11)
+    });
+
+    ADCX::set_sar_clk_div();
+
+    // disable AMP
+    sensors
+        .sar_meas1_ctrl1()
+        .modify(|_, w| unsafe { w.force_xpd_amp().bits(0b11) });
+    sensors.sar_amp_ctrl3().modify(|_, w| unsafe {
+        w.amp_rst_fb_fsm().bits(0);
+        w.amp_short_ref_fsm().bits(0);
+        w.amp_short_ref_gnd_fsm().bits(0)
+    });
+    sensors.sar_amp_ctrl1().modify(|_, w| unsafe {
+        w.sar_amp_wait1().bits(1);
+        w.sar_amp_wait2().bits(1)
+    });
+    sensors
+        .sar_amp_ctrl2()
+        .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
 }
 
 #[doc(hidden)]
@@ -110,6 +147,11 @@ pub trait RegisterAccess {
 
     /// Reads sample data.
     fn read_data() -> u16;
+
+    /// Configures the SAR clock divider.
+    ///
+    /// See `adc_ll_set_sar_clk_div` and `ADC_LL_SAR_CLK_DIV_DEFAULT`.
+    fn set_sar_clk_div();
 
     /// Sets up ADC hardware for calibration.
     fn calibration_init();
@@ -187,7 +229,17 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
             .bits()
     }
 
-    #[cfg(any(esp32s2, esp32s3))]
+    fn set_sar_clk_div() {
+        #[cfg(esp32s2)]
+        SENS::regs()
+            .sar_reader1_ctrl()
+            .modify(|_, w| unsafe { w.sar1_clk_div().bits(1) });
+        #[cfg(esp32s3)]
+        SENS::regs()
+            .sar_reader1_ctrl()
+            .modify(|_, w| unsafe { w.sar_sar1_clk_div().bits(1) });
+    }
+
     fn calibration_init() {
         // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32s3/include/hal/adc_ll.h#L833
         // https://github.com/espressif/esp-idf/blob/800f141f94c0f880c162de476512e183df671307/components/hal/esp32s2/include/hal/adc_ll.h#L1145
@@ -225,19 +277,23 @@ fn meas1_busy() -> bool {
 }
 
 impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
-    const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
-    const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
         regi2c::ADC_SAR1_DREF.write_field(enable as u8);
     }
 
-    fn connect_cal(source: AdcCalSource, enable: bool) {
-        match source {
-            AdcCalSource::Gnd => regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as u8),
-            AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_REF.write_field(enable as u8),
-        }
+    fn connect_gnd(enable: bool) {
+        regi2c::ADC_SAR1_ENCAL_GND.write_field(enable as u8);
+    }
+
+    fn setup_calibration(atten: Attenuation) {
+        // With no pad selected the hardware falls back to channel 0's attenuation, so
+        // that is where `cal_setup` programs it.
+        SENS::regs()
+            .sar_meas1_ctrl2()
+            .modify(|_, w| unsafe { w.sar1_en_pad().bits(0) });
+        Self::set_attenuation(0, atten as u8);
     }
 }
 
@@ -307,7 +363,17 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
             .bits()
     }
 
-    #[cfg(any(esp32s2, esp32s3))]
+    fn set_sar_clk_div() {
+        #[cfg(esp32s2)]
+        SENS::regs()
+            .sar_reader2_ctrl()
+            .modify(|_, w| unsafe { w.sar2_clk_div().bits(1) });
+        #[cfg(esp32s3)]
+        SENS::regs()
+            .sar_reader2_ctrl()
+            .modify(|_, w| unsafe { w.sar_sar2_clk_div().bits(1) });
+    }
+
     fn calibration_init() {
         regi2c::ADC_SAR2_DREF.write_field(4);
     }
@@ -335,27 +401,31 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
 }
 
 impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
-    const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
-    const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
         regi2c::ADC_SAR2_DREF.write_field(enable as u8);
     }
 
-    fn connect_cal(source: AdcCalSource, enable: bool) {
-        match source {
-            AdcCalSource::Gnd => regi2c::ADC_SAR2_ENCAL_GND.write_field(enable as u8),
-            AdcCalSource::Ref => regi2c::ADC_SAR2_ENCAL_REF.write_field(enable as u8),
-        }
+    fn connect_gnd(enable: bool) {
+        regi2c::ADC_SAR2_ENCAL_GND.write_field(enable as u8);
+    }
+
+    fn setup_calibration(atten: Attenuation) {
+        SENS::regs()
+            .sar_meas2_ctrl2()
+            .modify(|_, w| unsafe { w.sar2_en_pad().bits(0) });
+        Self::set_attenuation(0, atten as u8);
     }
 }
 
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: ADC,
+    attenuations: [Option<Attenuation>; NUM_ATTENS],
+    /// Hardware calibration code per attenuation, indexed by [`Attenuation`].
+    init_codes: [u16; super::ATTENUATION_COUNT],
     active_channel: Option<u8>,
-    last_init_code: u16,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
@@ -364,14 +434,18 @@ impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configures a given ADC instance using the provided configuration, and
-    /// initializes the ADC for use.
-    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
+    /// Creates a new ADC instance with the given configuration.
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self
+    where
+        ADCX: super::AdcCalEfuse + super::CalibrationAccess,
+    {
         let guard = GenericPeripheralGuard::new();
-        let sensors = SENS::regs();
 
-        // Set attenuation for pins
         let attenuations = config.attenuations;
+
+        init_hardware::<ADCX>();
+
+        let init_codes = super::hw_init_codes::<ADCX>(&attenuations);
 
         for (channel, attenuation) in attenuations.iter().enumerate() {
             if let Some(attenuation) = attenuation {
@@ -379,52 +453,15 @@ where
             }
         }
 
-        // Set controller to RTC
-        ADCX::clear_dig_force();
-        ADCX::set_start_force();
-        ADCX::set_en_pad_force();
-        sensors.sar_hall_ctrl().modify(|_, w| {
-            w.xpd_hall_force().set_bit();
-            w.hall_phase_force().set_bit()
-        });
-
-        // Set power to SW power on
-        #[cfg(esp32s2)]
-        sensors
-            .sar_meas1_ctrl1()
-            .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
-
-        #[cfg(esp32s3)]
-        sensors
-            .sar_peri_clk_gate_conf()
-            .modify(|_, w| w.saradc_clk_en().set_bit());
-
-        sensors.sar_power_xpd_sar().modify(|_, w| unsafe {
-            w.sarclk_en().set_bit();
-            w.force_xpd_sar().bits(0b11)
-        });
-
-        // disable AMP
-        sensors
-            .sar_meas1_ctrl1()
-            .modify(|_, w| unsafe { w.force_xpd_amp().bits(0b11) });
-        sensors.sar_amp_ctrl3().modify(|_, w| unsafe {
-            w.amp_rst_fb_fsm().bits(0);
-            w.amp_short_ref_fsm().bits(0);
-            w.amp_short_ref_gnd_fsm().bits(0)
-        });
-        sensors.sar_amp_ctrl1().modify(|_, w| unsafe {
-            w.sar_amp_wait1().bits(1);
-            w.sar_amp_wait2().bits(1)
-        });
-        sensors
-            .sar_amp_ctrl2()
-            .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
+        // The bootloader runs conversions of its own to seed the RNG, so the done flag can
+        // already be set here and would make the first read return a stale result.
+        ADCX::reset();
 
         Adc {
             _adc: adc_instance,
+            attenuations,
+            init_codes,
             active_channel: None,
-            last_init_code: 0,
             _guard: guard,
             _phantom: PhantomData,
         }
@@ -441,8 +478,9 @@ where
 
         Adc {
             _adc: self._adc,
+            attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
-            last_init_code: self.last_init_code,
             _guard: self._guard,
             _phantom: PhantomData,
         }
@@ -450,6 +488,10 @@ where
 
     /// Starts and waits for a conversion on the specified pin and returns the
     /// result.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel was not configured in [`AdcConfig`].
     pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
     where
         PIN: AdcChannel,
@@ -473,6 +515,10 @@ where
     /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel was not configured in [`AdcConfig`].
     pub fn read_oneshot<PIN, CS>(
         &mut self,
         pin: &mut super::AdcPin<PIN, ADCX, CS>,
@@ -545,15 +591,15 @@ where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
-        // Set ADC unit calibration according used scheme for pin
-        let init_code = pin.cal_scheme.adc_cal();
-        if self.last_init_code != init_code {
-            ADCX::calibration_init();
-            ADCX::set_init_code(init_code);
-            self.last_init_code = init_code;
-        }
+        let channel = pin.pin.adc_channel();
+        let attenuation = super::channel_attenuation(&self.attenuations, channel);
 
-        ADCX::set_en_pad(pin.pin.adc_channel());
+        // Reprogrammed for every conversion: the regi2c block is shared with the PHY,
+        // so the code cannot be assumed to survive between reads.
+        ADCX::calibration_init();
+        ADCX::set_init_code(self.init_codes[attenuation as usize]);
+
+        ADCX::set_en_pad(channel);
 
         ADCX::clear_start_sample();
         ADCX::start_sample();
@@ -576,8 +622,9 @@ where
         }
         Adc {
             _adc: self._adc,
+            attenuations: self.attenuations,
+            init_codes: self.init_codes,
             active_channel: self.active_channel,
-            last_init_code: self.last_init_code,
             _guard: self._guard,
             _phantom: PhantomData,
         }
@@ -587,6 +634,10 @@ where
     ///
     /// Takes an [`AdcPin`] reference, as it is expected that the
     /// ADC will be able to sample whatever channel underlies the pin.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the channel was not configured in [`AdcConfig`].
     pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
     where
         ADCX: Instance,
@@ -784,7 +835,6 @@ impl<ADCX: Instance> Drop for AdcFuture<ADCX> {
     }
 }
 
-#[cfg(any(esp32s2, esp32s3))]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
@@ -799,7 +849,6 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(any(esp32s2, esp32s3))]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)

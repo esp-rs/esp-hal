@@ -15,6 +15,12 @@ static ISR_INTERRUPT_7: Handler = Handler::new();
 #[derive(Default, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum TxPower {
+    /// -24 dBm
+    N24,
+    /// -21 dBm
+    N21,
+    /// -18 dBm
+    N18,
     /// -15 dBm
     N15,
     /// -12 dBm
@@ -48,6 +54,9 @@ pub enum TxPower {
 impl TxPower {
     fn idx(self) -> esp_power_level_t {
         match self {
+            Self::N24 => esp_power_level_t_ESP_PWR_LVL_N24,
+            Self::N21 => esp_power_level_t_ESP_PWR_LVL_N21,
+            Self::N18 => esp_power_level_t_ESP_PWR_LVL_N18,
             Self::N15 => esp_power_level_t_ESP_PWR_LVL_N15,
             Self::N12 => esp_power_level_t_ESP_PWR_LVL_N12,
             Self::N9 => esp_power_level_t_ESP_PWR_LVL_N9,
@@ -66,6 +75,9 @@ impl TxPower {
 
     fn dbm(self) -> i8 {
         match self {
+            Self::N24 => -24,
+            Self::N21 => -21,
+            Self::N18 => -18,
             Self::N15 => -15,
             Self::N12 => -12,
             Self::N9 => -9,
@@ -87,6 +99,12 @@ impl TxPower {
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
+    /// Enables controller modem sleep.
+    ///
+    /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
+    /// Set this before the controller starts. The default is off.
+    modem_sleep: bool,
+
     /// The priority of the RTOS task.
     task_priority: u8,
 
@@ -95,7 +113,7 @@ pub struct Config {
 
     /// The maximum number of simultaneous connections.
     ///
-    /// Range: 1 - 70
+    /// Range: 1 - 2
     max_connections: u16,
 
     /// Enable QA test mode.
@@ -126,17 +144,6 @@ pub struct Config {
     ///
     /// Range: 1 - 100
     ll_adv_dup_list_count: u16,
-
-    /// Enables verification of the Access Address within the `CONNECT_IND` PDU.
-    ///
-    /// Enabling this option will add stricter verification of the Access Address in the
-    /// `CONNECT_IND` PDU. This improves security by ensuring that only connection requests with
-    /// valid Access Addresses are accepted. If disabled, only basic checks are applied,
-    /// improving compatibility.
-    verify_access_address: bool,
-
-    /// Enable BLE channel assessment.
-    channel_assessment: bool,
 
     /// Default TX power.
     default_tx_power: TxPower,
@@ -177,6 +184,14 @@ pub struct Config {
     /// Range: 1 - 256
     scan_backoff_max: u16,
 
+    /// Enables verification of the Access Address within the `CONNECT_IND` PDU.
+    ///
+    /// Enabling this option will add stricter verification of the Access Address in the
+    /// `CONNECT_IND` PDU. This improves security by ensuring that only connection requests with
+    /// valid Access Addresses are accepted. If disabled, only basic checks are applied,
+    /// improving compatibility.
+    verify_access_address: bool,
+
     /// Enable BLE Clear Channel Assessment (CCA).
     cca: bool,
 
@@ -189,9 +204,6 @@ pub struct Config {
     ///
     /// Range: 20 dBm - 100 dBm
     cca_threshold: u8,
-
-    /// Enable / disable auxiliary packets when the extended ADV data length is zero.
-    data_length_zero_aux: bool,
 
     /// Disconnect when Instant Passed (0x28) occurs during ACL connection update.
     disconnect_llcp_conn_update: bool,
@@ -206,37 +218,36 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            modem_sleep: false,
             task_priority: crate::preempt::max_task_priority()
                 .saturating_sub(2)
                 .min(255) as u8,
-            task_stack_size: 4096,
-            max_connections: 2,
+            task_stack_size: CONFIG_BT_LE_CONTROLLER_TASK_STACK_SIZE as _,
+            max_connections: CONFIG_BT_LE_MAX_CONNECTIONS as _,
             qa_test_mode: false,
             bqb_test: false,
-            ll_resolv_list_size: 4,
-            ll_sync_list_cnt: 5,
-            ll_sync_cnt: 0,
-            ll_rsp_dup_list_count: 20,
-            ll_adv_dup_list_count: 20,
+            ll_resolv_list_size: CONFIG_BT_LE_LL_RESOLV_LIST_SIZE as _,
+            ll_sync_list_cnt: CONFIG_BT_LE_MAX_PERIODIC_ADVERTISER_LIST as _,
+            ll_sync_cnt: CONFIG_BT_LE_MAX_PERIODIC_SYNCS as _,
+            ll_rsp_dup_list_count: CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT as _,
+            ll_adv_dup_list_count: CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT as _,
             default_tx_power: TxPower::default(),
-            hci_high_buffer_count: 30,
-            hci_low_buffer_count: 8,
-            whitelist_size: 12,
-            acl_buf_size: 255,
-            acl_buf_count: 24,
-            hci_evt_buf_size: 70,
-            multi_adv_instances: 1,
-            ext_adv_max_size: 31,
+            hci_high_buffer_count: CONFIG_BT_LE_HCI_EVT_HI_BUF_COUNT as _,
+            hci_low_buffer_count: CONFIG_BT_LE_HCI_EVT_LO_BUF_COUNT as _,
+            whitelist_size: CONFIG_BT_LE_WHITELIST_SIZE as _,
+            acl_buf_size: CONFIG_BT_LE_ACL_BUF_SIZE as _,
+            acl_buf_count: CONFIG_BT_LE_ACL_BUF_COUNT as _,
+            hci_evt_buf_size: CONFIG_BT_LE_HCI_EVT_BUF_SIZE as _,
+            multi_adv_instances: CONFIG_BT_LE_MAX_EXT_ADV_INSTANCES as _,
+            ext_adv_max_size: CONFIG_BT_LE_EXT_ADV_MAX_SIZE as _,
             dis_scan_backoff: false,
-            scan_backoff_max: 256,
+            scan_backoff_max: CONFIG_BT_CTRL_SCAN_BACKOFF_UPPERLIMITMAX as _,
             verify_access_address: false,
             disconnect_llcp_conn_update: false,
             disconnect_llcp_chan_map_update: false,
             disconnect_llcp_phy_update: false,
             cca_threshold: 65,
             cca: false,
-            channel_assessment: false,
-            data_length_zero_aux: false,
         }
     }
 }
@@ -249,7 +260,7 @@ impl Config {
             0,
             crate::preempt::max_task_priority().min(255) as u8
         );
-        crate::ble::validate_range!(self, max_connections, 1, 70);
+        crate::ble::validate_range!(self, max_connections, 1, 2);
         crate::ble::validate_range!(self, ll_sync_cnt, 0, 3);
         crate::ble::validate_range!(self, ll_sync_list_cnt, 1, 5);
         crate::ble::validate_range!(self, ll_rsp_dup_list_count, 1, 100);
@@ -264,6 +275,10 @@ impl Config {
 }
 
 pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
+    let main_xtal_freq = esp_hal::clock::xtal_clock().as_mhz() as u8;
+
+    let rtc_freq = u64::from(super::super::lp_clk::frequency_hz());
+
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
@@ -276,9 +291,13 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_rsp_dup_list_count: config.ll_rsp_dup_list_count,
         ble_ll_adv_dup_list_count: config.ll_adv_dup_list_count,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
-        rtc_freq: 32000,
-        ble_ll_sca: 60,
-        ble_ll_scan_phy_number: 2,
+        rtc_freq,
+        ble_ll_sca: CONFIG_BT_LE_LL_SCA as _,
+        ble_ll_scan_phy_number: if CONFIG_BT_LE_LL_CFG_FEAT_LE_CODED_PHY != 0 {
+            2
+        } else {
+            1
+        },
         ble_ll_conn_def_auth_pyld_tmo: 3000,
         ble_ll_jitter_usecs: 16,
         ble_ll_sched_max_adv_pdu_usecs: 376,
@@ -299,49 +318,37 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         controller_run_cpu: 0,
         enable_qa_test: config.qa_test_mode as u8,
         enable_bqb_test: config.bqb_test as u8,
+        enable_uart_hci: 0,
+        ble_hci_uart_port: 0,
+        ble_hci_uart_baud: 0,
+        ble_hci_uart_data_bits: 0,
+        ble_hci_uart_stop_bits: 0,
+        ble_hci_uart_flow_ctrl: 0,
+        ble_hci_uart_uart_parity: 0,
         enable_tx_cca: config.cca as u8,
         cca_rssi_thresh: (256 - config.cca_threshold as u32) as u8,
-        sleep_en: 0,
-        coex_phy_coded_tx_rx_time_limit: 0,
+        sleep_en: u8::from(config.modem_sleep),
+        coex_phy_coded_tx_rx_time_limit: CONFIG_BT_LE_COEX_PHY_CODED_TX_RX_TLIM_EFF as _,
         dis_scan_backoff: config.dis_scan_backoff as u8,
-        ble_scan_classify_filter_enable: 1,
+        ble_scan_classify_filter_enable: 0,
         cca_drop_mode: 0,  //???
         cca_low_tx_pwr: 0, //???
-        main_xtal_freq: 40,
+        main_xtal_freq,
+        version_num: crate::hal::efuse::minor_chip_version(),
         ignore_wl_for_direct_adv: 0,
-        cpu_freq_mhz: 160,
-        enable_pcl: 0, // CONFIG_BT_LE_POWER_CONTROL_ENABLED
-        version_num: esp_hal::efuse::minor_chip_version() as u32,
-        csa2_select: 1,
-        enable_csr: 0,
+        csa2_select: CONFIG_BT_LE_50_FEATURE_SUPPORT as _,
         ble_aa_check: config.verify_access_address as u8,
         ble_llcp_disc_flag: config.disconnect_llcp_conn_update as u8
             | ((config.disconnect_llcp_chan_map_update as u8) << 1)
             | ((config.disconnect_llcp_phy_update as u8) << 2),
         scan_backoff_upperlimitmax: config.scan_backoff_max,
-        ble_chan_ass_en: config.channel_assessment as u8,
-        ble_data_lenth_zero_aux: config.data_length_zero_aux as u8,
-        vhci_enabled: 1,
-        ptr_check_enabled: 0,
-        ble_adv_tx_options: 0,
-        skip_unnecessary_checks_en: 0,
-        fast_conn_data_tx_en: 0,
-        ch39_txpwr: 9,
-        adv_rsv_cnt: 1,
-        conn_rsv_cnt: 2,
-        priority_level_cfg: 1 << 4 | 1 << 2,
-        slv_fst_rx_lat_en: 0,
-        dl_itvl_phy_sync_en: 0,
-        scan_allow_adi_filter: 0,
-        // BT_CONTROLLER_INIT_CONFIG_DEFAULT: both stay 0 unless ADV_FAST_TX is set.
-        enhanced_mem_resv: 0,
-        rxbuf_reserved: 0,
+        vhci_enabled: CONFIG_BT_LE_HCI_INTERFACE_USE_RAM as _,
         config_magic: CONFIG_MAGIC,
     }
 }
 
 pub(crate) fn bt_periph_module_enable() {
-    crate::radio_clocks::clocks_ll::enable_bt(true);
+    // nothing
 }
 
 pub(crate) fn disable_sleep_mode() {
@@ -379,8 +386,22 @@ pub(super) fn ble_rtc_clk_init() {
     crate::radio_clocks::clocks_ll::ble_rtc_clk_init();
 }
 
-pub(super) unsafe extern "C" fn reset_modem(_mdl_opts: u8, _start: u8) {
-    todo!()
+pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
+    trace!("esp_reset_rpa_moudle");
+    crate::radio_clocks::clocks_ll::reset_rpa();
+}
+
+// The controller library reads and writes this variable. The ROM of ESP32-C2 < eco4 does not
+// supply it.
+#[unsafe(no_mangle)]
+#[allow(non_upper_case_globals)]
+static mut g_ble_lll_rfmgmt_env_p: *mut c_void = core::ptr::null_mut();
+
+pub(crate) fn shutdown_ble_isr() {
+    unsafe {
+        BT::steal().disable_lp_timer_interrupt_on_all_cores();
+        BT::steal().disable_mac_interrupt_on_all_cores();
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -395,9 +416,137 @@ extern "C" fn BT_MAC() {
     ISR_INTERRUPT_4.dispatch();
 }
 
-pub(crate) fn shutdown_ble_isr() {
+const OS_MSYS_1_BLOCK_COUNT: i32 = 24;
+const SYSINIT_MSYS_1_MEMPOOL_SIZE: usize = 768;
+const SYSINIT_MSYS_1_MEMBLOCK_SIZE: i32 = 128;
+const OS_MSYS_2_BLOCK_COUNT: i32 = 24;
+const SYSINIT_MSYS_2_MEMPOOL_SIZE: usize = 1920;
+const SYSINIT_MSYS_2_MEMBLOCK_SIZE: i32 = 320;
+
+impl OsMempool {
+    const fn zeroed() -> Self {
+        Self {
+            mp_block_size: 0,
+            mp_num_blocks: 0,
+            mp_num_free: 0,
+            mp_min_free: 0,
+            mp_flags: 0,
+            mp_membuf_addr: 0,
+            next: core::ptr::null(),
+            first: core::ptr::null(),
+            name: core::ptr::null(),
+        }
+    }
+}
+
+unsafe extern "C" {
+    fn r_mem_init_mbuf_pool(
+        mem: *mut c_void,
+        mempool: *mut OsMempool,
+        mbuf_pool: *mut OsMbufPool,
+        num_blocks: i32,
+        block_size: i32,
+        name: *const u8,
+    ) -> i32;
+    fn r_os_msys_reset();
+    fn r_os_msys_register(mbuf_pool: *const OsMbufPool) -> i32;
+}
+
+impl OsMbufPool {
+    const fn zeroed() -> Self {
+        Self {
+            omp_databuf_len: 0,
+            omp_pool: core::ptr::null(),
+            next: core::ptr::null(),
+        }
+    }
+}
+
+type OsMembufT = u32;
+
+pub(crate) static mut OS_MSYS_INIT_1_DATA: *mut OsMembufT = core::ptr::null_mut();
+pub(crate) static mut OS_MSYS_INIT_1_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed();
+pub(crate) static mut OS_MSYS_INIT_1_MEMPOOL: OsMempool = OsMempool::zeroed();
+
+pub(crate) static mut OS_MSYS_INIT_2_DATA: *mut OsMembufT = core::ptr::null_mut();
+pub(crate) static mut OS_MSYS_INIT_2_MBUF_POOL: OsMbufPool = OsMbufPool::zeroed();
+pub(crate) static mut OS_MSYS_INIT_2_MEMPOOL: OsMempool = OsMempool::zeroed();
+
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L218-L279>
+fn os_msys_buf_alloc() -> bool {
+    use core::mem::size_of;
+
+    use crate::compat::malloc::calloc;
+
     unsafe {
-        BT::steal().disable_lp_timer_interrupt_on_all_cores();
-        BT::steal().disable_mac_interrupt_on_all_cores();
+        OS_MSYS_INIT_1_DATA =
+            calloc(SYSINIT_MSYS_1_MEMPOOL_SIZE as u32, size_of::<OsMembufT>()).cast();
+        OS_MSYS_INIT_2_DATA =
+            calloc(SYSINIT_MSYS_2_MEMPOOL_SIZE as u32, size_of::<OsMembufT>()).cast();
+
+        if OS_MSYS_INIT_1_DATA.is_null() || OS_MSYS_INIT_2_DATA.is_null() {
+            os_msys_buf_free();
+            return false;
+        }
+
+        true
+    }
+}
+
+// <https://github.com/espressif/esp-idf/blob/6d835d522/components/bt/porting/mem/os_msys_init.c#L281-L318>
+pub(super) fn os_msys_buf_free() {
+    use crate::compat::malloc::free;
+
+    unsafe {
+        // No C2 ROM revision exposes `os_mempool_unregister`, so drop every registered pool before
+        // releasing the memory it points at.
+        r_os_msys_reset();
+
+        if !OS_MSYS_INIT_1_DATA.is_null() {
+            free(OS_MSYS_INIT_1_DATA.cast());
+            OS_MSYS_INIT_1_DATA = core::ptr::null_mut();
+        }
+        if !OS_MSYS_INIT_2_DATA.is_null() {
+            free(OS_MSYS_INIT_2_DATA.cast());
+            OS_MSYS_INIT_2_DATA = core::ptr::null_mut();
+        }
+    }
+}
+
+pub(super) fn os_msys_init() {
+    static MSYS1: &[u8] = b"msys_1\0";
+    static MSYS2: &[u8] = b"msys_2\0";
+
+    unsafe {
+        let ret = os_msys_buf_alloc();
+        assert!(ret, "os_msys_buf_alloc failed");
+
+        r_os_msys_reset();
+
+        let rc = r_mem_init_mbuf_pool(
+            OS_MSYS_INIT_1_DATA.cast(),
+            &raw mut OS_MSYS_INIT_1_MEMPOOL,
+            &raw mut OS_MSYS_INIT_1_MBUF_POOL,
+            OS_MSYS_1_BLOCK_COUNT,
+            SYSINIT_MSYS_1_MEMBLOCK_SIZE,
+            MSYS1.as_ptr(),
+        );
+        assert!(rc == 0, "r_mem_init_mbuf_pool failed");
+
+        let rc = r_os_msys_register(&raw const OS_MSYS_INIT_1_MBUF_POOL);
+        assert!(rc == 0, "r_os_msys_register failed");
+
+        let rc = r_mem_init_mbuf_pool(
+            OS_MSYS_INIT_2_DATA.cast(),
+            &raw mut OS_MSYS_INIT_2_MEMPOOL,
+            &raw mut OS_MSYS_INIT_2_MBUF_POOL,
+            OS_MSYS_2_BLOCK_COUNT,
+            SYSINIT_MSYS_2_MEMBLOCK_SIZE,
+            MSYS2.as_ptr(),
+        );
+        assert!(rc == 0, "r_mem_init_mbuf_pool failed");
+
+        let rc = r_os_msys_register(&raw const OS_MSYS_INIT_2_MBUF_POOL);
+        assert!(rc == 0, "r_os_msys_register failed");
     }
 }

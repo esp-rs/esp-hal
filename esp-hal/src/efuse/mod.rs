@@ -48,6 +48,7 @@ use portable_atomic::AtomicU8;
 #[cfg_attr(esp32c6, path = "esp32c6/mod.rs")]
 #[cfg_attr(esp32c61, path = "esp32c61/mod.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2/mod.rs")]
+#[cfg_attr(esp32h4, path = "esp32h4/mod.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
@@ -159,6 +160,24 @@ pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
 pub fn read_bit(field: EfuseField) -> bool {
     assert_eq!(field.bit_count, 1);
     read_field_le::<u8>(field) != 0
+}
+
+/// Decodes a sign-magnitude number, where bit `sign_bit` carries the sign and the bits below it
+/// carry the magnitude.
+///
+/// The RTC calibration fields store their differences this way rather than in two's complement,
+/// so a raw read has to be converted before it can be added to a reference point.
+#[allow(
+    dead_code,
+    reason = "not every chip has sign-magnitude calibration fields"
+)]
+pub(crate) fn sign_magnitude(value: u32, sign_bit: u32) -> i32 {
+    let sign_mask = 1 << sign_bit;
+    if value & sign_mask != 0 {
+        -((value & !sign_mask) as i32)
+    } else {
+        value as i32
+    }
 }
 
 /// Overrides the base MAC address used by [`interface_mac_address`].

@@ -46,6 +46,7 @@ impl CpuClock {
         iomux_function_clock: Some(IomuxFunctionClockConfig::PllF48m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         timg_calibration_clock: None,
     };
 }
@@ -600,4 +601,45 @@ impl TimgInstance {
                 })
             });
     }
+}
+
+// BLE_LP_XTAL_CLK
+
+fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+// BLE_LP_CLK
+
+fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // ESP32-H2 has no BLE RTC timer clock gate.
+}
+
+fn configure_ble_lp_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<BleLpClkConfig>,
+    new_config: BleLpClkConfig,
+) {
+    let divisor = match new_config {
+        BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
+        _ => 0,
+    };
+    let sel_xtal32k = cfg_select! {
+        use_xtal32k => new_config == BleLpClkConfig::Xtal32k,
+        _ => false,
+    };
+
+    LP_CLKRST::regs().lpperi().modify(|_, w| unsafe {
+        w.lp_sel_osc_slow()
+            .bit(new_config == BleLpClkConfig::RcSlow);
+        w.lp_sel_osc_fast().clear_bit();
+        w.lp_sel_xtal().bit(new_config == BleLpClkConfig::Xtal);
+        w.lp_sel_xtal32k().bit(sel_xtal32k);
+        w.lp_bletimer_div_num().bits(divisor as u16);
+        if sel_xtal32k {
+            // 0 routes XTAL32K to the BLE timer 32 kHz input.
+            w.lp_bletimer_32k_sel().bits(0);
+        }
+        w
+    });
 }

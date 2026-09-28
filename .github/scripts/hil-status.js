@@ -1,63 +1,58 @@
-function statusSuffix(kind, conclusion) {
-  if (!conclusion) {
-    return `\n\n**Status update:** ${kind} run is still in progress or status unknown.`;
-  }
+// Verdict reporting for dispatched HIL runs.
+//
+// hil.yml's report job calls this when a dispatched run finishes.
+const STATUS_MARKER = "<!-- HIL_STATUS -->";
+
+function statusText(conclusion, attempt) {
+  const rerun = attempt > 1 ? ` on re-run (attempt ${attempt})` : "";
   if (conclusion === "success") {
-    return `\n\n**Status update:** ✅ ${kind} run **succeeded**.`;
+    return `**Status update:** ✅ HIL run **succeeded**${rerun}.`;
   }
   if (conclusion === "cancelled") {
-    return `\n\n**Status update:** ⚠️ ${kind} run was **cancelled**.`;
+    return `**Status update:** ⚠️ HIL run was **cancelled**${rerun}.`;
   }
-  return `\n\n**Status update:** ❌ ${kind} run **failed** (conclusion: ${conclusion}).`;
+  return `**Status update:** ❌ HIL run **failed**${rerun} (conclusion: ${conclusion}).`;
 }
 
-async function pollRun({
-  github,
-  context,
-  runId,
-  commentId,
-  kind,
-  maxPolls = 180,
-  pollIntervalMs = 15000,
-}) {
+function applyStatus(body, text) {
+  const [head] = body.split(STATUS_MARKER);
+  return `${head.trimEnd()}\n\n${STATUS_MARKER}\n${text}`;
+}
+
+function runConclusion(results) {
+  if (results.includes("cancelled")) return "cancelled";
+  if (results.includes("failure")) return "failure";
+  return "success";
+}
+
+async function updateRunStatus({ github, context, core, pr, conclusion }) {
   const { owner, repo } = context.repo;
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const runId = context.runId;
+  const attempt = Number(process.env.GITHUB_RUN_ATTEMPT);
 
-  let conclusion = null;
-
-  // Poll up to ~45 minutes by default (180 * 15s), matching what dispatch.yml
-  // passes for every HIL mode.
-  for (let i = 0; i < maxPolls; i++) {
-    await delay(pollIntervalMs);
-
-    const { data } = await github.rest.actions.getWorkflowRun({
-      owner,
-      repo,
-      run_id: runId,
-    });
-
-    if (data.status === "completed") {
-      conclusion = data.conclusion;
-      break;
-    }
-  }
-
-  const suffix = statusSuffix(kind, conclusion);
-
-  const comment = await github.rest.issues.getComment({
+  // The dispatcher's confirmation comment is the one carrying this run's URL.
+  const comments = await github.paginate(github.rest.issues.listComments, {
     owner,
     repo,
-    comment_id: commentId,
+    issue_number: pr,
+    per_page: 100,
   });
-
-  const body = `${comment.data.body}\n${suffix}`;
+  const comment = comments.findLast(
+    (c) =>
+      c.user?.login === "github-actions[bot]" &&
+      c.body?.includes(`/actions/runs/${runId}`),
+  );
+  if (!comment) {
+    core.info(`No bot comment on #${pr} references run ${runId}.`);
+    return;
+  }
 
   await github.rest.issues.updateComment({
     owner,
     repo,
-    comment_id: commentId,
-    body,
+    comment_id: comment.id,
+    body: applyStatus(comment.body, statusText(conclusion, attempt)),
   });
 }
 
-module.exports = { pollRun };
+module.exports = { updateRunStatus, runConclusion };

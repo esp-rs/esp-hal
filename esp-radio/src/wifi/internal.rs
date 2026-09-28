@@ -22,6 +22,7 @@ unsafe extern "C" {
         ...
     );
 
+    #[allow(improper_ctypes)]
     pub unsafe fn __esp_radio_log_writev(
         level: crate::sys::c_types::c_uint,
         tag: *const crate::sys::c_types::c_char,

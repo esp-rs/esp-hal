@@ -9,7 +9,7 @@
 
 use core::ptr;
 
-use crate::ble::npl::OsMempool;
+use super::OsMempool;
 
 const OS_OK: i32 = 0;
 const OS_INVALID_PARM: i32 = 3;
@@ -302,7 +302,7 @@ pub unsafe extern "C" fn os_memblock_get(mp: *mut OsMempool) -> *mut u8 {
         }
     }
 
-    let token = unsafe { crate::ESP_RADIO_LOCK.acquire() };
+    let token = unsafe { crate::ble::ESP_RADIO_LOCK.acquire() };
     let block = unsafe {
         if (*mp).mp_num_free == 0 {
             ptr::null_mut()
@@ -316,7 +316,7 @@ pub unsafe extern "C" fn os_memblock_get(mp: *mut OsMempool) -> *mut u8 {
             block.cast()
         }
     };
-    unsafe { crate::ESP_RADIO_LOCK.release(token) };
+    unsafe { crate::ble::ESP_RADIO_LOCK.release(token) };
     block
 }
 
@@ -327,7 +327,7 @@ unsafe fn memblock_put_from_cb(mp: *mut OsMempool, block_addr: *mut u8) -> i32 {
         return OS_INVALID_PARM;
     }
 
-    let token = unsafe { crate::ESP_RADIO_LOCK.acquire() };
+    let token = unsafe { crate::ble::ESP_RADIO_LOCK.acquire() };
     let rc = unsafe {
         let mut cur = (*mp).first.cast::<OsMemblock>();
         let mut dup = false;
@@ -348,7 +348,7 @@ unsafe fn memblock_put_from_cb(mp: *mut OsMempool, block_addr: *mut u8) -> i32 {
             OS_OK
         }
     };
-    unsafe { crate::ESP_RADIO_LOCK.release(token) };
+    unsafe { crate::ble::ESP_RADIO_LOCK.release(token) };
     rc
 }
 

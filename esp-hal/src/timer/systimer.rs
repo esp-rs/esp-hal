@@ -204,7 +204,7 @@ impl<'d> SystemTimer<'d> {
             _ => {
                 cfg_select! {
                     esp32s2 => crate::soc::clocks::apb_clk_frequency() as u64,
-                    esp32h2 => (crate::soc::clocks::xtal_clk_frequency() / 2) as u64,
+                    any(esp32h2, esp32h4) => (crate::soc::clocks::xtal_clk_frequency() / 2) as u64,
                     _ => (crate::soc::clocks::xtal_clk_frequency() * 10 / 25) as u64,
                 }
             }

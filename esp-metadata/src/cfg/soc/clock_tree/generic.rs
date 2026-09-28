@@ -23,6 +23,8 @@ use crate::{
             ConfiguresExpression,
             Expression,
             RejectExpression,
+            RootSource,
+            RootSourceArm,
             SourceFrequencySignature,
             ValidationContext,
             ValuesExpression,
@@ -528,6 +530,37 @@ impl ClockTreeNodeType for Generic {
         })
     }
 
+    fn root_source(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> RootSource {
+        let source_param_name = self.clock_source_parameter();
+        match self.upstream_clocks() {
+            ClockSource::Fixed(input) => RootSource::PassThrough(input.to_string()),
+            ClockSource::Mux(inputs) => {
+                let ty_name = self.param_type_name(instance, source_param_name);
+                let param_name = format_ident!("{source_param_name}");
+                let arms = inputs
+                    .iter()
+                    .map(|variant| {
+                        let name = variant.config_enum_variant_name();
+                        RootSourceArm {
+                            cfg_attr: variant.cfg_attr(),
+                            pattern: quote! { #ty_name::#name },
+                            upstream: variant.outputs.clone(),
+                        }
+                    })
+                    .collect();
+
+                RootSource::Selector {
+                    subject: quote! { config.#param_name() },
+                    arms,
+                }
+            }
+        }
+    }
+
     fn node_source_frequency_impl(
         &self,
         instance: &ClockTreeNodeInstance,
@@ -732,14 +765,14 @@ impl ClockTreeNodeType for Generic {
             match param {
                 NodeParameter::Value(_) => {
                     quote! {
-                        pub(crate) fn #param_name(self) -> u32 {
+                        pub fn #param_name(self) -> u32 {
                             self.#param_name as u32
                         }
                     }
                 }
                 NodeParameter::Source(_) => {
                     quote! {
-                        pub(crate) fn #param_name(self) -> #param_ty {
+                        pub fn #param_name(self) -> #param_ty {
                             self.#param_name
                         }
                     }

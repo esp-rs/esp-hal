@@ -17,10 +17,11 @@ pub(crate) fn enable_wifi(en: bool) {
         w.clk_wifibb_22m_en().bit(en)
     });
 
-    regs!(MODEM_LPCON).clk_conf().modify(|_, w| {
-        w.clk_wifipwr_en().bit(en);
-        w.clk_coex_en().bit(en)
-    });
+    // `clk_wifipwr_en` stays on. The blob calls `wifi_clock_disable` at every doze, and this clock
+    // drives the timer that wakes the modem for the next beacon.
+    regs!(MODEM_LPCON)
+        .clk_conf()
+        .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
 pub(crate) fn enable_ieee802154(en: bool) {

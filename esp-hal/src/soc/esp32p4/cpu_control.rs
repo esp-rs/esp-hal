@@ -1,5 +1,3 @@
-#[cfg(feature = "unstable")]
-use crate::system::multi_core;
 use crate::{
     peripherals::{HP_SYS, HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
     system::Cpu,
@@ -95,67 +93,4 @@ pub(crate) fn start_core1(entry_point: *const u32) {
 
     // Hand the entry point to the ROM, which Core 1 is polling.
     crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);
-}
-
-/// Core 1 entry point set as the boot address.
-///
-/// The ROM jumps here directly, bypassing `_start`, so `gp` and the FPU
-/// are not yet initialized. The naked prologue handles that before calling
-/// regular Rust.
-#[unsafe(naked)]
-#[cfg(feature = "unstable")]
-pub(crate) extern "C" fn start_core1_init<F>() -> !
-where
-    F: FnOnce(),
-{
-    core::arch::naked_asm!(
-        // Set up the global pointer so GP-relative symbol accesses work.
-        ".option push",
-        ".option norelax",
-        "la gp, __global_pointer$",
-        "li ra, 0", // ensure probe-rs stops unwinding
-        ".option pop",
-        // Initialize the FPU (riscv32imafc has F).
-        "li t0, 0x6000",
-        "csrrs x0, mstatus, t0",
-        "fscsr x0",
-        // Switch to Core 1's stack (stored by Core 0 before releasing this core).
-        "la t0, {stack_top}",
-        "lw sp, 0(t0)",
-        // Tail-call into regular Rust.
-        "j {init}",
-        stack_top = sym multi_core::APP_CORE_STACK_TOP,
-        init      = sym start_core1_init_impl::<F>,
-    )
-}
-
-#[cfg(feature = "unstable")]
-fn start_core1_init_impl<F>() -> !
-where
-    F: FnOnce(),
-{
-    crate::soc::enable_branch_predictor();
-
-    // The ROM has already handed off to us; clear the AppCpu boot address so a
-    // subsequent software reset doesn't re-enter this stale entry point.
-    // Matches IDF's `call_start_cpu1`.
-    crate::rom::ets_set_appcpu_boot_addr(0);
-
-    unsafe {
-        #[cfg(all(feature = "rt", stack_guard_monitoring))]
-        {
-            let guard =
-                multi_core::APP_CORE_STACK_GUARD.load(core::sync::atomic::Ordering::Acquire);
-            guard.write_volatile(esp_config::esp_config_int!(
-                u32,
-                "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-            ));
-            crate::debugger::set_stack_watchpoint(guard as usize);
-        }
-        crate::interrupt::init_vectoring();
-        #[cfg(all(feature = "rt", feature = "unstable"))]
-        crate::interrupt::ipc::install_app();
-    }
-
-    unsafe { multi_core::CpuControl::start_core1_run::<F>() }
 }

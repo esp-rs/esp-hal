@@ -866,14 +866,15 @@ impl RtcSleepConfig {
         self.deep_slp()
     }
 
-    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
-        self.deep = kind == SleepKind::Deep;
-    }
-
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {}
 
-    /// Finalize power-down flags, apply configuration based on the flags.
-    pub(crate) fn apply(&mut self) {
+    /// Selects the kind of the sleep, and what the sleep powers down.
+    ///
+    /// Sleep entry calls this before the hooks of the wakeup sources, so that a source can keep
+    /// powered what it needs.
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.deep = kind == SleepKind::Deep;
+
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(

@@ -1,19 +1,16 @@
 //! Bluetooth Low Energy HCI interface
 
-#[cfg(bt_controller = "btdm")]
-pub(crate) mod btdm;
+mod lp_clk;
 
-#[cfg(bt_controller = "npl")]
-pub(crate) mod npl;
-#[cfg(bt_controller = "npl")]
-mod os_mempool;
-
+#[cfg_attr(bt_controller = "btdm", path = "btdm/mod.rs")]
+#[cfg_attr(bt_controller = "npl", path = "npl/mod.rs")]
+#[cfg_attr(bt_controller = "btdm2", path = "btdm2/mod.rs")]
+pub(crate) mod porting;
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
-use core::mem::MaybeUninit;
 
-pub(crate) use ble::{ble_deinit, ble_init, send_hci, send_hci_async};
 use docsplay::Display;
 use esp_sync::NonReentrantMutex;
+pub(crate) use porting::{ble_deinit, ble_init};
 
 /// An error that is returned when the configuration is invalid.
 #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -24,33 +21,63 @@ pub struct InvalidConfigError;
 impl core::error::Error for InvalidConfigError {}
 
 // Expose chip-specific configuration types
-pub use ble::ble_os_adapter_chip_specific::*;
+pub use porting::chip_specific::*;
 
-#[cfg(bt_controller = "btdm")]
-use self::btdm as ble;
-#[cfg(bt_controller = "npl")]
-use self::npl as ble;
+pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
+/// Returns whether the caller runs in an interrupt handler.
+///
+/// The controller calls some of the OS glue from its interrupt handlers. Those calls must not
+/// block, so they use the try-variant of the operation.
+#[cfg(any(bt_controller = "npl", bt_controller = "btdm2"))]
+pub(crate) fn in_isr() -> bool {
+    !crate::hal::interrupt::RunLevel::current().is_thread()
+}
+
+static MODEM_SLEEP: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
+static MODEM_PHY_OFF: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
+
+pub(crate) fn set_modem_sleep(enabled: bool) {
+    MODEM_SLEEP.store(enabled, portable_atomic::Ordering::Relaxed);
+}
+
+#[allow(dead_code, reason = "The ESP32 BTDM adapter reads this flag")]
+pub(crate) fn modem_sleep_enabled() -> bool {
+    MODEM_SLEEP.load(portable_atomic::Ordering::Relaxed)
+}
+
+/// Drops the extra PHY reference taken around controller sleep.
+///
+/// The controller's [`esp_phy::PhyInitGuard`] stays alive. This pairs with
+/// [`modem_phy_acquire`].
+pub(crate) fn modem_phy_release() {
+    if !MODEM_PHY_OFF.swap(true, portable_atomic::Ordering::SeqCst) {
+        esp_phy::disable_phy();
+    }
+}
+
+/// Restores the PHY reference if sleep left it off.
+///
+/// Returns `true` if the reference was restored.
+pub(crate) fn modem_phy_acquire() -> bool {
+    let restore = MODEM_PHY_OFF.swap(false, portable_atomic::Ordering::SeqCst);
+    if restore {
+        core::mem::forget(esp_phy::enable_phy());
+    }
+    restore
+}
 
 unstable_module! {
     pub mod controller;
 }
 
+// btdm2 registers its own `wr_btdm_osal_malloc` / `wr_btdm_osal_free` wrappers.
+#[cfg(not(bt_controller = "btdm2"))]
 pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::sys::c_types::c_void {
     unsafe { crate::compat::malloc::malloc(size as usize).cast() }
 }
 
-#[cfg(any(esp32, esp32c3, esp32s3))]
-pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
-    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
-}
-
-#[cfg(any(esp32c3, esp32s3))]
-pub(crate) unsafe extern "C" fn malloc_retention(size: u32) -> *mut crate::sys::c_types::c_void {
-    // IDF uses heap_caps_malloc(size, MALLOC_CAP_RETENTION). We have no retention
-    // heap, so fall back to the same internal allocator as malloc_internal.
-    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
-}
-
+#[cfg(not(bt_controller = "btdm2"))]
 pub(crate) unsafe extern "C" fn free(ptr: *mut crate::sys::c_types::c_void) {
     unsafe { crate::compat::malloc::free(ptr.cast()) }
 }
@@ -67,8 +94,6 @@ static BT_STATE: NonReentrantMutex<BleState> = NonReentrantMutex::new(BleState {
     partial_read: None,
 });
 
-static mut HCI_OUT_COLLECTOR: MaybeUninit<HciOutCollector> = MaybeUninit::uninit();
-
 #[derive(PartialEq, Debug)]
 enum HciOutType {
     Unknown,
@@ -84,7 +109,7 @@ const MAX_HCI_PACKET_LEN: usize = 259;
 /// The byte-stream write APIs put no constraint on where the caller splits a packet, and one
 /// write can hold several packets. The collector takes only the bytes that the packet in progress
 /// still needs, so that it never runs past a packet boundary.
-struct HciOutCollector {
+pub(crate) struct HciOutCollector {
     data: [u8; MAX_HCI_PACKET_LEN],
     index: usize,
     ready: bool,
@@ -92,7 +117,7 @@ struct HciOutCollector {
 }
 
 impl HciOutCollector {
-    fn new() -> HciOutCollector {
+    pub(crate) const fn new() -> HciOutCollector {
         HciOutCollector {
             data: [0u8; MAX_HCI_PACKET_LEN],
             index: 0,
@@ -193,24 +218,43 @@ impl HciOutCollector {
     fn packet(&self) -> &[u8] {
         &self.data[0..self.index]
     }
-}
 
-/// Collects bytes of the host's stream, and passes the packet to `send` once it is complete.
-///
-/// This behaves like a byte-stream write: it handles at most one packet, and returns the number
-/// of bytes it took from `data`. Bytes that belong to the next packet stay in `data`, so the
-/// caller offers the rest in a later call. A non-empty `data` always yields a non-zero count.
-pub(crate) fn collect_and_send(data: &[u8], send: impl FnOnce(&[u8])) -> usize {
-    let hci_out = unsafe { (*core::ptr::addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
+    pub(crate) fn write(&mut self, buf: &[u8]) -> usize {
+        let taken = self.push(buf);
 
-    let taken = hci_out.push(data);
+        if self.is_ready() {
+            porting::send(self.packet());
+            self.reset();
+        }
 
-    if hci_out.is_ready() {
-        send(hci_out.packet());
-        hci_out.reset();
+        taken
     }
 
-    taken
+    pub(crate) async fn write_async(&mut self, buf: &[u8]) -> usize {
+        let taken = self.push(buf);
+
+        if self.is_ready() {
+            porting::send_async(self.packet()).await;
+            self.reset();
+        }
+
+        taken
+    }
+}
+
+impl embedded_io_07::ErrorType for HciOutCollector {
+    type Error = controller::BleConnectorError;
+}
+
+impl embedded_io_async_07::Write for HciOutCollector {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        Ok(self.write_async(buf).await)
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        // nothing to do
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

@@ -230,18 +230,12 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_aon_pd_en(pd_flags.pd_hp_aon());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
-        if pd_flags.pd_modem() {
-            // The modem (Wi-Fi/BLE) power domain is powered down during sleep, so
-            // isolate and retain its analog I2C buses as before.
+        if pd_flags.pd_modem() || pd_flags.pd_bbpll() {
             self.hp_sys.clk.set_i2c_iso_en(true);
             self.hp_sys.clk.set_i2c_retention(true);
         } else {
-            // The modem power domain is kept on across (light-)sleep
-            // (`pd_modem == false`, the default). In that case its analog blocks -
-            // the BBPLL and the analog I2C buses used to (re)configure it - must be
-            // kept powered too, matching the `HP_MODEM` power state. Otherwise the
-            // radio comes back without a usable PLL and can no longer transmit
-            // (e.g. BLE advertising silently stops working) after wakeup.
+            // Keep the BBPLL, and the analog I2C buses that configure it, as in the `HP_MODEM`
+            // power state. BLE cannot transmit after the wake without them.
             self.hp_sys.clk.set_i2c_iso_en(false);
             self.hp_sys.clk.set_i2c_retention(false);
             self.hp_sys.clk.set_xpd_bb_i2c(true);
@@ -624,6 +618,9 @@ bitfield::bitfield! {
     pub u32, pd_rc32k    , set_pd_rc32k    : 13;
     /// Controls the power-down status of the low-power peripheral domain.
     pub u32, pd_lp_periph, set_pd_lp_periph: 14;
+    /// Controls the power-down status of the BBPLL and the analog I2C buses that configure it,
+    /// while the modem domain stays powered.
+    pub u32, pd_bbpll    , set_pd_bbpll    : 15;
 }
 
 impl PowerDownFlags {
@@ -695,14 +692,15 @@ impl RtcSleepConfig {
         self.deep
     }
 
-    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
-        self.deep = kind == SleepKind::Deep;
-    }
-
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {}
 
-    /// Finalize power-down flags, apply configuration based on the flags.
-    pub(crate) fn apply(&mut self) {
+    /// Selects the kind of the sleep, and what the sleep powers down.
+    ///
+    /// Sleep entry calls this before the hooks of the wakeup sources, so that a source can keep
+    /// powered what it needs.
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.deep = kind == SleepKind::Deep;
+
         let lp_slow_uses_xtal32k = cfg_select! {
             use_xtal32k => ClockTree::with(|clocks| {
                 matches!(
@@ -727,6 +725,7 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
             self.pd_flags.set_pd_rc32k(true);
             self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags.set_pd_bbpll(true);
         } else {
             // Light sleep: the digital domain (CPU, RAM, peripherals) stays powered
             // and only clock-gated, so execution resumes in place. To cut power we
@@ -738,6 +737,7 @@ impl RtcSleepConfig {
             self.pd_flags.set_pd_xtal(true);
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
+            self.pd_flags.set_pd_bbpll(true);
         }
     }
 

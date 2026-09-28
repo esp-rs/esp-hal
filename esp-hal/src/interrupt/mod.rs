@@ -229,62 +229,36 @@ impl InterruptStatus {
         match cpu {
             Cpu::ProCpu => {
                 cfg_select! {
-                    esp32s31 => {
-                        if word == 5 {
-                            // Discontiguous, cannot be part of the standard status array
-                            return INTERRUPT_CORE0::regs().core_0_intr_status5().read().bits()
-                                & 0x1ff;
-                        }
-                        INTERRUPT_CORE0::regs()
-                            .core_0_intr_status(word)
-                            .read()
-                            .bits()
-                    }
                     esp32p4 => {
                         if word == 4 {
                             // Discontiguous, cannot be part of the standard status array
                             return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
                         }
-                        INTERRUPT_CORE0::regs()
-                            .core_0_intr_status(word)
-                            .read()
-                            .bits()
                     }
-                    _ => INTERRUPT_CORE0::regs()
-                        .core_0_intr_status(word)
-                        .read()
-                        .bits(),
+                    _ => {}
                 }
+
+                INTERRUPT_CORE0::regs()
+                    .core_0_intr_status(word)
+                    .read()
+                    .bits()
             }
             #[cfg(multi_core)]
             Cpu::AppCpu => {
                 cfg_select! {
-                    esp32s31 => {
-                        if word == 5 {
-                            // Discontiguous, cannot be part of the standard status array
-                            return INTERRUPT_CORE1::regs().core_1_intr_status5().read().bits()
-                                & 0x1ff;
-                        }
-                        INTERRUPT_CORE1::regs()
-                            .core_1_intr_status(word)
-                            .read()
-                            .bits()
-                    }
                     esp32p4 => {
                         if word == 4 {
                             // Discontiguous, cannot be part of the standard status array
                             return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
                         }
-                        INTERRUPT_CORE1::regs()
-                            .core_1_intr_status(word)
-                            .read()
-                            .bits()
                     }
-                    _ => INTERRUPT_CORE1::regs()
-                        .core_1_intr_status(word)
-                        .read()
-                        .bits(),
+                    _ => {}
                 }
+
+                INTERRUPT_CORE1::regs()
+                    .core_1_intr_status(word)
+                    .read()
+                    .bits()
             }
         }
     }

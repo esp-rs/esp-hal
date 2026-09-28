@@ -21,3 +21,6 @@ img\.shields\.io/badge/MSRV-
 # Ignore sites that may not tolerate us spamming them
 http://httpbin\.org/
 https://stackoverflow\.com/
+
+# Unreleased documentation
+^https://www\.espressif\.com/sites/default/files/documentation/esp32-h4_(datasheet|technical_reference_manual)_en\.pdf$

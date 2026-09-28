@@ -87,6 +87,12 @@ impl TxPower {
 #[derive(BuilderLite, Clone, Copy, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
+    /// Enables controller modem sleep.
+    ///
+    /// The low-power clock source comes from the clock tree (`BLE_LP_CLK`).
+    /// Set this before the controller starts. The default is off.
+    modem_sleep: bool,
+
     /// The priority of the RTOS task.
     task_priority: u8,
 
@@ -206,6 +212,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            modem_sleep: false,
             task_priority: crate::preempt::max_task_priority()
                 .saturating_sub(2)
                 .min(255) as u8,
@@ -276,7 +283,7 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_rsp_dup_list_count: config.ll_rsp_dup_list_count,
         ble_ll_adv_dup_list_count: config.ll_adv_dup_list_count,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
-        rtc_freq: 32768,
+        rtc_freq: u64::from(super::super::lp_clk::frequency_hz()),
         ble_ll_sca: 60,
         ble_ll_scan_phy_number: 2,
         ble_ll_conn_def_auth_pyld_tmo: 3000,
@@ -301,16 +308,17 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         enable_bqb_test: config.bqb_test as u8,
         enable_tx_cca: config.cca as u8,
         cca_rssi_thresh: (256 - config.cca_threshold as u32) as u8,
-        sleep_en: 0,
+        sleep_en: u8::from(config.modem_sleep),
         coex_phy_coded_tx_rx_time_limit: 0,
         dis_scan_backoff: config.dis_scan_backoff as u8,
         ble_scan_classify_filter_enable: 1,
         cca_drop_mode: 0,  //???
         cca_low_tx_pwr: 0, //???
-        main_xtal_freq: 48,
+        main_xtal_freq: 40,
         ignore_wl_for_direct_adv: 0,
-        cpu_freq_mhz: 240,
+        cpu_freq_mhz: 160,
         enable_pcl: 0, // CONFIG_BT_LE_POWER_CONTROL_ENABLED
+        version_num: esp_hal::efuse::minor_chip_version() as u32,
         csa2_select: 1,
         enable_csr: 0,
         ble_aa_check: config.verify_access_address as u8,
@@ -376,6 +384,10 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 
 pub(super) fn ble_rtc_clk_init() {
     crate::radio_clocks::clocks_ll::ble_rtc_clk_init();
+}
+
+pub(super) unsafe extern "C" fn reset_modem(_mdl_opts: u8, _start: u8) {
+    todo!()
 }
 
 #[unsafe(no_mangle)]

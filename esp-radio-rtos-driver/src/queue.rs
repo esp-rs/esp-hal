@@ -54,6 +54,11 @@ unsafe extern "Rust" {
         item: *const u8,
         higher_prio_task_waken: Option<&mut bool>,
     ) -> bool;
+    fn esp_rtos_queue_try_send_to_front_from_isr(
+        queue: QueuePtr,
+        item: *const u8,
+        higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool;
     fn esp_rtos_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool;
     fn esp_rtos_queue_receive_with_deadline(
         queue: QueuePtr,
@@ -222,6 +227,23 @@ pub trait QueueImplementation {
         higher_prio_task_waken: Option<&mut bool>,
     ) -> bool;
 
+    /// Attempts to enqueues an item at the front of the queue.
+    ///
+    /// If the queue is full, this function will immediately return `false`.
+    ///
+    /// The `higher_prio_task_waken` parameter is an optional mutable reference to a boolean flag.
+    /// If the flag is `Some`, the implementation may set it to `true` to request a context switch.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    unsafe fn try_send_to_front_from_isr(
+        queue: QueuePtr,
+        item: *const u8,
+        higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool;
+
     /// Dequeues an item from the queue.
     ///
     /// If the queue is empty, this function will block for the given timeout. If timeout is None,
@@ -363,6 +385,22 @@ macro_rules! register_queue_implementation {
         ) -> bool {
             unsafe {
                 <$t as $crate::queue::QueueImplementation>::try_send_to_back_from_isr(
+                    queue,
+                    item,
+                    higher_prio_task_waken,
+                )
+            }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_rtos_queue_try_send_to_front_from_isr(
+            queue: $crate::queue::QueuePtr,
+            item: *const u8,
+            higher_prio_task_waken: Option<&mut bool>,
+        ) -> bool {
+            unsafe {
+                <$t as $crate::queue::QueueImplementation>::try_send_to_front_from_isr(
                     queue,
                     item,
                     higher_prio_task_waken,
@@ -565,6 +603,28 @@ impl QueueHandle {
     ) -> bool {
         unsafe {
             esp_rtos_queue_try_send_to_back_from_isr(self.0, item, higher_priority_task_waken)
+        }
+    }
+
+    /// Attempts to enqueues an item at the front of the queue.
+    ///
+    /// If the queue is full, this function will immediately return `false`.
+    ///
+    /// If a higher priority task is woken up by this operation, the `higher_prio_task_waken` flag
+    /// is set to `true`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    #[inline]
+    pub unsafe fn try_send_to_front_from_isr(
+        &self,
+        item: *const u8,
+        higher_priority_task_waken: Option<&mut bool>,
+    ) -> bool {
+        unsafe {
+            esp_rtos_queue_try_send_to_front_from_isr(self.0, item, higher_priority_task_waken)
         }
     }
 
@@ -862,6 +922,27 @@ mod implementation {
                 .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
             {
                 queue.with(|inner| inner.send_to_back(item));
+                queue
+                    .semaphore_full
+                    .try_give_from_isr(higher_prio_task_waken);
+                true
+            } else {
+                false
+            }
+        }
+
+        unsafe fn try_send_to_front_from_isr(
+            queue: QueuePtr,
+            item: *const u8,
+            mut higher_prio_task_waken: Option<&mut bool>,
+        ) -> bool {
+            let queue = unsafe { CompatQueue::from_ptr(queue) };
+
+            if queue
+                .semaphore_empty
+                .try_take_from_isr(higher_prio_task_waken.as_deref_mut())
+            {
+                queue.with(|inner| inner.send_to_front(item));
                 queue
                     .semaphore_full
                     .try_give_from_isr(higher_prio_task_waken);

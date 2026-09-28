@@ -297,6 +297,13 @@ you can use the `crate-name/feature-name` format.
 This key is additive. The unnamed list is added to named lists, and multiple lists with the
 same name are merged.
 
+`FEATURES-IF(expr)` adds those features on every existing configuration, only for chips
+matching `expr` (the same syntax as `CHIP_FILTER`), and never creates a binary:
+
+```
+//% FEATURES-IF(esp32s3): psram
+```
+
 ### `//% ENV`
 
 Environmental variables to be set, when building the test or example. This is
@@ -311,6 +318,16 @@ One environment variable is specified in a single line. The name and value are s
 
 This key is additive. The unnamed list is added to named lists, and multiple lists with the
 same name are merged.
+
+`ENV(name)` creates that configuration if it does not exist. `ENV-IF(expr)` sets one
+variable on every existing configuration, only for chips matching `expr` (the same syntax
+as `CHIP_FILTER`), and never creates a binary. Other env vars are left as they are. If that
+variable was already set, this line replaces it for those chips:
+
+```
+//% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
+//% ENV-IF(psram_driver_supported && !soc_has_flash): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
+```
 
 ### `//% CARGO-CONFIG`
 

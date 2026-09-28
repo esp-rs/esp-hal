@@ -12,6 +12,31 @@ pub struct RcFastCalibrationProperties {
     tick_enable: bool,
 }
 
+/// The RC_SLOW calibration input may be tapped ahead of the divider that produces the RTC slow
+/// clock, in which case the calibration counts `multiplier` input cycles per measured cycle.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RcSlowCalibrationProperties {
+    multiplier: u32,
+}
+
+impl GenericProperty for RcSlowCalibrationProperties {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        Some(vec![String::from(
+            "timergroup_rc_slow_calibration_multiplier",
+        )])
+    }
+
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        let multiplier = number(self.multiplier);
+        quote! {
+            ("timergroup.rc_slow_calibration_multiplier") => {
+                #multiplier
+            };
+        }
+    }
+}
+
 impl GenericProperty for RcFastCalibrationProperties {
     fn cfgs(&self) -> Option<Vec<String>> {
         let mut cfgs = vec![String::from("timergroup_rc_fast_calibration_divider")];

@@ -10,8 +10,6 @@ pub use fields::*;
 pub enum AdcCalibUnit {
     /// Selects efuse calibration data for ADC1.
     ADC1,
-    /// Selects efuse calibration data for ADC2.
-    ADC2,
 }
 
 /// Returns whether SPI boot encryption is enabled.
@@ -105,11 +103,7 @@ pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
         Attenuation::_11dB => ADC1_CAL_VOL_ATTEN3,
     });
 
-    let cal_code = if cal_code & (1 << 9) != 0 {
-        2000 - (cal_code & !(1 << 9))
-    } else {
-        2000 + cal_code
-    };
+    let cal_code = (2000 + super::sign_magnitude(cal_code as u32, 9)) as u16;
 
     Some(cal_code)
 }

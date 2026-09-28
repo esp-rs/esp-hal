@@ -17,7 +17,8 @@
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, TIMG0},
+    efuse::ChipRevision,
+    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, TIMG0},
     soc::{regi2c, xtal32k},
 };
 
@@ -56,6 +57,7 @@ impl CpuClock {
         iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         timg_calibration_clock: None,
     };
     const PRESET_160: ClockConfig = ClockConfig {
@@ -73,6 +75,7 @@ impl CpuClock {
         iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
         lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         timg_calibration_clock: None,
     };
 }
@@ -747,5 +750,63 @@ impl TimgInstance {
                     TimgWdtClockConfig::RcFastClk => 2,
                 })
             });
+    }
+}
+
+// BLE_LP_XTAL_CLK
+
+fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+// BLE_LP_CLK
+
+fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_lp_timer_en().bit(en));
+}
+
+fn configure_ble_lp_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<BleLpClkConfig>,
+    new_config: BleLpClkConfig,
+) {
+    let divisor = match new_config {
+        BleLpClkConfig::Xtal => {
+            let mut ratio = xtal_clk_frequency() / ble_lp_xtal_clk_frequency();
+            // After v0.0, the crystal reaches this divider through a fixed divide-by-80 stage in
+            // the modem power domain.
+            if crate::soc::chip_revision_above(ChipRevision::from_combined(1)) {
+                ratio /= 80;
+            }
+            ratio - 1
+        }
+        _ => 0,
+    };
+    let sel_xtal32k = cfg_select! {
+        use_xtal32k => new_config == BleLpClkConfig::Xtal32k,
+        _ => false,
+    };
+
+    MODEM_LPCON::regs()
+        .test_conf()
+        .modify(|_, w| w.clk_en().set_bit());
+
+    MODEM_LPCON::regs().lp_timer_conf().modify(|_, w| unsafe {
+        w.clk_lp_timer_sel_osc_slow()
+            .bit(new_config == BleLpClkConfig::RcSlow);
+        w.clk_lp_timer_sel_osc_fast().clear_bit();
+        w.clk_lp_timer_sel_xtal()
+            .bit(new_config == BleLpClkConfig::Xtal);
+        w.clk_lp_timer_sel_xtal32k().bit(sel_xtal32k);
+        w.clk_lp_timer_div_num().bits(divisor as u16)
+    });
+
+    if sel_xtal32k {
+        // 0 routes XTAL32K to the modem 32 kHz input.
+        MODEM_LPCON::regs()
+            .modem_32k_clk_conf()
+            .modify(|_, w| unsafe { w.clk_modem_32k_sel().bits(0) });
     }
 }

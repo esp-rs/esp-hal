@@ -146,6 +146,7 @@ fn main() -> Result<()> {
         // Release-related subcommands:
         Cli::Release(release) => match release {
             Release::ChangelogPreview(args) => changelog_preview(&workspace, args),
+            #[cfg(feature = "release")]
             Release::BumpVersion(args) => bump_version(&workspace, args),
             Release::TagReleases(args) => tag_releases(&workspace, args),
             Release::Publish(args) => publish(&workspace, args),

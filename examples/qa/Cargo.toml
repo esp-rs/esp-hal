@@ -129,6 +129,15 @@ esp32h2 = [
     "esp-radio?/esp32h2",
     "esp-storage?/esp32h2",
 ]
+esp32h4 = [
+    "esp-alloc/esp32h4",
+    "esp-backtrace/esp32h4",
+    "esp-bootloader-esp-idf/esp32h4",
+    "esp-hal/esp32h4",
+    "esp-rtos/esp32h4",
+    "esp-println/esp32h4",
+    "esp-storage?/esp32h4",
+]
 esp32p4 = [
     "esp-alloc/esp32p4",
     "esp-backtrace/esp32p4",

@@ -21,7 +21,7 @@ use crate::{
         VersionBump,
         checker::min_package_update,
         do_version_bump,
-        release::changelog_preview,
+        release::{changelog_preview, registry::RegistrySnapshot},
     },
     git::{BackportInfo, current_branch, parse_backport_branch},
     metadata::Chip,
@@ -325,12 +325,15 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         .collect::<HashMap<_, _>>();
     validate_release_closure(workspace, &releasing)?;
 
-    let plan = Plan {
+    let mut plan = Plan {
         base: current_branch,
         slug,
         backport: backport.clone(),
         packages: plan_packages,
     };
+
+    let registry = RegistrySnapshot::fetch(plan.packages.iter().map(|step| step.package))?;
+    resolve_reserved_versions(&mut plan.packages, &registry)?;
 
     log::debug!("Writing release plan to {}", plan_path.display());
 
@@ -352,6 +355,9 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // You don't need to change versions and tag names. The plan will be updated when applying the
 // release plan. The release plan will then be added to the release PR and will be used to
 // orchestrate the actual publishing process.
+//
+// Version numbers crates.io already holds are skipped automatically: a yanked release keeps its
+// number reserved forever. Change the bump to release something else.
 //
 // For each package, this plan contains the version bump that will be applied.
 // A bump has two orthogonal fields — `base` (how much to bump
@@ -399,6 +405,21 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
         "To apply the release plan, you'll need to remove the heading comment, save the \
         file, then run the following command: `cargo xrelease execute-plan`",
     );
+
+    Ok(())
+}
+
+/// Step every planned version crates.io already holds, keeping each tag name
+/// pointing at the version it will actually be cut for.
+fn resolve_reserved_versions(
+    plan_packages: &mut [PackagePlan],
+    registry: &RegistrySnapshot,
+) -> Result<()> {
+    for step in plan_packages.iter_mut() {
+        step.new_version =
+            registry.next_free_version(step.package, &step.new_version, &step.bump)?;
+        step.tag_name = step.package.tag(&step.new_version);
+    }
 
     Ok(())
 }
@@ -1060,6 +1081,39 @@ mod tests {
         ]
         .into_iter()
         .collect()
+    }
+
+    /// A plan entry for [`resolve_reserved_versions`], which reads only
+    /// `package`, `new_version` and `bump`.
+    fn planned(package: Package, new_version: &str, bump: VersionBump) -> PackagePlan {
+        let new_version = ver(new_version);
+
+        PackagePlan {
+            package,
+            semver_checked: false,
+            current_version: new_version.clone(),
+            tag_name: package.tag(&new_version),
+            new_version,
+            bump,
+        }
+    }
+
+    #[test]
+    fn a_reservation_moves_one_entry_and_leaves_the_rest() {
+        // esp-rs/esp-hal#5385: esp-sync 0.2.0 is yanked, so the plan cannot use
+        // it, and the tag has to follow the version it is cut for.
+        let mut plan = vec![
+            planned(Package::EspSync, "0.2.0", VersionBump::minor()),
+            planned(Package::EspHal, "1.2.0", VersionBump::minor()),
+        ];
+        let registry = RegistrySnapshot::from_taken([(Package::EspSync, vec![ver("0.2.0")])]);
+
+        resolve_reserved_versions(&mut plan, &registry).unwrap();
+
+        assert_eq!(plan[0].new_version, ver("0.2.1"));
+        assert_eq!(plan[0].tag_name, "esp-sync-v0.2.1");
+        assert_eq!(plan[1].new_version, ver("1.2.0"));
+        assert_eq!(plan[1].tag_name, "esp-hal-v1.2.0");
     }
 
     #[test]

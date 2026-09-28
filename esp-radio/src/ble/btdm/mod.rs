@@ -1,23 +1,14 @@
 use alloc::boxed::Box;
-use core::{
-    ptr::{NonNull, addr_of_mut},
-    task::Poll,
-};
+use core::{ptr::NonNull, task::Poll};
 
 use esp_phy::PhyInitGuard;
-use esp_sync::RawMutex;
-use portable_atomic::{AtomicBool, Ordering};
+use portable_atomic::{AtomicBool, AtomicU32, Ordering};
 
 use super::{Config, ReceivedPacket};
 #[cfg(feature = "coex")]
 use crate::sys::include;
 use crate::{
     asynch::AtomicWaker,
-    ble::{
-        HCI_OUT_COLLECTOR,
-        HciOutCollector,
-        btdm::ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s},
-    },
     compat::common::str_from_c,
     hal::ram,
     sys::{c_types::*, include::*},
@@ -26,7 +17,13 @@ use crate::{
 #[cfg_attr(esp32c3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32s3, path = "os_adapter_esp32c3_s3.rs")]
 #[cfg_attr(esp32, path = "os_adapter_esp32.rs")]
-pub(crate) mod ble_os_adapter_chip_specific;
+pub(crate) mod chip_specific;
+
+use chip_specific::{G_OSI_FUNCS, osi_funcs_s};
+
+pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::sys::c_types::c_void {
+    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
+}
 
 static PACKET_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 static PACKET_SENT_WAKER: AtomicWaker = AtomicWaker::new();
@@ -95,35 +92,28 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-// This is fine, we're only accessing it inside a critical section (protected by INTERRUPT_LOCK).
-static mut G_INTER_FLAGS: heapless::Vec<esp_sync::RestoreState, 10> = heapless::Vec::new();
-
-static INTERRUPT_LOCK: RawMutex = RawMutex::new();
+static CRITICAL_NEST: AtomicU32 = AtomicU32::new(0);
+static CRITICAL_TOKEN: AtomicU32 = AtomicU32::new(0);
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
-    #[allow(static_mut_refs)]
-    unsafe {
-        let flags = unwrap!(
-            G_INTER_FLAGS.pop(),
-            "interrupt_enable called without prior interrupt_disable"
-        );
-        trace!("interrupt_enable {:?}", flags);
-        INTERRUPT_LOCK.release(flags);
+    trace!("interrupt_enable");
+    if CRITICAL_NEST.fetch_sub(1, Ordering::Release) == 1 {
+        let last = CRITICAL_TOKEN.load(Ordering::Relaxed);
+
+        unsafe {
+            super::ESP_RADIO_LOCK.release(esp_sync::RestoreState::new(last));
+        }
     }
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    #[allow(static_mut_refs)]
-    unsafe {
-        let flags = INTERRUPT_LOCK.acquire();
-        unwrap!(
-            G_INTER_FLAGS.push(flags),
-            "interrupt_disable was called too many times"
-        );
-        trace!("interrupt_disable {:?}", flags);
+    let last = CRITICAL_NEST.fetch_add(1, Ordering::Release);
+    if last == 0 {
+        let token = unsafe { super::ESP_RADIO_LOCK.acquire().inner() };
+        CRITICAL_TOKEN.store(token, Ordering::Relaxed);
     }
 }
 
@@ -215,62 +205,140 @@ unsafe extern "C" fn rand() -> i32 {
     unsafe { crate::common_adapter::random() as i32 }
 }
 
+const LP_CYCLE_US_FRAC: u32 = 19;
+static LP_CYCLE_US: AtomicU32 = AtomicU32::new(1 << LP_CYCLE_US_FRAC);
+
+unsafe extern "C" {
+    fn btdm_lpclk_select_src(sel: u32) -> bool;
+    fn btdm_lpclk_set_div(div: u32) -> bool;
+    #[cfg(not(esp32))]
+    fn btdm_sleep_clock_sync() -> u8;
+    fn btdm_controller_enable_sleep(enable: bool);
+    fn btdm_wakeup_request();
+    fn btdm_in_wakeup_requesting_set(set: bool);
+    fn btdm_power_state_active() -> bool;
+
+    #[cfg(feature = "coex")]
+    fn coex_update_lpclk_interval();
+}
+
+fn program_btdm_lpclk() {
+    let params = super::lp_clk::btdm();
+    LP_CYCLE_US.store(params.lpcycle_us, Ordering::Relaxed);
+    unsafe {
+        let selected = btdm_lpclk_select_src(params.select);
+        let divided = btdm_lpclk_set_div(params.divider);
+        assert!(selected && divided, "btdm_lpclk_select_src/set_div failed");
+        #[cfg(feature = "coex")]
+        coex_update_lpclk_interval();
+    }
+}
+
 #[ram]
-unsafe extern "C" fn btdm_lpcycles_2_hus(_cycles: u32, _error_corr: u32) -> u32 {
-    todo!();
+unsafe extern "C" fn btdm_lpcycles_2_hus(cycles: u32, error_corr: u32) -> u32 {
+    let lpcycle_us = LP_CYCLE_US.load(Ordering::Relaxed).max(1);
+    cfg_select! {
+        esp32 => {
+            let _ = error_corr;
+            let us = u64::from(lpcycle_us) * u64::from(cycles);
+            ((us + (1 << (LP_CYCLE_US_FRAC - 1))) >> LP_CYCLE_US_FRAC) as u32
+        }
+        _ => {
+            let error_corr = error_corr as *mut u32;
+            let mut local = if error_corr.is_null() {
+                0
+            } else {
+                unsafe { u64::from(*error_corr) }
+            };
+            let mut res = u64::from(lpcycle_us) * u64::from(cycles) * 2;
+            local += res;
+            res = local >> LP_CYCLE_US_FRAC;
+            local -= res << LP_CYCLE_US_FRAC;
+            if !error_corr.is_null() {
+                unsafe { *error_corr = local as u32 };
+            }
+            res as u32
+        }
+    }
 }
 
 #[ram]
 unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
-    const RTC_CLK_CAL_FRACT: u32 = 19;
-    let g_btdm_lpcycle_us_frac = RTC_CLK_CAL_FRACT;
-    let g_btdm_lpcycle_us = 2 << (g_btdm_lpcycle_us_frac);
-
-    // Converts a duration in half us into a number of low power clock cycles.
-    let cycles: u64 = ((us as u64) << g_btdm_lpcycle_us_frac) / (g_btdm_lpcycle_us as u64);
-    trace!("btdm_hus_2_lpcycles {} {}", us, cycles);
-
-    cycles as u32
+    let lpcycle_us = u64::from(LP_CYCLE_US.load(Ordering::Relaxed).max(1));
+    let cycles = (u64::from(us) << LP_CYCLE_US_FRAC) / lpcycle_us;
+    cfg_select! {
+        esp32 => cycles as u32,
+        _ => (cycles >> 1) as u32,
+    }
 }
 
-unsafe extern "C" fn btdm_sleep_check_duration(_slot_cnt: i32) -> i32 {
-    todo!();
+#[ram]
+unsafe extern "C" fn btdm_sleep_check_duration(slot_cnt: i32) -> i32 {
+    if !super::modem_sleep_enabled() {
+        return 0;
+    }
+
+    let (min_sleep, wake_delay) = cfg_select! {
+        esp32 => (12, 4),
+        _ => (24, 8),
+    };
+    let slot_cnt = slot_cnt as *mut i32;
+    let slots = unsafe { *slot_cnt };
+    if slots < min_sleep {
+        return 0;
+    }
+    unsafe { *slot_cnt = slots - wake_delay };
+    1
 }
 
-unsafe extern "C" fn btdm_sleep_enter_phase1(_lpcycles: i32) {
-    todo!();
-}
+unsafe extern "C" fn btdm_sleep_enter_phase1(_lpcycles: i32) {}
 
 unsafe extern "C" fn btdm_sleep_enter_phase2() {
-    todo!();
+    if super::modem_sleep_enabled() {
+        super::modem_phy_release();
+    }
 }
 
-unsafe extern "C" fn btdm_sleep_exit_phase1() {
-    todo!();
-}
+unsafe extern "C" fn btdm_sleep_exit_phase1() {}
 
-unsafe extern "C" fn btdm_sleep_exit_phase2() {
-    todo!();
-}
+unsafe extern "C" fn btdm_sleep_exit_phase2() {}
 
 unsafe extern "C" fn btdm_sleep_exit_phase3() {
-    todo!();
+    if !super::modem_sleep_enabled() {
+        return;
+    }
+    let phy_restored = super::modem_phy_acquire();
+    cfg_select! {
+        // The RF can be off since the last baseband initialization.
+        esp32 => {
+            if phy_restored {
+                unsafe { btdm_rf_bb_init_phase2() };
+            }
+        }
+        _ => {
+            let _ = phy_restored;
+            unsafe { while btdm_sleep_clock_sync() != 0 {} }
+        }
+    }
 }
 
-unsafe extern "C" fn coex_schm_status_bit_set(typ: i32, status: i32) {
-    trace!("coex_schm_status_bit_set {} {}", typ, status);
-    #[cfg(feature = "coex")]
+fn wake_controller_for_hci() {
+    if !super::modem_sleep_enabled() {
+        return;
+    }
     unsafe {
-        include::coex_schm_status_bit_set(typ as u32, status as u32)
-    };
+        btdm_in_wakeup_requesting_set(true);
+        if !btdm_power_state_active() {
+            btdm_wakeup_request();
+        }
+    }
 }
 
-unsafe extern "C" fn coex_schm_status_bit_clear(typ: i32, status: i32) {
-    trace!("coex_schm_status_bit_clear {} {}", typ, status);
-    #[cfg(feature = "coex")]
-    unsafe {
-        include::coex_schm_status_bit_clear(typ as u32, status as u32)
-    };
+fn end_controller_hci_wake() {
+    if !super::modem_sleep_enabled() {
+        return;
+    }
+    unsafe { btdm_in_wakeup_requesting_set(false) };
 }
 
 #[ram]
@@ -278,30 +346,13 @@ unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
     unsafe { crate::common_adapter::read_mac(mac as *mut _, 2) }
 }
 
-#[cfg(esp32)]
-unsafe extern "C" fn set_isr13(n: i32, handler: unsafe extern "C" fn(), arg: *const ()) -> i32 {
-    unsafe { ble_os_adapter_chip_specific::set_isr(n, handler, arg) }
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn interrupt_l3_disable() {
-    // info!("unimplemented interrupt_l3_disable");
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn interrupt_l3_restore() {
-    //  info!("unimplemented interrupt_l3_restore");
-}
-
-#[cfg(esp32)]
-unsafe extern "C" fn custom_queue_create(_len: u32, _item_size: u32) -> *mut c_void {
-    todo!();
-}
-
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
+    super::set_modem_sleep(config.modem_sleep());
+    super::lp_clk::request();
+    program_btdm_lpclk();
+
     let phy_init_guard;
     unsafe {
-        (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
         // turn on logging
         #[allow(static_mut_refs)]
         #[cfg(feature = "print-logs-from-driver")]
@@ -315,9 +366,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         }
 
         // esp32_bt_controller_init
-        ble_os_adapter_chip_specific::btdm_controller_mem_init();
+        chip_specific::btdm_controller_mem_init();
 
-        let mut cfg = ble_os_adapter_chip_specific::create_ble_config(config);
+        let mut cfg = chip_specific::create_ble_config(config);
 
         let res = btdm_osi_funcs_register(&G_OSI_FUNCS);
         assert!(res == 0, "btdm_osi_funcs_register returned {}", res);
@@ -331,9 +382,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         let version = btdm_controller_get_compile_version();
         debug!("BT controller compile version {}", str_from_c(version));
 
-        ble_os_adapter_chip_specific::bt_periph_module_enable();
+        chip_specific::bt_periph_module_enable();
 
-        ble_os_adapter_chip_specific::disable_sleep_mode();
+        chip_specific::disable_sleep_mode();
 
         let res = btdm_controller_init(
             #[cfg(esp32)]
@@ -368,6 +419,10 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         btdm_controller_enable(esp_bt_mode_t_ESP_BT_MODE_BLE);
 
+        if config.modem_sleep() {
+            btdm_controller_enable_sleep(true);
+        }
+
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
     }
 
@@ -377,6 +432,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    super::modem_phy_acquire();
+    super::set_modem_sleep(false);
+
     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
         esp_hal::Internal::conjure()
     });
@@ -384,24 +442,22 @@ pub(crate) fn ble_deinit() {
     unsafe {
         btdm_controller_deinit();
     }
+
+    super::lp_clk::release();
     // Disabling the PHY happens automatically, when the BLEController gets dropped.
 }
 
-/// Sends HCI data to the BLE controller.
-///
-/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
-/// caller must offer the remaining bytes again.
-pub(crate) fn send_hci(data: &[u8]) -> usize {
+pub(crate) fn send(data: &[u8]) {
     // make sure the packet buffer doesn't get touched until sent
     while PACKET_IN_FLIGHT.load(Ordering::Acquire) {}
     while unsafe { !API_vhci_host_check_send_available() } {
         trace!("can_send is false");
     }
 
-    super::collect_and_send(data, send_packet)
+    send_packet(data)
 }
 
-pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
+pub(crate) async fn send_async(data: &[u8]) {
     // make sure the packet buffer doesn't get touched until sent
     core::future::poll_fn(|cx| {
         PACKET_SENT_WAKER.register(cx.waker());
@@ -415,24 +471,24 @@ pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
     })
     .await;
 
-    super::collect_and_send(data, send_packet)
+    send_packet(data)
 }
 
 fn send_packet(packet: &[u8]) {
     unsafe {
         PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
 
+        wake_controller_for_hci();
+
         #[cfg(all(esp32, feature = "coex"))]
-        ble_os_adapter_chip_specific::async_wakeup_request(
-            ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-        );
+        chip_specific::async_wakeup_request(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
 
         API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
 
         #[cfg(all(esp32, feature = "coex"))]
-        ble_os_adapter_chip_specific::async_wakeup_request_end(
-            ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
-        );
+        chip_specific::async_wakeup_request_end(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
+
+        end_controller_hci_wake();
     }
 
     trace!("sent vhci host packet");

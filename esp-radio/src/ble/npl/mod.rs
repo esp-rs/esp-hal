@@ -1,12 +1,9 @@
 use alloc::vec::Vec;
-use core::{
-    mem::transmute,
-    ptr::{NonNull, addr_of, addr_of_mut},
-};
+use core::{mem::transmute, ptr::NonNull};
 
 use esp_phy::PhyInitGuard;
 
-use super::*;
+use super::{Config, ReceivedPacket, in_isr};
 use crate::{
     compat::{self, OSI_FUNCS_TIME_BLOCKING, common::str_from_c, queue},
     hal::time::Instant,
@@ -19,11 +16,10 @@ use crate::{
 #[cfg_attr(esp32c6, path = "os_adapter_esp32c6.rs")]
 #[cfg_attr(esp32c61, path = "os_adapter_esp32c61.rs")]
 #[cfg_attr(esp32h2, path = "os_adapter_esp32h2.rs")]
-pub(crate) mod ble_os_adapter_chip_specific;
+pub(crate) mod chip_specific;
+mod os_mempool;
 
 const EVENT_QUEUE_SIZE: usize = 16;
-
-const TIME_FOREVER: u32 = crate::compat::OSI_FUNCS_TIME_BLOCKING;
 
 const BLE_HCI_TRANS_BUF_CMD: i32 = 3;
 
@@ -344,7 +340,7 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
         0x20250825
     },
 
-    esp_intr_alloc: Some(ble_os_adapter_chip_specific::esp_intr_alloc),
+    esp_intr_alloc: Some(chip_specific::esp_intr_alloc),
     esp_intr_free: Some(esp_intr_free),
     malloc: Some(crate::ble::malloc),
     free: Some(crate::ble::free),
@@ -367,9 +363,9 @@ static G_OSI_FUNCS: ExtFuncsT = ExtFuncsT {
     ecc_gen_key_pair: Some(ecc_gen_key_pair),
     ecc_gen_dh_key: Some(ecc_gen_dh_key),
     #[cfg(any(esp32c6, esp32h2))]
-    esp_reset_modem: Some(ble_os_adapter_chip_specific::reset_modem),
+    esp_reset_modem: Some(chip_specific::reset_modem),
     #[cfg(esp32c2)]
-    esp_reset_rpa_moudle: Some(ble_os_adapter_chip_specific::esp_reset_rpa_moudle),
+    esp_reset_rpa_moudle: Some(chip_specific::esp_reset_rpa_moudle),
     #[cfg(esp32c2)]
     esp_bt_track_pll_cap: None,
     magic: 0xA5A5A5A5,
@@ -526,9 +522,11 @@ pub(crate) struct npl_funcs_t {
     p_ble_npl_hw_exit_critical: Option<unsafe extern "C" fn(mask: u32)>,
     p_ble_npl_get_time_forever: Option<unsafe extern "C" fn() -> u32>,
     p_ble_npl_hw_is_in_critical: Option<unsafe extern "C" fn() -> u8>,
+    p_ble_npl_eventq_put_to_front:
+        Option<unsafe extern "C" fn(queue: *mut ble_npl_eventq, event: *const ble_npl_event)>,
 }
 
-static mut G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
+static G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
     p_ble_npl_os_started: Some(ble_npl_os_started),
     p_ble_npl_get_current_task_id: Some(ble_npl_get_current_task_id),
     p_ble_npl_eventq_init: Some(ble_npl_eventq_init),
@@ -573,6 +571,7 @@ static mut G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
     p_ble_npl_hw_exit_critical: Some(ble_npl_hw_exit_critical),
     p_ble_npl_get_time_forever: Some(ble_npl_get_time_forever),
     p_ble_npl_hw_is_in_critical: Some(ble_npl_hw_is_in_critical),
+    p_ble_npl_eventq_put_to_front: Some(ble_npl_eventq_put_to_front),
 };
 
 #[repr(C)]
@@ -623,21 +622,20 @@ unsafe extern "C" fn ble_npl_hw_is_in_critical() -> u8 {
 }
 
 unsafe extern "C" fn ble_npl_get_time_forever() -> u32 {
-    trace!("ble_npl_get_time_forever");
-    TIME_FOREVER
+    OSI_FUNCS_TIME_BLOCKING
 }
 
 unsafe extern "C" fn ble_npl_hw_exit_critical(mask: u32) {
     trace!("ble_npl_hw_exit_critical {}", mask);
     unsafe {
         let token = esp_sync::RestoreState::new(mask);
-        crate::ESP_RADIO_LOCK.release(token);
+        super::ESP_RADIO_LOCK.release(token);
     }
 }
 
 unsafe extern "C" fn ble_npl_hw_enter_critical() -> u32 {
     trace!("ble_npl_hw_enter_critical");
-    unsafe { crate::ESP_RADIO_LOCK.acquire().inner() }
+    unsafe { super::ESP_RADIO_LOCK.acquire().inner() }
 }
 
 unsafe extern "C" fn ble_npl_hw_set_isr(_no: i32, _mask: u32) {
@@ -941,6 +939,19 @@ unsafe extern "C" fn ble_npl_eventq_remove(
 unsafe extern "C" fn ble_npl_eventq_put(queue: *mut ble_npl_eventq, event: *const ble_npl_event) {
     trace!("ble_npl_eventq_put {:?} {:?}", queue, event);
 
+    unsafe { eventq_insert(queue, event, false) }
+}
+
+unsafe extern "C" fn ble_npl_eventq_put_to_front(
+    queue: *mut ble_npl_eventq,
+    event: *const ble_npl_event,
+) {
+    trace!("ble_npl_eventq_put_to_front {:?} {:?}", queue, event);
+
+    unsafe { eventq_insert(queue, event, true) }
+}
+
+unsafe fn eventq_insert(queue: *mut ble_npl_eventq, event: *const ble_npl_event, front: bool) {
     let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
@@ -954,13 +965,29 @@ unsafe extern "C" fn ble_npl_eventq_put(queue: *mut ble_npl_eventq, event: *cons
     }
 
     let wrapper = unwrap!(unsafe { queue.as_mut() }, "queue wrapper is null");
-
+    let handle = wrapper.dummy as _;
     // Store the pointer to the ble_npl_event in the queue - this is what we'll need to dequeue.
-    queue::queue_send_to_back(
-        wrapper.dummy as _,
-        (&raw const event).cast(),
-        OSI_FUNCS_TIME_BLOCKING,
-    );
+    let item = (&raw const event).cast();
+
+    let sent = if in_isr() {
+        if front {
+            queue::queue_try_send_to_front_from_isr(handle, item, core::ptr::null_mut())
+        } else {
+            queue::queue_try_send_to_back_from_isr(handle, item, core::ptr::null_mut())
+        }
+    } else if front {
+        queue::queue_send_to_front(handle, item, OSI_FUNCS_TIME_BLOCKING)
+    } else {
+        queue::queue_send_to_back(handle, item, OSI_FUNCS_TIME_BLOCKING)
+    };
+
+    if sent == 0 {
+        // The queue is full. Mark the event unqueued so that the controller can post it again.
+        trace!("Event queue is full, event dropped");
+        unsafe {
+            (*evt).queued = false;
+        }
+    }
 }
 
 unsafe extern "C" fn ble_npl_eventq_get(
@@ -971,13 +998,18 @@ unsafe extern "C" fn ble_npl_eventq_get(
 
     let mut evt = core::ptr::null_mut::<ble_npl_event>();
     let wrapper = unwrap!(unsafe { queue.as_mut() }, "queue wrapper is null");
+    let item = (&raw mut evt).cast();
 
-    if queue::queue_receive(
-        wrapper.dummy as _,
-        (&raw mut evt).cast(),
-        blob_ticks_to_micros(timeout),
-    ) == 1
-    {
+    let received = if in_isr() {
+        if timeout != 0 {
+            return core::ptr::null();
+        }
+        queue::queue_try_receive_from_isr(wrapper.dummy as _, item, core::ptr::null_mut())
+    } else {
+        queue::queue_receive(wrapper.dummy as _, item, blob_ticks_to_micros(timeout))
+    };
+
+    if received != 0 {
         trace!("got {:x}", evt as usize);
         unsafe {
             let evt = (*evt).dummy as *mut Event;
@@ -1033,11 +1065,11 @@ unsafe extern "C" fn ble_npl_callout_init(
         unsafe {
             let new_callout =
                 crate::compat::malloc::calloc(1, core::mem::size_of::<Callout>()) as *mut Callout;
-            ble_npl_event_init(addr_of_mut!((*new_callout).events), func, args);
+            ble_npl_event_init(&raw mut (*new_callout).events, func, args);
             (*callout).dummy = new_callout as i32;
 
             crate::compat::timer_compat::compat_timer_setfn(
-                addr_of_mut!((*new_callout).timer_handle),
+                &raw mut (*new_callout).timer_handle,
                 callout_timer_callback_wrapper,
                 callout as *mut c_void,
             );
@@ -1053,9 +1085,9 @@ unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
 
     unsafe {
         if !(*co).eventq.is_null() {
-            ble_npl_eventq_put((*co).eventq.cast_mut(), addr_of!((*co).events));
+            ble_npl_eventq_put((*co).eventq.cast_mut(), &raw const (*co).events);
         } else {
-            ble_npl_event_run(addr_of!((*co).events));
+            ble_npl_event_run(&raw const (*co).events);
         }
     }
 }
@@ -1082,11 +1114,68 @@ pub(crate) struct BleNplCountInfoT {
     mutex_count: u16,
 }
 
+#[crate::hal::ram]
+unsafe extern "C" fn controller_sleep_cb(_enable_tick: u32, _arg: *mut c_void) {
+    super::modem_phy_release();
+}
+
+#[crate::hal::ram]
+unsafe extern "C" fn controller_wakeup_cb(_arg: *mut c_void) {
+    super::modem_phy_acquire();
+}
+
+fn register_modem_sleep() {
+    unsafe extern "C" {
+        #[cfg(not(esp32c2))]
+        fn r_ble_lll_sleep_set_sleep_cb(
+            sleep_cb: unsafe extern "C" fn(u32, *mut c_void),
+            wakeup_cb: unsafe extern "C" fn(*mut c_void),
+            sleep_arg: *mut c_void,
+            wakeup_arg: *mut c_void,
+            us_to_enabled: u32,
+        );
+        #[cfg(esp32c2)]
+        fn r_ble_lll_rfmgmt_set_sleep_cb(
+            sleep_cb: unsafe extern "C" fn(u32, *mut c_void),
+            wakeup_cb: unsafe extern "C" fn(*mut c_void),
+            sleep_arg: *mut c_void,
+            wakeup_arg: *mut c_void,
+            us_to_enabled: u32,
+        );
+    }
+
+    // ESP-IDF modem-sleep PHY enable delay. C2 adds `BLE_RTC_DELAY_US` (1800) to 500.
+    let delay_us = cfg_select! {
+        esp32c2 => 2_300,
+        esp32h2 => 1_500,
+        _ => 500,
+    };
+
+    unsafe {
+        cfg_select! {
+            esp32c2 => r_ble_lll_rfmgmt_set_sleep_cb(
+                controller_sleep_cb,
+                controller_wakeup_cb,
+                core::ptr::null_mut(),
+                core::ptr::null_mut(),
+                delay_us,
+            ),
+            _ => r_ble_lll_sleep_set_sleep_cb(
+                controller_sleep_cb,
+                controller_wakeup_cb,
+                core::ptr::null_mut(),
+                core::ptr::null_mut(),
+                delay_us,
+            ),
+        }
+    }
+}
+
 pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
+    super::set_modem_sleep(config.modem_sleep());
+
     let phy_init_guard;
     unsafe {
-        (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
-
         // turn on logging
         #[allow(static_mut_refs)]
         #[cfg(all(feature = "print-logs-from-driver", esp32c2))]
@@ -1099,9 +1188,11 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             g_ble_plf_log_level = 10;
         }
 
-        self::ble_os_adapter_chip_specific::ble_rtc_clk_init();
+        self::chip_specific::ble_rtc_clk_init();
 
-        let cfg = ble_os_adapter_chip_specific::create_ble_config(config);
+        super::lp_clk::request();
+
+        let cfg = chip_specific::create_ble_config(config);
 
         let res = esp_register_ext_funcs(&G_OSI_FUNCS as *const ExtFuncsT);
         assert!(res == 0, "esp_register_ext_funcs returned {}", res);
@@ -1122,11 +1213,11 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
             assert!(res == 0, "coex_init failed");
         }
 
-        ble_os_adapter_chip_specific::bt_periph_module_enable();
+        chip_specific::bt_periph_module_enable();
 
-        ble_os_adapter_chip_specific::disable_sleep_mode();
+        chip_specific::disable_sleep_mode();
 
-        let res = esp_register_npl_funcs(core::ptr::addr_of!(G_NPL_FUNCS));
+        let res = esp_register_npl_funcs(&G_NPL_FUNCS);
         assert!(res == 0, "esp_register_npl_funcs returned {}", res);
 
         // not really using  here ... remove it?
@@ -1146,7 +1237,7 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         // Initialize the global memory pool
         #[cfg(esp32c2)]
-        ble_os_adapter_chip_specific::os_msys_init();
+        chip_specific::os_msys_init();
 
         phy_init_guard = esp_phy::enable_phy();
 
@@ -1163,6 +1254,10 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         let res = ble_controller_init(&cfg);
         assert!(res == 0, "ble_controller_init returned {}", res);
+
+        if config.modem_sleep() {
+            register_modem_sleep();
+        }
 
         #[cfg(feature = "coex")]
         crate::sys::include::coex_enable();
@@ -1204,6 +1299,9 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 }
 
 pub(crate) fn ble_deinit() {
+    super::modem_phy_acquire();
+    super::set_modem_sleep(false);
+
     #[cfg(rng_trng_supported)]
     esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
         esp_hal::Internal::conjure()
@@ -1222,11 +1320,13 @@ pub(crate) fn ble_deinit() {
         assert!(res == 0, "ble_controller_deinit returned {}", res);
 
         #[cfg(esp32c2)]
-        ble_os_adapter_chip_specific::os_msys_buf_free();
+        chip_specific::os_msys_buf_free();
 
         esp_unregister_npl_funcs();
         esp_unregister_ext_funcs();
     }
+
+    super::lp_clk::release();
 }
 
 unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i32 {
@@ -1245,7 +1345,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
     data.push(len as u8);
     data.extend_from_slice(payload);
 
-    dump_packet_info(&data);
+    super::dump_packet_info(&data);
 
     super::BT_STATE.with(|state| {
         state.rx_queue.push_back(ReceivedPacket {
@@ -1290,29 +1390,21 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     0
 }
 
-/// Sends HCI data to the Bluetooth controller.
-///
-/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
-/// caller must offer the remaining bytes again.
-pub(crate) fn send_hci(data: &[u8]) -> usize {
-    super::collect_and_send(data, send_packet)
+pub(crate) fn send(data: &[u8]) {
+    send_packet(data)
 }
 
-/// Sends HCI data to the Bluetooth controller.
-///
-/// Returns the number of bytes taken from `data`. At most one packet is sent per call, so the
-/// caller must offer the remaining bytes again.
-pub(crate) async fn send_hci_async(data: &[u8]) -> usize {
-    super::collect_and_send(data, send_packet)
+pub(crate) async fn send_async(data: &[u8]) {
+    send_packet(data)
 }
 
 fn send_packet(packet: &[u8]) {
     const DATA_TYPE_COMMAND: u8 = 1;
     const DATA_TYPE_ACL: u8 = 2;
 
-    dump_packet_info(packet);
+    super::dump_packet_info(packet);
 
-    super::BT_STATE.with(|_state| unsafe {
+    unsafe {
         if packet[0] == DATA_TYPE_COMMAND {
             let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
             core::ptr::copy_nonoverlapping(
@@ -1344,5 +1436,5 @@ fn send_packet(packet: &[u8]) {
         } else {
             warn!("Unknown packet kind {} dropped", packet[0]);
         }
-    });
+    }
 }

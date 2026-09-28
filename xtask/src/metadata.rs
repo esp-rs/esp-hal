@@ -55,6 +55,8 @@ pub enum Chip {
     Esp32c61,
     /// ESP32-H2
     Esp32h2,
+    /// ESP32-H4
+    Esp32h4,
     /// ESP32-P4 (chip revision v3.x / eco5 only)
     Esp32p4,
     /// ESP32-S2

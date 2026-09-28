@@ -42,6 +42,28 @@ mod timer;
 
 mod wakeup;
 pub(crate) use wakeup::*;
+#[instability::unstable]
+pub use wakeup::{SleepEntryHook, SleepExitHook, WrappedSleepConfig};
+
+/// The result of a light sleep.
+#[cfg(sleep_light_sleep)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum LightSleep {
+    /// The call returned from the sleep.
+    ///
+    /// The sleep may also never have started, because no wakeup source was enabled, because the
+    /// hardware rejected the request, or because a sleep limit was too short for the transition to
+    /// catch. This result does not tell those apart from a sleep that a wakeup source ended.
+    Ended,
+
+    /// A wakeup source refused the sleep, so the chip stayed awake.
+    ///
+    /// The refusal holds until the state that caused it changes, so a second call refuses too.
+    /// Wait for an interrupt instead.
+    Refused,
+}
 
 /// Prepares the sleep hardware, and clears the wakeup sources of the previous run.
 ///
@@ -91,6 +113,9 @@ impl<'d> LowPower<'d> {
     /// disarm it, a later call replaces it, and [`Self::clear_wakeup_deadline`] removes it.
     ///
     /// A deadline in the past ends a light sleep immediately, and makes [`Self::sleep_deep`] panic.
+    ///
+    /// A wakeup source can limit one sleep to an earlier wake. The limit does not replace this
+    /// deadline. The deadline stays armed for the next sleep.
     #[cfg(sleep_has_wakeup_source_timer)]
     pub fn set_wakeup_deadline(&mut self, deadline: crate::time::Instant) {
         timer::set_deadline(deadline);
@@ -112,11 +137,15 @@ impl<'d> LowPower<'d> {
     /// The hardware cannot reject this sleep, because the function cannot return to report the
     /// rejection. Use [`Self::sleep_deep_with_rejection`] for that.
     ///
+    /// A wakeup source cannot refuse this sleep. The wake resets the chip, so the call cannot
+    /// return a refusal. [`Self::sleep_light`] reports a refusal.
+    ///
     /// # Panics
     ///
     /// Panics if no wakeup source is enabled, because then nothing can end the sleep. Panics also
-    /// if the armed wakeup deadline is too near for the sleep transition to catch it. In both
-    /// cases the chip never wakes again, and it gives no report of the cause.
+    /// if the armed wakeup deadline is too near for the sleep transition to catch it, or if a
+    /// wakeup source limits the sleep to less time than the transition can catch. In these cases
+    /// the chip never wakes again, and it gives no report of the cause.
     #[cfg(sleep_deep_sleep)]
     pub fn sleep_deep(&mut self, config: RtcSleepConfig) -> ! {
         #[cfg(sleep_has_wakeup_source_timer)]
@@ -138,6 +167,10 @@ impl<'d> LowPower<'d> {
     /// rejection, the chip sleeps through the event that the caller wants to wake on. The return of
     /// this function is the complete report, so it gives no other result.
     ///
+    /// A wakeup source cannot refuse this sleep. A wakeup source can limit it. The function also
+    /// returns when that limit is too short for the sleep transition to catch. The chip stays
+    /// awake. The return does not say which case it was.
+    ///
     /// A rejected request returns the wake pads to their drivers, but it cannot return every pad.
     /// Sleep entry disconnects the pads that no hold keeps, on the chips that need that step to
     /// reach the deep-sleep current, and it cannot know their earlier configuration. Configure
@@ -157,19 +190,40 @@ impl<'d> LowPower<'d> {
     /// Light sleep keeps the state of the digital domain, so the program continues at the same
     /// place.
     ///
-    /// The function also returns immediately, without a sleep, if no wakeup source is enabled, or
-    /// if the hardware rejects the request because a wakeup source is already asserted. It
-    /// reports neither case. For the caller, a refused sleep, a rejected sleep and a very short
-    /// sleep have the same result.
+    /// A wakeup source can refuse the sleep, which keeps the chip awake. A direct call and
+    /// automatic light sleep both honor a refusal. The return reports it, because the caller then
+    /// has to wait for the event itself.
+    ///
+    /// A wakeup source can also limit the length of the sleep. The chip wakes at the sooner of that
+    /// limit and the armed wakeup deadline. When the timer source is not enabled, the limit enables
+    /// it for this sleep and disables it again afterwards. The sleep does not start when that wake
+    /// is already due, or when the transition cannot catch it. The result is [`LightSleep::Ended`],
+    /// not [`LightSleep::Refused`].
+    ///
+    /// The function also returns without a sleep if no wakeup source is enabled, or if the
+    /// hardware rejects the request because a wakeup source is already asserted. It reports
+    /// neither case. For the caller, a rejected sleep and a very short sleep have the same
+    /// result.
     #[cfg(sleep_light_sleep)]
-    pub fn sleep_light(&mut self, config: RtcSleepConfig) {
-        self.sleep(config, SleepKind::Light, true);
+    pub fn sleep_light(&mut self, config: RtcSleepConfig) -> LightSleep {
+        if self.sleep(config, SleepKind::Light, true) {
+            LightSleep::Refused
+        } else {
+            LightSleep::Ended
+        }
     }
 
     /// Calculates the sleep configuration from the wakeup-enable mask, and enters the sleep.
+    ///
+    /// Returns whether a wakeup source refused a light sleep. A deep sleep ignores a refusal,
+    /// so this function does not return `true` for a deep sleep.
+    ///
+    /// A sleep limit can end the call before the sleep starts. That result is `false`. It is not a
+    /// refusal. A deep sleep whose limit the transition cannot catch panics when the caller cannot
+    /// accept a rejection.
     #[cfg(sleep_driver_supported)]
     #[crate::ram]
-    fn sleep(&mut self, config: RtcSleepConfig, kind: SleepKind, allow_reject: bool) {
+    fn sleep(&mut self, config: RtcSleepConfig, kind: SleepKind, allow_reject: bool) -> bool {
         let rtc = Rtc::new(unsafe { crate::peripherals::RTC_TIMER::steal() });
 
         let mut config = config;
@@ -179,17 +233,48 @@ impl<'d> LowPower<'d> {
         // the hardware. They also run before the last read of the mask, because a hook can
         // enable another source. The GPIO hook does this while it allocates its pins to the
         // paths.
-        run_entry_hooks(&mut config);
+        let entry = run_entry_hooks(&mut config);
 
+        // Stop before `apply` when a hook refused a light sleep. `apply` writes the sleep
+        // configuration, and the chip must stay awake with that configuration unchanged.
+        // Entry hooks can already have moved a pad. The exit hooks put the pad back.
+        // A deep sleep ignores the refusal. The wake resets the chip, so there is no caller.
+        if kind == SleepKind::Light && entry.refused {
+            #[cfg(sleep_has_wakeup_source_timer)]
+            if let Some(clamp) = entry.clamp {
+                timer::restore_after_limit(clamp);
+            }
+            run_exit_hooks();
+            return true;
+        }
+
+        // A limit inside the transition window cannot wake the chip. esp32 cannot reject on the
+        // timer, so the hardware does not report the miss. Stay awake. The exit hooks undo pad
+        // changes from the entry hooks. The comparator was not written.
+        #[cfg(sleep_has_wakeup_source_timer)]
+        if matches!(&entry.clamp, Some(timer::LimitClamp::TooShort)) {
+            run_exit_hooks();
+            if kind == SleepKind::Deep && !allow_reject {
+                panic!("the wakeup deadline is too near to be caught by the sleep transition");
+            }
+            return false;
+        }
+
+        // The PMU chips write the configuration when the sleep starts.
+        #[cfg(not(soc_has_pmu))]
         config.apply();
 
         // A sleep with no wakeup source never ends. No counter overflow ends it either.
         let wakeup_mask = mask();
         if wakeup_mask == 0 {
+            // No sleep starts, so a clamp must not keep the comparator.
+            #[cfg(sleep_has_wakeup_source_timer)]
+            if let Some(clamp) = entry.clamp {
+                timer::restore_after_limit(clamp);
+            }
             match kind {
-                // A refused sleep gives the same result as a rejected sleep, and light sleep does
-                // not report that case either.
-                SleepKind::Light => return,
+                // Not a software refusal. Light sleep does not report a missing wakeup source.
+                SleepKind::Light => return false,
                 SleepKind::Deep => {
                     panic!("no wakeup source is enabled, so nothing could end the sleep")
                 }
@@ -256,6 +341,15 @@ impl<'d> LowPower<'d> {
         // Last, because this call reads the wakeup cause, and after a light sleep the cause is
         // available only after the line above.
         gpio::wakeup::record_wakeup();
+
+        // After the cause is recorded. A limit must not keep the comparator, or the next sleep
+        // inherits a deadline that no hook requested.
+        #[cfg(sleep_has_wakeup_source_timer)]
+        if let Some(clamp) = entry.clamp {
+            timer::restore_after_limit(clamp);
+        }
+
+        false
     }
 }
 

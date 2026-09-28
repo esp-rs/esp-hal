@@ -35,9 +35,14 @@ pub(crate) fn enable_phy(en: bool) {
     regs!(MODEM_SYSCON)
         .clk_conf()
         .modify(|_, w| w.clk_i2c_mst_sel_160m().bit(en));
+    // `clk_wifipwr_en` stays on after the first enable. It drives the timer that wakes the modem
+    // for the next beacon, and the PHY is disabled at every doze.
     regs!(MODEM_LPCON).clk_conf().modify(|_, w| {
         w.clk_coex_en().bit(en);
-        w.clk_wifipwr_en().bit(en)
+        if en {
+            w.clk_wifipwr_en().set_bit();
+        }
+        w
     });
 
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
