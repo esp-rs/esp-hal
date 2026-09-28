@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use core::{ptr::NonNull, task::Poll};
 
 use esp_phy::PhyInitGuard;
-use portable_atomic::{AtomicBool, AtomicU32, Ordering};
+use portable_atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 
 use super::{Config, ReceivedPacket};
 #[cfg(feature = "coex")]
@@ -291,7 +291,43 @@ unsafe extern "C" fn btdm_sleep_check_duration(slot_cnt: i32) -> i32 {
     1
 }
 
-unsafe extern "C" fn btdm_sleep_enter_phase1(_lpcycles: i32) {}
+/// When the chip must be awake again, in microseconds since boot. Zero while the controller does
+/// not sleep.
+static CHIP_WAKE_AT_US: AtomicU64 = AtomicU64::new(0);
+
+#[ram]
+unsafe extern "C" fn btdm_sleep_enter_phase1(lpcycles: i32) {
+    if !super::modem_sleep_enabled() {
+        return;
+    }
+
+    // ESP-IDF `btdm_sleep_enter_phase1_wrapper`. The chip must wake before the controller does,
+    // with a margin for the clock drift and for the wake of the chip.
+    const MIN_UNCERTAINTY_US: u32 = 1800;
+    let lp_time = unsafe { btdm_lpcycles_2_hus(lpcycles as u32, 0) };
+    // The C3 and S3 count in half microseconds.
+    let us_to_sleep = cfg_select! {
+        esp32 => lp_time,
+        _ => lp_time >> 1,
+    };
+    let uncertainty = (us_to_sleep >> 11).max(MIN_UNCERTAINTY_US);
+    let now = esp_hal::time::Instant::now()
+        .duration_since_epoch()
+        .as_micros();
+    let wake_at = now + u64::from(us_to_sleep.saturating_sub(uncertainty));
+    CHIP_WAKE_AT_US.store(wake_at.max(1), Ordering::Relaxed);
+}
+
+/// Returns how long the chip can sleep before the controller wakes.
+///
+/// Returns zero when the chip must not sleep.
+pub(super) fn time_until_controller_wakes() -> esp_hal::time::Duration {
+    let wake_at = CHIP_WAKE_AT_US.load(Ordering::Relaxed);
+    let now = esp_hal::time::Instant::now()
+        .duration_since_epoch()
+        .as_micros();
+    esp_hal::time::Duration::from_micros(wake_at.saturating_sub(now))
+}
 
 unsafe extern "C" fn btdm_sleep_enter_phase2() {
     if super::modem_sleep_enabled() {
@@ -307,6 +343,7 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
     if !super::modem_sleep_enabled() {
         return;
     }
+    CHIP_WAKE_AT_US.store(0, Ordering::Relaxed);
     let phy_restored = super::modem_phy_acquire();
     cfg_select! {
         // The RF can be off since the last baseband initialization.
@@ -326,6 +363,8 @@ fn wake_controller_for_hci() {
     if !super::modem_sleep_enabled() {
         return;
     }
+    // `btdm_in_wakeup_requesting_set(true)` takes a lock, and only
+    // `btdm_in_wakeup_requesting_set(false)` releases it. Do not nest the calls.
     unsafe {
         btdm_in_wakeup_requesting_set(true);
         if !btdm_power_state_active() {
@@ -334,11 +373,37 @@ fn wake_controller_for_hci() {
     }
 }
 
+/// Wakes the controller for a coex scheduler event.
+///
+/// Returns `true` if the controller sleeps. The controller then handles the event after it wakes.
+unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
+    trace!("coex_bt_wakeup_request");
+
+    let wake = super::modem_sleep_enabled() && unsafe { !btdm_power_state_active() };
+    if wake {
+        unsafe { btdm_wakeup_request() };
+    }
+    wake
+}
+
+unsafe extern "C" fn coex_bt_wakeup_request_end() {
+    trace!("coex_bt_wakeup_request_end");
+    // Nothing to release: `coex_bt_wakeup_request` does not take the wakeup-requesting lock.
+}
+
 fn end_controller_hci_wake() {
     if !super::modem_sleep_enabled() {
         return;
     }
     unsafe { btdm_in_wakeup_requesting_set(false) };
+}
+
+/// Returns whether the controller has not yet taken the last HCI packet.
+///
+/// The send path requests a controller wake, and the controller takes the PHY again only later.
+/// Until then, the PHY reference shows a sleeping controller.
+pub(super) fn hci_packet_in_flight() -> bool {
+    PACKET_IN_FLIGHT.load(Ordering::Acquire)
 }
 
 #[ram]
@@ -426,12 +491,17 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
     }
 
+    if config.modem_sleep() && super::lp_clk::light_sleep_supported() {
+        super::lp_clk::claim_wake_source();
+    }
+
     // At some point the "High-speed ADC" entropy source became available.
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
     phy_init_guard
 }
 
 pub(crate) fn ble_deinit() {
+    super::lp_clk::release_wake_source();
     super::modem_phy_acquire();
     super::set_modem_sleep(false);
 
@@ -479,15 +549,7 @@ fn send_packet(packet: &[u8]) {
         PACKET_IN_FLIGHT.store(true, Ordering::Relaxed);
 
         wake_controller_for_hci();
-
-        #[cfg(all(esp32, feature = "coex"))]
-        chip_specific::async_wakeup_request(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
-
         API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
-
-        #[cfg(all(esp32, feature = "coex"))]
-        chip_specific::async_wakeup_request_end(chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI);
-
         end_controller_hci_wake();
     }
 

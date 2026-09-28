@@ -131,6 +131,16 @@ fn configure_xtal_clk_impl(
 
 // PLL_CLK
 
+/// Configures and calibrates the BBPLL again.
+///
+/// The BBPLL loses its analog configuration while the PMU powers it down, for example in a light
+/// sleep. ESP-IDF configures it again before it uses the PLL after a wake.
+pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
+    if clocks.pll_clk_refcount > 0 {
+        enable_pll_clk_impl(clocks, true);
+    }
+}
+
 fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
         // TODO: these are WT fields, PAC should be fixed accordingly

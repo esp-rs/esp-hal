@@ -488,7 +488,18 @@ impl RtcSleepConfig {
         }
 
         unsafe {
-            assert!(!self.pd_cur_slp() || self.bias_sleep_slp());
+            // Like `rtc_sleep_get_default_config`: a crystal that stays on through a light sleep
+            // needs the bias current and the voltage of the active mode.
+            let xtal_on = self.xtal_fpu() && !self.deep_slp();
+            let bias_sleep_slp = self.bias_sleep_slp() && !xtal_on;
+            let pd_cur_slp = self.pd_cur_slp() && !xtal_on;
+            let dbg_atten_slp = if xtal_on {
+                RTC_CNTL_DBG_ATTEN_LIGHTSLEEP_NODROP
+            } else {
+                self.dbg_atten_slp()
+            };
+
+            assert!(!pd_cur_slp || bias_sleep_slp);
 
             regi2c::I2C_DIG_REG_EXT_RTC_DREG_SLEEP.write_field(self.rtc_dbias_slp());
             regi2c::I2C_DIG_REG_EXT_DIG_DREG_SLEEP.write_field(self.dig_dbias_slp());
@@ -503,9 +514,9 @@ impl RtcSleepConfig {
             });
 
             rtc_cntl.bias_conf().modify(|_, w| {
-                w.dbg_atten_deep_slp().bits(self.dbg_atten_slp());
-                w.bias_sleep_deep_slp().bit(self.bias_sleep_slp());
-                w.pd_cur_deep_slp().bit(self.pd_cur_slp())
+                w.dbg_atten_deep_slp().bits(dbg_atten_slp);
+                w.bias_sleep_deep_slp().bit(bias_sleep_slp);
+                w.pd_cur_deep_slp().bit(pd_cur_slp)
             });
 
             if self.deep_slp() {

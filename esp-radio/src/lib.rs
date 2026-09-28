@@ -407,7 +407,7 @@ impl RadioRefGuard {
     /// Like [`Self::new`], but the chip can sleep while the guard exists.
     ///
     /// The driver must refuse the sleeps that are not safe for it.
-    #[cfg(all(feature = "wifi", not(esp32)))]
+    #[cfg(any(feature = "ble", all(feature = "wifi", not(esp32))))]
     pub(crate) fn without_wake_lock() -> Self {
         Self::create(false)
     }
