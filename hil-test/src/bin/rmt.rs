@@ -88,6 +88,8 @@ struct LoopbackConfig {
     length1_base: u16,
     length1_step: u16,
     length2: u16,
+    sclk_div: u16, // 1 - 256
+    ch_div: u8,
 }
 
 impl Default for LoopbackConfig {
@@ -105,14 +107,20 @@ impl Default for LoopbackConfig {
             length1_base: 100,
             length1_step: 10,
             length2: 50,
+            sclk_div: 1,
+            ch_div: DIV,
         }
     }
 }
 
 impl LoopbackConfig {
+    fn sclk_freq(&self) -> Rate {
+        FREQ / self.sclk_div as u32
+    }
+
     fn tx_config(&self) -> TxChannelConfig {
         TxChannelConfig::default()
-            .with_clk_divider(DIV)
+            .with_clk_divider(self.ch_div)
             .with_idle_output(self.idle_output)
             .with_idle_output_level(Level::Low)
             .with_memsize(self.tx_memsize)
@@ -120,7 +128,7 @@ impl LoopbackConfig {
 
     fn rx_config(&self) -> RxChannelConfig {
         RxChannelConfig::default()
-            .with_clk_divider(DIV)
+            .with_clk_divider(self.ch_div)
             .with_idle_threshold(self.idle_threshold)
             .with_memsize(self.rx_memsize)
     }
@@ -133,17 +141,21 @@ impl LoopbackConfig {
 // buffer in loopback tests with buffer wrapping. If we did, that might hide bugs.
 // FIXME: Make a method on LoopbackConfig?
 fn generate_tx_data(conf: &LoopbackConfig) -> Vec<PulseCode> {
+    const WRAP_COUNT: u16 = 23;
+
     let mut tx_data: Vec<_> = (0..)
         .take(conf.tx_len)
         .map(|i| {
-            PulseCode::new(
+            PulseCode::try_new(
                 Level::High,
-                conf.length1_base + conf.length1_step * (i % 23),
+                conf.length1_base + conf.length1_step * (i % WRAP_COUNT),
                 Level::Low,
                 conf.length2,
             )
+            .expect("pulse code length out of range")
         })
         .collect();
+    let mut i_max = WRAP_COUNT.min(conf.tx_len as u16);
 
     let mut pos = conf.tx_len - 1;
     match conf.end_marker {
@@ -151,19 +163,25 @@ fn generate_tx_data(conf: &LoopbackConfig) -> Vec<PulseCode> {
         EndMarkerConfig::Field1 => {
             tx_data[pos] = PulseCode::end_marker();
             pos -= 1;
+            i_max -= 1;
         }
         EndMarkerConfig::Field2 => {
             tx_data[pos] = tx_data[pos].with_length2(0).unwrap();
             pos -= 1;
+            i_max -= 1;
         }
     }
     if conf.write_stop_code {
-        tx_data[pos] = PulseCode::new(
+        i_max -= 1;
+        assert!(conf.length1_base + i_max * conf.length1_step + conf.length2 < conf.idle_threshold);
+
+        tx_data[pos] = PulseCode::try_new(
             Level::High,
             2 * conf.idle_threshold,
             Level::Low,
             conf.length2,
-        );
+        )
+        .expect("idle_threshold out of range");
     }
 
     tx_data
@@ -289,10 +307,13 @@ fn check_data_eq(
 
 struct BitbangTransmitter {
     pin: Flex<'static>,
+    cycles_per_us: u32,
 }
 
 impl BitbangTransmitter {
-    fn new(pin: impl Pin + 'static) -> Self {
+    const SCALE: u32 = 1024;
+
+    fn new(pin: impl Pin + 'static, conf: &LoopbackConfig) -> Self {
         let mut pin = Flex::new(pin);
         pin.set_input_enable(true);
         pin.set_output_enable(true);
@@ -301,7 +322,10 @@ impl BitbangTransmitter {
 
         pin.set_low();
 
-        Self { pin }
+        Self {
+            pin,
+            cycles_per_us: conf.ch_div as u32 * 1000 * Self::SCALE / conf.sclk_freq().as_khz(),
+        }
     }
 
     fn rx_pin(&mut self) -> impl PeripheralInput<'static> {
@@ -309,8 +333,6 @@ impl BitbangTransmitter {
     }
 
     fn transmit(&mut self, tx_data: &[PulseCode]) {
-        let cycles_per_us = DIV as u32 / FREQ.as_mhz();
-
         let delay = Delay::new();
 
         for code in tx_data {
@@ -318,22 +340,23 @@ impl BitbangTransmitter {
                 break;
             }
             self.pin.set_level(code.level1());
-            delay.delay_micros(code.length1() as u32 * cycles_per_us);
+            delay.delay_micros(code.length1() as u32 * self.cycles_per_us / Self::SCALE);
 
             if code.length2() == 0 {
                 break;
             }
             self.pin.set_level(code.level2());
-            delay.delay_micros(code.length2() as u32 * cycles_per_us);
+            delay.delay_micros(code.length2() as u32 * self.cycles_per_us / Self::SCALE);
         }
     }
 }
 
-fn do_rmt_loopback_inner(
+// Returns the channels for reuse if the transactions completed.
+fn do_rmt_loopback_inner<'ch>(
     conf: &LoopbackConfig,
-    tx_channel: Channel<Blocking, Tx>,
-    rx_channel: Channel<Blocking, Rx>,
-) {
+    tx_channel: Channel<'ch, Blocking, Tx>,
+    rx_channel: Channel<'ch, Blocking, Rx>,
+) -> Option<(Channel<'ch, Blocking, Tx>, Channel<'ch, Blocking, Rx>)> {
     let tx_data = generate_tx_data(conf);
     let mut rcv_data = vec![PulseCode::default(); conf.tx_len];
 
@@ -358,6 +381,8 @@ fn do_rmt_loopback_inner(
         // The test should fail here when the delay above is increased, e.g. to 100ms.
         assert!(!rx_done);
         assert!(!tx_done);
+
+        None
     } else {
         let run = move || match rx_transaction {
             Ok(mut rx_transaction) => {
@@ -370,17 +395,19 @@ fn do_rmt_loopback_inner(
                     }
                 }
 
-                tx_transaction.wait().unwrap();
+                let tx_channel = tx_transaction.wait().unwrap();
                 match rx_transaction.wait() {
-                    Ok((rx_count, _channel)) => Ok(rx_count),
-                    Err((err, _channel)) => Err(err),
+                    Ok((rx_count, rx_channel)) => (Ok(rx_count), Some((tx_channel, rx_channel))),
+                    Err((err, rx_channel)) => (Err(err), Some((tx_channel, rx_channel))),
                 }
             }
-            Err((e, _)) => Err(e),
+            Err((e, _)) => (Err(e), None),
         };
-        let rx_res = run();
+        let (rx_res, channels) = run();
 
         check_data_eq(conf, &tx_data, &rcv_data, rx_res);
+
+        channels
     }
 }
 
@@ -433,6 +460,36 @@ async fn do_rmt_loopback_async(ctx: &mut Context, conf: &LoopbackConfig) {
     let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&conf);
 
     do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await
+}
+
+// SCLK dividers to test; ESP32 and ESP32-S2 don't have an SCLK divider.
+const SCLK_DIVIDERS: &[u16] = if cfg!(any(esp32, esp32s2)) {
+    &[1]
+} else {
+    &[1, 16, 256]
+};
+
+const CHANNEL_DIVIDERS: &[u8] = &[1, 16, 255];
+
+fn divider_loopback_config(sclk_div: u16, ch_div: u8) -> LoopbackConfig {
+    let div = sclk_div as u32 * ch_div as u32;
+    // the stop code is sent with length 2 * idle_threshold = 40 * step, cf. generate_tx_data
+    let step = (32767 / (41 * div)).max(5) as u16;
+
+    #[cfg(feature = "defmt")]
+    defmt::info!("sclk_div: {}, ch_div: {}, step: {}", sclk_div, ch_div, step);
+
+    LoopbackConfig {
+        idle_output: true,
+        sclk_div,
+        ch_div,
+        tx_len: 5,
+        length1_base: 10 * step,
+        length1_step: step,
+        length2: 2 * step,
+        idle_threshold: 20 * step,
+        ..Default::default()
+    }
 }
 
 macro_rules! pins {
@@ -491,7 +548,7 @@ impl Context {
         &mut self,
         conf: &LoopbackConfig,
     ) -> (Channel<'_, Blocking, Tx>, Channel<'_, Blocking, Rx>) {
-        let rmt = Rmt::new(self.rmt.reborrow(), FREQ).unwrap();
+        let rmt = Rmt::new(self.rmt.reborrow(), conf.sclk_freq()).unwrap();
         let (rx, tx) = pins!(self);
         Self::setup_impl(rmt, rx, tx, conf)
     }
@@ -500,7 +557,9 @@ impl Context {
         &mut self,
         conf: &LoopbackConfig,
     ) -> (Channel<'_, Async, Tx>, Channel<'_, Async, Rx>) {
-        let rmt = Rmt::new(self.rmt.reborrow(), FREQ).unwrap().into_async();
+        let rmt = Rmt::new(self.rmt.reborrow(), conf.sclk_freq())
+            .unwrap()
+            .into_async();
         let (rx, tx) = pins!(self);
         Self::setup_impl(rmt, rx, tx, conf)
     }
@@ -847,7 +906,7 @@ mod tests {
             let conf = LoopbackConfig::default();
 
             let (rx_pin, tx_pin) = pins!($ctx);
-            let mut rmt = Rmt::new($ctx.rmt.reborrow(), FREQ).unwrap();
+            let mut rmt = Rmt::new($ctx.rmt.reborrow(), conf.sclk_freq()).unwrap();
 
             let tx_channel = rmt
                 .$tx_channel
@@ -939,9 +998,9 @@ mod tests {
             ..Default::default()
         };
 
-        let rmt = Rmt::new(ctx.rmt, FREQ).unwrap();
+        let rmt = Rmt::new(ctx.rmt, conf.sclk_freq()).unwrap();
 
-        let mut bitbang_tx = BitbangTransmitter::new(ctx.pin);
+        let mut bitbang_tx = BitbangTransmitter::new(ctx.pin, &conf);
         let (_, rx_channel) = Context::setup_impl(rmt, bitbang_tx.rx_pin(), NoPin, &conf);
 
         let tx_data = generate_tx_data(&conf);
@@ -1010,7 +1069,7 @@ mod tests {
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
-            let mut rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap();
+            let mut rmt = Rmt::new(ctx.rmt.reborrow(), conf.sclk_freq()).unwrap();
 
             // Test that dropping & recreating ChannelCreator works
             for _ in 0..3 {
@@ -1074,7 +1133,9 @@ mod tests {
 
         // Test that dropping & recreating Rmt works
         for _ in 0..3 {
-            let mut rmt = Rmt::new(ctx.rmt.reborrow(), FREQ).unwrap().into_async();
+            let mut rmt = Rmt::new(ctx.rmt.reborrow(), conf.sclk_freq())
+                .unwrap()
+                .into_async();
 
             // Test that dropping & recreating ChannelCreator works
             for _ in 0..3 {
@@ -1191,6 +1252,64 @@ mod tests {
         rmt_loopback_continuous_tx_impl(ctx, true);
     }
 
+    // Regression test for continuous tx with a slow SCLK, where the loop count interrupt often
+    // never fired, see esp-rs/esp-hal#3930.
+    #[cfg(all(rmt_has_tx_loop_count, not(esp32s2)))]
+    #[test]
+    #[timeout(3)]
+    fn rmt_continuous_tx_slow_sclk(mut ctx: Context) {
+        use esp_hal::time::Instant;
+
+        const LOOPS: u16 = 10;
+        const CODE_LENGTH: u16 = 289;
+
+        let sclk = FREQ / 256;
+        let expected_us = (LOOPS as u64 * 2 * CODE_LENGTH as u64 * 1_000_000) / sclk.as_hz() as u64;
+
+        let tx_data = [
+            PulseCode::new(Level::High, CODE_LENGTH, Level::Low, CODE_LENGTH),
+            PulseCode::end_marker(),
+        ];
+        let config = TxChannelConfig::default()
+            .with_clk_divider(1)
+            .with_idle_output(true)
+            .with_idle_output_level(Level::Low);
+
+        let mut rmt = Rmt::new(ctx.rmt.reborrow(), sclk).unwrap();
+
+        // Reconfigure the channel for every transaction, as in the original report.
+        for _ in 0..10 {
+            let tx_channel = rmt
+                .channel0
+                .reborrow()
+                .configure_tx(&config)
+                .unwrap()
+                .with_pin(ctx.pin.reborrow());
+
+            #[cfg(rmt_has_tx_loop_auto_stop)]
+            let loopmode = LoopMode::Finite(LOOPS);
+            #[cfg(not(rmt_has_tx_loop_auto_stop))]
+            let loopmode = LoopMode::InfiniteWithInterrupt(LOOPS);
+
+            let start = Instant::now();
+            let tx_transaction = tx_channel
+                .transmit_continuously(&tx_data, loopmode)
+                .unwrap();
+
+            while !tx_transaction.is_loopcount_interrupt_set() {}
+            let elapsed_us = start.elapsed().as_micros();
+
+            tx_transaction.stop_next().unwrap();
+
+            assert!(
+                elapsed_us * 10 >= expected_us * 9 && elapsed_us * 10 <= expected_us * 11,
+                "unexpected tx duration: {} us (expected {} us)",
+                elapsed_us,
+                expected_us
+            );
+        }
+    }
+
     // Test that using loopcount 0 doesn't hang, but returns success immediately.
     #[cfg(rmt_has_tx_loop_auto_stop)]
     #[test]
@@ -1284,5 +1403,38 @@ mod tests {
             },
         )
         .await;
+    }
+
+    // Repeated transactions on the same channels are required to trigger some of the issues with
+    // slow SCLK.
+    #[test]
+    #[timeout(10)]
+    fn rmt_dividers(mut ctx: Context) {
+        for &sclk_div in SCLK_DIVIDERS {
+            for &ch_div in CHANNEL_DIVIDERS {
+                let conf = divider_loopback_config(sclk_div, ch_div);
+
+                let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&conf);
+                for _ in 0..3 {
+                    (tx_channel, rx_channel) =
+                        do_rmt_loopback_inner(&conf, tx_channel, rx_channel).unwrap();
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[timeout(10)]
+    async fn rmt_dividers_async(mut ctx: Context) {
+        for &sclk_div in SCLK_DIVIDERS {
+            for &ch_div in CHANNEL_DIVIDERS {
+                let conf = divider_loopback_config(sclk_div, ch_div);
+
+                let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&conf);
+                for _ in 0..3 {
+                    do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await;
+                }
+            }
+        }
     }
 }

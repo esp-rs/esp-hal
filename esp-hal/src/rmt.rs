@@ -932,7 +932,7 @@ impl<'rmt> Rmt<'rmt, Blocking> {
         // contains lots of code to drop them again on error.
         let this = Rmt::create(peripheral, counter_frequency);
 
-        self::chip_specific::configure_clock(clk_src, div);
+        self::chip_specific::configure_clock(clk_src, div, counter_frequency);
         Ok(this)
     }
 
@@ -1852,10 +1852,11 @@ impl<'ch> RxTransaction<'ch, '_> {
             Some(Event::End | Event::Error) => {
                 // Do not clear the interrupt flags here: Subsequent calls of wait() must
                 // be able to observe them if this is currently called via poll()
-                // Rx is stopped already, but we do need to clear the rx enable flag!
-                // Otherwise the next `raw.update` call will start it even though that
-                // might not be desired.
+                // Rx is stopped already, but we do need to clear the rx enable flag and
+                // apply that right away! Otherwise the next `raw.update` call would do so
+                // while starting the next transaction, which breaks it when SCLK is slow.
                 raw.stop_rx(false);
+                raw.update();
 
                 // `RmtReader::read()` is safe to call even if `poll_internal` is called repeatedly
                 // after the receiver finished since it returns immediately if already done.
@@ -2070,10 +2071,11 @@ impl core::future::Future for RxFuture<'_> {
         let result = match raw.get_rx_status() {
             // Read all available data also on error
             Some(ev @ (Event::End | Event::Error)) => {
-                // Rx is stopped already, but we do need to clear the rx enable flag!
-                // Otherwise the next `raw.update` call will start it even though that
-                // might not be desired.
+                // Rx is stopped already, but we do need to clear the rx enable flag and
+                // apply that right away! Otherwise the next `raw.update` call would do so
+                // while starting the next transaction, which breaks it when SCLK is slow.
                 raw.stop_rx(false);
+                raw.update();
 
                 if !this.reader.read(&mut this.data, raw, true) {
                     Err(Error::ReceiverError)
@@ -2252,6 +2254,7 @@ macro_rules! max_from_register_spec {
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
     use enumset::EnumSet;
+    use portable_atomic::{AtomicU32, Ordering};
     #[cfg(place_rmt_driver_in_ram)]
     use procmacros::ram;
 
@@ -2271,6 +2274,9 @@ mod chip_specific {
         WAKER,
     };
     use crate::{peripherals::RMT, soc::clocks, time::Rate};
+
+    // Time to wait after a `conf_update`, see `DynChannelAccess::update`.
+    static CONF_UPDATE_DELAY_US: AtomicU32 = AtomicU32::new(0);
 
     pub(super) fn validate_clock(
         source: ClockSource,
@@ -2293,7 +2299,17 @@ mod chip_specific {
         Ok((div, actual_frequency))
     }
 
-    pub(super) fn configure_clock(source: ClockSource, div: u8) {
+    pub(super) fn configure_clock(source: ClockSource, div: u8, frequency: Rate) {
+        // Synchronizing a `conf_update` into the SCLK domain takes about one SCLK cycle, wait for
+        // two to leave some margin. For a fast SCLK, this is shorter than the register accesses
+        // following the update, so don't delay at all.
+        let delay_us = if frequency < Rate::from_mhz(10) {
+            2_000_000u32.div_ceil(frequency.as_hz())
+        } else {
+            0
+        };
+        CONF_UPDATE_DELAY_US.store(delay_us, Ordering::Relaxed);
+
         clocks::ClockTree::with(|clocks| {
             clocks::RmtInstance::Rmt.configure_sclk(clocks, source);
         });
@@ -2392,6 +2408,14 @@ mod chip_specific {
             } else {
                 rmt.ch_rx_conf1(ch_idx)
                     .modify(|_, w| w.conf_update().set_bit());
+            }
+
+            // The update needs to be synchronized into the SCLK domain before it takes effect.
+            // Register writes or another update during that time may be lost, which breaks
+            // transactions in unexpected ways when SCLK is slow.
+            let delay_us = CONF_UPDATE_DELAY_US.load(Ordering::Relaxed);
+            if delay_us > 0 {
+                crate::rom::ets_delay_us(delay_us);
             }
         }
 
@@ -2846,7 +2870,7 @@ mod chip_specific {
         Ok((1, frequency))
     }
 
-    pub(super) fn configure_clock(source: ClockSource, _div: u8) {
+    pub(super) fn configure_clock(source: ClockSource, _div: u8, _frequency: Rate) {
         let rmt = RMT::regs();
 
         clocks::ClockTree::with(|clocks| {
