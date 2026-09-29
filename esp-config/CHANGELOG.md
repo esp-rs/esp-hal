@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Resolved a runtime panic in `esp-config` due to a type mismatch in the `clap` value parser for the `--chip` argument. (#6426)
 
 ### Removed
 

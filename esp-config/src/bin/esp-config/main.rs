@@ -30,8 +30,10 @@ struct Args {
     config_file: Option<String>,
 }
 
-fn chip_from_str(str: &str) -> Result<Option<Chip>, String> {
-    Chip::from_str(str).map(Some)
+// `clap` already handles the `Option` wrapper via the struct field type,
+// so the value parser should return `Chip` directly instead of `Option<Chip>`.
+fn chip_from_str(str: &str) -> Result<Chip, String> {
+    Chip::from_str(str)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
