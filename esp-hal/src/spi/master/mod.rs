@@ -858,15 +858,7 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-
-        self.driver().setup_full_duplex()?;
-
-        if self.use_blocking_transfer(words.len()) {
-            return self.driver().transfer_in_place(words);
-        }
-
-        self.driver().transfer_in_place_async(words).await
+        self.acquire().transfer_in_place_async(words).await
     }
 
     /// Half-duplex read.
@@ -892,15 +884,7 @@ impl<'d> Spi<'d, Async> {
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-
-        if self.use_blocking_transfer(buffer.len()) {
-            return self
-                .driver()
-                .half_duplex_read(data_mode, cmd, address, dummy, buffer);
-        }
-
-        self.driver()
+        self.acquire()
             .half_duplex_read_async(data_mode, cmd, address, dummy, buffer)
             .await
     }
@@ -931,15 +915,7 @@ impl<'d> Spi<'d, Async> {
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-
-        if self.use_blocking_transfer(buffer.len()) {
-            return self
-                .driver()
-                .half_duplex_write(data_mode, cmd, address, dummy, buffer);
-        }
-
-        self.driver()
+        self.acquire()
             .half_duplex_write_async(data_mode, cmd, address, dummy, buffer)
             .await
     }
@@ -947,27 +923,11 @@ impl<'d> Spi<'d, Async> {
     // TODO: These inherent methods should be public
 
     async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-
-        self.driver().setup_full_duplex()?;
-
-        if self.use_blocking_transfer(words.len()) {
-            return self.driver().read(words);
-        }
-
-        self.driver().read_async(words).await
+        self.acquire().read_async(words).await
     }
 
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-
-        self.driver().setup_full_duplex()?;
-
-        if self.use_blocking_transfer(words.len()) {
-            return self.driver().write(words);
-        }
-
-        self.driver().write_async(words).await
+        self.acquire().write_async(words).await
     }
 }
 
@@ -1233,10 +1193,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-
-        self.driver().setup_full_duplex()?;
-        self.driver().write(words)
+        self.acquire().write(words)
     }
 
     #[procmacros::doc_replace]
@@ -1263,9 +1220,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-        self.driver().setup_full_duplex()?;
-        self.driver().read(words)
+        self.acquire().read(words)
     }
 
     #[procmacros::doc_replace]
@@ -1292,9 +1247,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-        self.driver().setup_full_duplex()?;
-        self.driver().transfer_in_place(words)
+        self.acquire().transfer(words)
     }
 
     /// Half-duplex read.
@@ -1316,8 +1269,7 @@ where
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-        self.driver()
+        self.acquire()
             .half_duplex_read(data_mode, cmd, address, dummy, buffer)
     }
 
@@ -1343,8 +1295,7 @@ where
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-        self.driver()
+        self.acquire()
             .half_duplex_write(data_mode, cmd, address, dummy, buffer)
     }
 
@@ -1361,6 +1312,247 @@ where
         Driver {
             info: self.spi.info(),
             state: self.spi.state(),
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Acquires the bus for a series of transfers.
+    ///
+    /// Every transfer needs the SPI function clock. Without an acquired bus it is
+    /// requested and released around each transfer, which lets the clock be gated
+    /// between transfers but adds a clock tree operation to each of them, and each
+    /// transfer sets the bus up again. While the returned [`SpiAcquired`] exists,
+    /// the clock stays requested, and the bus is only set up again when the kind
+    /// of transfer changes. Dropping it releases the clock.
+    ///
+    /// Useful for a device that needs many short transfers in quick succession,
+    /// at the cost of keeping the function clock running while the bus is held.
+    ///
+    /// # Examples
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2);
+    ///
+    /// let mut bus = spi.acquire();
+    /// let mut status = [0x03, 0x2C, 0x00];
+    /// bus.transfer(&mut status)?;
+    /// let mut frame = [0u8; 14];
+    /// frame[0] = 0x90;
+    /// bus.transfer(&mut frame)?;
+    /// drop(bus);
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn acquire(&mut self) -> SpiAcquired<'_, 'd, Dm> {
+        SpiAcquired {
+            _clock: SpiClockGuard::new(self.spi.info()),
+            spi: self,
+            full_duplex: false,
+        }
+    }
+}
+
+/// An SPI bus acquired for a series of transfers, see [`Spi::acquire`].
+///
+/// Holds the SPI function clock until dropped.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub struct SpiAcquired<'a, 'd, Dm: DriverMode> {
+    spi: &'a mut Spi<'d, Dm>,
+    _clock: SpiClockGuard,
+    /// The bus is set up for full-duplex transfers. Half-duplex transfers set it
+    /// up differently and clear this.
+    full_duplex: bool,
+}
+
+impl<Dm: DriverMode> SpiAcquired<'_, '_, Dm> {
+    fn driver(&self) -> Driver {
+        self.spi.driver()
+    }
+
+    /// Sets the bus up for full-duplex transfers, unless it already is
+    fn setup_full_duplex(&mut self) -> Result<(), Error> {
+        if !self.full_duplex {
+            self.driver().setup_full_duplex()?;
+            self.full_duplex = true;
+        }
+        Ok(())
+    }
+
+    /// Writes bytes to SPI. See [`Spi::write`].
+    #[instability::unstable]
+    pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
+        self.setup_full_duplex()?;
+        self.driver().write(words)
+    }
+
+    /// Reads bytes from SPI. See [`Spi::read`].
+    #[instability::unstable]
+    pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.setup_full_duplex()?;
+        self.driver().read(words)
+    }
+
+    /// Sends `words` and replaces them with the received bytes. See [`Spi::transfer`].
+    #[instability::unstable]
+    pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.setup_full_duplex()?;
+        self.driver().transfer_in_place(words)
+    }
+
+    /// Half-duplex read. See [`Spi::half_duplex_read`].
+    #[instability::unstable]
+    pub fn half_duplex_read(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.full_duplex = false;
+        self.driver()
+            .half_duplex_read(data_mode, cmd, address, dummy, buffer)
+    }
+
+    /// Half-duplex write. See [`Spi::half_duplex_write`].
+    #[instability::unstable]
+    pub fn half_duplex_write(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        self.full_duplex = false;
+        self.driver()
+            .half_duplex_write(data_mode, cmd, address, dummy, buffer)
+    }
+
+    fn transfer_full_duplex(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        self.setup_full_duplex()?;
+        if read.is_empty() {
+            self.driver().write(write)
+        } else if write.is_empty() {
+            self.driver().read(read)
+        } else {
+            self.driver().transfer(read, write)
+        }
+    }
+}
+
+impl SpiAcquired<'_, '_, Async> {
+    /// Sets the bus up for full-duplex transfers. An async transfer whose future
+    /// is dropped may leave it in any state, so async transfers always set it up.
+    fn setup_full_duplex_async(&mut self) -> Result<(), Error> {
+        self.full_duplex = false;
+        self.driver().setup_full_duplex()
+    }
+
+    /// See [`Spi::transfer_in_place_async`].
+    #[instability::unstable]
+    pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.setup_full_duplex_async()?;
+
+        if self.spi.use_blocking_transfer(words.len()) {
+            return self.driver().transfer_in_place(words);
+        }
+
+        self.driver().transfer_in_place_async(words).await
+    }
+
+    /// See [`Spi::half_duplex_read_async`].
+    #[instability::unstable]
+    pub async fn half_duplex_read_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.full_duplex = false;
+
+        if self.spi.use_blocking_transfer(buffer.len()) {
+            return self
+                .driver()
+                .half_duplex_read(data_mode, cmd, address, dummy, buffer);
+        }
+
+        self.driver()
+            .half_duplex_read_async(data_mode, cmd, address, dummy, buffer)
+            .await
+    }
+
+    /// See [`Spi::half_duplex_write_async`].
+    #[instability::unstable]
+    pub async fn half_duplex_write_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        self.full_duplex = false;
+
+        if self.spi.use_blocking_transfer(buffer.len()) {
+            return self
+                .driver()
+                .half_duplex_write(data_mode, cmd, address, dummy, buffer);
+        }
+
+        self.driver()
+            .half_duplex_write_async(data_mode, cmd, address, dummy, buffer)
+            .await
+    }
+
+    async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
+        self.setup_full_duplex_async()?;
+
+        if self.spi.use_blocking_transfer(words.len()) {
+            return self.driver().read(words);
+        }
+
+        self.driver().read_async(words).await
+    }
+
+    async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
+        self.setup_full_duplex_async()?;
+
+        if self.spi.use_blocking_transfer(words.len()) {
+            return self.driver().write(words);
+        }
+
+        self.driver().write_async(words).await
+    }
+
+    async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
+        self.setup_full_duplex_async()?;
+
+        if self.spi.use_blocking_transfer(read.len().max(write.len())) {
+            return if read.is_empty() {
+                self.driver().write(write)
+            } else if write.is_empty() {
+                self.driver().read(read)
+            } else {
+                self.driver().transfer(read, write)
+            };
+        }
+
+        if read.is_empty() {
+            self.driver().write_async(write).await
+        } else if write.is_empty() {
+            self.driver().read_async(read).await
+        } else {
+            self.driver().transfer_async(read, write).await
         }
     }
 }
@@ -1398,22 +1590,11 @@ where
     }
 
     fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-        self.driver().setup_full_duplex()?;
-
-        if read.is_empty() {
-            self.driver().write(write)
-        } else if write.is_empty() {
-            self.driver().read(read)
-        } else {
-            self.driver().transfer(read, write)
-        }
+        self.acquire().transfer_full_duplex(read, write)
     }
 
     fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
-        self.driver().setup_full_duplex()?;
-        self.driver().transfer_in_place(words)
+        self.acquire().transfer(words)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
@@ -1431,27 +1612,61 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 
     async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        let _clock = SpiClockGuard::new(self.spi.info());
+        self.acquire().transfer_async(read, write).await
+    }
 
-        self.driver().setup_full_duplex()?;
+    async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer_in_place_async(words).await
+    }
 
-        if self.use_blocking_transfer(read.len().max(write.len())) {
-            return if read.is_empty() {
-                self.driver().write(write)
-            } else if write.is_empty() {
-                self.driver().read(read)
-            } else {
-                self.driver().transfer(read, write)
-            };
-        }
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
 
-        if read.is_empty() {
-            self.driver().write_async(write).await
-        } else if write.is_empty() {
-            self.driver().read_async(read).await
-        } else {
-            self.driver().transfer_async(read, write).await
-        }
+impl<Dm> embedded_hal::spi::ErrorType for SpiAcquired<'_, '_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Error = Error;
+}
+
+impl<Dm> SpiBus for SpiAcquired<'_, '_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.read(words)
+    }
+
+    fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.write(words)
+    }
+
+    fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.transfer_full_duplex(read, write)
+    }
+
+    fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.transfer(words)
+    }
+
+    fn flush(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+impl SpiBusAsync for SpiAcquired<'_, '_, Async> {
+    async fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        self.read_async(words).await
+    }
+
+    async fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+        self.write_async(words).await
+    }
+
+    async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+        self.transfer_async(read, write).await
     }
 
     async fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
