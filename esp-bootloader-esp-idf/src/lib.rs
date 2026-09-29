@@ -102,8 +102,10 @@
 mod fmt;
 
 #[cfg(not(feature = "std"))]
+#[cfg_attr(not(flash_driver_supported), allow(dead_code))]
 mod rom;
 #[cfg(not(feature = "std"))]
+#[cfg_attr(not(flash_driver_supported), allow(unused_imports))]
 pub(crate) use rom as crypto;
 
 #[cfg(feature = "std")]
@@ -113,12 +115,16 @@ pub use crypto::Crc32 as Crc32ForTesting;
 #[cfg(feature = "std")]
 pub(crate) use non_rom as crypto;
 
+#[cfg(flash_driver_supported)]
 mod flash;
 
+#[cfg(flash_driver_supported)]
 pub mod partitions;
 
+#[cfg(flash_driver_supported)]
 pub mod ota;
 
+#[cfg(flash_driver_supported)]
 pub mod ota_updater;
 
 // We run tests on the host which happens to be MacOS machines and mach-o

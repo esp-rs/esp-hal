@@ -25,45 +25,141 @@ pub trait FlashAccess {
 }
 
 #[cfg(not(feature = "std"))]
-impl FlashAccess for super::FlashStorage<'_> {
-    #[cfg(feature = "embedded-storage")]
-    const READ_SIZE: usize = esp_storage::FlashStorage::READ_SIZE;
-    #[cfg(feature = "embedded-storage")]
-    const WRITE_SIZE: usize = esp_storage::FlashStorage::WRITE_SIZE;
-    #[cfg(feature = "embedded-storage")]
-    const ERASE_SIZE: usize = esp_storage::FlashStorage::ERASE_SIZE;
-    #[cfg(feature = "embedded-storage")]
-    const SECTOR_SIZE: u32 = esp_storage::FlashStorage::SECTOR_SIZE;
+mod esp_hal_flash {
+    use super::*;
+    use crate::flash::FlashStorage;
 
-    fn flash_read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
-        esp_storage::FlashStorage::read(self, offset, bytes).map_err(|_| Error::StorageError)
+    const WORD_SIZE: u32 = 4;
+
+    /// Size of the stack buffer that stages data between byte slices and the
+    /// word-based flash driver, which needs word-aligned buffers in DRAM.
+    const BOUNCE_BUFFER_WORDS: usize = 64;
+    const BOUNCE_BUFFER_BYTES: usize = BOUNCE_BUFFER_WORDS * WORD_SIZE as usize;
+
+    fn words_as_bytes(words: &[u32]) -> &[u8] {
+        // SAFETY: every bit pattern is a valid `u8`, and `u8` has no alignment requirement.
+        unsafe { core::slice::from_raw_parts(words.as_ptr().cast(), size_of_val(words)) }
     }
 
-    fn flash_write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
-        esp_storage::FlashStorage::write(self, offset, bytes).map_err(|_| Error::StorageError)
+    fn words_as_bytes_mut(words: &mut [u32]) -> &mut [u8] {
+        // SAFETY: every bit pattern is a valid `u8` and `u32`, and `u8` has no alignment
+        // requirement.
+        unsafe { core::slice::from_raw_parts_mut(words.as_mut_ptr().cast(), size_of_val(words)) }
     }
 
-    fn flash_erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
-        esp_storage::FlashStorage::erase(self, from, to).map_err(|_| Error::StorageError)
+    /// Reads `bytes.len()` bytes at any `offset`, one bounce buffer at a time.
+    fn read_bytes(
+        flash: &mut FlashStorage<'_>,
+        offset: u32,
+        mut bytes: &mut [u8],
+        encrypted: bool,
+    ) -> Result<(), Error> {
+        let mut buffer = [0u32; BOUNCE_BUFFER_WORDS];
+        let mut address = offset;
+
+        while !bytes.is_empty() {
+            let lead = (address % WORD_SIZE) as usize;
+            let len = bytes.len().min(BOUNCE_BUFFER_BYTES - lead);
+            let words = &mut buffer[..(lead + len).div_ceil(WORD_SIZE as usize)];
+            let aligned_address = address - lead as u32;
+
+            if encrypted {
+                flash.read_encrypted(aligned_address, words)
+            } else {
+                flash.read(aligned_address, words)
+            }
+            .map_err(|_| Error::StorageError)?;
+
+            let (head, tail) = bytes.split_at_mut(len);
+            head.copy_from_slice(&words_as_bytes(words)[lead..][..len]);
+            bytes = tail;
+            address += len as u32;
+        }
+
+        Ok(())
     }
 
-    fn flash_read_encrypted(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
-        esp_storage::FlashStorage::read_encrypted(self, offset, bytes)
-            .map_err(|_| Error::StorageError)
+    /// Writes `bytes` at a word-aligned `offset`, one bounce buffer at a time.
+    ///
+    /// The target range must be erased: the driver does not erase before
+    /// programming.
+    fn write_bytes(
+        flash: &mut FlashStorage<'_>,
+        offset: u32,
+        mut bytes: &[u8],
+        encrypted: bool,
+    ) -> Result<(), Error> {
+        if !offset.is_multiple_of(WORD_SIZE) || !bytes.len().is_multiple_of(WORD_SIZE as usize) {
+            return Err(Error::StorageError);
+        }
+
+        let mut buffer = [0u32; BOUNCE_BUFFER_WORDS];
+        let mut address = offset;
+
+        while !bytes.is_empty() {
+            let len = bytes.len().min(BOUNCE_BUFFER_BYTES);
+            let words = &mut buffer[..len / WORD_SIZE as usize];
+            let (head, tail) = bytes.split_at(len);
+            words_as_bytes_mut(words).copy_from_slice(head);
+
+            // SAFETY: the caller must not program flash that is mapped for
+            // instruction fetch or as immutable data.
+            unsafe {
+                if encrypted {
+                    flash.write_encrypted(address, words)
+                } else {
+                    flash.write(address, words)
+                }
+            }
+            .map_err(|_| Error::StorageError)?;
+
+            bytes = tail;
+            address += len as u32;
+        }
+
+        Ok(())
     }
 
-    fn flash_write_encrypted(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
-        esp_storage::FlashStorage::write_encrypted(self, offset, bytes)
-            .map_err(|_| Error::StorageError)
-    }
+    impl FlashAccess for FlashStorage<'_> {
+        #[cfg(feature = "embedded-storage")]
+        const READ_SIZE: usize = 1;
+        #[cfg(feature = "embedded-storage")]
+        const WRITE_SIZE: usize = WORD_SIZE as usize;
+        #[cfg(feature = "embedded-storage")]
+        const ERASE_SIZE: usize = Self::SECTOR_SIZE as usize;
+        #[cfg(feature = "embedded-storage")]
+        const SECTOR_SIZE: u32 = 4096;
 
-    #[cfg(feature = "embedded-storage")]
-    fn flash_read_nor(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
-        esp_storage::FlashStorage::read_nor(self, offset, bytes).map_err(|_| Error::StorageError)
-    }
+        fn flash_read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
+            read_bytes(self, offset, bytes, false)
+        }
 
-    #[cfg(feature = "embedded-storage")]
-    fn flash_write_nor(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
-        esp_storage::FlashStorage::write_nor(self, offset, bytes).map_err(|_| Error::StorageError)
+        fn flash_write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
+            write_bytes(self, offset, bytes, false)
+        }
+
+        fn flash_erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
+            // SAFETY: the caller must not erase flash that is mapped for
+            // instruction fetch or as immutable data.
+            unsafe { self.erase(from, to) }.map_err(|_| Error::StorageError)
+        }
+
+        fn flash_read_encrypted(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
+            read_bytes(self, offset, bytes, true)
+        }
+
+        fn flash_write_encrypted(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
+            write_bytes(self, offset, bytes, true)
+        }
+
+        #[cfg(feature = "embedded-storage")]
+        fn flash_read_nor(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
+            read_bytes(self, offset, bytes, false)
+        }
+
+        #[cfg(feature = "embedded-storage")]
+        fn flash_write_nor(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
+            write_bytes(self, offset, bytes, false)
+        }
     }
 }

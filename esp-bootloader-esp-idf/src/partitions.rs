@@ -109,7 +109,7 @@ impl PartitionEntry {
         let enabled = false;
 
         #[cfg(not(feature = "std"))]
-        let enabled = esp_storage::flash_encryption();
+        let enabled = esp_hal::efuse::flash_encryption();
 
         enabled
             && (self.is_encrypted()
@@ -643,7 +643,7 @@ fn read_partition_table_impl<'a, F: FlashAccess>(
     let enabled = false;
 
     #[cfg(not(feature = "std"))]
-    let enabled = esp_storage::flash_encryption();
+    let enabled = esp_hal::efuse::flash_encryption();
 
     if enabled {
         flash.flash_read_encrypted(PARTITION_TABLE_OFFSET, storage)?;
@@ -871,8 +871,7 @@ pub struct NorFlashRegion<'r, 'a, 'd> {
 #[cfg(feature = "embedded-storage")]
 /// [`NorFlash`] view of an encrypted [`FlashRegion`].
 ///
-/// Write size is one flash sector ([`esp_storage::FlashStorage::SECTOR_SIZE`]): the ROM encrypts
-/// whole sectors.
+/// Write size is one flash sector (4096 bytes): the ROM encrypts whole sectors.
 pub struct EncryptedNorFlashRegion<'r, 'a, 'd> {
     region: &'r mut FlashRegion<'a, 'd>,
 }
