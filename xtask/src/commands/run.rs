@@ -503,7 +503,7 @@ pub fn run_examples(
                             Ok(console::Key::Char('r')) => {
                                 // A retry looks again, so a board swapped in meanwhile is the one
                                 // to run on. Another chip is for the caller to start over for.
-                                if let Some(connected) = crate::detect::with_espflash()?
+                                if let Some(connected) = crate::detect::rescan_with_espflash()?
                                     && connected != chip
                                 {
                                     return Err(anyhow!(connected));
