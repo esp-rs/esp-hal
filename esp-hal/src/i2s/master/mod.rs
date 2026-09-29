@@ -602,56 +602,165 @@ impl From<DmaError> for Error {
     }
 }
 
-/// Supported data formats
+/// Supported I2S data formats.
+///
+/// Each format defines two dimensions:
+///
+/// - **`Data{X}` (on-wire slot width)**: The number of bit-clock (BCLK) cycles allocated to each
+///   channel slot on the physical line ([`Self::data_bits`]). This determines the BCLK frequency
+///   (`BCLK = sample_rate * channels * data_bits`) and the time duration of each channel slot.
+/// - **`Channel{Y}` (in-memory sample width)**: The number of active audio data bits per sample
+///   transferred to or from memory via DMA ([`Self::channel_bits`]).
+///
+/// ### In-Memory Representation
+///
+/// In the DMA memory buffer, samples are stored with a size corresponding to `Channel{Y}`:
+/// - 32-bit (`Channel32`): 4 bytes per sample (e.g. `i32` / `u32`).
+/// - 24-bit (`Channel24`): 3 bytes per sample (packed 24-bit PCM).
+/// - 16-bit (`Channel16`): 2 bytes per sample (e.g. `i16` / `u16`).
+/// - 8-bit (`Channel8`): 1 byte per sample (e.g. `i8` / `u8`).
+///
+/// ### On-Wire Representation and Padding
+///
+/// On the physical I2S lines, each channel occupies `Data{X}` clock cycles:
+/// - When `X == Y` (e.g. [`Data16Channel16`], [`Data32Channel32`]), the entire slot carries sample
+///   data with no padding.
+/// - When `X > Y` (e.g. [`Data32Channel16`]), the `Y`-bit sample occupies `Y` bits of the `X`-bit
+///   slot on the wire, and the remaining `X - Y` bits are padded or discarded according to
+///   [`Alignment`]:
+///   - [`Alignment::Left`] (default):
+///     - **TX**: The `Y` sample bits are transmitted first (MSB-aligned within the slot), followed
+///       by `X - Y` zero bits.
+///     - **RX**: The first `Y` bits from the wire are captured into memory; trailing bits in the
+///       slot are discarded.
+///   - [`Alignment::Right`]:
+///     - **TX**: `X - Y` zero bits are transmitted first, followed by the `Y` sample bits
+///       (LSB-aligned within the slot).
+///     - **RX**: The leading `X - Y` bits are discarded; the last `Y` bits of the slot are captured
+///       into memory.
+///
+/// Note: In this driver's naming scheme, `Data{X}` refers to the on-wire slot width, and
+/// `Channel{Y}` refers to the in-memory sample data width. (This differs from some datasheets where
+/// the on-wire slot is called "slot width" or "channel width", and the sample size is called "data
+/// width".)
+///
+/// [`Data16Channel16`]: DataFormat::Data16Channel16
+/// [`Data32Channel16`]: DataFormat::Data32Channel16
+/// [`Data32Channel32`]: DataFormat::Data32Channel32
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(not(i2s_version = "1"))]
 pub enum DataFormat {
-    /// 32-bit data width and 32-bit channel width.
+    /// 32-bit on-wire slot width (32 BCLK cycles) and 32-bit in-memory sample width (4 bytes per
+    /// sample).
     Data32Channel32,
-    /// 32-bit data width and 24-bit channel width.
+    /// 32-bit on-wire slot width (32 BCLK cycles) and 24-bit in-memory sample width (3 bytes packed
+    /// per sample).
+    ///
+    /// In TX, 24-bit samples from memory are padded to 32 bits on the wire according to
+    /// [`Alignment`]. In RX, 24 bits are extracted from each 32-bit slot on the wire into
+    /// memory.
     Data32Channel24,
-    /// 32-bit data width and 16-bit channel width.
+    /// 32-bit on-wire slot width (32 BCLK cycles) and 16-bit in-memory sample width (2 bytes per
+    /// sample).
+    ///
+    /// In TX, 16-bit samples from memory are padded to 32 bits on the wire according to
+    /// [`Alignment`]. In RX, 16 bits are extracted from each 32-bit slot on the wire into
+    /// memory.
     Data32Channel16,
-    /// 32-bit data width and 8-bit channel width.
+    /// 32-bit on-wire slot width (32 BCLK cycles) and 8-bit in-memory sample width (1 byte per
+    /// sample).
+    ///
+    /// In TX, 8-bit samples from memory are padded to 32 bits on the wire according to
+    /// [`Alignment`]. In RX, 8 bits are extracted from each 32-bit slot on the wire into
+    /// memory.
     Data32Channel8,
-    /// 16-bit data width and 16-bit channel width.
+    /// 16-bit on-wire slot width (16 BCLK cycles) and 16-bit in-memory sample width (2 bytes per
+    /// sample).
     Data16Channel16,
-    /// 16-bit data width and 8-bit channel width.
+    /// 16-bit on-wire slot width (16 BCLK cycles) and 8-bit in-memory sample width (1 byte per
+    /// sample).
+    ///
+    /// In TX, 8-bit samples from memory are padded to 16 bits on the wire according to
+    /// [`Alignment`]. In RX, 8 bits are extracted from each 16-bit slot on the wire into
+    /// memory.
     Data16Channel8,
-    /// 8-bit data width and 8-bit channel width.
+    /// 8-bit on-wire slot width (8 BCLK cycles) and 8-bit in-memory sample width (1 byte per
+    /// sample).
     Data8Channel8,
 }
 
-/// Supported data formats
+/// Supported I2S data formats.
+///
+/// Each format defines the on-wire slot width (`Data{X}`) and the in-memory sample width
+/// (`Channel{Y}`). On the ESP32-S2, each slot on the wire matches the sample data width in memory
+/// (`X == Y`).
+///
+/// - **`Data{X}` (on-wire slot width)**: The number of bit-clock (BCLK) cycles allocated to each
+///   channel slot on the physical line ([`Self::data_bits`]).
+/// - **`Channel{Y}` (in-memory sample width)**: The number of audio data bits per sample
+///   transferred to or from memory via DMA ([`Self::channel_bits`]).
+///
+/// In the DMA memory buffer, samples occupy:
+/// - 32-bit ([`Data32Channel32`]): 4 bytes per sample.
+/// - 24-bit ([`Data24Channel24`]): 3 bytes per sample.
+/// - 16-bit ([`Data16Channel16`]): 2 bytes per sample.
+/// - 8-bit ([`Data8Channel8`]): 1 byte per sample.
+///
+/// [`Data32Channel32`]: DataFormat::Data32Channel32
+/// [`Data24Channel24`]: DataFormat::Data24Channel24
+/// [`Data16Channel16`]: DataFormat::Data16Channel16
+/// [`Data8Channel8`]: DataFormat::Data8Channel8
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(esp32s2)]
 pub enum DataFormat {
-    /// 32-bit data width and 32-bit channel width.
+    /// 32-bit on-wire slot width (32 BCLK cycles) and 32-bit in-memory sample width (4 bytes per
+    /// sample).
     Data32Channel32,
-    /// 24-bit data width and 24-bit channel width.
+    /// 24-bit on-wire slot width (24 BCLK cycles) and 24-bit in-memory sample width (3 bytes packed
+    /// per sample).
     Data24Channel24,
-    /// 16-bit data width and 16-bit channel width.
+    /// 16-bit on-wire slot width (16 BCLK cycles) and 16-bit in-memory sample width (2 bytes per
+    /// sample).
     Data16Channel16,
-    /// 8-bit data width and 8-bit channel width.
+    /// 8-bit on-wire slot width (8 BCLK cycles) and 8-bit in-memory sample width (1 byte per
+    /// sample).
     Data8Channel8,
 }
 
-/// Supported data formats
+/// Supported I2S data formats.
+///
+/// Each format defines the on-wire slot width (`Data{X}`) and the in-memory sample width
+/// (`Channel{Y}`). On the ESP32, each slot on the wire matches the sample data width in memory (`X
+/// == Y`).
+///
+/// - **`Data{X}` (on-wire slot width)**: The number of bit-clock (BCLK) cycles allocated to each
+///   channel slot on the physical line ([`Self::data_bits`]).
+/// - **`Channel{Y}` (in-memory sample width)**: The number of audio data bits per sample
+///   transferred to or from memory via DMA ([`Self::channel_bits`]).
+///
+/// In the DMA memory buffer, samples occupy:
+/// - 32-bit ([`Data32Channel32`]): 4 bytes per sample.
+/// - 16-bit ([`Data16Channel16`]): 2 bytes per sample.
+///
+/// [`Data32Channel32`]: DataFormat::Data32Channel32
+/// [`Data16Channel16`]: DataFormat::Data16Channel16
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(esp32)]
 pub enum DataFormat {
-    /// 32-bit data width and 32-bit channel width.
+    /// 32-bit on-wire slot width (32 BCLK cycles) and 32-bit in-memory sample width (4 bytes per
+    /// sample).
     Data32Channel32,
-    /// 16-bit data width and 16-bit channel width.
+    /// 16-bit on-wire slot width (16 BCLK cycles) and 16-bit in-memory sample width (2 bytes per
+    /// sample).
     Data16Channel16,
 }
 
 #[cfg(not(i2s_version = "1"))]
 impl DataFormat {
-    /// Returns the number of data bits for the selected data format.
+    /// Returns the on-wire slot width in bits (number of BCLK cycles per channel slot).
     pub fn data_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -664,7 +773,8 @@ impl DataFormat {
         }
     }
 
-    /// Returns the number of channel bits for the selected data format.
+    /// Returns the in-memory sample width in bits (active audio data bits per sample transferred
+    /// via DMA).
     pub fn channel_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -680,7 +790,7 @@ impl DataFormat {
 
 #[cfg(esp32s2)]
 impl DataFormat {
-    /// Returns the number of data bits for the selected data format.
+    /// Returns the on-wire slot width in bits (number of BCLK cycles per channel slot).
     pub fn data_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -690,7 +800,8 @@ impl DataFormat {
         }
     }
 
-    /// Returns the number of channel bits for the selected data format.
+    /// Returns the in-memory sample width in bits (active audio data bits per sample transferred
+    /// via DMA).
     pub fn channel_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -703,7 +814,7 @@ impl DataFormat {
 
 #[cfg(esp32)]
 impl DataFormat {
-    /// Returns the number of data bits for the selected data format.
+    /// Returns the on-wire slot width in bits (number of BCLK cycles per channel slot).
     pub fn data_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -711,7 +822,8 @@ impl DataFormat {
         }
     }
 
-    /// Returns the number of channel bits for the selected data format.
+    /// Returns the in-memory sample width in bits (active audio data bits per sample transferred
+    /// via DMA).
     pub fn channel_bits(&self) -> u8 {
         match self {
             DataFormat::Data32Channel32 => 32,
@@ -771,14 +883,17 @@ pub enum Polarity {
     ActiveLow,
 }
 
+/// Alignment of sample data within the on-wire slot when the in-memory sample width is less than
+/// the on-wire slot width.
+///
+/// See [`DataFormat`] for more details on padding and on-wire slot alignment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Represent left/right alignment
 pub enum Alignment {
     #[default]
-    /// Left aligned
+    /// Left aligned (MSB-aligned within the on-wire slot).
     Left,
-    /// Right aligned
+    /// Right aligned (LSB-aligned within the on-wire slot).
     Right,
 }
 
@@ -884,7 +999,7 @@ pub struct TdmConfig {
     #[cfg(not(i2s_version = "1"))]
     mclk_out: MclkOut,
 
-    /// Formats of the data.
+    /// Data format configuring on-wire slot width and in-memory sample width.
     #[cfg(i2s_version = "1")]
     data_format: DataFormat,
 }
@@ -974,7 +1089,9 @@ impl TdmConfig {
         }
     }
 
-    /// Assigns the given value to the `data_format` field in both units.
+    /// Assigns the given data format to both units.
+    ///
+    /// See [`DataFormat`] for details on on-wire slot width and in-memory sample width.
     #[must_use]
     #[cfg(not(i2s_version = "1"))]
     pub fn with_data_format(self, data_format: DataFormat) -> Self {
@@ -1084,7 +1201,7 @@ pub struct TdmUnitConfig {
     /// I2S channels configuration.
     channels: Channels,
 
-    /// Formats of the data.
+    /// Data format configuring on-wire slot width and in-memory sample width.
     #[cfg(not(i2s_version = "1"))]
     data_format: DataFormat,
 
@@ -1105,7 +1222,8 @@ pub struct TdmUnitConfig {
     #[cfg(not(i2s_version = "1"))]
     bit_order: BitOrder,
 
-    /// Alignment of channel in data. Only relevant if channel width is less than data width.
+    /// Alignment of sample data within the on-wire slot. Only relevant when sample width is less
+    /// than slot width.
     #[cfg(not(i2s_version = "1"))]
     alignment: Alignment,
 }
