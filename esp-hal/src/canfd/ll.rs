@@ -602,8 +602,6 @@ impl Driver {
         unsafe { &*self.regs }
     }
 
-    // ---------------------------------------------------------------- identity
-
     pub(super) fn device_id(&self) -> u16 {
         self.r().device_id_version().read().device_id().bits()
     }
@@ -613,8 +611,6 @@ impl Driver {
         let r = self.r().device_id_version().read();
         (r.ver_major().bits(), r.ver_minor().bits())
     }
-
-    // ------------------------------------------------------------------- reset
 
     /// Issues a soft reset. No wait is required afterwards (TRM 38.3.2).
     pub(super) fn reset(&self) {
@@ -628,8 +624,6 @@ impl Driver {
     pub(super) fn is_enabled(&self) -> bool {
         self.r().mode_settings().read().ena().bit_is_set()
     }
-
-    // -------------------------------------------------------------------- mode
 
     /// Applies every mode setting in one write. Only valid while disabled.
     pub(super) fn apply_mode_settings(&self, settings: &ModeSettings) {
@@ -659,8 +653,6 @@ impl Driver {
             }
         });
     }
-
-    // -------------------------------------------------------------- bit timing
 
     pub(super) fn set_nominal_timing(&self, timing: &Timing) {
         self.r().btr().write(|w| unsafe {
@@ -694,8 +686,6 @@ impl Driver {
     pub(super) fn transmitter_delay(&self) -> u8 {
         self.r().trv_delay_ssp_cfg().read().trv_delay_value().bits()
     }
-
-    // -------------------------------------------------------------- TX buffers
 
     pub(super) fn tx_buffer_count(&self) -> u8 {
         self.r()
@@ -775,8 +765,6 @@ impl Driver {
         });
     }
 
-    // --------------------------------------------------------------- RX buffer
-
     /// Size of the RX buffer, in 32-bit words.
     pub(super) fn rx_buffer_size(&self) -> u16 {
         self.r().rx_mem_info().read().rx_buff_size().bits()
@@ -821,8 +809,6 @@ impl Driver {
         frame
     }
 
-    // ---------------------------------------------------------------- commands
-
     pub(super) fn flush_rx(&self) {
         self.r().command().write(|w| w.rrb().set_bit());
     }
@@ -846,8 +832,6 @@ impl Driver {
             .command()
             .write(|w| w.rxfcrst().set_bit().txfcrst().set_bit());
     }
-
-    // ------------------------------------------------------------------ errors
 
     pub(super) fn rec(&self) -> u16 {
         self.r().rec_tec().read().rec_val().bits()
@@ -883,8 +867,6 @@ impl Driver {
         self.r().mode_settings().modify(|_, w| w.tstm().bit(enable));
     }
 
-    // -------------------------------------------------------------- interrupts
-
     pub(super) fn enable_interrupts(&self, mask: u32) {
         self.r().int_ena_set().write(|w| unsafe { w.bits(mask) });
     }
@@ -901,8 +883,6 @@ impl Driver {
         self.r().int_stat().write(|w| unsafe { w.bits(mask) });
     }
 
-    // ---------------------------------------------------------------- counters
-
     pub(super) fn rx_traffic_counter(&self) -> u32 {
         self.r().rx_fr_ctr().read().val().bits()
     }
@@ -910,8 +890,6 @@ impl Driver {
     pub(super) fn tx_traffic_counter(&self) -> u32 {
         self.r().tx_fr_ctr().read().tx_ctr_val().bits()
     }
-
-    // ----------------------------------------------------------------- filters
 
     /// Sets a mask filter's acceptance code and mask.
     ///
@@ -991,8 +969,6 @@ impl Driver {
             .write(|w| unsafe { w.bits(bits) });
     }
 
-    // ----------------------------------------------------------- error capture
-
     pub(super) fn error_capture(&self) -> ErrorCapture {
         let r = self.r().err_capt_retr_ctr_alc_ts_info().read();
         ErrorCapture {
@@ -1016,8 +992,6 @@ impl Driver {
     pub(super) fn fd_error_count(&self) -> u16 {
         self.r().err_norm_err_fd().read().err_fd_val().bits()
     }
-
-    // ------------------------------------------------------- timestamp counter
 
     pub(super) fn timer_bit_width(&self) -> u8 {
         self.r()

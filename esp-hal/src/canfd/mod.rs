@@ -1821,8 +1821,6 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.split().1
     }
 
-    // ---------------------------------------------------------------------- TX
-
     /// Returns the number of TX buffers the hardware provides.
     pub fn tx_buffer_count(&self) -> u8 {
         self.bus.tx_buffers
@@ -1882,8 +1880,6 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.tx_half().set_tx_priority(index, priority);
     }
 
-    // ---------------------------------------------------------------------- RX
-
     /// Returns the number of complete frames waiting in the RX buffer.
     pub fn rx_frame_count(&self) -> u16 {
         self.bus.driver.rx_frame_count()
@@ -1923,8 +1919,6 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
     pub fn clear_rx_overrun(&mut self) {
         self.bus.driver.clear_overrun();
     }
-
-    // ------------------------------------------------------------------ errors
 
     /// Returns the current fault confinement state.
     ///
@@ -1977,8 +1971,6 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         Ok(())
     }
 
-    // -------------------------------------------------------- traffic counters
-
     /// Resets the received and transmitted frame counters.
     pub fn reset_traffic_counters(&mut self) {
         self.bus.driver.reset_traffic_counters();
@@ -1995,8 +1987,6 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
     pub fn tx_traffic_count(&self) -> u32 {
         self.bus.driver.tx_traffic_counter()
     }
-
-    // ----------------------------------------------------------------- filters
 
     /// Configures one mask filter and enables it.
     ///
@@ -2057,8 +2047,6 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
         self.bus.driver.set_filter_kinds(a, b, c, range);
     }
 
-    // ------------------------------------------------------------ error detail
-
     /// Returns details of the last bus error the core captured.
     ///
     /// Only meaningful after the core has reported a bus error; see
@@ -2094,8 +2082,6 @@ impl<'d, Dm: DriverMode> CanFd<'d, Dm> {
     pub fn transmitter_delay(&self) -> u8 {
         self.bus.driver.transmitter_delay()
     }
-
-    // -------------------------------------------------------------- timestamps
 
     /// Starts the timestamp counter from zero, at the requested resolution.
     ///
