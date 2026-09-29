@@ -666,6 +666,12 @@ driver_configs![
                 has_5g: bool,
                 #[serde(default)]
                 csi_supported: bool,
+                /// The Wi-Fi blobs contain Wi-Fi Aware (NAN) code (`SOC_WIFI_NAN_SUPPORT`).
+                #[serde(default)]
+                has_nan: bool,
+                /// The Wi-Fi blobs contain Fine Timing Measurement code (`SOC_WIFI_FTM_SUPPORT`).
+                #[serde(default)]
+                has_ftm: bool,
             }
         },
         IeeeProperties {

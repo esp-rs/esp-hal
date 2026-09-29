@@ -488,6 +488,7 @@ support_status = { status = "not_supported", issue = 376 }
 [device.wifi]
 mac_version = 1
 csi_supported = true
+has_ftm = true
 
 [device.bt]
 support_status = "partial"

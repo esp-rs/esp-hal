@@ -560,6 +560,8 @@ support_status = "partial"
 mac_version = 3
 has_wifi6 = true
 csi_supported = true
+has_nan = true
+has_ftm = true
 
 [device.bt]
 support_status = "partial"

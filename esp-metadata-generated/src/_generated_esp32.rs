@@ -328,6 +328,12 @@ macro_rules! property {
     ("wifi.csi_supported") => {
         true
     };
+    ("wifi.has_nan") => {
+        true
+    };
+    ("wifi.has_ftm") => {
+        false
+    };
     ("ethernet.mii_via_gpio_matrix") => {
         false
     };
