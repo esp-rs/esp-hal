@@ -508,7 +508,7 @@ impl<'d, Dm: DriverMode> Camera<'d, Dm> {
         Ok(CameraTransfer {
             camera: ManuallyDrop::new(self),
             buffer_view: ManuallyDrop::new(buf.into_view()),
-            eof_result: None,
+            eof_error: None,
         })
     }
 }
@@ -518,7 +518,7 @@ impl<'d, Dm: DriverMode> Camera<'d, Dm> {
 pub struct CameraTransfer<'d, BUF: DmaRxBuffer, Dm: DriverMode = Blocking> {
     camera: ManuallyDrop<Camera<'d, Dm>>,
     buffer_view: ManuallyDrop<BUF::View>,
-    eof_result: Option<Result<(), DmaError>>,
+    eof_error: Option<DmaError>,
 }
 
 impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> CameraTransfer<'d, BUF, Dm> {
@@ -572,8 +572,8 @@ impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> CameraTransfer<'d, BUF, Dm> {
             | DmaRxInterrupt::DescriptorEmpty
             | DmaRxInterrupt::ErrorEof;
         let interrupts = self.camera.rx_channel.pending_in_interrupts();
-        let result = match self.eof_result {
-            Some(Err(error)) => Err(error),
+        let result = match self.eof_error {
+            Some(error) => Err(error),
             _ if !interrupts.is_disjoint(errors) => Err(DmaError::DescriptorError),
             _ => Ok(()),
         };
@@ -614,7 +614,8 @@ impl<BUF: DmaRxBuffer> CameraTransfer<'_, BUF, Async> {
     /// guarantee that a complete frame has been received.
     ///
     /// This does not stop the camera or DMA. Call [`Self::stop`] to return
-    /// the camera and buffer. Subsequent calls return the same result immediately.
+    /// the camera and buffer. After a successful wait, another call can wait
+    /// for a later EOF. Receive errors are retained for this transfer.
     ///
     /// # Errors
     ///
@@ -626,11 +627,13 @@ impl<BUF: DmaRxBuffer> CameraTransfer<'_, BUF, Async> {
     ///
     /// Dropping the future does not stop the camera or DMA. The wait can be retried.
     pub async fn wait_for_dma_eof(&mut self) -> Result<(), DmaError> {
-        if let Some(result) = self.eof_result {
-            return result;
+        if let Some(error) = self.eof_error {
+            return Err(error);
         }
         let result = DmaRxFuture::new(&mut self.camera.rx_channel).await;
-        self.eof_result = Some(result);
+        if let Err(error) = result {
+            self.eof_error = Some(error);
+        }
         result
     }
 }

@@ -547,10 +547,10 @@ mod camera_tests {
                 let output = dpi.send(true, sent).map_err(|e| e.0).unwrap();
 
                 transfer.wait_for_dma_eof().await.unwrap();
-                hil_test::assert!(matches!(
-                    poll_once(transfer.wait_for_dma_eof()),
-                    Poll::Ready(Ok(()))
-                ));
+                if rx_bytes > FRAME_BYTES {
+                    hil_test::assert!(poll_once(transfer.wait_for_dma_eof()).is_pending());
+                    transfer.wait_for_dma_eof().await.unwrap();
+                }
                 // Allow another frame to arrive to verify reception continues after EOF.
                 esp_hal::delay::Delay::new().delay_millis(10);
                 (camera, received) = transfer.stop();
@@ -617,10 +617,12 @@ mod camera_tests {
                 "First EOF, RX length {}",
                 rx_bytes
             );
-            hil_test::assert!(matches!(
-                poll_once(transfer.wait_for_dma_eof()),
-                Poll::Ready(result) if result == expected
-            ));
+            if expected.is_err() {
+                hil_test::assert!(matches!(
+                    poll_once(transfer.wait_for_dma_eof()),
+                    Poll::Ready(result) if result == expected
+                ));
+            }
             let (result, next_camera, next_received) = transfer.wait();
             hil_test::assert_eq!(
                 result,
