@@ -351,11 +351,12 @@ impl BitbangTransmitter {
     }
 }
 
-fn do_rmt_loopback_inner(
+// Returns the channels for reuse if the transactions completed.
+fn do_rmt_loopback_inner<'ch>(
     conf: &LoopbackConfig,
-    tx_channel: Channel<Blocking, Tx>,
-    rx_channel: Channel<Blocking, Rx>,
-) {
+    tx_channel: Channel<'ch, Blocking, Tx>,
+    rx_channel: Channel<'ch, Blocking, Rx>,
+) -> Option<(Channel<'ch, Blocking, Tx>, Channel<'ch, Blocking, Rx>)> {
     let tx_data = generate_tx_data(conf);
     let mut rcv_data = vec![PulseCode::default(); conf.tx_len];
 
@@ -380,6 +381,8 @@ fn do_rmt_loopback_inner(
         // The test should fail here when the delay above is increased, e.g. to 100ms.
         assert!(!rx_done);
         assert!(!tx_done);
+
+        None
     } else {
         let run = move || match rx_transaction {
             Ok(mut rx_transaction) => {
@@ -392,17 +395,19 @@ fn do_rmt_loopback_inner(
                     }
                 }
 
-                tx_transaction.wait().unwrap();
+                let tx_channel = tx_transaction.wait().unwrap();
                 match rx_transaction.wait() {
-                    Ok((rx_count, _channel)) => Ok(rx_count),
-                    Err((err, _channel)) => Err(err),
+                    Ok((rx_count, rx_channel)) => (Ok(rx_count), Some((tx_channel, rx_channel))),
+                    Err((err, rx_channel)) => (Err(err), Some((tx_channel, rx_channel))),
                 }
             }
-            Err((e, _)) => Err(e),
+            Err((e, _)) => (Err(e), None),
         };
-        let rx_res = run();
+        let (rx_res, channels) = run();
 
         check_data_eq(conf, &tx_data, &rcv_data, rx_res);
+
+        channels
     }
 }
 
@@ -455,6 +460,36 @@ async fn do_rmt_loopback_async(ctx: &mut Context, conf: &LoopbackConfig) {
     let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&conf);
 
     do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await
+}
+
+// SCLK dividers to test; ESP32 and ESP32-S2 don't have an SCLK divider.
+const SCLK_DIVIDERS: &[u16] = if cfg!(any(esp32, esp32s2)) {
+    &[1]
+} else {
+    &[1, 16, 256]
+};
+
+const CHANNEL_DIVIDERS: &[u8] = &[1, 16, 255];
+
+fn divider_loopback_config(sclk_div: u16, ch_div: u8) -> LoopbackConfig {
+    let div = sclk_div as u32 * ch_div as u32;
+    // the stop code is sent with length 2 * idle_threshold = 40 * step, cf. generate_tx_data
+    let step = (32767 / (41 * div)).max(5) as u16;
+
+    #[cfg(feature = "defmt")]
+    defmt::info!("sclk_div: {}, ch_div: {}, step: {}", sclk_div, ch_div, step);
+
+    LoopbackConfig {
+        idle_output: true,
+        sclk_div,
+        ch_div,
+        tx_len: 5,
+        length1_base: 10 * step,
+        length1_step: step,
+        length2: 2 * step,
+        idle_threshold: 20 * step,
+        ..Default::default()
+    }
 }
 
 macro_rules! pins {
@@ -1312,35 +1347,35 @@ mod tests {
         .await;
     }
 
+    // Repeated transactions on the same channels are required to trigger some of the issues with
+    // slow SCLK.
     #[test]
+    #[timeout(10)]
     fn rmt_dividers(mut ctx: Context) {
-        for sclk_div in [1, 16, 256] {
-            for ch_div in [1, 16, 255] {
-                let div = sclk_div as u32 * ch_div as u32;
-                // the stop code is sent with length 2 * idle_threshold = 40 * step, cf.
-                // generate_tx_data
-                let step = (32767 / (41 * div)).max(5) as u16;
-                let conf = LoopbackConfig {
-                    idle_output: true,
-                    // write_stop_code: false,
-                    sclk_div,
-                    ch_div,
-                    tx_len: 5,
-                    length1_base: 10 * step,
-                    length1_step: step,
-                    length2: 2 * step,
-                    idle_threshold: 20 * step,
-                    ..Default::default()
-                };
-                #[cfg(feature = "defmt")]
-                {
-                    defmt::info!("sclk_div: {}, ch_div: {}, step: {}", sclk_div, ch_div, step);
-                    defmt::flush();
+        for &sclk_div in SCLK_DIVIDERS {
+            for &ch_div in CHANNEL_DIVIDERS {
+                let conf = divider_loopback_config(sclk_div, ch_div);
+
+                let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(&conf);
+                for _ in 0..3 {
+                    (tx_channel, rx_channel) =
+                        do_rmt_loopback_inner(&conf, tx_channel, rx_channel).unwrap();
                 }
+            }
+        }
+    }
 
-                let (tx_channel, rx_channel) = ctx.setup_loopback(&conf);
+    #[test]
+    #[timeout(10)]
+    async fn rmt_dividers_async(mut ctx: Context) {
+        for &sclk_div in SCLK_DIVIDERS {
+            for &ch_div in CHANNEL_DIVIDERS {
+                let conf = divider_loopback_config(sclk_div, ch_div);
 
-                do_rmt_loopback_inner(&conf, tx_channel, rx_channel);
+                let (mut tx_channel, mut rx_channel) = ctx.setup_loopback_async(&conf);
+                for _ in 0..3 {
+                    do_rmt_loopback_async_inner(&conf, &mut tx_channel, &mut rx_channel).await;
+                }
             }
         }
     }
