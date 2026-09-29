@@ -812,6 +812,38 @@ mod twai {
             receive_frames(&mut ctx, NUM_SENT_FRAMES + NUM_ASYNC_SENT_FRAMES).await;
         }
 
+        #[test]
+        async fn test_overruns_are_counted(mut ctx: Context<Async>) {
+            let frame =
+                EspTwaiFrame::new_self_reception(StandardId::new(0).unwrap(), b"12345678").unwrap();
+
+            // Nothing drains the receive FIFO while the interrupt is off, so
+            // it overruns
+            interrupt::disable(Cpu::ProCpu, TWAI0);
+            const SENT: usize = 10;
+            for _ in 0..SENT {
+                block!(ctx.twai.transmit(&frame)).unwrap();
+            }
+            interrupt::enable(TWAI0, Priority3);
+
+            // Let the handler run, then take everything it queued
+            transmit_frames(&mut ctx, &frame, 1).await;
+            let mut overruns = 0;
+            for _ in 0..SENT + 1 {
+                match ctx.twai.receive_async().await {
+                    Ok(_) => {}
+                    Err(esp_hal::twai::EspTwaiError::EmbeddedHAL(ErrorKind::Overrun)) => {
+                        overruns += 1
+                    }
+                    Err(err) => panic!("{:#?}", err),
+                }
+            }
+
+            assert!(overruns > 0, "the FIFO did not overrun");
+            assert_eq!(ctx.twai.error_counts().overrun, overruns);
+            assert_eq!(ctx.twai.error_counts().bit, 0);
+        }
+
         fn no_init() {}
 
         #[test(init = no_init)]
@@ -843,6 +875,12 @@ mod twai {
                 twai.transmit_async(&frame).await,
                 Err(twai::EspTwaiError::TransmissionAborted)
             );
+
+            // Every attempt read its first dominant bit back recessive: bit
+            // errors, one per attempt until the controller went error passive
+            let counts = twai.error_counts();
+            assert!(counts.bit > 0, "{:?}", counts);
+            assert_eq!(counts.acknowledge, 0, "{:?}", counts);
         }
     }
 }

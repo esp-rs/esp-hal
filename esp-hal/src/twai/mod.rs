@@ -1055,6 +1055,8 @@ where
         // Clear any interrupts by reading the status register
         let _ = self.regs().int_raw().read();
 
+        self.twai.async_state().counts.reset();
+
         // Put the peripheral into operation mode by clearing the reset mode bit.
         self.regs().mode().modify(|_, w| w.reset_mode().clear_bit());
 
@@ -1212,6 +1214,13 @@ where
         self.regs().tx_err_cnt().read().tx_err_cnt().bits()
     }
 
+    /// What the controller has reported since the driver was started (see
+    /// [`ErrorCounts`])
+    #[instability::unstable]
+    pub fn error_counts(&self) -> ErrorCounts {
+        self.twai.async_state().counts.snapshot()
+    }
+
     /// Returns whether the controller is in a bus off state.
     pub fn is_bus_off(&self) -> bool {
         self.regs().status().read().bus_off_st().bit_is_set()
@@ -1352,6 +1361,13 @@ where
         self.twai.register_block()
     }
 
+    /// What the controller has reported since the driver was started (see
+    /// [`ErrorCounts`])
+    #[instability::unstable]
+    pub fn error_counts(&self) -> ErrorCounts {
+        self.twai.async_state().counts.snapshot()
+    }
+
     /// Receives a frame.
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
         let status = self.regs().status().read();
@@ -1403,6 +1419,36 @@ pub enum TwaiInterrupt {
     /// error warning limit in either direction, or the controller entered or
     /// left the bus-off state.
     ErrorWarning,
+}
+
+/// What the controller has reported since the driver was last started
+/// ([`TwaiConfiguration::start`]), as counted by the async driver's interrupt
+/// handler (a blocking driver counts nothing).
+///
+/// Bus errors are classified from the error code capture register as
+/// ESP-IDF does: bit, form and stuff errors by type, an acknowledgement
+/// error by the ACK slot segment, anything else as `other`.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub struct ErrorCounts {
+    /// Bit errors
+    pub bit: u32,
+    /// Form errors
+    pub form: u32,
+    /// Stuff errors
+    pub stuff: u32,
+    /// Acknowledgement errors: nobody acknowledged a transmitted frame
+    pub acknowledge: u32,
+    /// Other bus errors
+    pub other: u32,
+    /// Arbitration lost while transmitting (the controller retries)
+    pub arbitration_lost: u32,
+    /// Frames lost in the controller: its receive FIFO overran
+    pub overrun: u32,
+    /// Frames lost because the driver's receive queue was full
+    pub queue_full: u32,
 }
 
 /// Errors that can occur when interacting with the TWAI peripheral.
@@ -1699,6 +1745,8 @@ mod asynch {
 
     use embassy_sync::{channel::Channel, waitqueue::AtomicWaker};
     use esp_sync::RawMutex;
+    // `portable_atomic`: the ESP32-C3 has no atomic read-modify-write
+    use portable_atomic::{AtomicU32, Ordering};
 
     use super::*;
     use crate::rtc_cntl::WakeLock;
@@ -1707,6 +1755,83 @@ mod asynch {
         pub tx_waker: AtomicWaker,
         pub err_waker: AtomicWaker,
         pub rx_queue: Channel<RawMutex, Result<EspTwaiFrame, EspTwaiError>, 32>,
+        pub counts: Counts,
+    }
+
+    /// [`ErrorCounts`], kept by the interrupt handler
+    pub struct Counts {
+        bit: AtomicU32,
+        form: AtomicU32,
+        stuff: AtomicU32,
+        acknowledge: AtomicU32,
+        other: AtomicU32,
+        arbitration_lost: AtomicU32,
+        overrun: AtomicU32,
+        queue_full: AtomicU32,
+    }
+
+    /// ECC: the error type in bits 7-6, the segment in bits 4-0
+    const ECC_TYPE_OTHER: u8 = 3;
+    const ECC_SEGMENT_ACK_SLOT: u8 = 25;
+
+    impl Counts {
+        const fn new() -> Self {
+            Self {
+                bit: AtomicU32::new(0),
+                form: AtomicU32::new(0),
+                stuff: AtomicU32::new(0),
+                acknowledge: AtomicU32::new(0),
+                other: AtomicU32::new(0),
+                arbitration_lost: AtomicU32::new(0),
+                overrun: AtomicU32::new(0),
+                queue_full: AtomicU32::new(0),
+            }
+        }
+
+        fn count(counter: &AtomicU32) {
+            counter.fetch_add(1, Ordering::Relaxed);
+        }
+
+        /// A bus error, from the error code capture register
+        fn bus_error(&self, ecc: u8) {
+            let counter = match ecc >> 6 {
+                0 => &self.bit,
+                1 => &self.form,
+                2 => &self.stuff,
+                ECC_TYPE_OTHER if ecc & 0x1F == ECC_SEGMENT_ACK_SLOT => &self.acknowledge,
+                _ => &self.other,
+            };
+            Self::count(counter);
+        }
+
+        pub fn reset(&self) {
+            for counter in [
+                &self.bit,
+                &self.form,
+                &self.stuff,
+                &self.acknowledge,
+                &self.other,
+                &self.arbitration_lost,
+                &self.overrun,
+                &self.queue_full,
+            ] {
+                counter.store(0, Ordering::Relaxed);
+            }
+        }
+
+        pub fn snapshot(&self) -> ErrorCounts {
+            let get = |c: &AtomicU32| c.load(Ordering::Relaxed);
+            ErrorCounts {
+                bit: get(&self.bit),
+                form: get(&self.form),
+                stuff: get(&self.stuff),
+                acknowledge: get(&self.acknowledge),
+                other: get(&self.other),
+                arbitration_lost: get(&self.arbitration_lost),
+                overrun: get(&self.overrun),
+                queue_full: get(&self.queue_full),
+            }
+        }
     }
 
     impl Default for TwaiAsyncState {
@@ -1721,6 +1846,7 @@ mod asynch {
                 tx_waker: AtomicWaker::new(),
                 err_waker: AtomicWaker::new(),
                 rx_queue: Channel::new(),
+                counts: Counts::new(),
             }
         }
     }
@@ -1876,11 +2002,23 @@ mod asynch {
         // next frame, and clearing the bits afterwards from a copy read
         // before the wake would disable it again - the next frame's
         // completion would wake nobody.
+        let int_ena = register_block.int_ena().read();
         unsafe {
             register_block
                 .int_ena()
                 .modify(|r, w| w.bits(r.bits() & (!int_raw.bits() | 1)));
         }
+        // ... except the bus error and arbitration lost interrupts: they only
+        // feed `ErrorCounts`, and reading their capture registers below
+        // re-arms them. Masking them until the next future poll calls
+        // `listen` would drop every error in between. ESP-IDF keeps them
+        // enabled as well.
+        register_block.int_ena().modify(|_, w| {
+            w.bus_err_int_ena()
+                .bit(int_ena.bus_err_int_ena().bit())
+                .arb_lost_int_ena()
+                .bit(int_ena.arb_lost_int_ena().bit())
+        });
 
         // The error warning interrupt fires on every change of the error or
         // bus status. Entering bus-off sets both the bus-off and the error
@@ -1917,6 +2055,7 @@ mod asynch {
                 let msg = if status_reg.read().miss_st().bit_is_set() {
                     // Current frame is incomplete (Rx FIFO has overrun)
                     release_receive_fifo(register_block);
+                    Counts::count(&async_state.counts.overrun);
                     Err(EspTwaiError::EmbeddedHAL(ErrorKind::Overrun))
                 } else {
                     // Current frame is complete
@@ -1924,8 +2063,10 @@ mod asynch {
                     release_receive_fifo(register_block);
                     Ok(frame)
                 };
-                // Rx queue is full? Stop consuming Rx frames
+                // Rx queue is full? Stop consuming Rx frames. The one just
+                // taken was released already: it is lost, and counted.
                 if rx_queue.try_send(msg).is_err() {
+                    Counts::count(&async_state.counts.queue_full);
                     break;
                 }
             }
@@ -1935,13 +2076,29 @@ mod asynch {
             async_state.tx_waker.wake();
         }
 
+        if int_raw.arb_lost_int_st().bit_is_set() {
+            // Reading the capture register re-arms the interrupt; nothing
+            // else did, so it fired once per driver lifetime
+            let _ = register_block.arb_lost_cap().read();
+            Counts::count(&async_state.counts.arbitration_lost);
+        }
+
         if int_raw.err_warn_int_st().bit_is_set()
             || int_raw.err_passive_int_st().bit_is_set()
             || int_raw.bus_err_int_st().bit_is_set()
         {
-            // We might want to use the error code to gather statistics in the
-            // future.
-            let _ = register_block.err_code_cap().read();
+            // Reading the capture register also re-arms the bus error
+            // interrupt. The error that takes the controller bus-off raises
+            // no bus error interrupt of its own (ESP-IDF counts it from the
+            // error warning interrupt), so it is counted here too.
+            let ecc = register_block.err_code_cap().read().bits() as u8;
+            let status = register_block.status().read();
+            let entered_bus_off = int_raw.err_warn_int_st().bit_is_set()
+                && status.bus_off_st().bit_is_set()
+                && status.err_st().bit_is_set();
+            if int_raw.bus_err_int_st().bit_is_set() || entered_bus_off {
+                async_state.counts.bus_error(ecc);
+            }
             async_state.err_waker.wake();
             // A frame that cannot be transmitted never raises the transmit
             // interrupt, so wake transmitters on errors to let them
