@@ -653,6 +653,10 @@ driver_configs![
             name: "Bluetooth",
             properties: {
                 controller: String,
+                /// Whether the CPU clock must stay at its configured frequency while the
+                /// controller uses the PHY.
+                #[serde(default)]
+                requires_fast_cpu: bool,
             }
         },
         WifiProperties {
@@ -666,6 +670,10 @@ driver_configs![
                 has_5g: bool,
                 #[serde(default)]
                 csi_supported: bool,
+                /// Whether the CPU clock must stay at its configured frequency while the modem is
+                /// awake.
+                #[serde(default)]
+                requires_fast_cpu: bool,
             }
         },
         IeeeProperties {
@@ -980,6 +988,10 @@ driver_configs![
                 /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
                 #[serde(default)]
                 deep_sleep_needs_gpio_isolation: bool,
+                /// Whether `wait_for_interrupt` can switch the CPU clock to XTAL_CLK. No peripheral
+                /// function clock may derive from the CPU clock or from the bus clocks.
+                #[serde(default)]
+                idle_frequency_scaling: bool,
             }
         },
         UlpFsmProperties {
@@ -1063,6 +1075,10 @@ driver_configs![
                 #[serde(default)]
                 hex_spi: bool,
                 extmem_origin: u32,
+                /// Whether PSRAM must switch to a low speed while the CPU clock comes from
+                /// XTAL_CLK, because the AXI bus clock must not be slower than the PSRAM clock.
+                #[serde(default)]
+                idle_low_speed_switch: bool,
             }
         },
         RomProperties {

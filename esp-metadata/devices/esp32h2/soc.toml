@@ -323,6 +323,7 @@ version = 2
 [device.sleep]
 support_status = "partial"
 light_sleep = true
+idle_frequency_scaling = true
 deep_sleep = true
 # esp32h2 has no separate per-pin path: `pin_wakeup_version` stays unset because the per-pin
 # registers *are* the ext1 registers.

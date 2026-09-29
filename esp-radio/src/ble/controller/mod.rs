@@ -61,6 +61,7 @@ pub struct BleConnector<'d> {
 impl Drop for BleConnector<'_> {
     fn drop(&mut self) {
         crate::ble::ble_deinit();
+        crate::ble::unlock_cpu_frequency();
         crate::ble::clear_bt_state();
     }
 }
@@ -80,6 +81,9 @@ impl<'d> BleConnector<'d> {
         };
 
         config.validate()?;
+
+        // The controller can release the PHY while `ble_init` runs.
+        crate::ble::lock_cpu_frequency();
 
         Ok(Self {
             _phy_init_guard: crate::ble::ble_init(&config),

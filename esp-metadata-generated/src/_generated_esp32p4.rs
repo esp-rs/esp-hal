@@ -454,6 +454,9 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
+    ("sleep.idle_frequency_scaling") => {
+        true
+    };
     ("dma.mem2mem_requires_peripheral") => {
         false
     };
@@ -501,6 +504,9 @@ macro_rules! property {
     };
     ("psram.extmem_origin", str) => {
         stringify!(1207959552)
+    };
+    ("psram.idle_low_speed_switch") => {
+        true
     };
     ("rom.has_crc_le") => {
         true
