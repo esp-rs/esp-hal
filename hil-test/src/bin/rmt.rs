@@ -1252,6 +1252,64 @@ mod tests {
         rmt_loopback_continuous_tx_impl(ctx, true);
     }
 
+    // Regression test for continuous tx with a slow SCLK, where the loop count interrupt often
+    // never fired, see esp-rs/esp-hal#3930.
+    #[cfg(all(rmt_has_tx_loop_count, not(esp32s2)))]
+    #[test]
+    #[timeout(3)]
+    fn rmt_continuous_tx_slow_sclk(mut ctx: Context) {
+        use esp_hal::time::Instant;
+
+        const LOOPS: u16 = 10;
+        const CODE_LENGTH: u16 = 289;
+
+        let sclk = FREQ / 256;
+        let expected_us = (LOOPS as u64 * 2 * CODE_LENGTH as u64 * 1_000_000) / sclk.as_hz() as u64;
+
+        let tx_data = [
+            PulseCode::new(Level::High, CODE_LENGTH, Level::Low, CODE_LENGTH),
+            PulseCode::end_marker(),
+        ];
+        let config = TxChannelConfig::default()
+            .with_clk_divider(1)
+            .with_idle_output(true)
+            .with_idle_output_level(Level::Low);
+
+        let mut rmt = Rmt::new(ctx.rmt.reborrow(), sclk).unwrap();
+
+        // Reconfigure the channel for every transaction, as in the original report.
+        for _ in 0..10 {
+            let tx_channel = rmt
+                .channel0
+                .reborrow()
+                .configure_tx(&config)
+                .unwrap()
+                .with_pin(ctx.pin.reborrow());
+
+            #[cfg(rmt_has_tx_loop_auto_stop)]
+            let loopmode = LoopMode::Finite(LOOPS);
+            #[cfg(not(rmt_has_tx_loop_auto_stop))]
+            let loopmode = LoopMode::InfiniteWithInterrupt(LOOPS);
+
+            let start = Instant::now();
+            let tx_transaction = tx_channel
+                .transmit_continuously(&tx_data, loopmode)
+                .unwrap();
+
+            while !tx_transaction.is_loopcount_interrupt_set() {}
+            let elapsed_us = start.elapsed().as_micros();
+
+            tx_transaction.stop_next().unwrap();
+
+            assert!(
+                elapsed_us * 10 >= expected_us * 9 && elapsed_us * 10 <= expected_us * 11,
+                "unexpected tx duration: {} us (expected {} us)",
+                elapsed_us,
+                expected_us
+            );
+        }
+    }
+
     // Test that using loopcount 0 doesn't hang, but returns success immediately.
     #[cfg(rmt_has_tx_loop_auto_stop)]
     #[test]
