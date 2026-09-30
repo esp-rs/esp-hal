@@ -1,10 +1,8 @@
 use core::marker::PhantomData;
 
-use super::flash_access::FlashAccess;
+use super::{SECTOR_SIZE, WORD_SIZE, flash_access::FlashAccess};
 use crate::partitions::Error;
 
-const WORD_SIZE: u32 = 4;
-const SECTOR_SIZE: u32 = 4096;
 const BLOCK_SIZE: u32 = 65536;
 const FLASH_SIZE: usize = (BLOCK_SIZE * 4) as usize;
 const ERASE_BYTE: u8 = 0xff;
@@ -43,8 +41,12 @@ impl MockFlash<'_> {
         self.flash_read(offset, bytes)
     }
 
+    /// Overwrites flash contents with `bytes`, without NOR semantics.
     pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
-        self.flash_write(offset, bytes)
+        Self::check_bounds(offset, bytes.len())?;
+        let offset = offset as usize;
+        Self::with_flash(|flash| flash[offset..][..bytes.len()].copy_from_slice(bytes));
+        Ok(())
     }
 
     pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
@@ -94,9 +96,12 @@ impl FlashAccess for MockFlash<'_> {
         while !bytes.is_empty() {
             let len = bytes.len().min((Self::SECTOR_SIZE - data_offset) as usize);
 
+            // NOR flash programming can only clear bits, setting them needs an erase.
             Self::with_flash(|flash| {
                 flash[aligned_offset as usize + data_offset as usize..][..len]
-                    .copy_from_slice(&bytes[..len]);
+                    .iter_mut()
+                    .zip(&bytes[..len])
+                    .for_each(|(cell, byte)| *cell &= byte);
             });
 
             aligned_offset += Self::SECTOR_SIZE;
