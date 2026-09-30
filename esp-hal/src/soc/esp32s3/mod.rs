@@ -9,9 +9,9 @@ crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
     pub mod lp_core;
+    // The light sleep path stalls the other core, and it is not gated on the feature.
+    pub mod cpu_control;
 }
-#[cfg(feature = "unstable")]
-pub mod cpu_control;
 pub mod gpio;
 pub(crate) mod regi2c;
 
@@ -126,6 +126,42 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     }
     unsafe {
         Cache_Invalidate_Addr(addr, size);
+    }
+}
+
+/// Writes back all dirty data cache lines.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_writeback_all() {
+    unsafe extern "C" {
+        fn Cache_WriteBack_All();
+    }
+    unsafe {
+        Cache_WriteBack_All();
+    }
+}
+
+/// Invalidates the entire instruction cache.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_invalidate_icache_all() {
+    unsafe extern "C" {
+        fn Cache_Invalidate_ICache_All();
+    }
+    unsafe {
+        Cache_Invalidate_ICache_All();
+    }
+}
+
+/// Invalidates the entire data cache.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_invalidate_dcache_all() {
+    unsafe extern "C" {
+        fn Cache_Invalidate_DCache_All();
+    }
+    unsafe {
+        Cache_Invalidate_DCache_All();
     }
 }
 

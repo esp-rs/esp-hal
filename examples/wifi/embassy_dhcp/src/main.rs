@@ -12,6 +12,9 @@
 //!   between beacons.
 //! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
 //!   sleeps only while the station is in power save. On the ESP32, Wi-Fi keeps the chip awake.
+//! - `CPU_POWERDOWN` lets light sleep power the CPU down, and retains its state in RAM. This saves
+//!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
+//!   -S3 and -S31 support this. On other chips the constant has no effect.
 //!
 //! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
 //! the output.
@@ -92,6 +95,56 @@ const POWER_SAVE: PowerSaveMode = PowerSaveMode::Minimum;
 /// to be enabled. The chip sleeps only while the station is in power save. On the ESP32, Wi-Fi
 /// keeps the chip awake.
 const LIGHT_SLEEP: bool = true;
+/// Whether light sleep powers the CPU down. Requires [`LIGHT_SLEEP`] to be enabled.
+const CPU_POWERDOWN: bool = true;
+
+// An example reads no chip capability, so this condition lists the chips that support CPU
+// power-down.
+cfg_select! {
+    any(
+        feature = "esp32c3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32s3",
+        feature = "esp32s31",
+    ) => {
+        use esp_hal::rtc_cntl::CpuRetentionStorage;
+
+        // The memory that the bootloader used is otherwise unused after boot.
+        #[ram(reclaimed, unstable(zeroed))]
+        static CPU_RETENTION_MEMORY: CpuRetentionStorage = CpuRetentionStorage::new();
+
+        // Keeping the cache tags makes the wake faster, because the cache stays warm.
+        #[cfg(feature = "esp32s3")]
+        #[ram(reclaimed, unstable(zeroed))]
+        static CACHE_TAGMEM: esp_hal::rtc_cntl::CacheTagRetentionStorage =
+            esp_hal::rtc_cntl::CacheTagRetentionStorage::new();
+
+        /// The reclaimed RAM that CPU power-down takes from the heap. The 16 bytes per buffer
+        /// cover its alignment.
+        const CPU_POWERDOWN_RAM: usize = size_of::<CpuRetentionStorage>()
+            + 16
+            + cfg_select! {
+                feature = "esp32s3" => size_of::<esp_hal::rtc_cntl::CacheTagRetentionStorage>() + 16,
+                _ => 0,
+            };
+
+        fn enable_cpu_powerdown(sleep: &mut esp_rtos::sleep::Sleep) {
+            sleep
+                .enable_cpu_powerdown(CPU_RETENTION_MEMORY.take())
+                .unwrap();
+
+            #[cfg(feature = "esp32s3")]
+            sleep.keep_cache_tags(CACHE_TAGMEM.take()).unwrap();
+        }
+    }
+    _ => {
+        const CPU_POWERDOWN_RAM: usize = 0;
+
+        fn enable_cpu_powerdown(_sleep: &mut esp_rtos::sleep::Sleep) {}
+    }
+}
 
 #[esp_hal::main]
 async fn main(spawner: Spawner) -> ! {
@@ -99,12 +152,15 @@ async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
-    esp_alloc::heap_allocator!(size: 36 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024 - CPU_POWERDOWN_RAM);
+    esp_alloc::heap_allocator!(size: 36 * 1024 + CPU_POWERDOWN_RAM);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     if LIGHT_SLEEP {
-        let sleep = esp_rtos::sleep::configure(peripherals.LPWR);
+        let mut sleep = esp_rtos::sleep::configure(peripherals.LPWR);
+        if CPU_POWERDOWN {
+            enable_cpu_powerdown(&mut sleep);
+        }
         esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
     } else {
         esp_rtos::start(timg0.timer0);
