@@ -268,6 +268,25 @@ pub enum MaskFilter {
     C,
 }
 
+/// One filter instance, as `FILTER_CONTROL` addresses it.
+#[derive(Clone, Copy)]
+pub(super) enum FilterSlot {
+    Mask(MaskFilter),
+    Range,
+}
+
+impl FilterSlot {
+    /// Position of the four frame kind bits of this filter in `FILTER_CONTROL`.
+    fn shift(self) -> u32 {
+        match self {
+            Self::Mask(MaskFilter::A) => 0,
+            Self::Mask(MaskFilter::B) => 4,
+            Self::Mask(MaskFilter::C) => 8,
+            Self::Range => 12,
+        }
+    }
+}
+
 /// Frame formats a filter accepts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -954,15 +973,23 @@ impl Driver {
             .write(|w| unsafe { w.bit_ran_high_val().bits(high) });
     }
 
-    /// Sets which frame kinds each filter accepts.
-    pub(super) fn set_filter_kinds(
-        &self,
-        a: FrameKinds,
-        b: FrameKinds,
-        c: FrameKinds,
-        range: FrameKinds,
-    ) {
-        let bits = a.bits() | (b.bits() << 4) | (c.bits() << 8) | (range.bits() << 12);
+    /// Sets which frame kinds one filter accepts and leaves the others alone.
+    ///
+    /// The register is the only record of the kinds, so the receiving half of
+    /// a split driver and the driver itself change them the same way.
+    pub(super) fn set_filter_kinds(&self, filter: FilterSlot, kinds: FrameKinds) {
+        let shift = filter.shift();
+        self.r().filter_control_filter_status().modify(|r, w| {
+            // The upper half of the register is read-only status.
+            let others = r.bits() & 0xFFFF & !(0xF << shift);
+            unsafe { w.bits(others | (kinds.bits() << shift)) }
+        });
+    }
+
+    /// Makes filter A accept every kind of frame and disables the other
+    /// filters, in one write: the reset value of `FILTER_CONTROL`.
+    pub(super) fn reset_filter_kinds(&self) {
+        let bits = FrameKinds::ALL.bits() << FilterSlot::Mask(MaskFilter::A).shift();
         // The upper half of the register is read-only status.
         self.r()
             .filter_control_filter_status()
