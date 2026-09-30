@@ -49,6 +49,10 @@ struct IeeeState {
     /// isr_handle_ack_rx_done and stop_rx_ack). Cleared at the start of
     /// each transmit.
     ack_frame: Option<RawReceived>,
+    /// A received frame whose ACK is being sent. It is copied out of the single RX buffer as soon
+    /// as it is received, but, only delivered (queued and notified) once the
+    /// ACK is sent or aborted - see [`deliver_pending_rx`].
+    pending_rx: Option<RawReceived>,
 }
 
 static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
@@ -57,6 +61,7 @@ static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
     rx_queue_size: 10,
     pending_tx: None,
     ack_frame: None,
+    pending_rx: None,
 });
 
 unsafe extern "C" {
@@ -72,6 +77,7 @@ unsafe extern "C" {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Ieee802154State {
     Idle,
+    Sleep,
     Receive,
     Transmit,
     TxAck,
@@ -272,6 +278,33 @@ pub fn ieee802154_receive() -> i32 {
     0 // ESP-OK
 }
 
+/// Stops the current operation, whatever it is, and puts the radio to sleep - the C driver's
+/// `ieee802154_sleep`.
+///
+/// As there, the operation is stopped even with a frame on the air: a frame being received is
+/// lost, the ACK of a received frame is aborted (the frame itself is delivered), and a
+/// transmission fails.
+pub fn ieee802154_sleep() -> i32 {
+    STATE.with(sleep_inner);
+
+    0 // ESP-OK
+}
+
+fn sleep_inner(state: &mut IeeeState) {
+    if state.state == Ieee802154State::Sleep {
+        return;
+    }
+
+    stop_current_operation_inner(state);
+
+    if state.pending_tx.take().is_some() {
+        restore_rx_abort_events();
+        super::tx_failed();
+    }
+
+    state.state = Ieee802154State::Sleep;
+}
+
 pub fn ieee802154_poll() -> Option<RawReceived> {
     STATE.with(|state| state.rx_queue.pop_front())
 }
@@ -304,11 +337,14 @@ fn stop_current_operation_inner(state: &mut IeeeState) {
         Ieee802154State::Idle => {
             set_cmd(Command::Stop);
         }
+        Ieee802154State::Sleep => {
+            // Do nothing
+        }
         Ieee802154State::Receive => {
             stop_rx(state);
         }
         Ieee802154State::TxAck => {
-            stop_tx_ack();
+            stop_tx_ack(state);
         }
         Ieee802154State::Transmit | Ieee802154State::TxEnhAck => {
             stop_tx(state);
@@ -330,11 +366,11 @@ fn stop_rx(state: &mut IeeeState) {
     clear_events(Event::RxDone | Event::RxAbort | Event::RxSfdDone);
 }
 
-fn stop_tx_ack() {
+fn stop_tx_ack(state: &mut IeeeState) {
     set_cmd(Command::Stop);
 
-    // Frame was already copied to queue in isr_handle_rx_done.
-    // Don't call receive_done again (that caused the "Receive queue full" bug).
+    // The ACK is aborted, but the frame it acknowledges was received: deliver it.
+    deliver_pending_rx(state);
 
     clear_events(Event::AckTxDone | Event::RxAbort | Event::TxSfdDone);
 }
@@ -345,7 +381,8 @@ fn stop_tx(state: &mut IeeeState) {
     let evts = events();
 
     if state.state == Ieee802154State::TxEnhAck {
-        // Frame was already copied in isr_handle_rx_done, no need to call receive_done
+        // If the current operation is sending an Enh-Ack, deliver the frame it acknowledges.
+        deliver_pending_rx(state);
         clear_events(Event::AckTxDone as u16);
     } else if (evts & Event::TxDone != 0)
         && (!frame_is_ack_required(unsafe {
@@ -383,18 +420,38 @@ fn stop_rx_ack(state: &mut IeeeState) {
     clear_events(Event::AckRxDone | Event::RxSfdDone | Event::TxAbort);
 }
 
-fn receive_done(state: &mut IeeeState) {
-    unsafe {
-        if state.rx_queue.len() < state.rx_queue_size {
-            let item = RawReceived {
-                data: RX_BUFFER,
-                channel: freq_to_channel(freq()),
-            };
-            state.rx_queue.push_back(item);
-        } else {
-            warn!("Receive queue full");
-        }
+/// Copies the frame out of the RX buffer.
+fn rx_buffer_frame() -> RawReceived {
+    RawReceived {
+        data: unsafe { RX_BUFFER },
+        channel: freq_to_channel(freq()),
     }
+}
+
+/// Delivers the frame in the RX buffer - the C driver's `ieee802154_receive_done`.
+fn receive_done(state: &mut IeeeState) {
+    deliver(state, rx_buffer_frame());
+}
+
+/// Delivers the frame whose ACK was being sent, if any, once that ACK is sent or aborted.
+fn deliver_pending_rx(state: &mut IeeeState) {
+    if let Some(frame) = state.pending_rx.take() {
+        deliver(state, frame);
+    }
+}
+
+/// Queues a received frame, and notifies the upper layer.
+///
+/// A frame is visible to [`ieee802154_poll`] only from here on,
+/// so the upper layer never sees a frame whose ACK is still being sent.
+fn deliver(state: &mut IeeeState, frame: RawReceived) {
+    if state.rx_queue.len() < state.rx_queue_size {
+        state.rx_queue.push_back(frame);
+    } else {
+        warn!("Receive queue full");
+    }
+
+    super::rx_available();
 }
 
 fn set_next_rx_buffer() {
@@ -475,22 +532,27 @@ fn event_end_process() {
 fn next_operation_inner(state: &mut IeeeState) {
     // Set state to Idle before dispatching the next operation.
     // This prevents stop_current_operation_inner (called from tx_init)
-    // from seeing a stale TxAck state and calling stop_tx_ack, which
-    // would duplicate-queue the already-delivered received frame.
+    // from seeing a stale TxAck state and stopping an ACK that is
+    // already done.
     state.state = Ieee802154State::Idle;
 
     if let Some(pending) = state.pending_tx.take() {
-        // Restore RX abort events to normal (matching C driver's next_operation)
-        disable_rx_abort_events(RxAbortReason::all());
-        enable_rx_abort_events(RxAbortReason::TxAckTimeout | RxAbortReason::TxAckCoexBreak);
-        // Clear any stale RX abort events created during deferral
-        clear_events(Event::RxAbort as u16);
+        restore_rx_abort_events();
         transmit_internal(state, pending.frame, pending.cca);
     } else if ieee802154_pib_get_rx_when_idle() {
         enable_rx();
         state.state = Ieee802154State::Receive;
+    } else {
+        sleep_inner(state);
     }
-    // else state stays Idle
+}
+
+/// Restores the RX abort events that a deferred transmission enabled.
+fn restore_rx_abort_events() {
+    disable_rx_abort_events(RxAbortReason::all());
+    enable_rx_abort_events(RxAbortReason::TxAckTimeout | RxAbortReason::TxAckCoexBreak);
+    // Clear any stale RX abort events created during deferral
+    clear_events(Event::RxAbort as u16);
 }
 
 fn next_operation() {
@@ -622,23 +684,24 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
             // and the hardware may overwrite it during auto-ACK or later RX.
             // The C driver can defer because it has multiple RX buffers and
             // advances the index in isr_handle_rx_done via next_rx_buffer().
-            receive_done(state);
+            let frame = rx_buffer_frame();
 
             if will_auto_send_ack(frm) {
                 // auto tx ack for frame version 0b00 and 0b01
-                // Frame data already copied above. Defer rx_available()
-                // notification until ACK completes (isr_handle_ack_tx_done).
+                // Like the C driver, deliver the frame only once the ACK is
+                // sent or aborted (isr_handle_ack_tx_done and friends).
                 ack_config_pending_bit(frm);
+                stage_pending_rx(state, frame);
                 state.state = Ieee802154State::TxAck;
                 *needs_next_op = false;
             } else if should_send_enhanced_ack(frm) {
                 // Enhanced ACK for frame version 0b10 - TODO: full enh-ack support
-                // Frame data already copied above.
+                stage_pending_rx(state, frame);
                 state.state = Ieee802154State::TxEnhAck;
                 *needs_next_op = false;
             } else {
-                // No ACK needed, notify immediately (data already copied above)
-                super::rx_available();
+                // No ACK needed, deliver immediately
+                deliver(state, frame);
                 *needs_next_op = true;
             }
         });
@@ -647,10 +710,16 @@ fn isr_handle_rx_done(needs_next_op: &mut bool) {
 
 /// Handle ACK TX done in ISR - matches C driver's isr_handle_ack_tx_done
 fn isr_handle_ack_tx_done(needs_next_op: &mut bool) {
-    // Frame was already copied to queue in isr_handle_rx_done (we must copy
-    // immediately because we only have one RX buffer). Now notify upper layer.
-    super::rx_available();
+    STATE.with(deliver_pending_rx);
     *needs_next_op = true;
+}
+
+/// Holds a received frame back until its ACK is sent or aborted.
+fn stage_pending_rx(state: &mut IeeeState, frame: RawReceived) {
+    // Every way out of the ACK states delivers the staged frame, so there is none left here.
+    // Should one be, deliver it rather than lose it.
+    deliver_pending_rx(state);
+    state.pending_rx = Some(frame);
 }
 
 /// Handle ACK RX done in ISR - matches C driver's isr_handle_ack_rx_done
@@ -728,14 +797,12 @@ fn isr_handle_tx_ack_phase_rx_abort(rx_abort_reason: u32, needs_next_op: &mut bo
         r if r == RxAbortReason::TxAckTimeout as u32
             || r == RxAbortReason::TxAckCoexBreak as u32 =>
         {
-            // Frame was already copied in isr_handle_rx_done, just notify
-            super::rx_available();
+            STATE.with(deliver_pending_rx);
             *needs_next_op = true;
         }
         // Enhanced ACK security error - notify upper layer
         r if r == RxAbortReason::EnhackSecurityError as u32 => {
-            // Frame was already copied in isr_handle_rx_done, just notify
-            super::rx_available();
+            STATE.with(deliver_pending_rx);
             *needs_next_op = true;
         }
         _ => {

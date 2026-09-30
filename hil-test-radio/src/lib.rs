@@ -72,6 +72,8 @@ pub mod ieee802154 {
     pub const SUPPORT_ADDRESS: u16 = 0x2323;
     /// Payload the DUT transmits and the support firmware echoes back.
     pub const PAYLOAD: &[u8] = b"esp-radio 802.15.4 HIL";
+    /// Payload the support firmware echoes back in a frame that requests an ACK.
+    pub const PAYLOAD_ACKED: &[u8] = b"esp-radio 802.15.4 HIL, acked";
 }
 
 #[macro_export]
