@@ -138,15 +138,64 @@ impl PartitionEntry {
         }
     }
 
-    /// Provides a "view" into the partition allowing to read/write the
+    /// Provides a plaintext "view" into the partition allowing to read/write the
     /// partition contents using the given [`FlashStorage`].
-    pub fn as_flash_region<'a, 'd>(self, flash: &'a mut FlashStorage<'d>) -> FlashRegion<'a, 'd> {
-        FlashRegion {
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NotSupported`] if the partition is effectively encrypted. Use
+    /// [`PartitionEntry::as_encrypted_flash_region`] instead.
+    pub fn as_flash_region<'a, 'd>(
+        self,
+        flash: &'a mut FlashStorage<'d>,
+    ) -> Result<FlashRegion<'a, 'd>, Error> {
+        if self.is_effectively_encrypted() {
+            return Err(Error::NotSupported);
+        }
+        Ok(FlashRegion {
+            region: self.region(flash),
+        })
+    }
+
+    /// Provides a "view" into an encrypted partition, which reads decrypted
+    /// data and writes encrypted data.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::NotSupported`] if the partition is not effectively encrypted, i.e. flash
+    /// encryption is disabled or the partition type is not encrypted.
+    pub fn as_encrypted_flash_region<'a, 'd>(
+        self,
+        flash: &'a mut FlashStorage<'d>,
+    ) -> Result<EncryptedFlashRegion<'a, 'd>, Error> {
+        if !self.is_effectively_encrypted() {
+            return Err(Error::NotSupported);
+        }
+        Ok(EncryptedFlashRegion {
+            region: self.region(flash),
+        })
+    }
+
+    /// Provides a "view" into the partition that is plaintext or encrypted,
+    /// depending on whether the partition is effectively encrypted.
+    pub fn as_partition_region<'a, 'd>(
+        self,
+        flash: &'a mut FlashStorage<'d>,
+    ) -> PartitionRegion<'a, 'd> {
+        let region = self.region(flash);
+        if self.is_effectively_encrypted() {
+            PartitionRegion::Encrypted(EncryptedFlashRegion { region })
+        } else {
+            PartitionRegion::Plain(FlashRegion { region })
+        }
+    }
+
+    fn region<'a, 'd>(self, flash: &'a mut FlashStorage<'d>) -> Region<'a, 'd> {
+        Region {
             offset: self.offset(),
             len: self.len(),
             partition_type: self.partition_type(),
             read_only: self.is_read_only(),
-            encrypted: self.is_effectively_encrypted(),
             flash,
         }
     }
@@ -262,7 +311,7 @@ pub enum Error {
     InvalidState,
     /// The given argument is invalid.
     InvalidArgument,
-    /// The operation is not supported for this partition (e.g. `as_nor_flash` on an encrypted
+    /// The operation is not supported for this partition (e.g. `as_flash_region` on an encrypted
     /// partition).
     NotSupported,
     /// The partition does not contain a valid application or bootloader image.
@@ -773,26 +822,22 @@ fn sha256_flash_contents<F: FlashAccess>(
     Ok(hasher.finalize().into())
 }
 
-/// A flash region is a "view" into the partition.
+/// The flash range of a partition.
 ///
-/// It allows to read and write to the partition without the need to account for
-/// the partition offset.
+/// Holds the bounds, write-protection and alignment checks that the public
+/// region types share.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct FlashRegion<'a, 'd> {
-    pub(crate) offset: u32,
-    pub(crate) len: u32,
-    pub(crate) partition_type: PartitionType,
-    pub(crate) read_only: bool,
-    /// Whether the partition is effectively encrypted (see
-    /// `PartitionEntry::is_effectively_encrypted`).
-    pub(crate) encrypted: bool,
-    pub(crate) flash: &'a mut FlashStorage<'d>,
+struct Region<'a, 'd> {
+    offset: u32,
+    len: u32,
+    partition_type: PartitionType,
+    read_only: bool,
+    flash: &'a mut FlashStorage<'d>,
 }
 
-impl<'a, 'd> FlashRegion<'a, 'd> {
-    /// Returns the size of the partition in bytes.
-    pub fn partition_size(&self) -> usize {
+impl Region<'_, '_> {
+    fn capacity(&self) -> usize {
         self.len as _
     }
 
@@ -804,32 +849,21 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
         self.range().contains(&start) && (start + len as u32 <= self.range().end)
     }
 
-    /// Reads bytes from the partition.
-    pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
+    fn read(&mut self, offset: u32, bytes: &mut [u8], encrypted: bool) -> Result<(), Error> {
         let address = offset + self.offset;
 
         if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
-        if self.encrypted {
+        if encrypted {
             self.flash.flash_read_encrypted(address, bytes)
         } else {
             self.flash.flash_read(address, bytes)
         }
     }
 
-    /// Writes bytes to the partition.
-    ///
-    /// The target range must be erased first: flash programming can only clear bits.
-    ///
-    /// # Errors
-    ///
-    /// - [`Error::WriteProtected`] if the partition is read-only.
-    /// - [`Error::OutOfBounds`] if the range exceeds the partition.
-    /// - [`Error::NotAligned`] if `offset` or the length is not a multiple of 4, or of 16 if the
-    ///   partition is encrypted.
-    pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
+    fn write(&mut self, offset: u32, bytes: &[u8], encrypted: bool) -> Result<(), Error> {
         let address = offset + self.offset;
 
         if self.read_only {
@@ -840,7 +874,7 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
             return Err(Error::OutOfBounds);
         }
 
-        let align = if self.encrypted {
+        let align = if encrypted {
             ENCRYPTED_WRITE_SIZE
         } else {
             WORD_SIZE
@@ -849,28 +883,14 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
             return Err(Error::NotAligned);
         }
 
-        if self.encrypted {
+        if encrypted {
             self.flash.flash_write_encrypted(address, bytes)
         } else {
             self.flash.flash_write(address, bytes)
         }
     }
 
-    /// Returns the size of the partition in bytes.
-    pub fn capacity(&self) -> usize {
-        self.partition_size()
-    }
-
-    /// Erases flash in the partition from `from` up to but not including `to`.
-    ///
-    /// Addresses are relative to the partition start.
-    ///
-    /// # Errors
-    ///
-    /// - [`Error::WriteProtected`] if the partition is read-only.
-    /// - [`Error::OutOfBounds`] if `from > to` or the range exceeds the partition.
-    /// - [`Error::NotAligned`] if `from` or `to` is not a multiple of 4096.
-    pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
+    fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
         let address_from = from + self.offset;
         let address_to = to + self.offset;
 
@@ -894,98 +914,203 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
     }
 }
 
-#[cfg(feature = "embedded-storage")]
-/// [`NorFlash`] and [`MultiwriteNorFlash`] view of a non-encrypted [`FlashRegion`].
-pub struct NorFlashRegion<'r, 'a, 'd> {
-    region: &'r mut FlashRegion<'a, 'd>,
+/// A plaintext "view" into a partition.
+///
+/// It allows to read and write to the partition without the need to account for
+/// the partition offset.
+///
+/// Created by [`PartitionEntry::as_flash_region`].
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct FlashRegion<'a, 'd> {
+    region: Region<'a, 'd>,
 }
 
-#[cfg(feature = "embedded-storage")]
-/// [`NorFlash`] view of an encrypted [`FlashRegion`].
+impl FlashRegion<'_, '_> {
+    /// Returns the size of the partition in bytes.
+    pub fn partition_size(&self) -> usize {
+        self.region.capacity()
+    }
+
+    /// Reads bytes from the partition.
+    pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
+        self.region.read(offset, bytes, false)
+    }
+
+    /// Writes bytes to the partition.
+    ///
+    /// The target range must be erased first: flash programming can only clear bits.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::OutOfBounds`] if the range exceeds the partition.
+    /// - [`Error::NotAligned`] if `offset` or the length is not a multiple of 4.
+    pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
+        self.region.write(offset, bytes, false)
+    }
+
+    /// Returns the size of the partition in bytes.
+    pub fn capacity(&self) -> usize {
+        self.region.capacity()
+    }
+
+    /// Erases flash in the partition from `from` up to but not including `to`.
+    ///
+    /// Addresses are relative to the partition start.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::OutOfBounds`] if `from > to` or the range exceeds the partition.
+    /// - [`Error::NotAligned`] if `from` or `to` is not a multiple of 4096.
+    pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
+        self.region.erase(from, to)
+    }
+}
+
+/// A "view" into an encrypted partition.
 ///
-/// Write size is one flash sector (4096 bytes): the ROM encrypts whole sectors.
-pub struct EncryptedNorFlashRegion<'r, 'a, 'd> {
-    region: &'r mut FlashRegion<'a, 'd>,
+/// Reads decrypt data, writes encrypt it. Offsets are relative to the partition start.
+///
+/// This type does not implement the `embedded-storage` NOR flash traits, erased
+/// flash does not read back as `0xFF` after decryption.
+///
+/// Created by [`PartitionEntry::as_encrypted_flash_region`].
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct EncryptedFlashRegion<'a, 'd> {
+    region: Region<'a, 'd>,
+}
+
+impl EncryptedFlashRegion<'_, '_> {
+    /// Returns the size of the partition in bytes.
+    pub fn partition_size(&self) -> usize {
+        self.region.capacity()
+    }
+
+    /// Returns the size of the partition in bytes.
+    pub fn capacity(&self) -> usize {
+        self.region.capacity()
+    }
+
+    /// Reads and decrypts bytes from the partition.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::OutOfBounds`] if the range exceeds the partition.
+    pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
+        self.region.read(offset, bytes, true)
+    }
+
+    /// Encrypts and writes bytes to the partition.
+    ///
+    /// The target range must be erased first: flash programming can only clear bits.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::OutOfBounds`] if the range exceeds the partition.
+    /// - [`Error::NotAligned`] if `offset` or the length is not a multiple of 16.
+    pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
+        self.region.write(offset, bytes, true)
+    }
+
+    /// Erases flash in the partition from `from` up to but not including `to`.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::OutOfBounds`] if `from > to` or the range exceeds the partition.
+    /// - [`Error::NotAligned`] if `from` or `to` is not a multiple of 4096.
+    pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
+        self.region.erase(from, to)
+    }
+}
+
+/// A "view" into a partition that is either plaintext or encrypted.
+///
+/// Used for partitions that are encrypted only when flash encryption is
+/// enabled, such as app and OTA data partitions. All methods forward to the
+/// wrapped region.
+///
+/// Created by [`PartitionEntry::as_partition_region`].
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PartitionRegion<'a, 'd> {
+    /// The partition is not encrypted.
+    Plain(FlashRegion<'a, 'd>),
+    /// The partition is encrypted.
+    Encrypted(EncryptedFlashRegion<'a, 'd>),
+}
+
+impl<'a, 'd> PartitionRegion<'a, 'd> {
+    fn region(&self) -> &Region<'a, 'd> {
+        match self {
+            Self::Plain(region) => &region.region,
+            Self::Encrypted(region) => &region.region,
+        }
+    }
+
+    pub(crate) fn partition_type(&self) -> PartitionType {
+        self.region().partition_type
+    }
+
+    /// Returns the size of the partition in bytes.
+    pub fn partition_size(&self) -> usize {
+        self.region().capacity()
+    }
+
+    /// Returns the size of the partition in bytes.
+    pub fn capacity(&self) -> usize {
+        self.region().capacity()
+    }
+
+    /// Returns whether the partition is encrypted.
+    pub fn is_encrypted(&self) -> bool {
+        matches!(self, Self::Encrypted(_))
+    }
+
+    /// Reads bytes from the partition, see [`FlashRegion::read`] and
+    /// [`EncryptedFlashRegion::read`].
+    pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
+        match self {
+            Self::Plain(region) => region.read(offset, bytes),
+            Self::Encrypted(region) => region.read(offset, bytes),
+        }
+    }
+
+    /// Writes bytes to the partition, see [`FlashRegion::write`] and
+    /// [`EncryptedFlashRegion::write`].
+    pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
+        match self {
+            Self::Plain(region) => region.write(offset, bytes),
+            Self::Encrypted(region) => region.write(offset, bytes),
+        }
+    }
+
+    /// Erases the partition from `from` up to but not including `to`, see
+    /// [`FlashRegion::erase`].
+    pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
+        match self {
+            Self::Plain(region) => region.erase(from, to),
+            Self::Encrypted(region) => region.erase(from, to),
+        }
+    }
 }
 
 #[cfg(feature = "embedded-storage")]
 mod embedded_storage_traits {
-    use ::embedded_storage::{
-        ReadStorage,
-        Region,
-        Storage,
-        nor_flash::{
-            ErrorType,
-            MultiwriteNorFlash,
-            NorFlash,
-            NorFlashError,
-            NorFlashErrorKind,
-            ReadNorFlash,
-        },
+    use embedded_storage::nor_flash::{
+        ErrorType,
+        MultiwriteNorFlash,
+        NorFlash,
+        NorFlashError,
+        NorFlashErrorKind,
+        ReadNorFlash,
     };
 
     use super::*;
-
-    const NOR_READ_SIZE: usize = <FlashStorage<'static> as FlashAccess>::READ_SIZE;
-    const NOR_WRITE_SIZE: usize = <FlashStorage<'static> as FlashAccess>::WRITE_SIZE;
-    const NOR_ERASE_SIZE: usize = <FlashStorage<'static> as FlashAccess>::ERASE_SIZE;
-    const ENCRYPTED_WRITE_SIZE: usize =
-        <FlashStorage<'static> as FlashAccess>::SECTOR_SIZE as usize;
-
-    impl<'a, 'd> FlashRegion<'a, 'd> {
-        /// Returns a [`NorFlashRegion`] for [`NorFlash`] access.
-        ///
-        /// # Errors
-        ///
-        /// Returns [`Error::NotSupported`] if this partition is treated as encrypted (e.g. app
-        /// partitions when flash encryption is enabled).
-        pub fn as_nor_flash<'r>(&'r mut self) -> Result<NorFlashRegion<'r, 'a, 'd>, Error> {
-            if self.encrypted {
-                return Err(Error::NotSupported);
-            }
-
-            Ok(NorFlashRegion { region: self })
-        }
-
-        /// Returns a [`EncryptedNorFlashRegion`] for [`NorFlash`] access.
-        ///
-        /// # Errors
-        ///
-        /// Returns [`Error::NotSupported`] if this partition is not treated as encrypted.
-        pub fn as_nor_flash_encrypted<'r>(
-            &'r mut self,
-        ) -> Result<EncryptedNorFlashRegion<'r, 'a, 'd>, Error> {
-            if !self.encrypted {
-                return Err(Error::NotSupported);
-            }
-
-            Ok(EncryptedNorFlashRegion { region: self })
-        }
-    }
-
-    impl Region for FlashRegion<'_, '_> {
-        fn contains(&self, address: u32) -> bool {
-            self.range().contains(&address)
-        }
-    }
-
-    impl ReadStorage for FlashRegion<'_, '_> {
-        type Error = Error;
-
-        fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
-            FlashRegion::read(self, offset, bytes)
-        }
-
-        fn capacity(&self) -> usize {
-            FlashRegion::capacity(self)
-        }
-    }
-
-    impl Storage for FlashRegion<'_, '_> {
-        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-            FlashRegion::write(self, offset, bytes)
-        }
-    }
 
     impl NorFlashError for Error {
         fn kind(&self) -> NorFlashErrorKind {
@@ -997,97 +1122,36 @@ mod embedded_storage_traits {
         }
     }
 
-    impl ErrorType for NorFlashRegion<'_, '_, '_> {
+    impl ErrorType for FlashRegion<'_, '_> {
         type Error = Error;
     }
 
-    impl ReadNorFlash for NorFlashRegion<'_, '_, '_> {
-        const READ_SIZE: usize = NOR_READ_SIZE;
+    impl ReadNorFlash for FlashRegion<'_, '_> {
+        const READ_SIZE: usize = 1;
 
         fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
-            let address = offset + self.region.offset;
-
-            if !self.region.in_range(address, bytes.len()) {
-                return Err(Error::OutOfBounds);
-            }
-
-            self.region.flash.flash_read_nor(address, bytes)
+            FlashRegion::read(self, offset, bytes)
         }
 
         fn capacity(&self) -> usize {
-            self.region.capacity()
+            FlashRegion::capacity(self)
         }
     }
 
-    impl NorFlash for NorFlashRegion<'_, '_, '_> {
-        const WRITE_SIZE: usize = NOR_WRITE_SIZE;
-        const ERASE_SIZE: usize = NOR_ERASE_SIZE;
+    impl NorFlash for FlashRegion<'_, '_> {
+        const WRITE_SIZE: usize = WORD_SIZE as usize;
+        const ERASE_SIZE: usize = SECTOR_SIZE as usize;
 
         fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
-            self.region.erase(from, to)
+            FlashRegion::erase(self, from, to)
         }
 
         fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-            let address = offset + self.region.offset;
-
-            if self.region.read_only {
-                return Err(Error::WriteProtected);
-            }
-
-            if !self.region.in_range(address, bytes.len()) {
-                return Err(Error::OutOfBounds);
-            }
-
-            self.region.flash.flash_write_nor(address, bytes)
+            FlashRegion::write(self, offset, bytes)
         }
     }
 
-    impl MultiwriteNorFlash for NorFlashRegion<'_, '_, '_> {}
-
-    impl ErrorType for EncryptedNorFlashRegion<'_, '_, '_> {
-        type Error = Error;
-    }
-
-    impl ReadNorFlash for EncryptedNorFlashRegion<'_, '_, '_> {
-        const READ_SIZE: usize = NOR_READ_SIZE;
-
-        fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
-            let address = offset + self.region.offset;
-
-            if !self.region.in_range(address, bytes.len()) {
-                return Err(Error::OutOfBounds);
-            }
-
-            self.region.flash.flash_read_encrypted(address, bytes)
-        }
-
-        fn capacity(&self) -> usize {
-            self.region.capacity()
-        }
-    }
-
-    impl NorFlash for EncryptedNorFlashRegion<'_, '_, '_> {
-        const WRITE_SIZE: usize = ENCRYPTED_WRITE_SIZE;
-        const ERASE_SIZE: usize = NOR_ERASE_SIZE;
-
-        fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
-            self.region.erase(from, to)
-        }
-
-        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-            let address = offset + self.region.offset;
-
-            if self.region.read_only {
-                return Err(Error::WriteProtected);
-            }
-
-            if !self.region.in_range(address, bytes.len()) {
-                return Err(Error::OutOfBounds);
-            }
-
-            self.region.flash.flash_write_encrypted(address, bytes)
-        }
-    }
+    impl MultiwriteNorFlash for FlashRegion<'_, '_> {}
 }
 
 #[cfg(test)]
@@ -1287,8 +1351,8 @@ mod storage_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut nvs_partition = nvs.as_flash_region(&mut storage);
-        assert_eq!(nvs_partition.offset, 36864);
+        let mut nvs_partition = nvs.as_flash_region(&mut storage).unwrap();
+        assert_eq!(nvs_partition.region.offset, 36864);
 
         assert_eq!(nvs_partition.capacity(), 24576);
 
@@ -1314,8 +1378,8 @@ mod storage_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut nvs_partition = nvs.as_flash_region(&mut storage);
-        assert_eq!(nvs_partition.offset, 36864);
+        let mut nvs_partition = nvs.as_flash_region(&mut storage).unwrap();
+        assert_eq!(nvs_partition.region.offset, 36864);
 
         assert_eq!(nvs_partition.capacity(), 24576);
 
@@ -1334,7 +1398,7 @@ mod storage_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut nvs_partition = nvs.as_flash_region(&mut storage);
+        let mut nvs_partition = nvs.as_flash_region(&mut storage).unwrap();
 
         let capacity = nvs_partition.capacity() as u32;
         assert_eq!(capacity, 24576);
@@ -1363,7 +1427,7 @@ mod storage_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut nvs_partition = nvs.as_flash_region(&mut storage);
+        let mut nvs_partition = nvs.as_flash_region(&mut storage).unwrap();
 
         let capacity = nvs_partition.capacity() as u32;
 
@@ -1383,7 +1447,7 @@ mod storage_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut nvs_partition = nvs.as_flash_region(&mut storage);
+        let mut nvs_partition = nvs.as_flash_region(&mut storage).unwrap();
 
         assert_eq!(nvs_partition.write(2, &[0; 4]), Err(Error::NotAligned));
         assert_eq!(nvs_partition.write(4, &[0; 6]), Err(Error::NotAligned));
@@ -1402,13 +1466,42 @@ mod storage_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut region = nvs.as_flash_region(&mut storage);
-        region.encrypted = true;
+        // Host tests run without flash encryption, so build the region directly.
+        let mut region = EncryptedFlashRegion {
+            region: nvs.region(&mut storage),
+        };
 
         region.erase(0, 4096).unwrap();
         assert_eq!(region.write(4, &[0; 16]), Err(Error::NotAligned));
         assert_eq!(region.write(16, &[0; 20]), Err(Error::NotAligned));
         region.write(16, &[0x5a; 32]).unwrap();
+
+        let mut buffer = [0u8; 34];
+        region.read(15, &mut buffer).unwrap();
+        assert_eq!(buffer[0], 0xff);
+        assert_eq!(buffer[1..33], [0x5a; 32]);
+        assert_eq!(buffer[33], 0xff);
+    }
+
+    #[test]
+    fn encrypted_region_requires_flash_encryption() {
+        let mut storage = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+
+        assert!(!nvs.is_effectively_encrypted());
+        assert!(nvs.as_flash_region(&mut storage).is_ok());
+        assert!(!nvs.as_partition_region(&mut storage).is_encrypted());
+        assert!(matches!(
+            nvs.as_encrypted_flash_region(&mut storage),
+            Err(Error::NotSupported)
+        ));
     }
 }
 
@@ -1476,6 +1569,7 @@ mod sha256_tests {
             .unwrap();
 
         nvs.as_flash_region(&mut flash)
+            .unwrap()
             .write(0, &[0xa5u8; 0x6000])
             .unwrap();
 
@@ -1542,7 +1636,13 @@ mod sha256_tests {
 
 #[cfg(all(test, feature = "embedded-storage"))]
 mod nor_flash_tests {
-    use embedded_storage::nor_flash::{MultiwriteNorFlash, NorFlash, ReadNorFlash};
+    use embedded_storage::nor_flash::{
+        MultiwriteNorFlash,
+        NorFlash,
+        NorFlashError,
+        NorFlashErrorKind,
+        ReadNorFlash,
+    };
 
     use super::*;
 
@@ -1556,48 +1656,21 @@ mod nor_flash_tests {
     }
 
     #[test]
-    fn plain_nor_flash_implements_multi_write() {
+    fn flash_region_implements_multi_write() {
         fn assert_multi_write<N: MultiwriteNorFlash>() {}
-        assert_multi_write::<NorFlashRegion<'static, 'static, 'static>>();
+        assert_multi_write::<FlashRegion<'static, 'static>>();
     }
 
     #[test]
-    fn as_nor_flash_succeeds_on_plain_partition() {
-        let mut storage = test_flash();
-
-        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
-        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
-
-        let nvs = pt
-            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
-            .unwrap()
-            .unwrap();
-        let mut nvs_partition = nvs.as_flash_region(&mut storage);
-
-        assert!(nvs_partition.as_nor_flash().is_ok());
-        assert!(matches!(
-            nvs_partition.as_nor_flash_encrypted(),
-            Err(Error::NotSupported)
-        ));
-    }
-
-    #[test]
-    fn nor_flash_write_sizes() {
+    fn nor_flash_sizes() {
         assert_eq!(
-            <NorFlashRegion<'static, 'static, 'static> as NorFlash>::WRITE_SIZE,
-            <FlashStorage<'static> as FlashAccess>::WRITE_SIZE
+            <FlashRegion<'static, 'static> as ReadNorFlash>::READ_SIZE,
+            1
         );
+        assert_eq!(<FlashRegion<'static, 'static> as NorFlash>::WRITE_SIZE, 4);
         assert_eq!(
-            <EncryptedNorFlashRegion<'static, 'static, 'static> as NorFlash>::WRITE_SIZE,
-            <FlashStorage<'static> as FlashAccess>::SECTOR_SIZE as usize
-        );
-        assert_eq!(
-            <NorFlashRegion<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
-            <FlashStorage<'static> as FlashAccess>::READ_SIZE
-        );
-        assert_eq!(
-            <EncryptedNorFlashRegion<'static, 'static, 'static> as ReadNorFlash>::READ_SIZE,
-            <FlashStorage<'static> as FlashAccess>::READ_SIZE
+            <FlashRegion<'static, 'static> as NorFlash>::ERASE_SIZE,
+            4096
         );
     }
 
@@ -1612,16 +1685,32 @@ mod nor_flash_tests {
             .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
             .unwrap()
             .unwrap();
-        let mut nvs_partition = nvs.as_flash_region(&mut storage);
-        let capacity = nvs_partition.capacity() as u32;
-        let mut nor_flash = nvs_partition.as_nor_flash().unwrap();
+        let mut nor_flash = nvs.as_flash_region(&mut storage).unwrap();
+        let capacity = ReadNorFlash::capacity(&nor_flash) as u32;
 
-        nor_flash.erase(0, capacity).unwrap();
+        NorFlash::erase(&mut nor_flash, 0, capacity).unwrap();
         let mut buffer = [0u8; 4096];
-        nor_flash.read(capacity - 4096, &mut buffer).unwrap();
+        ReadNorFlash::read(&mut nor_flash, capacity - 4096, &mut buffer).unwrap();
         assert!(buffer.iter().all(|v| *v == 0xff));
 
-        assert!(nor_flash.erase(0, capacity + 4096) == Err(Error::OutOfBounds));
-        assert!(nor_flash.erase(4096, 0) == Err(Error::OutOfBounds));
+        assert!(NorFlash::erase(&mut nor_flash, 0, capacity + 4096) == Err(Error::OutOfBounds));
+        assert!(NorFlash::erase(&mut nor_flash, 4096, 0) == Err(Error::OutOfBounds));
+    }
+
+    #[test]
+    fn nor_flash_rejects_unaligned_write() {
+        let mut storage = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nor_flash = nvs.as_flash_region(&mut storage).unwrap();
+
+        let error = NorFlash::write(&mut nor_flash, 1, &[0; 4]).unwrap_err();
+        assert_eq!(error.kind(), NorFlashErrorKind::NotAligned);
     }
 }

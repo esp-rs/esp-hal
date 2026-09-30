@@ -8,20 +8,6 @@ pub trait FlashAccess {
     fn flash_erase(&mut self, from: u32, to: u32) -> Result<(), Error>;
     fn flash_read_encrypted(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error>;
     fn flash_write_encrypted(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error>;
-
-    #[cfg(feature = "embedded-storage")]
-    const READ_SIZE: usize;
-    #[cfg(feature = "embedded-storage")]
-    const WRITE_SIZE: usize;
-    #[cfg(feature = "embedded-storage")]
-    const ERASE_SIZE: usize;
-    #[cfg(feature = "embedded-storage")]
-    const SECTOR_SIZE: u32;
-
-    #[cfg(feature = "embedded-storage")]
-    fn flash_read_nor(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error>;
-    #[cfg(feature = "embedded-storage")]
-    fn flash_write_nor(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error>;
 }
 
 #[cfg(not(feature = "std"))]
@@ -119,15 +105,6 @@ mod esp_hal_flash {
     }
 
     impl FlashAccess for FlashStorage<'_> {
-        #[cfg(feature = "embedded-storage")]
-        const READ_SIZE: usize = 1;
-        #[cfg(feature = "embedded-storage")]
-        const WRITE_SIZE: usize = WORD_SIZE as usize;
-        #[cfg(feature = "embedded-storage")]
-        const ERASE_SIZE: usize = Self::SECTOR_SIZE as usize;
-        #[cfg(feature = "embedded-storage")]
-        const SECTOR_SIZE: u32 = crate::flash::SECTOR_SIZE;
-
         fn flash_read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
             read_bytes(self, offset, bytes, false)
         }
@@ -148,16 +125,6 @@ mod esp_hal_flash {
 
         fn flash_write_encrypted(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
             write_bytes(self, offset, bytes, true)
-        }
-
-        #[cfg(feature = "embedded-storage")]
-        fn flash_read_nor(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
-            read_bytes(self, offset, bytes, false)
-        }
-
-        #[cfg(feature = "embedded-storage")]
-        fn flash_write_nor(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
-            write_bytes(self, offset, bytes, false)
         }
     }
 }
