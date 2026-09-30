@@ -34,6 +34,7 @@ use crate::partitions::{
 
 const SLOT0_DATA_OFFSET: u32 = 0x0000;
 const SLOT1_DATA_OFFSET: u32 = 0x1000;
+const SLOT_SIZE: u32 = 0x1000;
 
 const UNINITIALIZED_SEQUENCE: u32 = 0xffffffff;
 
@@ -169,10 +170,23 @@ impl OtaSelectEntry {
         let bytes: &mut [u8; 32] = unwrap!(
             unsafe { core::slice::from_raw_parts_mut(self as *mut _ as *mut u8, 0x20) }.try_into()
         );
-        region.write(offset, bytes)?;
-
-        Ok(())
+        write_slot(region, offset, bytes)
     }
+}
+
+/// Erases the OTA-data slot at `offset` and programs `bytes` into it.
+///
+/// Migration note: with `esp-storage`, every write did an implicit
+/// read-modify-write of the whole sector. `esp_hal::flash::Flash` only
+/// programs, so the slot has to be erased explicitly before it is rewritten.
+/// ESP-IDF does the same in `rewrite_ota_seq`.
+fn write_slot(
+    region: &mut FlashRegion<'_, '_>,
+    offset: u32,
+    bytes: &[u8; 32],
+) -> Result<(), Error> {
+    region.erase(offset, offset + SLOT_SIZE)?;
+    region.write(offset, bytes)
 }
 
 /// This is used to manipulate the OTA-data partition.
@@ -265,8 +279,8 @@ impl<'a, 'd> Ota<'a, 'd> {
     /// number exceeds the value given to the constructor.
     pub fn set_current_app_partition(&mut self, app: AppPartitionSubType) -> Result<(), Error> {
         if app == AppPartitionSubType::Factory {
-            self.flash.write(SLOT0_DATA_OFFSET, &[0xffu8; 0x20])?;
-            self.flash.write(SLOT1_DATA_OFFSET, &[0xffu8; 0x20])?;
+            write_slot(&mut self.flash, SLOT0_DATA_OFFSET, &[0xffu8; 0x20])?;
+            write_slot(&mut self.flash, SLOT1_DATA_OFFSET, &[0xffu8; 0x20])?;
             return Ok(());
         }
 

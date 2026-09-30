@@ -27,9 +27,7 @@ pub trait FlashAccess {
 #[cfg(not(feature = "std"))]
 mod esp_hal_flash {
     use super::*;
-    use crate::flash::FlashStorage;
-
-    const WORD_SIZE: u32 = 4;
+    use crate::flash::{FlashStorage, WORD_SIZE};
 
     /// Size of the stack buffer that stages data between byte slices and the
     /// word-based flash driver, which needs word-aligned buffers in DRAM.
@@ -90,7 +88,7 @@ mod esp_hal_flash {
         encrypted: bool,
     ) -> Result<(), Error> {
         if !offset.is_multiple_of(WORD_SIZE) || !bytes.len().is_multiple_of(WORD_SIZE as usize) {
-            return Err(Error::StorageError);
+            return Err(Error::NotAligned);
         }
 
         let mut buffer = [0u32; BOUNCE_BUFFER_WORDS];
@@ -128,7 +126,7 @@ mod esp_hal_flash {
         #[cfg(feature = "embedded-storage")]
         const ERASE_SIZE: usize = Self::SECTOR_SIZE as usize;
         #[cfg(feature = "embedded-storage")]
-        const SECTOR_SIZE: u32 = 4096;
+        const SECTOR_SIZE: u32 = crate::flash::SECTOR_SIZE;
 
         fn flash_read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
             read_bytes(self, offset, bytes, false)

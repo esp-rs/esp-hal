@@ -20,8 +20,8 @@ const MD5_MAGIC: u16 = 0xebeb;
 
 const OTA_SUBTYPE_OFFSET: u8 = 0x10;
 
-use crate::flash::FlashAccess;
 pub use crate::flash::FlashStorage;
+use crate::flash::{ENCRYPTED_WRITE_SIZE, FlashAccess, SECTOR_SIZE, WORD_SIZE};
 
 /// Represents a single partition entry.
 #[derive(Clone, Copy)]
@@ -247,6 +247,8 @@ pub enum Error {
     OutOfBounds,
     /// An error which originates from the embedded-storage implementation.
     StorageError,
+    /// An address or length is not aligned as the operation requires.
+    NotAligned,
     /// The partition is write protected.
     WriteProtected,
     /// The partition is invalid.
@@ -816,6 +818,15 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
     }
 
     /// Write bytes to the partition.
+    ///
+    /// The target range must be erased first: flash programming can only clear bits.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::OutOfBounds`] if the range exceeds the partition.
+    /// - [`Error::NotAligned`] if `offset` or the length is not a multiple of 4, or of 16 if the
+    ///   partition is encrypted.
     pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
         let address = offset + self.offset;
 
@@ -825,6 +836,15 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
 
         if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
+        }
+
+        let align = if self.encrypted {
+            ENCRYPTED_WRITE_SIZE
+        } else {
+            WORD_SIZE
+        };
+        if !offset.is_multiple_of(align) || !bytes.len().is_multiple_of(align as usize) {
+            return Err(Error::NotAligned);
         }
 
         if self.encrypted {
@@ -842,6 +862,12 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
     /// Erase flash in the partition from `from` up to but not including `to`.
     ///
     /// Addresses are relative to the partition start.
+    ///
+    /// # Errors
+    ///
+    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::OutOfBounds`] if `from > to` or the range exceeds the partition.
+    /// - [`Error::NotAligned`] if `from` or `to` is not a multiple of 4096.
     pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
         let address_from = from + self.offset;
         let address_to = to + self.offset;
@@ -856,6 +882,10 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
 
         if !self.in_range(address_from, (address_to - address_from) as usize) {
             return Err(Error::OutOfBounds);
+        }
+
+        if !from.is_multiple_of(SECTOR_SIZE) || !to.is_multiple_of(SECTOR_SIZE) {
+            return Err(Error::NotAligned);
         }
 
         self.flash.flash_erase(address_from, address_to)
@@ -958,6 +988,7 @@ mod embedded_storage_traits {
     impl NorFlashError for Error {
         fn kind(&self) -> NorFlashErrorKind {
             match self {
+                Error::NotAligned => NorFlashErrorKind::NotAligned,
                 Error::OutOfBounds => NorFlashErrorKind::OutOfBounds,
                 _ => NorFlashErrorKind::Other,
             }
@@ -1263,6 +1294,7 @@ mod storage_tests {
         nvs_partition.read(0, &mut buffer).unwrap();
         assert!(buffer.iter().all(|v| *v == 23));
         buffer.fill(42);
+        nvs_partition.erase(0, 24576).unwrap();
         nvs_partition.write(0, &buffer).unwrap();
         let mut buffer = [0u8; 24576];
         nvs_partition.read(0, &mut buffer).unwrap();
@@ -1336,6 +1368,45 @@ mod storage_tests {
         assert!(nvs_partition.erase(0, capacity + 4096) == Err(Error::OutOfBounds));
         assert!(nvs_partition.erase(capacity, capacity + 4096) == Err(Error::OutOfBounds));
         assert!(nvs_partition.erase(4096, 0) == Err(Error::OutOfBounds));
+    }
+
+    #[test]
+    fn rejects_unaligned_write_and_erase() {
+        let mut storage = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nvs_partition = nvs.as_flash_region(&mut storage);
+
+        assert_eq!(nvs_partition.write(2, &[0; 4]), Err(Error::NotAligned));
+        assert_eq!(nvs_partition.write(4, &[0; 6]), Err(Error::NotAligned));
+        assert_eq!(nvs_partition.erase(512, 4096), Err(Error::NotAligned));
+        assert_eq!(nvs_partition.erase(0, 512), Err(Error::NotAligned));
+    }
+
+    #[test]
+    fn encrypted_write_requires_16_byte_alignment() {
+        let mut storage = test_flash();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut region = nvs.as_flash_region(&mut storage);
+        region.encrypted = true;
+
+        region.erase(0, 4096).unwrap();
+        assert_eq!(region.write(4, &[0; 16]), Err(Error::NotAligned));
+        assert_eq!(region.write(16, &[0; 20]), Err(Error::NotAligned));
+        region.write(16, &[0x5a; 32]).unwrap();
     }
 }
 
