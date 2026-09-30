@@ -2,7 +2,8 @@
 //!
 //! Runs on the second board of the radio HIL rig. It joins the same channel
 //! and PAN as the device-under-test, auto-acknowledges frames addressed to it,
-//! and echoes every received data frame's payload back to the DUT. This lets
+//! and echoes every received data frame's payload back to the DUT - in a frame
+//! that requests an ACK when the payload is `PAYLOAD_ACKED`. This lets
 //! the DUT test both the transmit (ACK) and receive paths against real peer
 //! hardware.
 
@@ -18,7 +19,7 @@
 use esp_hal::{clock::CpuClock, main};
 use esp_radio::ieee802154::{Config, Frame, Ieee802154};
 use hil_test as _;
-use hil_test::ieee802154::{CHANNEL, DUT_ADDRESS, PAN_ID, SUPPORT_ADDRESS};
+use hil_test::ieee802154::{CHANNEL, DUT_ADDRESS, PAN_ID, PAYLOAD_ACKED, SUPPORT_ADDRESS};
 use ieee802154::mac::{
     Address,
     FrameContent,
@@ -47,11 +48,13 @@ fn init_heap() {
 }
 
 fn echo_frame(seq: u8, payload: alloc::vec::Vec<u8>) -> Frame {
+    let ack_request = payload.as_slice() == PAYLOAD_ACKED;
+
     Frame {
         header: Header {
             frame_type: FrameType::Data,
             frame_pending: false,
-            ack_request: false,
+            ack_request,
             pan_id_compress: false,
             seq_no_suppress: false,
             ie_present: false,
