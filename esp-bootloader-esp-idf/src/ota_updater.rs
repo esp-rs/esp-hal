@@ -2,7 +2,7 @@
 
 use crate::{
     ota::OtaImageState,
-    partitions::{AppPartitionSubType, Error, FlashRegion, FlashStorage, PartitionTable},
+    partitions::{AppPartitionSubType, Error, FlashStorage, PartitionRegion, PartitionTable},
 };
 
 /// Provides a more convenient, but less flexible, way to do OTA updates.
@@ -72,7 +72,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
                 crate::partitions::DataPartitionSubType::Ota,
             ))?;
         if let Some(ota_part) = ota_part {
-            let ota_part = ota_part.as_flash_region(self.flash);
+            let ota_part = ota_part.as_partition_region(self.flash);
             let ota = crate::ota::Ota::new(ota_part, self.ota_count)?;
             Ok(ota)
         } else {
@@ -136,16 +136,21 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         self.ota_data()?.set_current_app_partition(next_slot)
     }
 
-    /// Returns a [FlashRegion] along with the [AppPartitionSubType] for the
+    /// Returns a [PartitionRegion] along with the [AppPartitionSubType] for the
     /// partition which would be selected by [Self::activate_next_partition].
-    pub fn next_partition(&mut self) -> Result<(FlashRegion<'_, 'd>, AppPartitionSubType), Error> {
+    ///
+    /// The region is encrypted when flash encryption is enabled. Erase it before
+    /// writing the new image.
+    pub fn next_partition(
+        &mut self,
+    ) -> Result<(PartitionRegion<'_, 'd>, AppPartitionSubType), Error> {
         let next_slot = self.next_ota_part()?;
 
         let flash_region = self
             .pt
             .find_partition(crate::partitions::PartitionType::App(next_slot))?
             .ok_or(Error::Invalid)?
-            .as_flash_region(self.flash);
+            .as_partition_region(self.flash);
 
         Ok((flash_region, next_slot))
     }
