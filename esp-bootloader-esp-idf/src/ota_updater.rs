@@ -5,7 +5,7 @@ use crate::{
     partitions::{AppPartitionSubType, Error, FlashRegion, FlashStorage, PartitionTable},
 };
 
-/// This can be used as more convenient - yet less flexible, way to do OTA updates.
+/// Provides a more convenient, but less flexible, way to do OTA updates.
 ///
 /// If you need lower level access see [crate::ota::Ota]
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub struct OtaUpdater<'a, 'd> {
 }
 
 impl<'a, 'd> OtaUpdater<'a, 'd> {
-    /// Create a new instance of [OtaUpdater].
+    /// Creates a new instance of [OtaUpdater].
     ///
     /// # Errors
     /// [Error::Invalid] if no OTA data partition or less than two OTA app partition were found.
@@ -111,7 +111,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         self.ota_data()?.current_app_partition()
     }
 
-    /// Get the [OtaImageState] of the currently selected partition.
+    /// Returns the [OtaImageState] of the currently selected partition.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -119,7 +119,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         self.ota_data()?.current_ota_state()
     }
 
-    /// Set the [OtaImageState] of the currently selected slot.
+    /// Sets the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -150,7 +150,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         Ok((flash_region, next_slot))
     }
 
-    /// Reset the OTA-data.
+    /// Resets the OTA-data.
     ///
     /// If present this will activate the FACTORY image, OTA0 otherwise.
     pub fn reset_data(&mut self) -> Result<(), Error> {

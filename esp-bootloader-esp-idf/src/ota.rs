@@ -189,7 +189,7 @@ fn write_slot(
     region.write(offset, bytes)
 }
 
-/// This is used to manipulate the OTA-data partition.
+/// Reads and updates the OTA-data partition.
 ///
 /// If you are looking for a more high-level way to do this, see [crate::ota_updater::OtaUpdater]
 #[derive(Debug)]
@@ -200,8 +200,8 @@ pub struct Ota<'a, 'd> {
 }
 
 impl<'a, 'd> Ota<'a, 'd> {
-    /// Create a [Ota] instance from the given [FlashRegion] and the count of OTA app partitions
-    /// (not including "firmware" and "test" partitions)
+    /// Creates a new [Ota] instance from the given [FlashRegion] and the count of OTA app
+    /// partitions (not including "firmware" and "test" partitions)
     ///
     /// # Errors
     /// A [Error::InvalidPartition] if the given flash region
@@ -363,7 +363,7 @@ impl<'a, 'd> Ota<'a, 'd> {
         Ok(slot)
     }
 
-    /// Set the [OtaImageState] of the currently selected slot.
+    /// Sets the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -379,7 +379,7 @@ impl<'a, 'd> Ota<'a, 'd> {
         }
     }
 
-    /// Get the [OtaImageState] of the currently selected slot.
+    /// Returns the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.

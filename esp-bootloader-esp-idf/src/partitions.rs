@@ -34,42 +34,42 @@ impl PartitionEntry {
         Self { binary: *binary }
     }
 
-    /// The magic value of the entry.
+    /// Returns the magic value of the entry.
     pub fn magic(&self) -> u16 {
         u16::from_le_bytes(unwrap!(self.binary[..2].try_into()))
     }
 
-    /// The partition type in raw representation.
+    /// Returns the partition type in raw representation.
     pub fn raw_type(&self) -> u8 {
         self.binary[2]
     }
 
-    /// The partition sub-type in raw representation.
+    /// Returns the partition sub-type in raw representation.
     pub fn raw_subtype(&self) -> u8 {
         self.binary[3]
     }
 
-    /// Offset of the partition on flash.
+    /// Returns the offset of the partition on flash.
     pub fn offset(&self) -> u32 {
         u32::from_le_bytes(unwrap!(self.binary[4..][..4].try_into()))
     }
 
-    /// Length of the partition in bytes.
+    /// Returns the length of the partition in bytes.
     pub fn len(&self) -> u32 {
         u32::from_le_bytes(unwrap!(self.binary[8..][..4].try_into()))
     }
 
-    /// Checks for a zero-length partition.
+    /// Returns whether the partition has zero length.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// The label of the partition.
+    /// Returns the label of the partition.
     pub fn label(&self) -> &[u8] {
         &self.binary[12..][..16]
     }
 
-    /// The label of the partition as `&str`.
+    /// Returns the label of the partition as `&str`.
     pub fn label_as_str(&self) -> &str {
         let array = self.label();
         let len = array
@@ -81,18 +81,18 @@ impl PartitionEntry {
         }
     }
 
-    /// Raw flags of this partition. You probably want to use
+    /// Returns the raw flags of this partition. You probably want to use
     /// [Self::is_read_only] and [Self::is_encrypted] instead.
     pub fn flags(&self) -> u32 {
         u32::from_le_bytes(unwrap!(self.binary[28..][..4].try_into()))
     }
 
-    /// If the partition is read only.
+    /// Returns whether the partition is read-only.
     pub fn is_read_only(&self) -> bool {
         self.flags() & 0b01 != 0
     }
 
-    /// If the partition is encrypted.
+    /// Returns whether the partition is encrypted.
     ///
     /// This is the flag from the partition table.
     /// If flash encryption is enabled certain partition types are encrypted
@@ -101,7 +101,9 @@ impl PartitionEntry {
         self.flags() & 0b10 != 0
     }
 
-    /// Like [PartitionEntry::is_encrypted] but also takes into account:
+    /// Returns whether the partition is effectively encrypted.
+    ///
+    /// Unlike [PartitionEntry::is_encrypted], this also takes into account:
     /// - is flash encryption enabled, otherwise this will always return false
     /// - certain partition types are always encrypted, no matter what the partition table says
     pub(crate) fn is_effectively_encrypted(&self) -> bool {
@@ -125,7 +127,7 @@ impl PartitionEntry {
                 ))
     }
 
-    /// The partition type (type and sub-type).
+    /// Returns the partition type (type and sub-type).
     pub fn partition_type(&self) -> PartitionType {
         match self.raw_type() {
             0 => PartitionType::App(unwrap!(self.raw_subtype().try_into())),
@@ -149,7 +151,7 @@ impl PartitionEntry {
         }
     }
 
-    /// Calculate the SHA-256 digest of this partition.
+    /// Calculates the SHA-256 digest of this partition.
     ///
     /// - App / bootloader with appended hash: return that digest after verifying it
     /// - App / bootloader without appended hash: hash the image (not the whole partition)
@@ -346,17 +348,17 @@ impl<'a> PartitionTable<'a> {
         Ok(raw_table)
     }
 
-    /// Number of partitions contained in the partition table.
+    /// Returns the number of partitions contained in the partition table.
     pub fn len(&self) -> usize {
         self.entries
     }
 
-    /// Checks if there are no recognized partitions.
+    /// Returns whether there are no recognized partitions.
     pub fn is_empty(&self) -> bool {
         self.entries == 0
     }
 
-    /// Get a partition entry.
+    /// Returns a partition entry.
     pub fn get_partition(&self, index: usize) -> Result<PartitionEntry, Error> {
         if index >= self.entries {
             return Err(Error::OutOfBounds);
@@ -364,7 +366,7 @@ impl<'a> PartitionTable<'a> {
         Ok(PartitionEntry::new(&self.binary[index]))
     }
 
-    /// Get the first partition matching the given partition type.
+    /// Returns the first partition matching the given partition type.
     pub fn find_partition(&self, pt: PartitionType) -> Result<Option<PartitionEntry>, Error> {
         for i in 0..self.entries {
             let entry = self.get_partition(i)?;
@@ -381,13 +383,13 @@ impl<'a> PartitionTable<'a> {
     }
 
     #[cfg(feature = "std")]
-    /// Get the currently booted partition.
+    /// Returns the currently booted partition.
     pub fn booted_partition(&self) -> Result<Option<PartitionEntry>, Error> {
         Err(Error::Invalid)
     }
 
     #[cfg(not(feature = "std"))]
-    /// Get the currently booted partition.
+    /// Returns the currently booted partition.
     pub fn booted_partition(&self) -> Result<Option<PartitionEntry>, Error> {
         // Read entry 0 from MMU to know which partition is mapped
         //
@@ -627,7 +629,7 @@ impl TryFrom<u8> for PartitionTablePartitionSubType {
     }
 }
 
-/// Read the partition table.
+/// Reads the partition table.
 ///
 /// Pass [`FlashStorage`] and a buffer to read the partition table into.
 pub fn read_partition_table<'a, 'd>(
@@ -669,7 +671,7 @@ struct ImageMetadata {
     hash_appended: bool,
 }
 
-/// Parse an app/bootloader image on flash and return its length and optional
+/// Parses an app/bootloader image on flash and returns its length and optional
 /// appended SHA-256 digest.
 ///
 /// Walks the image header and segment table, accounts for the checksum
@@ -745,7 +747,7 @@ fn flash_read<F: FlashAccess>(
     }
 }
 
-/// Hash `len` bytes of flash starting at `flash_offset`.
+/// Hashes `len` bytes of flash starting at `flash_offset`.
 ///
 /// Reads the region in fixed-size chunks so large partitions do not need to be
 /// loaded into memory at once.
@@ -802,7 +804,7 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
         self.range().contains(&start) && (start + len as u32 <= self.range().end)
     }
 
-    /// Read bytes from the partition.
+    /// Reads bytes from the partition.
     pub fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Error> {
         let address = offset + self.offset;
 
@@ -817,7 +819,7 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
         }
     }
 
-    /// Write bytes to the partition.
+    /// Writes bytes to the partition.
     ///
     /// The target range must be erased first: flash programming can only clear bits.
     ///
@@ -859,7 +861,7 @@ impl<'a, 'd> FlashRegion<'a, 'd> {
         self.partition_size()
     }
 
-    /// Erase flash in the partition from `from` up to but not including `to`.
+    /// Erases flash in the partition from `from` up to but not including `to`.
     ///
     /// Addresses are relative to the partition start.
     ///

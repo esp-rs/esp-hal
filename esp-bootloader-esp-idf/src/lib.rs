@@ -368,7 +368,7 @@ pub const SECURE_VERSION: u32 =
 pub const ESP_IDF_COMPATIBLE_VERSION: &str =
     esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_ESP_IDF_VERSION");
 
-/// This macro populates the application descriptor (see [EspAppDesc]) which is
+/// Populates the application descriptor (see [EspAppDesc]) which is
 /// available as a static named `ESP_APP_DESC`
 ///
 /// In most cases you can just use the no-arguments version of this macro.
