@@ -9,8 +9,14 @@
 mod generate;
 #[cfg(feature = "build")]
 pub use generate::{
-    ConfigOption, DisplayHint, Error, Stability, generate_config,
-    generate_config_from_yaml_definition, validator::Validator, value::Value,
+    ConfigOption,
+    DisplayHint,
+    Error,
+    Stability,
+    generate_config,
+    generate_config_from_yaml_definition,
+    validator::Validator,
+    value::Value,
 };
 #[cfg(feature = "tui")]
 pub use generate::{do_checks, evaluate_yaml_config};
