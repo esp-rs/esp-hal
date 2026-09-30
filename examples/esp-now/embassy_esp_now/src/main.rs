@@ -12,7 +12,7 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::esp_now::{BROADCAST_ADDRESS, PeerInfo};
 
@@ -24,7 +24,8 @@ async fn main(_spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
