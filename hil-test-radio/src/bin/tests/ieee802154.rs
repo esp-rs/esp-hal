@@ -6,13 +6,14 @@
 //!
 //! The support firmware (`ieee802154_echo_support`) runs on a second board and
 //! echoes back every frame it receives, so this binary can exercise both the
-//! transmit/ACK and the receive paths against real peer hardware.
+//! transmit/ACK and the receive paths against real peer hardware - also while
+//! a BLE controller is created and dropped next to the running 802.15.4 driver.
 
 //% CHIP_FILTER(has_ieee802154): esp32c6
 //% HARNESS-FIRMWARE(has_ieee802154): ieee802154_echo_support
 
 //% FEATURES: unstable esp-alloc embassy
-//% FEATURES(has_ieee802154): esp-radio/ieee802154 esp-radio esp-radio-unstable
+//% FEATURES(has_ieee802154): esp-radio/ieee802154 esp-radio/ble esp-radio esp-radio-unstable
 
 //% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4
 
