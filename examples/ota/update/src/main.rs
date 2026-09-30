@@ -31,27 +31,31 @@
 //!
 //! See <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html>
 
+//% CHIP_FILTER: flash_driver_supported
+
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
 use esp_hal::{
+    flash::{Config, Flash},
     gpio::{Input, InputConfig, Pull},
     main,
 };
 use esp_println::println;
-use esp_storage::FlashStorage;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
 static OTA_IMAGE: &[u8] = include_bytes!("../../../../target/ota_image");
+
+const SECTOR_SIZE: usize = 4096;
 
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut flash = FlashStorage::new(peripherals.FLASH);
+    let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
 
     let mut buffer = [0u8; esp_bootloader_esp_idf::partitions::PARTITION_TABLE_MAX_LEN];
     let pt =
@@ -115,12 +119,24 @@ fn main() -> ! {
 
             println!("Flashing image to {:?}", part_type);
 
-            // write to the app partition
-            for (sector, chunk) in OTA_IMAGE.chunks(4096).enumerate() {
+            // Write to the app partition. The region is encrypted if flash
+            // encryption is enabled.
+            let mut sector_buffer = [0xff; SECTOR_SIZE];
+            for (sector, chunk) in OTA_IMAGE.chunks(SECTOR_SIZE).enumerate() {
                 println!("Writing sector {sector}...");
 
+                let offset = (sector * SECTOR_SIZE) as u32;
                 next_app_partition
-                    .write((sector * 4096) as u32, chunk)
+                    .erase(offset, offset + SECTOR_SIZE as u32)
+                    .unwrap();
+
+                // Encrypted writes must be a multiple of 16 bytes, so pad the
+                // last chunk with erased bytes.
+                sector_buffer.fill(0xff);
+                sector_buffer[..chunk.len()].copy_from_slice(chunk);
+                let len = chunk.len().next_multiple_of(16);
+                next_app_partition
+                    .write(offset, &sector_buffer[..len])
                     .unwrap();
             }
 
