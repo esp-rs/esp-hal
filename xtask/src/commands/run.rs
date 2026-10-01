@@ -319,8 +319,14 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         .map(|(filter, _)| filter.raw.as_str())
         .collect::<Vec<_>>();
     if !unmatched.is_empty() {
-        bail!(
-            "ELF selector did not match any artifact: {}",
+        if unmatched.len() == filters.len() {
+            bail!(
+                "ELF selector did not match any artifact: {}",
+                unmatched.join(", ")
+            );
+        }
+        log::warn!(
+            "Skipping ELF selectors without a matching artifact: {}",
             unmatched.join(", ")
         );
     }
