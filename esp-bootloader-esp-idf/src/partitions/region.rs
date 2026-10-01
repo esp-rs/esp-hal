@@ -5,6 +5,8 @@ impl PartitionEntry {
     /// Provides a plaintext "view" into the partition allowing to read/write the
     /// partition contents using the given [`FlashStorage`].
     ///
+    /// The partition containing the running application is always read-only.
+    ///
     /// # Errors
     ///
     /// [`Error::NotSupported`] if the partition is effectively encrypted. Use
@@ -24,6 +26,8 @@ impl PartitionEntry {
     /// Provides a "view" into an encrypted partition, which reads decrypted
     /// data and writes encrypted data.
     ///
+    /// The partition containing the running application is always read-only.
+    ///
     /// # Errors
     ///
     /// [`Error::NotSupported`] if the partition is not effectively encrypted, i.e. flash
@@ -42,6 +46,8 @@ impl PartitionEntry {
 
     /// Provides a "view" into the partition that is plaintext or encrypted,
     /// depending on whether the partition is effectively encrypted.
+    ///
+    /// The partition containing the running application is always read-only.
     pub fn as_partition_region<'a, 'd>(
         self,
         flash: &'a mut FlashStorage<'d>,
@@ -59,9 +65,20 @@ impl PartitionEntry {
             offset: self.offset(),
             len: self.len(),
             partition_type: self.partition_type(),
-            read_only: self.is_read_only(),
+            // Modifying the running application would corrupt code or immutable data.
+            read_only: self.is_read_only() || self.contains_running_app(),
             flash,
         }
+    }
+
+    #[cfg(feature = "std")]
+    fn contains_running_app(&self) -> bool {
+        false
+    }
+
+    #[cfg(not(feature = "std"))]
+    fn contains_running_app(&self) -> bool {
+        (self.offset()..self.offset() + self.len()).contains(&super::table::booted_app_offset())
     }
 }
 
@@ -186,7 +203,8 @@ impl FlashRegion<'_, '_> {
     ///
     /// # Errors
     ///
-    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::WriteProtected`] if the partition is read-only or contains the running
+    ///   application.
     /// - [`Error::OutOfBounds`] if the range exceeds the partition.
     /// - [`Error::NotAligned`] if `offset` or the length is not a multiple of 4.
     pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
@@ -204,7 +222,8 @@ impl FlashRegion<'_, '_> {
     ///
     /// # Errors
     ///
-    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::WriteProtected`] if the partition is read-only or contains the running
+    ///   application.
     /// - [`Error::OutOfBounds`] if `from > to` or the range exceeds the partition.
     /// - [`Error::NotAligned`] if `from` or `to` is not a multiple of 4096.
     pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
@@ -252,7 +271,8 @@ impl EncryptedFlashRegion<'_, '_> {
     ///
     /// # Errors
     ///
-    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::WriteProtected`] if the partition is read-only or contains the running
+    ///   application.
     /// - [`Error::OutOfBounds`] if the range exceeds the partition.
     /// - [`Error::NotAligned`] if `offset` or the length is not a multiple of 16.
     pub fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Error> {
@@ -263,7 +283,8 @@ impl EncryptedFlashRegion<'_, '_> {
     ///
     /// # Errors
     ///
-    /// - [`Error::WriteProtected`] if the partition is read-only.
+    /// - [`Error::WriteProtected`] if the partition is read-only or contains the running
+    ///   application.
     /// - [`Error::OutOfBounds`] if `from > to` or the range exceeds the partition.
     /// - [`Error::NotAligned`] if `from` or `to` is not a multiple of 4096.
     pub fn erase(&mut self, from: u32, to: u32) -> Result<(), Error> {

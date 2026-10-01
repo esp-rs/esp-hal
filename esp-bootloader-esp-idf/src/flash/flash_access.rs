@@ -86,8 +86,9 @@ mod esp_hal_flash {
             let (head, tail) = bytes.split_at(len);
             words_as_bytes_mut(words).copy_from_slice(head);
 
-            // SAFETY: the caller must not program flash that is mapped for
-            // instruction fetch or as immutable data.
+            // SAFETY: all writes and erases go through `Region`, which refuses to
+            // modify the partition of the running application, the only flash that
+            // is mapped for instruction fetch or as immutable data after boot.
             unsafe {
                 if encrypted {
                     flash.write_encrypted(address, words)
@@ -114,8 +115,9 @@ mod esp_hal_flash {
         }
 
         fn flash_erase(&mut self, from: u32, to: u32) -> Result<(), Error> {
-            // SAFETY: the caller must not erase flash that is mapped for
-            // instruction fetch or as immutable data.
+            // SAFETY: all writes and erases go through `Region`, which refuses to
+            // modify the partition of the running application, the only flash that
+            // is mapped for instruction fetch or as immutable data after boot.
             unsafe { self.erase(from, to) }.map_err(|_| Error::StorageError)
         }
 
