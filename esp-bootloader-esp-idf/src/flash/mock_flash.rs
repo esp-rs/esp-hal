@@ -143,3 +143,37 @@ impl FlashAccess for MockFlash<'_> {
         self.flash_write(offset, bytes)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_cannot_set_bits() {
+        let mut flash = MockFlash::new();
+        flash.flash_erase(0, SECTOR_SIZE).unwrap();
+
+        flash.flash_write(0, &[0x0f; 4]).unwrap();
+        flash.flash_write(0, &[0xf0; 4]).unwrap();
+
+        let mut bytes = [0u8; 4];
+        flash.flash_read(0, &mut bytes).unwrap();
+        assert_eq!(bytes, [0x00; 4]);
+    }
+
+    #[test]
+    fn erase_restores_erased_state() {
+        let mut flash = MockFlash::new();
+        flash.flash_erase(0, SECTOR_SIZE).unwrap();
+        flash.flash_write(0, &[0x00; 4]).unwrap();
+
+        flash.flash_write(0, &[ERASE_BYTE; 4]).unwrap();
+        let mut bytes = [0u8; 4];
+        flash.flash_read(0, &mut bytes).unwrap();
+        assert_eq!(bytes, [0x00; 4]);
+
+        flash.flash_erase(0, SECTOR_SIZE).unwrap();
+        flash.flash_read(0, &mut bytes).unwrap();
+        assert_eq!(bytes, [ERASE_BYTE; 4]);
+    }
+}
