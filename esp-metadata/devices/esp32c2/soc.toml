@@ -257,6 +257,7 @@ channel_count = 6
 ## Radio
 [device.wifi]
 mac_version = 1
+has_ftm = true
 
 [device.bt]
 support_status = "partial"

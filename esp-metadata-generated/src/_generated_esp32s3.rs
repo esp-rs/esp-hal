@@ -355,6 +355,12 @@ macro_rules! property {
     ("wifi.csi_supported") => {
         true
     };
+    ("wifi.has_nan") => {
+        false
+    };
+    ("wifi.has_ftm") => {
+        true
+    };
     ("phy.combo_module") => {
         true
     };

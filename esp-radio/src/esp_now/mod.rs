@@ -337,6 +337,7 @@ impl Debug for ReceivedData {
 #[instability::unstable]
 pub enum EspNowWifiInterface {
     /// Use the access point interface
+    #[cfg(wifi_softap_support)]
     AccessPoint,
     /// Use the station interface
     Station,
@@ -345,6 +346,7 @@ pub enum EspNowWifiInterface {
 impl EspNowWifiInterface {
     fn as_wifi_interface(&self) -> wifi_interface_t {
         match self {
+            #[cfg(wifi_softap_support)]
             EspNowWifiInterface::AccessPoint => wifi_interface_t_WIFI_IF_AP,
             EspNowWifiInterface::Station => wifi_interface_t_WIFI_IF_STA,
         }
@@ -353,6 +355,7 @@ impl EspNowWifiInterface {
     fn from_wifi_interface(interface: wifi_interface_t) -> Self {
         #[allow(non_upper_case_globals)]
         match interface {
+            #[cfg(wifi_softap_support)]
             wifi_interface_t_WIFI_IF_AP => EspNowWifiInterface::AccessPoint,
             wifi_interface_t_WIFI_IF_STA => EspNowWifiInterface::Station,
             wifi_interface_t_WIFI_IF_NAN => panic!("NAN is unsupported"),
