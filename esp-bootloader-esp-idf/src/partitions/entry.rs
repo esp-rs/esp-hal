@@ -66,7 +66,8 @@ impl PartitionEntry {
 
     /// Returns whether the partition is read-only.
     pub fn is_read_only(&self) -> bool {
-        self.flags() & 0b01 != 0
+        // Bit 1, see `PART_FLAG_READONLY` in <https://github.com/espressif/esp-idf/blob/188e3e55bb20505b5fa9dc49ee390bf42c58b4ee/components/bootloader_support/include/esp_flash_partitions.h#L48-L49>.
+        self.flags() & 0b10 != 0
     }
 
     /// Returns whether the partition is encrypted.
@@ -75,7 +76,8 @@ impl PartitionEntry {
     /// If flash encryption is enabled certain partition types are encrypted
     /// regardless of this.
     pub fn is_encrypted(&self) -> bool {
-        self.flags() & 0b10 != 0
+        // Bit 0, see `PART_FLAG_ENCRYPTED` in <https://github.com/espressif/esp-idf/blob/188e3e55bb20505b5fa9dc49ee390bf42c58b4ee/components/bootloader_support/include/esp_flash_partitions.h#L48-L49>.
+        self.flags() & 0b01 != 0
     }
 
     /// Returns whether the partition is effectively encrypted.
@@ -90,17 +92,17 @@ impl PartitionEntry {
         #[cfg(not(feature = "std"))]
         let enabled = esp_hal::efuse::flash_encryption();
 
+        // Same types as `is_partition_encrypted` in ESP-IDF, minus TEE OTA, which this crate
+        // doesn't know: <https://github.com/espressif/esp-idf/blob/188e3e55bb20505b5fa9dc49ee390bf42c58b4ee/components/esp_partition/partition.c#L73-L94>
         enabled
             && (self.is_encrypted()
-                || matches!(self.partition_type(), PartitionType::App(_))
-                || matches!(self.partition_type(), PartitionType::PartitionTable(_))
                 || matches!(
                     self.partition_type(),
-                    PartitionType::Data(DataPartitionSubType::NvsKeys)
-                )
-                || matches!(
-                    self.partition_type(),
-                    PartitionType::Data(DataPartitionSubType::Ota)
+                    PartitionType::App(_)
+                        | PartitionType::Bootloader(_)
+                        | PartitionType::PartitionTable(_)
+                        | PartitionType::Data(DataPartitionSubType::NvsKeys)
+                        | PartitionType::Data(DataPartitionSubType::Ota)
                 ))
     }
 
