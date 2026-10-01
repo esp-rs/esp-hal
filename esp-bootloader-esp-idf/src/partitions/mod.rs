@@ -58,7 +58,7 @@ pub enum Error {
         expected_size: usize,
         expected_type: PartitionType,
     },
-    /// Invalid state
+    /// Invalid state.
     InvalidState,
     /// The given argument is invalid.
     InvalidArgument,

@@ -58,8 +58,9 @@ impl PartitionEntry {
         }
     }
 
-    /// Returns the raw flags of this partition. You probably want to use
-    /// [Self::is_read_only] and [Self::is_encrypted] instead.
+    /// Returns the raw flags of this partition.
+    ///
+    /// [Self::is_read_only] and [Self::is_encrypted] decode the individual flags.
     pub fn flags(&self) -> u32 {
         u32::from_le_bytes(unwrap!(self.binary[28..][..4].try_into()))
     }
@@ -93,7 +94,7 @@ impl PartitionEntry {
         let enabled = esp_hal::efuse::flash_encryption();
 
         // Same types as `is_partition_encrypted` in ESP-IDF, minus TEE OTA, which this crate
-        // doesn't know: <https://github.com/espressif/esp-idf/blob/188e3e55bb20505b5fa9dc49ee390bf42c58b4ee/components/esp_partition/partition.c#L73-L94>
+        // does not know: <https://github.com/espressif/esp-idf/blob/188e3e55bb20505b5fa9dc49ee390bf42c58b4ee/components/esp_partition/partition.c#L73-L94>
         enabled
             && (self.is_encrypted()
                 || matches!(

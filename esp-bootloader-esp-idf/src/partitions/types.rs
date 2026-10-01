@@ -16,7 +16,7 @@ pub enum PartitionType {
     PartitionTable(PartitionTablePartitionSubType),
 }
 
-/// A partition type
+/// A partition type.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
@@ -36,41 +36,41 @@ pub enum RawPartitionType {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 pub enum AppPartitionSubType {
-    /// Factory image
+    /// Factory image.
     Factory = 0,
-    /// OTA slot 0
+    /// OTA slot 0.
     Ota0    = OTA_SUBTYPE_OFFSET,
-    /// OTA slot 1
+    /// OTA slot 1.
     Ota1,
-    /// OTA slot 2
+    /// OTA slot 2.
     Ota2,
-    /// OTA slot 3
+    /// OTA slot 3.
     Ota3,
-    /// OTA slot 4
+    /// OTA slot 4.
     Ota4,
-    /// OTA slot 5
+    /// OTA slot 5.
     Ota5,
-    /// OTA slot 6
+    /// OTA slot 6.
     Ota6,
-    /// OTA slot 7
+    /// OTA slot 7.
     Ota7,
-    /// OTA slot 8
+    /// OTA slot 8.
     Ota8,
-    /// OTA slot 9
+    /// OTA slot 9.
     Ota9,
-    /// OTA slot 10
+    /// OTA slot 10.
     Ota10,
-    /// OTA slot 11
+    /// OTA slot 11.
     Ota11,
-    /// OTA slot 12
+    /// OTA slot 12.
     Ota12,
-    /// OTA slot 13
+    /// OTA slot 13.
     Ota13,
-    /// OTA slot 14
+    /// OTA slot 14.
     Ota14,
-    /// OTA slot 15
+    /// OTA slot 15.
     Ota15,
-    /// Test image
+    /// Test image.
     Test,
 }
 
@@ -109,7 +109,7 @@ pub enum DataPartitionSubType {
     Phy,
     /// Used for Non-Volatile Storage (NVS).
     Nvs,
-    /// Used for storing core dumps while using a custom partition table
+    /// Used for storing core dumps while using a custom partition table.
     Coredump,
     /// NvsKeys is used for the NVS key partition. (NVS).
     NvsKeys,
