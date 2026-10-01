@@ -528,9 +528,10 @@ mod camera_tests {
         let (camera, dpi, dma_tx_buf, dma_rx_buf) = loopback(ctx);
         let camera_transfer = camera.receive(dma_rx_buf).map_err(|e| e.0).unwrap();
         let dpi_transfer = dpi.send(true, dma_tx_buf).map_err(|e| e.0).unwrap();
-        let (_, _, dma_rx_buf) = camera_transfer.wait();
+        let (result, _, dma_rx_buf) = camera_transfer.wait();
         let (_, dma_tx_buf) = dpi_transfer.stop();
 
+        hil_test::assert_eq!(result, Ok(()));
         hil_test::assert_eq!(dma_rx_buf.number_of_received_bytes(), FRAME_BYTES);
         hil_test::assert_eq!(
             &dma_tx_buf.as_slice()[..FRAME_BYTES],
@@ -644,7 +645,7 @@ mod camera_tests {
             let (result, next_camera, next_received) = transfer.wait();
             hil_test::assert_eq!(
                 result,
-                Err(DmaError::DescriptorError),
+                expected,
                 "After waiting for the camera to stop, RX length {}",
                 rx_bytes
             );

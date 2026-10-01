@@ -94,7 +94,7 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
-    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, DmaRxInterrupt, asynch::DmaRxFuture},
+    dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, asynch::DmaRxFuture},
     gpio::{
         InputConfig,
         InputSignal,
@@ -567,14 +567,10 @@ impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> CameraTransfer<'d, BUF, Dm> {
 
         // Note: There is no "done" interrupt to clear.
 
-        let errors = DmaRxInterrupt::DescriptorError
-            | DmaRxInterrupt::DescriptorEmpty
-            | DmaRxInterrupt::ErrorEof;
-        let interrupts = self.camera.rx_channel.pending_in_interrupts();
         let result = match self.eof_error {
             Some(error) => Err(error),
-            _ if !interrupts.is_disjoint(errors) => Err(DmaError::DescriptorError),
-            _ => Ok(()),
+            None if self.camera.rx_channel.has_error() => Err(DmaError::DescriptorError),
+            None => Ok(()),
         };
         let (camera, view) = self.release();
 
