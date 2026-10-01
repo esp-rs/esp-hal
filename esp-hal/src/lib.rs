@@ -298,6 +298,9 @@ pub mod i2c;
 #[path = "i2s/clocks/mod.rs"]
 mod i2s_clocks;
 pub mod peripherals;
+// Expose the peripheral module at the crate root so sub-modules 
+// can import the `Peripheral` trait required for the ownership model.
+pub mod peripheral;
 #[cfg(all(
     feature = "unstable",
     any(

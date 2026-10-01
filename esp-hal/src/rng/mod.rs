@@ -1,6 +1,7 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "documentation" => concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/system/random.html).")
 ))]
+#![cfg_attr(rng_trng_supported, doc = r"For more details see [`Trng`].")]
 //! # Random Number Generator (RNG)
 //!
 //! ## Overview
@@ -12,7 +13,6 @@
 //!
 //! There are certain pre-conditions which must be met in order for the RNG to
 //! produce *true* random numbers.
-#![cfg_attr(rng_trng_supported, doc = r"For more details see [`Trng`].")]
 //! The hardware RNG produces true random numbers
 //! under any of the following conditions:
 //!
@@ -33,7 +33,7 @@
 //! # {before_snippet}
 //! # use esp_hal::rng::Rng;
 //! #
-//! let rng = Rng::new();
+//! let rng = Rng::new(p.RNG);
 //!
 //! // Generate a random word (u32):
 //! let rand_word = rng.random();
@@ -61,7 +61,7 @@
 //!     dest: *mut u8,
 //!     len: usize,
 //! ) -> Result<(), Error> {
-//!      unsafe { esp_hal::rng::Rng::new().read_into_raw(dest, len) };
+//!      unsafe { esp_hal::rng::Rng::new(p.RNG).read_into_raw(dest, len) };
 //!      Ok(())
 //! # }
 //! # }
@@ -70,6 +70,10 @@
 //!
 //! [`getrandom`]: https://crates.io/crates/getrandom
 //! [custom backend]: https://github.com/rust-random/getrandom/tree/v0.4.2?tab=readme-ov-file#custom-backend
+
+// Import necessary peripheral traits and types for ownership model
+use crate::peripheral::Peripheral;
+use crate::peripherals::RNG;
 
 mod ll;
 
@@ -83,20 +87,26 @@ pub use trng::*;
 /// (Pseudo-)Random Number Generator.
 ///
 /// [`Rng`] can be created at any time to generate pseudo-random numbers
+/// of the underlying [`RNG`] peripheral.
 #[cfg_attr(
     rng_trng_supported,
     doc = r"To generate true random numbers, see [`Trng`]."
 )]
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-pub struct Rng;
+pub struct Rng<'d> {
+    _rng: RNG<'d>,
+}
 
-impl Rng {
+impl<'d> Rng<'d> {
     /// Creates a new random number generator instance.
     #[inline]
-    pub fn new() -> Self {
-        Self
+    #[allow(private_bounds)]
+    pub fn new(rng: impl Peripheral<P = RNG<'d>> + 'd) -> Self {
+        Self {
+            _rng: rng.into_peripheral(),
+        }
     }
 
     #[procmacros::doc_replace]
@@ -108,7 +118,7 @@ impl Rng {
     /// # {before_snippet}
     /// use esp_hal::rng::Rng;
     ///
-    /// let rng = Rng::new();
+    /// let rng = Rng::new(p.RNG);
     /// let random_number = rng.random();
     /// # {after_snippet}
     /// ```
@@ -129,7 +139,7 @@ impl Rng {
     /// # {before_snippet}
     /// use esp_hal::rng::Rng;
     ///
-    /// let rng = Rng::new();
+    /// let rng = Rng::new(p.RNG);
     /// let mut rng_values = [0; 10];
     /// rng.read(&mut rng_values);
     /// # {after_snippet}
@@ -157,9 +167,9 @@ impl Rng {
 // Implement RngCore traits
 
 /// Compatibility with `rand_core 0.6`. Documentation can be found at
-/// <https://docs.rs/rand_core/0.6.4/rand_core/trait.RngCore.html>.
+/// [https://docs.rs/rand_core/0.6.4/rand_core/trait.RngCore.html](https://docs.rs/rand_core/0.6.4/rand_core/trait.RngCore.html).
 #[instability::unstable]
-impl rand_core_06::RngCore for Rng {
+impl rand_core_06::RngCore for Rng<'_> {
     fn next_u32(&mut self) -> u32 {
         self.random()
     }
@@ -181,9 +191,9 @@ impl rand_core_06::RngCore for Rng {
 }
 
 /// Compatibility with `rand_core 0.9`. Documentation can be found at
-/// <https://docs.rs/rand_core/0.9.5/rand_core/trait.RngCore.html>.
+/// [https://docs.rs/rand_core/0.9.5/rand_core/trait.RngCore.html](https://docs.rs/rand_core/0.9.5/rand_core/trait.RngCore.html).
 #[instability::unstable]
-impl rand_core_09::RngCore for Rng {
+impl rand_core_09::RngCore for Rng<'_> {
     fn next_u32(&mut self) -> u32 {
         self.random()
     }
@@ -199,7 +209,7 @@ impl rand_core_09::RngCore for Rng {
 
 /// Compatibility with `rand_core 0.10`
 #[instability::unstable]
-impl rand_core_010::TryRng for Rng {
+impl rand_core_010::TryRng for Rng<'_> {
     type Error = core::convert::Infallible;
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
         Ok(self.random())

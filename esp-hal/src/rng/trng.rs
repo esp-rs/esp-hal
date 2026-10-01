@@ -6,6 +6,7 @@ static TRNG_ENABLED: AtomicUsize = AtomicUsize::new(0);
 static TRNG_USERS: AtomicUsize = AtomicUsize::new(0);
 
 use super::Rng;
+use crate::peripheral::Peripheral;
 use crate::peripherals::{ADC1, RNG};
 
 /// Ensures random numbers are cryptographically secure.
@@ -155,7 +156,7 @@ pub enum TrngError {
 /// // ADC is not available from now
 /// let trng_source = TrngSource::new(peripherals.RNG, peripherals.ADC1.reborrow());
 ///
-/// let trng = Trng::try_new()?;
+/// let trng = Trng::try_new(p.RNG)?;
 ///
 /// // Generate true random numbers
 /// trng.read(&mut buf);
@@ -184,19 +185,25 @@ pub enum TrngError {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 #[instability::unstable]
-pub struct Trng {
-    rng: Rng,
+pub struct Trng<'a> {
+    rng: Rng<'a>,
 }
 
-impl Clone for Trng {
+impl<'a> Clone for Trng<'a> {
     #[inline]
     fn clone(&self) -> Self {
         TRNG_USERS.fetch_add(1, Ordering::Acquire);
-        Self { rng: self.rng }
+        Self {
+            rng: Rng {
+                // Use clone_unchecked to duplicate the peripheral handle safely here,
+                // or clone the Rng structure itself if it implements Clone.
+                _rng: unsafe { self.rng._rng.clone_unchecked() },
+            },
+        }
     }
 }
 
-impl Trng {
+impl<'a> Trng<'a> {
     /// Creates a new True Random Number Generator (TRNG) instance.
     ///
     /// # Errors
@@ -204,12 +211,10 @@ impl Trng {
     /// [`TrngError::TrngSourceNotEnabled`] when the [`TrngSource`] is not active.
     #[inline]
     #[instability::unstable]
-    pub fn try_new() -> Result<Self, TrngError> {
+    pub fn try_new(rng: impl Peripheral<P = RNG<'a>> + 'a) -> Result<Self, TrngError> {
         TRNG_USERS.fetch_add(1, Ordering::Acquire);
-        let this = Self { rng: Rng::new() };
+        let this = Self { rng: Rng::new(rng) };
         if TRNG_ENABLED.load(Ordering::Acquire) == 0 {
-            // Dropping `this` reduces the TRNG_USERS count back (to 0 as it should be when TRNG
-            // is not enabled).
             return Err(TrngError::TrngSourceNotEnabled);
         }
         Ok(this)
@@ -232,12 +237,16 @@ impl Trng {
     /// Downgrades the `Trng` instance to a `Rng` instance.
     #[inline]
     #[instability::unstable]
-    pub fn downgrade(self) -> Rng {
-        Rng::new()
+    pub fn downgrade(self) -> Rng<'a> {
+        unsafe {
+            let rng = core::ptr::read(&self.rng);
+            core::mem::forget(self);
+            rng
+        }
     }
 }
 
-impl Drop for Trng {
+impl<'a> Drop for Trng<'a> {
     fn drop(&mut self) {
         TRNG_USERS.fetch_sub(1, Ordering::Release);
     }
@@ -246,7 +255,7 @@ impl Drop for Trng {
 /// Compatibility with `rand_core 0.6`. Documentation can be found at
 /// <https://docs.rs/rand_core/0.6.4/rand_core/trait.RngCore.html>.
 #[instability::unstable]
-impl rand_core_06::RngCore for Trng {
+impl<'a> rand_core_06::RngCore for Trng<'a> {
     fn next_u32(&mut self) -> u32 {
         <Rng as rand_core_06::RngCore>::next_u32(&mut self.rng)
     }
@@ -267,7 +276,7 @@ impl rand_core_06::RngCore for Trng {
 /// Compatibility with `rand_core 0.9`. Documentation can be found at
 /// <https://docs.rs/rand_core/0.9.5/rand_core/trait.RngCore.html>.
 #[instability::unstable]
-impl rand_core_09::RngCore for Trng {
+impl<'a> rand_core_09::RngCore for Trng<'a> {
     fn next_u32(&mut self) -> u32 {
         <Rng as rand_core_09::RngCore>::next_u32(&mut self.rng)
     }
@@ -282,17 +291,15 @@ impl rand_core_09::RngCore for Trng {
 /// Compatibility with `rand_core 0.6`. Documentation can be found at
 /// <https://docs.rs/rand_core/0.6.4/rand_core/trait.CryptoRng.html>.
 #[instability::unstable]
-impl rand_core_06::CryptoRng for Trng {}
+impl<'a> rand_core_06::CryptoRng for Trng<'a> {}
 /// Compatibility with `rand_core 0.9`. Documentation can be found at
 /// <https://docs.rs/rand_core/0.9.5/rand_core/trait.CryptoRng.html>.
 #[instability::unstable]
-impl rand_core_09::CryptoRng for Trng {}
-
-// Non-try variants are blanket-implemented when `Error = Infallible`.
+impl<'a> rand_core_09::CryptoRng for Trng<'a> {}
 
 /// Compatibility with `rand_core 0.10`
 #[instability::unstable]
-impl rand_core_010::TryRng for Trng {
+impl<'a> rand_core_010::TryRng for Trng<'a> {
     type Error = core::convert::Infallible;
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
         <Rng as rand_core_010::TryRng>::try_next_u32(&mut self.rng)
@@ -307,4 +314,4 @@ impl rand_core_010::TryRng for Trng {
 
 /// Compatibility with `rand_core 0.10`
 #[instability::unstable]
-impl rand_core_010::TryCryptoRng for Trng {}
+impl<'a> rand_core_010::TryCryptoRng for Trng<'a> {}
