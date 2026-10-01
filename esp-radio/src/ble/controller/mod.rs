@@ -349,7 +349,23 @@ impl bt_hci_transport::Transport for BleConnector<'_> {
 
         let mut reader = &packet[..];
         let kind = PacketKind::read(&mut reader)?;
-        Ok(P::read_hci(kind, &mut reader, rx)?)
+        let parsed = P::read_hci(kind, &mut reader, rx)?;
+
+        // `P::read_hci` reads only the length that the packet header gives, so bytes after it
+        // stay in `reader`. A data packet must fill its frame exactly: extra bytes show that the
+        // frame is malformed. Event packets are not checked, which is the same as in the
+        // `bt_hci::transport::Transport` implementation above
+        // (`ControllerToHostPacket::from_hci_bytes_complete`).
+        if kind != PacketKind::Event && !reader.is_empty() {
+            warn!(
+                "[hci] dropping {:?} packet with {} unexpected trailing bytes",
+                kind,
+                reader.len()
+            );
+            return Err(BleConnectorError::Unknown);
+        }
+
+        Ok(parsed)
     }
 
     /// Write a complete HCI packet from the tx buffer
