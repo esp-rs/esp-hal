@@ -311,13 +311,27 @@ pub(crate) fn take_next() -> Option<Box<[u8]>> {
     BT_STATE.with(|state| state.rx_queue.pop_front().map(|packet| packet.data))
 }
 
-pub(crate) fn read_next(data: &mut [u8]) -> usize {
-    if let Some(packet) = take_next() {
-        data[..packet.len()].copy_from_slice(&packet);
-        packet.len()
-    } else {
-        0
-    }
+/// Removes the next packet from the receive queue, and copies it into `data`.
+///
+/// Returns the length of the packet, or 0 if the queue is empty. If the packet is longer than
+/// `data`, the packet is dropped and an error is returned: the caller can then read the next
+/// packet.
+pub(crate) fn read_next(data: &mut [u8]) -> Result<usize, controller::BleConnectorError> {
+    let Some(packet) = take_next() else {
+        return Ok(0);
+    };
+
+    let Some(dst) = data.get_mut(..packet.len()) else {
+        warn!(
+            "[hci] dropping received packet of {} bytes, which is longer than the {}-byte buffer",
+            packet.len(),
+            data.len()
+        );
+        return Err(controller::BleConnectorError::Unknown);
+    };
+
+    dst.copy_from_slice(&packet);
+    Ok(packet.len())
 }
 
 /// Reads the next HCI packet from the BLE controller.

@@ -92,9 +92,12 @@ impl<'d> BleConnector<'d> {
     }
 
     /// Read the next HCI packet from the BLE controller.
+    ///
+    /// Returns the length of the packet, or 0 if no packet is available. If the packet is longer
+    /// than `buf`, the packet is dropped and an error is returned.
     #[instability::unstable]
     pub fn next(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
-        Ok(read_next(buf))
+        read_next(buf)
     }
 
     /// Read from HCI.
@@ -355,8 +358,17 @@ impl bt_hci::transport::Transport for BleConnector<'_> {
         let rx = unsafe { &mut *core::ptr::slice_from_raw_parts_mut(rx.as_mut_ptr(), rx.len()) };
 
         // `ControllerToHostPacket` borrows `rx`, so the packet has to be copied there.
-        HciPacketReadyEventFuture.await;
-        let len = read_next(rx);
+        let len = loop {
+            HciPacketReadyEventFuture.await;
+            match read_next(rx) {
+                Ok(0) => {} // A different reader took the packet first: wait again.
+                Ok(len) => break len,
+                // The packet is longer than `rx`, and `read_next` dropped it. Do not return an
+                // error: hosts stop their receive loop on a read error, so one packet that
+                // does not fit would stop all BLE traffic.
+                Err(_) => {}
+            }
+        };
         parse_hci(&rx[..len])
     }
 
