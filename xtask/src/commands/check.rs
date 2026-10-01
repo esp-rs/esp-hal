@@ -170,6 +170,8 @@ pub fn check_global_symbols(chips: &[Chip]) -> Result<()> {
     let mut total_problematic = vec![];
 
     let package = Package::EspHal; // Only esp-hal for now
+    // Unmangled symbols, such as `global_asm!` labels, must carry the crate prefix.
+    let allowed_prefix = format!("__{}_", package.as_ref().replace('-', "_"));
 
     for chip in chips {
         let target = package.target_triple(chip)?;
@@ -203,6 +205,7 @@ pub fn check_global_symbols(chips: &[Chip]) -> Result<()> {
 
             for symbol in obj.symbols().filter(|s| s.is_global() && s.is_definition()) {
                 if let Ok(name) = symbol.name()
+                    && !name.starts_with(&allowed_prefix)
                     && try_demangle(name).is_err()
                 {
                     let section = symbol.section_index().map(|i| i.0).unwrap_or(0);
