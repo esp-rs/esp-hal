@@ -193,10 +193,10 @@ macro_rules! critical_regs_asm {
     ) => {
         core::arch::global_asm!(
             ".section .rwtext,\"ax\",@progbits",
-            ".global critical_regs_save",
-            ".type critical_regs_save, @function",
+            ".global _RNvC7esp_hal18critical_regs_save",
+            ".type _RNvC7esp_hal18critical_regs_save, @function",
             ".align 4",
-            "critical_regs_save:",
+            "_RNvC7esp_hal18critical_regs_save:",
             "csrw mscratch, t0",
             "mv t0, a0",
             "sw ra, {ra}(t0)",
@@ -256,12 +256,12 @@ macro_rules! critical_regs_asm {
             "lw t2, {t2}(t3)",
             "lw t3, {t3}(t3)",
             "ret",
-            ".size critical_regs_save, . - critical_regs_save",
+            ".size _RNvC7esp_hal18critical_regs_save, . - _RNvC7esp_hal18critical_regs_save",
 
-            ".global critical_regs_restore",
-            ".type critical_regs_restore, @function",
+            ".global _RNvC7esp_hal21critical_regs_restore",
+            ".type _RNvC7esp_hal21critical_regs_restore, @function",
             ".align 4",
-            "critical_regs_restore:",
+            "_RNvC7esp_hal21critical_regs_restore:",
             "la t1, {critical_frame_ptr}",
             // The mask keeps a single-core chip on entry 0 without a second copy of this block.
             // No general register is live here, so `t1` and `t2` are free.
@@ -322,7 +322,7 @@ macro_rules! critical_regs_asm {
             "lw t0, {t0}(t0)",
             "2:",
             "ret",
-            ".size critical_regs_restore, . - critical_regs_restore",
+            ".size _RNvC7esp_hal21critical_regs_restore, . - _RNvC7esp_hal21critical_regs_restore",
             ra = const offset_of!(CriticalSleepFrame, ra),
             sp = const offset_of!(CriticalSleepFrame, sp),
             gp = const offset_of!(CriticalSleepFrame, gp),
@@ -417,8 +417,12 @@ critical_regs_asm!(
     mintthresh_csr = const 0x347,
 );
 
+// The assembly names are Rust v0-mangled paths under `esp_hal`, so that they stay out of the
+// unmangled global namespace that applications and esp-idf libraries share.
 unsafe extern "C" {
+    #[link_name = "_RNvC7esp_hal18critical_regs_save"]
     fn critical_regs_save(frame: *mut CriticalSleepFrame) -> *mut CriticalSleepFrame;
+    #[link_name = "_RNvC7esp_hal21critical_regs_restore"]
     fn critical_regs_restore();
 }
 
