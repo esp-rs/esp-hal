@@ -7,6 +7,7 @@
 
 crate::unstable_module! {
     pub mod clocks;
+    pub mod trng;
 }
 pub(crate) mod cpu_control;
 pub(crate) mod regi2c;
@@ -73,6 +74,9 @@ pub(crate) fn pre_init() {
     systimer.modify(|_, w| w.rst_en().set_bit());
     systimer.modify(|_, w| w.rst_en().clear_bit());
     systimer.modify(|_, w| w.clk_en().set_bit());
+
+    // Mirrors ESP-IDF's `init_rng`, see <https://github.com/espressif/esp-idf/blob/8d7d8aef588/components/esp_hw_support/hw_random.c#L114-L120>
+    trng::rng_ll_enable();
 }
 
 /// Opens LP/HP peripheral PMS regions for all security modes.

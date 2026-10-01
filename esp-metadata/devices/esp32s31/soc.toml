@@ -218,7 +218,7 @@ has_region_monitor = true
 
 [device.rng]
 support_status = { status = "partial", issue = 5977 }
-trng_supported = false  # TODO
+trng_supported = true
 apb_cycle_wait_num = 16 # TODO
 is_lp_sys = false
 

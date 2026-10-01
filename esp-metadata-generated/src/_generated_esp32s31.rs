@@ -437,7 +437,7 @@ macro_rules! property {
         stringify!(16)
     };
     ("rng.trng_supported") => {
-        false
+        true
     };
     ("rng.is_lp_sys") => {
         false
