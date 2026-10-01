@@ -801,7 +801,8 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
     /// Creates an Ethernet driver using RMII ([`RmiiPinBundle`]) or MII ([`MiiPinBundle`]).
     #[cfg_attr(
         ethernet_has_rgmii,
-        doc = "On chips with RGMII, use [`RgmiiPinBundle`]."
+        doc = "On chips with RGMII, use [`RgmiiPinBundle`]. RGMII is limited to 100 Mbps when the
+    MPLL does not divide to its 125 MHz transmit clock."
     )]
     pub fn new<B: EthernetPinBundle + 'd, const RX: usize, const TX: usize>(
         eth: ETH<'d>,
@@ -814,13 +815,24 @@ impl<'d, P: Phy> Ethernet<'d, Blocking, P> {
 
         pins.apply();
 
+        let max_speed = cfg_select! {
+            ethernet_has_rgmii => {
+                if B::MAX_SPEED == Speed::_1000M {
+                    clock::rgmii_max_speed()
+                } else {
+                    B::MAX_SPEED
+                }
+            }
+            _ => B::MAX_SPEED,
+        };
+
         init_common(
             clock_guard,
             storage,
             mac_addr,
             phy,
             eth,
-            B::MAX_SPEED,
+            max_speed,
             B::apply_speed,
         )
     }

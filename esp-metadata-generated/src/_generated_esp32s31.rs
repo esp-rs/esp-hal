@@ -1646,6 +1646,14 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// fn configure_mpll_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<MpllClkConfig>,
+///     _new_config: MpllClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // RC_FAST_CLK
 ///
 /// fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -2141,6 +2149,23 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum PsramInstance {
             Psram = 0,
+        }
+        /// Selects the output frequency of `MPLL_CLK`. Depends on `XTAL_CLK`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum MpllClkConfig {
+            /// 400 MHz
+            _400,
+            /// 500 MHz
+            _500,
+        }
+        impl MpllClkConfig {
+            pub fn value(&self) -> u32 {
+                match self {
+                    MpllClkConfig::_400 => 400000000,
+                    MpllClkConfig::_500 => 500000000,
+                }
+            }
         }
         /// The list of clock signals that the `CPU_ROOT_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2751,6 +2776,7 @@ macro_rules! define_clock_tree_types {
         }
         /// Represents the device's clock tree.
         pub struct ClockTree {
+            mpll_clk: Option<MpllClkConfig>,
             cpu_root_clk: Option<CpuRootClkConfig>,
             cpu_clk: Option<CpuClkConfig>,
             mem_clk: Option<MemClkConfig>,
@@ -2818,6 +2844,10 @@ macro_rules! define_clock_tree_types {
             /// Locks the clock tree for exclusive access.
             pub fn with<R>(f: impl FnOnce(&mut ClockTree) -> R) -> R {
                 CLOCK_TREE.with(f)
+            }
+            /// Returns the current configuration of the MPLL_CLK clock tree node
+            pub fn mpll_clk(&self) -> Option<MpllClkConfig> {
+                self.mpll_clk
             }
             /// Returns the current configuration of the CPU_ROOT_CLK clock tree node
             pub fn cpu_root_clk(&self) -> Option<CpuRootClkConfig> {
@@ -2970,6 +3000,7 @@ macro_rules! define_clock_tree_types {
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
+                mpll_clk: None,
                 cpu_root_clk: None,
                 cpu_clk: None,
                 mem_clk: None,
@@ -3033,6 +3064,8 @@ macro_rules! define_clock_tree_types {
                 uart_mem_clock_refcount: [0; 4],
                 psram_function_clock_refcount: [0; 1],
             });
+        static MPLL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
         static CPU_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static CPU_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -3296,6 +3329,14 @@ macro_rules! define_clock_tree_types {
         pub fn cpll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
         }
+        pub fn configure_mpll_clk(clocks: &mut ClockTree, config: MpllClkConfig) {
+            let old_config = clocks.mpll_clk.replace(config);
+            refresh_mpll_clk_downstream(clocks);
+            configure_mpll_clk_impl(clocks, old_config, config);
+        }
+        pub fn mpll_clk_config(clocks: &mut ClockTree) -> Option<MpllClkConfig> {
+            clocks.mpll_clk
+        }
         pub fn request_mpll_clk(clocks: &mut ClockTree) {
             trace!("Requesting MPLL_CLK");
             if increment_reference_count(&mut clocks.mpll_clk_refcount) {
@@ -3312,8 +3353,12 @@ macro_rules! define_clock_tree_types {
                 release_xtal_clk(clocks);
             }
         }
+        #[allow(unused_variables)]
+        pub fn mpll_clk_config_frequency(clocks: &mut ClockTree, config: MpllClkConfig) -> u32 {
+            config.value()
+        }
         pub fn mpll_clk_frequency() -> u32 {
-            (500 * 1000000)
+            MPLL_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
         }
         pub fn mpll_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
@@ -3563,7 +3608,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn pll_f25m_frequency() -> u32 {
-            (mpll_clk_frequency() / 20)
+            25000000
         }
         pub fn pll_f25m_source_frequency() -> u32 {
             mpll_clk_frequency()
@@ -3585,7 +3630,7 @@ macro_rules! define_clock_tree_types {
             }
         }
         pub fn pll_f50m_frequency() -> u32 {
-            (mpll_clk_frequency() / 10)
+            50000000
         }
         pub fn pll_f50m_source_frequency() -> u32 {
             mpll_clk_frequency()
@@ -5163,6 +5208,8 @@ macro_rules! define_clock_tree_types {
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         #[instability::unstable]
         pub struct ClockConfig {
+            /// `MPLL_CLK` configuration.
+            pub mpll_clk: Option<MpllClkConfig>,
             /// `CPU_ROOT_CLK` configuration.
             pub cpu_root_clk: Option<CpuRootClkConfig>,
             /// `CPU_CLK` configuration.
@@ -5188,6 +5235,9 @@ macro_rules! define_clock_tree_types {
         }
         impl ClockConfig {
             fn apply(&self, clocks: &mut ClockTree) {
+                if let Some(config) = self.mpll_clk {
+                    configure_mpll_clk(clocks, config);
+                }
                 if let Some(config) = self.cpu_root_clk {
                     configure_cpu_root_clk(clocks, config);
                 }
@@ -5232,6 +5282,17 @@ macro_rules! define_clock_tree_types {
             *refcount = refcount.saturating_sub(1);
             let last = *refcount == 0;
             last
+        }
+        fn refresh_mpll_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.mpll_clk {
+                MPLL_CLK_FREQ_CACHE.store(
+                    mpll_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+            for child_instance in [PsramInstance::Psram] {
+                refresh_psram_function_clock_downstream(clocks, child_instance);
+            }
         }
         fn refresh_rc_fast_clk_downstream(clocks: &mut ClockTree) {
             refresh_cpu_root_clk_downstream(clocks);
