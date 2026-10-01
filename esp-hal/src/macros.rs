@@ -674,3 +674,25 @@ macro_rules! if_unstable_hal {
 macro_rules! if_unstable_hal {
     ($($tt:tt)*) => {};
 }
+
+/// Macro to select code depending on the runtime. Other crates can use this to
+/// "detect" the esp-hal/rt feature
+#[macro_export]
+#[doc(hidden)]
+#[cfg(feature = "rt")]
+macro_rules! if_rt {
+    ({ $($rt:tt)* } else { $($no_rt:tt)* }) => {
+        $($rt)*
+    };
+}
+
+/// Macro to select code depending on the runtime. Other crates can use this to
+/// "detect" the esp-hal/rt feature
+#[macro_export]
+#[doc(hidden)]
+#[cfg(not(feature = "rt"))]
+macro_rules! if_rt {
+    ({ $($rt:tt)* } else { $($no_rt:tt)* }) => {
+        $($no_rt)*
+    };
+}
