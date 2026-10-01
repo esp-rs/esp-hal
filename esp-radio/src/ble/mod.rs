@@ -101,8 +101,23 @@ enum HciOutType {
     Command,
 }
 
-/// The largest HCI packet, including the packet type indicator byte.
-const MAX_HCI_PACKET_LEN: usize = 259;
+/// The largest HCI command packet: indicator (1) + header (3) + parameters (up to 255).
+pub(crate) const MAX_HCI_CMD_PACKET_LEN: usize = 1 + 3 + 255;
+
+/// The largest outgoing HCI ACL data packet that this connector supports: indicator (1) + header
+/// (4) + data (up to 255).
+///
+/// `trouble-host` splits outgoing ACL data at the size that the controller reports (`LE Read
+/// Buffer Size`). `Transport::write` rejects ACL packets with more than 255 data bytes.
+pub(crate) const MAX_HCI_ACL_PACKET_LEN: usize = 1 + 4 + 255;
+
+/// The largest outgoing HCI packet that this connector supports, including the packet type
+/// indicator byte.
+const MAX_HCI_PACKET_LEN: usize = if MAX_HCI_ACL_PACKET_LEN > MAX_HCI_CMD_PACKET_LEN {
+    MAX_HCI_ACL_PACKET_LEN
+} else {
+    MAX_HCI_CMD_PACKET_LEN
+};
 
 /// Reassembles whole HCI packets out of the byte stream that the host writes.
 ///
