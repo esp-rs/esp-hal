@@ -15,7 +15,7 @@
 //! should be used for the next boot.
 //!
 //! Note: The prebuilt bootloaders provided by `espflash` _might not_ include
-//! OTA support. In that case you need to build the bootloader yourself.
+//! OTA support. In that case, the bootloader must be built from source.
 //!
 //! The general procedure to change the active slot
 //! - read the partition table [crate::partitions::read_partition_table]
@@ -42,16 +42,16 @@ const UNINITIALIZED_SEQUENCE: u32 = 0xffffffff;
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::FromRepr)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum OtaDataSlot {
-    /// If there is a `firmware` app-partition it's used. Otherwise OTA-0
+    /// If there is a `firmware` app-partition it's used. Otherwise OTA-0.
     None,
-    /// OTA-0
+    /// OTA-0.
     Slot0,
-    /// OTA-1
+    /// OTA-1.
     Slot1,
 }
 
 impl OtaDataSlot {
-    /// The next logical OTA-data slot
+    /// The next logical OTA-data slot.
     fn next(&self) -> OtaDataSlot {
         match self {
             OtaDataSlot::None => OtaDataSlot::Slot0,
@@ -77,7 +77,7 @@ pub enum OtaImageState {
     /// Monitor the first boot. The bootloader will change this to
     /// `PendingVerify` if auto-rollback is enabled.
     ///
-    /// You want to set this state after activating a newly installed update.
+    /// Applications set this state after activating a newly installed update.
     New           = 0x0,
 
     /// Bootloader changes [OtaImageState::New] to
@@ -191,7 +191,7 @@ fn write_slot(
 
 /// Reads and updates the OTA-data partition.
 ///
-/// If you are looking for a more high-level way to do this, see [crate::ota_updater::OtaUpdater]
+/// For a higher-level API, see [crate::ota_updater::OtaUpdater].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Ota<'a, 'd> {
@@ -201,7 +201,7 @@ pub struct Ota<'a, 'd> {
 
 impl<'a, 'd> Ota<'a, 'd> {
     /// Creates a new [Ota] instance from the given [PartitionRegion] and the count of OTA app
-    /// partitions (not including "firmware" and "test" partitions)
+    /// partitions (not including "firmware" and "test" partitions).
     ///
     /// # Errors
     /// A [Error::InvalidPartition] if the given flash region

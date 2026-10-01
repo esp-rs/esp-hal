@@ -321,7 +321,7 @@ impl<T, E> Try for Result<T, E> {
     }
 }
 
-/// A way to `{:x?}` format a byte slice which is compatible with `defmt`
+/// A way to `{:x?}` format a byte slice which is compatible with `defmt`.
 #[allow(unused)]
 pub(crate) struct Bytes<'a>(pub &'a [u8]);
 

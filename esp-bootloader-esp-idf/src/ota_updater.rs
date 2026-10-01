@@ -7,7 +7,7 @@ use crate::{
 
 /// Provides a more convenient, but less flexible, way to do OTA updates.
 ///
-/// If you need lower level access see [crate::ota::Ota]
+/// For lower-level access, see [crate::ota::Ota].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OtaUpdater<'a, 'd> {
