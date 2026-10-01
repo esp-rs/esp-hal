@@ -78,8 +78,8 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Driver         | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-H4 | ESP32-P4 | ESP32-S2 | ESP32-S3 | ESP32-S31 |
 | -------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:---------:|:--------:|:--------:|:--------:|:--------:|:--------:|:---------:|
 | GPIO           | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      | ✔️      | ✔️       |
-| Dedicated GPIO |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
-| IOMUX          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
+| Dedicated GPIO |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
+| IOMUX          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | LP IO          | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 
 ### Serial interfaces
@@ -105,10 +105,10 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | SDMMC/SDIO host | ⚒️   |          |          |          |          |           |          |          | ⚒️      |          | ⚒️      | ⚒️       |
 | SDIO slave      | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          |          |          |          |          |           |
 | TWAI            | ⚒️   |          | ⚒️      |          | ⚒️      |           | ⚒️      |          | ❌       | ⚒️      | ⚒️      |           |
-| CANFD           |       |          |          | [❌][5163] [^1] |          |           |          | ❌       |          |          |          | ❌        |
+| CANFD           |       |          |          | ⚒️      |          |           |          | ❌       |          |          |          | ❌        |
 | USB OTG FS      |       |          |          |          |          |           |          | ❌       | ⚒️      | ⚒️      | ⚒️      |           |
 | USB OTG HS      |       |          |          |          |          |           |          |          | ⚒️      |          |          | ⚒️       |
-| USB Serial/JTAG |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      |          | ⚒️      | ⚒️       |
+| USB Serial/JTAG |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      | ⚒️       |
 
 ### Wireless and networking
 
@@ -208,7 +208,6 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [5155]: https://github.com/esp-rs/esp-hal/issues/5155
 [5160]: https://github.com/esp-rs/esp-hal/issues/5160
 [5161]: https://github.com/esp-rs/esp-hal/issues/5161
-[5163]: https://github.com/esp-rs/esp-hal/issues/5163
 [5164]: https://github.com/esp-rs/esp-hal/issues/5164
 [5166]: https://github.com/esp-rs/esp-hal/issues/5166
 [5167]: https://github.com/esp-rs/esp-hal/issues/5167

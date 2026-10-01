@@ -367,6 +367,24 @@ mod camera_tests {
         }
     }
 
+    #[test]
+    fn test_camera_configuration(ctx: Context) {
+        let peripherals = ctx.peripherals;
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let dma_channel = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+        let _camera = Camera::new(
+            lcd_cam.cam,
+            dma_channel,
+            cam::Config::default().with_eof_mode(cam::EofMode::VsyncSignal),
+        )
+        .unwrap();
+        let regs = esp_hal::peripherals::LCD_CAM::regs();
+        hil_test::assert!(regs.cam_ctrl().read().cam_vs_eof_en().bit_is_set());
+    }
+
     fn loopback(
         ctx: Context,
     ) -> (

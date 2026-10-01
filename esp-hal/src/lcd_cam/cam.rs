@@ -263,22 +263,6 @@ impl<Dm: DriverMode> Camera<'_, Dm> {
             return Err(ConfigError::LineInterrupt);
         }
 
-        self.regs().cam_ctrl().write(|w| {
-            // Force enable the clock for all configuration registers.
-            unsafe {
-                if let Some(threshold) = config.vsync_filter_threshold {
-                    w.cam_vsync_filter_thres().bits(threshold as _);
-                }
-                w.cam_byte_order()
-                    .bit(config.byte_order != ByteOrder::default());
-                w.cam_bit_order()
-                    .bit(config.bit_order != BitOrder::default());
-                w.cam_vs_eof_en()
-                    .bit(matches!(config.eof_mode, EofMode::VsyncSignal));
-                w.cam_line_int_en().bit(config.line_interrupt.is_some());
-                w.cam_stop_en().clear_bit()
-            }
-        });
         ClockTree::with(|clocks| {
             LcdCamInstance::LcdCam.configure_cam_clock(clocks, clock_config);
             if !self.cam.clock_requested {
@@ -287,6 +271,21 @@ impl<Dm: DriverMode> Camera<'_, Dm> {
             }
         });
 
+        self.regs().cam_ctrl().modify(|_, w| unsafe {
+            w.cam_vsync_filter_thres().bits(
+                config
+                    .vsync_filter_threshold
+                    .map_or(0, |threshold| threshold as _),
+            );
+            w.cam_byte_order()
+                .bit(config.byte_order != ByteOrder::default());
+            w.cam_bit_order()
+                .bit(config.bit_order != BitOrder::default());
+            w.cam_vs_eof_en()
+                .bit(matches!(config.eof_mode, EofMode::VsyncSignal));
+            w.cam_line_int_en().bit(config.line_interrupt.is_some());
+            w.cam_stop_en().clear_bit()
+        });
         self.regs().cam_ctrl1().write(|w| unsafe {
             w.cam_2byte_en().bit(config.enable_2byte_mode);
             w.cam_vh_de_mode_en()

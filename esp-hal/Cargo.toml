@@ -141,6 +141,7 @@ somni-template = "0.3.1"
 [dev-dependencies]
 crypto-bigint = { version = "0.7.5", default-features = false }
 jiff = { version = "0.2", default-features = false, features = ["static"] }
+static_cell = "2"
 
 [features]
 default = ["rt", "exception-handler", "float-save-restore"]
@@ -354,8 +355,10 @@ defmt = [
     "esp32c61?/defmt",
     "esp32h2?/defmt",
     "esp32h4?/defmt",
+    "esp32p4?/defmt",
     "esp32s2?/defmt",
     "esp32s3?/defmt",
+    "esp32s31?/defmt",
     "fugit/defmt",
     "esp-riscv-rt?/defmt",
     "xtensa-lx-rt?/defmt",
