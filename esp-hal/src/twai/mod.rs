@@ -1868,8 +1868,19 @@ mod asynch {
 
     pub(super) fn handle_interrupt(register_block: &RegisterBlock, async_state: &TwaiAsyncState) {
         let int_raw = register_block.int_raw().read();
-        let int_ena_reg = register_block.int_ena();
-        let int_ena = int_ena_reg.read();
+
+        // Disable the interrupts that fired (except the receive interrupt)
+        // before waking anyone: a woken task on a higher priority executor
+        // runs as soon as it is woken, before this handler returns. A
+        // transmit future polled then enables the transmit interrupt for its
+        // next frame, and clearing the bits afterwards from a copy read
+        // before the wake would disable it again - the next frame's
+        // completion would wake nobody.
+        unsafe {
+            register_block
+                .int_ena()
+                .modify(|r, w| w.bits(r.bits() & (!int_raw.bits() | 1)));
+        }
 
         // The error warning interrupt fires on every change of the error or
         // bus status. Entering bus-off sets both the bus-off and the error
@@ -1937,11 +1948,6 @@ mod asynch {
             // re-evaluate their pending frame and give up once the peripheral
             // reaches the error-passive or bus-off state.
             async_state.tx_waker.wake();
-        }
-
-        // Clear interrupt request bits
-        unsafe {
-            int_ena_reg.modify(|_, w| w.bits(int_ena.bits() & (!int_raw.bits() | 1)));
         }
     }
 }
