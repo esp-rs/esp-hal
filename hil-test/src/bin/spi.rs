@@ -398,7 +398,7 @@ mod tests {
     fn max_output_frequency_is_attainable_by_default(mut ctx: Context) {
         let max_mhz = cfg_select! {
             any(esp32, esp32c2) => 40,
-            esp32h2 => 48, // and H21, H4
+            any(esp32h2, esp32h4) => 48, // and H21
             any(
                 esp32c3, esp32c5, esp32c6, esp32c61, esp32p4, esp32s2, esp32s3, esp32s31
             ) => 80,
@@ -1435,7 +1435,7 @@ mod tests {
         check_typical_values(&mut ctx, SpiFunctionClockConfig::Xtal);
         #[cfg(esp32c2)]
         check_typical_values(&mut ctx, SpiFunctionClockConfig::Pll40m);
-        #[cfg(esp32h2)]
+        #[cfg(any(esp32h2, esp32h4))]
         check_typical_values(&mut ctx, SpiFunctionClockConfig::PllF48m);
         #[cfg(esp32c3)]
         check_typical_values(&mut ctx, SpiFunctionClockConfig::Pll80m);
