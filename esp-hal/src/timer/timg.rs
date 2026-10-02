@@ -652,7 +652,13 @@ where
                 w.wdt_stg3().bits(MwdtStageAction::Off as u8)
             });
 
-            #[cfg(any(esp32c2, esp32c3, esp32c6))]
+            // Chips with the `WDT_CONF_UPDATE_EN` bit latch WDT configuration
+            // registers only after the update strobe - without it the
+            // configuration written above never applies. ESP-IDF's `mwdt_ll.h`
+            // strobes after every MWDT configuration write.
+            #[cfg(any(
+                esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31
+            ))]
             reg_block
                 .wdtconfig0()
                 .modify(|_, w| w.wdt_conf_update_en().set_bit());
@@ -731,7 +737,9 @@ where
 
         config_register.write(|w| unsafe { w.hold().bits(timeout) });
 
-        #[cfg(any(esp32c2, esp32c3, esp32c6))]
+        #[cfg(any(
+            esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31
+        ))]
         reg_block
             .wdtconfig0()
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
@@ -758,6 +766,13 @@ where
                 MwdtStage::Stage3 => w.wdt_stg3().bits(action as u8),
             }
         });
+
+        #[cfg(any(
+            esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31
+        ))]
+        reg_block
+            .wdtconfig0()
+            .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
         self.set_write_protection(true);
     }
