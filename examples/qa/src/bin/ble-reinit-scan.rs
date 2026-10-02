@@ -83,7 +83,6 @@ async fn main(_spawner: Spawner) {
             let address: Address = Address::random([0xff, 0x8f, 0x1b, 0x05, 0xe4, 0xff]);
 
             let mut resources: HostResources<
-                _,
                 DefaultPacketPool,
                 CONNECTIONS_MAX,
                 L2CAP_CHANNELS_MAX,
@@ -91,11 +90,11 @@ async fn main(_spawner: Spawner) {
             let stack = trouble_host::new(controller, &mut resources)
                 .set_random_address(address)
                 .build();
-            let central = stack.central();
+            let mut central = stack.central();
             let mut runner = stack.runner();
 
             let printer = Printer;
-            let mut scanner = Scanner::new(central);
+            let mut scanner = Scanner::new(&mut central);
             println!(
                 "Iteration {iteration}: active for {}s",
                 ACTIVE_PHASE.as_secs()
