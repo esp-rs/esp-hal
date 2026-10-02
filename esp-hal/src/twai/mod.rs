@@ -1368,6 +1368,10 @@ where
 
         // Check if the packet in the receive buffer is valid or overrun.
         if status.miss_st().bit_is_set() {
+            // The FIFO entry is what is left of an overrun, not a frame:
+            // release it, or every later call would report it again. The
+            // async interrupt handler does the same.
+            release_receive_fifo(self.regs());
             return nb::Result::Err(nb::Error::Other(EspTwaiError::EmbeddedHAL(
                 ErrorKind::Overrun,
             )));

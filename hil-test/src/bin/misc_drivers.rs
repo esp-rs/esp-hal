@@ -660,6 +660,40 @@ mod twai {
             assert_eq!(frame.data(), &[1, 2, 3])
         }
 
+        #[test]
+        // The receive FIFO holds 64 bytes, four 8-byte standard frames; later
+        // frames overrun it. A blocking receiver must see the overrun once
+        // and then an empty FIFO, not the same overrun entry for ever.
+        fn test_blocking_receive_releases_overrun(mut ctx: Context<Blocking>) {
+            let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, b"12345678").unwrap();
+
+            const SENT: usize = 10;
+            for _ in 0..SENT {
+                block!(ctx.twai.transmit(&frame)).unwrap();
+            }
+
+            let mut frames = 0;
+            let mut overruns = 0;
+            loop {
+                match ctx.twai.receive() {
+                    Ok(received) => {
+                        assert_eq!(received.data(), b"12345678");
+                        frames += 1;
+                    }
+                    Err(nb::Error::Other(twai::EspTwaiError::EmbeddedHAL(ErrorKind::Overrun))) => {
+                        overruns += 1;
+                    }
+                    Err(nb::Error::WouldBlock) => break,
+                    Err(nb::Error::Other(err)) => panic!("{:?}", err),
+                }
+                assert!(frames + overruns <= SENT, "the same overrun reported again");
+            }
+
+            assert!(frames > 0, "no frame received");
+            assert!(overruns > 0, "no overrun reported");
+            assert!(frames < SENT, "the FIFO did not overrun");
+        }
+
         fn no_init() {}
 
         #[test(init = no_init)]
