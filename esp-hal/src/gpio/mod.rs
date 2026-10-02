@@ -547,6 +547,14 @@ for_each_analog_function! {
                         let bank = crate::gpio::low_level::bank(self.number());
                         let bit = 1 << (self.number() - bank.offset());
                         bank.write_out_en_clear(bit);
+
+                        // The output matrix can keep a peripheral routed to the pad across a
+                        // reset, and that peripheral then drives the pad regardless of the
+                        // output enable cleared above:
+                        // <https://github.com/espressif/esp-idf/blob/4d59230/components/esp_driver_gpio/src/gpio.c#L221>
+                        GPIO::regs()
+                            .func_out_sel_cfg(self.number() as usize)
+                            .write(|w| unsafe { w.out_sel().bits(OutputSignal::GPIO as _) });
                     }
                 }
             }
