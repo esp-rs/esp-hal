@@ -1,11 +1,16 @@
 //! Wi-Fi access point.
 
+#[cfg(wifi_softap_support)]
 use procmacros::BuilderLite;
 
 #[cfg(feature = "unstable")]
 use super::CountryInfo;
-use super::{AuthenticationMethod, DisconnectReason, Protocols, SecondaryChannel, Ssid};
-use crate::{WifiError, sys::include::wifi_ap_record_t, wifi::AuthenticationMethodConfig};
+use super::{AuthenticationMethod, SecondaryChannel, Ssid};
+#[cfg(wifi_softap_support)]
+use super::{DisconnectReason, Protocols};
+use crate::sys::include::wifi_ap_record_t;
+#[cfg(wifi_softap_support)]
+use crate::{WifiError, wifi::AuthenticationMethodConfig};
 
 /// Information about a detected Wi-Fi access point.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
@@ -31,6 +36,7 @@ pub struct AccessPointInfo {
 }
 
 /// Configuration for a Wi-Fi access point.
+#[cfg(wifi_softap_support)]
 #[derive(Clone, PartialEq, Eq, BuilderLite, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AccessPointConfig {
@@ -60,6 +66,7 @@ pub struct AccessPointConfig {
     pub(crate) beacon_timeout: u16,
 }
 
+#[cfg(wifi_softap_support)]
 impl AccessPointConfig {
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
         // Soft-AP doesn't support WEP (nor WAPI/OWE, which
@@ -84,6 +91,7 @@ impl AccessPointConfig {
     }
 }
 
+#[cfg(wifi_softap_support)]
 impl Default for AccessPointConfig {
     fn default() -> Self {
         Self {
@@ -101,6 +109,7 @@ impl Default for AccessPointConfig {
 }
 
 /// Information about a station connected to the access point.
+#[cfg(wifi_softap_support)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -114,6 +123,7 @@ pub struct ConnectedInfo {
 }
 
 /// Information about a station disconnected from the access point.
+#[cfg(wifi_softap_support)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -129,6 +139,7 @@ pub struct DisconnectedInfo {
 }
 
 /// Either the [ConnectedInfo] or [DisconnectedInfo].
+#[cfg(wifi_softap_support)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EventInfo {

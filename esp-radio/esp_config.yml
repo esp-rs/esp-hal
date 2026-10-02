@@ -37,3 +37,43 @@ options:
     constraints:
       - type:
           validator: non_negative_integer
+
+  - name: wifi_softap_support
+    description: "Wi-Fi access point support. Mirrors ESP-IDF's `CONFIG_ESP_WIFI_SOFTAP_SUPPORT`.
+      When disabled, the access point parts of the Wi-Fi driver are replaced by stubs, which saves
+      about 30 KB of flash, and the access point API (`Config::AccessPoint`,
+      `Config::AccessPointStation`, `Interface::access_point`, ESP-NOW's access point interface, ...)
+      is not available."
+    default:
+      - value: true
+
+  - name: wifi_nan_sync_enable
+    description: "Link the Wi-Fi Aware: Synchronization (NAN-Sync) code of the Wi-Fi driver.
+      Mirrors ESP-IDF's `CONFIG_ESP_WIFI_NAN_SYNC_ENABLE`. esp-radio doesn't provide a NAN API,
+      so this is only useful when using the driver's NAN functions directly.
+      When disabled, the NAN code is replaced by stubs, which saves a significant amount of flash."
+    default:
+      - value: false
+    active: "wifi_has_nan"
+
+  - name: wifi_ftm_enable
+    description: "Enable Fine Timing Measurement (FTM) for calculating Wi-Fi Round-Trip-Time (RTT).
+      Mirrors ESP-IDF's `CONFIG_ESP_WIFI_FTM_ENABLE`. esp-radio doesn't provide an FTM API,
+      so this is only useful when using the driver's FTM functions directly."
+    default:
+      - value: false
+    active: "wifi_has_ftm"
+
+  - name: wifi_ftm_initiator_support
+    description: "FTM Initiator support. Only used when `wifi_ftm_enable` is set.
+      Mirrors ESP-IDF's `CONFIG_ESP_WIFI_FTM_INITIATOR_SUPPORT`."
+    default:
+      - value: true
+    active: "wifi_has_ftm"
+
+  - name: wifi_ftm_responder_support
+    description: "FTM Responder support. Only used when `wifi_ftm_enable` is set.
+      Mirrors ESP-IDF's `CONFIG_ESP_WIFI_FTM_RESPONDER_SUPPORT`."
+    default:
+      - value: true
+    active: "wifi_has_ftm"

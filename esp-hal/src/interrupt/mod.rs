@@ -81,7 +81,7 @@ pub use arch::*;
 
 use crate::pac;
 
-unstable_driver! {
+unstable_module! {
     pub mod software;
 
     #[cfg(all(feature = "rt", multi_core))]

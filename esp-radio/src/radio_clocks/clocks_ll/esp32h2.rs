@@ -29,12 +29,21 @@ fn ble_ieee802154_clock_enable(en: bool) {
         .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
+/// BLE and IEEE 802.15.4 run on one and the same set of clocks here, so it stays on for as long
+/// as either of them is up.
+fn enable_bt_ieee802154_common(en: bool) {
+    use crate::radio_clocks::Refcount;
+
+    static REFCOUNT: Refcount = Refcount::new();
+    REFCOUNT.update(en, ble_ieee802154_clock_enable);
+}
+
 pub(crate) fn enable_bt(en: bool) {
-    ble_ieee802154_clock_enable(en);
+    enable_bt_ieee802154_common(en);
 }
 
 pub(crate) fn enable_ieee802154(en: bool) {
-    ble_ieee802154_clock_enable(en);
+    enable_bt_ieee802154_common(en);
 }
 
 pub(crate) fn init_clocks() {
