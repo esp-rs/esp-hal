@@ -237,7 +237,7 @@ impl<'d> Camera<'d, Async> {
     }
 }
 
-impl<Dm: DriverMode> Camera<'_, Dm> {
+impl<'d, Dm: DriverMode> Camera<'d, Dm> {
     fn regs(&self) -> &pac::lcd_cam::RegisterBlock {
         self.cam.lcd_cam.register_block()
     }
@@ -312,9 +312,7 @@ impl<Dm: DriverMode> Camera<'_, Dm> {
 
         Ok(())
     }
-}
 
-impl<'d, Dm: DriverMode> Camera<'d, Dm> {
     /// Configures the master clock (MCLK) pin for the camera interface.
     pub fn with_master_clock(self, mclk: impl PeripheralOutput<'d>) -> Self {
         let mclk = mclk.into();
