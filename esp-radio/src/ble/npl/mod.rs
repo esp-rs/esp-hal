@@ -189,8 +189,6 @@ unsafe extern "C" {
     fn esp_register_npl_funcs(funcs: *const npl_funcs_t) -> i32;
     fn esp_unregister_npl_funcs();
 
-    fn bt_bb_v2_init_cmplx(value: u8);
-
     fn r_ble_hci_trans_cfg_hs(
         // ble_hci_trans_rx_cmd_fn
         evt: Option<unsafe extern "C" fn(cmd: *const u8, arg: *const c_void) -> i32>,
@@ -1275,8 +1273,8 @@ pub(crate) fn ble_init(config: &Config) -> PhyInitGuard<'static> {
 
         phy_init_guard = esp_phy::enable_phy();
 
-        // init bb
-        bt_bb_v2_init_cmplx(1);
+        // init bb - unless the IEEE 802.15.4 driver, which shares it, already did
+        crate::btbb_enable();
 
         coex_pti_v2();
 
@@ -1364,6 +1362,8 @@ pub(crate) fn ble_deinit() {
         esp_unregister_npl_funcs();
         esp_unregister_ext_funcs();
     }
+
+    crate::btbb_disable();
 
     super::lp_clk::release();
 }

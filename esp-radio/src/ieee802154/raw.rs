@@ -16,7 +16,7 @@ use super::{
     pib::*,
 };
 use crate::{
-    radio_clocks::{deinit_radio_clocks, enable_ieee802154, init_radio_clocks},
+    radio_clocks::enable_ieee802154,
     sys::include::{
         ieee802154_coex_event_t,
         ieee802154_coex_event_t_IEEE802154_IDLE,
@@ -24,8 +24,6 @@ use crate::{
         ieee802154_coex_event_t_IEEE802154_MIDDLE,
     },
 };
-
-const PHY_ENABLE_VERSION_PRINT: u8 = 1;
 
 /// ACK receive timeout in microseconds (200ms), matching the C driver's
 /// `receive_ack_timeout_timer_start(200000)`.
@@ -62,8 +60,6 @@ static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
 });
 
 unsafe extern "C" {
-    fn bt_bb_v2_init_cmplx(print_version: u8); // from libbtbb.a
-
     fn bt_bb_set_zb_tx_on_delay(time: u16); // from libbtbb.a
 
     fn esp_coex_ieee802154_ack_pti_set(event: ieee802154_coex_event_t); // from ???
@@ -104,8 +100,9 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-/// Gates off the 802.15.4 modem clocks and de-initializes the radio clocks
-/// when dropped.
+/// Releases what [`esp_ieee802154_enable`] took, in reverse order, when dropped: gates off the
+/// 802.15.4 modem clocks, and lets go of the BT baseband and of the modem power domain - which
+/// stay up for as long as another radio (BLE) holds them.
 ///
 /// Must be dropped only after the PHY guards: PHY teardown still requires the
 /// modem clocks.
@@ -116,28 +113,28 @@ pub(crate) struct RadioClockGuard;
 impl Drop for RadioClockGuard {
     fn drop(&mut self) {
         enable_ieee802154(false);
-        deinit_radio_clocks();
+        crate::btbb_disable();
+        crate::release_modem_domain();
     }
 }
 
 pub(crate) fn esp_ieee802154_enable(
     radio: IEEE802154<'_>,
 ) -> (PhyClockGuard<'_>, PhyInitGuard<'_>, RadioClockGuard) {
-    init_radio_clocks();
+    // The modem power domain (and, with it, the modem reset) and the BT baseband are shared with
+    // BLE: taken here so that a BLE controller created later does not reset the MAC configured
+    // below, and so that the baseband is initialized once, by whichever radio comes first.
+    crate::acquire_modem_domain();
     let phy_clock_guard = esp_phy::enable_phy_clock();
     enable_ieee802154(true);
 
     let phy_init_guard = esp_phy::enable_phy();
 
-    esp_btbb_enable();
+    crate::btbb_enable();
     ieee802154_mac_init(radio);
 
     info!("date={:x}", mac_date());
     (phy_clock_guard, phy_init_guard, RadioClockGuard)
-}
-
-fn esp_btbb_enable() {
-    unsafe { bt_bb_v2_init_cmplx(PHY_ENABLE_VERSION_PRINT) };
 }
 
 fn ieee802154_mac_init(radio: IEEE802154<'_>) {
