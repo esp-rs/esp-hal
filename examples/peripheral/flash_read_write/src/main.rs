@@ -2,14 +2,18 @@
 //!
 //! See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/partition-tables.html#built-in-partition-tables
 
+//% CHIP_FILTER: flash_driver_supported
+
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
 use esp_bootloader_esp_idf::partitions;
-use esp_hal::main;
+use esp_hal::{
+    flash::{Config, Flash},
+    main,
+};
 use esp_println::println;
-use esp_storage::FlashStorage;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -18,7 +22,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut flash = FlashStorage::new(peripherals.FLASH);
+    let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
     println!("Flash size = {}", flash.capacity());
 
     let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
@@ -40,10 +44,13 @@ fn main() -> ! {
 
     // The app descriptor (if present) is contained in the first 256 bytes
     // of an app image, right after the image header (24 bytes) and the first
-    // section header (8 bytes)
+    // section header (8 bytes).
+    //
+    // App partitions are encrypted when flash encryption is enabled, so access
+    // them through a `PartitionRegion` which handles both cases.
     let mut app_desc = [0u8; 256];
     factory
-        .as_flash_region(&mut flash)
+        .as_partition_region(&mut flash)
         .read(32, &mut app_desc)
         .unwrap();
     println!("App descriptor dump {:02x?}", app_desc);
@@ -62,7 +69,8 @@ fn main() -> ! {
         ))
         .unwrap()
         .unwrap();
-    let mut nvs_partition = nvs.as_flash_region(&mut flash);
+    // NVS partitions are not flash-encrypted, so access them as a plain `FlashRegion`.
+    let mut nvs_partition = nvs.as_flash_region(&mut flash).unwrap();
 
     let mut bytes = [0u8; 32];
     println!("NVS partition size = {}", nvs_partition.capacity());
@@ -88,6 +96,11 @@ fn main() -> ! {
     bytes[0x06] = bytes[0x06].wrapping_add(3);
     bytes[0x07] = bytes[0x07].wrapping_add(4);
 
+    // Writes can only clear bits, so erase the sector before writing new data.
+    // This also erases the rest of the sector.
+    nvs_partition
+        .erase(offset_in_nvs_partition, offset_in_nvs_partition + 4096)
+        .unwrap();
     nvs_partition
         .write(offset_in_nvs_partition, &bytes)
         .unwrap();

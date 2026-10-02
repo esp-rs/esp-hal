@@ -15,7 +15,7 @@
 //! should be used for the next boot.
 //!
 //! Note: The prebuilt bootloaders provided by `espflash` _might not_ include
-//! OTA support. In that case you need to build the bootloader yourself.
+//! OTA support. In that case, the bootloader must be built from source.
 //!
 //! The general procedure to change the active slot
 //! - read the partition table [crate::partitions::read_partition_table]
@@ -28,12 +28,13 @@ use crate::partitions::{
     AppPartitionSubType,
     DataPartitionSubType,
     Error,
-    FlashRegion,
+    PartitionRegion,
     PartitionType,
 };
 
 const SLOT0_DATA_OFFSET: u32 = 0x0000;
 const SLOT1_DATA_OFFSET: u32 = 0x1000;
+const SLOT_SIZE: u32 = 0x1000;
 
 const UNINITIALIZED_SEQUENCE: u32 = 0xffffffff;
 
@@ -41,16 +42,16 @@ const UNINITIALIZED_SEQUENCE: u32 = 0xffffffff;
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::FromRepr)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum OtaDataSlot {
-    /// If there is a `firmware` app-partition it's used. Otherwise OTA-0
+    /// If there is a `firmware` app-partition it's used. Otherwise OTA-0.
     None,
-    /// OTA-0
+    /// OTA-0.
     Slot0,
-    /// OTA-1
+    /// OTA-1.
     Slot1,
 }
 
 impl OtaDataSlot {
-    /// The next logical OTA-data slot
+    /// The next logical OTA-data slot.
     fn next(&self) -> OtaDataSlot {
         match self {
             OtaDataSlot::None => OtaDataSlot::Slot0,
@@ -76,7 +77,7 @@ pub enum OtaImageState {
     /// Monitor the first boot. The bootloader will change this to
     /// `PendingVerify` if auto-rollback is enabled.
     ///
-    /// You want to set this state after activating a newly installed update.
+    /// Applications set this state after activating a newly installed update.
     New           = 0x0,
 
     /// Bootloader changes [OtaImageState::New] to
@@ -130,7 +131,7 @@ struct OtaSelectEntry {
 }
 
 impl OtaSelectEntry {
-    fn read<'a, 'd>(region: &mut FlashRegion<'a, 'd>, offset: u32) -> Result<Self, Error> {
+    fn read<'a, 'd>(region: &mut PartitionRegion<'a, 'd>, offset: u32) -> Result<Self, Error> {
         fn is_valid(buffer: &[u8]) -> bool {
             let ota_seq = u32::from_le_bytes(unwrap!(buffer[0..4].try_into()));
             let ota_state = u32::from_le_bytes(unwrap!(buffer[24..28].try_into()));
@@ -163,31 +164,44 @@ impl OtaSelectEntry {
 
     fn write<'a, 'd>(
         &mut self,
-        region: &mut FlashRegion<'a, 'd>,
+        region: &mut PartitionRegion<'a, 'd>,
         offset: u32,
     ) -> Result<(), Error> {
         let bytes: &mut [u8; 32] = unwrap!(
             unsafe { core::slice::from_raw_parts_mut(self as *mut _ as *mut u8, 0x20) }.try_into()
         );
-        region.write(offset, bytes)?;
-
-        Ok(())
+        write_slot(region, offset, bytes)
     }
 }
 
-/// This is used to manipulate the OTA-data partition.
+/// Erases the OTA-data slot at `offset` and programs `bytes` into it.
 ///
-/// If you are looking for a more high-level way to do this, see [crate::ota_updater::OtaUpdater]
+/// Migration note: with `esp-storage`, every write did an implicit
+/// read-modify-write of the whole sector. `esp_hal::flash::Flash` only
+/// programs, so the slot has to be erased explicitly before it is rewritten.
+/// ESP-IDF does the same in `rewrite_ota_seq`.
+fn write_slot(
+    region: &mut PartitionRegion<'_, '_>,
+    offset: u32,
+    bytes: &[u8; 32],
+) -> Result<(), Error> {
+    region.erase(offset, offset + SLOT_SIZE)?;
+    region.write(offset, bytes)
+}
+
+/// Reads and updates the OTA-data partition.
+///
+/// For a higher-level API, see [crate::ota_updater::OtaUpdater].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Ota<'a, 'd> {
-    flash: FlashRegion<'a, 'd>,
+    flash: PartitionRegion<'a, 'd>,
     ota_partition_count: usize,
 }
 
 impl<'a, 'd> Ota<'a, 'd> {
-    /// Create a [Ota] instance from the given [FlashRegion] and the count of OTA app partitions
-    /// (not including "firmware" and "test" partitions)
+    /// Creates a new [Ota] instance from the given [PartitionRegion] and the count of OTA app
+    /// partitions (not including "firmware" and "test" partitions).
     ///
     /// # Errors
     /// A [Error::InvalidPartition] if the given flash region
@@ -195,7 +209,7 @@ impl<'a, 'd> Ota<'a, 'd> {
     ///
     /// [Error::InvalidArgument] if the `ota_partition_count` exceeds the maximum or if it's 0.
     pub fn new(
-        flash: FlashRegion<'a, 'd>,
+        flash: PartitionRegion<'a, 'd>,
         ota_partition_count: usize,
     ) -> Result<Ota<'a, 'd>, Error> {
         if ota_partition_count == 0 || ota_partition_count > 16 {
@@ -203,7 +217,7 @@ impl<'a, 'd> Ota<'a, 'd> {
         }
 
         if flash.capacity() != 0x2000
-            || flash.partition_type != PartitionType::Data(DataPartitionSubType::Ota)
+            || flash.partition_type() != PartitionType::Data(DataPartitionSubType::Ota)
         {
             return Err(Error::InvalidPartition {
                 expected_size: 0x2000,
@@ -265,8 +279,8 @@ impl<'a, 'd> Ota<'a, 'd> {
     /// number exceeds the value given to the constructor.
     pub fn set_current_app_partition(&mut self, app: AppPartitionSubType) -> Result<(), Error> {
         if app == AppPartitionSubType::Factory {
-            self.flash.write(SLOT0_DATA_OFFSET, &[0xffu8; 0x20])?;
-            self.flash.write(SLOT1_DATA_OFFSET, &[0xffu8; 0x20])?;
+            write_slot(&mut self.flash, SLOT0_DATA_OFFSET, &[0xffu8; 0x20])?;
+            write_slot(&mut self.flash, SLOT1_DATA_OFFSET, &[0xffu8; 0x20])?;
             return Ok(());
         }
 
@@ -349,7 +363,7 @@ impl<'a, 'd> Ota<'a, 'd> {
         Ok(slot)
     }
 
-    /// Set the [OtaImageState] of the currently selected slot.
+    /// Sets the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -365,7 +379,7 @@ impl<'a, 'd> Ota<'a, 'd> {
         }
     }
 
-    /// Get the [OtaImageState] of the currently selected slot.
+    /// Returns the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -423,8 +437,8 @@ mod tests {
     fn ota_region<'a>(
         flash: &'a mut FlashStorage<'static>,
         binary: [u8; 32],
-    ) -> FlashRegion<'a, 'static> {
-        PartitionEntry { binary }.as_flash_region(flash)
+    ) -> PartitionRegion<'a, 'static> {
+        PartitionEntry { binary }.as_partition_region(flash)
     }
 
     fn init_ota_flash(flash: &mut FlashStorage<'static>) {

@@ -2,12 +2,12 @@
 
 use crate::{
     ota::OtaImageState,
-    partitions::{AppPartitionSubType, Error, FlashRegion, FlashStorage, PartitionTable},
+    partitions::{AppPartitionSubType, Error, FlashStorage, PartitionRegion, PartitionTable},
 };
 
-/// This can be used as more convenient - yet less flexible, way to do OTA updates.
+/// Provides a more convenient, but less flexible, way to do OTA updates.
 ///
-/// If you need lower level access see [crate::ota::Ota]
+/// For lower-level access, see [crate::ota::Ota].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OtaUpdater<'a, 'd> {
@@ -17,7 +17,7 @@ pub struct OtaUpdater<'a, 'd> {
 }
 
 impl<'a, 'd> OtaUpdater<'a, 'd> {
-    /// Create a new instance of [OtaUpdater].
+    /// Creates a new instance of [OtaUpdater].
     ///
     /// # Errors
     /// [Error::Invalid] if no OTA data partition or less than two OTA app partition were found.
@@ -72,7 +72,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
                 crate::partitions::DataPartitionSubType::Ota,
             ))?;
         if let Some(ota_part) = ota_part {
-            let ota_part = ota_part.as_flash_region(self.flash);
+            let ota_part = ota_part.as_partition_region(self.flash);
             let ota = crate::ota::Ota::new(ota_part, self.ota_count)?;
             Ok(ota)
         } else {
@@ -111,7 +111,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         self.ota_data()?.current_app_partition()
     }
 
-    /// Get the [OtaImageState] of the currently selected partition.
+    /// Returns the [OtaImageState] of the currently selected partition.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -119,7 +119,7 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         self.ota_data()?.current_ota_state()
     }
 
-    /// Set the [OtaImageState] of the currently selected slot.
+    /// Sets the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -136,21 +136,26 @@ impl<'a, 'd> OtaUpdater<'a, 'd> {
         self.ota_data()?.set_current_app_partition(next_slot)
     }
 
-    /// Returns a [FlashRegion] along with the [AppPartitionSubType] for the
+    /// Returns a [PartitionRegion] along with the [AppPartitionSubType] for the
     /// partition which would be selected by [Self::activate_next_partition].
-    pub fn next_partition(&mut self) -> Result<(FlashRegion<'_, 'd>, AppPartitionSubType), Error> {
+    ///
+    /// The region is encrypted when flash encryption is enabled. Erase it before
+    /// writing the new image.
+    pub fn next_partition(
+        &mut self,
+    ) -> Result<(PartitionRegion<'_, 'd>, AppPartitionSubType), Error> {
         let next_slot = self.next_ota_part()?;
 
         let flash_region = self
             .pt
             .find_partition(crate::partitions::PartitionType::App(next_slot))?
             .ok_or(Error::Invalid)?
-            .as_flash_region(self.flash);
+            .as_partition_region(self.flash);
 
         Ok((flash_region, next_slot))
     }
 
-    /// Reset the OTA-data.
+    /// Resets the OTA-data.
     ///
     /// If present this will activate the FACTORY image, OTA0 otherwise.
     pub fn reset_data(&mut self) -> Result<(), Error> {
