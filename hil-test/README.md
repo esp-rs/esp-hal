@@ -49,64 +49,79 @@ Some tests will require physical connections, please see the current [configurat
 ### Running Tests Remotely (ie. on Self-Hosted Runners)
 The [`hil.yml`] workflow builds the test suite for all our available targets and executes them.
 
+Every board carries a pair of connected LP pads and, except for the ESP32, a pair of connected HP
+pads. LP and HP pads hold their level through different registers, so the GPIO tests need a
+connected pair of each.
+
 Our self-hosted runners have the following setup:
 - ESP32-C2 (`esp32c2-jtag`):
   - Devkit: `ESP8684-DevKitM-1` connected via UART (`UART` port).
     - `GPIO18` and `GPIO9` are I2C pins.
-    - `GPIO2` and `GPIO3` are connected.
+    - `GPIO2` and `GPIO3` are connected (LP pads).
+    - `GPIO10` and `GPIO0` are connected (`GPIO10` is an HP pad, `GPIO0` an LP one - the board
+      has no second free HP pad).
   - Probe: `ESP-Prog` connected with the [following connections][connection_c2]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C3 (`rustboard`):
   - Devkit: `ESP32-C3-DevKit-RUST-1` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO4` and `GPIO5` are I2C pins.
-    - `GPIO2` and `GPIO3` are connected.
+    - `GPIO2` and `GPIO3` are connected (LP pads).
+    - `GPIO6` and `GPIO7` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C5 (`esp32c5-usb`):
   - Devkit: `ESP32-C5-DevKitC-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO2` and `GPIO3` are I2C pins.
-    - `GPIO9` and `GPIO10` are connected.
+    - `GPIO9` and `GPIO10` are connected (HP pads).
+    - `GPIO4` and `GPIO5` are connected (LP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C6 (`esp32c6-usb`):
   - Devkit: `ESP32-C6-DevKitC-1 V1.2` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO6` and `GPIO7` are I2C pins.
-    - `GPIO2` and `GPIO3` are connected.
+    - `GPIO2` and `GPIO3` are connected (LP pads).
+    - `GPIO22` and `GPIO23` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-C61 (`esp32c61-usb`):
   - Devkit: `ESP32-C61-DevKitC-1 V2.0` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO6` and `GPIO7` are I2C pins.
-    - `GPIO2` and `GPIO3` are connected.
+    - `GPIO2` and `GPIO3` are connected (LP pads).
+    - `GPIO22` and `GPIO23` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-H2 (`esp32h2-usb`):
   - Devkit: `ESP32-H2-DevKitM-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO12` and `GPIO22` are I2C pins.
-    - `GPIO2` and `GPIO3` are connected.
+    - `GPIO2` and `GPIO3` are connected (HP pads).
+    - `GPIO10` and `GPIO11` are connected (LP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-P4 (`esp32p4`):
   - Devkit: `ESP32-P4 EV Board 1.6 (rev 3.1)` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO2` and `GPIO3` are I2C pins.
-    - `GPIO5` and `GPIO6` are connected.
+    - `GPIO5` and `GPIO6` are connected (LP pads).
+    - `GPIO46` and `GPIO53` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S2 (`esp32s2-jtag`):
   - Devkit: `ESP32-S2-Saola-1` connected via UART (`UART` port).
     - `GPIO2` and `GPIO3` are I2C pins.
-    - `GPIO9` and `GPIO10` are connected.
+    - `GPIO9` and `GPIO10` are connected (LP pads).
+    - `GPIO37` and `GPIO38` are connected (HP pads).
   - Probe: `ESP-Prog` connected with the [following connections][connection_s2]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S3 (`esp32s3-usb`):
   - Devkit: `ESP32-S3-DevKitC-1` connected via USB-Serial-JTAG (`USB` port) and UART (`UART` port).
     - `GPIO2` and `GPIO3` are I2C pins.
-    - `GPIO9` and `GPIO10` are connected.
+    - `GPIO9` and `GPIO10` are connected (LP pads).
+    - `GPIO40` and `GPIO41` are connected (HP pads).
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32-S31 (`esp32s31-jtag`):
   - Devkit: `ESP32-S31_QFN80_Test_Board` connected via UART (`USB-UART` port).
     - `GPIO6` and `GPIO7` are I2C pins.
-    - `GPIO2` and `GPIO3` are connected.
+    - `GPIO2` and `GPIO3` are connected (LP pads).
+    - `GPIO8` and `GPIO44` are connected (HP pads).
   - Probe: `ESP-Prog` connected with the [following connections][connection_s31]
   - RPi: Raspbian 12 configured with the following [setup]
 - ESP32 (`esp32-jtag`):
   - Devkit: `ESP32-ETHERNET-A-v1.2` connected via USB-Serial-JTAG (`USB` port).
     - `GPIO32` and `GPIO33` are I2C pins.
-    - `GPIO2` and `GPIO4` are connected.
+    - `GPIO2` and `GPIO4` are connected (LP pads). The used devkit exposes no free HP pad, so the HP tests do not run on this chip.
   - RPi: Raspbian 12 configured with the following [setup]
 
 [connection_s31]: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s31/api-guides/jtag-debugging/configure-other-jtag.html#configure-hardware

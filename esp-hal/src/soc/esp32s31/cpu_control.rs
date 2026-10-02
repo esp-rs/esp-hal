@@ -1,5 +1,3 @@
-#[cfg(feature = "unstable")]
-use crate::system::multi_core;
 use crate::{
     peripherals::{HP_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, PMU},
     system::Cpu,
@@ -66,6 +64,28 @@ pub(crate) fn pre_system_reset() {
     crate::rom::ets_set_appcpu_boot_addr(0);
 }
 
+/// Releases core 1 from reset after a CPU-domain power-down wake.
+///
+/// esp-idf keys this on `core_id == 0` in both the initiator and the helper paths.
+#[cfg(all(
+    cpu_retention = "software",
+    multi_core,
+    supports_cpu_power_down,
+    feature = "rt"
+))]
+#[crate::ram]
+pub(crate) fn restart_core1_after_wake() {
+    if Cpu::current() != Cpu::ProCpu {
+        return;
+    }
+    HP_SYS_CLKRST::regs().hpcore1_ctrl0().modify(|_, w| {
+        w.core1_cpu_clk_en()
+            .set_bit()
+            .core1_global_rst_en()
+            .clear_bit()
+    });
+}
+
 pub(crate) fn disable_core1() {
     // ESP-IDF single-core mode disables both Core 1 clocks and holds the core
     // in global reset.
@@ -93,64 +113,4 @@ pub(crate) fn start_core1(entry_point: *const u32) {
 
     // Core 1's ROM waits for this address before handing control to the app.
     crate::rom::ets_set_appcpu_boot_addr(entry_point as u32);
-}
-
-/// Core 1 entry point set as the boot address.
-///
-/// ROM jumps here directly, bypassing `_start`, so initialize `gp` and the FPU
-/// before entering regular Rust.
-#[unsafe(naked)]
-#[cfg(feature = "unstable")]
-pub(crate) extern "C" fn start_core1_init<F>() -> !
-where
-    F: FnOnce(),
-{
-    core::arch::naked_asm!(
-        ".option push",
-        ".option norelax",
-        "la gp, __global_pointer$",
-        "li ra, 0", // ensure probe-rs stops unwinding
-        ".option pop",
-        // Follow IDF's FPU initialization, enable it in Initial state, touch
-        // fcsr (which makes the state Dirty), then clear the dirty bit to
-        // leave mstatus.FS in Clean state (0b10).
-        "li t0, 0x2000",
-        "csrs mstatus, t0",
-        "li t0, 1",
-        "csrw fcsr, t0",
-        "li t0, 0x2000",
-        "csrc mstatus, t0",
-        "la t0, {stack_top}",
-        "lw sp, 0(t0)",
-        "j {init}",
-        stack_top = sym multi_core::APP_CORE_STACK_TOP,
-        init = sym start_core1_init_impl::<F>,
-    )
-}
-
-#[cfg(feature = "unstable")]
-fn start_core1_init_impl<F>() -> !
-where
-    F: FnOnce(),
-{
-    crate::soc::enable_branch_predictor();
-    crate::rom::ets_set_appcpu_boot_addr(0);
-
-    unsafe {
-        #[cfg(all(feature = "rt", stack_guard_monitoring))]
-        {
-            let guard =
-                multi_core::APP_CORE_STACK_GUARD.load(core::sync::atomic::Ordering::Acquire);
-            guard.write_volatile(esp_config::esp_config_int!(
-                u32,
-                "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-            ));
-            crate::debugger::set_stack_watchpoint(guard as usize);
-        }
-        crate::interrupt::init_vectoring();
-        #[cfg(all(feature = "rt", feature = "unstable"))]
-        crate::interrupt::ipc::install_app();
-    }
-
-    unsafe { multi_core::CpuControl::start_core1_run::<F>() }
 }

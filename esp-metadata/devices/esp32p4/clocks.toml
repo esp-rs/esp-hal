@@ -4,12 +4,12 @@ system_clocks = { clock_tree = [
     { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "360, 400", output = "VALUE * 1_000_000" },
     { name = "SPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "480 * 1_000_000" },
     { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "320, 400, 500", output = "VALUE * 1_000_000" },
-    { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000" },
+    { name = "RC_FAST_CLK", type = "source",                     output = "20_000_000", adjustable = "10_000_000..=30_000_000" },
 
     # Low-speed clocks
     { name = "XTAL32K_CLK",  type = "source", output = "32768", cfg = "use_xtal32k" },
     { name = "OSC_SLOW_CLK", type = "source", output = "32768"   },
-    { name = "RC_SLOW_CLK",  type = "source", output = "136_000" },
+    { name = "RC_SLOW_CLK",  type = "source", output = "136_000", adjustable = "68_000..=204_000" },
     { name = "RC32K_CLK",    type = "source", output = "32768"   },
 
     # SPLL divider taps

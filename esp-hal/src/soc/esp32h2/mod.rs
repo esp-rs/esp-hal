@@ -37,4 +37,19 @@ pub(crate) fn pre_init() {
     crate::peripherals::HP_APM::regs()
         .func_ctrl()
         .write(|w| unsafe { w.bits(0x0) });
+
+    // Mirrors ESP-IDF's `init_rng`, see <https://github.com/espressif/esp-idf/blob/8d7d8aef588/components/esp_hw_support/hw_random.c#L114-L120>
+    trng::rng_ll_enable();
+}
+
+/// Invalidate a specific range of addresses in the cache.
+#[cfg(feature = "unstable")]
+#[crate::ram]
+pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_Invalidate_Addr(addr, size);
+    }
 }

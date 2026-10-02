@@ -535,44 +535,6 @@ mod tests {
         assert_eq!(test_gpio2.is_set_low(), true);
     }
 
-    #[test]
-    #[cfg(all(feature = "unstable", lp_io_driver_supported))]
-    fn creating_a_driver_releases_the_hold_of_a_pad(mut ctx: Context) {
-        let probe = Input::new(
-            ctx.test_gpio2.reborrow(),
-            InputConfig::default().with_pull(Pull::None),
-        );
-
-        // A program that held the pad while it drove a high level.
-        {
-            let mut pin = Flex::new(ctx.test_gpio1.reborrow());
-            pin.apply_output_config(&OutputConfig::default());
-            pin.set_output_enable(true);
-            pin.set_high();
-
-            pin.set_pad_hold(true);
-            assert!(pin.is_pad_held(), "the pad does not report its hold");
-
-            pin.set_low();
-            ctx.delay.delay_millis(1);
-            assert_eq!(
-                probe.level(),
-                Level::High,
-                "the hold does not keep the level of the pad"
-            );
-        }
-
-        let mut pin = Flex::new(ctx.test_gpio1.reborrow());
-        pin.apply_output_config(&OutputConfig::default());
-        pin.set_output_enable(true);
-        pin.set_low();
-
-        assert!(!pin.is_pad_held(), "the pad still reports a hold");
-
-        ctx.delay.delay_millis(1);
-        assert_eq!(probe.level(), Level::Low, "the pad is still held");
-    }
-
     // Tests touch pin (GPIO2) as AnyPin and Output
     // https://github.com/esp-rs/esp-hal/issues/1943
     #[test]
@@ -912,6 +874,93 @@ mod tests {
                 }
             };
         }
+    }
+}
+
+// LP and HP pads have separate hold implementations, so each needs a connected pair of its own.
+#[cfg(all(feature = "unstable", lp_io_driver_supported))]
+#[embedded_test::tests(default_timeout = 3)]
+mod pad_hold {
+    use esp_hal::{
+        delay::Delay,
+        gpio::{AnyPin, Flex, Input, InputConfig, Level, OutputConfig, Pin, Pull},
+    };
+
+    struct Context {
+        lp_pad: AnyPin<'static>,
+        lp_probe: AnyPin<'static>,
+        #[cfg(not(esp32))]
+        hp_pad: AnyPin<'static>,
+        #[cfg(not(esp32))]
+        hp_probe: AnyPin<'static>,
+        delay: Delay,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (lp_pad, lp_probe) = hil_test::lp_test_pins!(peripherals);
+        #[cfg(not(esp32))]
+        let (hp_pad, hp_probe) = hil_test::hp_test_pins!(peripherals);
+
+        Context {
+            lp_pad: lp_pad.degrade(),
+            lp_probe: lp_probe.degrade(),
+            #[cfg(not(esp32))]
+            hp_pad: hp_pad.degrade(),
+            #[cfg(not(esp32))]
+            hp_probe: hp_probe.degrade(),
+            delay: Delay::new(),
+        }
+    }
+
+    fn creating_a_driver_releases_the_hold(
+        mut pad: AnyPin<'static>,
+        probe: AnyPin<'static>,
+        delay: Delay,
+    ) {
+        let probe = Input::new(probe, InputConfig::default().with_pull(Pull::None));
+
+        // A program that held the pad while it drove a high level.
+        {
+            let mut pin = Flex::new(pad.reborrow());
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
+            pin.set_high();
+
+            pin.set_pad_hold(true);
+            assert!(pin.is_pad_held(), "the pad does not report its hold");
+
+            pin.set_low();
+            delay.delay_millis(1);
+            assert_eq!(
+                probe.level(),
+                Level::High,
+                "the hold does not keep the level of the pad"
+            );
+        }
+
+        let mut pin = Flex::new(pad.reborrow());
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+        pin.set_low();
+
+        assert!(!pin.is_pad_held(), "the pad still reports a hold");
+
+        delay.delay_millis(1);
+        assert_eq!(probe.level(), Level::Low, "the pad is still held");
+    }
+
+    #[test]
+    fn creating_a_driver_releases_the_hold_of_an_lp_pad(ctx: Context) {
+        creating_a_driver_releases_the_hold(ctx.lp_pad, ctx.lp_probe, ctx.delay);
+    }
+
+    #[test]
+    #[cfg(not(esp32))]
+    fn creating_a_driver_releases_the_hold_of_an_hp_pad(ctx: Context) {
+        creating_a_driver_releases_the_hold(ctx.hp_pad, ctx.hp_probe, ctx.delay);
     }
 }
 

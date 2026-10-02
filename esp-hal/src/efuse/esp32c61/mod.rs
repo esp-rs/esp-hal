@@ -95,17 +95,6 @@ pub enum AdcCalibUnit {
     ADC1,
 }
 
-/// Returns a signed value from the raw data from eFuse. Sign bit is the index of the sign bit,
-/// starting from 0. see <https://github.com/espressif/esp-idf/blob/08e0d30a74ad0bfd5a34933142b80f45619ee410/components/efuse/esp32c61/esp_efuse_rtc_calib.c#L18>.
-fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
-    let sign_mask = 1u32 << sign_bit;
-    if data & sign_mask != 0 {
-        -((data & !sign_mask) as i32)
-    } else {
-        data as i32
-    }
-}
-
 /// Returns the ADC initial code for specified attenuation from efuse.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74ad0bfd5a34933142b80f45619ee410/components/efuse/esp32c61/esp_efuse_rtc_calib.c#L33>
@@ -144,7 +133,7 @@ pub fn rtc_calib_get_chan_compens(
         _ => return None,
     });
 
-    Some(get_signed_val(chan_diff, 3) * (4 - atten as i32))
+    Some(super::sign_magnitude(chan_diff, 3) * (4 - atten as i32))
 }
 
 /// Returns the ADC calibration coefficients.
@@ -183,7 +172,7 @@ pub fn rtc_calib_cal_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
         Attenuation::_6dB | Attenuation::_11dB => 2300,
     };
 
-    let out = chk_offset + get_signed_val(cal_vol as u32, 9);
+    let out = chk_offset + super::sign_magnitude(cal_vol as u32, 9);
 
     Some(out as u16)
 }

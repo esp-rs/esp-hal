@@ -30,6 +30,7 @@ cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x1f
+cpu_pmp_granularity = 128
 
 has_swd_watchdog = true
 
@@ -48,6 +49,7 @@ peripherals = [
     # { name = "AVC" },
     # { name = "BITSCRAMBLER" },
     { name = "CACHE" },
+    { name = "CLIC", hidden = true },
     { name = "CLINT" },
     # { name = "CPU_APM" }, # TODO: verify we need it
     { name = "DMA" },
@@ -118,8 +120,8 @@ peripherals = [
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
     # { name = "TRACE0", pac = "TRACE" },
-    # { name = "TWAI0" }, # TODO: too different from what we know
-    # { name = "TWAI1" }, # TODO: too different from what we know
+    { name = "TWAI0", interrupts = { peri = "TWAI0", timer = "TWAI0_TIMER" }, clock_group = "TWAI" },
+    { name = "TWAI1", interrupts = { peri = "TWAI1", timer = "TWAI1_TIMER" }, clock_group = "TWAI" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
     { name = "UHCI0" },
@@ -335,7 +337,11 @@ has_region_monitor = true
 support_status = { status = "not_supported", issue = 5168 }
 
 [device.canfd]
-support_status = { status = "not_supported", issue = 5163 }
+support_status = "partial"
+instances = [
+    { name = "twai0", sys_instance = "Twai0", rx = "TWAI0_RX", tx = "TWAI0_TX" },
+    { name = "twai1", sys_instance = "Twai1", rx = "TWAI1_RX", tx = "TWAI1_TX" },
+]
 
 [device.key_manager]
 support_status = { status = "not_supported", issue = 5171 }
@@ -371,6 +377,8 @@ mac_version = 3
 has_5g = true
 csi_supported = true
 has_wifi6 = true
+has_nan = true
+has_ftm = true
 
 [device.bt]
 support_status = "partial"
@@ -431,6 +439,11 @@ wakeup_sources = {
     Bt = 10,
     LpCore = 11,
 }
+
+[device.sleep.retention]
+cpu_retention = "software"
+cpu_retention_frame = "clic"
+supports_top_power_down = true
 
 [device.etm]
 support_status = { status = "not_supported", issue = 5167 }

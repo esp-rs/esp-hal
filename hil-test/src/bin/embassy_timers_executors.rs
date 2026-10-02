@@ -69,6 +69,11 @@ mod timers_executors {
             "diff: {:?}",
             (t2 - t1).as_millis()
         );
+        assert!(
+            (t2 - t1).as_millis() < 80u64,
+            "diff: {:?}",
+            (t2 - t1).as_millis()
+        );
     }
 
     pub async fn run_join_test() {

@@ -479,3 +479,35 @@ jobs:
           script: |
             const { evaluateHilGate } = require('./.github/scripts/hil-gate.js');
             await evaluateHilGate({ github, context, core });
+
+  # The dispatcher cannot report the verdict: a run it starts with GITHUB_TOKEN
+  # raises no workflow_run event. Reporting from inside the run also covers
+  # re-runs, which re-run this job along with the legs it depends on.
+  report:
+    needs: [build, devtool, hil-run, hil-run-radio]
+    # `always()` rather than `!cancelled()`: a cancelled run must still report
+    # its verdict.
+    if: always() && inputs.pr_number != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6 # for `require`
+        with:
+          fetch-depth: 1
+
+      - name: Update HIL status comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { updateRunStatus, runConclusion } = require('./.github/scripts/hil-status.js');
+
+            await updateRunStatus({
+              github,
+              context,
+              core,
+              pr: Number('${{ inputs.pr_number }}'),
+              conclusion: runConclusion(${{ toJSON(needs.*.result) }}),
+            });

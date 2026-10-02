@@ -3,6 +3,8 @@
 //! Assumes a certain (i.e. default) partition table layout.
 //% CHIP_FILTER: flash_driver_supported
 //% FEATURES: unstable
+//% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "--cfg=__test_flash" ]
+//% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "--cfg=__test_flash" ]
 
 #![no_std]
 #![no_main]
@@ -367,5 +369,179 @@ mod tests {
             flash.read(APP_DESC_OFFSET, &mut buf),
             Err(Error::OtherCoreRunning)
         );
+    }
+
+    /// HIL boards have no encryption key burned, so `read_encrypted` returns
+    /// the raw image and must agree with a plain read.
+    #[test]
+    fn test_read_encrypted_same_as_unencrypted_wo_encryption_enabled() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut flash = flash_from_peripherals(peripherals);
+
+        let mut words = [0u32; 32];
+        let mut encrypted = [0u32; 32];
+        for offset in (0x10_000..0x20_000).step_by(128) {
+            flash.read(offset, &mut words).unwrap();
+            flash.read_encrypted(offset, &mut encrypted).unwrap();
+            assert_eq!(words, encrypted);
+        }
+    }
+
+    /// The read loop remaps once per MMU page. This range straddles a 64 KiB
+    /// boundary, which is a page boundary on every chip whose MMU page is
+    /// 64 KiB or smaller.
+    #[test]
+    fn test_read_encrypted_across_mmu_page() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut flash = flash_from_peripherals(peripherals);
+
+        let mut words = [0u32; 64];
+        let mut encrypted = [0u32; 64];
+        flash.read(0x1_FF80, &mut words).unwrap();
+        flash.read_encrypted(0x1_FF80, &mut encrypted).unwrap();
+        assert_eq!(words, encrypted);
+    }
+
+    #[test]
+    fn test_write_encrypted_will_encrypt() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut flash = flash_from_peripherals(peripherals);
+
+        let sector = flash.chip_info().sector_size;
+        // SAFETY: NVS is not mapped firmware.
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+
+        let zeros = [0u32; 64];
+        unsafe { flash.write_encrypted(NVS, &zeros).unwrap() };
+
+        // A plain read sees ciphertext, so the stored bytes differ from the
+        // plaintext that was written.
+        let mut words = [0u32; 64];
+        flash.read(NVS, &mut words).unwrap();
+        assert_ne!(words, zeros);
+
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+    }
+
+    #[test]
+    fn test_write_encrypted_alignment_and_bounds() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut flash = flash_from_peripherals(peripherals);
+
+        let cap = flash.capacity() as u32;
+        let buf16 = [0u32; 4];
+        let mut read1 = [0u32; 1];
+
+        assert_eq!(
+            unsafe { flash.write_encrypted(NVS + 1, &buf16) },
+            Err(Error::NotAligned)
+        );
+        assert_eq!(
+            unsafe { flash.write_encrypted(NVS, &[0u32; 3]) },
+            Err(Error::NotAligned)
+        );
+        assert_eq!(flash.read_encrypted(1, &mut read1), Err(Error::NotAligned));
+        assert_eq!(
+            flash.read_encrypted(cap, &mut read1),
+            Err(Error::OutOfBounds)
+        );
+        assert_eq!(
+            unsafe { flash.write_encrypted(cap, &buf16) },
+            Err(Error::OutOfBounds)
+        );
+
+        // Flash-resident source is rejected; the caller must stage through RAM.
+        assert_eq!(
+            unsafe { flash.write_encrypted(NVS, &FLASH_PATTERN) },
+            Err(Error::NotSupported)
+        );
+
+        flash.read_encrypted(NVS, &mut []).unwrap();
+        unsafe { flash.write_encrypted(NVS, &[]).unwrap() };
+    }
+
+    /// True when writing up to `addr` needs the ESP32 neighbor bridge.
+    ///
+    /// On ESP32 a 16- but not 32-byte aligned boundary shares an AES row with
+    /// the neighboring block, so the driver decrypts and re-encrypts that
+    /// neighbor. That only reproduces the original ciphertext once the
+    /// encryption eFuses are burned — without them the ROM encrypts on write
+    /// but `read_encrypted` cannot decrypt, so the neighbor does change. HIL
+    /// boards are never encrypted; `qa-test/flash_encrypted` covers the bridge.
+    fn needs_row_bridge(addr: u32) -> bool {
+        cfg!(esp32) && !addr.is_multiple_of(32)
+    }
+
+    /// ROM headers copy-paste ESP32's 32-byte alignment onto every chip.
+    /// On later chips `esp_rom_spiflash_write_encrypted` accepts 16-byte rows
+    /// (and 64-byte rows when the XTS block allows). Each case below is a
+    /// single ROM call: a 32-byte-only ROM would return an error, or program
+    /// past the request.
+    #[cfg(not(esp32))]
+    #[test]
+    fn test_rom_write_encrypted_accepts_non_32_byte_rows() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut flash = flash_from_peripherals(peripherals);
+
+        let sector = flash.chip_info().sector_size;
+        let row16 = [0x5A5A_5A5Au32; 4];
+
+        // 16 bytes at a 32-byte aligned address.
+        // SAFETY: NVS is not mapped firmware.
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+        unsafe { flash.write_encrypted(NVS, &row16).unwrap() };
+        let mut written = [0u32; 4];
+        flash.read(NVS, &mut written).unwrap();
+        assert_ne!(written, row16);
+        assert_range_erased(&mut flash, NVS + 16, 16);
+
+        // 16 bytes at a 16- but not 32-byte aligned address.
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+        unsafe { flash.write_encrypted(NVS + 16, &row16).unwrap() };
+        flash.read(NVS + 16, &mut written).unwrap();
+        assert_ne!(written, row16);
+        assert_range_erased(&mut flash, NVS, 16);
+        assert_range_erased(&mut flash, NVS + 32, 16);
+
+        #[cfg(not(any(esp32c2, esp32c3)))]
+        {
+            let row64 = [0x5A5A_5A5Au32; 16];
+            unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+            unsafe { flash.write_encrypted(NVS, &row64).unwrap() };
+            let mut written64 = [0u32; 16];
+            flash.read(NVS, &mut written64).unwrap();
+            assert_ne!(written64, row64);
+            assert_range_erased(&mut flash, NVS + 64, 16);
+        }
+
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+    }
+
+    /// 16-, 32-, and 48-byte writes (48 is 32+16) at both 32- and 16-byte
+    /// aligned offsets. Bytes outside the requested range must keep their
+    /// erased value.
+    #[test]
+    fn test_write_encrypted_does_not_touch_neighbors() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut flash = flash_from_peripherals(peripherals);
+
+        let sector = flash.chip_info().sector_size;
+        let data = [0x5A5A_5A5Au32; 12];
+
+        for (offset, words) in [(0u32, 4usize), (0, 8), (0, 12), (16, 4), (16, 8), (16, 12)] {
+            // SAFETY: NVS is not mapped firmware.
+            unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+            unsafe { flash.write_encrypted(NVS + offset, &data[..words]).unwrap() };
+
+            let end = offset + (words * 4) as u32;
+            if offset > 0 && !needs_row_bridge(offset) {
+                assert_range_erased(&mut flash, NVS, offset as usize);
+            }
+            if !needs_row_bridge(end) {
+                assert_range_erased(&mut flash, NVS + end, 16);
+            }
+        }
+
+        unsafe { flash.erase(NVS, NVS + sector).unwrap() };
     }
 }

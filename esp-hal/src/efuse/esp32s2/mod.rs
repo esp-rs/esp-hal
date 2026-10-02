@@ -282,14 +282,6 @@ const RTC_CALIB_MAP: [RtcCalibEntry; 33] = [
     },
 ];
 
-fn signed_bit_to_int(number: u32, len: u32) -> i32 {
-    if number >> (len - 1) != 0 {
-        -((number ^ (1 << (len - 1))) as i32)
-    } else {
-        number as i32
-    }
-}
-
 fn rtc_calib_tag(version: u8, unit: u8, atten: Attenuation, param: RtcCalibParam) -> Option<u8> {
     let atten = atten as u8;
     let offset = match (version, param) {
@@ -300,6 +292,17 @@ fn rtc_calib_tag(version: u8, unit: u8, atten: Attenuation, param: RtcCalibParam
         _ => return None,
     };
     Some(offset + unit * 4 + atten)
+}
+
+// Reads the RTC bandgap trim from eFuse block 2.
+//
+// See `efuse_ll_get_ocode` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/hal/esp32s2/include/hal/efuse_ll.h>
+pub(crate) fn ocode() -> u8 {
+    const OCODE1: crate::efuse::EfuseField = crate::efuse::EfuseField::new(2, 4, 128, 4);
+    const OCODE2: crate::efuse::EfuseField = crate::efuse::EfuseField::new(2, 4, 144, 3);
+
+    (super::read_field_le::<u8>(OCODE2) << 4) + super::read_field_le::<u8>(OCODE1)
 }
 
 fn rtc_calib_parsed(tag: u8, skip_efuse: bool) -> i32 {
@@ -317,7 +320,7 @@ fn rtc_calib_parsed(tag: u8, skip_efuse: bool) -> i32 {
             entry.length as u32,
         );
         let bits = super::read_field_le::<u32>(field);
-        signed_bit_to_int(bits, entry.length as u32) * i32::from(entry.multiplier)
+        super::sign_magnitude(bits, entry.length as u32 - 1) * i32::from(entry.multiplier)
     };
     raw + i32::from(entry.base) + rtc_calib_parsed(entry.depends, skip_efuse)
 }

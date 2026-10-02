@@ -41,6 +41,17 @@ pub(crate) fn init_clocks() {
     regs!(SYSCON)
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | DPORT_WIFI_CLK_WIFI_EN) });
+
+    // The Wi-Fi light sleep clock: the RTC slow clock, undivided. The divider resets to 255.
+    regs!(SYSTEM)
+        .lpck_div_int()
+        .modify(|_, w| unsafe { w.lpck_div_num().bits(0) });
+    regs!(SYSTEM).bt_lpck_div_frac().modify(|_, w| {
+        w.lpclk_sel_xtal32k().clear_bit();
+        w.lpclk_sel_xtal().clear_bit();
+        w.lpclk_sel_8m().clear_bit();
+        w.lpclk_sel_rtc_slow().set_bit()
+    });
 }
 
 pub(crate) fn deinit_clocks() {

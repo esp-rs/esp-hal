@@ -11,20 +11,23 @@ use bt_hci::{
 };
 use bt_hci_transport::{PacketKind, PacketToController, PacketToHost};
 use docsplay::Display;
+use embassy_sync::mutex::Mutex;
 use esp_phy::PhyInitGuard;
+use esp_sync::RawMutex;
 
 use crate::{
     RadioRefGuard,
     asynch::AtomicWaker,
     ble::{
         Config,
+        HciOutCollector,
         InvalidConfigError,
+        MAX_HCI_ACL_PACKET_LEN,
+        MAX_HCI_CMD_PACKET_LEN,
         have_hci_packet,
         have_hci_read_data,
         read_hci,
         read_next,
-        send_hci,
-        send_hci_async,
         take_next,
     },
 };
@@ -52,6 +55,9 @@ pub struct BleConnector<'d> {
     _phy_init_guard: PhyInitGuard<'d>,
     _device: crate::hal::peripherals::BT<'d>,
     _guard: RadioRefGuard,
+    /// The `Transport` implementations write through a shared reference, so they need the mutex to
+    /// get at the writer.
+    hci_writer: Mutex<RawMutex, HciOutCollector>,
 }
 
 impl Drop for BleConnector<'_> {
@@ -67,7 +73,13 @@ impl<'d> BleConnector<'d> {
         device: crate::hal::peripherals::BT<'d>,
         config: Config,
     ) -> Result<BleConnector<'d>, BleInitError> {
-        let _guard = RadioRefGuard::new();
+        // With modem sleep, the claimed `Bt` wakeup source refuses the sleeps that are not safe.
+        // The driver claims it only where light sleep works with the controller.
+        let _guard = if config.modem_sleep() && crate::ble::lp_clk::light_sleep_supported() {
+            RadioRefGuard::without_wake_lock()
+        } else {
+            RadioRefGuard::new()
+        };
 
         config.validate()?;
 
@@ -75,13 +87,17 @@ impl<'d> BleConnector<'d> {
             _phy_init_guard: crate::ble::ble_init(&config),
             _device: device,
             _guard,
+            hci_writer: Mutex::new(HciOutCollector::new()),
         })
     }
 
     /// Read the next HCI packet from the BLE controller.
+    ///
+    /// Returns the length of the packet, or 0 if no packet is available. If the packet is longer
+    /// than `buf`, the packet is dropped and an error is returned.
     #[instability::unstable]
     pub fn next(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
-        Ok(read_next(buf))
+        read_next(buf)
     }
 
     /// Read from HCI.
@@ -117,7 +133,7 @@ impl<'d> BleConnector<'d> {
     /// Returns the number of bytes written, which is at most one packet.
     #[instability::unstable]
     pub fn write(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        Ok(send_hci(buf))
+        Ok(self.hci_writer.get_mut().write(buf))
     }
 
     /// Write to HCI asynchronously.
@@ -125,7 +141,7 @@ impl<'d> BleConnector<'d> {
     /// Returns the number of bytes written, which is at most one packet.
     #[instability::unstable]
     pub async fn write_async(&mut self, buf: &[u8]) -> Result<usize, BleConnectorError> {
-        Ok(send_hci_async(buf).await)
+        Ok(self.hci_writer.get_mut().write_async(buf).await)
     }
 }
 
@@ -280,27 +296,6 @@ impl core::future::Future for HciPacketReadyEventFuture {
     }
 }
 
-/// The HCI output of the BLE controller.
-///
-/// The transport implementations use this zero-sized writer to serialize packets directly into the
-/// controller.
-struct HciWriter;
-
-impl embedded_io_07::ErrorType for HciWriter {
-    type Error = BleConnectorError;
-}
-
-impl embedded_io_async_07::Write for HciWriter {
-    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-        Ok(send_hci_async(buf).await)
-    }
-
-    async fn flush(&mut self) -> Result<(), Self::Error> {
-        // nothing to do
-        Ok(())
-    }
-}
-
 impl<E: embedded_io_07::Error> From<bt_hci_transport::ReadHciError<E>> for BleConnectorError {
     fn from(_e: bt_hci_transport::ReadHciError<E>) -> Self {
         BleConnectorError::Unknown
@@ -315,6 +310,33 @@ fn parse_hci(data: &[u8]) -> Result<ControllerToHostPacket<'_>, BleConnectorErro
             Err(BleConnectorError::Unknown)
         }
     }
+}
+
+/// Checks that the collector can send a packet, before any byte of it gets to the collector.
+///
+/// `indicator` is the HCI packet type indicator, and `size` is the size of the packet without it.
+///
+/// The collector sends only command and ACL packets, and only up to its buffer size. It cannot
+/// drop a packet as a whole, so it would read the rest of such a packet as new packets.
+fn check_outgoing_packet(indicator: u8, size: usize) -> Result<(), BleConnectorError> {
+    const COMMAND: u8 = 1;
+    const ACL_DATA: u8 = 2;
+
+    let max_len = match indicator {
+        COMMAND => MAX_HCI_CMD_PACKET_LEN,
+        ACL_DATA => MAX_HCI_ACL_PACKET_LEN,
+        _ => 0,
+    };
+    let len = size.saturating_add(1);
+    if len > max_len {
+        warn!(
+            "[hci] dropping outgoing packet of type {} and {} bytes, which cannot be sent",
+            indicator, len
+        );
+        return Err(BleConnectorError::Unknown);
+    }
+
+    Ok(())
 }
 
 /// Waits for a packet from the controller, then removes it from the receive queue.
@@ -336,15 +358,27 @@ impl bt_hci::transport::Transport for BleConnector<'_> {
         let rx = unsafe { &mut *core::ptr::slice_from_raw_parts_mut(rx.as_mut_ptr(), rx.len()) };
 
         // `ControllerToHostPacket` borrows `rx`, so the packet has to be copied there.
-        HciPacketReadyEventFuture.await;
-        let len = read_next(rx);
+        let len = loop {
+            HciPacketReadyEventFuture.await;
+            match read_next(rx) {
+                Ok(0) => {} // A different reader took the packet first: wait again.
+                Ok(len) => break len,
+                // The packet is longer than `rx`, and `read_next` dropped it. Do not return an
+                // error: hosts stop their receive loop on a read error, so one packet that
+                // does not fit would stop all BLE traffic.
+                Err(_) => {}
+            }
+        };
         parse_hci(&rx[..len])
     }
 
     /// Write a complete HCI packet from the tx buffer
     async fn write<T: HostToControllerPacket>(&self, val: &T) -> Result<(), Self::Error> {
+        check_outgoing_packet(T::KIND as u8, val.size())?;
+
+        let mut writer = self.hci_writer.lock().await;
         bt_hci::transport::WithIndicator::new(val)
-            .write_hci_async(HciWriter)
+            .write_hci_async(&mut *writer)
             .await
     }
 }
@@ -358,13 +392,32 @@ impl bt_hci_transport::Transport for BleConnector<'_> {
 
         let mut reader = &packet[..];
         let kind = PacketKind::read(&mut reader)?;
-        Ok(P::read_hci(kind, &mut reader, rx)?)
+        let parsed = P::read_hci(kind, &mut reader, rx)?;
+
+        // `P::read_hci` reads only the length that the packet header gives, so bytes after it
+        // stay in `reader`. A data packet must fill its frame exactly: extra bytes show that the
+        // frame is malformed. Event packets are not checked, which is the same as in the
+        // `bt_hci::transport::Transport` implementation above
+        // (`ControllerToHostPacket::from_hci_bytes_complete`).
+        if kind != PacketKind::Event && !reader.is_empty() {
+            warn!(
+                "[hci] dropping {:?} packet with {} unexpected trailing bytes",
+                kind,
+                reader.len()
+            );
+            return Err(BleConnectorError::Unknown);
+        }
+
+        Ok(parsed)
     }
 
     /// Write a complete HCI packet from the tx buffer
     async fn write<P: PacketToController>(&self, tx: &P) -> Result<(), Self::Error> {
+        check_outgoing_packet(P::KIND as u8, tx.size())?;
+
+        let mut writer = self.hci_writer.lock().await;
         bt_hci_transport::WithIndicator::new(tx)
-            .write_hci_async(HciWriter)
+            .write_hci_async(&mut *writer)
             .await
     }
 }

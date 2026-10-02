@@ -14,8 +14,9 @@ use crate::{
     metadata::{Chip, Config},
 };
 
-/// Return the minimum required bump for the next release.
-/// Even if nothing changed this will be [ReleaseType::Patch]
+/// Return the minimum bump the stable API requires for the next release.
+///
+/// Additions are not detected, so new API and unchanged API both return [ReleaseType::Patch].
 pub fn minimum_update(
     workspace: &Path,
     package: Package,

@@ -2,11 +2,11 @@ system_clocks = { clock_tree = [
     # High-speed clock sources
     { name = "XTAL_CLK",    type = "source",  values = "40",                          output = "VALUE * 1_000_000", always_on = true },
     { name = "PLL_CLK",     type = "derived", from = "XTAL_CLK", values = "320, 480", output = "VALUE * 1_000_000" },
-    { name = "RC_FAST_CLK", type = "source",                                          output = "17_500_000" },
+    { name = "RC_FAST_CLK", type = "source",                                          output = "17_500_000", adjustable = "8_750_000..=26_250_000" },
 
     # Low-speed clocks
     { name = "XTAL32K_CLK",     type = "source",  output = "32768", cfg = "use_xtal32k" },
-    { name = "RC_SLOW_CLK",     type = "source",  output = "136_000" },
+    { name = "RC_SLOW_CLK",     type = "source",  output = "136_000", adjustable = "68_000..=204_000" },
     { name = "RC_FAST_DIV_CLK", type = "generic", output = "RC_FAST_CLK / 256" },
 
     # CPU clock source dividers
@@ -46,6 +46,12 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K", outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
         { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
         { name = "RC_FAST", outputs = "RC_FAST_DIV_CLK" },
+    ] },
+    # BLE modem-sleep clock. The BTDM blob programs the source and divider.
+    { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "1_000_000" },
+    { name = "BLE_LP_CLK", type = "mux", variants = [
+        { name = "XTAL",     outputs = "BLE_LP_XTAL_CLK" },
+        { name = "RTC_SLOW", outputs = "RTC_SLOW_CLK" },
     ] },
     { name = "RTC_FAST_CLK", type = "mux", variants = [
         { name = "XTAL", outputs = "XTAL_DIV_CLK" },

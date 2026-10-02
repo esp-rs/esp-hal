@@ -25,6 +25,7 @@ esp-println = { path = "../../../esp-println", features = ["log-04"] }
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
 esp-radio = { path = "../../../esp-radio", features = [
     "log-04",
+    "unstable",
     "wifi",
 ] }
 reqwless = { version = "0.14.0", default-features = false }

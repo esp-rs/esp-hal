@@ -422,6 +422,12 @@ impl<'a> PartitionTable<'a> {
                     (((0x20500000 + 0x37c) as *const u32).read_volatile() & 0x7ff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
                 };
             }
+            feature = "esp32h4" => {
+                let paddr = unsafe {
+                    ((0x60098000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_MMU_ITEM_INDEX_REG
+                    (((0x60098000 + 0x37c) as *const u32).read_volatile() & 0x1ff) << 16 // SPI_MEM_MMU_ITEM_CONTENT_REG
+                };
+            }
             any(
                 feature = "esp32c5",
                 feature = "esp32c6",

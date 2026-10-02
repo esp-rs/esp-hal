@@ -24,20 +24,9 @@ pub(crate) fn enable_phy(en: bool) {
         .modify(|_, w| w.clk_coex_en().bit(en));
 
     regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
-        w.clk_wifi_apb_en().bit(en);
-        w.clk_wifibb_22m_en().bit(en);
-        w.clk_fe_40m_en().bit(en);
-        w.clk_fe_80m_en().bit(en);
-        w.clk_wifibb_44m_en().bit(en);
-        w.clk_wifimac_en().bit(en)
-    });
-
-    regs!(MODEM_SYSCON)
-        .clk_conf1()
-        .modify(|r, w| unsafe { w.bits(r.bits() | 0x1fb) });
-
-    regs!(MODEM_SYSCON).clk_conf1().modify(|_, w| {
         w.clk_fe_apb_en().bit(en);
+        w.clk_fe_20m_en().bit(en);
+        w.clk_fe_40m_en().bit(en);
         w.clk_fe_80m_en().bit(en);
         w.clk_fe_160m_en().bit(en);
         w.clk_fe_dac_en().bit(en);
@@ -45,3 +34,9 @@ pub(crate) fn enable_phy(en: bool) {
         w.clk_fe_adc_en().bit(en)
     });
 }
+
+/// `MODEM_SYSCON.clk_conf`: `clk_modem_sec_apb_en`.
+pub(crate) const CALIBRATION_CLK_CONF_MASK: u32 = 1 << 28;
+/// `MODEM_SYSCON.clk_conf1`: `clk_wifibb_*_en` (bits 0-8), `clk_wifi_apb_en`, `clk_bt_apb_en` and
+/// `clk_btbb_en`.
+pub(crate) const CALIBRATION_CLK_CONF1_MASK: u32 = 0x1ff | 1 << 10 | 1 << 16 | 1 << 17;

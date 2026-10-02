@@ -22,6 +22,7 @@ unsafe extern "C" {
         ...
     );
 
+    #[allow(improper_ctypes)]
     pub unsafe fn __esp_radio_log_writev(
         level: crate::sys::c_types::c_uint,
         tag: *const crate::sys::c_types::c_char,
@@ -259,13 +260,23 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
 
 const WIFI_ENABLE_WPA3_SAE: u64 = 1 << 0;
 const WIFI_ENABLE_ENTERPRISE: u64 = 1 << 7;
-// const WIFI_FTM_INITIATOR: u64 = 1 << 2;
-// const WIFI_FTM_RESPONDER: u64 = 1 << 3;
+pub(super) const WIFI_FTM_INITIATOR: u64 = if cfg!(all(wifi_ftm_enable, wifi_ftm_initiator_support))
+{
+    1 << 2
+} else {
+    0
+};
+const WIFI_FTM_RESPONDER: u64 = if cfg!(all(wifi_ftm_enable, wifi_ftm_responder_support)) {
+    1 << 3
+} else {
+    0
+};
 // const WIFI_ENABLE_GCMP: u64 = 1 << 4;
 // const WIFI_ENABLE_GMAC: u64 = 1 << 5;
 // const WIFI_ENABLE_11R: u64 = 1 << 6;
 
-const WIFI_FEATURE_CAPS: u64 = WIFI_ENABLE_WPA3_SAE | WIFI_ENABLE_ENTERPRISE;
+const WIFI_FEATURE_CAPS: u64 =
+    WIFI_ENABLE_WPA3_SAE | WIFI_ENABLE_ENTERPRISE | WIFI_FTM_INITIATOR | WIFI_FTM_RESPONDER;
 
 #[unsafe(no_mangle)]
 pub(super) static mut __ESP_RADIO_G_WIFI_FEATURE_CAPS: u64 = WIFI_FEATURE_CAPS;

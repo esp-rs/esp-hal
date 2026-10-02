@@ -165,6 +165,8 @@ pub mod dma {
     use enumset::enum_set;
 
     use super::*;
+    #[cfg(not(spi_slave_dma_engine = "SPI_DMA"))]
+    use crate::RegisterToggle;
     use crate::{
         DriverMode,
         dma::{Channel, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
@@ -490,8 +492,6 @@ pub mod dma {
             self.info
                 .prepare_length_and_lines(read_buffer_len, write_buffer_len);
 
-            self.reset_dma_before_usr_cmd();
-
             #[cfg(not(esp32))]
             self.regs()
                 .dma_conf()
@@ -499,26 +499,36 @@ pub mod dma {
 
             self.clear_dma_interrupts();
             self.info.setup_for_flush();
-            self.regs().cmd().modify(|_, w| w.usr().set_bit());
 
             if read_buffer_len > 0 {
+                self.reset_dma_rx_fifo();
                 channel.rx.start_transfer()?;
             }
 
             if write_buffer_len > 0 {
+                self.reset_dma_tx_fifo();
                 channel.tx.start_transfer()?;
             }
+
+            // The SPI master owns SCLK and CS. Arm the peripheral only after
+            // both GDMA directions can service the first edge.
+            self.regs().cmd().modify(|_, w| w.usr().set_bit());
 
             Ok(())
         }
 
-        fn reset_dma_before_usr_cmd(&self) {
+        fn reset_dma_rx_fifo(&self) {
             #[cfg(not(spi_slave_dma_engine = "SPI_DMA"))]
-            self.regs().dma_conf().modify(|_, w| {
-                w.rx_afifo_rst().set_bit();
-                w.buf_afifo_rst().set_bit();
-                w.dma_afifo_rst().set_bit()
-            });
+            self.regs()
+                .dma_conf()
+                .toggle(|w, bit| w.rx_afifo_rst().bit(bit));
+        }
+
+        fn reset_dma_tx_fifo(&self) {
+            #[cfg(not(spi_slave_dma_engine = "SPI_DMA"))]
+            self.regs()
+                .dma_conf()
+                .toggle(|w, bit| w.dma_afifo_rst().bit(bit));
         }
 
         fn enable_dma(&self) {

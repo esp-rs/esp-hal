@@ -259,7 +259,7 @@ use core::marker::PhantomData;
 
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
-#[cfg_attr(esp32s31, allow(unused))]
+#[allow(unused)]
 pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
@@ -372,6 +372,8 @@ unstable_driver! {
     pub mod aes;
     #[cfg(assist_debug_driver_supported)]
     pub mod assist_debug;
+    #[cfg(canfd_driver_supported)]
+    pub mod canfd;
     pub mod delay;
     #[cfg(ecc_driver_supported)]
     pub mod ecc;

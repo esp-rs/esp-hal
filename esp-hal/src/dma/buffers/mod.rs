@@ -2110,9 +2110,10 @@ fn build_descriptor_list_for_psram(
     // MIN_LAST_DMA_LEN data to work with.
     let has_aligned_data = data_len > BUF_LEN;
 
-    // Calculate byte offset to the start of the buffer
+    // Calculate byte offset to the start of the buffer. An already-aligned
+    // buffer needs no head at all.
     let offset = data_addr % min_alignment;
-    let head_to_copy = min_alignment - offset;
+    let head_to_copy = (min_alignment - offset) % min_alignment;
     let head_to_copy = if !has_aligned_data {
         BUF_LEN
     } else if head_to_copy > 0 && head_to_copy < MIN_LAST_DMA_LEN {

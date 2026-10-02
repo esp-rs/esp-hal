@@ -37,7 +37,9 @@ context_switch_source = "ipc"
 cpu_has_branch_predictor = true
 multi_core_enabled = true
 cpu_has_csr_pc = false
+cpu_has_zcmp_workaround = true
 cpu_mcause_mask = 0x3f
+cpu_pmp_granularity = 128
 internal_memory_cached = true
 
 has_swd_watchdog = true
@@ -57,10 +59,11 @@ peripherals = [
     { name = "SYSTEM", pac = "HP_SYS" },
     { name = "HP_SYS" },
     { name = "HP_SYS_CLKRST" },
-    { name = "RNG", pac = "LP_SYS" },
+    { name = "RNG", pac = "LP_TRNG" },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "LP_I2C_ANA_MST" },
+    { name = "CACHE", hidden = true },
     { name = "CLIC" },
     { name = "CLINT" },
     { name = "CLINT_OTHER_CORE" },
@@ -77,6 +80,7 @@ peripherals = [
     { name = "LP_WDT" },
     { name = "LPWR", pac = "LP_SYS" },
     { name = "PMU" },
+    { name = "PAU" },
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
@@ -417,9 +421,8 @@ version = 1 # FIXME placeholder
 
 [device.rng]
 support_status = { status = "partial", issue = 5982 }
-trng_supported = false  # TODO
-apb_cycle_wait_num = 16  # placeholder
-is_lp_sys = true
+trng_supported = true
+apb_cycle_wait_num = 16  # TODO
 
 [device.lp_timer]
 support_status = "partial"
@@ -482,6 +485,11 @@ wakeup_sources = {
     Ext1 = 12,
     Timer = 13,
 }
+
+[device.sleep.retention]
+cpu_retention = "software"
+cpu_retention_frame = "p4"
+supports_top_power_down = true
 
 [device.spi_slave]
 support_status = "partial"

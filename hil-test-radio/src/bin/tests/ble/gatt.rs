@@ -2,7 +2,11 @@
 mod tests {
     use embassy_futures::select::select;
     use embassy_time::{Duration, Timer, with_timeout};
-    use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
+    use esp_hal::{
+        clock::CpuClock,
+        peripherals::{BT, Peripherals},
+        timer::timg::TimerGroup,
+    };
     use esp_radio::ble::controller::BleConnector;
     use trouble_host::prelude::*;
 
@@ -19,11 +23,39 @@ mod tests {
         let timg0 = TimerGroup::new(p.TIMG0);
         esp_rtos::start(timg0.timer0);
 
-        let connector = BleConnector::new(p.BT, Default::default()).unwrap();
+        connect_and_read_battery_level(p.BT).await;
+    }
+
+    /// The 802.15.4 driver is brought up (and kept receiving) before the BLE controller is
+    /// created, the way a Thread device that commissions over BLE does it. Initializing BLE must
+    /// not reset the RF frontend under the PHY that 802.15.4 already initialized, or the
+    /// controller cannot transmit: no scan request, no connection request, no GATT.
+    #[cfg(soc_has_ieee802154)]
+    #[test]
+    async fn ble_central_connects_while_ieee802154_is_up(p: Peripherals) {
+        use esp_radio::ieee802154::{Config, Ieee802154};
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let mut ieee802154 = Ieee802154::new(p.IEEE802154);
+        ieee802154.set_config(Config {
+            rx_when_idle: true,
+            ..Default::default()
+        });
+        ieee802154.start_receive();
+
+        connect_and_read_battery_level(p.BT).await;
+
+        drop(ieee802154);
+    }
+
+    async fn connect_and_read_battery_level(bt: BT<'_>) {
+        let connector = BleConnector::new(bt, Default::default()).unwrap();
         let controller: ExternalController<_, 1> = ExternalController::new(connector);
 
         let address = Address::random(crate::PERIPHERAL_ADDRESS);
-        let mut resources: HostResources<_, DefaultPacketPool, 1, 2> = HostResources::new();
+        let mut resources: HostResources<DefaultPacketPool, 1, 2> = HostResources::new();
         let stack = trouble_host::new(controller, &mut resources)
             .set_random_address(Address::random([0xff, 0x48, 0x49, 0x4c, 0x43, 0xff]))
             .build();

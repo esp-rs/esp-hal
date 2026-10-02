@@ -37,8 +37,7 @@ pub fn block_version() -> (u8, u8) {
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L21>
 #[instability::unstable]
 pub fn rtc_calib_version() -> u8 {
-    // ESP-IDF compares `major * 100 + minor` against 1, so any non-zero block version
-    // selects calibration version 1.
+    // Any non-zero block version selects calibration version 1.
     let (major, minor) = block_version();
     if major > 0 || minor > 0 { 1 } else { 0 }
 }
@@ -98,17 +97,6 @@ pub enum AdcCalibUnit {
     ADC2,
 }
 
-/// Returns a signed value from the raw data from eFuse. Sign bit is the index of the sign bit,
-/// starting from 0. see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L19>.
-fn get_signed_val(data: u32, sign_bit: u32) -> i32 {
-    let sign_mask = 1u32 << sign_bit;
-    if data & sign_mask != 0 {
-        -((data & !sign_mask) as i32)
-    } else {
-        data as i32
-    }
-}
-
 /// Returns the ADC initial code for specified attenuation from efuse.
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L34>
@@ -141,6 +129,10 @@ pub fn rtc_calib_get_chan_compens(
     channel: u16,
     atten: Attenuation,
 ) -> Option<i32> {
+    if rtc_calib_version() != 1 {
+        return None;
+    }
+
     let chan_diff: u32 = super::read_field_le(match (unit, channel) {
         (AdcCalibUnit::ADC1, 0) => ADC1_CH0_ATTEN0_INITCODE_DIFF,
         (AdcCalibUnit::ADC1, 1) => ADC1_CH1_ATTEN0_INITCODE_DIFF,
@@ -159,7 +151,7 @@ pub fn rtc_calib_get_chan_compens(
         _ => return None,
     });
 
-    Some(get_signed_val(chan_diff, 3) * (4 - atten as i32))
+    Some(super::sign_magnitude(chan_diff, 3) * (4 - atten as i32))
 }
 
 /// Returns the ADC calibration reference point voltage.
@@ -200,5 +192,5 @@ pub fn rtc_calib_cal_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16>
         Attenuation::_6dB | Attenuation::_11dB => 2350,
     };
 
-    Some((chk_offset + get_signed_val(cal_vol as u32, 9)) as u16)
+    Some((chk_offset + super::sign_magnitude(cal_vol as u32, 9)) as u16)
 }

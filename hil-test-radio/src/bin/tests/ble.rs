@@ -3,12 +3,16 @@
 //! The support firmware is a BLE peripheral; this test binary acts as the
 //! central device and validates that scanning and connection establishment work
 //! against real peer hardware.
+//!
+//! On chips with an IEEE 802.15.4 radio, it also checks that BLE still works when
+//! the 802.15.4 driver was brought up first.
 
 //% CHIP_FILTER(has_wifi_ble): esp32c6 || esp32s3
 //% HARNESS-FIRMWARE(has_wifi_ble): ble_peripheral_support
 
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(has_wifi_ble): esp-radio/ble esp-radio esp-radio-unstable
+//% FEATURES-IF(soc_has_ieee802154): esp-radio/ieee802154
 
 //% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4
 

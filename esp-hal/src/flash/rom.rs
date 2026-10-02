@@ -164,6 +164,18 @@ pub(super) fn write(dest_addr: u32, data: &[u32]) -> Result<(), Error> {
     })
 }
 
+/// Write `len` bytes at `dest_addr` with transparent encryption.
+///
+/// `data` must be word-aligned. On ESP32, `dest_addr` and `len` must be
+/// 32-byte aligned. On later chips, 16/32/64-byte rows are accepted. The
+/// ROM may encrypt in place.
+#[inline(always)]
+pub(super) fn write_encrypted(dest_addr: u32, data: *mut u32, len: u32) -> Result<(), Error> {
+    check_rc(unsafe {
+        esp_rom_sys::rom::spiflash::esp_rom_spiflash_write_encrypted(dest_addr, data, len)
+    })
+}
+
 #[inline(always)]
 pub(super) fn unlock() -> Result<(), Error> {
     check_rc(unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_unlock() })

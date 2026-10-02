@@ -1843,7 +1843,15 @@ impl DmaDriver {
             w.dma_rx_ena().clear_bit()
         });
 
-        // PDMA: nothing to do
+        // PDMA has no enable bit: whether the peripheral takes its data from the
+        // descriptors or from the FIFO is decided by whether a link is armed, so
+        // a stale link keeps routing a CPU-driven transfer into DMA. This mirrors
+        // the clearing `start_transfer_dma` already does on the way *in*.
+        #[cfg(any(spi_master_version = "1", spi_master_version = "2"))]
+        {
+            self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
+            self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
+        }
     }
 
     fn regs(&self) -> &RegisterBlock {

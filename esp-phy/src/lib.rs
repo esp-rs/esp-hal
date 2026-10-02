@@ -285,16 +285,18 @@ impl PhyState {
                 self.phy_clock_state_transition_timestamp = now;
                 self.mac_clock_delta_since_last_call += delta;
             }
-            if self.calibrated {
-                unsafe {
-                    sys::include::phy_wakeup_init();
+            phy_clocks::with_calibration_clocks(|| {
+                if self.calibrated {
+                    unsafe {
+                        sys::include::phy_wakeup_init();
+                    }
+                    #[cfg(phy_backed_up_digital_register_count_is_set)]
+                    self.restore_digital_regs();
+                } else {
+                    self.calibrate();
+                    self.calibrated = true;
                 }
-                #[cfg(phy_backed_up_digital_register_count_is_set)]
-                self.restore_digital_regs();
-            } else {
-                self.calibrate();
-                self.calibrated = true;
-            }
+            });
         }
         #[cfg(esp32)]
         if let Some(cb) = self.mac_time_update_cb {
