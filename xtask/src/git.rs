@@ -70,6 +70,44 @@ pub fn current_branch() -> Result<String> {
     Ok(String::from_utf8_lossy(&status.stdout).trim().to_string())
 }
 
+/// Whether `git_ref` (a tag, branch or commit) exists in the repository.
+pub fn ref_exists(workspace: &std::path::Path, git_ref: &str) -> Result<bool> {
+    let status = Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet"])
+        .arg(format!("{git_ref}^{{commit}}"))
+        .current_dir(workspace)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .context("Failed to check whether a git ref exists")?;
+
+    Ok(status.success())
+}
+
+/// Read `repo_relative_path` as it existed at `git_ref` via `git show`. The path
+/// must use `/` separators, as git addresses tree entries that way on every OS.
+pub fn show_file_at_ref(
+    workspace: &std::path::Path,
+    git_ref: &str,
+    repo_relative_path: &str,
+) -> Result<String> {
+    let spec = format!("{git_ref}:{repo_relative_path}");
+    let output = Command::new("git")
+        .arg("show")
+        .arg(&spec)
+        .current_dir(workspace)
+        .output()
+        .with_context(|| format!("Failed to run `git show {spec}`"))?;
+
+    anyhow::ensure!(
+        output.status.success(),
+        "`git show {spec}` failed: {}",
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 #[cfg(feature = "release")]
 /// Ensure that the git workspace is clean (no uncommitted changes).
 pub fn ensure_workspace_clean(workspace: &std::path::Path) -> Result<()> {
