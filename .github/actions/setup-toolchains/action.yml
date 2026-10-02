@@ -10,7 +10,7 @@ inputs:
   current-xtensa-version:
     description: Xtensa Rust release for the "current" channel.
     required: false
-    default: "1.97.0.0"
+    default: "1.98.0.0"
   xtensa:
     description: When "true", install the Xtensa toolchain.
     required: false
