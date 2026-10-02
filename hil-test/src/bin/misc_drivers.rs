@@ -694,6 +694,33 @@ mod twai {
             assert!(frames < SENT, "the FIFO did not overrun");
         }
 
+        #[test]
+        // A stopped driver takes a new bitrate and operating mode, and starts
+        // again with them.
+        fn test_reconfigure_stopped_driver(ctx: Context<Blocking>) {
+            let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3]).unwrap();
+
+            // Normal mode: nobody acknowledges on the loopback pin
+            let mut config = ctx.twai.stop();
+            config.set_operating_mode(TwaiMode::Normal);
+            config.set_baud_rate(twai::BaudRate::B500K);
+            let twai = config.start();
+
+            // Back to self-test mode at another bitrate: the frame loops back
+            let mut config = twai.stop();
+            config.set_operating_mode(TwaiMode::SelfTest);
+            config.set_baud_rate(twai::BaudRate::B250K);
+            let mut twai = config.start();
+
+            let (rx, tx) = twai.parts();
+            block!(tx.transmit(&frame)).unwrap();
+            let received = block!(rx.receive()).unwrap();
+            assert_eq!(received.data(), &[1, 2, 3]);
+
+            // The borrowed halves are gone: the driver can be stopped again
+            let _config = twai.stop();
+        }
+
         fn no_init() {}
 
         #[test(init = no_init)]
