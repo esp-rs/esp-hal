@@ -203,6 +203,8 @@ pub struct Camera<'d, Dm: DriverMode = Blocking> {
 
 impl<'d> Camera<'d, Blocking> {
     /// Creates a new `Camera` instance with DMA support.
+    // Work around an Xtensa LLVM PCREL_WRAPPER failure under fat LTO.
+    #[cfg_attr(xtensa, inline(never))]
     pub fn new(
         cam: Cam<'d>,
         channel: impl CamDmaRxChannel<'d>,
