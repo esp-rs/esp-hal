@@ -193,10 +193,10 @@ macro_rules! critical_regs_asm {
     ) => {
         core::arch::global_asm!(
             ".section .rwtext,\"ax\",@progbits",
-            ".global critical_regs_save",
-            ".type critical_regs_save, @function",
+            ".global __esp_hal_critical_regs_save",
+            ".type __esp_hal_critical_regs_save, @function",
             ".align 4",
-            "critical_regs_save:",
+            "__esp_hal_critical_regs_save:",
             "csrw mscratch, t0",
             "mv t0, a0",
             "sw ra, {ra}(t0)",
@@ -256,12 +256,12 @@ macro_rules! critical_regs_asm {
             "lw t2, {t2}(t3)",
             "lw t3, {t3}(t3)",
             "ret",
-            ".size critical_regs_save, . - critical_regs_save",
+            ".size __esp_hal_critical_regs_save, . - __esp_hal_critical_regs_save",
 
-            ".global critical_regs_restore",
-            ".type critical_regs_restore, @function",
+            ".global __esp_hal_critical_regs_restore",
+            ".type __esp_hal_critical_regs_restore, @function",
             ".align 4",
-            "critical_regs_restore:",
+            "__esp_hal_critical_regs_restore:",
             "la t1, {critical_frame_ptr}",
             // The mask keeps a single-core chip on entry 0 without a second copy of this block.
             // No general register is live here, so `t1` and `t2` are free.
@@ -322,7 +322,7 @@ macro_rules! critical_regs_asm {
             "lw t0, {t0}(t0)",
             "2:",
             "ret",
-            ".size critical_regs_restore, . - critical_regs_restore",
+            ".size __esp_hal_critical_regs_restore, . - __esp_hal_critical_regs_restore",
             ra = const offset_of!(CriticalSleepFrame, ra),
             sp = const offset_of!(CriticalSleepFrame, sp),
             gp = const offset_of!(CriticalSleepFrame, gp),
@@ -418,7 +418,9 @@ critical_regs_asm!(
 );
 
 unsafe extern "C" {
+    #[link_name = "__esp_hal_critical_regs_save"]
     fn critical_regs_save(frame: *mut CriticalSleepFrame) -> *mut CriticalSleepFrame;
+    #[link_name = "__esp_hal_critical_regs_restore"]
     fn critical_regs_restore();
 }
 
