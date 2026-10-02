@@ -420,12 +420,7 @@ mod indexed {
     }
 
     pub(super) fn set_entry_invalid(entry_id: u32) {
-        with_entry(entry_id, || {
-            // Match `mmu_ll_set_entry_invalid`: the PAC reset value is not zero on every chip.
-            SPI0::regs()
-                .mmu_item_content()
-                .write(|w| unsafe { w.bits(0) });
-        });
+        with_entry(entry_id, || SPI0::regs().mmu_item_content().reset());
     }
 }
 
