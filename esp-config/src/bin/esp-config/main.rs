@@ -332,7 +332,7 @@ fn parse_configs(
 mod tests {
     use super::*;
 
-    // Regression test to ensure `--chip` argument parsing does not panic[cite: 1]
+    // Regression test to ensure `--chip` argument parsing does not panic
     #[test]
     fn parses_chip_arg() {
         let args = Args::try_parse_from(["esp-config", "--chip", "esp32c6"]).unwrap();
