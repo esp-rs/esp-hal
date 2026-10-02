@@ -641,6 +641,20 @@ where
         reg_block
             .wdtconfig0()
             .modify(|_, w| w.wdt_en().bit(enabled));
+
+        // The enable-bit write is subject to the same latching as the other
+        // WDTCONFIG0 fields on chips that have WDT_CONF_UPDATE_EN. Without the
+        // strobe a disable does not take effect, so a watchdog left armed by a
+        // previous image keeps running across soft resets. Observed on
+        // ESP32-C5: esp_hal::init() could not disable the inherited MWDT and
+        // the next image boot-looped on the stale hold.
+        #[cfg(any(
+            esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31
+        ))]
+        reg_block
+            .wdtconfig0()
+            .modify(|_, w| w.wdt_conf_update_en().set_bit());
+
         if enabled {
             reg_block.wdtconfig0().modify(|_, w| unsafe {
                 w.wdt_flashboot_mod_en().bit(false);
