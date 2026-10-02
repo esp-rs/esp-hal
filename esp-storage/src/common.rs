@@ -5,9 +5,7 @@ pub use esp_hal::peripherals::FLASH as Flash;
 
 #[cfg(multi_core)]
 esp_hal::if_unstable_hal! {
-    use esp_hal::peripherals::CPU_CTRL;
     use esp_hal::system::Cpu;
-    use esp_hal::system::CpuControl;
     use esp_hal::system::is_running;
 }
 
@@ -252,6 +250,13 @@ pub(crate) enum MultiCoreStrategy {
 impl<'d> FlashStorage<'d> {
     /// Enable auto parking of the second core before writing to flash.
     /// The other core will be automatically un-parked when the write is complete.
+    ///
+    /// With the `rt` feature of `esp-hal`, the other core parks itself through an
+    /// inter-processor call, so it is never stopped while it holds a lock. A write
+    /// fails with [`FlashStorageError::OtherCoreRunning`] if it doesn't park in time.
+    ///
+    /// Without `rt`, the other core is stalled, and interrupts on this core stay
+    /// disabled until it is un-parked.
     pub fn multicore_auto_park(mut self) -> FlashStorage<'d> {
         self.multi_core_strategy = MultiCoreStrategy::AutoPark;
         self
@@ -291,10 +296,16 @@ impl MultiCoreStrategy {
             #[cfg(multi_core)]
             MultiCoreStrategy::AutoPark => {
                 esp_hal::if_unstable_hal! {
-                    let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
                     for other_cpu in Cpu::other() {
                         if is_running(other_cpu) {
-                            unsafe { cpu_ctrl.park_core(other_cpu) };
+                            esp_hal::if_rt!({
+                                crate::ipc_park::park(other_cpu)?;
+                            } else {
+                                let mut cpu_ctrl = esp_hal::system::CpuControl::new(unsafe {
+                                    esp_hal::peripherals::CPU_CTRL::steal()
+                                });
+                                unsafe { cpu_ctrl.park_core(other_cpu) };
+                            });
                             return Ok(true);
                         }
                     }
@@ -318,10 +329,16 @@ impl MultiCoreStrategy {
                     && unpark
                 {
                     esp_hal::if_unstable_hal! {
-                        let mut cpu_ctrl = CpuControl::new(unsafe { CPU_CTRL::steal() });
-                        for other_cpu in Cpu::other() {
-                            cpu_ctrl.unpark_core(other_cpu);
-                        }
+                        esp_hal::if_rt!({
+                            crate::ipc_park::unpark();
+                        } else {
+                            let mut cpu_ctrl = esp_hal::system::CpuControl::new(unsafe {
+                                esp_hal::peripherals::CPU_CTRL::steal()
+                            });
+                            for other_cpu in Cpu::other() {
+                                cpu_ctrl.unpark_core(other_cpu);
+                            }
+                        });
                     }
                 }
             }
@@ -337,6 +354,22 @@ impl MultiCoreStrategy {
     /// * `Ok` with the result of the operation
     /// * `Err` if the operation fails
     pub(crate) fn with<R>(
+        self,
+        f: impl FnOnce() -> Result<R, FlashStorageError>,
+    ) -> Result<R, FlashStorageError> {
+        // Without `rt` the other core is stalled, so keep interrupts off until it is
+        // un-parked: a handler could otherwise wait on something the stalled core holds.
+        #[cfg(multi_core)]
+        esp_hal::if_rt!({} else {
+            if self == MultiCoreStrategy::AutoPark {
+                return crate::maybe_with_critical_section(|| self.park_and_run(f));
+            }
+        });
+
+        self.park_and_run(f)
+    }
+
+    fn park_and_run<R>(
         self,
         f: impl FnOnce() -> Result<R, FlashStorageError>,
     ) -> Result<R, FlashStorageError> {

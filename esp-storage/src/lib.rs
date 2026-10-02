@@ -49,6 +49,11 @@ mod chip_specific;
 
 mod buffer;
 mod common;
+// Inter-processor calls need the `rt` feature
+#[cfg(all(multi_core, not(feature = "emulation")))]
+esp_hal::if_rt!({
+    mod ipc_park;
+} else {});
 
 pub use common::{Flash, FlashStorage, FlashStorageError};
 
