@@ -124,6 +124,9 @@ macro_rules! property {
     ("timergroup.timg_has_divcnt_rst") => {
         true
     };
+    ("timergroup.wdt_has_conf_update") => {
+        true
+    };
     ("timergroup.rc_fast_calibration_divider_min_rev") => {
         0
     };

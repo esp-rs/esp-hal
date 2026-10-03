@@ -360,6 +360,7 @@ rc_fast_calibration = { divider = 32, min_rev = 0 }
 # `cal_val` the same way, see rtc_clk_cal_internal() in
 # components/esp_hw_support/port/esp32h4/rtc_time.c.
 rc_slow_calibration = { multiplier = 4 }
+wdt_has_conf_update = true
 
 [device.aes]
 support_status = "not_supported"

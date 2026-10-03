@@ -641,6 +641,13 @@ where
         reg_block
             .wdtconfig0()
             .modify(|_, w| w.wdt_en().bit(enabled));
+
+        // The enable-bit write is latched by the update strobe as well.
+        #[cfg(timergroup_wdt_has_conf_update)]
+        reg_block
+            .wdtconfig0()
+            .modify(|_, w| w.wdt_conf_update_en().set_bit());
+
         if enabled {
             reg_block.wdtconfig0().modify(|_, w| unsafe {
                 w.wdt_flashboot_mod_en().bit(false);
@@ -652,7 +659,7 @@ where
                 w.wdt_stg3().bits(MwdtStageAction::Off as u8)
             });
 
-            #[cfg(any(esp32c2, esp32c3, esp32c6))]
+            #[cfg(timergroup_wdt_has_conf_update)]
             reg_block
                 .wdtconfig0()
                 .modify(|_, w| w.wdt_conf_update_en().set_bit());
@@ -731,7 +738,7 @@ where
 
         config_register.write(|w| unsafe { w.hold().bits(timeout) });
 
-        #[cfg(any(esp32c2, esp32c3, esp32c6))]
+        #[cfg(timergroup_wdt_has_conf_update)]
         reg_block
             .wdtconfig0()
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
@@ -758,6 +765,11 @@ where
                 MwdtStage::Stage3 => w.wdt_stg3().bits(action as u8),
             }
         });
+
+        #[cfg(timergroup_wdt_has_conf_update)]
+        reg_block
+            .wdtconfig0()
+            .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
         self.set_write_protection(true);
     }

@@ -9,7 +9,7 @@ mod tests {
     #[cfg(timergroup_driver_supported)]
     use esp_hal::{
         clock::CpuClock,
-        timer::timg::{MwdtStage, TimerGroup},
+        timer::timg::{MwdtStage, MwdtStageAction, TimerGroup},
     };
 
     #[test]
@@ -130,5 +130,68 @@ mod tests {
 
         let delay = Delay::new();
         delay.delay(Duration::from_millis(1000));
+    }
+
+    #[test]
+    #[cfg(timergroup_timg0)]
+    fn test_timg0_wdt_timeout_is_applied() {
+        let p = esp_hal::init(Config::default());
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let mut wdt0 = timg0.wdt;
+
+        wdt0.set_timeout(MwdtStage::Stage0, Duration::from_secs(2));
+        wdt0.enable();
+
+        let delay = Delay::new();
+
+        // Outliving the default hold proves the requested timeout is applied.
+        delay.delay(Duration::from_millis(1_500));
+
+        // Disable the watchdog, to prevent accidentally resetting the MCU while the host is setting
+        // up the next test.
+        wdt0.disable();
+    }
+
+    #[test]
+    #[cfg(timergroup_timg0)]
+    fn test_timg0_wdt_stage_action_is_applied() {
+        let p = esp_hal::init(Config::default());
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let mut wdt0 = timg0.wdt;
+
+        wdt0.set_timeout(MwdtStage::Stage0, Duration::from_secs(1));
+        wdt0.enable();
+        wdt0.set_stage_action(MwdtStage::Stage0, MwdtStageAction::Off);
+
+        let delay = Delay::new();
+
+        // Stage 0 is off - outliving the hold proves the stage action is applied.
+        delay.delay(Duration::from_millis(1_500));
+
+        // Disable the watchdog, to prevent accidentally resetting the MCU while the host is setting
+        // up the next test.
+        wdt0.disable();
+    }
+
+    #[test]
+    #[cfg(timergroup_timg0)]
+    fn test_timg0_wdt_disable_is_applied() {
+        let p = esp_hal::init(Config::default());
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let mut wdt0 = timg0.wdt;
+
+        wdt0.set_timeout(MwdtStage::Stage0, Duration::from_secs(1));
+        wdt0.enable();
+
+        let delay = Delay::new();
+        delay.delay(Duration::from_millis(50));
+
+        wdt0.disable();
+
+        // Outliving the hold after disabling (and not feeding) proves disable is applied.
+        delay.delay(Duration::from_millis(1_500));
     }
 }
