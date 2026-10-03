@@ -46,9 +46,13 @@ pub fn is_running(core: Cpu) -> bool {
 pub(crate) fn pre_system_reset() {
     // Match IDF's esp_restart_noos(): reset and stall only the other core.
     // The caller must remain alive to request the subsequent system reset.
-    let other_core = match Cpu::current() {
-        Cpu::ProCpu => Cpu::AppCpu,
-        Cpu::AppCpu => Cpu::ProCpu,
+    // The other core by hart parity rather than `Cpu::current()`, whose
+    // unknown-hart branch panics: a panic handler resets through here, and a
+    // panic on this path would re-enter it.
+    let other_core = if crate::system::raw_core() & 1 == 0 {
+        Cpu::AppCpu
+    } else {
+        Cpu::ProCpu
     };
     LP_AON::regs()
         .cpucore_cfg()
