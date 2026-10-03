@@ -16,6 +16,14 @@ use crate::{
     system::{Peripheral, PeripheralGuard},
 };
 
+fn burst_size_bits(config: ExternalBurstConfig) -> u8 {
+    match config {
+        ExternalBurstConfig::Size16 => 1,
+        ExternalBurstConfig::Size32 => 2,
+        ExternalBurstConfig::Size64 => 3,
+    }
+}
+
 /// Immutable per-channel metadata owned by each `AXI_DMA_CH*` singleton.
 pub(crate) struct ChannelInfo {
     pub(crate) channel: u8,
@@ -129,8 +137,12 @@ impl RegisterAccess for AxiGdmaTxChannel<'_> {
         self.ch().out_conf0().toggle(|w, en| w.out_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        self.ch().out_conf0().modify(|_, w| unsafe {
+            w.out_burst_size_sel()
+                .bits(burst_size_bits(burst_mode.external_memory))
+        });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()
@@ -319,8 +331,12 @@ impl RegisterAccess for AxiGdmaRxChannel<'_> {
         self.ch().in_conf0().toggle(|w, en| w.in_rst().bit(en));
     }
 
-    // AXI-DMA data burst is always enabled; nothing to configure.
-    fn set_burst_mode(&self, _burst_mode: BurstConfig) {}
+    fn set_burst_mode(&self, burst_mode: BurstConfig) {
+        self.ch().in_conf0().modify(|_, w| unsafe {
+            w.in_burst_size_sel()
+                .bits(burst_size_bits(burst_mode.external_memory))
+        });
+    }
 
     fn set_descr_burst_mode(&self, burst_mode: bool) {
         self.ch()

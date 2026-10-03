@@ -74,8 +74,7 @@ pub trait RegisterAccess: Sealed {
     /// Resets the state machine of the channel and FIFO pointer.
     fn reset(&self);
 
-    /// Enables or disables INCR burst transfer for channel reading
-    /// accessing data in internal RAM.
+    /// Configures data burst transfers for this channel.
     fn set_burst_mode(&self, burst_mode: BurstConfig);
 
     /// Enables or disables burst transfer for channel reading

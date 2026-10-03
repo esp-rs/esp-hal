@@ -145,11 +145,14 @@ cfg_select! {
             /// Configures the burst size for PSRAM transfers.
             ///
             /// Burst mode is always enabled for PSRAM transfers.
+            /// On AXI DMA, this size also applies to internal memory transfers,
+            /// regardless of [`Self::internal_memory`].
             pub external_memory: ExternalBurstConfig,
 
             /// Enables or disables the burst mode for internal memory transfers.
             ///
-            /// The burst size is not configurable.
+            /// AXI DMA data bursts are always enabled, with their size configured by
+            /// [`Self::external_memory`].
             pub internal_memory: InternalBurstConfig,
         }
 
