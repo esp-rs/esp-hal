@@ -125,7 +125,7 @@ macro_rules! property {
         true
     };
     ("timergroup.wdt_has_conf_update") => {
-        false
+        true
     };
     ("timergroup.rc_fast_calibration_divider_min_rev") => {
         0
