@@ -367,15 +367,10 @@ pub(crate) fn enable_pmp() {
         end_addr: u32,
         permission: u8,
     ) -> Result<(), PmpError> {
-        let granularity = cfg_select! {
-            // this limits the effectiveness for these targets
-            // we could adjust the linker scripts to honor the granularity but that
-            // would waste some memory
-            //
-            // TODO: #6311 will be the proper metadata backed implementation
-            any(esp32c5, esp32c61, esp32p4, esp32s31) => 128,
-            _ => 4,
-        };
+        // The CPU hardwires the address bits below the PMP granularity to zero, rounding both ends
+        // of the region down. Round the start up instead, so that the region cannot grow downwards
+        // over memory in front of it, such as the trap section and its interrupt handler table.
+        let granularity = property!("soc.cpu_pmp_granularity");
         let start_addr = start_addr.next_multiple_of(granularity);
         let end_addr = end_addr & !(granularity - 1);
 

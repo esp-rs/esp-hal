@@ -47,6 +47,7 @@ mod init_tests {
 
     #[test]
     #[should_panic]
+    #[timeout(6)]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_without_scheduler(p: Peripherals) {
         // esp-rtos must be initialized before esp-radio.
@@ -55,6 +56,7 @@ mod init_tests {
 
     #[test]
     #[should_panic]
+    #[timeout(6)]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_cs(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -67,6 +69,7 @@ mod init_tests {
 
     #[test]
     #[should_panic]
+    #[timeout(6)]
     #[cfg(soc_has_wifi)]
     fn test_init_fails_interrupt_free(p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
@@ -77,6 +80,7 @@ mod init_tests {
 
     #[test]
     #[should_panic]
+    #[timeout(6)]
     #[cfg(soc_has_wifi)]
     async fn test_init_fails_in_interrupt_executor_task(p: Peripherals) {
         static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<2>> = StaticCell::new();

@@ -122,7 +122,7 @@ portable-atomic    = "1.11"
 static_cell        = { version = "2.1.1" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
-trouble-host = { version = "0.7.0", features = [
+trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
@@ -221,6 +221,14 @@ esp32h2 = [
     "esp-bootloader-esp-idf/esp32h2",
     "esp-metadata-generated/esp32h2",
     "esp-rtos?/esp32h2",
+]
+esp32h4 = [
+    "esp-hal/esp32h4",
+    "esp-alloc?/esp32h4",
+    "esp-bootloader-esp-idf/esp32h4",
+    "esp-metadata-generated/esp32h4",
+    "esp-rtos?/esp32h4",
+    "esp-storage?/esp32h4",
 ]
 esp32p4 = [
     "esp-hal/esp32p4",

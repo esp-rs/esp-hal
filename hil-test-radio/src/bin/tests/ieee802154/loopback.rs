@@ -1,7 +1,11 @@
 #[embedded_test::tests(default_timeout = 30, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
     use embassy_time::{Duration, Timer};
-    use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
+    use esp_hal::{
+        clock::CpuClock,
+        peripherals::{IEEE802154, Peripherals, TIMG0},
+        timer::timg::TimerGroup,
+    };
     use esp_radio::ieee802154::{Config, Frame, Ieee802154};
     use hil_test::ieee802154::{CHANNEL, DUT_ADDRESS, PAN_ID, PAYLOAD, SUPPORT_ADDRESS};
     use ieee802154::mac::{
@@ -55,11 +59,11 @@ mod tests {
         }
     }
 
-    fn start_radio(p: Peripherals) -> Ieee802154<'static> {
-        let timg0 = TimerGroup::new(p.TIMG0);
+    fn start_radio(timg0: TIMG0<'static>, radio: IEEE802154<'static>) -> Ieee802154<'static> {
+        let timg0 = TimerGroup::new(timg0);
         esp_rtos::start(timg0.timer0);
 
-        let mut ieee802154 = Ieee802154::new(p.IEEE802154);
+        let mut ieee802154 = Ieee802154::new(radio);
         ieee802154.set_config(dut_config());
         ieee802154.start_receive();
         ieee802154
@@ -69,7 +73,7 @@ mod tests {
     /// should be able to observe the received ACK frame.
     #[test]
     async fn transmit_is_acknowledged(p: Peripherals) {
-        let mut ieee802154 = start_radio(p);
+        let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
 
         let mut acked = false;
         for seq in 0..30u8 {
@@ -92,10 +96,39 @@ mod tests {
     /// the DUT should receive a frame carrying the payload it sent.
     #[test]
     async fn receives_echoed_frame(p: Peripherals) {
-        let mut ieee802154 = start_radio(p);
+        let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
 
-        let mut echoed = false;
-        'outer: for seq in 0..30u8 {
+        assert!(
+            receives_echo(&mut ieee802154).await,
+            "did not receive an echoed frame from the peer board"
+        );
+    }
+
+    /// A BLE controller created after the 802.15.4 driver, and dropped before it, must leave the
+    /// running driver alone: creating it must not reset the 802.15.4 MAC (and the RF frontend
+    /// under the PHY), and dropping it must not power down or gate what the driver still uses.
+    #[test]
+    async fn survives_ble_init_and_drop(p: Peripherals) {
+        use esp_radio::ble::controller::BleConnector;
+
+        let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
+
+        let ble = BleConnector::new(p.BT, Default::default()).unwrap();
+        assert!(
+            receives_echo(&mut ieee802154).await,
+            "802.15.4 stopped working once BLE was initialized"
+        );
+
+        drop(ble);
+        assert!(
+            receives_echo(&mut ieee802154).await,
+            "802.15.4 stopped working once BLE was dropped"
+        );
+    }
+
+    /// Sends frames to the peer board until it echoes one back.
+    async fn receives_echo(ieee802154: &mut Ieee802154<'_>) -> bool {
+        for seq in 0..30u8 {
             ieee802154.transmit(&data_frame(seq, true), false).ok();
 
             // Wait for the peer to auto-ACK and echo the frame back to us.
@@ -104,15 +137,11 @@ mod tests {
                 if let Some(Ok(received)) = ieee802154.received()
                     && received.frame.payload.as_slice() == PAYLOAD
                 {
-                    echoed = true;
-                    break 'outer;
+                    return true;
                 }
             }
         }
 
-        assert!(
-            echoed,
-            "did not receive an echoed frame from the peer board"
-        );
+        false
     }
 }

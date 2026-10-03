@@ -43,7 +43,7 @@ block-device-adapters = "0.2.0"
 embedded-fatfs = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
 embedded-partitions = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 rtos-trace = { version = "0.2.0", optional = true }
-trouble-host = { version = "0.7.0", features = [
+trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",

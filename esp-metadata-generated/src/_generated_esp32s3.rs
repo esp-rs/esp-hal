@@ -88,6 +88,9 @@ macro_rules! property {
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
     };
+    ("gpio.need_soft_isolate_during_pd") => {
+        false
+    };
     ("gpio.has_bank_1") => {
         true
     };
@@ -352,6 +355,12 @@ macro_rules! property {
     ("wifi.csi_supported") => {
         true
     };
+    ("wifi.has_nan") => {
+        false
+    };
+    ("wifi.has_ftm") => {
+        true
+    };
     ("phy.combo_module") => {
         true
     };
@@ -451,6 +460,18 @@ macro_rules! property {
     ("sleep.deep_sleep_needs_gpio_isolation") => {
         true
     };
+    ("sleep.cpu_retention_mem_size") => {
+        8800
+    };
+    ("sleep.cpu_retention_mem_align") => {
+        16
+    };
+    ("sleep.cpu_retention_mem_start") => {
+        1070104576
+    };
+    ("sleep.cpu_retention_mem_end") => {
+        1070530560
+    };
     ("assist_debug.has_sp_monitor") => {
         false
     };
@@ -537,6 +558,12 @@ macro_rules! property {
     };
     ("soc.cpu_mcause_mask", str) => {
         stringify!(0)
+    };
+    ("soc.cpu_pmp_granularity") => {
+        4
+    };
+    ("soc.cpu_pmp_granularity", str) => {
+        stringify!(4)
     };
     ("clock_tree.system_pre_div_in") => {
         [crate ::soc::clocks::SystemPreDivInConfig::Xtal, crate

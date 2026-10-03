@@ -88,6 +88,7 @@ peripherals = [
     { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
     { name = "PLIC_MX" },
+    { name = "PLIC_UX", hidden = true },
     { name = "PMU" },
     { name = "RMT", clock_group = "RMT" },
     { name = "RNG", pac = "LP_PERI" },
@@ -347,6 +348,11 @@ wakeup_sources = {
     LpCore = 11,
 }
 
+[device.sleep.retention]
+cpu_retention = "software"
+cpu_retention_frame = "c6_h2"
+supports_top_power_down = true
+
 [device.parl_io]
 support_status = "partial"
 version = 1
@@ -416,6 +422,7 @@ support_status = "partial"
 has_wifi6 = true
 mac_version = 2
 csi_supported = true
+has_ftm = true
 
 [device.bt]
 support_status = "partial"

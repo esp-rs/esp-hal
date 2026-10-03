@@ -33,6 +33,36 @@ use esp_hal::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+cfg_select! {
+    feature = "esp32s3" => {
+        use esp_hal::rtc_cntl::CacheTagRetentionStorage;
+
+        #[esp_hal::ram(reclaimed, unstable(zeroed))]
+        static CACHE_TAGMEM: CacheTagRetentionStorage = CacheTagRetentionStorage::new();
+    }
+    _ => {}
+}
+// An example reads no chip capability, so this condition and the one at `enable_cpu_powerdown`
+// list the chips that `supports_cpu_power_down` holds for.
+cfg_select! {
+    any(
+        feature = "esp32c3",
+        feature = "esp32s3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32h2",
+        feature = "esp32s31",
+        feature = "esp32p4"
+    ) => {
+        use esp_hal::rtc_cntl::CpuRetentionStorage;
+
+        #[esp_hal::ram(reclaimed, unstable(zeroed))]
+        static CPU_RETENTION_MEMORY: CpuRetentionStorage = CpuRetentionStorage::new();
+    }
+    _ => {}
+}
+
 #[embassy_executor::task]
 async fn periodic() {
     loop {
@@ -109,7 +139,27 @@ async fn main(spawner: Spawner) {
 
     let timg0 = TimerGroup::new(p.TIMG0);
 
-    let sleep = esp_rtos::sleep::configure(p.LPWR);
+    // ESP32, C2 and S2 have no CPU powerdown, but no need to complicate this any further.
+    #[allow(unused_mut)]
+    let mut sleep = esp_rtos::sleep::configure(p.LPWR);
+
+    #[cfg(any(
+        feature = "esp32c3",
+        feature = "esp32s3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32h2",
+        feature = "esp32s31",
+        feature = "esp32p4"
+    ))]
+    sleep
+        .enable_cpu_powerdown(CPU_RETENTION_MEMORY.take())
+        .unwrap();
+
+    #[cfg(feature = "esp32s3")]
+    sleep.keep_cache_tags(CACHE_TAGMEM.take()).unwrap();
+
     esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
 
     let boot_btn = cfg_select! {
