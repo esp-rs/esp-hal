@@ -651,12 +651,12 @@ where
                 w.wdt_stg2().bits(MwdtStageAction::Off as u8);
                 w.wdt_stg3().bits(MwdtStageAction::Off as u8)
             });
-
-            #[cfg(any(esp32c2, esp32c3, esp32c6))]
-            reg_block
-                .wdtconfig0()
-                .modify(|_, w| w.wdt_conf_update_en().set_bit());
         }
+
+        #[cfg(timergroup_wdt_has_conf_update)]
+        reg_block
+            .wdtconfig0()
+            .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
         #[cfg(soc_has_clock_node_timg_wdt_clock)]
         if !enabled {
@@ -731,7 +731,7 @@ where
 
         config_register.write(|w| unsafe { w.hold().bits(timeout) });
 
-        #[cfg(any(esp32c2, esp32c3, esp32c6))]
+        #[cfg(timergroup_wdt_has_conf_update)]
         reg_block
             .wdtconfig0()
             .modify(|_, w| w.wdt_conf_update_en().set_bit());
@@ -758,6 +758,11 @@ where
                 MwdtStage::Stage3 => w.wdt_stg3().bits(action as u8),
             }
         });
+
+        #[cfg(timergroup_wdt_has_conf_update)]
+        reg_block
+            .wdtconfig0()
+            .modify(|_, w| w.wdt_conf_update_en().set_bit());
 
         self.set_write_protection(true);
     }
