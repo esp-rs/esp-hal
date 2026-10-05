@@ -77,9 +77,15 @@ use self::sniffer::Sniffer;
 #[cfg(feature = "wifi-eap")]
 use self::sta::eap::EapStationConfig;
 use self::{
-    ap::{AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
-    scan::{ScanConfig, ScanResults, ScanTypeConfig, free_ap_list_on_drop},
+    scan::{
+        AccessPointInfo,
+        ScanConfig,
+        ScanResults,
+        ScanTypeConfig,
+        convert_ap_info,
+        free_ap_list_on_drop,
+    },
     sta::StationConfig,
     state::*,
 };
@@ -94,6 +100,7 @@ use crate::{
     },
     wifi::event::{EventInfo, WifiEvent},
 };
+#[cfg(wifi_softap_support)]
 pub mod ap;
 
 unstable_module!(

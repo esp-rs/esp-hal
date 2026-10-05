@@ -1,42 +1,11 @@
 //! Wi-Fi access point.
 
-#[cfg(wifi_softap_support)]
 use procmacros::BuilderLite;
 
-#[cfg(feature = "unstable")]
-use super::CountryInfo;
-use super::{AuthenticationMethod, SecondaryChannel, Ssid};
-#[cfg(wifi_softap_support)]
-use super::{DisconnectReason, Protocols};
-use crate::sys::include::wifi_ap_record_t;
-#[cfg(wifi_softap_support)]
+use super::{DisconnectReason, Protocols, SecondaryChannel, Ssid};
 use crate::{WifiError, wifi::AuthenticationMethodConfig};
 
-/// Information about a detected Wi-Fi access point.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub struct AccessPointInfo {
-    /// The SSID of the access point.
-    pub ssid: Ssid,
-    /// The BSSID (MAC address) of the access point.
-    pub bssid: [u8; 6],
-    /// The channel the access point is operating on.
-    pub channel: u8,
-    /// The secondary channel configuration of the access point.
-    pub secondary_channel: SecondaryChannel,
-    /// The signal strength of the access point (RSSI).
-    pub signal_strength: i8,
-    /// The authentication method used by the access point.
-    pub auth_method: Option<AuthenticationMethod>,
-    #[cfg(feature = "unstable")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    /// The country information of the access point (if available from beacon frames).
-    pub country: Option<CountryInfo>,
-}
-
 /// Configuration for a Wi-Fi access point.
-#[cfg(wifi_softap_support)]
 #[derive(Clone, PartialEq, Eq, BuilderLite, Hash, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AccessPointConfig {
@@ -66,7 +35,6 @@ pub struct AccessPointConfig {
     pub(crate) beacon_timeout: u16,
 }
 
-#[cfg(wifi_softap_support)]
 impl AccessPointConfig {
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
         // Soft-AP doesn't support WEP (nor WAPI/OWE, which
@@ -91,7 +59,6 @@ impl AccessPointConfig {
     }
 }
 
-#[cfg(wifi_softap_support)]
 impl Default for AccessPointConfig {
     fn default() -> Self {
         Self {
@@ -109,7 +76,6 @@ impl Default for AccessPointConfig {
 }
 
 /// Information about a station connected to the access point.
-#[cfg(wifi_softap_support)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -123,7 +89,6 @@ pub struct ConnectedInfo {
 }
 
 /// Information about a station disconnected from the access point.
-#[cfg(wifi_softap_support)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -139,7 +104,6 @@ pub struct DisconnectedInfo {
 }
 
 /// Either the [ConnectedInfo] or [DisconnectedInfo].
-#[cfg(wifi_softap_support)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EventInfo {
@@ -147,24 +111,4 @@ pub enum EventInfo {
     Connected(ConnectedInfo),
     /// Information about a station disconnected from the access point.
     Disconnected(DisconnectedInfo),
-}
-
-#[allow(non_upper_case_globals)]
-pub(crate) fn convert_ap_info(record: &wifi_ap_record_t) -> AccessPointInfo {
-    // `record.ssid` is 33 bytes to always fit the NUL terminator of a
-    // maximum-length SSID - clamp to 32 in case the driver ever hands us one
-    // without it.
-    let str_len = record.ssid.iter().position(|&c| c == 0).unwrap_or(32);
-    let ssid = Ssid::try_from(&record.ssid[..str_len]).expect("SSID length is valid");
-
-    AccessPointInfo {
-        ssid,
-        bssid: record.bssid,
-        channel: record.primary,
-        secondary_channel: SecondaryChannel::from_raw(record.second),
-        signal_strength: record.rssi,
-        auth_method: Some(AuthenticationMethod::from_raw(record.authmode)),
-        #[cfg(feature = "unstable")]
-        country: CountryInfo::try_from_c(&record.country),
-    }
 }
