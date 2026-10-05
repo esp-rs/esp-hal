@@ -1,5 +1,6 @@
 crate::unstable_module! {
     pub mod clocks;
+    pub mod trng;
 }
 
 pub(crate) mod cpu_control;
