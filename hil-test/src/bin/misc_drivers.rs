@@ -700,11 +700,25 @@ mod twai {
         fn test_reconfigure_stopped_driver(ctx: Context<Blocking>) {
             let frame = EspTwaiFrame::new_self_reception(StandardId::ZERO, &[1, 2, 3]).unwrap();
 
-            // Normal mode: nobody acknowledges on the loopback pin
+            // Normal mode: nobody acknowledges on the loopback pin, so the
+            // frame is retried until the peripheral turns error passive and
+            // the driver gives up on it. In self-test mode it would have been
+            // sent.
             let mut config = ctx.twai.stop();
             config.set_operating_mode(TwaiMode::Normal);
             config.set_baud_rate(twai::BaudRate::B500K);
-            let twai = config.start();
+            let mut twai = config.start();
+
+            block!(twai.transmit(&frame)).unwrap();
+            assert_eq!(
+                block!(twai.transmit(&frame)),
+                Err(twai::EspTwaiError::TransmissionAborted)
+            );
+            assert!(twai.transmit_error_count() >= 128);
+            assert!(
+                twai.receive().is_err(),
+                "an unacknowledged frame was received"
+            );
 
             // Back to self-test mode at another bitrate: the frame loops back
             let mut config = twai.stop();
@@ -712,7 +726,7 @@ mod twai {
             config.set_baud_rate(twai::BaudRate::B250K);
             let mut twai = config.start();
 
-            let (rx, tx) = twai.parts();
+            let (rx, tx) = twai.split_mut();
             block!(tx.transmit(&frame)).unwrap();
             let received = block!(rx.receive()).unwrap();
             assert_eq!(received.data(), &[1, 2, 3]);

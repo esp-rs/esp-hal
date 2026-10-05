@@ -1281,11 +1281,11 @@ where
         self.rx.receive()
     }
 
-    /// The receiving and transmitting halves, borrowed. Unlike [`Self::split`]
+    /// Borrows the receiving and transmitting halves. Unlike [`Self::split`]
     /// the driver stays whole, so it can still be stopped and reconfigured
     /// ([`Self::stop`]) once they are no longer in use.
     #[instability::unstable]
-    pub fn parts(&mut self) -> (&mut TwaiRx<'d, Dm>, &mut TwaiTx<'d, Dm>) {
+    pub fn split_mut(&mut self) -> (&mut TwaiRx<'d, Dm>, &mut TwaiTx<'d, Dm>) {
         (&mut self.rx, &mut self.tx)
     }
 
