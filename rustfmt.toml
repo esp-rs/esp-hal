@@ -16,3 +16,7 @@ enum_discrim_align_threshold = 35
 group_imports       = "StdExternalCrate"
 imports_granularity = "Crate"
 imports_layout      = "HorizontalVertical"
+
+# The esp-generate template contains `//%` and `//+` directives that formatting
+# (in particular `wrap_comments`) would break.
+ignore = ["template"]

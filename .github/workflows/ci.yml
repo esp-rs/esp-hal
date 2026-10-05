@@ -27,6 +27,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   DEFMT_LOG: trace
   PROBE_RS_CONFIG_PRESET: local-hil
+  ESP_GENERATE_VERSION: v2.0.0
 
 # Cancel any currently running workflows from the same PR, branch, or
 # tag when a new workflow is triggered.
@@ -474,6 +475,45 @@ jobs:
         run: cd extras/ieee802154-sniffer && cargo build
 
   # --------------------------------------------------------------------------
+  # Check that the esp-generate template in `template/` renders and builds
+  # against this commit
+
+  template:
+    needs: calculate
+    if: needs.calculate.outputs.run-build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-toolchains
+        with:
+          xtensa: "true"
+          xtensa-buildtargets: esp32s3
+          riscv: "true"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install esp-generate
+        run: |
+          mkdir -p "$RUNNER_TEMP/esp-generate"
+          gh release download "$ESP_GENERATE_VERSION" --repo esp-rs/esp-generate \
+            --pattern esp-generate-x86_64-unknown-linux-gnu \
+            --output "$RUNNER_TEMP/esp-generate/esp-generate"
+          chmod +x "$RUNNER_TEMP/esp-generate/esp-generate"
+          echo "$RUNNER_TEMP/esp-generate" >> "$GITHUB_PATH"
+
+      - name: Render the esp-generate template for every chip
+        run: esp-generate --template template check
+
+      - name: Build the esp-generate template (RISC-V)
+        run: esp-generate --template template check -o esp32c6 --all-combinations --build
+
+      - name: Build the esp-generate template (Xtensa)
+        run: esp-generate --template template check -o esp32s3 --all-combinations --build
+
+  # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
   #
   # Deliberately absent from `ci-result` below.
@@ -548,6 +588,7 @@ jobs:
       - msrv
       - xtensa-lld
       - host-tests
+      - template
       - semver-check
       - hil
       - merge-freeze-gate

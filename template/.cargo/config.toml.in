@@ -1,0 +1,25 @@
+# Keep compilation settings in this file and user/runtime settings in `esp-config.toml`.
+include = ["esp-config.toml"]
+
+[target.{{ chip.rust_target }}]
+runner = "espflash flash --monitor --chip {{ chip.name }}"
+
+[build]
+rustflags = [
+#%if chip.xtensa
+  "-C", "link-arg=-nostartfiles",
+#%else if chip.riscv
+  # Required to obtain backtraces (e.g. when using the "esp-backtrace" crate.)
+  # NOTE: May negatively impact performance of produced code
+  "-C", "force-frame-pointers",
+#%endif
+]
+
+target = "{{ chip.rust_target }}"
+
+[unstable]
+#%if option("alloc")
+build-std = ["alloc", "core"]
+#%else
+#+build-std = ["core"]
+#%endif
