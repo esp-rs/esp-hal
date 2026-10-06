@@ -5,8 +5,7 @@ cfg_select! {
     esp32s31 => {
         use pac::ahb_dma as gdma_pac;
     }
-    // esp32h4
-    _ => {
+    esp32h4 => {
         use pac::dma as gdma_pac;
     }
 }

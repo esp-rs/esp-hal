@@ -11,7 +11,7 @@ impl SpiInstance {
             SpiInstance::Spi2 => PCR::regs()
                 .spi2_clkm_conf()
                 .modify(|_, w| w.spi2_clkm_en().bit(en)),
-            #[cfg(esp32h4)]
+            #[cfg(soc_has_spi3)]
             SpiInstance::Spi3 => PCR::regs()
                 .spi3_clkm_conf()
                 .modify(|_, w| w.spi3_clkm_en().bit(en)),
@@ -41,7 +41,7 @@ impl SpiInstance {
             SpiInstance::Spi2 => PCR::regs()
                 .spi2_clkm_conf()
                 .modify(|_, w| unsafe { w.spi2_clkm_sel().bits(sel) }),
-            #[cfg(esp32h4)]
+            #[cfg(soc_has_spi3)]
             SpiInstance::Spi3 => PCR::regs()
                 .spi3_clkm_conf()
                 .modify(|_, w| unsafe { w.spi3_clkm_sel().bits(sel) }),
