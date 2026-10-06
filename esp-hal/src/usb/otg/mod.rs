@@ -40,6 +40,7 @@ let usb = Usb::new_hs(peripherals.USB_HS);
 "#
 )]
 
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_usb_synopsys_otg::{
     PhyType,
     State,
@@ -108,6 +109,8 @@ pub struct UsbOtgInfo {
     pub(crate) fifo_depth_words: usize,
     pub(crate) phy_type: PhyType,
     pub(crate) rx_fifo_extra_words: u16,
+    /// Number of TX FIFOs (including the one used by EP0) available to IN endpoints.
+    pub(crate) tx_fifo_count: u8,
     pub(crate) device_interrupt: InterruptHandler,
     pub(crate) host_interrupt: InterruptHandler,
     pub(crate) enable_device_mode: fn(),
@@ -131,12 +134,12 @@ impl<'d> USB_FS<'d> {
     }
 
     fn device_state() -> State<'static> {
-        static DEVICE: StateStorage<7> = StateStorage::new();
+        static DEVICE: StateStorage<7> = StateStorage::new(CriticalSectionRawMutex::new());
         DEVICE.as_state()
     }
 
     fn host_state() -> HostState<'static> {
-        static HOST: HostStateStorage<8> = HostStateStorage::new();
+        static HOST: HostStateStorage<8> = HostStateStorage::new(CriticalSectionRawMutex::new());
         HOST.as_host_state()
     }
 
@@ -202,6 +205,8 @@ impl<'d> USB_FS<'d> {
             fifo_depth_words: property!("usb_otg.fifo_depth_words"),
             phy_type: PhyType::InternalFullSpeed,
             rx_fifo_extra_words: 30,
+            // GNPTXFSIZ (EP0) + DIEPTXF1..4
+            tx_fifo_count: 5,
             device_interrupt: otg_fs_device_interrupt,
             host_interrupt: otg_fs_host_interrupt,
             enable_device_mode: fs_enable_device_mode,
@@ -228,12 +233,12 @@ impl<'d> USB_HS<'d> {
     }
 
     fn device_state() -> State<'static> {
-        static DEVICE: StateStorage<16> = StateStorage::new();
+        static DEVICE: StateStorage<16> = StateStorage::new(CriticalSectionRawMutex::new());
         DEVICE.as_state()
     }
 
     fn host_state() -> HostState<'static> {
-        static HOST: HostStateStorage<16> = HostStateStorage::new();
+        static HOST: HostStateStorage<16> = HostStateStorage::new(CriticalSectionRawMutex::new());
         HOST.as_host_state()
     }
 
@@ -256,6 +261,8 @@ impl<'d> USB_HS<'d> {
             fifo_depth_words: property!("usb_otg_hs.fifo_depth_words"),
             phy_type: PhyType::InternalHighSpeed,
             rx_fifo_extra_words: 31,
+            // Unchanged: one TX FIFO per endpoint, as before.
+            tx_fifo_count: 16,
             device_interrupt: otg_hs_device_interrupt,
             host_interrupt: otg_hs_host_interrupt,
             enable_device_mode: ll::hs_enable_device_mode,

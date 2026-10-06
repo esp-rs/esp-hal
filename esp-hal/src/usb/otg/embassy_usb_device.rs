@@ -30,11 +30,13 @@ impl<'d> Driver<'d> {
     ///   endpoint max packet sizes.
     pub fn new(peri: Usb<'d>, ep_out_buffer: &'d mut [u8], config: Config) -> Self {
         let info = peri.info();
+        let state = peri.embassy_device_state();
         let instance = OtgInstance {
             regs: unsafe { Otg::from_ptr(info.register_ptr.cast_mut()) },
-            state: peri.embassy_device_state(),
+            state,
             fifo_depth_words: info.fifo_depth_words as u16,
             extra_rx_fifo_words: info.rx_fifo_extra_words,
+            tx_fifo_count: info.tx_fifo_count,
             phy_type: info.phy_type,
             calculate_trdt_fn: |_| 5,
         };

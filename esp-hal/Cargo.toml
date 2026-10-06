@@ -400,3 +400,10 @@ mixed_attributes_style = "allow"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(host_os, values("windows"))'] }
+
+# DRAFT: paired with https://github.com/embassy-rs/embassy/pull/7191 (unreleased driver API).
+# Drop this section once embassy-usb-synopsys-otg is released and the version requirement above is bumped.
+[patch.crates-io]
+embassy-usb-synopsys-otg = { git = "https://github.com/muness/embassy", branch = "synopsys-otg-multi-packet-out" }
+embassy-sync             = { git = "https://github.com/muness/embassy", branch = "synopsys-otg-multi-packet-out" }
+embassy-usb-driver       = { git = "https://github.com/muness/embassy", branch = "synopsys-otg-multi-packet-out" }
