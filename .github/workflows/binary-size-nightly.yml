@@ -1,0 +1,253 @@
+# Builds a few examples on every chip, once at the current `main` and once at
+# `main` from 24 hours earlier, and compares their sizes. When an example grows
+# past the threshold, opens an issue that lists the pull requests merged in
+# between (or comments on the issue that is already open).
+
+name: Binary Size Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Commit to compare against. Empty: main from 24 hours earlier."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  EXAMPLES: hello_world embassy_hello_world embassy_dhcp bas_peripheral
+  # Read at compile time by the Wi-Fi examples.
+  SSID: SSID
+  PASSWORD: PASSWORD
+  STATIC_IP: 1.1.1.1
+  GATEWAY_IP: 1.1.1.1
+  HOST_IP: 1.1.1.1
+
+jobs:
+  prepare:
+    # Forks can still dispatch the workflow by hand.
+    if: github.event_name != 'schedule' || github.repository_owner == 'esp-rs'
+    runs-on: ubuntu-latest
+    outputs:
+      base: ${{ steps.range.outputs.base }}
+      head: ${{ steps.range.outputs.head }}
+      chips: ${{ steps.range.outputs.chips }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the commits to compare
+        id: range
+        env:
+          INPUT_BASE: ${{ inputs.base }}
+        run: |
+          HEAD_SHA=$(git rev-parse HEAD)
+          if [ -n "$INPUT_BASE" ]; then
+            BASE_SHA=$(git rev-parse --verify "$INPUT_BASE^{commit}")
+          else
+            BASE_SHA=$(git rev-list -1 --first-parent --before="24 hours ago" HEAD)
+          fi
+          echo "Comparing $BASE_SHA with $HEAD_SHA"
+
+          if [ "$BASE_SHA" != "$HEAD_SHA" ]; then
+            echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
+            echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo "Nothing was merged since $BASE_SHA."
+          fi
+          echo "chips=$(jq -c '[.[].soc]' .github/chips.json)" >> "$GITHUB_OUTPUT"
+
+  measure:
+    needs: prepare
+    if: needs.prepare.outputs.base != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        soc: ${{ fromJSON(needs.prepare.outputs.chips) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Rust target
+        id: target
+        run: |
+          ENTRY=$(jq -c --arg s "${{ matrix.soc }}" '.[] | select(.soc == $s)' .github/chips.json)
+          echo "rust-target=$(echo "$ENTRY" | jq -r '."rust-target"')" >> "$GITHUB_OUTPUT"
+          echo "arch=$(echo "$ENTRY" | jq -r '.arch')" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/setup-toolchains
+        with:
+          xtensa: ${{ steps.target.outputs.arch == 'xtensa' }}
+          xtensa-buildtargets: ${{ matrix.soc }}
+          xtensa-default: "true"
+          riscv: ${{ steps.target.outputs.arch == 'riscv' }}
+          riscv-targets: ${{ steps.target.outputs.rust-target }}
+
+      # Prints "<flash> <bss>" for an ELF file. Flash counts every allocated
+      # section with contents, bss the zero-initialized RAM. Skips the sections
+      # the linker scripts use to reserve or pad address space: their size
+      # follows from the memory layout, not from what the firmware contains.
+      - name: Measure ${{ matrix.soc }}
+        env:
+          SOC: ${{ matrix.soc }}
+          TARGET: ${{ steps.target.outputs.rust-target }}
+          BASE: ${{ needs.prepare.outputs.base }}
+          HEAD: ${{ needs.prepare.outputs.head }}
+        run: |
+          set -euo pipefail
+
+          size_of() {
+            local flash=0 bss=0 name type addr off size es flags rest
+            while read -r name type addr off size es flags rest; do
+              [[ "$flags" == *A* ]] || continue
+              case "$name" in
+                .stack|.text_gap|.rotext_dummy|.rwdata_dummy|.rtc_fast.dummy) continue ;;
+              esac
+              if [ "$type" = NOBITS ]; then
+                bss=$((bss + 16#$size))
+              else
+                flash=$((flash + 16#$size))
+              fi
+            done < <(readelf -S -W "$1" | sed -n 's/^ *\[ *[0-9]*\] //p')
+            echo "$flash $bss"
+          }
+
+          mkdir -p sizes
+          for ROLE in base head; do
+            if [ "$ROLE" = base ]; then REF=$BASE; else REF=$HEAD; fi
+            git checkout --quiet --force "$REF"
+            for EXAMPLE in $EXAMPLES; do
+              MANIFEST=$(find examples -path "*/$EXAMPLE/Cargo.toml" -print -quit)
+              # Examples list the chips they support as features.
+              if [ -z "$MANIFEST" ] || ! grep -Eq "^$SOC[[:space:]]*=" "$MANIFEST"; then
+                continue
+              fi
+              cargo xtask build "$EXAMPLE" "$SOC"
+              NAME=$(sed -n 's/^name *= *"\(.*\)"/\1/p' "$MANIFEST" | head -n1)
+              echo "$SOC $EXAMPLE $ROLE $(size_of "target/$TARGET/release/$NAME")" >> sizes/$SOC.txt
+            done
+          done
+          cat sizes/$SOC.txt
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: sizes-${{ matrix.soc }}
+          path: sizes/${{ matrix.soc }}.txt
+
+  report:
+    needs: [prepare, measure]
+    # Report what was measured, also when some chips failed.
+    if: always() && needs.prepare.outputs.base != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sizes-*
+          path: sizes
+          merge-multiple: true
+
+      # An example regresses when flash or bss grows by at least 1% and by at
+      # least 2048 (flash) or 512 (bss) bytes.
+      - name: Compare
+        id: compare
+        env:
+          BASE: ${{ needs.prepare.outputs.base }}
+          HEAD: ${{ needs.prepare.outputs.head }}
+        run: |
+          set -euo pipefail
+          # Lines are "<chip> <example> <base|head> <flash> <bss>".
+          sort sizes/*.txt | awk '
+            function cell(was, now, min,   d, p, s) {
+              if (was == "") return now " (new)"
+              d = now - was
+              if (d == 0) return now
+              p = (was > 0) ? 100 * d / was : 0
+              s = sprintf("%d (%+d, %+.2f%%)", now, d, p)
+              if (d >= min && p >= 1) { regressed = 1; return "**" s "**" }
+              return s
+            }
+            {
+              key = $1 " " $2
+              if ($3 == "base") { base_flash[key] = $4; base_bss[key] = $5 }
+              else { head_flash[key] = $4; head_bss[key] = $5; order[++n] = key }
+            }
+            END {
+              print "| Chip | Example | Flash (bytes) | bss (bytes) |"
+              print "|---|---|---|---|"
+              for (i = 1; i <= n; i++) {
+                key = order[i]; split(key, part, " "); regressed = 0
+                flash = cell(base_flash[key], head_flash[key], 2048)
+                bss = cell(base_bss[key], head_bss[key], 512)
+                row = sprintf("| `%s` | `%s` | %s | %s |", part[1], part[2], flash, bss)
+                print row
+                if (regressed) print row > "regressions.md"
+              }
+            }' > table.md
+
+          {
+            echo "## Binary size report"
+            echo
+            echo "Base: $BASE, head: $HEAD. Regressions are marked in bold."
+            echo
+            cat table.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -s regressions.md ]; then
+            echo "regressed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open or update the issue
+        if: steps.compare.outputs.regressed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: Binary size regression on main
+          BASE: ${{ needs.prepare.outputs.base }}
+          HEAD: ${{ needs.prepare.outputs.head }}
+        run: |
+          set -euo pipefail
+          {
+            echo "The nightly binary size check found examples that grew past the threshold."
+            echo
+            echo "Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo
+            echo "### Regressions"
+            echo
+            echo "| Chip | Example | Flash (bytes) | bss (bytes) |"
+            echo "|---|---|---|---|"
+            cat regressions.md
+            echo
+            echo "### Merged between \`${BASE:0:10}\` and \`${HEAD:0:10}\`"
+            echo
+            # Keep @-mentions in commit subjects from notifying anyone.
+            git log --first-parent --format='- %h %s' "$BASE..$HEAD" | sed 's/@/@\xE2\x80\x8B/g'
+            echo
+            echo "<details><summary>All examples</summary>"
+            echo
+            cat table.md
+            echo
+            echo "</details>"
+          } > issue.md
+
+          NUMBER=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --author "app/github-actions" \
+            --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')
+          if [ -n "$NUMBER" ]; then
+            gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file issue.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file issue.md
+          fi
