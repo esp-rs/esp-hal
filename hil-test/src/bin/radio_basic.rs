@@ -30,6 +30,12 @@ fn init_heap() {
         esp32h2 => {
             esp_alloc::heap_allocator!(size: 72 * 1024);
         }
+        // The reclaimed region (dram2_seg) is only 56 KiB on the H4.
+        esp32h4 => {
+            use esp_hal::ram;
+            esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 56 * 1024);
+            esp_alloc::heap_allocator!(size: 56 * 1024);
+        }
         _ => {
             use esp_hal::ram;
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);

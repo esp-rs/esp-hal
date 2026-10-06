@@ -8,7 +8,7 @@ mod tests {
 
         let target_frequency = if cfg!(esp32c2) {
             26
-        } else if cfg!(esp32h2) {
+        } else if cfg!(any(esp32h2, esp32h4)) {
             32
         } else if cfg!(esp32c5) {
             48
