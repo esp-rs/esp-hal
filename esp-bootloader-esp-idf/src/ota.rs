@@ -176,10 +176,8 @@ impl OtaSelectEntry {
 
 /// Erases the OTA-data slot at `offset` and programs `bytes` into it.
 ///
-/// Migration note: with `esp-storage`, every write did an implicit
-/// read-modify-write of the whole sector. `esp_hal::flash::Flash` only
-/// programs, so the slot has to be erased explicitly before it is rewritten.
-/// ESP-IDF does the same in `rewrite_ota_seq`.
+/// Programming can only clear bits, so the slot has to be erased explicitly
+/// before it is rewritten.
 fn write_slot(
     region: &mut AutoFlashRegion<'_, '_>,
     offset: u32,

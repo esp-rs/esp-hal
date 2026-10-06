@@ -47,7 +47,7 @@ pub enum Error {
     Invalid,
     /// An operation tries to access data that is out of bounds.
     OutOfBounds,
-    /// An error which originates from the embedded-storage implementation.
+    /// The flash driver reported an error.
     StorageError,
     /// An address or length is not aligned as the operation requires.
     NotAligned,
