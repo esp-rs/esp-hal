@@ -19,7 +19,7 @@ page_size = 0x10000
 entry_num = 512
 
 [device.flash]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.rom]
 has_crc_le  = true

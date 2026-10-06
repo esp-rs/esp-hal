@@ -84,10 +84,6 @@ name              = "spi"
 harness           = false
 
 [[bin]]
-name              = "storage"
-harness           = false
-
-[[bin]]
 name              = "flash"
 harness           = false
 

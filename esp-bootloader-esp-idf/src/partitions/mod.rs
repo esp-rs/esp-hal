@@ -25,7 +25,7 @@ mod types;
 
 pub use self::{
     entry::PartitionEntry,
-    region::{EncryptedFlashRegion, FlashRegion, PartitionRegion},
+    region::{AutoFlashRegion, EncryptedFlashRegion, FlashRegion},
     table::{PartitionTable, read_partition_table},
     types::{
         AppPartitionSubType,

@@ -48,15 +48,15 @@ impl PartitionEntry {
     /// depending on whether the partition is effectively encrypted.
     ///
     /// The partition containing the running application is always read-only.
-    pub fn as_partition_region<'a, 'd>(
+    pub fn as_auto_flash_region<'a, 'd>(
         self,
         flash: &'a mut FlashStorage<'d>,
-    ) -> PartitionRegion<'a, 'd> {
+    ) -> AutoFlashRegion<'a, 'd> {
         let region = self.region(flash);
         if self.is_effectively_encrypted() {
-            PartitionRegion::Encrypted(EncryptedFlashRegion { region })
+            AutoFlashRegion::Encrypted(EncryptedFlashRegion { region })
         } else {
-            PartitionRegion::Plain(FlashRegion { region })
+            AutoFlashRegion::Plain(FlashRegion { region })
         }
     }
 
@@ -298,17 +298,17 @@ impl EncryptedFlashRegion<'_, '_> {
 /// enabled, such as app and OTA data partitions. All methods forward to the
 /// wrapped region.
 ///
-/// Created by [`PartitionEntry::as_partition_region`].
+/// Created by [`PartitionEntry::as_auto_flash_region`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum PartitionRegion<'a, 'd> {
+pub enum AutoFlashRegion<'a, 'd> {
     /// The partition is not encrypted.
     Plain(FlashRegion<'a, 'd>),
     /// The partition is encrypted.
     Encrypted(EncryptedFlashRegion<'a, 'd>),
 }
 
-impl<'a, 'd> PartitionRegion<'a, 'd> {
+impl<'a, 'd> AutoFlashRegion<'a, 'd> {
     fn region(&self) -> &Region<'a, 'd> {
         match self {
             Self::Plain(region) => &region.region,
@@ -539,7 +539,7 @@ mod tests {
 
         assert!(!nvs.is_effectively_encrypted());
         assert!(nvs.as_flash_region(&mut storage).is_ok());
-        assert!(!nvs.as_partition_region(&mut storage).is_encrypted());
+        assert!(!nvs.as_auto_flash_region(&mut storage).is_encrypted());
         assert!(matches!(
             nvs.as_encrypted_flash_region(&mut storage),
             Err(Error::NotSupported)

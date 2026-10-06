@@ -208,7 +208,7 @@ mod flash_tests {
         ))
         .unwrap()
         .unwrap()
-        .as_partition_region(&mut flash)
+        .as_auto_flash_region(&mut flash)
         .read(32, &mut app_desc)
         .unwrap();
 

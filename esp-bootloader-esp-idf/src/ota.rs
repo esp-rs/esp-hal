@@ -26,9 +26,9 @@
 //! For more details see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html>
 use crate::partitions::{
     AppPartitionSubType,
+    AutoFlashRegion,
     DataPartitionSubType,
     Error,
-    PartitionRegion,
     PartitionType,
 };
 
@@ -131,7 +131,7 @@ struct OtaSelectEntry {
 }
 
 impl OtaSelectEntry {
-    fn read<'a, 'd>(region: &mut PartitionRegion<'a, 'd>, offset: u32) -> Result<Self, Error> {
+    fn read<'a, 'd>(region: &mut AutoFlashRegion<'a, 'd>, offset: u32) -> Result<Self, Error> {
         fn is_valid(buffer: &[u8]) -> bool {
             let ota_seq = u32::from_le_bytes(unwrap!(buffer[0..4].try_into()));
             let ota_state = u32::from_le_bytes(unwrap!(buffer[24..28].try_into()));
@@ -164,7 +164,7 @@ impl OtaSelectEntry {
 
     fn write<'a, 'd>(
         &mut self,
-        region: &mut PartitionRegion<'a, 'd>,
+        region: &mut AutoFlashRegion<'a, 'd>,
         offset: u32,
     ) -> Result<(), Error> {
         let bytes: &mut [u8; 32] = unwrap!(
@@ -181,7 +181,7 @@ impl OtaSelectEntry {
 /// programs, so the slot has to be erased explicitly before it is rewritten.
 /// ESP-IDF does the same in `rewrite_ota_seq`.
 fn write_slot(
-    region: &mut PartitionRegion<'_, '_>,
+    region: &mut AutoFlashRegion<'_, '_>,
     offset: u32,
     bytes: &[u8; 32],
 ) -> Result<(), Error> {
@@ -195,12 +195,12 @@ fn write_slot(
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Ota<'a, 'd> {
-    flash: PartitionRegion<'a, 'd>,
+    flash: AutoFlashRegion<'a, 'd>,
     ota_partition_count: usize,
 }
 
 impl<'a, 'd> Ota<'a, 'd> {
-    /// Creates a new [Ota] instance from the given [PartitionRegion] and the count of OTA app
+    /// Creates a new [Ota] instance from the given [AutoFlashRegion] and the count of OTA app
     /// partitions (not including "firmware" and "test" partitions).
     ///
     /// # Errors
@@ -209,7 +209,7 @@ impl<'a, 'd> Ota<'a, 'd> {
     ///
     /// [Error::InvalidArgument] if the `ota_partition_count` exceeds the maximum or if it's 0.
     pub fn new(
-        flash: PartitionRegion<'a, 'd>,
+        flash: AutoFlashRegion<'a, 'd>,
         ota_partition_count: usize,
     ) -> Result<Ota<'a, 'd>, Error> {
         if ota_partition_count == 0 || ota_partition_count > 16 {
@@ -437,8 +437,8 @@ mod tests {
     fn ota_region<'a>(
         flash: &'a mut FlashStorage<'static>,
         binary: [u8; 32],
-    ) -> PartitionRegion<'a, 'static> {
-        PartitionEntry { binary }.as_partition_region(flash)
+    ) -> AutoFlashRegion<'a, 'static> {
+        PartitionEntry { binary }.as_auto_flash_region(flash)
     }
 
     fn init_ota_flash(flash: &mut FlashStorage<'static>) {

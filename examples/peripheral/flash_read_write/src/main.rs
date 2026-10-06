@@ -47,10 +47,10 @@ fn main() -> ! {
     // section header (8 bytes).
     //
     // App partitions are encrypted when flash encryption is enabled, so access
-    // them through a `PartitionRegion` which handles both cases.
+    // them through an `AutoFlashRegion` which handles both cases.
     let mut app_desc = [0u8; 256];
     factory
-        .as_partition_region(&mut flash)
+        .as_auto_flash_region(&mut flash)
         .read(32, &mut app_desc)
         .unwrap();
     println!("App descriptor dump {:02x?}", app_desc);

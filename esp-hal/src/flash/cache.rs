@@ -30,7 +30,7 @@ cfg_select! {
             l2: u32,
         }
     }
-    esp32s31 => {
+    any(esp32h4, esp32s31) => {
         struct Inner {
             i0: u32,
             i1: u32,
@@ -106,6 +106,12 @@ unsafe extern "C" {
             fn Cache_Resume_L1_CORE1_ICache(autoload: u32);
             fn Cache_Resume_L1_DCache(autoload: u32);
         }
+        // `map`: bit 0 is ICache0, bit 1 is ICache1, bit 4 is DCache, see
+        // https://github.com/espressif/esp-idf/blob/188e3e55bb20505b5fa9dc49ee390bf42c58b4ee/components/esp_rom/esp32h4/include/esp32h4/rom/cache.h#L162-L164
+        esp32h4 => {
+            fn Cache_Suspend_Cache(map: u32) -> u32;
+            fn Cache_Resume_Cache(map: u32, autoload: u32);
+        }
         any(esp32c5, esp32c61) => {
             fn Cache_Suspend_Cache() -> u32;
             fn Cache_Resume_Cache(autoload: u32);
@@ -172,6 +178,15 @@ fn suspend_caches() -> Inner {
                 d: Cache_Suspend_L1_DCache(),
             }
         },
+        // Same order as `cache_ll_suspend_cache()`, see
+        // https://github.com/espressif/esp-idf/blob/188e3e55bb20505b5fa9dc49ee390bf42c58b4ee/components/esp_hal_cache/esp32h4/include/hal/cache_ll.h#L295-L311
+        esp32h4 => unsafe {
+            Inner {
+                i0: Cache_Suspend_Cache(1 << 0),
+                i1: Cache_Suspend_Cache(1 << 1),
+                d: Cache_Suspend_Cache(1 << 4),
+            }
+        },
         any(esp32c5, esp32c61) => unsafe {
             Inner {
                 autoload: Cache_Suspend_Cache(),
@@ -215,6 +230,11 @@ fn resume_caches(inner: &Inner) {
             Cache_Resume_L1_DCache(inner.d);
             Cache_Resume_L1_CORE1_ICache(inner.i1);
             Cache_Resume_L1_CORE0_ICache(inner.i0);
+        },
+        esp32h4 => unsafe {
+            Cache_Resume_Cache(1 << 4, inner.d);
+            Cache_Resume_Cache(1 << 0, inner.i0);
+            Cache_Resume_Cache(1 << 1, inner.i1);
         },
         any(esp32c5, esp32c61) => unsafe { Cache_Resume_Cache(inner.autoload) },
         _ => unsafe { Cache_Resume_ICache(inner.autoload) },

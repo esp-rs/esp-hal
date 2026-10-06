@@ -101,11 +101,9 @@
 // MUST be the first module
 mod fmt;
 
-#[cfg(not(feature = "std"))]
-#[cfg_attr(not(flash_driver_supported), allow(dead_code))]
+#[cfg(all(not(feature = "std"), flash_driver_supported))]
 mod rom;
-#[cfg(not(feature = "std"))]
-#[cfg_attr(not(flash_driver_supported), allow(unused_imports))]
+#[cfg(all(not(feature = "std"), flash_driver_supported))]
 pub(crate) use rom as crypto;
 
 #[cfg(feature = "std")]
