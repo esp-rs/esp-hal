@@ -21,7 +21,8 @@ pub enum RelCheckCmds {
     Deinit,
     /// Package the release plan's crates into the local registry at their planned versions.
     Update,
-    /// Rewrite `esp-*` path dependencies in examples and tests to registry versions.
+    /// Rewrite `esp-*` path dependencies in examples and tests to registry versions, and point
+    /// compile-tests at the registry.
     ReplacePathDeps,
     /// Validate workspace esp-rom-sys dependency version policy.
     CheckRomSysPolicy,
@@ -563,6 +564,7 @@ fn revert_scrap_path_deps() -> Result<()> {
         crate::Package::HilTest.to_string(),
         crate::Package::HilTestRadio.to_string(),
         crate::Package::QaTest.directory().to_string(),
+        crate::Package::CompileTests.directory().to_string(),
     ];
 
     for pkg in pkgs {
@@ -707,8 +709,20 @@ fn scrap_path_deps(plan: &Plan) -> Result<()> {
                 if !config.contains("local-registry") {
                     std::fs::write(
                         manifest_path.join(".cargo/config.toml"),
-                        format!(
-                            r#"{}
+                        with_local_registry_source(&config)?,
+                    )?;
+                }
+            }
+        }
+    }
+
+    redirect_compile_tests()
+}
+
+/// `config` with crates.io replaced by the local registry.
+fn with_local_registry_source(config: &str) -> Result<String> {
+    Ok(format!(
+        r#"{}
 
 # {}{}
 [source.crates-io]
@@ -718,20 +732,33 @@ replace-with = 'local-registry'
 [source.local-registry]
 local-registry = '{}'
 "#,
-                            config,
-                            "STOP",
-                            "SHIP",
-                            windows_safe_path(
-                                &std::path::PathBuf::from("target/local-registry")
-                                    .canonicalize()
-                                    .unwrap()
-                            )
-                            .display()
-                        ),
-                    )?;
-                }
-            }
+        config,
+        "STOP",
+        "SHIP",
+        local_registry_path()?.display()
+    ))
+}
+
+/// Resolve every compile-test project against the local registry, or a plan
+/// crate's unpublished version cannot resolve. Requirements stay untouched,
+/// unlike `scrap_path_deps`: the frozen lines' pins are what is under test.
+fn redirect_compile_tests() -> Result<()> {
+    let root = Path::new(crate::Package::CompileTests.directory());
+    for project in crate::find_packages(root)? {
+        let config_path = project.join(".cargo/config.toml");
+        let backup_path = project.join(".cargo/config.toml$");
+        if std::fs::exists(&backup_path)? {
+            continue;
         }
+
+        // `init` resolved these against crates.io; a stale lock would hide the
+        // plan's semver-compatible releases from the frozen lines.
+        std::fs::remove_file(project.join("Cargo.lock")).ok();
+
+        let config = std::fs::read_to_string(&config_path)
+            .with_context(|| format!("Failed to read {}", config_path.display()))?;
+        std::fs::rename(&config_path, &backup_path)?;
+        std::fs::write(&config_path, with_local_registry_source(&config)?)?;
     }
 
     Ok(())
