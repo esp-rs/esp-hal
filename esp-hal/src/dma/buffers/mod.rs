@@ -1428,6 +1428,10 @@ impl DmaTxStreamBuf {
     ///
     /// It is expected to pre-fill at least enough data to fill the first two descriptors' buffers.
     /// The more data is pre-filled, the more head-room is left to push more data.
+    ///
+    /// Pre-filled data only applies to the next transfer: a buffer returned from a
+    /// transfer starts with nothing pre-filled. If nothing is pushed before a
+    /// transfer starts, the entire buffer is transmitted with its current contents.
     pub fn push(&mut self, data: &[u8]) -> usize {
         self.push_with(|buf| {
             let len = buf.len().min(data.len());
@@ -1440,6 +1444,10 @@ impl DmaTxStreamBuf {
     ///
     /// It is expected to pre-fill at least enough data to fill the first two descriptors' buffers.
     /// The more data is pre-filled, the more head-room is left to push more data.
+    ///
+    /// Pre-filled data only applies to the next transfer: a buffer returned from a
+    /// transfer starts with nothing pre-filled. If nothing is pushed before a
+    /// transfer starts, the entire buffer is transmitted with its current contents.
     ///
     /// Returns the number of bytes filled.
     pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
@@ -1625,6 +1633,7 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
         } = view;
         buf.view_descriptor_idx = descriptor_idx;
         buf.view_descriptor_offset = descriptor_offset;
+        buf.pre_filled = None;
         buf
     }
 }

@@ -477,4 +477,27 @@ mod tests {
             core::assert!(matches!(descriptors[3].owner(), Owner::Cpu));
         });
     }
+
+    #[test]
+    fn test_dma_tx_stream_buf_reuse_starts_with_empty_prefill() {
+        with_tx_stream_buffer(|mut buf| {
+            core::assert_eq!(buf.push(&[1u8; BUFFER_SIZE]), BUFFER_SIZE);
+            buf.prepare();
+
+            let view = buf.into_view();
+            let mut buf = <DmaTxStreamBuf as DmaTxBuffer>::from_view(view);
+
+            // Pushing into a buffer returned by a transfer starts from an empty pre-fill.
+            core::assert_eq!(buf.push(&[2u8; CHUNK_SIZE * 2]), CHUNK_SIZE * 2);
+            buf.prepare();
+
+            let (descriptors, buffer) = buf.split();
+            core::assert!(buffer[..CHUNK_SIZE * 2].iter().all(|&b| b == 2));
+            core::assert!(matches!(descriptors[0].owner(), Owner::Dma));
+            core::assert!(matches!(descriptors[1].owner(), Owner::Dma));
+            // Only the newly pushed bytes are handed to the DMA, not stale data.
+            core::assert!(matches!(descriptors[2].owner(), Owner::Cpu));
+            core::assert!(matches!(descriptors[3].owner(), Owner::Cpu));
+        });
+    }
 }
