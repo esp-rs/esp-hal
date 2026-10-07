@@ -59,7 +59,7 @@ use hil_test::{assert, assert_eq};
 
 // RMT channel clock = 500kHz
 cfg_select! {
-    esp32h2 => {
+    any(esp32h2, esp32h4) => {
         const FREQ: Rate = Rate::from_mhz(32);
         const DIV: u8 = 64;
     }
