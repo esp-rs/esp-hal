@@ -4,8 +4,8 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
-# Pins track the current lines: older ones predate esp32p4/esp32s31, which this
-# project must cover.
+# Pins track the current lines. bump_crate_version rewrites this file only;
+# ble_*/wifi_* stay on the minor they were frozen at.
 [dependencies]
 esp-hal = { version = "1.2" }
 esp-backtrace = { version = "0.20", features = [

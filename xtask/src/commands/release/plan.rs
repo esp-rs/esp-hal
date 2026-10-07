@@ -680,13 +680,44 @@ pub struct StaleDependency {
     pub commits: usize,
 }
 
+/// Newest non-pre-release `{package}-v*` tag on `tree_version`'s major.minor
+/// line. Backport patches (1.2.2 vs tree 1.2.0) are what users resolve; the
+/// working-tree version's own tag can lag that line.
+fn newest_patch_tag(
+    package: Package,
+    tree_version: &semver::Version,
+    tags: &[String],
+) -> Option<String> {
+    let prefix = format!("{package}-v");
+    let mut best: Option<semver::Version> = None;
+    for tag in tags {
+        let Some(ver) = tag
+            .strip_prefix(&prefix)
+            .and_then(|s| semver::Version::parse(s).ok())
+        else {
+            continue;
+        };
+        if !ver.pre.is_empty() {
+            continue;
+        }
+        if ver.major != tree_version.major || ver.minor != tree_version.minor {
+            continue;
+        }
+        if best.as_ref().is_none_or(|b| ver > *b) {
+            best = Some(ver);
+        }
+    }
+    best.map(|v| package.tag(&v))
+}
+
 /// Run every planner gate against a finalized set of plan packages, refusing a
 /// plan that is wrong on paper and returning the non-blocking stale-dependency
 /// warnings.
 ///
 /// A frozen crate (published, not in the plan, not a standalone-project
-/// collection) is read from its release tag, never the working tree, which
-/// `bump_crate_version` rewrites for every workspace crate.
+/// collection) is read from the newest patch tag on its working-tree
+/// major.minor line, never the working tree, which `bump_crate_version`
+/// rewrites for every workspace crate.
 pub fn validate_plan(workspace: &Path, packages: &[PackagePlan]) -> Result<Vec<StaleDependency>> {
     let in_plan = packages.iter().map(|p| p.package).collect::<HashSet<_>>();
     let releasing = packages
@@ -702,7 +733,10 @@ pub fn validate_plan(workspace: &Path, packages: &[PackagePlan]) -> Result<Vec<S
         }
 
         let mut tree = CargoToml::new(workspace, pkg)?;
-        let tag = pkg.tag(&tree.package_version());
+        let tree_version = tree.package_version();
+        let tags = crate::git::list_tags(workspace, &format!("{pkg}-v*"))?;
+        let tag =
+            newest_patch_tag(pkg, &tree_version, &tags).unwrap_or_else(|| pkg.tag(&tree_version));
         ensure!(
             crate::git::ref_exists(workspace, &tag)?,
             "Cannot validate the release: frozen package {pkg} has no release tag {tag}."
@@ -1505,6 +1539,36 @@ mod tests {
         assert!(
             release_closure_violations(&frozen, &releasing).is_empty(),
             "a patch bump to 0.5.2 must be accepted by ^0.5"
+        );
+    }
+
+    #[test]
+    fn newest_patch_tag_picks_backport_ahead_of_tree() {
+        // Tree is 1.2.0 (last main release); users resolve 1.2.2 from the
+        // backport branch. Pre-releases and other minors must not win.
+        let tags = [
+            "esp-hal-v1.1.9".to_string(),
+            "esp-hal-v1.2.0".to_string(),
+            "esp-hal-v1.2.0-rc.0".to_string(),
+            "esp-hal-v1.2.1".to_string(),
+            "esp-hal-v1.2.2".to_string(),
+            "esp-hal-v1.3.0".to_string(),
+        ];
+        assert_eq!(
+            newest_patch_tag(Package::EspHal, &ver("1.2.0"), &tags).as_deref(),
+            Some("esp-hal-v1.2.2")
+        );
+    }
+
+    #[test]
+    fn newest_patch_tag_falls_back_when_line_has_no_tags() {
+        let tags = [
+            "esp-hal-v1.1.9".to_string(),
+            "esp-config-v0.5.1".to_string(),
+        ];
+        assert_eq!(
+            newest_patch_tag(Package::EspHal, &ver("1.2.0"), &tags),
+            None
         );
     }
 

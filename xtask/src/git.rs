@@ -70,6 +70,28 @@ pub fn current_branch() -> Result<String> {
     Ok(String::from_utf8_lossy(&status.stdout).trim().to_string())
 }
 
+/// Local tags matching `pattern` (`git tag -l <pattern>`).
+#[cfg(feature = "release")]
+pub fn list_tags(workspace: &std::path::Path, pattern: &str) -> Result<Vec<String>> {
+    let output = Command::new("git")
+        .args(["tag", "-l", pattern])
+        .current_dir(workspace)
+        .output()
+        .context("Failed to list git tags")?;
+
+    anyhow::ensure!(
+        output.status.success(),
+        "`git tag -l {pattern}` failed: {}",
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect())
+}
+
 /// Whether `git_ref` (a tag, branch or commit) exists in the repository.
 pub fn ref_exists(workspace: &std::path::Path, git_ref: &str) -> Result<bool> {
     let status = Command::new("git")

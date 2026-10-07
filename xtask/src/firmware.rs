@@ -783,8 +783,8 @@ fn fetch_sparse_index(crate_name: &str) -> Option<String> {
 ///
 /// A frozen dependency line that predates the chip returns `Ok(false)` so the
 /// build skips this project for the chip instead of hitting a `<dep>/<chip>`
-/// feature cargo cannot find. A dependency the release itself publishes that
-/// lacks the feature is a hard error (see [`chip_dep_declares_feature`]).
+/// feature cargo cannot find. A crate this release publishes that lacks the
+/// feature is a hard error (see [`chip_dep_declares_feature`]).
 pub fn compile_test_project_supports_chip(
     workspace: &Path,
     project_path: &Path,
@@ -836,31 +836,44 @@ fn chip_dep_declares_feature(
         )
     })?;
 
-    // Prefer the in-repo working-tree manifest when its version satisfies the
-    // requirement: that is the code the imminent release will publish, so its
-    // feature table is authoritative and a missing chip feature is a real error.
-    if let Ok(package) = Package::from_str(dep, true)
+    let tree = if let Ok(package) = Package::from_str(dep, true)
         && let Ok(toml) = crate::cargo::CargoToml::new(workspace, package)
     {
-        let tree_version = toml.package_version();
-        if req.matches(&tree_version) {
-            if manifest_declares_feature(&toml.manifest, &chip_feature) {
-                return Ok(true);
-            }
-            bail!(
-                "{}: crate `{dep}` {tree_version} (working tree) does not declare the \
-                 `{chip_feature}` feature required for {chip}. A chip was added to the metadata \
-                 without a matching feature in {dep}.",
-                project.display()
-            );
+        Some((
+            toml.package_version(),
+            manifest_declares_feature(&toml.manifest, &chip_feature),
+        ))
+    } else {
+        None
+    };
+
+    let index_body = index_cache
+        .entry(dep.to_string())
+        .or_insert_with(|| fetch_sparse_index(dep));
+    let max_published = match index_body.as_deref() {
+        Some(body) => max_version_matching(body, &req)?,
+        None => None,
+    };
+
+    // Trust the tree only when cargo will resolve that version (it is newer
+    // than, or the only match for, the requirement). A published tree version
+    // older than the index max is crates.io's crate, whose features can lag.
+    if let Some((tree_version, has_feature)) = &tree
+        && tree_is_resolving_version(tree_version, &req, max_published.as_ref())
+    {
+        if *has_feature {
+            return Ok(true);
         }
+        bail!(
+            "{}: crate `{dep}` {tree_version} (working tree) does not declare the \
+             `{chip_feature}` feature required for {chip}. A chip was added to the metadata \
+             without a matching feature in {dep}.",
+            project.display()
+        );
     }
 
     // Frozen line: read the published index. A missing feature means this line
     // predates the chip, so the project does not cover it - skip, do not error.
-    let index_body = index_cache
-        .entry(dep.to_string())
-        .or_insert_with(|| fetch_sparse_index(dep));
     let Some(index_body) = index_body.as_deref() else {
         log::warn!(
             "Cannot verify `{dep}` ({chip}) against the crates.io index (offline?); attempting the build"
@@ -868,13 +881,25 @@ fn chip_dep_declares_feature(
         return Ok(true);
     };
 
-    let Some(resolved) = max_version_matching(index_body, &req)? else {
+    let Some(resolved) = max_published else {
         log::warn!("No published `{dep}` satisfies `{req_str}`; attempting the build");
         return Ok(true);
     };
 
     let features = features_for_version(index_body, &resolved)?;
     Ok(features.contains(&chip_feature))
+}
+
+/// Whether the working-tree crate is the version cargo will resolve.
+///
+/// A published tree version that is older than the index max must not win:
+/// cargo picks the published crate, whose feature table can lag the tree.
+fn tree_is_resolving_version(
+    tree_version: &semver::Version,
+    req: &semver::VersionReq,
+    max_published: Option<&semver::Version>,
+) -> bool {
+    req.matches(tree_version) && max_published.is_none_or(|published| tree_version > published)
 }
 
 /// The version requirement string for `dep` in a manifest's `[dependencies]`,
@@ -1121,6 +1146,46 @@ mod tests {
             .map(|(name, _)| name.as_str())
             .collect::<Vec<_>>();
         assert_eq!(p4_projects, ["hal"]);
+    }
+
+    #[test]
+    fn tree_is_resolving_when_newer_than_published() {
+        let req = semver::VersionReq::parse("1.2").unwrap();
+        let tree = semver::Version::parse("1.3.0").unwrap();
+        let published = semver::Version::parse("1.2.2").unwrap();
+        assert!(tree_is_resolving_version(&tree, &req, Some(&published)));
+    }
+
+    #[test]
+    fn tree_is_not_resolving_when_published_is_ahead() {
+        // Tree 1.2.0 with unreleased chip features; cargo resolves crates.io 1.2.2.
+        let req = semver::VersionReq::parse("1.2").unwrap();
+        let tree = semver::Version::parse("1.2.0").unwrap();
+        let published = semver::Version::parse("1.2.2").unwrap();
+        assert!(!tree_is_resolving_version(&tree, &req, Some(&published)));
+    }
+
+    #[test]
+    fn tree_is_not_resolving_when_equal_to_published() {
+        let req = semver::VersionReq::parse("1.2").unwrap();
+        let tree = semver::Version::parse("1.2.2").unwrap();
+        let published = semver::Version::parse("1.2.2").unwrap();
+        assert!(!tree_is_resolving_version(&tree, &req, Some(&published)));
+    }
+
+    #[test]
+    fn tree_is_resolving_when_nothing_is_published() {
+        let req = semver::VersionReq::parse("1.3").unwrap();
+        let tree = semver::Version::parse("1.3.0").unwrap();
+        assert!(tree_is_resolving_version(&tree, &req, None));
+    }
+
+    #[test]
+    fn frozen_line_tree_does_not_match_req() {
+        let req = semver::VersionReq::parse("~1.1.0").unwrap();
+        let tree = semver::Version::parse("1.2.0").unwrap();
+        let published = semver::Version::parse("1.1.1").unwrap();
+        assert!(!tree_is_resolving_version(&tree, &req, Some(&published)));
     }
 
     #[test]

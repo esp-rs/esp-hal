@@ -75,6 +75,13 @@ pub fn examples(
             }
         }
         examples = supported;
+        if examples.is_empty() {
+            bail!(
+                "Chip '{chip}' is untested: every compile-test project that selects it would \
+                 enable a `<dep>/{chip}` feature the resolved crates do not declare. The `hal` \
+                 project's pins must follow the crates that gained the chip."
+            );
+        }
     }
 
     examples.sort_by_key(|a| a.binary_name());
