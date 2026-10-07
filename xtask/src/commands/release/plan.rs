@@ -715,9 +715,11 @@ fn newest_patch_tag(
 /// warnings.
 ///
 /// A frozen crate (published, not in the plan, not a standalone-project
-/// collection) is read from the newest patch tag on its working-tree
-/// major.minor line, never the working tree, which `bump_crate_version`
-/// rewrites for every workspace crate.
+/// collection) is read from its tags, never the working tree, which
+/// `bump_crate_version` rewrites for every workspace crate. Its requirements
+/// come from the newest patch on its line, which is what users resolve; drift is
+/// measured against the tag of the working-tree version, since a backport
+/// branch's manifest changes are not unreleased work on this branch.
 pub fn validate_plan(workspace: &Path, packages: &[PackagePlan]) -> Result<Vec<StaleDependency>> {
     let in_plan = packages.iter().map(|p| p.package).collect::<HashSet<_>>();
     let releasing = packages
@@ -734,21 +736,23 @@ pub fn validate_plan(workspace: &Path, packages: &[PackagePlan]) -> Result<Vec<S
 
         let mut tree = CargoToml::new(workspace, pkg)?;
         let tree_version = tree.package_version();
-        let tags = crate::git::list_tags(workspace, &format!("{pkg}-v*"))?;
-        let tag =
-            newest_patch_tag(pkg, &tree_version, &tags).unwrap_or_else(|| pkg.tag(&tree_version));
+        let tree_tag = pkg.tag(&tree_version);
         ensure!(
-            crate::git::ref_exists(workspace, &tag)?,
-            "Cannot validate the release: frozen package {pkg} has no release tag {tag}."
+            crate::git::ref_exists(workspace, &tree_tag)?,
+            "Cannot validate the release: frozen package {pkg} has no release tag {tree_tag}."
         );
+        let tags = crate::git::list_tags(workspace, &format!("{pkg}-v*"))?;
+        let resolved_tag =
+            newest_patch_tag(pkg, &tree_version, &tags).unwrap_or_else(|| tree_tag.clone());
 
-        let mut at_tag = CargoToml::at_ref(workspace, pkg, &tag)?;
-        frozen_reqs.insert(pkg, at_tag.repo_dependency_requirements());
+        let mut at_resolved = CargoToml::at_ref(workspace, pkg, &resolved_tag)?;
+        frozen_reqs.insert(pkg, at_resolved.repo_dependency_requirements());
 
+        let mut at_tree_tag = CargoToml::at_ref(workspace, pkg, &tree_tag)?;
         let tree_deps = tree.dependency_requirements();
-        let tag_deps = at_tag.dependency_requirements();
+        let tag_deps = at_tree_tag.dependency_requirements();
         if tree_deps != tag_deps {
-            drift_errors.push(format_manifest_drift(pkg, &tag, &tree_deps, &tag_deps));
+            drift_errors.push(format_manifest_drift(pkg, &tree_tag, &tree_deps, &tag_deps));
         }
     }
 
