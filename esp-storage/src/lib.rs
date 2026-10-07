@@ -1,6 +1,23 @@
 //! `esp-storage` contains API functions related to reading, writing and erasing memory for data in
 //! the external flash.
 //!
+//! <section class="warning">
+//!
+//! This crate is deprecated. Use instead:
+//!
+//! - [`esp_hal::flash::Flash`] for raw and encrypted flash I/O
+//!   ([`Flash::read_encrypted`](esp_hal::flash::Flash::read_encrypted),
+//!   [`Flash::write_encrypted`](esp_hal::flash::Flash::write_encrypted)). This driver is unstable,
+//!   works on `u32` word buffers in DRAM, and does not implement `embedded-storage` traits.
+//! - `FlashRegion`, `EncryptedFlashRegion` and `AutoFlashRegion` from [`esp-bootloader-esp-idf`](https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/)
+//!   for byte-oriented, partition-scoped access. With the `embedded-storage` feature of that crate,
+//!   `FlashRegion` implements the `embedded-storage` NOR flash traits.
+//!
+//! `esp_bootloader_esp_idf::partitions::FlashStorage` is an alias for [`esp_hal::flash::Flash`],
+//! not this crate's [`FlashStorage`].
+//!
+//! </section>
+//!
 //! For higher-level functionality which works with partitions defined in the partition table, see
 //! `esp-bootloader-esp-idf`.
 //!
