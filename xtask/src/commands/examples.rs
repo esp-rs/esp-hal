@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 
 use super::{build::build_examples, run::run_examples, select};
-use crate::{Package, cargo::CargoAction, metadata::Chip};
+use crate::{Package, cargo::CargoAction, firmware::ChipCoverage, metadata::Chip};
 
 const EXAMPLE_ARGUMENT_HINT: &str =
     "the example name as a token, or `all` to act on every example of the package";
@@ -65,22 +65,33 @@ pub fn examples(
     // published dependency line that predates the chip.
     if package == Package::CompileTests && matches!(action, CargoAction::Build(_)) {
         let mut supported = Vec::with_capacity(examples.len());
+        let mut released = false;
         for ex in examples {
-            if crate::firmware::compile_test_project_supports_chip(
+            match crate::firmware::compile_test_project_supports_chip(
                 workspace,
                 ex.example_path(),
                 chip,
             )? {
-                supported.push(ex);
+                ChipCoverage::Builds => supported.push(ex),
+                ChipCoverage::Skipped { released: r } => released |= r,
             }
         }
         examples = supported;
         if examples.is_empty() {
-            bail!(
-                "Chip '{chip}' is untested: every compile-test project that selects it would \
-                 enable a `<dep>/{chip}` feature the resolved crates do not declare. The `hal` \
-                 project's pins must follow the crates that gained the chip."
+            // A chip no resolving crate ships yet is legitimately untestable; one
+            // this release publishes must be covered.
+            if released {
+                bail!(
+                    "Chip '{chip}' is untested: this release publishes it, but every \
+                     compile-test project that selects it depends on a published line that \
+                     predates it. Add those crates to the release so the `hal` project's pins \
+                     follow them."
+                );
+            }
+            log::warn!(
+                "Skipping compile-tests for {chip}: no crate this build resolves supports it yet"
             );
+            return Ok(());
         }
     }
 

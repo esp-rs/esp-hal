@@ -778,18 +778,38 @@ fn fetch_sparse_index(crate_name: &str) -> Option<String> {
     String::from_utf8(output.stdout).ok()
 }
 
+/// Whether a compile-test project can build a chip at the versions that resolve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChipCoverage {
+    Builds,
+    /// A dependency's resolving line predates the chip. `released` is set when
+    /// another dependency ships the chip from the working tree, i.e. this
+    /// release publishes the chip and the project cannot test it.
+    Skipped {
+        released: bool,
+    },
+}
+
+/// Where a chip-dep's `<chip>` feature comes from at the version that resolves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DepChipSupport {
+    WorkingTree,
+    Published,
+    Missing,
+}
+
 /// Whether every `chip-deps` crate of the compile-test project at `project_path`
 /// declares the `<chip>` cargo feature at the version that will resolve.
 ///
-/// A frozen dependency line that predates the chip returns `Ok(false)` so the
-/// build skips this project for the chip instead of hitting a `<dep>/<chip>`
-/// feature cargo cannot find. A crate this release publishes that lacks the
-/// feature is a hard error (see [`chip_dep_declares_feature`]).
+/// A frozen dependency line that predates the chip skips this project for the
+/// chip instead of hitting a `<dep>/<chip>` feature cargo cannot find. A crate
+/// this release publishes that lacks the feature is a hard error (see
+/// [`chip_dep_declares_feature`]).
 pub fn compile_test_project_supports_chip(
     workspace: &Path,
     project_path: &Path,
     chip: Chip,
-) -> Result<bool> {
+) -> Result<ChipCoverage> {
     let cargo_toml_path = project_path.join("Cargo.toml");
     let toml_str = fs::read_to_string(&cargo_toml_path)?;
     let doc = toml_str
@@ -797,20 +817,31 @@ pub fn compile_test_project_supports_chip(
         .with_context(|| format!("Failed to parse {}", cargo_toml_path.display()))?;
 
     let mut index_cache: HashMap<String, Option<String>> = HashMap::new();
+    let mut support = Vec::new();
     for dep in chip_aware_deps(&doc) {
         let dep = dep.to_string();
-        if !chip_dep_declares_feature(workspace, project_path, &doc, &dep, chip, &mut index_cache)?
-        {
+        let found =
+            chip_dep_declares_feature(workspace, project_path, &doc, &dep, chip, &mut index_cache)?;
+        if found == DepChipSupport::Missing {
             log::info!(
                 "Skipping compile-test {} for {chip}: dependency `{dep}` does not support it at \
                  the version that resolves",
                 project_path.display()
             );
-            return Ok(false);
         }
+        support.push(found);
     }
 
-    Ok(true)
+    Ok(coverage(&support))
+}
+
+fn coverage(support: &[DepChipSupport]) -> ChipCoverage {
+    if !support.contains(&DepChipSupport::Missing) {
+        return ChipCoverage::Builds;
+    }
+    ChipCoverage::Skipped {
+        released: support.contains(&DepChipSupport::WorkingTree),
+    }
 }
 
 fn chip_dep_declares_feature(
@@ -820,7 +851,7 @@ fn chip_dep_declares_feature(
     dep: &str,
     chip: Chip,
     index_cache: &mut HashMap<String, Option<String>>,
-) -> Result<bool> {
+) -> Result<DepChipSupport> {
     let chip_feature = chip.to_string();
 
     let Some(req_str) = dependency_requirement(doc, dep) else {
@@ -862,7 +893,7 @@ fn chip_dep_declares_feature(
         && tree_is_resolving_version(tree_version, &req, max_published.as_ref())
     {
         if *has_feature {
-            return Ok(true);
+            return Ok(DepChipSupport::WorkingTree);
         }
         bail!(
             "{}: crate `{dep}` {tree_version} (working tree) does not declare the \
@@ -878,16 +909,20 @@ fn chip_dep_declares_feature(
         log::warn!(
             "Cannot verify `{dep}` ({chip}) against the crates.io index (offline?); attempting the build"
         );
-        return Ok(true);
+        return Ok(DepChipSupport::Published);
     };
 
     let Some(resolved) = max_published else {
         log::warn!("No published `{dep}` satisfies `{req_str}`; attempting the build");
-        return Ok(true);
+        return Ok(DepChipSupport::Published);
     };
 
     let features = features_for_version(index_body, &resolved)?;
-    Ok(features.contains(&chip_feature))
+    Ok(if features.contains(&chip_feature) {
+        DepChipSupport::Published
+    } else {
+        DepChipSupport::Missing
+    })
 }
 
 /// Whether the working-tree crate is the version cargo will resolve.
@@ -1146,6 +1181,32 @@ mod tests {
             .map(|(name, _)| name.as_str())
             .collect::<Vec<_>>();
         assert_eq!(p4_projects, ["hal"]);
+    }
+
+    #[test]
+    fn coverage_builds_when_every_dep_has_the_chip() {
+        use DepChipSupport::*;
+        assert_eq!(coverage(&[WorkingTree, Published]), ChipCoverage::Builds);
+    }
+
+    #[test]
+    fn coverage_flags_a_released_chip_a_published_dep_lacks() {
+        // esp-hal ships the chip from the tree, esp-backtrace resolves a line without it.
+        use DepChipSupport::*;
+        assert_eq!(
+            coverage(&[WorkingTree, Missing]),
+            ChipCoverage::Skipped { released: true }
+        );
+    }
+
+    #[test]
+    fn coverage_skips_a_chip_nothing_in_the_build_ships() {
+        // Partial release without the chip's crates: every dep is a published line.
+        use DepChipSupport::*;
+        assert_eq!(
+            coverage(&[Published, Missing, Missing]),
+            ChipCoverage::Skipped { released: false }
+        );
     }
 
     #[test]
