@@ -6,7 +6,6 @@
 // The default 64KB leaves nothing to reclaim, see the dcache_reclaimed tests below.
 //% ENV-IF(esp32s3): ESP_HAL_CONFIG_DATA_CACHE_SIZE=32KB
 //% FEATURES: unstable esp-alloc/nightly
-//% FEATURES-IF(soc_has_flash): esp-storage
 
 #![no_std]
 #![no_main]
@@ -170,12 +169,15 @@ mod dcache_reclaimed {
     }
 }
 
-#[cfg(feature = "esp-storage")]
+#[cfg(flash_driver_supported)]
 #[embedded_test::tests]
-mod storage_tests {
+mod flash_tests {
     use esp_bootloader_esp_idf::partitions;
-    use esp_hal::{clock::CpuClock, peripherals::FLASH};
-    use esp_storage::FlashStorage;
+    use esp_hal::{
+        clock::CpuClock,
+        flash::{Config, Flash},
+        peripherals::FLASH,
+    };
 
     struct Context<'a> {
         flash: FLASH<'a>,
@@ -191,8 +193,8 @@ mod storage_tests {
     }
 
     #[test]
-    fn test_with_accessing_flash_storage(ctx: Context<'static>) {
-        let mut flash = FlashStorage::new(ctx.flash);
+    fn test_with_accessing_flash(ctx: Context<'static>) {
+        let mut flash = Flash::new(ctx.flash, Config::default()).unwrap();
 
         let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
         let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
@@ -206,7 +208,7 @@ mod storage_tests {
         ))
         .unwrap()
         .unwrap()
-        .as_flash_region(&mut flash)
+        .as_auto_flash_region(&mut flash)
         .read(32, &mut app_desc)
         .unwrap();
 
@@ -221,14 +223,12 @@ mod storage_tests {
     }
 
     #[test]
-    fn test_spiram_is_reliable_when_using_esp_storage() {
+    fn test_spiram_is_reliable_when_writing_flash(ctx: Context<'static>) {
         // adapted from the reproducer in https://github.com/esp-rs/esp-hal/issues/3642
 
-        const NVS_PART_FLASH_ADDR: usize = 0x9000;
+        const NVS_PART_FLASH_ADDR: u32 = 0x9000;
 
-        #[repr(C, align(4))]
-        struct AlignedBuf<const N: usize>([u8; N]);
-
+        let mut flash = Flash::new(ctx.flash, Config::default()).unwrap();
         let rng = esp_hal::rng::Rng::new();
 
         for _ in 0..100 {
@@ -236,15 +236,9 @@ mod storage_tests {
             let mut heap_buf = alloc::vec![0u8; 1024];
             rng.read(&mut buf);
             heap_buf.copy_from_slice(&buf);
-            let mut flash_buf = AlignedBuf([0; 4096]);
-            unsafe {
-                esp_storage::ll::spiflash_write(
-                    NVS_PART_FLASH_ADDR as u32,
-                    flash_buf.0.as_mut_ptr() as *const u32,
-                    1024,
-                )
-                .unwrap();
-            }
+            let flash_buf = [0u32; 256];
+            // SAFETY: the NVS partition is not mapped.
+            unsafe { flash.write(NVS_PART_FLASH_ADDR, &flash_buf) }.unwrap();
 
             for i in 0..1024 {
                 assert_eq!(buf[i], heap_buf[i], "buf != heap_buf at index {}", i);

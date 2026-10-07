@@ -33,6 +33,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         None
     };
 
+    // Partition and OTA access is built on `esp_hal::flash`. Host tests replace it with a mock.
+    println!("cargo::rustc-check-cfg=cfg(flash_driver_supported)");
+    if chip.is_none_or(|chip| chip.contains("flash_driver_supported")) {
+        println!("cargo::rustc-cfg=flash_driver_supported");
+    }
+
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")

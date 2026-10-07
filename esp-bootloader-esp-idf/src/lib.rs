@@ -78,9 +78,9 @@
 //!
 //! After the bootloader has started the application, the `.dram2_uninit` region becomes available
 //! for use. This region can be used for dynamic memory allocation or other purposes, but the data
-//! placed there cannot be initialized (i.e. it must be `MaybeUninit<T>`). For convenience, you can
-//! use the `#[esp_hal::ram(reclaimed)]` attribute, which will also check that the variable can be
-//! placed in the reclaimed memory.
+//! placed there cannot be initialized (i.e. it must be `MaybeUninit<T>`). The
+//! `#[esp_hal::ram(reclaimed)]` attribute places a variable there and checks that the variable can
+//! be placed in the reclaimed memory.
 #![doc = ""]
 #![cfg_attr(not(feature = "std"), doc = concat!("For ", esp_metadata_generated::chip!(), " the size of the reclaimed memory is ", esp_metadata_generated::memory_range!(size as str, "DRAM2_UNINIT")," bytes."))]
 #![doc = ""]
@@ -101,9 +101,9 @@
 // MUST be the first module
 mod fmt;
 
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), flash_driver_supported))]
 mod rom;
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), flash_driver_supported))]
 pub(crate) use rom as crypto;
 
 #[cfg(feature = "std")]
@@ -113,12 +113,16 @@ pub use crypto::Crc32 as Crc32ForTesting;
 #[cfg(feature = "std")]
 pub(crate) use non_rom as crypto;
 
+#[cfg(flash_driver_supported)]
 mod flash;
 
+#[cfg(flash_driver_supported)]
 pub mod partitions;
 
+#[cfg(flash_driver_supported)]
 pub mod ota;
 
+#[cfg(flash_driver_supported)]
 pub mod ota_updater;
 
 // We run tests on the host which happens to be MacOS machines and mach-o
@@ -129,45 +133,43 @@ pub mod ota_updater;
 #[unsafe(export_name = "bootloader.NAME")]
 static OTA_FEATURE: [u8; 7] = *b"ESP-IDF";
 
-/// ESP-IDF compatible application descriptor
+/// ESP-IDF compatible application descriptor.
 ///
 /// This gets populated by the [esp_app_desc] macro.
 #[repr(C)]
 pub struct EspAppDesc {
-    /// Magic word ESP_APP_DESC_MAGIC_WORD
+    /// Magic word ESP_APP_DESC_MAGIC_WORD.
     magic_word: u32,
-    /// Secure version
+    /// Secure version.
     secure_version: u32,
-    /// Reserved
+    /// Reserved.
     reserv1: [u32; 2],
-    /// Application version
+    /// Application version.
     version: [core::ffi::c_char; 32],
-    /// Project name
+    /// Project name.
     project_name: [core::ffi::c_char; 32],
-    /// Compile time
+    /// Compile time.
     time: [core::ffi::c_char; 16],
-    /// Compile date
+    /// Compile date.
     date: [core::ffi::c_char; 16],
-    /// Version IDF
+    /// Version IDF.
     idf_ver: [core::ffi::c_char; 32],
-    /// sha256 of elf file
+    /// sha256 of elf file.
     app_elf_sha256: [u8; 32],
-    /// Minimal eFuse block revision supported by image, in format: major * 100
-    /// + minor
+    /// Minimal eFuse block revision supported by image, in format `major * 100 + minor`.
     min_efuse_blk_rev_full: u16,
-    /// Maximal eFuse block revision supported by image, in format: major * 100
-    /// + minor
+    /// Maximal eFuse block revision supported by image, in format `major * 100 + minor`.
     max_efuse_blk_rev_full: u16,
-    /// MMU page size in log base 2 format
+    /// MMU page size in log base 2 format.
     mmu_page_size: u8,
-    /// Reserved
+    /// Reserved.
     reserv3: [u8; 3],
-    /// Reserved
+    /// Reserved.
     reserv2: [u32; 18],
 }
 
 impl EspAppDesc {
-    /// Needs to be public since it's used by the macro
+    /// Needs to be public since it's used by the macro.
     #[doc(hidden)]
     #[expect(clippy::too_many_arguments, reason = "For internal use only")]
     pub const fn new_internal(
@@ -199,63 +201,63 @@ impl EspAppDesc {
         }
     }
 
-    /// The magic word - should be `0xABCD5432`
+    /// The magic word - should be `0xABCD5432`.
     pub fn magic_word(&self) -> u32 {
         self.magic_word
     }
 
-    /// Secure version
+    /// Secure version.
     pub fn secure_version(&self) -> u32 {
         self.secure_version
     }
 
-    /// Application version
+    /// Application version.
     pub fn version(&self) -> &str {
         array_to_str(&self.version)
     }
 
-    /// Application name
+    /// Application name.
     pub fn project_name(&self) -> &str {
         array_to_str(&self.project_name)
     }
 
-    /// Compile time
+    /// Compile time.
     pub fn time(&self) -> &str {
         array_to_str(&self.time)
     }
 
-    /// Compile data
+    /// Compile date.
     pub fn date(&self) -> &str {
         array_to_str(&self.date)
     }
 
-    /// IDF version
+    /// IDF version.
     pub fn idf_ver(&self) -> &str {
         array_to_str(&self.idf_ver)
     }
 
-    /// SHA256
+    /// SHA256.
     ///
-    /// The default tooling won't populate this
+    /// The default tooling won't populate this.
     pub fn app_elf_sha256(&self) -> &[u8; 32] {
         &self.app_elf_sha256
     }
 
-    /// Minimal eFuse block revision supported by image
+    /// Minimal eFuse block revision supported by image.
     ///
-    /// Format `major * 100 + minor`
+    /// Format `major * 100 + minor`.
     pub fn min_efuse_blk_rev_full(&self) -> u16 {
         self.min_efuse_blk_rev_full
     }
 
-    /// Maximal eFuse block revision supported by image
+    /// Maximal eFuse block revision supported by image.
     ///
-    /// Format `major * 100 + minor`
+    /// Format `major * 100 + minor`.
     pub fn max_efuse_blk_rev_full(&self) -> u16 {
         self.max_efuse_blk_rev_full
     }
 
-    /// MMU page size in bytes
+    /// MMU page size in bytes.
     pub fn mmu_page_size(&self) -> u32 {
         2_u32.pow(self.mmu_page_size as u32)
     }
@@ -335,13 +337,13 @@ const fn str_to_cstr_array<const C: usize>(s: &str) -> [::core::ffi::c_char; C] 
     ret
 }
 
-/// Build time
+/// Build time.
 pub const BUILD_TIME: &str = env!("ESP_BOOTLOADER_BUILD_TIME");
 
-/// Build date
+/// Build date.
 pub const BUILD_DATE: &str = env!("ESP_BOOTLOADER_BUILD_DATE");
 
-/// MMU page size in bytes
+/// MMU page size in bytes.
 pub const MMU_PAGE_SIZE: u32 = {
     let mmu_page_size =
         esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_MMU_PAGE_SIZE").as_bytes();
@@ -358,14 +360,14 @@ pub const MMU_PAGE_SIZE: u32 = {
 pub const SECURE_VERSION: u32 =
     esp_config::esp_config_int!(u32, "ESP_BOOTLOADER_ESP_IDF_CONFIG_SECURE_VERSION");
 
-/// The (pretended) ESP-IDF version
+/// The (pretended) ESP-IDF version.
 pub const ESP_IDF_COMPATIBLE_VERSION: &str =
     esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_ESP_IDF_VERSION");
 
-/// This macro populates the application descriptor (see [EspAppDesc]) which is
-/// available as a static named `ESP_APP_DESC`
+/// Populates the application descriptor (see [EspAppDesc]) which is
+/// available as a static named `ESP_APP_DESC`.
 ///
-/// In most cases you can just use the no-arguments version of this macro.
+/// In most cases, the no-arguments version of this macro is enough.
 #[macro_export]
 macro_rules! esp_app_desc {
     () => {
