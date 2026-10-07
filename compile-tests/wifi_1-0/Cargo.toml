@@ -21,7 +21,7 @@ esp-backtrace = { version = "0.18.0", features = [
     "println",
 ] }
 esp-bootloader-esp-idf = { version = "0.4.0" }
-# `~` keeps esp-hal on the line esp-radio 0.17 targets: xtensa-lx-rt sets `links`, so one version only.
+# esp-radio 0.17 accepts any esp-hal 1.x; without `~` cargo resolves the newest and this line goes untested.
 esp-hal = { version = "~1.0.0" , features = ["log-04", "unstable"] }
 esp-println = { version = "0.16.0", features = ["log-04"] }
 esp-rtos = { version = "0.2.0", features = ["esp-radio", "embassy", "log-04"] }
