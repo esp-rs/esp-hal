@@ -311,6 +311,36 @@ fn bump_crate_version(
         }
     }
 
+    // compile-tests/hal tracks the current lines. Frozen ble_*/wifi_* stay on
+    // the minor they were snapshotted at, so they are not rewritten here.
+    let hal_manifest = bumped_package
+        .workspace
+        .join("compile-tests")
+        .join("hal")
+        .join("Cargo.toml");
+    if hal_manifest.exists() {
+        let content = fs::read_to_string(&hal_manifest)
+            .with_context(|| format!("Could not read {}", hal_manifest.display()))?;
+        let mut toml =
+            CargoToml::from_str(&bumped_package.workspace, Package::CompileTests, &content)
+                .with_context(|| format!("Could not parse {}", hal_manifest.display()))?;
+        if toml.change_version_of_dependency(&package_name, &version) {
+            if dry_run {
+                log::info!(
+                    "  Dry run: would update {package_name} in compile-tests/hal: \
+                     ({prev_version} -> {version})"
+                );
+            } else {
+                log::info!(
+                    "  Bumping {package_name} version for compile-tests/hal: \
+                     ({prev_version} -> {version})"
+                );
+                fs::write(&hal_manifest, toml.manifest.to_string())
+                    .with_context(|| format!("Could not write {}", hal_manifest.display()))?;
+            }
+        }
+    }
+
     Ok(version)
 }
 

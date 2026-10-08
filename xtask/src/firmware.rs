@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     fs,
     path::{Path, PathBuf},
 };
@@ -8,6 +8,7 @@ use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
+use toml_edit::DocumentMut;
 
 use crate::{Package, ScriptContext, metadata::Chip, windows_safe_path};
 
@@ -240,17 +241,10 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
 /// Returns the chips selected by a `CHIP_FILTER` expression (a boolean expression over
 /// cfg symbols, key-value cfg symbols, and chip names, e.g. `cfg_symbol && !esp32`,
 /// `esp32c6 || esp32h2`, or `interrupt_controller != "clic"`).
-fn parse_chips(expr: &str) -> anyhow::Result<Vec<Chip>> {
-    let script_ctx = ScriptContext::new();
-
+fn parse_chips(expr: &str) -> Result<Vec<Chip>> {
     let mut chips = Vec::new();
     for chip in Chip::iter() {
-        let mut ctx = script_ctx.for_chip(chip);
-
-        let selected = ctx.evaluate(expr).map_err(|err| {
-            anyhow::anyhow!("{err:?}").context("Failed to evaluate chip expression")
-        })?;
-        if selected {
+        if chip_matches(chip, expr)? {
             chips.push(chip);
         }
     }
@@ -451,11 +445,6 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     Ok(examples)
 }
 
-#[derive(Debug, Deserialize)]
-struct CargoToml {
-    features: HashMap<String, Vec<String>>,
-}
-
 /// Parse the chip set from `//% CHIP_FILTER:` annotations in a source file.
 /// Returns `None` if the annotation is not present.
 fn parse_chips_from_annotation(
@@ -485,7 +474,16 @@ fn parse_chips_from_annotation(
 }
 
 /// Load all examples by finding all packages in the given path, and parsing their metadata.
-pub fn load_cargo_toml(examples_path: &Path, package: Package) -> Result<Vec<Metadata>> {
+///
+/// Two shapes coexist under `examples/` and `compile-tests/`:
+///
+/// - A project with no per-chip `[features]` table: chips come from its `//% CHIP_FILTER`
+///   annotation (every chip when absent), and xtask forwards `<dep>/<chip>` to each chip-aware
+///   dependency. This is how compile-tests work.
+/// - A self-contained project (e.g. `examples/async/embassy_ethernet`), each buildable on its own
+///   and meant to be copied elsewhere as a starting point, declares one `[features]` key per
+///   supported chip; that is its chip set, narrowed by an optional `//% CHIP_FILTER`.
+pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
     let mut packages = crate::find_packages(examples_path)?;
@@ -503,44 +501,61 @@ pub fn load_cargo_toml(examples_path: &Path, package: Package) -> Result<Vec<Met
         let text = fs::read_to_string(&main_rs_path)?;
         let description = parse_description(&text);
 
-        let toml = fs::read_to_string(&cargo_toml_path)?;
-        let toml: CargoToml = toml_edit::de::from_str(&toml)?;
+        let toml_str = fs::read_to_string(&cargo_toml_path)?;
+        let doc = toml_str
+            .parse::<DocumentMut>()
+            .with_context(|| format!("Failed to parse {}", cargo_toml_path.display()))?;
 
-        let cargo_chips: Vec<Chip> = toml
-            .features
-            .keys()
-            .filter_map(|k| Chip::from_str(k, true).ok())
-            .collect();
-
-        let chips_from_annotations = parse_chips_from_annotation(&text).with_context(|| {
+        let annotation_chips = parse_chips_from_annotation(&text).with_context(|| {
             format!("Failed to parse annotations in {}", main_rs_path.display())
         })?;
+        let feature_chips = feature_table_chips(&doc);
 
-        // Without a CHIP_FILTER an example is expected to build for every chip, otherwise a newly
-        // added chip silently drops out of its coverage.
+        if feature_chips.is_empty() {
+            let deps = chip_aware_deps(&doc);
+            for chip in selected_chips(&annotation_chips) {
+                let features = deps.iter().map(|dep| format!("{dep}/{chip}")).collect();
+                examples.push(Metadata {
+                    example_path: package_path.clone(),
+                    chip,
+                    configuration_name: String::new(),
+                    features,
+                    tag: None,
+                    description: description.clone(),
+                    harness_firmware: None,
+                    support_firmware: false,
+                    env_vars: HashMap::new(),
+                    cargo_config: Vec::new(),
+                });
+            }
+            continue;
+        }
+
+        // A `[features]` chip table, narrowed by an optional `//% CHIP_FILTER`. Without an
+        // annotation the project must list every chip, otherwise a newly added chip silently
+        // drops out of its coverage.
         let missing: Vec<Chip> = Chip::iter()
-            .filter(|chip| match &chips_from_annotations {
+            .filter(|chip| match &annotation_chips {
                 Some(annotated) => annotated.contains(chip),
-                None => package != Package::CompileTests,
+                None => true,
             })
-            .filter(|chip| !cargo_chips.contains(chip))
+            .filter(|chip| !feature_chips.contains(chip))
             .collect();
-
         if !missing.is_empty() {
             bail!(
-                "{}: chips {missing:?} are missing from Cargo.toml. Add them, or narrow the set with a \
-                 `//% CHIP_FILTER:` annotation.",
+                "{}: chips {missing:?} are missing from Cargo.toml. Add them, or narrow the set \
+                 with a `//% CHIP_FILTER:` annotation.",
                 package_path.display()
             );
         }
 
-        let chips = cargo_chips.into_iter().filter(|c| {
-            chips_from_annotations
+        for chip in feature_chips {
+            if annotation_chips
                 .as_ref()
-                .is_none_or(|set| set.contains(c))
-        });
-
-        for chip in chips {
+                .is_some_and(|set| !set.contains(&chip))
+            {
+                continue;
+            }
             examples.push(Metadata {
                 example_path: package_path.clone(),
                 chip,
@@ -559,6 +574,385 @@ pub fn load_cargo_toml(examples_path: &Path, package: Package) -> Result<Vec<Met
     Ok(examples)
 }
 
+/// Chips selected by a `//% CHIP_FILTER` annotation, or every chip when absent.
+fn selected_chips(annotation: &Option<std::collections::HashSet<Chip>>) -> Vec<Chip> {
+    match annotation {
+        Some(set) => Chip::iter().filter(|c| set.contains(c)).collect(),
+        None => Chip::iter().collect(),
+    }
+}
+
+/// Whether the standalone project at `dir` declares a per-chip `[features]`
+/// table. Compile-tests do not (their chip rides on forwarded `<dep>/<chip>`
+/// features), so the bare chip feature must not be enabled for them.
+pub(crate) fn project_has_chip_feature_table(dir: &Path) -> bool {
+    std::fs::read_to_string(dir.join("Cargo.toml"))
+        .ok()
+        .and_then(|s| s.parse::<DocumentMut>().ok())
+        .is_some_and(|doc| !feature_table_chips(&doc).is_empty())
+}
+
+/// The chips named by a project's `[features]` keys.
+fn feature_table_chips(doc: &DocumentMut) -> Vec<Chip> {
+    doc.get("features")
+        .and_then(|f| f.as_table())
+        .map(|table| {
+            table
+                .iter()
+                .filter_map(|(key, _)| Chip::from_str(key, true).ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The `esp-*` dependencies that declare chip features; xtask forwards each as
+/// `<dep>/<chip>` for the selected chips. Chip-agnostic deps (esp-alloc) and
+/// third-party crates are left out.
+fn chip_aware_deps(doc: &DocumentMut) -> Vec<Package> {
+    let Some(table) = doc.get("dependencies").and_then(|d| d.as_table()) else {
+        return Vec::new();
+    };
+    let mut deps = Vec::new();
+    for (name, item) in table.iter() {
+        let real = item.get("package").and_then(|p| p.as_str()).unwrap_or(name);
+        if let Ok(pkg) = Package::from_str(real, true)
+            && pkg.has_chip_features()
+            && !deps.contains(&pkg)
+        {
+            deps.push(pkg);
+        }
+    }
+    deps.sort();
+    deps
+}
+
+/// Whether `expr` holds for `chip`, evaluated against the chip's device metadata.
+fn chip_matches(chip: Chip, expr: &str) -> Result<bool> {
+    let script_ctx = ScriptContext::new();
+    let mut ctx = script_ctx.for_chip(chip);
+    ctx.evaluate(expr)
+}
+
+/// The chips each compile-test project selects (from its `//% CHIP_FILTER`),
+/// keyed by project directory name. Report-only helper for the plan and PR body.
+pub fn compile_test_coverage(workspace: &Path) -> Result<Vec<(String, Vec<Chip>)>> {
+    let root = windows_safe_path(&workspace.join(Package::CompileTests.directory()));
+    let mut packages = crate::find_packages(&root)?;
+    packages.sort();
+
+    let mut coverage = Vec::new();
+    for package_path in packages {
+        let main_rs_path = package_path.join("src").join("main.rs");
+        if !main_rs_path.exists() {
+            continue;
+        }
+        let text = fs::read_to_string(&main_rs_path)?;
+        let chips = selected_chips(&parse_chips_from_annotation(&text)?);
+        let name = package_path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        coverage.push((name, chips));
+    }
+
+    coverage.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(coverage)
+}
+
+/// Render [`compile_test_coverage`] as one `- project: chip, chip` line each.
+pub fn format_compile_test_coverage(coverage: &[(String, Vec<Chip>)]) -> String {
+    coverage
+        .iter()
+        .map(|(project, chips)| {
+            let chips = if chips.is_empty() {
+                "(no chips)".to_string()
+            } else {
+                chips
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            format!("- {project}: {chips}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The feature names declared for `version` in a crates.io sparse-index body
+/// (newline-delimited JSON). Merges `features` and `features2`, since cargo
+/// splits weak/`dep:` syntax into the latter but the names are equally valid.
+pub fn features_for_version(
+    index_body: &str,
+    version: &semver::Version,
+) -> Result<BTreeSet<String>> {
+    #[derive(Deserialize)]
+    struct IndexEntry {
+        vers: String,
+        #[serde(default)]
+        features: HashMap<String, Vec<String>>,
+        #[serde(default)]
+        features2: Option<HashMap<String, Vec<String>>>,
+    }
+
+    for line in index_body.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let entry: IndexEntry = serde_json::from_str(line)
+            .with_context(|| format!("Failed to parse crates.io index line: {line}"))?;
+        // Compare parsed versions so build metadata on one side doesn't cause a miss.
+        let Ok(entry_version) = semver::Version::parse(&entry.vers) else {
+            continue;
+        };
+        if entry_version == *version {
+            let mut names: BTreeSet<String> = entry.features.into_keys().collect();
+            if let Some(features2) = entry.features2 {
+                names.extend(features2.into_keys());
+            }
+            return Ok(names);
+        }
+    }
+
+    bail!("version {version} was not found in the crates.io index response");
+}
+
+/// The highest non-yanked published version satisfying `req`, from a sparse-index body.
+fn max_version_matching(
+    index_body: &str,
+    req: &semver::VersionReq,
+) -> Result<Option<semver::Version>> {
+    #[derive(Deserialize)]
+    struct VersionEntry {
+        vers: String,
+        #[serde(default)]
+        yanked: bool,
+    }
+
+    let mut best: Option<semver::Version> = None;
+    for line in index_body.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let entry: VersionEntry = serde_json::from_str(line)
+            .with_context(|| format!("Failed to parse crates.io index line: {line}"))?;
+        if entry.yanked {
+            continue;
+        }
+        let Ok(version) = semver::Version::parse(&entry.vers) else {
+            continue;
+        };
+        if req.matches(&version) && best.as_ref().is_none_or(|b| version > *b) {
+            best = Some(version);
+        }
+    }
+
+    Ok(best)
+}
+
+/// The crates.io sparse-index URL for a crate, following the registry's prefix layout.
+fn sparse_index_url(crate_name: &str) -> String {
+    let name = crate_name.to_lowercase();
+    let prefix = match name.len() {
+        1 => "1".to_string(),
+        2 => "2".to_string(),
+        3 => format!("3/{}", &name[0..1]),
+        _ => format!("{}/{}", &name[0..2], &name[2..4]),
+    };
+    format!("https://index.crates.io/{prefix}/{name}")
+}
+
+/// Fetch a crate's sparse-index document via `curl`, or `None` when curl or the
+/// network is unavailable. curl avoids a dependency for one best-effort check.
+fn fetch_sparse_index(crate_name: &str) -> Option<String> {
+    let url = sparse_index_url(crate_name);
+    let output = std::process::Command::new("curl")
+        .args(["-sSf", &url])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout).ok()
+}
+
+/// Whether a compile-test project can build a chip at the versions that resolve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChipCoverage {
+    Builds,
+    /// A dependency's resolving line predates the chip. `released` is set when
+    /// another dependency ships the chip from the working tree, i.e. this
+    /// release publishes the chip and the project cannot test it.
+    Skipped {
+        released: bool,
+    },
+}
+
+/// Where a chip-dep's `<chip>` feature comes from at the version that resolves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DepChipSupport {
+    WorkingTree,
+    Published,
+    Missing,
+}
+
+/// Whether every `chip-deps` crate of the compile-test project at `project_path`
+/// declares the `<chip>` cargo feature at the version that will resolve.
+///
+/// A frozen dependency line that predates the chip skips this project for the
+/// chip instead of hitting a `<dep>/<chip>` feature cargo cannot find. A crate
+/// this release publishes that lacks the feature is a hard error (see
+/// [`chip_dep_declares_feature`]).
+pub fn compile_test_project_supports_chip(
+    workspace: &Path,
+    project_path: &Path,
+    chip: Chip,
+) -> Result<ChipCoverage> {
+    let cargo_toml_path = project_path.join("Cargo.toml");
+    let toml_str = fs::read_to_string(&cargo_toml_path)?;
+    let doc = toml_str
+        .parse::<DocumentMut>()
+        .with_context(|| format!("Failed to parse {}", cargo_toml_path.display()))?;
+
+    let mut index_cache: HashMap<String, Option<String>> = HashMap::new();
+    let mut support = Vec::new();
+    for dep in chip_aware_deps(&doc) {
+        let dep = dep.to_string();
+        let found =
+            chip_dep_declares_feature(workspace, project_path, &doc, &dep, chip, &mut index_cache)?;
+        if found == DepChipSupport::Missing {
+            log::info!(
+                "Skipping compile-test {} for {chip}: dependency `{dep}` does not support it at \
+                 the version that resolves",
+                project_path.display()
+            );
+        }
+        support.push(found);
+    }
+
+    Ok(coverage(&support))
+}
+
+fn coverage(support: &[DepChipSupport]) -> ChipCoverage {
+    if !support.contains(&DepChipSupport::Missing) {
+        return ChipCoverage::Builds;
+    }
+    ChipCoverage::Skipped {
+        released: support.contains(&DepChipSupport::WorkingTree),
+    }
+}
+
+fn chip_dep_declares_feature(
+    workspace: &Path,
+    project: &Path,
+    doc: &DocumentMut,
+    dep: &str,
+    chip: Chip,
+    index_cache: &mut HashMap<String, Option<String>>,
+) -> Result<DepChipSupport> {
+    let chip_feature = chip.to_string();
+
+    let Some(req_str) = dependency_requirement(doc, dep) else {
+        bail!(
+            "{}: `{dep}` is a compile-test chip-dep but has no [dependencies] entry",
+            project.display()
+        );
+    };
+    let req = semver::VersionReq::parse(&req_str).with_context(|| {
+        format!(
+            "{}: invalid version requirement `{req_str}` for {dep}",
+            project.display()
+        )
+    })?;
+
+    let tree = if let Ok(package) = Package::from_str(dep, true)
+        && let Ok(toml) = crate::cargo::CargoToml::new(workspace, package)
+    {
+        Some((
+            toml.package_version(),
+            manifest_declares_feature(&toml.manifest, &chip_feature),
+        ))
+    } else {
+        None
+    };
+
+    let index_body = index_cache
+        .entry(dep.to_string())
+        .or_insert_with(|| fetch_sparse_index(dep));
+    let max_published = match index_body.as_deref() {
+        Some(body) => max_version_matching(body, &req)?,
+        None => None,
+    };
+
+    // Trust the tree only when cargo will resolve that version (it is newer
+    // than, or the only match for, the requirement). A published tree version
+    // older than the index max is crates.io's crate, whose features can lag.
+    if let Some((tree_version, has_feature)) = &tree
+        && tree_is_resolving_version(tree_version, &req, max_published.as_ref())
+    {
+        if *has_feature {
+            return Ok(DepChipSupport::WorkingTree);
+        }
+        bail!(
+            "{}: crate `{dep}` {tree_version} (working tree) does not declare the \
+             `{chip_feature}` feature required for {chip}. A chip was added to the metadata \
+             without a matching feature in {dep}.",
+            project.display()
+        );
+    }
+
+    // Frozen line: read the published index. A missing feature means this line
+    // predates the chip, so the project does not cover it - skip, do not error.
+    let Some(index_body) = index_body.as_deref() else {
+        log::warn!(
+            "Cannot verify `{dep}` ({chip}) against the crates.io index (offline?); attempting the build"
+        );
+        return Ok(DepChipSupport::Published);
+    };
+
+    let Some(resolved) = max_published else {
+        log::warn!("No published `{dep}` satisfies `{req_str}`; attempting the build");
+        return Ok(DepChipSupport::Published);
+    };
+
+    let features = features_for_version(index_body, &resolved)?;
+    Ok(if features.contains(&chip_feature) {
+        DepChipSupport::Published
+    } else {
+        DepChipSupport::Missing
+    })
+}
+
+/// Whether the working-tree crate is the version cargo will resolve.
+///
+/// A published tree version that is older than the index max must not win:
+/// cargo picks the published crate, whose feature table can lag the tree.
+fn tree_is_resolving_version(
+    tree_version: &semver::Version,
+    req: &semver::VersionReq,
+    max_published: Option<&semver::Version>,
+) -> bool {
+    req.matches(tree_version) && max_published.is_none_or(|published| tree_version > published)
+}
+
+/// The version requirement string for `dep` in a manifest's `[dependencies]`,
+/// whether written as `dep = "x"`, `dep = { version = "x" }`, or a table.
+fn dependency_requirement(doc: &DocumentMut, dep: &str) -> Option<String> {
+    let item = doc.get("dependencies")?.get(dep)?;
+    item.as_str()
+        .or_else(|| item.get("version").and_then(|v| v.as_str()))
+        .map(String::from)
+}
+
+fn manifest_declares_feature(manifest: &DocumentMut, feature: &str) -> bool {
+    manifest
+        .get("features")
+        .and_then(|f| f.as_table())
+        .is_some_and(|table| table.contains_key(feature))
+}
+
 /// Load every example or test the given package owns.
 ///
 /// Packages keep their firmware in one of three shapes: a directory of standalone projects, a
@@ -566,7 +960,7 @@ pub fn load_cargo_toml(examples_path: &Path, package: Package) -> Result<Vec<Met
 pub fn load_package(workspace: &Path, package: Package) -> Result<Vec<Metadata>> {
     let root = windows_safe_path(&workspace.join(package.directory()));
     if package.contains_standalone_projects() {
-        return load_cargo_toml(&root, package);
+        return load_cargo_toml(&root);
     }
 
     let bins = match package {
@@ -633,4 +1027,236 @@ fn parse_description(text: &str) -> Option<String> {
     log::debug!("Parsed description: {:?}", description);
 
     description
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn chips(expr: &str) -> Vec<Chip> {
+        parse_chips(expr).expect("expression should evaluate")
+    }
+
+    #[test]
+    fn wifi_predicate_selects_wifi_chips() {
+        let selected = chips("wifi_driver_supported");
+        // The wifi compile-test must cover both incident chips: esp32s31 (#6334,
+        // beta.1 shipped against emg lacking its Wi-Fi metadata) and esp32c5
+        // (Wi-Fi 6 metadata not exercised). esp32h2 and esp32p4 have no Wi-Fi.
+        assert!(selected.contains(&Chip::Esp32s31));
+        assert!(selected.contains(&Chip::Esp32c5));
+        assert!(!selected.contains(&Chip::Esp32h2));
+        assert!(!selected.contains(&Chip::Esp32p4));
+    }
+
+    #[test]
+    fn bt_predicate_selects_bt_chips() {
+        let selected = chips("bt_driver_supported");
+        // esp32h2 has a Bluetooth driver but no Wi-Fi one, and esp32s31 gained a
+        // BLE driver (#6332). Radio-less chips (esp32s2, esp32p4) are excluded.
+        assert!(selected.contains(&Chip::Esp32h2));
+        assert!(selected.contains(&Chip::Esp32s31));
+        assert!(!selected.contains(&Chip::Esp32s2));
+        assert!(!selected.contains(&Chip::Esp32p4));
+    }
+
+    #[test]
+    fn hal_predicate_selects_every_chip() {
+        // `true` is the `hal` project's predicate: it must cover esp32p4, which
+        // nothing else selects, so no chip is left without a compile-test.
+        let selected = chips("true");
+        assert!(selected.contains(&Chip::Esp32p4));
+        assert_eq!(selected.len(), Chip::iter().count());
+    }
+
+    #[test]
+    fn false_predicate_selects_no_chip() {
+        // A predicate no chip satisfies yields an empty set; the build path turns
+        // this into a hard zero-coverage error.
+        assert!(chips("false").is_empty());
+    }
+
+    #[test]
+    fn chip_aware_deps_are_the_esp_crates_with_chip_features() {
+        // esp-hal and esp-alloc both declare per-chip features and are forwarded;
+        // embassy-executor is third-party (not a workspace crate) and is left out.
+        let doc = r#"
+            [dependencies]
+            esp-hal = "1.1.0"
+            esp-alloc = "0.10.0"
+            embassy-executor = "0.10.0"
+        "#
+        .parse::<DocumentMut>()
+        .unwrap();
+
+        let deps = chip_aware_deps(&doc);
+        assert!(deps.contains(&Package::EspHal));
+        assert!(deps.contains(&Package::EspAlloc));
+        assert_eq!(deps.len(), 2);
+    }
+
+    #[test]
+    fn feature_table_chips_reads_only_chip_keys() {
+        let doc = r#"
+            [features]
+            default = []
+            esp32 = []
+            esp32c6 = []
+        "#
+        .parse::<DocumentMut>()
+        .unwrap();
+
+        let chips = feature_table_chips(&doc);
+        assert!(chips.contains(&Chip::Esp32));
+        assert!(chips.contains(&Chip::Esp32c6));
+        assert_eq!(chips.len(), 2);
+    }
+
+    #[test]
+    fn features_for_version_reports_declared_feature_names() {
+        // Two versions of the same crate; only 0.18.0 declares `esp32c6`.
+        let body = concat!(
+            r#"{"name":"esp-radio","vers":"0.17.0","deps":[],"features":{"wifi":[],"esp32":[]},"cksum":"a","yanked":false}"#,
+            "\n",
+            r#"{"name":"esp-radio","vers":"0.18.0","deps":[],"features":{"wifi":[]},"features2":{"esp32c6":[]},"cksum":"b","yanked":false}"#,
+            "\n",
+        );
+
+        let older = features_for_version(body, &semver::Version::parse("0.17.0").unwrap()).unwrap();
+        assert!(!older.contains("esp32c6"));
+
+        // The resolved (max satisfying) version and its merged feature set.
+        let req = semver::VersionReq::parse("^0.18.0").unwrap();
+        let resolved = max_version_matching(body, &req).unwrap().unwrap();
+        assert_eq!(resolved, semver::Version::parse("0.18.0").unwrap());
+        let features = features_for_version(body, &resolved).unwrap();
+        assert!(features.contains("esp32c6"));
+        assert!(features.contains("wifi"));
+    }
+
+    #[test]
+    fn features_for_version_flags_missing_chip_feature() {
+        // The mechanism behind #6334 (beta.1) and new-chip coverage: the
+        // published version that resolves lacks the required chip feature, so the
+        // feature check can skip an old dependency line for that chip instead of
+        // failing the build.
+        let body = concat!(
+            r#"{"name":"dep","vers":"1.0.0","deps":[],"features":{"esp32":[]},"cksum":"a","yanked":false}"#,
+            "\n",
+            r#"{"name":"dep","vers":"1.1.0","deps":[],"features":{"esp32":[]},"cksum":"b","yanked":false}"#,
+            "\n",
+        );
+        let req = semver::VersionReq::parse("^1.0").unwrap();
+        let resolved = max_version_matching(body, &req).unwrap().unwrap();
+        assert_eq!(resolved, semver::Version::parse("1.1.0").unwrap());
+        let features = features_for_version(body, &resolved).unwrap();
+        assert!(!features.contains("esp32s31"));
+    }
+
+    #[test]
+    fn real_compile_tests_cover_every_chip() {
+        // Exercises the real projects end to end: derives each one's chip set
+        // from its `//% CHIP_FILTER` against the live metadata, and asserts every
+        // chip is covered so no release chip is silently untested.
+        let workspace = crate::repo_root_for_tests();
+        let coverage = compile_test_coverage(&workspace).expect("coverage should compute");
+
+        for chip in Chip::iter() {
+            assert!(
+                coverage.iter().any(|(_, chips)| chips.contains(&chip)),
+                "chip {chip} is not covered by any compile-test project"
+            );
+        }
+
+        // `hal` is the catch-all, and esp32p4 relies on it exclusively.
+        let hal = coverage
+            .iter()
+            .find(|(name, _)| name == "hal")
+            .expect("hal project present");
+        assert_eq!(hal.1.len(), Chip::iter().count());
+
+        let p4_projects = coverage
+            .iter()
+            .filter(|(_, chips)| chips.contains(&Chip::Esp32p4))
+            .map(|(name, _)| name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(p4_projects, ["hal"]);
+    }
+
+    #[test]
+    fn coverage_builds_when_every_dep_has_the_chip() {
+        use DepChipSupport::*;
+        assert_eq!(coverage(&[WorkingTree, Published]), ChipCoverage::Builds);
+    }
+
+    #[test]
+    fn coverage_flags_a_released_chip_a_published_dep_lacks() {
+        // esp-hal ships the chip from the tree, esp-backtrace resolves a line without it.
+        use DepChipSupport::*;
+        assert_eq!(
+            coverage(&[WorkingTree, Missing]),
+            ChipCoverage::Skipped { released: true }
+        );
+    }
+
+    #[test]
+    fn coverage_skips_a_chip_nothing_in_the_build_ships() {
+        // Partial release without the chip's crates: every dep is a published line.
+        use DepChipSupport::*;
+        assert_eq!(
+            coverage(&[Published, Missing, Missing]),
+            ChipCoverage::Skipped { released: false }
+        );
+    }
+
+    #[test]
+    fn tree_is_resolving_when_newer_than_published() {
+        let req = semver::VersionReq::parse("1.2").unwrap();
+        let tree = semver::Version::parse("1.3.0").unwrap();
+        let published = semver::Version::parse("1.2.2").unwrap();
+        assert!(tree_is_resolving_version(&tree, &req, Some(&published)));
+    }
+
+    #[test]
+    fn tree_is_not_resolving_when_published_is_ahead() {
+        // Tree 1.2.0 with unreleased chip features; cargo resolves crates.io 1.2.2.
+        let req = semver::VersionReq::parse("1.2").unwrap();
+        let tree = semver::Version::parse("1.2.0").unwrap();
+        let published = semver::Version::parse("1.2.2").unwrap();
+        assert!(!tree_is_resolving_version(&tree, &req, Some(&published)));
+    }
+
+    #[test]
+    fn tree_is_not_resolving_when_equal_to_published() {
+        let req = semver::VersionReq::parse("1.2").unwrap();
+        let tree = semver::Version::parse("1.2.2").unwrap();
+        let published = semver::Version::parse("1.2.2").unwrap();
+        assert!(!tree_is_resolving_version(&tree, &req, Some(&published)));
+    }
+
+    #[test]
+    fn tree_is_resolving_when_nothing_is_published() {
+        let req = semver::VersionReq::parse("1.3").unwrap();
+        let tree = semver::Version::parse("1.3.0").unwrap();
+        assert!(tree_is_resolving_version(&tree, &req, None));
+    }
+
+    #[test]
+    fn frozen_line_tree_does_not_match_req() {
+        let req = semver::VersionReq::parse("~1.1.0").unwrap();
+        let tree = semver::Version::parse("1.2.0").unwrap();
+        let published = semver::Version::parse("1.1.1").unwrap();
+        assert!(!tree_is_resolving_version(&tree, &req, Some(&published)));
+    }
+
+    #[test]
+    fn sparse_index_url_follows_registry_prefix_layout() {
+        assert_eq!(sparse_index_url("a"), "https://index.crates.io/1/a");
+        assert_eq!(sparse_index_url("bc"), "https://index.crates.io/2/bc");
+        assert_eq!(sparse_index_url("abc"), "https://index.crates.io/3/a/abc");
+        assert_eq!(
+            sparse_index_url("esp-hal"),
+            "https://index.crates.io/es/p-/esp-hal"
+        );
+    }
 }
