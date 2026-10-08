@@ -392,7 +392,7 @@ algo = {
     sha512_224 = 5,
     sha512_256 = 6,
     sha512_t = 7,
-    # TODO: sm3 = 14
+    sm3 = 14,
 }
 
 [device.hmac]

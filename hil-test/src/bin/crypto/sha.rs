@@ -11,6 +11,8 @@ use esp_hal::sha::Sha512;
 use esp_hal::sha::Sha512_224;
 #[cfg(sha_has_sha512_256)]
 use esp_hal::sha::Sha512_256;
+#[cfg(sha_has_sm3)]
+use esp_hal::sha::Sm3;
 use esp_hal::{
     clock::CpuClock,
     rng::Rng,
@@ -165,6 +167,32 @@ mod tests {
             _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
             sha: Sha::new(peripherals.SHA),
         }
+    }
+
+    #[test]
+    #[cfg(sha_has_sm3)]
+    fn test_sm3(mut ctx: Context) {
+        let mut output = [0u8; 32];
+        for len in [0, 3, 55, 56, 63, 64, 65, 127, 128, 129, SOURCE_DATA.len()] {
+            let input = &SOURCE_DATA[..len];
+            hash_sha::<Sm3>(&mut ctx.sha, input, &mut output);
+            assert_sw_hash::<sm3::Sm3>("SM3", input, &output);
+            hash_digest::<Sm3>(&mut ctx.sha, input, &mut output);
+            assert_sw_hash::<sm3::Sm3>("SM3 digest", input, &output);
+        }
+
+        let (first, second) = SOURCE_DATA.split_at(SOURCE_DATA.len() / 2);
+        let mut context = esp_hal::sha::Context::<Sm3>::new();
+        {
+            let mut hash = ctx.sha.start::<Sm3>();
+            Update::update(&mut hash, first);
+            block!(hash.save(&mut context)).unwrap();
+        }
+        hash_sha::<Sha256>(&mut ctx.sha, SOURCE_DATA, &mut output);
+        let mut hash = ShaDigest::restore(&mut ctx.sha, &mut context);
+        Update::update(&mut hash, second);
+        block!(hash.finish(&mut output)).unwrap();
+        assert_sw_hash::<sm3::Sm3>("SM3 restored", SOURCE_DATA, &output);
     }
 
     #[test]
@@ -406,6 +434,26 @@ mod work_queue_tests {
             #[cfg(rng_trng_supported)]
             _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
         }
+    }
+
+    #[test]
+    #[cfg(sha_has_sm3)]
+    fn test_sm3_context(mut ctx: Context) {
+        use esp_hal::sha::{Sha256Context, Sm3Context};
+
+        let _sha_driver = ctx.sha.start();
+
+        let mut sm3 = Sm3Context::new();
+        let mut sha256 = Sha256Context::new();
+        for chunk in SOURCE_DATA.chunks(3) {
+            sm3.update(chunk).wait_blocking();
+            sha256.update(chunk).wait_blocking();
+        }
+        let mut output = [0u8; 32];
+        Sha256Context::finalize(&mut sha256, &mut output).wait_blocking();
+        assert_sw_hash::<sha2::Sha256>("SHA-256 context", SOURCE_DATA, &output);
+        Sm3Context::finalize(&mut sm3, &mut output).wait_blocking();
+        assert_sw_hash::<sm3::Sm3>("SM3 context", SOURCE_DATA, &output);
     }
 
     /// Calling finalize repeatedly will first return the result of the first hashing operation,

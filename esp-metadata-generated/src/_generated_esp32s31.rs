@@ -1194,14 +1194,17 @@ macro_rules! for_each_sha_algorithm {
         _for_each_inner_sha_algorithm!((Sha512_224, "SHA-512/224"(sizes : 128, 28, 16)
         (insecure_against :), 5)); _for_each_inner_sha_algorithm!((Sha512_256,
         "SHA-512/256"(sizes : 128, 32, 16) (insecure_against :), 6));
-        _for_each_inner_sha_algorithm!((algos(Sha1, "SHA-1"(sizes : 64, 20, 8)
-        (insecure_against : "collision", "length extension"), 0), (Sha224,
-        "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
-        (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
-        2), (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 3), (Sha512,
-        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 4),
-        (Sha512_224, "SHA-512/224"(sizes : 128, 28, 16) (insecure_against :), 5),
-        (Sha512_256, "SHA-512/256"(sizes : 128, 32, 16) (insecure_against :), 6)));
+        _for_each_inner_sha_algorithm!((Sm3, "SM3"(sizes : 64, 32, 8) (insecure_against :
+        "length extension"), 14)); _for_each_inner_sha_algorithm!((algos(Sha1,
+        "SHA-1"(sizes : 64, 20, 8) (insecure_against : "collision", "length extension"),
+        0), (Sha224, "SHA-224"(sizes : 64, 28, 8) (insecure_against :
+        "length extension"), 1), (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against
+        : "length extension"), 2), (Sha384, "SHA-384"(sizes : 128, 48, 16)
+        (insecure_against :), 3), (Sha512, "SHA-512"(sizes : 128, 64, 16)
+        (insecure_against : "length extension"), 4), (Sha512_224, "SHA-512/224"(sizes :
+        128, 28, 16) (insecure_against :), 5), (Sha512_256, "SHA-512/256"(sizes : 128,
+        32, 16) (insecure_against :), 6), (Sm3, "SM3"(sizes : 64, 32, 8)
+        (insecure_against : "length extension"), 14)));
     };
 }
 #[macro_export]
