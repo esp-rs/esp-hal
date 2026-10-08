@@ -1318,8 +1318,20 @@ mod tests {
         forwarded
     }
 
-    /// A feature that forwards to a per-chip dependency must do so for every chip, otherwise
-    /// the feature silently does nothing on the chips that were left out.
+    /// Whether the per-chip dependency of `chip` should receive `forwarded_feature`.
+    fn chip_expects_feature(chip: &str, forwarded_feature: &str) -> bool {
+        let symbol = format!("{}_driver_supported", forwarded_feature.replace('-', "_"));
+        if !Chip::all_symbols().contains(&symbol) {
+            return true;
+        }
+
+        let chip = chip
+            .parse::<Chip>()
+            .unwrap_or_else(|_| panic!("unknown chip `{chip}`"));
+
+        Config::for_chip(&chip).symbols.contains(&symbol)
+    }
+
     #[test]
     fn chip_coverage_dependency_features_are_forwarded() {
         let mut problems = Vec::new();
@@ -1337,8 +1349,10 @@ mod tests {
                     continue;
                 };
 
-                let missing = declared.difference(&chips).collect::<Vec<_>>();
-
+                let missing = declared
+                    .difference(&chips)
+                    .filter(|chip| chip_expects_feature(chip, &forwarded_feature))
+                    .collect::<Vec<_>>();
                 if !missing.is_empty() {
                     problems.push(format!(
                         "{package}: feature `{feature}` forwards `{prefix}<chip>?/{forwarded_feature}`, but not for {missing:?}"
@@ -1348,6 +1362,15 @@ mod tests {
         }
 
         assert!(problems.is_empty(), "{}", problems.join("\n"));
+    }
+
+    #[test]
+    fn chip_coverage_dependency_feature_support() {
+        assert!(chip_expects_feature("esp32", "wifi"));
+        assert!(!chip_expects_feature("esp32h2", "wifi"));
+        assert!(chip_expects_feature("esp32h2", "bt"));
+        assert!(!chip_expects_feature("esp32s2", "bt"));
+        assert!(chip_expects_feature("esp32s2", "defmt"));
     }
 
     #[test]
