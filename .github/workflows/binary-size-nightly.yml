@@ -1,7 +1,7 @@
 # Builds a few examples on every chip, once at the current `main` and once at
-# `main` from 24 hours earlier, and compares their sizes. When an example grows
-# past the limits, opens an issue that lists the pull requests merged in
-# between (or comments on the issue that is already open).
+# `main` from 24 hours earlier, and compares their sizes. An example that grew
+# past the limits is also built after each pull request merged in between, to
+# find the one behind it. Reports to an issue (or comments on the open one).
 #
 # `binary-size.yml` measures a single pull request the same way (`/test-size`).
 
@@ -9,7 +9,7 @@ name: Binary Size Nightly
 
 on:
   schedule:
-    - cron: "0 3 * * *"
+    - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       base:
@@ -48,6 +48,7 @@ jobs:
     outputs:
       base: ${{ steps.range.outputs.base }}
       head: ${{ steps.range.outputs.head }}
+      between: ${{ steps.range.outputs.between }}
       chips: ${{ steps.range.outputs.chips }}
     steps:
       - uses: actions/checkout@v6
@@ -83,6 +84,7 @@ jobs:
           examples: ${{ env.EXAMPLES }}
           base: ${{ needs.prepare.outputs.base }}
           head: ${{ needs.prepare.outputs.head }}
+          between: ${{ needs.prepare.outputs.between }}
 
   report:
     needs: [prepare, measure]
@@ -110,6 +112,7 @@ jobs:
         env:
           BASE: ${{ needs.prepare.outputs.base }}
           HEAD: ${{ needs.prepare.outputs.head }}
+          BETWEEN: ${{ needs.prepare.outputs.between }}
           CHIPS: ${{ needs.prepare.outputs.chips }}
         with:
           script: |

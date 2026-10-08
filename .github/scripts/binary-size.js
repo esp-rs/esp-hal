@@ -46,10 +46,19 @@ async function resolveNightlyRange({ core, exec }) {
     return;
   }
 
+  // The commits merged before `head`, oldest first. `measure` builds them only
+  // for examples that grew past the limits, to find the pull request behind it.
+  const between = (
+    await git(exec, ["rev-list", "--first-parent", "--reverse", `${base}..${head}`])
+  )
+    .split("\n")
+    .slice(0, -1);
+
   // The matrix of the `measure` jobs.
   const chips = JSON.parse(fs.readFileSync(".github/chips.json", "utf8"));
   core.setOutput("base", base);
   core.setOutput("head", head);
+  core.setOutput("between", between.join(" "));
   core.setOutput("chips", JSON.stringify(chips.map((chip) => chip.soc)));
 }
 
@@ -151,6 +160,7 @@ async function measure({ core, exec }) {
   const { SOC: soc, TARGET: target, BASE: base, HEAD: head } = process.env;
   const pkg = process.env.PACKAGE || "";
   const examples = process.env.EXAMPLES.split(/\s+/).filter(Boolean);
+  const between = (process.env.BETWEEN || "").split(/\s+/).filter(Boolean);
 
   // A pull request head may only be reachable from `refs/pull/*`.
   await exec.exec("git", ["fetch", "--quiet", "--no-tags", "origin", base, head]);
@@ -165,6 +175,7 @@ async function measure({ core, exec }) {
     ]) {
       lines.push(...(await measureCommit({ core, exec, soc, target, pkg, examples, role, commit })));
     }
+    lines.push(...(await measureBetween({ core, exec, soc, target, pkg, lines, between })));
   } finally {
     await exec.exec("git", ["checkout", "--quiet", "--force", original]);
   }
@@ -205,6 +216,31 @@ async function measureCommit({ core, exec, soc, target, pkg, examples, role, com
   return lines;
 }
 
+// Builds the examples that grew past the limits at every commit in between,
+// so the report can name the pull request behind the growth. A commit that
+// fails to build is skipped, its growth then shows up in the next one.
+async function measureBetween({ core, exec, soc, target, pkg, lines, between }) {
+  if (between.length === 0) return [];
+  const entries = groupSizes(lines).filter((entry) => entry.head);
+  const examples = compareEntries(entries, limitsFromEnv())
+    .filter((row) => row.regressed)
+    .map((row) => row.example);
+  if (examples.length === 0) return [];
+
+  await exec.exec("git", ["fetch", "--quiet", "--no-tags", "origin", ...between]);
+  const found = [];
+  for (const commit of between) {
+    try {
+      found.push(
+        ...(await measureCommit({ core, exec, soc, target, pkg, examples, role: commit, commit })),
+      );
+    } catch (error) {
+      core.warning(`Skipping ${commit} on ${soc}: ${error.message}`);
+    }
+  }
+  return found;
+}
+
 // Reads the `MAX_*` limits from `env`. A typo fails the run instead of
 // silently never reporting.
 function limitsFromEnv() {
@@ -221,29 +257,35 @@ function limitsFromEnv() {
   return limits;
 }
 
-// Groups the "<chip> <example> <base|head> <section> <flash|bss> <bytes>" lines
-// into one entry per chip and example, with the sections and totals of both
-// commits. Sorted so tables keep the same order.
+// Groups the "<chip> <example> <role> <section> <flash|bss> <bytes>" lines into
+// one entry per chip and example, with the sections and totals of each commit.
+// The role is `base`, `head`, or the hash of a commit in between.
+function groupSizes(lines) {
+  const examples = new Map();
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const [chip, example, role, section, kind, bytes] = line.trim().split(/\s+/);
+    const key = `${chip} ${example}`;
+    if (!examples.has(key)) examples.set(key, { chip, example, between: {} });
+    const entry = examples.get(key);
+    const sizes = role === "base" || role === "head" ? entry : entry.between;
+    sizes[role] ??= { flash: 0, bss: 0, sections: new Map() };
+    sizes[role][kind] += Number(bytes);
+    sizes[role].sections.set(section, Number(bytes));
+  }
+  return [...examples.values()];
+}
+
+// Reads the sizes of all chips, sorted so tables keep the same order.
 function readSizes() {
   if (!fs.existsSync(SIZES_DIR)) return [];
 
-  const examples = new Map();
-  for (const file of fs.readdirSync(SIZES_DIR)) {
-    const text = fs.readFileSync(path.join(SIZES_DIR, file), "utf8");
-    for (const line of text.split("\n")) {
-      if (!line.trim()) continue;
-      const [chip, example, role, section, kind, bytes] = line.trim().split(/\s+/);
-      const key = `${chip} ${example}`;
-      if (!examples.has(key)) examples.set(key, { chip, example });
-      const entry = examples.get(key);
-      entry[role] ??= { flash: 0, bss: 0, sections: new Map() };
-      entry[role][kind] += Number(bytes);
-      entry[role].sections.set(section, Number(bytes));
-    }
-  }
+  const lines = fs
+    .readdirSync(SIZES_DIR)
+    .flatMap((file) => fs.readFileSync(path.join(SIZES_DIR, file), "utf8").split("\n"));
 
   // An example that only exists at the base was removed, nothing to report.
-  return [...examples.values()]
+  return groupSizes(lines)
     .filter((entry) => entry.head)
     .sort(
       (a, b) =>
@@ -340,6 +382,81 @@ function missingNote(chips) {
   return `No sizes from ${chips.map((chip) => `\`${chip}\``).join(", ")}: the build failed or no example supports them, see the run.`;
 }
 
+// Names a commit by its pull request, or by its hash and subject when it has
+// none. Escaped for a table cell, with mentions kept from notifying anyone.
+async function describeCommit({ github, context, exec }, sha) {
+  const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+    ...context.repo,
+    commit_sha: sha,
+  });
+  const pull = pulls.find((pull) => pull.merged_at);
+  const text = pull
+    ? `#${pull.number} ${pull.title}`
+    : `${sha.slice(0, 10)} ${await git(exec, ["log", "-1", "--format=%s", sha])}`;
+  return text.replaceAll("@", "@\u200b").replaceAll("|", "\\|");
+}
+
+// Splits every regression into the growth of each merged pull request, from
+// the sizes `measureBetween` recorded. Commits without sizes are counted
+// together with the next one that has them. Returns the table and, for each
+// pull request that alone grew past the limits, the examples it grew.
+async function growthByPullRequest(api, rows, chain, limits) {
+  const names = new Map();
+  const lines = [];
+  const culprits = new Map();
+  for (const row of rows) {
+    let previous = row.base;
+    let pending = [];
+    for (const commit of chain.slice(1)) {
+      pending.push(commit);
+      const sizes = commit === chain.at(-1) ? row.head : row.between[commit];
+      if (!sizes) continue;
+
+      if (sizes.flash !== previous.flash || sizes.bss !== previous.bss) {
+        for (const sha of pending) {
+          if (!names.has(sha)) names.set(sha, await describeCommit(api, sha));
+        }
+        const flash = compare(previous.flash, sizes.flash, limits.flash, limits.percent);
+        const bss = compare(previous.bss, sizes.bss, limits.bss, limits.percent);
+        const pulls = pending.map((sha) => names.get(sha)).join("<br>");
+        lines.push(
+          `| \`${row.chip}\` | \`${row.example}\` | ${pulls} | ${flash.text} | ${bss.text} |`,
+        );
+
+        if (flash.regressed || bss.regressed) {
+          const culprit = pending.map((sha) => names.get(sha)).join(" or ");
+          if (!culprits.has(culprit)) culprits.set(culprit, new Map());
+          const examples = culprits.get(culprit);
+          if (!examples.has(row.example)) examples.set(row.example, []);
+          examples.get(row.example).push(row.chip);
+        }
+      }
+      previous = sizes;
+      pending = [];
+    }
+  }
+  const table = [
+    "| Chip | Example | Pull request | Flash (bytes) | bss (bytes) |",
+    "|---|---|---|---|---|",
+    ...lines,
+  ].join("\n");
+  return { table, culprits };
+}
+
+// Names the pull requests that alone grew past the limits, and where.
+function causeText(culprits) {
+  if (culprits.size === 0) {
+    return "No single pull request grew past the limits on its own, the growth adds up over several of them. See the growth by pull request below.";
+  }
+  const lines = [...culprits].map(([culprit, examples]) => {
+    const where = [...examples]
+      .map(([example, chips]) => `\`${example}\` on ${chips.map((chip) => `\`${chip}\``).join(", ")}`)
+      .join("; ");
+    return `**${culprit}** grew past the limits on its own: ${where}.`;
+  });
+  return lines.length === 1 ? lines[0] : lines.map((line) => `- ${line}`).join("\n");
+}
+
 // Writes the nightly table to the run summary and, when something grew past
 // the limits, opens or updates the regression issue.
 async function reportNightly({ github, context, core, exec }) {
@@ -380,16 +497,35 @@ async function reportNightly({ github, context, core, exec }) {
     await git(exec, ["log", "--first-parent", "--format=- %h %s", `${base}..${head}`])
   ).replaceAll("@", "@\u200b");
 
+  const between = (process.env.BETWEEN || "").split(/\s+/).filter(Boolean);
+  const chain = [base, ...between, head];
+  const growth = await growthByPullRequest(
+    { github, context, exec },
+    regressions,
+    chain,
+    limits,
+  );
+
   const body = [
     "The nightly binary size check found examples that grew past the limits.",
     "",
     `Workflow run: ${runUrl(context)}`,
+    "",
+    "### Cause",
+    "",
+    causeText(growth.culprits),
     "",
     "### Regressions",
     "",
     totalsTable(regressions),
     "",
     sectionsDetails(regressions),
+    "",
+    "### Growth by pull request",
+    "",
+    "The size after each pull request that changed it. In bold where that pull request alone grew past the limits.",
+    "",
+    growth.table,
     "",
     `### Merged between \`${base.slice(0, 10)}\` and \`${head.slice(0, 10)}\``,
     "",

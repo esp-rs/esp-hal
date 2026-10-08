@@ -21,6 +21,12 @@ inputs:
   head:
     description: Commit to measure.
     required: true
+  between:
+    description: >-
+      Space-separated commits between base and head. Examples that grew past
+      the `MAX_*` limits are also built at each of them.
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -52,6 +58,7 @@ runs:
         PACKAGE: ${{ inputs.package }}
         BASE: ${{ inputs.base }}
         HEAD: ${{ inputs.head }}
+        BETWEEN: ${{ inputs.between }}
       with:
         script: |
           const { measure } = require('./.github/scripts/binary-size.js');
