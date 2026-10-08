@@ -63,9 +63,9 @@ By default, `/hil` commands run the `hil-test` package. Include `hil-test-radio`
 
 Triggers the binary size analysis workflow, which:
 
-- Builds selected binaries for the PR and for the base branch.
-- Runs `bloaty` to compare section sizes.
-- Generates a report.
+- Builds the selected example for the PR head and for the commit the PR branched from.
+- Compares the size of every section that ends up in the image.
+- Reports the flash and bss totals and the sections that changed in a comment on the PR.
 
 ## Trust Management Commands
 

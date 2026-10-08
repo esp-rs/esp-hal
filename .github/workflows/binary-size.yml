@@ -1,3 +1,10 @@
+# Measures how much a pull request changes the size of an example, on request
+# (`/test-size`, see `dispatch.yml`). Builds the example at the pull request
+# head and at the commit it branched from, and reports every section that
+# changed in a comment on the pull request.
+#
+# `binary-size-nightly.yml` measures what `main` gained in a day the same way.
+
 name: Binary Size Analysis
 
 run-name: >-
@@ -37,246 +44,90 @@ on:
         default: ""
         type: string
 
-jobs:
-  binary-size:
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      pull-requests: write
-      contents: read
+permissions:
+  contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+  # Read at compile time by the Wi-Fi examples.
+  SSID: SSID
+  PASSWORD: PASSWORD
+  STATIC_IP: 1.1.1.1
+  GATEWAY_IP: 1.1.1.1
+  HOST_IP: 1.1.1.1
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      base: ${{ steps.range.outputs.base }}
+      head: ${{ steps.range.outputs.head }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Resolve the commits to compare
+        id: range
+        uses: actions/github-script@v8
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          script: |
+            const { resolvePullRequestRange } = require('./.github/scripts/binary-size.js');
+            await resolvePullRequestRange({ github, context, core });
+
+  # Builds the pull request's code, so it gets no write access.
+  measure:
+    needs: prepare
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         soc: ${{ fromJSON(inputs.chips) }}
-
     steps:
-      # Checked out first so the chip metadata is available to the step below.
-      - name: Checkout Repo (Initial)
-        uses: actions/checkout@v6
-
-      - name: Resolve Rust target
-        id: target
-        run: |
-          ENTRY=$(jq -c --arg s "${{ matrix.soc }}" '.[] | select(.soc == $s)' .github/chips.json)
-          if [ -z "$ENTRY" ]; then
-            echo "Error: Unknown SoC: ${{ matrix.soc }}"
-            exit 1
-          fi
-          echo "rust-target=$(echo "$ENTRY" | jq -r '."rust-target"')" >> $GITHUB_OUTPUT
-          echo "arch=$(echo "$ENTRY" | jq -r '.arch')" >> $GITHUB_OUTPUT
-
-      # Only the toolchain for this leg's architecture is installed.
-      - name: Setup Rust
-        uses: ./.github/actions/setup-toolchains
+      - uses: actions/checkout@v6
         with:
-          xtensa: ${{ steps.target.outputs.arch == 'xtensa' }}
-          xtensa-buildtargets: ${{ matrix.soc }}
-          xtensa-default: "true"
-          riscv: ${{ steps.target.outputs.arch == 'riscv' }}
-          riscv-targets: ${{ steps.target.outputs.rust-target }}
-          riscv-components: rust-src, llvm-tools
+          persist-credentials: false
 
-      - name: Install Binutils and Hub
-        run: |
-          cargo install cargo-binutils
-          sudo apt-get update
-          sudo apt-get install -y hub
-
-      # Checkout the PR on top of the initial checkout above.
-      # context https://github.com/actions/checkout/issues/331
-      - name: Checkout Pull Request (PR Code at Root)
-        run: hub pr checkout ${{ github.event.inputs.pr_number }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cache Cargo Dependencies
-        uses: actions/cache@v6
+      - uses: ./.github/actions/measure-binary-size
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/
-            ~/.cargo/git/
-            ./target/
-          key: ${{ runner.os }}-${{ matrix.soc }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          soc: ${{ matrix.soc }}
+          examples: ${{ inputs.example_name }}
+          package: ${{ inputs.package }}
+          base: ${{ needs.prepare.outputs.base }}
+          head: ${{ needs.prepare.outputs.head }}
 
-      - name: Dir for result files
-        run: mkdir -p $HOME/results
-
-      - name: Build PR example
-        run: |
-          set -euo pipefail
-
-          RAW_INPUT="${{ github.event.inputs.example_name }}"
-          PACKAGE="${{ github.event.inputs.package }}"
-          PKG_ARGS=""
-          if [ -n "$PACKAGE" ]; then
-            PKG_ARGS="--package $PACKAGE"
-          fi
-
-          cargo xtask build $RAW_INPUT $PKG_ARGS "${{ matrix.soc }}"
-
-          EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
-          MANIFEST=$(find examples -path "*/${EXAMPLE_NAME}/Cargo.toml" -print -quit 2>/dev/null || true)
-          if [ -n "$MANIFEST" ]; then
-            EXAMPLE_NAME=$(sed -n '/^\[package\]$/,/^\[/{s/^[[:space:]]*name[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p}' "$MANIFEST" | head -n 1)
-          fi
-          BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
-
-          BIN=$(find target examples -type f \
-            -path "*/release/${BIN_NAME}" -executable 2>/dev/null | head -n 1 || true)
-
-          # Fallback to `_` instead of `-`
-          if [ -z "$BIN" ]; then
-            BIN=$(find target examples -type f \
-              -path "*/release/${EXAMPLE_NAME}" -executable 2>/dev/null | head -n 1 || true)
-          fi
-
-          if [ -z "$BIN" ]; then
-            echo "Error: Built PR binary not found"
-            exit 1
-          fi
-
-          cp "$BIN" $HOME/results/pr_qa_build_${{ matrix.soc }}.elf
-
-      # Checkout base
-      - name: Checkout Base Commit
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Build Base example
-        run: |
-          set -euo pipefail
-          cargo clean
-
-          RAW_INPUT="${{ github.event.inputs.example_name }}"
-          PACKAGE="${{ github.event.inputs.package }}"
-          PKG_ARGS=""
-          if [ -n "$PACKAGE" ]; then
-            PKG_ARGS="--package $PACKAGE"
-          fi
-
-          cargo xtask build $RAW_INPUT $PKG_ARGS "${{ matrix.soc }}"
-
-          EXAMPLE_NAME=$(echo "$RAW_INPUT" | awk '{print $1}')
-          MANIFEST=$(find examples -path "*/${EXAMPLE_NAME}/Cargo.toml" -print -quit 2>/dev/null || true)
-          if [ -n "$MANIFEST" ]; then
-            EXAMPLE_NAME=$(sed -n '/^\[package\]$/,/^\[/{s/^[[:space:]]*name[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p}' "$MANIFEST" | head -n 1)
-          fi
-          BIN_NAME=$(echo "$EXAMPLE_NAME" | tr '_' '-')
-
-          BIN=$(find target examples -type f \
-            -path "*/release/${BIN_NAME}" -executable 2>/dev/null | head -n 1 || true)
-
-          # Fallback to `_` instead of `-`
-          if [ -z "$BIN" ]; then
-            BIN=$(find target examples -type f \
-              -path "*/release/${EXAMPLE_NAME}" -executable 2>/dev/null | head -n 1 || true)
-          fi
-
-          if [ -z "$BIN" ]; then
-            echo "Error: Built BASE binary not found"
-            exit 1
-          fi
-
-          cp "$BIN" $HOME/results/base_qa_build_${{ matrix.soc }}.elf
-
-      - name: Copy binaries to workspace for Bloaty
-        run: |
-          # Copy files from $HOME/results to current workspace
-          cp $HOME/results/base_qa_build_${{ matrix.soc }}.elf ./
-          cp $HOME/results/pr_qa_build_${{ matrix.soc }}.elf ./
-          ls -la *.elf
-
-      # Diffs and Artifacts
-      - name: Run Bloaty Diff
-        id: bloaty-qa
-        uses: carlosperate/bloaty-action@v1
-        with:
-          bloaty-args: -d sections --domain vm --source-filter "^.text$|^.data|^.bss|^.rwdata|^.rwtext" pr_qa_build_${{ matrix.soc }}.elf -- base_qa_build_${{ matrix.soc }}.elf
-          output-to-summary: false
-        continue-on-error: true
-
-      - name: Save Bloaty output
-        run: |
-          echo "EXAMPLE_DIFF<<EOF" > result-pr-${{ matrix.soc }}.txt
-          echo "\`\`\`" >> result-pr-${{ matrix.soc }}.txt
-          echo "${{ steps.bloaty-qa.outputs.bloaty-output || 'N/A' }}" >> result-pr-${{ matrix.soc }}.txt
-          echo "\`\`\`" >> result-pr-${{ matrix.soc }}.txt
-          echo "EOF" >> result-pr-${{ matrix.soc }}.txt
-
-      - name: Upload Result Artifact
-        uses: actions/upload-artifact@v6
-        with:
-          name: result-${{ matrix.soc }}
-          path: result-pr-${{ matrix.soc }}.txt
-
-  report-results:
-    needs: binary-size
+  report:
+    needs: [prepare, measure]
+    # Report what was measured, also when some chips failed.
     if: always()
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
       contents: read
+      pull-requests: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v6
         with:
-          pattern: result-*
-          path: ./results
+          sparse-checkout: .github/scripts
+
+      # Nothing to download when every build failed.
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: sizes-*
+          path: sizes
           merge-multiple: true
 
-      - name: Generate Combined Report
-        if: needs.binary-size.result == 'success'
-        id: combine
-        working-directory: ${{ github.workspace }}
-        run: cargo run -p esp-devtool --features report -- generate-report --input results
-
-      - name: Find and Update Comment with GH CLI
+      - name: Report on the pull request
+        uses: actions/github-script@v8
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ISSUE_NUMBER=${{ github.event.inputs.pr_number }}
-          echo "Processing PR Number: $ISSUE_NUMBER"
-
-          COMMENTS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments)
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          RESULT="${{ needs.binary-size.result }}"
-
-          COMMENT_ID="${{ github.event.inputs.comment_id }}"
-
-          {
-            echo "Run: $RUN_URL"
-            echo
-            if [ "$RESULT" = "success" ]; then
-              cat report.txt
-            else
-              echo "Binary size analysis **failed** (conclusion: $RESULT)."
-              echo
-              echo "Please inspect the workflow run for details."
-            fi
-          } > comment-body.md
-
-          # Fallback to an existing Binary Size Report comment (for older runs)
-          if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
-            COMMENT_ID=$(echo "$COMMENTS" | jq -r '
-              .[]
-              | select(.user.login == "github-actions[bot]")
-              | select(.body | test("^## Binary Size Report"))
-              | .id' | head -n1)
-          fi
-
-          if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
-            echo "Updating existing comment: $COMMENT_ID"
-            gh api -X PATCH \
-              repos/${{ github.repository }}/issues/comments/$COMMENT_ID \
-              -f "body=$(cat comment-body.md)"
-          else
-            echo "Creating new comment"
-            gh api -X POST \
-              repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments \
-              -f "body=$(cat comment-body.md)"
-          fi
+          PR_NUMBER: ${{ inputs.pr_number }}
+          COMMENT_ID: ${{ inputs.comment_id }}
+          CHIPS: ${{ inputs.chips }}
+          BASE: ${{ needs.prepare.outputs.base }}
+          HEAD: ${{ needs.prepare.outputs.head }}
+        with:
+          script: |
+            const { reportPullRequest } = require('./.github/scripts/binary-size.js');
+            await reportPullRequest({ github, context, core });

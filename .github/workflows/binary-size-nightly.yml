@@ -1,7 +1,9 @@
 # Builds a few examples on every chip, once at the current `main` and once at
 # `main` from 24 hours earlier, and compares their sizes. When an example grows
-# past the threshold, opens an issue that lists the pull requests merged in
+# past the limits, opens an issue that lists the pull requests merged in
 # between (or comments on the issue that is already open).
+#
+# `binary-size.yml` measures a single pull request the same way (`/test-size`).
 
 name: Binary Size Nightly
 
@@ -18,6 +20,10 @@ on:
 
 permissions:
   contents: read
+
+# Two runs at once would report the same regression twice.
+concurrency:
+  group: binary-size-nightly
 
 env:
   CARGO_TERM_COLOR: always
@@ -55,8 +61,8 @@ jobs:
           INPUT_BASE: ${{ inputs.base }}
         with:
           script: |
-            const { resolveRange } = require('./.github/scripts/binary-size.js');
-            await resolveRange({ core, exec });
+            const { resolveNightlyRange } = require('./.github/scripts/binary-size.js');
+            await resolveNightlyRange({ core, exec });
 
   measure:
     needs: prepare
@@ -69,73 +75,14 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
-      - name: Resolve Rust target
-        id: target
-        run: |
-          ENTRY=$(jq -c --arg s "${{ matrix.soc }}" '.[] | select(.soc == $s)' .github/chips.json)
-          echo "rust-target=$(echo "$ENTRY" | jq -r '."rust-target"')" >> "$GITHUB_OUTPUT"
-          echo "arch=$(echo "$ENTRY" | jq -r '.arch')" >> "$GITHUB_OUTPUT"
-
-      - uses: ./.github/actions/setup-toolchains
+      - uses: ./.github/actions/measure-binary-size
         with:
-          xtensa: ${{ steps.target.outputs.arch == 'xtensa' }}
-          xtensa-buildtargets: ${{ matrix.soc }}
-          xtensa-default: "true"
-          riscv: ${{ steps.target.outputs.arch == 'riscv' }}
-          riscv-targets: ${{ steps.target.outputs.rust-target }}
-
-      # Prints "<flash> <bss>" for an ELF file. Flash counts every allocated
-      # section with contents, bss the zero-initialized RAM. Skips the sections
-      # the linker scripts use to reserve or pad address space: their size
-      # follows from the memory layout, not from what the firmware contains.
-      - name: Measure ${{ matrix.soc }}
-        env:
-          SOC: ${{ matrix.soc }}
-          TARGET: ${{ steps.target.outputs.rust-target }}
-          BASE: ${{ needs.prepare.outputs.base }}
-          HEAD: ${{ needs.prepare.outputs.head }}
-        run: |
-          set -euo pipefail
-
-          size_of() {
-            local flash=0 bss=0 name type addr off size es flags rest
-            while read -r name type addr off size es flags rest; do
-              [[ "$flags" == *A* ]] || continue
-              case "$name" in
-                .stack|.text_gap|.rotext_dummy|.rwdata_dummy|.rtc_fast.dummy) continue ;;
-              esac
-              if [ "$type" = NOBITS ]; then
-                bss=$((bss + 16#$size))
-              else
-                flash=$((flash + 16#$size))
-              fi
-            done < <(readelf -S -W "$1" | sed -n 's/^ *\[ *[0-9]*\] //p')
-            echo "$flash $bss"
-          }
-
-          mkdir -p sizes
-          for ROLE in base head; do
-            if [ "$ROLE" = base ]; then REF=$BASE; else REF=$HEAD; fi
-            git checkout --quiet --force "$REF"
-            for EXAMPLE in $EXAMPLES; do
-              MANIFEST=$(find examples -path "*/$EXAMPLE/Cargo.toml" -print -quit)
-              # Examples list the chips they support as features.
-              if [ -z "$MANIFEST" ] || ! grep -Eq "^$SOC[[:space:]]*=" "$MANIFEST"; then
-                continue
-              fi
-              cargo xtask build "$EXAMPLE" "$SOC"
-              NAME=$(sed -n 's/^name *= *"\(.*\)"/\1/p' "$MANIFEST" | head -n1)
-              echo "$SOC $EXAMPLE $ROLE $(size_of "target/$TARGET/release/$NAME")" >> sizes/$SOC.txt
-            done
-          done
-          cat sizes/$SOC.txt
-
-      - uses: actions/upload-artifact@v6
-        with:
-          name: sizes-${{ matrix.soc }}
-          path: sizes/${{ matrix.soc }}.txt
+          soc: ${{ matrix.soc }}
+          examples: ${{ env.EXAMPLES }}
+          base: ${{ needs.prepare.outputs.base }}
+          head: ${{ needs.prepare.outputs.head }}
 
   report:
     needs: [prepare, measure]
@@ -150,7 +97,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Nothing to download when every build failed.
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           pattern: sizes-*
           path: sizes
@@ -161,7 +110,8 @@ jobs:
         env:
           BASE: ${{ needs.prepare.outputs.base }}
           HEAD: ${{ needs.prepare.outputs.head }}
+          CHIPS: ${{ needs.prepare.outputs.chips }}
         with:
           script: |
-            const { report } = require('./.github/scripts/binary-size.js');
-            await report({ github, context, core, exec });
+            const { reportNightly } = require('./.github/scripts/binary-size.js');
+            await reportNightly({ github, context, core, exec });
