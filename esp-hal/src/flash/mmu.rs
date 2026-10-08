@@ -142,7 +142,7 @@ pub(super) fn read_flash_encrypted(offset: u32, data: &mut [u32]) -> Result<(), 
 ///
 /// Both users invalidate flash that may be mapped as code as well as data, so
 /// every cache that can hold the line is included.
-#[cfg(not(any(esp32, esp32p4, esp32s31)))]
+#[cfg(not(any(esp32, esp32h4, esp32p4, esp32s31)))]
 fn invalidate_cache(vaddr: u32, size: u32) {
     unsafe { crate::soc::cache_invalidate_addr(vaddr, size) }
 }
@@ -150,7 +150,7 @@ fn invalidate_cache(vaddr: u32, size: u32) {
 // Not `soc::cache_invalidate_addr`: it only covers the L1 D-cache (plus L2 on
 // the P4) for DMA buffers, while flash is also cached by the L1 I-caches. On
 // the P4, adding `soc::cache_invalidate_icache_addr` would invalidate L2 twice.
-#[cfg(any(esp32p4, esp32s31))]
+#[cfg(any(esp32h4, esp32p4, esp32s31))]
 fn invalidate_cache(vaddr: u32, size: u32) {
     const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;
     const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
@@ -386,7 +386,7 @@ mod indexed {
 
     pub(super) fn entry_is_flash_mapping(entry_id: u32) -> bool {
         cfg_select! {
-            any(esp32c5, esp32c61) => with_entry(entry_id, || {
+            any(esp32c5, esp32c61, esp32h4) => with_entry(entry_id, || {
                 !SPI0::regs().mmu_item_content().read().access_spiram().bit()
             }),
             _ => {
@@ -408,7 +408,7 @@ mod indexed {
         with_entry(entry_id, || {
             SPI0::regs().mmu_item_content().write(|w| {
                 unsafe { w.paddr().bits(page) };
-                #[cfg(any(esp32c5, esp32c61))]
+                #[cfg(any(esp32c5, esp32c61, esp32h4))]
                 w.access_spiram().clear_bit();
                 w.valid().set_bit();
                 if encrypted {
@@ -420,12 +420,7 @@ mod indexed {
     }
 
     pub(super) fn set_entry_invalid(entry_id: u32) {
-        with_entry(entry_id, || {
-            // Match `mmu_ll_set_entry_invalid`: the PAC reset value is not zero on every chip.
-            SPI0::regs()
-                .mmu_item_content()
-                .write(|w| unsafe { w.bits(0) });
-        });
+        with_entry(entry_id, || SPI0::regs().mmu_item_content().reset());
     }
 }
 

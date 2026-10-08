@@ -5,8 +5,11 @@ use crate::{
     private::DropGuard,
     rtc_cntl::{
         Rtc,
-        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
-        sleep::{SleepKind, pmu_common::SleepTimeConfig},
+        rtc::{HpAnalog, HpBackupClk, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
+        sleep::{
+            SleepKind,
+            pmu_common::{SleepTimeConfig, request_sleep},
+        },
     },
     soc::{
         clocks::{self, ClockTree, SocRootClkConfig},
@@ -587,7 +590,10 @@ bitfield::bitfield! {
     /// Controls the power-down status of the high-performance peripheral power domain.
     pub u32, pd_hp_periph, set_pd_hp_periph: 3;
     /// Controls the power-down status of the CPU power domain.
-    pub u32, pd_cpu      , set_pd_cpu      : 4;
+    ///
+    /// Crate-private, because a light sleep needs CPU retention to power this domain down. A
+    /// power-down without retention loses the CPU state.
+    pub(crate) u32, pd_cpu, set_pd_cpu: 4;
     /// Controls the power-down status of the high-performance always-on domain.
     pub u32, pd_hp_aon   , set_pd_hp_aon   : 5;
     /// Controls the power-down status of memory group 0.
@@ -726,10 +732,12 @@ impl RtcSleepConfig {
         }
     }
 
-    /// Configures the wakeup options and requests the sleep.
+    /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// The caller waits for the result of the request. The return value is a guard that restores
-    /// what sleep entry changed for the sleep only, so the caller keeps it until the sleep ends.
+    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
+    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
+    /// sleep ends.
+    #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
         let restore_clock_config = ClockTree::with(|clocks| {
             let old_root = clocks.soc_root_clk();
@@ -773,6 +781,17 @@ impl RtcSleepConfig {
             DigitalSleepConfig::defaults_light_sleep(self.pd_flags).apply();
         }
 
+        // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/lowpower/port/esp32c6/sleep_clock_icg.c#L40-L48
+        // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/port/esp32c6/pmu_sleep.c#L299-L302
+        let mut icg_func = HpBackupClk::default();
+        icg_func.set_retention(!self.deep && clocks::wifi_pwr_clk_runs_in_sleep());
+        PMU::regs()
+            .hp_sleep_sysclk()
+            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(icg_func.0 != 0));
+        PMU::regs()
+            .hp_sleep_icg_hp_func()
+            .write(|w| unsafe { w.hp_sleep_dig_icg_func_en().bits(icg_func.0) });
+
         param.apply();
 
         // like esp-idf pmu_sleep_start()
@@ -811,15 +830,19 @@ impl RtcSleepConfig {
 
         // Start entry into sleep mode
 
-        // pmu_ll_hp_set_sleep_enable
-        PMU::regs()
-            .slp_wakeup_cntl0()
-            .write(|w| w.sleep_req().bit(true));
-
         restore_clock_config
     }
 
+    /// Requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    #[inline(always)]
+    pub(crate) fn enter_sleep(&self) -> bool {
+        request_sleep()
+    }
+
     /// Cleans up after sleep.
+    #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
         // like esp-idf pmu_sleep_finish()
         // In "pd_cpu lightsleep" and "deepsleep" modes we never get here

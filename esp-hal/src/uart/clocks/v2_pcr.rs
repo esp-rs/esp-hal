@@ -37,6 +37,11 @@ impl UartInstance {
                 UartFunctionClockSclk::RcFast => 1,
                 UartFunctionClockSclk::PllF80m => 2,
             },
+            esp32h4 => match new_config.sclk() {
+                UartFunctionClockSclk::Xtal => 0,
+                UartFunctionClockSclk::RcFast => 1,
+                UartFunctionClockSclk::PllF48m => 2,
+            },
             any(esp32c6, esp32h2) => match new_config.sclk() {
                 #[cfg(esp32c6)]
                 UartFunctionClockSclk::PllF80m => 1,

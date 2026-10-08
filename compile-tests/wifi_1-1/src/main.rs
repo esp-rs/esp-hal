@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+//% CHIP_FILTER: wifi_driver_supported
+
 use embassy_executor::Spawner;
 use embassy_net::{
     Runner,

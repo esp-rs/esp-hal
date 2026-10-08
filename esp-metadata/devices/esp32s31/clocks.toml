@@ -247,8 +247,10 @@ peripheral_clocks = { templates = [
     { name = "Systimer", template_params = { clk_en = "{{apb_clk}} {{peri_clk}}" }, keep_enabled = true },
     { name = "Timg0", template_params = { peripheral = "timergrp0", clk_en = "{{apb_clk}}" }, keep_enabled = true },
     { name = "Timg1", template_params = { peripheral = "timergrp1", clk_en = "{{apb_clk}}" } },
-    # ADC -- clock and reset live in LP_PERI, not HP_SYS_CLKRST.
-    { name = "ApbSarAdc", template_params = {
+    # ADC -- clock and reset live in LP_PERI, not HP_SYS_CLKRST. `lp_adc_clk_en` resets to 1 and
+    # the PMU needs it while it powers the TOP domain down: gating it off leaves a deep sleep that
+    # the wakeup sources never end.
+    { name = "ApbSarAdc", keep_enabled = true, template_params = {
         clk_en_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_clk_en().bit(enable));",
         rst_template = "crate::peripherals::LP_PERI::regs().adc_ctrl().modify(|_, w| w.lp_adc_rst_en().bit(reset));"
     } },

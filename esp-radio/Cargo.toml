@@ -33,9 +33,12 @@ check-configs = [
     { features = ["esp-hal/rt", "defmt"] },
     { features = ["esp-hal/rt", "defmt"], env = { ESP_RADIO_CONFIG_DUMP_PACKETS = "true" } },
     { features = ["esp-hal/rt", "wifi"], if = 'wifi_driver_supported' },
+    { features = ["esp-hal/rt", "wifi"], env = { ESP_RADIO_CONFIG_WIFI_NAN_SYNC_ENABLE = "true" }, if = 'wifi_driver_supported && wifi_has_nan' },
+    { features = ["esp-hal/rt", "wifi"], env = { ESP_RADIO_CONFIG_WIFI_FTM_ENABLE = "true" }, if = 'wifi_driver_supported && wifi_has_ftm' },
     # feature(c_variadic) requires nightly compiler, but we can't configure the toolchain here. Only check xtensa chips, where the compiler has nightly features enabled.
     { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "print-logs-from-driver", "unstable"], if = 'wifi_driver_supported && xtensa' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer"], if = 'wifi_driver_supported' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "wifi", "wifi-eap", "esp-now", "sniffer"], env = { ESP_RADIO_CONFIG_WIFI_SOFTAP_SUPPORT = "false" }, if = 'wifi_driver_supported' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'bt_driver_supported' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'ieee802154_driver_supported' },
     { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "ble", "coex"], if = 'wifi_driver_supported && bt_driver_supported' },
@@ -82,27 +85,27 @@ byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
 embassy-sync = "0.8"
 # Make sure these are aligned with esp-phy's dependencies, too!
-esp-wifi-sys-esp32 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c2 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c3 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c5 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c6 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c61 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32h2 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32s2 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32s3 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32s31 = { version = "0.3.0", optional = true }
+esp-wifi-sys-esp32 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c3 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c5 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c6 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c61 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32h2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32s2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32s3 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32s31 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
 
-esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
-esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "22f3f71" }
+esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
 
 # Optional dependencies enabling ecosystem features
 embedded-io-06 = { package = "embedded-io", version = "0.6", default-features = false, optional = true }
@@ -285,7 +288,20 @@ esp32s31 = [
 
 #DOC_IF has("wifi_driver_supported")
 ## Enable Wi-Fi support.
-wifi = ["dep:enumset", "dep:embassy-net-driver-02", "dep:xarxa-driver"]
+wifi = [
+    "dep:enumset",
+    "dep:embassy-net-driver-02",
+    "dep:xarxa-driver",
+    "esp-wifi-sys-esp32?/wifi",
+    "esp-wifi-sys-esp32c2?/wifi",
+    "esp-wifi-sys-esp32c3?/wifi",
+    "esp-wifi-sys-esp32c5?/wifi",
+    "esp-wifi-sys-esp32c6?/wifi",
+    "esp-wifi-sys-esp32c61?/wifi",
+    "esp-wifi-sys-esp32s2?/wifi",
+    "esp-wifi-sys-esp32s3?/wifi",
+    "esp-wifi-sys-esp32s31?/wifi",
+]
 
 ## Enable Wi-Fi Enterprise Authentication Protocol (EAP) support.
 ##
@@ -307,7 +323,22 @@ sniffer = ["wifi", "__has_unstable_feature_enabled"]
 ## Enable BLE support.
 ##
 ## ⚠️ This feature is considered unstable.
-ble = ["esp-hal/__bluetooth", "dep:bt-hci", "dep:bt-hci-transport", "dep:enumset", "__has_unstable_feature_enabled"]
+ble = [
+    "esp-hal/__bluetooth",
+    "dep:bt-hci",
+    "dep:bt-hci-transport",
+    "dep:enumset",
+    "__has_unstable_feature_enabled",
+    "esp-wifi-sys-esp32?/bt",
+    "esp-wifi-sys-esp32c2?/bt",
+    "esp-wifi-sys-esp32c3?/bt",
+    "esp-wifi-sys-esp32c5?/bt",
+    "esp-wifi-sys-esp32c6?/bt",
+    "esp-wifi-sys-esp32c61?/bt",
+    "esp-wifi-sys-esp32h2?/bt",
+    "esp-wifi-sys-esp32s3?/bt",
+    "esp-wifi-sys-esp32s31?/bt",
+]
 #DOC_ENDIF
 
 #DOC_IF has("bt_driver_supported") && has("wifi_driver_supported")
@@ -331,7 +362,15 @@ csi = ["__has_unstable_feature_enabled"]
 ## Cannot be used together with Wi-Fi.
 ##
 ## ⚠️ This feature is considered unstable.
-ieee802154 = ["dep:byte", "dep:ieee802154", "__has_unstable_feature_enabled"]
+ieee802154 = [
+    "dep:byte",
+    "dep:ieee802154",
+    "__has_unstable_feature_enabled",
+    "esp-wifi-sys-esp32c5?/ieee802154",
+    "esp-wifi-sys-esp32c6?/ieee802154",
+    "esp-wifi-sys-esp32h2?/ieee802154",
+    "esp-wifi-sys-esp32s31?/ieee802154",
+]
 #DOC_ENDIF
 
 #! ### Ecosystem Feature Flags

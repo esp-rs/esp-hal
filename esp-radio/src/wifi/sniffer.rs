@@ -104,6 +104,9 @@ impl Sniffer {
     }
 
     /// Transmit a raw frame.
+    ///
+    /// Returns [`WifiError::Unsupported`] when `use_sta_interface` is `false` and the
+    /// `ESP_RADIO_CONFIG_WIFI_SOFTAP_SUPPORT` configuration option is disabled.
     #[instability::unstable]
     pub fn send_raw_frame(
         &mut self,
@@ -111,6 +114,10 @@ impl Sniffer {
         buffer: &[u8],
         use_internal_seq_num: bool,
     ) -> Result<(), WifiError> {
+        if !use_sta_interface && cfg!(not(wifi_softap_support)) {
+            return Err(WifiError::Unsupported);
+        }
+
         esp_wifi_result!(unsafe {
             esp_wifi_80211_tx(
                 if use_sta_interface {

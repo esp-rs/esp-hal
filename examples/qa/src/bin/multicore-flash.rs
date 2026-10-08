@@ -3,11 +3,11 @@
 //! This test verifies that flash operations remain correct when running
 //! on one core while the other core creates significant cache pressure.
 //!
-//! It tests the `multicore_auto_park()` and `multicore_ignore()` functionality based on the boolean
-//! values of `FLASH_ON_CORE_0` and `USE_AUTO_PARK`.
+//! It tests the `MultiCoreStrategy::AutoPark` and `MultiCoreStrategy::ignore()` strategies of
+//! `esp_hal::flash::Flash` based on the boolean values of `FLASH_ON_CORE_0` and `USE_AUTO_PARK`.
 
-//% CHIP_FILTER: multi_core && !esp32 && !esp32p4
-//% FEATURES: unstable esp-storage
+//% CHIP_FILTER: multi_core && flash_driver_supported && !esp32 && !esp32p4
+//% FEATURES: unstable
 
 // TODO: Make esp32 work
 
@@ -19,6 +19,7 @@ use core::ptr::addr_of_mut;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
+    flash::{Config, Flash, MultiCoreStrategy},
     main,
     peripherals::FLASH,
     system::{CpuControl, Stack},
@@ -104,12 +105,15 @@ fn read() {
 fn flash_access(flash: esp_hal::peripherals::FLASH) {
     println!("flash access running");
 
-    let flash = esp_storage::FlashStorage::new(flash);
-    let mut flash = if USE_AUTO_PARK {
-        flash.multicore_auto_park()
+    let strategy = if USE_AUTO_PARK {
+        MultiCoreStrategy::AutoPark
     } else {
-        unsafe { flash.multicore_ignore() }
+        // SAFETY: not sound, the other core reads from flash. This is what the
+        // test exercises.
+        unsafe { MultiCoreStrategy::ignore() }
     };
+    let mut flash =
+        Flash::new(flash, Config::default().with_multi_core_strategy(strategy)).unwrap();
     println!("flash created");
     let d = esp_hal::delay::Delay::new();
 
@@ -120,9 +124,11 @@ fn flash_access(flash: esp_hal::peripherals::FLASH) {
         println!("write flash");
         other2();
 
-        let foo = [0u8; 0x4000];
+        let foo = [0u32; 0x1000];
 
-        let res = flash.write_nor(0x9000, &foo);
+        // SAFETY: 0x9000 is the NVS partition of the default partition table,
+        // which is not mapped.
+        let res = unsafe { flash.write(0x9000, &foo) };
         println!("Writing to flash result: {:?}", res);
     }
 }

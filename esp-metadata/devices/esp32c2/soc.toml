@@ -201,6 +201,7 @@ instances = [
 support_status = "partial"
 instances = [{ name = "timg0" }]
 timg_has_divcnt_rst = true
+wdt_has_conf_update = true
 
 [device.uart]
 support_status = "supported"
@@ -257,6 +258,7 @@ channel_count = 6
 ## Radio
 [device.wifi]
 mac_version = 1
+has_ftm = true
 
 [device.bt]
 support_status = "partial"

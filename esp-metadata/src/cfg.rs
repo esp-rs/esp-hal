@@ -174,6 +174,10 @@ pub(crate) struct SupportItem {
     pub hide_from_peri_table: bool,
 }
 
+fn default_cpu_pmp_granularity() -> Option<u32> {
+    Some(4)
+}
+
 /// Define driver configuration structs, and a PeriConfig struct
 /// that contains all of them.
 macro_rules! driver_configs {
@@ -363,6 +367,15 @@ driver_configs![
                 remap_iomux_pin_registers: bool,
                 #[serde(default)] // currently 0 in all devices
                 func_in_sel_offset: u32,
+                /// Whether the digital pads must be isolated in software when a power domain that
+                /// feeds them is powered down (`SOC_GPIO_NEED_SOFT_ISOLATE_DURING_PD` in ESP-IDF).
+                ///
+                /// This is independent of `sleep.deep_sleep_needs_gpio_isolation`. That flag covers
+                /// chips that cannot hold a single pad through a deep sleep. This flag covers chips
+                /// that can hold a pad, but still leak current unless software disconnects the
+                /// unused digital pads.
+                #[serde(default)]
+                need_soft_isolate_during_pd: bool,
 
                 #[serde(flatten)]
                 pins_and_signals: GpioPinsAndSignals,
@@ -668,6 +681,12 @@ driver_configs![
                 has_5g: bool,
                 #[serde(default)]
                 csi_supported: bool,
+                /// The Wi-Fi blobs contain Wi-Fi Aware (NAN) code (`SOC_WIFI_NAN_SUPPORT`).
+                #[serde(default)]
+                has_nan: bool,
+                /// The Wi-Fi blobs contain Fine Timing Measurement code (`SOC_WIFI_FTM_SUPPORT`).
+                #[serde(default)]
+                has_ftm: bool,
             }
         },
         IeeeProperties {
@@ -863,6 +882,8 @@ driver_configs![
                 timg_has_timer1: bool,
                 #[serde(default)]
                 timg_has_divcnt_rst: bool,
+                #[serde(default)]
+                wdt_has_conf_update: bool,
 
                 #[serde(default)]
                 rc_fast_calibration: Option<RcFastCalibrationProperties>,
@@ -982,6 +1003,13 @@ driver_configs![
                 /// Whether deep-sleep entry must isolate the digital pads to prevent a leakage current.
                 #[serde(default)]
                 deep_sleep_needs_gpio_isolation: bool,
+                /// CPU retention capabilities and reachable retention-memory bounds.
+                ///
+                /// Not `Option`: an absent table must emit no symbols at all, and an optional
+                /// property also emits `<name>_is_set`, which would claim retention on the chips
+                /// that have none. `cfgs()` returns `None` when the table is empty.
+                #[serde(default)]
+                retention: SleepRetentionProperties,
             }
         },
         UlpFsmProperties {
@@ -1105,6 +1133,10 @@ driver_configs![
                 has_swd_watchdog: bool,
                 #[serde(default)]
                 cpu_mcause_mask: u32,
+                /// PMP address matching granularity, in bytes.
+                /// ESP-IDF: `SOC_CPU_PMP_REGION_GRANULARITY`.
+                #[serde(default = "default_cpu_pmp_granularity")]
+                cpu_pmp_granularity: Option<u32>,
                 #[serde(flatten)]
                 config: SocConfig,
             }

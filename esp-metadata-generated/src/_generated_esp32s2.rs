@@ -88,6 +88,9 @@ macro_rules! property {
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
     };
+    ("gpio.need_soft_isolate_during_pd") => {
+        false
+    };
     ("gpio.has_bank_1") => {
         true
     };
@@ -331,6 +334,12 @@ macro_rules! property {
     ("wifi.csi_supported") => {
         true
     };
+    ("wifi.has_nan") => {
+        true
+    };
+    ("wifi.has_ftm") => {
+        true
+    };
     ("phy.combo_module") => {
         false
     };
@@ -356,6 +365,9 @@ macro_rules! property {
         true
     };
     ("timergroup.timg_has_divcnt_rst") => {
+        false
+    };
+    ("timergroup.wdt_has_conf_update") => {
         false
     };
     ("aes.has_split_text_registers") => {
@@ -492,6 +504,12 @@ macro_rules! property {
     };
     ("soc.cpu_mcause_mask", str) => {
         stringify!(0)
+    };
+    ("soc.cpu_pmp_granularity") => {
+        4
+    };
+    ("soc.cpu_pmp_granularity", str) => {
+        stringify!(4)
     };
     ("clock_tree.cpu_pll_div_in") => {
         [crate ::soc::clocks::CpuPllDivInConfig::Pll, crate

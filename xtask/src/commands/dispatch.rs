@@ -389,6 +389,32 @@ fn dispatch_examples(
         Verb::Build | Verb::Check => CargoAction::Build(None),
         Verb::Test => unreachable!("`test` does not dispatch examples, use `run` instead"),
     };
+
+    // `cargo xtask build compile-tests` with no chip builds the whole
+    // metadata-driven matrix: every project for every chip its `if` selects,
+    // each on the chip's toolchain (Xtensa has no stable channel). xtask owns
+    // this so the release workflow does not enumerate a fixed chip set.
+    if package == Package::CompileTests && chips.is_empty() && names.is_empty() {
+        for chip in Chip::iter() {
+            let toolchain = args.toolchain.as_deref().unwrap_or(if chip.is_xtensa() {
+                "esp"
+            } else {
+                "stable"
+            });
+            examples(
+                workspace,
+                package,
+                chip,
+                Some("all"),
+                action.clone(),
+                args.debug,
+                Some(toolchain),
+                args.timings,
+            )?;
+        }
+        return Ok(());
+    }
+
     let names: Vec<Option<String>> = if names.is_empty() {
         vec![None]
     } else {

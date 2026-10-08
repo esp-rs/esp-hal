@@ -17,7 +17,7 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_backtrace as _;
-use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
 use esp_println::println;
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
@@ -31,7 +31,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);

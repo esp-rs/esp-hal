@@ -68,6 +68,8 @@ use event::EVENT_CHANNEL;
 use portable_atomic::{AtomicU8, AtomicUsize, Ordering};
 use procmacros::BuilderLite;
 
+#[cfg(wifi_softap_support)]
+use self::ap::AccessPointConfig;
 pub(crate) use self::os_adapter::*;
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -75,9 +77,15 @@ use self::sniffer::Sniffer;
 #[cfg(feature = "wifi-eap")]
 use self::sta::eap::EapStationConfig;
 use self::{
-    ap::{AccessPointConfig, AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
-    scan::{ScanConfig, ScanResults, ScanTypeConfig, free_ap_list_on_drop},
+    scan::{
+        AccessPointInfo,
+        ScanConfig,
+        ScanResults,
+        ScanTypeConfig,
+        convert_ap_info,
+        free_ap_list_on_drop,
+    },
     sta::StationConfig,
     state::*,
 };
@@ -92,6 +100,7 @@ use crate::{
     },
     wifi::event::{EventInfo, WifiEvent},
 };
+#[cfg(wifi_softap_support)]
 pub mod ap;
 
 unstable_module!(
@@ -114,9 +123,10 @@ esp_hal::if_unstable_hal! {
 }
 pub(crate) mod state;
 
-#[cfg(not(esp32))]
+#[cfg(wifi_ftm_enable)]
 mod ftm_calibration;
 mod internal;
+mod weak_overrides;
 
 const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
@@ -374,9 +384,11 @@ pub enum Config {
     Station(StationConfig),
 
     /// Access point configuration.
+    #[cfg(wifi_softap_support)]
     AccessPoint(AccessPointConfig),
 
     /// Simultaneous station and access point configuration.
+    #[cfg(wifi_softap_support)]
     AccessPointStation(StationConfig, AccessPointConfig),
 
     /// EAP station configuration for enterprise Wi-Fi.
@@ -388,9 +400,11 @@ impl Config {
     fn validate(&self) -> Result<(), WifiError> {
         match self {
             Config::Station(station_configuration) => station_configuration.validate(),
+            #[cfg(wifi_softap_support)]
             Config::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
             }
+            #[cfg(wifi_softap_support)]
             Config::AccessPointStation(station_configuration, access_point_configuration) => {
                 station_configuration.validate()?;
                 access_point_configuration.validate()
@@ -537,8 +551,10 @@ impl WifiMode {
 impl From<&Config> for WifiMode {
     fn from(config: &Config) -> Self {
         match config {
+            #[cfg(wifi_softap_support)]
             Config::AccessPoint(_) => Self::AccessPoint,
             Config::Station(_) => Self::Station,
+            #[cfg(wifi_softap_support)]
             Config::AccessPointStation(_, _) => Self::AccessPointStation,
             #[cfg(feature = "wifi-eap")]
             Config::EapStation(_) => Self::Station,
@@ -1064,6 +1080,7 @@ impl PacketQueue {
     }
 }
 
+#[cfg(wifi_softap_support)]
 static DATA_QUEUE_RX_AP: NonReentrantMutex<PacketQueue> =
     NonReentrantMutex::new(PacketQueue::new());
 
@@ -1171,6 +1188,18 @@ fn set_mac_time_update_cb(_wifi: crate::hal::peripherals::WIFI<'_>) {
     }
 }
 
+fn wifi_init_feature_caps() -> u64 {
+    let caps = unsafe { internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS };
+
+    // ESP-IDF disables the FTM initiator on ESP32-C6 v0.0 and v0.1.
+    #[cfg(all(esp32c6, wifi_ftm_enable))]
+    if esp_hal::efuse::chip_revision().combined() <= 1 {
+        return caps & !internal::WIFI_FTM_INITIATOR;
+    }
+
+    caps
+}
+
 pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), WifiError> {
     #[cfg(esp32)]
     set_mac_time_update_cb(_wifi);
@@ -1191,6 +1220,7 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
         ))?;
 
         // until we support APSTA we just register the same callback for AP and station
+        #[cfg(wifi_softap_support)]
         esp_wifi_result!(esp_wifi_internal_reg_rxcb(
             wifi_interface_t_WIFI_IF_AP,
             Some(recv_cb_ap)
@@ -1241,6 +1271,7 @@ fn wifi_deinit() -> Result<(), WifiError> {
     while let Some(packet) = DATA_QUEUE_RX_STA.with(|q| q.pop_front()) {
         drop(packet);
     }
+    #[cfg(wifi_softap_support)]
     while let Some(packet) = DATA_QUEUE_RX_AP.with(|q| q.pop_front()) {
         drop(packet);
     }
@@ -1271,6 +1302,7 @@ unsafe extern "C" fn recv_cb_sta(
     }
 }
 
+#[cfg(wifi_softap_support)]
 unsafe extern "C" fn recv_cb_ap(
     buffer: *mut c_types::c_void,
     len: u16,
@@ -1422,6 +1454,7 @@ enum InterfaceType {
     /// Station mode.
     Station,
     /// Access Point mode.
+    #[cfg(wifi_softap_support)]
     AccessPoint,
 }
 
@@ -1432,6 +1465,7 @@ impl InterfaceType {
             InterfaceType::Station => {
                 esp_hal::efuse::interface_mac_address(InterfaceMacAddress::Station)
             }
+            #[cfg(wifi_softap_support)]
             InterfaceType::AccessPoint => {
                 esp_hal::efuse::interface_mac_address(InterfaceMacAddress::AccessPoint)
             }
@@ -1445,6 +1479,7 @@ impl InterfaceType {
     fn data_queue_rx(&self) -> &'static NonReentrantMutex<PacketQueue> {
         match self {
             InterfaceType::Station => &DATA_QUEUE_RX_STA,
+            #[cfg(wifi_softap_support)]
             InterfaceType::AccessPoint => &DATA_QUEUE_RX_AP,
         }
     }
@@ -1492,6 +1527,7 @@ impl InterfaceType {
     fn interface(&self) -> wifi_interface_t {
         match self {
             InterfaceType::Station => wifi_interface_t_WIFI_IF_STA,
+            #[cfg(wifi_softap_support)]
             InterfaceType::AccessPoint => wifi_interface_t_WIFI_IF_AP,
         }
     }
@@ -1507,6 +1543,7 @@ impl InterfaceType {
     fn register_link_state_waker(&self, waker: &core::task::Waker) {
         match self {
             InterfaceType::Station => STA_LINK_STATE_WAKER.register(waker),
+            #[cfg(wifi_softap_support)]
             InterfaceType::AccessPoint => AP_LINK_STATE_WAKER.register(waker),
         }
     }
@@ -1516,6 +1553,7 @@ impl InterfaceType {
             InterfaceType::Station => {
                 matches!(station_state(), WifiStationState::Connected)
             }
+            #[cfg(wifi_softap_support)]
             InterfaceType::AccessPoint => {
                 matches!(access_point_state(), WifiAccessPointState::Started)
             }
@@ -1532,6 +1570,7 @@ impl InterfaceType {
 static SINGLETONS: AtomicU8 = AtomicU8::new(0);
 
 const STA_BIT: u8 = 1 << 0;
+#[cfg(wifi_softap_support)]
 const AP_BIT: u8 = 1 << 1;
 #[cfg(feature = "sniffer")]
 pub(super) const SNIFFER_BIT: u8 = 1 << 2;
@@ -1592,6 +1631,7 @@ impl Interface {
     ///
     /// Panics if an access-point interface already exists.
     /// Use [`try_access_point()`](Self::try_access_point) for a non-panicking alternative.
+    #[cfg(wifi_softap_support)]
     pub fn access_point() -> Self {
         Self::try_access_point().expect("access point interface already taken")
     }
@@ -1599,6 +1639,7 @@ impl Interface {
     /// Tries to create the access-point-mode interface.
     ///
     /// Returns `None` if an access-point interface already exists.
+    #[cfg(wifi_softap_support)]
     pub fn try_access_point() -> Option<Self> {
         if try_acquire(AP_BIT) {
             Some(Self {
@@ -1645,6 +1686,7 @@ impl Drop for Interface {
     fn drop(&mut self) {
         let bit = match self.mode {
             InterfaceType::Station => STA_BIT,
+            #[cfg(wifi_softap_support)]
             InterfaceType::AccessPoint => AP_BIT,
         };
         release(bit);
@@ -2754,7 +2796,7 @@ impl<'d> WifiController<'d> {
                     wifi_task_core_id: Cpu::current() as _,
                     beacon_max_len: crate::sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
                     mgmt_sbuf_num: crate::sys::include::WIFI_MGMT_SBUF_NUM as i32,
-                    feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
+                    feature_caps: wifi_init_feature_caps(),
                     sta_disconnected_pm: config.sta_disconnected_pm as _,
                     espnow_max_encrypt_num: config.espnow_max_encrypt_num as _,
 
@@ -2769,6 +2811,7 @@ impl<'d> WifiController<'d> {
                 };
             }
 
+            #[cfg(wifi_softap_support)]
             DATA_QUEUE_RX_AP.with(|queue| queue.change_capacity(config.rx_queue_size))?;
             DATA_QUEUE_RX_STA.with(|queue| queue.change_capacity(config.rx_queue_size))?;
 
@@ -3086,7 +3129,9 @@ impl WifiController<'_> {
 
         let mode = match conf {
             Config::Station(_) => wifi_mode_t_WIFI_MODE_STA,
+            #[cfg(wifi_softap_support)]
             Config::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
+            #[cfg(wifi_softap_support)]
             Config::AccessPointStation(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
             #[cfg(feature = "wifi-eap")]
             Config::EapStation(_) => wifi_mode_t_WIFI_MODE_STA,
@@ -3103,10 +3148,12 @@ impl WifiController<'_> {
                 self.apply_sta_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)?;
             }
+            #[cfg(wifi_softap_support)]
             Config::AccessPoint(config) => {
                 self.apply_ap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)?;
             }
+            #[cfg(wifi_softap_support)]
             Config::AccessPointStation(sta_config, ap_config) => {
                 self.apply_ap_config(ap_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &ap_config.protocols)?;
@@ -3531,6 +3578,7 @@ ignored."
     }
 
     /// Wait for connected / disconnected events.
+    #[cfg(wifi_softap_support)]
     pub async fn wait_for_access_point_connected_event_async(
         &self,
     ) -> Result<ap::EventInfo, WifiError> {
@@ -3585,6 +3633,7 @@ ignored."
         Err(WifiError::Other)
     }
 
+    #[cfg(wifi_softap_support)]
     fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
         config.validate()?;
 

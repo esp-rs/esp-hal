@@ -30,6 +30,7 @@ cpu_has_branch_predictor = true
 cpu_has_csr_pc = false
 cpu_csr_prv_mode = 0x810
 cpu_mcause_mask = 0x1f
+cpu_pmp_granularity = 128
 
 has_swd_watchdog = true
 
@@ -45,8 +46,9 @@ peripherals = [
     { name = "APB_SARADC" },
     # { name = "AVC" },
     { name = "ASSIST_DEBUG"},
-    { name = "CLINT" },
     { name = "CACHE" },
+    { name = "CLIC", hidden = true },
+    { name = "CLINT" },
     # { name = "CPU_APM" }, # TODO: verify we need it
     { name = "DMA" },
     { name = "ECC" },
@@ -135,6 +137,7 @@ support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 rc_fast_calibration = { divider = 32, min_rev = 0 }
+wdt_has_conf_update = true
 
 [device.gpio]
 support_status = "supported"
@@ -225,6 +228,11 @@ wakeup_sources = {
     Bt = 10,
     LpCore = 11,
 }
+
+[device.sleep.retention]
+cpu_retention = "software"
+cpu_retention_frame = "clic"
+supports_top_power_down = true
 
 [device.rng]
 support_status = { status = "partial", issue = 5981 }
@@ -351,6 +359,8 @@ support_status = "partial"
 has_wifi6 = true
 mac_version = 3
 csi_supported = true
+has_nan = true
+has_ftm = true
 
 [device.bt]
 support_status = "partial"

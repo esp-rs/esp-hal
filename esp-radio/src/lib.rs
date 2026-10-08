@@ -322,13 +322,7 @@ pub(crate) fn init() {
         );
     }
 
-    // Ungate the modem clocks first: `enable_wifi_power_domain` pulses the
-    // modem reset, which is ineffective while the clocks are gated — and
-    // esp-phy's clock guard has gated them again by the time we re-init.
-    // (ESP-IDF never gates these clocks, so its power-up reset always lands.)
-    radio_clocks::init_radio_clocks();
-
-    crate::common_adapter::enable_wifi_power_domain();
+    acquire_modem_domain();
 
     wifi_set_log_verbose();
 
@@ -355,25 +349,10 @@ pub(crate) fn deinit() {
     ble::shutdown_ble_isr();
 
     // Gate the BT clocks (the Wi-Fi driver gates its own clocks during
-    // `wifi_deinit`), power down the modem power domain, and gate the
-    // remaining modem clocks, mirroring ESP-IDF's fixed-mask clock control
-    // (`periph_ll_wifi_module_disable_clk_set_rst` and friends). This must
-    // only run once all radios are off: PHY teardown still needs the modem
-    // clocks.
+    // `wifi_deinit`), then let go of the modem power domain.
     #[cfg(feature = "ble")]
     crate::radio_clocks::enable_bt(false);
-    crate::common_adapter::disable_wifi_power_domain();
-    crate::radio_clocks::deinit_radio_clocks();
-
-    // After the modem power domain has been powered down, the PHY driver's
-    // internal init flag must be reset, otherwise the next `phy_wakeup_init`
-    // assumes retained PHY registers that the power-down wiped (mirrors
-    // ESP-IDF's `esp_phy_modem_deinit`, "Fix the issue caused by the power
-    // domain off. This issue is only on ESP32C3.").
-    #[cfg(esp32c3)]
-    unsafe {
-        crate::sys::include::phy_init_flag()
-    };
+    release_modem_domain();
 
     esp_hal::if_unstable_hal! {
         // Allow using `ADC2` again
@@ -382,6 +361,82 @@ pub(crate) fn deinit() {
     }
 
     debug!("Radio deinitialized");
+}
+
+/// The modem power domain, held by every radio that is up.
+///
+/// Powering the domain up pulses a reset over the modem subsystems the radios share (the RF
+/// frontend, the basebands and the MACs), so it must happen before the first radio initializes
+/// and never again while any radio is live; powering it down gates clocks that every radio needs.
+/// Hence the count: whichever radio comes up first powers the domain up, whichever goes last
+/// powers it down. Wi-Fi and BLE hold it through [`RadioRefGuard`]; the IEEE 802.15.4 driver
+/// holds it on its own, as it needs nothing else of [`init`] (the scheduler, coexistence).
+static MODEM_DOMAIN_REFCOUNT: Refcount = Refcount::new();
+
+/// Take a reference to the modem power domain, powering it up if this is the first one.
+pub(crate) fn acquire_modem_domain() {
+    MODEM_DOMAIN_REFCOUNT.increment(|| {
+        // Ungate the modem clocks first: `enable_wifi_power_domain` pulses the
+        // modem reset, which is ineffective while the clocks are gated — and
+        // esp-phy's clock guard has gated them again by the time we re-init.
+        // (ESP-IDF never gates these clocks, so its power-up reset always lands.)
+        radio_clocks::init_radio_clocks();
+
+        crate::common_adapter::enable_wifi_power_domain();
+    });
+}
+
+/// Release a reference to the modem power domain, powering it down if this was the last one.
+pub(crate) fn release_modem_domain() {
+    MODEM_DOMAIN_REFCOUNT.decrement(|| {
+        // Power down the modem power domain and gate the remaining modem clocks,
+        // mirroring ESP-IDF's fixed-mask clock control
+        // (`periph_ll_wifi_module_disable_clk_set_rst` and friends). This must
+        // only run once all radios are off: PHY teardown still needs the modem
+        // clocks.
+        crate::common_adapter::disable_wifi_power_domain();
+        radio_clocks::deinit_radio_clocks();
+
+        // After the modem power domain has been powered down, the PHY driver's
+        // internal init flag must be reset, otherwise the next `phy_wakeup_init`
+        // assumes retained PHY registers that the power-down wiped (mirrors
+        // ESP-IDF's `esp_phy_modem_deinit`, "Fix the issue caused by the power
+        // domain off. This issue is only on ESP32C3.").
+        #[cfg(esp32c3)]
+        unsafe {
+            crate::sys::include::phy_init_flag()
+        };
+    });
+}
+
+/// The BT baseband, shared by BLE and IEEE 802.15.4.
+///
+/// Whichever radio comes up first initializes it, and the one that follows leaves it alone
+/// (ESP-IDF's `esp_btbb_enable`) rather than re-initializing it under the first one's feet.
+/// A power-up of the modem domain resets the baseband, and no radio holds this count without
+/// holding the domain, so the two counts reach zero together and the next radio re-initializes.
+///
+/// The `btdm2` controller (ESP32-S31) still initializes the baseband on its own.
+#[cfg(any(feature = "ieee802154", all(feature = "ble", bt_controller = "npl")))]
+static BTBB_REFCOUNT: Refcount = Refcount::new();
+
+/// Take a reference to the BT baseband, initializing it if this is the first one.
+#[cfg(any(feature = "ieee802154", all(feature = "ble", bt_controller = "npl")))]
+pub(crate) fn btbb_enable() {
+    unsafe extern "C" {
+        fn bt_bb_v2_init_cmplx(print_version: u8); // from libbtbb.a
+    }
+
+    const PRINT_VERSION: u8 = 1;
+
+    BTBB_REFCOUNT.increment(|| unsafe { bt_bb_v2_init_cmplx(PRINT_VERSION) });
+}
+
+/// Release a reference to the BT baseband. There is nothing to undo on the last one: the
+/// baseband goes down with the modem power domain.
+#[cfg(any(feature = "ieee802154", all(feature = "ble", bt_controller = "npl")))]
+pub(crate) fn btbb_disable() {
+    BTBB_REFCOUNT.decrement(|| {});
 }
 
 /// Management of the global reference count

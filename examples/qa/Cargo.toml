@@ -33,7 +33,6 @@ esp-radio = { path = "../../esp-radio", features = [
     "log-04",
     "unstable",
 ], optional = true }
-esp-storage = { path = "../../esp-storage", optional = true }
 ieee802154 = "0.6.1"
 lis3dh-async = "0.9.3"
 ssd1306 = "0.10.0"
@@ -43,7 +42,7 @@ block-device-adapters = "0.2.0"
 embedded-fatfs = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112", default-features = false }
 embedded-partitions = { git = "https://github.com/MabezDev/embedded-fatfs", rev = "518528cc111fcf65c48abbdeb80735a38eada112" }
 rtos-trace = { version = "0.2.0", optional = true }
-trouble-host = { version = "0.7.0", features = [
+trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
@@ -67,7 +66,6 @@ esp32 = [
     "esp-rtos/esp32",
     "esp-println/esp32",
     "esp-radio?/esp32",
-    "esp-storage?/esp32",
 ]
 esp32c2 = [
     "esp-alloc/esp32c2",
@@ -77,7 +75,6 @@ esp32c2 = [
     "esp-rtos/esp32c2",
     "esp-println/esp32c2",
     "esp-radio?/esp32c2",
-    "esp-storage?/esp32c2",
 ]
 esp32c3 = [
     "esp-alloc/esp32c3",
@@ -87,7 +84,6 @@ esp32c3 = [
     "esp-rtos/esp32c3",
     "esp-println/esp32c3",
     "esp-radio?/esp32c3",
-    "esp-storage?/esp32c3",
 ]
 esp32c5 = [
     "esp-alloc/esp32c5",
@@ -97,7 +93,6 @@ esp32c5 = [
     "esp-rtos/esp32c5",
     "esp-println/esp32c5",
     "esp-radio?/esp32c5",
-    "esp-storage?/esp32c5",
 ]
 esp32c6 = [
     "esp-alloc/esp32c6",
@@ -107,7 +102,6 @@ esp32c6 = [
     "esp-rtos/esp32c6",
     "esp-println/esp32c6",
     "esp-radio?/esp32c6",
-    "esp-storage?/esp32c6",
 ]
 esp32c61 = [
     "esp-alloc/esp32c61",
@@ -117,7 +111,6 @@ esp32c61 = [
     "esp-rtos/esp32c61",
     "esp-println/esp32c61",
     "esp-radio?/esp32c61",
-    "esp-storage?/esp32c61",
 ]
 esp32h2 = [
     "esp-alloc/esp32h2",
@@ -127,7 +120,6 @@ esp32h2 = [
     "esp-rtos/esp32h2",
     "esp-println/esp32h2",
     "esp-radio?/esp32h2",
-    "esp-storage?/esp32h2",
 ]
 esp32h4 = [
     "esp-alloc/esp32h4",
@@ -136,7 +128,6 @@ esp32h4 = [
     "esp-hal/esp32h4",
     "esp-rtos/esp32h4",
     "esp-println/esp32h4",
-    "esp-storage?/esp32h4",
 ]
 esp32p4 = [
     "esp-alloc/esp32p4",
@@ -145,7 +136,6 @@ esp32p4 = [
     "esp-hal/esp32p4",
     "esp-rtos/esp32p4",
     "esp-println/esp32p4",
-    "esp-storage?/esp32p4",
 ]
 esp32s2 = [
     "esp-alloc/esp32s2",
@@ -155,7 +145,6 @@ esp32s2 = [
     "esp-rtos/esp32s2",
     "esp-println/esp32s2",
     "esp-radio?/esp32s2",
-    "esp-storage?/esp32s2",
 ]
 esp32s3 = [
     "esp-alloc/esp32s3",
@@ -165,7 +154,6 @@ esp32s3 = [
     "esp-rtos/esp32s3",
     "esp-println/esp32s3",
     "esp-radio?/esp32s3",
-    "esp-storage?/esp32s3",
 ]
 esp32s31 = [
     "esp-alloc/esp32s31",
@@ -175,7 +163,6 @@ esp32s31 = [
     "esp-rtos/esp32s31",
     "esp-println/esp32s31",
     "esp-radio?/esp32s31",
-    "esp-storage?/esp32s31",
 ]
 
 rtos-trace = ["esp-rtos/rtos-trace", "dep:rtos-trace"]
