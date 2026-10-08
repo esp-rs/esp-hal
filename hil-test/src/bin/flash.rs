@@ -544,4 +544,20 @@ mod tests {
 
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
     }
+
+    #[test]
+    fn test_booted_partition_is_the_factory_app() {
+        use esp_bootloader_esp_idf::partitions::{self, AppPartitionSubType, PartitionType};
+
+        let mut flash = flash_from_peripherals(esp_hal::init(esp_hal::Config::default()));
+        let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+        let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
+
+        let booted = pt.booted_partition().unwrap().unwrap();
+        assert_eq!(
+            booted.partition_type(),
+            PartitionType::App(AppPartitionSubType::Factory)
+        );
+        assert_eq!(booted.offset(), APP_DESC_OFFSET - 0x20);
+    }
 }
