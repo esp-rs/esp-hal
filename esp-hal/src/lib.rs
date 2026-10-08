@@ -393,6 +393,8 @@ unstable_driver! {
     pub mod parl_io;
     #[cfg(pcnt_driver_supported)]
     pub mod pcnt;
+    #[cfg(pixel_accelerator_driver_supported)]
+    pub mod ppa;
     #[cfg(rmt_driver_supported)]
     pub mod rmt;
     #[cfg(rsa_driver_supported)]

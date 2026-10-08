@@ -5465,6 +5465,8 @@ macro_rules! implement_peripheral_clocks {
             ApbSarAdc,
             /// AXI_GDMA peripheral clock signal
             AxiGdma,
+            /// DMA2D peripheral clock signal
+            Dma2d,
             /// ECC peripheral clock signal
             Ecc,
             /// EMAC peripheral clock signal
@@ -5485,6 +5487,8 @@ macro_rules! implement_peripheral_clocks {
             Pcnt,
             /// PCNT1 peripheral clock signal
             Pcnt1,
+            /// PPA peripheral clock signal
+            Ppa,
             /// RMT peripheral clock signal
             Rmt,
             /// RSA peripheral clock signal
@@ -5532,6 +5536,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::AhbGdma,
                 Self::ApbSarAdc,
                 Self::AxiGdma,
+                Self::Dma2d,
                 Self::Ecc,
                 Self::Emac,
                 Self::GpioSd,
@@ -5542,6 +5547,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::LcdCam,
                 Self::Pcnt,
                 Self::Pcnt1,
+                Self::Ppa,
                 Self::Rmt,
                 Self::Rsa,
                 Self::SdioHost,
@@ -5580,6 +5586,11 @@ macro_rules! implement_peripheral_clocks {
                 Peripheral::AxiGdma => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .axi_pdma_ctrl0()
+                        .modify(|_, w| w.sys_clk_en().bit(enable));
+                }
+                Peripheral::Dma2d => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .dma2d_ctrl0()
                         .modify(|_, w| w.sys_clk_en().bit(enable));
                 }
                 Peripheral::Ecc => {
@@ -5637,6 +5648,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .pcnt_ctrl0()
                         .modify(|_, w| w.pcnt1_apb_clk_en().bit(enable));
+                }
+                Peripheral::Ppa => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .ppa_ctrl0()
+                        .modify(|_, w| w.sys_clk_en().bit(enable));
                 }
                 Peripheral::Rmt => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -5745,6 +5761,11 @@ macro_rules! implement_peripheral_clocks {
                         .axi_pdma_ctrl0()
                         .modify(|_, w| w.rst_en().bit(reset));
                 }
+                Peripheral::Dma2d => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .dma2d_ctrl0()
+                        .modify(|_, w| w.rst_en().bit(reset));
+                }
                 Peripheral::Ecc => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .crypto_ctrl0()
@@ -5790,6 +5811,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .pcnt_ctrl0()
                         .modify(|_, w| w.pcnt1_rst_en().bit(reset));
+                }
+                Peripheral::Ppa => {
+                    crate::peripherals::HP_SYS_CLKRST::regs()
+                        .ppa_ctrl0()
+                        .modify(|_, w| w.rst_en().bit(reset));
                 }
                 Peripheral::Rmt => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -6466,20 +6492,21 @@ macro_rules! for_each_peripheral {
         "CNNT_SYS peripheral singleton"] CNNT_SYS <= CNNT_SYS() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc =
         "CNNT_IO_MUX peripheral singleton"] CNNT_IO_MUX <= CNNT_IO_MUX() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "ETH peripheral singleton"] ETH
-        <= virtual(SBD : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_MAC peripheral singleton"]
-        EMAC_MAC <= GMAC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "ECC peripheral singleton"] ECC <= ECC() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "EFUSE peripheral singleton"]
-        EFUSE <= EFUSE() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "GPIO peripheral singleton"] GPIO <= GPIO() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO_SD peripheral singleton"]
-        GPIO_SD <= GPIO_EXT() (unstable))); _for_each_inner_peripheral!((@ peri_type
-        #[doc = "HP_APM peripheral singleton"] HP_APM <= HP_APM() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "DMA2D peripheral singleton"]
+        DMA2D <= DMA2D() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "ETH peripheral singleton"] ETH <= virtual(SBD : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "EMAC_DMA peripheral singleton"]
+        EMAC_DMA <= GMAC_DMA() (unstable))); _for_each_inner_peripheral!((@ peri_type
+        #[doc = "EMAC_MAC peripheral singleton"] EMAC_MAC <= GMAC() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "ECC peripheral singleton"] ECC
+        <= ECC() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "EFUSE peripheral singleton"] EFUSE <= EFUSE() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "GPIO peripheral singleton"]
+        GPIO <= GPIO() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "GPIO_SD peripheral singleton"] GPIO_SD <= GPIO_EXT() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "HP_APM peripheral singleton"]
+        HP_APM <= HP_APM() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "HP_MEM_APM peripheral singleton"] HP_MEM_APM <= HP_MEM_APM() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "HP_SYS peripheral singleton"]
         HP_SYS <= HP_SYS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -6537,7 +6564,8 @@ macro_rules! for_each_peripheral {
         PCNT1 <= PCNT1(PCNT1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "PMU peripheral singleton"] PMU <= PMU() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "PPA peripheral singleton"] PPA
+        <= PPA() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER() (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "RNG peripheral singleton"] RNG
         <= TRNG() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -6678,6 +6706,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((CLIC(unstable)));
         _for_each_inner_peripheral!((CLINT(unstable)));
         _for_each_inner_peripheral!((CLINT_OTHER_CORE(unstable)));
+        _for_each_inner_peripheral!((DMA2D(unstable)));
         _for_each_inner_peripheral!((ETH(unstable)));
         _for_each_inner_peripheral!((ECC(unstable)));
         _for_each_inner_peripheral!((GPIO(unstable)));
@@ -6711,6 +6740,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((PCNT(unstable)));
         _for_each_inner_peripheral!((PCNT1(unstable)));
         _for_each_inner_peripheral!((PMU(unstable)));
+        _for_each_inner_peripheral!((PPA(unstable)));
         _for_each_inner_peripheral!((RTC_TIMER(unstable)));
         _for_each_inner_peripheral!((RNG(unstable)));
         _for_each_inner_peripheral!((RMT(unstable)));
@@ -6985,6 +7015,7 @@ macro_rules! for_each_peripheral {
         (unstable)), (@ peri_type #[doc = "CNNT_SYS peripheral singleton"] CNNT_SYS <=
         CNNT_SYS() (unstable)), (@ peri_type #[doc = "CNNT_IO_MUX peripheral singleton"]
         CNNT_IO_MUX <= CNNT_IO_MUX() (unstable)), (@ peri_type #[doc =
+        "DMA2D peripheral singleton"] DMA2D <= DMA2D() (unstable)), (@ peri_type #[doc =
         "ETH peripheral singleton"] ETH <= virtual(SBD : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (@ peri_type #[doc
         = "EMAC_DMA peripheral singleton"] EMAC_DMA <= GMAC_DMA() (unstable)), (@
@@ -7041,6 +7072,7 @@ macro_rules! for_each_peripheral {
         PCNT1(PCNT1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
         "PMU peripheral singleton"] PMU <= PMU() (unstable)), (@ peri_type #[doc =
+        "PPA peripheral singleton"] PPA <= PPA() (unstable)), (@ peri_type #[doc =
         "RTC_TIMER peripheral singleton"] RTC_TIMER <= LP_TIMER() (unstable)), (@
         peri_type #[doc = "RNG peripheral singleton"] RNG <= TRNG() (unstable)), (@
         peri_type #[doc = "RMT peripheral singleton"] RMT <= RMT(RMT : {
@@ -7122,24 +7154,24 @@ macro_rules! for_each_peripheral {
         (SDM_CH6(unstable)), (SDM_CH7(unstable)), (AES(unstable)),
         (APB_SARADC(unstable)), (ASSIST_DEBUG(unstable)), (CACHE(unstable)),
         (CLIC(unstable)), (CLINT(unstable)), (CLINT_OTHER_CORE(unstable)),
-        (ETH(unstable)), (ECC(unstable)), (GPIO(unstable)), (GPIO_SD(unstable)),
-        (HP_APM(unstable)), (HP_MEM_APM(unstable)), (HP_SYS(unstable)),
-        (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0), (I2C1),
-        (I2S0(unstable)), (I2S1(unstable)), (IEEE802154(unstable)),
+        (DMA2D(unstable)), (ETH(unstable)), (ECC(unstable)), (GPIO(unstable)),
+        (GPIO_SD(unstable)), (HP_APM(unstable)), (HP_MEM_APM(unstable)),
+        (HP_SYS(unstable)), (HP_ALIVE_SYS(unstable)), (HP_SYS_CLKRST(unstable)), (I2C0),
+        (I2C1), (I2S0(unstable)), (I2S1(unstable)), (IEEE802154(unstable)),
         (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)), (IO_MUX(unstable)),
         (LCD_CAM(unstable)), (LP_AON_CLK_RST(unstable)), (LP_APM(unstable)),
         (LP_GPIO(unstable)), (LP_IO_MUX(unstable)), (LP_PERI(unstable)),
         (LP_SYS(unstable)), (LP_TEE(unstable)), (LP_WDT(unstable)), (LPWR(unstable)),
         (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
         (PAU(unstable)), (PCNT(unstable)), (PCNT1(unstable)), (PMU(unstable)),
-        (RTC_TIMER(unstable)), (RNG(unstable)), (RMT(unstable)), (RSA(unstable)),
-        (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (AXI_GDMA(unstable)),
-        (DMA(unstable)), (SHA(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)),
-        (SDHOST(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (UART0), (UART1), (UART2), (UART3), (UHCI0(unstable)), (USB_DEVICE(unstable)),
-        (USB_HS(unstable)), (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)),
-        (FLASH(unstable)), (PSRAM(unstable)), (GPIO_DEDICATED(unstable)), (WIFI),
-        (CPU_CTRL(unstable)), (IPC(unstable)), (FROM_CPU_INTR0(unstable)),
+        (PPA(unstable)), (RTC_TIMER(unstable)), (RNG(unstable)), (RMT(unstable)),
+        (RSA(unstable)), (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3),
+        (AXI_GDMA(unstable)), (DMA(unstable)), (SHA(unstable)), (SYSTEM(unstable)),
+        (SYSTIMER(unstable)), (SDHOST(unstable)), (TEE(unstable)), (TIMG0(unstable)),
+        (TIMG1(unstable)), (UART0), (UART1), (UART2), (UART3), (UHCI0(unstable)),
+        (USB_DEVICE(unstable)), (USB_HS(unstable)), (ADC1(unstable)), (ADC2(unstable)),
+        (BT(unstable)), (FLASH(unstable)), (PSRAM(unstable)), (GPIO_DEDICATED(unstable)),
+        (WIFI), (CPU_CTRL(unstable)), (IPC(unstable)), (FROM_CPU_INTR0(unstable)),
         (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
         (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(UHCI0,
         Uhci0, 0, AhbGdmaChannel), (LCD_CAM, LcdCam, 0, AxiGdmaChannel), (I2S0, I2s0, 1,
