@@ -54,8 +54,10 @@ use crate::{
 #[non_exhaustive]
 pub enum ClockSource {
     /// Use RC_FAST clock source
+    #[cfg(temp_sensor_clock_sources_rc_fast)]
     RcFast,
     /// Use XTAL clock source
+    #[cfg(temp_sensor_clock_sources_xtal)]
     #[default]
     Xtal,
 }

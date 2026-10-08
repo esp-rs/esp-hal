@@ -338,6 +338,7 @@ channel_count = 6
 ## Miscellaneous
 [device.io_mux]
 [device.temp_sensor]
+clock_sources = ["xtal", "rc_fast"]
 [device.systimer]
 [device.lp_timer]
 

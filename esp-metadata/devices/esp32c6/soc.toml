@@ -413,6 +413,7 @@ support_status = "not_supported"
 [device.etm]
 [device.io_mux]
 [device.temp_sensor]
+clock_sources = ["xtal", "rc_fast"]
 [device.systimer]
 [device.ulp_riscv]
 [device.lp_timer]
