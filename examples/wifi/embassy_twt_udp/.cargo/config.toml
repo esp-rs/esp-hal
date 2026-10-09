@@ -10,6 +10,8 @@ ESP_LOG = "info"
 SSID = "SSID"
 PASSWORD = "PASSWORD"
 TARGET_IP = "255.255.255.255"
+# Wi-Fi band: "auto", "2.4" or "5". Only used on dual-band chips (ESP32-C5).
+BAND = "auto"
 
 [unstable]
 build-std = ["alloc", "core"]
