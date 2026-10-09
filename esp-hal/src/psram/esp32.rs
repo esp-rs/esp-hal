@@ -52,11 +52,7 @@ pub struct PsramConfig {
 #[procmacros::ram]
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
     utils::psram_init(config);
-    true
-}
 
-#[procmacros::ram]
-pub(crate) fn map_psram(mut config: PsramConfig) -> Range<usize> {
     if config.size.is_auto() {
         const MAX_MEM_SIZE: usize = 4 * 1024 * 1024;
 
@@ -67,7 +63,7 @@ pub(crate) fn map_psram(mut config: PsramConfig) -> Range<usize> {
         // probe how much memory we can write/read
         utils::s_mapping(EXTMEM_ORIGIN as u32, MAX_MEM_SIZE as u32);
 
-        let guessed_size = unsafe {
+        let last_correctly_read = unsafe {
             let ptr = EXTMEM_ORIGIN as *mut u8;
             for i in (1023..MAX_MEM_SIZE).step_by(1024) {
                 ptr.add(i).write_volatile(0x7f);
@@ -82,13 +78,23 @@ pub(crate) fn map_psram(mut config: PsramConfig) -> Range<usize> {
                 }
             }
 
-            last_correctly_read + 1
+            last_correctly_read
         };
 
+        if last_correctly_read == 0 {
+            warn!("No PSRAM found");
+            return false;
+        }
+        let guessed_size = last_correctly_read + 1;
         info!("Assuming {} bytes of PSRAM", guessed_size);
         config.size = PsramSize::Size(guessed_size);
     }
 
+    true
+}
+
+#[procmacros::ram]
+pub(crate) fn map_psram(config: PsramConfig) -> Range<usize> {
     utils::s_mapping(EXTMEM_ORIGIN as u32, config.size.get() as u32);
 
     EXTMEM_ORIGIN..EXTMEM_ORIGIN + config.size.get()
