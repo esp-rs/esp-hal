@@ -1,0 +1,62 @@
+name: API Baseline Refresh
+
+# Artifacts expire after 90 days, and CI fails without a baseline. Re-upload the latest baselines
+# unchanged, so they don't expire when no release or breaking change regenerates them.
+on:
+  schedule:
+    - cron: "17 2 15 2,4,6,8,10,12 *"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write # To delete the refreshed copy
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # The packages `cargo xcheck semver-check download-baselines` downloads in CI.
+        package: [esp-hal, esp-rom-sys, esp-radio]
+
+    steps:
+      - name: Record start time
+        id: start
+        run: echo "time=$(date -u -d '-5 minutes' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Download latest baselines
+        run: cargo xcheck semver-check --packages ${{ matrix.package }} download-baselines
+
+      - name: Upload API baselines as artifact
+        id: upload
+        uses: actions/upload-artifact@v6
+        with:
+          name: api-baselines-${{ matrix.package }}
+          path: ${{ matrix.package }}/api-baseline/
+          retention-days: 90 # Maximum for public repos
+          if-no-files-found: error
+
+      # CI uses the newest artifact. If the baselines were regenerated while this job ran, this
+      # copy may hold the old content, so delete it and keep the regenerated one.
+      - name: Delete refreshed copy if regenerated meanwhile
+        env:
+          NAME: api-baselines-${{ matrix.package }}
+          OURS: ${{ steps.upload.outputs.artifact-id }}
+          SINCE: ${{ steps.start.outputs.time }}
+        run: |
+          NEWER=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=$NAME&per_page=100" \
+            --jq "[.artifacts[] | select(.id != $OURS and .created_at > \"$SINCE\")] | length")
+          if [ "$NEWER" -gt 0 ]; then
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$OURS"
+            echo "::warning::$NAME was regenerated during the refresh, deleted the refreshed copy"
+          fi
