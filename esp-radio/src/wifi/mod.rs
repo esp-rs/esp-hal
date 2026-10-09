@@ -1157,9 +1157,6 @@ pub enum WifiError {
     /// Passed arguments are invalid.
     InvalidArguments,
 
-    /// The operation is not supported.
-    NotSupported,
-
     /// An unspecified error occurred in the radio driver.
     Other,
 
@@ -1175,17 +1172,13 @@ pub enum WifiError {
     /// Station still in disconnect status.
     NotConnected,
 
-    /// All TWT flow IDs are in use.
-    TwtFull,
-
-    /// TWT setup action frame response timed out.
-    TwtSetupTimeout,
-
-    /// TWT setup action frame transmission failed.
-    TwtSetupTxFail,
-
-    /// TWT setup was rejected by the AP.
-    TwtSetupRejected,
+    /// A Target Wake Time (TWT) operation failed.
+    ///
+    /// The inner [`twt::TwtError`] type is only nameable with the `unstable`
+    /// feature enabled.
+    #[cfg(wifi_has_wifi6)]
+    #[allow(private_interfaces)]
+    Twt(twt::TwtError),
 }
 
 impl WifiError {
@@ -1203,14 +1196,18 @@ impl WifiError {
             // are returned without any logging.
             ESP_ERR_NO_MEM => WifiError::OutOfMemory,
             ESP_ERR_INVALID_ARG => WifiError::InvalidArguments,
-            ESP_ERR_NOT_SUPPORTED => WifiError::NotSupported,
+            ESP_ERR_NOT_SUPPORTED => WifiError::Unsupported,
             ESP_ERR_WIFI_SSID => WifiError::InvalidSsid,
             ESP_ERR_WIFI_PASSWORD => WifiError::InvalidPassword,
             ESP_ERR_WIFI_NOT_CONNECT => WifiError::NotConnected,
-            ESP_ERR_WIFI_TWT_FULL => WifiError::TwtFull,
-            ESP_ERR_WIFI_TWT_SETUP_TIMEOUT => WifiError::TwtSetupTimeout,
-            ESP_ERR_WIFI_TWT_SETUP_TXFAIL => WifiError::TwtSetupTxFail,
-            ESP_ERR_WIFI_TWT_SETUP_REJECT => WifiError::TwtSetupRejected,
+            #[cfg(wifi_has_wifi6)]
+            ESP_ERR_WIFI_TWT_FULL => WifiError::Twt(twt::TwtError::Full),
+            #[cfg(wifi_has_wifi6)]
+            ESP_ERR_WIFI_TWT_SETUP_TIMEOUT => WifiError::Twt(twt::TwtError::SetupTimeout),
+            #[cfg(wifi_has_wifi6)]
+            ESP_ERR_WIFI_TWT_SETUP_TXFAIL => WifiError::Twt(twt::TwtError::SetupTxFail),
+            #[cfg(wifi_has_wifi6)]
+            ESP_ERR_WIFI_TWT_SETUP_REJECT => WifiError::Twt(twt::TwtError::SetupRejected),
 
             // Known driver state-machine and timeout codes. These occur in
             // perfectly normal operation.
@@ -4247,7 +4244,7 @@ impl WifiController<'_> {
                         target_wake_time,
                     });
                 } else {
-                    break Err(twt::ITwtSetupError::Failed(twt::ITwtSetupFailedInfo {
+                    break Err(twt::ITwtSetupError::Rejected(twt::ITwtSetupFailedInfo {
                         config: negotiated_config,
                         status,
                         reason,
@@ -4262,6 +4259,10 @@ impl WifiController<'_> {
     ///
     /// Use [`twt::FlowTarget::All`] to tear down all active agreements.
     ///
+    /// Returns `Ok(())` once the teardown completed and
+    /// [`WifiError::Twt`]`(`[`twt::TwtError::TeardownFailed`]`)` if the station
+    /// failed to send the teardown frame.
+    ///
     /// Concurrent calls must use different flow IDs. Otherwise incorrect
     /// results may be returned.
     ///
@@ -4272,21 +4273,14 @@ impl WifiController<'_> {
     /// # use esp_radio::wifi::twt::FlowId;
     /// # let controller =
     /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
-    /// let status = controller.itwt_teardown(FlowId::Flow0).await?;
-    /// println!("teardown status: {status:?}");
+    /// controller.itwt_teardown(FlowId::Flow0).await?;
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
-    pub async fn itwt_teardown(
-        &self,
-        target: impl Into<twt::FlowTarget>,
-    ) -> Result<twt::ITwtTeardownStatus, WifiError> {
+    pub async fn itwt_teardown(&self, target: impl Into<twt::FlowTarget>) -> Result<(), WifiError> {
         self.itwt_teardown_internal(target.into()).await
     }
-    async fn itwt_teardown_internal(
-        &self,
-        target: twt::FlowTarget,
-    ) -> Result<twt::ITwtTeardownStatus, WifiError> {
+    async fn itwt_teardown_internal(&self, target: twt::FlowTarget) -> Result<(), WifiError> {
         event::enable_wifi_events(WifiEvent::IndividualTargetWakeTimeTeardown.into());
 
         let mut subscriber = EVENT_CHANNEL
@@ -4312,7 +4306,7 @@ impl WifiController<'_> {
                         }
                     }
                 }
-                break Ok(status);
+                break twt::teardown_result(status);
             }
         }
     }
@@ -4387,7 +4381,7 @@ impl WifiController<'_> {
                 if status == 0 {
                     break Ok(());
                 } else {
-                    break Err(WifiError::Failed);
+                    break Err(WifiError::Twt(twt::TwtError::SuspendFailed));
                 }
             }
         }
@@ -4401,6 +4395,10 @@ impl WifiController<'_> {
     /// local clock to drift. Periodic probes keep the clocks aligned and
     /// prevent the AP from tearing down the agreement.
     ///
+    /// Returns [`twt::TwtError::ProbeTimeout`] or [`twt::TwtError::ProbeFailed`]
+    /// (wrapped in [`WifiError::Twt`]) if the probe did not succeed, and
+    /// [`WifiError::NotConnected`] if the station disconnected.
+    ///
     /// ## Example
     ///
     /// ```rust,no_run
@@ -4409,17 +4407,13 @@ impl WifiController<'_> {
     /// # let controller =
     /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
     /// // Send a probe with a 50ms timeout
-    /// let status = controller
+    /// controller
     ///     .itwt_send_probe(Duration::from_millis(50))
     ///     .await?;
-    /// println!("probe: {status:?}");
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
-    pub async fn itwt_send_probe(
-        &self,
-        timeout: Duration,
-    ) -> Result<twt::ITwtProbeStatus, WifiError> {
+    pub async fn itwt_send_probe(&self, timeout: Duration) -> Result<(), WifiError> {
         event::enable_wifi_events(WifiEvent::IndividualTargetWakeTimeProbe.into());
 
         let mut subscriber = EVENT_CHANNEL
@@ -4433,7 +4427,7 @@ impl WifiController<'_> {
         loop {
             let event = subscriber.next_message_pure().await;
             if let event::EventInfo::IndividualTargetWakeTimeProbe { status, reason: _ } = event {
-                break Ok(status);
+                break twt::probe_result(status);
             }
         }
     }

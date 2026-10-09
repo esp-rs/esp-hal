@@ -1099,6 +1099,7 @@ pub enum EventInfo {
     AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap,
 
     /// Individual Target-Wake-Time setup.
+    #[cfg(wifi_has_wifi6)]
     IndividualTargetWakeTimeSetup {
         /// The negotiated iTWT setup configuration.
         config: crate::wifi::twt::ITwtSetupConfig,
@@ -1111,6 +1112,7 @@ pub enum EventInfo {
     },
 
     /// Individual Target-Wake-Time teardown.
+    #[cfg(wifi_has_wifi6)]
     IndividualTargetWakeTimeTeardown {
         /// Flow ID that was torn down.
         flow_id: crate::wifi::twt::FlowId,
@@ -1119,6 +1121,7 @@ pub enum EventInfo {
     },
 
     /// Individual Target-Wake-Time probe.
+    #[cfg(wifi_has_wifi6)]
     IndividualTargetWakeTimeProbe {
         /// Probe status.
         status: crate::wifi::twt::ITwtProbeStatus,
@@ -1127,6 +1130,7 @@ pub enum EventInfo {
     },
 
     /// Individual Target-Wake-Time suspended.
+    #[cfg(wifi_has_wifi6)]
     IndividualTargetWakeTimeSuspend {
         /// Suspend status. 0 (`ESP_OK`) indicates success.
         status: i32,
@@ -1137,6 +1141,7 @@ pub enum EventInfo {
     },
 
     /// Target-Wake-Time wakeup event.
+    #[cfg(wifi_has_wifi6)]
     TargetWakeTimeWakeup {
         /// TWT type (individual or broadcast).
         twt_type: crate::wifi::twt::TwtType,
@@ -1359,6 +1364,7 @@ impl EventInfo {
             WifiEvent::AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap => {
                 Some(EventInfo::AccessPointWifiProtectedStatusRegistrarPushButtonConfigurationOverlap)
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::IndividualTargetWakeTimeSetup => {
                 let ev =
                     unsafe { IndividualTargetWakeTimeSetup::from_raw_event_data(payload) };
@@ -1369,6 +1375,7 @@ impl EventInfo {
                     target_wake_time: ev.target_wake_time(),
                 })
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::IndividualTargetWakeTimeTeardown => {
                 let ev =
                     unsafe { IndividualTargetWakeTimeTeardown::from_raw_event_data(payload) };
@@ -1377,6 +1384,7 @@ impl EventInfo {
                     status: ev.status(),
                 })
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::IndividualTargetWakeTimeProbe => {
                 let ev =
                     unsafe { IndividualTargetWakeTimeProbe::from_raw_event_data(payload) };
@@ -1385,6 +1393,7 @@ impl EventInfo {
                     reason: ev.reason(),
                 })
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::IndividualTargetWakeTimeSuspend => {
                 let ev =
                     unsafe { IndividualTargetWakeTimeSuspend::from_raw_event_data(payload) };
@@ -1394,6 +1403,7 @@ impl EventInfo {
                     actual_suspend_time_ms: ev.actual_suspend_time_ms(),
                 })
             }
+            #[cfg(wifi_has_wifi6)]
             WifiEvent::TargetWakeTimeWakeup => {
                 let ev = unsafe { TargetWakeTimeWakeup::from_raw_event_data(payload) };
                 Some(EventInfo::TargetWakeTimeWakeup {
