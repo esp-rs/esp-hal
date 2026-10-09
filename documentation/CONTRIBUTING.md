@@ -13,6 +13,7 @@ This guide outlines the contribution workflow, from reporting issues and submitt
     *   [Testing Your Contributions]
     *   [Commit Your Updates]
 *   [Pull Request: From Submission to Merge]
+    *   [Before you ask for review]
     *   [Writing the description]
 *   [AI-Assisted Contributions]
 *   [Merge Freezes]
@@ -25,6 +26,7 @@ This guide outlines the contribution workflow, from reporting issues and submitt
 [Testing Your Contributions]: #testing-your-contributions
 [Commit your updates]: #commit-your-updates
 [Pull Request: From Submission to Merge]: #pull-request-from-submission-to-merge
+[Before you ask for review]: #before-you-ask-for-review
 [Writing the description]: #writing-the-description
 [AI-Assisted Contributions]: #ai-assisted-contributions
 [Merge Freezes]: #merge-freezes
@@ -148,6 +150,39 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts
 [Breaking changes]: ./DEVELOPER-GUIDELINES.md#breaking-changes
+
+### Before you ask for review
+
+Reviewers ask for the same changes again and again. Check your PR against this list before you ask
+for a review.
+
+- **Comments**: Keep only comments that tell the reader something the code cannot, such as a
+  hardware quirk or an order that must hold. Remove comments that narrate the code, explain how you
+  found the bug, or describe how the code worked before. Do not add section separators. Do not add
+  a `TODO` for a known limitation: fix it in the PR, or open an issue.
+- **Approach**: Fix the cause, not the symptom. Make the smallest change that solves the problem.
+  Before you add new code, a dependency or an abstraction, look for one that the codebase already
+  has.
+- **Scope**: Keep the PR to one change. Send unrelated fixes, refactors and formatting changes as
+  separate PRs.
+- **Tests**: Add a test that fails without your change and passes with it. Put it in an existing
+  test suite where one fits. Use host tests for logic that does not need hardware, and HIL or QA
+  tests for hardware behavior.
+- **Chip differences**: Use metadata and cfg symbols (`soc_has_<peripheral>`,
+  `<driver>_driver_supported`, or a new metadata flag) instead of lists of chips. Gate
+  chip-specific documentation with `cfg_attr`, so it only appears for the chips it applies to. Do
+  not hard-code values that the PAC or the metadata already provide.
+- **API**: Follow the [esp-rs developer guidelines]. Mark new public API as unstable. Use the names
+  and patterns of the existing drivers. Do not break stable API.
+- **Evidence**: Back performance, memory and code size claims with numbers from before and after
+  the change. If the change can affect existing behavior, run the affected examples or QA tests on
+  hardware.
+- **Changelog**: Add an entry for each user-visible change, including changed defaults and
+  behavior. Do not add entries for tests, internal refactors, or crates that you did not change.
+- **Clean up**: Remove leftover code, unused items and accidental changes. Make CI pass, including
+  `cargo xtask fmt`.
+- **Updates**: When the change moves during review, update the PR title and description to match.
+  Do not merge or rebase on `main` unless there is a conflict, because each push runs CI again.
 
 ### Writing the description
 

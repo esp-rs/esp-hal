@@ -4,7 +4,8 @@ esp-hal is a monorepo of bare-metal `no_std` Rust crates for Espressif chips. Ea
 directory is its own Cargo project, and most have a README. The root workspace only holds the
 `xtask` tooling, and all building, linting and testing goes through `cargo xtask`.
 
-This file is an index. Before you change anything, read the documents that cover your task.
+This file is an index. Read a linked document when your current step needs it, not at the start of a
+task.
 
 ## Where to look
 
@@ -39,25 +40,6 @@ This file is an index. Before you change anything, read the documents that cover
 - Xtensa chips (`esp32`, `esp32s2`, `esp32s3`) need the `esp` toolchain. xtask picks it
   automatically, plain `cargo` needs `+esp`.
 - Do not open GitHub issues on your own.
-
-## Verify
-
-Name the crate and chip in each command. Leaving them out covers every crate on every chip and is
-slow. For changes that are not chip-specific, use `esp32s3` (Xtensa) and `esp32c6` (RISC-V).
-
-1. `cargo xtask fmt`
-2. `cargo xtask lint <crate> <chip>`
-3. `cargo xtask build <example> <chip>` for affected examples. Leaving out the example is an error,
-   not "all".
-4. `cargo xtask host-tests <crate>` if host-side code changed.
-5. `cargo xtask documentation <crate> <chip>` and `cargo xtask doc-tests <crate> <chip>` if docs
-   changed.
-6. `cargo update-metadata --check` if metadata changed.
-7. `cargo xtask check-pr-changelog` with the PR description on stdin.
-
-HIL tests (`cargo xtask test <chip> <test>`) need a connected board. If you cannot run them, say so
-in the PR. Do not run `cargo xtask ci` unless asked: it runs every CI check for a chip and is very
-expensive.
 
 ## Editing this file
 
