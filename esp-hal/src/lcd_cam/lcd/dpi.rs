@@ -545,7 +545,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
     /// reported as one. This reads raw status and does not require interrupt
     /// listening to be enabled.
     #[instability::unstable]
-    pub fn interrupts(&mut self) -> EnumSet<DpiInterrupt> {
+    pub fn interrupts(&self) -> EnumSet<DpiInterrupt> {
         let sources = Instance::interrupts();
         let mut interrupts = EnumSet::new();
         if sources.contains(LcdCamInterrupt::LcdVsync) {
@@ -556,7 +556,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
 
     /// Clears the selected LCD interrupt sources.
     #[instability::unstable]
-    pub fn clear_interrupts(&mut self, interrupts: impl Into<EnumSet<DpiInterrupt>>) {
+    pub fn clear_interrupts(&self, interrupts: impl Into<EnumSet<DpiInterrupt>>) {
         let interrupts = interrupts.into();
         let mut sources = EnumSet::new();
         if interrupts.contains(DpiInterrupt::Vsync) {

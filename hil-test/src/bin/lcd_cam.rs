@@ -674,7 +674,16 @@ mod camera_tests {
 
         transfer.clear_interrupts(DpiInterrupt::Vsync);
         transfer.wait_for_vsync();
+        hil_test::assert!(transfer.interrupts().is_empty());
         transfer.wait_for_vsync();
+        hil_test::assert!(transfer.interrupts().is_empty());
+
+        while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
+            core::hint::spin_loop();
+        }
+        let (dpi, buffer) = transfer.stop();
+        let transfer = dpi.send(true, buffer).map_err(|e| e.0).unwrap();
+        hil_test::assert!(transfer.interrupts().is_empty());
 
         let _ = transfer.stop();
     }
@@ -723,7 +732,9 @@ mod dpi_async_tests {
             hil_test::assert!(first_poll.is_pending());
         }
         transfer.wait_for_vsync().await;
+        hil_test::assert!(transfer.interrupts().is_empty());
         transfer.wait_for_vsync().await;
+        hil_test::assert!(transfer.interrupts().is_empty());
 
         while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
             core::hint::spin_loop();
@@ -733,6 +744,14 @@ mod dpi_async_tests {
             let first_poll = core::future::poll_fn(|cx| Poll::Ready(wait.as_mut().poll(cx))).await;
             hil_test::assert!(first_poll.is_ready());
         }
+        hil_test::assert!(transfer.interrupts().is_empty());
+
+        while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
+            core::hint::spin_loop();
+        }
+        let (dpi, buffer) = transfer.stop();
+        let transfer = dpi.send(true, buffer).map_err(|e| e.0).unwrap();
+        hil_test::assert!(transfer.interrupts().is_empty());
 
         let _ = transfer.stop();
     }
