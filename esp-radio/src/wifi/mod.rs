@@ -4058,15 +4058,16 @@ impl WifiController<'_> {
 
         loop {
             let event = subscriber.next_message_pure().await;
-            if let event::EventInfo::IndividualTargetWakeTimeTeardown {
-                flow_id: event_flow_id,
-                status,
-            } = event
-            {
+            if let event::EventInfo::IndividualTargetWakeTimeTeardown { flows, status } = event {
                 match target {
-                    twt::FlowTarget::All => {}
+                    // A "teardown all" completes when the event covers all flows.
+                    twt::FlowTarget::All => {
+                        if flows != EnumSet::all() {
+                            continue;
+                        }
+                    }
                     twt::FlowTarget::Id(id) => {
-                        if event_flow_id != id {
+                        if !flows.contains(id) {
                             continue;
                         }
                     }
@@ -4280,10 +4281,15 @@ impl WifiController<'_> {
                 {
                     break Ok(twt::TwtWakeupInfo { twt_type, flow_id });
                 }
-                event::EventInfo::IndividualTargetWakeTimeTeardown { flow_id, status }
-                    if flows.contains(flow_id) =>
-                {
-                    break Err(twt::TwtWaitError::FlowTornDown { flow_id, status });
+                event::EventInfo::IndividualTargetWakeTimeTeardown {
+                    flows: torn_down,
+                    status,
+                } if !torn_down.is_disjoint(flows) => {
+                    break Err(twt::TwtWaitError::FlowTornDown {
+                        // Not empty, checked by the guard above.
+                        flow_id: (torn_down & flows).iter().next().unwrap(),
+                        status,
+                    });
                 }
                 event::EventInfo::StationDisconnected { .. } => {
                     break Err(twt::TwtWaitError::Disconnected);

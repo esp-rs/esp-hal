@@ -1114,8 +1114,11 @@ pub enum EventInfo {
     /// Individual Target-Wake-Time teardown.
     #[cfg(wifi_has_wifi6)]
     IndividualTargetWakeTimeTeardown {
-        /// Flow ID that was torn down.
-        flow_id: crate::wifi::twt::FlowId,
+        /// The set of flows that were torn down.
+        ///
+        /// Contains a single flow, or all flows if a "teardown all" was
+        /// requested by the station or sent by the AP.
+        flows: EnumSet<crate::wifi::twt::FlowId>,
         /// Teardown status.
         status: crate::wifi::twt::ITwtTeardownStatus,
     },
@@ -1380,7 +1383,11 @@ impl EventInfo {
                 let ev =
                     unsafe { IndividualTargetWakeTimeTeardown::from_raw_event_data(payload) };
                 Some(EventInfo::IndividualTargetWakeTimeTeardown {
-                    flow_id: crate::wifi::twt::FlowId::from_raw(ev.flow_id()),
+                    flows: match ev.flow_id() {
+                        // "Teardown all" (802.11-2024 9.6.24.9), may also be sent by the AP.
+                        crate::wifi::twt::FLOW_ID_ALL => EnumSet::all(),
+                        raw => EnumSet::only(crate::wifi::twt::FlowId::from_raw(raw)),
+                    },
                     status: ev.status(),
                 })
             }
@@ -1406,8 +1413,14 @@ impl EventInfo {
             #[cfg(wifi_has_wifi6)]
             WifiEvent::TargetWakeTimeWakeup => {
                 let ev = unsafe { TargetWakeTimeWakeup::from_raw_event_data(payload) };
+                let twt_type = ev.twt_type();
+                if twt_type == crate::wifi::twt::TwtType::Broadcast {
+                    // Broadcast TWT flow IDs may exceed 7. Only iTWT is supported.
+                    debug!("Ignoring broadcast TWT wakeup (flow {})", ev.flow_id());
+                    return None;
+                }
                 Some(EventInfo::TargetWakeTimeWakeup {
-                    twt_type: ev.twt_type(),
+                    twt_type,
                     flow_id: crate::wifi::twt::FlowId::from_raw(ev.flow_id()),
                 })
             }

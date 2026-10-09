@@ -128,6 +128,8 @@ pub enum TwtWakeDurationUnit {
 /// A TWT flow identifier (0-7).
 ///
 /// Each individual TWT agreement is identified by a flow ID in the range 0-7.
+/// A [`FlowId`] always refers to exactly one flow; use [`FlowTarget`] to
+/// address "all flows" in requests.
 #[derive(Debug, EnumSetType, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -173,6 +175,10 @@ impl FlowId {
     }
 }
 
+/// Raw flow ID meaning "all flows" in teardown/suspend operations and events.
+#[cfg(wifi_has_wifi6)]
+pub(crate) const FLOW_ID_ALL: u8 = 8;
+
 /// Target for a TWT operation — either a specific flow or all active flows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -195,7 +201,7 @@ impl FlowTarget {
     pub(crate) fn as_raw(self) -> u8 {
         match self {
             FlowTarget::Id(id) => id.as_u8(),
-            FlowTarget::All => 8,
+            FlowTarget::All => FLOW_ID_ALL,
         }
     }
 }
