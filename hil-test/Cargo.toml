@@ -70,6 +70,10 @@ name              = "parl_io"
 harness           = false
 
 [[bin]]
+name              = "psram"
+harness           = false
+
+[[bin]]
 name              = "rmt"
 harness           = false
 required-features = ["embassy", "esp-alloc"]
