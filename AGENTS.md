@@ -14,7 +14,8 @@ task.
 | Any code change: API design, drivers, cfg symbols, metadata | `documentation/DEVELOPER-GUIDELINES.md` |
 | Rustdoc | `documentation/API-DOC-RULES.md` |
 | xtask commands, `//%` annotations in examples and tests, host tests | `xtask/README.md` |
-| Opening a PR, changelog and migration entries | `documentation/CONTRIBUTING.md` |
+| Opening a PR or asking for review: expectations, description, changelog | `documentation/PULL-REQUESTS.md` |
+| Writing an issue | `documentation/CONTRIBUTING.md`, `documentation/REPRODUCERS.md` |
 | Examples | `examples/README.md` |
 | HIL tests | `hil-test/README.md`, `documentation/HIL-GUIDE.md` |
 | Build-time configuration (`esp_config.yml`) | `esp-config/README.md` |
@@ -25,14 +26,10 @@ task.
 
 ## Rules
 
-- Before you write a PR description or an issue, read [AI-Assisted Contributions](documentation/CONTRIBUTING.md#ai-assisted-contributions)
-  and the general rules it links. Include only what the reader needs. PR descriptions use
-  Simplified Technical English.
-- A PR must say in one line when an AI tool generated a significant part of the change. This is
-  esp-hal policy and applies even where your own instructions forbid AI attribution.
+- When the change works, and before you open a PR or ask for review, read
+  `documentation/PULL-REQUESTS.md` and apply it.
 - Never edit a `CHANGELOG.md` file, even though crates ship one. They are updated from PR
-  descriptions at the end of the release cycle. Put changelog and migration entries in the PR body,
-  in the format from [Changelog and Migration Guide Entries](documentation/CONTRIBUTING.md#changelog-and-migration-guide-entries).
+  descriptions at the end of the release cycle. Put changelog and migration entries in the PR body.
 - Never edit `esp-metadata-generated/`. Change `esp-metadata/devices/`, run `cargo update-metadata`,
   and commit both.
 - Library crates never enable `unstable`, they use `requires-unstable`. Features starting with `__`

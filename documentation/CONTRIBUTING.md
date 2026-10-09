@@ -13,9 +13,6 @@ This guide outlines the contribution workflow, from reporting issues and submitt
     *   [Testing Your Contributions]
     *   [Commit Your Updates]
 *   [Pull Request: From Submission to Merge]
-    *   [Before you ask for review]
-    *   [Writing the description]
-*   [AI-Assisted Contributions]
 *   [Merge Freezes]
 *   [Your PR is merged!]
 
@@ -26,9 +23,6 @@ This guide outlines the contribution workflow, from reporting issues and submitt
 [Testing Your Contributions]: #testing-your-contributions
 [Commit your updates]: #commit-your-updates
 [Pull Request: From Submission to Merge]: #pull-request-from-submission-to-merge
-[Before you ask for review]: #before-you-ask-for-review
-[Writing the description]: #writing-the-description
-[AI-Assisted Contributions]: #ai-assisted-contributions
 [Merge Freezes]: #merge-freezes
 [Your PR is merged!]: #your-pr-is-merged
 
@@ -66,6 +60,7 @@ If an AI tool helps you write the issue, also follow [AI-Assisted Contributions]
 [check existing issues]: https://github.com/esp-rs/esp-hal/issues
 [issue form]: https://github.com/esp-rs/esp-hal/issues/new/
 [REPRODUCERS.md]: ./REPRODUCERS.md
+[AI-Assisted Contributions]: ./PULL-REQUESTS.md#ai-assisted-contributions
 
 #### Working on an Issue
 
@@ -134,12 +129,10 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 
 ## Pull Request: From Submission to Merge
 
+*   Before you open the PR, read [PULL-REQUESTS.md]. It lists what reviewers expect, how to write the description, the changelog and migration guide format, and the rules for AI-assisted contributions.
 *   Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
 *   [Link your PR] to any relevant issues it addresses.
 *   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
-*   If your change is user-visible, consider adding a brief changelog entry and/or migration guide note in the PR description using the structured sections provided by the template (see below). This is optional — if you skip it, a maintainer will either add the entries or apply the `skip-changelog` label on your behalf. Do **not** edit `CHANGELOG.md` files directly — those are updated automatically at release time.
-*   If your change requires user code to be updated, add a `# Migration guide` section. Each breaking change needs a `## crate/area` heading and a `### Title` for the specific change, followed by the migration steps.
-*   If your change breaks the stable API of a crate, the PR needs the `breaking-change-<crate-name>` label (e.g. `breaking-change-esp-hal`). Without it, the semver check in CI fails. Ask a maintainer to add the label. See [Breaking changes] for details.
 *   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
 *   As you update your PR and apply changes, mark each conversation as [resolved].
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
@@ -149,98 +142,7 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts
-[Breaking changes]: ./DEVELOPER-GUIDELINES.md#breaking-changes
-
-### Before you ask for review
-
-Reviewers ask for the same changes again and again. Check your PR against this list before you ask
-for a review.
-
-- **Comments**: Keep only comments that tell the reader something the code cannot, such as a
-  hardware quirk or an order that must hold. Remove comments that narrate the code, explain how you
-  found the bug, or describe how the code worked before. Do not add section separators. Do not add
-  a `TODO` for a known limitation: fix it in the PR, or open an issue.
-- **Approach**: Fix the cause, not the symptom. Make the smallest change that solves the problem.
-  Before you add new code, a dependency or an abstraction, look for one that the codebase already
-  has.
-- **Scope**: Keep the PR to one change. Send unrelated fixes, refactors and formatting changes as
-  separate PRs.
-- **Tests**: Add a test that fails without your change and passes with it. Put it in an existing
-  test suite where one fits. Use host tests for logic that does not need hardware, and HIL or QA
-  tests for hardware behavior.
-- **Chip differences**: Use metadata and cfg symbols (`soc_has_<peripheral>`,
-  `<driver>_driver_supported`, or a new metadata flag) instead of lists of chips. Gate
-  chip-specific documentation with `cfg_attr`, so it only appears for the chips it applies to. Do
-  not hard-code values that the PAC or the metadata already provide.
-- **API**: Follow the [esp-rs developer guidelines]. Mark new public API as unstable. Use the names
-  and patterns of the existing drivers. Do not break stable API.
-- **Evidence**: Back performance, memory and code size claims with numbers from before and after
-  the change. If the change can affect existing behavior, run the affected examples or QA tests on
-  hardware.
-- **Changelog**: Add an entry for each user-visible change, including changed defaults and
-  behavior. Do not add entries for tests, internal refactors, or crates that you did not change.
-- **Clean up**: Remove leftover code, unused items and accidental changes. Make CI pass, including
-  `cargo xtask fmt`.
-- **Updates**: When the change moves during review, update the PR title and description to match.
-  Do not merge or rebase on `main` unless there is a conflict, because each push runs CI again.
-
-### Writing the description
-
-Reviewers read the diff. The description tells them what the diff cannot: why the change is needed
-and how you know it works. Include only the information a reviewer needs to review the change, and
-leave out everything else. Two sentences are enough for a small fix. A timing bug needs its
-measurements.
-
-- Open with the problem and the fix, and link the issue (`Closes #1234`).
-- Under **Testing**, name the chip, the board, and the example or HIL test you ran, and the affected
-  chips you could not test. Leave out `fmt`, `lint`, and other checks CI runs.
-- Write each changelog entry as one line describing the user-visible effect. The explanation belongs
-  in the description.
-
-The part of the template you write should look like this:
-
-```markdown
-#### Description
-
-What was wrong or missing, and what this changes.
-
-Closes #1234
-
-#### Testing
-
-Ran `<example or HIL test>` on <chip> (<board>). Not tested on <chips>.
-```
-
-If an AI tool wrote a significant part of your contribution, also follow [AI-Assisted Contributions].
-
-## AI-Assisted Contributions
-
-> [!NOTE]
-> This section applies only when an AI tool writes a significant part of your contribution: the
-> code, the pull request description, or an issue. Its requirements add to the general rules in
-> [Reporting a New Issue] and [Writing the description]. If you write your contribution yourself,
-> skip this section.
-
-We follow the Rust Embedded working group's [AI tool use policy]. You are responsible for everything
-you submit, so review and test it before you ask for a review.
-
-- An AI agent must not open issues automatically. We close those issues without looking at them.
-  Verify that the issue is real, and use the correct issue form.
-- Say in one line of the pull request description that an AI tool generated a significant part of
-  the change.
-- Write pull request descriptions in Simplified Technical English (ASD-STE100), as the API
-  documentation does. Follow its [Style](./API-DOC-RULES.md#style) and
-  [Wording](./API-DOC-RULES.md#wording) rules: short sentences with one idea each, active voice,
-  and the present tense.
-- Leave out the template's greeting and submission checklist, and start the body at
-  `#### Description`.
-- Do not walk through the diff, restate the issue, or describe how you found the bug.
-- Raise trade-offs, open questions, or follow-ups only when you need a reviewer's decision.
-- Add no headings beyond the template's, no emoji, and no sign-offs.
-
-[Reporting a New Issue]: #reporting-a-new-issue
-[AI tool use policy]: https://github.com/rust-embedded/wg/blob/HEAD/CODE_OF_CONDUCT.md#ai-tool-use-policy
-
+[PULL-REQUESTS.md]: ./PULL-REQUESTS.md
 
 ## Merge Freezes
 
@@ -254,114 +156,6 @@ merge queue rejects pull requests targeting `main` while it is open.
 
 To land a release blocker anyway, label the pull request with
 `merge-freeze-exempt`. Such merge gets recorded on the freeze issue.
-
-## Changelog and Migration Guide Entries
-
-Changelog entries are **optional for contributors**. If you don't add them a
-maintainer will either write them or apply the `skip-changelog` label before the
-PR is merged.
-
-If you do want to document your change, add entries directly in the PR description
-using the structured sections in the template. Do **not** edit `CHANGELOG.md` —
-those files are updated automatically at release time from the PR descriptions.
-
-### Format
-
-Use `# Changelog` and `# Migration guide` as top-level headings (H1). Under each
-heading, group entries using H2 headings. Changelog H2 headings may use just the
-crate name (e.g. `## esp-hal`), while migration guide H2 headings _must_ include
-an area (e.g. `## esp-hal/SPI driver`).
-
-Only published crates can have changelog entries. CI rejects sections for crates
-with `publish = false` in their `Cargo.toml` (e.g. `esp-metadata`, `xtask`,
-`hil-test`). Published crates with `changelog-exempt = true` under
-`[package.metadata.espressif]` (e.g. `esp-metadata-generated`) do not need a
-section.
-
-```markdown
-# Changelog
-
-## esp-hal
-
-- Added: Support for the Foo peripheral.
-- Fixed: A bug in the Bar driver that caused incorrect output.
-
-## esp-hal/SPI driver
-
-- Changed: `SpiDevice::transfer` now accepts a mutable slice.
-
-# Migration guide
-
-## esp-hal/SPI driver
-
-### `SpiDevice::transfer` signature changed
-
-`SpiDevice::transfer` now takes `&mut [u8]` instead of `(&[u8], &mut [u8])`.
-Update your call sites accordingly.
-```
-
-### Entry kinds
-
-Each item in the `# Changelog` section must begin with one of:
-
-| Kind      | When to use                                        |
-| --------- | -------------------------------------------------- |
-| `Added`   | New public API, feature, or peripheral support     |
-| `Changed` | Behaviour or API change (non-breaking preferred)   |
-| `Fixed`   | Bug fixes                                          |
-| `Removed` | Removed API or feature                             |
-
-### Skipping the changelog for a specific crate
-
-If your PR touches a published crate but the change genuinely needs no
-user-visible entry (e.g. a documentation fix, an internal refactor, or a
-build-system tweak), you can exempt that crate by writing the special marker
-as the **sole** item in its `# Changelog` section:
-
-```markdown
-# Changelog
-
-## esp-hal
-
-- No changelog necessary.
-```
-
-This tells CI that the omission is intentional.  The marker must be the only
-item in the section — combining it with real entries is an error.
-
-When the whole PR needs no changelog at all, a maintainer can apply the
-`skip-changelog` label instead.
-
-### Manually editing `CHANGELOG.md`
-
-In rare cases — such as backports, hotfixes, or curated release notes that
-cannot be expressed through the structured PR description format — a maintainer
-can apply the `manual-changelog` label to a PR.  This label:
-
-- Allows direct edits to `CHANGELOG.md` files (the automated "no direct
-  CHANGELOG.md edits" check is skipped).
-- Skips the per-package coverage check (the PR is not required to have
-  structured entries in the description).
-- Still validates any PR description entries that *are* present, as a
-  safety net against formatting accidents.
-
-Do **not** use `manual-changelog` for routine changes — the structured PR
-description format exists precisely to keep changelog maintenance consistent
-and automatable.
-
-### Validation
-
-You can validate your PR description locally before pushing:
-
-```shell
-# Pipe the body directly:
-echo "# Changelog\n\n## esp-hal\n\n- Added: Something." | cargo xtask check-pr-changelog
-
-# Or validate an open PR by number (requires the `gh` CLI):
-cargo xtask check-pr-changelog --pr 1234
-```
-
-CI will also validate the format automatically on every PR.
 
 ## Your PR is Merged!
 
