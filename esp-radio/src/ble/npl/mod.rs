@@ -605,14 +605,11 @@ unsafe extern "C" fn coex_core_ble_conn_dyn_prio_get(_low: *mut bool, _high: *mu
     todo!()
 }
 
-#[allow(unused)]
-unsafe extern "C" fn coex_schm_status_bit_set(_type: u32, _status: u32) {
-    trace!("coex_schm_status_bit_set is an empty stub");
-}
-
-#[allow(unused)]
-unsafe extern "C" fn coex_schm_status_bit_clear(_type: u32, _status: u32) {
-    trace!("coex_schm_status_bit_clear is an empty stub");
+coex_fns! {
+    #[allow(unused)]
+    fn coex_schm_status_bit_set(typ: u32, status: u32);
+    #[allow(unused)]
+    fn coex_schm_status_bit_clear(typ: u32, status: u32);
 }
 
 unsafe extern "C" fn ble_npl_hw_is_in_critical() -> u8 {
