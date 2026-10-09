@@ -1,0 +1,125 @@
+# Builds a few examples on every chip, once at the current `main` and once at
+# the `main` the last successful run measured, and compares their sizes. An
+# example that grew past the limits is also built after each pull request
+# merged in between, to find the one behind it. Reports to an issue (or
+# comments on the open one).
+#
+# `binary-size.yml` measures a single pull request the same way (`/test-size`).
+
+name: Binary Size Nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Commit to compare against. Empty: where the last successful scheduled run ended."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+# Two runs at once would report the same regression twice.
+concurrency:
+  group: binary-size-nightly
+
+env:
+  CARGO_TERM_COLOR: always
+  EXAMPLES: hello_world embassy_hello_world embassy_dhcp bas_peripheral
+  # An example regresses when it grows by more than this many percent and by
+  # more than this many bytes.
+  MAX_GROWTH_PERCENT: 1
+  MAX_FLASH_GROWTH_BYTES: 2048
+  MAX_BSS_GROWTH_BYTES: 512
+  # Read at compile time by the Wi-Fi examples.
+  SSID: SSID
+  PASSWORD: PASSWORD
+  STATIC_IP: 1.1.1.1
+  GATEWAY_IP: 1.1.1.1
+  HOST_IP: 1.1.1.1
+
+jobs:
+  prepare:
+    # Forks can still dispatch the workflow by hand.
+    if: github.event_name != 'schedule' || github.repository_owner == 'esp-rs'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Finds the last successful run.
+      actions: read
+    outputs:
+      base: ${{ steps.range.outputs.base }}
+      head: ${{ steps.range.outputs.head }}
+      between: ${{ steps.range.outputs.between }}
+      chips: ${{ steps.range.outputs.chips }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the commits to compare
+        id: range
+        uses: actions/github-script@v8
+        env:
+          INPUT_BASE: ${{ inputs.base }}
+        with:
+          script: |
+            const { resolveNightlyRange } = require('./.github/scripts/binary-size.js');
+            await resolveNightlyRange({ github, context, core, exec });
+
+  measure:
+    needs: prepare
+    if: needs.prepare.outputs.base != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        soc: ${{ fromJSON(needs.prepare.outputs.chips) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/measure-binary-size
+        with:
+          soc: ${{ matrix.soc }}
+          examples: ${{ env.EXAMPLES }}
+          base: ${{ needs.prepare.outputs.base }}
+          head: ${{ needs.prepare.outputs.head }}
+          between: ${{ needs.prepare.outputs.between }}
+
+  report:
+    needs: [prepare, measure]
+    # Report what was measured, also when some chips failed.
+    if: always() && needs.prepare.outputs.base != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # Nothing to download when every build failed.
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: sizes-*
+          path: sizes
+          merge-multiple: true
+
+      - name: Compare and report
+        uses: actions/github-script@v8
+        env:
+          BASE: ${{ needs.prepare.outputs.base }}
+          HEAD: ${{ needs.prepare.outputs.head }}
+          BETWEEN: ${{ needs.prepare.outputs.between }}
+          CHIPS: ${{ needs.prepare.outputs.chips }}
+        with:
+          script: |
+            const { reportNightly } = require('./.github/scripts/binary-size.js');
+            await reportNightly({ github, context, core, exec });

@@ -62,9 +62,6 @@ enum Cli {
         #[arg(value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
         chips: Vec<Chip>,
     },
-    #[cfg(feature = "report")]
-    /// Generate reports from CI data.
-    GenerateReport(generate_report::ReportArgs),
     /// Tasks for checking compile tests with a local registry.
     #[cfg(feature = "rel-check")]
     #[clap(subcommand)]
@@ -171,8 +168,6 @@ fn main() -> Result<()> {
         Cli::CheckPrChangelog(args) => check_pr_changelog(&workspace, args.pr),
         Cli::HostTests(args) => host_tests(&workspace, args),
         Cli::CheckGlobalSymbols { chips } => check_global_symbols(&chips),
-        #[cfg(feature = "report")]
-        Cli::GenerateReport(args) => generate_report::generate_report(&workspace, args),
         #[cfg(feature = "rel-check")]
         Cli::RelCheck(relcheck) => relcheck::run_rel_check(relcheck),
 

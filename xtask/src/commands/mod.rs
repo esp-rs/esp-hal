@@ -26,8 +26,6 @@ mod clean;
 pub mod dispatch;
 mod examples;
 mod fmt;
-#[cfg(feature = "report")]
-pub mod generate_report;
 #[cfg(feature = "semver-checks")]
 pub(crate) mod generate_rom_symbols;
 mod host_tests;
