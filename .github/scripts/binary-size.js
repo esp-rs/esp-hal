@@ -24,20 +24,43 @@ function runUrl(context) {
   return `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
 }
 
-// Base is the given commit, or the last `main` commit older than 24 hours.
+// The head of the last successful scheduled run, if `main` still contains it.
+async function previousHead({ github, context, exec }) {
+  const { data } = await github.rest.actions.listWorkflowRuns({
+    ...context.repo,
+    workflow_id: "binary-size-nightly.yml",
+    event: "schedule",
+    status: "success",
+    per_page: 1,
+  });
+  const sha = data.workflow_runs[0]?.head_sha;
+  if (!sha) return "";
+  const { exitCode } = await exec.getExecOutput(
+    "git",
+    ["merge-base", "--is-ancestor", sha, "HEAD"],
+    { ignoreReturnCode: true, silent: true },
+  );
+  return exitCode === 0 ? sha : "";
+}
+
+// Base is the given commit, or where the last successful scheduled run ended,
+// so every commit is measured once. Commit dates can't tell that: the merge
+// queue dates a commit about half an hour before it lands on `main`. Without
+// such a run, base is the last `main` commit older than 24 hours.
 // `--first-parent` keeps to `main` itself: one commit per merged pull request.
-async function resolveNightlyRange({ core, exec }) {
+async function resolveNightlyRange({ github, context, core, exec }) {
   const input = process.env.INPUT_BASE || "";
   const head = await git(exec, ["rev-parse", "HEAD"]);
   const base = input
     ? await git(exec, ["rev-parse", "--verify", `${input}^{commit}`])
-    : await git(exec, [
+    : (await previousHead({ github, context, exec })) ||
+      (await git(exec, [
         "rev-list",
         "-1",
         "--first-parent",
         "--before=24 hours ago",
         "HEAD",
-      ]);
+      ]));
   core.info(`Comparing ${base} with ${head}`);
 
   // Empty outputs skip the other jobs.
@@ -398,15 +421,18 @@ async function describeCommit({ github, context, exec }, sha) {
 
 // Splits every regression into the growth of each merged pull request, from
 // the sizes `measureBetween` recorded. Commits without sizes are counted
-// together with the next one that has them. Returns the table and, for each
-// pull request that alone grew past the limits, the examples it grew.
+// together with the next one that has them. Returns the table, the examples
+// each pull request alone grew past the limits, and the regressions that no
+// single pull request explains.
 async function growthByPullRequest(api, rows, chain, limits) {
   const names = new Map();
   const lines = [];
   const culprits = new Map();
+  const unexplained = [];
   for (const row of rows) {
     let previous = row.base;
     let pending = [];
+    const explained = { flash: false, bss: false };
     for (const commit of chain.slice(1)) {
       pending.push(commit);
       const sizes = commit === chain.at(-1) ? row.head : row.between[commit];
@@ -425,14 +451,17 @@ async function growthByPullRequest(api, rows, chain, limits) {
 
         if (flash.regressed || bss.regressed) {
           const culprit = pending.map((sha) => names.get(sha)).join(" or ");
-          if (!culprits.has(culprit)) culprits.set(culprit, new Map());
-          const examples = culprits.get(culprit);
-          if (!examples.has(row.example)) examples.set(row.example, []);
-          examples.get(row.example).push(row.chip);
+          if (!culprits.has(culprit)) culprits.set(culprit, []);
+          culprits.get(culprit).push(row);
         }
+        explained.flash ||= flash.regressed;
+        explained.bss ||= bss.regressed;
       }
       previous = sizes;
       pending = [];
+    }
+    if ((row.flash.regressed && !explained.flash) || (row.bss.regressed && !explained.bss)) {
+      unexplained.push(row);
     }
   }
   const table = [
@@ -440,20 +469,32 @@ async function growthByPullRequest(api, rows, chain, limits) {
     "|---|---|---|---|---|",
     ...lines,
   ].join("\n");
-  return { table, culprits };
+  return { table, culprits, unexplained };
 }
 
-// Names the pull requests that alone grew past the limits, and where.
-function causeText(culprits) {
-  if (culprits.size === 0) {
-    return "No single pull request grew past the limits on its own, the growth adds up over several of them. See the growth by pull request below.";
+// Lists rows as "`example` on `chip`, `chip`; `example` on `chip`".
+function whereText(rows) {
+  const chips = new Map();
+  for (const row of rows) {
+    if (!chips.has(row.example)) chips.set(row.example, []);
+    chips.get(row.example).push(`\`${row.chip}\``);
   }
-  const lines = [...culprits].map(([culprit, examples]) => {
-    const where = [...examples]
-      .map(([example, chips]) => `\`${example}\` on ${chips.map((chip) => `\`${chip}\``).join(", ")}`)
-      .join("; ");
-    return `**${culprit}** grew past the limits on its own: ${where}.`;
-  });
+  return [...chips]
+    .map(([example, list]) => `\`${example}\` on ${list.join(", ")}`)
+    .join("; ");
+}
+
+// Names the pull requests that alone grew past the limits, and where, and the
+// regressions that only add up over several pull requests.
+function causeText({ culprits, unexplained }) {
+  const lines = [...culprits].map(
+    ([culprit, rows]) => `**${culprit}** grew past the limits on its own: ${whereText(rows)}.`,
+  );
+  if (unexplained.length > 0) {
+    lines.push(
+      `No single pull request grew past the limits on its own in ${whereText(unexplained)}, the growth adds up over several of them. See the growth by pull request below.`,
+    );
+  }
   return lines.length === 1 ? lines[0] : lines.map((line) => `- ${line}`).join("\n");
 }
 
@@ -513,7 +554,7 @@ async function reportNightly({ github, context, core, exec }) {
     "",
     "### Cause",
     "",
-    causeText(growth.culprits),
+    causeText(growth),
     "",
     "### Regressions",
     "",

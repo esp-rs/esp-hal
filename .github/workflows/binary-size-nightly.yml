@@ -1,7 +1,8 @@
 # Builds a few examples on every chip, once at the current `main` and once at
-# `main` from 24 hours earlier, and compares their sizes. An example that grew
-# past the limits is also built after each pull request merged in between, to
-# find the one behind it. Reports to an issue (or comments on the open one).
+# the `main` the last successful run measured, and compares their sizes. An
+# example that grew past the limits is also built after each pull request
+# merged in between, to find the one behind it. Reports to an issue (or
+# comments on the open one).
 #
 # `binary-size.yml` measures a single pull request the same way (`/test-size`).
 
@@ -13,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       base:
-        description: "Commit to compare against. Empty: main from 24 hours earlier."
+        description: "Commit to compare against. Empty: where the last successful scheduled run ended."
         required: false
         default: ""
         type: string
@@ -45,6 +46,10 @@ jobs:
     # Forks can still dispatch the workflow by hand.
     if: github.event_name != 'schedule' || github.repository_owner == 'esp-rs'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Finds the last successful run.
+      actions: read
     outputs:
       base: ${{ steps.range.outputs.base }}
       head: ${{ steps.range.outputs.head }}
@@ -63,7 +68,7 @@ jobs:
         with:
           script: |
             const { resolveNightlyRange } = require('./.github/scripts/binary-size.js');
-            await resolveNightlyRange({ core, exec });
+            await resolveNightlyRange({ github, context, core, exec });
 
   measure:
     needs: prepare
