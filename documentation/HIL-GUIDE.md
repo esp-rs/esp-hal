@@ -59,13 +59,23 @@ Use `binary::test_name` to run a single embedded-test case inside a matching HIL
 
 By default, `/hil` commands run the `hil-test` package. Include `hil-test-radio` in the comment body to run the radio HIL package instead.
 
-### `/test-size`
+### `/test-size <example> [--package <package>] <chip> [<chip> ...]`
 
 Triggers the binary size analysis workflow, which:
 
 - Builds the selected example for the PR head and for the commit the PR branched from.
 - Compares the size of every section that ends up in the image.
 - Reports the flash and bss totals and the sections that changed in a comment on the PR.
+
+Examples:
+
+- `/test-size hello_world esp32c6`
+- `/test-size embassy_hello_world esp32 esp32c3 esp32s3`
+- `/test-size embassy-adc --package qa-test esp32c6`
+
+The example is the first word that is not a chip name. Separate chips with spaces, at least one is required.
+
+By default, the example comes from the `examples` package, the projects under `examples/`. Use `--package qa-test` for a binary from `examples/qa/src/bin`, named after its file.
 
 ## Trust Management Commands
 
