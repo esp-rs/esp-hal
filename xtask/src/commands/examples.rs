@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use super::{build::build_examples, run::run_examples, select};
-use crate::{Package, cargo::CargoAction, metadata::Chip};
+use crate::{Package, cargo::CargoAction, firmware::ChipCoverage, metadata::Chip};
 
 const EXAMPLE_ARGUMENT_HINT: &str =
     "the example name as a token, or `all` to act on every example of the package";
@@ -33,7 +33,7 @@ pub fn examples(
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
     let examples = if package.contains_standalone_projects() {
-        crate::firmware::load_cargo_toml(&package_path, package).with_context(|| {
+        crate::firmware::load_cargo_toml(&package_path).with_context(|| {
             format!(
                 "Failed to load specified examples from {}",
                 package_path.display()
@@ -52,6 +52,48 @@ pub fn examples(
         .into_iter()
         .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
+
+    // Guard only CompileTests; examples/ coverage is legitimately sparse.
+    if package == Package::CompileTests && examples.is_empty() {
+        bail!(
+            "No compile-test project selects chip '{chip}'. Every chip must be covered by at \
+             least one project under compile-tests/ (the `hal` project covers all chips)."
+        );
+    }
+
+    // Skip projects whose forwarded `<dep>/<chip>` feature will not resolve on a
+    // published dependency line that predates the chip.
+    if package == Package::CompileTests && matches!(action, CargoAction::Build(_)) {
+        let mut supported = Vec::with_capacity(examples.len());
+        let mut released = false;
+        for ex in examples {
+            match crate::firmware::compile_test_project_supports_chip(
+                workspace,
+                ex.example_path(),
+                chip,
+            )? {
+                ChipCoverage::Builds => supported.push(ex),
+                ChipCoverage::Skipped { released: r } => released |= r,
+            }
+        }
+        examples = supported;
+        if examples.is_empty() {
+            // A chip no resolving crate ships yet is legitimately untestable; one
+            // this release publishes must be covered.
+            if released {
+                bail!(
+                    "Chip '{chip}' is untested: this release publishes it, but every \
+                     compile-test project that selects it depends on a published line that \
+                     predates it. Add those crates to the release so the `hal` project's pins \
+                     follow them."
+                );
+            }
+            log::warn!(
+                "Skipping compile-tests for {chip}: no crate this build resolves supports it yet"
+            );
+            return Ok(());
+        }
+    }
 
     examples.sort_by_key(|a| a.binary_name());
 

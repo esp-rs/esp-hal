@@ -6,6 +6,18 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-storage?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
+> **Deprecated.** Use instead:
+>
+> - `esp_hal::flash::Flash` from [esp-hal](https://docs.espressif.com/projects/rust/esp-hal/latest/) for raw and encrypted flash I/O
+>   (`read`, `write`, `erase`, `read_encrypted`, `write_encrypted`). This driver is unstable (requires the `unstable` feature of `esp-hal`).
+>   It works on `u32` word buffers in DRAM at 4-byte-aligned offsets, does not erase before writing, and does not implement `embedded-storage` traits.
+> - `FlashRegion`, `EncryptedFlashRegion` and `AutoFlashRegion` from [esp-bootloader-esp-idf](https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/)
+>   for byte-oriented, partition-scoped access, including encrypted partitions.
+>   With the `embedded-storage` feature, `FlashRegion` implements `ReadNorFlash`, `NorFlash` and `MultiwriteNorFlash`.
+>   For the read-modify-write behavior of the `Storage` trait, wrap it in `embedded_storage::nor_flash::RmwMultiwriteNorFlashStorage`.
+>
+> See [#6447](https://github.com/esp-rs/esp-hal/pull/6447) for migration notes.
+
 This crate provides functionality to access ESP32 flash. Enable the
 `embedded-storage` feature for [`embedded-storage`](https://github.com/rust-embedded-community/embedded-storage) trait implementations.
 

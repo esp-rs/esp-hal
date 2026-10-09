@@ -64,7 +64,8 @@ preview-docs = ["dep:opener", "dep:rocket"]
 semver-checks = [ "dep:cargo-semver-checks", "dep:flate2", "dep:temp-file", "dep:regex", "dep:zip" ]
 release = ["semver-checks", "dep:opener", "dep:regex", "dep:tame-index"]
 report = ["dep:regex"]
-rel-check = ["dep:regex"]
+# The registry check reads the real release `Plan`, so it needs the release feature.
+rel-check = ["release"]
 mcp = ["dep:inventory", "dep:rmcp", "dep:schemars", "dep:tokio", "dep:xtask-mcp-macros"]
 
 # schemars is being used in `xtask_mcp_macros` and it's incorrectly detected as unused.

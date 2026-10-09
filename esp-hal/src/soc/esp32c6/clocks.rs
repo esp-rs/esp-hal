@@ -19,6 +19,7 @@
 use crate::{
     efuse::ChipRevision,
     peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, TIMG0},
+    rtc_cntl::rtc::ICG_NOGATING_SLEEP,
     soc::{regi2c, xtal32k},
 };
 
@@ -765,8 +766,37 @@ impl TimgInstance {
 
 // BLE_LP_XTAL_CLK
 
-fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do.
+/// Returns whether the BLE timer gets the crystal via the Wi-Fi power clock (crystal / 80).
+fn ble_timer_uses_wifi_pwr_clk() -> bool {
+    crate::soc::chip_revision_above(ChipRevision::from_combined(1))
+}
+
+// https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/modem/port/esp32c6/modem_clock_impl.c#L335-L348
+fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if !ble_timer_uses_wifi_pwr_clk() {
+        return;
+    }
+
+    // `rtc::init` turns the Wi-Fi power clock on for good.
+    MODEM_LPCON::regs()
+        .clk_conf_power_st()
+        .modify(|r, w| unsafe {
+            let map = r.clk_wifipwr_st_map().bits();
+            w.clk_wifipwr_st_map().bits(if en {
+                map | ICG_NOGATING_SLEEP
+            } else {
+                map & !ICG_NOGATING_SLEEP
+            })
+        });
+}
+
+pub(crate) fn wifi_pwr_clk_runs_in_sleep() -> bool {
+    let map = MODEM_LPCON::regs()
+        .clk_conf_power_st()
+        .read()
+        .clk_wifipwr_st_map()
+        .bits();
+    (map & ICG_NOGATING_SLEEP) != 0
 }
 
 // BLE_LP_CLK
@@ -785,9 +815,7 @@ fn configure_ble_lp_clk_impl(
     let divisor = match new_config {
         BleLpClkConfig::Xtal => {
             let mut ratio = xtal_clk_frequency() / ble_lp_xtal_clk_frequency();
-            // After v0.0, the crystal reaches this divider through a fixed divide-by-80 stage in
-            // the modem power domain.
-            if crate::soc::chip_revision_above(ChipRevision::from_combined(1)) {
+            if ble_timer_uses_wifi_pwr_clk() {
                 ratio /= 80;
             }
             ratio - 1

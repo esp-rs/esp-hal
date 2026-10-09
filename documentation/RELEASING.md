@@ -58,9 +58,11 @@ The bump in `release_plan.jsonc` has two fields: `base` (how much to raise
 Notes:
 
 - `execute-plan` also merges changelog and migration-guide entries from merged
-  pull request descriptions, and labels the PR with `release:docs`,
-  `release:registry:compile-test`, and `release:registry:ci`. Those labels drive
-  the `cargo update` checks in the `pre-release-checks` workflow.
+  pull request descriptions, and labels the release PR with `manual-changelog`,
+  `release:docs`, and `merge-freeze-exempt`. The `pre-release-checks` workflow
+  then builds the compile-tests and the examples/qa/tests against a local
+  registry on every release PR. Add `release:registry:skip-ci` to the PR to skip
+  the heavier examples/qa/tests build.
 - Run `post-release` only for the final stable release.
 
 ## Kickoff

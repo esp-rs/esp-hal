@@ -5,14 +5,17 @@ use core::{marker::PhantomData, mem::MaybeUninit};
 use esp_hal::time::Duration;
 use procmacros::BuilderLite;
 
+#[cfg(feature = "unstable")]
+use crate::wifi::CountryInfo;
 use crate::{
     drop_guard::DropGuard,
     sys::include,
     wifi::{
+        AuthenticationMethod,
+        SecondaryChannel,
         Ssid,
         WifiController,
         WifiError,
-        ap::{AccessPointInfo, convert_ap_info},
         esp_wifi_result,
     },
 };
@@ -104,6 +107,49 @@ pub struct ScanConfig {
     /// If [`None`] is passed, all networks will be returned.
     /// If [`Some`] is passed, the specified number of networks will be returned.
     pub(crate) max: Option<usize>,
+}
+
+/// Information about a detected Wi-Fi access point.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct AccessPointInfo {
+    /// The SSID of the access point.
+    pub ssid: Ssid,
+    /// The BSSID (MAC address) of the access point.
+    pub bssid: [u8; 6],
+    /// The channel the access point is operating on.
+    pub channel: u8,
+    /// The secondary channel configuration of the access point.
+    pub secondary_channel: SecondaryChannel,
+    /// The signal strength of the access point (RSSI).
+    pub signal_strength: i8,
+    /// The authentication method used by the access point.
+    pub auth_method: Option<AuthenticationMethod>,
+    #[cfg(feature = "unstable")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    /// The country information of the access point (if available from beacon frames).
+    pub country: Option<CountryInfo>,
+}
+
+#[allow(non_upper_case_globals)]
+pub(crate) fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
+    // `record.ssid` is 33 bytes to always fit the NUL terminator of a
+    // maximum-length SSID - clamp to 32 in case the driver ever hands us one
+    // without it.
+    let str_len = record.ssid.iter().position(|&c| c == 0).unwrap_or(32);
+    let ssid = Ssid::try_from(&record.ssid[..str_len]).expect("SSID length is valid");
+
+    AccessPointInfo {
+        ssid,
+        bssid: record.bssid,
+        channel: record.primary,
+        secondary_channel: SecondaryChannel::from_raw(record.second),
+        signal_strength: record.rssi,
+        auth_method: Some(AuthenticationMethod::from_raw(record.authmode)),
+        #[cfg(feature = "unstable")]
+        country: CountryInfo::try_from_c(&record.country),
+    }
 }
 
 /// Wi-Fi scan results.

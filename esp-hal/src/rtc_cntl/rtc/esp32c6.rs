@@ -79,7 +79,6 @@ fn pmu_power_domain_force_default() {
 fn modem_clock_domain_power_state_icg_map_init() {
     // C6 has SOC_PM_SUPPORT_PMU_MODEM_STATE defined
 
-    // const ICG_NOGATING_SLEEP: u8 = 1 << 0; // unused
     const ICG_NOGATING_MODEM: u8 = 1 << 1;
     const ICG_NOGATING_ACTIVE: u8 = 1 << 2;
 
@@ -196,6 +195,8 @@ const LP_CALI_DBIAS: u8 = 26;
 const ICG_MODEM_CODE_SLEEP: u8 = 0;
 const ICG_MODEM_CODE_MODEM: u8 = 1;
 const ICG_MODEM_CODE_ACTIVE: u8 = 2;
+
+pub(crate) const ICG_NOGATING_SLEEP: u8 = 1 << ICG_MODEM_CODE_SLEEP;
 
 const HP_SYSCLK_XTAL: u8 = 0;
 const HP_SYSCLK_PLL: u8 = 1;

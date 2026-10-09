@@ -98,9 +98,15 @@ use self::sniffer::Sniffer;
 #[cfg(feature = "wifi-eap")]
 use self::sta::eap::EapStationConfig;
 use self::{
-    ap::{AccessPointInfo, convert_ap_info},
     private::PacketBuffer,
-    scan::{ScanConfig, ScanResults, ScanTypeConfig, free_ap_list_on_drop},
+    scan::{
+        AccessPointInfo,
+        ScanConfig,
+        ScanResults,
+        ScanTypeConfig,
+        convert_ap_info,
+        free_ap_list_on_drop,
+    },
     sta::StationConfig,
     state::*,
 };
@@ -115,6 +121,7 @@ use crate::{
     },
     wifi::event::{EventInfo, WifiEvent},
 };
+#[cfg(wifi_softap_support)]
 pub mod ap;
 
 unstable_module!(
@@ -875,6 +882,8 @@ impl TryFrom<alloc::string::String> for Ssid {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::try_from_instead_of_from_str)]
 impl TryFrom<&str> for Ssid {
     type Error = WifiError;
 
@@ -1019,6 +1028,8 @@ impl TryFrom<alloc::string::String> for Password {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::try_from_instead_of_from_str)]
 impl TryFrom<&str> for Password {
     type Error = WifiError;
 
@@ -1265,6 +1276,11 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
             Some(recv_cb_ap)
         ))?;
 
+        // As in ESP-IDF (`modem_clock_configure_wifi_status`), the MAC and baseband clocks stay on
+        // while the driver is initialized, even though it calls `wifi_clock_disable` at every doze.
+        #[cfg(soc_has_modem_syscon)]
+        crate::radio_clocks::enable_wifi(true);
+
         Ok(())
     }
 }
@@ -1316,6 +1332,8 @@ fn wifi_deinit() -> Result<(), WifiError> {
     }
 
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+    #[cfg(soc_has_modem_syscon)]
+    crate::radio_clocks::enable_wifi(false);
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
     Ok(())
 }

@@ -391,6 +391,9 @@ macro_rules! property {
     ("timergroup.timg_has_divcnt_rst") => {
         false
     };
+    ("timergroup.wdt_has_conf_update") => {
+        false
+    };
     ("aes.has_split_text_registers") => {
         false
     };

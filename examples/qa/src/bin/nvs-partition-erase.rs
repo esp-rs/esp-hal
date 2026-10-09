@@ -7,12 +7,13 @@
 //! Assumes the device is flashed with a partition table containing an NVS
 //! partition (which is the case for the default partition table).
 //!
-//! Also exercises `esp_storage::FlashStorage::erase` on the last sector of the
+//! Also exercises `esp_hal::flash::Flash::erase` on the last sector of the
 //! whole flash - an area nothing occupies with the default partition table.
 //!
 //! NOTE: This test erases the NVS partition and the last sector of the flash!
 
-//% FEATURES: esp-storage
+//% CHIP_FILTER: flash_driver_supported
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -25,9 +26,11 @@ use esp_bootloader_esp_idf::partitions::{
     PartitionType,
     read_partition_table,
 };
-use esp_hal::main;
+use esp_hal::{
+    flash::{self, Config, Flash},
+    main,
+};
 use esp_println::println;
-use esp_storage::FlashStorageError;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -38,7 +41,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut flash = esp_storage::FlashStorage::new(peripherals.FLASH);
+    let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
 
     let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
     let pt = read_partition_table(&mut flash, &mut buffer).unwrap();
@@ -48,7 +51,7 @@ fn main() -> ! {
         .unwrap()
         .expect("No NVS partition found");
 
-    let mut region = nvs.as_flash_region(&mut flash);
+    let mut region = nvs.as_flash_region(&mut flash).unwrap();
     let len = region.partition_size() as u32;
     println!("NVS partition: {} bytes", len);
     assert!(len >= 2 * SECTOR_SIZE);
@@ -85,19 +88,21 @@ fn main() -> ! {
     );
     assert_eq!(region.erase(SECTOR_SIZE, 0), Err(Error::OutOfBounds));
 
-    // The same boundary conditions apply to `FlashStorage` itself: erasing the
-    // last sector of the flash must succeed
+    // The same boundary conditions apply to the flash driver itself: erasing
+    // the last sector of the flash must succeed
     let capacity = flash.capacity() as u32;
-    flash
-        .write(capacity - SECTOR_SIZE, &[0xa5; SECTOR_SIZE as usize])
-        .unwrap();
-    flash.erase(capacity - SECTOR_SIZE, capacity).unwrap();
-    flash.read(capacity - SECTOR_SIZE, &mut sector).unwrap();
-    assert!(sector.iter().all(|&b| b == 0xff));
+    let mut words = [0xa5a5_a5a5u32; SECTOR_SIZE as usize / 4];
+    // SAFETY: the last sector of the flash is not mapped.
+    unsafe {
+        flash.write(capacity - SECTOR_SIZE, &words).unwrap();
+        flash.erase(capacity - SECTOR_SIZE, capacity).unwrap();
+    }
+    flash.read(capacity - SECTOR_SIZE, &mut words).unwrap();
+    assert!(words.iter().all(|&w| w == u32::MAX));
 
     assert_eq!(
-        flash.erase(SECTOR_SIZE, 0),
-        Err(FlashStorageError::OutOfBounds)
+        unsafe { flash.erase(SECTOR_SIZE, 0) },
+        Err(flash::Error::OutOfBounds)
     );
 
     println!("Test passed");

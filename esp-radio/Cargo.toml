@@ -85,16 +85,16 @@ byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
 embassy-sync = "0.8"
 # Make sure these are aligned with esp-phy's dependencies, too!
-esp-wifi-sys-esp32 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c2 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c3 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c5 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c6 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32c61 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32h2 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32s2 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32s3 = { version = "0.3.0", optional = true }
-esp-wifi-sys-esp32s31 = { version = "0.3.0", optional = true }
+esp-wifi-sys-esp32 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c3 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c5 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c6 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32c61 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32h2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32s2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32s3 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
+esp-wifi-sys-esp32s31 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "a09ab97" }
 
 esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
 esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "33d9b66" }
@@ -288,7 +288,20 @@ esp32s31 = [
 
 #DOC_IF has("wifi_driver_supported")
 ## Enable Wi-Fi support.
-wifi = ["dep:enumset", "dep:embassy-net-driver-02", "dep:xarxa-driver"]
+wifi = [
+    "dep:enumset",
+    "dep:embassy-net-driver-02",
+    "dep:xarxa-driver",
+    "esp-wifi-sys-esp32?/wifi",
+    "esp-wifi-sys-esp32c2?/wifi",
+    "esp-wifi-sys-esp32c3?/wifi",
+    "esp-wifi-sys-esp32c5?/wifi",
+    "esp-wifi-sys-esp32c6?/wifi",
+    "esp-wifi-sys-esp32c61?/wifi",
+    "esp-wifi-sys-esp32s2?/wifi",
+    "esp-wifi-sys-esp32s3?/wifi",
+    "esp-wifi-sys-esp32s31?/wifi",
+]
 
 ## Enable Wi-Fi Enterprise Authentication Protocol (EAP) support.
 ##
@@ -310,7 +323,22 @@ sniffer = ["wifi", "__has_unstable_feature_enabled"]
 ## Enable BLE support.
 ##
 ## ⚠️ This feature is considered unstable.
-ble = ["esp-hal/__bluetooth", "dep:bt-hci", "dep:bt-hci-transport", "dep:enumset", "__has_unstable_feature_enabled"]
+ble = [
+    "esp-hal/__bluetooth",
+    "dep:bt-hci",
+    "dep:bt-hci-transport",
+    "dep:enumset",
+    "__has_unstable_feature_enabled",
+    "esp-wifi-sys-esp32?/bt",
+    "esp-wifi-sys-esp32c2?/bt",
+    "esp-wifi-sys-esp32c3?/bt",
+    "esp-wifi-sys-esp32c5?/bt",
+    "esp-wifi-sys-esp32c6?/bt",
+    "esp-wifi-sys-esp32c61?/bt",
+    "esp-wifi-sys-esp32h2?/bt",
+    "esp-wifi-sys-esp32s3?/bt",
+    "esp-wifi-sys-esp32s31?/bt",
+]
 #DOC_ENDIF
 
 #DOC_IF has("bt_driver_supported") && has("wifi_driver_supported")
@@ -334,7 +362,15 @@ csi = ["__has_unstable_feature_enabled"]
 ## Cannot be used together with Wi-Fi.
 ##
 ## ⚠️ This feature is considered unstable.
-ieee802154 = ["dep:byte", "dep:ieee802154", "__has_unstable_feature_enabled"]
+ieee802154 = [
+    "dep:byte",
+    "dep:ieee802154",
+    "__has_unstable_feature_enabled",
+    "esp-wifi-sys-esp32c5?/ieee802154",
+    "esp-wifi-sys-esp32c6?/ieee802154",
+    "esp-wifi-sys-esp32h2?/ieee802154",
+    "esp-wifi-sys-esp32s31?/ieee802154",
+]
 #DOC_ENDIF
 
 #! ### Ecosystem Feature Flags

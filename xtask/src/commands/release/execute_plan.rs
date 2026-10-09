@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path, process::Command};
+use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
@@ -9,8 +9,16 @@ use crate::{
     commands::{
         VersionBump,
         checker::generate_baseline,
+        do_version_bump,
         release::{
-            plan::{PackagePlan, Plan, validate_release_closure},
+            plan::{
+                PackagePlan,
+                Plan,
+                StaleDependency,
+                format_stale_dependency_warnings,
+                print_stale_dependency_warnings,
+                validate_plan,
+            },
             registry::RegistrySnapshot,
         },
         update_package,
@@ -32,7 +40,8 @@ pub struct ApplyPlanArgs {
     manual_pull_request: bool,
 }
 
-/// Execute the release plan by making code changes, committing them to a new
+/// Execute the release plan: bump versions, merge changelog entries, commit the
+/// changes to a fresh release branch, and open (or update) the release PR.
 pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     ensure_workspace_clean(workspace)
         .with_context(|| format!("Workspace {workspace:?} is not clean!"))?;
@@ -64,27 +73,15 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    // The plan is hand-edited between `plan` and here (packages get removed), so
-    // re-check that what remains still forms a self-consistent release before
-    // touching any files.
-    let releasing = plan
-        .packages
-        .iter()
-        .map(|p| (p.package, p.new_version.clone()))
-        .collect::<HashMap<_, _>>();
-    validate_release_closure(workspace, &releasing)?;
-
-    // Preflight: validate every package up front, before touching any files, so
-    // a mismatched version or other plan error aborts without leaving the
-    // workspace half-edited.
+    // Recompute each version and tag from `current_version` and `bump` before
+    // validation, so a hand-edited `bump` (not a stale `new_version`) decides
+    // what is released, and a drifted manifest aborts before any file changes.
     //
-    // We deliberately do NOT reuse the manifests parsed here in the apply loop
-    // below. Bumping a package rewrites the on-disk manifests of its workspace
-    // dependents, so a package bumped after its dependencies must be re-read to
-    // observe those rewrites. Saving a snapshot taken here would write it back
-    // stale and silently revert every dependency bump an earlier step applied.
+    // Do not reuse these manifests in the apply loop: bumping a package rewrites
+    // its workspace dependents on disk, so each must be re-read there or an
+    // earlier dependency bump would be silently reverted.
     let mut bump_decisions = Vec::with_capacity(plan.packages.len());
-    for step in plan.packages.iter() {
+    for step in plan.packages.iter_mut() {
         let package = CargoToml::new(workspace, step.package).with_context(|| {
             format!(
                 "Couldn't create Cargo.toml in workspace {workspace:?} for {:?}",
@@ -92,7 +89,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             )
         })?;
 
-        match validate_package(&package, step)? {
+        match recompute_and_validate_package(&package, step)? {
             Preflight::Bump => bump_decisions.push(true),
             Preflight::AlreadyReleased => {
                 println!(
@@ -103,6 +100,12 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             }
         }
     }
+
+    // The plan is hand-edited between `plan` and here (packages get removed and
+    // bumps get tweaked), so run every planner gate against the recomputed
+    // versions before touching any files.
+    let warnings = validate_plan(workspace, &plan.packages)?;
+    print_stale_dependency_warnings(&warnings);
 
     // Must run before the apply loop: `update_package` finalizes Unreleased into
     // the new version section, so fragments added after would land in the wrong
@@ -198,12 +201,18 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     let branch_name = format!("release-branch-{}", plan.slug);
     let branch = make_git_changes(!args.no_dry_run, &branch_name, &commit_message(&plan))?;
 
+    // Report-only: include the compile-test chip coverage in the PR body. A read
+    // failure is logged and the section omitted rather than aborting the release.
+    let coverage_section = compile_test_coverage_section(workspace);
+
     open_pull_request(
         &branch,
         !args.no_dry_run,
         args.manual_pull_request,
         &plan_source,
         &plan,
+        &warnings,
+        &coverage_section,
     )
     .with_context(|| "Failed to open pull request")?;
 
@@ -225,21 +234,39 @@ enum Preflight {
     AlreadyReleased,
 }
 
-/// Validate a package against its plan entry without mutating anything.
+/// Recompute a package's `new_version`/`tag_name` from its `bump`, validate it
+/// against the manifest on disk, and update the plan entry in place.
 ///
 /// Run for every package before any changelog or version edits happen, so that
-/// a bad plan aborts cleanly instead of leaving the workspace half-edited. The
-/// same checks gate the actual bump, but live here only — the apply loop reuses
-/// the [`Preflight`] result instead of repeating them.
-fn validate_package(package: &CargoToml, step: &PackagePlan) -> Result<Preflight> {
+/// a bad plan aborts cleanly instead of leaving the workspace half-edited, and
+/// so the checks that follow see the version the `bump` actually produces rather
+/// than a possibly-stale `new_version` field.
+fn recompute_and_validate_package(
+    package: &CargoToml,
+    step: &mut PackagePlan,
+) -> Result<Preflight> {
     let current = package.package_version();
+
+    let new_version = do_version_bump(&step.current_version, &step.bump).with_context(|| {
+        format!(
+            "Failed to compute the new version of {} from its bump",
+            step.package
+        )
+    })?;
+
+    // Re-run after the bump was already applied: the manifest already carries
+    // the recomputed target version.
     if current != step.current_version {
-        if current == step.new_version {
+        if current == new_version {
+            step.new_version = new_version;
+            step.tag_name = step.package.tag(&step.new_version);
             return Ok(Preflight::AlreadyReleased);
         }
         bail!(
-            "The version of package {} has changed in an unexpected way. Cannot continue.",
-            step.package
+            "The manifest version of {} is {current}, but the plan's current_version is {}. \
+             Re-run `cargo xrelease plan`.",
+            step.package,
+            step.current_version
         );
     }
 
@@ -254,6 +281,8 @@ fn validate_package(package: &CargoToml, step: &PackagePlan) -> Result<Preflight
         );
     }
 
+    step.new_version = new_version;
+    step.tag_name = step.package.tag(&step.new_version);
     Ok(Preflight::Bump)
 }
 
@@ -399,27 +428,53 @@ fn commit_message(plan: &Plan) -> String {
 
 const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
 // `manual-changelog` exempts the PR from the direct-CHANGELOG-edit check (the release
-// tooling writes the changelog wholesale). The `release:*` labels each gate an optional,
-// heavy CI workflow; all are applied by default so every check runs, and a maintainer can
-// remove individual ones to skip a check that isn't relevant to the packages being released.
+// tooling writes the changelog wholesale). `release:docs` gates the docs build.
 // `merge-freeze-exempt` lets the PR through the merge queue during a release freeze; it is a
 // no-op when no freeze is active.
-const PR_LABELS: &[&str] = &[
-    "manual-changelog",
-    "release:docs",
-    "release:registry:compile-test",
-    "release:registry:ci",
-    "merge-freeze-exempt",
-];
+//
+// The registry compile-test runs on every release PR and the examples/tests step runs by
+// default, skipped only by adding `release:registry:skip-ci` (see `pre-rel-check.yml`), so
+// neither is applied here as an opt-in gate.
+const PR_LABELS: &[&str] = &["manual-changelog", "release:docs", "merge-freeze-exempt"];
 
-fn build_pr_body(plan: &Plan, release_plan_str: &str) -> String {
+/// The compile-test chip coverage section for the PR body, or an empty string
+/// when it cannot be computed. Report-only.
+fn compile_test_coverage_section(workspace: &Path) -> String {
+    match crate::firmware::compile_test_coverage(workspace) {
+        Ok(coverage) => format!(
+            "\n### Compile-test chip coverage\n\n{}\n",
+            crate::firmware::format_compile_test_coverage(&coverage)
+        ),
+        Err(e) => {
+            log::warn!("Could not compute compile-test coverage: {e}");
+            String::new()
+        }
+    }
+}
+
+fn build_pr_body(
+    plan: &Plan,
+    release_plan_str: &str,
+    warnings: &[StaleDependency],
+    coverage_section: &str,
+) -> String {
     let packages = format_package_list(plan);
+
+    let stale_section = if warnings.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n### Stale-dependency warnings\n\nThese in-repo dependencies have commits since \
+             their last release. The registry check decides whether this release needs them:\n\n{}\n",
+            format_stale_dependency_warnings(warnings).join("\n")
+        )
+    };
 
     let mut body = format!(
         r#"This pull request prepares the following packages for release:
 
 {packages}
-
+{stale_section}{coverage_section}
 <details>
 
 <summary>Release plan (click to expand)</summary>
@@ -458,8 +513,10 @@ fn open_pull_request(
     manual_pull_request: bool,
     release_plan_str: &str,
     release_plan: &Plan,
+    warnings: &[StaleDependency],
+    coverage_section: &str,
 ) -> Result<()> {
-    let body = build_pr_body(release_plan, release_plan_str);
+    let body = build_pr_body(release_plan, release_plan_str, warnings, coverage_section);
 
     if dry_run {
         println!("Dry run: would create/update the release PR with body:");

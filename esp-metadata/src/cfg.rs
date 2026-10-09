@@ -882,6 +882,8 @@ driver_configs![
                 timg_has_timer1: bool,
                 #[serde(default)]
                 timg_has_divcnt_rst: bool,
+                #[serde(default)]
+                wdt_has_conf_update: bool,
 
                 #[serde(default)]
                 rc_fast_calibration: Option<RcFastCalibrationProperties>,

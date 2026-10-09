@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use proc_macro2::{TokenStream, TokenStream as TokenStream2};
+use proc_macro2::{Literal, TokenStream, TokenStream as TokenStream2, TokenTree};
 use quote::quote;
 use syn::{
     AttrStyle,
@@ -80,7 +80,7 @@ impl Replacements {
                     }
                 }
             } else {
-                for attr_inner in self.inline_attributes(line) {
+                for attr_inner in self.inline_attributes(line, span) {
                     if outer {
                         attrs.push(syn::parse_quote_spanned! { span => #[ #attr_inner ] });
                     } else {
@@ -130,7 +130,7 @@ impl Replacements {
     /// A line without placeholders expands to a single attribute. Otherwise, each placeholder
     /// contributes as many attributes as it has conditional values, so a line is emitted for every
     /// combination of the values of its placeholders.
-    fn inline_attributes(&self, line: &str) -> Vec<TokenStream2> {
+    fn inline_attributes(&self, line: &str, span: proc_macro2::Span) -> Vec<TokenStream2> {
         let pieces = self.split_line(line);
 
         // The placeholders of the line, in order of first appearance. A placeholder used multiple
@@ -145,7 +145,7 @@ impl Replacements {
         }
 
         if placeholders.is_empty() {
-            let line = create_raw_string(line);
+            let line = create_raw_string(line, span);
             return vec![quote! { doc = #line }];
         }
 
@@ -177,10 +177,13 @@ impl Replacements {
                 .filter_map(|placeholder| choice(placeholder).0.as_ref())
                 .collect::<Vec<_>>();
 
-            let doc = quote_doc_line(pieces.iter().map(|piece| match piece {
-                Piece::Text(text) => Inline::Text((*text).to_string()),
-                Piece::Replacement(placeholder) => choice(placeholder).1.clone(),
-            }));
+            let doc = quote_doc_line(
+                pieces.iter().map(|piece| match piece {
+                    Piece::Text(text) => Inline::Text((*text).to_string()),
+                    Piece::Replacement(placeholder) => choice(placeholder).1.clone(),
+                }),
+                span,
+            );
 
             attributes.push(match conditions.as_slice() {
                 [] => doc,
@@ -198,7 +201,7 @@ impl Replacements {
 /// Text is concatenated as far as possible, so that a line that is fully known here becomes a
 /// single string. The rest is left to `concat!`, which runs once the attribute is expanded and the
 /// remaining pieces are known.
-fn quote_doc_line(pieces: impl Iterator<Item = Inline>) -> TokenStream2 {
+fn quote_doc_line(pieces: impl Iterator<Item = Inline>, span: proc_macro2::Span) -> TokenStream2 {
     let mut parts: Vec<Inline> = vec![];
     for piece in pieces {
         match (parts.last_mut(), piece) {
@@ -208,19 +211,20 @@ fn quote_doc_line(pieces: impl Iterator<Item = Inline>) -> TokenStream2 {
     }
 
     if let [Inline::Text(text)] = parts.as_slice() {
-        let line = create_raw_string(text);
+        let line = create_raw_string(text, span);
         return quote! { doc = #line };
     }
 
     let parts = parts.iter().map(|part| match part {
-        Inline::Text(text) => create_raw_string(text),
+        Inline::Text(text) => create_raw_string(text, span),
         Inline::Expanded(tokens) => tokens.clone(),
     });
 
     quote! { doc = concat!( #(#parts),* ) }
 }
 
-fn create_raw_string(line: &str) -> TokenStream2 {
+/// Creates a raw string literal with the span of the original doc attribute.
+fn create_raw_string(line: &str, span: proc_macro2::Span) -> TokenStream2 {
     let hash = if line.contains("#\"") {
         "##"
     } else if line.contains('"') {
@@ -229,7 +233,9 @@ fn create_raw_string(line: &str) -> TokenStream2 {
         ""
     };
 
-    TokenStream2::from_str(&format!("r{hash}\"{line}\"{hash}")).unwrap()
+    let mut literal = Literal::from_str(&format!("r{hash}\"{line}\"{hash}")).unwrap();
+    literal.set_span(span);
+    TokenTree::Literal(literal).into()
 }
 
 impl Parse for Replacements {

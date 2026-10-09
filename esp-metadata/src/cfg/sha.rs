@@ -28,8 +28,8 @@ pub struct ShaAlgoMap {
     sha512_t: Option<u32>,
 }
 
-impl super::GenericProperty for ShaAlgoMap {
-    fn macros(&self) -> Option<proc_macro2::TokenStream> {
+impl ShaAlgoMap {
+    fn algorithms(&self) -> impl Iterator<Item = (ShaAlgo, u32)> {
         let modes = [
             ("SHA-1", self.sha1),
             ("SHA-224", self.sha224),
@@ -41,10 +41,25 @@ impl super::GenericProperty for ShaAlgoMap {
             ("SHA-512/t", self.sha512_t),
         ];
 
-        let algos = modes
+        modes
             .into_iter()
             .filter_map(|(name, mode)| mode.map(|m| (name, m)))
-            .filter_map(|(name, mode)| ShaAlgo::new(name).map(|name| (name, mode)))
+            .filter_map(|(name, mode)| ShaAlgo::new(name).map(|algo| (algo, mode)))
+    }
+}
+
+impl super::GenericProperty for ShaAlgoMap {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        Some(
+            self.algorithms()
+                .map(|(algo, _)| format!("sha_has_{}", algo.ident.to_string().to_lowercase()))
+                .collect(),
+        )
+    }
+
+    fn macros(&self) -> Option<proc_macro2::TokenStream> {
+        let algos = self
+            .algorithms()
             .map(|(algo, mode)| {
                 let mode = number(mode);
                 quote! { #algo, #mode }
@@ -161,6 +176,27 @@ impl ToTokens for ShaAlgo {
 
         tokens.extend(
             quote! { #ident, #name (sizes: #block_size, #digest_len, #message_len_bytes) (insecure_against: #(#insecure),*) },
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cfg::GenericProperty;
+
+    #[test]
+    fn cfgs_only_include_implemented_algorithms() {
+        let modes = ShaAlgoMap {
+            sha1: Some(0),
+            sha512_224: Some(5),
+            sha512_t: Some(7),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            modes.cfgs().unwrap(),
+            ["sha_has_sha1", "sha_has_sha512_224"]
         );
     }
 }

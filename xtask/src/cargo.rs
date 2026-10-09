@@ -633,6 +633,18 @@ impl CargoToml {
             })
     }
 
+    /// Load the Cargo.toml for `package` as it existed at `git_ref`, so a frozen
+    /// crate's requirements come from its release tag rather than the working
+    /// tree that `bump_crate_version` rewrites.
+    pub fn at_ref(workspace: &Path, package: Package, git_ref: &str) -> Result<Self> {
+        let repo_relative = format!("{}/Cargo.toml", package.directory());
+        let manifest = crate::git::show_file_at_ref(workspace, git_ref, &repo_relative)
+            .with_context(|| {
+                format!("Failed to read {repo_relative} at {git_ref} for package {package}")
+            })?;
+        Self::from_str(workspace, package, &manifest)
+    }
+
     /// Create a `CargoToml` instance from a manifest string.
     pub fn from_str(workspace: &Path, package: Package, manifest: &str) -> Result<Self> {
         // Parse the manifest string into a mutable TOML document.
@@ -778,18 +790,19 @@ impl CargoToml {
         dependencies
     }
 
-    /// Returns each in-repo dependency with its version requirement string,
-    /// across the normal, build, and target-specific dependency sections.
-    ///
-    /// `dev-dependencies` are excluded: they are not part of the published
-    /// crate, so they neither enter a released crate's dependency tree nor
-    /// constrain what downstream users resolve.
-    ///
-    /// Dependencies without a `version` (e.g. git-only) are skipped, and renamed
-    /// dependencies (`alias = { package = "real-name" }`) resolve to the real
-    /// crate. A crate may appear more than once if depended on from several
-    /// sections.
+    /// The in-repo subset of [`dependency_requirements`], each dependency
+    /// resolved to its [`Package`].
     pub fn repo_dependency_requirements(&mut self) -> Vec<(Package, String)> {
+        self.dependency_requirements()
+            .into_iter()
+            .filter_map(|(name, req)| Package::from_str(&name, true).ok().map(|pkg| (pkg, req)))
+            .collect()
+    }
+
+    /// Every non-dev dependency as a sorted `(name, requirement)` pair, so two
+    /// manifests can be diffed for drift directly. Renamed deps resolve to the
+    /// real crate name; deps without a `version` are skipped.
+    pub fn dependency_requirements(&mut self) -> Vec<(String, String)> {
         let mut dependencies = Vec::new();
         self.visit_dependencies(|_, dependency_kind, table| {
             if dependency_kind == "dev-dependencies" {
@@ -797,16 +810,12 @@ impl CargoToml {
             }
             for (key, value) in table.iter() {
                 let (name, version) = match value {
-                    // package = "version"
                     Item::Value(Value::String(version)) => (key, Some(version.value().to_string())),
-                    // package = { version = "version", package = "real-name" }
                     Item::Value(Value::InlineTable(t)) => {
                         let name = t.get("package").and_then(|p| p.as_str()).unwrap_or(key);
                         let version = t.get("version").and_then(|v| v.as_str()).map(String::from);
                         (name, version)
                     }
-                    // [dependencies.package]
-                    // version = "version"
                     Item::Table(t) => {
                         let name = t.get("package").and_then(|p| p.as_str()).unwrap_or(key);
                         let version = t.get("version").and_then(|v| v.as_str()).map(String::from);
@@ -815,11 +824,13 @@ impl CargoToml {
                     _ => (key, None),
                 };
 
-                if let (Ok(package), Some(version)) = (Package::from_str(name, true), version) {
-                    dependencies.push((package, version));
+                if let Some(version) = version {
+                    dependencies.push((name.to_string(), version));
                 }
             }
         });
+        dependencies.sort();
+        dependencies.dedup();
         dependencies
     }
 

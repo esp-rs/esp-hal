@@ -186,7 +186,7 @@ for_each_peripheral! {
     // Define the Peripherals struct
     (singletons $( ( $(#[$cfg:meta])* $name:ident $(($unstable:ident $(#[$unstable_cfg:meta])*))?) ),*) => {
         // We need a way to ignore the "unstable" marker, but macros can't generate attributes or struct fields.
-        // The solution is printing an empty doc comment.
+        // The solution is appending an empty string to a doc comment.
         macro_rules! ignore { ($any:tt) => {""} }
 
         /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
@@ -220,10 +220,9 @@ for_each_peripheral! {
                 $(#[$cfg])*
                 #[doc = concat!("The ", stringify!($name), " peripheral.")]
                 $(
-                    #[doc = "**This API is marked as unstable** and is only available when the `unstable`
+                    #[doc = concat!("**This API is marked as unstable** and is only available when the `unstable`
                             crate feature is enabled. This comes with no stability guarantees, and could be changed
-                            or removed at any time."]
-                    #[doc = ignore!($unstable)]
+                            or removed at any time.", ignore!($unstable))]
                     #[cfg(feature = "unstable")]
                     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
                 )?
@@ -232,10 +231,9 @@ for_each_peripheral! {
                 $(
                     $(#[$unstable_cfg])*
                     #[doc = concat!("The ", stringify!($name), " peripheral.")]
-                    #[doc = "**This API is marked as unstable** and is only available when the `unstable`
+                    #[doc = concat!("**This API is marked as unstable** and is only available when the `unstable`
                             crate feature is enabled. This comes with no stability guarantees, and could be changed
-                            or removed at any time."]
-                    #[doc = ignore!($unstable)]
+                            or removed at any time.", ignore!($unstable))]
                     #[cfg(not(feature = "unstable"))]
                     #[allow(unused)]
                     pub(crate) $name: $name<'static>,

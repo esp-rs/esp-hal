@@ -22,7 +22,7 @@ use esp_hal::{
 use hil_test as _;
 
 // Configure a 1 MHz RMT clock on every supported chip.
-const RMT_DIVIDER: u8 = if cfg!(esp32h2) { 32 } else { 80 };
+const RMT_DIVIDER: u8 = if cfg!(any(esp32h2, esp32h4)) { 32 } else { 80 };
 const RMT_FREQUENCY: Rate = Rate::from_mhz(RMT_DIVIDER as u32);
 
 const SDM_FREQUENCY: Rate = Rate::from_khz(500);

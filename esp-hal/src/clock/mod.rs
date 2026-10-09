@@ -500,6 +500,10 @@ pub(crate) fn calibrate_rtc_slow_clock() {
     const SLOW_CLK_SRC_CAL_CYCLES: u32 = 16;
     let cal_val = RtcClock::calibrate(slow_clk, SLOW_CLK_SRC_CAL_CYCLES);
 
+    if cal_val == 0 {
+        panic!("{:?} calibration failed.", slow_clk);
+    }
+
     let reg = cfg_select! {
         esp32s31 => LP_AON::regs().lp_store(1),
         esp32p4 => LP_AON::regs().lp_store1(),
@@ -508,7 +512,7 @@ pub(crate) fn calibrate_rtc_slow_clock() {
 
     reg.write(|w| unsafe { w.bits(cal_val) });
 
-    if rc_slow_selected && cal_val != 0 {
+    if rc_slow_selected {
         let frequency = ((1_000_000u64 << RtcClock::CAL_FRACT) / cal_val as u64) as u32;
 
         // On some chips, the calibrated clock is RC_SLOW_CLK divided down.

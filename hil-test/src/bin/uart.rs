@@ -165,7 +165,7 @@ mod tests {
             cfg_select! {
                 esp32c2 => ClockSource::PllF40m,
                 any(esp32c5, esp32c6, esp32c61, esp32p4, esp32s31) => ClockSource::PllF80m,
-                esp32h2 => ClockSource::PllF48m,
+                any(esp32h2, esp32h4) => ClockSource::PllF48m,
                 _ => ClockSource::Apb,
             };
 
