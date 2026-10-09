@@ -517,6 +517,52 @@ impl ITwtProbeStatus {
     }
 }
 
+#[cfg(wifi_has_wifi6)]
+pub(crate) fn teardown_result(status: ITwtTeardownStatus) -> Result<(), WifiError> {
+    match status {
+        ITwtTeardownStatus::Success => Ok(()),
+        ITwtTeardownStatus::Fail => Err(WifiError::Twt(TwtError::TeardownFailed)),
+    }
+}
+
+#[cfg(wifi_has_wifi6)]
+pub(crate) fn probe_result(status: ITwtProbeStatus) -> Result<(), WifiError> {
+    match status {
+        ITwtProbeStatus::Success => Ok(()),
+        ITwtProbeStatus::Fail => Err(WifiError::Twt(TwtError::ProbeFailed)),
+        ITwtProbeStatus::Timeout => Err(WifiError::Twt(TwtError::ProbeTimeout)),
+        ITwtProbeStatus::Disconnected => Err(WifiError::NotConnected),
+    }
+}
+
+/// Errors specific to Target Wake Time (TWT) operations.
+#[cfg(wifi_has_wifi6)]
+#[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum TwtError {
+    /// All TWT flow IDs are in use.
+    Full,
+    /// TWT setup action frame response timed out.
+    SetupTimeout,
+    /// TWT setup action frame transmission failed.
+    SetupTxFail,
+    /// TWT setup was rejected by the AP.
+    SetupRejected,
+    /// The station failed to send the teardown frame.
+    TeardownFailed,
+    /// Suspending the TWT agreement failed.
+    SuspendFailed,
+    /// The probe request failed.
+    ProbeFailed,
+    /// The probe request timed out.
+    ProbeTimeout,
+}
+
+#[cfg(wifi_has_wifi6)]
+impl core::error::Error for TwtError {}
+
 /// TWT type (individual or broadcast).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -614,6 +660,10 @@ pub struct ITwtSetupInfo {
 }
 
 /// Information about a failed iTWT setup.
+///
+/// `config` holds the AP's response (`setup_cmd` and the proposed
+/// parameters), which can be used to re-request a setup with the AP's
+/// parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -634,15 +684,15 @@ pub struct ITwtSetupFailedInfo {
 #[instability::unstable]
 pub enum ITwtSetupError {
     /// The AP responded with a non-success status.
-    Failed(ITwtSetupFailedInfo),
+    Rejected(ITwtSetupFailedInfo),
 
     /// A Wi-Fi error occurred.
-    WifiError(WifiError),
+    Wifi(WifiError),
 }
 
 impl From<WifiError> for ITwtSetupError {
     fn from(error: WifiError) -> Self {
-        ITwtSetupError::WifiError(error)
+        ITwtSetupError::Wifi(error)
     }
 }
 
