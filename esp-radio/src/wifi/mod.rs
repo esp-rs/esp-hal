@@ -859,6 +859,8 @@ impl TryFrom<alloc::string::String> for Ssid {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::try_from_instead_of_from_str)]
 impl TryFrom<&str> for Ssid {
     type Error = WifiError;
 
@@ -1003,6 +1005,8 @@ impl TryFrom<alloc::string::String> for Password {
     }
 }
 
+#[allow(unknown_lints)]
+#[allow(clippy::try_from_instead_of_from_str)]
 impl TryFrom<&str> for Password {
     type Error = WifiError;
 
