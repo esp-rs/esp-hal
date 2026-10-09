@@ -13,20 +13,14 @@
 //! scheduled window.
 //!
 //! For best latency, send packets in response to
-#![cfg_attr(
-    wifi_has_wifi6,
-    doc = "[`WifiController::wait_for_next_twt_wakeup`](crate::wifi::WifiController::wait_for_next_twt_wakeup)"
-)]
+//! [`WifiController::wait_for_next_twt_wakeup`](crate::wifi::WifiController::wait_for_next_twt_wakeup)
 //! events. An independent timer can desync from TWT wakeups, causing
 //! packets to miss their window.
 //!
 //! # Event subscribers
 //!
 //! The async TWT methods on
-#![cfg_attr(
-    wifi_has_wifi6,
-    doc = "[`WifiController`](crate::wifi::WifiController)"
-)]
+//! [`WifiController`](crate::wifi::WifiController)
 //! wait for driver events. Each pending call holds one event channel
 //! subscriber and needs queue capacity in the event channel. Concurrent
 //! waiters (or other tasks listening for events) require increasing the
@@ -42,13 +36,12 @@
 use core::fmt;
 
 use docsplay::Display;
-use enumset::EnumSetType;
+use enumset::{EnumSet, EnumSetType};
 use esp_hal::time::Duration;
+use portable_atomic::Ordering;
 use procmacros::BuilderLite;
 
-use super::WifiError;
-#[cfg(wifi_has_wifi6)]
-use crate::sys::include::wifi_twt_config_t;
+use super::{WifiController, WifiError, WifiEvent, esp_wifi_result, event, event::EVENT_CHANNEL};
 use crate::sys::include::{
     wifi_itwt_probe_status_t,
     wifi_itwt_probe_status_t_ITWT_PROBE_FAIL,
@@ -58,6 +51,7 @@ use crate::sys::include::{
     wifi_itwt_teardown_status_t,
     wifi_itwt_teardown_status_t_ITWT_TEARDOWN_FAIL,
     wifi_itwt_teardown_status_t_ITWT_TEARDOWN_SUCCESS,
+    wifi_twt_config_t,
     wifi_twt_setup_cmds_t,
     wifi_twt_setup_cmds_t_TWT_ACCEPT,
     wifi_twt_setup_cmds_t_TWT_ALTERNATE,
@@ -190,7 +184,6 @@ impl FlowId {
 }
 
 /// Raw flow ID meaning "all flows" in teardown/suspend operations and events.
-#[cfg(wifi_has_wifi6)]
 pub(crate) const FLOW_ID_ALL: u8 = 8;
 
 /// Target for a TWT operation — either a specific flow or all active flows.
@@ -211,7 +204,6 @@ impl From<FlowId> for FlowTarget {
 }
 
 impl FlowTarget {
-    #[cfg(wifi_has_wifi6)]
     pub(crate) fn as_raw(self) -> u8 {
         match self {
             FlowTarget::Id(id) => id.as_u8(),
@@ -258,10 +250,7 @@ pub struct ITwtSetupConfig {
     /// Internal correlation ID used to match setup responses to requests.
     ///
     /// Automatically assigned by
-    #[cfg_attr(
-        wifi_has_wifi6,
-        doc = "[`WifiController::itwt_setup`](crate::wifi::WifiController::itwt_setup)."
-    )]
+    /// [`WifiController::itwt_setup`](crate::wifi::WifiController::itwt_setup).
     #[builder_lite(skip_setter)]
     pub twt_id: u16,
     /// The wake interval exponent (set via
@@ -413,7 +402,6 @@ impl ITwtSetupConfig {
         Duration::from_micros(us)
     }
 
-    #[cfg(wifi_has_wifi6)]
     pub(crate) fn to_raw(self) -> wifi_twt_setup_config_t {
         debug_assert!(self.wake_interval_exponent <= 31);
         debug_assert!(self.min_wake_duration >= 1);
@@ -488,7 +476,6 @@ impl ITwtSetupConfig {
 }
 
 /// Status value used by the iTWT setup event to indicate success.
-#[cfg(wifi_has_wifi6)]
 pub(crate) const ITWT_SETUP_SUCCESS: i32 = 1;
 
 /// Status of an iTWT teardown operation.
@@ -541,7 +528,6 @@ impl ITwtProbeStatus {
     }
 }
 
-#[cfg(wifi_has_wifi6)]
 pub(crate) fn teardown_result(status: ITwtTeardownStatus) -> Result<(), WifiError> {
     match status {
         ITwtTeardownStatus::Success => Ok(()),
@@ -549,7 +535,6 @@ pub(crate) fn teardown_result(status: ITwtTeardownStatus) -> Result<(), WifiErro
     }
 }
 
-#[cfg(wifi_has_wifi6)]
 pub(crate) fn probe_result(status: ITwtProbeStatus) -> Result<(), WifiError> {
     match status {
         ITwtProbeStatus::Success => Ok(()),
@@ -560,7 +545,6 @@ pub(crate) fn probe_result(status: ITwtProbeStatus) -> Result<(), WifiError> {
 }
 
 /// Errors specific to Target Wake Time (TWT) operations.
-#[cfg(wifi_has_wifi6)]
 #[derive(Display, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -584,7 +568,6 @@ pub enum TwtError {
     ProbeTimeout,
 }
 
-#[cfg(wifi_has_wifi6)]
 impl core::error::Error for TwtError {}
 
 /// TWT type (individual or broadcast).
@@ -620,7 +603,6 @@ pub struct TwtConfig {
     enable_keep_alive: bool,
 }
 
-#[cfg(wifi_has_wifi6)]
 impl TwtConfig {
     pub(crate) fn to_raw(self) -> wifi_twt_config_t {
         wifi_twt_config_t {
@@ -721,3 +703,520 @@ impl From<WifiError> for ITwtSetupError {
 }
 
 impl core::error::Error for ITwtSetupError {}
+
+impl WifiController<'_> {
+    #[procmacros::doc_replace]
+    /// Negotiate an individual TWT (Target Wake Time) agreement with the AP.
+    ///
+    /// The AP may accept, modify, or reject the requested parameters. On
+    /// success, returns [`ITwtSetupInfo`] with the negotiated configuration.
+    /// Up to 8 simultaneous agreements are supported.
+    ///
+    /// Each call is assigned a unique `twt_id` for correlating the response.
+    /// The call completes with [`ITwtSetupError::Rejected`] if the AP
+    /// rejects the request and with [`WifiError::NotConnected`] (wrapped in
+    /// [`ITwtSetupError::Wifi`]) if the station is or becomes
+    /// disconnected while waiting. There is no timeout on the driver side.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Running several TWT calls
+    /// concurrently (or alongside other tasks that wait for events) requires
+    /// increasing the `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_hal::time::Duration;
+    /// # use esp_radio::wifi::twt::ITwtSetupConfig;
+    /// # let controller =
+    /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
+    /// let setup = ITwtSetupConfig::default()
+    ///     .with_wake_interval(Duration::from_millis(500))
+    ///     .with_min_wake_duration(Duration::from_millis(65));
+    ///
+    /// let info = controller.itwt_setup(setup).await?;
+    /// println!(
+    ///     "flow_id={:?}, interval={:?}",
+    ///     info.config.flow_id,
+    ///     info.config.wake_interval()
+    /// );
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub async fn itwt_setup(
+        &self,
+        mut config: ITwtSetupConfig,
+    ) -> Result<ITwtSetupInfo, ITwtSetupError> {
+        use portable_atomic::AtomicU16;
+        /// Monotonic counter for assigning unique `twt_id` values to iTWT setup
+        /// requests.
+        static NEXT_TWT_ID: AtomicU16 = AtomicU16::new(0);
+        const TWT_ID_MASK: u16 = 0x7FFF;
+
+        event::enable_wifi_events(
+            WifiEvent::IndividualTargetWakeTimeSetup | WifiEvent::StationDisconnected,
+        );
+
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(WifiError::NotConnected.into());
+        }
+
+        // ESP-IDF accepts a `twt_id` in [0, 32767]. Wrap within 15 bits.
+        let twt_id = NEXT_TWT_ID.fetch_add(1, Ordering::Relaxed) & TWT_ID_MASK;
+        config.twt_id = twt_id;
+
+        let mut raw = config.to_raw();
+        esp_wifi_result!(unsafe { crate::sys::include::esp_wifi_sta_itwt_setup(&mut raw) })?;
+
+        loop {
+            match subscriber.next_message_pure().await {
+                event::EventInfo::IndividualTargetWakeTimeSetup {
+                    config: negotiated_config,
+                    status,
+                    reason,
+                    target_wake_time,
+                } => {
+                    if negotiated_config.twt_id != twt_id {
+                        continue;
+                    }
+                    if status == ITWT_SETUP_SUCCESS {
+                        break Ok(ITwtSetupInfo {
+                            config: negotiated_config,
+                            target_wake_time,
+                        });
+                    } else {
+                        break Err(ITwtSetupError::Rejected(ITwtSetupFailedInfo {
+                            config: negotiated_config,
+                            status,
+                            reason,
+                        }));
+                    }
+                }
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(WifiError::NotConnected.into());
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Tear down an individual TWT agreement.
+    ///
+    /// Use [`FlowTarget::All`] to tear down all active agreements.
+    ///
+    /// Returns `Ok(())` once the teardown completed and
+    /// [`WifiError::Twt`]`(`[`TwtError::TeardownFailed`]`)` if the station
+    /// failed to send the teardown frame. Returns
+    /// [`WifiError::NotConnected`] if the station is or becomes disconnected.
+    ///
+    /// The call completes on the first teardown event covering the flow, so it
+    /// may also complete because of an AP-initiated teardown of the same flow.
+    /// A [`FlowTarget::All`] request completes on an event covering all
+    /// flows. There is no timeout on the driver side.
+    ///
+    /// Concurrent calls must use different flow IDs. Otherwise incorrect
+    /// results may be returned.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Concurrent callers (or
+    /// other tasks waiting for events) require increasing the
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::twt::FlowId;
+    /// # let controller =
+    /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
+    /// controller.itwt_teardown(FlowId::Flow0).await?;
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub async fn itwt_teardown(&self, target: impl Into<FlowTarget>) -> Result<(), WifiError> {
+        self.itwt_teardown_internal(target.into()).await
+    }
+    async fn itwt_teardown_internal(&self, target: FlowTarget) -> Result<(), WifiError> {
+        event::enable_wifi_events(
+            WifiEvent::IndividualTargetWakeTimeTeardown | WifiEvent::StationDisconnected,
+        );
+
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(WifiError::NotConnected);
+        }
+
+        esp_wifi_result!(unsafe {
+            crate::sys::include::esp_wifi_sta_itwt_teardown(target.as_raw() as i32)
+        })?;
+
+        loop {
+            match subscriber.next_message_pure().await {
+                event::EventInfo::IndividualTargetWakeTimeTeardown { flows, status } => {
+                    match target {
+                        // A "teardown all" completes when the event covers all flows.
+                        FlowTarget::All => {
+                            if flows != EnumSet::all() {
+                                continue;
+                            }
+                        }
+                        FlowTarget::Id(id) => {
+                            if !flows.contains(id) {
+                                continue;
+                            }
+                        }
+                    }
+                    break teardown_result(status);
+                }
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(WifiError::NotConnected);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Suspend an individual TWT agreement for the given duration.
+    ///
+    /// The station temporarily stops following the TWT schedule, then
+    /// automatically resumes.
+    /// Use [`FlowTarget::All`] to suspend all active agreements.
+    ///
+    /// Returns [`WifiError::NotConnected`] if the station is or becomes
+    /// disconnected. The call completes on the first suspend event covering
+    /// the flow, so it may also complete because of an AP-initiated suspend of
+    /// the same flow. There is no timeout on the driver side.
+    ///
+    /// Concurrent calls must use different flow IDs. Otherwise incorrect
+    /// results may be returned.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Concurrent callers (or
+    /// other tasks waiting for events) require increasing the
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_hal::time::Duration;
+    /// # use esp_radio::wifi::twt::FlowId;
+    /// # let controller =
+    /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
+    /// // Suspend flow 0 for 5 seconds
+    /// controller
+    ///     .itwt_suspend(FlowId::Flow0, Duration::from_secs(5))
+    ///     .await?;
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub async fn itwt_suspend(
+        &self,
+        target: impl Into<FlowTarget>,
+        suspend_time: Duration,
+    ) -> Result<(), WifiError> {
+        self.itwt_suspend_internal(target.into(), suspend_time)
+            .await
+    }
+    async fn itwt_suspend_internal(
+        &self,
+        target: FlowTarget,
+        suspend_time: Duration,
+    ) -> Result<(), WifiError> {
+        event::enable_wifi_events(
+            WifiEvent::IndividualTargetWakeTimeSuspend | WifiEvent::StationDisconnected,
+        );
+
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(WifiError::NotConnected);
+        }
+
+        esp_wifi_result!(unsafe {
+            crate::sys::include::esp_wifi_sta_itwt_suspend(
+                target.as_raw() as i32,
+                suspend_time.as_millis() as i32,
+            )
+        })?;
+
+        loop {
+            match subscriber.next_message_pure().await {
+                event::EventInfo::IndividualTargetWakeTimeSuspend {
+                    status,
+                    suspended_flows,
+                    actual_suspend_time_ms: _,
+                } => {
+                    match target {
+                        FlowTarget::All => {}
+                        FlowTarget::Id(id) => {
+                            if !suspended_flows.contains(id) {
+                                continue;
+                            }
+                        }
+                    }
+                    if status == 0 {
+                        break Ok(());
+                    } else {
+                        break Err(WifiError::Twt(TwtError::SuspendFailed));
+                    }
+                }
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(WifiError::NotConnected);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Send a probe request to resynchronize the station's TSF clock with the
+    /// AP.
+    ///
+    /// During iTWT the station misses beacons while sleeping, causing its
+    /// local clock to drift. Periodic probes keep the clocks aligned and
+    /// prevent the AP from tearing down the agreement.
+    ///
+    /// Returns [`TwtError::ProbeTimeout`] or [`TwtError::ProbeFailed`]
+    /// (wrapped in [`WifiError::Twt`]) if the probe did not succeed, and
+    /// [`WifiError::NotConnected`] if the station disconnected.
+    ///
+    /// Probe events carry no identifier, so only one probe should be in flight
+    /// at a time. There is no additional timeout on the driver side.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Concurrent callers (or
+    /// other tasks waiting for events) require increasing the
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_hal::time::Duration;
+    /// # let controller =
+    /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
+    /// // Send a probe with a 50ms timeout
+    /// controller
+    ///     .itwt_send_probe(Duration::from_millis(50))
+    ///     .await?;
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub async fn itwt_send_probe(&self, timeout: Duration) -> Result<(), WifiError> {
+        event::enable_wifi_events(
+            WifiEvent::IndividualTargetWakeTimeProbe | WifiEvent::StationDisconnected,
+        );
+
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(WifiError::NotConnected);
+        }
+
+        esp_wifi_result!(unsafe {
+            crate::sys::include::esp_wifi_sta_itwt_send_probe_req(timeout.as_millis() as i32)
+        })?;
+
+        loop {
+            match subscriber.next_message_pure().await {
+                event::EventInfo::IndividualTargetWakeTimeProbe { status, reason: _ } => {
+                    break probe_result(status);
+                }
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(WifiError::NotConnected);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Wait for the next TWT wakeup event on the given flow(s).
+    ///
+    /// Returns when the station wakes up for a TWT service period on one
+    /// of the specified flows, or returns an error if a watched flow is
+    /// torn down or the station disconnects.
+    ///
+    /// [`TwtConfig::post_wakeup_event`](TwtConfig::post_wakeup_event)
+    /// must be `true` for wakeup events to be generated.
+    ///
+    /// For latency-sensitive applications, send outgoing packets in
+    /// response to this event rather than on an independent timer. The
+    /// WiFi firmware buffers TX until the next wake window, so a packet
+    /// queued just after a window closes must wait for the next one.
+    ///
+    /// Multiple concurrent callers will each receive every wakeup event.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Concurrent callers (or
+    /// other tasks waiting for events) require increasing the
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::twt::FlowId;
+    /// # let controller =
+    /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
+    /// loop {
+    ///     match controller.wait_for_next_twt_wakeup(FlowId::Flow0).await {
+    ///         Ok(wakeup) => {
+    ///             println!(
+    ///                 "woke up: type={:?}, flow={:?}",
+    ///                 wakeup.twt_type, wakeup.flow_id
+    ///             );
+    ///             // ... do work during the service period ...
+    ///         }
+    ///         Err(e) => {
+    ///             println!("TWT wait failed: {e:?}");
+    ///             break;
+    ///         }
+    ///     }
+    /// }
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub async fn wait_for_next_twt_wakeup(
+        &self,
+        flows: impl Into<EnumSet<FlowId>>,
+    ) -> Result<TwtWakeupInfo, TwtWaitError> {
+        self.wait_for_next_twt_wakeup_internal(flows.into()).await
+    }
+    async fn wait_for_next_twt_wakeup_internal(
+        &self,
+        flows: EnumSet<FlowId>,
+    ) -> Result<TwtWakeupInfo, TwtWaitError> {
+        event::enable_wifi_events(
+            WifiEvent::TargetWakeTimeWakeup
+                | WifiEvent::IndividualTargetWakeTimeTeardown
+                | WifiEvent::StationDisconnected,
+        );
+
+        let mut subscriber = EVENT_CHANNEL
+            .subscriber()
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(TwtWaitError::Disconnected);
+        }
+
+        if let Ok(active) = self.itwt_flow_id_status()
+            && active.intersection(flows).is_empty()
+        {
+            return Err(TwtWaitError::FlowTornDown {
+                flow_id: flows.iter().next().unwrap(),
+                status: ITwtTeardownStatus::Success,
+            });
+        }
+
+        loop {
+            let event = subscriber.next_message_pure().await;
+            match event {
+                event::EventInfo::TargetWakeTimeWakeup { twt_type, flow_id }
+                    if flows.contains(flow_id) =>
+                {
+                    break Ok(TwtWakeupInfo { twt_type, flow_id });
+                }
+                event::EventInfo::IndividualTargetWakeTimeTeardown {
+                    flows: torn_down,
+                    status,
+                } if !torn_down.is_disjoint(flows) => {
+                    break Err(TwtWaitError::FlowTornDown {
+                        // Not empty, checked by the guard above.
+                        flow_id: (torn_down & flows).iter().next().unwrap(),
+                        status,
+                    });
+                }
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(TwtWaitError::Disconnected);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Get the set of active iTWT flow IDs.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # let controller =
+    /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
+    /// let active = controller.itwt_flow_id_status()?;
+    /// println!("active flows: {:?}", active);
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn itwt_flow_id_status(&self) -> Result<EnumSet<FlowId>, WifiError> {
+        let mut bitmap: i32 = 0;
+        esp_wifi_result!(unsafe {
+            crate::sys::include::esp_wifi_sta_itwt_get_flow_id_status(&mut bitmap)
+        })?;
+        Ok(EnumSet::from_repr(bitmap as u8))
+    }
+
+    /// Adjust the wake-up time relative to the negotiated target wake time.
+    #[instability::unstable]
+    pub fn itwt_set_target_wake_time_offset(&self, offset_us: u32) -> Result<(), WifiError> {
+        esp_wifi_result!(unsafe {
+            crate::sys::include::esp_wifi_sta_itwt_set_target_wake_time_offset(offset_us as i32)
+        })
+    }
+
+    #[procmacros::doc_replace]
+    /// Apply general TWT configuration.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// # use esp_radio::wifi::twt::TwtConfig;
+    /// # let controller =
+    /// #   esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default())?;
+    /// controller.twt_config(&TwtConfig::default().with_post_wakeup_event(true))?;
+    /// # {after_snippet}
+    /// ```
+    #[instability::unstable]
+    pub fn twt_config(&self, config: &TwtConfig) -> Result<(), WifiError> {
+        let mut raw = config.to_raw();
+        esp_wifi_result!(unsafe { crate::sys::include::esp_wifi_sta_twt_config(&mut raw) })
+    }
+}

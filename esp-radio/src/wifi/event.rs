@@ -253,6 +253,7 @@ impl IndividualTargetWakeTimeSetup<'_> {
     }
 
     /// Get the negotiated iTWT setup configuration.
+    #[cfg(wifi_has_wifi6)]
     pub fn config(&self) -> crate::wifi::twt::ITwtSetupConfig {
         crate::wifi::twt::ITwtSetupConfig::from_raw(&self.0.config)
     }
@@ -265,6 +266,7 @@ impl IndividualTargetWakeTimeTeardown<'_> {
     }
 
     /// Get the teardown status.
+    #[cfg(wifi_has_wifi6)]
     pub fn status(&self) -> crate::wifi::twt::ITwtTeardownStatus {
         crate::wifi::twt::ITwtTeardownStatus::from_raw(self.0.status)
     }
@@ -272,6 +274,7 @@ impl IndividualTargetWakeTimeTeardown<'_> {
 
 impl IndividualTargetWakeTimeProbe<'_> {
     /// Get the probe status.
+    #[cfg(wifi_has_wifi6)]
     pub fn status(&self) -> crate::wifi::twt::ITwtProbeStatus {
         crate::wifi::twt::ITwtProbeStatus::from_raw(self.0.status)
     }
@@ -301,6 +304,7 @@ impl IndividualTargetWakeTimeSuspend<'_> {
 
 impl TargetWakeTimeWakeup<'_> {
     /// Get the TWT type (individual or broadcast).
+    #[cfg(wifi_has_wifi6)]
     pub fn twt_type(&self) -> crate::wifi::twt::TwtType {
         crate::wifi::twt::TwtType::from_raw(self.0.twt_type)
     }
