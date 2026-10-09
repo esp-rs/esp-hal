@@ -117,7 +117,7 @@ peripherals = [
     { name = "FLASH", virtual = true },
     { name = "GPIO_DEDICATED", virtual = true },
     { name = "LP_CORE", virtual = true },
-    { name = "TSENS", virtual = true },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "WIFI", virtual = true, interrupts = { bb = "WIFI_BB", mac = "WIFI_MAC", pwr = "WIFI_PWR", modem_peri_timeout = "MODEM_PERI_TIMEOUT" }, stable = true },
     { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
     { name = "FROM_CPU_INTR1", virtual = true },
