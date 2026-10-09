@@ -3946,8 +3946,20 @@ impl WifiController<'_> {
     /// success, returns [`twt::ITwtSetupInfo`] with the negotiated configuration.
     /// Up to 8 simultaneous agreements are supported.
     ///
-    /// Concurrent calls are safe — each is assigned a unique `twt_id` for
-    /// correlating the response.
+    /// Each call is assigned a unique `twt_id` for correlating the response.
+    /// The call completes with [`twt::ITwtSetupError::Rejected`] if the AP
+    /// rejects the request and with [`WifiError::NotConnected`] (wrapped in
+    /// [`twt::ITwtSetupError::Wifi`]) if the station is or becomes
+    /// disconnected while waiting. There is no timeout on the driver side.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Running several TWT calls
+    /// concurrently (or alongside other tasks that wait for events) requires
+    /// increasing the `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
     ///
     /// ## Example
     ///
@@ -3979,11 +3991,17 @@ impl WifiController<'_> {
         /// requests.
         static NEXT_TWT_ID: AtomicU16 = AtomicU16::new(0);
 
-        event::enable_wifi_events(WifiEvent::IndividualTargetWakeTimeSetup.into());
+        event::enable_wifi_events(
+            WifiEvent::IndividualTargetWakeTimeSetup | WifiEvent::StationDisconnected,
+        );
 
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
-            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(WifiError::NotConnected.into());
+        }
 
         let twt_id = NEXT_TWT_ID.fetch_add(1, Ordering::Relaxed);
         config.twt_id = twt_id;
@@ -3992,29 +4010,33 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { crate::sys::include::esp_wifi_sta_itwt_setup(&mut raw) })?;
 
         loop {
-            let event = subscriber.next_message_pure().await;
-            if let event::EventInfo::IndividualTargetWakeTimeSetup {
-                config: negotiated_config,
-                status,
-                reason,
-                target_wake_time,
-            } = event
-            {
-                if negotiated_config.twt_id != twt_id {
-                    continue;
+            match subscriber.next_message_pure().await {
+                event::EventInfo::IndividualTargetWakeTimeSetup {
+                    config: negotiated_config,
+                    status,
+                    reason,
+                    target_wake_time,
+                } => {
+                    if negotiated_config.twt_id != twt_id {
+                        continue;
+                    }
+                    if status == twt::ITWT_SETUP_SUCCESS {
+                        break Ok(twt::ITwtSetupInfo {
+                            config: negotiated_config,
+                            target_wake_time,
+                        });
+                    } else {
+                        break Err(twt::ITwtSetupError::Rejected(twt::ITwtSetupFailedInfo {
+                            config: negotiated_config,
+                            status,
+                            reason,
+                        }));
+                    }
                 }
-                if status == 1 {
-                    break Ok(twt::ITwtSetupInfo {
-                        config: negotiated_config,
-                        target_wake_time,
-                    });
-                } else {
-                    break Err(twt::ITwtSetupError::Rejected(twt::ITwtSetupFailedInfo {
-                        config: negotiated_config,
-                        status,
-                        reason,
-                    }));
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(WifiError::NotConnected.into());
                 }
+                _ => {}
             }
         }
     }
@@ -4026,10 +4048,25 @@ impl WifiController<'_> {
     ///
     /// Returns `Ok(())` once the teardown completed and
     /// [`WifiError::Twt`]`(`[`twt::TwtError::TeardownFailed`]`)` if the station
-    /// failed to send the teardown frame.
+    /// failed to send the teardown frame. Returns
+    /// [`WifiError::NotConnected`] if the station is or becomes disconnected.
+    ///
+    /// The call completes on the first teardown event covering the flow, so it
+    /// may also complete because of an AP-initiated teardown of the same flow.
+    /// A [`twt::FlowTarget::All`] request completes on an event covering all
+    /// flows. There is no timeout on the driver side.
     ///
     /// Concurrent calls must use different flow IDs. Otherwise incorrect
     /// results may be returned.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Concurrent callers (or
+    /// other tasks waiting for events) require increasing the
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
     ///
     /// ## Example
     ///
@@ -4046,33 +4083,44 @@ impl WifiController<'_> {
         self.itwt_teardown_internal(target.into()).await
     }
     async fn itwt_teardown_internal(&self, target: twt::FlowTarget) -> Result<(), WifiError> {
-        event::enable_wifi_events(WifiEvent::IndividualTargetWakeTimeTeardown.into());
+        event::enable_wifi_events(
+            WifiEvent::IndividualTargetWakeTimeTeardown | WifiEvent::StationDisconnected,
+        );
 
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
-            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(WifiError::NotConnected);
+        }
 
         esp_wifi_result!(unsafe {
             crate::sys::include::esp_wifi_sta_itwt_teardown(target.as_raw() as i32)
         })?;
 
         loop {
-            let event = subscriber.next_message_pure().await;
-            if let event::EventInfo::IndividualTargetWakeTimeTeardown { flows, status } = event {
-                match target {
-                    // A "teardown all" completes when the event covers all flows.
-                    twt::FlowTarget::All => {
-                        if flows != EnumSet::all() {
-                            continue;
+            match subscriber.next_message_pure().await {
+                event::EventInfo::IndividualTargetWakeTimeTeardown { flows, status } => {
+                    match target {
+                        // A "teardown all" completes when the event covers all flows.
+                        twt::FlowTarget::All => {
+                            if flows != EnumSet::all() {
+                                continue;
+                            }
+                        }
+                        twt::FlowTarget::Id(id) => {
+                            if !flows.contains(id) {
+                                continue;
+                            }
                         }
                     }
-                    twt::FlowTarget::Id(id) => {
-                        if !flows.contains(id) {
-                            continue;
-                        }
-                    }
+                    break twt::teardown_result(status);
                 }
-                break twt::teardown_result(status);
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(WifiError::NotConnected);
+                }
+                _ => {}
             }
         }
     }
@@ -4084,8 +4132,22 @@ impl WifiController<'_> {
     /// automatically resumes.
     /// Use [`twt::FlowTarget::All`] to suspend all active agreements.
     ///
+    /// Returns [`WifiError::NotConnected`] if the station is or becomes
+    /// disconnected. The call completes on the first suspend event covering
+    /// the flow, so it may also complete because of an AP-initiated suspend of
+    /// the same flow. There is no timeout on the driver side.
+    ///
     /// Concurrent calls must use different flow IDs. Otherwise incorrect
     /// results may be returned.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Concurrent callers (or
+    /// other tasks waiting for events) require increasing the
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
     ///
     /// ## Example
     ///
@@ -4115,11 +4177,17 @@ impl WifiController<'_> {
         target: twt::FlowTarget,
         suspend_time: Duration,
     ) -> Result<(), WifiError> {
-        event::enable_wifi_events(WifiEvent::IndividualTargetWakeTimeSuspend.into());
+        event::enable_wifi_events(
+            WifiEvent::IndividualTargetWakeTimeSuspend | WifiEvent::StationDisconnected,
+        );
 
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
-            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(WifiError::NotConnected);
+        }
 
         esp_wifi_result!(unsafe {
             crate::sys::include::esp_wifi_sta_itwt_suspend(
@@ -4129,26 +4197,30 @@ impl WifiController<'_> {
         })?;
 
         loop {
-            let event = subscriber.next_message_pure().await;
-            if let event::EventInfo::IndividualTargetWakeTimeSuspend {
-                status,
-                suspended_flows,
-                actual_suspend_time_ms: _,
-            } = event
-            {
-                match target {
-                    twt::FlowTarget::All => {}
-                    twt::FlowTarget::Id(id) => {
-                        if !suspended_flows.contains(id) {
-                            continue;
+            match subscriber.next_message_pure().await {
+                event::EventInfo::IndividualTargetWakeTimeSuspend {
+                    status,
+                    suspended_flows,
+                    actual_suspend_time_ms: _,
+                } => {
+                    match target {
+                        twt::FlowTarget::All => {}
+                        twt::FlowTarget::Id(id) => {
+                            if !suspended_flows.contains(id) {
+                                continue;
+                            }
                         }
                     }
+                    if status == 0 {
+                        break Ok(());
+                    } else {
+                        break Err(WifiError::Twt(twt::TwtError::SuspendFailed));
+                    }
                 }
-                if status == 0 {
-                    break Ok(());
-                } else {
-                    break Err(WifiError::Twt(twt::TwtError::SuspendFailed));
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(WifiError::NotConnected);
                 }
+                _ => {}
             }
         }
     }
@@ -4165,6 +4237,18 @@ impl WifiController<'_> {
     /// (wrapped in [`WifiError::Twt`]) if the probe did not succeed, and
     /// [`WifiError::NotConnected`] if the station disconnected.
     ///
+    /// Probe events carry no identifier, so only one probe should be in flight
+    /// at a time. There is no additional timeout on the driver side.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Concurrent callers (or
+    /// other tasks waiting for events) require increasing the
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
+    ///
     /// ## Example
     ///
     /// ```rust,no_run
@@ -4180,20 +4264,31 @@ impl WifiController<'_> {
     /// ```
     #[instability::unstable]
     pub async fn itwt_send_probe(&self, timeout: Duration) -> Result<(), WifiError> {
-        event::enable_wifi_events(WifiEvent::IndividualTargetWakeTimeProbe.into());
+        event::enable_wifi_events(
+            WifiEvent::IndividualTargetWakeTimeProbe | WifiEvent::StationDisconnected,
+        );
 
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
-            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
+
+        if !self.is_connected() {
+            return Err(WifiError::NotConnected);
+        }
 
         esp_wifi_result!(unsafe {
             crate::sys::include::esp_wifi_sta_itwt_send_probe_req(timeout.as_millis() as i32)
         })?;
 
         loop {
-            let event = subscriber.next_message_pure().await;
-            if let event::EventInfo::IndividualTargetWakeTimeProbe { status, reason: _ } = event {
-                break twt::probe_result(status);
+            match subscriber.next_message_pure().await {
+                event::EventInfo::IndividualTargetWakeTimeProbe { status, reason: _ } => {
+                    break twt::probe_result(status);
+                }
+                event::EventInfo::StationDisconnected { .. } => {
+                    break Err(WifiError::NotConnected);
+                }
+                _ => {}
             }
         }
     }
@@ -4214,6 +4309,15 @@ impl WifiController<'_> {
     /// queued just after a window closes must wait for the next one.
     ///
     /// Multiple concurrent callers will each receive every wakeup event.
+    ///
+    /// # Event subscribers
+    ///
+    /// Each pending call holds one event channel subscriber and relies on the
+    /// event channel having enough queue capacity. Concurrent callers (or
+    /// other tasks waiting for events) require increasing the
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+    /// `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options.
+    /// Running out of subscribers panics.
     ///
     /// ## Example
     ///
@@ -4258,7 +4362,7 @@ impl WifiController<'_> {
 
         let mut subscriber = EVENT_CHANNEL
             .subscriber()
-            .expect("Unable to subscribe to events - consider increasing the internal event channel subscriber count");
+            .expect("Unable to subscribe to events - consider increasing ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS (esp-radio config option `event_channel_subscribers`)");
 
         if !self.is_connected() {
             return Err(twt::TwtWaitError::Disconnected);

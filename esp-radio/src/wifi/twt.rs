@@ -20,6 +20,20 @@
 //! events. An independent timer can desync from TWT wakeups, causing
 //! packets to miss their window.
 //!
+//! # Event subscribers
+//!
+//! The async TWT methods on
+#![cfg_attr(
+    wifi_has_wifi6,
+    doc = "[`WifiController`](crate::wifi::WifiController)"
+)]
+//! wait for driver events. Each pending call holds one event channel
+//! subscriber and needs queue capacity in the event channel. Concurrent
+//! waiters (or other tasks listening for events) require increasing the
+//! `ESP_RADIO_CONFIG_EVENT_CHANNEL_SUBSCRIBERS` and
+//! `ESP_RADIO_CONFIG_EVENT_CHANNEL_CAPACITY` configuration options; running out
+//! of subscribers panics. The calls do not apply timeouts of their own.
+//!
 //! # Multiple flows
 //!
 //! Up to 8 simultaneous iTWT flows (flow IDs 0–7) can be active.
@@ -472,6 +486,10 @@ impl ITwtSetupConfig {
         }
     }
 }
+
+/// Status value used by the iTWT setup event to indicate success.
+#[cfg(wifi_has_wifi6)]
+pub(crate) const ITWT_SETUP_SUCCESS: i32 = 1;
 
 /// Status of an iTWT teardown operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
