@@ -1226,6 +1226,11 @@ pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), 
             Some(recv_cb_ap)
         ))?;
 
+        // As in ESP-IDF (`modem_clock_configure_wifi_status`), the MAC and baseband clocks stay on
+        // while the driver is initialized, even though it calls `wifi_clock_disable` at every doze.
+        #[cfg(soc_has_modem_syscon)]
+        crate::radio_clocks::enable_wifi(true);
+
         Ok(())
     }
 }
@@ -1277,6 +1282,8 @@ fn wifi_deinit() -> Result<(), WifiError> {
     }
 
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
+    #[cfg(soc_has_modem_syscon)]
+    crate::radio_clocks::enable_wifi(false);
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
     Ok(())
 }
