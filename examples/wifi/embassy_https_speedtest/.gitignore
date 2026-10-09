@@ -1,0 +1,3 @@
+.tools/
+server-cert.*
+server-key.pem
