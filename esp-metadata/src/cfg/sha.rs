@@ -26,6 +26,7 @@ pub struct ShaAlgoMap {
     sha512_224: Option<u32>,
     sha512_256: Option<u32>,
     sha512_t: Option<u32>,
+    sm3: Option<u32>,
 }
 
 impl ShaAlgoMap {
@@ -39,6 +40,7 @@ impl ShaAlgoMap {
             ("SHA-512/224", self.sha512_224),
             ("SHA-512/256", self.sha512_256),
             ("SHA-512/t", self.sha512_t),
+            ("SM3", self.sm3),
         ];
 
         modes
@@ -139,6 +141,15 @@ impl ShaAlgo {
                 insecure_against_collision: false,
                 insecure_against_length_extension: false,
             },
+            Self {
+                name: "SM3",
+                ident: format_ident!("Sm3"),
+                digest_len: 32,
+                block_size: 64,
+                message_len_bytes: 8,
+                insecure_against_collision: false,
+                insecure_against_length_extension: true,
+            },
         ];
 
         for a in known {
@@ -191,12 +202,13 @@ mod tests {
             sha1: Some(0),
             sha512_224: Some(5),
             sha512_t: Some(7),
+            sm3: Some(14),
             ..Default::default()
         };
 
         assert_eq!(
             modes.cfgs().unwrap(),
-            ["sha_has_sha1", "sha_has_sha512_224"]
+            ["sha_has_sha1", "sha_has_sha512_224", "sha_has_sm3"]
         );
     }
 }
