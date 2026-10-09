@@ -134,9 +134,10 @@ impl<'d> Sha<'d> {
     }
 
     /// Starts a new digest.
-    ///
-    /// # Panics
-    /// Panics if SM3 is selected and disabled by eFuse.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\n# Panics\nPanics if SM3 is selected and disabled by eFuse."
+    )]
     pub fn start<'a, A: ShaAlgorithm>(&'a mut self) -> ShaDigest<'d, A, &'a mut Self> {
         ShaDigest::new(self)
     }
@@ -144,9 +145,10 @@ impl<'d> Sha<'d> {
     /// Starts a new digest and take ownership of the driver.
     /// This is useful for storage outside a function body. i.e. in static or
     /// struct.
-    ///
-    /// # Panics
-    /// Panics if SM3 is selected and disabled by eFuse.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\n# Panics\nPanics if SM3 is selected and disabled by eFuse."
+    )]
     pub fn start_owned<A: ShaAlgorithm>(self) -> ShaDigest<'d, A, Self> {
         ShaDigest::new(self)
     }
@@ -408,9 +410,10 @@ impl DigestState {
 
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     /// Creates a new digest.
-    ///
-    /// # Panics
-    /// Panics if SM3 is selected and disabled by eFuse.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\n# Panics\nPanics if SM3 is selected and disabled by eFuse."
+    )]
     #[allow(unused_mut)]
     pub fn new(mut sha: S) -> Self {
         #[cfg(not(esp32))]
@@ -532,9 +535,10 @@ pub struct Context<A: ShaAlgorithm> {
 #[cfg(not(esp32))]
 impl<A: ShaAlgorithm> Context<A> {
     /// Creates a new empty context.
-    ///
-    /// # Panics
-    /// Panics if SM3 is selected and disabled by eFuse.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\n# Panics\nPanics if SM3 is selected and disabled by eFuse."
+    )]
     pub fn new() -> Self {
         Self {
             state: DigestState::new(A::ALGORITHM_KIND),
