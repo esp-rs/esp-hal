@@ -173,6 +173,12 @@ impl<'a> Ieee802154<'a> {
         ieee802154_receive();
     }
 
+    /// Put the radio to sleep: stop whatever it is doing, and stop receiving frames.
+    #[instability::unstable]
+    pub fn sleep(&mut self) {
+        ieee802154_sleep();
+    }
+
     /// Return the raw data of a received frame
     #[instability::unstable]
     pub fn raw_received(&mut self) -> Option<RawReceived> {
