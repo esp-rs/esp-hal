@@ -43,6 +43,9 @@ enum Cli {
     FmtPackages(FmtPackagesArgs),
     /// Run cargo clean
     Clean(CleanArgs),
+    /// Generate a project from `template/`, wired to this checkout.
+    #[clap(alias = "new")]
+    NewProject(NewProjectArgs),
     /// Lint all packages in the workspace with clippy
     #[clap(name = "lint", alias = "lint-packages")]
     LintPackages(LintPackagesArgs),
@@ -165,6 +168,7 @@ fn main() -> Result<()> {
         Cli::Ci(args) => run_ci_checks(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::Clean(args) => clean(&workspace, args),
+        Cli::NewProject(args) => new_project(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),

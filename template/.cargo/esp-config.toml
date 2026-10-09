@@ -1,0 +1,3 @@
+# Keep user/runtime configuration values in this file.
+[env]
+ESP_LOG="info"

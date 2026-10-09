@@ -9,6 +9,7 @@ use super::{
     check::{CheckPackagesArgs, check_packages},
     examples::examples,
     lint::{LintPackagesArgs, lint_packages},
+    new_project::INSTALL_HINT,
     run::{DocTestArgs, run_doc_tests},
     tests::tests,
 };
@@ -73,6 +74,9 @@ impl Runner {
                 }
                 if options.no_check_crates {
                     skip.push(String::from("check"));
+                }
+                if options.steps.is_empty() {
+                    skip.push(String::from("template"));
                 }
                 skip
             },
@@ -140,6 +144,49 @@ impl Runner {
 
         Ok(())
     }
+}
+
+/// Render every `template/` option combination for every chip, then build the
+/// ones valid for `chip`.
+fn check_template(workspace: &Path, chip: Chip) -> Result<()> {
+    let template = workspace.join("template");
+    if !template.join("metadata.toml").exists() {
+        bail!("no template at {}", template.display());
+    }
+
+    // The generated projects refer to this checkout by a relative path, which
+    // only exists when they are on the same drive.
+    let temp = workspace.join("target").join("template-check");
+    std::fs::create_dir_all(&temp)
+        .with_context(|| format!("failed to create {}", temp.display()))?;
+
+    let check = |args: &[&str]| -> Result<()> {
+        let status = std::process::Command::new("esp-generate")
+            .envs(["TMPDIR", "TMP", "TEMP"].map(|var| (var, &temp)))
+            .arg("--template")
+            .arg(&template)
+            .arg("check")
+            .args(args)
+            .status();
+        let status = match status {
+            Ok(status) => status,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                bail!("esp-generate was not found on PATH. {INSTALL_HINT}")
+            }
+            Err(e) => return Err(e).context("failed to run esp-generate"),
+        };
+        if !status.success() {
+            bail!(
+                "`template/` did not pass `esp-generate check`. If esp-generate rejected \
+                 `--template`: {INSTALL_HINT} Otherwise update the template in the same change \
+                 that moved the API — it exists so every commit can scaffold a working project."
+            );
+        }
+        Ok(())
+    };
+
+    check(&[])?;
+    check(&["-o", chip.as_ref(), "--build"])
 }
 
 /// Perform (parts of) the checks done in CI for a given chip.
@@ -392,6 +439,10 @@ pub fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             None,
             false,
         )
+    });
+
+    runner.run("template", "Check esp-generate template", || {
+        check_template(workspace, args.chip)
     });
 
     runner.finish()

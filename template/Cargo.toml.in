@@ -1,0 +1,129 @@
+[package]
+name = "{{ project_name }}"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "{{ project_name }}"
+path = "./src/bin/main.rs"
+
+[workspace]
+
+[dependencies]
+log = "0.4.27"
+#%if option("embassy")
+embassy-executor = { version = "0.10.0", features = ["log"] }
+embassy-time = { version = "0.5.0", features = ["log"] }
+#%endif
+#%if option("ble-trouble")
+trouble-host = { version = "0.7.0", features = ["gatt"] }
+bt-hci = "0.9.0"
+#%endif
+
+[dependencies.esp-hal]
+#%if template_origin == "repository"
+path = "{{ template_repo }}/esp-hal"
+#%else
+#+git = "{{ template_url }}"
+#+rev = "{{ template_commit }}"
+#%endif
+features = [
+    "{{ chip.name }}",
+    #%if option("unstable-hal")
+    "unstable",
+    #%endif
+    "log-04",
+]
+
+[dependencies.esp-bootloader-esp-idf]
+#%if template_origin == "repository"
+path = "{{ template_repo }}/esp-bootloader-esp-idf"
+#%else
+#+git = "{{ template_url }}"
+#+rev = "{{ template_commit }}"
+#%endif
+features = ["{{ chip.name }}", "log-04"]
+
+[dependencies.esp-println]
+#%if template_origin == "repository"
+path = "{{ template_repo }}/esp-println"
+#%else
+#+git = "{{ template_url }}"
+#+rev = "{{ template_commit }}"
+#%endif
+features = ["{{ chip.name }}", "log-04"]
+
+[dependencies.esp-backtrace]
+#%if template_origin == "repository"
+path = "{{ template_repo }}/esp-backtrace"
+#%else
+#+git = "{{ template_url }}"
+#+rev = "{{ template_commit }}"
+#%endif
+features = ["{{ chip.name }}", "panic-handler", "println"]
+
+#%if option("alloc")
+[dependencies.esp-alloc]
+#%if template_origin == "repository"
+path = "{{ template_repo }}/esp-alloc"
+#%else
+#+git = "{{ template_url }}"
+#+rev = "{{ template_commit }}"
+#%endif
+features = ["{{ chip.name }}"]
+#%endif alloc
+
+#%if option("embassy")
+[dependencies.esp-rtos]
+#%if template_origin == "repository"
+path = "{{ template_repo }}/esp-rtos"
+#%else
+#+git = "{{ template_url }}"
+#+rev = "{{ template_commit }}"
+#%endif
+features = [
+    "{{ chip.name }}",
+    "embassy",
+    #%if option("wifi") || option("ble-trouble")
+    "esp-radio",
+    #%endif
+    #%if option("alloc")
+    "esp-alloc",
+    #%endif
+    "log-04",
+]
+#%endif embassy
+
+#%if option("wifi") || option("ble-trouble")
+[dependencies.esp-radio]
+#%if template_origin == "repository"
+path = "{{ template_repo }}/esp-radio"
+#%else
+#+git = "{{ template_url }}"
+#+rev = "{{ template_commit }}"
+#%endif
+features = [
+    "{{ chip.name }}",
+    #%if option("wifi")
+    "wifi",
+    #%endif
+    #%if option("ble-trouble")
+    "ble",
+    #%endif
+    #%if option("wifi") && option("ble-trouble")
+    "coex",
+    #%endif
+    "esp-alloc",
+    "unstable",
+    "log-04",
+]
+#%endif wifi || ble-trouble
+
+[profile.dev]
+opt-level = "s"
+
+[profile.release]
+codegen-units = 1
+debug = 2
+lto = 'fat'
+opt-level = 's'
