@@ -133,7 +133,9 @@ impl<'a> PartitionTable<'a> {
     #[cfg(not(feature = "std"))]
     /// Returns the currently booted partition.
     pub fn booted_partition(&self) -> Result<Option<PartitionEntry>, Error> {
-        let paddr = booted_app_offset();
+        let Some(paddr) = booted_app_offset() else {
+            return Ok(None);
+        };
 
         for id in 0..self.len() {
             let entry = self.get_partition(id)?;
@@ -146,10 +148,12 @@ impl<'a> PartitionTable<'a> {
     }
 }
 
-/// Returns the flash offset of the running application image.
+/// Returns the flash offset of the running application image, or `None` when no MMU entry maps
+/// it.
 #[cfg(not(feature = "std"))]
-pub(super) fn booted_app_offset() -> u32 {
-    // Read entry 0 from MMU to know which partition is mapped
+pub(super) fn booted_app_offset() -> Option<u32> {
+    // Read MMU entry 0, or on the chips that select an entry by index, scan the table (see the
+    // last arm).
     //
     // See <https://github.com/espressif/esp-idf/blob/758939caecb16e5542b3adfba0bc85025517db45/components/hal/mmu_hal.c#L124>
     cfg_select! {
@@ -175,35 +179,116 @@ pub(super) fn booted_app_offset() -> u32 {
                 (((0x5008C000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
             };
         }
-        feature = "esp32s31" => {
-            // Read MMU entry 0, which maps the beginning of the flash
-            // virtual-address range.
-            let paddr = unsafe {
-                ((0x20500000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_C_MMU_ITEM_INDEX_REG
-                (((0x20500000 + 0x37c) as *const u32).read_volatile() & 0x7ff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
-            };
-        }
-        feature = "esp32h4" => {
-            let paddr = unsafe {
-                ((0x60098000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_MMU_ITEM_INDEX_REG
-                (((0x60098000 + 0x37c) as *const u32).read_volatile() & 0x1ff) << 16 // SPI_MEM_MMU_ITEM_CONTENT_REG
-            };
-        }
         any(
             feature = "esp32c5",
             feature = "esp32c6",
             feature = "esp32c61",
-            feature = "esp32h2"
+            feature = "esp32h2",
+            feature = "esp32h4",
+            feature = "esp32s31"
         ) => {
-            let paddr = unsafe {
-                ((0x60002000 + 0x380) as *mut u32).write_volatile(0);
-                (((0x60002000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16
-            };
+            // The bootloader maps one flash entry to the app's first page, so that the app can find
+            // its partition. Its index depends on the bootloader build, and entry 0 no longer maps
+            // the app once code runs from PSRAM. The flash driver's temporary mappings can sit
+            // above it on the S31, but they are unmapped again before each read returns. The
+            // image header check, of the magic byte and the chip ID, rejects a data page left
+            // mapped, for example after a failed read.
+            //
+            // See <https://github.com/espressif/esp-idf/blob/4d59230ddff16327812782151ef0afef202dc6d7/components/bootloader_support/src/bootloader_utility.c#L1082-L1083>
+            let paddr = mmu::app_entry_paddr()?;
         }
         _ => {}
     }
 
-    paddr
+    Some(paddr)
+}
+
+/// The flash MMU on the chips that select an entry by index.
+#[cfg(all(
+    not(feature = "std"),
+    any(
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32h2",
+        feature = "esp32h4",
+        feature = "esp32s31"
+    )
+))]
+mod mmu {
+    use esp_metadata_generated::{memory_range, property};
+
+    cfg_select! {
+        any(feature = "esp32c5", feature = "esp32c61") => {
+            // See <https://github.com/espressif/esp-idf/blob/4d59230ddff16327812782151ef0afef202dc6d7/components/soc/esp32c5/include/soc/ext_mem_defs.h#L48-L60>
+            const SPI_MEM: usize = 0x6000_2000;
+            const VALID: u32 = 1 << 10;
+            const ACCESS_SPIRAM: u32 = 1 << 9;
+            const PADDR: u32 = 0x1ff;
+        }
+        any(feature = "esp32c6", feature = "esp32h2") => {
+            // See <https://github.com/espressif/esp-idf/blob/4d59230ddff16327812782151ef0afef202dc6d7/components/soc/esp32c6/include/soc/ext_mem_defs.h#L42-L53>
+            const SPI_MEM: usize = 0x6000_2000;
+            const VALID: u32 = 1 << 9;
+            // This MMU maps flash only.
+            const ACCESS_SPIRAM: u32 = 0;
+            const PADDR: u32 = 0x1ff;
+        }
+        feature = "esp32h4" => {
+            // See <https://github.com/espressif/esp-idf/blob/4d59230ddff16327812782151ef0afef202dc6d7/components/soc/esp32h4/include/soc/ext_mem_defs.h#L50-L62>
+            const SPI_MEM: usize = 0x6009_8000;
+            const VALID: u32 = 1 << 10;
+            const ACCESS_SPIRAM: u32 = 1 << 9;
+            const PADDR: u32 = 0x1ff;
+        }
+        feature = "esp32s31" => {
+            // SPI_MEM_C maps flash only. PSRAM has its own MMU.
+            // See <https://github.com/espressif/esp-idf/blob/4d59230ddff16327812782151ef0afef202dc6d7/components/soc/esp32s31/include/soc/ext_mem_defs.h#L57-L75>
+            const SPI_MEM: usize = 0x2050_0000;
+            const VALID: u32 = 1 << 12;
+            const ACCESS_SPIRAM: u32 = 0;
+            const PADDR: u32 = 0x7ff;
+        }
+    }
+
+    const ITEM_CONTENT: usize = SPI_MEM + 0x37c;
+    const ITEM_INDEX: usize = SPI_MEM + 0x380;
+    const ENTRY_NUM: u32 = property!("mmu.entry_num");
+    const PAGE_SIZE: u32 = property!("mmu.page_size");
+    // The image header starts with the magic byte and holds the chip ID at byte 12.
+    //
+    // See <https://github.com/espressif/esp-idf/blob/c712a0dde385d659a1470a136251980d31a70bc1/components/bootloader_support/include/esp_app_format.h#L20-L33>
+    // and <https://github.com/espressif/esp-idf/blob/c712a0dde385d659a1470a136251980d31a70bc1/components/bootloader_support/include/esp_app_format.h#L77-L93>
+    const IMAGE_MAGIC: u8 = 0xE9;
+    const CHIP_ID: u16 = cfg_select! {
+        feature = "esp32c5" => 0x0017,
+        feature = "esp32c6" => 0x000D,
+        feature = "esp32c61" => 0x0014,
+        feature = "esp32h2" => 0x0010,
+        feature = "esp32h4" => 0x001C,
+        feature = "esp32s31" => 0x0020,
+    };
+
+    /// The flash address of the highest valid flash entry whose page starts with an image header
+    /// for this chip.
+    pub(super) fn app_entry_paddr() -> Option<u32> {
+        let window = memory_range!("DROM").start as u32;
+        (0..ENTRY_NUM).rev().find_map(|entry_id| {
+            let content = unsafe {
+                (ITEM_INDEX as *mut u32).write_volatile(entry_id);
+                (ITEM_CONTENT as *const u32).read_volatile()
+            };
+            if content & (VALID | ACCESS_SPIRAM) != VALID {
+                return None;
+            }
+            let header = (window + entry_id * PAGE_SIZE) as *const u32;
+            // SAFETY: the entry is valid, so its page is mapped and the reads cannot fault.
+            let (first, chip_id) =
+                unsafe { (header.read_volatile(), header.add(3).read_volatile()) };
+            (first as u8 == IMAGE_MAGIC && chip_id as u16 == CHIP_ID)
+                .then_some((content & PADDR) * PAGE_SIZE)
+        })
+    }
 }
 
 /// Reads the partition table.
