@@ -137,6 +137,7 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 *   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
 *   If your change is user-visible, consider adding a brief changelog entry and/or migration guide note in the PR description using the structured sections provided by the template (see below). This is optional — if you skip it, a maintainer will either add the entries or apply the `skip-changelog` label on your behalf. Do **not** edit `CHANGELOG.md` files directly — those are updated automatically at release time.
 *   If your change requires user code to be updated, add a `# Migration guide` section. Each breaking change needs a `## crate/area` heading and a `### Title` for the specific change, followed by the migration steps.
+*   If your change breaks the stable API of a crate, the PR needs the `breaking-change-<crate-name>` label (e.g. `breaking-change-esp-hal`). Without it, the semver check in CI fails. Ask a maintainer to add the label. See [Breaking changes] for details.
 *   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
 *   As you update your PR and apply changes, mark each conversation as [resolved].
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
@@ -146,6 +147,7 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts
+[Breaking changes]: ./DEVELOPER-GUIDELINES.md#breaking-changes
 
 ### Writing the description
 

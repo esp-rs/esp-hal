@@ -1,8 +1,8 @@
 # AGENTS.md
 
 esp-hal is a monorepo of bare-metal `no_std` Rust crates for Espressif chips. Each top-level crate
-directory is its own Cargo project with a README. The root workspace only holds the `xtask` tooling,
-and all building, linting and testing goes through `cargo xtask`.
+directory is its own Cargo project, and most have a README. The root workspace only holds the
+`xtask` tooling, and all building, linting and testing goes through `cargo xtask`.
 
 This file is an index. Before you change anything, read the documents that cover your task.
 
