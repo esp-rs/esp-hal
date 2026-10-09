@@ -10,7 +10,7 @@ inputs:
   current-xtensa-version:
     description: Xtensa Rust release for the "current" channel.
     required: false
-    default: "1.97.0.0"
+    default: "1.99.0.0"
   xtensa:
     description: When "true", install the Xtensa toolchain.
     required: false
@@ -112,7 +112,7 @@ runs:
         echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
 
     - if: inputs.xtensa == 'true'
-      uses: esp-rs/xtensa-toolchain@v1.6
+      uses: SergioGasquez/xtensa-toolchain@5c72555a0f50c2da8097a4be9d6fb97af5edc334
       with:
         buildtargets: ${{ steps.chips.outputs.buildtargets }}
         default: ${{ inputs.xtensa-default }}
