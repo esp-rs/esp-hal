@@ -827,11 +827,7 @@ driver_configs![
         TempProperties {
             driver: temp_sensor,
             name: "Temperature sensor",
-            properties: {
-                /// Available temperature sensor clock sources.
-                #[serde(default)]
-                clock_sources: Vec<String>,
-            }
+            properties: {}
         },
         TouchProperties {
             driver: touch,

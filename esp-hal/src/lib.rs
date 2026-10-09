@@ -314,6 +314,10 @@ pub mod rng;
 pub mod spi;
 pub mod system;
 pub mod time;
+// The TSENS driver is unstable, but its clock tree nodes are part of every build.
+#[cfg(soc_has_tsens)]
+#[path = "tsens/clocks.rs"]
+mod tsens_clocks;
 #[cfg(uart_driver_supported)]
 pub mod uart;
 
