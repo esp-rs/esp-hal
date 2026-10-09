@@ -391,10 +391,7 @@ struct DigestState {
 
 impl DigestState {
     fn new(algorithm: ShaAlgorithmKind) -> Self {
-        #[cfg(sha_has_sm3)]
-        if algorithm == ShaAlgorithmKind::Sm3 {
-            assert!(Sm3::is_supported(), "SM3 is disabled by eFuse");
-        }
+        assert!(algorithm.is_supported(), "SM3 is disabled by eFuse");
 
         Self {
             algorithm,
@@ -681,6 +678,20 @@ for_each_sha_algorithm! {
 }
 
 impl ShaAlgorithmKind {
+    /// Returns whether the algorithm is enabled.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\nSM3 is disabled when the `DIS_SM_CRYPT` eFuse is set."
+    )]
+    #[instability::unstable]
+    pub fn is_supported(self) -> bool {
+        match self {
+            #[cfg(sha_has_sm3)]
+            Self::Sm3 => !crate::efuse::read_bit(crate::efuse::DIS_SM_CRYPT),
+            _ => true,
+        }
+    }
+
     fn start(self, sha: &crate::peripherals::SHA<'_>) {
         let regs = sha.register_block();
         cfg_select! {
@@ -809,15 +820,6 @@ for_each_sha_algorithm! {
             type Digest011OutputSize = paste::paste!(digest_011::consts::[< U $digest_len >]);
         }
     };
-}
-
-#[cfg(sha_has_sm3)]
-impl Sm3 {
-    /// Returns whether SM3 is enabled by eFuse.
-    #[instability::unstable]
-    pub fn is_supported() -> bool {
-        !crate::efuse::read_bit(crate::efuse::DIS_SM_CRYPT)
-    }
 }
 
 fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
