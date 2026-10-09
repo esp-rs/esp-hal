@@ -13,6 +13,8 @@ This guide outlines the contribution workflow, from reporting issues and submitt
     *   [Testing Your Contributions]
     *   [Commit Your Updates]
 *   [Pull Request: From Submission to Merge]
+    *   [Writing the description]
+*   [AI-Assisted Contributions]
 *   [Merge Freezes]
 *   [Your PR is merged!]
 
@@ -23,6 +25,8 @@ This guide outlines the contribution workflow, from reporting issues and submitt
 [Testing Your Contributions]: #testing-your-contributions
 [Commit your updates]: #commit-your-updates
 [Pull Request: From Submission to Merge]: #pull-request-from-submission-to-merge
+[Writing the description]: #writing-the-description
+[AI-Assisted Contributions]: #ai-assisted-contributions
 [Merge Freezes]: #merge-freezes
 [Your PR is merged!]: #your-pr-is-merged
 
@@ -52,11 +56,14 @@ Before adding or changing code, review the [esp-rs developer guidelines].
 
 Encountered a problem or have an idea? First, [check existing issues] to avoid duplicates. If your concern is new, use our [issue form] to submit it.
 
-An AI agent must not open issues automatically. We will close those issues without looking at them. Take the time to verify that the issue is real, and
-make sure you use the correct issue form to open it.
+Include only the information someone needs to reproduce the problem, or at least to explore it, and
+leave out everything else. [REPRODUCERS.md] describes a good minimal reproducer.
+
+If an AI tool helps you write the issue, also follow [AI-Assisted Contributions].
 
 [check existing issues]: https://github.com/esp-rs/esp-hal/issues
 [issue form]: https://github.com/esp-rs/esp-hal/issues/new/
+[REPRODUCERS.md]: ./REPRODUCERS.md
 
 #### Working on an Issue
 
@@ -139,6 +146,63 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts
+
+### Writing the description
+
+Reviewers read the diff. The description tells them what the diff cannot: why the change is needed
+and how you know it works. Include only the information a reviewer needs to review the change, and
+leave out everything else. Two sentences are enough for a small fix. A timing bug needs its
+measurements.
+
+- Open with the problem and the fix, and link the issue (`Closes #1234`).
+- Under **Testing**, name the chip, the board, and the example or HIL test you ran, and the affected
+  chips you could not test. Leave out `fmt`, `lint`, and other checks CI runs.
+- Write each changelog entry as one line describing the user-visible effect. The explanation belongs
+  in the description.
+
+The part of the template you write should look like this:
+
+```markdown
+#### Description
+
+What was wrong or missing, and what this changes.
+
+Closes #1234
+
+#### Testing
+
+Ran `<example or HIL test>` on <chip> (<board>). Not tested on <chips>.
+```
+
+If an AI tool wrote a significant part of your contribution, also follow [AI-Assisted Contributions].
+
+## AI-Assisted Contributions
+
+> [!NOTE]
+> This section applies only when an AI tool writes a significant part of your contribution: the
+> code, the pull request description, or an issue. Its requirements add to the general rules in
+> [Reporting a New Issue] and [Writing the description]. If you write your contribution yourself,
+> skip this section.
+
+We follow the Rust Embedded working group's [AI tool use policy]. You are responsible for everything
+you submit, so review and test it before you ask for a review.
+
+- An AI agent must not open issues automatically. We close those issues without looking at them.
+  Verify that the issue is real, and use the correct issue form.
+- Say in one line of the pull request description that an AI tool generated a significant part of
+  the change.
+- Write pull request descriptions in Simplified Technical English (ASD-STE100), as the API
+  documentation does. Follow its [Style](./API-DOC-RULES.md#style) and
+  [Wording](./API-DOC-RULES.md#wording) rules: short sentences with one idea each, active voice,
+  and the present tense.
+- Leave out the template's greeting and submission checklist, and start the body at
+  `#### Description`.
+- Do not walk through the diff, restate the issue, or describe how you found the bug.
+- Raise trade-offs, open questions, or follow-ups only when you need a reviewer's decision.
+- Add no headings beyond the template's, no emoji, and no sign-offs.
+
+[Reporting a New Issue]: #reporting-a-new-issue
+[AI tool use policy]: https://github.com/rust-embedded/wg/blob/HEAD/CODE_OF_CONDUCT.md#ai-tool-use-policy
 
 
 ## Merge Freezes
