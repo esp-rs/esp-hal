@@ -370,8 +370,8 @@ mod blocking_tests {
 mod camera_tests {
     use core::task::Poll;
 
-    use embassy_futures::poll_once;
-    use esp_hal::dma::DmaError;
+    use embassy_futures::{join::join, poll_once};
+    use esp_hal::{dma::DmaError, gpio::interconnect::InputSignal as GpioInputSignal};
 
     use super::*;
 
@@ -387,7 +387,7 @@ mod camera_tests {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
         let dma_rx_buf = dma_rx_buffer!(3 * FRAME_BYTES).unwrap();
-        let dma_tx_buf = dma_tx_buffer!(2 * FRAME_BYTES).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(FRAME_BYTES).unwrap();
 
         Context {
             peripherals,
@@ -421,6 +421,7 @@ mod camera_tests {
         Dpi<'static, esp_hal::Blocking>,
         DmaTxBuf,
         DmaRxBuf,
+        GpioInputSignal<'static>,
     ) {
         let peripherals = ctx.peripherals;
         let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
@@ -497,14 +498,14 @@ mod camera_tests {
             lcd_cam.cam,
             rx_channel,
             cam::Config::default()
-                .with_frequency(Rate::from_mhz(1))
+                .with_frequency(Rate::from_mhz(2))
                 .with_vh_de_mode(VhdeMode::VsyncHsync),
         )
         .unwrap()
         .with_vsync(vsync_in)
         .with_hsync(hsync_in)
         .with_h_enable(de_in)
-        .with_pixel_clock(pclk_in)
+        .with_pixel_clock(pclk_in.clone())
         .with_data0(d0_in)
         .with_data1(d1_in)
         .with_data2(d2_in)
@@ -523,12 +524,42 @@ mod camera_tests {
             *b = (i % FRAME_BYTES % 256) as u8;
         }
 
-        (camera, dpi, dma_tx_buf, dma_rx_buf)
+        (camera, dpi, dma_tx_buf, dma_rx_buf, pclk_in)
+    }
+
+    fn pulse_camera_vsync(pclk: &GpioInputSignal<'static>) {
+        use esp_hal::gpio::{InputSignal, interconnect::PeripheralSignal};
+
+        let delay = esp_hal::delay::Delay::new();
+        // Keep PCLK running during manual VSYNC pulses.
+        for vsync in [Level::Low, Level::High] {
+            vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC);
+            for _ in 0..10 {
+                Level::Low.connect_input_to_peripheral(InputSignal::CAM_PCLK);
+                delay.delay_micros(1);
+                Level::High.connect_input_to_peripheral(InputSignal::CAM_PCLK);
+                delay.delay_micros(1);
+            }
+        }
+        InputSignal::CAM_PCLK.connect_to(pclk);
+    }
+
+    fn send_frame(
+        dpi: Dpi<'static, esp_hal::Blocking>,
+        sent: DmaTxBuf,
+        pclk: &GpioInputSignal<'static>,
+    ) -> (Dpi<'static, esp_hal::Blocking>, DmaTxBuf) {
+        let output = dpi.send(false, sent).map_err(|e| e.0).unwrap();
+        let (result, dpi, sent) = output.wait();
+        hil_test::assert_eq!(result, Ok(()));
+        // Pulse VSYNC after pixel input has stopped.
+        pulse_camera_vsync(pclk);
+        (dpi, sent)
     }
 
     #[test]
     fn test_camera_can_receive_from_rgb(ctx: Context) {
-        let (camera, dpi, dma_tx_buf, dma_rx_buf) = loopback(ctx);
+        let (camera, dpi, dma_tx_buf, dma_rx_buf, _) = loopback(ctx);
         let camera_transfer = camera.receive(dma_rx_buf).map_err(|e| e.0).unwrap();
         let dpi_transfer = dpi.send(true, dma_tx_buf).map_err(|e| e.0).unwrap();
         let (result, _, dma_rx_buf) = camera_transfer.wait();
@@ -544,8 +575,12 @@ mod camera_tests {
 
     #[test]
     async fn test_camera_dma_eof(ctx: Context) {
-        let (camera, mut dpi, mut sent, mut received) = loopback(ctx);
-        let mut camera = camera.into_async().into_blocking().into_async();
+        let (camera, mut dpi, mut sent, mut received, pclk) = loopback(ctx);
+        let mut camera = camera
+            .with_vsync(Level::High)
+            .into_async()
+            .into_blocking()
+            .into_async();
         for eof_mode in [
             cam::EofMode::VsyncSignal,
             cam::EofMode::ByteLen((FRAME_BYTES - 1) as u16),
@@ -553,7 +588,7 @@ mod camera_tests {
             camera
                 .apply_config(
                     &cam::Config::default()
-                        .with_frequency(Rate::from_mhz(1))
+                        .with_frequency(Rate::from_mhz(2))
                         .with_vh_de_mode(VhdeMode::VsyncHsync)
                         .with_eof_mode(eof_mode),
                 )
@@ -562,29 +597,28 @@ mod camera_tests {
                 (FRAME_BYTES, FRAME_BYTES),
                 (3 * FRAME_BYTES, 2 * FRAME_BYTES),
             ] {
-                sent.set_length(minimum_received);
                 received.set_length(rx_bytes);
                 let mut transfer = camera.receive(received).map_err(|e| e.0).unwrap();
-                hil_test::assert!(poll_once(transfer.wait_for_dma_eof()).is_pending());
-                let output = dpi.send(true, sent).map_err(|e| e.0).unwrap();
-
-                transfer.wait_for_dma_eof().await.unwrap();
-                if rx_bytes > FRAME_BYTES {
+                pulse_camera_vsync(&pclk);
+                for _ in 0..minimum_received / FRAME_BYTES {
                     hil_test::assert!(poll_once(transfer.wait_for_dma_eof()).is_pending());
-                    transfer.wait_for_dma_eof().await.unwrap();
-                }
-                // Allow another frame to arrive to verify reception continues after EOF.
-                esp_hal::delay::Delay::new().delay_millis(10);
-                (camera, received) = transfer.stop();
-                (dpi, sent) = output.stop();
 
-                hil_test::assert!(received.number_of_received_bytes() >= minimum_received);
+                    let (eof_result, next_output) = join(transfer.wait_for_dma_eof(), async {
+                        send_frame(dpi, sent, &pclk)
+                    })
+                    .await;
+                    hil_test::assert_eq!(eof_result, Ok(()));
+                    (dpi, sent) = next_output;
+                }
+                (camera, received) = transfer.stop();
+
+                hil_test::assert_eq!(received.number_of_received_bytes(), minimum_received);
                 hil_test::assert!(
-                    received
-                        .received_data()
-                        .flatten()
-                        .take(minimum_received)
-                        .eq(sent.as_slice()[..minimum_received].iter())
+                    received.received_data().flatten().eq(sent
+                        .as_slice()
+                        .iter()
+                        .cycle()
+                        .take(minimum_received))
                 );
             }
         }
@@ -592,19 +626,18 @@ mod camera_tests {
 
     #[test]
     async fn test_camera_dma_eof_pending(ctx: Context) {
-        let (camera, mut dpi, mut sent, mut received) = loopback(ctx);
-        let mut camera = camera.into_async();
+        let (camera, mut dpi, mut sent, mut received, pclk) = loopback(ctx);
+        let mut camera = camera.with_vsync(Level::High).into_async();
         received.set_length(received.capacity());
         for poll_before_eof in [false, true] {
             let mut transfer = camera.receive(received).map_err(|e| e.0).unwrap();
+            pulse_camera_vsync(&pclk);
             {
                 let mut wait = core::pin::pin!(transfer.wait_for_dma_eof());
                 if poll_before_eof {
                     hil_test::assert!(poll_once(wait.as_mut()).is_pending());
                 }
-                let output = dpi.send(true, sent).map_err(|e| e.0).unwrap();
-                esp_hal::delay::Delay::new().delay_millis(20);
-                (dpi, sent) = output.stop();
+                (dpi, sent) = send_frame(dpi, sent, &pclk);
                 // Cancel the wait after EOF, before observing its result.
             }
             hil_test::assert!(matches!(
@@ -623,15 +656,16 @@ mod camera_tests {
 
     #[test]
     async fn test_camera_dma_eof_overflow(ctx: Context) {
-        let (camera, mut dpi, mut sent, mut received) = loopback(ctx);
-        let mut camera = camera.into_async();
+        let (camera, mut dpi, mut sent, mut received, pclk) = loopback(ctx);
+        let mut camera = camera.with_vsync(Level::High).into_async();
         for (rx_bytes, expected) in [
             (1024, Err(DmaError::DescriptorError)),
             (2 * FRAME_BYTES, Ok(())),
         ] {
             received.set_length(rx_bytes);
             let mut transfer = camera.receive(received).map_err(|e| e.0).unwrap();
-            let output = dpi.send(true, sent).map_err(|e| e.0).unwrap();
+            pulse_camera_vsync(&pclk);
+            (dpi, sent) = send_frame(dpi, sent, &pclk);
 
             hil_test::assert_eq!(
                 transfer.wait_for_dma_eof().await,
@@ -644,16 +678,14 @@ mod camera_tests {
                     poll_once(transfer.wait_for_dma_eof()),
                     Poll::Ready(result) if result == expected
                 ));
+                let (result, next_camera, next_received) = transfer.wait();
+                hil_test::assert_eq!(result, expected);
+                (camera, received) = (next_camera, next_received);
+            } else {
+                (camera, received) = transfer.stop();
+                hil_test::assert_eq!(received.number_of_received_bytes(), FRAME_BYTES);
+                hil_test::assert_eq!(&received.as_slice()[..FRAME_BYTES], sent.as_slice());
             }
-            let (result, next_camera, next_received) = transfer.wait();
-            hil_test::assert_eq!(
-                result,
-                expected,
-                "After waiting for the camera to stop, RX length {}",
-                rx_bytes
-            );
-            (camera, received) = (next_camera, next_received);
-            (dpi, sent) = output.stop();
         }
     }
 
