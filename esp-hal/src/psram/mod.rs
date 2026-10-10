@@ -90,7 +90,6 @@ const EXTMEM_ORIGIN: usize = property!("psram.extmem_origin");
 
 static MAPPED_PSRAM_START: AtomicUsize = AtomicUsize::new(0);
 static MAPPED_PSRAM_END: AtomicUsize = AtomicUsize::new(0);
-static PSRAM_SIZE: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) fn psram_range() -> Range<usize> {
     let end = MAPPED_PSRAM_END.load(Ordering::Acquire);
@@ -116,7 +115,6 @@ impl Psram {
     pub fn new(peri: PSRAM<'static>, mut config: PsramConfig) -> Self {
         if init_psram(&mut config) {
             info!("PSRAM size: {} MB", config.size.get() / 1_024 / 1_024);
-            PSRAM_SIZE.store(config.size.get(), Ordering::Relaxed);
             let range = map_psram(config);
 
             unsafe { set_psram_range(range) };
@@ -128,13 +126,5 @@ impl Psram {
     pub fn raw_parts(&self) -> (*mut u8, usize) {
         let range = psram_range();
         (range.start as *mut u8, range.end - range.start)
-    }
-
-    /// Returns the size of the PSRAM chip in bytes, as detected or configured at start-up.
-    ///
-    /// Returns 0 when PSRAM is not initialised.
-    #[instability::unstable]
-    pub fn size(&self) -> usize {
-        PSRAM_SIZE.load(Ordering::Relaxed)
     }
 }
