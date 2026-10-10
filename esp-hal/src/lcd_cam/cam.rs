@@ -609,6 +609,8 @@ impl<BUF: DmaRxBuffer> CameraTransfer<'_, BUF, Async> {
     /// This does not stop the camera or DMA. Call [`Self::stop`] to return
     /// the camera and buffer. After a successful wait, another call can wait
     /// for a later EOF. Receive errors are retained for this transfer.
+    /// EOF status is latched: multiple EOFs before the wait consumes the status
+    /// are reported as one event.
     ///
     /// # Errors
     ///
