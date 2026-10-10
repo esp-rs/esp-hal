@@ -13,6 +13,7 @@
 //! * SHA-256
 //! * SHA-384
 //! * SHA-512
+//! * SM3
 //!
 //! It provides functions to update the hash calculation with input data, finish
 //! the hash calculation and retrieve the resulting hash value. The SHA
@@ -133,6 +134,10 @@ impl<'d> Sha<'d> {
     }
 
     /// Starts a new digest.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\n# Panics\nPanics if SM3 is selected and disabled by eFuse."
+    )]
     pub fn start<'a, A: ShaAlgorithm>(&'a mut self) -> ShaDigest<'d, A, &'a mut Self> {
         ShaDigest::new(self)
     }
@@ -140,6 +145,10 @@ impl<'d> Sha<'d> {
     /// Starts a new digest and take ownership of the driver.
     /// This is useful for storage outside a function body. i.e. in static or
     /// struct.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\n# Panics\nPanics if SM3 is selected and disabled by eFuse."
+    )]
     pub fn start_owned<A: ShaAlgorithm>(self) -> ShaDigest<'d, A, Self> {
         ShaDigest::new(self)
     }
@@ -382,6 +391,8 @@ struct DigestState {
 
 impl DigestState {
     fn new(algorithm: ShaAlgorithmKind) -> Self {
+        assert!(algorithm.is_supported(), "SM3 is disabled by eFuse");
+
         Self {
             algorithm,
             alignment_helper: AlignmentHelper::default(),
@@ -396,6 +407,10 @@ impl DigestState {
 
 impl<'d, A: ShaAlgorithm, S: BorrowMut<Sha<'d>>> ShaDigest<'d, A, S> {
     /// Creates a new digest.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\n# Panics\nPanics if SM3 is selected and disabled by eFuse."
+    )]
     #[allow(unused_mut)]
     pub fn new(mut sha: S) -> Self {
         #[cfg(not(esp32))]
@@ -517,6 +532,10 @@ pub struct Context<A: ShaAlgorithm> {
 #[cfg(not(esp32))]
 impl<A: ShaAlgorithm> Context<A> {
     /// Creates a new empty context.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\n# Panics\nPanics if SM3 is selected and disabled by eFuse."
+    )]
     pub fn new() -> Self {
         Self {
             state: DigestState::new(A::ALGORITHM_KIND),
@@ -659,6 +678,20 @@ for_each_sha_algorithm! {
 }
 
 impl ShaAlgorithmKind {
+    /// Returns whether the algorithm is enabled.
+    #[cfg_attr(
+        sha_has_sm3,
+        doc = "\nSM3 is disabled when the `DIS_SM_CRYPT` eFuse is set."
+    )]
+    #[instability::unstable]
+    pub fn is_supported(self) -> bool {
+        match self {
+            #[cfg(sha_has_sm3)]
+            Self::Sm3 => !crate::efuse::read_bit(crate::efuse::DIS_SM_CRYPT),
+            _ => true,
+        }
+    }
+
     fn start(self, sha: &crate::peripherals::SHA<'_>) {
         let regs = sha.register_block();
         cfg_select! {
@@ -1395,6 +1428,12 @@ pub enum FinalizeError {
 // Now implement the actual public types.
 // Helper macro to limit the scope of `paste`
 macro_rules! impl_worker_context {
+    (@panic_docs Sm3Context) => {
+        "\n# Panics\nPanics if SM3 is disabled by eFuse."
+    };
+    (@panic_docs $name:ident) => {
+        ""
+    };
     ($name:ident, $full_name:literal, $algo:expr, $digest_len:literal, $block_size:literal ) => {
         #[doc = concat!("A ", $full_name, " context.")]
         #[cfg_attr(not(esp32), derive(Clone))]
@@ -1408,6 +1447,7 @@ macro_rules! impl_worker_context {
             /// [`Self::finalize`].
             ///
             /// Any number of contexts can be created, to hash any number of messages concurrently.
+            #[doc = impl_worker_context!(@panic_docs $name)]
             pub fn new() -> Self {
                 Self(ShaContext::new($algo))
             }

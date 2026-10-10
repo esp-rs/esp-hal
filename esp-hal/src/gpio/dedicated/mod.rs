@@ -44,6 +44,7 @@
 //! - [`write_ll`]: write output levels for a selected set of channels in one operation
 //! - [`read_all_ll`]: read the current input levels of all channels
 //! - [`output_levels_ll`]: read the current output levels of all channels
+//!
 //! These functions operate purely on channel bitmasks (bit 0 -> channel 0, bit 1 -> channel 1, ...)
 //! and do not track pin configuration. Prefer the higher-level drivers and bundles unless you
 //! specifically need the lowest overhead.

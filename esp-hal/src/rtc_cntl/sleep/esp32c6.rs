@@ -5,7 +5,7 @@ use crate::{
     private::DropGuard,
     rtc_cntl::{
         Rtc,
-        rtc::{HpAnalog, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
+        rtc::{HpAnalog, HpBackupClk, HpSysCntlReg, HpSysPower, LpAnalog, LpSysPower},
         sleep::{
             SleepKind,
             pmu_common::{SleepTimeConfig, request_sleep},
@@ -780,6 +780,17 @@ impl RtcSleepConfig {
             AnalogSleepConfig::defaults_light_sleep(self.pd_flags).apply();
             DigitalSleepConfig::defaults_light_sleep(self.pd_flags).apply();
         }
+
+        // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/lowpower/port/esp32c6/sleep_clock_icg.c#L40-L48
+        // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/port/esp32c6/pmu_sleep.c#L299-L302
+        let mut icg_func = HpBackupClk::default();
+        icg_func.set_retention(!self.deep && clocks::wifi_pwr_clk_runs_in_sleep());
+        PMU::regs()
+            .hp_sleep_sysclk()
+            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(icg_func.0 != 0));
+        PMU::regs()
+            .hp_sleep_icg_hp_func()
+            .write(|w| unsafe { w.hp_sleep_dig_icg_func_en().bits(icg_func.0) });
 
         param.apply();
 
