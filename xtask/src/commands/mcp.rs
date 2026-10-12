@@ -91,19 +91,11 @@ impl ServerHandler for EspHalServer {
             .collect();
         let packages: Vec<String> = crate::Package::iter().map(|p| p.to_string()).collect();
 
-        // Read the copilot-instructions file for agent onboarding context.
-        let copilot_instructions = std::env::current_dir()
-            .ok()
-            .map(|ws| ws.join(".github/copilot-instructions.md"))
-            .and_then(|path| std::fs::read_to_string(path).ok())
-            .unwrap_or_default();
-
         let instructions = format!(
             "esp-hal xtask automation tools. Use these to build, lint, format, test, \
              and check the esp-hal workspace.\n\n\
              Valid chip values: {}\n\n\
-             Valid package values: {}\n\n\
-             {copilot_instructions}",
+             Valid package values: {}",
             chips.join(", "),
             packages.join(", "),
         );
