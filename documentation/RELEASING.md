@@ -74,6 +74,23 @@ does have a baseline, `plan` exits with an error. Baselines are regenerated
 after a breaking change, so items stabilized before the last regeneration
 are not listed.
 
+## Manual changelog edits
+
+In rare cases, such as backports, hotfixes, or curated release notes that cannot
+be expressed through the structured PR description format, a maintainer can
+apply the `manual-changelog` label to a PR. This label:
+
+- Allows direct edits to `CHANGELOG.md` files (the automated "no direct
+  CHANGELOG.md edits" check is skipped).
+- Skips the per-package coverage check (the PR is not required to have
+  structured entries in the description).
+- Still validates any PR description entries that *are* present, as a
+  safety net against formatting accidents.
+
+Do **not** use `manual-changelog` for routine changes. The structured PR
+description format exists to keep changelog maintenance consistent and
+automatable.
+
 ## Kickoff
 
 - Land toolchain changes first. If the MSRV or CI toolchain must move, run
