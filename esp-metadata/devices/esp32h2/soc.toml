@@ -348,6 +348,16 @@ cpu_retention = "software"
 cpu_retention_frame = "c6_h2"
 supports_top_power_down = true
 
+[device.mcpwm]
+support_status = "partial"
+instances = [
+    { name = "mcpwm0", sys_instance = "Mcpwm0" },
+]
+swsync_can_propagate = true
+capture_clk_from_group = true
+support_etm = true
+support_sleep_retention = true
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -379,7 +389,6 @@ instances = [
 [device.ledc]
 version = 3
 channel_count = 6
-[device.mcpwm]
 [device.pcnt]
 instances = {
     PCNT = {
