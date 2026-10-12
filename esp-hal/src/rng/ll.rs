@@ -63,6 +63,7 @@ fn read_one(wait_cycles: usize) -> u32 {
                 *last_wait_start = now;
 
                 cfg_select! {
+                    any(esp32c5, esp32c61) => Some(RNG::regs().rng_data_sync().read().bits()),
                     rng_is_lp_sys => Some(RNG::regs().rng_data().read().bits()),
                     esp32s31 => Some(RNG::regs().crc_sync_data().read().bits()),
                     _ => Some(RNG::regs().data().read().bits()),
