@@ -721,6 +721,8 @@ pub(crate) fn now() -> Instant {
 
 #[cfg(esp32)]
 pub(crate) mod implem {
+    use esp_sync::RawMutex;
+
     use crate::peripherals::TIMG0;
 
     #[cfg(feature = "rt")]
@@ -746,23 +748,30 @@ pub(crate) mod implem {
 
     #[inline]
     pub(crate) fn raw_counter() -> u64 {
+        // The latch is shared between cores, so we need additional locking
+        static LACT_LOCK: RawMutex = RawMutex::new();
+
         // on ESP32 use LACT
         let tg0 = TIMG0::regs();
-        tg0.lactupdate().write(|w| unsafe { w.update().bits(1) });
+        let (hi, lo) = LACT_LOCK.lock(|| {
+            tg0.lactupdate().write(|w| unsafe { w.update().bits(1) });
 
-        // The peripheral doesn't have a bit to indicate that the update is done, so we
-        // poll the lower 32 bit part of the counter until it changes, or a timeout
-        // expires.
-        let lo_initial = tg0.lactlo().read().bits();
-        let mut div = tg0.lactconfig().read().divider().bits();
-        let lo = loop {
-            let lo = tg0.lactlo().read().bits();
-            if lo != lo_initial || div == 0 {
-                break lo;
-            }
-            div -= 1;
-        };
-        let hi = tg0.lacthi().read().bits();
+            // The peripheral doesn't have a bit to indicate that the update is done, so we
+            // poll the lower 32 bit part of the counter until it changes, or a timeout
+            // expires.
+            let lo_initial = tg0.lactlo().read().bits();
+            let mut div = tg0.lactconfig().read().divider().bits();
+            let lo = loop {
+                let lo = tg0.lactlo().read().bits();
+                if lo != lo_initial || div == 0 {
+                    break lo;
+                }
+                div -= 1;
+            };
+            let hi = tg0.lacthi().read().bits();
+
+            (hi, lo)
+        });
 
         ((hi as u64) << 32u64) | lo as u64
     }
