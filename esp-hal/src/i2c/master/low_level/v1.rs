@@ -96,7 +96,15 @@ pub(super) fn reset_fifo(driver: &Driver<'_>) {
 }
 
 pub(super) fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    register_block.data().read().fifo_rdata().bits()
+    // A FIFO read over the DPORT bus can advance the read pointer twice and drop a byte (ESP-IDF
+    // `i2c_ll_read_rxfifo`: "fifo pointer jump over a random address").
+    let peri_offset =
+        register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
+    let fifo_ptr =
+        (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
+    let byte = unsafe { (fifo_ptr.read_volatile() & 0xff) as u8 };
+    core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+    byte
 }
 
 pub(super) fn write_fifo(register_block: &RegisterBlock, data: u8) {
