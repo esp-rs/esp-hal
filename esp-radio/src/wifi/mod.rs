@@ -1378,9 +1378,7 @@ pub(crate) fn wifi_start_scan(
                     min: min.as_millis() as u32,
                     max: max.as_millis() as u32,
                 },
-                // Time per channel that only allows passive scanning. Covers one typical beacon
-                // interval (102.4 ms).
-                passive: 120,
+                passive: 0,
             },
             wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
         ),
@@ -2460,6 +2458,10 @@ pub struct CountryInfo {
     /// Operating class.
     #[builder_lite(unstable)]
     operating_class: OperatingClass,
+
+    /// Whether IEEE 802.11d is enabled. Disable it to find hidden access points on all channels.
+    #[builder_lite(unstable)]
+    ieee80211d_enabled: bool,
 }
 
 impl From<[u8; 2]> for CountryInfo {
@@ -2467,6 +2469,7 @@ impl From<[u8; 2]> for CountryInfo {
         Self {
             country,
             operating_class: OperatingClass::default(),
+            ieee80211d_enabled: true,
         }
     }
 }
@@ -2480,6 +2483,7 @@ impl CountryInfo {
         Some(Self {
             country: [cc[0], cc[1]],
             operating_class,
+            ieee80211d_enabled: info.policy == wifi_country_policy_t_WIFI_COUNTRY_POLICY_AUTO,
         })
     }
 }
@@ -2981,7 +2985,10 @@ impl WifiController<'_> {
             0,
         ];
         unsafe {
-            esp_wifi_result!(esp_wifi_set_country_code(code.as_ptr().cast(), true))?;
+            esp_wifi_result!(esp_wifi_set_country_code(
+                code.as_ptr().cast(),
+                country.ieee80211d_enabled
+            ))?;
         }
         Ok(())
     }
@@ -3177,6 +3184,19 @@ impl WifiController<'_> {
 
             // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
             esp_wifi_result!(unsafe { esp_wifi_start() })?;
+
+            // Default for all scans, including connect scans. Requires a started station.
+            if mode != wifi_mode_t_WIFI_MODE_AP {
+                let params = wifi_scan_default_params_t {
+                    scan_time: wifi_scan_time_t {
+                        active: wifi_active_scan_time_t { min: 0, max: 0 },
+                        // Covers one typical beacon interval (102.4 ms).
+                        passive: 120,
+                    },
+                    home_chan_dwell_time: 0,
+                };
+                esp_wifi_result!(unsafe { esp_wifi_set_scan_parameters(&params) })?;
+            }
         }
 
         reset_mode_on_error.defuse();
