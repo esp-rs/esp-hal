@@ -151,11 +151,9 @@ impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
         let register_block = unsafe { &*PWM::block() };
 
         // set prescaler
+        // TODO: configure dividers through clock tree
         cfg_select! {
             soc_has_pcr => {
-                // On chips with a PCR, the group clock is divided by
-                // `PCR.pwm_clk_conf.pwm_div_num`. `MCPWM.clk_cfg.clk_prescale` has
-                // no effect on these chips, so leave it alone, as ESP-IDF does.
                 crate::peripherals::PCR::regs()
                     .pwm_clk_conf()
                     .modify(|_, w| unsafe { w.pwm_div_num().bits(peripheral_clock.prescaler) });
