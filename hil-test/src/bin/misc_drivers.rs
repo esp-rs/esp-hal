@@ -1,5 +1,6 @@
 //! Interrupt Tests
 //!     "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
+//! MCPWM Tests
 //! PCNT Tests
 //! RNG Tests
 //! System Timer Tests
@@ -428,6 +429,80 @@ mod pcnt {
 
         assert_eq!(0, HANDLER_CALLS.load(Ordering::Relaxed));
         assert!(unit0.value() == 0);
+    }
+}
+
+#[cfg(all(mcpwm_driver_supported, pcnt_driver_supported))]
+#[embedded_test::tests(default_timeout = 3)]
+mod mcpwm {
+    use esp_hal::{
+        delay::Delay,
+        gpio::{AnyPin, Input, InputConfig, Pin, Pull},
+        mcpwm::{McPwm, PeripheralClockConfig, operator::PwmPinConfig, timer::PwmWorkingMode},
+        pcnt::{Unit, channel::EdgeMode},
+        peripherals::MCPWM0,
+        time::Rate,
+    };
+
+    struct Context<'d> {
+        mcpwm: MCPWM0<'d>,
+        unit: Unit<'d>,
+        input: AnyPin<'d>,
+        output: AnyPin<'d>,
+        delay: Delay,
+    }
+
+    #[init]
+    fn init() -> Context<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (din, dout) = hil_test::common_test_pins!(peripherals);
+
+        Context {
+            mcpwm: peripherals.MCPWM0,
+            unit: Unit::new(peripherals.PCNT0_UNIT0),
+            input: din.degrade(),
+            output: dout.degrade(),
+            delay: Delay::new(),
+        }
+    }
+
+    #[test]
+    fn output_frequency_follows_peripheral_clock_prescaler(ctx: Context<'static>) {
+        // Divide the source clock by 8. On chips that divide the group clock in the PCR, the
+        // divider resets to 5, so this tells "prescaler applied" from "reset value left in place".
+        let clock_cfg = PeripheralClockConfig::with_prescaler(7);
+
+        let mut mcpwm = McPwm::new(ctx.mcpwm, clock_cfg);
+        mcpwm.operator0.set_timer(&mcpwm.timer0);
+        let mut pwm_pin = mcpwm
+            .operator0
+            .with_pin_a(ctx.output, PwmPinConfig::UP_ACTIVE_HIGH);
+        pwm_pin.set_timestamp(50);
+
+        // 10 kHz is an exact divisor of the peripheral clock on every chip with MCPWM.
+        let timer_clock_cfg = clock_cfg
+            .timer_clock_with_frequency(99, PwmWorkingMode::Increase, Rate::from_khz(10))
+            .unwrap();
+
+        let unit = ctx.unit;
+        unit.channel0.set_edge_signal(Input::new(
+            ctx.input,
+            InputConfig::default().with_pull(Pull::Down),
+        ));
+        unit.channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+
+        mcpwm.timer0.start(timer_clock_cfg);
+
+        // 10 ms at 10 kHz is 100 rising edges.
+        unit.clear();
+        unit.resume();
+        ctx.delay.delay_millis(10);
+        unit.pause();
+
+        let edges = unit.value();
+        hil_test::assert!((98..=102).contains(&edges), "counted {} edges", edges);
     }
 }
 
