@@ -4,11 +4,14 @@ const TRUST_HEADER = "### [HIL trust list]";
 const JSON_BEGIN = "<!-- HIL_TRUST_JSON";
 const JSON_END = "HIL_TRUST_JSON -->";
 
+// The command is the first line, the rest of the comment is free text.
 function parseTrustCommand(body, cmd) {
-  const text = String(body || "").trim();
+  const line = String(body || "").trim().split(/\r?\n/)[0].trim();
   const re = new RegExp(`^\\/${cmd}\\s+@([A-Za-z0-9-]+)\\b$`, "i");
-  const m = text.match(re);
-  if (!m) return { login: "", error: `Usage: /${cmd} @<login>` };
+  const m = line.match(re);
+  if (!m) {
+    return { login: "", error: `Usage: \`/${cmd} @<login>\` on the first line of the comment.` };
+  }
   return { login: m[1].toLowerCase(), error: "" };
 }
 

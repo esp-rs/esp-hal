@@ -101,7 +101,14 @@ jobs:
           script: |
             const { parseTrustCommand } = require('./.github/scripts/hil-trust.js');
             const res = parseTrustCommand(context.payload.comment.body, 'trust');
-            if (res.error) core.setFailed(res.error);
+            if (res.error) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body: res.error,
+              });
+              core.setFailed(res.error);
+            }
             core.setOutput('login', res.login);
 
       - id: find
@@ -156,7 +163,14 @@ jobs:
           script: |
             const { parseTrustCommand } = require('./.github/scripts/hil-trust.js');
             const res = parseTrustCommand(context.payload.comment.body, 'revoke');
-            if (res.error) core.setFailed(res.error);
+            if (res.error) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body: res.error,
+              });
+              core.setFailed(res.error);
+            }
             core.setOutput('login', res.login);
 
       - id: find
