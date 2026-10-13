@@ -6710,7 +6710,7 @@ impl Chip {
                     "interrupt_controller=\"clic\"",
                     "context_switch_source=\"ipc\"",
                     "mmu_page_size=\"65536\"",
-                    "mmu_entry_num=\"512\"",
+                    "mmu_entry_num=\"1024\"",
                     "psram_octal_spi",
                     "psram_hex_spi",
                     "psram_extmem_origin=\"1207959552\"",
@@ -7106,7 +7106,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupt_controller=\"clic\"",
                     "cargo:rustc-cfg=context_switch_source=\"ipc\"",
                     "cargo:rustc-cfg=mmu_page_size=\"65536\"",
-                    "cargo:rustc-cfg=mmu_entry_num=\"512\"",
+                    "cargo:rustc-cfg=mmu_entry_num=\"1024\"",
                     "cargo:rustc-cfg=psram_octal_spi",
                     "cargo:rustc-cfg=psram_hex_spi",
                     "cargo:rustc-cfg=psram_extmem_origin=\"1207959552\"",
@@ -11003,7 +11003,7 @@ impl Chip {
             "interrupt_controller, values(\"xtensa\",\"riscv_basic\",\"clic\",\"plic\")",
             "context_switch_source, values(\"ipc\",\"from_cpu\",\"clint\",\"software0\")",
             "mmu_page_size, values(\"65536\")",
-            "mmu_entry_num, values(\"256\",\"64\",\"128\",\"512\",\"384\",\"1024\")",
+            "mmu_entry_num, values(\"256\",\"64\",\"128\",\"512\",\"1024\",\"384\")",
             "psram_extmem_origin, \
              values(\"1065353216\",\"1107296256\",\"1207959552\",\"1062207488\",\"1006632960\",\"\
              1342177280\")",

@@ -515,10 +515,10 @@ macro_rules! property {
         stringify!(65536)
     };
     ("mmu.entry_num") => {
-        512
+        1024
     };
     ("mmu.entry_num", str) => {
-        stringify!(512)
+        stringify!(1024)
     };
     ("psram.octal_spi") => {
         true
