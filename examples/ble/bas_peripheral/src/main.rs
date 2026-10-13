@@ -19,7 +19,7 @@
 //! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
 //! the output.
 
-//% CHIP_FILTER: bt_driver_supported
+//% CHIP_FILTER: bt_driver_supported && sleep_light_sleep
 
 #![no_std]
 #![no_main]

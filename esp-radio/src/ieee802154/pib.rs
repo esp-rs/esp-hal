@@ -215,12 +215,20 @@ fn ieee802154_set_multipan_hal(pib: &Pib) {
 }
 
 // https://github.com/espressif/esp-idf/blob/v5.3/components/ieee802154/driver/esp_ieee802154_pib.c#L48
+// TODO: revisit how we get these values. Newer IDF reads the power table from the PHY blob
+// (`bt_bb_get_tx_pwr_table`): https://github.com/espressif/esp-idf/blob/v6.1/components/ieee802154/driver/esp_ieee802154_pib.c#L76-L101
 fn ieee802154_txpower_convert(txpower: i8) -> u8 {
     cfg_select! {
         esp32h2 => {
             // https://github.com/espressif/esp-idf/blob/v5.3/components/hal/esp32h2/include/hal/ieee802154_ll.h
             const IEEE802154_TXPOWER_VALUE_MAX: i8 = 20;
             const IEEE802154_TXPOWER_VALUE_MIN: i8 = -24;
+            const IEEE802154_TXPOWER_INDEX_MIN: i8 = 0;
+        }
+        esp32h4 => {
+            // https://github.com/espressif/esp-idf/blob/5d36094661/components/esp_hal_ieee802154/esp32h4/include/hal/ieee802154_ll.h
+            const IEEE802154_TXPOWER_VALUE_MAX: i8 = 10;
+            const IEEE802154_TXPOWER_VALUE_MIN: i8 = -14;
             const IEEE802154_TXPOWER_INDEX_MIN: i8 = 0;
         }
         _ => {
