@@ -403,7 +403,7 @@ fn cargo_doc_without_pre_processing(
     // One rustdoc output directory is shared by every package and chip on the same target
     // triple, and rustdoc does not know about our chip features. Park the previous build's
     // directory under `.xtask-doc-cache/<id>` and restore the one for this package and chip
-    // if we have built it before, so switching packages stays incremental too.
+    // if we have built it before, so Cargo can skip rustdoc when nothing changed.
     let build_id_path = docs_target.with_file_name(".xtask-doc-build-id");
     let cache_dir = docs_target.with_file_name(".xtask-doc-cache");
     let build_id = match chip {
