@@ -11,7 +11,11 @@ By default, only `esp-rs` organization **members** and **owners** can trigger HI
 Behind the scenes, all comment-commands are first handled by `dispatch.yml`.  
 This workflow parses the comment, checks trust/permissions, and then triggers the appropriate workflow (such as `hil.yml` or `binary_size.yml`) via `workflow_dispatch`.
 
-### `/hil quick`
+The words of a command go in any order, like the arguments of `cargo xtask test`: each is a chip, a package, a keyword such as `quick`, or else a test name. Separate them with spaces or commas, so `/test esp32 rmt c6 i2c` runs `rmt` and `i2c` on ESP32 and ESP32-C6. Chips can be shortened as in xtask, so `c6`, `esp32-c6` and `ESP32C6` all mean `esp32c6`. Only the first line of the comment is read, the rest is free text.
+
+`/hil` is the previous spelling of `/test` and still works, with the same words.
+
+### `/test quick`
 
 Runs a **minimal** HIL matrix on a limited set of chips:
 
@@ -25,41 +29,49 @@ The CI will:
 
 In further commands, the feedback from the bot will be identical.
 
-### `/hil full`
+### `/test full`
 
-Runs the **full** HIL matrix on **all supported chips**.
+Runs the **full** HIL matrix on **all supported chips**. `/test all` does the same.
 
 The full matrix run will also be executed in the merge queue and is a prerequisite for a successful merge.
 
-### `/hil <chip> [<chip> ...]`
+### `/test <chip> [<chip> ...]`
 
 Runs HIL tests **only for the listed chips**.
 
 Examples:
 
-- `/hil esp32c3`
-- `/hil esp32c3 esp32s3`
-- `/hil esp32c3,esp32c6, esp32s3`
+- `/test c3`
+- `/test esp32c3 s3`
+- `/test c3, c6, ESP32-S3`
 
-### `/hil <matrix/chips> --test <TEST> [, <TEST>...]`
+Chips can be added to the quick matrix too: `/test quick c3` runs on ESP32-S3, ESP32-C6 and ESP32-C3.
 
-Runs **only chosen** HIL tests for selected chip(-s) or matrix.
+### `/test <matrix/chips> <test> [<test> ...]`
+
+Runs **only chosen** HIL tests for selected chip(-s) or matrix. Every word that is not a chip, a package or a keyword is a test name, wherever it stands.
 
 Examples:
 
-- `/hil quick --test rmt`
-- `/hil esp32 esp32c6 --tests rmt, i2c`
-- `/hil esp32c6 hil-test-radio`
-- `/hil esp32c6 hil-test-radio --tests wifi`
-- `/hil esp32c6 --test radio_basic::test_scan_doesnt_leak`
+- `/test quick rmt`
+- `/test esp32 rmt c6 i2c`
+- `/test c6 radio_basic::test_scan_doesnt_leak`
 
-Both `--test` and `--tests` will work.
+Use `binary::test_name` to run a single embedded-test case inside a matching HIL test binary. For example, `/test c6 radio_basic::test_scan_doesnt_leak` builds the `radio_basic` ELF and forwards `test_scan_doesnt_leak` as the embedded-test filter when CI runs the prebuilt ELF.
 
-Use `binary::test_name` to run a single embedded-test case inside a matching HIL test binary. For example, `/hil esp32c6 --test radio_basic::test_scan_doesnt_leak` builds the `radio_basic` ELF and forwards `test_scan_doesnt_leak` as the embedded-test filter when CI runs the prebuilt ELF.
+The `--test` and `--tests` flags of xtask are accepted as well, `/test c6 --tests rmt, i2c` is the same as `/test c6 rmt i2c`.
 
-By default, `/hil` commands run the `hil-test` package. Include `hil-test-radio` in the comment body to run the radio HIL package instead.
+### Radio HIL
 
-### `/test-size <example> [--package <package>] <chip> [<chip> ...]`
+By default, `/test` runs the `hil-test` package. Add `radio` (or `hil-test-radio`) to run the radio HIL package instead, or both `radio` and `hil-test` to run both.
+
+Examples:
+
+- `/test c6 radio`
+- `/test c6 radio wifi`
+- `/test quick radio hil-test`
+
+### `/test-size <example> [<example> ...] <chip> [<chip> ...]`
 
 Triggers the binary size analysis workflow, which:
 
@@ -69,13 +81,14 @@ Triggers the binary size analysis workflow, which:
 
 Examples:
 
-- `/test-size hello_world esp32c6`
-- `/test-size embassy_hello_world esp32 esp32c3 esp32s3`
-- `/test-size embassy-adc --package qa-test esp32c6`
+- `/test-size hello_world c6`
+- `/test-size embassy_hello_world esp32 c3 s3`
+- `/test-size hello_world embassy_hello_world c6`
+- `/test-size embassy-adc qa c6`
 
-The example is the first word that is not a chip name. Separate chips with spaces, at least one is required.
+Every word that is not a chip or a package is an example. At least one example and one chip are required.
 
-By default, the example comes from the `examples` package, the projects under `examples/`. Use `--package qa-test` for a binary from `examples/qa/src/bin`, named after its file.
+By default, the examples come from the `examples` package, the projects under `examples/`. Add `qa` (or `qa-test`) for binaries from `examples/qa/src/bin`, named after their files. `--package qa` from before still works.
 
 ## Trust Management Commands
 
@@ -102,4 +115,4 @@ After revocation, the user loses access to the commands above for that PR.
 
 ## Help / Usage Hints
 
-If you request `/hil help` or `/hil` without a valid variant or chips, the bot will respond with a short usage explanation, and a reminder that the requester must be a maintainer or trusted author.
+If you request `/test help` or `/test` alone, the bot will respond with a short usage explanation, and a reminder that the requester must be a maintainer or trusted author. A `/test` or `/test-size` command that can't be run, for example one without a chip or with an unknown chip like `c66`, gets the same explanation with what went wrong. `/hil` is answered the same way.
