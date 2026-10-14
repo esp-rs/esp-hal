@@ -1,5 +1,5 @@
 use std::{
-    fs::{self, create_dir_all},
+    fs::{self, FileTimes, create_dir_all},
     io::Write,
     path::{Path, PathBuf},
 };
@@ -390,18 +390,6 @@ fn cargo_doc_without_pre_processing(
         None
     };
 
-    // cleaning the docs isn't strictly necessary but otherwise rustdoc will pick up
-    // any docs which were built previously resulting in inconsistency regarding how esp-*
-    // inter-crate links are rendered
-    //
-    // however a real problem is that this could pick up e.g. esp-hal docs for the wrong target chip
-    // (rustdoc doesn't know about our chip features, it just knows about target triples!)
-    //
-    // this was never an issue when building via the GitHub workflow because of the way the job is
-    // setup but better safe than sorry
-    //
-    // ideally we could just use `cargo clean --doc` but for `+esp` this turned out to be not
-    // working as intended
     let mut docs_target = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {
         PathBuf::from(target_path)
     } else {
@@ -412,11 +400,53 @@ fn cargo_doc_without_pre_processing(
     };
     docs_target = docs_target.join("doc");
 
-    if docs_target.exists() {
-        log::info!("Removing directory {:?}", docs_target);
-        fs::remove_dir_all(&docs_target)
-            .with_context(|| format!("Unable to remove {:?}", docs_target))?;
+    // One rustdoc output directory is shared by every package and chip on the same target
+    // triple, and rustdoc does not know about our chip features. Park the previous build's
+    // directory under `.xtask-doc-cache/<id>` and restore the one for this package and chip
+    // if we have built it before, so switching packages stays incremental too.
+    let build_id_path = docs_target.with_file_name(".xtask-doc-build-id");
+    let cache_dir = docs_target.with_file_name(".xtask-doc-cache");
+    let build_id = match chip {
+        Some(chip) => format!("{package}-{chip}"),
+        None => package.to_string(),
+    };
+
+    let prev_id = fs::read_to_string(&build_id_path)
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty() && !s.contains(['/', '\\', ' ']));
+
+    if docs_target.exists() && prev_id.as_deref() != Some(build_id.as_str()) {
+        if let Some(prev_id) = prev_id {
+            let parked = cache_dir.join(prev_id);
+            if parked.exists() {
+                fs::remove_dir_all(&parked)
+                    .with_context(|| format!("Unable to remove {:?}", parked))?;
+            }
+            fs::create_dir_all(&cache_dir)
+                .with_context(|| format!("Unable to create {:?}", cache_dir))?;
+            fs::rename(&docs_target, &parked)
+                .with_context(|| format!("Unable to park {:?} to {:?}", docs_target, parked))?;
+        } else {
+            log::info!("Removing directory {:?}", docs_target);
+            fs::remove_dir_all(&docs_target)
+                .with_context(|| format!("Unable to remove {:?}", docs_target))?;
+        }
     }
+
+    if !docs_target.exists() {
+        let parked = cache_dir.join(&build_id);
+        if parked.exists() {
+            fs::rename(&parked, &docs_target)
+                .with_context(|| format!("Unable to restore {:?} to {:?}", parked, docs_target))?;
+        }
+    }
+
+    if let Some(parent) = build_id_path.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("Unable to create {:?}", parent))?;
+    }
+    fs::write(&build_id_path, &build_id)
+        .with_context(|| format!("Failed to write {}", build_id_path.display()))?;
 
     let mut features = vec![];
     let doc_config = if let Some(chip) = &chip {
@@ -518,24 +548,13 @@ fn cargo_doc_without_pre_processing(
     crate::cargo::run_with_env(&command.command, &package_path, command.env_vars, false)
         .with_context(|| format!("Failed to run `cargo doc` for {}", package_name))?;
 
-    // Build up the path at which the built documentation can be found:
-    let mut docs_path = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {
-        PathBuf::from(target_path)
-    } else {
-        workspace.join(package.directory()).join("target")
-    };
-
-    if let Some(ref target) = target {
-        docs_path = docs_path.join(target);
-    }
-    docs_path = docs_path.join("doc");
-
-    Ok(crate::windows_safe_path(&docs_path))
+    Ok(crate::windows_safe_path(&docs_target))
 }
 
 /// Pre-process the Cargo.toml file
 ///
-/// This will keep the original as "Cargo.toml_original"
+/// This will keep the original as "Cargo.toml_original", unless there is nothing to
+/// pre-process, in which case the file is left untouched.
 ///
 /// This will check for `#DOC_IF <condition>` lines - evaluating the condition to false will turn
 /// any documenting comments into non-documenting comments until a `#DOC_ENDIF` line is encountered.
@@ -543,26 +562,11 @@ fn cargo_doc_without_pre_processing(
 /// The only currently supported function for expressions is `has(<SYMBOL>)`
 /// e.g. `has("psram")`
 fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &Path) -> Result<(), anyhow::Error> {
-    let cargo_toml = std::fs::read_to_string(windows_safe_path(&package_path.join("Cargo.toml")))
-        .with_context(|| {
-        format!(
-            "Failed to read {}",
-            package_path.join("Cargo.toml").display()
-        )
-    })?;
+    let manifest_path = windows_safe_path(&package_path.join("Cargo.toml"));
+    let original_path = windows_safe_path(&package_path.join("Cargo.toml_original"));
 
-    std::fs::rename(
-        windows_safe_path(&package_path.join("Cargo.toml")),
-        windows_safe_path(&package_path.join("Cargo.toml_original")),
-    )
-    .with_context(|| {
-        format!(
-            "Failed to rename {}",
-            package_path.join("Cargo.toml").display()
-        )
-    })?;
-
-    let cargo_toml = cargo_toml.lines();
+    let cargo_toml = std::fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
 
     let chip_cfg = chip.as_ref().map(|chip| Config::for_chip(chip));
     let mut processed_cargo_toml = Vec::new();
@@ -576,7 +580,7 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &Path) -> Result<(),
     });
 
     let mut hide = false;
-    for line in cargo_toml {
+    for line in cargo_toml.lines() {
         let mut line = line.to_string();
 
         if line.starts_with("#DOC_ENDIF") {
@@ -604,16 +608,29 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &Path) -> Result<(),
         processed_cargo_toml.push(line);
     }
 
-    std::fs::write(
-        windows_safe_path(&package_path.join("Cargo.toml")),
-        processed_cargo_toml.join("\n"),
-    )
-    .with_context(|| {
-        format!(
-            "Failed to write pre-processed {}",
-            package_path.join("Cargo.toml").display()
-        )
-    })?;
+    let mut processed_cargo_toml = processed_cargo_toml.join("\n");
+    if cargo_toml.ends_with('\n') {
+        processed_cargo_toml.push('\n');
+    }
+
+    // Rewriting the manifest would make cargo rebuild the crate, so leave it alone when
+    // there is nothing to pre-process.
+    if processed_cargo_toml == cargo_toml {
+        return Ok(());
+    }
+
+    std::fs::rename(&manifest_path, &original_path)
+        .with_context(|| format!("Failed to rename {}", manifest_path.display()))?;
+
+    std::fs::write(&manifest_path, processed_cargo_toml)
+        .with_context(|| format!("Failed to write pre-processed {}", manifest_path.display()))?;
+
+    // Keep the original mtime so Cargo does not treat the temporary manifest as newly modified.
+    let mtime = fs::metadata(&original_path)?.modified()?;
+    fs::File::options()
+        .write(true)
+        .open(&manifest_path)?
+        .set_times(FileTimes::new().set_modified(mtime))?;
 
     Ok(())
 }
@@ -1019,7 +1036,7 @@ fn render_template(resources: &Path, template: &str, env: Env) -> Result<String>
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{fs, path::Path};
 
     use somni_expr::somni_struct;
     use somni_template::{Env, Iter, TemplateTypes};
@@ -1033,7 +1050,9 @@ mod tests {
         latest_redirect_base,
         latest_redirect_fallback,
         latest_redirect_html,
+        pre_process_cargo_toml,
         render_template,
+        restore_cargo_toml,
         should_write_latest_redirect,
     };
 
@@ -1051,6 +1070,38 @@ mod tests {
             manifest.insert_version(*v);
         }
         manifest
+    }
+
+    #[test]
+    fn processed_manifest_preserves_original_mtime() {
+        let temp = tempfile::tempdir().unwrap();
+        let package_path = temp.path().join("package");
+        fs::create_dir(&package_path).unwrap();
+
+        let original = "#DOC_IF has(\"wifi\")\n## Wi-Fi\n#DOC_ENDIF\n";
+        fs::write(package_path.join("Cargo.toml"), original).unwrap();
+        let original_mtime = fs::metadata(package_path.join("Cargo.toml"))
+            .unwrap()
+            .modified()
+            .unwrap();
+
+        pre_process_cargo_toml(None, &package_path).unwrap();
+        let processed_mtime = fs::metadata(package_path.join("Cargo.toml"))
+            .unwrap()
+            .modified()
+            .unwrap();
+
+        assert_eq!(original_mtime, processed_mtime);
+        assert_eq!(
+            fs::read_to_string(package_path.join("Cargo.toml")).unwrap(),
+            "# Wi-Fi\n"
+        );
+
+        restore_cargo_toml(package_path.clone()).unwrap();
+        assert_eq!(
+            fs::read_to_string(package_path.join("Cargo.toml")).unwrap(),
+            original
+        );
     }
 
     #[test]
