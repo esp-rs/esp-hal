@@ -52,6 +52,7 @@ and revoke with:
 // `esp32-c6`, `ESP32C6` and `c6` name the same chip as `esp32c6`, as in xtask.
 function normalizeChip(word) {
   const name = word.toLowerCase().replace(/[-_]/g, "");
+  if (!name) return null;
   const soc = name.startsWith("esp32") ? name : `esp32${name}`;
   return SOCS.includes(soc) ? soc : null;
 }
