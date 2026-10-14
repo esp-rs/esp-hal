@@ -59,7 +59,7 @@ async function findDispatchedRun({
   return null;
 }
 
-async function findHilRun({ github, context, pr, selector, distinctId }) {
+async function findHilRun({ github, context, pr, selector, tests = '', pkg = '', distinctId }) {
   const run = await findDispatchedRun({
     github,
     context,
@@ -69,9 +69,16 @@ async function findHilRun({ github, context, pr, selector, distinctId }) {
 
   const isMatrix = selector === 'quick' || selector === 'full';
 
+  // Words of a command can go in any order
+  const details = [
+    ...(isMatrix ? [] : [`chips: ${selector}`]),
+    ...(tests ? [`tests: ${tests.split(',').join(', ')}`] : []),
+    ...(pkg && pkg !== 'hil-test' ? [`package: ${pkg}`] : []),
+  ];
   let body = isMatrix
-    ? `Triggered **${selector}** HIL run for #${pr}.`
-    : `Triggered **HIL** run for #${pr} (chips: ${selector}).`;
+    ? `Triggered **${selector}** HIL run for #${pr}`
+    : `Triggered **HIL** run for #${pr}`;
+  body += details.length ? ` (${details.join('; ')}).` : '.';
 
   if (run?.html_url) {
     body += `\n\nRun: ${run.html_url}`;

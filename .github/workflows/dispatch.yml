@@ -75,7 +75,7 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             Author **@${{ steps.pr.outputs.login }}** was trusted for this PR via the `trusted-author` label.
-            They can now use `/hil quick`, `/hil full` and `/hil <CHIPS>` and their features.
+            They can now use `/test` (`quick`, `full`, or chips and test names). `/hil` still works too.
 
   # ---------------------------------------------------------------------------
   # TRUST MANAGEMENT (/trust, /revoke)
@@ -141,7 +141,7 @@ jobs:
         with:
           issue-number: ${{ github.event.issue.number }}
           # separate short confirmation comment
-          body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR. They can now use `/hil quick`, `/hil full` and `/hil <CHIPS>` and their features."
+          body: "Trusted **@${{ steps.parse.outputs.login }}** for this PR. They can now use `/test` (`quick`, `full`, or chips and test names). `/hil` still works too."
 
   revoke:
     if: >
@@ -205,7 +205,7 @@ jobs:
           body: "Revoked **@${{ steps.parse.outputs.login }}** for this PR."
 
   # ---------------------------------------------------------------------------
-  # SLASH-BASED DISPATCHES (/hil quick, /hil full, /hil <chips...>)
+  # SLASH-BASED DISPATCHES (/test quick, /test full, /test <chip> <test>, and the previous /hil spelling)
   # ---------------------------------------------------------------------------
 
   auth:
@@ -256,7 +256,8 @@ jobs:
     needs: auth
     if: github.event_name == 'issue_comment' &&
       needs.auth.outputs.allowed == 'true' &&
-      startsWith(github.event.comment.body, '/hil ')
+      (startsWith(github.event.comment.body, '/hil ') ||
+      startsWith(github.event.comment.body, '/test '))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6 # for `require`
@@ -267,39 +268,15 @@ jobs:
         id: mode
         uses: actions/github-script@v7
         with:
+          # A command that can't be run is answered by `hil-help`.
           script: |
-            const { parseChips, parseTests, parsePackage } = require('./.github/scripts/hil-parse.js');
-            const chips = require('./.github/chips.json');
-            const body = context.payload.comment.body;
+            const { parseHilCommand } = require('./.github/scripts/hil-parse.js');
+            const res = parseHilCommand(context.payload.comment.body) || {};
 
-            let mode, selected, error = '';
-            if (body.startsWith('/hil quick')) {
-              mode = 'quick';
-              selected = chips.filter(c => c.quick).map(c => c.soc).join(' ');
-            } else if (body.startsWith('/hil full')) {
-              mode = 'full';
-              selected = chips.map(c => c.soc).join(' ');
-            } else {
-              mode = 'chips';
-              const res = parseChips(body);
-              selected = res.chips;
-              error = res.error;
-            }
-
-            core.setOutput('selector', mode === 'chips' ? selected : mode);
-            core.setOutput('mode', mode);
-            core.setOutput('chips', selected);
-            core.setOutput('error', error);
-            core.setOutput('tests', parseTests(body));
-            core.setOutput('package', parsePackage(body));
-
-      - name: Report invalid chips
-        if: steps.mode.outputs.chips == '' && steps.mode.outputs.error != ''
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            @${{ github.event.comment.user.login }}, HIL **per-chip** request failed: ${{ steps.mode.outputs.error }}
+            core.setOutput('selector', res.selector || '');
+            core.setOutput('chips', res.chips || '');
+            core.setOutput('tests', res.tests || '');
+            core.setOutput('package', res.package || '');
 
       - name: Dispatch HIL
         if: steps.mode.outputs.chips != ''
@@ -331,6 +308,8 @@ jobs:
               context,
               pr: context.payload.issue.number,
               selector: '${{ steps.mode.outputs.selector }}',
+              tests: '${{ steps.mode.outputs.tests }}',
+              pkg: '${{ steps.mode.outputs.package }}',
               distinctId: '${{ env.DISTINCT_ID }}',
             });
 
@@ -348,6 +327,7 @@ jobs:
     if:
       github.event_name == 'issue_comment' && needs.auth.outputs.allowed != 'true' &&
       (startsWith(github.event.comment.body, '/hil ') ||
+      startsWith(github.event.comment.body, '/test ') ||
       startsWith(github.event.comment.body, '/test-size'))
     runs-on: ubuntu-latest
     steps:
@@ -361,38 +341,35 @@ jobs:
             ```
             /trust @${{ github.event.comment.user.login }}
             ```
-            After that, you can use `/hil quick`, `/hil full`, `/hil <chips...>` or `/test-size`.
+            After that, you can use `/test` (`quick`, `full`, or chips and test names; `/hil` still works) or `/test-size`.
 
   hil-help:
     if: github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/hil') &&
-      !startsWith(github.event.comment.body, '/hil quick') &&
-      !startsWith(github.event.comment.body, '/hil full') &&
-      !contains(github.event.comment.body, 'esp32')
+      (startsWith(github.event.comment.body, '/hil') ||
+      startsWith(github.event.comment.body, '/test')) &&
+      !startsWith(github.event.comment.body, '/test-')
     runs-on: ubuntu-latest
     steps:
-      - name: Explain usage
-        uses: peter-evans/create-or-update-comment@v4
+      - uses: actions/checkout@v6 # for `require`
         with:
-          issue-number: ${{ github.event.issue.number }}
-          body: |
-            Usage:
-            - `/hil quick` — run a quick HIL matrix (only `ESP32-S3` (Xtensa) and `ESP32-C6` (RISC-V) tests)
-            - `/hil full`  — run the full HIL matrix for all supported chips
-            - `/hil <chip1> [<chip2> ...]` — run the full HIL tests **only** for the listed chips
-            - `/test-size <example_name> [--package <pkg>] <chip1> [chip2 ...]` — run binary size analysis for the specified example on one or more chips. Example: `/test-size embassy_hello_world esp32c3 esp32c6` or `/test-size sleep_timer --package qa esp32c3`
-            - You can optionally append `--test <name>[,<name>...]` to any `/hil` command to only run selected tests.
-            - You can optionally include `hil-test-radio` in the comment body of any `/hil` command to run radio HIL instead of the default `hil-test` package.
-            If you aren't a repository **member/owner**, you must be **trusted for this PR**.
-            Maintainers can grant access with a `trusted-author` label or with:
-            ```
-            /trust @<login>
-            ```
-            and revoke with:
-            ```
-            /revoke @<login>
-            ```
+          fetch-depth: 1
+
+      - name: Explain usage
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { parseHilCommand, USAGE } = require('./.github/scripts/hil-parse.js');
+            const res = parseHilCommand(context.payload.comment.body);
+            if (!res || (!res.help && !res.error)) return;
+
+            const login = context.payload.comment.user.login;
+            const problem = res.error ? `@${login}, this command can't be run:\n${res.error}\n\n` : '';
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: problem + USAGE,
+            });
 
   binary-size:
     needs: auth
@@ -407,68 +384,30 @@ jobs:
 
       - name: Extract parameters from comment
         id: extract
-        env:
-          COMMENT: ${{ github.event.comment.body }}
-        run: |
-          # Expected format: /test-size example_name chip(s)
-          # Use only the line that holds the command (let users add free-form
-          # text in the rest of the comment) and strip any CR characters that
-          # GitHub may include on CRLF line endings.
-          COMMAND_LINE=$(printf '%s' "$COMMENT" | tr -d '\r' | grep -m1 -E '^/test-size' || true)
-          if [ -z "$COMMAND_LINE" ]; then
-            echo "Error: Could not find /test-size command line in comment."
-            exit 1
-          fi
-          # Strip the /test-size prefix
-          ARGS=$(printf '%s' "$COMMAND_LINE" | sed 's|/test-size[[:space:]]*||')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { parseTestSizeCommand, USAGE } = require('./.github/scripts/hil-parse.js');
+            const res = parseTestSizeCommand(context.payload.comment.body);
+            if (!res || res.error) {
+              const login = context.payload.comment.user.login;
+              const error = res?.error || 'Write the command as `/test-size` followed by its words.';
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: context.issue.number,
+                body: `@${login}, this \`/test-size\` command can't be run:\n${error}\n\n${USAGE}`,
+              });
+              core.setFailed(error);
+              return;
+            }
 
-          # Extract --package value if present
-          PACKAGE=""
-          if echo "$ARGS" | grep -q '\-\-package'; then
-            PACKAGE=$(echo "$ARGS" | sed 's/.*--package[[:space:]]\+\([^[:space:]]\+\).*/\1/')
-            # Remove --package <value> from ARGS for further parsing
-            ARGS=$(echo "$ARGS" | sed 's/--package[[:space:]]\+[^[:space:]]\+//')
-          fi
-
-          # Known chips — everything matching these is a chip, first token is the example
-          KNOWN_CHIPS=$(jq -r '[.[].soc] | join(" ")' .github/chips.json)
-
-          EXAMPLE_NAME=""
-          CHIPS_JSON="["
-          FIRST=true
-
-          for token in $ARGS; do
-            if echo "$KNOWN_CHIPS" | grep -qw "$token"; then
-              if [ "$FIRST" = "true" ]; then
-                CHIPS_JSON="${CHIPS_JSON}\"${token}\""
-                FIRST=false
-              else
-                CHIPS_JSON="${CHIPS_JSON},\"${token}\""
-              fi
-            elif [ -z "$EXAMPLE_NAME" ]; then
-              EXAMPLE_NAME="$token"
-            fi
-          done
-          CHIPS_JSON="${CHIPS_JSON}]"
-
-          if [ -z "$EXAMPLE_NAME" ]; then
-            echo "Error: No example name provided."
-            echo "Expected: /test-size example_name [--package pkg] chip1 [chip2 ...]"
-            exit 1
-          fi
-
-          if [ "$CHIPS_JSON" = "[]" ]; then
-            echo "Error: No valid chip names provided."
-            echo "Valid chips: $KNOWN_CHIPS"
-            exit 1
-          fi
-
-          echo "example_name=$EXAMPLE_NAME" >> $GITHUB_OUTPUT
-          echo "package=$PACKAGE"           >> $GITHUB_OUTPUT
-          echo "chips=$CHIPS_JSON"          >> $GITHUB_OUTPUT
-          CHIPS_ESCAPED=$(echo "$CHIPS_JSON" | sed 's/"/\\"/g')
-          echo "chips_escaped=$CHIPS_ESCAPED" >> $GITHUB_OUTPUT
-          echo "Parsed — example: $EXAMPLE_NAME | package: $PACKAGE | chips: $CHIPS_JSON"
+            // `example_name` takes several examples, separated by spaces.
+            const chips = JSON.stringify(res.chips);
+            core.setOutput('example_name', res.examples);
+            core.setOutput('package', res.package);
+            core.setOutput('chips', chips);
+            core.setOutput('chips_escaped', JSON.stringify(chips).slice(1, -1));
+            core.info(`Parsed — examples: ${res.examples} | package: ${res.package} | chips: ${chips}`);
 
       - name: Confirm in PR
         id: comment
