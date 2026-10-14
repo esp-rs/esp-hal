@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -10,6 +10,7 @@ use clap::Args;
 use serde::Deserialize;
 use strum::IntoEnumIterator as _;
 
+use super::tests::SKIPPED_SELECTORS_FILENAME;
 use crate::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
@@ -167,10 +168,10 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         if !path.is_file() {
             continue;
         }
-        if path
-            .file_name()
-            .is_some_and(|name| name == std::ffi::OsStr::new(RADIO_ELF_MANIFEST_FILENAME))
-        {
+        if path.file_name().is_some_and(|name| {
+            name == std::ffi::OsStr::new(RADIO_ELF_MANIFEST_FILENAME)
+                || name == std::ffi::OsStr::new(SKIPPED_SELECTORS_FILENAME)
+        }) {
             continue;
         }
 
@@ -318,10 +319,24 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
         .filter(|(_, matched)| !**matched)
         .map(|(filter, _)| filter.raw.as_str())
         .collect::<Vec<_>>();
+    let skipped_selectors = load_skipped_selectors(&args.path)?;
+    let (skipped, unmatched): (Vec<_>, Vec<_>) = unmatched.into_iter().partition(|raw| {
+        let raw = raw.to_lowercase();
+        skipped_selectors
+            .iter()
+            .any(|name| name.to_lowercase().contains(&raw))
+    });
     if !unmatched.is_empty() {
         bail!(
             "ELF selector did not match any artifact: {}",
             unmatched.join(", ")
+        );
+    }
+    if !skipped.is_empty() {
+        log::warn!(
+            "Skipping selectors without a test for '{}': {}",
+            args.chip,
+            skipped.join(", ")
         );
     }
 
@@ -358,7 +373,10 @@ fn parse_elf_filters(raw_filters: &[String]) -> Result<Vec<ElfFilter>> {
             None => (raw, None),
         };
 
-        let binary = binary.trim().to_lowercase();
+        let mut binary = binary.trim().to_lowercase();
+        if let Some(stem) = binary.strip_suffix(".rs") {
+            binary = stem.to_string();
+        }
         if binary.is_empty() {
             bail!("Empty binary filter in ELF selector '{raw}' is not allowed");
         }
@@ -418,6 +436,18 @@ fn load_radio_test_manifest(path: &Path) -> Result<Option<HashMap<String, RadioE
         .map(|entry| (entry.artifact.clone(), entry))
         .collect::<HashMap<_, _>>();
     Ok(Some(by_artifact))
+}
+
+fn load_skipped_selectors(path: &Path) -> Result<HashSet<String>> {
+    let skipped_path = path.join(SKIPPED_SELECTORS_FILENAME);
+    if !skipped_path.exists() {
+        return Ok(HashSet::new());
+    }
+
+    let content = fs::read_to_string(&skipped_path)
+        .with_context(|| format!("Failed to read {}", skipped_path.display()))?;
+    serde_json::from_str(&content)
+        .with_context(|| format!("Failed to parse {}", skipped_path.display()))
 }
 
 fn resolve_harness_binary_path(elfs: &[(String, PathBuf)], harness_name: &str) -> Option<PathBuf> {
