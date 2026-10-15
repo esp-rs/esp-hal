@@ -14,6 +14,9 @@ pub struct AccessPointConfig {
     /// Whether the SSID is hidden or visible.
     pub(crate) ssid_hidden: bool,
     /// The channel the access point will operate on.
+    ///
+    /// The channel must be allowed in the configured country. The default country only allows
+    /// channels that are permitted in all regions.
     pub(crate) channel: u8,
     /// The secondary channel configuration.
     pub(crate) secondary_channel: Option<SecondaryChannel>,

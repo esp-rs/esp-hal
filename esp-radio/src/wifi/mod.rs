@@ -2431,7 +2431,7 @@ impl OperatingClass {
 #[procmacros::doc_replace]
 /// Country information.
 ///
-/// Defaults to China (CN) with Operating Class "0".
+/// Defaults to "01" (world safe mode) with IEEE 802.11d enabled.
 ///
 /// To create a [`CountryInfo`] instance, use the `from` method first, then set additional
 /// properties using the builder methods.
@@ -2458,6 +2458,10 @@ pub struct CountryInfo {
     /// Operating class.
     #[builder_lite(unstable)]
     operating_class: OperatingClass,
+
+    /// Whether IEEE 802.11d is enabled. Disable it to find hidden access points on all channels.
+    #[builder_lite(unstable)]
+    ieee80211d_enabled: bool,
 }
 
 impl From<[u8; 2]> for CountryInfo {
@@ -2465,32 +2469,12 @@ impl From<[u8; 2]> for CountryInfo {
         Self {
             country,
             operating_class: OperatingClass::default(),
+            ieee80211d_enabled: true,
         }
     }
 }
 
 impl CountryInfo {
-    fn into_blob(self) -> wifi_country_t {
-        wifi_country_t {
-            cc: [
-                self.country[0],
-                self.country[1],
-                self.operating_class.into_code(),
-            ],
-            // TODO: these may be valid defaults, but they should be configurable.
-            schan: 1,
-            nchan: 13,
-            // This field is output-only: esp_wifi_set_country ignores it. The actual TX power
-            // is controlled exclusively via esp_wifi_set_max_tx_power after WiFi start.
-            // See: https://github.com/espressif/esp-idf/blob/20f5e18/components/esp_wifi/include/esp_wifi_types.h#L46
-            max_tx_power: 0,
-            policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
-
-            #[cfg(wifi_has_5g)]
-            wifi_5g_channel_mask: 0,
-        }
-    }
-
     #[cfg_attr(not(feature = "unstable"), expect(dead_code))]
     fn try_from_c(info: &wifi_country_t) -> Option<Self> {
         let cc = &info.cc;
@@ -2499,6 +2483,7 @@ impl CountryInfo {
         Some(Self {
             country: [cc[0], cc[1]],
             operating_class,
+            ieee80211d_enabled: info.policy == wifi_country_policy_t_WIFI_COUNTRY_POLICY_AUTO,
         })
     }
 }
@@ -2643,7 +2628,7 @@ impl Default for ControllerConfig {
             espnow_max_encrypt_num: crate::sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM
                 as _,
 
-            country_info: CountryInfo::from(*b"CN"),
+            country_info: CountryInfo::from(*b"01"),
 
             initial_config: Config::Station(StationConfig::default()),
         }
@@ -2991,9 +2976,19 @@ impl WifiController<'_> {
     }
 
     fn set_country_info(&mut self, country: &CountryInfo) -> Result<(), WifiError> {
+        // A zero operating class code terminates the string early, which the driver treats as
+        // "all environments".
+        let code = [
+            country.country[0],
+            country.country[1],
+            country.operating_class.into_code(),
+            0,
+        ];
         unsafe {
-            let country = country.into_blob();
-            esp_wifi_result!(esp_wifi_set_country(&country))?;
+            esp_wifi_result!(esp_wifi_set_country_code(
+                code.as_ptr().cast(),
+                country.ieee80211d_enabled
+            ))?;
         }
         Ok(())
     }
@@ -3189,6 +3184,19 @@ impl WifiController<'_> {
 
             // `esp_wifi_start` is actually not async - i.e. we get the even before it returns
             esp_wifi_result!(unsafe { esp_wifi_start() })?;
+
+            // Default for all scans, including connect scans. Requires a started station.
+            if mode != wifi_mode_t_WIFI_MODE_AP {
+                let params = wifi_scan_default_params_t {
+                    scan_time: wifi_scan_time_t {
+                        active: wifi_active_scan_time_t { min: 0, max: 0 },
+                        // Covers one typical beacon interval (102.4 ms).
+                        passive: 120,
+                    },
+                    home_chan_dwell_time: 0,
+                };
+                esp_wifi_result!(unsafe { esp_wifi_set_scan_parameters(&params) })?;
+            }
         }
 
         reset_mode_on_error.defuse();
@@ -3703,7 +3711,17 @@ ignored."
                 return Ok(());
             }
 
-            esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_AP, &mut cfg))
+            esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_AP, &mut cfg)).inspect_err(
+                |e| {
+                    if *e == WifiError::InvalidArguments {
+                        warn!(
+                            "The access point configuration was rejected. Channel {} might not be \
+                             allowed in the configured country, see `ControllerConfig::country_info`.",
+                            config.channel
+                        );
+                    }
+                },
+            )
         }
     }
 
