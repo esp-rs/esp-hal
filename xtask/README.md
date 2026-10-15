@@ -155,20 +155,20 @@ Manifest consistency tests (for example `cargo test chip_coverage`) live in the
 `xtask` crate itself. CI covers them with `cd xtask && cargo test --features release`
 in the same `host-tests` job. Run that locally the same way.
 
-**Detection is not enough.** Each package with host tests also needs a match arm
-in `run_host_tests` (`xtask/src/lib.rs`). Without it, xtask fails with
-`Instructions for host testing were not provided for: '<package>'` even though
-the tests compile with `cargo test -p <package>`.
+**Detection is not enough.** Each package with host tests also needs `host-test-configs`
+under `[package.metadata.espressif]` in its `Cargo.toml`. Without it, xtask fails with
+`Instructions for host testing were not provided in Cargo.toml (\`host-test-configs\`) for: '<package>'`
+even though the tests compile with `cargo test -p <package>`.
 
 When adding host tests to a package:
 
 1. Add the tests (`#[test]` in `src/`, and/or `tests/*.rs` integration tests).
-2. Add a `Package::<Name> => { ... }` arm to `run_host_tests` with the right
-   `cargo test` invocation (features, `--lib`, `--tests`, Miri, etc.). Copy a
+2. Add a `host-test-configs` array under `[package.metadata.espressif]` in the crate's `Cargo.toml`
+   with the right `cargo test` options (`features`, `cargo-args`, `test-args`, `miri`). Copy a
    similar package if unsure.
 3. Verify with `cargo xtask host-tests <package>`.
 
-## Package metadata: `check-configs`, `clippy-configs`, `doc-config`, `semver-config`
+## Package metadata: `check-configs`, `clippy-configs`, `doc-config`, `semver-config`, `host-test-configs`
 
 Published crates can list CI check, clippy, documentation, and semver cases under
 `[package.metadata.espressif]` in their `Cargo.toml`. Each case is one inline table; `features`

@@ -22,6 +22,12 @@ check-configs = [
     { features = ["embedded-storage", "critical-section", "bytewise-read"] },
 ]
 clippy-configs = [{ features = ["embedded-storage", "critical-section", "bytewise-read"] }]
+host-test-configs = [
+    { features = ["emulation"], test-args = ["--test-threads=1"] },
+    { features = ["emulation", "bytewise-read"], test-args = ["--test-threads=1"] },
+    { features = ["emulation"], test-args = ["--test-threads=1"], miri = true },
+    { features = ["emulation", "bytewise-read"], test-args = ["--test-threads=1"], miri = true },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"

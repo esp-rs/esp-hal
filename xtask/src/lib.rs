@@ -68,6 +68,15 @@ pub struct CheckConfig {
     pub env: HashMap<String, String>,
 }
 
+/// One `host-test-configs` case from `[package.metadata.espressif]`.
+#[derive(Debug, Clone, Default)]
+pub struct HostTestConfig {
+    pub features: Vec<String>,
+    pub cargo_args: Vec<String>,
+    pub test_args: Vec<String>,
+    pub miri: bool,
+}
+
 #[derive(
     Debug,
     Clone,
@@ -251,13 +260,19 @@ impl Package {
     /// Does the package have any host tests?
     ///
     /// Returns true when `src/**/*.rs` contains `#[test]`. Packages that return
-    /// true must also have a match arm in [`run_host_tests`]; see `xtask/README.md`
-    /// ("Host tests").
+    /// true must also configure `host-test-configs` in `[package.metadata.espressif]`;
+    /// see `xtask/README.md` ("Host tests").
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
-        if *self == Package::HilTest || *self == Package::HilTestRadio {
+        if self.contains_standalone_projects() {
             return false;
         }
-        let package_path = workspace.join(self.directory()).join("src");
+        // Test suites (`hil-test`, `hil-test-radio`) use `#[test]` with `embedded-test`
+        // rather than host `cargo test`.
+        let package_dir = workspace.join(self.directory());
+        if package_dir.join("src").join("bin").is_dir() && !self.is_published() {
+            return false;
+        }
+        let package_path = package_dir.join("src");
 
         walkdir::WalkDir::new(package_path)
             .into_iter()
@@ -530,6 +545,64 @@ impl Package {
             .unwrap_or_default();
 
         log::debug!("Clippy configs for package '{}': {:?}", self, cases);
+        cases
+    }
+
+    /// Host test configurations to run for this package via `cargo xtask host-tests`.
+    pub fn host_test_config_rules(&self) -> Vec<HostTestConfig> {
+        let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return Vec::new();
+        };
+
+        let mut cases = Vec::new();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("host-test-configs")
+        {
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "'host-test-configs' must be an array of tables. {:?}",
+                    config_meta
+                );
+            };
+
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("'host-test-configs' items must be inline tables.");
+                };
+
+                let features = Self::parse_required_features(table);
+
+                let parse_str_array = |key: &str| -> Vec<String> {
+                    let Some(val) = table.get(key) else {
+                        return Vec::new();
+                    };
+                    let Value::Array(arr) = val else {
+                        panic!("'{key}' must be an array.");
+                    };
+                    arr.iter()
+                        .map(|v| {
+                            v.as_str()
+                                .unwrap_or_else(|| panic!("'{key}' items must be strings."))
+                                .to_owned()
+                        })
+                        .collect()
+                };
+
+                let cargo_args = parse_str_array("cargo-args");
+                let test_args = parse_str_array("test-args");
+                let miri = table.get("miri").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                cases.push(HostTestConfig {
+                    features,
+                    cargo_args,
+                    test_args,
+                    miri,
+                });
+            }
+        }
+
+        log::debug!("Host test configs for package '{}': {:?}", self, cases);
         cases
     }
 
@@ -915,100 +988,41 @@ pub fn format_package(
 /// Run the host tests for the specified package.
 ///
 /// Called by `cargo xtask host-tests` for every package where [`Package::has_host_tests`]
-/// is true. **When adding `#[test]` functions to a package, add a match arm here**
-/// with the correct `cargo test` flags/features. See `xtask/README.md` ("Host tests").
+/// is true. Driven by `host-test-configs` in `[package.metadata.espressif]`.
+/// See `xtask/README.md` ("Host tests").
 pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     log::info!("Running host tests for package: {}", package);
     let package_path = workspace.join(package.directory());
 
-    let cmd = CargoArgsBuilder::default();
-
-    match package {
-        Package::EspConfig => cargo::run(
-            &cmd.clone()
-                .subcommand("test")
-                .features(&["build".into(), "tui".into()])
-                .build(),
-            &package_path,
-        ),
-
-        Package::EspBootloaderEspIdf => cargo::run(
-            &cmd.clone()
-                .subcommand("test")
-                .arg("--lib")
-                .arg("--tests")
-                .features(&["std".into(), "embedded-storage".into()])
-                .arg("--")
-                .arg("--test-threads=1")
-                .build(),
-            &package_path,
-        ),
-
-        Package::EspStorage => {
-            cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .features(&["emulation".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            )?;
-
-            cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .features(&["emulation".into(), "bytewise-read".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            )?;
-
-            log::info!("Running miri host tests for package: {}", package);
-
-            cargo::run(
-                &cmd.clone()
-                    .toolchain("nightly")
-                    .subcommand("miri")
-                    .subcommand("test")
-                    .features(&["emulation".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            )?;
-
-            cargo::run(
-                &cmd.clone()
-                    .toolchain("nightly")
-                    .subcommand("miri")
-                    .subcommand("test")
-                    .features(&["emulation".into(), "bytewise-read".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            )
-        }
-        Package::EspHalProcmacros => cargo::run(
-            &cmd.clone()
-                .subcommand("test")
-                .features(&[
-                    "has-lp-core".into(),
-                    "is-lp-core".into(),
-                    "rtc-slow".into(),
-                    "rtc-fast".into(),
-                ])
-                .build(),
-            &package_path,
-        ),
-        Package::EspMetadata => cargo::run(&cmd.clone().subcommand("test").build(), &package_path),
-        _ => Err(anyhow!(
-            "Instructions for host testing were not provided for: '{}'",
+    let configs = package.host_test_config_rules();
+    if configs.is_empty() {
+        return Err(anyhow!(
+            "Instructions for host testing were not provided in Cargo.toml (`host-test-configs`) for: '{}'",
             package,
-        )),
+        ));
     }
+
+    for config in configs {
+        let mut cmd = CargoArgsBuilder::default();
+        if config.miri {
+            log::info!("Running miri host tests for package: {}", package);
+            cmd = cmd.toolchain("nightly").subcommand("miri");
+        }
+        cmd = cmd.subcommand("test");
+        for arg in &config.cargo_args {
+            cmd = cmd.arg(arg);
+        }
+        cmd = cmd.features(&config.features);
+        if !config.test_args.is_empty() {
+            cmd = cmd.arg("--");
+            for arg in &config.test_args {
+                cmd = cmd.arg(arg);
+            }
+        }
+        cargo::run(&cmd.build(), &package_path)?;
+    }
+
+    Ok(())
 }
 
 /// How many times an operation that writes source files is attempted before
@@ -1456,6 +1470,20 @@ mod tests {
                 !projects.is_empty(),
                 "package '{package}' contains no standalone projects"
             );
+        }
+    }
+
+    #[test]
+    fn packages_with_host_tests_define_host_test_configs() {
+        let workspace = repo_root_for_tests();
+
+        for package in Package::iter() {
+            if package.has_host_tests(&workspace) {
+                assert!(
+                    !package.host_test_config_rules().is_empty(),
+                    "package '{package}' has `#[test]` in src/ but does not define `host-test-configs` in `[package.metadata.espressif]`"
+                );
+            }
         }
     }
 }

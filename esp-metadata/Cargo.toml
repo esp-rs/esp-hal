@@ -17,6 +17,9 @@ check-configs = [
     { features = [] },
 ]
 clippy-configs = [] # don't waste time on this
+host-test-configs = [
+    { features = [] },
+]
 
 [dependencies]
 anyhow       = "1.0"
