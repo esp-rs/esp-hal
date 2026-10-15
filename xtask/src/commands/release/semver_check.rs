@@ -103,8 +103,7 @@ pub mod checker {
                 let package_name = package.to_string();
                 let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
-                let current_path =
-                    build_prepared_doc_json(package, chip, &package_path)?;
+                let current_path = build_prepared_doc_json(package, chip, &package_path)?;
 
                 let to_path = PathBuf::from(&package_path).join(format!(
                     "api-baseline/{}.json.gz",

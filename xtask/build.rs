@@ -14,7 +14,9 @@ struct DiscoveredPackage {
 
 fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let workspace = manifest_dir.parent().expect("xtask must live inside workspace root");
+    let workspace = manifest_dir
+        .parent()
+        .expect("xtask must live inside workspace root");
     let root_manifest = workspace.join("Cargo.toml");
     println!("cargo::rerun-if-changed={}", root_manifest.display());
 

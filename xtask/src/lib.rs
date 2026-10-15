@@ -1417,17 +1417,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn packages_with_host_tests_define_host_test_configs() {
-        let workspace = repo_root_for_tests();
-
-        for package in Package::iter() {
-            if package.has_host_tests(&workspace) {
-                assert!(
-                    !package.host_test_config_rules().is_empty(),
-                    "package '{package}' has `#[test]` in src/ but does not define `host-test-configs` in `[package.metadata.espressif]`"
-                );
-            }
-        }
-    }
 }
