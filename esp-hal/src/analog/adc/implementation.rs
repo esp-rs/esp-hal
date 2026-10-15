@@ -1,11 +1,8 @@
 // Fallback target for `mod implementation;` in `mod.rs`.
 //
-// Every supported chip redirects that module to a real implementation with a `#[cfg_attr(<chip>,
-// path = "...")]` arm, so this file is only ever compiled when a chip enables `[device.adc]` in its
-// metadata without being listed there. Relying on the default module path keeps the chip list in
-// one place; the alternative, a `#[cfg(not(any(...)))]` guard, would have to repeat it.
+// Shared controllers set `adc.controller` to `rtc` or `digital`. ESP32, ESP32-P4, and ESP32-S31
+// use chip path attrs. This file is only compiled when none of those match.
 compile_error!(
-    "This chip has ADC support enabled in `esp-metadata` but no ADC implementation module. \
-     Add a `#[cfg_attr(<chip>, path = \"...\")]` arm to `esp-hal/src/analog/adc/mod.rs`, or drop \
-     `[device.adc]` from the chip's `soc.toml`."
+    "This chip has ADC support enabled in `esp-metadata` but no ADC implementation was selected. \
+     Set `adc.controller` to \"rtc\" or \"digital\", or add a chip path attr in `mod.rs`."
 );

@@ -9,7 +9,7 @@
 //% CHIP_FILTER: adc_driver_supported
 //% FEATURES: unstable
 //% FEATURES(efuse):
-//% CHIP_FILTER(self_cal): adc_driver_supported && !esp32 && !esp32c5 && !esp32s31
+//% CHIP_FILTER(self_cal): adc_efuse_calibration && !esp32c5
 //% CARGO-CONFIG(self_cal): target.'cfg(target_os="none")'.rustflags=["--cfg=__test_adc_self_cal"]
 
 #![no_std]
@@ -98,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(not(any(esp32, esp32s31)))]
+    #[cfg(adc_basic_calibration)]
     fn basic_calibration_reads_complete(p: Peripherals) {
         use esp_hal::{analog::adc::AdcCalBasic, peripherals::ADC1};
 
@@ -113,7 +113,7 @@ mod tests {
     // Line fitting needs a factory reference point from eFuse, which the ESP32-H2 dev kits on the
     // HIL runners do not have burnt - `AdcCalLine` (and `AdcCalCurve`, built on it) panics there.
     #[test]
-    #[cfg(not(any(esp32h2, esp32s31)))]
+    #[cfg(all(adc_line_calibration, not(esp32h2)))]
     fn line_calibration_reads_complete(p: Peripherals) {
         use esp_hal::{analog::adc::AdcCalLine, peripherals::ADC1};
 
@@ -129,7 +129,7 @@ mod tests {
 
     // Not on the ESP32-H2 HIL dev kits, see `line_calibration_reads_complete`.
     #[test]
-    #[cfg(any(esp32c3, esp32c5, esp32c6, esp32c61, esp32p4, esp32s3))]
+    #[cfg(all(adc_curve_calibration, not(esp32h2)))]
     fn curve_calibration_reads_complete(p: Peripherals) {
         use esp_hal::{analog::adc::AdcCalCurve, peripherals::ADC1};
 

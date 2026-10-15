@@ -500,6 +500,28 @@ impl Config {
                 .validate_mem2mem(dma.mem2mem_requires_peripheral)?;
         }
 
+        if let Some(adc) = &self.device.peri_config.adc
+            && adc.support_status.is_supported()
+        {
+            let chip = &self.device.name;
+            ensure!(
+                matches!(adc.controller.as_str(), "" | "rtc" | "digital"),
+                "{chip}: adc.controller must be rtc, digital, or empty"
+            );
+            if adc.controller == "digital" {
+                ensure!(
+                    adc.channel_count > 0,
+                    "{chip}: digital ADC needs adc.channel_count"
+                );
+                if adc.pcr_clock {
+                    ensure!(
+                        adc.pll_clock_sel > 0,
+                        "{chip}: PCR ADC clock needs adc.pll_clock_sel"
+                    );
+                }
+            }
+        }
+
         Ok(())
     }
 

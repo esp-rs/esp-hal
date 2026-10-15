@@ -69,11 +69,8 @@ use crate::gpio::AnalogPin;
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32p4, path = "p4.rs")]
 #[cfg_attr(esp32s31, path = "s31.rs")]
-#[cfg_attr(any(esp32s2, esp32s3), path = "s2_s3.rs")]
-#[cfg_attr(
-    any(esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2),
-    path = "dig_ctrl.rs"
-)]
+#[cfg_attr(adc_controller = "rtc", path = "s2_s3.rs")]
+#[cfg_attr(adc_controller = "digital", path = "dig_ctrl.rs")]
 #[cfg(feature = "unstable")]
 mod implementation;
 
@@ -100,7 +97,7 @@ pub enum Attenuation {
 }
 
 /// The number of [`Attenuation`] variants, and in turn the length of tables indexed by one.
-#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+#[cfg(all(feature = "unstable", adc_efuse_calibration))]
 const ATTENUATION_COUNT: usize = 4;
 
 /// An I/O pin which can be read using the ADC.
@@ -227,11 +224,11 @@ pub trait CalibrationAccess: RegisterAccess {
 }
 
 /// Number of times the search below is repeated. The extremes are discarded and the rest averaged.
-#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+#[cfg(all(feature = "unstable", adc_efuse_calibration))]
 const ADC_CAL_TIMES: u32 = 10;
 
 /// One past the highest initial code. The field is twelve bits wide on every chip.
-#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+#[cfg(all(feature = "unstable", adc_efuse_calibration))]
 const ADC_CAL_OFFSET_RANGE: u16 = 4096;
 
 /// Finds the initial code that cancels out the calibration source the unit is currently connected
@@ -245,7 +242,7 @@ const ADC_CAL_OFFSET_RANGE: u16 = 4096;
 ///
 /// See `adc_hal_self_calibration` in
 /// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>.
-#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+#[cfg(all(feature = "unstable", adc_efuse_calibration))]
 fn search_init_code<ADCX: CalibrationAccess>(mut measure: impl FnMut() -> u16) -> u16 {
     let mut sum = 0;
     let mut lowest = u16::MAX;
@@ -315,7 +312,7 @@ impl<ADCX> AdcCalScheme<ADCX> for () {
 }
 
 /// Returns the attenuation channel `channel` was configured with.
-#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+#[cfg(all(feature = "unstable", adc_efuse_calibration))]
 fn channel_attenuation(attenuations: &[Option<Attenuation>], channel: u8) -> Attenuation {
     match attenuations[channel as usize] {
         Some(attenuation) => attenuation,
@@ -331,7 +328,7 @@ fn channel_attenuation(attenuations: &[Option<Attenuation>], channel: u8) -> Att
 //
 // Determining a code can involve measuring the ADC, and that measurement programs channel 0's
 // attenuation, so the caller has to apply the configured attenuations afterwards.
-#[cfg(all(feature = "unstable", not(any(esp32, esp32s31))))]
+#[cfg(all(feature = "unstable", adc_efuse_calibration))]
 fn hw_init_codes<ADCX>(attenuations: &[Option<Attenuation>]) -> [u16; ATTENUATION_COUNT]
 where
     ADCX: AdcCalEfuse + CalibrationAccess,
@@ -359,7 +356,7 @@ where
 }
 
 /// A helper trait to get access to ADC calibration efuses.
-#[cfg(not(any(esp32, esp32s31)))]
+#[cfg(adc_efuse_calibration)]
 #[doc(hidden)]
 pub trait AdcCalEfuse {
     /// Returns the ADC calibration init code.
@@ -380,7 +377,7 @@ pub trait AdcCalEfuse {
     /// Returns the ADC channel specific calibration.
     ///
     /// Returns digital per channel offset from reference voltage.
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
+    #[cfg(adc_channel_compensation)]
     fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32>;
 }
 

@@ -1,21 +1,13 @@
-#[cfg(any(
-    esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s2, esp32s3
-))]
+#[cfg(adc_basic_calibration)]
 pub use self::basic::AdcCalBasic;
-#[cfg(any(esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s3))]
+#[cfg(adc_curve_calibration)]
 pub use self::curve::{AdcCalCurve, AdcHasCurveCal};
-#[cfg(any(
-    esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s2, esp32s3
-))]
+#[cfg(adc_line_calibration)]
 pub use self::line::{AdcCalLine, AdcHasLineCal};
 
-#[cfg(any(
-    esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s2, esp32s3
-))]
+#[cfg(adc_basic_calibration)]
 mod basic;
-#[cfg(any(esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s3))]
+#[cfg(adc_curve_calibration)]
 mod curve;
-#[cfg(any(
-    esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s2, esp32s3
-))]
+#[cfg(adc_line_calibration)]
 mod line;

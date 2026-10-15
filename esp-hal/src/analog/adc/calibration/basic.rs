@@ -13,7 +13,7 @@ use crate::analog::adc::{AdcCalEfuse, AdcCalScheme, Attenuation, CalibrationAcce
 /// returns readings unchanged.
 #[derive(Clone, Copy)]
 pub struct AdcCalBasic<ADCX> {
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
+    #[cfg(adc_channel_compensation)]
     chan_compens: i32,
 
     _phantom: PhantomData<ADCX>,
@@ -31,13 +31,13 @@ where
 
     fn new_cal_with_channel(_atten: Attenuation, _channel: u8) -> Self {
         Self {
-            #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
+            #[cfg(adc_channel_compensation)]
             chan_compens: ADCX::cal_chan_compens(_atten, _channel).unwrap_or(0),
             _phantom: PhantomData,
         }
     }
 
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4))]
+    #[cfg(adc_channel_compensation)]
     fn adc_val(&self, val: u16) -> u16 {
         (val as i32 - self.chan_compens).clamp(0, ADCX::ADC_VAL_MASK as i32) as u16
     }

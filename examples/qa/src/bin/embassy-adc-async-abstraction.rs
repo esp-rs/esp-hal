@@ -4,9 +4,8 @@
 //! PINS
 //! GPIO4 for ADC1, GPIO20 on the ESP32-P4
 
-// The ESP32-S31 is excluded because this example calibrates the pin, and no
-// calibration scheme is implemented for that chip.
-//% CHIP_FILTER: adc_driver_supported && !esp32 && !esp32s31
+// Needs a calibration scheme and async ADC (no async on ESP32).
+//% CHIP_FILTER: adc_basic_calibration && !esp32
 
 #![no_std]
 #![no_main]

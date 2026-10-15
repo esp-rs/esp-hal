@@ -99,6 +99,12 @@ peripherals = [
 
 [device.adc]
 support_status = "partial"
+controller = "digital"
+channel_count = 5
+line_calibration = true
+curve_calibration = true
+basic_calibration = true
+efuse_calibration = true
 # ADC2 is deliberately absent. Its digital controller is broken on this chip and the chip has no
 # RTC ADC controller to fall back on, so there is no way to read it reliably. ESP-IDF refuses to
 # create a one-shot unit for it unless `CONFIG_ADC_ONESHOT_FORCE_USE_ADC2_ON_C3` is set.

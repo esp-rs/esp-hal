@@ -388,6 +388,45 @@ macro_rules! property {
     ("rgb_display.output_lines", str) => {
         stringify!(24)
     };
+    ("adc.controller") => {
+        ""
+    };
+    ("adc.channel_count") => {
+        0
+    };
+    ("adc.channel_count", str) => {
+        stringify!(0)
+    };
+    ("adc.line_calibration") => {
+        false
+    };
+    ("adc.curve_calibration") => {
+        false
+    };
+    ("adc.basic_calibration") => {
+        false
+    };
+    ("adc.efuse_calibration") => {
+        false
+    };
+    ("adc.channel_compensation") => {
+        false
+    };
+    ("adc.pcr_clock") => {
+        false
+    };
+    ("adc.pll_clock_sel") => {
+        0
+    };
+    ("adc.pll_clock_sel", str) => {
+        stringify!(0)
+    };
+    ("adc.pcr_sar_clk_div") => {
+        false
+    };
+    ("adc.sar_power_override") => {
+        false
+    };
     ("sdm.channel_count") => {
         8
     };

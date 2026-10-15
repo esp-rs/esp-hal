@@ -110,6 +110,7 @@ peripherals = [
 
 [device.adc]
 support_status = "partial"
+line_calibration = true
 instances = [
     { name = "adc1" },
     { name = "adc2" },

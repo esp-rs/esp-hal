@@ -812,7 +812,32 @@ driver_configs![
         AdcProperties {
             driver: adc,
             name: "ADC",
-            properties: {}
+            properties: {
+                #[serde(default)]
+                controller: String,
+                #[serde(default)]
+                channel_count: u32,
+
+                #[serde(default)]
+                line_calibration: bool,
+                #[serde(default)]
+                curve_calibration: bool,
+                #[serde(default)]
+                basic_calibration: bool,
+                #[serde(default)]
+                efuse_calibration: bool,
+                #[serde(default)]
+                channel_compensation: bool,
+
+                #[serde(default)]
+                pcr_clock: bool,
+                #[serde(default)]
+                pll_clock_sel: u32,
+                #[serde(default)]
+                pcr_sar_clk_div: bool,
+                #[serde(default)]
+                sar_power_override: bool,
+            }
         },
         AvcProperties {
             driver: avc,

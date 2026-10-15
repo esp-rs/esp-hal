@@ -370,6 +370,45 @@ macro_rules! property {
     ("ethernet.has_rgmii") => {
         false
     };
+    ("adc.controller") => {
+        ""
+    };
+    ("adc.channel_count") => {
+        0
+    };
+    ("adc.channel_count", str) => {
+        stringify!(0)
+    };
+    ("adc.line_calibration") => {
+        true
+    };
+    ("adc.curve_calibration") => {
+        true
+    };
+    ("adc.basic_calibration") => {
+        true
+    };
+    ("adc.efuse_calibration") => {
+        true
+    };
+    ("adc.channel_compensation") => {
+        true
+    };
+    ("adc.pcr_clock") => {
+        false
+    };
+    ("adc.pll_clock_sel") => {
+        0
+    };
+    ("adc.pll_clock_sel", str) => {
+        stringify!(0)
+    };
+    ("adc.pcr_sar_clk_div") => {
+        false
+    };
+    ("adc.sar_power_override") => {
+        false
+    };
     ("sdm.channel_count") => {
         8
     };
