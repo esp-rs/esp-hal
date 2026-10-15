@@ -63,7 +63,7 @@ where
     MC: Converter,
 {
     async fn measure(&mut self) -> u16 {
-        let raw_value = self.adc.read_oneshot(&mut self.pin).await;
+        let raw_value = self.adc.read_oneshot(&mut self.pin).await.unwrap();
 
         MC::raw_to_metering(raw_value)
     }
@@ -94,8 +94,11 @@ async fn main(_spawner: Spawner) {
         .enable_pin_with_cal::<_, AdcCalBasic<esp_hal::peripherals::ADC1<'static>>>(
             analog_pin1,
             Attenuation::_11dB,
-        );
-    let adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();
+        )
+        .unwrap();
+    let adc1 = Adc::new(peripherals.ADC1, adc1_config)
+        .unwrap()
+        .into_async();
     let mut id = AdcSensor::<_, _, _, Identity>::new(adc1, pin1);
 
     let delay = Delay::new();
