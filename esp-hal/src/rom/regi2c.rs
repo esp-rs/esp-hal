@@ -70,25 +70,26 @@ impl RawRegI2cField {
     #[inline(always)]
     const fn mask(&self) -> u8 {
         const fn lower_n_bits(bits: u8) -> u8 {
-            !((u32::MAX << bits) as u8)
+            !(u32::MAX.wrapping_shl(bits as u32) as u8)
         }
 
-        lower_n_bits(self.msb - self.lsb + 1)
+        lower_n_bits(self.msb.wrapping_sub(self.lsb).wrapping_add(1))
     }
 
     #[allow(unused)]
     #[inline(always)]
     pub fn read(&self) -> u8 {
-        (self.register.read() >> self.lsb) & self.mask()
+        self.register.read().wrapping_shr(u32::from(self.lsb)) & self.mask()
     }
 
     #[allow(unused)]
     #[inline(always)]
     pub fn write_field(&self, data: u8) {
-        let mask = self.mask() << self.lsb;
+        let lsb = u32::from(self.lsb);
+        let mask = self.mask().wrapping_shl(lsb);
         let bits = self.register.read();
         self.register
-            .write_reg((bits & !mask) | ((data << self.lsb) & mask));
+            .write_reg((bits & !mask) | (data.wrapping_shl(lsb) & mask));
     }
 }
 

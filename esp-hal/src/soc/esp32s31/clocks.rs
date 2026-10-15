@@ -15,7 +15,8 @@ use crate::{
 
 /// The crystal frequency in MHz. The S31 supports only a 40 MHz crystal (`SOC_XTAL_SUPPORT_40M`).
 ///
-/// Light sleep uses this constant, because `xtal_clk_frequency` does not run from RAM.
+/// Light sleep and the code-in-PSRAM start-up use this constant: `xtal_clk_frequency` is in flash
+/// and reads the clock tree.
 pub(crate) const XTAL_MHZ: u32 = 40;
 
 define_clock_tree_types!();
@@ -332,6 +333,8 @@ pub(crate) fn set_mpll_power(on: bool) {
 ///
 /// MPLL = XTAL * (fb_div + 1) / (ref_div + 1), with ref_div 1.
 ///
+/// It must not panic or log.
+///
 /// Ref: [IDF `clk_ll_mpll_set_config` (esp32s31)](https://github.com/espressif/esp-idf/blob/27506a49bc919926f546e325d5f5334ba23db316/components/esp_hal_clock/esp32s31/include/hal/clk_tree_ll.h#L527-L545)
 ///
 /// Light sleep calls this function with the caches suspended, so the function must be inlined.
@@ -387,7 +390,12 @@ fn configure_mpll_clk_impl(
     // Configuration applied in enable_mpll_clk_impl
 }
 
+/// The external LDO's `dref` and `mul` for 1800 mV, computed when esp-hal builds.
+const LDO_1800_MV: (u8, u8) = ldo_voltage_to_params(1800);
+
 /// Programs the PMU external LDO regulators for the MSPI PHY.
+///
+/// It must not panic or log.
 fn psram_phy_ldo_init() {
     // Limit inrush current while the output cap charges; keep ripple
     // suppression (voltage detector) enabled.
@@ -396,7 +404,7 @@ fn psram_phy_ldo_init() {
         .modify(|_, w| w.ext_cur_lim().set_bit());
 
     // Set up for 1800mV
-    let (dref, mul) = ldo_voltage_to_params(1800);
+    let (dref, mul) = LDO_1800_MV;
     PMU::regs().ext_ldo_ctrl().modify(|_, w| unsafe {
         w.ext_ldo_mul().bits(mul);
         w.ext_ldo_dref().bits(dref);
@@ -419,7 +427,7 @@ fn psram_phy_ldo_init() {
 }
 
 // Returns None if rail voltage is to be used.
-fn ldo_voltage_to_params(voltage_mv: u16) -> (u8, u8) {
+const fn ldo_voltage_to_params(voltage_mv: u16) -> (u8, u8) {
     // to avoid using FPU, enlarge the constants by 1000 as fixed point
     const K_1000: u32 = 1000;
     const VOS_1000: u32 = 0;
@@ -431,13 +439,15 @@ fn ldo_voltage_to_params(voltage_mv: u16) -> (u8, u8) {
     let mut min_voltage_diff = 400_000_000;
     let mut matched_dref = 0;
     let mut matched_mul = 0;
-    for dref_val in 0..16 {
+    let mut dref_val: u32 = 0;
+    while dref_val < 16 {
         let vref_20 = if dref_val < 9 {
             10 + dref_val
         } else {
             20 + (dref_val - 9) * 2
         };
-        for mul_val in 0..8 {
+        let mut mul_val: u32 = 0;
+        while mul_val < 8 {
             let vout_80000000 = (vref_20 * K_1000 + 20 * VOS_1000) * (4000 + mul_val * C_1000);
             let diff = (voltage_mv as u32 * 80000).abs_diff(vout_80000000);
             if diff < min_voltage_diff {
@@ -445,7 +455,9 @@ fn ldo_voltage_to_params(voltage_mv: u16) -> (u8, u8) {
                 matched_dref = dref_val as u8;
                 matched_mul = mul_val as u8;
             }
+            mul_val += 1;
         }
+        dref_val += 1;
     }
 
     (matched_dref, matched_mul)
