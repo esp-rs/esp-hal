@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    peripherals::{LP_AON, PMU},
+    peripherals::{LP_AON, PCR, PMU, USB_DEVICE},
     private::DropGuard,
     rtc_cntl::{
         Rtc,
@@ -16,6 +16,20 @@ use crate::{
         xtal32k,
     },
 };
+
+#[inline(always)]
+fn usb_device_is_active() -> bool {
+    PCR::regs()
+        .usb_device_conf()
+        .read()
+        .usb_device_clk_en()
+        .bit_is_set()
+        && USB_DEVICE::regs()
+            .conf0()
+            .read()
+            .usb_pad_enable()
+            .bit_is_set()
+}
 
 /// Configuration for controlling the behavior during sleep modes.
 #[derive(Clone, Copy)]
@@ -183,7 +197,7 @@ impl DigitalSleepConfig {
             syscntl: {
                 let mut cfg = HpSysCntlReg::default();
 
-                cfg.set_dig_pad_slp_sel(pd_flags.pd_top().not());
+                cfg.set_dig_pad_slp_sel(!pd_flags.pd_top() && pd_flags.pd_xtal());
 
                 cfg
             },
@@ -726,7 +740,10 @@ impl RtcSleepConfig {
             // regulator to the 0.6 V light-sleep voltage instead of holding it at the
             // active calibration voltage (see `AnalogSleepConfig::defaults_light_sleep`),
             // which is the dominant saving.
-            self.pd_flags.set_pd_xtal(true);
+            //
+            // When USB_DEVICE (USB Serial/JTAG) is active, keep XTAL and BBPLL powered
+            // so the USB SIE continues responding to host packets during light sleep.
+            self.pd_flags.set_pd_xtal(!usb_device_is_active());
             self.pd_flags.set_pd_rc_fast(true);
             self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
         }
@@ -739,17 +756,28 @@ impl RtcSleepConfig {
     /// sleep ends.
     #[crate::ram]
     pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
+        let keep_usb_clock = !self.deep && usb_device_is_active();
+
         let restore_clock_config = ClockTree::with(|clocks| {
             let old_root = clocks.soc_root_clk();
+
+            if keep_usb_clock {
+                clocks::request_pll_clk(clocks);
+            }
 
             clocks::configure_soc_root_clk(clocks, SocRootClkConfig::Xtal);
 
             // Restore the old clock settings when we return
             DropGuard::new((), move |_| {
                 ClockTree::with(|clocks| {
-                    crate::soc::clocks::reconfigure_pll(clocks);
+                    if !keep_usb_clock {
+                        crate::soc::clocks::reconfigure_pll(clocks);
+                    }
                     if let Some(old_root) = old_root {
                         clocks::configure_soc_root_clk(clocks, old_root);
+                    }
+                    if keep_usb_clock {
+                        clocks::release_pll_clk(clocks);
                     }
                 });
             })
@@ -757,7 +785,14 @@ impl RtcSleepConfig {
 
         // pmu_sleep_config_default + pmu_sleep_init.
 
-        let power = PowerSleepConfig::defaults(self.pd_flags);
+        let mut power = PowerSleepConfig::defaults(self.pd_flags);
+        if keep_usb_clock {
+            power.hp_sys.clk.set_i2c_iso_en(false);
+            power.hp_sys.clk.set_i2c_retention(false);
+            power.hp_sys.clk.set_xpd_bb_i2c(true);
+            power.hp_sys.clk.set_xpd_bbpll_i2c(true);
+            power.hp_sys.clk.set_xpd_bbpll(true);
+        }
         power.apply();
 
         // Needs to happen after rtc_clk_cpu_freq_set_xtal
@@ -785,12 +820,34 @@ impl RtcSleepConfig {
         // https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/port/esp32c6/pmu_sleep.c#L299-L302
         let mut icg_func = HpBackupClk::default();
         icg_func.set_retention(!self.deep && clocks::wifi_pwr_clk_runs_in_sleep());
-        PMU::regs()
-            .hp_sleep_sysclk()
-            .modify(|_, w| w.hp_sleep_icg_sys_clock_en().bit(icg_func.0 != 0));
+        if keep_usb_clock {
+            icg_func.set_usb_device(true);
+            icg_func.set_hpbus(true);
+            icg_func.set_iomux(true);
+        }
+        const HP_SYSCLK_XTAL: u8 = 0;
+        const HP_SYSCLK_PLL: u8 = 1;
+        PMU::regs().hp_sleep_sysclk().modify(|_, w| unsafe {
+            w.hp_sleep_icg_sys_clock_en().bit(icg_func.0 != 0);
+            w.hp_sleep_dig_sys_clk_sel().bits(if keep_usb_clock {
+                HP_SYSCLK_PLL
+            } else {
+                HP_SYSCLK_XTAL
+            })
+        });
         PMU::regs()
             .hp_sleep_icg_hp_func()
             .write(|w| unsafe { w.hp_sleep_dig_icg_func_en().bits(icg_func.0) });
+        const PMU_ICG_APB_ENA_USB_DEVICE: u32 = 1 << 17;
+        const PMU_ICG_APB_ENA_IOMUX: u32 = 1 << 26;
+        let icg_apb = if keep_usb_clock {
+            PMU_ICG_APB_ENA_USB_DEVICE | PMU_ICG_APB_ENA_IOMUX
+        } else {
+            0
+        };
+        PMU::regs()
+            .hp_sleep_icg_hp_apb()
+            .write(|w| unsafe { w.hp_sleep_dig_icg_apb_en().bits(icg_apb) });
 
         param.apply();
 
