@@ -169,7 +169,7 @@ pub enum TrngError {
 ///
 /// let mut adc1_config = AdcConfig::new();
 /// let mut adc1_pin = adc1_config.enable_pin(peripherals.__analog_pin__, Attenuation::_11dB);
-/// let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
+/// let mut adc1 = Adc::new(peripherals.ADC1, adc1_config)?;
 /// let pin_value = adc1.read_oneshot(&mut adc1_pin)?;
 ///
 /// // Now we can only generate pseudo-random numbers...

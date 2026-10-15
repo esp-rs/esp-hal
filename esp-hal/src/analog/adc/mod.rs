@@ -32,7 +32,7 @@
 //! # use esp_hal::delay::Delay;
 //! let mut adc1_config = AdcConfig::new();
 //! let mut pin = adc1_config.enable_pin(peripherals.__analog_pin__, Attenuation::_11dB);
-//! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
+//! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config)?;
 //!
 //! let mut delay = Delay::new();
 //!
