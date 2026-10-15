@@ -38,11 +38,6 @@ its own, and clap cannot tell a trailing chip name from it.
 esp32 esp32c6` documents both crates for both chips. Naming no crate means every crate, naming no
 chip means every chip.
 
-`doc` parks each crate and chip pair's rustdoc output directory under
-`target/<triple>/.xtask-doc-cache` instead of wiping `target/<triple>/doc` on every run. That keeps
-docs from mixing across crates or chips while letting Cargo skip rustdoc when a crate has not
-changed.
-
 ```text
 cargo xtask build --help
 ```
