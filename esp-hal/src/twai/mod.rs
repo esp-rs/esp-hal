@@ -908,10 +908,13 @@ where
         crate::interrupt::bind_handler(self.twai.interrupt(), handler);
     }
 
-    /// Sets the bitrate of the bus.
+    /// Sets the bitrate of the bus. Also usable on the configuration
+    /// [`Twai::stop`] returns, to change the bitrate of a driver that has
+    /// been running.
     ///
     /// The timings currently assume an APB_CLK of 80 MHz.
-    fn set_baud_rate(&mut self, baud_rate: BaudRate) {
+    #[instability::unstable]
+    pub fn set_baud_rate(&mut self, baud_rate: BaudRate) {
         // TWAI is clocked from the APB_CLK according to Table 6-4 [ESP32C3 Reference Manual](https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf)
         // Included timings are all for 80MHz so assert that we are running at 80MHz.
         #[cfg(not(any(esp32h2, esp32c6)))]
@@ -1015,6 +1018,13 @@ where
         self.regs()
             .err_warning_limit()
             .write(|w| unsafe { w.err_warning_limit().bits(limit) });
+    }
+
+    /// Sets the operating mode the driver starts in ([`Self::start`]). Also
+    /// usable on the configuration [`Twai::stop`] returns.
+    #[instability::unstable]
+    pub fn set_operating_mode(&mut self, mode: TwaiMode) {
+        self.mode = mode;
     }
 
     /// Sets the operating mode based on provided option.
@@ -1278,6 +1288,14 @@ where
     /// Receives a TWAI frame from the TWAI bus.
     pub fn receive(&mut self) -> nb::Result<EspTwaiFrame, EspTwaiError> {
         self.rx.receive()
+    }
+
+    /// Borrows the receiving and transmitting halves. Unlike [`Self::split`]
+    /// the driver stays whole, so it can still be stopped and reconfigured
+    /// ([`Self::stop`]) once they are no longer in use.
+    #[instability::unstable]
+    pub fn split_mut(&mut self) -> (&mut TwaiRx<'d, Dm>, &mut TwaiTx<'d, Dm>) {
+        (&mut self.rx, &mut self.tx)
     }
 
     /// Consumes this `Twai` instance and splits it into transmitting and
