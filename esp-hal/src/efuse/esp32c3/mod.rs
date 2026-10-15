@@ -75,13 +75,13 @@ pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u1
 ///
 /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c3/esp_efuse_rtc_calib.c#L49>
 #[instability::unstable]
-pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
-    match atten {
+pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
+    Some(match atten {
         Attenuation::_0dB => 400,
         Attenuation::_2p5dB => 550,
         Attenuation::_6dB => 750,
         Attenuation::_11dB => 1370,
-    }
+    })
 }
 
 /// Returns the ADC reference point digital code for specified attenuation.

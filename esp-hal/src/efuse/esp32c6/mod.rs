@@ -102,14 +102,14 @@ pub fn rtc_calib_get_chan_compens(
 ///
 /// See <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32c6/esp_efuse_rtc_calib.c#L98>
 #[instability::unstable]
-pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
+pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
     let version = rtc_calib_version();
     let input_vout_mv = match version {
         2 => [750, 1000, 1500, 2800],
         _ => [400, 550, 750, 1370],
     };
 
-    input_vout_mv[atten as usize]
+    Some(input_vout_mv[atten as usize])
 }
 
 /// Returns the ADC reference point digital code for specified attenuation.

@@ -158,13 +158,13 @@ pub fn rtc_calib_get_chan_compens(
 ///
 /// see <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/efuse/esp32p4/esp_efuse_rtc_calib.c#L88>
 #[instability::unstable]
-pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
-    match atten {
+pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
+    Some(match atten {
         Attenuation::_0dB => 600,
         Attenuation::_2p5dB => 800,
         Attenuation::_6dB => 1200,
         Attenuation::_11dB => 2300,
-    }
+    })
 }
 
 /// Returns the ADC calibration code.

@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 
 use super::AdcHasLineCal;
 use crate::{
-    analog::adc::{AdcCalScheme, Attenuation},
+    analog::adc::{AdcCalScheme, Attenuation, Error},
     efuse,
 };
 
@@ -193,10 +193,12 @@ impl<ADCX> AdcCalScheme<ADCX> for AdcCalLine<ADCX>
 where
     ADCX: AdcHasLineCal,
 {
-    fn new_cal(atten: Attenuation) -> Self {
+    fn new_cal(atten: Attenuation) -> Result<Self, Error> {
         let unit = ADCX::UNIT;
         let atten_idx = atten as usize;
 
+        // Unburnt Vref defaults to 1100 mV per the reference model; the scheme
+        // always produces coefficients, so construction never fails.
         let vref = if check_efuse_vref() {
             read_efuse_vref()
         } else {
@@ -211,14 +213,14 @@ where
             characterize_using_vref(unit, atten_idx, vref)
         };
 
-        Self {
+        Ok(Self {
             coeff_a,
             coeff_b,
             vref,
             use_lut: atten == Attenuation::_11dB,
             unit,
             _phantom: PhantomData,
-        }
+        })
     }
 
     fn adc_val(&self, val: u16) -> u16 {

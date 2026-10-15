@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use crate::analog::adc::{AdcCalEfuse, AdcCalScheme, Attenuation, CalibrationAccess};
+use crate::analog::adc::{AdcCalEfuse, AdcCalScheme, Attenuation, CalibrationAccess, Error};
 
 /// Basic ADC calibration scheme.
 ///
@@ -25,16 +25,19 @@ impl<ADCX> AdcCalScheme<ADCX> for AdcCalBasic<ADCX>
 where
     ADCX: AdcCalEfuse + CalibrationAccess,
 {
-    fn new_cal(atten: Attenuation) -> Self {
+    fn new_cal(atten: Attenuation) -> Result<Self, Error> {
         Self::new_cal_with_channel(atten, 0)
     }
 
-    fn new_cal_with_channel(_atten: Attenuation, _channel: u8) -> Self {
-        Self {
+    fn new_cal_with_channel(_atten: Attenuation, _channel: u8) -> Result<Self, Error> {
+        Ok(Self {
+            // A missing per-channel offset means the chip did not characterize this
+            // channel, so no correction applies. `channel` always comes from a valid
+            // ADC pin, and unburnt eFuses likewise mean zero correction.
             #[cfg(adc_channel_compensation)]
             chan_compens: ADCX::cal_chan_compens(_atten, _channel).unwrap_or(0),
             _phantom: PhantomData,
-        }
+        })
     }
 
     #[cfg(adc_channel_compensation)]
