@@ -128,6 +128,7 @@ esp32h4 = [
     "esp-hal/esp32h4",
     "esp-rtos/esp32h4",
     "esp-println/esp32h4",
+    "esp-radio?/esp32h4",
 ]
 esp32p4 = [
     "esp-alloc/esp32p4",
