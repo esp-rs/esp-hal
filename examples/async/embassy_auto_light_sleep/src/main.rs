@@ -12,7 +12,10 @@
 //! observe the chip waking from light sleep via the timer (`WakeupSource::Timer`)
 //! or via the BOOT button (`WakeupSource::Gpio`).
 //!
-//! Use the UART port for this example - USB Serial/JTAG will break when the device enters sleep.
+//! On ESP32-C3, ESP32-S3, ESP32-S31, and ESP32-P4, USB Serial/JTAG disconnects
+//! when the device enters sleep, so use the UART port on those targets. On
+//! ESP32-C5, ESP32-C6, ESP32-C61, and ESP32-H2, USB Serial/JTAG remains active
+//! across light sleep.
 
 //% CHIP_FILTER: sleep_driver_supported && sleep_light_sleep
 
