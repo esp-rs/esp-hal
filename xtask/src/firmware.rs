@@ -963,9 +963,11 @@ pub fn load_package(workspace: &Path, package: Package) -> Result<Vec<Metadata>>
         return load_cargo_toml(&root);
     }
 
-    let bins = match package {
-        Package::QaTest | Package::HilTest | Package::HilTestRadio => root.join("src").join("bin"),
-        _ => root.join("examples"),
+    let src_bin = root.join("src").join("bin");
+    let bins = if src_bin.is_dir() {
+        src_bin
+    } else {
+        root.join("examples")
     };
 
     let mut firmware = load(&bins)?;

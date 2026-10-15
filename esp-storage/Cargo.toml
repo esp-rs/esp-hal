@@ -12,6 +12,7 @@ license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 chip-features-matter = true
+doc-config = { env = { CARGO_PROFILE_DEBUG_OPT_LEVEL = "3" } }
 check-configs = [
     { features = [] },
     { features = ["embedded-storage"] },

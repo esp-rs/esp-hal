@@ -193,24 +193,18 @@ impl Package {
 
     /// Does the package have inline assembly?
     pub fn has_inline_assembly(&self, workspace: &Path) -> bool {
-        // feature(asm_experimental_arch) is enabled in all crates that use Xtensa
-        // assembly, which covers crates that use assembly AND are used for both
-        // architectures (e.g. esp-backtrace).
-        // But RISC-V doesn't need this feature, so we can either scrape the crate
-        // source, or check in a list of packages.
-        if matches!(self, Package::EspRiscvRt | Package::EspLpHal) {
-            return true;
-        }
-
-        let lib_rs_path = workspace.join(self.directory()).join("src").join("lib.rs");
-        let Ok(source) = std::fs::read_to_string(&lib_rs_path) else {
-            return false;
-        };
-
-        source
-            .lines()
-            .filter(|line| line.starts_with("#!["))
-            .any(|line| line.contains("asm_experimental_arch"))
+        let src_path = workspace.join(self.directory()).join("src");
+        walkdir::WalkDir::new(src_path)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
+            .any(|entry| {
+                std::fs::read_to_string(entry.path()).is_ok_and(|src| {
+                    src.contains("asm_experimental_arch")
+                        || src.contains("asm!(")
+                        || src.contains("global_asm!(")
+                })
+            })
     }
 
     /// Is the package compatible with the given chip?
@@ -234,7 +228,7 @@ impl Package {
 
     /// Does the package have a migration guide?
     pub fn has_migration_guide(&self, workspace: &Path) -> bool {
-        let package_path = workspace.join(self.to_string());
+        let package_path = workspace.join(self.directory());
 
         // Check if the package directory exists
         let Ok(entries) = std::fs::read_dir(&package_path) else {
@@ -308,11 +302,25 @@ impl Package {
 
     /// Build on host
     pub fn build_on_host(&self, features: &[String]) -> bool {
-        match self {
-            Self::EspConfig | Self::EspMetadata => true,
-            Self::EspMetadataGenerated if features.iter().any(|f| f == "build-script") => true,
-            _ => false,
+        if !self.needs_build_std() {
+            return true;
         }
+
+        let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+        let Some(Item::Value(Value::Array(host_features))) = metadata.get("host-features") else {
+            return false;
+        };
+
+        host_features.iter().any(|hf| {
+            hf.as_str()
+                .is_some_and(|hf| features.iter().any(|f| f == hf))
+        })
     }
 
     fn parse_required_features(table: &InlineTable) -> Vec<String> {
@@ -452,10 +460,6 @@ impl Package {
     // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
     // chip-specific features.
     pub fn doc_config_rules(&self, config: &Config) -> Option<CheckConfig> {
-        if *self == Self::Examples {
-            return None;
-        }
-
         let config = self.single_config_rule_from_metadata(config, "doc-config");
 
         log::debug!("Doc config for package '{}': {:?}", self, config);
