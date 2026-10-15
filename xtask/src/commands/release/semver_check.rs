@@ -21,7 +21,13 @@ pub struct SemverCheckArgs {
     pub command: SemverCheckCmd,
 
     /// Package(s) to target.
-    #[arg(long, alias = "package", value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal, Package::EspRomSys, Package::EspRadio])]
+    #[arg(
+        long,
+        alias = "package",
+        value_enum,
+        value_delimiter = ',',
+        default_values_t = Package::iter().filter(|p| p.is_semver_checked() || p.has_semver_config())
+    )]
     pub packages: Vec<Package>,
 
     /// Default packages that are not supposed to run, used in CI.
@@ -98,7 +104,7 @@ pub mod checker {
                 let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
                 let current_path =
-                    build_prepared_doc_json(workspace, package, chip, &package_path)?;
+                    build_prepared_doc_json(package, chip, &package_path)?;
 
                 let to_path = PathBuf::from(&package_path).join(format!(
                     "api-baseline/{}.json.gz",

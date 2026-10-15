@@ -77,57 +77,7 @@ pub struct HostTestConfig {
     pub miri: bool,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    clap::ValueEnum,
-    strum::Display,
-    strum::EnumIter,
-    strum::AsRefStr,
-    serde::Deserialize,
-    serde::Serialize,
-)]
-#[serde(rename_all = "kebab-case")]
-#[strum(serialize_all = "kebab-case")]
-/// Represents the packages in the `esp-hal` workspace.
-pub enum Package {
-    EspAlloc,
-    EspBacktrace,
-    EspBootloaderEspIdf,
-    EspConfig,
-    EspHal,
-    EspHalProcmacros,
-    EspRomSys,
-    EspLpHal,
-    EspMetadata,
-    EspMetadataGenerated,
-    EspPhy,
-    EspPrintln,
-    EspRiscvRt,
-    EspStorage,
-    EspSync,
-    EspRadio,
-    EspRadioRtosDriver,
-    EspRtos,
-    #[value(alias = "example")]
-    Examples,
-    #[value(alias = "test", alias = "tests")]
-    HilTest,
-    HilTestRadio,
-    #[value(alias = "qa")]
-    QaTest,
-    XtensaLx,
-    XtensaLxRt,
-    XtensaLxRtProcMacros,
-
-    CompileTests,
-}
+include!(concat!(env!("OUT_DIR"), "/packages.rs"));
 
 // Returns the root directory of the esp-hal repository.
 fn repo_root() -> PathBuf {
@@ -147,16 +97,6 @@ fn repo_root() -> PathBuf {
 static TOML: Mutex<Option<HashMap<Package, Option<CargoToml>>>> = Mutex::new(None);
 
 impl Package {
-    /// Source directory relative to the workspace root.
-    ///
-    /// Usually matches the clap/package name. QA tests live under `examples/qa`.
-    pub fn directory(&self) -> &str {
-        match self {
-            Self::QaTest => "examples/qa",
-            other => other.as_ref(),
-        }
-    }
-
     /// Does the package have chip-specific cargo features?
     pub fn has_chip_features(&self) -> bool {
         use strum::IntoEnumIterator;
@@ -297,11 +237,6 @@ impl Package {
             .as_ref()
             .and_then(|toml| toml.espressif_metadata_bool("chip-features-matter"))
             .unwrap_or(false)
-    }
-
-    /// Is this "package" a directory of standalone projects rather than a single crate?
-    pub fn contains_standalone_projects(&self) -> bool {
-        matches!(self, Package::Examples | Package::CompileTests)
     }
 
     /// Should documentation be built for the package, and should the package be
@@ -690,8 +625,7 @@ impl Package {
         format!("{self}-v{version}")
     }
 
-    #[cfg(feature = "release")]
-    fn is_semver_checked(&self) -> bool {
+    pub(crate) fn is_semver_checked(&self) -> bool {
         let toml = self.toml();
         let Some(ref toml) = *toml else {
             // No Cargo.toml in the package, must be the examples
@@ -701,14 +635,24 @@ impl Package {
             .unwrap_or(false)
     }
 
+    pub(crate) fn has_semver_config(&self) -> bool {
+        let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
+        toml.espressif_metadata()
+            .is_some_and(|m| m.contains_key("semver-config"))
+    }
+
     #[cfg(feature = "semver-checks")]
-    pub(crate) fn clean_semver_check(&self, dest_path: &Path) -> anyhow::Result<()> {
-        if self == &Package::EspRomSys && dest_path.exists() {
-            fs::remove_file(dest_path)
+    pub(crate) fn clean_semver_check(&self, package_path: &Path) -> anyhow::Result<()> {
+        let dest_path = package_path.join("src/generated_rom_symbols.rs");
+        if dest_path.exists() {
+            fs::remove_file(&dest_path)
                 .context("Failed to remove existing generated_rom_symbols.rs")?;
 
             // Create new file with placeholder content
-            fs::write(dest_path, "// Do not delete - placeholder for fmt!\n")
+            fs::write(&dest_path, "// Do not delete - placeholder for fmt!\n")
                 .context("Failed to create new generated_rom_symbols.rs placeholder")?;
         }
 
@@ -721,9 +665,9 @@ impl Package {
         package_path: &Path,
         chip: &Chip,
     ) -> anyhow::Result<()> {
-        if self == &Package::EspRomSys {
+        if package_path.join("src/generated_rom_symbols.rs").exists() {
             log::info!("Generating ROM symbol markers for chip: {}", chip);
-            crate::commands::generate_rom_symbols::generate_rom_symbols(&package_path, chip)?;
+            crate::commands::generate_rom_symbols::generate_rom_symbols(package_path, chip)?;
         }
         Ok(())
     }
@@ -1421,7 +1365,7 @@ mod tests {
     fn chip_coverage_standalone_projects_declare_required_chips() {
         let workspace = repo_root_for_tests();
 
-        for package in [Package::Examples, Package::CompileTests] {
+        for package in Package::iter().filter(Package::contains_standalone_projects) {
             crate::firmware::load_package(&workspace, package)
                 .unwrap_or_else(|err| panic!("failed to load '{package}': {err}"));
         }

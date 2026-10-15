@@ -27,7 +27,7 @@ pub fn minimum_update(
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
-    let current_path = build_prepared_doc_json(workspace, package, &chip, &package_path)?;
+    let current_path = build_prepared_doc_json(package, &chip, &package_path)?;
 
     let Some(baseline_path_gz) = baseline_gz(workspace, package, chip)? else {
         log::warn!(
@@ -106,15 +106,13 @@ pub(crate) fn decompress_gz(src: &Path, dest: &Path) -> Result<(), Error> {
 /// `prepare_semver_check`, build rustdoc JSON, then `clean_semver_check`, which
 /// runs even when the build fails.
 pub(crate) fn build_prepared_doc_json(
-    workspace: &Path,
     package: Package,
     chip: &Chip,
     package_path: &PathBuf,
 ) -> Result<PathBuf, Error> {
     package.prepare_semver_check(package_path, chip)?;
     let result = build_doc_json(package, chip, package_path);
-    let rom_symbols_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
-    if let Err(cleanup) = package.clean_semver_check(&rom_symbols_path) {
+    if let Err(cleanup) = package.clean_semver_check(package_path) {
         // A build failure is what the caller can act on, so it is not replaced.
         if result.is_err() {
             log::warn!("Failed to clean up after building the doc JSON: {cleanup:#}");

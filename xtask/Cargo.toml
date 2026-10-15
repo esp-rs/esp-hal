@@ -59,6 +59,9 @@ xtask-mcp-macros = { path = "../xtask-mcp-macros", optional = true }
 pretty_assertions = "1.2.0"
 tempfile = "3"
 
+[build-dependencies]
+toml_edit = "0.25"
+
 [features]
 deploy-docs  = ["dep:reqwest", "dep:kuchikiki"]
 preview-docs = ["dep:opener", "dep:rocket"]

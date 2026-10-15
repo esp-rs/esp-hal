@@ -47,7 +47,7 @@ pub(crate) fn newly_stable(
             .join(package.to_string())
             .join(format!("{chip}.json"));
         decompress_gz(&baseline_gz_path, &baseline)?;
-        let current = build_prepared_doc_json(workspace, package, &chip, &package_path)?;
+        let current = build_prepared_doc_json(package, &chip, &package_path)?;
 
         let diff = PublicApiDiff::between(
             public_api_from_rustdoc(&baseline)?,
