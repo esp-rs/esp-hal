@@ -92,18 +92,18 @@ pub fn rtc_calib_get_chan_compens(
 ///
 /// See: <https://github.com/espressif/esp-idf/blob/027613140/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
 #[instability::unstable]
-pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
+pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
     let version = rtc_calib_version();
     let input_vout_mv = match version {
         1 => [750, 1000, 1500, 2800],
         _ => {
             // The required efuse bits for this chip are not burnt.
             // 1100 is the middle of the reference voltage range.
-            return 1100;
+            return Some(1100);
         }
     };
 
-    input_vout_mv[atten as usize]
+    Some(input_vout_mv[atten as usize])
 }
 
 /// Returns the calibration code.

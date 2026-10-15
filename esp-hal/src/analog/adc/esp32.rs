@@ -3,7 +3,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use super::{AdcCalScheme, AdcConfig, Attenuation};
+use super::{AdcCalScheme, AdcConfig, Attenuation, Error};
 use crate::{
     peripherals::{ADC1, ADC2, SENS},
     private,
@@ -17,13 +17,6 @@ pub use self::calibration::*;
 // ADC2 cannot be used with `radio` functionality on `esp32`, this global helps us to track it's
 // state to prevent unexpected behaviour
 static ADC2_IN_USE: AtomicBool = AtomicBool::new(false);
-
-/// ADC Error
-#[derive(Debug)]
-pub enum Error {
-    /// `ADC2` is used together with `radio`.
-    Adc2InUse,
-}
 
 #[doc(hidden)]
 /// Tries to "claim" `ADC2` peripheral and sets its status.
@@ -240,6 +233,8 @@ pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
     resolution_bits: u8,
+    // Set when this driver claimed ADC2, which it then releases on drop.
+    adc2_claimed: bool,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
@@ -250,16 +245,21 @@ where
     /// Configures a given ADC instance using the provided configuration, and
     /// initializes the ADC for use.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// `ADC2` cannot be used simultaneously with `radio` functionalities, otherwise this function
-    /// will panic.
-    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
-        if ADCX::instance_number() == 2 && try_claim_adc2(private::Internal).is_err() {
-            panic!(
-                "ADC2 is already in use by Radio. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth."
-            );
-        }
+    /// Returns [`Error::Adc2InUse`] if `ADC2` is already in use by the radio.
+    /// `ADC2` cannot be used simultaneously with `radio` functionalities.
+    /// The handle is consumed even on failure; pass a reborrowed handle to retry later.
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Result<Self, Error> {
+        // Claim ADC2 for exclusive use; the driver releases it on drop.
+        let adc2_claimed = if ADCX::instance_number() == 2 {
+            if try_claim_adc2(private::Internal).is_err() {
+                return Err(Error::Adc2InUse);
+            }
+            true
+        } else {
+            false
+        };
 
         let sensors = SENS::regs();
 
@@ -312,7 +312,7 @@ where
             .sar_read_ctrl2()
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
-        Adc {
+        Ok(Adc {
             _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
@@ -322,8 +322,9 @@ where
                 Resolution::_11Bit => 11,
                 Resolution::_12Bit => 12,
             },
+            adc2_claimed,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// Requests that the ADC begin a conversion on the specified pin.
@@ -331,19 +332,22 @@ where
     /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
     pub fn read_oneshot<PIN, CS>(
         &mut self,
         pin: &mut super::AdcPin<PIN, ADCX, CS>,
-    ) -> nb::Result<u16, ()>
+    ) -> nb::Result<u16, Error>
     where
         PIN: super::AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
-        if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
-            panic!(
-                "Channel {} is not configured reading!",
-                pin.pin.adc_channel()
-            );
+        let channel = pin.pin.adc_channel();
+        if self.attenuations[channel as usize].is_none() {
+            return Err(nb::Error::Other(Error::ChannelNotConfigured(channel)));
         }
 
         if let Some(active_channel) = self.active_channel {
@@ -383,8 +387,10 @@ where
     }
 }
 
-impl Drop for ADC2<'_> {
+impl<ADC, Dm: crate::DriverMode> Drop for Adc<'_, ADC, Dm> {
     fn drop(&mut self) {
-        release_adc2(private::Internal);
+        if self.adc2_claimed {
+            release_adc2(private::Internal);
+        }
     }
 }
