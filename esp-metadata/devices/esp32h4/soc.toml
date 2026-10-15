@@ -297,7 +297,6 @@ fifo_depth_words = 256
 
 [device.bt]
 support_status = "partial"
-# IDF `porting_btdm` (nested config + `esp_*` VHCI), like ESP32-S31
 controller = "btdm2"
 
 [device.ieee802154]

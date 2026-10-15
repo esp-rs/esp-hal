@@ -19,7 +19,7 @@
 //! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
 //! the output.
 
-//% CHIP_FILTER: bt_driver_supported && sleep_light_sleep
+//% CHIP_FILTER: bt_driver_supported
 
 #![no_std]
 #![no_main]
@@ -43,12 +43,15 @@ esp_bootloader_esp_idf::esp_app_desc!();
 const MODEM_SLEEP: bool = true;
 /// Whether the chip enters automatic light sleep when all tasks are idle. Requires
 /// [`MODEM_SLEEP`] to be enabled.
+#[cfg(feature = "light_sleep")]
 const LIGHT_SLEEP: bool = true;
 /// Whether light sleep powers the CPU down. Requires [`LIGHT_SLEEP`] to be enabled.
+#[cfg(feature = "light_sleep")]
 const CPU_POWERDOWN: bool = true;
 
 // An example reads no chip capability, so this condition lists the chips that support CPU
 // power-down.
+#[cfg(feature = "light_sleep")]
 cfg_select! {
     any(
         feature = "esp32c3",
@@ -111,6 +114,7 @@ async fn main(_s: Spawner) {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    #[cfg(feature = "light_sleep")]
     if LIGHT_SLEEP {
         let mut sleep = esp_rtos::sleep::configure(peripherals.LPWR);
         if CPU_POWERDOWN {
@@ -120,6 +124,8 @@ async fn main(_s: Spawner) {
     } else {
         esp_rtos::start(timg0.timer0);
     }
+    #[cfg(not(feature = "light_sleep"))]
+    esp_rtos::start(timg0.timer0);
 
     let connector = BleConnector::new(
         peripherals.BT,
