@@ -204,13 +204,18 @@ mod xtensa {
         )
     }
 
-    #[cfg(esp32s3)]
-    global_asm!(".section .rwtext,\"ax\",@progbits");
+    // The section switch must stay in the same block as the literals: rustc does not emit
+    // separate `global_asm!` items in source order.
     global_asm!(
+        cfg_select! {
+            esp32s3 => ".pushsection .rwtext,\"ax\",@progbits",
+            _ => ".pushsection .text,\"ax\",@progbits",
+        },
         "
         .literal sym_stack_chk_guard, {__stack_chk_guard}
         .literal stack_guard_value, {stack_guard_value}
         .literal sym_esp32_init, {__esp32_init}
+        .popsection
         ",
         __stack_chk_guard = sym __stack_chk_guard,
         stack_guard_value = const esp_config::esp_config_int!(
