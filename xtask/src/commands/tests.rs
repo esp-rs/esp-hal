@@ -67,6 +67,7 @@ pub fn tests(
 
     let mut commands = CargoCommandBatcher::new();
     let mut artifact_meta = HashMap::<String, firmware::Metadata>::new();
+    let mut unsupported_for_chip: Vec<String> = Vec::new();
     // Execute the specified action:
     // If user sets some specific test(s)
     if let Some(test_arg) = test {
@@ -78,7 +79,6 @@ pub fn tests(
         }
 
         let mut unknown_selected: Vec<String> = Vec::new();
-        let mut unsupported_for_chip: Vec<String> = Vec::new();
 
         for selected in trimmed.into_iter().filter(|s| !s.is_empty()) {
             let (test_arg, filter) = match selected.split_once("::") {
@@ -331,8 +331,22 @@ pub fn tests(
         )?;
     }
 
+    if let CargoAction::Build(Some(out_dir)) = &action
+        && !unsupported_for_chip.is_empty()
+        && !built_artifacts.is_empty()
+    {
+        let path = out_dir
+            .join(chip.to_string())
+            .join(SKIPPED_SELECTORS_FILENAME);
+        std::fs::write(&path, serde_json::to_string(&unsupported_for_chip)?)
+            .with_context(|| format!("Failed to write {}", path.display()))?;
+    }
+
     Ok(())
 }
+
+/// Lists the selectors that `elfs` may leave unmatched, because they have no test for the chip.
+pub(crate) const SKIPPED_SELECTORS_FILENAME: &str = "skipped-selectors.json";
 
 const RADIO_ELF_MANIFEST_FILENAME: &str = "radio-elfs.json";
 
