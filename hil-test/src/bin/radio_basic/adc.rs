@@ -47,7 +47,7 @@ mod tests {
 
         let mut config = AdcConfig::new();
         let mut pin = config.enable_pin(adc_pin, Attenuation::_11dB);
-        let mut adc = Adc::new(p.ADC1, config);
+        let mut adc = Adc::new(p.ADC1, config).unwrap();
         let mut read = || nb::block!(adc.read_oneshot(&mut pin)).unwrap();
 
         let before = read();
