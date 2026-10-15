@@ -537,16 +537,11 @@ for_each_analog_function! {
                     xtensa => { self.set_analog_impl(); }
                     riscv => {
                         // Just configure as a floating GPIO.
-                        io_mux_reg(self.number()).modify(|_, w| unsafe {
-                            w.mcu_sel().bits(AlternateFunction::GPIO as u8);
-                            w.fun_ie().clear_bit();
+                        unsafe { AnyPin::steal(self.number()) }.init_gpio();
+                        io_mux_reg(self.number()).modify(|_, w| {
                             w.fun_wpu().clear_bit();
                             w.fun_wpd().clear_bit()
                         });
-
-                        let bank = crate::gpio::low_level::bank(self.number());
-                        let bit = 1 << (self.number() - bank.offset());
-                        bank.write_out_en_clear(bit);
                     }
                 }
             }
