@@ -77,7 +77,6 @@ pub mod checker {
         fs,
         io::Write,
         path::{Path, PathBuf},
-        str::FromStr,
     };
 
     use anyhow::Context;
@@ -314,114 +313,32 @@ pub mod checker {
             return Ok(false);
         }
 
-        // Query repository artifacts via GitHub API and download the one matching `artifact_name`
+        // Download the baseline ZIP from the `api-baselines` GitHub release
         log::info!("Attempting to download artifact: {artifact_name} from {repo}");
 
-        // List artifacts for the repository, filtered by name
-        let list_output = Command::new("gh")
-            .args([
-                "api",
-                "-H",
-                "Accept: application/vnd.github+json",
-                "-H",
-                "X-GitHub-Api-Version: 2022-11-28",
-                &format!("/repos/{}/actions/artifacts?name={}", repo, artifact_name),
-            ])
-            .output();
-
-        let artifacts: Vec<serde_json::Value> = match list_output {
-            Ok(result) if result.status.success() => {
-                let body = String::from_utf8_lossy(&result.stdout);
-                log::debug!("Artifacts list response: {}", body);
-                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body) {
-                    match json.get("artifacts").and_then(|a| a.as_array()) {
-                        Some(arr) => arr.clone(),
-                        None => vec![],
-                    }
-                } else {
-                    vec![]
-                }
-            }
-            Ok(result) => {
-                let stderr = String::from_utf8_lossy(&result.stderr);
-                log::debug!("Failed to list artifacts. stderr: {}", stderr);
-                vec![]
-            }
-            Err(e) => {
-                log::debug!("Error invoking gh api to list artifacts: {}", e);
-                vec![]
-            }
-        };
-
-        if artifacts.is_empty() {
-            log::debug!("No artifacts found for name {}", artifact_name);
-            return Ok(false);
-        }
-
-        // Find the latest, non-expired artifact
-        let latest_artifact = artifacts
-            .iter()
-            .filter(|artifact| {
-                let name_matches = artifact
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .map(|n| n == artifact_name)
-                    .unwrap_or(false);
-
-                let expired = artifact
-                    .get("expired")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-
-                name_matches && !expired
-            })
-            .max_by_key(|artifact| {
-                artifact
-                    .get("created_at")
-                    .and_then(|v| v.as_str())
-                    .map(|s| jiff::Timestamp::from_str(s).expect("Invalid timestamp"))
-            });
-
-        let Some(artifact) = latest_artifact else {
-            log::debug!(
-                "No valid (non-expired) artifacts found for {}",
-                artifact_name
-            );
-            return Ok(false);
-        };
-
-        let id = match artifact.get("id").and_then(|v| v.as_u64()) {
-            Some(id) => id.to_string(),
-            None => {
-                log::debug!("Artifact missing ID field");
-                return Ok(false);
-            }
-        };
-
-        log::debug!("Downloading artifact id {} (name: {})", id, artifact_name);
-
-        // Download the artifact ZIP (API returns a redirect to the ZIP)
         let download = Command::new("gh")
             .args([
-                "api",
-                "-H",
-                "Accept: application/vnd.github+json",
-                "-H",
-                "X-GitHub-Api-Version: 2022-11-28",
-                &format!("/repos/{}/actions/artifacts/{}/zip", repo, id),
+                "release",
+                "download",
+                "api-baselines",
+                "--repo",
+                repo,
+                "--pattern",
+                &format!("{artifact_name}.zip"),
+                "--output",
+                "-",
             ])
             .output();
 
         let Ok(result) = download else {
-            log::debug!("Error invoking gh api to download artifact id {}", id);
+            log::debug!("Error invoking gh release download for {}", artifact_name);
             return Ok(false);
         };
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
             log::debug!(
-                "Failed to download artifact id {} (name: {}). stderr: {}",
-                id,
+                "Failed to download release asset {}.zip. stderr: {}",
                 artifact_name,
                 stderr
             );
@@ -434,7 +351,7 @@ pub mod checker {
         let mut archive = match ZipArchive::new(Cursor::new(&result.stdout)) {
             Ok(arc) => arc,
             Err(e) => {
-                log::debug!("Failed to open ZIP archive for artifact id {}: {}", id, e);
+                log::debug!("Failed to open ZIP archive for {}: {}", artifact_name, e);
                 return Ok(false);
             }
         };
