@@ -181,6 +181,13 @@ system_clocks = { clock_tree = [
             { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
         ] },
     ] },
+    { group = "ADC", clocks = [
+        { name = "FUNCTION_CLOCK", type = "mux", variants = [
+            { name = "XTAL",     outputs = "XTAL_CLK" },
+            { name = "PLL_F80M", outputs = "PLL_F80M", default = true },
+            { name = "RC_FAST",  outputs = "RC_FAST_CLK" },
+        ] },
+    ] },
 ] }
 
 peripheral_clocks = { templates = [

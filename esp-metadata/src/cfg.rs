@@ -833,8 +833,6 @@ driver_configs![
                 #[serde(default)]
                 pcr_clock: bool,
                 #[serde(default)]
-                pll_clock_sel: Option<u32>,
-                #[serde(default)]
                 pcr_sar_clk_div: bool,
                 #[serde(default)]
                 sar_power_override: bool,

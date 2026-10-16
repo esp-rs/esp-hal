@@ -491,6 +491,31 @@ impl ParlIoInstance {
     }
 }
 
+impl AdcInstance {
+    // ADC_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        PCR::regs()
+            .saradc_clkm_conf()
+            .modify(|_, w| w.saradc_clkm_en().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<AdcFunctionClockConfig>,
+        new_config: AdcFunctionClockConfig,
+    ) {
+        PCR::regs().saradc_clkm_conf().modify(|_, w| unsafe {
+            w.saradc_clkm_sel().bits(match new_config {
+                AdcFunctionClockConfig::Xtal => 0,
+                AdcFunctionClockConfig::PllF96m => 1,
+                AdcFunctionClockConfig::RcFast => 2,
+            })
+        });
+    }
+}
+
 impl SdmInstance {
     // SDM_FUNCTION_CLOCK
 
