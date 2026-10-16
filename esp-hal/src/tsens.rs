@@ -43,22 +43,13 @@
 //! - Temperature calibration range is not supported
 //! - Interrupts are not supported
 
+/// Clock source for the temperature sensor.
+pub use crate::soc::clocks::TsensSclkConfig as ClockSource;
 use crate::{
+    clock::ll::{ClockTree, TsensInstance},
     peripherals::{APB_SARADC, TSENS},
     system::GenericPeripheralGuard,
 };
-
-/// Clock source for the temperature sensor.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Copy, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub enum ClockSource {
-    /// Use RC_FAST clock source
-    RcFast,
-    /// Use XTAL clock source
-    #[default]
-    Xtal,
-}
 
 /// Temperature sensor configuration
 #[derive(Debug, Clone, Default, PartialEq, Eq, Copy, Hash, procmacros::BuilderLite)]
@@ -117,6 +108,7 @@ impl Temperature {
 #[derive(Debug)]
 pub struct TemperatureSensor<'d> {
     _peripheral: TSENS<'d>,
+    _clock_guard: TsensClockGuard,
     _tsens_guard: GenericPeripheralGuard<{ crate::system::Peripheral::Tsens as u8 }>,
     _abp_saradc_guard: GenericPeripheralGuard<{ crate::system::Peripheral::ApbSarAdc as u8 }>,
 }
@@ -130,12 +122,12 @@ impl<'d> TemperatureSensor<'d> {
         let apb_saradc_guard = GenericPeripheralGuard::new();
         let tsens_guard = GenericPeripheralGuard::new();
 
-        let mut tsens = Self {
+        let tsens = Self {
             _peripheral: peripheral,
+            _clock_guard: TsensClockGuard::new(config.clock_source),
             _tsens_guard: tsens_guard,
             _abp_saradc_guard: apb_saradc_guard,
         };
-        tsens.apply_config(&config)?;
 
         tsens.power_up();
 
@@ -159,10 +151,8 @@ impl<'d> TemperatureSensor<'d> {
 
     /// Changes the temperature sensor configuration.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        // Set clock source
-        APB_SARADC::regs().tsens_ctrl2().write(|w| {
-            w.clk_sel()
-                .bit(matches!(config.clock_source, ClockSource::Xtal))
+        ClockTree::with(|clocks| {
+            TsensInstance::Tsens.configure_sclk(clocks, config.clock_source);
         });
 
         Ok(())
@@ -177,5 +167,24 @@ impl<'d> TemperatureSensor<'d> {
         let offset = -1i8;
 
         Temperature::new(raw_value, offset)
+    }
+}
+
+#[derive(Debug)]
+struct TsensClockGuard;
+
+impl TsensClockGuard {
+    fn new(source: ClockSource) -> Self {
+        ClockTree::with(|clocks| {
+            TsensInstance::Tsens.configure_sclk(clocks, source);
+            TsensInstance::Tsens.request_sclk(clocks);
+        });
+        Self
+    }
+}
+
+impl Drop for TsensClockGuard {
+    fn drop(&mut self) {
+        ClockTree::with(|clocks| TsensInstance::Tsens.release_sclk(clocks));
     }
 }

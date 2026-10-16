@@ -708,6 +708,10 @@ macro_rules! property {
     ("clock_tree.i2c.function_clock.div_num") => {
         (0, 255)
     };
+    ("clock_tree.tsens.sclk") => {
+        [crate ::soc::clocks::TsensSclkConfig::RcFast, crate
+        ::soc::clocks::TsensSclkConfig::Xtal]
+    };
     ("clock_tree.spi.function_clock") => {
         [crate ::soc::clocks::SpiFunctionClockConfig::PllF80m, crate
         ::soc::clocks::SpiFunctionClockConfig::Xtal, crate
@@ -1872,6 +1876,22 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl TsensInstance {
+///     // TSENS_SCLK
+///
+///     fn enable_sclk_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_sclk_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<TsensSclkConfig>,
+///         _new_config: TsensSclkConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
@@ -1921,6 +1941,11 @@ macro_rules! define_clock_tree_types {
         pub enum UartInstance {
             Uart0 = 0,
             Uart1 = 1,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TsensInstance {
+            Tsens = 0,
         }
         /// Selects the output frequency of `XTAL_CLK`.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2632,6 +2657,16 @@ macro_rules! define_clock_tree_types {
                 self.integral as u32
             }
         }
+        /// The list of clock signals that the `TSENS_SCLK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TsensSclkConfig {
+            /// Selects `RC_FAST_CLK`.
+            RcFast,
+            #[default]
+            /// Selects `XTAL_CLK`.
+            Xtal,
+        }
         /// Represents the device's clock tree.
         pub struct ClockTree {
             xtal_clk: Option<XtalClkConfig>,
@@ -2666,6 +2701,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock: [Option<TimgWdtClockConfig>; 2],
             uart_function_clock: [Option<UartFunctionClockConfig>; 2],
             uart_baud_rate_generator: [Option<UartBaudRateGeneratorConfig>; 2],
+            tsens_sclk: [Option<TsensSclkConfig>; 1],
             pll_clk_refcount: u32,
             rc_fast_clk_refcount: u32,
             #[cfg(use_xtal32k)]
@@ -2696,6 +2732,7 @@ macro_rules! define_clock_tree_types {
             timg_wdt_clock_refcount: [u32; 2],
             uart_function_clock_refcount: [u32; 2],
             uart_baud_rate_generator_refcount: [u32; 2],
+            tsens_sclk_refcount: [u32; 1],
         }
         impl ClockTree {
             /// Locks the clock tree for exclusive access.
@@ -2846,6 +2883,10 @@ macro_rules! define_clock_tree_types {
             pub fn uart1_baud_rate_generator(&self) -> Option<UartBaudRateGeneratorConfig> {
                 self.uart_baud_rate_generator[UartInstance::Uart1 as usize]
             }
+            /// Returns the current configuration of the TSENS_SCLK clock tree node
+            pub fn tsens_sclk(&self) -> Option<TsensSclkConfig> {
+                self.tsens_sclk[TsensInstance::Tsens as usize]
+            }
         }
         static CLOCK_TREE: ::esp_sync::NonReentrantMutex<ClockTree> =
             ::esp_sync::NonReentrantMutex::new(ClockTree {
@@ -2881,6 +2922,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock: [None; 2],
                 uart_function_clock: [None; 2],
                 uart_baud_rate_generator: [None; 2],
+                tsens_sclk: [None; 1],
                 pll_clk_refcount: 0,
                 rc_fast_clk_refcount: 0,
                 #[cfg(use_xtal32k)]
@@ -2911,6 +2953,7 @@ macro_rules! define_clock_tree_types {
                 timg_wdt_clock_refcount: [0; 2],
                 uart_function_clock_refcount: [0; 2],
                 uart_baud_rate_generator_refcount: [0; 2],
+                tsens_sclk_refcount: [0; 1],
             });
         static XTAL_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -2954,6 +2997,8 @@ macro_rules! define_clock_tree_types {
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
         static UART_BAUD_RATE_GENERATOR_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 2] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 2];
+        static TSENS_SCLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static HP_ROOT_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static CPU_HS_DIV_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
@@ -5287,6 +5332,68 @@ macro_rules! define_clock_tree_types {
                     .load(::core::sync::atomic::Ordering::Acquire)
             }
         }
+        impl TsensInstance {
+            pub fn configure_sclk(self, clocks: &mut ClockTree, new_selector: TsensSclkConfig) {
+                let old_selector = clocks.tsens_sclk[self as usize].replace(new_selector);
+                refresh_tsens_sclk_downstream(clocks, self);
+                if clocks.tsens_sclk_refcount[self as usize] > 0 {
+                    match new_selector {
+                        TsensSclkConfig::RcFast => request_rc_fast_clk(clocks),
+                        TsensSclkConfig::Xtal => request_xtal_clk(clocks),
+                    }
+                    self.configure_sclk_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            TsensSclkConfig::RcFast => release_rc_fast_clk(clocks),
+                            TsensSclkConfig::Xtal => release_xtal_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_sclk_impl(clocks, old_selector, new_selector);
+                }
+            }
+            pub fn sclk_config(self, clocks: &mut ClockTree) -> Option<TsensSclkConfig> {
+                clocks.tsens_sclk[self as usize]
+            }
+            pub fn request_sclk(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::SCLK", self);
+                if increment_reference_count(&mut clocks.tsens_sclk_refcount[self as usize]) {
+                    trace!("Enabling {:?}::SCLK", self);
+                    match unwrap!(clocks.tsens_sclk[self as usize]) {
+                        TsensSclkConfig::RcFast => request_rc_fast_clk(clocks),
+                        TsensSclkConfig::Xtal => request_xtal_clk(clocks),
+                    }
+                    self.enable_sclk_impl(clocks, true);
+                }
+            }
+            pub fn release_sclk(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::SCLK", self);
+                if decrement_reference_count(&mut clocks.tsens_sclk_refcount[self as usize]) {
+                    trace!("Disabling {:?}::SCLK", self);
+                    self.enable_sclk_impl(clocks, false);
+                    match unwrap!(clocks.tsens_sclk[self as usize]) {
+                        TsensSclkConfig::RcFast => release_rc_fast_clk(clocks),
+                        TsensSclkConfig::Xtal => release_xtal_clk(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn sclk_config_frequency(clocks: &mut ClockTree, config: TsensSclkConfig) -> u32 {
+                match config {
+                    TsensSclkConfig::RcFast => rc_fast_clk_frequency(),
+                    TsensSclkConfig::Xtal => xtal_clk_frequency(),
+                }
+            }
+            pub fn sclk_frequency(self) -> u32 {
+                TSENS_SCLK_FREQ_CACHE[self as usize].load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn sclk_source_frequency(source: TsensSclkConfig) -> u32 {
+                match source {
+                    TsensSclkConfig::RcFast => rc_fast_clk_frequency(),
+                    TsensSclkConfig::Xtal => xtal_clk_frequency(),
+                }
+            }
+        }
         /// Clock tree configuration.
         ///
         /// The fields of this struct are optional, with the following caveats:
@@ -5427,6 +5534,9 @@ macro_rules! define_clock_tree_types {
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
             }
+            for child_instance in [TsensInstance::Tsens] {
+                refresh_tsens_sclk_downstream(clocks, child_instance);
+            }
         }
         fn refresh_rc_fast_clk_downstream(clocks: &mut ClockTree) {
             refresh_soc_root_clk_downstream(clocks);
@@ -5456,6 +5566,9 @@ macro_rules! define_clock_tree_types {
             }
             for child_instance in [UartInstance::Uart0, UartInstance::Uart1] {
                 refresh_uart_function_clock_downstream(clocks, child_instance);
+            }
+            for child_instance in [TsensInstance::Tsens] {
+                refresh_tsens_sclk_downstream(clocks, child_instance);
             }
         }
         fn refresh_rc_slow_clk_downstream(clocks: &mut ClockTree) {
@@ -5629,6 +5742,14 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.uart_baud_rate_generator[instance as usize] {
                 UART_BAUD_RATE_GENERATOR_FREQ_CACHE[instance as usize].store(
                     instance.baud_rate_generator_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_tsens_sclk_downstream(clocks: &mut ClockTree, instance: TsensInstance) {
+            if let Some(config) = clocks.tsens_sclk[instance as usize] {
+                TSENS_SCLK_FREQ_CACHE[instance as usize].store(
+                    TsensInstance::sclk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
