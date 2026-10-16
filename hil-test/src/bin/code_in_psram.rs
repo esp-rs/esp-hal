@@ -3,7 +3,7 @@
 //% CHIP_FILTER(at_200mhz, at_250mhz): psram_code_in_psram
 //% ENV: ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 //% ENV(at_250mhz): ESP_HAL_CONFIG_PSRAM_FREQUENCY=250MHz
-//% FEATURES: unstable
+//% FEATURES: unstable esp-alloc embassy
 
 #![no_std]
 #![no_main]
@@ -23,6 +23,34 @@ extern crate esp_metadata_generated;
 static RODATA: [u32; 4] = [0x5053_524D; 4];
 static mut DATA: u32 = 0x4441_5441;
 static mut BSS: u32 = 0;
+
+/// A random 64 KiB block after the image in the booted partition, so that each run wears another.
+fn scratch_block(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>) -> u32 {
+    use esp_bootloader_esp_idf::partitions;
+
+    const BLOCK: u32 = 0x1_0000;
+    let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+    let pt = partitions::read_partition_table(flash, &mut pt_mem).unwrap();
+    let app = pt.booted_partition().unwrap().unwrap();
+
+    // ESP-IDF image: a 24-byte header, then segments of load address, length, and data, then a
+    // checksum and a hash, which fit in the next block.
+    let mut header = [0u32; 6];
+    flash.read(app.offset(), &mut header).unwrap();
+    let mut end = app.offset() + 24;
+    for _ in 0..(header[0] >> 8) & 0xFF {
+        let mut segment = [0u32; 2];
+        flash.read(end, &mut segment).unwrap();
+        end += 8 + segment[1];
+    }
+    let first = (end + BLOCK).div_ceil(BLOCK);
+    let last = (app.offset() + app.len()) / BLOCK;
+    assert!(
+        first < last,
+        "no free 64 KiB block after the image in the booted partition"
+    );
+    (first + esp_hal::rng::Rng::new().random() % (last - first)) * BLOCK
+}
 
 static SWINT: Mutex<RefCell<Option<SoftwareInterrupt<'static, 2>>>> =
     Mutex::new(RefCell::new(None));
@@ -309,5 +337,317 @@ mod tests {
             booted.partition_type(),
             PartitionType::App(AppPartitionSubType::Factory)
         );
+    }
+}
+
+/// Flash operations while code runs from PSRAM: the other core and interrupts keep running.
+///
+/// The probe uses the ESP32-S31's ROM range and its cross-core interrupt register.
+#[cfg(feature = "esp32s31")]
+#[embedded_test::tests(default_timeout = 30)]
+mod flash_operations {
+    use core::sync::atomic::AtomicBool;
+
+    use allocator_api2::boxed::Box;
+    use esp_alloc::ExternalMemory;
+    use esp_bootloader_esp_idf::partitions;
+    use esp_hal::{
+        flash::{Config, Error, Flash, MultiCoreStrategy},
+        interrupt::{InterruptHandler, Priority},
+        peripherals::{CPU_CTRL, FROM_CPU_INTR2, Peripherals, SYSTEM},
+        system::{CpuControl, Stack},
+    };
+    use hil_test::mk_static;
+
+    use super::*;
+
+    /// The ESP32-S31's ROM, where the flash routines run.
+    ///
+    /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/soc/esp32s31/include/soc/soc.h#L147-L148>.
+    const ROM: core::ops::Range<u32> = 0x2F80_0000..0x2F85_0000;
+    const BLOCK: u32 = 0x1_0000;
+
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    static RUNNING: AtomicBool = AtomicBool::new(false);
+    static DONE: AtomicBool = AtomicBool::new(false);
+    static HANDLER_RUNS: AtomicU32 = AtomicU32::new(0);
+    static IN_ROM: AtomicU32 = AtomicU32::new(0);
+    static CORE1_STORES: AtomicU32 = AtomicU32::new(0);
+
+    // An interrupt taken while core 0 was in the ROM routine is what the operation must allow.
+    extern "C" fn probe_handler() {
+        let mepc: u32;
+        unsafe { core::arch::asm!("csrr {0}, mepc", out(reg) mepc) };
+        if ROM.contains(&mepc) {
+            IN_ROM.fetch_add(1, Ordering::Relaxed);
+        }
+        SoftwareInterrupt::new(unsafe { FROM_CPU_INTR2::steal() }).reset();
+        HANDLER_RUNS.fetch_add(1, Ordering::Release);
+    }
+
+    /// Starts core 1, which raises the probe interrupt and stores to `page` while `RUNNING`, and
+    /// returns once it runs.
+    fn start_core1(
+        cpu_ctrl: CPU_CTRL<'static>,
+        intr: FROM_CPU_INTR2<'static>,
+        page: Option<usize>,
+    ) {
+        let mut swint = SoftwareInterrupt::new(intr);
+        swint.set_interrupt_handler(InterruptHandler::new(probe_handler, Priority::max()));
+        core::mem::forget(swint);
+
+        let mut cpu_control = CpuControl::new(cpu_ctrl);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let guard = cpu_control
+            .start_app_core(stack, move || {
+                STARTED.store(true, Ordering::Release);
+                loop {
+                    while !RUNNING.load(Ordering::Acquire) {}
+                    while RUNNING.load(Ordering::Acquire) {
+                        let before = HANDLER_RUNS.load(Ordering::Acquire);
+                        // `SoftwareInterrupt::raise` waits until the interrupt reads as pending,
+                        // and core 0's handler can take and clear it first. So this core only
+                        // sets it.
+                        SYSTEM::regs()
+                            .cpu_intr_from_cpu(2)
+                            .write(|w| w.cpu_intr().set_bit());
+                        while HANDLER_RUNS.load(Ordering::Acquire) == before
+                            && RUNNING.load(Ordering::Acquire)
+                        {}
+                        if let Some(page) = page {
+                            let n = CORE1_STORES.load(Ordering::Relaxed).wrapping_add(1);
+                            unsafe { (page as *mut u32).write_volatile(n ^ in_text()) };
+                            CORE1_STORES.store(n, Ordering::Release);
+                        }
+                        // Raising again at once starves core 0's ROM routine. The count sets how
+                        // much of the time core 0 runs, and nothing depends on its value.
+                        for _ in 0..1000 {
+                            core::hint::spin_loop();
+                        }
+                    }
+                    DONE.store(true, Ordering::Release);
+                }
+            })
+            .unwrap();
+        core::mem::forget(guard);
+        while !STARTED.load(Ordering::Acquire) {}
+    }
+
+    /// Runs `operation` while core 1 runs, and returns how many probe interrupts it took in ROM.
+    fn while_core1_runs(operation: impl FnOnce()) -> u32 {
+        let before = IN_ROM.load(Ordering::Relaxed);
+        DONE.store(false, Ordering::Relaxed);
+        RUNNING.store(true, Ordering::Release);
+        operation();
+        RUNNING.store(false, Ordering::Release);
+        // The test's timeout already fails a hang. This assertion turns the hang into a failure
+        // that prints the counters.
+        let deadline = esp_hal::time::Instant::now() + esp_hal::time::Duration::from_secs(1);
+        while !DONE.load(Ordering::Acquire) {
+            assert!(
+                esp_hal::time::Instant::now() < deadline,
+                "core 1 did not stop: {} handler runs, {} in ROM, {} stores",
+                HANDLER_RUNS.load(Ordering::Relaxed),
+                IN_ROM.load(Ordering::Relaxed),
+                CORE1_STORES.load(Ordering::Relaxed),
+            );
+        }
+        IN_ROM.load(Ordering::Relaxed) - before
+    }
+
+    struct Context {
+        flash: Flash<'static, esp_hal::Blocking>,
+        heap: Box<[u32; 1024], ExternalMemory>,
+    }
+
+    fn setup() -> Context {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+        let core1_page = Box::into_raw(Box::new_in(0u32, ExternalMemory)) as usize;
+        start_core1(p.CPU_CTRL, p.FROM_CPU_INTR2, Some(core1_page));
+        Context {
+            flash: Flash::new(p.FLASH, Config::default()).unwrap(),
+            heap: Box::new_in([PATTERN_WORD; 1024], ExternalMemory),
+        }
+    }
+
+    const PATTERN_WORD: u32 = 0x5AA5_C33C;
+
+    #[test]
+    fn test_erase_and_write_run_with_interrupts_and_the_other_core() {
+        let mut ctx = setup();
+        let block = scratch_block(&mut ctx.flash);
+        let data = mk_static!([u32; 4096], [PATTERN_WORD; 4096]);
+
+        let flash = &mut ctx.flash;
+        // SAFETY: the block is in the booted partition, after the image.
+        unsafe { flash.erase(block, block + BLOCK).unwrap() };
+        let in_write = while_core1_runs(|| unsafe { flash.write(block, data).unwrap() });
+        let in_erase = while_core1_runs(|| unsafe { flash.erase(block, block + BLOCK).unwrap() });
+
+        assert!(in_write > 0, "no interrupt ran during the write");
+        assert!(in_erase > 0, "no interrupt ran during the erase");
+        assert!(ctx.heap.iter().all(|&w| w == PATTERN_WORD));
+        assert!(CORE1_STORES.load(Ordering::Acquire) > 0);
+    }
+
+    #[test]
+    fn test_reads_run_with_interrupts_and_the_other_core() {
+        let mut ctx = setup();
+        let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+        let app = partitions::read_partition_table(&mut ctx.flash, &mut pt_mem)
+            .unwrap()
+            .booted_partition()
+            .unwrap()
+            .unwrap()
+            .offset();
+        let flash = &mut ctx.flash;
+        let buffer = mk_static!([u32; 4096], [0; 4096]);
+
+        let in_reads = while_core1_runs(|| {
+            for _ in 0..200 {
+                flash.read(app, buffer).unwrap();
+            }
+        });
+
+        assert!(in_reads > 0, "no interrupt ran during 200 reads");
+        assert!(ctx.heap.iter().all(|&w| w == PATTERN_WORD));
+    }
+
+    // A page left mapped with its old cache lines would return the old words to the second
+    // `read_encrypted`.
+    #[test]
+    fn test_read_encrypted_sees_new_data() {
+        let mut ctx = setup();
+        let block = scratch_block(&mut ctx.flash);
+        let flash = &mut ctx.flash;
+        let mut plain = [0u32; 256];
+        let mut through_mmu = [0u32; 256];
+
+        flash.read(block, &mut plain).unwrap();
+        flash.read_encrypted(block, &mut through_mmu).unwrap();
+        assert_eq!(plain, through_mmu);
+
+        let data = [PATTERN_WORD; 256];
+        // SAFETY: the block is in the booted partition, after the image.
+        unsafe {
+            flash.erase(block, block + BLOCK).unwrap();
+            flash.write(block, &data).unwrap();
+        }
+        flash.read_encrypted(block, &mut through_mmu).unwrap();
+        assert_eq!(through_mmu, data);
+    }
+
+    #[test]
+    fn test_error_strategy_allows_the_other_core() {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        let config = Config::default().with_multi_core_strategy(MultiCoreStrategy::Error);
+        let mut flash = Flash::new(p.FLASH, config).unwrap();
+        start_core1(p.CPU_CTRL, p.FROM_CPU_INTR2, None);
+
+        let mut buffer = [0u32; 4];
+        assert_eq!(flash.read(0x1_0000, &mut buffer), Ok(()));
+    }
+
+    #[test]
+    fn test_read_into_psram_is_refused() {
+        let mut ctx = setup();
+        let mut buffer = Box::new_in([0u32; 4], ExternalMemory);
+        assert_eq!(
+            ctx.flash.read(0x1_0000, &mut buffer[..]),
+            Err(Error::NotSupported)
+        );
+    }
+}
+
+/// Flash operations under esp-rtos, with code in PSRAM: a higher-priority thread keeps running on
+/// the core that runs the operation.
+///
+/// The scheduler starts in this module only, because its tick interrupt would run under every other
+/// test.
+#[embedded_test::tests(default_timeout = 30, executor = esp_rtos::embassy::Executor::new())]
+mod rtos_flash {
+    use core::sync::atomic::AtomicBool;
+
+    use esp_hal::{
+        Blocking,
+        flash::{Config, Flash},
+        peripherals::Peripherals,
+        time::Duration,
+        timer::timg::TimerGroup,
+    };
+    use esp_rtos::{
+        CurrentThreadHandle,
+        thread::{Stack, ThreadSpawner},
+    };
+    use hil_test::mk_static;
+    use static_cell::ConstStaticCell;
+
+    use super::*;
+
+    const BLOCK: u32 = 0x1_0000;
+    const PATTERN_WORD: u32 = 0x5AA5_C33C;
+
+    static IN_OPERATION: AtomicBool = AtomicBool::new(false);
+    static TICKS: AtomicU32 = AtomicU32::new(0);
+    static TICKER_STACK: ConstStaticCell<Stack<8192>> = ConstStaticCell::new(Stack::new());
+
+    struct Context {
+        flash: Flash<'static, Blocking>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+        // The ticker blocks for 1 ms between counts, so this thread runs in between.
+        CurrentThreadHandle::get().set_priority(1);
+        ThreadSpawner::from_static(TICKER_STACK.take())
+            .with_priority(2)
+            .spawn(|| {
+                loop {
+                    if IN_OPERATION.load(Ordering::Acquire) {
+                        TICKS.fetch_add(1, Ordering::Relaxed);
+                    }
+                    CurrentThreadHandle::get().delay(Duration::from_millis(1));
+                }
+            })
+            .detach();
+        Context {
+            flash: Flash::new(p.FLASH, Config::default()).unwrap(),
+        }
+    }
+
+    /// Runs `operation`, which makes one ROM call, and returns how often the ticker ran during it.
+    fn ticks_during(operation: impl FnOnce()) -> u32 {
+        let before = TICKS.load(Ordering::Relaxed);
+        IN_OPERATION.store(true, Ordering::Release);
+        operation();
+        IN_OPERATION.store(false, Ordering::Release);
+        TICKS.load(Ordering::Relaxed) - before
+    }
+
+    // One tick can fall just before or just after the ROM call. More than one shows that the
+    // ticker preempted this thread inside the call.
+    #[test]
+    fn test_a_higher_priority_thread_runs_during_an_erase(mut ctx: Context) {
+        let block = scratch_block(&mut ctx.flash);
+        let flash = &mut ctx.flash;
+        // SAFETY: the block is in the booted partition, after the image.
+        let ticks = ticks_during(|| unsafe { flash.erase(block, block + BLOCK).unwrap() });
+        assert!(ticks > 1, "the ticker ran {ticks} times during the erase");
+    }
+
+    #[test]
+    fn test_a_higher_priority_thread_runs_during_a_write(mut ctx: Context) {
+        let block = scratch_block(&mut ctx.flash);
+        let data = mk_static!([u32; 4096], [PATTERN_WORD; 4096]);
+        let flash = &mut ctx.flash;
+        // SAFETY: the block is in the booted partition, after the image.
+        unsafe { flash.erase(block, block + BLOCK).unwrap() };
+        // SAFETY: as above.
+        let ticks = ticks_during(|| unsafe { flash.write(block, data).unwrap() });
+        assert!(ticks > 1, "the ticker ran {ticks} times during the write");
     }
 }

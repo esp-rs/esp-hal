@@ -466,10 +466,13 @@ mod tests {
         .unwrap();
 
         let mut buf = [0u32; 1];
-        assert_eq!(
-            flash.read(APP_DESC_OFFSET, &mut buf),
+        // With code in PSRAM, nothing fetches from flash, so the strategy is not relevant.
+        let expected = if option_env!("ESP_HAL_CONFIG_CODE_IN_PSRAM") == Some("true") {
+            Ok(())
+        } else {
             Err(Error::OtherCoreRunning)
-        );
+        };
+        assert_eq!(flash.read(APP_DESC_OFFSET, &mut buf), expected);
     }
 
     /// HIL boards have no encryption key burned, so `read_encrypted` returns
