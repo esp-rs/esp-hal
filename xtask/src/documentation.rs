@@ -94,7 +94,18 @@ pub fn build_documentation(
             if package.chip_features_matter() {
                 chips.to_vec()
             } else {
-                vec![Chip::Esp32c6]
+                let chip = chips
+                    .iter()
+                    .copied()
+                    .find(|c| *c == Chip::Esp32c6 && package.validate_package_chip(c).is_ok())
+                    .or_else(|| {
+                        chips
+                            .iter()
+                            .copied()
+                            .find(|c| package.validate_package_chip(c).is_ok())
+                    })
+                    .unwrap_or(Chip::Esp32c6);
+                vec![chip]
             }
         } else {
             log::debug!("Package '{package}' does not have chip features, ignoring argument");

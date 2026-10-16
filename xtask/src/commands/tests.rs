@@ -33,23 +33,12 @@ pub fn tests(
     let is_radio_package = package == Package::HilTestRadio;
 
     // Determine the appropriate build target for the given package and chip:
-    let target = Package::HilTest.target_triple(&chip)?;
+    let target = package.target_triple(&chip)?;
 
     // Load all test metadata first so we can differentiate between:
     // - unknown test selectors (typos)
     // - valid tests that are unsupported for the selected chip.
-    let bins_root = package_path.join("src").join("bin");
-    let mut all_tests = crate::firmware::load(&bins_root)?;
-    if is_radio_package {
-        let tests_root = bins_root.join("tests");
-        if tests_root.exists() {
-            all_tests.extend(crate::firmware::load(&tests_root)?);
-        }
-        let support_root = bins_root.join("support");
-        if support_root.exists() {
-            all_tests.extend(crate::firmware::load(&support_root)?);
-        }
-    }
+    let mut all_tests = crate::firmware::load_package(workspace, package)?;
     all_tests.sort_by_key(|a| a.binary_name());
     let tests_for_chip = all_tests
         .iter()

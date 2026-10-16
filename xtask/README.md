@@ -223,6 +223,12 @@ builds and doc-tests always set `RUSTDOCFLAGS` (and `ESP_HAL_DOCTEST` for doc-te
 duplicate keys from `doc-config`. Semver checks always set `RUSTDOCFLAGS` and override duplicate
 keys from `semver-config`.
 
+Other optional keys under `[package.metadata.espressif]`:
+
+- `host-test-configs` — array of host `cargo test` cases (`features`, `cargo-args`, `test-args`, `miri`); see [Host tests](#host-tests) above.
+- `host-features` — array of cargo features enabled when building or checking a host-buildable package on the host target.
+- `aliases` — array of short CLI aliases accepted for the package in `cargo xtask` commands (for example `["test", "tests"]` on `hil-test` or `["qa"]` on `qa-test`).
+
 ## Test/example metadata use
 
 Each test and example can specify metadata. This metadata is read, interpreted and used by the

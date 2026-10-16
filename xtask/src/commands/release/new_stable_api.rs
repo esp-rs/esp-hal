@@ -28,7 +28,7 @@ pub(crate) fn newly_stable(
     package: Package,
     chips: &[Chip],
 ) -> anyhow::Result<(Vec<NewStableItem>, BTreeSet<Chip>)> {
-    let package_path = crate::windows_safe_path(&workspace.join(package.to_string()));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
     let mut newly_stable: BTreeMap<String, BTreeSet<Chip>> = BTreeMap::new();
     let mut unchecked_chips = BTreeSet::new();
 

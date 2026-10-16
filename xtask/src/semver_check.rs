@@ -24,8 +24,7 @@ pub fn minimum_update(
 ) -> Result<ReleaseType, Error> {
     log::info!("Package = {}, Chip = {}", package, chip);
 
-    let package_name = package.to_string();
-    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
     let current_path = build_prepared_doc_json(package, &chip, &package_path)?;
 
@@ -79,7 +78,7 @@ pub(crate) fn baseline_gz(
     package: Package,
     chip: Chip,
 ) -> Result<Option<PathBuf>, Error> {
-    let package_path = crate::windows_safe_path(&workspace.join(package.to_string()));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
     let baseline_path_gz = package_path.join(format!(
         "api-baseline/{}.json.gz",
         baseline_stem(package, chip)

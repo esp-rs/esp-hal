@@ -110,8 +110,11 @@ fn discover_packages(workspace: &Path, root_manifest: &Path) -> Vec<DiscoveredPa
 }
 
 fn read_package_metadata(manifest_path: &Path) -> Option<(String, Vec<String>)> {
-    let content = fs::read_to_string(manifest_path).ok()?;
-    let doc = content.parse::<toml_edit::DocumentMut>().ok()?;
+    let content = fs::read_to_string(manifest_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", manifest_path.display()));
+    let doc = content
+        .parse::<toml_edit::DocumentMut>()
+        .unwrap_or_else(|e| panic!("failed to parse {}: {e}", manifest_path.display()));
     let package = doc.get("package")?;
     let name = package.get("name")?.as_str()?.to_owned();
     let aliases = package
@@ -145,7 +148,7 @@ fn make_discovered_package(
 }
 
 fn kebab_to_pascal(s: &str) -> String {
-    s.split('-')
+    s.split(['-', '_', '/'])
         .map(|part| {
             let mut chars = part.chars();
             match chars.next() {

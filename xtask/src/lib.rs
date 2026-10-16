@@ -199,12 +199,16 @@ impl Package {
 
     /// Does the package have any host tests?
     ///
-    /// Returns true when `src/**/*.rs` contains `#[test]`. Packages that return
-    /// true must also configure `host-test-configs` in `[package.metadata.espressif]`;
+    /// Returns true when `host-test-configs` is configured in `[package.metadata.espressif]`
+    /// or when `src/**/*.rs` contains `#[test]`. Packages that return
+    /// true must configure `host-test-configs` in `[package.metadata.espressif]`;
     /// see `xtask/README.md` ("Host tests").
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
         if self.contains_standalone_projects() {
             return false;
+        }
+        if !self.host_test_config_rules().is_empty() {
+            return true;
         }
         // Test suites (`hil-test`, `hil-test-radio`) use `#[test]` with `embedded-test`
         // rather than host `cargo test`.
@@ -219,7 +223,8 @@ impl Package {
             .filter_map(Result::ok)
             .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
             .any(|entry| {
-                std::fs::read_to_string(entry.path()).is_ok_and(|src| src.contains("#[test]"))
+                std::fs::read_to_string(entry.path())
+                    .is_ok_and(|src| src.lines().any(|line| line.trim().starts_with("#[test]")))
             })
     }
 
@@ -867,28 +872,6 @@ pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> 
     }
 
     Ok(())
-}
-
-/// Return a (sorted) list of paths to each valid Cargo package in the
-/// workspace.
-pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
-    let mut paths = Vec::new();
-    for entry in fs::read_dir(workspace).context("Failed to read {workspace}")? {
-        let entry = entry?;
-        if entry.file_type()?.is_dir() && entry.path().join("Cargo.toml").exists() {
-            paths.push(entry.path());
-        }
-    }
-
-    paths.sort();
-
-    log::debug!(
-        "Found {} packages in workspace '{}':",
-        paths.len(),
-        workspace.display()
-    );
-
-    Ok(paths)
 }
 
 /// Parse the version from the specified package's Cargo manifest.

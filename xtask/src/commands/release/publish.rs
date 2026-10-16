@@ -19,8 +19,7 @@ pub struct PublishArgs {
 
 /// Publish a package to crates.io.
 pub fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
-    let package_name = args.package.to_string();
-    let package_path = windows_safe_path(&workspace.join(&package_name));
+    let package_path = windows_safe_path(&workspace.join(args.package.directory()));
 
     ensure!(
         args.package.is_published(),

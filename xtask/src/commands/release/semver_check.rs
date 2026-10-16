@@ -100,8 +100,7 @@ pub mod checker {
                     continue;
                 }
                 log::info!("Chip = {}", chip.to_string());
-                let package_name = package.to_string();
-                let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+                let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
                 let current_path = build_prepared_doc_json(package, chip, &package_path)?;
 
@@ -220,7 +219,7 @@ pub mod checker {
             log::info!("Downloading API baselines for {package}");
 
             let package_name = package.to_string();
-            let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+            let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
             let baseline_dir = package_path.join("api-baseline");
 
             // Remove existing baselines
