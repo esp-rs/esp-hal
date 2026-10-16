@@ -16,6 +16,8 @@ on:
     # No `labeled`/`unlabeled`: a label change would rebuild everything and
     # cancel the run in progress. `calculate` reads labels live instead, so
     # "Re-run all jobs" picks up labels added after the run started.
+    # Re-run after removing `skip-ci-non-code-change`: the merge queue does not
+    # run `esp-hal` or `xtensa-lld`, so a stale green run would skip them.
     types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:

@@ -166,9 +166,14 @@ migration steps.
 
 If your change breaks the stable API of a crate, the PR needs the `breaking-change-<crate-name>`
 label (e.g. `breaking-change-esp-hal`). Without it, the semver check in CI fails. Ask a maintainer
-to add the label. Label changes do not re-run CI, so if the check already failed, the maintainer
-uses "Re-run all jobs" afterwards. See [Breaking changes](./DEVELOPER-GUIDELINES.md#breaking-changes)
-in the developer guidelines.
+to add the label. See [Breaking changes](./DEVELOPER-GUIDELINES.md#breaking-changes) in the
+developer guidelines.
+
+Label changes do not re-run CI. After adding or removing a label that affects CI
+(`breaking-change-*`, `skip-semver-checks`, `skip-ci-non-code-change`), the maintainer uses
+"Re-run all jobs". This is required when removing `skip-ci-non-code-change`: the merge queue does
+not run the `esp-hal` or `xtensa-lld` jobs, so a stale green run would let the PR merge without
+them.
 
 ### Skipping the changelog for a specific crate
 
