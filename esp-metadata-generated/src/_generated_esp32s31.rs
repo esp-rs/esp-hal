@@ -388,6 +388,30 @@ macro_rules! property {
     ("rgb_display.output_lines", str) => {
         stringify!(24)
     };
+    ("adc.line_calibration") => {
+        false
+    };
+    ("adc.curve_calibration") => {
+        false
+    };
+    ("adc.basic_calibration") => {
+        false
+    };
+    ("adc.calibration_v1_scheme_supported") => {
+        false
+    };
+    ("adc.channel_compensation") => {
+        false
+    };
+    ("adc.pcr_clock") => {
+        false
+    };
+    ("adc.pcr_sar_clk_div") => {
+        false
+    };
+    ("adc.sar_power_override") => {
+        false
+    };
     ("sdm.channel_count") => {
         8
     };

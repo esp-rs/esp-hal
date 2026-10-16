@@ -130,6 +130,16 @@ peripherals = [
 
 [device.adc]
 support_status = "partial"
+controller = "digital"
+channel_count = 7
+pcr_clock = true
+pll_clock_sel = 1
+line_calibration = true
+curve_calibration = true
+basic_calibration = true
+calibration_v1_scheme_supported = true
+channel_compensation = true
+sar_power_override = true
 instances = [
     { name = "adc1" },
 ]

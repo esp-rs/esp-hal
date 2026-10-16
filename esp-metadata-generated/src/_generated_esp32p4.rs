@@ -370,6 +370,30 @@ macro_rules! property {
     ("ethernet.has_rgmii") => {
         false
     };
+    ("adc.line_calibration") => {
+        true
+    };
+    ("adc.curve_calibration") => {
+        true
+    };
+    ("adc.basic_calibration") => {
+        true
+    };
+    ("adc.calibration_v1_scheme_supported") => {
+        true
+    };
+    ("adc.channel_compensation") => {
+        true
+    };
+    ("adc.pcr_clock") => {
+        false
+    };
+    ("adc.pcr_sar_clk_div") => {
+        false
+    };
+    ("adc.sar_power_override") => {
+        false
+    };
     ("sdm.channel_count") => {
         8
     };

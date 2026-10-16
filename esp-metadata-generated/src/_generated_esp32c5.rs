@@ -352,6 +352,45 @@ macro_rules! property {
     ("phy.combo_module") => {
         false
     };
+    ("adc.controller") => {
+        "digital"
+    };
+    ("adc.channel_count") => {
+        6
+    };
+    ("adc.channel_count", str) => {
+        stringify!(6)
+    };
+    ("adc.line_calibration") => {
+        true
+    };
+    ("adc.curve_calibration") => {
+        true
+    };
+    ("adc.basic_calibration") => {
+        true
+    };
+    ("adc.calibration_v1_scheme_supported") => {
+        true
+    };
+    ("adc.channel_compensation") => {
+        true
+    };
+    ("adc.pcr_clock") => {
+        true
+    };
+    ("adc.pll_clock_sel") => {
+        2
+    };
+    ("adc.pll_clock_sel", str) => {
+        stringify!(2)
+    };
+    ("adc.pcr_sar_clk_div") => {
+        true
+    };
+    ("adc.sar_power_override") => {
+        true
+    };
     ("sdm.channel_count") => {
         4
     };

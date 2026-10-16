@@ -129,7 +129,7 @@ macro_rules! coeff_tables {
     };
 }
 
-#[cfg(any(esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s3))]
+#[cfg(adc_curve_calibration)]
 mod impls {
     use super::*;
 

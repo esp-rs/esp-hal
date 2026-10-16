@@ -13,7 +13,7 @@
 
 use embassy_executor::Spawner;
 use esp_backtrace as _;
-#[cfg(not(feature = "esp32s31"))]
+#[cfg(adc_line_calibration)]
 use esp_hal::analog::adc::AdcCalLine;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
@@ -41,12 +41,10 @@ async fn main(_spawner: Spawner) {
 
     // The ESP32-S31 has no calibration scheme implemented.
     let mut pin1 = cfg_select! {
-        feature = "esp32s31" => adc1_config.enable_pin(adc1_pin, Attenuation::_11dB),
-        _ => adc1_config
-            .enable_pin_with_cal::<_, AdcCalLine<esp_hal::peripherals::ADC1<'static>>>(
-                adc1_pin,
-                Attenuation::_11dB,
-            ),
+        adc_line_calibration => adc1_config.enable_pin_with_cal::<_, AdcCalLine<
+            esp_hal::peripherals::ADC1<'static>,
+        >>(adc1_pin, Attenuation::_11dB),
+        _ => adc1_config.enable_pin(adc1_pin, Attenuation::_11dB),
     };
 
     let mut adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();

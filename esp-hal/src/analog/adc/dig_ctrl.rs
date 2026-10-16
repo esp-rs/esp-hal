@@ -39,22 +39,7 @@ mod calibration;
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h2/include/soc/regi2c_saradc.h
 const ADC_VAL_MASK: u16 = 0xfff;
 
-// The number of analog IO pins, and in turn the number of attentuations,
-// depends on which chip is being used
-cfg_select! {
-    esp32c6 => {
-        pub(super) const NUM_ATTENS: usize = 7;
-    }
-    esp32c5 => {
-        pub(super) const NUM_ATTENS: usize = 6;
-    }
-    esp32c61 => {
-        pub(super) const NUM_ATTENS: usize = 4;
-    }
-    _ => {
-        pub(super) const NUM_ATTENS: usize = 5;
-    }
-}
+pub(super) const NUM_ATTENS: usize = property!("adc.channel_count");
 
 impl<ADCX> AdcConfig<ADCX>
 where
@@ -127,7 +112,7 @@ fn init_hardware() {
     // The ESP32-C2 and ESP32-C3 keep the divider in the ADC itself, and only support APB as the
     // source. The other chips take the PLL output via the PCR - 80 MHz, or 96 MHz on the
     // ESP32-H2.
-    #[cfg(any(esp32c2, esp32c3))]
+    #[cfg(not(adc_pcr_clock))]
     APB_SARADC::regs().clkm_conf().modify(|_, w| unsafe {
         w.clk_sel().bits(2);
         w.clkm_div_num().bits(div_num);
@@ -135,14 +120,11 @@ fn init_hardware() {
         w.clkm_div_a().bits(div_a)
     });
 
-    #[cfg(not(any(esp32c2, esp32c3)))]
+    #[cfg(adc_pcr_clock)]
     {
         // The PLL is source 1 on the ESP32-C6 and ESP32-H2, but source 2 on the ESP32-C5 and
         // ESP32-C61 - there, 1 selects the imprecise RC_FAST oscillator instead.
-        #[cfg(any(esp32c5, esp32c61))]
-        const PLL: u8 = 2;
-        #[cfg(not(any(esp32c5, esp32c61)))]
-        const PLL: u8 = 1;
+        let pll: u8 = property!("adc.pll_clock_sel");
 
         // The peripheral guard only enables the bus clock (`saradc_reg_clk_en`); the
         // controller runs off a separate function clock that has to be enabled here.
@@ -151,7 +133,7 @@ fn init_hardware() {
             .saradc_clkm_conf()
             .modify(|_, w| unsafe {
                 w.saradc_clkm_en().set_bit();
-                w.saradc_clkm_sel().bits(PLL);
+                w.saradc_clkm_sel().bits(pll);
                 w.saradc_clkm_div_num().bits(div_num);
                 w.saradc_clkm_div_b().bits(div_b);
                 w.saradc_clkm_div_a().bits(div_a)
@@ -165,14 +147,14 @@ fn init_hardware() {
         w.start_force().clear_bit();
         w.start().clear_bit();
         w.sar_clk_gated().set_bit();
-        #[cfg(not(any(esp32c5, esp32c61, esp32h2)))]
+        #[cfg(not(adc_pcr_sar_clk_div))]
         w.sar_clk_div().bits(1);
         w.xpd_sar_force().bits(0b11)
     });
 
     // The ESP32-C5, ESP32-C61, and ESP32-H2 configure the divider in PCR.
     // See `adc_ll_digi_set_clk_div`.
-    #[cfg(any(esp32c5, esp32c61, esp32h2))]
+    #[cfg(adc_pcr_sar_clk_div)]
     crate::peripherals::PCR::regs()
         .sar_clk_div()
         .modify(|_, w| unsafe { w.sar1_clk_div_num().bits(1) });
@@ -215,7 +197,7 @@ impl Drop for FunctionClockGuard {
 struct SarPowerGuard;
 
 cfg_select! {
-    any(esp32c5, esp32c6, esp32c61, esp32h2) => {
+    adc_sar_power_override => {
         static SAR_POWER_REFS: esp_sync::NonReentrantMutex<u8> =
             esp_sync::NonReentrantMutex::new(0);
 
@@ -594,7 +576,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
         crate::efuse::rtc_calib_cal_code(AdcCalibUnit::ADC1, atten)
     }
 
-    #[cfg(any(esp32c5, esp32c6, esp32c61, esp32h2))]
+    #[cfg(adc_channel_compensation)]
     fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32> {
         crate::efuse::rtc_calib_get_chan_compens(AdcCalibUnit::ADC1, channel, atten)
     }

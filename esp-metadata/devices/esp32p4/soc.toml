@@ -277,6 +277,11 @@ support_status = "not_supported"
 
 [device.adc]
 support_status = "partial"
+line_calibration = true
+curve_calibration = true
+basic_calibration = true
+calibration_v1_scheme_supported = true
+channel_compensation = true
 instances = [
     { name = "adc1" },
     { name = "adc2" },

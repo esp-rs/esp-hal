@@ -91,15 +91,18 @@ fn init_hardware<ADCX: RegisterAccess>() {
     });
 
     // Set power to SW power on
-    #[cfg(esp32s2)]
-    sensors
-        .sar_meas1_ctrl1()
-        .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
-
-    #[cfg(esp32s3)]
-    sensors
-        .sar_peri_clk_gate_conf()
-        .modify(|_, w| w.saradc_clk_en().set_bit());
+    cfg_select! {
+        esp32s2 => {
+            sensors
+                .sar_meas1_ctrl1()
+                .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
+        }
+        _ => {
+            sensors
+                .sar_peri_clk_gate_conf()
+                .modify(|_, w| w.saradc_clk_en().set_bit());
+        }
+    }
 
     sensors.sar_power_xpd_sar().modify(|_, w| unsafe {
         w.sarclk_en().set_bit();
@@ -230,14 +233,12 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 
     fn set_sar_clk_div() {
-        #[cfg(esp32s2)]
-        SENS::regs()
-            .sar_reader1_ctrl()
-            .modify(|_, w| unsafe { w.sar1_clk_div().bits(1) });
-        #[cfg(esp32s3)]
-        SENS::regs()
-            .sar_reader1_ctrl()
-            .modify(|_, w| unsafe { w.sar_sar1_clk_div().bits(1) });
+        SENS::regs().sar_reader1_ctrl().modify(|_, w| unsafe {
+            cfg_select! {
+                esp32s2 => w.sar1_clk_div().bits(1),
+                _ => w.sar_sar1_clk_div().bits(1),
+            }
+        });
     }
 
     fn calibration_init() {
@@ -364,14 +365,12 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
     }
 
     fn set_sar_clk_div() {
-        #[cfg(esp32s2)]
-        SENS::regs()
-            .sar_reader2_ctrl()
-            .modify(|_, w| unsafe { w.sar2_clk_div().bits(1) });
-        #[cfg(esp32s3)]
-        SENS::regs()
-            .sar_reader2_ctrl()
-            .modify(|_, w| unsafe { w.sar_sar2_clk_div().bits(1) });
+        SENS::regs().sar_reader2_ctrl().modify(|_, w| unsafe {
+            cfg_select! {
+                esp32s2 => w.sar2_clk_div().bits(1),
+                _ => w.sar_sar2_clk_div().bits(1),
+            }
+        });
     }
 
     fn calibration_init() {
