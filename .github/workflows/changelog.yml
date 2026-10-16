@@ -1,19 +1,31 @@
 name: Changelog check
 
+# Separate from CI because this check depends on the PR body and labels, so it
+# has to re-run when either changes, and it is cheap enough to do so on every
+# such event. Branch protection requires the `changelog` job next to `ci-result`.
 on:
-  workflow_call:
-    inputs:
-      pr-number:
-        description: "Pull request number to check"
-        required: true
-        type: number
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  # A required check must report in the merge queue too, where `changelog` is
+  # skipped, which counts as success.
+  merge_group:
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
+
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
   changelog:
+    # Do not skip based on which label changed or what an edit touched: a
+    # skipped required check counts as success and would replace a failure.
+    if: >
+      github.event_name == 'pull_request' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.state != 'closed'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -23,6 +35,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Check PR changelog
-        run: cargo xtask check-pr-changelog --pr ${{ inputs.pr-number }}
+        run: cargo xtask check-pr-changelog --pr ${{ github.event.pull_request.number }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

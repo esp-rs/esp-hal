@@ -13,7 +13,12 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+    # No `labeled`/`unlabeled`: a label change would rebuild everything and
+    # cancel the run in progress. `calculate` reads labels live instead, so
+    # "Re-run all jobs" picks up labels added after the run started.
+    # Re-run after removing `skip-ci-non-code-change`: the merge queue does not
+    # run `esp-hal` or `xtensa-lld`, so a stale green run would skip them.
+    types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
   workflow_dispatch:
 
@@ -36,8 +41,7 @@ jobs:
   # jobs and reusable workflows run.  Every other job/workflow in this file
   # gates on `calculate` outputs.
   # Draft PRs run no CI at all: every other job needs `calculate`, so skipping
-  # it skips them too. Closed and merged PRs are skipped the same way, since
-  # label events fire on them as well.
+  # it skips them too. Closed and merged PRs are skipped the same way.
   calculate:
     if: >
       !github.event.pull_request.draft &&
@@ -52,7 +56,6 @@ jobs:
       run-msrv: ${{ steps.decide.outputs.run-msrv }}
       run-host-tests: ${{ steps.decide.outputs.run-host-tests }}
       run-hil: ${{ steps.decide.outputs.run-hil }}
-      run-changelog: ${{ steps.decide.outputs.run-changelog }}
       run-semver-check: ${{ steps.decide.outputs.run-semver-check }}
     steps:
       - uses: actions/checkout@v6
@@ -62,8 +65,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "pull_request_target" ]]; then
-            LABELS=$(printf "%b" "${{ join(github.event.pull_request.labels.*.name, '\n') }}")
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # Not the event payload: a re-run reuses it, labels and all.
+            LABELS=$(gh pr view "${{ github.event.pull_request.number }}" --json labels --jq '.labels[].name')
           elif [[ "${{ github.event_name }}" == "merge_group" ]]; then
             COMMIT_MSG=$(git log -1 --pretty=%B)
             PR_NUMBER=$(echo "$COMMIT_MSG" | grep -o "#[0-9]*" | grep -o "[0-9]*" || true)
@@ -93,7 +97,7 @@ jobs:
           LABELS: ${{ steps.labels.outputs.labels }}
         run: |
           BUILD=true; DOCS=true; MSRV=true; HOST=true
-          CHANGELOG=true; SEMVER=true
+          SEMVER=true
           HIL=false
 
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
@@ -108,7 +112,6 @@ jobs:
             HIL=false
           fi
           if echo "$LABELS" | grep -qw 'skip-semver-checks'; then SEMVER=false; fi
-          if echo "$LABELS" | grep -qw 'skip-changelog'; then CHANGELOG=false; fi
 
           for pair in \
             "run-build=$BUILD" \
@@ -116,12 +119,11 @@ jobs:
             "run-msrv=$MSRV" \
             "run-host-tests=$HOST" \
             "run-hil=$HIL" \
-            "run-changelog=$CHANGELOG" \
             "run-semver-check=$SEMVER"; do
             echo "$pair" >> "$GITHUB_OUTPUT"
           done
 
-          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST hil=$HIL changelog=$CHANGELOG semver=$SEMVER"
+          echo "Decision: build=$BUILD docs=$DOCS msrv=$MSRV host=$HOST hil=$HIL semver=$SEMVER"
 
   # Merge freeze — see documentation/CONTRIBUTING.md.
   #
@@ -500,17 +502,6 @@ jobs:
   # --------------------------------------------------------------------------
   # Reusable workflow calls — gated by calculate outputs
 
-  changelog:
-    needs: calculate
-    if: >
-      github.event_name == 'pull_request' &&
-      !github.event.pull_request.draft &&
-      needs.calculate.outputs.run-changelog == 'true'
-    uses: ./.github/workflows/changelog.yml
-    with:
-      pr-number: ${{ github.event.pull_request.number }}
-    secrets: inherit
-
   semver-check:
     needs: calculate
     if: needs.calculate.outputs.run-semver-check == 'true'
@@ -536,7 +527,8 @@ jobs:
   # --------------------------------------------------------------------------
   # Gate job for branch protection
   #
-  # Branch protection should require this single job instead of individual jobs.
+  # Branch protection should require this job instead of individual jobs, plus
+  # `changelog` from changelog.yml.
   # Skipped jobs (due to calculate outputs) are treated as success.
   # Failed or cancelled jobs cause this gate to fail.
   #
@@ -556,7 +548,6 @@ jobs:
       - msrv
       - xtensa-lld
       - host-tests
-      - changelog
       - semver-check
       - hil
       - merge-freeze-gate
