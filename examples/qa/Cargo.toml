@@ -5,6 +5,9 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 publish = false
 
+[package.metadata.espressif]
+aliases = ["qa"]
+
 [build-dependencies]
 esp-metadata-generated = { path = "../../esp-metadata-generated", features = ["build-script"] }
 

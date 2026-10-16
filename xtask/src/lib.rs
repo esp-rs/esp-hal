@@ -151,7 +151,7 @@ impl Package {
                 std::fs::read_to_string(entry.path()).is_ok_and(|src| {
                     src.contains("asm_experimental_arch")
                         || src.contains("asm!(")
-                        || src.contains("global_asm!(")
+                        || src.contains("asm!{")
                 })
             })
     }
@@ -1416,5 +1416,4 @@ mod tests {
             );
         }
     }
-
 }

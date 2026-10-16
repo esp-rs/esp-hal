@@ -9,6 +9,7 @@ struct DiscoveredPackage {
     name: String,
     variant: String,
     directory: String,
+    aliases: Vec<String>,
     contains_standalone_projects: bool,
 }
 
@@ -55,23 +56,38 @@ fn discover_packages(workspace: &Path, root_manifest: &Path) -> Vec<DiscoveredPa
             continue;
         }
         // A Cargo.toml marks a single crate, otherwise the folder holds standalone projects.
-        if path.join("Cargo.toml").exists() {
-            let name = read_package_name(&path.join("Cargo.toml")).unwrap_or(rel_dir.to_string());
-            discovered.push(make_discovered_package(name, rel_dir.to_string(), false));
+        let manifest_path = path.join("Cargo.toml");
+        if manifest_path.exists() {
+            println!("cargo::rerun-if-changed={}", manifest_path.display());
+            let (name, aliases) = read_package_metadata(&manifest_path)
+                .unwrap_or_else(|| (rel_dir.to_string(), Vec::new()));
+            discovered.push(make_discovered_package(
+                name,
+                rel_dir.to_string(),
+                aliases,
+                false,
+            ));
         } else {
             println!("cargo::rerun-if-changed={}", path.display());
+            let aliases = rel_dir
+                .strip_suffix('s')
+                .map(ToOwned::to_owned)
+                .into_iter()
+                .collect();
             discovered.push(make_discovered_package(
                 rel_dir.to_string(),
                 rel_dir.to_string(),
+                aliases,
                 true,
             ));
             if let Ok(entries) = fs::read_dir(&path) {
                 let mut subdirs: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
                 subdirs.sort();
                 for sub_path in subdirs {
+                    let sub_manifest = sub_path.join("Cargo.toml");
                     if sub_path.is_dir()
-                        && sub_path.join("Cargo.toml").exists()
-                        && let Some(pkg_name) = read_package_name(&sub_path.join("Cargo.toml"))
+                        && sub_manifest.exists()
+                        && let Some((pkg_name, aliases)) = read_package_metadata(&sub_manifest)
                     {
                         let sub_rel = sub_path
                             .strip_prefix(workspace)
@@ -80,7 +96,9 @@ fn discover_packages(workspace: &Path, root_manifest: &Path) -> Vec<DiscoveredPa
                             .replace('\\', "/");
                         // Also register multi-binary crates like `examples/qa` (`qa-test`).
                         if sub_path.join("src").join("bin").is_dir() {
-                            discovered.push(make_discovered_package(pkg_name, sub_rel, false));
+                            println!("cargo::rerun-if-changed={}", sub_manifest.display());
+                            discovered
+                                .push(make_discovered_package(pkg_name, sub_rel, aliases, false));
                         }
                     }
                 }
@@ -91,18 +109,29 @@ fn discover_packages(workspace: &Path, root_manifest: &Path) -> Vec<DiscoveredPa
     discovered
 }
 
-fn read_package_name(manifest_path: &Path) -> Option<String> {
+fn read_package_metadata(manifest_path: &Path) -> Option<(String, Vec<String>)> {
     let content = fs::read_to_string(manifest_path).ok()?;
     let doc = content.parse::<toml_edit::DocumentMut>().ok()?;
-    doc.get("package")?
-        .get("name")?
-        .as_str()
-        .map(ToOwned::to_owned)
+    let package = doc.get("package")?;
+    let name = package.get("name")?.as_str()?.to_owned();
+    let aliases = package
+        .get("metadata")
+        .and_then(|m| m.get("espressif"))
+        .and_then(|e| e.get("aliases"))
+        .and_then(|a| a.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(ToOwned::to_owned))
+                .collect()
+        })
+        .unwrap_or_default();
+    Some((name, aliases))
 }
 
 fn make_discovered_package(
     name: String,
     directory: String,
+    aliases: Vec<String>,
     contains_standalone_projects: bool,
 ) -> DiscoveredPackage {
     let variant = kebab_to_pascal(&name);
@@ -110,6 +139,7 @@ fn make_discovered_package(
         name,
         variant,
         directory,
+        aliases,
         contains_standalone_projects,
     }
 }
@@ -154,13 +184,14 @@ pub enum Package {{"
     .unwrap();
 
     for pkg in packages {
-        match pkg.name.as_str() {
-            "examples" => writeln!(out, "    #[value(alias = \"example\")]").unwrap(),
-            "hil-test" => {
-                writeln!(out, "    #[value(alias = \"test\", alias = \"tests\")]").unwrap()
-            }
-            "qa-test" => writeln!(out, "    #[value(alias = \"qa\")]").unwrap(),
-            _ => {}
+        if !pkg.aliases.is_empty() {
+            let aliases = pkg
+                .aliases
+                .iter()
+                .map(|a| format!("alias = {a:?}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            writeln!(out, "    #[value({aliases})]").unwrap();
         }
         writeln!(out, "    {},", pkg.variant).unwrap();
     }
