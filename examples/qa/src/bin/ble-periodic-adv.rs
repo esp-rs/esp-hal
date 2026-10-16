@@ -11,7 +11,7 @@
 //! match `3 + Advertising_Data_Length`.
 
 //% FEATURES: esp-radio esp-radio/ble esp-radio/unstable esp-hal/unstable
-//% CHIP_FILTER: bt_driver_supported && !esp32
+//% CHIP_FILTER: bt_driver_supported && bt_controller == "npl"
 
 #![no_std]
 #![no_main]
