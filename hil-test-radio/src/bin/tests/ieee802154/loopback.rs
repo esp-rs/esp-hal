@@ -1,13 +1,22 @@
 #[embedded_test::tests(default_timeout = 30, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
-    use embassy_time::{Duration, Timer};
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    use embassy_time::{Duration, Instant, Timer};
     use esp_hal::{
         clock::CpuClock,
         peripherals::{IEEE802154, Peripherals, TIMG0},
         timer::timg::TimerGroup,
     };
     use esp_radio::ieee802154::{Config, Frame, Ieee802154};
-    use hil_test::ieee802154::{CHANNEL, DUT_ADDRESS, PAN_ID, PAYLOAD, SUPPORT_ADDRESS};
+    use hil_test::ieee802154::{
+        CHANNEL,
+        DUT_ADDRESS,
+        PAN_ID,
+        PAYLOAD,
+        PAYLOAD_ACKED,
+        SUPPORT_ADDRESS,
+    };
     use ieee802154::mac::{
         Address,
         FrameContent,
@@ -39,6 +48,10 @@ mod tests {
     }
 
     fn data_frame(seq: u8, ack_request: bool) -> Frame {
+        data_frame_with_payload(seq, ack_request, PAYLOAD)
+    }
+
+    fn data_frame_with_payload(seq: u8, ack_request: bool, payload: &[u8]) -> Frame {
         Frame {
             header: Header {
                 frame_type: FrameType::Data,
@@ -54,9 +67,20 @@ mod tests {
                 auxiliary_security_header: None,
             },
             content: FrameContent::Data,
-            payload: PAYLOAD.to_vec(),
+            payload: payload.to_vec(),
             footer: [0u8; 2],
         }
+    }
+
+    static TX_DONE: AtomicBool = AtomicBool::new(false);
+    static TX_FAILED: AtomicBool = AtomicBool::new(false);
+
+    fn on_tx_done() {
+        TX_DONE.store(true, Ordering::Relaxed);
+    }
+
+    fn on_tx_failed() {
+        TX_FAILED.store(true, Ordering::Relaxed);
     }
 
     fn start_radio(timg0: TIMG0<'static>, radio: IEEE802154<'static>) -> Ieee802154<'static> {
@@ -143,5 +167,116 @@ mod tests {
         }
 
         false
+    }
+
+    /// The peer board echoes an ACK-requesting frame back when it receives `PAYLOAD_ACKED`. The
+    /// DUT acknowledges it, and only then delivers it - so it must arrive.
+    #[test]
+    async fn receives_acknowledged_echo(p: Peripherals) {
+        let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
+
+        let mut echoed = false;
+        'outer: for seq in 0..30u8 {
+            ieee802154
+                .transmit(&data_frame_with_payload(seq, true, PAYLOAD_ACKED), false)
+                .ok();
+
+            for _ in 0..20 {
+                Timer::after(Duration::from_millis(20)).await;
+                if let Some(Ok(received)) = ieee802154.received()
+                    && received.frame.payload.as_slice() == PAYLOAD_ACKED
+                {
+                    assert!(
+                        received.frame.header.ack_request,
+                        "the echoed frame does not request an ACK"
+                    );
+                    echoed = true;
+                    break 'outer;
+                }
+            }
+        }
+
+        assert!(
+            echoed,
+            "did not receive the acknowledged echo from the peer board"
+        );
+    }
+
+    /// Once asleep, the DUT receives nothing - not the echo of the frame it has just sent - until
+    /// `start_receive`.
+    #[test]
+    async fn sleep_stops_reception_until_start_receive(p: Peripherals) {
+        let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
+        ieee802154.set_tx_done_callback_fn(on_tx_done);
+
+        for seq in 0..5u8 {
+            TX_DONE.store(false, Ordering::Relaxed);
+            ieee802154.transmit(&data_frame(seq, false), false).ok();
+
+            // `rx_when_idle` turns the receiver back on after the transmission. Put the radio to
+            // sleep right then: the peer needs far longer than this to echo the frame back.
+            let deadline = Instant::now() + Duration::from_millis(50);
+            while !TX_DONE.load(Ordering::Relaxed) && Instant::now() < deadline {}
+            assert!(
+                TX_DONE.load(Ordering::Relaxed),
+                "the transmission did not complete"
+            );
+
+            ieee802154.sleep();
+
+            Timer::after(Duration::from_millis(200)).await;
+            assert!(
+                ieee802154.received().is_none(),
+                "received a frame while asleep"
+            );
+        }
+
+        // Awake again, the echoes arrive - which also shows that the peer did echo above.
+        ieee802154.start_receive();
+
+        let mut echoed = false;
+        'outer: for seq in 0..30u8 {
+            ieee802154.transmit(&data_frame(seq, true), false).ok();
+
+            for _ in 0..20 {
+                Timer::after(Duration::from_millis(20)).await;
+                if let Some(Ok(received)) = ieee802154.received()
+                    && received.frame.payload.as_slice() == PAYLOAD
+                {
+                    echoed = true;
+                    break 'outer;
+                }
+            }
+        }
+
+        assert!(
+            echoed,
+            "did not receive an echoed frame after start_receive"
+        );
+    }
+
+    /// `sleep` stops a transmission that is in progress, as the ESP-IDF driver does: it fails.
+    #[test]
+    async fn sleep_aborts_transmission(p: Peripherals) {
+        let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
+        ieee802154.set_tx_done_callback_fn(on_tx_done);
+        ieee802154.set_tx_failed_callback_fn(on_tx_failed);
+
+        TX_DONE.store(false, Ordering::Relaxed);
+        TX_FAILED.store(false, Ordering::Relaxed);
+
+        // The frame, and the ACK it waits for, take far longer to go over the air than it takes to
+        // get to the `sleep` call.
+        ieee802154.transmit(&data_frame(0, true), false).ok();
+        ieee802154.sleep();
+
+        assert!(
+            TX_FAILED.load(Ordering::Relaxed),
+            "the stopped transmission did not fail"
+        );
+        assert!(
+            !TX_DONE.load(Ordering::Relaxed),
+            "the stopped transmission completed"
+        );
     }
 }
