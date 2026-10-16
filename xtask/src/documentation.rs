@@ -347,11 +347,11 @@ fn cargo_doc(
             cargo_doc_without_pre_processing(workspace, package, chip, channel, base_url);
 
         // Restore the original Cargo.toml
-        restore_cargo_toml(package_path)?;
+        restore_cargo_toml(&package_path)?;
         cargo_doc_res
     } else {
         // Restore the original Cargo.toml
-        restore_cargo_toml(package_path)?;
+        restore_cargo_toml(&package_path)?;
         Err(pre_process_res.err().unwrap())
     }
 }
@@ -562,6 +562,8 @@ fn cargo_doc_without_pre_processing(
 /// The only currently supported function for expressions is `has(<SYMBOL>)`
 /// e.g. `has("psram")`
 fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &Path) -> Result<(), anyhow::Error> {
+    restore_cargo_toml(package_path)?;
+
     let manifest_path = windows_safe_path(&package_path.join("Cargo.toml"));
     let original_path = windows_safe_path(&package_path.join("Cargo.toml_original"));
 
@@ -636,7 +638,7 @@ fn pre_process_cargo_toml(chip: Option<Chip>, package_path: &Path) -> Result<(),
 }
 
 /// Restore the original Cargo.toml file
-fn restore_cargo_toml(package_path: PathBuf) -> Result<(), anyhow::Error> {
+fn restore_cargo_toml(package_path: &Path) -> Result<(), anyhow::Error> {
     if std::fs::exists(windows_safe_path(&package_path.join("Cargo.toml_original")))? {
         if std::fs::exists(windows_safe_path(&package_path.join("Cargo.toml")))? {
             std::fs::remove_file(windows_safe_path(&package_path.join("Cargo.toml")))?;
@@ -1078,14 +1080,22 @@ mod tests {
         let package_path = temp.path().join("package");
         fs::create_dir(&package_path).unwrap();
 
-        let original = "#DOC_IF has(\"wifi\")\n## Wi-Fi\n#DOC_ENDIF\n";
+        let original = "#DOC_IF has(\"wifi_driver_supported\")\n## Wi-Fi\n#DOC_ENDIF\n";
         fs::write(package_path.join("Cargo.toml"), original).unwrap();
         let original_mtime = fs::metadata(package_path.join("Cargo.toml"))
             .unwrap()
             .modified()
             .unwrap();
 
-        pre_process_cargo_toml(None, &package_path).unwrap();
+        // Simulate an interrupted run on a Wi-Fi chip followed by a non-Wi-Fi chip without an
+        // explicit restore in between.
+        pre_process_cargo_toml(Some(crate::Chip::Esp32c6), &package_path).unwrap();
+        assert_eq!(
+            fs::read_to_string(package_path.join("Cargo.toml")).unwrap(),
+            "## Wi-Fi\n"
+        );
+
+        pre_process_cargo_toml(Some(crate::Chip::Esp32h2), &package_path).unwrap();
         let processed_mtime = fs::metadata(package_path.join("Cargo.toml"))
             .unwrap()
             .modified()
@@ -1097,7 +1107,7 @@ mod tests {
             "# Wi-Fi\n"
         );
 
-        restore_cargo_toml(package_path.clone()).unwrap();
+        restore_cargo_toml(&package_path).unwrap();
         assert_eq!(
             fs::read_to_string(package_path.join("Cargo.toml")).unwrap(),
             original
