@@ -198,6 +198,8 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32c61::*;
     #[cfg(esp32h2)]
     pub use esp_wifi_sys_esp32h2::*;
+    #[cfg(esp32h4)]
+    pub use esp_wifi_sys_esp32h4::*;
     #[cfg(esp32s2)]
     pub use esp_wifi_sys_esp32s2::*;
     #[cfg(esp32s3)]
@@ -234,7 +236,7 @@ macro_rules! unstable_module {
 
 mod asynch;
 mod compat;
-#[cfg(esp32s31)]
+#[cfg(any(esp32h4, esp32s31))]
 mod compiler_rt_abi;
 #[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm2")))]
 mod drop_guard;
@@ -498,7 +500,7 @@ impl Drop for RadioRefGuard {
 /// Does nothing unless the `print-logs-from-driver` feature is enabled.
 #[instability::unstable]
 pub fn wifi_set_log_verbose() {
-    #[cfg(all(feature = "print-logs-from-driver", not(esp32h2)))]
+    #[cfg(all(feature = "print-logs-from-driver", not(any(esp32h2, esp32h4))))]
     unsafe {
         use crate::sys::include::{
             esp_wifi_internal_set_log_level,

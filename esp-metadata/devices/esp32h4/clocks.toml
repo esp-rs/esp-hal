@@ -55,6 +55,13 @@ system_clocks = { clock_tree = [
         { name = "RC_SLOW",  outputs = "RC_SLOW_D4_CLK" },
         { name = "OSC_SLOW", outputs = "OSC_SLOW_CLK" },
     ] },
+    # BLE RTC timer (LP_CLKRST.lpperi). Independent of LP_SLOW_CLK.
+    { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "100_000" },
+    { name = "BLE_LP_CLK", type = "mux", variants = [
+        { name = "XTAL",    outputs = "BLE_LP_XTAL_CLK" },
+        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
+        { name = "XTAL32K", outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
+    ] },
 
     # PCR.timg_cali_clk_conf.timg_cali_clk_sel: 1 = XTAL32K, 3 = RC_SLOW,
     # 4 = TIMG_SECURE_CLK, where RC_FAST sits behind a /32 divider.

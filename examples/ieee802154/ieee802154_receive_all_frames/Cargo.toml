@@ -40,6 +40,13 @@ esp32h2 = [
     "esp-hal/esp32h2",
     "esp-radio/esp32h2",
 ]
+esp32h4 = [
+    "esp-alloc/esp32h4",
+    "esp-backtrace/esp32h4",
+    "esp-bootloader-esp-idf/esp32h4",
+    "esp-hal/esp32h4",
+    "esp-radio/esp32h4",
+]
 esp32s31 = [
     "esp-alloc/esp32s31",
     "esp-backtrace/esp32s31",

@@ -45,6 +45,7 @@ use crate::{
     time::{blob_ticks_to_micros, blob_ticks_to_millis, millis_to_blob_ticks},
 };
 
+#[cfg_attr(esp32h4, path = "os_adapter_esp32h4.rs")]
 #[cfg_attr(esp32s31, path = "os_adapter_esp32s31.rs")]
 pub(crate) mod chip_specific;
 
@@ -390,6 +391,7 @@ fn esp_bt_controller_init(cfg: *mut esp_bt_controller_config_t) -> esp_err_t {
         coex_pti_v2();
         // Same ROM pointer 802.15.4 TX needs on S31. A null/stale
         // `coex_pti_tab_ptr` leaves the BB waiting for a PTI grant.
+        #[cfg(soc_has_wifi)]
         {
             unsafe extern "C" {
                 static mut coex_pti_tab_ptr: u32;
@@ -778,7 +780,12 @@ unsafe extern "C" fn btdm_lp_wake_up_cb(arg: *mut c_void) {
     let params = arg.cast::<u32>();
     super::modem_phy_acquire();
     if !params.is_null() {
-        let by_bt = esp_hal::rtc_cntl::wakeup_cause().contains(esp_hal::rtc_cntl::WakeupSource::Bt);
+        let by_bt = cfg_select! {
+            sleep_driver_supported => {
+                esp_hal::rtc_cntl::wakeup_cause().contains(esp_hal::rtc_cntl::WakeupSource::Bt)
+            }
+            _ => false,
+        };
         unsafe {
             let value = params.read_volatile();
             params.write_volatile(if by_bt {
@@ -791,6 +798,7 @@ unsafe extern "C" fn btdm_lp_wake_up_cb(arg: *mut c_void) {
 }
 
 /// Returns whether the controller refuses a light sleep, because its next event is too close.
+#[cfg(sleep_driver_supported)]
 pub(super) fn controller_skips_light_sleep() -> bool {
     unsafe extern "C" {
         fn r_btdm_sleep_should_skip_light_sleep_check() -> bool;
