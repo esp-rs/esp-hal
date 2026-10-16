@@ -135,7 +135,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ---------------------------- |:-----:|:--------:|:--------:|:--------:|:--------:|:---------:|:--------:|:--------:|:--------:|:--------:|:--------:|:---------:|
 | Bit Scrambler                |       |          |          | [❌][5170] [^1] |          |           |          |          | ❌       |          |          | ❌        |
 | Image Signal Processor       |       |          |          |          |          |           |          |          | ❌       |          |          |           |
-| Pixel Processing Accelerator |       |          |          |          |          |           |          |          | ❌       |          |          | ❌        |
+| Pixel Processing Accelerator |       |          |          |          |          |           |          |          | ❌       |          |          | ⚒️       |
 | JPEG Codec                   |       |          |          |          |          |           |          |          | ❌       |          |          | ❌        |
 | H.264 encoder                |       |          |          |          |          |           |          |          | ❌       |          |          |           |
 | Audio Sample Rate Converter  |       |          |          |          |          |           |          | ❌       |          |          |          | ❌        |

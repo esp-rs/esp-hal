@@ -57,6 +57,7 @@ peripherals = [
     { name = "CLINT_OTHER_CORE" },
     { name = "CNNT_SYS", hidden = true },
     { name = "CNNT_IO_MUX", hidden = true },
+    { name = "DMA2D" },
     { name = "ETH", virtual = true, interrupts = { peri = "SBD" } },
     { name = "EMAC_DMA", pac = "GMAC_DMA", hidden = true },
     { name = "EMAC_MAC", pac = "GMAC", hidden = true },
@@ -95,6 +96,7 @@ peripherals = [
     { name = "PCNT",  interrupts = { peri = "PCNT0" } },
     { name = "PCNT1", interrupts = { peri = "PCNT1" } },
     { name = "PMU" },
+    { name = "PPA" },
     { name = "RTC_TIMER", pac = "LP_TIMER" },
     { name = "RNG", pac = "TRNG" },
     { name = "RMT", interrupts = { peri = "RMT" }, clock_group = "RMT" },
@@ -594,7 +596,7 @@ extmem_origin = 0x5000_0000
 octal_spi = true
 
 [device.pixel_accelerator]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.asrc]
 support_status = "not_supported"
