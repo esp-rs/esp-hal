@@ -4,6 +4,9 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+[package.metadata.espressif]
+aliases = ["test", "tests"]
+
 [lib]
 name = "hil_test"
 

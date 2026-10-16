@@ -21,7 +21,13 @@ pub struct SemverCheckArgs {
     pub command: SemverCheckCmd,
 
     /// Package(s) to target.
-    #[arg(long, alias = "package", value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal, Package::EspRomSys, Package::EspRadio])]
+    #[arg(
+        long,
+        alias = "package",
+        value_enum,
+        value_delimiter = ',',
+        default_values_t = Package::iter().filter(|p| p.is_semver_checked() || p.has_semver_config())
+    )]
     pub packages: Vec<Package>,
 
     /// Default packages that are not supposed to run, used in CI.
@@ -94,11 +100,9 @@ pub mod checker {
                     continue;
                 }
                 log::info!("Chip = {}", chip.to_string());
-                let package_name = package.to_string();
-                let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+                let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
-                let current_path =
-                    build_prepared_doc_json(workspace, package, chip, &package_path)?;
+                let current_path = build_prepared_doc_json(package, chip, &package_path)?;
 
                 let to_path = PathBuf::from(&package_path).join(format!(
                     "api-baseline/{}.json.gz",
@@ -215,7 +219,7 @@ pub mod checker {
             log::info!("Downloading API baselines for {package}");
 
             let package_name = package.to_string();
-            let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+            let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
             let baseline_dir = package_path.join("api-baseline");
 
             // Remove existing baselines

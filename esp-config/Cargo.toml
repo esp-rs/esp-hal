@@ -20,6 +20,9 @@ check-configs = [
 clippy-configs = [
     { features = ["tui"] },
 ]
+host-test-configs = [
+    { features = ["build", "tui"] },
+]
 
 [lib]
 bench = false

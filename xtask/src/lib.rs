@@ -68,57 +68,16 @@ pub struct CheckConfig {
     pub env: HashMap<String, String>,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    clap::ValueEnum,
-    strum::Display,
-    strum::EnumIter,
-    strum::AsRefStr,
-    serde::Deserialize,
-    serde::Serialize,
-)]
-#[serde(rename_all = "kebab-case")]
-#[strum(serialize_all = "kebab-case")]
-/// Represents the packages in the `esp-hal` workspace.
-pub enum Package {
-    EspAlloc,
-    EspBacktrace,
-    EspBootloaderEspIdf,
-    EspConfig,
-    EspHal,
-    EspHalProcmacros,
-    EspRomSys,
-    EspLpHal,
-    EspMetadata,
-    EspMetadataGenerated,
-    EspPhy,
-    EspPrintln,
-    EspRiscvRt,
-    EspStorage,
-    EspSync,
-    EspRadio,
-    EspRadioRtosDriver,
-    EspRtos,
-    #[value(alias = "example")]
-    Examples,
-    #[value(alias = "test", alias = "tests")]
-    HilTest,
-    HilTestRadio,
-    #[value(alias = "qa")]
-    QaTest,
-    XtensaLx,
-    XtensaLxRt,
-    XtensaLxRtProcMacros,
-
-    CompileTests,
+/// One `host-test-configs` case from `[package.metadata.espressif]`.
+#[derive(Debug, Clone, Default)]
+pub struct HostTestConfig {
+    pub features: Vec<String>,
+    pub cargo_args: Vec<String>,
+    pub test_args: Vec<String>,
+    pub miri: bool,
 }
+
+include!(concat!(env!("OUT_DIR"), "/packages.rs"));
 
 // Returns the root directory of the esp-hal repository.
 fn repo_root() -> PathBuf {
@@ -138,16 +97,6 @@ fn repo_root() -> PathBuf {
 static TOML: Mutex<Option<HashMap<Package, Option<CargoToml>>>> = Mutex::new(None);
 
 impl Package {
-    /// Source directory relative to the workspace root.
-    ///
-    /// Usually matches the clap/package name. QA tests live under `examples/qa`.
-    pub fn directory(&self) -> &str {
-        match self {
-            Self::QaTest => "examples/qa",
-            other => other.as_ref(),
-        }
-    }
-
     /// Does the package have chip-specific cargo features?
     pub fn has_chip_features(&self) -> bool {
         use strum::IntoEnumIterator;
@@ -193,24 +142,18 @@ impl Package {
 
     /// Does the package have inline assembly?
     pub fn has_inline_assembly(&self, workspace: &Path) -> bool {
-        // feature(asm_experimental_arch) is enabled in all crates that use Xtensa
-        // assembly, which covers crates that use assembly AND are used for both
-        // architectures (e.g. esp-backtrace).
-        // But RISC-V doesn't need this feature, so we can either scrape the crate
-        // source, or check in a list of packages.
-        if matches!(self, Package::EspRiscvRt | Package::EspLpHal) {
-            return true;
-        }
-
-        let lib_rs_path = workspace.join(self.directory()).join("src").join("lib.rs");
-        let Ok(source) = std::fs::read_to_string(&lib_rs_path) else {
-            return false;
-        };
-
-        source
-            .lines()
-            .filter(|line| line.starts_with("#!["))
-            .any(|line| line.contains("asm_experimental_arch"))
+        let src_path = workspace.join(self.directory()).join("src");
+        walkdir::WalkDir::new(src_path)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
+            .any(|entry| {
+                std::fs::read_to_string(entry.path()).is_ok_and(|src| {
+                    src.contains("asm_experimental_arch")
+                        || src.contains("asm!(")
+                        || src.contains("asm!{")
+                })
+            })
     }
 
     /// Is the package compatible with the given chip?
@@ -234,7 +177,7 @@ impl Package {
 
     /// Does the package have a migration guide?
     pub fn has_migration_guide(&self, workspace: &Path) -> bool {
-        let package_path = workspace.join(self.to_string());
+        let package_path = workspace.join(self.directory());
 
         // Check if the package directory exists
         let Ok(entries) = std::fs::read_dir(&package_path) else {
@@ -256,21 +199,32 @@ impl Package {
 
     /// Does the package have any host tests?
     ///
-    /// Returns true when `src/**/*.rs` contains `#[test]`. Packages that return
-    /// true must also have a match arm in [`run_host_tests`]; see `xtask/README.md`
-    /// ("Host tests").
+    /// Returns true when `host-test-configs` is configured in `[package.metadata.espressif]`
+    /// or when `src/**/*.rs` contains `#[test]`. Packages that return
+    /// true must configure `host-test-configs` in `[package.metadata.espressif]`;
+    /// see `xtask/README.md` ("Host tests").
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
-        if *self == Package::HilTest || *self == Package::HilTestRadio {
+        if self.contains_standalone_projects() {
             return false;
         }
-        let package_path = workspace.join(self.directory()).join("src");
+        if !self.host_test_config_rules().is_empty() {
+            return true;
+        }
+        // Test suites (`hil-test`, `hil-test-radio`) use `#[test]` with `embedded-test`
+        // rather than host `cargo test`.
+        let package_dir = workspace.join(self.directory());
+        if package_dir.join("src").join("bin").is_dir() && !self.is_published() {
+            return false;
+        }
+        let package_path = package_dir.join("src");
 
         walkdir::WalkDir::new(package_path)
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
             .any(|entry| {
-                std::fs::read_to_string(entry.path()).is_ok_and(|src| src.contains("#[test]"))
+                std::fs::read_to_string(entry.path())
+                    .is_ok_and(|src| src.lines().any(|line| line.trim().starts_with("#[test]")))
             })
     }
 
@@ -290,11 +244,6 @@ impl Package {
             .unwrap_or(false)
     }
 
-    /// Is this "package" a directory of standalone projects rather than a single crate?
-    pub fn contains_standalone_projects(&self) -> bool {
-        matches!(self, Package::Examples | Package::CompileTests)
-    }
-
     /// Should documentation be built for the package, and should the package be
     /// published?
     pub fn is_published(&self) -> bool {
@@ -308,11 +257,25 @@ impl Package {
 
     /// Build on host
     pub fn build_on_host(&self, features: &[String]) -> bool {
-        match self {
-            Self::EspConfig | Self::EspMetadata => true,
-            Self::EspMetadataGenerated if features.iter().any(|f| f == "build-script") => true,
-            _ => false,
+        if !self.needs_build_std() {
+            return true;
         }
+
+        let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+        let Some(Item::Value(Value::Array(host_features))) = metadata.get("host-features") else {
+            return false;
+        };
+
+        host_features.iter().any(|hf| {
+            hf.as_str()
+                .is_some_and(|hf| features.iter().any(|f| f == hf))
+        })
     }
 
     fn parse_required_features(table: &InlineTable) -> Vec<String> {
@@ -452,10 +415,6 @@ impl Package {
     // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
     // chip-specific features.
     pub fn doc_config_rules(&self, config: &Config) -> Option<CheckConfig> {
-        if *self == Self::Examples {
-            return None;
-        }
-
         let config = self.single_config_rule_from_metadata(config, "doc-config");
 
         log::debug!("Doc config for package '{}': {:?}", self, config);
@@ -526,6 +485,64 @@ impl Package {
             .unwrap_or_default();
 
         log::debug!("Clippy configs for package '{}': {:?}", self, cases);
+        cases
+    }
+
+    /// Host test configurations to run for this package via `cargo xtask host-tests`.
+    pub fn host_test_config_rules(&self) -> Vec<HostTestConfig> {
+        let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return Vec::new();
+        };
+
+        let mut cases = Vec::new();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("host-test-configs")
+        {
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "'host-test-configs' must be an array of tables. {:?}",
+                    config_meta
+                );
+            };
+
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("'host-test-configs' items must be inline tables.");
+                };
+
+                let features = Self::parse_required_features(table);
+
+                let parse_str_array = |key: &str| -> Vec<String> {
+                    let Some(val) = table.get(key) else {
+                        return Vec::new();
+                    };
+                    let Value::Array(arr) = val else {
+                        panic!("'{key}' must be an array.");
+                    };
+                    arr.iter()
+                        .map(|v| {
+                            v.as_str()
+                                .unwrap_or_else(|| panic!("'{key}' items must be strings."))
+                                .to_owned()
+                        })
+                        .collect()
+                };
+
+                let cargo_args = parse_str_array("cargo-args");
+                let test_args = parse_str_array("test-args");
+                let miri = table.get("miri").and_then(|v| v.as_bool()).unwrap_or(false);
+
+                cases.push(HostTestConfig {
+                    features,
+                    cargo_args,
+                    test_args,
+                    miri,
+                });
+            }
+        }
+
+        log::debug!("Host test configs for package '{}': {:?}", self, cases);
         cases
     }
 
@@ -613,8 +630,7 @@ impl Package {
         format!("{self}-v{version}")
     }
 
-    #[cfg(feature = "release")]
-    fn is_semver_checked(&self) -> bool {
+    pub(crate) fn is_semver_checked(&self) -> bool {
         let toml = self.toml();
         let Some(ref toml) = *toml else {
             // No Cargo.toml in the package, must be the examples
@@ -624,14 +640,24 @@ impl Package {
             .unwrap_or(false)
     }
 
+    pub(crate) fn has_semver_config(&self) -> bool {
+        let toml = self.toml();
+        let Some(ref toml) = *toml else {
+            return false;
+        };
+        toml.espressif_metadata()
+            .is_some_and(|m| m.contains_key("semver-config"))
+    }
+
     #[cfg(feature = "semver-checks")]
-    pub(crate) fn clean_semver_check(&self, dest_path: &Path) -> anyhow::Result<()> {
-        if self == &Package::EspRomSys && dest_path.exists() {
-            fs::remove_file(dest_path)
+    pub(crate) fn clean_semver_check(&self, package_path: &Path) -> anyhow::Result<()> {
+        let dest_path = package_path.join("src/generated_rom_symbols.rs");
+        if dest_path.exists() {
+            fs::remove_file(&dest_path)
                 .context("Failed to remove existing generated_rom_symbols.rs")?;
 
             // Create new file with placeholder content
-            fs::write(dest_path, "// Do not delete - placeholder for fmt!\n")
+            fs::write(&dest_path, "// Do not delete - placeholder for fmt!\n")
                 .context("Failed to create new generated_rom_symbols.rs placeholder")?;
         }
 
@@ -644,9 +670,9 @@ impl Package {
         package_path: &Path,
         chip: &Chip,
     ) -> anyhow::Result<()> {
-        if self == &Package::EspRomSys {
+        if package_path.join("src/generated_rom_symbols.rs").exists() {
             log::info!("Generating ROM symbol markers for chip: {}", chip);
-            crate::commands::generate_rom_symbols::generate_rom_symbols(&package_path, chip)?;
+            crate::commands::generate_rom_symbols::generate_rom_symbols(package_path, chip)?;
         }
         Ok(())
     }
@@ -848,28 +874,6 @@ pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> 
     Ok(())
 }
 
-/// Return a (sorted) list of paths to each valid Cargo package in the
-/// workspace.
-pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
-    let mut paths = Vec::new();
-    for entry in fs::read_dir(workspace).context("Failed to read {workspace}")? {
-        let entry = entry?;
-        if entry.file_type()?.is_dir() && entry.path().join("Cargo.toml").exists() {
-            paths.push(entry.path());
-        }
-    }
-
-    paths.sort();
-
-    log::debug!(
-        "Found {} packages in workspace '{}':",
-        paths.len(),
-        workspace.display()
-    );
-
-    Ok(paths)
-}
-
 /// Parse the version from the specified package's Cargo manifest.
 pub fn package_version(_workspace: &Path, package: Package) -> Result<semver::Version> {
     let toml = package.toml();
@@ -911,100 +915,41 @@ pub fn format_package(
 /// Run the host tests for the specified package.
 ///
 /// Called by `cargo xtask host-tests` for every package where [`Package::has_host_tests`]
-/// is true. **When adding `#[test]` functions to a package, add a match arm here**
-/// with the correct `cargo test` flags/features. See `xtask/README.md` ("Host tests").
+/// is true. Driven by `host-test-configs` in `[package.metadata.espressif]`.
+/// See `xtask/README.md` ("Host tests").
 pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     log::info!("Running host tests for package: {}", package);
     let package_path = workspace.join(package.directory());
 
-    let cmd = CargoArgsBuilder::default();
-
-    match package {
-        Package::EspConfig => cargo::run(
-            &cmd.clone()
-                .subcommand("test")
-                .features(&["build".into(), "tui".into()])
-                .build(),
-            &package_path,
-        ),
-
-        Package::EspBootloaderEspIdf => cargo::run(
-            &cmd.clone()
-                .subcommand("test")
-                .arg("--lib")
-                .arg("--tests")
-                .features(&["std".into(), "embedded-storage".into()])
-                .arg("--")
-                .arg("--test-threads=1")
-                .build(),
-            &package_path,
-        ),
-
-        Package::EspStorage => {
-            cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .features(&["emulation".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            )?;
-
-            cargo::run(
-                &cmd.clone()
-                    .subcommand("test")
-                    .features(&["emulation".into(), "bytewise-read".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            )?;
-
-            log::info!("Running miri host tests for package: {}", package);
-
-            cargo::run(
-                &cmd.clone()
-                    .toolchain("nightly")
-                    .subcommand("miri")
-                    .subcommand("test")
-                    .features(&["emulation".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            )?;
-
-            cargo::run(
-                &cmd.clone()
-                    .toolchain("nightly")
-                    .subcommand("miri")
-                    .subcommand("test")
-                    .features(&["emulation".into(), "bytewise-read".into()])
-                    .arg("--")
-                    .arg("--test-threads=1")
-                    .build(),
-                &package_path,
-            )
-        }
-        Package::EspHalProcmacros => cargo::run(
-            &cmd.clone()
-                .subcommand("test")
-                .features(&[
-                    "has-lp-core".into(),
-                    "is-lp-core".into(),
-                    "rtc-slow".into(),
-                    "rtc-fast".into(),
-                ])
-                .build(),
-            &package_path,
-        ),
-        Package::EspMetadata => cargo::run(&cmd.clone().subcommand("test").build(), &package_path),
-        _ => Err(anyhow!(
-            "Instructions for host testing were not provided for: '{}'",
+    let configs = package.host_test_config_rules();
+    if configs.is_empty() {
+        return Err(anyhow!(
+            "Instructions for host testing were not provided in Cargo.toml (`host-test-configs`) for: '{}'",
             package,
-        )),
+        ));
     }
+
+    for config in configs {
+        let mut cmd = CargoArgsBuilder::default();
+        if config.miri {
+            log::info!("Running miri host tests for package: {}", package);
+            cmd = cmd.toolchain("nightly").subcommand("miri");
+        }
+        cmd = cmd.subcommand("test");
+        for arg in &config.cargo_args {
+            cmd = cmd.arg(arg);
+        }
+        cmd = cmd.features(&config.features);
+        if !config.test_args.is_empty() {
+            cmd = cmd.arg("--");
+            for arg in &config.test_args {
+                cmd = cmd.arg(arg);
+            }
+        }
+        cargo::run(&cmd.build(), &package_path)?;
+    }
+
+    Ok(())
 }
 
 /// How many times an operation that writes source files is attempted before
@@ -1403,7 +1348,7 @@ mod tests {
     fn chip_coverage_standalone_projects_declare_required_chips() {
         let workspace = repo_root_for_tests();
 
-        for package in [Package::Examples, Package::CompileTests] {
+        for package in Package::iter().filter(Package::contains_standalone_projects) {
             crate::firmware::load_package(&workspace, package)
                 .unwrap_or_else(|err| panic!("failed to load '{package}': {err}"));
         }

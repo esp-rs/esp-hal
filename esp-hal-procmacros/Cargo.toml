@@ -20,6 +20,9 @@ check-configs = [
 clippy-configs = [
     { features = [] },
 ]
+host-test-configs = [
+    { features = ["has-lp-core", "is-lp-core", "rtc-slow", "rtc-fast"] },
+]
 
 [package.metadata.docs.rs]
 features = ["has-ulp-core", "interrupt", "ram", "is-ulp-core"]

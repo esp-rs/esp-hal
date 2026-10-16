@@ -11,6 +11,7 @@ license       = "MIT OR Apache-2.0"
 [package.metadata.espressif]
 changelog-exempt = true
 chip-features-matter = true
+host-features = ["build-script"]
 check-configs = [
     { features = [] },
     { features = ["build-script"] },
