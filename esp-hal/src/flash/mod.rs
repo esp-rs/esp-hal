@@ -272,6 +272,17 @@ pub struct ChipInfo {
     pub page_size: u32,
 }
 
+/// Returns the flash offset of the app partition the bootloader started.
+///
+/// Returns `None` if no MMU entry maps the app's first page.
+///
+/// The function reads through the cache, so it must not run while the flash
+/// cache is suspended.
+#[instability::unstable]
+pub fn booted_app_offset() -> Option<u32> {
+    mmu::booted_app_offset()
+}
+
 /// Internal SPI flash driver.
 ///
 /// Constructible only in [`Blocking`] mode.

@@ -266,6 +266,65 @@ fn find_free_entry() -> Option<u32> {
         .find(|&entry_id| !entry_is_valid(entry_id))
 }
 
+/// Returns the flash offset of the app partition the bootloader started.
+///
+/// An app reads its own flash offset to tell which partition it originated in.
+/// ESP-IDF's contract is that the bootloader maps the app's first page at the
+/// last flash MMU entry, and that the entry stays valid regardless of any
+/// remapping below it. The bootloader also maps the app's rodata at its link
+/// address. esp-hal's linker scripts put that at the start of the flash
+/// window, so entry 0 holds the same page when the app runs from flash. That
+/// is a side effect, not the contract. The ESP32 is the exception, which can
+/// never run from PSRAM. There MMU entry 0 is the contract. This function
+/// scans back from the highest entry to allow for a bootloader built for a
+/// smaller page size, which puts its last entry lower.
+/// See <https://github.com/espressif/esp-idf/blob/4d59230ddff16327812782151ef0afef202dc6d7/components/bootloader_support/src/bootloader_utility.c#L1069-L1083>.
+pub(super) fn booted_app_offset() -> Option<u32> {
+    cfg_select! {
+        esp32 => entry_is_valid(0).then(|| entry_flash_page(0) * mmu_page_size()),
+        _ => data_entries()
+            .rev()
+            .find(|&entry_id| {
+                entry_is_valid(entry_id)
+                    && entry_is_flash_mapping(entry_id)
+                    && maps_image_header(entry_id)
+            })
+            .map(|entry_id| entry_flash_page(entry_id) * mmu_page_size()),
+    }
+}
+
+/// Returns whether an entry's page starts with an image header for this chip.
+///
+/// The check rejects a data page left mapped above the bootloader's entry.
+#[cfg(not(esp32))]
+fn maps_image_header(entry_id: u32) -> bool {
+    // The header's first byte is the magic and the u16 at byte 12 is the chip ID.
+    // See <https://github.com/espressif/esp-idf/blob/c712a0dde385d659a1470a136251980d31a70bc1/components/bootloader_support/include/esp_app_format.h#L20-L33>
+    // and <https://github.com/espressif/esp-idf/blob/c712a0dde385d659a1470a136251980d31a70bc1/components/bootloader_support/include/esp_app_format.h#L77-L93>
+    const IMAGE_MAGIC: u8 = 0xE9;
+    const CHIP_ID: u16 = cfg_select! {
+        esp32s2 => 0x0002,
+        esp32c3 => 0x0005,
+        esp32s3 => 0x0009,
+        esp32c2 => 0x000C,
+        esp32c6 => 0x000D,
+        esp32h2 => 0x0010,
+        esp32p4 => 0x0012,
+        esp32c61 => 0x0014,
+        esp32c5 => 0x0017,
+        esp32h4 => 0x001C,
+        esp32s31 => 0x0020,
+    };
+
+    let Some(page) = entry_id_to_vaddr(entry_id) else {
+        return false;
+    };
+    let header = page.cast::<u32>();
+    // SAFETY: the caller checked that the entry is valid, so the reads hit a mapped page.
+    let (first, chip_id) = unsafe { (header.read_volatile(), header.add(3).read_volatile()) };
+    first as u8 == IMAGE_MAGIC && chip_id as u16 == CHIP_ID
+}
+
 /// Entries that can back a temporary mapping and be read through as data.
 fn data_entries() -> Range<u32> {
     cfg_select! {

@@ -29,7 +29,7 @@ pub(super) fn write_psram_mmu_entry(entry_id: u32, page: u16) {
     MEMSPI2::regs().mmu_item_content().write(|w| unsafe {
         w.paddr().bits(page);
         w.access_spiram().set_bit();
-        w.spiram_valid().set_bit()
+        w.valid().set_bit()
     });
 }
 
