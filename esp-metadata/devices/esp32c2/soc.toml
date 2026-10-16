@@ -39,7 +39,7 @@ memory_map = { ranges = [
 
 peripherals = [
     { name = "APB_CTRL" },
-    { name = "APB_SARADC" },
+    { name = "APB_SARADC", clock_group = "ADC" },
     { name = "BB" },
     { name = "ASSIST_DEBUG" },
     { name = "DMA" },

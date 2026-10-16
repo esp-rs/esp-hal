@@ -1496,6 +1496,13 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// impl AdcInstance {
+///     // ADC_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+/// }
 /// impl SdmInstance {
 ///     // SDM_FUNCTION_CLOCK
 ///
@@ -1668,6 +1675,11 @@ macro_rules! for_each_sw_interrupt {
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum AdcInstance {
+            ApbSaradc = 0,
+        }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum SdmInstance {
@@ -2187,6 +2199,7 @@ macro_rules! define_clock_tree_types {
             low_power_clk_refcount: u32,
             uart_mem_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
+            adc_function_clock_refcount: [u32; 1],
             sdm_function_clock_refcount: [u32; 1],
             i2c_function_clock_refcount: [u32; 1],
             i2s_tx_clk_refcount: [u32; 1],
@@ -2359,6 +2372,7 @@ macro_rules! define_clock_tree_types {
                 low_power_clk_refcount: 0,
                 uart_mem_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
+                adc_function_clock_refcount: [0; 1],
                 sdm_function_clock_refcount: [0; 1],
                 i2c_function_clock_refcount: [0; 1],
                 i2s_tx_clk_refcount: [0; 1],
@@ -3528,6 +3542,32 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(),
                 #[cfg(use_xtal32k)]
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
+            }
+        }
+        impl AdcInstance {
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.adc_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    request_apb_clk(clocks);
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.adc_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    release_apb_clk(clocks);
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                apb_clk_frequency()
+            }
+            pub fn function_clock_source_frequency() -> u32 {
+                apb_clk_frequency()
             }
         }
         impl SdmInstance {

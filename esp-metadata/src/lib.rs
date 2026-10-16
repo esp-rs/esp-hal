@@ -516,12 +516,6 @@ impl Config {
                     adc.channel_count.is_some_and(|count| count > 0),
                     "{chip}: digital ADC needs adc.channel_count"
                 );
-                if adc.pcr_clock {
-                    ensure!(
-                        adc.pll_clock_sel.is_some_and(|sel| sel > 0),
-                        "{chip}: PCR ADC clock needs adc.pll_clock_sel"
-                    );
-                }
             }
         }
 

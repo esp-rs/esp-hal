@@ -120,6 +120,9 @@ system_clocks = { clock_tree = [
             { name = "PLL_80M", outputs = "PLL_80M", default = true },
         ] },
     ] },
+    { group = "ADC", clocks = [
+        { name = "FUNCTION_CLOCK", type = "generic", output = "APB_CLK" },
+    ] },
     { group = "I2S",
       presets = {
         CLK = {

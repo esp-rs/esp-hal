@@ -41,7 +41,7 @@ memory_map = { ranges = [
 
 peripherals = [
     { name = "AES", interrupts = { peri = "AES" } },
-    { name = "APB_SARADC" },
+    { name = "APB_SARADC", clock_group = "ADC" },
     { name = "ASSIST_DEBUG" },
     { name = "ATOMIC" },
     { name = "CLINT", hidden = true },
@@ -133,7 +133,6 @@ support_status = "partial"
 controller = "digital"
 channel_count = 7
 pcr_clock = true
-pll_clock_sel = 1
 line_calibration = true
 curve_calibration = true
 basic_calibration = true

@@ -1100,6 +1100,13 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// impl AdcInstance {
+///     // ADC_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+/// }
 /// impl I2cInstance {
 ///     // I2C_FUNCTION_CLOCK
 ///
@@ -1203,6 +1210,11 @@ macro_rules! for_each_sw_interrupt {
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum AdcInstance {
+            ApbSaradc = 0,
+        }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum I2cInstance {
@@ -1643,7 +1655,6 @@ macro_rules! define_clock_tree_types {
             osc_slow_clk_refcount: u32,
             rc_slow_clk_refcount: u32,
             rc_fast_div_clk_refcount: u32,
-            apb_clk_refcount: u32,
             crypto_clk_refcount: u32,
             mspi_clk_refcount: u32,
             pll_40m_refcount: u32,
@@ -1653,6 +1664,7 @@ macro_rules! define_clock_tree_types {
             low_power_clk_refcount: u32,
             uart_mem_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
+            adc_function_clock_refcount: [u32; 1],
             i2c_function_clock_refcount: [u32; 1],
             spi_function_clock_refcount: [u32; 1],
             timg_function_clock_refcount: [u32; 1],
@@ -1781,7 +1793,6 @@ macro_rules! define_clock_tree_types {
                 osc_slow_clk_refcount: 0,
                 rc_slow_clk_refcount: 0,
                 rc_fast_div_clk_refcount: 0,
-                apb_clk_refcount: 0,
                 crypto_clk_refcount: 0,
                 mspi_clk_refcount: 0,
                 pll_40m_refcount: 0,
@@ -1791,6 +1802,7 @@ macro_rules! define_clock_tree_types {
                 low_power_clk_refcount: 0,
                 uart_mem_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
+                adc_function_clock_refcount: [0; 1],
                 i2c_function_clock_refcount: [0; 1],
                 spi_function_clock_refcount: [0; 1],
                 timg_function_clock_refcount: [0; 1],
@@ -2281,20 +2293,16 @@ macro_rules! define_clock_tree_types {
         pub fn configure_apb_clk(clocks: &mut ClockTree, new_selector: ApbClkConfig) {
             let old_selector = clocks.apb_clk.replace(new_selector);
             refresh_apb_clk_downstream(clocks);
-            if clocks.apb_clk_refcount > 0 {
-                match new_selector {
-                    ApbClkConfig::Pll40m => request_pll_40m(clocks),
-                    ApbClkConfig::Cpu => request_cpu_clk(clocks),
+            match new_selector {
+                ApbClkConfig::Pll40m => request_pll_40m(clocks),
+                ApbClkConfig::Cpu => request_cpu_clk(clocks),
+            }
+            configure_apb_clk_impl(clocks, old_selector, new_selector);
+            if let Some(old_selector) = old_selector {
+                match old_selector {
+                    ApbClkConfig::Pll40m => release_pll_40m(clocks),
+                    ApbClkConfig::Cpu => release_cpu_clk(clocks),
                 }
-                configure_apb_clk_impl(clocks, old_selector, new_selector);
-                if let Some(old_selector) = old_selector {
-                    match old_selector {
-                        ApbClkConfig::Pll40m => release_pll_40m(clocks),
-                        ApbClkConfig::Cpu => release_cpu_clk(clocks),
-                    }
-                }
-            } else {
-                configure_apb_clk_impl(clocks, old_selector, new_selector);
             }
         }
         pub fn apb_clk_config(clocks: &mut ClockTree) -> Option<ApbClkConfig> {
@@ -2302,24 +2310,20 @@ macro_rules! define_clock_tree_types {
         }
         pub fn request_apb_clk(clocks: &mut ClockTree) {
             trace!("Requesting APB_CLK");
-            if increment_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Enabling APB_CLK");
-                match unwrap!(clocks.apb_clk) {
-                    ApbClkConfig::Pll40m => request_pll_40m(clocks),
-                    ApbClkConfig::Cpu => request_cpu_clk(clocks),
-                }
-                enable_apb_clk_impl(clocks, true);
+            trace!("Enabling APB_CLK");
+            match unwrap!(clocks.apb_clk) {
+                ApbClkConfig::Pll40m => request_pll_40m(clocks),
+                ApbClkConfig::Cpu => request_cpu_clk(clocks),
             }
+            enable_apb_clk_impl(clocks, true);
         }
         pub fn release_apb_clk(clocks: &mut ClockTree) {
             trace!("Releasing APB_CLK");
-            if decrement_reference_count(&mut clocks.apb_clk_refcount) {
-                trace!("Disabling APB_CLK");
-                enable_apb_clk_impl(clocks, false);
-                match unwrap!(clocks.apb_clk) {
-                    ApbClkConfig::Pll40m => release_pll_40m(clocks),
-                    ApbClkConfig::Cpu => release_cpu_clk(clocks),
-                }
+            trace!("Disabling APB_CLK");
+            enable_apb_clk_impl(clocks, false);
+            match unwrap!(clocks.apb_clk) {
+                ApbClkConfig::Pll40m => release_pll_40m(clocks),
+                ApbClkConfig::Cpu => release_cpu_clk(clocks),
             }
         }
         #[allow(unused_variables)]
@@ -3016,6 +3020,32 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::RcSlowClk => rc_slow_clk_frequency(),
                 TimgCalibrationClockConfig::RcFastDivClk => rc_fast_div_clk_frequency(),
                 TimgCalibrationClockConfig::Osc32kClk => osc_slow_clk_frequency(),
+            }
+        }
+        impl AdcInstance {
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.adc_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    request_apb_clk(clocks);
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.adc_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    release_apb_clk(clocks);
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                apb_clk_frequency()
+            }
+            pub fn function_clock_source_frequency() -> u32 {
+                apb_clk_frequency()
             }
         }
         impl I2cInstance {
