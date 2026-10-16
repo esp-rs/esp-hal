@@ -9,7 +9,7 @@
 //% CHIP_FILTER: adc_driver_supported
 //% FEATURES: unstable
 //% FEATURES(efuse):
-//% CHIP_FILTER(self_cal): adc_efuse_calibration && !esp32c5
+//% CHIP_FILTER(self_cal): adc_calibration_v1_scheme_supported && !esp32c5
 //% CARGO-CONFIG(self_cal): target.'cfg(target_os="none")'.rustflags=["--cfg=__test_adc_self_cal"]
 
 #![no_std]

@@ -370,7 +370,7 @@ macro_rules! property {
     ("adc.basic_calibration") => {
         true
     };
-    ("adc.efuse_calibration") => {
+    ("adc.calibration_v1_scheme_supported") => {
         true
     };
     ("adc.channel_compensation") => {

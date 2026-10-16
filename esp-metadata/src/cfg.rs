@@ -182,13 +182,14 @@ fn default_cpu_pmp_granularity() -> Option<u32> {
 /// that contains all of them.
 macro_rules! driver_configs {
     (@ignore $t:tt) => {};
-    (@property (u32)           $self:ident, $config:ident) => { Value::Number($self.$config) };
-    (@property (bool)          $self:ident, $config:ident) => { Value::Boolean($self.$config) };
-    (@property (String)        $self:ident, $config:ident) => { Value::String($self.$config.clone()) };
-    (@property (Vec<u32>)      $self:ident, $config:ident) => { Value::NumberList($self.$config.clone()) };
-    (@property (Vec<String>)   $self:ident, $config:ident) => { Value::StringList($self.$config.clone()) };
-    (@property (Option<u32>)   $self:ident, $config:ident) => { Value::from($self.$config) };
-    (@property ($($other:ty)*) $self:ident, $config:ident) => { Value::Generic(Box::new($self.$config.clone())) };
+    (@property (u32)            $self:ident, $config:ident) => { Value::Number($self.$config) };
+    (@property (bool)           $self:ident, $config:ident) => { Value::Boolean($self.$config) };
+    (@property (String)         $self:ident, $config:ident) => { Value::String($self.$config.clone()) };
+    (@property (Vec<u32>)       $self:ident, $config:ident) => { Value::NumberList($self.$config.clone()) };
+    (@property (Vec<String>)    $self:ident, $config:ident) => { Value::StringList($self.$config.clone()) };
+    (@property (Option<u32>)    $self:ident, $config:ident) => { Value::from($self.$config) };
+    (@property (Option<String>) $self:ident, $config:ident) => { $self.$config.clone().map_or(Value::Unset, Value::String) };
+    (@property ($($other:ty)*)  $self:ident, $config:ident) => { Value::Generic(Box::new($self.$config.clone())) };
     (@is_optional Option<$t:ty>) => { true };
     (@is_optional $t:ty) => { false };
 
@@ -814,9 +815,9 @@ driver_configs![
             name: "ADC",
             properties: {
                 #[serde(default)]
-                controller: String,
+                controller: Option<String>,
                 #[serde(default)]
-                channel_count: u32,
+                channel_count: Option<u32>,
 
                 #[serde(default)]
                 line_calibration: bool,
@@ -825,14 +826,14 @@ driver_configs![
                 #[serde(default)]
                 basic_calibration: bool,
                 #[serde(default)]
-                efuse_calibration: bool,
+                calibration_v1_scheme_supported: bool,
                 #[serde(default)]
                 channel_compensation: bool,
 
                 #[serde(default)]
                 pcr_clock: bool,
                 #[serde(default)]
-                pll_clock_sel: u32,
+                pll_clock_sel: Option<u32>,
                 #[serde(default)]
                 pcr_sar_clk_div: bool,
                 #[serde(default)]

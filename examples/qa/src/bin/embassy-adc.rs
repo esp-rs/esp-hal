@@ -39,7 +39,7 @@ async fn main(_spawner: Spawner) {
         _ => peripherals.GPIO4,
     };
 
-    // Chips without line calibration (ESP32-S31) enable the pin uncalibrated.
+    // The ESP32-S31 has no calibration scheme implemented.
     let mut pin1 = cfg_select! {
         adc_line_calibration => adc1_config.enable_pin_with_cal::<_, AdcCalLine<
             esp_hal::peripherals::ADC1<'static>,

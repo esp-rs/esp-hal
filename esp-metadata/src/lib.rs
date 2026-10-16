@@ -505,17 +505,20 @@ impl Config {
         {
             let chip = &self.device.name;
             ensure!(
-                matches!(adc.controller.as_str(), "" | "rtc" | "digital"),
-                "{chip}: adc.controller must be rtc, digital, or empty"
+                matches!(
+                    adc.controller.as_deref(),
+                    None | Some("rtc") | Some("digital")
+                ),
+                "{chip}: adc.controller must be rtc, digital, or unset"
             );
-            if adc.controller == "digital" {
+            if adc.controller.as_deref() == Some("digital") {
                 ensure!(
-                    adc.channel_count > 0,
+                    adc.channel_count.is_some_and(|count| count > 0),
                     "{chip}: digital ADC needs adc.channel_count"
                 );
                 if adc.pcr_clock {
                     ensure!(
-                        adc.pll_clock_sel > 0,
+                        adc.pll_clock_sel.is_some_and(|sel| sel > 0),
                         "{chip}: PCR ADC clock needs adc.pll_clock_sel"
                     );
                 }

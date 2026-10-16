@@ -154,7 +154,7 @@ pcr_sar_clk_div = true
 line_calibration = true
 curve_calibration = true
 basic_calibration = true
-efuse_calibration = true
+calibration_v1_scheme_supported = true
 channel_compensation = true
 sar_power_override = true
 instances = [{ name = "adc1" }]

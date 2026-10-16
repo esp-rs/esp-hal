@@ -277,7 +277,7 @@ macro_rules! property {
     ("adc.basic_calibration") => {
         true
     };
-    ("adc.efuse_calibration") => {
+    ("adc.calibration_v1_scheme_supported") => {
         true
     };
     ("adc.channel_compensation") => {
@@ -285,12 +285,6 @@ macro_rules! property {
     };
     ("adc.pcr_clock") => {
         false
-    };
-    ("adc.pll_clock_sel") => {
-        0
-    };
-    ("adc.pll_clock_sel", str) => {
-        stringify!(0)
     };
     ("adc.pcr_sar_clk_div") => {
         false
