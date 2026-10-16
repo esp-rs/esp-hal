@@ -46,6 +46,10 @@ name              = "i2s"
 harness           = false
 
 [[bin]]
+name              = "ledc"
+harness           = false
+
+[[bin]]
 name              = "interrupt"
 harness           = false
 
