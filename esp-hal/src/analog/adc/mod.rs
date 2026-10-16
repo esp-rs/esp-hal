@@ -32,7 +32,7 @@
 //! # use esp_hal::delay::Delay;
 //! let mut adc1_config = AdcConfig::new();
 //! let mut pin = adc1_config.enable_pin(peripherals.__analog_pin__, Attenuation::_11dB);
-//! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
+//! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config)?;
 //!
 //! let mut delay = Delay::new();
 //!
@@ -157,33 +157,42 @@ impl<ADCX> AdcConfig<ADCX> {
 
         AdcPin {
             pin,
-            cal_scheme: AdcCalScheme::<()>::new_cal(attenuation),
+            // The unit scheme never fails; construct it directly to keep this infallible.
+            cal_scheme: (),
             _phantom: PhantomData,
         }
     }
 
     /// Enables the specified pin with the given attenuation and calibration
     /// scheme.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::MissingCalibrationData`] if the chip carries no
+    /// calibration data for the scheme, or [`Error::UnsupportedAttenuation`]
+    /// if the attenuation has no calibration data on this chip.
     #[cfg(feature = "unstable")]
     pub fn enable_pin_with_cal<PIN, CS>(
         &mut self,
         pin: PIN,
         attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCX, CS>
+    ) -> Result<AdcPin<PIN, ADCX, CS>, Error>
     where
         PIN: AdcChannel + AnalogPin,
         CS: AdcCalScheme<ADCX>,
     {
+        let channel = pin.adc_channel();
+        let cal_scheme = CS::new_cal_with_channel(attenuation, channel)?;
+
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        let channel = pin.adc_channel();
         self.attenuations[channel as usize] = Some(attenuation);
 
-        AdcPin {
+        Ok(AdcPin {
             pin,
-            cal_scheme: CS::new_cal_with_channel(attenuation, channel),
+            cal_scheme,
             _phantom: PhantomData,
-        }
+        })
     }
 }
 
@@ -289,13 +298,27 @@ pub trait AdcChannel {
 /// ADC reads.
 pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
     /// Creates a new calibration scheme for the given attenuation.
-    fn new_cal(atten: Attenuation) -> Self;
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MissingCalibrationData` if the chip carries no
+    /// calibration data for the scheme, or `Error::UnsupportedAttenuation`
+    /// if the attenuation has no calibration data on this chip.
+    #[cfg(feature = "unstable")]
+    fn new_cal(atten: Attenuation) -> Result<Self, Error>;
 
     /// Creates a new calibration scheme for the given attenuation and ADC
     /// channel.
     ///
     /// The default implementation ignores `channel` and calls [`Self::new_cal`].
-    fn new_cal_with_channel(atten: Attenuation, _channel: u8) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MissingCalibrationData` if the chip carries no
+    /// calibration data for the scheme, or `Error::UnsupportedAttenuation`
+    /// if the attenuation has no calibration data on this chip.
+    #[cfg(feature = "unstable")]
+    fn new_cal_with_channel(atten: Attenuation, _channel: u8) -> Result<Self, Error> {
         Self::new_cal(atten)
     }
 
@@ -308,15 +331,79 @@ pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
 impl crate::private::Sealed for () {}
 
 impl<ADCX> AdcCalScheme<ADCX> for () {
-    fn new_cal(_atten: Attenuation) -> Self {}
+    #[cfg(feature = "unstable")]
+    fn new_cal(_atten: Attenuation) -> Result<Self, Error> {
+        Ok(())
+    }
+}
+
+/// Errors that can occur while using the ADC.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+#[cfg(feature = "unstable")]
+pub enum Error {
+    /// The ADC channel was not configured for reading.
+    ChannelNotConfigured(u8),
+    /// `ADC2` cannot be used together with the radio.
+    ///
+    /// Only constructed on ESP32, where `ADC2` shares hardware with Wi-Fi and
+    /// Bluetooth.
+    Adc2InUse,
+    /// The chip carries no eFuse calibration data for the requested scheme.
+    ///
+    /// Constructed when line/curve fitting is requested but the calibration
+    /// eFuses are unburnt, or when the stored reference point is zero and
+    /// therefore unusable.
+    MissingCalibrationData,
+    /// The attenuation has no calibration reference point on this chip.
+    ///
+    /// Constructed when the requested attenuation is not characterized for
+    /// calibration (e.g. ESP32-C2 line fitting at 2.5 dB/6 dB, or a missing
+    /// curve-fitting coefficient set).
+    UnsupportedAttenuation(Attenuation),
+}
+
+#[cfg(feature = "unstable")]
+impl core::error::Error for Error {}
+
+#[cfg(feature = "unstable")]
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::ChannelNotConfigured(channel) => {
+                write!(f, "ADC channel {channel} is not configured for reading")
+            }
+            Self::Adc2InUse => f.write_str("ADC2 cannot be used together with the radio"),
+            Self::MissingCalibrationData => {
+                f.write_str("ADC calibration data is missing from eFuse for the requested scheme")
+            }
+            Self::UnsupportedAttenuation(atten) => {
+                write!(
+                    f,
+                    "ADC attenuation {atten:?} has no calibration data on this chip"
+                )
+            }
+        }
+    }
 }
 
 /// Returns the attenuation channel `channel` was configured with.
+/// Returns the attenuation channel `channel` was configured with.
+///
+/// # Errors
+///
+/// Returns [`Error::ChannelNotConfigured`] if the channel was not enabled via
+/// [`AdcConfig::enable_pin`] or [`AdcConfig::enable_pin_with_cal`].
 #[cfg(all(feature = "unstable", adc_calibration_v1_scheme_supported))]
-fn channel_attenuation(attenuations: &[Option<Attenuation>], channel: u8) -> Attenuation {
+fn channel_attenuation(
+    attenuations: &[Option<Attenuation>],
+    channel: u8,
+) -> Result<Attenuation, Error> {
     match attenuations[channel as usize] {
-        Some(attenuation) => attenuation,
-        None => panic!("Channel {} is not configured for reading", channel),
+        Some(attenuation) => Ok(attenuation),
+        None => Err(Error::ChannelNotConfigured(channel)),
     }
 }
 
@@ -366,8 +453,10 @@ pub trait AdcCalEfuse {
 
     /// Returns the ADC calibration reference point voltage.
     ///
-    /// Returns reference voltage (millivolts) for a given attenuation.
-    fn cal_mv(atten: Attenuation) -> u16;
+    /// Returns reference voltage (millivolts) for a given attenuation, or
+    /// `None` when the attenuation has no reference point on this chip
+    /// (e.g. ESP32-C2 at 2.5 dB/6 dB).
+    fn cal_mv(atten: Attenuation) -> Option<u16>;
 
     /// Returns the ADC calibration reference point digital value.
     ///

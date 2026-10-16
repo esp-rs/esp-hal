@@ -41,18 +41,23 @@ async fn main(_spawner: Spawner) {
 
     // The ESP32-S31 has no calibration scheme implemented.
     let mut pin1 = cfg_select! {
-        adc_line_calibration => adc1_config.enable_pin_with_cal::<_, AdcCalLine<
-            esp_hal::peripherals::ADC1<'static>,
-        >>(adc1_pin, Attenuation::_11dB),
+        adc_line_calibration => adc1_config
+            .enable_pin_with_cal::<_, AdcCalLine<esp_hal::peripherals::ADC1<'static>>>(
+                adc1_pin,
+                Attenuation::_11dB,
+            )
+            .unwrap(),
         _ => adc1_config.enable_pin(adc1_pin, Attenuation::_11dB),
     };
 
-    let mut adc1 = Adc::new(peripherals.ADC1, adc1_config).into_async();
+    let mut adc1 = Adc::new(peripherals.ADC1, adc1_config)
+        .unwrap()
+        .into_async();
 
     let delay = Delay::new();
 
     loop {
-        let adc1_value: u16 = adc1.read_oneshot(&mut pin1).await;
+        let adc1_value: u16 = adc1.read_oneshot(&mut pin1).await.unwrap();
         println!("ADC1 value: {}", adc1_value);
         delay.delay_millis(1000);
     }

@@ -17,7 +17,7 @@ use core::{
 use procmacros::handler;
 
 pub use self::calibration::*;
-use super::{AdcConfig, Attenuation};
+use super::{AdcConfig, Attenuation, Error};
 use crate::{
     Async,
     Blocking,
@@ -439,12 +439,37 @@ pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
+impl<'d, ADCX, Dm> Adc<'d, ADCX, Dm>
+where
+    ADCX: RegisterAccess + 'd,
+    Dm: crate::DriverMode,
+{
+    // Validate the channel before modifying ADC registers.
+    // The calibration init code depends on the channel's attenuation.
+    fn start_sample<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> Result<(), Error>
+    where
+        PIN: super::AdcChannel,
+        CS: super::AdcCalScheme<ADCX>,
+    {
+        let channel = pin.pin.adc_channel();
+        let attenuation = super::channel_attenuation(&self.attenuations, channel)?;
+
+        ADCX::calibration_init();
+        ADCX::set_init_code(self.init_codes[attenuation as usize]);
+
+        ADCX::config_onetime_sample(channel, attenuation as u8);
+        start_onetime_sample::<ADCX>(&self.sar_power);
+
+        Ok(())
+    }
+}
+
 impl<'d, ADCX> Adc<'d, ADCX, Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
     /// Creates a new ADC instance with the given configuration.
-    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Result<Self, Error>
     where
         ADCX: super::AdcCalEfuse + super::CalibrationAccess,
     {
@@ -460,7 +485,7 @@ where
         // already be set here and would make the first read return a stale result.
         ADCX::reset();
 
-        Adc {
+        Ok(Adc {
             _adc: adc_instance,
             attenuations: config.attenuations,
             init_codes,
@@ -469,7 +494,7 @@ where
             _clock: clock,
             sar_power,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// Reconfigures the ADC driver to operate in asynchronous mode.
@@ -499,19 +524,19 @@ where
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the channel was not configured in [`AdcConfig`].
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
     pub fn read_oneshot<PIN, CS>(
         &mut self,
         pin: &mut super::AdcPin<PIN, ADCX, CS>,
-    ) -> nb::Result<u16, ()>
+    ) -> nb::Result<u16, Error>
     where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
     {
         let channel = pin.pin.adc_channel();
-        let attenuation = super::channel_attenuation(&self.attenuations, channel);
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
@@ -522,13 +547,8 @@ where
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
+            self.start_sample(pin).map_err(nb::Error::Other)?;
             self.active_channel = Some(channel);
-
-            ADCX::calibration_init();
-            ADCX::set_init_code(self.init_codes[attenuation as usize]);
-
-            ADCX::config_onetime_sample(channel, attenuation as u8);
-            start_onetime_sample::<ADCX>(&self.sar_power);
         }
 
         // Wait for ADC to finish conversion
@@ -568,7 +588,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
         crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
     }
 
-    fn cal_mv(atten: Attenuation) -> u16 {
+    fn cal_mv(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC1, atten)
     }
 
@@ -611,23 +631,20 @@ where
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the channel was not configured in [`AdcConfig`].
-    pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
+    pub async fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCX, CS>,
+    ) -> Result<u16, Error>
     where
         ADCX: Instance,
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
     {
-        let channel = pin.pin.adc_channel();
-        let attenuation = super::channel_attenuation(&self.attenuations, channel);
-
-        ADCX::calibration_init();
-        ADCX::set_init_code(self.init_codes[attenuation as usize]);
-
-        ADCX::config_onetime_sample(channel, attenuation as u8);
-        start_onetime_sample::<ADCX>(&self.sar_power);
+        self.start_sample(pin)?;
 
         // Wait for ADC to finish conversion and get value
         let adc_ready_future = AdcFuture::new(self);
@@ -639,7 +656,7 @@ where
         ADCX::reset();
 
         // Postprocess converted value according to calibration scheme used for pin
-        pin.cal_scheme.adc_val(converted_value)
+        Ok(pin.cal_scheme.adc_val(converted_value))
     }
 }
 

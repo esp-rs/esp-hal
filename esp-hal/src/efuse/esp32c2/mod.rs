@@ -82,13 +82,16 @@ pub fn rtc_calib_init_code(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u1
 
 /// Returns the ADC reference point voltage for specified attenuation in millivolts.
 ///
+/// Returns `None` for attenuations without a reference point on this chip
+/// (2.5 dB and 6 dB only have init codes, not line-fitting data).
+///
 /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_rtc_calib.c#L65>
 #[instability::unstable]
-pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
+pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
     match atten {
-        Attenuation::_0dB => 400,
-        Attenuation::_11dB => 1370,
-        _ => panic!("Unsupported attenuation"),
+        Attenuation::_0dB => Some(400),
+        Attenuation::_11dB => Some(1370),
+        _ => None,
     }
 }
 

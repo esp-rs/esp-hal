@@ -7,6 +7,7 @@ use crate::analog::adc::{
     AdcHasLineCal,
     Attenuation,
     CalibrationAccess,
+    Error,
 };
 
 const COEFF_MUL: i64 = 1 << 52;
@@ -67,24 +68,27 @@ impl<ADCX> AdcCalScheme<ADCX> for AdcCalCurve<ADCX>
 where
     ADCX: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + CalibrationAccess,
 {
-    fn new_cal(atten: Attenuation) -> Self {
+    fn new_cal(atten: Attenuation) -> Result<Self, Error> {
         Self::new_cal_with_channel(atten, 0)
     }
 
-    fn new_cal_with_channel(atten: Attenuation, channel: u8) -> Self {
-        let line = AdcCalLine::<ADCX>::new_cal_with_channel(atten, channel);
+    fn new_cal_with_channel(atten: Attenuation, channel: u8) -> Result<Self, Error> {
+        let line = AdcCalLine::<ADCX>::new_cal_with_channel(atten, channel)?;
 
-        let coeff = ADCX::curves_coeffs()
+        // Every shipped coefficient table covers all four attenuations; a miss
+        // means the user requested an attenuation the chip never characterized.
+        let Some(coeff) = ADCX::curves_coeffs()
             .iter()
             .find(|item| item.atten == atten)
-            .expect("No curve coefficients for given attenuation")
-            .coeff;
+        else {
+            return Err(Error::UnsupportedAttenuation(atten));
+        };
 
-        Self {
+        Ok(Self {
             line,
-            coeff,
+            coeff: coeff.coeff,
             _phantom: PhantomData,
-        }
+        })
     }
 
     fn adc_val(&self, val: u16) -> u16 {

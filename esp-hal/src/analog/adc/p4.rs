@@ -11,7 +11,7 @@ use portable_atomic::{AtomicU32, Ordering};
 use procmacros::handler;
 
 pub use self::calibration::*;
-use super::{AdcCalScheme, AdcChannel, AdcConfig, AdcPin, Attenuation};
+use super::{AdcCalScheme, AdcChannel, AdcConfig, AdcPin, Attenuation, Error};
 use crate::{
     Async,
     Blocking,
@@ -360,7 +360,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
         crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC1, atten)
     }
 
-    fn cal_mv(atten: Attenuation) -> u16 {
+    fn cal_mv(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC1, atten)
     }
 
@@ -379,7 +379,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
         crate::efuse::rtc_calib_init_code(AdcCalibUnit::ADC2, atten)
     }
 
-    fn cal_mv(atten: Attenuation) -> u16 {
+    fn cal_mv(atten: Attenuation) -> Option<u16> {
         crate::efuse::rtc_calib_cal_mv(AdcCalibUnit::ADC2, atten)
     }
 
@@ -408,13 +408,13 @@ where
     ADCX: RegisterAccess,
     Dm: crate::DriverMode,
 {
-    fn start_sample<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>)
+    fn start_sample<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> Result<(), Error>
     where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
         let channel = pin.pin.adc_channel();
-        let attenuation = super::channel_attenuation(&self.attenuations, channel);
+        let attenuation = super::channel_attenuation(&self.attenuations, channel)?;
 
         // Reprogrammed for every conversion: the regi2c block is shared with the PHY,
         // so the code cannot be assumed to survive between reads.
@@ -425,6 +425,8 @@ where
 
         ADCX::clear_start_sample();
         ADCX::start_sample();
+
+        Ok(())
     }
 }
 
@@ -433,7 +435,7 @@ where
     ADCX: RegisterAccess + 'd,
 {
     /// Creates a new ADC instance with the given configuration.
-    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Result<Self, Error>
     where
         ADCX: super::AdcCalEfuse + super::CalibrationAccess,
     {
@@ -455,28 +457,29 @@ where
         // already be set here and would make the first read return a stale result.
         ADCX::reset();
 
-        Adc {
+        Ok(Adc {
             _adc: adc_instance,
             attenuations,
             init_codes,
             active_channel: None,
             _guard: guard,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// Starts and waits for a conversion on the specified pin and returns the
     /// result.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the channel was not configured in [`AdcConfig`].
-    pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
+    pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> Result<u16, Error>
     where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
-        self.start_sample(pin);
+        self.start_sample(pin)?;
 
         // Wait for ADC to finish conversion
         while !ADCX::is_done() {}
@@ -486,7 +489,7 @@ where
         ADCX::reset();
 
         // Postprocess converted value according to calibration scheme used for pin
-        pin.cal_scheme.adc_val(converted_value)
+        Ok(pin.cal_scheme.adc_val(converted_value))
     }
 
     /// Requests that the ADC begin a conversion on the specified pin.
@@ -495,13 +498,14 @@ where
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the channel was not configured in [`AdcConfig`].
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
     pub fn read_oneshot<PIN, CS>(
         &mut self,
         pin: &mut super::AdcPin<PIN, ADCX, CS>,
-    ) -> nb::Result<u16, ()>
+    ) -> nb::Result<u16, Error>
     where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
@@ -515,9 +519,8 @@ where
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
+            self.start_sample(pin).map_err(nb::Error::Other)?;
             self.active_channel = Some(pin.pin.adc_channel());
-
-            self.start_sample(pin);
         }
 
         // Wait for ADC to finish conversion
@@ -597,16 +600,20 @@ where
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the channel was not configured in [`AdcConfig`].
-    pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
+    pub async fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCX, CS>,
+    ) -> Result<u16, Error>
     where
         ADCX: Instance,
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
     {
-        self.start_sample(pin);
+        self.start_sample(pin)?;
 
         AdcFuture::<ADCX>::new(self).await;
 
@@ -614,7 +621,7 @@ where
         ADCX::reset();
 
         // Postprocess converted value according to calibration scheme used for pin
-        pin.cal_scheme.adc_val(converted_value)
+        Ok(pin.cal_scheme.adc_val(converted_value))
     }
 }
 
