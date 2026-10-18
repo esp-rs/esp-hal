@@ -96,15 +96,27 @@ pub(super) fn reset_fifo(driver: &Driver<'_>) {
 }
 
 pub(super) fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    // A FIFO read over the DPORT bus can advance the read pointer twice and drop a byte (ESP-IDF
-    // `i2c_ll_read_rxfifo`: "fifo pointer jump over a random address").
-    let peri_offset =
-        register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
-    let fifo_ptr =
-        (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
-    let byte = unsafe { (fifo_ptr.read_volatile() & 0xff) as u8 };
-    core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
-    byte
+    // A plain FIFO read can advance the read pointer twice and drop a byte. ESP-IDF's
+    // `DPORT_REG_READ` avoids this: mask interrupts up to level 5, do a dummy APB read (UART0
+    // DATE), then read the FIFO. The FIFO cannot be read through its AHB address (ESP32 errata).
+    let apb = crate::peripherals::UART0::regs().date().as_ptr();
+    let fifo = register_block.data().as_ptr();
+    let value: u32;
+    unsafe {
+        core::arch::asm!(
+            "rsil {ps}, 5",
+            "l32i {apb}, {apb}, 0",
+            "l32i {value}, {fifo}, 0",
+            "wsr.ps {ps}",
+            "rsync",
+            ps = out(reg) _,
+            apb = inout(reg) apb => _,
+            fifo = in(reg) fifo,
+            value = out(reg) value,
+            options(nostack),
+        );
+    }
+    (value & 0xff) as u8
 }
 
 pub(super) fn write_fifo(register_block: &RegisterBlock, data: u8) {
