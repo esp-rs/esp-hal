@@ -265,6 +265,12 @@ macro_rules! property {
     ("i2s.supports_pdm2pcm") => {
         false
     };
+    ("bt.controller") => {
+        "btdm2"
+    };
+    ("phy.combo_module") => {
+        false
+    };
     ("timergroup.timg_has_timer1") => {
         false
     };
@@ -410,6 +416,11 @@ macro_rules! property {
         [#[cfg(use_xtal32k)] crate ::soc::clocks::LpSlowClkConfig::Xtal32k, crate
         ::soc::clocks::LpSlowClkConfig::RcSlow, crate
         ::soc::clocks::LpSlowClkConfig::OscSlow]
+    };
+    ("clock_tree.ble_lp_clk") => {
+        [crate ::soc::clocks::BleLpClkConfig::Xtal, crate
+        ::soc::clocks::BleLpClkConfig::RcSlow, #[cfg(use_xtal32k)] crate
+        ::soc::clocks::BleLpClkConfig::Xtal32k]
     };
     ("clock_tree.timg_calibration_clock") => {
         [crate ::soc::clocks::TimgCalibrationClockConfig::RcSlowClk, crate
@@ -991,6 +1002,26 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // BLE_LP_XTAL_CLK
+///
+/// fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// // BLE_LP_CLK
+///
+/// fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
+/// fn configure_ble_lp_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<BleLpClkConfig>,
+///     _new_config: BleLpClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // TIMG_CALIBRATION_CLOCK
 ///
 /// fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -1340,6 +1371,18 @@ macro_rules! define_clock_tree_types {
             /// Selects `OSC_SLOW_CLK`.
             OscSlow,
         }
+        /// The list of clock signals that the `BLE_LP_CLK` multiplexer can output.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum BleLpClkConfig {
+            /// Selects `BLE_LP_XTAL_CLK`.
+            Xtal,
+            /// Selects `RC_SLOW_CLK`.
+            RcSlow,
+            #[cfg(use_xtal32k)]
+            /// Selects `XTAL32K_CLK`.
+            Xtal32k,
+        }
         /// The list of clock signals that the `TIMG_CALIBRATION_CLOCK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1596,6 +1639,7 @@ macro_rules! define_clock_tree_types {
             apb_clk: Option<ApbClkConfig>,
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
+            ble_lp_clk: Option<BleLpClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
             i2s_tx_clk: [Option<I2sClkConfig>; 1],
             i2s_rx_clk: [Option<I2sClkConfig>; 1],
@@ -1612,10 +1656,12 @@ macro_rules! define_clock_tree_types {
             rc_fast_clk_refcount: u32,
             #[cfg(use_xtal32k)]
             xtal32k_clk_refcount: u32,
+            rc_slow_clk_refcount: u32,
             rc_slow_d4_clk_refcount: u32,
             apb_clk_refcount: u32,
             lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
+            ble_lp_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
             i2s_tx_clk_refcount: [u32; 1],
             i2s_rx_clk_refcount: [u32; 1],
@@ -1659,6 +1705,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the LP_SLOW_CLK clock tree node
             pub fn lp_slow_clk(&self) -> Option<LpSlowClkConfig> {
                 self.lp_slow_clk
+            }
+            /// Returns the current configuration of the BLE_LP_CLK clock tree node
+            pub fn ble_lp_clk(&self) -> Option<BleLpClkConfig> {
+                self.ble_lp_clk
             }
             /// Returns the current configuration of the TIMG_CALIBRATION_CLOCK clock tree node
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
@@ -1734,6 +1784,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk: None,
                 lp_fast_clk: None,
                 lp_slow_clk: None,
+                ble_lp_clk: None,
                 timg_calibration_clock: None,
                 i2s_tx_clk: [None; 1],
                 i2s_rx_clk: [None; 1],
@@ -1750,10 +1801,12 @@ macro_rules! define_clock_tree_types {
                 rc_fast_clk_refcount: 0,
                 #[cfg(use_xtal32k)]
                 xtal32k_clk_refcount: 0,
+                rc_slow_clk_refcount: 0,
                 rc_slow_d4_clk_refcount: 0,
                 apb_clk_refcount: 0,
                 lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
+                ble_lp_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
                 i2s_tx_clk_refcount: [0; 1],
                 i2s_rx_clk_refcount: [0; 1],
@@ -1776,6 +1829,8 @@ macro_rules! define_clock_tree_types {
         static LP_FAST_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static LP_SLOW_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static BLE_LP_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -1897,6 +1952,20 @@ macro_rules! define_clock_tree_types {
                 LpSlowClkConfig::Xtal32k => xtal32k_clk_root_source(clocks),
                 LpSlowClkConfig::RcSlow => rc_slow_d4_clk_root_source(clocks),
                 LpSlowClkConfig::OscSlow => osc_slow_clk_root_source(clocks),
+            }
+        }
+        /// Returns the clock source that `BLE_LP_XTAL_CLK` currently runs on.
+        pub fn ble_lp_xtal_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            xtal_clk_root_source(clocks)
+        }
+        /// Returns the clock source that `BLE_LP_CLK` currently runs on.
+        pub fn ble_lp_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            let config = clocks.ble_lp_clk?;
+            match config {
+                BleLpClkConfig::Xtal => ble_lp_xtal_clk_root_source(clocks),
+                BleLpClkConfig::RcSlow => rc_slow_clk_root_source(clocks),
+                #[cfg(use_xtal32k)]
+                BleLpClkConfig::Xtal32k => xtal32k_clk_root_source(clocks),
             }
         }
         /// Returns the clock source that `TIMG_CALIBRATION_CLOCK` currently runs on.
@@ -2110,13 +2179,17 @@ macro_rules! define_clock_tree_types {
         }
         pub fn request_rc_slow_clk(clocks: &mut ClockTree) {
             trace!("Requesting RC_SLOW_CLK");
-            trace!("Enabling RC_SLOW_CLK");
-            enable_rc_slow_clk_impl(clocks, true);
+            if increment_reference_count(&mut clocks.rc_slow_clk_refcount) {
+                trace!("Enabling RC_SLOW_CLK");
+                enable_rc_slow_clk_impl(clocks, true);
+            }
         }
         pub fn release_rc_slow_clk(clocks: &mut ClockTree) {
             trace!("Releasing RC_SLOW_CLK");
-            trace!("Disabling RC_SLOW_CLK");
-            enable_rc_slow_clk_impl(clocks, false);
+            if decrement_reference_count(&mut clocks.rc_slow_clk_refcount) {
+                trace!("Disabling RC_SLOW_CLK");
+                enable_rc_slow_clk_impl(clocks, false);
+            }
         }
         static RC_SLOW_CLK_FREQUENCY: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(rc_slow_clk_nominal_frequency());
@@ -2459,6 +2532,96 @@ macro_rules! define_clock_tree_types {
                 LpSlowClkConfig::Xtal32k => xtal32k_clk_frequency(),
                 LpSlowClkConfig::RcSlow => rc_slow_d4_clk_frequency(),
                 LpSlowClkConfig::OscSlow => osc_slow_clk_frequency(),
+            }
+        }
+        pub fn request_ble_lp_xtal_clk(clocks: &mut ClockTree) {
+            trace!("Requesting BLE_LP_XTAL_CLK");
+            trace!("Enabling BLE_LP_XTAL_CLK");
+            request_xtal_clk(clocks);
+            enable_ble_lp_xtal_clk_impl(clocks, true);
+        }
+        pub fn release_ble_lp_xtal_clk(clocks: &mut ClockTree) {
+            trace!("Releasing BLE_LP_XTAL_CLK");
+            trace!("Disabling BLE_LP_XTAL_CLK");
+            enable_ble_lp_xtal_clk_impl(clocks, false);
+            release_xtal_clk(clocks);
+        }
+        pub fn ble_lp_xtal_clk_frequency() -> u32 {
+            100000
+        }
+        pub fn ble_lp_xtal_clk_source_frequency() -> u32 {
+            xtal_clk_frequency()
+        }
+        pub fn configure_ble_lp_clk(clocks: &mut ClockTree, new_selector: BleLpClkConfig) {
+            let old_selector = clocks.ble_lp_clk.replace(new_selector);
+            refresh_ble_lp_clk_downstream(clocks);
+            if clocks.ble_lp_clk_refcount > 0 {
+                match new_selector {
+                    BleLpClkConfig::Xtal => request_ble_lp_xtal_clk(clocks),
+                    BleLpClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                    #[cfg(use_xtal32k)]
+                    BleLpClkConfig::Xtal32k => request_xtal32k_clk(clocks),
+                }
+                configure_ble_lp_clk_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    match old_selector {
+                        BleLpClkConfig::Xtal => release_ble_lp_xtal_clk(clocks),
+                        BleLpClkConfig::RcSlow => release_rc_slow_clk(clocks),
+                        #[cfg(use_xtal32k)]
+                        BleLpClkConfig::Xtal32k => release_xtal32k_clk(clocks),
+                    }
+                }
+            } else {
+                configure_ble_lp_clk_impl(clocks, old_selector, new_selector);
+            }
+        }
+        pub fn ble_lp_clk_config(clocks: &mut ClockTree) -> Option<BleLpClkConfig> {
+            clocks.ble_lp_clk
+        }
+        pub fn request_ble_lp_clk(clocks: &mut ClockTree) {
+            trace!("Requesting BLE_LP_CLK");
+            if increment_reference_count(&mut clocks.ble_lp_clk_refcount) {
+                trace!("Enabling BLE_LP_CLK");
+                match unwrap!(clocks.ble_lp_clk) {
+                    BleLpClkConfig::Xtal => request_ble_lp_xtal_clk(clocks),
+                    BleLpClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                    #[cfg(use_xtal32k)]
+                    BleLpClkConfig::Xtal32k => request_xtal32k_clk(clocks),
+                }
+                enable_ble_lp_clk_impl(clocks, true);
+            }
+        }
+        pub fn release_ble_lp_clk(clocks: &mut ClockTree) {
+            trace!("Releasing BLE_LP_CLK");
+            if decrement_reference_count(&mut clocks.ble_lp_clk_refcount) {
+                trace!("Disabling BLE_LP_CLK");
+                enable_ble_lp_clk_impl(clocks, false);
+                match unwrap!(clocks.ble_lp_clk) {
+                    BleLpClkConfig::Xtal => release_ble_lp_xtal_clk(clocks),
+                    BleLpClkConfig::RcSlow => release_rc_slow_clk(clocks),
+                    #[cfg(use_xtal32k)]
+                    BleLpClkConfig::Xtal32k => release_xtal32k_clk(clocks),
+                }
+            }
+        }
+        #[allow(unused_variables)]
+        pub fn ble_lp_clk_config_frequency(clocks: &mut ClockTree, config: BleLpClkConfig) -> u32 {
+            match config {
+                BleLpClkConfig::Xtal => ble_lp_xtal_clk_frequency(),
+                BleLpClkConfig::RcSlow => rc_slow_clk_frequency(),
+                #[cfg(use_xtal32k)]
+                BleLpClkConfig::Xtal32k => xtal32k_clk_frequency(),
+            }
+        }
+        pub fn ble_lp_clk_frequency() -> u32 {
+            BLE_LP_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn ble_lp_clk_source_frequency(source: BleLpClkConfig) -> u32 {
+            match source {
+                BleLpClkConfig::Xtal => ble_lp_xtal_clk_frequency(),
+                BleLpClkConfig::RcSlow => rc_slow_clk_frequency(),
+                #[cfg(use_xtal32k)]
+                BleLpClkConfig::Xtal32k => xtal32k_clk_frequency(),
             }
         }
         pub fn configure_timg_calibration_clock(
@@ -3224,6 +3387,8 @@ macro_rules! define_clock_tree_types {
             pub lp_fast_clk: Option<LpFastClkConfig>,
             /// `LP_SLOW_CLK` configuration.
             pub lp_slow_clk: Option<LpSlowClkConfig>,
+            /// `BLE_LP_CLK` configuration.
+            pub ble_lp_clk: Option<BleLpClkConfig>,
             /// `TIMG_CALIBRATION_CLOCK` configuration.
             pub timg_calibration_clock: Option<TimgCalibrationClockConfig>,
         }
@@ -3246,6 +3411,9 @@ macro_rules! define_clock_tree_types {
                 }
                 if let Some(config) = self.lp_slow_clk {
                     configure_lp_slow_clk(clocks, config);
+                }
+                if let Some(config) = self.ble_lp_clk {
+                    configure_ble_lp_clk(clocks, config);
                 }
                 if let Some(config) = self.timg_calibration_clock {
                     configure_timg_calibration_clock(clocks, config);
@@ -3286,6 +3454,7 @@ macro_rules! define_clock_tree_types {
         }
         fn refresh_rc_slow_clk_downstream(clocks: &mut ClockTree) {
             refresh_lp_slow_clk_downstream(clocks);
+            refresh_ble_lp_clk_downstream(clocks);
             refresh_timg_calibration_clock_downstream(clocks);
         }
         fn refresh_hp_root_clk_downstream(clocks: &mut ClockTree) {
@@ -3335,6 +3504,14 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.lp_slow_clk {
                 LP_SLOW_CLK_FREQ_CACHE.store(
                     lp_slow_clk_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_ble_lp_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.ble_lp_clk {
+                BLE_LP_CLK_FREQ_CACHE.store(
+                    ble_lp_clk_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
@@ -4251,6 +4428,9 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "I2C1 peripheral singleton"]
         I2C1 <= I2C1(I2C_EXT1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "IEEE802154 peripheral singleton"] IEEE802154 <= IEEE802154(ZB_MAC : {
+        bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }) (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
@@ -4350,6 +4530,11 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "ADC1 peripheral singleton"] ADC1 <= virtual() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc = "BT peripheral singleton"] BT <=
+        virtual(BT_BB : { bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt },
+        LP_RTC_BLE_TIMER : { bind_lp_timer_interrupt, enable_lp_timer_interrupt,
+        disable_lp_timer_interrupt }, BT_MAC : { bind_mac_interrupt,
+        enable_mac_interrupt, disable_mac_interrupt }) (unstable)));
         _for_each_inner_peripheral!((@ peri_type #[doc = "CPU_CTRL peripheral singleton"]
         CPU_CTRL <= virtual() (unstable))); _for_each_inner_peripheral!((@ peri_type
         #[doc = "IPC peripheral singleton"] IPC <= virtual() (unstable)));
@@ -4411,6 +4596,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((I2C_ANA_MST(unstable)));
         _for_each_inner_peripheral!((I2S0(unstable)));
         _for_each_inner_peripheral!((I2C0)); _for_each_inner_peripheral!((I2C1));
+        _for_each_inner_peripheral!((IEEE802154(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE0(unstable)));
         _for_each_inner_peripheral!((INTERRUPT_CORE1(unstable)));
         _for_each_inner_peripheral!((INTPRI(unstable)));
@@ -4458,6 +4644,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((USB_FS(unstable)));
         _for_each_inner_peripheral!((ZERO_DET(unstable)));
         _for_each_inner_peripheral!((ADC1(unstable)));
+        _for_each_inner_peripheral!((BT(unstable)));
         _for_each_inner_peripheral!((CPU_CTRL(unstable)));
         _for_each_inner_peripheral!((IPC(unstable)));
         _for_each_inner_peripheral!((FLASH(unstable)));
@@ -4659,26 +4846,28 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
         "I2C1 peripheral singleton"] I2C1 <= I2C1(I2C_EXT1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (@ peri_type #[doc =
-        "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <= INTERRUPT_CORE0()
-        (unstable)), (@ peri_type #[doc = "INTERRUPT_CORE1 peripheral singleton"]
-        INTERRUPT_CORE1 <= INTERRUPT_CORE1() (unstable)), (@ peri_type #[doc =
-        "INTPRI peripheral singleton"] INTPRI <= INTPRI() (unstable)), (@ peri_type #[doc
-        = "IO_MUX peripheral singleton"] IO_MUX <= IO_MUX() (unstable)), (@ peri_type
-        #[doc = "KEYMNG peripheral singleton"] KEYMNG <= KEYMNG(KM : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (@ peri_type #[doc = "LEDC peripheral singleton"] LEDC <= LEDC()
-        (unstable)), (@ peri_type #[doc = "LPWR peripheral singleton"] LPWR <=
-        LP_CLKRST() (unstable)), (@ peri_type #[doc = "LP_ANA peripheral singleton"]
-        LP_ANA <= LP_ANA() (unstable)), (@ peri_type #[doc =
-        "LP_AON peripheral singleton"] LP_AON <= LP_AON() (unstable)), (@ peri_type #[doc
-        = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST() (unstable)), (@
-        peri_type #[doc = "LP_GPIO peripheral singleton"] LP_GPIO <= LP_GPIO()
-        (unstable)), (@ peri_type #[doc = "LP_IO_MUX peripheral singleton"] LP_IO_MUX <=
-        LP_IO_MUX() (unstable)), (@ peri_type #[doc = "LP_PERI peripheral singleton"]
-        LP_PERI <= LP_PERI() (unstable)), (@ peri_type #[doc =
-        "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)), (@ peri_type #[doc
-        = "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)), (@ peri_type
-        #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0(MCPWM0 : {
+        "IEEE802154 peripheral singleton"] IEEE802154 <= IEEE802154(ZB_MAC : {
+        bind_mac_interrupt, enable_mac_interrupt, disable_mac_interrupt }) (unstable)),
+        (@ peri_type #[doc = "INTERRUPT_CORE0 peripheral singleton"] INTERRUPT_CORE0 <=
+        INTERRUPT_CORE0() (unstable)), (@ peri_type #[doc =
+        "INTERRUPT_CORE1 peripheral singleton"] INTERRUPT_CORE1 <= INTERRUPT_CORE1()
+        (unstable)), (@ peri_type #[doc = "INTPRI peripheral singleton"] INTPRI <=
+        INTPRI() (unstable)), (@ peri_type #[doc = "IO_MUX peripheral singleton"] IO_MUX
+        <= IO_MUX() (unstable)), (@ peri_type #[doc = "KEYMNG peripheral singleton"]
+        KEYMNG <= KEYMNG(KM : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (@ peri_type #[doc =
+        "LEDC peripheral singleton"] LEDC <= LEDC() (unstable)), (@ peri_type #[doc =
+        "LPWR peripheral singleton"] LPWR <= LP_CLKRST() (unstable)), (@ peri_type #[doc
+        = "LP_ANA peripheral singleton"] LP_ANA <= LP_ANA() (unstable)), (@ peri_type
+        #[doc = "LP_AON peripheral singleton"] LP_AON <= LP_AON() (unstable)), (@
+        peri_type #[doc = "LP_CLKRST peripheral singleton"] LP_CLKRST <= LP_CLKRST()
+        (unstable)), (@ peri_type #[doc = "LP_GPIO peripheral singleton"] LP_GPIO <=
+        LP_GPIO() (unstable)), (@ peri_type #[doc = "LP_IO_MUX peripheral singleton"]
+        LP_IO_MUX <= LP_IO_MUX() (unstable)), (@ peri_type #[doc =
+        "LP_PERI peripheral singleton"] LP_PERI <= LP_PERI() (unstable)), (@ peri_type
+        #[doc = "LP_TEE peripheral singleton"] LP_TEE <= LP_TEE() (unstable)), (@
+        peri_type #[doc = "LP_WDT peripheral singleton"] LP_WDT <= LP_WDT() (unstable)),
+        (@ peri_type #[doc = "MCPWM0 peripheral singleton"] MCPWM0 <= MCPWM0(MCPWM0 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "MCPWM1 peripheral singleton"] MCPWM1 <=
         MCPWM1(MCPWM1 : { bind_peri_interrupt, enable_peri_interrupt,
@@ -4738,35 +4927,40 @@ macro_rules! for_each_peripheral {
         #[doc = "ZERO_DET peripheral singleton"] ZERO_DET <= ZERO_DET(ZERO_DET : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (@ peri_type #[doc = "ADC1 peripheral singleton"] ADC1 <= virtual()
-        (unstable)), (@ peri_type #[doc = "CPU_CTRL peripheral singleton"] CPU_CTRL <=
-        virtual() (unstable)), (@ peri_type #[doc = "IPC peripheral singleton"] IPC <=
-        virtual() (unstable)), (@ peri_type #[doc = "FLASH peripheral singleton"] FLASH
-        <= virtual() (unstable)), (@ peri_type #[doc =
-        "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <= virtual() (unstable)),
-        (@ peri_type #[doc = "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <=
+        (unstable)), (@ peri_type #[doc = "BT peripheral singleton"] BT <= virtual(BT_BB
+        : { bind_bb_interrupt, enable_bb_interrupt, disable_bb_interrupt },
+        LP_RTC_BLE_TIMER : { bind_lp_timer_interrupt, enable_lp_timer_interrupt,
+        disable_lp_timer_interrupt }, BT_MAC : { bind_mac_interrupt,
+        enable_mac_interrupt, disable_mac_interrupt }) (unstable)), (@ peri_type #[doc =
+        "CPU_CTRL peripheral singleton"] CPU_CTRL <= virtual() (unstable)), (@ peri_type
+        #[doc = "IPC peripheral singleton"] IPC <= virtual() (unstable)), (@ peri_type
+        #[doc = "FLASH peripheral singleton"] FLASH <= virtual() (unstable)), (@
+        peri_type #[doc = "FROM_CPU_INTR0 peripheral singleton"] FROM_CPU_INTR0 <=
         virtual() (unstable)), (@ peri_type #[doc =
-        "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <= virtual() (unstable)),
-        (@ peri_type #[doc = "FROM_CPU_INTR3 peripheral singleton"] FROM_CPU_INTR3 <=
-        virtual() (unstable)))); _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1),
-        (GPIO2), (GPIO3), (#[cfg(not(use_xtal32k))] GPIO4), (#[cfg(not(use_xtal32k))]
-        GPIO5), (GPIO6), (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12),
-        (GPIO13), (GPIO14), (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19), (GPIO20),
-        (GPIO21), (GPIO22), (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27), (GPIO28),
-        (GPIO29), (GPIO30), (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36),
-        (GPIO37), (GPIO38), (GPIO39), (DMA_CH0(unstable)), (DMA_CH1(unstable)),
-        (DMA_CH2(unstable)), (DMA_CH3(unstable)), (DMA_CH4(unstable)), (AES(unstable)),
+        "FROM_CPU_INTR1 peripheral singleton"] FROM_CPU_INTR1 <= virtual() (unstable)),
+        (@ peri_type #[doc = "FROM_CPU_INTR2 peripheral singleton"] FROM_CPU_INTR2 <=
+        virtual() (unstable)), (@ peri_type #[doc =
+        "FROM_CPU_INTR3 peripheral singleton"] FROM_CPU_INTR3 <= virtual() (unstable))));
+        _for_each_inner_peripheral!((singletons(GPIO0), (GPIO1), (GPIO2), (GPIO3),
+        (#[cfg(not(use_xtal32k))] GPIO4), (#[cfg(not(use_xtal32k))] GPIO5), (GPIO6),
+        (GPIO7), (GPIO8), (GPIO9), (GPIO10), (GPIO11), (GPIO12), (GPIO13), (GPIO14),
+        (GPIO15), (GPIO16), (GPIO17), (GPIO18), (GPIO19), (GPIO20), (GPIO21), (GPIO22),
+        (GPIO23), (GPIO24), (GPIO25), (GPIO26), (GPIO27), (GPIO28), (GPIO29), (GPIO30),
+        (GPIO31), (GPIO32), (GPIO33), (GPIO34), (GPIO35), (GPIO36), (GPIO37), (GPIO38),
+        (GPIO39), (DMA_CH0(unstable)), (DMA_CH1(unstable)), (DMA_CH2(unstable)),
+        (DMA_CH3(unstable)), (DMA_CH4(unstable)), (AES(unstable)),
         (APB_SARADC(unstable)), (ASRC(unstable)), (BUS_MONITOR(unstable)),
         (CACHE(unstable)), (CLIC(unstable)), (CLINT(unstable)),
         (CLINT_OTHER_CORE(unstable)), (CPU_APM(unstable)), (DMA(unstable)),
         (ECC(unstable)), (ECDSA(unstable)), (ETM(unstable)), (GPIO(unstable)),
         (GPIO_DEDICATED(unstable)), (GPIO_SD(unstable)), (HMAC(unstable)),
         (HP_APM(unstable)), (HP_SYS(unstable)), (HUK(unstable)), (I2C_ANA_MST(unstable)),
-        (I2S0(unstable)), (I2C0), (I2C1), (INTERRUPT_CORE0(unstable)),
-        (INTERRUPT_CORE1(unstable)), (INTPRI(unstable)), (IO_MUX(unstable)),
-        (KEYMNG(unstable)), (LEDC(unstable)), (LPWR(unstable)), (LP_ANA(unstable)),
-        (LP_AON(unstable)), (LP_CLKRST(unstable)), (LP_GPIO(unstable)),
-        (LP_IO_MUX(unstable)), (LP_PERI(unstable)), (LP_TEE(unstable)),
-        (LP_WDT(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)),
+        (I2S0(unstable)), (I2C0), (I2C1), (IEEE802154(unstable)),
+        (INTERRUPT_CORE0(unstable)), (INTERRUPT_CORE1(unstable)), (INTPRI(unstable)),
+        (IO_MUX(unstable)), (KEYMNG(unstable)), (LEDC(unstable)), (LPWR(unstable)),
+        (LP_ANA(unstable)), (LP_AON(unstable)), (LP_CLKRST(unstable)),
+        (LP_GPIO(unstable)), (LP_IO_MUX(unstable)), (LP_PERI(unstable)),
+        (LP_TEE(unstable)), (LP_WDT(unstable)), (MCPWM0(unstable)), (MCPWM1(unstable)),
         (MEM_MONITOR(unstable)), (MODEM_LPCON(unstable)), (MODEM_SYSCON(unstable)),
         (PARL_IO(unstable)), (PAU(unstable)), (PCNT(unstable)), (PCR(unstable)),
         (PMU(unstable)), (PVT(unstable)), (RMT(unstable)), (RNG(unstable)),
@@ -4774,13 +4968,14 @@ macro_rules! for_each_peripheral {
         (SPI2), (SPI3), (SYSTEM(unstable)), (SYSTIMER(unstable)), (TEE(unstable)),
         (TIMG0(unstable)), (TIMG1(unstable)), (TOUCH(unstable)), (TOUCH_AON(unstable)),
         (TWAI0(unstable)), (UART0), (UART1), (UHCI0(unstable)), (USB_DEVICE(unstable)),
-        (USB_FS(unstable)), (ZERO_DET(unstable)), (ADC1(unstable)), (CPU_CTRL(unstable)),
-        (IPC(unstable)), (FLASH(unstable)), (FROM_CPU_INTR0(unstable)),
-        (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
-        (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(SPI3,
-        Spi3, 0, AhbGdmaChannel), (SPI2, Spi2, 1, AhbGdmaChannel), (UHCI0, Uhci0, 2,
-        AhbGdmaChannel), (I2S0, I2s0, 3, AhbGdmaChannel), (AES, Aes, 4, AhbGdmaChannel),
-        (SHA, Sha, 7, AhbGdmaChannel), (PARL_IO, ParlIo, 9, AhbGdmaChannel)));
+        (USB_FS(unstable)), (ZERO_DET(unstable)), (ADC1(unstable)), (BT(unstable)),
+        (CPU_CTRL(unstable)), (IPC(unstable)), (FLASH(unstable)),
+        (FROM_CPU_INTR0(unstable)), (FROM_CPU_INTR1(unstable)),
+        (FROM_CPU_INTR2(unstable)), (FROM_CPU_INTR3(unstable))));
+        _for_each_inner_peripheral!((dma_eligible(SPI3, Spi3, 0, AhbGdmaChannel), (SPI2,
+        Spi2, 1, AhbGdmaChannel), (UHCI0, Uhci0, 2, AhbGdmaChannel), (I2S0, I2s0, 3,
+        AhbGdmaChannel), (AES, Aes, 4, AhbGdmaChannel), (SHA, Sha, 7, AhbGdmaChannel),
+        (PARL_IO, ParlIo, 9, AhbGdmaChannel)));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

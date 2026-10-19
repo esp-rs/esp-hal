@@ -3,12 +3,16 @@
 //! The tree reports the divided output frequency. An RC source has no calibrated rate, so selecting
 //! one panics here.
 
-use enumset::EnumSet;
-use esp_hal::{
-    clock::ll::{self, BleLpClkConfig, ClockSource},
-    rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig},
+use esp_hal::clock::ll::{self, BleLpClkConfig};
+#[cfg(sleep_driver_supported)]
+use {
+    enumset::EnumSet,
+    esp_hal::{
+        clock::ll::ClockSource,
+        rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig},
+    },
+    portable_atomic::{AtomicU32, Ordering},
 };
-use portable_atomic::{AtomicU32, Ordering};
 
 /// BTDM blob parameters for the selected low-power clock.
 #[cfg(bt_controller = "btdm")]
@@ -44,12 +48,14 @@ pub(crate) fn release() {
 /// controller clock.
 pub(crate) fn light_sleep_supported() -> bool {
     cfg_select! {
+        not(sleep_driver_supported) => false,
         esp32 => ll::ClockTree::with(ll::ble_lp_clk_root_source) != Some(ClockSource::XtalClk),
         _ => true,
     }
 }
 
 /// The source that `BLE_LP_CLK` runs on, as the bits of an [`EnumSet`].
+#[cfg(sleep_driver_supported)]
 static WAKE_CLOCK: AtomicU32 = AtomicU32::new(0);
 
 /// Claims the `Bt` wakeup source, so that the chip can sleep while the controller sleeps.
@@ -57,21 +63,26 @@ static WAKE_CLOCK: AtomicU32 = AtomicU32::new(0);
 /// Call this only with modem sleep on, after the controller is enabled, and only when
 /// [`light_sleep_supported`] returns `true`. Otherwise the radio wake lock stays.
 pub(crate) fn claim_wake_source() {
-    let root = ll::ClockTree::with(ll::ble_lp_clk_root_source);
-    WAKE_CLOCK.store(
-        root.map_or(0, |source| EnumSet::only(source).as_u32()),
-        Ordering::Relaxed,
-    );
-    WakeupSource::Bt.enable_with_hooks(Some(sleep_entry), None);
+    #[cfg(sleep_driver_supported)]
+    {
+        let root = ll::ClockTree::with(ll::ble_lp_clk_root_source);
+        WAKE_CLOCK.store(
+            root.map_or(0, |source| EnumSet::only(source).as_u32()),
+            Ordering::Relaxed,
+        );
+        WakeupSource::Bt.enable_with_hooks(Some(sleep_entry), None);
+    }
 }
 
 /// Releases the claim taken by [`claim_wake_source`].
 ///
 /// Call this before the controller is disabled.
 pub(crate) fn release_wake_source() {
+    #[cfg(sleep_driver_supported)]
     WakeupSource::Bt.disable();
 }
 
+#[cfg(sleep_driver_supported)]
 fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     // The controller does not survive a deep sleep, so it needs no clock through one.
     if config.is_deep_sleep() {

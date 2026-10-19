@@ -76,6 +76,7 @@ peripherals = [
     { name = "I2S0", interrupts = { peri = "I2S" }, clock_group = "I2S" },
     { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
     { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
+    { name = "IEEE802154", interrupts = { mac = "ZB_MAC" } },
     { name = "INTERRUPT_CORE0" },
     { name = "INTERRUPT_CORE1" },
     { name = "INTPRI" },
@@ -128,6 +129,7 @@ peripherals = [
     { name = "ZERO_DET", interrupts = { peri = "ZERO_DET" } }, # the analog comparator
 
     { name = "ADC1", virtual = true },
+    { name = "BT", virtual = true, interrupts = { mac = "BT_MAC", bb = "BT_BB", lp_timer = "LP_RTC_BLE_TIMER" } },
     { name = "CPU_CTRL", virtual = true },
     { name = "IPC", virtual = true },
     { name = "FLASH", virtual = true },
@@ -294,14 +296,14 @@ fifo_depth_words = 256
 [device.usb_serial_jtag]
 
 [device.bt]
-support_status = "not_supported"
-controller = "npl"
+support_status = "partial"
+controller = "btdm2"
 
 [device.ieee802154]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.phy]
-support_status = "not_supported"
+support_status = "partial"
 
 [device.asrc]
 support_status = "not_supported"
