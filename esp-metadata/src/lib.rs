@@ -1664,7 +1664,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
         let slug = group_slug(group);
         writeln!(
             output,
-            "### {group} <small>([[details]({PERIPHERAL_SUPPORT_INDEX_URL}#{slug})])</small>"
+            "### [{group}]({PERIPHERAL_SUPPORT_INDEX_URL}#{slug})"
         )?;
         writeln!(output)?;
         write_support_table(output, &drivers, &mut issues)?;
