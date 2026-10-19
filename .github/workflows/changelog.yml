@@ -5,7 +5,15 @@ name: Changelog check
 # such event. Branch protection requires the `changelog` job next to `ci-result`.
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review]
+    types: [
+      opened,
+      edited,
+      synchronize,
+      reopened,
+      labeled,
+      unlabeled,
+      ready_for_review,
+    ]
   # A required check must report in the merge queue too, where `changelog` is
   # skipped, which counts as success.
   merge_group:
