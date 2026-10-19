@@ -358,6 +358,8 @@ pub use procmacros::handler;
 pub use procmacros::load_lp_code;
 #[cfg(feature = "rt")]
 pub use procmacros::main;
+#[instability::unstable]
+pub use procmacros::psram;
 pub use procmacros::ram;
 
 #[instability::unstable]
@@ -664,6 +666,17 @@ pub mod __macro_implementation {
     pub const fn assert_is_persistable<T: super::Persistable>() {}
 
     pub const fn assert_is_uninit<T: super::Uninit>() {}
+
+    // Only the code-in-PSRAM start-up maps PSRAM before `main` and zeroes `.bss.psram`, and only
+    // where PSRAM has its own address window, so `.bss.psram` has a fixed address.
+    #[instability::unstable]
+    pub const fn assert_psram_available() {
+        if !cfg!(all(code_in_psram, psram_separate_window)) {
+            core::panic!(
+                "`psram` needs the `code-in-psram` option, on a chip whose PSRAM has its own address window"
+            );
+        }
+    }
 
     #[cfg(feature = "rt")]
     #[cfg(riscv)]

@@ -13,6 +13,9 @@ PROVIDE(interrupt0 = DefaultHandler);
 */
 PROVIDE(_mp_hook = default_mp_hook);
 
+/* Before `rwdata.x`, see `psram.x`. */
+INCLUDE "psram.x"
+
 SECTIONS {
   /* Shared sections - ordering matters */
   INCLUDE "rwtext.x"
@@ -35,6 +38,8 @@ INSERT BEFORE .text;
 INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
+/* See `psram_code_end.x`. The sections below are in RAM, or are INFO sections at 0. */
+INCLUDE "psram_code_end.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
 INCLUDE "metadata.x"
