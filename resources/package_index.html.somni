@@ -20,8 +20,7 @@
       margin: 0;
       padding: 40px 20px;
       display: flex;
-      height: 100vh;
-      width: 100vw;
+      min-height: 100vh;
       justify-content: center;
       box-sizing: border-box;
     }
@@ -40,7 +39,8 @@
     }
 
     .content {
-      width: 900px;
+      width: min(1160px, 100%);
+      margin: auto 0;
     }
 
     h2 {
@@ -81,10 +81,259 @@
       width: 120px;
     }
 
-    @media screen and (min-height: 650px) {
-      body {
-        align-items: center;
-      }
+    .peri-matrix {
+      margin-top: 2.5rem;
+      background-color: #2b2b2b;
+      border: 1px solid #454444;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .peri-matrix-summary {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 14px 18px;
+      cursor: pointer;
+      user-select: none;
+      background-color: #303030;
+      list-style: none;
+    }
+
+    .peri-matrix-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .peri-matrix-summary::before {
+      content: "▸";
+      color: #d6991d;
+      font-size: 1.1em;
+      transition: transform 0.15s ease;
+    }
+
+    .peri-matrix[open] > .peri-matrix-summary::before {
+      transform: rotate(90deg);
+    }
+
+    .peri-matrix-summary:hover {
+      background-color: #383838;
+    }
+
+    .peri-matrix-title {
+      color: #d6991d;
+      font-size: 1.15em;
+      font-weight: 500;
+    }
+
+    .peri-matrix-subtitle {
+      color: #a8a8a8;
+      font-size: 0.88em;
+    }
+
+    .peri-matrix-body {
+      padding: 16px 18px 20px;
+      border-top: 1px solid #454444;
+    }
+
+    .peri-controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background-color: #353535;
+      border: 1px solid #454444;
+      border-radius: 6px;
+      font-size: 0.85em;
+    }
+
+    .peri-legends {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .peri-legend-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .peri-legend-heading {
+      color: #c0c0c0;
+      font-weight: 500;
+      min-width: 95px;
+    }
+
+    .peri-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: #e0e0e0;
+    }
+
+    .peri-empty-swatch {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 16px;
+      border: 1px solid #4a4a4a;
+      border-radius: 3px;
+      background: repeating-linear-gradient(
+        -45deg,
+        #252525,
+        #252525 3px,
+        #2d2d2d 3px,
+        #2d2d2d 6px
+      );
+      color: #6a6a6a;
+      font-size: 0.75em;
+      line-height: 1;
+    }
+
+    .peri-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .peri-btn {
+      background-color: #2b2b2b;
+      color: #d6991d;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-family: inherit;
+      font-size: 0.95em;
+      cursor: pointer;
+    }
+
+    .peri-btn:hover {
+      background-color: #3f3f3f;
+      border-color: #d6991d;
+    }
+
+    .peri-note {
+      margin: 8px 2px 12px;
+      font-size: 0.8em;
+      color: #a8a8a8;
+    }
+
+    .peri-group {
+      margin-top: 10px;
+      border: 1px solid #454444;
+      border-radius: 6px;
+      background-color: #333333;
+      overflow: hidden;
+    }
+
+    .peri-group-summary {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 500;
+      background-color: #383838;
+    }
+
+    .peri-group-summary:hover {
+      background-color: #404040;
+    }
+
+    .peri-group-count {
+      font-size: 0.8em;
+      font-weight: 400;
+      color: #bdbdbd;
+      background-color: #2b2b2b;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .peri-table-wrap {
+      overflow-x: auto;
+      border-top: 1px solid #454444;
+    }
+
+    .peri-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    .peri-table th {
+      background-color: #292929;
+      color: #dcdcdc;
+      font-weight: 500;
+      white-space: nowrap;
+      padding: 8px 6px;
+      border-bottom: 1px solid #454444;
+      text-align: center;
+    }
+
+    .peri-table td {
+      padding: 6px;
+      text-align: center;
+      border-top: 1px solid #3d3d3d;
+      white-space: nowrap;
+    }
+
+    .peri-table th.driver-col,
+    .peri-table td.driver-col {
+      text-align: left;
+      padding-left: 14px;
+      padding-right: 12px;
+      min-width: 170px;
+    }
+
+    .peri-table th.api-col,
+    .peri-table td.api-col {
+      border-right: 2px solid #454444;
+      width: 44px;
+    }
+
+    .peri-table tbody tr:hover td {
+      background-color: #3c3c3c;
+    }
+
+    .peri-table td.na-cell {
+      background: repeating-linear-gradient(
+        -45deg,
+        #252525,
+        #252525 4px,
+        #2c2c2c 4px,
+        #2c2c2c 8px
+      );
+      color: #5e5e5e;
+      user-select: none;
+    }
+
+    .peri-table tbody tr:hover td.na-cell {
+      background: repeating-linear-gradient(
+        -45deg,
+        #2b2b2b,
+        #2b2b2b 4px,
+        #333333 4px,
+        #333333 8px
+      );
+      color: #777;
+    }
+
+    .peri-table .not-impl {
+      color: #777;
+    }
+
+    .peri-table a.issue-link {
+      text-decoration: none;
+      border-bottom: 1px dashed #d6991d;
+      padding-bottom: 1px;
+    }
+
+    .peri-table a.issue-link:hover {
+      border-bottom-style: solid;
     }
   </style>
 </head>
@@ -108,6 +357,51 @@
       <span class="crate-version">{{ meta.version }}</span>
     </div>
 {% endfor %}
+{% if peripheral_support != "" %}
+    <details class="peri-matrix" id="peripheral-support">
+      <summary class="peri-matrix-summary">
+        <span class="peri-matrix-title">Peripheral Support Matrix</span>
+        <span class="peri-matrix-subtitle">Per-chip feature completeness and API stability</span>
+      </summary>
+      <div class="peri-matrix-body">
+        <div class="peri-controls">
+          <div class="peri-legends">
+            <div class="peri-legend-group">
+              <span class="peri-legend-heading">API Stability:</span>
+              <span class="peri-legend-item">✔️ Stable</span>
+              <span class="peri-legend-item">🚧 Unstable</span>
+              <span class="peri-legend-item">⚠️ Planned overhaul</span>
+            </div>
+            <div class="peri-legend-group">
+              <span class="peri-legend-heading">Chip Support:</span>
+              <span class="peri-legend-item">✔️ Supported</span>
+              <span class="peri-legend-item">⚒️ Partial support</span>
+              <span class="peri-legend-item">❌ Not supported</span>
+              <span class="peri-legend-item"><span class="peri-empty-swatch">—</span> Not available</span>
+            </div>
+          </div>
+          <div class="peri-actions">
+            <button type="button" class="peri-btn" onclick="document.querySelectorAll('#peripheral-support .peri-group').forEach(function(d) { d.open = true; })">Expand all</button>
+            <button type="button" class="peri-btn" onclick="document.querySelectorAll('#peripheral-support .peri-group').forEach(function(d) { d.open = false; })">Collapse all</button>
+          </div>
+        </div>
+        <p class="peri-note">Underlined icons open the peripheral's tracking issue on GitHub.</p>
+{{ peripheral_support }}
+      </div>
+    </details>
+    <script>
+      (function() {
+        function checkHash() {
+          if (location.hash === "#peripheral-support") {
+            var el = document.getElementById("peripheral-support");
+            if (el) el.open = true;
+          }
+        }
+        checkHash();
+        window.addEventListener("hashchange", checkHash);
+      })();
+    </script>
+{% endif %}
   </div>
 </body>
 

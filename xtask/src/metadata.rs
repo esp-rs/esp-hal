@@ -18,7 +18,7 @@ use anyhow::{Context, Result, bail};
 use strum::IntoEnumIterator;
 
 /// Cache layout this devtool understands. Must match `esp-metadata`.
-const CACHE_VERSION: u32 = 1;
+const CACHE_VERSION: u32 = 2;
 
 /// Supported devices.
 #[derive(
@@ -116,6 +116,11 @@ impl Chip {
     }
 }
 
+/// Pre-rendered HTML peripheral support matrix for the `esp-hal` documentation index.
+pub fn peripheral_support_html() -> &'static str {
+    &cache().peripheral_support_html
+}
+
 /// The configuration symbols of a single device.
 #[derive(Debug, Default, Clone)]
 pub struct Config {
@@ -155,6 +160,7 @@ struct Cache {
     hash: String,
     symbols: Vec<String>,
     kv_symbols: Vec<String>,
+    peripheral_support_html: String,
     chips: BTreeMap<String, ChipCache>,
 }
 

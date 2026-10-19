@@ -17,7 +17,7 @@ use esp_metadata::{Chip, Config, TokenStream};
 /// Bump when the cache layout changes. Devtools that expect a different
 /// version refuse to use the cache instead of regenerating it, because
 /// regeneration cannot resolve a version mismatch.
-const CACHE_VERSION: u32 = 1;
+const CACHE_VERSION: u32 = 2;
 
 const USAGE: &str = "\
 Usage: cargo update-metadata [--check]
@@ -224,6 +224,8 @@ struct Cache {
     symbols: Vec<String>,
     /// Every symbol with a value defined by any chip.
     kv_symbols: Vec<String>,
+    /// Pre-rendered HTML peripheral support matrix for the `esp-hal` documentation index.
+    peripheral_support_html: String,
     chips: BTreeMap<String, ChipCache>,
 }
 
@@ -306,11 +308,15 @@ fn dump_cache(workspace: &Path) -> Result<PathBuf> {
         .filter(|symbol| !kv_symbols.contains(symbol))
         .collect::<BTreeSet<_>>();
 
+    let mut peripheral_support_html = String::new();
+    esp_metadata::generate_chip_support_status_html(&mut peripheral_support_html)?;
+
     let cache = Cache {
         version: CACHE_VERSION,
         hash: esp_metadata::input_hash(workspace)?,
         symbols: symbols.into_iter().collect(),
         kv_symbols: kv_symbols.into_iter().collect(),
+        peripheral_support_html,
         chips,
     };
 
