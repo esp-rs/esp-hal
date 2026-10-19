@@ -63,6 +63,7 @@ mod interrupt;
     feature = "has-ulp-core"
 ))]
 mod lp_core;
+mod psram;
 mod ram;
 mod unified_main;
 
@@ -133,6 +134,33 @@ mod unified_main;
 #[proc_macro_attribute]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     ram::ram(args.into(), input.into()).into()
+}
+
+/// Places a `static` in PSRAM.
+///
+/// The attribute needs the `code-in-psram` option of esp-hal, on a chip whose PSRAM has its own
+/// address window, such as the ESP32-S31, and esp-hal's `unstable` feature. It takes one option:
+///
+/// - `zeroed`: The start-up that copies the code into PSRAM zeroes the `static`, before `main`. The
+///   compiler rejects an initializer that is not all zero bytes, so the type does not have to
+///   implement `bytemuck::Zeroable`.
+///
+/// Without `zeroed`, the attribute is an error: a `static` with an initial value cannot be placed
+/// in PSRAM yet.
+///
+/// `esp_hal::init` panics if PSRAM is smaller than these statics. Before `init`, an access to a
+/// static past the end of PSRAM causes a bus fault with no message, so `init` must be called
+/// before the first access.
+///
+/// # Examples
+///
+/// ```rust, ignore
+/// #[psram(zeroed)]
+/// static mut SOME_PSRAM_DATA: [u8; 0x4000] = [0; 0x4000];
+/// ```
+#[proc_macro_attribute]
+pub fn psram(args: TokenStream, input: TokenStream) -> TokenStream {
+    psram::psram(args.into(), input.into()).into()
 }
 
 /// Replaces placeholders in rustdoc doc comments.

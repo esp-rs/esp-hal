@@ -33,8 +33,13 @@ pub(crate) static APP_OFFSET: AtomicU32 = AtomicU32::new(0);
 
 /// The stage the start-up reached, for a probe to read.
 ///
-/// 0: not started. 1: started. 2: starting PSRAM. 3: scanning the flash MMU. 4: copying.
-/// 5: unmapping flash. 6: done.
+/// - 0: not started.
+/// - 1: started.
+/// - 2: starting PSRAM.
+/// - 3: scanning the flash MMU.
+/// - 4: copying, then zeroing `.bss.psram`.
+/// - 5: unmapping flash.
+/// - 6: done.
 ///
 /// The start-up stops with:
 ///
@@ -50,6 +55,12 @@ pub(crate) static APP_OFFSET: AtomicU32 = AtomicU32::new(0);
 static ESP_HAL_CODE_IN_PSRAM_STAGE: AtomicU32 = AtomicU32::new(0);
 
 const FLASH_ENTRIES: u32 = property!("mmu.entry_num");
+
+#[cfg(psram_separate_window)]
+unsafe extern "C" {
+    pub(crate) static _psram_bss_start: u8;
+    pub(crate) static _psram_bss_end: u8;
+}
 const IMAGE_MAGIC: u32 = 0xE9;
 
 #[inline(always)]
@@ -271,4 +282,18 @@ fn copy_segments(flash: &mut FlashReader<'_>, app: u32, size: u32) {
     chip::cache_writeback(start, copied);
     chip::cache_invalidate_code(start, copied);
     CODE_END.store(code_end as usize, Ordering::Relaxed);
+
+    // A `.bss.psram` past the end of PSRAM is not zeroed. The MMU maps only the PSRAM fitted, so
+    // the stores would fault before `main` could report it. `start_with_code` reports it, and
+    // nothing touches the section before then.
+    let bss_start = &raw const _psram_bss_start as u32;
+    let bss_end = &raw const _psram_bss_end as u32;
+    if bss_start < bss_end && bss_end <= end {
+        let mut addr = bss_start;
+        while addr < bss_end {
+            store_word(addr, 0);
+            addr = addr.wrapping_add(4);
+        }
+        chip::cache_writeback(bss_start, bss_end.wrapping_sub(bss_start));
+    }
 }

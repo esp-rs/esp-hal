@@ -24,6 +24,32 @@ static RODATA: [u32; 4] = [0x5053_524D; 4];
 static mut DATA: u32 = 0x4441_5441;
 static mut BSS: u32 = 0;
 
+// 256 KiB, so the static spans several MMU pages.
+#[esp_hal::psram(zeroed)]
+static mut PSRAM_BSS: [u32; 0x1_0000] = [0; 0x1_0000];
+
+struct PsramState {
+    waker: Mutex<RefCell<Option<core::task::Waker>>>,
+    flag: core::sync::atomic::AtomicBool,
+}
+
+#[esp_hal::psram(zeroed)]
+static PSRAM_STATE: PsramState = PsramState {
+    waker: Mutex::new(RefCell::new(None)),
+    flag: core::sync::atomic::AtomicBool::new(false),
+};
+
+#[repr(C, align(64))]
+struct DmaBlock([u8; 4096]);
+
+#[esp_hal::psram(zeroed)]
+static mut DMA_SOURCE: DmaBlock = DmaBlock([0; 4096]);
+
+unsafe extern "C" {
+    static _psram_code_end: u8;
+    static _psram_bss_end: u8;
+}
+
 /// A random 64 KiB block after the image in the booted partition, so that each run wears another.
 fn scratch_block(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>) -> u32 {
     use esp_bootloader_esp_idf::partitions;
@@ -193,6 +219,92 @@ mod tests {
         for (n, &i) in probes.iter().enumerate() {
             assert_eq!(heap[i], PATTERN.wrapping_add(n as u32));
         }
+    }
+
+    // PSRAM keeps its content across a reset, so the zeros come from the start-up, at every boot.
+    #[test]
+    fn test_psram_static_is_zeroed_above_the_code() {
+        let _peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let start = addr_of!(PSRAM_BSS) as u32;
+        assert!(in_window(start));
+        assert!(start >= addr_of!(_psram_code_end) as u32);
+
+        let words = unsafe { &mut *addr_of_mut!(PSRAM_BSS) };
+        assert_eq!(words.iter().position(|&w| w != 0), None);
+        let probes = [0, words.len() / 2, words.len() - 1];
+        for (n, &i) in probes.iter().enumerate() {
+            words[i] = PATTERN.wrapping_add(n as u32);
+        }
+        for (n, &i) in probes.iter().enumerate() {
+            assert_eq!(words[i], PATTERN.wrapping_add(n as u32));
+        }
+    }
+
+    #[test]
+    fn test_psram_static_holds_none_and_false() {
+        let _peripherals = esp_hal::init(esp_hal::Config::default());
+
+        assert!(in_window(addr_of!(PSRAM_STATE) as u32));
+        assert!(critical_section::with(|cs| PSRAM_STATE
+            .waker
+            .borrow_ref(cs)
+            .is_none()));
+        assert!(!PSRAM_STATE.flag.load(Ordering::Relaxed));
+        PSRAM_STATE.flag.store(true, Ordering::Relaxed);
+        assert!(PSRAM_STATE.flag.load(Ordering::Relaxed));
+    }
+
+    // The CPU writes the source through the cache just before the transfer, so the DMA reads the
+    // written bytes only if the driver treats the static as PSRAM and writes the cache back.
+    // Outside `psram_range`, the driver rejects the buffer.
+    #[cfg(all(dma_can_access_psram, dma_supports_mem2mem))]
+    #[test]
+    fn test_dma_reads_psram_static() {
+        use esp_hal::dma::{BurstConfig, ExternalBurstConfig, Mem2Mem};
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mem2mem = cfg_select! {
+            feature = "esp32s31" => Mem2Mem::new(peripherals.DMA_AXI_CH1),
+            _ => Mem2Mem::new(peripherals.DMA_CH0),
+        };
+        let (rx_buffer, rx_descriptors, _, tx_descriptors) = esp_hal::dma_buffers!(4096);
+        let mut mem2mem = mem2mem
+            .with_descriptors(
+                rx_descriptors,
+                tx_descriptors,
+                BurstConfig {
+                    external_memory: ExternalBurstConfig::Size64,
+                    internal_memory: Default::default(),
+                },
+            )
+            .unwrap();
+
+        let source = unsafe { &mut (*addr_of_mut!(DMA_SOURCE)).0 };
+        assert!(in_window(source.as_ptr() as u32));
+        for (i, byte) in source.iter_mut().enumerate() {
+            *byte = (i as u8).wrapping_mul(31).wrapping_add(7);
+        }
+
+        mem2mem
+            .start_transfer(rx_buffer, source)
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        for (i, &byte) in rx_buffer.iter().enumerate() {
+            assert_eq!(byte, (i as u8).wrapping_mul(31).wrapping_add(7));
+        }
+    }
+
+    #[test]
+    fn test_heap_after_psram_statics() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let psram = Psram::new(peripherals.PSRAM, PsramConfig::default());
+
+        let (start, _) = psram.raw_parts();
+        assert!(start as u32 >= addr_of!(_psram_bss_end) as u32);
+        assert!(start as u32 >= addr_of!(PSRAM_BSS) as u32 + 0x4_0000);
     }
 
     #[test]

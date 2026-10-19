@@ -32,6 +32,12 @@ MEMORY
     */
     ROM : ORIGIN = ROM_WINDOW + 0x20, LENGTH = 0x4000000 - 0x20
 
+    /* The same window, for `.bss.psram` above the code. A region of its own gives the section
+       its own location counter. The PSRAM fitted can be smaller than the window. The start-up
+       checks each segment against the PSRAM size it detects, and `esp_hal::init` checks
+       `.bss.psram`. */
+    PSRAM_BSS : ORIGIN = ORIGIN(ROM), LENGTH = LENGTH(ROM)
+
     /* LP SRAM (32 KB, persists over deep sleep).
        Source: esp-idf components/esp_system/ld/esp32s31/memory.ld.in (lp_ram_seg)
     */
