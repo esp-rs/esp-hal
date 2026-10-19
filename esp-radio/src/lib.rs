@@ -68,7 +68,8 @@ if let Ok(controller) = BleConnector::new(peripherals.BT, Default::default()) {}
 //! ```toml
 //! [dependencies.esp-radio]
 //! # A supported chip needs to be specified, as well as specific use-case features
-#![doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now", "esp-alloc"]"#)]
+#![cfg_attr(wifi_driver_supported, doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now", "esp-alloc"]"#))]
+#![cfg_attr(not(wifi_driver_supported), doc = concat!(r#"features = [""#, chip!(), r#"", "ble", "esp-alloc"]"#))]
 //! [dependencies.esp-rtos]
 #![doc = concat!(r#"features = [""#, chip!(), r#"", "esp-radio", "esp-alloc"]"#)]
 //! [dependencies.esp-alloc]
