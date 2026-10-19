@@ -13,6 +13,9 @@ PROVIDE(interrupt0 = DefaultHandler);
 */
 PROVIDE(_mp_hook = default_mp_hook);
 
+/* `psram.x` must come before `rwdata.x`. See `psram.x`. */
+INCLUDE "psram.x"
+
 SECTIONS {
   /* Shared sections - ordering matters */
   INCLUDE "rwtext.x"
@@ -37,6 +40,8 @@ INCLUDE "rodata.x"
 INCLUDE "text.x"
 ASSERT(!ESP_HAL_CODE_IN_PSRAM || ADDR(.text) == ADDR(.rodata.wifi) + SIZEOF(.rodata.wifi), "With code-in-psram, .text must start where .rodata.wifi ends");
 INCLUDE "rtc_fast.x"
+/* See `psram_code_end.x`. The sections below are in RAM, or are INFO sections at 0. */
+INCLUDE "psram_code_end.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
 INCLUDE "metadata.x"

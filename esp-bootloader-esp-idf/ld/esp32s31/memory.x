@@ -32,6 +32,9 @@ MEMORY
     */
     ROM : ORIGIN = ROM_WINDOW + 0x20, LENGTH = 0x4000000 - 0x20
 
+    /* The same window, for `.bss.psram` above the code. See `psram.x`. */
+    PSRAM_BSS : ORIGIN = ORIGIN(ROM), LENGTH = LENGTH(ROM)
+
     /* With code in PSRAM, the start-up that copies the code runs from here, in the flash window. */
     BOOT_FLASH : ORIGIN = 0x40000000 + 0x20, LENGTH = 0x10000 - 0x20
 

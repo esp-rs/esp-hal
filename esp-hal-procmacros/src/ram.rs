@@ -243,15 +243,7 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         None
     };
     let trait_check = trait_check.map(|name| {
-        use proc_macro_crate::{FoundCrate, crate_name};
-
-        let hal = Ident::new(
-            match crate_name("esp-hal") {
-                Ok(FoundCrate::Name(ref name)) => name,
-                _ => "crate",
-            },
-            Span::call_site(),
-        );
+        let hal = hal_crate();
 
         let assertion = quote::format_ident!("assert_is_{name}");
         let Item::Static(ref item) = item else {
@@ -278,6 +270,19 @@ fn is_naked(attrs: &[syn::Attribute]) -> bool {
                     .parse_args::<syn::Path>()
                     .is_ok_and(|path| path.is_ident("naked")))
     })
+}
+
+/// The path to esp-hal in the crate that uses the attribute, or `crate` inside esp-hal.
+pub(crate) fn hal_crate() -> Ident {
+    use proc_macro_crate::{FoundCrate, crate_name};
+
+    Ident::new(
+        match crate_name("esp-hal") {
+            Ok(FoundCrate::Name(ref name)) => name,
+            _ => "crate",
+        },
+        Span::call_site(),
+    )
 }
 
 #[cfg(test)]

@@ -356,6 +356,8 @@ pub use procmacros::handler;
 pub use procmacros::load_lp_code;
 #[cfg(feature = "rt")]
 pub use procmacros::main;
+#[instability::unstable]
+pub use procmacros::psram;
 pub use procmacros::ram;
 
 #[instability::unstable]
@@ -662,6 +664,15 @@ pub mod __macro_implementation {
     pub const fn assert_is_persistable<T: super::Persistable>() {}
 
     pub const fn assert_is_uninit<T: super::Uninit>() {}
+
+    // `.bss.psram` needs the code-in-PSRAM start-up, which maps PSRAM before `main` and zeroes the
+    // section.
+    #[instability::unstable]
+    pub const fn assert_psram_available() {
+        if !cfg!(code_in_psram) {
+            core::panic!("`psram` needs the `code-in-psram` option");
+        }
+    }
 
     #[cfg(feature = "rt")]
     #[cfg(riscv)]

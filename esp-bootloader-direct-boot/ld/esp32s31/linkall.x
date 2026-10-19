@@ -1,6 +1,9 @@
 INCLUDE "esp_hal_config.x"
 INCLUDE "direct_boot_memory.x"
 
+/* The symbols let the link reach the assertion, which names the cause. */
+PROVIDE(_psram_bss_start = 0);
+PROVIDE(_psram_bss_end = 0);
 ASSERT(ESP_HAL_CODE_IN_PSRAM == 0, "esp-bootloader-direct-boot does not support the code-in-psram option of esp-hal")
 
 /* esp-hal region aliases */

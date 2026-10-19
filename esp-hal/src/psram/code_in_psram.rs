@@ -17,6 +17,12 @@ pub(crate) static CODE_END: AtomicUsize = AtomicUsize::new(0);
 pub(crate) static APP_OFFSET: AtomicU32 = AtomicU32::new(0);
 
 const FLASH_ENTRIES: u32 = property!("mmu.entry_num");
+
+unsafe extern "C" {
+    pub(crate) static _psram_bss_start: u8;
+    pub(crate) static _psram_bss_end: u8;
+}
+
 const IMAGE_MAGIC: u32 = 0xE9;
 
 /// Why the start-up stopped. The value is the exit code, or the value in `a0`.
@@ -325,4 +331,17 @@ fn copy_segments(flash: &mut FlashReader<'_>, app: u32, size: u32) {
     chip::cache_writeback(start, copied);
     chip::cache_invalidate_code(start, copied);
     CODE_END.store(code_end as usize, Ordering::Relaxed);
+
+    // A `.bss.psram` past the end of PSRAM is not zeroed. The MMU maps only the PSRAM fitted, so
+    // the stores would fault before `main` could report it. `adopt_started_psram` reports it.
+    let bss_start = &raw const _psram_bss_start as u32;
+    let bss_end = &raw const _psram_bss_end as u32;
+    if bss_start < bss_end && bss_end <= end {
+        let mut addr = bss_start;
+        while addr < bss_end {
+            store_word(addr, 0);
+            addr = addr.wrapping_add(4);
+        }
+        chip::cache_writeback(bss_start, bss_end.wrapping_sub(bss_start));
+    }
 }

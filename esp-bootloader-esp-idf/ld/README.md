@@ -68,6 +68,10 @@ A bootloader support crate provides `linkall.x`, which must:
 - Place the input sections esp-hal and the runtime crates emit, including `.trap*`, `.rwtext*`,
   `.hal_main` (RISC-V, after `.init` and `.init.rust`),
   `.rtc_fast.*` / `.rtc_slow.*`, `.dram2_uninit*`, `.uncached.*` and `.espressif.metadata`.
+- With the `code-in-psram` option, define `_psram_bss_start` and `_psram_bss_end`, and place
+  `.bss.psram*` after the code, in the window that the code runs from, before `.bss`. Without the
+  option, `.bss.psram*` must be empty. If the crate does not support the option, fail the link when
+  `ESP_HAL_CODE_IN_PSRAM` is 1.
 - Respect the memory protection esp-hal sets up from these symbols (below).
 
 ### Memory protection

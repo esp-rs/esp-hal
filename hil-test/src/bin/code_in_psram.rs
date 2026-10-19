@@ -25,6 +25,25 @@ static SWINT: Mutex<RefCell<Option<SoftwareInterrupt<'static, 2>>>> =
     Mutex::new(RefCell::new(None));
 static INTERRUPTS: AtomicU32 = AtomicU32::new(0);
 
+// 256 KiB, so the static spans several MMU pages.
+#[esp_hal::psram(zeroed)]
+static mut PSRAM_BSS: [u32; 0x1_0000] = [0; 0x1_0000];
+
+// Not `mut`: the attribute accepts a static with interior mutability.
+#[esp_hal::psram(zeroed)]
+static PSRAM_WAKER: Mutex<RefCell<Option<core::task::Waker>>> = Mutex::new(RefCell::new(None));
+
+#[repr(C, align(64))]
+struct DmaBlock([u8; 4096]);
+
+#[esp_hal::psram(zeroed)]
+static mut DMA_SOURCE: DmaBlock = DmaBlock([0; 4096]);
+
+unsafe extern "C" {
+    static _psram_code_end: u8;
+    static _psram_bss_end: u8;
+}
+
 #[inline(never)]
 fn in_text() -> u32 {
     unsafe { core::ptr::read_volatile(&RODATA[0]) }
@@ -70,7 +89,6 @@ fn booted_image(
 
 /// Returns the flash offset of a random 64 KiB block after the image in the booted partition. A
 /// random block spreads the wear of the tests over the partition.
-#[cfg(esp32s31)]
 fn scratch_block(flash: &mut esp_hal::flash::Flash<'_, esp_hal::Blocking>) -> u32 {
     const BLOCK: u32 = 0x1_0000;
     // The checksum and the hash after the last segment fit in the next block.
@@ -118,7 +136,7 @@ fn assert_pattern(words: &[u32], seed: u32, what: &str) {
 
 #[embedded_test::tests(default_timeout = 5)]
 mod tests {
-    use core::ptr::addr_of;
+    use core::ptr::{addr_of, addr_of_mut};
 
     #[cfg(esp32s31)]
     use esp_hal::{
@@ -172,10 +190,6 @@ mod tests {
         );
     }
 
-    fn booted_app_offset(flash: &mut Flash<'_, esp_hal::Blocking>) -> u32 {
-        booted_image(flash, |_, _, _, _| {}).0
-    }
-
     #[test]
     fn test_code_and_rodata_in_psram() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
@@ -220,8 +234,12 @@ mod tests {
         let psram = Psram::new(peripherals.PSRAM, PsramConfig::default());
 
         let (start, size) = psram.raw_parts();
-        assert!(start as u32 > in_text as *const () as u32);
-        assert!(start as u32 > addr_of!(RODATA) as u32);
+        // The heap starts at the page after the code and the statics, as the linker placed them.
+        let used = (addr_of!(_psram_code_end) as u32).max(addr_of!(_psram_bss_end) as u32);
+        assert_eq!(
+            start as u32,
+            used.next_multiple_of(property!("mmu.page_size"))
+        );
         // `Psram::size` is the whole chip.
         assert!(psram.size().is_power_of_two());
 
@@ -233,24 +251,107 @@ mod tests {
         assert_eq!(heap[words - 1], PATTERN);
     }
 
-    // Fails if a flash read changes PSRAM content that the data cache does not hold.
+    /// Asserts that `PSRAM_BSS` is all zero and above the code, then writes a pattern over all of
+    /// it.
+    ///
+    /// PSRAM keeps its content across the reset between two tests. The static is larger than the
+    /// cache, so most of the pattern is in PSRAM at the reset. The second test that calls this
+    /// function reads zeros only if the start-up zeroed the static.
+    fn assert_psram_bss_zeroed_then_write() {
+        let start = addr_of!(PSRAM_BSS) as u32;
+        assert!(in_window(start));
+        assert!(start >= addr_of!(_psram_code_end) as u32);
+
+        let words = unsafe { &mut *addr_of_mut!(PSRAM_BSS) };
+        assert_eq!(words.iter().position(|&w| w != 0), None);
+        fill_pattern(words, PATTERN);
+    }
+
     #[test]
-    fn test_heap_survives_flash_read() {
+    fn test_psram_static_is_zeroed_above_the_code() {
+        let _peripherals = esp_hal::init(esp_hal::Config::default());
+        assert_psram_bss_zeroed_then_write();
+        assert!(critical_section::with(|cs| PSRAM_WAKER
+            .borrow_ref(cs)
+            .is_none()));
+    }
+
+    #[test]
+    fn test_psram_static_is_zeroed_again() {
+        let _peripherals = esp_hal::init(esp_hal::Config::default());
+        assert_psram_bss_zeroed_then_write();
+    }
+
+    // The CPU writes the source through the cache just before the transfer, so the DMA reads the
+    // written bytes only if the driver treats the static as PSRAM and writes the cache back.
+    // Outside `psram_range`, the driver rejects the buffer.
+    #[cfg(all(dma_can_access_psram, dma_supports_mem2mem))]
+    #[test]
+    fn test_dma_reads_psram_static() {
+        use esp_hal::dma::{BurstConfig, ExternalBurstConfig, Mem2Mem};
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mem2mem = cfg_select! {
+            esp32s31 => Mem2Mem::new(peripherals.DMA_AXI_CH1),
+            _ => Mem2Mem::new(peripherals.DMA_CH0),
+        };
+        let (rx_buffer, rx_descriptors, _, tx_descriptors) = esp_hal::dma_buffers!(4096);
+        let mut mem2mem = mem2mem
+            .with_descriptors(
+                rx_descriptors,
+                tx_descriptors,
+                BurstConfig {
+                    external_memory: ExternalBurstConfig::Size64,
+                    internal_memory: Default::default(),
+                },
+            )
+            .unwrap();
+
+        let source = unsafe { &mut (*addr_of_mut!(DMA_SOURCE)).0 };
+        assert!(in_window(source.as_ptr() as u32));
+        for (i, byte) in source.iter_mut().enumerate() {
+            *byte = (i as u8).wrapping_mul(31).wrapping_add(7);
+        }
+
+        mem2mem
+            .start_transfer(rx_buffer, source)
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        for (i, &byte) in rx_buffer.iter().enumerate() {
+            assert_eq!(byte, (i as u8).wrapping_mul(31).wrapping_add(7));
+        }
+    }
+
+    // The heap and a PSRAM static keep their content over a flash erase, a write and a read.
+    #[test]
+    fn test_psram_survives_flash_operations() {
+        const BLOCK: u32 = 0x1_0000;
+
         let peripherals = esp_hal::init(esp_hal::Config::default());
         hil_test::init_logger!(peripherals);
         let psram = Psram::new(peripherals.PSRAM, PsramConfig::default());
         let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
-        let app = booted_app_offset(&mut flash);
+        let block = scratch_block(&mut flash);
 
         let (start, _) = psram.raw_parts();
         let heap = unsafe { core::slice::from_raw_parts_mut(start as *mut u32, UNCACHED_WORDS) };
         let seed = fresh_seed();
         fill_pattern(heap, seed);
+        let words = unsafe { &mut *addr_of_mut!(PSRAM_BSS) };
+        fill_pattern(words, PATTERN);
 
+        let data = [PATTERN; 64];
+        unsafe {
+            flash.erase(block, block + BLOCK).unwrap();
+            flash.write(block, &data).unwrap();
+        }
         let mut buffer = [0u32; 4096];
-        flash.read(app, &mut buffer).unwrap();
+        flash.read(block, &mut buffer).unwrap();
 
-        assert_pattern(heap, seed, "the heap after a flash read");
+        assert_pattern(heap, seed, "the heap after the flash operations");
+        assert_pattern(words, PATTERN, "PSRAM_BSS after the flash operations");
     }
 
     #[test]
