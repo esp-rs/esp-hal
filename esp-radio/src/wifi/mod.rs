@@ -1378,6 +1378,8 @@ pub(crate) fn wifi_start_scan(
                     min: min.as_millis() as u32,
                     max: max.as_millis() as u32,
                 },
+                // 0 keeps the default set by `esp_wifi_set_scan_parameters` (120 ms) for
+                // passive-only channels.
                 passive: 0,
             },
             wifi_scan_type_t_WIFI_SCAN_TYPE_ACTIVE,
@@ -3186,6 +3188,8 @@ impl WifiController<'_> {
             esp_wifi_result!(unsafe { esp_wifi_start() })?;
 
             // Default for all scans, including connect scans. Requires a started station.
+            // `wifi_start_scan` only overrides the active or passive time for a single scan and
+            // the driver restores these defaults when a scan finishes.
             if mode != wifi_mode_t_WIFI_MODE_AP {
                 let params = wifi_scan_default_params_t {
                     scan_time: wifi_scan_time_t {

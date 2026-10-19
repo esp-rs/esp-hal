@@ -16,7 +16,8 @@ pub struct AccessPointConfig {
     /// The channel the access point will operate on.
     ///
     /// The channel must be allowed in the configured country. The default country only allows
-    /// channels that are permitted in all regions.
+    /// channels that are permitted in all regions. Applying the configuration fails with
+    /// [`WifiError::InvalidArguments`] if the channel is not allowed.
     pub(crate) channel: u8,
     /// The secondary channel configuration.
     pub(crate) secondary_channel: Option<SecondaryChannel>,
