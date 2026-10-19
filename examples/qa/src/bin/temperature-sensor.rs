@@ -25,7 +25,7 @@ fn main() -> ! {
     let delay = Delay::new();
 
     // Wait for the sensor to stabilize
-    delay.delay_micros(200);
+    delay.delay_micros(300);
 
     loop {
         let temp = temperature_sensor.get_temperature();

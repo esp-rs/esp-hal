@@ -133,7 +133,9 @@ define_regi2c! {
         reg: I2C_SAR_REG5(5) {
             field: ADC_SAR2_DREF(6..4)
         }
-        reg: I2C_SAR_REG6(6) {}
+        reg: I2C_SAR_REG6(6) {
+            field: I2C_SARADC_TSENS_DAC(3..0)
+        }
         reg: I2C_SAR_REG7(7) {
             field: ADC_SAR2_ENCAL_GND(7..7),
             field: ADC_SAR2_ENCAL_REF(6..6),

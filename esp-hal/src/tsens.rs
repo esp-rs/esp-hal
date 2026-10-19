@@ -29,10 +29,10 @@
 //!
 //! let temperature_sensor = TemperatureSensor::new(peripherals.TSENS, Config::default())?;
 //! let delay = Delay::new();
-//! delay.delay_micros(200);
+//! delay.delay_micros(300);
 //! loop {
 //!     let temp = temperature_sensor.get_temperature();
-//!     println!("Temperature: {:.2}°C", temp.to_celcius());
+//!     println!("Temperature: {:.2}°C", temp.to_celsius());
 //!     delay.delay_millis(1_000);
 //! }
 //! # }
@@ -130,6 +130,8 @@ impl<'d> TemperatureSensor<'d> {
         };
 
         tsens.power_up();
+        // https://github.com/espressif/esp-idf/blob/ab95e70748f2eddac6f87217b0cf62533684a6ba/components/esp_hal_ana_conv/esp32c6/temperature_sensor_periph.c#L9-L16
+        crate::soc::regi2c::I2C_SARADC_TSENS_DAC.write_field(7); // 20 °C to 100 °C, offset -1.
 
         Ok(tsens)
     }
@@ -167,6 +169,12 @@ impl<'d> TemperatureSensor<'d> {
         let offset = -1i8;
 
         Temperature::new(raw_value, offset)
+    }
+}
+
+impl Drop for TemperatureSensor<'_> {
+    fn drop(&mut self) {
+        self.power_down();
     }
 }
 
