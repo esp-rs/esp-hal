@@ -43,6 +43,8 @@
 //! - Temperature calibration range is not supported
 //! - Interrupts are not supported
 
+mod clocks;
+
 /// Clock source for the temperature sensor.
 pub use crate::soc::clocks::TsensSclkConfig as ClockSource;
 use crate::{
