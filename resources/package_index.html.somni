@@ -335,6 +335,22 @@
     .peri-table a.issue-link:hover {
       border-bottom-style: solid;
     }
+
+    .peri-table td span[title="Supported"],
+    .peri-table td a[title^="Supported"],
+    .peri-table td span[title="Stable"],
+    .peri-table td a[title^="Stable"],
+    .peri-icon-tick {
+      display: inline-block;
+      filter: invert(1) sepia(1) saturate(4) hue-rotate(75deg) brightness(1.05);
+    }
+
+    .peri-table td span[title="Partial support"],
+    .peri-table td a[title^="Partial support"],
+    .peri-icon-tools {
+      display: inline-block;
+      filter: invert(1) sepia(0.6) saturate(3) hue-rotate(5deg) brightness(1.05);
+    }
   </style>
 </head>
 
@@ -368,14 +384,14 @@
           <div class="peri-legends">
             <div class="peri-legend-group">
               <span class="peri-legend-heading">API Stability:</span>
-              <span class="peri-legend-item">✔️ Stable</span>
+              <span class="peri-legend-item"><span class="peri-icon-tick">✔️</span> Stable</span>
               <span class="peri-legend-item">🚧 Unstable</span>
               <span class="peri-legend-item">⚠️ Planned overhaul</span>
             </div>
             <div class="peri-legend-group">
               <span class="peri-legend-heading">Chip Support:</span>
-              <span class="peri-legend-item">✔️ Supported</span>
-              <span class="peri-legend-item">⚒️ Partial support</span>
+              <span class="peri-legend-item"><span class="peri-icon-tick">✔️</span> Supported</span>
+              <span class="peri-legend-item"><span class="peri-icon-tools">⚒️</span> Partial support</span>
               <span class="peri-legend-item">❌ Not supported</span>
               <span class="peri-legend-item"><span class="peri-empty-swatch">—</span> Not available</span>
             </div>
@@ -392,9 +408,22 @@
     <script>
       (function() {
         function checkHash() {
-          if (location.hash === "#peripheral-support") {
-            var el = document.getElementById("peripheral-support");
-            if (el) el.open = true;
+          var id = decodeURIComponent(location.hash.slice(1));
+          if (!id) return;
+          var matrix = document.getElementById("peripheral-support");
+          if (!matrix) return;
+          if (id === "peripheral-support") {
+            matrix.open = true;
+            matrix.scrollIntoView();
+            return;
+          }
+          var target = document.getElementById(id);
+          if (target && target.classList.contains("peri-group")) {
+            matrix.open = true;
+            matrix.querySelectorAll(".peri-group").forEach(function(d) {
+              d.open = (d === target);
+            });
+            target.scrollIntoView();
           }
         }
         checkHash();

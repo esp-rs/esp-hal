@@ -1640,10 +1640,17 @@ fn visible_driver_groups() -> Vec<(&'static str, Vec<&'static SupportItem>)> {
     groups
 }
 
+const PERIPHERAL_SUPPORT_INDEX_URL: &str =
+    "https://docs.espressif.com/projects/rust/esp-hal/latest/index.html";
+
+fn group_slug(group: &str) -> String {
+    group.to_ascii_lowercase().replace(' ', "-")
+}
+
 pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result {
     writeln!(
         output,
-        "For a detailed per-chip support matrix, see the [documentation index](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#peripheral-support)."
+        "For a detailed per-chip support matrix, see the [documentation index]({PERIPHERAL_SUPPORT_INDEX_URL}#peripheral-support)."
     )?;
     writeln!(output)?;
 
@@ -1654,7 +1661,11 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
 
     let mut issues = Vec::new();
     for (group, drivers) in visible_driver_groups() {
-        writeln!(output, "### {group}")?;
+        let slug = group_slug(group);
+        writeln!(
+            output,
+            "### {group} <small>([[details]({PERIPHERAL_SUPPORT_INDEX_URL}#{slug})])</small>"
+        )?;
         writeln!(output)?;
         write_support_table(output, &drivers, &mut issues)?;
         writeln!(output)?;
@@ -1740,14 +1751,14 @@ pub fn generate_chip_support_status_html(output: &mut impl Write) -> std::fmt::R
         .map(|chip| format!("<th>{}</th>", chip.pretty_name()))
         .collect();
 
-    for (idx, (group, drivers)) in visible_driver_groups().into_iter().enumerate() {
-        let open_attr = if idx == 0 { " open" } else { "" };
+    for (group, drivers) in visible_driver_groups() {
+        let slug = group_slug(group);
         let count = drivers.len();
         let driver_word = if count == 1 { "driver" } else { "drivers" };
 
         writeln!(
             output,
-            r#"        <details class="peri-group"{open_attr}>
+            r#"        <details class="peri-group" id="{slug}">
           <summary class="peri-group-summary">
             <span>{group}</span>
             <span class="peri-group-count">{count} {driver_word}</span>
