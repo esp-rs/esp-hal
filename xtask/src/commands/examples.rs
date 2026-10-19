@@ -28,25 +28,12 @@ pub fn examples(
     let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
     // Load all examples which support the specified chip and parse their metadata.
-    //
-    // Directories might contain a number of individual projects, and don't not rely on
-    // metadata comments in the source files. As such, it needs to load its metadata differently
-    // than other packages.
-    let examples = if package.contains_standalone_projects() {
-        crate::firmware::load_cargo_toml(&package_path).with_context(|| {
-            format!(
-                "Failed to load specified examples from {}",
-                package_path.display()
-            )
-        })?
-    } else {
-        let example_path = match package {
-            Package::QaTest => package_path.join("src").join("bin"),
-            _ => package_path.join("examples"),
-        };
-
-        crate::firmware::load(&example_path)?
-    };
+    let examples = crate::firmware::load_package(workspace, package).with_context(|| {
+        format!(
+            "Failed to load specified examples from {}",
+            package_path.display()
+        )
+    })?;
 
     let mut examples = examples
         .into_iter()

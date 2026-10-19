@@ -91,10 +91,21 @@ pub fn build_documentation(
             // Some packages have chip features, but they have no effect on the public API;
             // in this case, there's no point building it multiple times, so just build one
             // copy of the docs. Otherwise, use the provided chip arguments:
-            match package {
-                _ if package.chip_features_matter() => chips.to_vec(),
-                Package::XtensaLxRt => vec![Chip::Esp32s3],
-                _ => vec![Chip::Esp32c6],
+            if package.chip_features_matter() {
+                chips.to_vec()
+            } else {
+                let chip = chips
+                    .iter()
+                    .copied()
+                    .find(|c| *c == Chip::Esp32c6 && package.validate_package_chip(c).is_ok())
+                    .or_else(|| {
+                        chips
+                            .iter()
+                            .copied()
+                            .find(|c| package.validate_package_chip(c).is_ok())
+                    })
+                    .unwrap_or(Chip::Esp32c6);
+                vec![chip]
             }
         } else {
             log::debug!("Package '{package}' does not have chip features, ignoring argument");
@@ -538,10 +549,6 @@ fn cargo_doc_without_pre_processing(
         }
     }
     builder.add_env_var("RUSTDOCFLAGS", &rustdocflags);
-    // Special case: `esp-storage` requires the optimization level to be 2 or 3:
-    if package == Package::EspStorage {
-        builder.add_env_var("CARGO_PROFILE_DEBUG_OPT_LEVEL", "3");
-    }
 
     let command = CargoCommandBatcher::build_one_for_cargo(&builder);
     log::debug!("{command:#?}");

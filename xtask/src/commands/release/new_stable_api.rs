@@ -28,7 +28,7 @@ pub(crate) fn newly_stable(
     package: Package,
     chips: &[Chip],
 ) -> anyhow::Result<(Vec<NewStableItem>, BTreeSet<Chip>)> {
-    let package_path = crate::windows_safe_path(&workspace.join(package.to_string()));
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
     let mut newly_stable: BTreeMap<String, BTreeSet<Chip>> = BTreeMap::new();
     let mut unchecked_chips = BTreeSet::new();
 
@@ -47,7 +47,7 @@ pub(crate) fn newly_stable(
             .join(package.to_string())
             .join(format!("{chip}.json"));
         decompress_gz(&baseline_gz_path, &baseline)?;
-        let current = build_prepared_doc_json(workspace, package, &chip, &package_path)?;
+        let current = build_prepared_doc_json(package, &chip, &package_path)?;
 
         let diff = PublicApiDiff::between(
             public_api_from_rustdoc(&baseline)?,

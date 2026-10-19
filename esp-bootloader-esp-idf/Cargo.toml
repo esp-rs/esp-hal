@@ -21,6 +21,9 @@ check-configs = [
 clippy-configs = [
     { features = ["defmt", "validation"] },
 ]
+host-test-configs = [
+    { features = ["std", "embedded-storage"], cargo-args = ["--lib", "--tests"], test-args = ["--test-threads=1"] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
