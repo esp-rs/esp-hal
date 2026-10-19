@@ -630,6 +630,7 @@ impl Package {
         format!("{self}-v{version}")
     }
 
+    #[cfg(feature = "semver-checks")]
     pub(crate) fn is_semver_checked(&self) -> bool {
         let toml = self.toml();
         let Some(ref toml) = *toml else {
@@ -640,6 +641,7 @@ impl Package {
             .unwrap_or(false)
     }
 
+    #[cfg(feature = "semver-checks")]
     pub(crate) fn has_semver_config(&self) -> bool {
         let toml = self.toml();
         let Some(ref toml) = *toml else {

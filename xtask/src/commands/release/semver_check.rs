@@ -20,14 +20,8 @@ pub struct SemverCheckArgs {
     #[command(subcommand)]
     pub command: SemverCheckCmd,
 
-    /// Package(s) to target.
-    #[arg(
-        long,
-        alias = "package",
-        value_enum,
-        value_delimiter = ',',
-        default_values_t = Package::iter().filter(|p| p.is_semver_checked() || p.has_semver_config())
-    )]
+    /// Package(s) to target. Omitted means every semver-checked package.
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',')]
     pub packages: Vec<Package>,
 
     /// Default packages that are not supposed to run, used in CI.
@@ -52,17 +46,27 @@ pub fn semver_checks(workspace: &Path, args: SemverCheckArgs) -> anyhow::Result<
     }
 
     #[cfg(feature = "semver-checks")]
-    match args.command {
-        SemverCheckCmd::GenerateBaseline => {
-            checker::generate_baseline(&workspace, args.packages, args.chips)
+    {
+        let packages = if args.packages.is_empty() {
+            Package::iter()
+                .filter(|p| p.is_semver_checked() || p.has_semver_config())
+                .collect()
+        } else {
+            args.packages
+        };
+
+        match args.command {
+            SemverCheckCmd::GenerateBaseline => {
+                checker::generate_baseline(&workspace, packages, args.chips)
+            }
+            SemverCheckCmd::Check => checker::check_for_breaking_changes(
+                &workspace,
+                packages,
+                args.exclude_packages,
+                args.chips,
+            ),
+            SemverCheckCmd::DownloadBaselines => checker::download_baselines(&workspace, packages),
         }
-        SemverCheckCmd::Check => checker::check_for_breaking_changes(
-            &workspace,
-            args.packages,
-            args.exclude_packages,
-            args.chips,
-        ),
-        SemverCheckCmd::DownloadBaselines => checker::download_baselines(&workspace, args.packages),
     }
 }
 
