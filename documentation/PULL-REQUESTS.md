@@ -169,12 +169,6 @@ label (e.g. `breaking-change-esp-hal`). Without it, the semver check in CI fails
 to add the label. See [Breaking changes](./DEVELOPER-GUIDELINES.md#breaking-changes) in the
 developer guidelines.
 
-Label changes do not re-run CI. After adding or removing a label that affects CI
-(`breaking-change-*`, `skip-semver-checks`, `skip-ci-non-code-change`), the maintainer uses
-"Re-run all jobs". This is required when removing `skip-ci-non-code-change`: the merge queue does
-not run the `esp-hal` or `xtensa-lld` jobs, so a stale green run would let the PR merge without
-them.
-
 ### Skipping the changelog for a specific crate
 
 If your PR touches a published crate but the change genuinely needs no
