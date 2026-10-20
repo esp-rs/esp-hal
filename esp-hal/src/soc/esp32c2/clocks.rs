@@ -691,11 +691,12 @@ impl AdcInstance {
     // ADC_FUNCTION_CLOCK
 
     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        if en {
-            crate::peripherals::APB_SARADC::regs()
-                .clkm_conf()
-                .modify(|_, w| unsafe { w.clk_sel().bits(2) });
-        }
+        crate::peripherals::APB_SARADC::regs()
+            .clkm_conf()
+            .modify(|_, w| unsafe {
+                w.clk_en().bit(en);
+                w.clk_sel().bits(if en { 2 } else { 0 })
+            });
     }
 }
 

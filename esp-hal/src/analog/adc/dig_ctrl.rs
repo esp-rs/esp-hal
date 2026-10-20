@@ -147,9 +147,6 @@ fn init_hardware() {
         .modify(|_, w| unsafe { w.sar1_clk_div_num().bits(1) });
 }
 
-/// Keeps the PLL output that `init_hardware` selects as the controller clock running.
-///
-/// Nothing else necessarily requests that clock, and the bootloader may leave it gated.
 struct FunctionClockGuard;
 
 impl FunctionClockGuard {
@@ -421,8 +418,8 @@ pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
     /// Hardware calibration code per attenuation, indexed by [`Attenuation`].
     init_codes: [u16; super::ATTENUATION_COUNT],
     active_channel: Option<u8>,
-    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _clock: FunctionClockGuard,
+    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     sar_power: SarPowerGuard,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
