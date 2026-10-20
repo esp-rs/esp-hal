@@ -5,18 +5,19 @@
 //! the binary. In a real world application you can get the image via HTTP(S),
 //! UART or from an sd-card etc.
 //!
-//! Adjust the target and the chip in the following commands according to the
-//! chip used!
+//! When these instructions are shown by `cargo xtask run`, `{CHIP}` and
+//! `{TARGET}` are already replaced for the selected chip, so the commands can
+//! be copy-pasted as shown.
 //!
 //! ```ignore,bash
-//! cargo xtask build gpio esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt target/ota_image
-//! cargo xtask build ota/update esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
-//! cargo xtask build ota/update esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
+//! cargo xtask build gpio {CHIP}
+//! espflash save-image --chip={CHIP} target/{TARGET}/release/gpio_interrupt target/ota_image
+//! cargo xtask build ota/update {CHIP}
+//! espflash save-image --chip={CHIP} target/{TARGET}/release/ota_update target/ota_image
+//! cargo xtask build ota/update {CHIP}
+//! espflash save-image --chip={CHIP} target/{TARGET}/release/ota_update target/ota_image
 //! espflash erase-flash
-//! cargo xtask run ota/update esp32
+//! cargo xtask run ota/update {CHIP}
 //! ```
 //!
 //! On first boot notice the firmware partition gets booted ("Loaded app from

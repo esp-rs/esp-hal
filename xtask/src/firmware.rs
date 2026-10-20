@@ -95,6 +95,16 @@ impl Metadata {
         self.description.clone()
     }
 
+    /// Optional description of the example, with `{CHIP}` and `{TARGET}`
+    /// placeholders replaced for a run on the given target triple.
+    pub fn description_for(&self, target: &str) -> Option<String> {
+        self.description.as_deref().map(|description| {
+            description
+                .replace("{CHIP}", self.chip.as_ref())
+                .replace("{TARGET}", target)
+        })
+    }
+
     /// Optional support firmware binary to run on a second target.
     pub fn harness_firmware(&self) -> Option<&str> {
         self.harness_firmware.as_deref()
@@ -1076,6 +1086,35 @@ mod tests {
         // A predicate no chip satisfies yields an empty set; the build path turns
         // this into a hard zero-coverage error.
         assert!(chips("false").is_empty());
+    }
+
+    #[test]
+    fn description_for_substitutes_chip_and_target() {
+        let example = Metadata {
+            example_path: PathBuf::from("ota/update"),
+            chip: Chip::Esp32c6,
+            configuration_name: String::new(),
+            features: Vec::new(),
+            tag: None,
+            description: Some(
+                "espflash save-image --chip={CHIP} target/{TARGET}/release/ota_update \
+                 target/ota_image"
+                    .to_string(),
+            ),
+            harness_firmware: None,
+            support_firmware: false,
+            env_vars: HashMap::new(),
+            cargo_config: Vec::new(),
+        };
+
+        let description = example
+            .description_for("riscv32imac-esp-unknown-elf")
+            .unwrap();
+        assert_eq!(
+            description,
+            "espflash save-image --chip=esp32c6 \
+             target/riscv32imac-esp-unknown-elf/release/ota_update target/ota_image"
+        );
     }
 
     #[test]
