@@ -9,9 +9,10 @@ Reviewers ask for the same changes again and again. Check your PR against this l
 for a review.
 
 - **Comments**: Keep only comments that tell the reader something the code cannot, such as a
-  hardware quirk or an order that must hold. Remove comments that narrate the code, explain how you
-  found the bug, or describe how the code worked before. Do not add section separators. Do not add
-  a `TODO` for a known limitation: fix it in the PR, or open an issue.
+  hardware quirk or an order that must hold. Do not write comments for the reviewer into the code.
+  Remove comments that narrate the code, explain how you found the bug, or describe how the code
+  worked before. Do not add section separators. Do not add a `TODO` for a known limitation: fix it
+  in the PR, or open an issue.
 - **Approach**: Fix the cause, not the symptom. Make the smallest change that solves the problem.
   Before you add new code, a dependency or an abstraction, look for one that the codebase already
   has.
