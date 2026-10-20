@@ -132,6 +132,7 @@ trouble-host = { version = "0.8.0", features = [
     "scan",
 ], optional = true }
 
+aes-gcm             = { version = "0.11", default-features = false, features = ["aes"] }
 primeorder          = { version = "0.13.0", default-features = false }
 crypto-bigint       = { version = "0.7.5", default-features = false }
 digest              = { version = "0.11", default-features = false }
