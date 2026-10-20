@@ -32,6 +32,7 @@ use esp_radio::{
         sta::StationConfig,
     },
 };
+use qa_test::DRAM2_UNINIT_SIZE;
 esp_bootloader_esp_idf::esp_app_desc!();
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
@@ -56,12 +57,12 @@ async fn main(spawner: Spawner) -> ! {
     // COEX needs more RAM - add some more
     #[cfg(feature = "esp32")]
     {
-        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
         esp_alloc::heap_allocator!(size: 24 * 1024);
     }
     #[cfg(not(feature = "esp32"))]
     {
-        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+        esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
         esp_alloc::heap_allocator!(size: 64 * 1024);
     }
 

@@ -13,6 +13,7 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-metadata-generated = { path = "../../../esp-metadata-generated" }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "log-04", "embassy"] }
 esp-radio = { path = "../../../esp-radio", features = [
@@ -29,6 +30,7 @@ esp32 = [
     "esp-backtrace/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-hal/esp32",
+    "esp-metadata-generated/esp32",
     "esp-rtos/esp32",
     "esp-radio/esp32",
 ]
@@ -37,6 +39,7 @@ esp32c2 = [
     "esp-backtrace/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-hal/esp32c2",
+    "esp-metadata-generated/esp32c2",
     "esp-rtos/esp32c2",
     "esp-radio/esp32c2",
 ]
@@ -45,6 +48,7 @@ esp32c3 = [
     "esp-backtrace/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-hal/esp32c3",
+    "esp-metadata-generated/esp32c3",
     "esp-rtos/esp32c3",
     "esp-radio/esp32c3",
 ]
@@ -53,6 +57,7 @@ esp32c5 = [
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
+    "esp-metadata-generated/esp32c5",
     "esp-rtos/esp32c5",
     "esp-radio/esp32c5",
 ]
@@ -61,6 +66,7 @@ esp32c6 = [
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
+    "esp-metadata-generated/esp32c6",
     "esp-rtos/esp32c6",
     "esp-radio/esp32c6",
 ]
@@ -69,6 +75,7 @@ esp32c61 = [
     "esp-backtrace/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-hal/esp32c61",
+    "esp-metadata-generated/esp32c61",
     "esp-rtos/esp32c61",
     "esp-radio/esp32c61",
 ]
@@ -77,6 +84,7 @@ esp32s31 = [
     "esp-backtrace/esp32s31",
     "esp-bootloader-esp-idf/esp32s31",
     "esp-hal/esp32s31",
+    "esp-metadata-generated/esp32s31",
     "esp-rtos/esp32s31",
     "esp-radio/esp32s31",
 ]
@@ -85,6 +93,7 @@ esp32s2 = [
     "esp-backtrace/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-hal/esp32s2",
+    "esp-metadata-generated/esp32s2",
     "esp-rtos/esp32s2",
     "esp-radio/esp32s2",
 ]
@@ -93,6 +102,7 @@ esp32s3 = [
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
+    "esp-metadata-generated/esp32s3",
     "esp-rtos/esp32s3",
     "esp-radio/esp32s3",
 ]

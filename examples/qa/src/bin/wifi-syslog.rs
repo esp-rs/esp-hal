@@ -14,6 +14,7 @@ use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, ram, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::wifi::{AuthenticationMethodConfig, Config, ControllerConfig, sta::StationConfig};
+use qa_test::DRAM2_UNINIT_SIZE;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -27,7 +28,7 @@ async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(size: 32 * 1024);
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);

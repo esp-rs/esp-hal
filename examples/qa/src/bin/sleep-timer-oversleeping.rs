@@ -19,6 +19,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
+use qa_test::DRAM2_UNINIT_SIZE;
 
 extern crate alloc;
 
@@ -43,7 +44,7 @@ async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(config);
 
     esp_alloc::heap_allocator!(size: 32768);
-    esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: 32768);
+    esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);

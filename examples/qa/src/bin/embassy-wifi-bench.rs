@@ -35,6 +35,7 @@ use esp_radio::wifi::{
     WifiController,
     sta::StationConfig,
 };
+use qa_test::DRAM2_UNINIT_SIZE;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -71,7 +72,7 @@ async fn main(spawner: Spawner) -> ! {
 
     esp_alloc::heap_allocator!(size: 32 * 1024);
     // add some more RAM
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
 
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 

@@ -29,6 +29,7 @@ use esp_radio::wifi::{
     WifiController,
     sta::StationConfig,
 };
+use qa_test::DRAM2_UNINIT_SIZE;
 use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -140,7 +141,7 @@ async fn main(spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Provide a heap for components that allocate (esp-rtos/esp-radio, etc.)
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
 
     // Preempt scheduler (WiFi)
     let timg0 = TimerGroup::new(peripherals.TIMG0);
