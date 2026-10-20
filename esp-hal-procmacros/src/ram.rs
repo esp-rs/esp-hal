@@ -144,31 +144,37 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let is_fn = matches!(item, Item::Fn(_));
-    let section_name = match (
-        is_fn,
-        rtc_fast,
-        rtc_slow,
-        dram2_uninit,
-        dcache_reclaimed,
-        persistent,
-        zeroed,
-    ) {
-        (true, false, false, false, false, false, false) => Ok(".rwtext"),
-        (true, true, false, false, false, false, false) => Ok(".rtc_fast.text"),
-        (true, false, true, false, false, false, false) => Ok(".rtc_slow.text"),
 
-        (false, false, false, false, false, false, false) => Ok(".data"),
-        (false, false, false, true, false, false, false) => Ok(".dram2_uninit"),
-        (false, false, false, true, false, false, true) => Ok(".dram2_uninit.bss"),
-        (false, false, false, false, true, false, false) => Ok(".dcache_reclaimed_uninit"),
+    // The memory option comes before the initialization option.
+    let options = [
+        (rtc_fast, "rtc_fast"),
+        (rtc_slow, "rtc_slow"),
+        (dram2_uninit, "reclaimed"),
+        (dcache_reclaimed, "dcache_reclaimed"),
+        (persistent, "persistent"),
+        (zeroed, "zeroed"),
+    ]
+    .into_iter()
+    .filter_map(|(set, name)| set.then_some(name))
+    .collect::<Vec<_>>();
 
-        (false, true, false, false, false, false, false) => Ok(".rtc_fast.data"),
-        (false, true, false, false, false, true, false) => Ok(".rtc_fast.persistent"),
-        (false, true, false, false, false, false, true) => Ok(".rtc_fast.bss"),
+    let section_name = match (is_fn, options.as_slice()) {
+        (true, []) => Ok(".rwtext"),
+        (true, ["rtc_fast"]) => Ok(".rtc_fast.text"),
+        (true, ["rtc_slow"]) => Ok(".rtc_slow.text"),
 
-        (false, false, true, false, false, false, false) => Ok(".rtc_slow.data"),
-        (false, false, true, false, false, true, false) => Ok(".rtc_slow.persistent"),
-        (false, false, true, false, false, false, true) => Ok(".rtc_slow.bss"),
+        (false, []) => Ok(".data"),
+        (false, ["reclaimed"]) => Ok(".dram2_uninit"),
+        (false, ["reclaimed", "zeroed"]) => Ok(".dram2_uninit.bss"),
+        (false, ["dcache_reclaimed"]) => Ok(".dcache_reclaimed_uninit"),
+
+        (false, ["rtc_fast"]) => Ok(".rtc_fast.data"),
+        (false, ["rtc_fast", "persistent"]) => Ok(".rtc_fast.persistent"),
+        (false, ["rtc_fast", "zeroed"]) => Ok(".rtc_fast.bss"),
+
+        (false, ["rtc_slow"]) => Ok(".rtc_slow.data"),
+        (false, ["rtc_slow", "persistent"]) => Ok(".rtc_slow.persistent"),
+        (false, ["rtc_slow", "zeroed"]) => Ok(".rtc_slow.bss"),
 
         _ => Err(()),
     };
