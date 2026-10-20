@@ -158,6 +158,10 @@ pub(crate) fn setup_multitasking() {
 ///
 /// The scheduler itself only changes the thread pointer. The new thread pointer is guaranteed to be non-zero.
 ///
+/// If the scheduler selects a new context, it keeps the scheduler lock. The other CPU can take the
+/// old task when the lock is released. Thus, the lock is released after the old context is saved
+/// and the CPU runs on the stack of the new context.
+///
 /// The current task's thread pointer can be zero, if and only if the current task is the
 /// idle "task", or the current task is being deleted. The assembly contains jumps to avoid
 /// storing these contexts.
@@ -263,6 +267,9 @@ unsafe extern "C" fn swint_handler_trampoline() {
         # If the thread pointer has not changed, just restore caller-saved registers
         beq t0, tp, 5f # Skip to restoring caller-saved registers in the new context
 
+        # Keep the lock token.
+        csrw mscratch, a0
+
         # Skip storing context for the idle context or deleted tasks (no thread pointer)
         beqz t0, 4f # Skip to loading registers for the new context
 
@@ -308,6 +315,12 @@ unsafe extern "C" fn swint_handler_trampoline() {
         lw t1, 31*4(tp)
         csrw mepc, t1
 
+        # Release the scheduler lock on the stack of the new context. The call clobbers only
+        # caller-saved registers, which are loaded below.
+        csrr a0, mscratch
+        la t0, {release_scheduler_lock}
+        jalr ra, t0, 0
+
 5:
         # When tp==0 the idle task is (re-)entering: its caller-saved registers were never
         # written to a CpuContext, so there is nothing to reload.
@@ -338,10 +351,17 @@ unsafe extern "C" fn swint_handler_trampoline() {
         .cfi_endproc
         ",
         scheduler_interrupt_handler = sym swint_handler,
+        release_scheduler_lock = sym release_scheduler_lock,
     }
 }
 
+/// Returns the token of the scheduler lock if the scheduler selected a new context.
 #[esp_hal::ram]
-extern "C" fn swint_handler() {
-    SCHEDULER.with(|scheduler| scheduler.switch_task());
+extern "C" fn swint_handler() -> u32 {
+    unsafe { SCHEDULER.switch_task_keep_lock() }
+}
+
+#[esp_hal::ram]
+extern "C" fn release_scheduler_lock(token: u32) {
+    unsafe { SCHEDULER.release_after_switch(token) };
 }

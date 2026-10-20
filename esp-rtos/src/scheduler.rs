@@ -1,13 +1,14 @@
 #[cfg(feature = "esp-radio")]
 use core::ffi::c_void;
 use core::{
-    cell::{RefCell, RefMut},
+    cell::{RefCell, RefMut, UnsafeCell},
     ptr::NonNull,
 };
 
-use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::RawMutex;
+#[cfg(riscv)]
+use esp_sync::RestoreState;
 use macros::ram;
 
 #[cfg(feature = "rtos-trace")]
@@ -262,7 +263,11 @@ impl SchedulerState {
         }
     }
 
-    fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
+    /// Selects the next task, and returns whether `task_switch` was called.
+    fn run_scheduler(
+        &mut self,
+        task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext),
+    ) -> bool {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_begin(TraceEvents::RunSchedule as u32);
 
@@ -320,8 +325,12 @@ impl SchedulerState {
         }
 
         let mut arm_next_timeslice_tick = false;
-        let next_task = self.run_queue.pop();
-        if next_task != current_task || deleted_self {
+        let next_task = self.run_queue.pop(
+            #[cfg(multi_core)]
+            self.per_cpu[1 - current_cpu].current_task,
+        );
+        let switched = next_task != current_task || deleted_self;
+        if switched {
             debug!("Switching task {:?} -> {:?}", current_task, next_task);
 
             // If the current task is deleted, we can skip saving its context. We signal this by
@@ -408,9 +417,12 @@ impl SchedulerState {
 
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_end(TraceEvents::RunSchedule as u32);
+
+        switched
     }
 
-    pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
+    /// Runs the scheduler, and returns whether it selected a different context.
+    pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) -> bool {
         self.run_scheduler(|current_context, next_context| {
             trace!(
                 "Task switch: {:x} -> {:x}",
@@ -422,7 +434,7 @@ impl SchedulerState {
                 #[cfg(xtensa)]
                 trap_frame,
             )
-        });
+        })
     }
 
     /// Returns whether `task` is the main task of any CPU.
@@ -606,13 +618,18 @@ impl GlobalState {
 }
 
 pub(crate) struct Scheduler {
-    inner: Mutex<RawMutex, GlobalState>,
+    lock: RawMutex,
+    inner: UnsafeCell<GlobalState>,
 }
+
+// `inner` is only accessed while `lock` is held.
+unsafe impl Sync for Scheduler {}
 
 impl Scheduler {
     const fn new() -> Self {
         Self {
-            inner: Mutex::new(GlobalState::new()),
+            lock: RawMutex::new(),
+            inner: UnsafeCell::new(GlobalState::new()),
         }
     }
 
@@ -621,7 +638,39 @@ impl Scheduler {
     }
 
     pub(crate) fn with_shared<R>(&self, cb: impl FnOnce(&GlobalState) -> R) -> R {
-        self.inner.lock(cb)
+        self.lock.lock(|| cb(unsafe { &*self.inner.get() }))
+    }
+
+    /// Runs the scheduler. If the scheduler selects a different context, the lock stays held and
+    /// the function returns the lock token. Otherwise, the function releases the lock. The return
+    /// value does not tell the two cases apart, because a token can be 0.
+    ///
+    /// # Safety
+    ///
+    /// If the lock stays held, the caller must save the old context, leave the old stack, and then
+    /// give the token to [`Self::release_after_switch`].
+    #[cfg(riscv)]
+    #[ram]
+    pub(crate) unsafe fn switch_task_keep_lock(&self) -> u32 {
+        let token = unsafe { self.lock.acquire() };
+        let switched = unsafe { &*self.inner.get() }.scheduler().switch_task();
+        if switched {
+            token.inner()
+        } else {
+            unsafe { self.lock.release(token) };
+            0
+        }
+    }
+
+    /// Releases the lock that [`Self::switch_task_keep_lock`] kept.
+    ///
+    /// # Safety
+    ///
+    /// `token` must be the value that [`Self::switch_task_keep_lock`] returned on this CPU.
+    #[cfg(riscv)]
+    #[ram]
+    pub(crate) unsafe fn release_after_switch(&self, token: u32) {
+        unsafe { self.lock.release(RestoreState::new(token)) };
     }
 
     pub(crate) fn current_task(&self) -> TaskPtr {
