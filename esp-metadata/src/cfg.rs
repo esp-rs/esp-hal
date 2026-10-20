@@ -41,7 +41,7 @@ pub(crate) use spi_slave::*;
 pub(crate) use timergroup::*;
 pub(crate) use uart::*;
 
-use crate::support_status::{SupportStatus, SupportStatusLevel};
+use crate::support_status::{DriverStability, SupportStatus, SupportStatusLevel};
 
 pub(crate) trait GenericProperty {
     fn cfgs(&self) -> Option<Vec<String>> {
@@ -170,6 +170,8 @@ pub(crate) struct SupportItem {
     /// The heading of the table the driver is listed in. Groups are written in
     /// the order they first appear in.
     pub group: &'static str,
+    /// Driver-wide API stability status.
+    pub stability: DriverStability,
     /// If true, this driver is not shown in the peripheral support table.
     pub hide_from_peri_table: bool,
 }
@@ -195,6 +197,8 @@ macro_rules! driver_configs {
 
     (@default $default:literal) => { $default };
     (@default $default:literal $opt:literal) => { $opt };
+    (@stability) => { DriverStability::Unstable };
+    (@stability $stability:expr) => { $stability };
 
     // Creates a single struct
     (@one
@@ -249,6 +253,8 @@ macro_rules! driver_configs {
                     // Driver name, used in the generated documentation.
                     name: $name:literal,
 
+                    $(stability: $stability:expr,)?
+
                     $(hide_from_peri_table: $hide:literal,)?
 
                     // When set, the type must provide `fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)>`.
@@ -284,6 +290,7 @@ macro_rules! driver_configs {
                             name: $name,
                             config_group: stringify!($driver),
                             group: $table_group,
+                            stability: driver_configs!(@stability $($stability)?),
                             hide_from_peri_table: driver_configs!(@default false $($hide)?),
                         },
                     )+)+
@@ -355,6 +362,7 @@ driver_configs![
         GpioProperties {
             driver: gpio,
             name: "GPIO",
+            stability: DriverStability::Stable,
             has_computed_properties: true,
             properties: {
                 /// Digital GPIO register-layout generation derived from the chip SVD.
@@ -416,6 +424,7 @@ driver_configs![
         UartProperties<UartInstanceConfig> {
             driver: uart,
             name: "UART",
+            stability: DriverStability::Stable,
             properties: {
                 ram_size: u32,
                 version: u32,
@@ -447,6 +456,7 @@ driver_configs![
         I2cMasterProperties<I2cMasterInstanceConfig> {
             driver: i2c_master,
             name: "I2C master",
+            stability: DriverStability::Stable,
             properties: {
                 /// Register-layout generation derived from the chip SVD. Also bumped when only the
                 /// function clock configuration differs.
@@ -514,6 +524,7 @@ driver_configs![
         SpiMasterProperties<SpiMasterInstanceConfig> {
             driver: spi_master,
             name: "SPI master",
+            stability: DriverStability::Stable,
             properties: {
                 /// Register-layout generation derived from the chip SVD.
                 version: u32,
@@ -866,6 +877,7 @@ driver_configs![
         LedcProperties {
             driver: ledc,
             name: "LEDC",
+            stability: DriverStability::Overhaul { issue: Some(2286) },
             properties: {
                 /// Register-layout generation derived from the chip SVD.
                 version: u32,
@@ -970,6 +982,7 @@ driver_configs![
         RngProperties {
             driver: rng,
             name: "RNG",
+            stability: DriverStability::Stable,
             properties: {
                 apb_cycle_wait_num: u32,
                 #[serde(default)]
