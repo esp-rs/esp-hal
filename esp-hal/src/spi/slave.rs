@@ -167,16 +167,7 @@ pub mod dma {
     use super::*;
     use crate::{
         DriverMode,
-        dma::{
-            Channel,
-            DmaChannelFor,
-            DmaEligible,
-            DmaRxBuffer,
-            DmaRxInterrupt,
-            DmaTxBuffer,
-            EmptyBuf,
-            PeripheralDmaChannel,
-        },
+        dma::{Channel, DmaRxBuffer, DmaRxInterrupt, DmaTxBuffer, EmptyBuf},
         spi::Error,
     };
 
@@ -187,9 +178,12 @@ pub mod dma {
         /// descriptors.
         #[cfg_attr(esp32, doc = "\n\n**Note**: ESP32 only supports Mode 1 and 3.")]
         #[instability::unstable]
-        pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
+        pub fn with_dma(
+            self,
+            channel: impl SpiSlaveDmaChannel<'d, AnySpi<'d>>,
+        ) -> dma::SpiDma<'d, Blocking> {
             self.spi.info().set_data_mode(self.data_mode, true);
-            SpiDma::new(self.spi, channel.degrade())
+            dma::SpiDma::new(self.spi, channel.into())
         }
     }
 
@@ -200,7 +194,7 @@ pub mod dma {
         Dm: DriverMode,
     {
         pub(crate) spi: AnySpi<'d>,
-        pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
+        pub(crate) channel: Channel<Dm, SpiSlaveErased<'d>>,
         _guard: PeripheralGuard,
     }
 
@@ -214,9 +208,9 @@ pub mod dma {
     }
 
     impl<'d> SpiDma<'d, Blocking> {
-        fn new(spi: AnySpi<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
+        pub(super) fn new(spi: AnySpi<'d>, channel: SpiSlaveErased<'d>) -> Self {
             let channel = Channel::new(channel);
-            channel.runtime_ensure_compatible(&spi);
+            channel.runtime_ensure_compatible(spi.dma_peripheral());
             let guard = PeripheralGuard::new(spi.info().peripheral);
 
             Self {
@@ -468,7 +462,7 @@ pub mod dma {
             write_buffer_len: usize,
             rx_buffer: &mut impl DmaRxBuffer,
             tx_buffer: &mut impl DmaTxBuffer,
-            channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
+            channel: &mut Channel<Dm, SpiSlaveErased<'_>>,
         ) -> Result<(), Error> {
             self.enable_dma();
 
@@ -517,7 +511,7 @@ pub mod dma {
         }
 
         fn reset_dma_before_usr_cmd(&self) {
-            #[cfg(dma_kind = "gdma")]
+            #[cfg(not(any(esp32, esp32s2)))]
             self.regs().dma_conf().modify(|_, w| {
                 w.rx_afifo_rst().set_bit();
                 w.buf_afifo_rst().set_bit();
@@ -526,54 +520,50 @@ pub mod dma {
         }
 
         fn enable_dma(&self) {
-            #[cfg(dma_kind = "gdma")]
-            self.regs().dma_conf().modify(|_, w| {
-                w.dma_tx_ena().set_bit();
-                w.dma_rx_ena().set_bit();
-                w.rx_eof_en().clear_bit()
-            });
-
-            #[cfg(dma_kind = "pdma")]
-            {
-                fn set_rst_bit(reg_block: &RegisterBlock, bit: bool) {
-                    reg_block.dma_conf().modify(|_, w| {
+            cfg_select! {
+                any(esp32, esp32s2) => {
+                    use crate::RegisterToggle;
+                    self.regs().dma_conf().toggle(|w, bit| {
                         w.in_rst().bit(bit);
                         w.out_rst().bit(bit);
                         w.ahbm_fifo_rst().bit(bit);
+                        #[cfg(esp32s2)]
+                        w.dma_infifo_full_clr().bit(bit);
                         w.ahbm_rst().bit(bit)
                     });
-
-                    #[cfg(esp32s2)]
-                    reg_block
-                        .dma_conf()
-                        .modify(|_, w| w.dma_infifo_full_clr().bit(bit));
+                },
+                _ => {
+                    self.regs().dma_conf().modify(|_, w| {
+                        w.dma_tx_ena().set_bit();
+                        w.dma_rx_ena().set_bit();
+                        w.rx_eof_en().clear_bit()
+                    });
                 }
-                set_rst_bit(self.regs(), true);
-                set_rst_bit(self.regs(), false);
             }
         }
 
         fn clear_dma_interrupts(&self) {
-            #[cfg(dma_kind = "gdma")]
             self.regs().dma_int_clr().write(|w| {
-                w.dma_infifo_full_err().clear_bit_by_one();
-                w.dma_outfifo_empty_err().clear_bit_by_one();
-                w.trans_done().clear_bit_by_one();
-                w.mst_rx_afifo_wfull_err().clear_bit_by_one();
-                w.mst_tx_afifo_rempty_err().clear_bit_by_one()
-            });
-
-            #[cfg(dma_kind = "pdma")]
-            self.regs().dma_int_clr().write(|w| {
-                w.inlink_dscr_empty().clear_bit_by_one();
-                w.outlink_dscr_error().clear_bit_by_one();
-                w.inlink_dscr_error().clear_bit_by_one();
-                w.in_done().clear_bit_by_one();
-                w.in_err_eof().clear_bit_by_one();
-                w.in_suc_eof().clear_bit_by_one();
-                w.out_done().clear_bit_by_one();
-                w.out_eof().clear_bit_by_one();
-                w.out_total_eof().clear_bit_by_one()
+                cfg_select! {
+                    any(esp32, esp32s2) => {
+                        w.inlink_dscr_empty().clear_bit_by_one();
+                        w.outlink_dscr_error().clear_bit_by_one();
+                        w.inlink_dscr_error().clear_bit_by_one();
+                        w.in_done().clear_bit_by_one();
+                        w.in_err_eof().clear_bit_by_one();
+                        w.in_suc_eof().clear_bit_by_one();
+                        w.out_done().clear_bit_by_one();
+                        w.out_eof().clear_bit_by_one();
+                        w.out_total_eof().clear_bit_by_one()
+                    },
+                    _ => {
+                        w.dma_infifo_full_err().clear_bit_by_one();
+                        w.dma_outfifo_empty_err().clear_bit_by_one();
+                        w.trans_done().clear_bit_by_one();
+                        w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                        w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+                    }
+                }
             });
         }
     }
@@ -581,23 +571,7 @@ pub mod dma {
     /// A marker for DMA-capable SPI peripheral instances.
     #[doc(hidden)]
     #[allow(private_bounds)]
-    pub trait InstanceDma: Instance + DmaEligible {}
-
-    impl<'d> DmaEligible for AnySpi<'d> {
-        #[cfg(dma_kind = "gdma")]
-        type Dma = crate::dma::AnyGdmaChannel<'d>;
-        #[cfg(dma_kind = "pdma")]
-        type Dma = crate::dma::AnySpiDmaChannel<'d>;
-
-        fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-            match &self.0 {
-                #[cfg(spi_master_spi2)]
-                any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
-                #[cfg(spi_master_spi3)]
-                any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
-            }
-        }
-    }
+    pub trait InstanceDma: Instance {}
 
     #[cfg(soc_has_spi2)]
     impl InstanceDma for crate::peripherals::SPI2<'_> {}
@@ -605,6 +579,29 @@ pub mod dma {
     impl InstanceDma for crate::peripherals::SPI3<'_> {}
 
     impl InstanceDma for AnySpi<'_> {}
+
+    with_spi_slave_dma_engine! {
+        ($engine:tt, $any_channel:ident) => {
+            /// DMA channel trait for SPI slave peripherals.
+            #[diagnostic::on_unimplemented(
+                message = "The DMA channel cannot be used with this SPI peripheral",
+                label = "This DMA channel",
+                note = "Use a channel that matches the SPI instance."
+            )]
+            pub trait SpiSlaveDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
+
+            crate::macros::impl_dma_channel_trait! {
+                $engine,
+                any_peri = AnySpi<'d>,
+                peris = for_each_spi_slave,
+                ($peri:path, $ch:path) => {
+                    impl<'d> SpiSlaveDmaChannel<'d, $peri> for $ch {}
+                }
+            }
+
+            type SpiSlaveErased<'d> = crate::dma::$any_channel<'d>;
+        };
+    }
 }
 
 /// A peripheral singleton compatible with the SPI slave driver.
@@ -776,27 +773,32 @@ impl Info {
 
     #[cfg(spi_slave_supports_dma)]
     fn is_bus_busy(&self) -> bool {
-        #[cfg(dma_kind = "pdma")]
-        {
-            self.regs().slave().read().trans_done().bit_is_clear()
-        }
-        #[cfg(dma_kind = "gdma")]
-        {
-            self.regs().dma_int_raw().read().trans_done().bit_is_clear()
-        }
+        let reg = cfg_select! {
+            any(esp32, esp32s2) => {
+                self.regs().slave()
+            },
+            _ => {
+                self.regs().dma_int_raw()
+            }
+        };
+        reg.read().trans_done().bit_is_clear()
     }
 
     // Clear the transaction-done interrupt flag so flush() can work properly.
     #[cfg(spi_slave_supports_dma)]
     fn setup_for_flush(&self) {
-        #[cfg(dma_kind = "pdma")]
-        self.regs()
-            .slave()
-            .modify(|_, w| w.trans_done().clear_bit());
-        #[cfg(dma_kind = "gdma")]
-        self.regs()
-            .dma_int_clr()
-            .write(|w| w.trans_done().clear_bit_by_one());
+        cfg_select! {
+            any(esp32, esp32s2) => {
+                self.regs()
+                    .slave()
+                    .modify(|_, w| w.trans_done().clear_bit());
+            },
+            _ => {
+                self.regs()
+                    .dma_int_clr()
+                    .write(|w| w.trans_done().clear_bit_by_one());
+            }
+        }
     }
 }
 
@@ -836,6 +838,21 @@ crate::any_peripheral! {
         #[cfg(spi_master_spi3)]
         Spi3(crate::peripherals::SPI3<'d>),
     }
+}
+
+#[cfg(spi_slave_supports_dma)]
+with_spi_slave_dma_engine! {
+    ($engine:tt, $any_ch:ident) => {
+        use crate::dma::DmaEligiblePeripheral;
+
+        impl DmaEligiblePeripheral for AnySpi<'_> {
+            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
+
+            fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+                any::delegate!(self, spi => { spi.dma_peripheral() })
+            }
+        }
+    };
 }
 
 impl Instance for AnySpi<'_> {

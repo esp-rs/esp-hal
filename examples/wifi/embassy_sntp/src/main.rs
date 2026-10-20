@@ -103,7 +103,7 @@ async fn main(spawner: Spawner) -> ! {
 
     println!("Starting wifi");
     let wifi_interface = esp_radio::wifi::Interface::station();
-    let mut controller = esp_radio::wifi::new(
+    let mut controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(station_config),
     )

@@ -478,15 +478,17 @@ mod interrupt_spi_dma {
     #[cfg(not(any(esp32, esp32s2, esp32s3)))]
     #[embassy_executor::task]
     async fn interrupt_driven_task(i2s_tx: esp_hal::i2s::master::I2s<'static, Blocking>) {
-        let (_, _, _, tx_descriptors) = dma_buffers!(128);
+        use esp_hal::dma_tx_stream_buffer;
 
-        let mut i2s_tx = i2s_tx.into_async().i2s_tx.build(tx_descriptors);
+        let mut buffer = dma_tx_stream_buffer!(1024, 256);
+
+        let mut i2s_tx = i2s_tx.into_async().i2s_tx.build();
 
         loop {
-            let mut buffer: [u8; 8] = [0; 8];
-
             INTERRUPT_TASK_WORKING.store(true, portable_atomic::Ordering::Relaxed);
-            i2s_tx.write_dma_async(&mut buffer).await.unwrap();
+            let res;
+            (res, i2s_tx, buffer) = i2s_tx.write(buffer).ok().unwrap().wait_async().await;
+            assert!(res.is_ok(), "I2S write transfer failed: {:?}", res.err());
             INTERRUPT_TASK_WORKING.store(false, portable_atomic::Ordering::Relaxed);
 
             if STOP_INTERRUPT_TASK.load(portable_atomic::Ordering::Relaxed) {
@@ -597,13 +599,17 @@ mod interrupt_spi_dma {
             system::{Cpu, CpuControl, Stack},
         };
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                type DmaChannel<'a> = esp_hal::peripherals::DMA_SPI2<'a>;
-            } else {
-                type DmaChannel<'a> = esp_hal::peripherals::DMA_CH0<'a>;
-            }
-        }
+        type DmaChannel<'a> = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => {
+                esp_hal::peripherals::DMA_SPI2<'a>
+            },
+            spi_master_dma_engine = "AHB_GDMA" => {
+                esp_hal::peripherals::DMA_CH0<'a>
+            },
+            spi_master_dma_engine = "AXI_GDMA" => {
+                esp_hal::peripherals::DMA_AXI_CH0<'a>
+            },
+        };
 
         const BUFFER_SIZE: usize = 256;
 
@@ -648,13 +654,17 @@ mod interrupt_spi_dma {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-        cfg_if::cfg_if! {
-            if #[cfg(dma_kind = "pdma")] {
-                let dma_channel = peripherals.DMA_SPI2;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            spi_master_dma_engine = "SPI_DMA" => {
+                peripherals.DMA_SPI2
+            },
+            spi_master_dma_engine = "AHB_GDMA" => {
+                peripherals.DMA_CH0
+            },
+            spi_master_dma_engine = "AXI_GDMA" => {
+                peripherals.DMA_AXI_CH0
+            },
+        };
 
         let transfer_finished = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 

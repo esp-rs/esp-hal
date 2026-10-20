@@ -97,7 +97,7 @@ async fn main(spawner: Spawner) -> ! {
     println!("Starting wifi");
     let wifi_ap_device = esp_radio::wifi::Interface::access_point();
     let wifi_sta_device = esp_radio::wifi::Interface::station();
-    let controller = esp_radio::wifi::new(
+    let controller = esp_radio::wifi::WifiController::new(
         peripherals.WIFI,
         ControllerConfig::default().with_initial_config(access_point_station_config),
     )
@@ -346,21 +346,11 @@ async fn connection(mut controller: WifiController<'static>) {
                         Either::Second(event) => {
                             if let Ok(event) = event {
                                 match event {
-                                    esp_radio::wifi::AccessPointStationEventInfo::Connected(
-                                        access_point_station_connected_info,
-                                    ) => {
-                                        println!(
-                                            "Station connected: {:?}",
-                                            access_point_station_connected_info
-                                        );
+                                    esp_radio::wifi::ap::EventInfo::Connected(info) => {
+                                        println!("Station connected: {:?}", info);
                                     }
-                                    esp_radio::wifi::AccessPointStationEventInfo::Disconnected(
-                                        access_point_station_disconnected_info,
-                                    ) => {
-                                        println!(
-                                            "Station disconnected: {:?}",
-                                            access_point_station_disconnected_info
-                                        );
+                                    esp_radio::wifi::ap::EventInfo::Disconnected(info) => {
+                                        println!("Station disconnected: {:?}", info);
                                     }
                                 }
                             }

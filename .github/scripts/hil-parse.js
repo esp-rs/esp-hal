@@ -11,6 +11,17 @@ const DEFAULT_ALLOWED = [
   "esp32s3",
 ];
 
+function parsePackage(body) {
+  const text = String(body || "").trim().toLowerCase();
+  if (text.includes("hil-test-radio")) {
+    return "hil-test-radio";
+  }
+  if (text.includes("hil-test")) {
+    return "hil-test";
+  }
+  return "all";
+}
+
 function parseTests(body) {
   const text = String(body || "").trim();
   const m = text.match(/--tests?\s+(.+)$/i);
@@ -53,4 +64,4 @@ function parseChips(body, allowed = DEFAULT_ALLOWED) {
   };
 }
 
-module.exports = { parseTests, parseChips };
+module.exports = { parseTests, parseChips, parsePackage };

@@ -833,3 +833,20 @@ impl UartInstance {
         });
     }
 }
+
+impl I2cInstance {
+    // I2C_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // Nothing to do.
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2cFunctionClockConfig>,
+        _new_config: I2cFunctionClockConfig,
+    ) {
+        // ESP32 I2C is hardwired to APB; no clock source selection register.
+    }
+}

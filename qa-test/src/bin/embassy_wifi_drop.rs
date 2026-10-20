@@ -46,7 +46,7 @@ async fn main(_spawner: Spawner) {
         );
 
         let mut wifi_interface = esp_radio::wifi::Interface::station();
-        let mut controller = esp_radio::wifi::new(
+        let mut controller = esp_radio::wifi::WifiController::new(
             wifi.reborrow(),
             ControllerConfig::default().with_initial_config(station_config),
         )
@@ -82,7 +82,7 @@ async fn main(_spawner: Spawner) {
         );
 
         let mut wifi_interface = esp_radio::wifi::Interface::station();
-        let mut controller = esp_radio::wifi::new(
+        let mut controller = esp_radio::wifi::WifiController::new(
             wifi.reborrow(),
             ControllerConfig::default().with_initial_config(station_config),
         )

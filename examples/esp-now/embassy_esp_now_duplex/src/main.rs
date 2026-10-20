@@ -52,7 +52,7 @@ async fn main(spawner: Spawner) -> ! {
     let wifi = peripherals.WIFI;
     let controller = mk_static!(
         esp_radio::wifi::WifiController<'static>,
-        esp_radio::wifi::new(wifi, Default::default()).unwrap()
+        esp_radio::wifi::WifiController::new(wifi, Default::default()).unwrap()
     );
 
     let esp_now = controller.esp_now();

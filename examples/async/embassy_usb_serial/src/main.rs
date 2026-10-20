@@ -23,11 +23,11 @@ use embassy_usb::{
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
-    otg_fs::{
+    timer::timg::TimerGroup,
+    usb::otg::{
         Usb,
         embassy_usb_device::{Config, Driver},
     },
-    timer::timg::TimerGroup,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -44,10 +44,10 @@ async fn main(_spawner: Spawner) {
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     #[cfg(not(feature = "esp32p4"))]
-    let usb = Usb::new(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
+    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
 
     #[cfg(feature = "esp32p4")]
-    let usb = Usb::new(peripherals.USB_FS, peripherals.GPIO27, peripherals.GPIO26);
+    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO27, peripherals.GPIO26);
 
     // Create the driver, from the HAL.
     let mut ep_out_buffer = [0u8; 1024];
@@ -60,13 +60,6 @@ async fn main(_spawner: Spawner) {
     config.manufacturer = Some("Espressif");
     config.product = Some("USB-serial example");
     config.serial_number = Some("12345678");
-
-    // Required for windows compatibility.
-    // https://developer.nordicsemi.com/nRF_Connect_SDK/doc/1.9.1/kconfig/CONFIG_CDC_ACM_IAD.html#help
-    config.device_class = 0xEF;
-    config.device_sub_class = 0x02;
-    config.device_protocol = 0x01;
-    config.composite_with_iads = true;
 
     // Create embassy-usb DeviceBuilder using the driver and config.
     // It needs some buffers for building the descriptors.

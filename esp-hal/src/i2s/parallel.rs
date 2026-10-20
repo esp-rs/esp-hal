@@ -100,16 +100,7 @@ use crate::{
     Blocking,
     DriverMode,
     RegisterToggle,
-    dma::{
-        Channel,
-        ChannelTx,
-        DmaChannelFor,
-        DmaEligible,
-        DmaError,
-        DmaTxBuffer,
-        PeripheralTxChannel,
-        asynch::DmaTxFuture,
-    },
+    dma::{ChannelTx, DmaEligiblePeripheral, DmaError, DmaTxBuffer, asynch::DmaTxFuture},
     gpio::{
         OutputConfig,
         OutputSignal,
@@ -248,23 +239,21 @@ where
     Dm: DriverMode,
 {
     instance: AnyI2s<'d>,
-    tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
+    tx_channel: ChannelTx<Dm, I2sParallelTxErased<'d>>,
     _guard: PeripheralGuard,
 }
 
 impl<'d> I2sParallel<'d, Blocking> {
-    /// Create a new I2S Parallel Interface
-    pub fn new(
+    fn new_internal(
         i2s: impl Instance + 'd,
-        channel: impl DmaChannelFor<AnyI2s<'d>>,
+        channel: I2sParallelTxErased<'d>,
         frequency: Rate,
         mut pins: impl TxPins<'d>,
         clock_pin: impl PeripheralOutput<'d>,
     ) -> Self {
-        let channel = Channel::new(channel.degrade());
-        channel.runtime_ensure_compatible(&i2s);
-
+        let channel = ChannelTx::new(channel);
         let i2s = i2s.degrade();
+        channel.runtime_ensure_compatible(i2s.dma_peripheral());
 
         let guard = PeripheralGuard::new(i2s.peripheral());
 
@@ -281,7 +270,7 @@ impl<'d> I2sParallel<'d, Blocking> {
         pins.configure(&i2s);
         Self {
             instance: i2s,
-            tx_channel: channel.tx,
+            tx_channel: channel,
             _guard: guard,
         }
     }
@@ -488,8 +477,7 @@ fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
     }
 }
 #[doc(hidden)]
-#[allow(private_bounds)]
-pub trait PrivateInstance: DmaEligible {
+pub trait PrivateInstance: crate::private::Sealed {
     fn regs(&self) -> &RegisterBlock;
     fn peripheral(&self) -> crate::system::Peripheral;
     fn ws_signal(&self) -> OutputSignal;
@@ -781,3 +769,67 @@ impl Instance for I2S0<'_> {}
 #[cfg(soc_has_i2s1)]
 impl Instance for I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}
+
+// Hacky implementation until we have per-instance metadata
+macro_rules! for_each_i2s {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_i2s {
+            $(($pattern) => $code;)*
+        }
+
+        #[cfg(soc_has_i2s0)]
+        _for_each_inner_i2s!((I2S0));
+
+        #[cfg(soc_has_i2s1)]
+        _for_each_inner_i2s!((I2S1));
+    };
+}
+
+/// DMA channel trait for I2S peripherals.
+#[diagnostic::on_unimplemented(
+    message = "The DMA channel cannot be used with this I2S peripheral",
+    label = "This DMA channel",
+    note = "Use a channel that matches the I2S instance."
+)]
+pub trait I2sParallelDmaChannel<'d, S>:
+    Into<I2sParallelTxErased<'d>> + crate::private::Sealed
+{
+}
+
+type I2sParallelTxErased<'d> = crate::dma::I2sDmaTxChannel<'d>;
+
+with_i2s_dma_engine! {
+    ($engine:tt, $any_channel:ident) => {
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            any_peri = AnyI2s<'d>,
+            peris = for_each_i2s,
+            ($peri:path, $ch:path) => {
+                impl<'d> I2sParallelDmaChannel<'d, $peri> for $ch {}
+            }
+        }
+    };
+}
+
+// `impl_dma_channel_trait!` only covers full channels; the TX half must be
+// listed explicitly because the trait erases to `I2sDmaTxChannel`.
+impl<'d> I2sParallelDmaChannel<'d, AnyI2s<'d>> for crate::dma::I2sDmaTxChannel<'d> {}
+
+for_each_i2s! {
+    ($i2s:ident) => {
+        impl<'d> I2sParallelDmaChannel<'d, crate::peripherals::$i2s<'d>> for crate::dma::I2sDmaTxChannel<'d> {}
+    };
+}
+
+impl<'d> I2sParallel<'d, crate::Blocking> {
+    /// Create a new I2S Parallel Interface
+    pub fn new<I: Instance + 'd>(
+        i2s: I,
+        channel: impl I2sParallelDmaChannel<'d, I>,
+        frequency: Rate,
+        pins: impl TxPins<'d>,
+        clock_pin: impl PeripheralOutput<'d>,
+    ) -> Self {
+        Self::new_internal(i2s, channel.into(), frequency, pins, clock_pin)
+    }
+}

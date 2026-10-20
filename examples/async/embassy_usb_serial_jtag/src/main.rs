@@ -12,7 +12,7 @@ use esp_hal::{
     Async,
     interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
-    usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
+    usb::usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
 };
 use static_cell::StaticCell;
 

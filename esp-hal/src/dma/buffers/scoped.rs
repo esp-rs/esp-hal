@@ -138,10 +138,18 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
     type Final = ScopedDmaTxBuf<'a>;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(soc_internal_memory_cached)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                self.descriptors.head() as u32,
+                core::mem::size_of_val(self.descriptors.descriptors) as u32,
+            );
+        }
+
         cfg_if::cfg_if! {
             if #[cfg(dma_can_access_psram)] {
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram {
+                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
                     unsafe {
                         crate::soc::cache_writeback_addr(
                             self.buffer.as_ptr() as u32,
@@ -149,6 +157,13 @@ unsafe impl<'a> DmaTxBuffer for ScopedDmaTxBuf<'a> {
                         )
                     };
                 }
+            } else if #[cfg(soc_internal_memory_cached)] {
+                unsafe {
+                    crate::soc::cache_writeback_addr(
+                        self.buffer.as_ptr() as u32,
+                        self.buffer.len() as u32,
+                    )
+                };
             }
         }
 
@@ -335,11 +350,19 @@ unsafe impl<'a> DmaRxBuffer for ScopedDmaRxBuf<'a> {
             desc.reset_for_rx();
         }
 
+        #[cfg(soc_internal_memory_cached)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                self.descriptors.head() as u32,
+                core::mem::size_of_val(self.descriptors.descriptors) as u32,
+            );
+        }
+
         cfg_if::cfg_if! {
             if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram {
+                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
                     unsafe {
                         crate::soc::cache_invalidate_addr(
                             self.buffer.as_ptr() as u32,
@@ -347,6 +370,13 @@ unsafe impl<'a> DmaRxBuffer for ScopedDmaRxBuf<'a> {
                         )
                     };
                 }
+            } else if #[cfg(soc_internal_memory_cached)] {
+                unsafe {
+                    crate::soc::cache_invalidate_addr(
+                        self.buffer.as_ptr() as u32,
+                        self.buffer.len() as u32,
+                    )
+                };
             }
         }
 

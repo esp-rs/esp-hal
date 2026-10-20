@@ -5,7 +5,8 @@
 
 use super::{EXTMEM_ORIGIN, PsramSize};
 use crate::{
-    peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
+    efuse,
+    peripherals::{HP_SYS, HP_SYS_CLKRST, LP_AON_CLKRST, PMU},
     soc::regi2c,
 };
 
@@ -138,8 +139,7 @@ pub struct PsramConfig {
 
 /// Initialize PSRAM.
 pub(crate) fn init_psram(config: &mut PsramConfig) -> bool {
-    init_psram_inner(config);
-    true
+    init_psram_inner(config)
 }
 
 pub(crate) fn map_psram(config: PsramConfig) -> core::ops::Range<usize> {
@@ -216,7 +216,8 @@ const AP_HEX_CS_SETUP_TIME: u32 = 4;
 const AP_HEX_CS_HOLD_TIME: u32 = 4;
 const AP_HEX_CS_HOLD_DELAY: u32 = 3;
 
-fn init_psram_inner(config: &mut PsramConfig) {
+#[crate::ram]
+fn init_psram_inner(config: &mut PsramConfig) -> bool {
     // Resolve the speed parameter set from `ram_frequency`. The MPLL
     // override (`config.core_clock`) lets the caller bypass the default
     // pairing (e.g. force 400 MHz MPLL with `Mhz20` bus); `None`
@@ -226,13 +227,18 @@ fn init_psram_inner(config: &mut PsramConfig) {
         params.mpll_mhz = mpll as u32;
     }
 
-    psram_phy_ldo_init(); // PMU EXT_LDO regulator setup for the MSPI PHY analog block.
-    configure_mpll(params.mpll_mhz);
+    psram_phy_ldo_init();
+    if !configure_mpll(params.mpll_mhz) {
+        return false;
+    }
 
     // Module clock + clock source
     HP_SYS_CLKRST::regs()
         .soc_clk_ctrl0()
         .modify(|_, w| w.psram_sys_clk_en().set_bit());
+
+    reset_psram_mspi();
+
     HP_SYS_CLKRST::regs()
         .peri_clk_ctrl00()
         .modify(|_, w| unsafe {
@@ -255,7 +261,18 @@ fn init_psram_inner(config: &mut PsramConfig) {
     }
 
     configure_psram_mspi(params, MSPI0_BASE); // basic AXI configuration here
+
+    // Silicon revision 3.0 (ECO5) requires two dummy PSRAM reads + a controller
+    // reset before the real MMU mapping is committed.  Port of IDF's
+    // `esp_psram_p4_rev3_workaround` in `esp_psram.c`.
+    if efuse::chip_revision() == efuse::ChipRevision::from_combined(300) {
+        debug!("Applying P4 v3.0 PSRAM workaround");
+        p4_rev3_psram_workaround();
+    }
+
     mmu_map_psram(MSPI0_BASE, config); // MMU mapping here
+
+    true
 }
 
 /// Set bus-clock divider for both PSRAM_MSPI0 (SRAM_CLK at 0x50) and
@@ -772,7 +789,7 @@ fn psram_phy_ldo_init() {
 }
 
 /// Configure MPLL to target frequency for PSRAM clock.
-fn configure_mpll(freq_mhz: u32) {
+fn configure_mpll(freq_mhz: u32) -> bool {
     // Power up the MPLL analog block.
     PMU::regs()
         .rf_pwc()
@@ -781,41 +798,143 @@ fn configure_mpll(freq_mhz: u32) {
         .lp_aonclkrst_hp_clk_ctrl()
         .modify(|_, w| w.lp_aonclkrst_hp_mpll_500m_clk_en().set_bit());
 
-    // div = freq_mhz/20 - 1, ref_div = 1 -> MPLL = XTAL(40) * (div+1) / (ref_div+1)
-    let ref_div: u8 = 1;
-    let div: u8 = (freq_mhz / 20).saturating_sub(1) as u8;
-    let div_val: u8 = (div << 3) | ref_div;
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.mspi_cal_stop().clear_bit());
 
-    let dhref = regi2c::I2C_MPLL_DHREF.read();
-    regi2c::I2C_MPLL_DHREF.write_reg(dhref | (3 << 4));
+    regi2c::I2C_MPLL_DHREF_DHREF.write_field(3);
 
     let rstb = regi2c::I2C_MPLL_IR_CAL_RSTB.read();
     regi2c::I2C_MPLL_IR_CAL_RSTB.write_reg(rstb & 0xDF);
     regi2c::I2C_MPLL_IR_CAL_RSTB.write_reg(rstb | (1 << 5));
+
+    // div = freq_mhz/20 - 1, ref_div = 1 -> MPLL = XTAL(40) * (div+1) / (ref_div+1)
+    let ref_div: u8 = 1;
+    let div: u8 = (freq_mhz / 20).saturating_sub(1) as u8;
+    let div_val: u8 = (div << 3) | ref_div;
     regi2c::I2C_MPLL_DIV_REG_ADDR.write_reg(div_val);
 
-    HP_SYS_CLKRST::regs()
-        .ana_pll_ctrl0()
-        .modify(|_, w| w.mspi_cal_stop().clear_bit());
-    let mut t = 1_000_000_u32;
-    while !HP_SYS_CLKRST::regs()
+    let mut t = 1_000_u32;
+    let mut success = true;
+    while HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .read()
         .mspi_cal_end()
-        .bit_is_set()
+        .bit_is_clear()
     {
         t = t.saturating_sub(1);
         if t == 0 {
+            warn!("PSRAM MPLL calibration timeout");
+            success = false;
             break;
         }
-        core::hint::spin_loop();
+        crate::rom::ets_delay_us(1);
     }
     HP_SYS_CLKRST::regs()
         .ana_pll_ctrl0()
         .modify(|_, w| w.mspi_cal_stop().set_bit());
-    // cal_end timeout (t == 0): surfaces later via `psram_detect_size` fallback.
-    let _ = t; // if need print this for debug
-    crate::rom::ets_delay_us(10);
+
+    if success {
+        debug!("Calibration timeout left: {}us", t);
+        crate::rom::ets_delay_us(10);
+    }
+
+    success
+}
+
+fn reset_psram_mspi() {
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_axi().set_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_apb().set_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_apb().clear_bit());
+    HP_SYS_CLKRST::regs()
+        .hp_rst_en0()
+        .modify(|_, w| w.rst_en_dual_mspi_axi().clear_bit());
+}
+
+/// ESP32-P4 silicon revision 3.0 workaround.
+///
+/// Port of IDF `esp_psram_p4_rev3_workaround` (`esp_psram.c`). Must be called
+/// after `configure_psram_mspi` and before `mmu_map_psram`.
+///
+/// The silicon bug requires two dummy PSRAM reads followed by a controller
+/// reset before the real MMU mapping is committed.  The dummy reads must reach
+/// the PSRAM hardware (not just the L1 cache), so they are issued at
+/// `0x8800_0000` — an alias that shares the same MMU linear address
+/// (`addr & 0xFFF_FFFF`) as the cached PSRAM base `0x4800_0000` but bypasses
+/// the L1 cache.  Core error responses are suppressed for the duration because
+/// the address is outside the normally-mapped window; the reads are expected to
+/// produce garbage.  The controller reset clears all MSPI0 registers, so the
+/// registers configured by `configure_psram_mspi`, `set_bus_clock`,
+/// `enable_dll`, and `set_cs_timing` are backed up before the reset and
+/// restored afterwards.
+fn p4_rev3_psram_workaround() {
+    /// MSPI0 registers touched by `configure_psram_mspi`, `set_bus_clock`,
+    /// `enable_dll`, and `set_cs_timing` that must survive the controller reset.
+    const BACKUP_ADDRS: [u32; 11] = [
+        MSPI0_BASE + 0x3C,  // CACHE_FCTRL
+        MSPI0_BASE + 0x40,  // CACHE_SCTRL
+        MSPI0_BASE + 0x44,  // SRAM_CMD
+        MSPI0_BASE + 0x48,  // SRAM_DRD_CMD
+        MSPI0_BASE + 0x4C,  // SRAM_DWR_CMD
+        MSPI0_BASE + 0x50,  // SRAM_CLK  (set_bus_clock)
+        MSPI0_BASE + 0x70,  // MEM_CTRL1
+        MSPI0_BASE + 0xD8,  // SMEM_DDR
+        MSPI0_BASE + 0x180, // MEM_TIMING_CALI  (enable_dll)
+        MSPI0_BASE + 0x190, // SMEM_TIMING_CALI (enable_dll)
+        MSPI0_BASE + 0x1A0, // SMEM_AC  (set_cs_timing)
+    ];
+
+    // Snapshot the MSPI0 registers before the reset wipes them.
+    let mut backup = [0u32; 11];
+    for (i, &addr) in BACKUP_ADDRS.iter().enumerate() {
+        unsafe { backup[i] = mmio_read_32(addr) }
+    }
+
+    // Suppress CPU bus-error response so the dummy reads below don't trap.
+    HP_SYS::regs()
+        .core_err_resp_dis()
+        .write(|w| unsafe { w.bits(0x7) });
+
+    unsafe {
+        // Map physical PSRAM page 0 to MMU entry 0 so both 0x4800_0000 and
+        // its uncached alias 0x8800_0000 reach the PSRAM hardware.
+        const MMU_ITEM_INDEX: u32 = MSPI0_BASE + 0x380;
+        const MMU_ITEM_CONTENT: u32 = MSPI0_BASE + 0x37C;
+        const PSRAM_VALID: u32 = 1 << 11;
+        const ACCESS_PSRAM: u32 = 1 << 10;
+        mmio_write_32(MMU_ITEM_INDEX, 0);
+        mmio_write_32(
+            MMU_ITEM_CONTENT,
+            PSRAM_VALID | ACCESS_PSRAM, // phys page 0
+        );
+
+        // Two dummy reads at the uncached PSRAM alias; result is discarded.
+        // The reads are expected to fail (garbage data) but must hit the controller.
+        let _ = core::ptr::read_volatile(0x8800_0000u32 as *const u32);
+        let _ = core::ptr::read_volatile(0x8800_0080u32 as *const u32);
+
+        crate::rom::ets_delay_us(1);
+    }
+
+    // Pulse the PSRAM controller reset (AXI then APB), mirroring IDF's
+    // `_psram_ctrlr_ll_reset_module_clock`.
+    reset_psram_mspi();
+
+    // Re-enable bus-error responses.
+    HP_SYS::regs()
+        .core_err_resp_dis()
+        .write(|w| unsafe { w.bits(0) });
+
+    // Restore the MSPI0 registers cleared by the reset.
+    for (i, &addr) in BACKUP_ADDRS.iter().enumerate() {
+        unsafe { mmio_write_32(addr, backup[i]) }
+    }
 }
 
 /// Configure PSRAM_MSPI0 (AXI cache) for HEX/DDR access at 0x4800_0000.

@@ -130,6 +130,7 @@ use crate::{
     gpio::{
         DriveMode,
         InputSignal,
+        Level,
         OutputConfig,
         OutputSignal,
         PinGuard,
@@ -148,8 +149,8 @@ use crate::{
 mod eh;
 mod low_level;
 
-use low_level::Driver;
 pub use low_level::{AnyI2c, Instance};
+use low_level::{Driver, I2cClockGuard};
 
 const I2C_FIFO_SIZE: usize = property!("i2c_master.fifo_size");
 // Chunk writes/reads by this size
@@ -563,6 +564,10 @@ enum Ack {
     Nack = 1,
 }
 
+/// Clock source for the I2C peripheral.
+#[instability::unstable]
+pub use crate::soc::clocks::I2cFunctionClockSclk as ClockSource;
+
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -599,6 +604,28 @@ pub struct Config {
     #[cfg(i2c_master_has_fsm_timeouts)]
     #[builder_lite(unstable)]
     scl_main_st_timeout: FsmTimeout,
+
+    /// The clock source for the I2C peripheral.
+    ///
+    /// Default value: [`ClockSource::default()`].
+    #[builder_lite(unstable)]
+    clock_source: ClockSource,
+
+    /// Selects whether the controller samples the SDA line while SCL is high or
+    /// low.
+    ///
+    /// Standard I2C devices change SDA while SCL is low and hold it stable while
+    /// SCL is high, so the line is sampled while SCL is high by default
+    /// ([`Level::High`]).
+    #[builder_lite(unstable)]
+    scl_sample_level: Level,
+
+    /// Enables I2C bus arbitration detection.
+    ///
+    /// Default value: `false`.
+    #[cfg(i2c_master_has_arbitration_en)]
+    #[builder_lite(unstable)]
+    bus_arbitration: bool,
 }
 
 impl Default for Config {
@@ -617,6 +644,13 @@ impl Default for Config {
             scl_st_timeout: Default::default(),
             #[cfg(i2c_master_has_fsm_timeouts)]
             scl_main_st_timeout: Default::default(),
+
+            clock_source: Default::default(),
+
+            scl_sample_level: Level::High,
+
+            #[cfg(i2c_master_has_arbitration_en)]
+            bus_arbitration: false,
         }
     }
 }
@@ -644,6 +678,7 @@ pub struct I2c<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
     guard: PeripheralGuard,
+    clock_guard: I2cClockGuard<'d>,
     config: DriverConfig,
 }
 
@@ -680,10 +715,14 @@ impl<'d> I2c<'d, Blocking> {
         let sda_pin = PinGuard::new_unconnected();
         let scl_pin = PinGuard::new_unconnected();
 
+        let i2c_any = i2c.degrade();
+        let clock_guard = I2cClockGuard::new(unsafe { i2c_any.clone_unchecked() });
+
         let i2c = I2c {
-            i2c: i2c.degrade(),
+            i2c: i2c_any,
             phantom: PhantomData,
             guard,
+            clock_guard,
             config: DriverConfig {
                 config,
                 sda_pin,
@@ -711,6 +750,7 @@ impl<'d> I2c<'d, Blocking> {
             i2c: self.i2c,
             phantom: PhantomData,
             guard: self.guard,
+            clock_guard: self.clock_guard,
             config: self.config,
         }
     }
@@ -803,6 +843,7 @@ impl<'d> I2c<'d, Async> {
             i2c: self.i2c,
             phantom: PhantomData,
             guard: self.guard,
+            clock_guard: self.clock_guard,
             config: self.config,
         }
     }

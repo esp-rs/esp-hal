@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/esp-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-hal)
 [![docs.rs](https://img.shields.io/docsrs/esp-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-hal/latest/)
-![MSRV](https://img.shields.io/badge/MSRV-1.88.0-blue?labelColor=1C2C2E&style=flat-square)
+![MSRV](https://img.shields.io/badge/MSRV-1.95.0-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-hal?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
@@ -70,7 +70,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Camera interface          | ❌    |          |          |          |          |           |          | ❌       | ❌       | ⚒️      |
 | DAC                       | ⚒️   |          |          |          |          |           |          |          | ⚒️      |          |
 | Dedicated GPIO            |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      |          | ⚒️      | ⚒️      |
-| DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
+| DMA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | DS                        |       |          | [❌][884] [^1] | [❌][884] [^1] | [❌][884] [^1] |           | [❌][884] [^1] | ❌       | [❌][884] [^1] | [❌][884] [^1] |
 | ECDSA                     |       |          |          | [❌][5444] [^1] |          | [❌][5444] [^1] | [❌][5444] [^1] | ❌       |          |          |
 | ECC                       |       | ⚒️      |          | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          |          |
@@ -98,9 +98,10 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | RNG                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | RSA                       | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | RTC Timekeeping           | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
-| SDIO host                 | ⚒️   |          |          |          |          |           |          | ❌       |          | ⚒️      |
-| SDIO slave                | ⚒️   |          |          | [❌][5169] [^1] | ⚒️      | [❌][5417] [^1] |          | ❌       |          |          |
+| SDIO host                 | ❌    |          |          |          |          |           |          | ❌       |          | ❌       |
+| SDIO slave                | ❌    |          |          | [❌][5169] [^1] | ❌       | [❌][5417] [^1] |          | ❌       |          |          |
 | SHA                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
+| SDM                       | [❌][2370] [^1] |          | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |           | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] | [❌][2370] [^1] |
 | Light/deep sleep          | ⚒️   | ⚒️      | ⚒️      | [❌][5165] [^1] | ⚒️      | [❌][5424] [^1] | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | SPI master                | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
 | SPI slave                 | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      |
@@ -111,9 +112,10 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | TWAI / CAN / CANFD        | ⚒️   |          | ⚒️      | [❌][5163] [^1] | ⚒️      |           | ⚒️      | ❌       | ⚒️      | ⚒️      |
 | UART                      | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️       | ✔️      | ⚒️      | ✔️      | ✔️      |
 | UHCI                      | ❌    |          | ⚒️      | ⚒️      | ⚒️      |           | ⚒️      | ❌       | ❌       | ⚒️      |
-| ULP (FSM)                 | ⚒️   |          |          |          |          |           |          |          | ⚒️      | ⚒️      |
+| ULP (FSM)                 | ❌    |          |          |          |          |           |          |          | ❌       | ❌       |
 | ULP (RISC-V)              |       |          |          | [❌][5160] [^1] | ⚒️      |           |          | ❌       | ⚒️      | ⚒️      |
 | USB OTG FS                |       |          |          |          |          |           |          | ⚒️      | ⚒️      | ⚒️      |
+| USB OTG HS                |       |          |          |          |          |           |          | ⚒️      |          |          |
 | USB Serial/JTAG           |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ⚒️      |          | ⚒️      |
 | WIFI                      | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       |          |          | ⚒️      | ⚒️      |
 
@@ -127,6 +129,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [884]: https://github.com/esp-rs/esp-hal/issues/884
 [1905]: https://github.com/esp-rs/esp-hal/issues/1905
 [1909]: https://github.com/esp-rs/esp-hal/issues/1909
+[2370]: https://github.com/esp-rs/esp-hal/issues/2370
 [5153]: https://github.com/esp-rs/esp-hal/issues/5153
 [5154]: https://github.com/esp-rs/esp-hal/issues/5154
 [5155]: https://github.com/esp-rs/esp-hal/issues/5155

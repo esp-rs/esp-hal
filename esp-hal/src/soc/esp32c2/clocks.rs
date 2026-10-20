@@ -19,7 +19,7 @@ use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
     clock::RtcClock,
-    peripherals::{I2C_ANA_MST, LPWR, SYSTEM, TIMG0, UART0, UART1},
+    peripherals::{I2C_ANA_MST, I2C0, LPWR, SYSTEM, TIMG0, UART0, UART1},
     rtc_cntl::Rtc,
     soc::regi2c,
     time::Rate,
@@ -735,6 +735,32 @@ impl UartInstance {
         regs.clkdiv().write(|w| unsafe {
             w.clkdiv().bits(new_config.integral as _);
             w.frag().bits(new_config.fractional as _)
+        });
+    }
+}
+
+impl I2cInstance {
+    // I2C_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        let _ = self;
+        I2C0::regs()
+            .clk_conf()
+            .modify(|_, w| w.sclk_active().bit(en));
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2cFunctionClockConfig>,
+        new_config: I2cFunctionClockConfig,
+    ) {
+        let _ = self;
+        // sclk_sel: 0 = XTAL, 1 = RC_FAST
+        I2C0::regs().clk_conf().modify(|_, w| unsafe {
+            w.sclk_sel()
+                .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
+            w.sclk_div_num().bits(new_config.div_num as _)
         });
     }
 }

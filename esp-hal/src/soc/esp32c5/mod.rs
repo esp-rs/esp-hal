@@ -72,13 +72,3 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
         Cache_Invalidate_Addr(addr, size);
     }
 }
-
-/// Get the size of a cache line in the DCache.
-#[doc(hidden)]
-#[unsafe(link_section = ".rwtext")]
-pub unsafe fn cache_get_dcache_line_size() -> u32 {
-    unsafe extern "C" {
-        fn Cache_Get_Line_Size() -> u32;
-    }
-    unsafe { Cache_Get_Line_Size() }
-}

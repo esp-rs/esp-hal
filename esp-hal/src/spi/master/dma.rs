@@ -20,15 +20,13 @@ use crate::{
     dma::{
         CHUNK_SIZE,
         Channel,
-        DmaChannelFor,
         DmaDescriptor,
-        DmaEligible,
+        DmaEligiblePeripheral,
         DmaRxBuf,
         DmaRxBuffer,
         DmaTxBuf,
         DmaTxBuffer,
         NoBuffer,
-        PeripheralDmaChannel,
         ScopedDmaRxBuf,
         ScopedDmaTxBuf,
         TransferDirection,
@@ -49,8 +47,9 @@ const MAX_DMA_SIZE: usize = 32736;
 impl<'d> Spi<'d, Blocking> {
     #[doc_replace(
         "dma_channel" => {
-            cfg(dma_kind = "pdma") => "DMA_SPI2",
-            cfg(dma_kind = "gdma") => "DMA_CH0",
+            cfg(spi_master_dma_engine = "SPI_DMA") => "DMA_SPI2",
+            cfg(spi_master_dma_engine = "AHB_GDMA") => "DMA_CH0",
+            cfg(spi_master_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
         }
     )]
     /// Converts the driver into an [`SpiDma`] driver that uses the specified DMA channel.
@@ -72,15 +71,19 @@ impl<'d> Spi<'d, Blocking> {
     /// # {after_snippet}
     /// ```
     #[instability::unstable]
-    pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
-        SpiDma::new_from_spi(self, channel.degrade())
+    pub fn with_dma(
+        self,
+        channel: impl SpiMasterDmaChannel<'d, AnySpi<'d>>,
+    ) -> SpiDma<'d, crate::Blocking> {
+        SpiDma::new_from_spi(self, channel.into())
     }
 }
 
 #[doc_replace(
     "dma_channel" => {
-        cfg(dma_kind = "pdma") => "DMA_SPI2",
-        cfg(dma_kind = "gdma") => "DMA_CH0",
+        cfg(spi_master_dma_engine = "SPI_DMA") => "DMA_SPI2",
+        cfg(spi_master_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(spi_master_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
     }
 )]
 /// DMA-controlled SPI driver.
@@ -140,7 +143,7 @@ where
     Dm: DriverMode,
 {
     spi: SpiWrapper<'d>,
-    pub(crate) channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
+    pub(crate) channel: Channel<Dm, SpiMasterErased<'d>>,
 }
 
 impl<Dm> crate::private::Sealed for SpiDma<'_, Dm> where Dm: DriverMode {}
@@ -249,9 +252,9 @@ impl<'d> SpiDma<'d, Blocking> {
         }
     }
 
-    fn new_inner(spi: SpiWrapper<'d>, channel: PeripheralDmaChannel<AnySpi<'d>>) -> Self {
+    fn new_inner(spi: SpiWrapper<'d>, channel: SpiMasterErased<'d>) -> Self {
         let channel = Channel::new(channel);
-        channel.runtime_ensure_compatible(&spi.spi);
+        channel.runtime_ensure_compatible(spi.spi.dma_peripheral());
 
         for_each_spi_master!((all $($inst:tt),*) => {
             const SPI_NUM: usize = 0 $(+ { stringify!($inst); 1 })*;
@@ -293,7 +296,7 @@ impl<'d> SpiDma<'d, Blocking> {
 
     pub(super) fn new_from_spi(
         spi_driver: Spi<'d, Blocking>,
-        channel: PeripheralDmaChannel<AnySpi<'d>>,
+        channel: SpiMasterErased<'d>,
     ) -> Self {
         let spi = spi_driver.spi;
 
@@ -519,8 +522,13 @@ impl<'d> SpiDma<'d, Async> {
             }
         }
 
+        let common_length = min(read.len(), write.len());
+        let (read_common, read_remainder) = read.split_at_mut(common_length);
+        let (write_common, write_remainder) = write.split_at(common_length);
+
+        // DmaOperationKind must be determined on the sub-slices actually passed to DMA.
         let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
-        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read) {
+        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read_common) {
             DmaOperationKind::Copied => {
                 MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() })
             }
@@ -532,7 +540,7 @@ impl<'d> SpiDma<'d, Async> {
         };
 
         let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
-        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write) {
+        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write_common) {
             DmaOperationKind::Copied => {
                 MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
             }
@@ -547,10 +555,6 @@ impl<'d> SpiDma<'d, Async> {
         if chunk_size == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
-
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
 
         for (read_chunk, write_chunk) in read_common
             .chunks_mut(chunk_size)
@@ -728,8 +732,12 @@ impl<'a> MaybeCopyRxBuf<'a> {
                 #[cfg(dma_can_access_psram)]
                 align_buffer,
                 ..
-            } =>
-            {
+            } => {
+                #[cfg(soc_internal_memory_cached)]
+                unsafe {
+                    crate::soc::cache_invalidate_addr(chunk.as_ptr() as u32, chunk.len() as u32);
+                }
+
                 #[cfg(dma_can_access_psram)]
                 for buffer in align_buffer.iter_mut() {
                     if let Some(buffer) = buffer.as_ref() {
@@ -826,8 +834,8 @@ where
     fn dma_driver(&self) -> DmaDriver {
         DmaDriver {
             driver: self.driver(),
-            dma_peripheral: self.spi().dma_peripheral(),
             state: self.spi().dma_state(),
+            dma_peripheral: self.spi.spi.dma_peripheral(),
         }
     }
 
@@ -1359,8 +1367,13 @@ aligned, otherwise the driver requires copying the entire buffer."
             }
         }
 
+        let common_length = min(read.len(), write.len());
+        let (read_common, read_remainder) = read.split_at_mut(common_length);
+        let (write_common, write_remainder) = write.split_at(common_length);
+
+        // DmaOperationKind must be determined on the sub-slices actually passed to DMA.
         let mut rx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
-        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read) {
+        let mut maybe_copy_rx_buffer = match DmaOperationKind::for_read(read_common) {
             DmaOperationKind::Copied => {
                 MaybeCopyRxBuf::Copy(unsafe { self.spi.dma_state().rx_buffer() })
             }
@@ -1372,7 +1385,7 @@ aligned, otherwise the driver requires copying the entire buffer."
         };
 
         let mut tx_descriptors = [DmaDescriptor::EMPTY; LINK_DESCRIPTOR_COUNT];
-        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write) {
+        let mut maybe_copy_tx_buffer = match DmaOperationKind::for_write(write_common) {
             DmaOperationKind::Copied => {
                 MaybeCopyTxBuf::Copy(unsafe { self.spi.dma_state().tx_buffer() })
             }
@@ -1387,10 +1400,6 @@ aligned, otherwise the driver requires copying the entire buffer."
         if chunk_size == 0 {
             return Err(Error::from(DmaError::BufferTooSmall));
         }
-
-        let common_length = min(read.len(), write.len());
-        let (read_common, read_remainder) = read.split_at_mut(common_length);
-        let (write_common, write_remainder) = write.split_at(common_length);
 
         for (read_chunk, write_chunk) in read_common
             .chunks_mut(chunk_size)
@@ -1568,6 +1577,7 @@ where
     ///
     /// This method returns `true` if both RX and TX operations are done,
     /// and the SPI instance is no longer busy.
+    #[instability::unstable]
     pub fn is_done(&self) -> bool {
         self.spi_dma.is_done()
     }
@@ -1642,7 +1652,7 @@ impl DmaDriver {
     }
 
     fn disable_dma(&self) {
-        #[cfg(dma_kind = "gdma")]
+        #[cfg(not(any(spi_master_version = "1", spi_master_version = "2")))]
         self.regs().dma_conf().modify(|_, w| {
             w.dma_tx_ena().clear_bit();
             w.dma_rx_ena().clear_bit()
@@ -1663,7 +1673,7 @@ impl DmaDriver {
         tx_len: usize,
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
-        channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
+        channel: &mut Channel<Dm, SpiMasterErased<'_>>,
     ) -> Result<(), Error> {
         #[cfg(spi_master_version = "2")]
         {
@@ -1712,7 +1722,7 @@ impl DmaDriver {
             }
         }
 
-        #[cfg(dma_kind = "gdma")]
+        #[cfg(not(any(spi_master_version = "1", spi_master_version = "2")))]
         self.reset_dma();
 
         self.driver.start_operation();
@@ -1721,78 +1731,65 @@ impl DmaDriver {
     }
 
     fn enable_dma(&self) {
-        #[cfg(dma_kind = "gdma")]
-        // for non GDMA this is done in `assign_tx_device` / `assign_rx_device`
-        self.regs().dma_conf().modify(|_, w| {
-            w.dma_tx_ena().set_bit();
-            w.dma_rx_ena().set_bit()
-        });
-
-        #[cfg(dma_kind = "pdma")]
-        self.reset_dma();
+        cfg_select! {
+            any(spi_master_version = "1", spi_master_version = "2") => {
+                self.reset_dma();
+            },
+            _ => {
+                self.regs().dma_conf().modify(|_, w| {
+                    w.dma_tx_ena().set_bit();
+                    w.dma_rx_ena().set_bit()
+                });
+            }
+        }
     }
 
     fn reset_dma(&self) {
-        #[cfg(dma_kind = "pdma")]
         self.regs().dma_conf().toggle(|w, bit| {
-            w.out_rst().bit(bit);
-            w.in_rst().bit(bit);
-            w.ahbm_fifo_rst().bit(bit);
-            w.ahbm_rst().bit(bit)
-        });
-
-        #[cfg(dma_kind = "gdma")]
-        self.regs().dma_conf().toggle(|w, bit| {
-            w.rx_afifo_rst().bit(bit);
-            w.buf_afifo_rst().bit(bit);
-            w.dma_afifo_rst().bit(bit)
+            cfg_select! {
+                any(spi_master_version = "1", spi_master_version = "2") => {
+                    w.out_rst().bit(bit);
+                    w.in_rst().bit(bit);
+                    w.ahbm_fifo_rst().bit(bit);
+                    w.ahbm_rst().bit(bit)
+                },
+                _ => {
+                    w.rx_afifo_rst().bit(bit);
+                    w.buf_afifo_rst().bit(bit);
+                    w.dma_afifo_rst().bit(bit)
+                }
+            }
         });
 
         self.clear_dma_interrupts();
     }
 
-    #[cfg(dma_kind = "gdma")]
     fn clear_dma_interrupts(&self) {
         self.regs().dma_int_clr().write(|w| {
-            w.dma_infifo_full_err().clear_bit_by_one();
-            w.dma_outfifo_empty_err().clear_bit_by_one();
-            w.trans_done().clear_bit_by_one();
-            w.mst_rx_afifo_wfull_err().clear_bit_by_one();
-            w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+            cfg_select! {
+                any(spi_master_version = "1", spi_master_version = "2") => {
+                    w.inlink_dscr_empty().clear_bit_by_one();
+                    w.outlink_dscr_error().clear_bit_by_one();
+                    w.inlink_dscr_error().clear_bit_by_one();
+                    w.in_done().clear_bit_by_one();
+                    w.in_err_eof().clear_bit_by_one();
+                    w.in_suc_eof().clear_bit_by_one();
+                    w.out_done().clear_bit_by_one();
+                    w.out_eof().clear_bit_by_one();
+                    w.out_total_eof().clear_bit_by_one()
+                },
+                _ => {
+                    w.dma_infifo_full_err().clear_bit_by_one();
+                    w.dma_outfifo_empty_err().clear_bit_by_one();
+                    w.trans_done().clear_bit_by_one();
+                    w.mst_rx_afifo_wfull_err().clear_bit_by_one();
+                    w.mst_tx_afifo_rempty_err().clear_bit_by_one()
+                }
+            }
         });
     }
-
-    #[cfg(dma_kind = "pdma")]
-    fn clear_dma_interrupts(&self) {
-        self.regs().dma_int_clr().write(|w| {
-            w.inlink_dscr_empty().clear_bit_by_one();
-            w.outlink_dscr_error().clear_bit_by_one();
-            w.inlink_dscr_error().clear_bit_by_one();
-            w.in_done().clear_bit_by_one();
-            w.in_err_eof().clear_bit_by_one();
-            w.in_suc_eof().clear_bit_by_one();
-            w.out_done().clear_bit_by_one();
-            w.out_eof().clear_bit_by_one();
-            w.out_total_eof().clear_bit_by_one()
-        });
-    }
 }
 
-impl<'d> DmaEligible for AnySpi<'d> {
-    #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyGdmaChannel<'d>;
-    #[cfg(dma_kind = "pdma")]
-    type Dma = crate::dma::AnySpiDmaChannel<'d>;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        let (info, _state) = self.dma_parts();
-        info.dma_peripheral
-    }
-}
-
-struct DmaInfo {
-    dma_peripheral: crate::dma::DmaPeripheral,
-}
 struct DmaState {
     tx_transfer_in_progress: Cell<bool>,
     rx_transfer_in_progress: Cell<bool>,
@@ -1837,14 +1834,10 @@ for_each_spi_master!(
     (all $( ($peri:ident, $sys:ident, $sclk:ident $_cs:tt $_sio:tt $(, $is_qspi:tt)?)),* ) => {
         impl AnySpi<'_> {
             #[inline(always)]
-            fn dma_parts(&self) -> (&'static DmaInfo, &'static DmaState) {
+            fn dma_state(&self) -> &'static DmaState {
                 match &self.0 {
                     $(
                         super::any::Inner::$sys(_spi) => {
-                            static DMA_INFO: DmaInfo = DmaInfo {
-                                dma_peripheral: crate::dma::DmaPeripheral::$sys,
-                            };
-
                             static DMA_STATE: DmaState = DmaState {
                                 tx_transfer_in_progress: Cell::new(false),
                                 rx_transfer_in_progress: Cell::new(false),
@@ -1853,22 +1846,10 @@ for_each_spi_master!(
                                 tx_buffer: UnsafeCell::new(MaybeUninit::uninit()),
                             };
 
-                            (&DMA_INFO, &DMA_STATE)
+                            &DMA_STATE
                         }
                     )*
                 }
-            }
-
-            #[inline(always)]
-            fn dma_state(&self) -> &'static DmaState {
-                let (_, state) = self.dma_parts();
-                state
-            }
-
-            #[inline(always)]
-            fn dma_info(&self) -> &'static DmaInfo {
-                let (info, _) = self.dma_parts();
-                info
             }
         }
     };
@@ -1878,9 +1859,31 @@ impl SpiWrapper<'_> {
     fn dma_state(&self) -> &'static DmaState {
         self.spi.dma_state()
     }
+}
 
-    #[inline(always)]
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        self.spi.dma_peripheral()
-    }
+with_spi_master_dma_engine! {
+    ($engine:tt, $any_channel:ident) => {
+        /// DMA channel trait for SPI peripherals.
+        ///
+        /// Implemented for each channel type that can serve a particular SPI instance `S`.
+        #[instability::unstable]
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with this SPI peripheral",
+            label = "This DMA channel",
+            note = "Use a channel that matches the SPI instance."
+        )]
+        pub trait SpiMasterDmaChannel<'d, S>: crate::private::Sealed + Into<crate::dma::$any_channel<'d>> {}
+
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            any_peri = AnySpi<'d>,
+            peris = for_each_spi_master,
+            ($peri:path, $ch:path) => {
+                impl<'d> SpiMasterDmaChannel<'d, $peri> for $ch {}
+            }
+        }
+
+        // Proxy type so that the type-erased DMA channel can be named in the driver, regardless of the DMA engine.
+        type SpiMasterErased<'d> = crate::dma::$any_channel<'d>;
+    };
 }

@@ -46,9 +46,6 @@ pub(crate) struct SchedulerState {
     /// A list of tasks ready to run
     pub(crate) run_queue: RunQueue,
 
-    /// Pointer to the task that is scheduled for deletion.
-    pub(crate) to_delete: TaskList<TaskDeleteListElement>,
-
     pub(crate) time_driver: Option<TimeDriver>,
 
     pub(crate) per_cpu: [CpuState; Cpu::COUNT],
@@ -65,6 +62,9 @@ pub(crate) struct CpuState {
     #[cfg(multi_core)]
     current_task: *mut Task,
 
+    /// Pointer to the task that is scheduled for deletion.
+    pub(crate) to_delete: TaskList<TaskDeleteListElement>,
+
     // This context will be filled out by the first context switch.
     // We allocate the main task statically, because there is always a main task. If deleted, we
     // simply don't deallocate this.
@@ -76,6 +76,7 @@ impl CpuState {
         Self {
             initialized: false,
             idle_context: CpuContext::new(),
+            to_delete: TaskList::new(),
 
             #[cfg(multi_core)]
             current_task: core::ptr::null_mut(),
@@ -118,7 +119,6 @@ impl SchedulerState {
         Self {
             all_tasks: TaskList::new(),
             run_queue: RunQueue::new(),
-            to_delete: TaskList::new(),
 
             time_driver: None,
 
@@ -138,12 +138,6 @@ impl SchedulerState {
     pub(crate) fn set_current_task(&mut self, cpu: Cpu, task: Option<TaskPtr>) {
         self.per_cpu[cpu as usize].current_task =
             task.map(|task| task.as_ptr()).unwrap_or_default();
-    }
-
-    #[inline]
-    #[cfg(multi_core)]
-    pub(crate) fn try_get_current_task(&self, cpu: Cpu) -> Option<TaskPtr> {
-        NonNull::new(self.per_cpu[cpu as usize].current_task)
     }
 
     pub(crate) fn setup(&mut self, time_driver: TimeDriver, idle_hook: IdleFn) {
@@ -202,21 +196,9 @@ impl SchedulerState {
 
     #[cold]
     #[inline(never)]
-    fn delete_marked_tasks(&mut self) {
-        let mut to_delete = core::mem::take(&mut self.to_delete);
-
-        while let Some(task_ptr) = to_delete.pop() {
+    fn delete_marked_tasks(&mut self, cpu: Cpu) {
+        while let Some(task_ptr) = self.per_cpu[cpu as usize].to_delete.pop() {
             assert!(task_ptr.state() == TaskState::Deleted);
-
-            #[cfg(multi_core)]
-            if Cpu::other()
-                .filter_map(|cpu| self.try_get_current_task(cpu))
-                .any(|task| task == task_ptr)
-            {
-                // We can't delete a task that is currently running on another CPU.
-                self.to_delete.push(task_ptr);
-                continue;
-            }
 
             trace!("delete_marked_tasks {:?}", task_ptr);
             self.delete_task(task_ptr);
@@ -227,12 +209,12 @@ impl SchedulerState {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_begin(TraceEvents::RunSchedule as u32);
 
-        if !self.to_delete.is_empty() {
-            self.delete_marked_tasks();
-        }
-
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
+
+        if !self.per_cpu[cpu as usize].to_delete.is_empty() {
+            self.delete_marked_tasks(cpu);
+        }
 
         let current_sp: u32;
         cfg_if::cfg_if! {
@@ -369,7 +351,9 @@ impl SchedulerState {
 
         if is_current {
             if task_to_delete.state() != TaskState::Deleted {
-                self.to_delete.push(task_to_delete);
+                self.per_cpu[Cpu::current() as usize]
+                    .to_delete
+                    .push(task_to_delete);
                 task_to_delete.set_state(TaskState::Deleted);
             }
 

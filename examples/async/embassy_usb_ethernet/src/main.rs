@@ -31,11 +31,11 @@ use embassy_usb::{
 use esp_backtrace as _;
 use esp_hal::{
     interrupt::software::SoftwareInterruptControl,
-    otg_fs::{
+    timer::timg::TimerGroup,
+    usb::otg::{
         Usb,
         embassy_usb_device::{Config, Driver as UsbDriver},
     },
-    timer::timg::TimerGroup,
 };
 use picoserve::AppBuilder as AppBuilderTrait;
 use static_cell::StaticCell;
@@ -64,7 +64,7 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let usb = Usb::new(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
+    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
 
     // Create the USB device driver.
     static EP_OUT_BUFFER: StaticCell<[u8; 1024]> = StaticCell::new();

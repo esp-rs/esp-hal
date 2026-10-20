@@ -2,7 +2,7 @@
 name          = "esp-hal"
 version       = "1.1.0"
 edition       = "2024"
-rust-version  = "1.88.0"
+rust-version  = "1.95.0"
 description   = "Bare-metal HAL for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-hal/latest/"
 keywords      = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
@@ -73,7 +73,7 @@ procmacros               = { version = "0.22.0", package = "esp-hal-procmacros",
 # They are needed when using the `unstable` feature.
 digest                   = { version = "0.10.7", default-features = false, features = ["core-api"], optional = true }
 embassy-usb-driver       = { version = "0.2", optional = true }
-embassy-usb-synopsys-otg = { version = "0.3.3", optional = true, features = ["host"] }
+embassy-usb-synopsys-otg = { version = "0.4.0", optional = true, features = ["host"] }
 embassy-net-driver-02    = { package = "embassy-net-driver", version = "0.2", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
 nb                       = { version = "1.1", optional = true }
@@ -111,7 +111,7 @@ esp32c61 = { version = "0.3", features = ["critical-section", "rt"], optional = 
 esp32h2 = { version = "0.19", features = ["critical-section", "rt"], optional = true }
 esp32s2 = { version = "0.31", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
 esp32s3 = { version = "0.35", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
-esp32p4 = { version = "0.2", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "0f4c316adbdbddb2479f50a5b931776b9655b23f" }
+esp32p4 = { version = "0.2", features = ["critical-section", "rt"], optional = true, git = "https://github.com/esp-rs/esp-pacs", rev = "5a07030bbe72d57f82314a26ec42b7f93e03bd1d" }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.15.0" }

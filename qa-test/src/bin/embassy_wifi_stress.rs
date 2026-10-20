@@ -61,7 +61,8 @@ async fn main(_spawner: Spawner) {
 
         println!("Wifi stack setup (STA)");
         let mut controller =
-            esp_radio::wifi::new(peripherals.WIFI.reborrow(), Default::default()).unwrap();
+            esp_radio::wifi::WifiController::new(peripherals.WIFI.reborrow(), Default::default())
+                .unwrap();
 
         {
             println!("Connecting to WiFi SSID: {}", SSID);

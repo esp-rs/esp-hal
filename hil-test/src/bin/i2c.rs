@@ -375,6 +375,33 @@ mod tests {
             ticker.next().await;
         }
     }
+    #[test]
+    // Only APB is supported on v1, so skip the test for that version.
+    #[cfg(not(i2c_master_version = "1"))]
+    fn test_read_cali_with_different_clock_sources(mut ctx: Context) {
+        use esp_hal::i2c::master::ClockSource;
+
+        cfg_if::cfg_if! {
+            if #[cfg(i2c_master_version = "3")] {
+                let configs = [ClockSource::Xtal, ClockSource::RcFast];
+            } else {
+                let configs = [ClockSource::Apb, ClockSource::RefTick];
+            }
+        }
+
+        for clock_source in configs {
+            ctx.i2c
+                .apply_config(&Config::default().with_clock_source(clock_source))
+                .unwrap_or_else(|e| panic!("{:?}: failed to apply {:?}", e, clock_source));
+
+            let mut read_data = [0u8; 22];
+            ctx.i2c
+                .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+                .unwrap_or_else(|e| panic!("{:?}: failed to read with {:?}", e, clock_source));
+
+            assert_ne!(read_data, [0u8; 22]);
+        }
+    }
 
     #[test]
     #[cfg(esp32s3)]

@@ -1,8 +1,9 @@
-#[cfg(feature = "unstable")]
-use super::{Async, Config, ConfigError, IoError, RxError, TxError, UartRx};
 use super::{Blocking, DriverMode, Uart, UartTx};
 #[cfg(feature = "unstable")]
-use crate::interrupt::InterruptHandler;
+use crate::{
+    interrupt::InterruptHandler,
+    uart::{Async, Config, ConfigError, IoError, RxError, TxError, UartRx},
+};
 
 #[instability::unstable]
 impl embedded_io_06::Error for RxError {

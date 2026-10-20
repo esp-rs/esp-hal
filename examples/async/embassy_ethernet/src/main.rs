@@ -48,7 +48,7 @@ use esp_hal::{
         RmiiPinBundle,
         clock::ExternalRefClock,
         mac::{Duplex, LinkState, Speed},
-        phy::{MdioDriver, Phy, PhyError, generic::GenericPhy},
+        phy::{MdioBus, Phy, PhyError, generic::GenericPhy},
     },
     gpio::{Level, Output, OutputConfig},
     interrupt::software::SoftwareInterruptControl,
@@ -105,11 +105,11 @@ impl Phy for ExamplePhy {
         self.phy.address()
     }
 
-    fn init(&mut self, mdio: &MdioDriver<'_>) -> Result<(), PhyError> {
+    fn init<M: MdioBus>(&mut self, mdio: &mut M) -> Result<(), PhyError> {
         self.phy.init(mdio)
     }
 
-    fn poll_link(&mut self, mdio: &MdioDriver<'_>, cx: Option<&mut Context<'_>>) -> LinkState {
+    fn poll_link<M: MdioBus>(&mut self, mdio: &mut M, cx: Option<&mut Context<'_>>) -> LinkState {
         if let Some(cx) = cx {
             if matches!(self.timer.poll_unpin(cx), Poll::Pending) {
                 return self.cached_link_state;

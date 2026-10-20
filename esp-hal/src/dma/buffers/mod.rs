@@ -880,7 +880,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
             if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram {
+                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
                     unsafe {
                         crate::soc::cache_writeback_addr(
                             self.buffer.as_ptr() as u32,
@@ -924,7 +924,7 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
             if #[cfg(dma_can_access_psram)] {
                 // Optimization: avoid locking for PSRAM range.
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
-                if is_data_in_psram {
+                if is_data_in_psram || cfg!(soc_internal_memory_cached) {
                     unsafe {
                         crate::soc::cache_invalidate_addr(
                             self.buffer.as_ptr() as u32,
@@ -995,6 +995,8 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 ///
 /// See [DmaRxStreamBufView] for APIs available whilst a transfer is in
 /// progress.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DmaRxStreamBuf {
     descriptors: &'static mut [DmaDescriptor],
     buffer: &'static mut [u8],
@@ -1015,22 +1017,16 @@ impl DmaRxStreamBuf {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
-        if descriptors.is_empty() {
+        // see https://github.com/esp-rs/esp-hal/issues/2269#issuecomment-4397953660
+        // we can lift that requirement once we sort out this issue
+        if descriptors.len() < 4 {
             return Err(DmaBufError::InsufficientDescriptors);
         }
 
         // Evenly distribute the buffer between the descriptors.
-        let chunk_size = buffer.len() / descriptors.len();
-
-        if chunk_size > 4095 {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
-
-        // Check that the last descriptor can hold the excess
-        let excess = buffer.len() % descriptors.len();
-        if chunk_size + excess > 4095 {
-            return Err(DmaBufError::InsufficientDescriptors);
-        }
+        let chunk_size = Some(buffer.len() / descriptors.len())
+            .filter(|x| *x <= 4095)
+            .ok_or(DmaBufError::InsufficientDescriptors)?;
 
         let mut chunks = buffer.chunks_exact_mut(chunk_size);
         for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
@@ -1039,12 +1035,15 @@ impl DmaRxStreamBuf {
         }
 
         let remainder = chunks.into_remainder();
-        debug_assert_eq!(remainder.len(), excess);
 
         if !remainder.is_empty() {
             // Append any excess to the last descriptor.
             let last_descriptor = descriptors.last_mut().unwrap();
-            last_descriptor.set_size(last_descriptor.size() + remainder.len());
+            let size = last_descriptor.size() + remainder.len();
+            if size > 4095 {
+                return Err(DmaBufError::InsufficientDescriptors);
+            }
+            last_descriptor.set_size(size);
         }
 
         Ok(Self {
@@ -1133,6 +1132,9 @@ impl DmaRxStreamBufView {
         let mut remaining = buf;
         loop {
             let available = self.peek();
+            if available.is_empty() {
+                break;
+            }
             if available.len() >= remaining.len() {
                 remaining.copy_from_slice(&available[0..remaining.len()]);
                 self.consume(remaining.len());
@@ -1238,8 +1240,9 @@ impl DmaRxStreamBufView {
                 (&[], false)
             } else {
                 let length = last_descriptor.len() - self.descriptor_offset;
+                let chunk_size = last_descriptor.size();
                 (
-                    &self.buf.buffer[self.buf.buffer.len() - length..],
+                    &self.buf.buffer[self.buf.buffer.len() - chunk_size..][..length],
                     last_descriptor.flags.suc_eof(),
                 )
             }
@@ -1273,6 +1276,316 @@ impl DmaRxStreamBufView {
     }
 }
 
+/// DMA Streaming Transmit Buffer.
+///
+/// This is symmetric implementation to [DmaRxStreamBuf], used for continuously
+/// streaming data to a peripheral's FIFO.
+///
+/// The list starts out like so `A(full) -> B(full) -> C(full) -> D(full) -> NULL`.
+///
+/// As the DMA writes to FIFO, the list progresses like so:
+/// - `A(full)  -> B(full)  -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(full)  -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(empty) -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(empty) -> C(empty) -> D(full) -> NULL`
+///
+/// As you call [DmaTxStreamBufView::push] the list (approximately) progresses like so:
+/// - `A(empty) -> B(empty) -> C(empty) -> D(full) -> NULL`
+/// - `B(empty) -> C(empty) -> D(full)  -> A(full) -> NULL`
+/// - `C(empty) -> D(full)  -> A(full)  -> B(full) -> NULL`
+/// - `D(full)  -> A(full)  -> B(full)  -> C(full) -> NULL`
+///
+/// If all the descriptors run out, the [DmaTxInterrupt::TotalEof] interrupt will fire and DMA
+/// will stop writing, at which point it is up to you to resume/restart the transfer.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct DmaTxStreamBuf {
+    descriptors: &'static mut [DmaDescriptor],
+    buffer: &'static mut [u8],
+    burst: BurstConfig,
+    pre_filled: Option<usize>,
+    view_descriptor_idx: usize,
+    view_descriptor_offset: usize,
+}
+
+impl DmaTxStreamBuf {
+    /// Creates a new [DmaTxStreamBuf] evenly distributing the buffer between
+    /// the provided descriptors.
+    pub fn new(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+    ) -> Result<Self, DmaBufError> {
+        match () {
+            _ if !is_slice_in_dram(descriptors) => Err(DmaBufError::UnsupportedMemoryRegion)?,
+            _ if !is_slice_in_dram(buffer) => Err(DmaBufError::UnsupportedMemoryRegion)?,
+            _ if descriptors.len() < 4 => {
+                // see https://github.com/esp-rs/esp-hal/issues/2269#issuecomment-4397953660
+                // we can lift that requirement once we sort out this issue
+                Err(DmaBufError::InsufficientDescriptors)?
+            }
+            _ => (),
+        };
+
+        // Evenly distribute the buffer between the descriptors.
+        let chunk_size = Some(buffer.len() / descriptors.len())
+            .filter(|x| *x <= 4095)
+            .ok_or(DmaBufError::InsufficientDescriptors)?;
+
+        let mut chunks = buffer.chunks_exact_mut(chunk_size);
+        for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
+            desc.buffer = chunk.as_mut_ptr();
+            desc.set_size(chunk.len());
+            desc.set_length(chunk.len());
+        }
+        let remainder = chunks.into_remainder();
+
+        if !remainder.is_empty() {
+            // Append any excess to the last descriptor.
+            let last_descriptor = descriptors.last_mut().unwrap();
+            let size = last_descriptor.size() + remainder.len();
+            if size > 4095 {
+                Err(DmaBufError::InsufficientDescriptors)?;
+            }
+            last_descriptor.set_size(size);
+        }
+
+        Ok(Self {
+            descriptors,
+            buffer,
+            burst: Default::default(),
+            pre_filled: None,
+            view_descriptor_idx: 0,
+            view_descriptor_offset: 0,
+        })
+    }
+
+    /// Consume the buf, returning the descriptors and buffer.
+    pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
+        (self.descriptors, self.buffer)
+    }
+
+    /// Push the buffer with the given data before DMA transfer starts.
+    ///
+    /// Otherwise the streaming buffer will transfer garbage data to
+    /// DMA so that CPU has enough time to fill the buffer after transfer starts.
+    pub fn push(&mut self, data: &[u8]) -> usize {
+        self.push_with(|buf| {
+            let len = buf.len().min(data.len());
+            buf[..len].copy_from_slice(&data[..len]);
+            len
+        })
+    }
+
+    /// Push the buffer with the given data before DMA transfer starts.
+    ///
+    /// Returns the number of bytes filled.
+    pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
+        let start = self.pre_filled.unwrap_or(0);
+        let bytes_pushed = f(&mut self.buffer[start..]);
+        self.pre_filled = Some(start + bytes_pushed);
+        bytes_pushed
+    }
+
+    fn setup_view_state(&mut self) {
+        self.view_descriptor_idx = 0;
+        self.view_descriptor_offset = 0;
+        let pre_filled = self.pre_filled.unwrap_or(self.buffer.len());
+        mark_tx_stream_descriptors_ready(
+            self.descriptors,
+            &mut self.view_descriptor_idx,
+            &mut self.view_descriptor_offset,
+            pre_filled,
+        );
+    }
+}
+
+/// Marks descriptors containing data that should be transmitted when the DMA
+/// channel starts. Unlike [advance_tx_stream_descriptors], this does not modify
+/// the `next` pointers because the linked list must remain intact until the
+/// transfer is running.
+fn mark_tx_stream_descriptors_ready(
+    descriptors: &mut [DmaDescriptor],
+    descriptor_idx: &mut usize,
+    descriptor_offset: &mut usize,
+    bytes_pushed: usize,
+) {
+    if bytes_pushed == 0 {
+        return;
+    }
+
+    let mut bytes_filled = 0;
+    let num_descriptors = descriptors.len();
+
+    for i in 0..num_descriptors {
+        let d = (*descriptor_idx + i) % num_descriptors;
+        let desc = &mut descriptors[d];
+        let bytes_in_d = desc.size() - *descriptor_offset;
+
+        if bytes_in_d + bytes_filled > bytes_pushed {
+            *descriptor_idx = d;
+            *descriptor_offset = *descriptor_offset + bytes_pushed - bytes_filled;
+            desc.set_owner(Owner::Dma);
+            desc.set_length(*descriptor_offset);
+            desc.set_suc_eof(true);
+            return;
+        }
+
+        bytes_filled += bytes_in_d;
+        *descriptor_offset = 0;
+
+        desc.set_owner(Owner::Dma);
+        desc.set_length(desc.size());
+        desc.set_suc_eof(true);
+    }
+}
+
+fn advance_tx_stream_descriptors(
+    descriptors: &mut [DmaDescriptor],
+    descriptor_idx: &mut usize,
+    descriptor_offset: &mut usize,
+    bytes_pushed: usize,
+) {
+    if bytes_pushed == 0 {
+        return;
+    }
+
+    let mut bytes_filled = 0;
+    let num_descriptors = descriptors.len();
+
+    for i in 0..num_descriptors {
+        let d = (*descriptor_idx + i) % num_descriptors;
+        let desc = &mut descriptors[d];
+        let bytes_in_d = desc.size() - *descriptor_offset;
+        if bytes_in_d + bytes_filled > bytes_pushed {
+            *descriptor_idx = d;
+            *descriptor_offset = *descriptor_offset + bytes_pushed - bytes_filled;
+            return;
+        }
+        bytes_filled += bytes_in_d;
+        *descriptor_offset = 0;
+
+        // Put the current descriptor at the end of the list
+        desc.set_owner(Owner::Dma);
+        desc.set_length(desc.size());
+        desc.set_suc_eof(true);
+        let p = d.checked_sub(1).unwrap_or(num_descriptors - 1);
+        if p != d {
+            let [prev, desc] = descriptors.get_disjoint_mut([p, d]).unwrap();
+            desc.next = null_mut();
+            prev.next = desc;
+        }
+    }
+}
+
+unsafe impl DmaTxBuffer for DmaTxStreamBuf {
+    type View = DmaTxStreamBufView;
+    type Final = Self;
+
+    fn prepare(&mut self) -> Preparation {
+        // Link up all the descriptors (but not in a circle).
+        let mut next = null_mut();
+        for desc in self.descriptors.iter_mut().rev() {
+            desc.next = next;
+            // set the owner for *all* descriptors - otherwise descriptors with pre-filled data
+            // might be owned by CPU
+            desc.set_owner(Owner::Dma);
+            next = desc;
+        }
+
+        self.setup_view_state();
+
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+            direction: TransferDirection::Out,
+            #[cfg(dma_can_access_psram)]
+            accesses_psram: false,
+            burst_transfer: self.burst,
+
+            // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
+            // implementation doesn't rely on the DMA checking for descriptor ownership.
+            // No descriptor is added back to the end of the stream before it's ready for the DMA
+            // to consume it.
+            check_owner: None,
+            auto_write_back: true,
+        }
+    }
+
+    fn into_view(self) -> Self::View {
+        DmaTxStreamBufView {
+            descriptor_idx: self.view_descriptor_idx,
+            descriptor_offset: self.view_descriptor_offset,
+            buf: self,
+        }
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view.buf
+    }
+}
+
+/// A view into a [DmaTxStreamBuf]
+pub struct DmaTxStreamBufView {
+    buf: DmaTxStreamBuf,
+    descriptor_idx: usize,
+    descriptor_offset: usize,
+}
+
+impl DmaTxStreamBufView {
+    /// Returns the number of bytes available for writing.
+    pub fn available_bytes(&self) -> usize {
+        let (tail, head) = self.buf.descriptors.split_at(self.descriptor_idx);
+        head.iter()
+            .chain(tail)
+            .take_while(|d| d.owner() == Owner::Cpu)
+            .map(|d| d.size())
+            .sum::<usize>()
+            - self.descriptor_offset
+    }
+
+    /// Pushes a buffer into the stream buffer.
+    /// Returns the number of bytes pushed.
+    pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
+        let chunk_size = self.buf.descriptors[0].size();
+        let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
+        let dma_end = (dma_start + self.available_bytes()).min(self.buf.buffer.len());
+        let bytes_pushed = f(&mut self.buf.buffer[dma_start..dma_end]);
+
+        self.advance(bytes_pushed);
+        bytes_pushed
+    }
+
+    /// Advances the first `n` bytes from the available data
+    pub fn advance(&mut self, bytes_pushed: usize) {
+        advance_tx_stream_descriptors(
+            self.buf.descriptors,
+            &mut self.descriptor_idx,
+            &mut self.descriptor_offset,
+            bytes_pushed,
+        );
+    }
+
+    /// Pushes a buffer into the stream buffer.
+    /// Returns the number of bytes pushed.
+    pub fn push(&mut self, data: &[u8]) -> usize {
+        let total_len = data.len();
+        let mut remaining = data;
+
+        while !remaining.is_empty() && self.available_bytes() > 0 {
+            let written = self.push_with(|buffer| {
+                let len = usize::min(buffer.len(), remaining.len());
+                buffer[..len].copy_from_slice(&remaining[..len]);
+                len
+            });
+            if written == 0 {
+                break;
+            }
+            remaining = &remaining[written..];
+        }
+
+        total_len - remaining.len()
+    }
+}
+
 static mut EMPTY: [DmaDescriptor; 1] = [DmaDescriptor::EMPTY];
 
 /// An empty buffer that can be used when you don't need to transfer any data.
@@ -1283,8 +1596,16 @@ unsafe impl DmaTxBuffer for EmptyBuf {
     type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(soc_internal_memory_cached)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                (&raw const EMPTY) as u32,
+                core::mem::size_of::<DmaDescriptor>() as u32,
+            );
+        }
+
         Preparation {
-            start: core::ptr::addr_of_mut!(EMPTY).cast(),
+            start: (&raw mut EMPTY).cast(),
             direction: TransferDirection::Out,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
@@ -1313,8 +1634,16 @@ unsafe impl DmaRxBuffer for EmptyBuf {
     type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
+        #[cfg(soc_internal_memory_cached)]
+        unsafe {
+            crate::soc::cache_writeback_addr(
+                (&raw const EMPTY) as u32,
+                core::mem::size_of::<DmaDescriptor>() as u32,
+            );
+        }
+
         Preparation {
-            start: core::ptr::addr_of_mut!(EMPTY).cast(),
+            start: (&raw mut EMPTY).cast(),
             direction: TransferDirection::In,
             #[cfg(dma_can_access_psram)]
             accesses_psram: false,
@@ -1481,7 +1810,7 @@ unsafe impl DmaRxBuffer for NoBuffer {
 ///
 /// The caller must keep all its descriptors and the buffers they
 /// point to valid while the buffer is being transferred.
-#[cfg_attr(not(any(aes_dma, spi_master_supports_dma)), expect(unused))]
+#[cfg_attr(not(any(aes_supports_dma, spi_master_supports_dma)), expect(unused))]
 pub(crate) unsafe fn prepare_for_tx(
     descriptors: &mut [DmaDescriptor],
     mut data: NonNull<[u8]>,
@@ -1511,9 +1840,11 @@ pub(crate) unsafe fn prepare_for_tx(
             let data_in_psram = crate::psram::psram_range().contains(&data_addr);
 
             // Make sure input data is in PSRAM instead of cache
-            if data_in_psram {
+            if data_in_psram || cfg!(soc_internal_memory_cached) {
                 unsafe { crate::soc::cache_writeback_addr(data_addr as u32, data_len as u32) };
             }
+        } else if #[cfg(soc_internal_memory_cached)] {
+            unsafe { crate::soc::cache_writeback_addr(data.addr().get() as u32, data_len as u32) };
         }
     }
 
@@ -1525,6 +1856,14 @@ pub(crate) unsafe fn prepare_for_tx(
 
     for desc in descriptors.linked_iter_mut() {
         desc.reset_for_tx(desc.next.is_null());
+    }
+
+    #[cfg(soc_internal_memory_cached)]
+    unsafe {
+        crate::soc::cache_writeback_addr(
+            descriptors.head() as u32,
+            core::mem::size_of_val(descriptors.descriptors) as u32,
+        );
     }
 
     Ok((
@@ -1549,7 +1888,7 @@ pub(crate) unsafe fn prepare_for_tx(
 ///
 /// The caller must keep all its descriptors and the buffers they
 /// point to valid while the buffer is being transferred.
-#[cfg_attr(not(any(aes_dma, spi_master_supports_dma)), expect(unused))]
+#[cfg_attr(not(any(aes_supports_dma, spi_master_supports_dma)), expect(unused))]
 pub(crate) unsafe fn prepare_for_rx(
     descriptors: &mut [DmaDescriptor],
     #[cfg(dma_can_access_psram)] align_buffers: &mut [Option<ManualWritebackBuffer>; 2],
@@ -1589,6 +1928,21 @@ pub(crate) unsafe fn prepare_for_rx(
                     crate::soc::cache_invalidate_addr(data_addr as u32, consumed_bytes as u32);
                 }
 
+                // On chips with cached internal memory, the ManualWritebackBuffer alignment
+                // buffers live in cached DRAM. Flush the entire struct (including
+                // dst_address and n_bytes) to memory now so that the post-DMA
+                // cache_invalidate_addr in write_back() can safely discard the stale
+                // cache without losing those metadata fields.
+                #[cfg(soc_internal_memory_cached)]
+                for buf in align_buffers.iter().flatten() {
+                    unsafe {
+                        crate::soc::cache_writeback_addr(
+                            buf as *const ManualWritebackBuffer as u32,
+                            core::mem::size_of::<ManualWritebackBuffer>() as u32,
+                        );
+                    }
+                }
+
                 consumed_bytes
             } else {
                 unreachable!()
@@ -1600,11 +1954,27 @@ pub(crate) unsafe fn prepare_for_rx(
         unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
         unwrap!(descriptors.set_tx_length(data_len, chunk_size));
 
+        #[cfg(soc_internal_memory_cached)]
+        // Invalidate data written by the DMA. As this likely affects more data than we touched,
+        // write back first.
+        unsafe {
+            crate::soc::cache_writeback_addr(data.addr().get() as u32, data_len as u32);
+            crate::soc::cache_invalidate_addr(data.addr().get() as u32, data_len as u32);
+        }
+
         data_len
     };
 
     for desc in descriptors.linked_iter_mut() {
         desc.reset_for_rx();
+    }
+
+    #[cfg(soc_internal_memory_cached)]
+    unsafe {
+        crate::soc::cache_writeback_addr(
+            descriptors.head() as u32,
+            core::mem::size_of_val(descriptors.descriptors) as u32,
+        );
     }
 
     (
@@ -1782,6 +2152,12 @@ impl ManualWritebackBuffer {
 
     pub fn write_back(&self) {
         unsafe {
+            // The DMA wrote its data directly to memory, bypassing the CPU cache.
+            // Invalidate the cache lines covering the alignment buffer so the CPU
+            // reads the fresh DMA data rather than the stale zeros from new().
+            #[cfg(soc_internal_memory_cached)]
+            crate::soc::cache_invalidate_addr(self.buffer.as_ptr() as u32, BUF_LEN as u32);
+
             self.dst_address
                 .as_ptr()
                 .copy_from(self.buffer.as_ptr(), self.n_bytes as usize);

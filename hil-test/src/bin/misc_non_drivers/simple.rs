@@ -200,7 +200,7 @@ mod tests {
     #[test]
     #[cfg(usb_serial_jtag_driver_supported)]
     fn creating_peripheral_does_not_break_debug_connection(ctx: Context) {
-        use esp_hal::usb_serial_jtag::UsbSerialJtag;
+        use esp_hal::usb::usb_serial_jtag::UsbSerialJtag;
 
         _ = UsbSerialJtag::new(ctx.p.USB_DEVICE).into_async().split();
     }

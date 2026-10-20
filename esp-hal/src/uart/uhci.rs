@@ -99,14 +99,11 @@ use crate::{
         Channel,
         ChannelRx,
         ChannelTx,
-        DmaChannelFor,
-        DmaEligible,
+        DmaChannel,
+        DmaEligiblePeripheral,
         DmaError,
         DmaRxBuffer,
         DmaTxBuffer,
-        PeripheralDmaChannel,
-        PeripheralRxChannel,
-        PeripheralTxChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     pac::uhci0,
@@ -145,24 +142,23 @@ crate::any_peripheral! {
     }
 }
 
-impl<'d> DmaEligible for AnyUhci<'d> {
-    #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyGdmaChannel<'d>;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            any::Inner::Uhci0(_) => crate::dma::DmaPeripheral::Uhci0,
-        }
-    }
-}
-
 impl AnyUhci<'_> {
     /// Opens the enum into the peripheral below
     fn register_block(&self) -> &uhci0::RegisterBlock {
-        match &self.0 {
-            any::Inner::Uhci0(x) => x.register_block(),
-        }
+        any::delegate!(self, uhci => { uhci.register_block() })
     }
+}
+
+with_uhci_dma_engine! {
+    ($engine:tt, $any_ch:ident) => {
+        impl DmaEligiblePeripheral for AnyUhci<'_> {
+            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
+
+            fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+                any::delegate!(self, uhci => { uhci.dma_peripheral() })
+            }
+        }
+    };
 }
 
 /// A configuration error.
@@ -267,7 +263,7 @@ where
     uart: Uart<'d, Dm>,
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     uhci_per: AnyUhci<'static>,
-    channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
+    channel: Channel<Dm, ErasedChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
@@ -390,12 +386,12 @@ impl<'d> Uhci<'d, Blocking> {
     pub fn new(
         uart: Uart<'d, Blocking>,
         uhci: peripherals::UHCI0<'static>,
-        channel: impl DmaChannelFor<AnyUhci<'d>>,
+        channel: impl UhciDmaChannel<'d>,
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
-        let channel = Channel::new(channel.degrade());
-        channel.runtime_ensure_compatible(&uhci);
+        let channel = Channel::new(channel.into());
+        channel.runtime_ensure_compatible(uhci.dma_peripheral());
 
         let uhci = Uhci {
             uart,
@@ -440,7 +436,7 @@ where
     uhci_per: AnyUhci<'static>,
     /// Tx of the used uart. You can configure it by accessing the value
     pub uart_tx: UartTx<'d, Dm>,
-    channel_tx: ChannelTx<Dm, PeripheralTxChannel<AnyUhci<'d>>>,
+    channel_tx: ChannelTx<Dm, ErasedTxChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
@@ -486,7 +482,7 @@ where
     uhci_per: AnyUhci<'static>,
     /// Rx of the used uart. You can configure it by accessing the value
     pub uart_rx: UartRx<'d, Dm>,
-    channel_rx: ChannelRx<Dm, PeripheralRxChannel<AnyUhci<'d>>>,
+    channel_rx: ChannelRx<Dm, ErasedRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
@@ -808,4 +804,29 @@ where
     fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
         self.apply_config(config)
     }
+}
+
+with_uhci_dma_engine! {
+    ($engine:tt, $any_channel:ident) => {
+        /// DMA channel trait for UHCI (UART DMA) peripherals.
+        ///
+        /// Implemented for every channel type capable of serving UHCI.
+        #[diagnostic::on_unimplemented(
+            message = "The DMA channel cannot be used with UHCI",
+            label = "This DMA channel"
+        )]
+        pub trait UhciDmaChannel<'d>: DmaChannel + Into<ErasedChannel<'d>> {}
+
+        crate::macros::impl_dma_channel_trait! {
+            $engine,
+            peri = UHCI0,
+            ($peri:path, $ch:path) => {
+                impl<'d> UhciDmaChannel<'d> for $ch {}
+            }
+        }
+
+        type ErasedChannel<'d> = crate::dma::$any_channel<'d>;
+        type ErasedTxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Tx;
+        type ErasedRxChannel<'d> = <ErasedChannel<'d> as DmaChannel>::Rx;
+    };
 }

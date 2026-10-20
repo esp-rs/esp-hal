@@ -10,7 +10,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, ExternalBurstConfig, Mem2Mem},
+    dma::{BurstConfig, DmaPeripheral, ExternalBurstConfig, Mem2Mem},
     dma_descriptors_chunk_size,
     main,
     time::Duration,
@@ -56,9 +56,7 @@ fn main() -> ! {
     let intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
-    let dma_peripheral = peripherals.SPI2;
-
-    let mut mem2mem = Mem2Mem::new(peripherals.DMA_CH0, dma_peripheral)
+    let mut mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2)
         .with_descriptors(
             rx_descriptors,
             tx_descriptors,

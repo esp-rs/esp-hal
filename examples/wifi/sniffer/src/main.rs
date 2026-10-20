@@ -41,7 +41,8 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
 
     // The sniffer borrows the controller, so we only need the controller here —
     // no station/AP `Interface` is required for promiscuous capture.
-    let controller = esp_radio::wifi::new(peripherals.WIFI, Default::default()).unwrap();
+    let controller =
+        esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default()).unwrap();
 
     let mut sniffer = controller.sniffer();
     sniffer.set_promiscuous_mode(true).unwrap();

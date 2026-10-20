@@ -18,7 +18,7 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
+    peripherals::{I2C_ANA_MST, I2C0, I2C1, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
     soc::regi2c,
     time::Rate,
 };
@@ -760,5 +760,31 @@ impl UartInstance {
         _new_config: UartMemClockConfig,
     ) {
         // Nothing to do.
+    }
+}
+
+impl I2cInstance {
+    // I2C_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+        // No dedicated enable bit on ESP32-S2; clock selection via ref_always_on.
+        let _ = self;
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<I2cFunctionClockConfig>,
+        new_config: I2cFunctionClockConfig,
+    ) {
+        let regs = match self {
+            I2cInstance::I2c0 => I2C0::regs(),
+            I2cInstance::I2c1 => I2C1::regs(),
+        };
+        // ref_always_on: 1 = APB, 0 = REF_TICK
+        regs.ctr().modify(|_, w| {
+            w.ref_always_on()
+                .bit(!matches!(new_config.sclk, I2cFunctionClockSclk::RefTick))
+        });
     }
 }

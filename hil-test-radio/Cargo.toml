@@ -1,0 +1,94 @@
+[package]
+name    = "hil-test-radio"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "hil_test"
+
+[[bin]]
+name              = "wifi"
+harness           = false
+required-features = ["esp-alloc"]
+path              = "src/bin/tests/wifi.rs"
+
+[[bin]]
+name              = "wifi_ap_support"
+harness           = false
+required-features = ["esp-alloc"]
+path              = "src/bin/support/wifi_ap_support.rs"
+
+[dependencies]
+cfg-if             = "1"
+defmt              = "1.0.1"
+defmt-rtt          = { version = "1.0.0", optional = true }
+embassy-executor   = { version = "0.10.0", default-features = false }
+embassy-time       = "0.5.0"
+embedded-io        = "0.7.1"
+embedded-io-async  = "0.7.0"
+esp-alloc          = { path = "../esp-alloc", optional = true }
+esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
+esp-hal            = { path = "../esp-hal" }
+esp-metadata-generated = { path = "../esp-metadata-generated" }
+esp-rtos           = { path = "../esp-rtos", optional = true }
+esp-storage        = { path = "../esp-storage", optional = true }
+esp-radio          = { path = "../esp-radio", optional = true }
+esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
+static_cell        = { version = "2.1.0" }
+semihosting        = { version = "0.1", features = ["stdio", "panic-handler"] }
+embedded-test      = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
+
+# radio HIL deps
+embassy-net = { version = "0.8.0", features = [
+    "dhcpv4",
+    "medium-ethernet",
+    "tcp",
+    "dns",
+] }
+reqwless = { version = "0.14.0", default-features = false }
+edge-dhcp = "0.7.0"
+edge-nal = "0.6.0"
+edge-nal-embassy = "0.8.1"
+
+[build-dependencies]
+esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
+
+[features]
+default = []
+unstable = ["esp-hal/unstable"]
+
+defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt"]
+esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
+esp-radio-unstable = ["esp-radio/unstable"]
+embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
+rtos-radio-driver = ["dep:esp-rtos", "esp-rtos/esp-radio", "dep:esp-radio-rtos-driver"]
+
+esp32c6 = [
+    "esp-hal/esp32c6",
+    "esp-alloc?/esp32c6",
+    "esp-radio?/esp32c6",
+    "esp-storage?/esp32c6",
+    "esp-bootloader-esp-idf/esp32c6",
+    "esp-metadata-generated/esp32c6",
+    "esp-rtos?/esp32c6",
+]
+
+# https://doc.rust-lang.org/cargo/reference/profiles.html#test
+# Test and bench profiles inherit from dev and release respectively.
+[profile.dev]
+codegen-units    = 1
+debug            = 2
+debug-assertions = true
+incremental      = false
+opt-level        = "z"
+overflow-checks  = true
+
+[profile.release]
+codegen-units    = 1
+debug            = 2
+debug-assertions = true
+incremental      = false
+opt-level        = 3
+lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
+overflow-checks  = true

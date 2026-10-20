@@ -1,7 +1,5 @@
 //! # Inter-IC Sound (I2S)
 
-use crate::dma::DmaEligible;
-
 pub mod master;
 
 #[cfg(esp32)]
@@ -17,18 +15,16 @@ crate::any_peripheral! {
     }
 }
 
-impl<'d> DmaEligible for AnyI2s<'d> {
-    #[cfg(dma_kind = "gdma")]
-    type Dma = crate::dma::AnyGdmaChannel<'d>;
-    #[cfg(dma_kind = "pdma")]
-    type Dma = crate::dma::AnyI2sDmaChannel<'d>;
+with_i2s_dma_engine! {
+    ($engine:tt, $any_ch:ident) => {
+        use crate::dma::DmaEligiblePeripheral;
 
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            #[cfg(soc_has_i2s0)]
-            any::Inner::I2s0(_) => crate::dma::DmaPeripheral::I2s0,
-            #[cfg(soc_has_i2s1)]
-            any::Inner::I2s1(_) => crate::dma::DmaPeripheral::I2s1,
+        impl DmaEligiblePeripheral for AnyI2s<'_> {
+            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
+
+            fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+                any::delegate!(self, i2s => { i2s.dma_peripheral() })
+            }
         }
-    }
+    };
 }

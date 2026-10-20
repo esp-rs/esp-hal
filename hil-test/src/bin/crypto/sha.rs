@@ -1,156 +1,154 @@
+use digest::{Digest, Update};
+#[cfg(rng_trng_supported)]
+use esp_hal::rng::TrngSource;
+#[cfg(not(esp32))]
+use esp_hal::sha::Sha224;
+#[cfg(any(esp32, esp32s2, esp32s3))]
+use esp_hal::sha::{Sha384, Sha512};
+#[cfg(any(esp32s2, esp32s3))]
+use esp_hal::sha::{Sha512_224, Sha512_256};
+use esp_hal::{
+    clock::CpuClock,
+    rng::Rng,
+    sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaBackend, ShaDigest},
+};
+use nb::block;
+
+const SOURCE_DATA: &[u8] = &[b'a'; 258];
+
+#[track_caller]
+fn assert_sw_hash<D: Digest>(algo: &str, input: &[u8], expected_output: &[u8]) {
+    let mut hasher = D::new();
+    hasher.update(input);
+    let soft_result = hasher.finalize();
+
+    hil_test::assert_eq!(
+        expected_output,
+        &soft_result[..],
+        "Output mismatch with {}",
+        algo
+    );
+}
+
+fn hash_sha<S: ShaAlgorithm>(sha: &mut Sha<'static>, mut input: &[u8], output: &mut [u8]) {
+    let mut digest = sha.start::<S>();
+    while !input.is_empty() {
+        input = block!(digest.update(input)).unwrap();
+    }
+    block!(digest.finish(output)).unwrap();
+}
+
+fn hash_digest<'a, S: ShaAlgorithm>(sha: &'a mut Sha<'static>, input: &[u8], output: &mut [u8]) {
+    let mut hasher = ShaDigest::<S, _>::new(sha);
+    Update::update(&mut hasher, input);
+    output.copy_from_slice(&digest::FixedOutput::finalize_fixed(hasher));
+}
+
+/// A simple test using the Sha trait. This will compare the result with a
+/// software implementation.
+#[track_caller]
+fn assert_sha<S: ShaAlgorithm, const N: usize>(sha: &mut Sha<'static>, input: &[u8]) {
+    let mut output = [0u8; N];
+    hash_sha::<S>(sha, input, &mut output);
+
+    // Compare against Software result.
+    match N {
+        20 => assert_sw_hash::<sha1::Sha1>("SHA-1", input, &output),
+        28 => assert_sw_hash::<sha2::Sha224>("SHA-224", input, &output),
+        32 => assert_sw_hash::<sha2::Sha256>("SHA-256", input, &output),
+        48 => assert_sw_hash::<sha2::Sha384>("SHA-384", input, &output),
+        64 => assert_sw_hash::<sha2::Sha512>("SHA-512", input, &output),
+        _ => unreachable!(),
+    }
+}
+
+/// A simple test using the Digest trait. This will compare the result with a
+/// software implementation.
+#[track_caller]
+fn assert_digest<'a, S: ShaAlgorithm, const N: usize>(sha: &'a mut Sha<'static>, input: &[u8]) {
+    let mut output = [0u8; N];
+    hash_digest::<S>(sha, input, &mut output);
+
+    // Compare against Software result.
+    match N {
+        20 => assert_sw_hash::<sha1::Sha1>("SHA-1", input, &output),
+        28 => assert_sw_hash::<sha2::Sha224>("SHA-224", input, &output),
+        32 => assert_sw_hash::<sha2::Sha256>("SHA-256", input, &output),
+        48 => assert_sw_hash::<sha2::Sha384>("SHA-384", input, &output),
+        64 => assert_sw_hash::<sha2::Sha512>("SHA-512", input, &output),
+        _ => unreachable!(),
+    }
+}
+
+#[allow(unused_mut)]
+fn with_random_data(
+    mut f: impl FnMut(
+        (&[u8], &mut [u8]),
+        (&[u8], &mut [u8]),
+        (&[u8], &mut [u8]),
+        (&[u8], &mut [u8]),
+        (&[u8], &mut [u8]),
+    ),
+) {
+    // Make sure this is not a multiple of the block size
+    const BUFFER_LEN: usize = 264;
+
+    let mut sha1_random = [0u8; BUFFER_LEN];
+    let mut sha224_random = [0u8; BUFFER_LEN];
+    let mut sha256_random = [0u8; BUFFER_LEN];
+    let mut sha384_random = [0u8; BUFFER_LEN];
+    let mut sha512_random = [0u8; BUFFER_LEN];
+
+    let rng = Rng::new();
+
+    // Fill source data with random data
+    rng.read(&mut sha1_random);
+    #[cfg(not(esp32))]
+    rng.read(&mut sha224_random);
+    rng.read(&mut sha256_random);
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    rng.read(&mut sha384_random);
+    #[cfg(any(esp32, esp32s2, esp32s3))]
+    rng.read(&mut sha512_random);
+
+    for size in [1, 64, 128, 256, BUFFER_LEN] {
+        let mut sha1_output = [0u8; 20];
+        let mut sha224_output = [0u8; 28];
+        let mut sha256_output = [0u8; 32];
+        let mut sha384_output = [0u8; 48];
+        let mut sha512_output = [0u8; 64];
+        f(
+            (&sha1_random[..size], &mut sha1_output[..]),
+            (&sha224_random[..size], &mut sha224_output[..]),
+            (&sha256_random[..size], &mut sha256_output[..]),
+            (&sha384_random[..size], &mut sha384_output[..]),
+            (&sha512_random[..size], &mut sha512_output[..]),
+        );
+
+        // Calculate software result to compare against
+        assert_sw_hash::<sha1::Sha1>("SHA-1", &sha1_random[..size], &sha1_output);
+
+        #[cfg(not(esp32))]
+        assert_sw_hash::<sha2::Sha224>("SHA-224", &sha224_random[..size], &sha224_output);
+
+        assert_sw_hash::<sha2::Sha256>("SHA-256", &sha256_random[..size], &sha256_output);
+
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        assert_sw_hash::<sha2::Sha384>("SHA-384", &sha384_random[..size], &sha384_output);
+
+        #[cfg(any(esp32, esp32s2, esp32s3))]
+        assert_sw_hash::<sha2::Sha512>("SHA-512", &sha512_random[..size], &sha512_output);
+    }
+}
+
 #[embedded_test::tests(default_timeout = 6)]
 mod tests {
-    use digest::{Digest, Update};
-    #[cfg(rng_trng_supported)]
-    use esp_hal::rng::TrngSource;
-    #[cfg(not(esp32))]
-    use esp_hal::sha::Sha224;
-    #[cfg(any(esp32, esp32s2, esp32s3))]
-    use esp_hal::sha::{Sha384, Sha512};
-    #[cfg(any(esp32s2, esp32s3))]
-    use esp_hal::sha::{Sha512_224, Sha512_256};
-    use esp_hal::{
-        clock::CpuClock,
-        rng::Rng,
-        sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaBackend, ShaDigest},
-    };
-    use nb::block;
-
-    const SOURCE_DATA: &[u8] = &[b'a'; 258];
+    use super::*;
 
     pub struct Context {
         #[cfg(rng_trng_supported)]
         _rng_source: TrngSource<'static>,
         sha: Sha<'static>,
-    }
-
-    #[track_caller]
-    fn assert_sw_hash<D: Digest>(algo: &str, input: &[u8], expected_output: &[u8]) {
-        let mut hasher = D::new();
-        hasher.update(input);
-        let soft_result = hasher.finalize();
-
-        hil_test::assert_eq!(
-            expected_output,
-            &soft_result[..],
-            "Output mismatch with {}",
-            algo
-        );
-    }
-
-    fn hash_sha<S: ShaAlgorithm>(sha: &mut Sha<'static>, mut input: &[u8], output: &mut [u8]) {
-        let mut digest = sha.start::<S>();
-        while !input.is_empty() {
-            input = block!(digest.update(input)).unwrap();
-        }
-        block!(digest.finish(output)).unwrap();
-    }
-
-    fn hash_digest<'a, S: ShaAlgorithm>(
-        sha: &'a mut Sha<'static>,
-        input: &[u8],
-        output: &mut [u8],
-    ) {
-        let mut hasher = ShaDigest::<S, _>::new(sha);
-        Update::update(&mut hasher, input);
-        output.copy_from_slice(&digest::FixedOutput::finalize_fixed(hasher));
-    }
-
-    /// A simple test using the Sha trait. This will compare the result with a
-    /// software implementation.
-    #[track_caller]
-    fn assert_sha<S: ShaAlgorithm, const N: usize>(sha: &mut Sha<'static>, input: &[u8]) {
-        let mut output = [0u8; N];
-        hash_sha::<S>(sha, input, &mut output);
-
-        // Compare against Software result.
-        match N {
-            20 => assert_sw_hash::<sha1::Sha1>("SHA-1", input, &output),
-            28 => assert_sw_hash::<sha2::Sha224>("SHA-224", input, &output),
-            32 => assert_sw_hash::<sha2::Sha256>("SHA-256", input, &output),
-            48 => assert_sw_hash::<sha2::Sha384>("SHA-384", input, &output),
-            64 => assert_sw_hash::<sha2::Sha512>("SHA-512", input, &output),
-            _ => unreachable!(),
-        }
-    }
-
-    /// A simple test using the Digest trait. This will compare the result with a
-    /// software implementation.
-    #[track_caller]
-    fn assert_digest<'a, S: ShaAlgorithm, const N: usize>(sha: &'a mut Sha<'static>, input: &[u8]) {
-        let mut output = [0u8; N];
-        hash_digest::<S>(sha, input, &mut output);
-
-        // Compare against Software result.
-        match N {
-            20 => assert_sw_hash::<sha1::Sha1>("SHA-1", input, &output),
-            28 => assert_sw_hash::<sha2::Sha224>("SHA-224", input, &output),
-            32 => assert_sw_hash::<sha2::Sha256>("SHA-256", input, &output),
-            48 => assert_sw_hash::<sha2::Sha384>("SHA-384", input, &output),
-            64 => assert_sw_hash::<sha2::Sha512>("SHA-512", input, &output),
-            _ => unreachable!(),
-        }
-    }
-
-    #[allow(unused_mut)]
-    fn with_random_data(
-        mut f: impl FnMut(
-            (&[u8], &mut [u8]),
-            (&[u8], &mut [u8]),
-            (&[u8], &mut [u8]),
-            (&[u8], &mut [u8]),
-            (&[u8], &mut [u8]),
-        ),
-    ) {
-        // Make sure this is not a multiple of the block size
-        const BUFFER_LEN: usize = 264;
-
-        let mut sha1_random = [0u8; BUFFER_LEN];
-        let mut sha224_random = [0u8; BUFFER_LEN];
-        let mut sha256_random = [0u8; BUFFER_LEN];
-        let mut sha384_random = [0u8; BUFFER_LEN];
-        let mut sha512_random = [0u8; BUFFER_LEN];
-
-        let rng = Rng::new();
-
-        // Fill source data with random data
-        rng.read(&mut sha1_random);
-        #[cfg(not(esp32))]
-        rng.read(&mut sha224_random);
-        rng.read(&mut sha256_random);
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        rng.read(&mut sha384_random);
-        #[cfg(any(esp32, esp32s2, esp32s3))]
-        rng.read(&mut sha512_random);
-
-        for size in [1, 64, 128, 256, BUFFER_LEN] {
-            let mut sha1_output = [0u8; 20];
-            let mut sha224_output = [0u8; 28];
-            let mut sha256_output = [0u8; 32];
-            let mut sha384_output = [0u8; 48];
-            let mut sha512_output = [0u8; 64];
-            f(
-                (&sha1_random[..size], &mut sha1_output[..]),
-                (&sha224_random[..size], &mut sha224_output[..]),
-                (&sha256_random[..size], &mut sha256_output[..]),
-                (&sha384_random[..size], &mut sha384_output[..]),
-                (&sha512_random[..size], &mut sha512_output[..]),
-            );
-
-            // Calculate software result to compare against
-            assert_sw_hash::<sha1::Sha1>("SHA-1", &sha1_random[..size], &sha1_output);
-
-            #[cfg(not(esp32))]
-            assert_sw_hash::<sha2::Sha224>("SHA-224", &sha224_random[..size], &sha224_output);
-
-            assert_sw_hash::<sha2::Sha256>("SHA-256", &sha256_random[..size], &sha256_output);
-
-            #[cfg(any(esp32, esp32s2, esp32s3))]
-            assert_sw_hash::<sha2::Sha384>("SHA-384", &sha384_random[..size], &sha384_output);
-
-            #[cfg(any(esp32, esp32s2, esp32s3))]
-            assert_sw_hash::<sha2::Sha512>("SHA-512", &sha512_random[..size], &sha512_output);
-        }
     }
 
     #[init]
@@ -352,12 +350,51 @@ mod tests {
         });
     }
 
+    /// Test the owned code path (start_owned) to ensure it works with BorrowMut
+    #[test]
+    fn test_sha_owned(ctx: Context) {
+        let mut sha_digest = ctx.sha.start_owned::<Sha256>();
+
+        let mut remaining = SOURCE_DATA;
+        while !remaining.is_empty() {
+            remaining = block!(sha_digest.update(remaining)).unwrap();
+        }
+
+        let mut output = [0u8; 32];
+        block!(sha_digest.finish(&mut output)).unwrap();
+
+        // Verify against software implementation
+        assert_sw_hash::<sha2::Sha256>("SHA-256", SOURCE_DATA, &output);
+    }
+}
+
+#[embedded_test::tests(default_timeout = 6)]
+mod work_queue_tests {
+    use super::*;
+
+    struct Context {
+        sha: ShaBackend<'static>,
+        #[cfg(rng_trng_supported)]
+        _rng_source: TrngSource<'static>,
+    }
+
+    #[init]
+    fn init() -> Context {
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let peripherals = esp_hal::init(config);
+
+        Context {
+            sha: ShaBackend::new(peripherals.SHA),
+            #[cfg(rng_trng_supported)]
+            _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
+        }
+    }
+
     /// Calling finalize repeatedly will first return the result of the first hashing operation,
     /// then return result for hashing 0 bytes.
     #[test]
-    fn test_repeated_finalize_is_empty_hash(_ctx: Context) {
-        let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
-        let _sha_driver = sha_backend.start();
+    fn test_repeated_finalize_is_empty_hash(mut ctx: Context) {
+        let _sha_driver = ctx.sha.start();
 
         let mut sha1 = esp_hal::sha::Sha1Context::new();
         let sha1 = &mut sha1; // Trick to not pick Digest methods erroneously
@@ -380,11 +417,10 @@ mod tests {
 
     #[test]
     #[cfg(not(esp32))]
-    fn test_clone_separates_state(_ctx: Context) {
+    fn test_clone_separates_state(mut ctx: Context) {
         use esp_hal::sha::Sha1Context;
 
-        let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
-        let _sha_driver = sha_backend.start();
+        let _sha_driver = ctx.sha.start();
 
         let mut sha1 = Sha1Context::new();
 
@@ -405,9 +441,8 @@ mod tests {
     /// A rolling test that loops between hasher for every step to test
     /// interleaving. This specifically tests the SHA backend implementation
     #[test]
-    fn test_for_digest_rolling_context(_ctx: Context) {
-        let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
-        let _sha_driver = sha_backend.start();
+    fn test_for_digest_rolling_context(mut ctx: Context) {
+        let _sha_driver = ctx.sha.start();
 
         #[allow(unused)]
         with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
@@ -461,9 +496,8 @@ mod tests {
     /// A rolling test that loops between hasher for every step to test
     /// interleaving. This specifically tests the SHA backend implementation
     #[test]
-    fn test_for_digest_rolling_context_interleaved(_ctx: Context) {
-        let mut sha_backend = ShaBackend::new(unsafe { esp_hal::peripherals::SHA::steal() });
-        let _sha_driver = sha_backend.start();
+    fn test_for_digest_rolling_context_interleaved(mut ctx: Context) {
+        let _sha_driver = ctx.sha.start();
 
         let mut sha1 = esp_hal::sha::Sha1Context::new();
 
@@ -520,22 +554,5 @@ mod tests {
                     .wait_blocking();
             }
         });
-    }
-
-    /// Test the owned code path (start_owned) to ensure it works with BorrowMut
-    #[test]
-    fn test_sha_owned(ctx: Context) {
-        let mut sha_digest = ctx.sha.start_owned::<Sha256>();
-
-        let mut remaining = SOURCE_DATA;
-        while !remaining.is_empty() {
-            remaining = block!(sha_digest.update(remaining)).unwrap();
-        }
-
-        let mut output = [0u8; 32];
-        block!(sha_digest.finish(&mut output)).unwrap();
-
-        // Verify against software implementation
-        assert_sw_hash::<sha2::Sha256>("SHA-256", SOURCE_DATA, &output);
     }
 }

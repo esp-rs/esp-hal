@@ -464,6 +464,7 @@ impl Runner {
                 }
                 if options.no_docs {
                     skip.push(String::from("docs"));
+                    skip.push(String::from("doc-tests"));
                 }
                 if options.no_check_crates {
                     skip.push(String::from("check"));
@@ -778,6 +779,20 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 test: None,
                 toolchain: None,
                 timings: false,
+                package: "hil-test".to_string(),
+            },
+            CargoAction::Build(Some(target_path.join("tests"))),
+        )?;
+
+        tests(
+            workspace,
+            TestsArgs {
+                chip: args.chip,
+                repeat: 1,
+                test: None,
+                toolchain: None,
+                timings: false,
+                package: "hil-test-radio".to_string(),
             },
             CargoAction::Build(Some(target_path.join("tests"))),
         )
