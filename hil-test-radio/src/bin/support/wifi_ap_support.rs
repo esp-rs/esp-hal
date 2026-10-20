@@ -27,7 +27,7 @@ use esp_radio::wifi::{
     ControllerConfig,
     Interface,
     WifiController,
-    ap::AccessPointConfig,
+    ap::{AccessPointConfig, EventInfo},
 };
 use hil_test as _;
 use hil_test::mk_static;
@@ -68,7 +68,7 @@ async fn main(spawner: Spawner) -> ! {
     let device = esp_radio::wifi::Interface::access_point();
     let controller = esp_radio::wifi::WifiController::new(
         p.WIFI,
-        ControllerConfig::default().with_initial_config(access_point_config),
+        ControllerConfig::default().with_initial_config(access_point_config.clone()),
     )
     .unwrap();
 
@@ -91,7 +91,7 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    spawner.spawn(connection(controller).unwrap());
+    spawner.spawn(connection(controller, access_point_config).unwrap());
     spawner.spawn(net_task(runner).unwrap());
     spawner.spawn(run_dhcp(stack, gw_ip_addr_str).unwrap());
 
@@ -191,11 +191,17 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
     }
 }
 
+/// After each station connects, applies the unchanged configuration again. The station must stay
+/// connected (`unchanged_access_point_config_keeps_the_station`).
 #[embassy_executor::task]
-async fn connection(controller: WifiController<'static>) {
+async fn connection(mut controller: WifiController<'static>, config: Config) {
     loop {
-        let _ = controller
+        if let Ok(EventInfo::Connected(_)) = controller
             .wait_for_access_point_connected_event_async()
-            .await;
+            .await
+        {
+            Timer::after(Duration::from_secs(1)).await;
+            controller.set_config(&config).unwrap();
+        }
     }
 }

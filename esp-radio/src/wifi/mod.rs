@@ -3706,7 +3706,7 @@ ignored."
             let mut current: wifi_config_t = core::mem::zeroed();
             if esp_wifi_get_config(wifi_interface_t_WIFI_IF_AP, &mut current)
                 == include::ESP_OK as i32
-                && current.ap == cfg.ap
+                && same_access_point_config(&current.ap, &cfg.ap)
             {
                 return Ok(());
             }
@@ -3913,4 +3913,20 @@ ignored."
             Ok(())
         }
     }
+}
+
+/// Compares the fields that come from [`AccessPointConfig`]. The driver changes others in
+/// the configuration it stores (`sae_pwe_h2e`; `pmf_cfg` and `pairwise_cipher` for some
+/// authentication methods), so a comparison of the whole configuration never matches.
+#[cfg(wifi_softap_support)]
+fn same_access_point_config(current: &wifi_ap_config_t, new: &wifi_ap_config_t) -> bool {
+    current.ssid == new.ssid
+        && current.ssid_len == new.ssid_len
+        && current.password == new.password
+        && current.channel == new.channel
+        && current.authmode == new.authmode
+        && current.ssid_hidden == new.ssid_hidden
+        && current.max_connection == new.max_connection
+        && current.beacon_interval == new.beacon_interval
+        && current.dtim_period == new.dtim_period
 }
