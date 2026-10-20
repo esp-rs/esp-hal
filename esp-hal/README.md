@@ -149,7 +149,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ADC                       | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️       | ⚒️      | ❌       | ⚒️      | ⚒️      | ⚒️      | ⚒️       |
 | Analog Voltage Comparator |       |          |          | [❌][5168] [^1] |          | [❌][5423] [^1] | ❌       | ❌       | ❌       |          |          | ❌        |
 | DAC                       | ⚒️   |          |          |          |          |           |          |          |          | ⚒️      |          | ❌        |
-| Temperature sensor        | ⚒️   | ⚒️      | ⚒️      | [❌][5153] [^1] | ⚒️      | [❌][5421] [^1] | ⚒️      | ❌       | ❌       | ⚒️      | ⚒️      | ❌        |
+| Temperature sensor        | ❌    | ❌       | ⚒️      | [❌][5153] [^1] | ⚒️      | [❌][5421] [^1] | ❌       | ❌       | ❌       | ❌       | ❌       | ❌        |
 | Touch                     | ⚒️   |          |          | [❌][5164] [^1] |          |           |          | ❌       | ❌       | [❌][1905] [^1] | [❌][1905] [^1] | ❌        |
 
 ### Timers and motor control

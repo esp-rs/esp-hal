@@ -1,7 +1,7 @@
 //! This example uses the internal temperature sensor to measure the chip's
 //! temperature
 
-//% CHIP_FILTER: soc_has_tsens
+//% CHIP_FILTER: temp_sensor_driver_supported
 
 #![no_std]
 #![no_main]
@@ -25,7 +25,7 @@ fn main() -> ! {
     let delay = Delay::new();
 
     // Wait for the sensor to stabilize
-    delay.delay_micros(200);
+    delay.delay_micros(300);
 
     loop {
         let temp = temperature_sensor.get_temperature();

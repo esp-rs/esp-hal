@@ -412,6 +412,7 @@ support_status = "not_supported"
 [device.psram]
 extmem_origin = 0x3F800000
 [device.temp_sensor]
+support_status = "not_supported"
 [device.lp_timer]
 
 [device.ulp_fsm]

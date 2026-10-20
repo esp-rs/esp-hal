@@ -257,6 +257,7 @@ channel_count = 6
 ## Miscellaneous
 [device.io_mux]
 [device.temp_sensor]
+support_status = "not_supported"
 [device.systimer]
 [device.lp_timer]
 

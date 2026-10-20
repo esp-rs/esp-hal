@@ -349,6 +349,8 @@ unstable_module! {
     pub mod analog;
     #[cfg(any(systimer_driver_supported, timergroup_driver_supported))]
     pub mod timer;
+    #[cfg(temp_sensor_driver_supported)]
+    pub mod tsens;
     #[cfg(soc_has_lpwr)]
     pub mod rtc_cntl;
     #[cfg(dma_driver_supported)]
@@ -407,8 +409,6 @@ unstable_driver! {
     pub mod touch;
     #[cfg(soc_has_trace0)]
     pub mod trace;
-    #[cfg(soc_has_tsens)]
-    pub mod tsens;
     #[cfg(twai_driver_supported)]
     pub mod twai;
     #[cfg(any(

@@ -412,6 +412,7 @@ instances = {
 [device.io_mux]
 [device.systimer]
 [device.temp_sensor]
+support_status = "not_supported"
 [device.lp_timer]
 
 ## Radio
