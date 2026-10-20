@@ -792,6 +792,12 @@ mod gcm {
     pub const MAX_TEXT: usize = 20_400;
     pub const MAX_AAD: usize = 4_080;
 
+    /// Adds the GCM tests' heap. The test modules share one region, because each test boots on
+    /// its own and the ESP32-S2 cannot fit two.
+    pub fn gcm_heap() {
+        esp_alloc::heap_allocator!(size: 96 * 1024);
+    }
+
     /// One NIST CAVP vector from `gcmtestvectors.zip` (files dated 2012-08-31), with a 96-bit IV
     /// and a 128-bit tag. `plaintext` is `None` for a vector the file marks FAIL.
     pub struct Vector {
@@ -1019,6 +1025,44 @@ mod gcm {
         bytes
     }
 
+    /// As [`compare_with_software`], waiting with `wait` instead of `wait_blocking`.
+    pub async fn compare_with_software_async(key: &[u8], len: usize, aad_len: usize) {
+        let nonce = random::<12>();
+        let aad = random_vec(aad_len);
+        let plaintext = random_vec(len);
+
+        let mut expected = copy_vec(&plaintext);
+        let expected_tag = sw_encrypt(key, &nonce, &aad, &mut expected);
+
+        let mut gcm = AesGcmContext::new(hw_key(key));
+        let mut ciphertext = zeroed_vec(len);
+        let mut tag = [0; 16];
+        let mut handle = gcm
+            .encrypt(&nonce, &aad, &plaintext, &mut ciphertext, &mut tag)
+            .unwrap();
+        handle.wait().await.unwrap();
+        core::mem::drop(handle);
+        hil_test::assert!(
+            ciphertext[..] == expected[..],
+            "len {} aad {}",
+            len,
+            aad_len
+        );
+        hil_test::assert_eq!(tag, expected_tag, "len {} aad {}", len, aad_len);
+
+        let mut handle = gcm
+            .decrypt_in_place(&nonce, &aad, &mut ciphertext, &tag)
+            .unwrap();
+        handle.wait().await.unwrap();
+        core::mem::drop(handle);
+        hil_test::assert!(
+            ciphertext[..] == plaintext[..],
+            "len {} aad {}",
+            len,
+            aad_len
+        );
+    }
+
     /// Encrypts and decrypts `len` random bytes with `aad_len` random bytes of additional data on
     /// the hardware, and compares both with RustCrypto.
     pub fn compare_with_software(key: &[u8], len: usize, aad_len: usize) {
@@ -1159,7 +1203,7 @@ mod gcm_tests {
     fn init() -> Context {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
-        esp_alloc::heap_allocator!(size: 96 * 1024);
+        gcm_heap();
 
         #[cfg(all(soc_has_psram, dma_can_access_psram))]
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
@@ -1629,6 +1673,75 @@ mod gcm_tests {
 
         hil_test::assert_eq!(output, expected);
         hil_test::assert_eq!(tag, expected_tag);
+    }
+
+    /// GCM and ECB operations queued together. The last is waited first, so the earlier results
+    /// must survive until they are asked for. Each GCM operation sets its own block mode, key and
+    /// lengths, and leaves nothing that changes the next operation.
+    #[test]
+    fn test_gcm_mixed_with_ecb(mut ctx: Context) {
+        let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+        fill_with_plaintext(&mut plaintext);
+        let mut ecb_128 = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+        let mut ecb_256 = AesContext::new(Ecb, Operation::Encrypt, KEY_256);
+        let mut ecb_128_out = [0; PLAINTEXT_BUF_SIZE];
+        let mut ecb_256_out = [0; PLAINTEXT_BUF_SIZE];
+
+        let (key_a, key_b) = (random::<16>(), random::<32>());
+        let (nonce_a, nonce_b) = (random::<12>(), random::<12>());
+        let aad_a = random::<16>();
+        let text_a = random::<17>();
+        let text_b = random::<16>();
+        let mut expected_a = text_a;
+        let expected_tag_a = sw_encrypt(&key_a, &nonce_a, &aad_a, &mut expected_a);
+        let mut expected_b = text_b;
+        let expected_tag_b = sw_encrypt(&key_b, &nonce_b, &[], &mut expected_b);
+
+        let mut gcm_a = AesGcmContext::new(hw_key(&key_a));
+        let mut gcm_b = AesGcmContext::new(hw_key(&key_b));
+        let (mut out_a, mut out_b) = ([0; 17], [0; 16]);
+        let (mut tag_a, mut tag_b) = ([0; 16], [0; 16]);
+
+        let ecb_128_handle = ecb_128.process(&plaintext, &mut ecb_128_out).unwrap();
+        let gcm_a_handle = gcm_a
+            .encrypt(&nonce_a, &aad_a, &text_a, &mut out_a, &mut tag_a)
+            .unwrap();
+        let ecb_256_handle = ecb_256.process(&plaintext, &mut ecb_256_out).unwrap();
+        let gcm_b_handle = gcm_b
+            .encrypt(&nonce_b, &[], &text_b, &mut out_b, &mut tag_b)
+            .unwrap();
+
+        let _backend = ctx.aes.start();
+
+        gcm_b_handle.wait_blocking().unwrap();
+        ecb_256_handle.wait_blocking();
+        gcm_a_handle.wait_blocking().unwrap();
+        ecb_128_handle.wait_blocking();
+
+        hil_test::assert_eq!(ecb_128_out, CIPHERTEXT_ECB_128);
+        hil_test::assert_eq!(ecb_256_out, CIPHERTEXT_ECB_256);
+        hil_test::assert_eq!(out_a, expected_a);
+        hil_test::assert_eq!(tag_a, expected_tag_a);
+        hil_test::assert_eq!(out_b, expected_b);
+        hil_test::assert_eq!(tag_b, expected_tag_b);
+    }
+
+    /// Two workers, each with its own key, interleave GCM operations through the queue, and each
+    /// gets its own results.
+    #[test]
+    async fn test_gcm_two_workers(mut ctx: Context) {
+        async fn worker() {
+            let key = random::<32>();
+            for _ in 0..20 {
+                let [len, aad_len] = random::<2>();
+                compare_with_software_async(&key, 1 + len as usize * 4, aad_len as usize % 64)
+                    .await;
+            }
+        }
+
+        let _backend = ctx.aes.start();
+
+        embassy_futures::join::join(worker(), worker()).await;
     }
 }
 
