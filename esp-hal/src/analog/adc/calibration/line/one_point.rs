@@ -1,7 +1,14 @@
 use core::marker::PhantomData;
 
 use super::AdcHasLineCal;
-use crate::analog::adc::{AdcCalBasic, AdcCalEfuse, AdcCalScheme, Attenuation, CalibrationAccess};
+use crate::analog::adc::{
+    AdcCalBasic,
+    AdcCalEfuse,
+    AdcCalScheme,
+    Attenuation,
+    CalibrationAccess,
+    Error,
+};
 
 /// Gain is stored as a `u32`, but is really a fixed-point number.
 const GAIN_SCALE: u32 = 1 << 16;
@@ -19,10 +26,12 @@ const GAIN_SCALE: u32 = 1 << 16;
 ///
 /// This scheme also includes basic calibration ([`AdcCalBasic`]).
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if the chip carries no line-fitting calibration data in eFuse, or if that data gives a
-/// reference point of zero.
+/// Returns [`Error::UnsupportedAttenuation`] if the attenuation has no
+/// reference point on this chip, or [`Error::MissingCalibrationData`] if the
+/// chip carries no line-fitting calibration data or the stored reference
+/// point is zero.
 #[derive(Clone, Copy)]
 pub struct AdcCalLine<ADCX> {
     basic: AdcCalBasic<ADCX>,
@@ -43,23 +52,28 @@ impl<ADCX> AdcCalScheme<ADCX> for AdcCalLine<ADCX>
 where
     ADCX: AdcCalEfuse + AdcHasLineCal + CalibrationAccess,
 {
-    fn new_cal(atten: Attenuation) -> Self {
+    fn new_cal(atten: Attenuation) -> Result<Self, Error> {
         Self::new_cal_with_channel(atten, 0)
     }
 
-    fn new_cal_with_channel(atten: Attenuation, channel: u8) -> Self {
-        let basic = AdcCalBasic::<ADCX>::new_cal_with_channel(atten, channel);
+    fn new_cal_with_channel(atten: Attenuation, channel: u8) -> Result<Self, Error> {
+        let basic = AdcCalBasic::<ADCX>::new_cal_with_channel(atten, channel)?;
 
         // Get the reference point (Dout, Vin) from efuse. Dout means mean raw ADC value when
         // specified Vin applied to input.
         // `cal_mv` goes first: it rejects attenuations without a reference point on the ESP32-C2.
-        let mv = ADCX::cal_mv(atten);
+        let Some(mv) = ADCX::cal_mv(atten) else {
+            return Err(Error::UnsupportedAttenuation(atten));
+        };
         let Some(code) = ADCX::cal_code(atten) else {
-            panic!("This chip needs eFuse calibration data for line fitting")
+            return Err(Error::MissingCalibrationData);
         };
 
-        // Guards the division below, which would otherwise divide by zero.
-        assert!(code != 0, "ADC calibration reference point is zero");
+        // A zero reference point would divide by zero below; it means the eFuse
+        // field was never burnt.
+        if code == 0 {
+            return Err(Error::MissingCalibrationData);
+        }
 
         // Estimate the (assumed) linear relationship between the measured raw value and
         // the voltage with the previously done measurement when the chip was
@@ -69,11 +83,11 @@ where
         // zero-voltage bias for every conversion.
         let gain = mv as u32 * GAIN_SCALE / code as u32;
 
-        Self {
+        Ok(Self {
             basic,
             gain,
             _phantom: PhantomData,
-        }
+        })
     }
 
     fn adc_val(&self, val: u16) -> u16 {

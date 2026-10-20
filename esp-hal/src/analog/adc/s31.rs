@@ -10,7 +10,7 @@ use Interrupt::LP_ADC as InterruptSource;
 use portable_atomic::{AtomicU32, Ordering};
 use procmacros::handler;
 
-use super::{AdcCalScheme, AdcChannel, AdcConfig, AdcPin};
+use super::{AdcCalScheme, AdcChannel, AdcConfig, AdcPin, Error};
 use crate::{
     Async,
     Blocking,
@@ -269,9 +269,18 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
 /// Analog-to-Digital Converter peripheral driver.
 pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: ADC,
+    configured: [bool; NUM_ATTENS],
     active_channel: Option<u8>,
     _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _phantom: PhantomData<(Dm, &'d mut ())>,
+}
+
+fn check_channel_configured(configured: &[bool; NUM_ATTENS], channel: u8) -> Result<(), Error> {
+    if configured[channel as usize] {
+        Ok(())
+    } else {
+        Err(Error::ChannelNotConfigured(channel))
+    }
 }
 
 impl<'d, ADCX> Adc<'d, ADCX, Blocking>
@@ -282,8 +291,10 @@ where
     ///
     /// The ESP32-S31 SAR ADC has a single attenuation setting, so the
     /// attenuation given per pin has no effect.
-    pub fn new(adc_instance: ADCX, _config: AdcConfig<ADCX>) -> Self {
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Result<Self, Error> {
         let guard = GenericPeripheralGuard::new();
+
+        let configured = config.attenuations.map(|attenuation| attenuation.is_some());
 
         // Select XTAL as the digital controller clock and divide it down.
         LP_PERI::regs().adc_ctrl().modify(|_, w| unsafe {
@@ -299,12 +310,13 @@ where
         ADCX::prepare();
         ADCX::reset();
 
-        Adc {
+        Ok(Adc {
             _adc: adc_instance,
+            configured,
             active_channel: None,
             _guard: guard,
             _phantom: PhantomData,
-        }
+        })
     }
 
     /// Reconfigures the ADC driver to operate in asynchronous mode.
@@ -317,6 +329,7 @@ where
 
         Adc {
             _adc: self._adc,
+            configured: self.configured,
             active_channel: self.active_channel,
             _guard: self._guard,
             _phantom: PhantomData,
@@ -328,12 +341,20 @@ where
     ///
     /// The result is in the range 0..=[`FULL_SCALE`], and an input tied to
     /// ground reads about [`ZERO_DIFF_CODE`].
-    pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> u16
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
+    pub fn read_blocking<PIN, CS>(&mut self, pin: &mut AdcPin<PIN, ADCX, CS>) -> Result<u16, Error>
     where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCX>,
     {
-        ADCX::sample(pin.pin.adc_channel())
+        let channel = pin.pin.adc_channel();
+        check_channel_configured(&self.configured, channel)?;
+
+        Ok(ADCX::sample(channel))
     }
 
     /// Requests that the ADC begin a conversion on the specified pin.
@@ -344,26 +365,34 @@ where
     ///
     /// The result is in the range 0..=[`FULL_SCALE`], and an input tied to
     /// ground reads about [`ZERO_DIFF_CODE`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
     pub fn read_oneshot<PIN, CS>(
         &mut self,
         pin: &mut super::AdcPin<PIN, ADCX, CS>,
-    ) -> nb::Result<u16, ()>
+    ) -> nb::Result<u16, Error>
     where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
     {
+        let channel = pin.pin.adc_channel();
+        check_channel_configured(&self.configured, channel).map_err(nb::Error::Other)?;
+
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != pin.pin.adc_channel() {
+            if active_channel != channel {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(pin.pin.adc_channel());
+            self.active_channel = Some(channel);
 
-            ADCX::start(pin.pin.adc_channel());
+            ADCX::start(channel);
         }
 
         if !ADCX::is_done() {
@@ -405,6 +434,7 @@ where
         }
         Adc {
             _adc: self._adc,
+            configured: self.configured,
             active_channel: self.active_channel,
             _guard: self._guard,
             _phantom: PhantomData,
@@ -419,20 +449,31 @@ where
     ///
     /// The result is in the range 0..=[`FULL_SCALE`], and an input tied to
     /// ground reads about [`ZERO_DIFF_CODE`].
-    pub async fn read_oneshot<PIN, CS>(&mut self, pin: &mut super::AdcPin<PIN, ADCX, CS>) -> u16
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
+    pub async fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCX, CS>,
+    ) -> Result<u16, Error>
     where
         ADCX: Instance,
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCX>,
     {
-        ADCX::start(pin.pin.adc_channel());
+        let channel = pin.pin.adc_channel();
+        check_channel_configured(&self.configured, channel)?;
+
+        ADCX::start(channel);
 
         AdcFuture::<ADCX>::new(self).await;
 
         let converted_value = ADCX::read_data();
         ADCX::reset();
 
-        converted_value
+        Ok(converted_value)
     }
 }
 

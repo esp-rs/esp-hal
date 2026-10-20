@@ -364,13 +364,13 @@ pub fn rtc_calib_init_code(unit: AdcCalibUnit, atten: Attenuation) -> Option<u16
 
 /// Returns the ADC reference point voltage for specified attenuation in millivolts.
 #[instability::unstable]
-pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> u16 {
-    match atten {
+pub fn rtc_calib_cal_mv(_unit: AdcCalibUnit, atten: Attenuation) -> Option<u16> {
+    Some(match atten {
         Attenuation::_0dB => 600,
         Attenuation::_2p5dB => 800,
         Attenuation::_6dB => 1000,
         Attenuation::_11dB => 2000,
-    }
+    })
 }
 
 /// Returns the ADC reference point digital code for specified attenuation.
