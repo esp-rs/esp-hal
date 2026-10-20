@@ -110,8 +110,41 @@ unsafe extern "C" fn ipc_handler<const CORE: usize>() {
     3:
         # `callback_handler` takes the callback from `t1`, and may clobber `ra`, `t0` and `t1`.
         sw   ra, 4(sp)
+
+        # Run the callback on the ISR stack of this CPU, unless the CPU already runs on it.
+        csrr t0, mhartid
+        bnez t0, 11f
+
+        la   t0, _isr_stack_bottom_cpu0
+        bltu sp, t0, 10f
+        la   t0, _isr_stack_top_cpu0
+        bltu sp, t0, 13f
+        j    14f
+    10:
+        la   t0, _isr_stack_top_cpu0
+        j    14f
+
+    11:
+        la   t0, _isr_stack_bottom_cpu1
+        bltu sp, t0, 12f
+        la   t0, _isr_stack_top_cpu1
+        bltu sp, t0, 13f
+        j    14f
+    12:
+        la   t0, _isr_stack_top_cpu1
+        j    14f
+
+    13:
+        mv   t0, sp
+    14:
+        addi t0, t0, -16
+        sw   sp, 0(t0)
+        mv   sp, t0
+
         la   t0, {callback_handler}
         jalr ra, 0(t0)
+
+        lw   sp, 0(sp)
         lw   ra, 4(sp)
         la   t1, {state} + {base}
         j    1b

@@ -264,8 +264,11 @@ impl SchedulerState {
     }
 
     /// Selects the next task, and returns whether `task_switch` was called.
+    ///
+    /// `current_sp` is the stack pointer of the interrupted context.
     fn run_scheduler(
         &mut self,
+        current_sp: u32,
         task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext),
     ) -> bool {
         #[cfg(feature = "rtos-trace")]
@@ -273,16 +276,6 @@ impl SchedulerState {
 
         let cpu = Cpu::current();
         let current_cpu = cpu as usize;
-
-        let current_sp: u32;
-        cfg_select! {
-            xtensa => unsafe {
-                core::arch::asm!("mov {0}, sp", out(reg) current_sp);
-            },
-            _ => unsafe {
-                core::arch::asm!("mv {0}, sp", out(reg) current_sp);
-            },
-        }
 
         if !self.per_cpu[cpu as usize].to_delete.is_empty() {
             self.delete_marked_tasks(cpu, current_sp as usize);
@@ -339,9 +332,6 @@ impl SchedulerState {
                 #[cfg(feature = "rtos-trace")]
                 rtos_trace::trace::task_exec_end(); // FIXME: rtos-trace should take the task ID for multi-core
 
-                // TODO: the SMP scheduler relies on at least the context saving to happen within
-                // the scheduler's critical section. We can't run the scheduler on the other core
-                // while it might try to restore a partially saved context.
                 #[cfg(multi_core)]
                 let current_ref = unsafe { current.as_ref() };
                 // The other core can only pick up the task we switch away from if it runs the
@@ -422,8 +412,22 @@ impl SchedulerState {
     }
 
     /// Runs the scheduler, and returns whether it selected a different context.
-    pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) -> bool {
-        self.run_scheduler(|current_context, next_context| {
+    pub(crate) fn switch_task(
+        &mut self,
+        #[cfg(xtensa)] trap_frame: &mut CpuContext,
+        #[cfg(riscv)] current_sp: u32,
+    ) -> bool {
+        #[cfg(xtensa)]
+        let current_sp = trap_frame.A1;
+
+        // The scheduler saves `current_sp` into the old context. The ISR stack belongs to the CPU,
+        // not to a task.
+        debug_assert!(
+            !on_isr_stack(current_sp),
+            "The context switch interrupted code that runs on the ISR stack"
+        );
+
+        self.run_scheduler(current_sp, |current_context, next_context| {
             trace!(
                 "Task switch: {:x} -> {:x}",
                 current_context as usize, next_context as usize
@@ -592,6 +596,32 @@ impl SchedulerState {
     }
 }
 
+/// Returns whether `sp` is in the ISR stack of the current CPU.
+fn on_isr_stack(sp: u32) -> bool {
+    unsafe extern "C" {
+        static _isr_stack_bottom_cpu0: u8;
+        static _isr_stack_top_cpu0: u8;
+        #[cfg(multi_core)]
+        static _isr_stack_bottom_cpu1: u8;
+        #[cfg(multi_core)]
+        static _isr_stack_top_cpu1: u8;
+    }
+
+    let (bottom, top) = match Cpu::current() {
+        Cpu::ProCpu => (
+            &raw const _isr_stack_bottom_cpu0,
+            &raw const _isr_stack_top_cpu0,
+        ),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => (
+            &raw const _isr_stack_bottom_cpu1,
+            &raw const _isr_stack_top_cpu1,
+        ),
+    };
+
+    (bottom as u32..top as u32).contains(&sp)
+}
+
 pub(crate) struct GlobalState {
     pub scheduler: RefCell<SchedulerState>,
     #[cfg(feature = "embassy")]
@@ -651,9 +681,11 @@ impl Scheduler {
     /// give the token to [`Self::release_after_switch`].
     #[cfg(riscv)]
     #[ram]
-    pub(crate) unsafe fn switch_task_keep_lock(&self) -> u32 {
+    pub(crate) unsafe fn switch_task_keep_lock(&self, interrupted_sp: u32) -> u32 {
         let token = unsafe { self.lock.acquire() };
-        let switched = unsafe { &*self.inner.get() }.scheduler().switch_task();
+        let switched = unsafe { &*self.inner.get() }
+            .scheduler()
+            .switch_task(interrupted_sp);
         if switched {
             token.inner()
         } else {

@@ -568,6 +568,12 @@ macro_rules! property {
     ("soc.cpu_mcause_mask", str) => {
         stringify!(63)
     };
+    ("soc.cpu_watchpoints") => {
+        3
+    };
+    ("soc.cpu_watchpoints", str) => {
+        stringify!(3)
+    };
     ("soc.cpu_pmp_granularity") => {
         128
     };

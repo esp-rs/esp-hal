@@ -759,6 +759,9 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(stack_guard_monitoring)]
     crate::soc::enable_main_stack_guard_monitoring();
 
+    #[cfg(feature = "rt")]
+    crate::soc::setup_isr_stack_guard();
+
     #[cfg(all(feature = "rt", enable_pmp, riscv))]
     crate::soc::enable_pmp();
 

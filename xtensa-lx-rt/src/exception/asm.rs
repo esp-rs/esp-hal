@@ -136,11 +136,51 @@ global_asm!(
     rotw 4
     .endm
 
+    // Allocates the exception frame on the ISR stack of the current core, and saves the
+    // interruptee's A1 into it. If A1 is already in the ISR stack (a nested interrupt, or an
+    // exception in an interrupt handler), the frame is allocated below A1. Only A0 is free here.
+    .macro ALLOCATE_FRAME_ON_ISR_STACK
+    rsr     a0, PRID
+    extui   a0, a0, 13, 1
+    bnez    a0, 20f
+
+    l32r    a0, isr_stack_bottom_cpu0
+    bltu    a1, a0, 10f
+    l32r    a0, isr_stack_top_cpu0
+    bltu    a1, a0, 30f
+    j       40f
+10:
+    l32r    a0, isr_stack_top_cpu0
+    j       40f
+
+20:
+    l32r    a0, isr_stack_bottom_cpu1
+    bltu    a1, a0, 21f
+    l32r    a0, isr_stack_top_cpu1
+    bltu    a1, a0, 30f
+    j       40f
+21:
+    l32r    a0, isr_stack_top_cpu1
+    j       40f
+
+30:
+    mov     a0, a1                     // already on the ISR stack: allocate below A1
+40:
+    addmi   a0, a0, -XT_STK_FRMSZ      // only allow multiple of 256
+    s32i    a1, a0, +XT_STK_A1         // save interruptee's A1/SP
+    mov     a1, a0
+    .endm
+
     .macro SAVE_CONTEXT level:req
+    .if \\level <= PS_INTLEVEL_EXCM
+    ALLOCATE_FRAME_ON_ISR_STACK
+    l32i    a0, sp, +XT_STK_A1
+    .else
     mov     a0, a1                     // save a1/sp
     addmi   sp, sp, -XT_STK_FRMSZ      // only allow multiple of 256
 
     s32i    a0, sp, +XT_STK_A1         // save interruptee's A1/SP
+    .endif
     s32e    a0, sp, -12                // for debug backtrace
 
     .ifc \\level,1
@@ -369,9 +409,12 @@ save_context:
     wsr     a3, ps
     rsr     a0, EPC1
 
-    addmi   sp,  sp, +XT_STK_FRMSZ   // go back to spill register region
+    // The frame can be on a different stack than the interruptee. A0-A3 survive
+    // SPILL_REGISTERS, so A3 keeps the frame address.
+    mov     a3,  sp
+    l32i    sp,  sp, +XT_STK_A1      // go back to spill register region
     SPILL_REGISTERS
-    addmi   sp,  sp, -XT_STK_FRMSZ   // return the current stack pointer
+    mov     sp,  a3                  // return the current stack pointer
 
     wsr     a2, PS                   //  restore to the value at entry
     rsync
@@ -502,6 +545,12 @@ restore_context:
 
 global_asm!(
     "
+    .section .rwtext,\"ax\",@progbits
+    .literal isr_stack_bottom_cpu0, _isr_stack_bottom_cpu0
+    .literal isr_stack_top_cpu0, _isr_stack_top_cpu0
+    .literal isr_stack_bottom_cpu1, _isr_stack_bottom_cpu1
+    .literal isr_stack_top_cpu1, _isr_stack_top_cpu1
+
     // Handle Other Exceptions or Level 1 interrupt by storing full context and
     // then calling regular function
     //

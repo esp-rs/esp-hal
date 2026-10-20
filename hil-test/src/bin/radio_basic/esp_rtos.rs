@@ -687,7 +687,7 @@ mod tests {
     }
 
     /// Counts and yields forever. `context` points to the `AtomicUsize` to increment.
-    #[cfg(all(multi_core, riscv))]
+    #[cfg(multi_core)]
     extern "C" fn count_and_yield(context: *mut c_void) {
         let counter = unsafe { &*(context as *const AtomicUsize) };
         loop {
@@ -698,7 +698,7 @@ mod tests {
 
     #[test]
     #[timeout(10)]
-    #[cfg(all(multi_core, riscv))]
+    #[cfg(multi_core)]
     fn unpinned_tasks_survive_migration(ctx: Context) {
         // Unpinned tasks that yield in a loop move between the cores. A periodic high-priority
         // interrupt delays core 0 at random points. Thus, core 1 can take a task that core 0
@@ -780,7 +780,7 @@ mod tests {
     }
 
     /// State that the victim and the waker of `woken_task_runs_on_one_core` share.
-    #[cfg(all(multi_core, riscv))]
+    #[cfg(multi_core)]
     struct WakeTest {
         victim: SemaphoreHandle,
         waker: SemaphoreHandle,
@@ -790,7 +790,7 @@ mod tests {
     }
 
     /// Wakes the waker, then blocks. `context` points to a `WakeTest`.
-    #[cfg(all(multi_core, riscv))]
+    #[cfg(multi_core)]
     extern "C" fn wake_test_victim(context: *mut c_void) {
         let test = unsafe { &*(context as *const WakeTest) };
         loop {
@@ -814,7 +814,7 @@ mod tests {
 
     /// Delays core 0 while the victim blocks, wakes the victim, then blocks. `context` points to a
     /// `WakeTest`.
-    #[cfg(all(multi_core, riscv))]
+    #[cfg(multi_core)]
     extern "C" fn wake_test_waker(context: *mut c_void) {
         let test = unsafe { &*(context as *const WakeTest) };
         loop {
@@ -831,7 +831,7 @@ mod tests {
 
     #[test]
     #[timeout(10)]
-    #[cfg(all(multi_core, riscv))]
+    #[cfg(multi_core)]
     fn woken_task_runs_on_one_core(ctx: Context) {
         // The victim blocks on core 0. The waker on core 1 delays core 0 with a high-priority
         // interrupt before core 0 switches away from the victim. The waker then wakes the victim
@@ -886,7 +886,7 @@ mod tests {
 
     #[test]
     #[timeout(10)]
-    #[cfg(all(multi_core, riscv))]
+    #[cfg(multi_core)]
     fn deleting_migrating_tasks_keeps_other_tasks_alive(ctx: Context) {
         // Core 0 deletes unpinned tasks while they move between the cores. The scheduler must not
         // free a task while core 1 switches away from it, because a new task can then reuse the

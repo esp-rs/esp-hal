@@ -1,4 +1,23 @@
 SECTIONS {
+  .isr_stack (NOLOAD) : ALIGN(16)
+  {
+    _isr_stack_bottom_cpu0 = ABSOLUTE(.);
+    . += ${ESP_HAL_CONFIG_ISR_STACK_SIZE_CPU0};
+    _isr_stack_top_cpu0 = ABSOLUTE(.);
+#IF multi_core
+    _isr_stack_bottom_cpu1 = ABSOLUTE(.);
+    . += ${ESP_HAL_CONFIG_ISR_STACK_SIZE_CPU1};
+    _isr_stack_top_cpu1 = ABSOLUTE(.);
+#ELSE
+    _isr_stack_bottom_cpu1 = _isr_stack_bottom_cpu0;
+    _isr_stack_top_cpu1 = _isr_stack_top_cpu0;
+#ENDIF
+
+    ASSERT(_isr_stack_top_cpu0 % 16 == 0 && _isr_stack_top_cpu1 % 16 == 0, "ISR stack sizes must be multiples of 16.");
+  } > RWDATA
+}
+
+SECTIONS {
   /* must be last segment using RWDATA */
   .stack (NOLOAD) : ALIGN(4)
   {

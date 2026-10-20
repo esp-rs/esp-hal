@@ -35,6 +35,15 @@ pub(crate) fn breakpoint_interrupt(context: &TrapFrame) {
         );
     }
 
+    #[cfg(stack_guard_monitoring)]
+    if dbgcause & 4 != 0 && dbgcause & 0b1111_0000_0000 == 0b0001_0000_0000 {
+        panic!(
+            "\n\nDetected a write to the ISR stack guard value on {:?}\n{:?}",
+            crate::system::Cpu::current(),
+            context
+        );
+    }
+
     panic!(
         "\n\nBreakpoint on {:?}\n{:?}\nDebug cause: {}",
         crate::system::Cpu::current(),
@@ -72,6 +81,13 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
                 "[{:?}] Detected a write to the main stack's guard value at 0x{:x}, possibly called by 0x{:x}",
                 core, mepc, context.ra
             )
+        } else if let Some(id) = crate::soc::ISR_STACK_WATCHPOINT
+            && unsafe { crate::debugger::watchpoint_hit(id) }
+        {
+            panic!(
+                "[{:?}] Detected a write to the ISR stack guard value at 0x{:x}, possibly called by 0x{:x}",
+                core, mepc, context.ra
+            );
         } else {
             if unsafe { crate::debugger::watchpoint_hit(1) } {
                 panic!(

@@ -176,21 +176,50 @@ pub(crate) fn setup_multitasking() {
 unsafe extern "C" fn swint_handler_trampoline() {
     core::arch::naked_asm! {"
         .cfi_startproc
-        # Restore t0. The HAL stub stored the interrupted t0 in mscratch.
-        csrr t0, mscratch
-
         # https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/139d8d8e1d8ee8c0c3ee150de709ceaab5c08417/riscv-dwarf.adoc
         # .cfi_register ra, 0x1341 # Unwind with MEPC as return address, crashes probe-rs
 
-        # Reserve enough stack space for the idle context. A running task saves
-        # directly into its CpuContext instead, avoiding duplicate stores.
-        addi sp, sp, -80 # RISC-V requires 16-byte alignment
+        # Move to the ISR stack of this CPU, unless the CPU already runs on it. t0 is free, because
+        # the HAL stub stored the interrupted t0 in mscratch.
+        csrr t0, mhartid
+        bnez t0, 11f
+
+        la t0, _isr_stack_bottom_cpu0
+        bltu sp, t0, 10f
+        la t0, _isr_stack_top_cpu0
+        bltu sp, t0, 13f
+        j 14f
+10:
+        la t0, _isr_stack_top_cpu0
+        j 14f
+
+11:
+        la t0, _isr_stack_bottom_cpu1
+        bltu sp, t0, 12f
+        la t0, _isr_stack_top_cpu1
+        bltu sp, t0, 13f
+        j 14f
+12:
+        la t0, _isr_stack_top_cpu1
+        j 14f
+
+13:
+        mv t0, sp
+14:
+        # Reserve enough stack space for the idle context and the interrupted stack pointer. A
+        # running task saves directly into its CpuContext instead, avoiding duplicate stores.
+        addi t0, t0, -80 # RISC-V requires 16-byte alignment
+        sw sp, 17*4(t0)
+        mv sp, t0
+
+        # Restore t0. The HAL stub stored the interrupted t0 in mscratch.
+        csrr t0, mscratch
 
         sw tp, 0*4(sp)
         bnez tp, 1f
 
         # Idle has no CpuContext (tp == 0), so preserve its caller-saved
-        # registers on the interrupted stack.
+        # registers on the stack.
         sw ra, 1*4(sp)
         sw t0, 2*4(sp)
         sw t1, 3*4(sp)
@@ -231,6 +260,7 @@ unsafe extern "C" fn swint_handler_trampoline() {
 2:
         # Let's run the interrupt handler, which runs the scheduler. If the scheduler
         # decides we need to switch context, it will change the thread pointer to the new context.
+        lw a0, 17*4(sp)
         la t0, {scheduler_interrupt_handler}
         jalr ra, t0, 0
 
@@ -256,13 +286,13 @@ unsafe extern "C" fn swint_handler_trampoline() {
         lw a6, 15*4(sp)
         lw a7, 16*4(sp)
         lw t0, 2*4(sp)
-        addi sp, sp, 80
+        lw sp, 17*4(sp)
         mret
 
 3:
-        # Free the interrupt stack before saving the old task's SP or loading
+        # Return to the interrupted stack before saving the old task's SP or loading
         # the selected context.
-        addi sp, sp, 80
+        lw sp, 17*4(sp)
 
         # If the thread pointer has not changed, just restore caller-saved registers
         beq t0, tp, 5f # Skip to restoring caller-saved registers in the new context
@@ -356,9 +386,11 @@ unsafe extern "C" fn swint_handler_trampoline() {
 }
 
 /// Returns the token of the scheduler lock if the scheduler selected a new context.
+///
+/// `interrupted_sp` is the stack pointer of the interrupted context.
 #[esp_hal::ram]
-extern "C" fn swint_handler() -> u32 {
-    unsafe { SCHEDULER.switch_task_keep_lock() }
+extern "C" fn swint_handler(interrupted_sp: u32) -> u32 {
+    unsafe { SCHEDULER.switch_task_keep_lock(interrupted_sp) }
 }
 
 #[esp_hal::ram]
