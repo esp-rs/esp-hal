@@ -2491,6 +2491,10 @@ impl CountryInfo {
 }
 
 /// Wi-Fi configuration.
+///
+/// The default country is `"01"` (world safe mode) with IEEE 802.11d enabled, which only allows
+/// channels that are permitted in all regions unless updated by a connected access point or
+/// configured explicitly.
 #[derive(Clone, BuilderLite, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
@@ -3089,6 +3093,9 @@ impl WifiController<'_> {
     /// Wi-Fi completely.
     ///
     /// ## Errors
+    ///
+    /// Returns [`WifiError::InvalidArguments`] if the access point channel is not allowed in the
+    /// configured country (see [`ControllerConfig`]).
     ///
     /// If this function returns an error, the Wi-Fi mode is reset to `NULL` and
     /// the controller is stopped.
