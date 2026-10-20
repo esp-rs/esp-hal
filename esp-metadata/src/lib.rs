@@ -1641,7 +1641,7 @@ fn visible_driver_groups() -> Vec<(&'static str, Vec<&'static SupportItem>)> {
 }
 
 const PERIPHERAL_SUPPORT_INDEX_URL: &str =
-    "https://docs.espressif.com/projects/rust/esp-hal/latest/index.html";
+    "https://docs.espressif.com/projects/rust/esp-hal/main/index.html";
 
 fn group_slug(group: &str) -> String {
     group.to_ascii_lowercase().replace(' ', "-")

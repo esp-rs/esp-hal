@@ -68,14 +68,14 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 
 <!-- The following table is machine generated. Do not edit the comments and the table by hand! -->
 <!-- start chip support table -->
-For a detailed per-chip support matrix, see the [documentation index](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#peripheral-support).
+For a detailed per-chip support matrix, see the [documentation index](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#peripheral-support).
 
  * ❌: Not supported
  * ⚠️: Planned overhaul (unstable, expect major breaking changes)
  * 🚧: Unstable (requires the `unstable` feature)
  * ✔️: Stable
 
-### [GPIO](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#gpio)
+### [GPIO](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#gpio)
 
 | Driver         | Status |
 | -------------- |:------:|
@@ -84,7 +84,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | IOMUX          | 🚧     |
 | LP IO          | 🚧     |
 
-### [Serial interfaces](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#serial-interfaces)
+### [Serial interfaces](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#serial-interfaces)
 
 | Driver          | Status |
 | --------------- |:------:|
@@ -112,7 +112,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | USB OTG HS      | 🚧     |
 | USB Serial/JTAG | 🚧     |
 
-### [Wireless and networking](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#wireless-and-networking)
+### [Wireless and networking](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#wireless-and-networking)
 
 | Driver        | Status |
 | ------------- |:------:|
@@ -121,7 +121,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | IEEE 802.15.4 | 🚧     |
 | Ethernet      | 🚧     |
 
-### [Display and camera](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#display-and-camera)
+### [Display and camera](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#display-and-camera)
 
 | Driver            | Status |
 | ----------------- |:------:|
@@ -131,7 +131,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | RGB display       | 🚧     |
 | SPI LCD interface | [❌][5374] [^1] |
 
-### [Signal processing](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#signal-processing)
+### [Signal processing](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#signal-processing)
 
 | Driver                       | Status |
 | ---------------------------- |:------:|
@@ -144,7 +144,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | CORDIC accelerator           | ❌     |
 | Voice Activity Detection     | ❌     |
 
-### [Analog](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#analog)
+### [Analog](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#analog)
 
 | Driver                    | Status |
 | ------------------------- |:------:|
@@ -154,7 +154,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | Temperature sensor        | 🚧     |
 | Touch                     | 🚧     |
 
-### [Timers and motor control](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#timers-and-motor-control)
+### [Timers and motor control](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#timers-and-motor-control)
 
 | Driver          | Status |
 | --------------- |:------:|
@@ -166,7 +166,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | SYSTIMER        | 🚧     |
 | Timers          | 🚧     |
 
-### [Cryptography and security](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#cryptography-and-security)
+### [Cryptography and security](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#cryptography-and-security)
 
 | Driver                  | Status |
 | ----------------------- |:------:|
@@ -180,7 +180,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | RSA                     | 🚧     |
 | SHA                     | 🚧     |
 
-### [Low power](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#low-power)
+### [Low power](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#low-power)
 
 | Driver           | Status |
 | ---------------- |:------:|
@@ -188,7 +188,7 @@ For a detailed per-chip support matrix, see the [documentation index](https://do
 | ULP (FSM)        | [❌][376] [^1] |
 | ULP (RISC-V)     | 🚧     |
 
-### [System](https://docs.espressif.com/projects/rust/esp-hal/latest/index.html#system)
+### [System](https://docs.espressif.com/projects/rust/esp-hal/main/index.html#system)
 
 | Driver       | Status |
 | ------------ |:------:|

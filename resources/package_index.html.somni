@@ -322,8 +322,8 @@
       color: #777;
     }
 
-    .peri-table .not-impl {
-      color: #777;
+    .not-impl {
+      color: #888;
     }
 
     .peri-table a.issue-link {
@@ -387,6 +387,7 @@
               <span class="peri-legend-item"><span class="peri-icon-tick">✔️</span> Stable</span>
               <span class="peri-legend-item">🚧 Unstable</span>
               <span class="peri-legend-item">⚠️ Planned overhaul</span>
+              <span class="peri-legend-item"><span class="not-impl">—</span> Not supported</span>
             </div>
             <div class="peri-legend-group">
               <span class="peri-legend-heading">Chip Support:</span>
