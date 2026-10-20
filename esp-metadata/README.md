@@ -8,9 +8,24 @@
 
 Metadata for Espressif devices, intended for use in [build scripts].
 
-Firmware crates are meant to depend on `esp-metadata-generated`, not on this crate directly. To update `esp-metadata-generated`, make your changes in `esp-metadata`, then run `cargo xtask update-metadata`.
+Firmware crates are meant to depend on `esp-metadata-generated`, not on this crate directly. To update `esp-metadata-generated`, make your changes in `esp-metadata`, then run `cargo update-metadata`.
 
 [build scripts]: https://doc.rust-lang.org/cargo/reference/build-scripts.html
+
+## Device metadata files
+
+Per-chip metadata lives under `devices/`. Each chip has an entry file at
+`devices/<chip>.toml` that may include fragments from `devices/<chip>/` using:
+
+```toml
+# {include <chip>/fragment.toml}
+```
+
+Includes are expanded as raw text before parsing. Paths are relative to the
+including file's directory, must use forward slashes, and must not contain `..`.
+The marker must appear alone on a line (leading whitespace is allowed). Included
+files may contain further includes; cycles are rejected with the full include
+chain in the error message.
 
 ## [Documentation](https://docs.espressif.com/projects/rust/esp-metadata/latest/)
 

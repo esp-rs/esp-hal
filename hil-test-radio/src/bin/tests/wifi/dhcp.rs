@@ -1,5 +1,6 @@
 #[embedded_test::tests(default_timeout = 45, executor = esp_rtos::embassy::Executor::new())]
 mod tests {
+    use embassy_futures::select::{Either, select};
     use embassy_net::{
         Runner,
         StackResources,
@@ -7,14 +8,9 @@ mod tests {
         tcp::client::{TcpClient, TcpClientState},
     };
     use embassy_time::{Duration, Timer};
-    use esp_hal::{
-        clock::CpuClock,
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::Peripherals,
-        rng::Rng,
-        timer::timg::TimerGroup,
-    };
+    use esp_hal::{clock::CpuClock, peripherals::Peripherals, rng::Rng, timer::timg::TimerGroup};
     use esp_radio::wifi::{
+        AuthenticationMethodConfig,
         Config,
         ControllerConfig,
         Interface,
@@ -40,33 +36,24 @@ mod tests {
     fn station_config() -> Config {
         Config::Station(
             StationConfig::default()
-                .with_ssid("AP")
-                .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
+                .with_ssid("AP".try_into().unwrap())
+                .with_authentication(AuthenticationMethodConfig::Open),
         )
     }
 
     #[embassy_executor::task]
     async fn net_task(mut runner: Runner<'static, Interface>) {
-        defmt::debug!("[STA] Starting network task");
         runner.run().await
     }
 
     #[embassy_executor::task]
     async fn connection(mut controller: WifiController<'static>) {
-        defmt::debug!("[STA] Start connection task");
-
         loop {
             match controller.connect_async().await {
                 Ok(_) => {
-                    defmt::info!("[STA] Wifi connected to");
-
-                    // wait until we're no longer connected
                     controller.wait_for_disconnect_async().await.ok();
-                    defmt::info!("[STA] Disconnected");
                 }
-                Err(e) => {
-                    defmt::info!("[STA] Failed to connect to wifi: {:?}", e);
-                }
+                Err(_) => {}
             }
 
             Timer::after(Duration::from_millis(1500)).await
@@ -101,8 +88,7 @@ mod tests {
 
         let scan_config = ScanConfig::default().with_max(10);
         let result = controller.scan_async(&scan_config).await.unwrap();
-
-        defmt::debug!("[STA] Scan complete, found {} networks", result.len());
+        let _ = result;
 
         spawner.spawn(connection(controller).unwrap());
         spawner.spawn(net_task(runner).unwrap());
@@ -144,12 +130,10 @@ mod tests {
 
     #[test]
     async fn wifi_dhcp_http_test(p: Peripherals) {
-        defmt::info!("[STA] Starting Wi-Fi DHCP HTTP test");
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let wifi_interface = Interface::station();
         let controller = esp_radio::wifi::WifiController::new(
@@ -159,17 +143,35 @@ mod tests {
         .unwrap();
 
         run_http_smoke_test(spawner, controller, wifi_interface).await;
+    }
 
-        defmt::info!("[STA] TEST_DONE: PASS");
+    #[test]
+    async fn unchanged_access_point_config_keeps_the_station(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        let mut controller = esp_radio::wifi::WifiController::new(
+            p.WIFI,
+            ControllerConfig::default().with_initial_config(station_config()),
+        )
+        .unwrap();
+
+        connect_with_retry(&mut controller).await;
+
+        // The support firmware applies its unchanged configuration again 1 s after a station
+        // connects.
+        let disconnect = controller.wait_for_disconnect_async();
+        let result = select(disconnect, Timer::after(Duration::from_secs(5))).await;
+        assert!(
+            matches!(result, Either::Second(())),
+            "The station was disconnected"
+        );
     }
 
     #[test]
     async fn wifi_drop(p: Peripherals) {
-        defmt::info!("[STA] Starting Wi-Fi Drop test");
-
         let timg0 = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
         let mut wifi = p.WIFI;
@@ -195,7 +197,5 @@ mod tests {
         .unwrap();
 
         run_http_smoke_test(spawner, controller, wifi_interface).await;
-
-        defmt::info!("[STA] Wi-Fi drop + recovery PASS");
     }
 }

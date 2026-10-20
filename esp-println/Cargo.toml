@@ -1,6 +1,6 @@
 [package]
 name          = "esp-println"
-version       = "0.17.0"
+version       = "0.18.0"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "Provides `print!` and `println!` implementations for various Espressif devices"
@@ -12,10 +12,12 @@ license       = "MIT OR Apache-2.0"
 links         = "esp-println"
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = ["auto", "defmt-espflash", "critical-section"] }
 check-configs = [
     { features = ["auto"] },
-    { features = ["jtag-serial"], if = 'chip_has("soc_has_usb_device")' },
+    { features = ["jtag-serial"], if = 'soc_has_usb_device' },
     { features = ["uart"] },
     { features = ["no-op"] },
     { features = ["auto", "log-04", "timestamp"] },
@@ -39,17 +41,17 @@ test  = false
 document-features = "0.2"
 
 # Unstable dependencies that are not (strictly) part of the public API
-esp-sync = { version = "0.2.1", path = "../esp-sync", optional = true }
+esp-sync = { version = "0.3.0", path = "../esp-sync", optional = true }
 
 # Optional dependencies
 portable-atomic  = { version = "1.11", optional = true, default-features = false }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt  = { version = "1.0.1", optional = true }
+defmt  = { version = "1.1", optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 log-04 = { package = "log", version = "0.4" }
 
 [features]
@@ -62,9 +64,11 @@ esp32c5 = ["esp-metadata-generated/esp32c5", "esp-sync?/esp32c5"]
 esp32c6  = ["esp-metadata-generated/esp32c6", "esp-sync?/esp32c6"]
 esp32c61 = ["esp-metadata-generated/esp32c61", "esp-sync?/esp32c61"]
 esp32h2 = ["esp-metadata-generated/esp32h2", "esp-sync?/esp32h2"]
+esp32h4 = ["esp-metadata-generated/esp32h4", "esp-sync?/esp32h4"]
 esp32p4 = ["esp-metadata-generated/esp32p4", "esp-sync?/esp32p4"]
 esp32s2 = ["esp-metadata-generated/esp32s2", "esp-sync?/esp32s2"]
 esp32s3 = ["esp-metadata-generated/esp32s3", "esp-sync?/esp32s3"]
+esp32s31 = ["esp-metadata-generated/esp32s31", "esp-sync?/esp32s31"]
 
 ## Use a critical section around print calls. This ensures that the output is consistent.
 critical-section = ["dep:esp-sync"]

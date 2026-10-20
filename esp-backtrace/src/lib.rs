@@ -115,9 +115,8 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     println!("{}", info);
     set_color_code(RESET);
 
-    cfg_if::cfg_if! {
-        if #[cfg(not(stack_dump))]
-        {
+    cfg_select! {
+        not(stack_dump) => {
             println!("");
             println!("Backtrace:");
             println!("");
@@ -132,7 +131,8 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
             for frame in backtrace.frames() {
                 println!("0x{:x}", frame.program_counter());
             }
-        } else {
+        }
+        _ => {
             arch::dump_stack();
         }
     }
@@ -201,20 +201,23 @@ fn abort() -> ! {
     println!("");
     println!("");
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "semihosting")] {
+    cfg_select! {
+        feature = "semihosting" => {
             arch::interrupt_free(|| {
                 semihosting::process::abort();
             });
-        } else if #[cfg(feature = "halt-cores")] {
+        }
+        feature = "halt-cores" => {
             halt();
-        } else if #[cfg(feature = "custom-halt")] {
+        }
+        feature = "custom-halt" => {
             // call custom code
             unsafe extern "Rust" {
                 fn custom_halt() -> !;
             }
             unsafe { custom_halt() }
         }
+        _ => {}
     }
 
     #[allow(unreachable_code)]

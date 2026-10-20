@@ -1,0 +1,149 @@
+use std::path::Path;
+
+use anyhow::{Context, Result, bail};
+
+use super::{build::build_examples, run::run_examples, select};
+use crate::{Package, cargo::CargoAction, firmware::ChipCoverage, metadata::Chip};
+
+const EXAMPLE_ARGUMENT_HINT: &str =
+    "the example name as a token, or `all` to act on every example of the package";
+
+/// Execute the given action on the specified examples.
+pub fn examples(
+    workspace: &Path,
+    package: Package,
+    chip: Chip,
+    example: Option<&str>,
+    action: CargoAction,
+    debug: bool,
+    toolchain: Option<&str>,
+    timings: bool,
+) -> Result<()> {
+    log::debug!("Running examples for '{package}' on '{chip:?}'");
+
+    package
+        .validate_package_chip(&chip)
+        .with_context(|| format!("The package '{package}' does not support the chip '{chip:?}'"))?;
+
+    let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
+
+    // Load all examples which support the specified chip and parse their metadata.
+    let examples = crate::firmware::load_package(workspace, package).with_context(|| {
+        format!(
+            "Failed to load specified examples from {}",
+            package_path.display()
+        )
+    })?;
+
+    let mut examples = examples
+        .into_iter()
+        .filter(|example| example.supports_chip(chip))
+        .collect::<Vec<_>>();
+
+    // Guard only CompileTests; examples/ coverage is legitimately sparse.
+    if package == Package::CompileTests && examples.is_empty() {
+        bail!(
+            "No compile-test project selects chip '{chip}'. Every chip must be covered by at \
+             least one project under compile-tests/ (the `hal` project covers all chips)."
+        );
+    }
+
+    // Skip projects whose forwarded `<dep>/<chip>` feature will not resolve on a
+    // published dependency line that predates the chip.
+    if package == Package::CompileTests && matches!(action, CargoAction::Build(_)) {
+        let mut supported = Vec::with_capacity(examples.len());
+        let mut released = false;
+        for ex in examples {
+            match crate::firmware::compile_test_project_supports_chip(
+                workspace,
+                ex.example_path(),
+                chip,
+            )? {
+                ChipCoverage::Builds => supported.push(ex),
+                ChipCoverage::Skipped { released: r } => released |= r,
+            }
+        }
+        examples = supported;
+        if examples.is_empty() {
+            // A chip no resolving crate ships yet is legitimately untestable; one
+            // this release publishes must be covered.
+            if released {
+                bail!(
+                    "Chip '{chip}' is untested: this release publishes it, but every \
+                     compile-test project that selects it depends on a published line that \
+                     predates it. Add those crates to the release so the `hal` project's pins \
+                     follow them."
+                );
+            }
+            log::warn!(
+                "Skipping compile-tests for {chip}: no crate this build resolves supports it yet"
+            );
+            return Ok(());
+        }
+    }
+
+    examples.sort_by_key(|a| a.binary_name());
+
+    let mut filtered = vec![];
+
+    if let Some(example) = example {
+        filtered.clone_from(&examples);
+        if !example.eq_ignore_ascii_case("all") {
+            filtered.retain(|ex| ex.matches_name(example));
+
+            if filtered.is_empty() {
+                log::warn!(
+                    "Example '{example}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package."
+                );
+
+                let example_name = select(
+                    "Select the example:",
+                    examples
+                        .iter()
+                        .map(|ex| ex.lookup_name(&package_path))
+                        .collect(),
+                    EXAMPLE_ARGUMENT_HINT,
+                )?;
+
+                if let Some(selected) = examples.iter().find(|ex| ex.matches_name(&example_name)) {
+                    filtered.push(selected.clone());
+                }
+            }
+        }
+    } else {
+        let example_name = select(
+            "Select an example:",
+            examples
+                .iter()
+                .map(|ex| ex.lookup_name(&package_path))
+                .collect(),
+            EXAMPLE_ARGUMENT_HINT,
+        )?;
+
+        if let Some(selected) = examples.iter().find(|ex| ex.matches_name(&example_name)) {
+            filtered.push(selected.clone());
+        }
+    }
+
+    match action {
+        CargoAction::Build(out_path) => build_examples(
+            package,
+            chip,
+            debug,
+            toolchain,
+            timings,
+            filtered,
+            &package_path,
+            out_path.as_deref(),
+        ),
+        CargoAction::Run => run_examples(
+            package,
+            chip,
+            debug,
+            toolchain,
+            timings,
+            filtered,
+            &package_path,
+        ),
+    }
+}

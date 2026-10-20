@@ -1,9 +1,9 @@
 [package]
 name          = "esp-storage"
-version       = "0.9.0"
+version       = "0.10.0"
 edition       = "2024"
 rust-version  = "1.95.0"
-description   = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
+description   = "Deprecated in favor of esp_hal::flash (esp-hal) and the partition API of esp-bootloader-esp-idf. Access ESP32 flash, including encrypted read/write."
 documentation = "https://docs.espressif.com/projects/rust/esp-storage/latest/"
 keywords      = ["embedded-storage", "esp32", "espressif", "no-std"]
 categories    = ["embedded", "hardware-support", "no-std"]
@@ -11,36 +11,60 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+chip-features-matter = true
+doc-config = { env = { CARGO_PROFILE_DEBUG_OPT_LEVEL = "3" } }
 check-configs = [
     { features = [] },
+    { features = ["embedded-storage"] },
     { features = ["critical-section"] },
-    { features = ["bytewise-read"]},
-    { features = ["critical-section", "bytewise-read"] },
+    { features = ["bytewise-read"] },
+    { features = ["embedded-storage", "critical-section"] },
+    { features = ["embedded-storage", "critical-section", "bytewise-read"] },
 ]
-clippy-configs = [{ features = ["critical-section", "bytewise-read"] }]
+clippy-configs = [{ features = ["embedded-storage", "critical-section", "bytewise-read"] }]
+host-test-configs = [
+    { features = ["emulation"], test-args = ["--test-threads=1"] },
+    { features = ["emulation", "bytewise-read"], test-args = ["--test-threads=1"] },
+    { features = ["emulation"], test-args = ["--test-threads=1"], miri = true },
+    { features = ["emulation", "bytewise-read"], test-args = ["--test-threads=1"], miri = true },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["esp32c6"]
+features       = ["esp32c6", "embedded-storage"]
 
 [lib]
 bench = false
 
 [dependencies]
-embedded-storage = "0.3.1"
-procmacros       = { version = "0.22.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
-esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false, optional = true}
+embedded-storage       = { version = "0.3.1", optional = true }
+procmacros             = { version = "0.23.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-hal                = { version = "~1.2.0", path = "../esp-hal", default-features = false, optional = true }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
 
 # Optional dependencies
-esp-sync         = { version = "0.2.1", path = "../esp-sync", optional = true }
-esp-rom-sys      = { version = "~0.1", path = "../esp-rom-sys", optional = true }
-defmt  = { version = "1.0.1", optional = true }
+esp-sync         = { version = "0.3.0", path = "../esp-sync", optional = true }
+esp-rom-sys      = { version = "0.1.5", path = "../esp-rom-sys", optional = true }
+defmt  = { version = "1.1", optional = true }
+
+esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32p4 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
 
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2"
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["critical-section"]
@@ -51,6 +75,9 @@ critical-section = []
 ## Bytewise read emulation
 bytewise-read = []
 
+## Implement traits from `embedded-storage` for [`FlashStorage`].
+embedded-storage = ["dep:embedded-storage"]
+
 ## Implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]
 
@@ -58,23 +85,29 @@ defmt = ["dep:defmt"]
 #! One of the following features must be enabled to select the target chip:
 
 ##
-esp32c2   = ["esp-hal/esp32c2", "esp-hal/unstable", "esp-rom-sys/esp32c2", "esp-sync/esp32c2"]
+esp32c2   = ["esp-hal/esp32c2", "esp-hal/unstable", "esp-rom-sys/esp32c2", "esp-sync/esp32c2", "dep:esp32c2"]
 ##
-esp32c3   = ["esp-hal/esp32c3", "esp-hal/unstable", "esp-rom-sys/esp32c3", "esp-sync/esp32c3"]
+esp32c3   = ["esp-hal/esp32c3", "esp-hal/unstable", "esp-rom-sys/esp32c3", "esp-sync/esp32c3", "dep:esp32c3"]
 ##
-esp32c5   = ["esp-hal/esp32c5", "esp-hal/unstable", "esp-rom-sys/esp32c5", "esp-sync/esp32c5"]
+esp32c5   = ["esp-hal/esp32c5", "esp-hal/unstable", "esp-rom-sys/esp32c5", "esp-sync/esp32c5", "dep:esp32c5"]
 ##
-esp32c6   = ["esp-hal/esp32c6", "esp-hal/unstable", "esp-rom-sys/esp32c6", "esp-sync/esp32c6"]
+esp32c6   = ["esp-hal/esp32c6", "esp-hal/unstable", "esp-rom-sys/esp32c6", "esp-sync/esp32c6", "dep:esp32c6"]
 ##
-esp32c61  = ["esp-hal/esp32c61", "esp-hal/unstable", "esp-rom-sys/esp32c61", "esp-sync/esp32c61"]
+esp32c61  = ["esp-hal/esp32c61", "esp-hal/unstable", "esp-rom-sys/esp32c61", "esp-sync/esp32c61", "dep:esp32c61"]
 ##
-esp32h2   = ["esp-hal/esp32h2", "esp-hal/unstable", "esp-rom-sys/esp32h2", "esp-sync/esp32h2"]
+esp32h2   = ["esp-hal/esp32h2", "esp-hal/unstable", "esp-rom-sys/esp32h2", "esp-sync/esp32h2", "dep:esp32h2"]
 ##
-esp32     = ["esp-hal/esp32", "esp-hal/unstable", "esp-rom-sys/esp32", "esp-sync/esp32"]
+esp32h4   = ["esp-hal/esp32h4", "esp-hal/unstable", "esp-rom-sys/esp32h4", "esp-sync/esp32h4", "dep:esp32h4"]
 ##
-esp32s2   = ["esp-hal/esp32s2", "esp-hal/unstable", "esp-rom-sys/esp32s2", "esp-sync/esp32s2"]
+esp32p4   = ["esp-hal/esp32p4", "esp-hal/unstable", "esp-rom-sys/esp32p4", "esp-sync/esp32p4", "dep:esp32p4"]
 ##
-esp32s3   = ["esp-hal/esp32s3", "esp-hal/unstable", "esp-rom-sys/esp32s3", "esp-sync/esp32s3"]
+esp32     = ["esp-hal/esp32", "esp-hal/unstable", "esp-rom-sys/esp32", "esp-sync/esp32", "dep:esp32"]
+##
+esp32s2   = ["esp-hal/esp32s2", "esp-hal/unstable", "esp-rom-sys/esp32s2", "esp-sync/esp32s2", "dep:esp32s2"]
+##
+esp32s3   = ["esp-hal/esp32s3", "esp-hal/unstable", "esp-rom-sys/esp32s3", "esp-sync/esp32s3", "dep:esp32s3"]
+##
+esp32s31  = ["esp-hal/esp32s31", "esp-hal/unstable", "esp-rom-sys/esp32s31", "esp-sync/esp32s31", "dep:esp32s31"]
 ## Used for testing on a host.
 emulation = []
 

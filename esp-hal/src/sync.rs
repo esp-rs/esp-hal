@@ -65,7 +65,7 @@ pub struct RawPriorityLimitedMutex {
 }
 
 impl RawPriorityLimitedMutex {
-    /// Create a new lock that is accessible at or below the given `priority`.
+    /// Creates a new lock that is accessible at or below the given `priority`.
     pub const fn new(priority: Priority) -> Self {
         Self {
             inner: GenericRawMutex::new(PriorityLock(RunLevel::Interrupt(

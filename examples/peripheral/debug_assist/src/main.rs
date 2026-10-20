@@ -2,6 +2,8 @@
 //!
 //! Uncomment the functionality you want to test
 
+//% CHIP_FILTER: assist_debug_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -24,8 +26,8 @@ fn main() -> ! {
     let mut da = DebugAssist::new(peripherals.ASSIST_DEBUG);
     da.set_interrupt_handler(interrupt_handler);
 
-    cfg_if::cfg_if! {
-        if #[cfg(not(feature = "esp32s3"))] {
+    cfg_select! {
+        not(feature = "esp32s3") => {
             use core::ptr::addr_of_mut;
 
             unsafe extern "C" {
@@ -41,7 +43,8 @@ fn main() -> ! {
             let stack_bottom = unsafe { addr_of_mut!(_stack_end) } as *mut _ as u32;
 
             let size = 4096;
-        } else {
+        }
+        _ => {
             let stack_bottom = 0x3fcce000;
 
             let size = 256;

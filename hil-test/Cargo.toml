@@ -4,8 +4,15 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+[package.metadata.espressif]
+aliases = ["test", "tests"]
+
 [lib]
 name = "hil_test"
+
+[[bin]]
+name              = "adc"
+harness           = false
 
 [[bin]]
 name              = "alloc_psram"
@@ -50,6 +57,10 @@ name              = "lcd_cam"
 harness           = false
 
 [[bin]]
+name              = "canfd"
+harness           = false
+
+[[bin]]
 name              = "misc_drivers"
 harness           = false
 
@@ -67,19 +78,16 @@ harness           = false
 required-features = ["embassy", "esp-alloc"]
 
 [[bin]]
-name              = "spi_full_duplex"
+name              = "sdm"
+harness           = false
+required-features = ["unstable"]
+
+[[bin]]
+name              = "spi"
 harness           = false
 
 [[bin]]
-name              = "spi_half_duplex_slave_qspi"
-harness           = false
-
-[[bin]]
-name              = "spi_half_duplex_write_psram"
-harness           = false
-
-[[bin]]
-name              = "storage_read_app_desc"
+name              = "flash"
 harness           = false
 
 [[bin]]
@@ -88,14 +96,12 @@ harness           = false
 
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
-cfg-if             = "1"
 critical-section   = "1"
-defmt              = "1.0.1"
+defmt              = "1.1"
 defmt-rtt          = { version = "1.0.0", optional = true }
 embassy-executor   = { version = "0.10.0", default-features = false }
 embassy-futures    = "0.1"
-embedded-storage   = "0.3.1"
-embassy-sync       = "0.7.0" # TODO: update after trouble-host has been released
+embassy-sync       = "0.8.0"
 embassy-time       = "0.5.0"
 embedded-hal       = "1.0.0"
 embedded-io        = "0.7.1"
@@ -107,23 +113,22 @@ esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
 esp-metadata-generated = { path = "../esp-metadata-generated" }
 esp-rtos           = { path = "../esp-rtos", optional = true }
-esp-storage        = { path = "../esp-storage", optional = true }
 esp-sync           = { path = "../esp-sync" }
 esp-radio          = { path = "../esp-radio", optional = true }
 esp-radio-rtos-driver = { path = "../esp-radio-rtos-driver", optional = true }
 portable-atomic    = "1.11"
-static_cell        = { version = "2.1.0" }
+static_cell        = { version = "2.1.1" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
-trouble-host = { version = "0.6.0", features = [
+trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
 ], optional = true }
 
 primeorder          = { version = "0.13.0", default-features = false }
-crypto-bigint       = { version = "0.5.5", default-features = false }
-digest              = { version = "0.10.7", default-features = false }
+crypto-bigint       = { version = "0.7.5", default-features = false }
+digest              = { version = "0.11", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embedded-test       = { version = "0.7.1", default-features = false, features = ["embassy-010", "external-executor", "semihosting"] }
 hex-literal         = "1.0.0"
@@ -131,8 +136,11 @@ nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 p384                = { version = "0.13.1", default-features = false, features = ["arithmetic"] }
-sha1                = { version = "0.10.6", default-features = false }
-sha2                = { version = "0.10.8", default-features = false }
+sha1                = { version = "0.11", default-features = false }
+sha2                = { version = "0.11", default-features = false }
+sm3                 = { version = "0.5", default-features = false }
+
+paste               = "1.0.15"
 
 [build-dependencies]
 esp-metadata-generated = { path = "../esp-metadata-generated", features = ["build-script"] }
@@ -142,7 +150,7 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 # Add the `embedded-test/defmt` feature for more verbose testing
-defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt"]
+defmt = ["dep:defmt-rtt", "embedded-test/defmt", "esp-hal/defmt", "esp-rtos?/defmt", "esp-radio?/defmt", "esp-radio-rtos-driver?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-rtos", "dep:esp-radio-rtos-driver", "esp-rtos/esp-radio"]
 esp-radio-unstable = ["esp-radio/unstable"]
 embassy = ["dep:esp-rtos", "esp-rtos/embassy"]
@@ -154,7 +162,6 @@ esp32 = [
     "esp-hal/esp32",
     "esp-alloc?/esp32",
     "esp-radio?/esp32",
-    "esp-storage?/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-metadata-generated/esp32",
     "esp-rtos?/esp32",
@@ -163,7 +170,6 @@ esp32c2 = [
     "esp-hal/esp32c2",
     "esp-alloc?/esp32c2",
     "esp-radio?/esp32c2",
-    "esp-storage?/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-metadata-generated/esp32c2",
     "esp-rtos?/esp32c2"
@@ -172,7 +178,6 @@ esp32c3 = [
     "esp-hal/esp32c3",
     "esp-alloc?/esp32c3",
     "esp-radio?/esp32c3",
-    "esp-storage?/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-metadata-generated/esp32c3",
     "esp-rtos?/esp32c3",
@@ -181,7 +186,6 @@ esp32c5 = [
     "esp-hal/esp32c5",
     "esp-alloc?/esp32c5",
     "esp-radio?/esp32c5",
-    "esp-storage?/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-metadata-generated/esp32c5",
     "esp-rtos?/esp32c5",
@@ -190,7 +194,6 @@ esp32c6 = [
     "esp-hal/esp32c6",
     "esp-alloc?/esp32c6",
     "esp-radio?/esp32c6",
-    "esp-storage?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-metadata-generated/esp32c6",
     "esp-rtos?/esp32c6",
@@ -199,7 +202,6 @@ esp32c61 = [
     "esp-hal/esp32c61",
     "esp-alloc?/esp32c61",
     "esp-radio?/esp32c61",
-    "esp-storage?/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-metadata-generated/esp32c61",
     "esp-rtos?/esp32c61",
@@ -208,24 +210,30 @@ esp32h2 = [
     "esp-hal/esp32h2",
     "esp-alloc?/esp32h2",
     "esp-radio?/esp32h2",
-    "esp-storage?/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-metadata-generated/esp32h2",
     "esp-rtos?/esp32h2",
+]
+esp32h4 = [
+    "esp-hal/esp32h4",
+    "esp-alloc?/esp32h4",
+    "esp-radio?/esp32h4",
+    "esp-bootloader-esp-idf/esp32h4",
+    "esp-metadata-generated/esp32h4",
+    "esp-rtos?/esp32h4",
 ]
 esp32p4 = [
     "esp-hal/esp32p4",
     "esp-alloc?/esp32p4",
     "esp-bootloader-esp-idf/esp32p4",
     "esp-metadata-generated/esp32p4",
-    "esp-rtos?/esp32p4"
+    "esp-rtos?/esp32p4",
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
     "esp-hal/esp32s2",
     "esp-alloc?/esp32s2",
     "esp-radio?/esp32s2",
-    "esp-storage?/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-metadata-generated/esp32s2",
     "esp-rtos?/esp32s2"
@@ -235,10 +243,17 @@ esp32s3 = [
     "esp-hal/esp32s3",
     "esp-alloc?/esp32s3",
     "esp-radio?/esp32s3",
-    "esp-storage?/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-metadata-generated/esp32s3",
     "esp-rtos?/esp32s3",
+]
+esp32s31 = [
+    "esp-hal/esp32s31",
+    "esp-alloc?/esp32s31",
+    "esp-radio?/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-metadata-generated/esp32s31",
+    "esp-rtos?/esp32s31",
 ]
 
 psram = ["esp-alloc"]
@@ -255,9 +270,10 @@ overflow-checks  = true
 
 [profile.release]
 codegen-units    = 1
-debug            = 2
 debug-assertions = true
 incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
+# We rarely debug HIL binaries, so let's shrink the .ELF size
+debug            = 0

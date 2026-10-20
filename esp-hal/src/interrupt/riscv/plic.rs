@@ -59,11 +59,18 @@ pub(super) fn current_runlevel() -> u8 {
 ///
 /// # Safety
 ///
-/// This function must only be used to raise the runlevel and to restore it
-/// to a previous value. It must not be used to arbitrarily lower the
-/// runlevel.
+/// Must only be used to raise the runlevel and to restore it to a previous
+/// value. Must not be used to arbitrarily lower the runlevel.
 pub(crate) fn change_current_runlevel(level: RunLevel) -> u8 {
     let prev_interrupt_priority = current_runlevel();
+
+    // The threshold does not mask the machine software interrupt, which carries the context
+    // switch. That switch runs below every elevated run level, so `mie` masks it here instead.
+    #[cfg(context_switch_source = "clint")]
+    match level {
+        RunLevel::Interrupt(_) => unsafe { riscv::register::mie::clear_msoft() },
+        RunLevel::ThreadMode => unsafe { riscv::register::mie::set_msoft() },
+    }
 
     // The CPU responds to interrupts `>= level`, but we want to also disable
     // interrupts at `level` so we set the threshold to `level + 1`.

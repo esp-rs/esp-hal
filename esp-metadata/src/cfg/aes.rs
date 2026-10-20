@@ -3,6 +3,7 @@ use quote::quote;
 use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AesKeyLengthOption {
     /// The key length in bits.
     pub bits: u32,
@@ -15,6 +16,7 @@ pub struct AesKeyLengthOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AesKeyLength {
     /// The supported key length options.
     options: Vec<AesKeyLengthOption>,

@@ -1,5 +1,7 @@
 //! Control LED by the boot button via ETM without involving the CPU.
 
+//% CHIP_FILTER: etm_driver_supported
+
 //! The following wiring is assumed:
 //! - LED => GPIO2
 

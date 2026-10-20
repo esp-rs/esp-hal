@@ -1,13 +1,20 @@
 use enumset::EnumSet;
 
 use super::{
-    super::{Config, DataMode, SpiInterrupt},
+    super::{DataMode, SpiInterrupt},
     Driver,
 };
 use crate::spi::{Error, Mode};
 
 pub(super) fn abort_transfer(driver: &Driver) {
     driver.configure_datalen(1, 1);
+}
+
+pub(super) fn enable_peripheral_clock(driver: &Driver) {
+    driver.regs().clk_gate().modify(|_, w| {
+        w.clk_en().set_bit();
+        w.mst_clk_active().set_bit()
+    });
 }
 
 pub(super) fn init(driver: &Driver) {
@@ -41,7 +48,7 @@ pub(super) fn init_spi_data_mode(
     Ok(())
 }
 
-pub(super) fn apply_config(_driver: &Driver, _config: &Config) {}
+pub(super) fn apply_config(_driver: &Driver) {}
 
 pub(super) fn set_data_mode(driver: &Driver, data_mode: Mode) {
     driver.regs().misc().modify(|_, w| {
@@ -62,6 +69,13 @@ pub(super) fn prepare_half_duplex(_driver: &Driver, _is_write: bool, dummy: u8) 
 
 pub(super) fn setup_half_duplex(driver: &Driver) {
     driver.regs().misc().write(|w| unsafe { w.bits(0) });
+}
+
+pub(super) fn set_cs_keep_active(driver: &Driver, keep_active: bool) {
+    driver
+        .regs()
+        .misc()
+        .modify(|_, w| w.cs_keep_active().bit(keep_active));
 }
 
 pub(super) fn write_address(driver: &Driver, addr: u32) {

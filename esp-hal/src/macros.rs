@@ -139,7 +139,7 @@ macro_rules! any_peripheral {
 
         $(#[$meta])*
         ///
-        /// This struct is a type-erased version of a peripheral singleton. It is useful
+        /// A type-erased version of a peripheral singleton. Useful
         /// for creating arrays of peripherals, or avoiding generics. Peripheral singletons
         /// can be type erased by using their `From` implementation.
         ///
@@ -155,7 +155,7 @@ macro_rules! any_peripheral {
             ///
             /// # Safety
             ///
-            /// You must ensure that you're only using one instance of this type at a time.
+            /// The caller must ensure that only one instance of this type is used at a time.
             #[inline]
             #[allow(unused)]
             pub unsafe fn clone_unchecked(&self) -> Self { unsafe {
@@ -164,8 +164,8 @@ macro_rules! any_peripheral {
 
             /// Creates a new peripheral reference with a shorter lifetime.
             ///
-            /// Use this method if you would like to keep working with the peripheral after
-            /// you dropped the driver that consumes this.
+            /// Use this method to keep working with the peripheral after
+            /// dropping the driver that consumes this.
             ///
             /// See [Peripheral singleton] section for more information.
             ///
@@ -287,17 +287,51 @@ macro_rules! if_set {
     };
 }
 
+#[cfg(feature = "unstable")]
+include!(concat!(env!("OUT_DIR"), "/version_macro.rs"));
+
+#[doc_replace]
+/// Selects code based on the `esp-hal` version.
+///
+/// Branches are considered from top to bottom. The first branch whose version
+/// is less than or equal to the current `esp-hal` version is
+/// expanded. The fallback branch is expanded if no version branch matches.
+///
+/// Version branches should be listed in descending order.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// # {before_snippet}
+/// use esp_hal::at_least_version;
+///
+/// let description = at_least_version! {
+///     (2, 0, 0) => { "esp-hal 2.0.0 or newer" }
+///     (1, 1, 0) => { "esp-hal 1.1.0 or newer" }
+///     _ => { "an older esp-hal version" }
+/// };
+/// # {after_snippet}
+/// ```
+#[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+macro_rules! at_least_version {
+    ($($branch:tt)*) => {
+        $crate::__esp_hal_at_least_version! { $($branch)* }
+    };
+}
+
 /// Macro to ignore tokens.
 ///
-/// This is useful when we need existence of a metavariable (to expand a
-/// repetition), but we don't need to use it.
+/// This is useful when a metavariable must exist (to expand a
+/// repetition), but need not be used.
 #[macro_export]
 #[doc(hidden)]
 macro_rules! ignore {
     ($($item:tt)*) => {};
 }
 
-/// Define a piece of (Espressif-specific) metadata that external tools may
+/// Defines a piece of (Espressif-specific) metadata that external tools may
 /// parse.
 ///
 /// The symbol name be formatted as `_ESP_METADATA_<category>_<name>`.
@@ -413,11 +447,11 @@ macro_rules! assign_resources {
             }
 
             impl<$group_lt> $group_struct<$group_lt> {
-                /// Unsafely create an instance of the assigned peripherals out of thin air.
+                /// Unsafely creates an instance of the assigned peripherals out of thin air.
                 ///
                 /// # Safety
                 ///
-                /// You must ensure that you're only using one instance of the contained peripherals at a time.
+                /// The caller must ensure that only one instance of the contained peripherals is used at a time.
                 pub unsafe fn steal() -> Self {
                     unsafe {
                         Self {
@@ -428,8 +462,8 @@ macro_rules! assign_resources {
 
                 /// Creates a new reference to the peripheral group with a shorter lifetime.
                 ///
-                /// Use this method if you would like to keep working with the peripherals after
-                /// you dropped the drivers that consume this.
+                /// Use this method to keep working with the peripherals after
+                /// dropping the drivers that consume this.
                 pub fn reborrow(&mut self) -> $group_struct<'_> {
                     $group_struct {
                         $($resource_name: self.$resource_name.reborrow()),*
@@ -446,11 +480,11 @@ macro_rules! assign_resources {
         }
 
         impl<$struct_lt> $struct_name<$struct_lt> {
-            /// Unsafely create an instance of the assigned peripherals out of thin air.
+            /// Unsafely creates an instance of the assigned peripherals out of thin air.
             ///
             /// # Safety
             ///
-            /// You must ensure that you're only using one instance of the contained peripherals at a time.
+            /// The caller must ensure that only one instance of the contained peripherals is used at a time.
             pub unsafe fn steal() -> Self {
                 unsafe {
                     Self {
@@ -461,8 +495,8 @@ macro_rules! assign_resources {
 
             /// Creates a new reference to the assigned peripherals with a shorter lifetime.
             ///
-            /// Use this method if you would like to keep working with the peripherals after
-            /// you dropped the drivers that consume this.
+            /// Use this method to keep working with the peripherals after
+            /// dropping the drivers that consume this.
             pub fn reborrow(&mut self) -> $struct_name<'_> {
                 $struct_name {
                     $($group_name: self.$group_name.reborrow()),*
@@ -523,6 +557,7 @@ macro_rules! assign_resources {
 /// ```
 #[doc(hidden)]
 #[rustfmt::skip]
+#[cfg(dma_driver_supported)]
 macro_rules! impl_dma_channel_trait {
     // Single peripheral instance case
     (
@@ -578,4 +613,64 @@ macro_rules! impl_dma_channel_trait {
         }
     };
 }
+#[cfg(dma_driver_supported)]
 pub(crate) use impl_dma_channel_trait;
+#[cfg(feature = "unstable")]
+use procmacros::doc_replace;
+
+/// Reads the RISC-V CSR that `csr` numbers.
+///
+/// The `riscv` crate names no debug CSR and no Espressif custom CSR, so the retention code reads
+/// them by number. `csr` is an `asm!` `const` operand, so it must be a constant expression.
+///
+/// # Safety
+///
+/// The caller must make sure that the CSR exists on this chip, and that the read has no effect
+/// that the caller does not expect.
+#[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+macro_rules! read_csr {
+    ($csr:expr) => {{
+        let value: u32;
+        core::arch::asm!("csrr {0}, {1}", out(reg) value, const $csr);
+        value
+    }};
+}
+#[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+pub(crate) use read_csr;
+
+/// Writes `value` to the RISC-V CSR that `csr` numbers.
+///
+/// `csr` is an `asm!` `const` operand, so it must be a constant expression.
+///
+/// # Safety
+///
+/// The caller must make sure that the CSR exists on this chip, and that the write has no effect
+/// that the caller does not expect.
+#[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+macro_rules! write_csr {
+    ($csr:expr, $value:expr) => {
+        core::arch::asm!("csrw {1}, {0}", in(reg) $value, const $csr)
+    };
+}
+#[cfg(all(cpu_retention = "software", supports_cpu_power_down))]
+pub(crate) use write_csr;
+
+/// Macro to allow using unstable HAL features conditionally. Other crates can
+/// use this to "detect" the esp-hal/unstable feature.
+#[macro_export]
+#[doc(hidden)]
+#[cfg(feature = "unstable")]
+macro_rules! if_unstable_hal {
+    ($($tt:tt)*) => {
+        $($tt)*
+    };
+}
+
+/// Macro to allow using unstable HAL features conditionally. Other crates can
+/// use this to "detect" the esp-hal/unstable feature.
+#[macro_export]
+#[doc(hidden)]
+#[cfg(not(feature = "unstable"))]
+macro_rules! if_unstable_hal {
+    ($($tt:tt)*) => {};
+}

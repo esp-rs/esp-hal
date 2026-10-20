@@ -9,14 +9,14 @@
 //! chip used!
 //!
 //! ```ignore,bash
-//! cargo xtask build examples gpio --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt examples/target/ota_image
-//! cargo xtask build examples update --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
-//! cargo xtask build examples update --chip=esp32
-//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! cargo xtask build gpio esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt target/ota_image
+//! cargo xtask build ota/update esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
+//! cargo xtask build ota/update esp32
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update target/ota_image
 //! espflash erase-flash
-//! cargo xtask run example update --chip=esp32
+//! cargo xtask run ota/update esp32
 //! ```
 //!
 //! On first boot notice the firmware partition gets booted ("Loaded app from
@@ -31,28 +31,31 @@
 //!
 //! See <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html>
 
+//% CHIP_FILTER: flash_driver_supported
+
 #![no_std]
 #![no_main]
 
-use embedded_storage::Storage;
 use esp_backtrace as _;
 use esp_hal::{
+    flash::{Config, Flash},
     gpio::{Input, InputConfig, Pull},
     main,
 };
 use esp_println::println;
-use esp_storage::FlashStorage;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-static OTA_IMAGE: &[u8] = include_bytes!("../../../target/ota_image");
+static OTA_IMAGE: &[u8] = include_bytes!("../../../../target/ota_image");
+
+const SECTOR_SIZE: usize = 4096;
 
 #[main]
 fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut flash = FlashStorage::new(peripherals.FLASH);
+    let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
 
     let mut buffer = [0u8; esp_bootloader_esp_idf::partitions::PARTITION_TABLE_MAX_LEN];
     let pt =
@@ -68,7 +71,13 @@ fn main() -> ! {
     let mut ota =
         esp_bootloader_esp_idf::ota_updater::OtaUpdater::new(&mut flash, &mut buffer).unwrap();
 
-    let current = ota.selected_partition().unwrap();
+    let current = if let Ok(current) = ota.selected_partition() {
+        current
+    } else {
+        ota.reset_data().unwrap();
+        esp_bootloader_esp_idf::partitions::AppPartitionSubType::Factory
+    };
+
     println!(
         "current image state {:?} (only relevant if the bootloader was built with auto-rollback support)",
         ota.current_ota_state()
@@ -88,15 +97,15 @@ fn main() -> ! {
         }
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))] {
-            let button = peripherals.GPIO0;
-        } else if #[cfg(any(feature = "esp32c5"))] {
-            let button = peripherals.GPIO28;
-        }else {
-            let button = peripherals.GPIO9;
-        }
-    }
+    let button =
+        cfg_select! {
+            any(feature = "esp32", feature = "esp32s2", feature = "esp32s3") => peripherals.GPIO0,
+            feature = "esp32c5" => peripherals.GPIO28,
+            feature = "esp32p4" => peripherals.GPIO35,
+            feature = "esp32h4" => peripherals.GPIO34,
+            feature = "esp32s31" => peripherals.GPIO61,
+            _ => peripherals.GPIO9,
+        };
 
     let boot_button = Input::new(button, InputConfig::default().with_pull(Pull::Up));
 
@@ -110,12 +119,24 @@ fn main() -> ! {
 
             println!("Flashing image to {:?}", part_type);
 
-            // write to the app partition
-            for (sector, chunk) in OTA_IMAGE.chunks(4096).enumerate() {
+            // Write to the app partition. The region is encrypted if flash
+            // encryption is enabled.
+            let mut sector_buffer = [0xff; SECTOR_SIZE];
+            for (sector, chunk) in OTA_IMAGE.chunks(SECTOR_SIZE).enumerate() {
                 println!("Writing sector {sector}...");
 
+                let offset = (sector * SECTOR_SIZE) as u32;
                 next_app_partition
-                    .write((sector * 4096) as u32, chunk)
+                    .erase(offset, offset + SECTOR_SIZE as u32)
+                    .unwrap();
+
+                // Encrypted writes must be a multiple of 16 bytes, so pad the
+                // last chunk with erased bytes.
+                sector_buffer.fill(0xff);
+                sector_buffer[..chunk.len()].copy_from_slice(chunk);
+                let len = chunk.len().next_multiple_of(16);
+                next_app_partition
+                    .write(offset, &sector_buffer[..len])
                     .unwrap();
             }
 

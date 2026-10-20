@@ -18,8 +18,8 @@
 use esp_rom_sys::rom::{ets_delay_us, ets_update_cpu_frequency_rom};
 
 use crate::{
-    peripherals::{I2C_ANA_MST, I2C0, I2C1, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1, UART0, UART1},
-    soc::regi2c,
+    peripherals::{I2C_ANA_MST, LPWR, RMT, SYSCON, SYSTEM, TIMG0, TIMG1},
+    soc::{regi2c, xtal32k},
     time::Rate,
 };
 
@@ -54,7 +54,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_6)),
         system_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };
@@ -65,7 +65,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_3)),
         system_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };
@@ -76,7 +76,7 @@ impl CpuClock {
         cpu_pll_div: Some(CpuPllDivConfig::new(CpuPllDivDivisor::_2)),
         system_pre_div: None,
         cpu_clk: Some(CpuClkConfig::Pll),
-        rtc_slow_clk: Some(RtcSlowClkConfig::RcSlow),
+        rtc_slow_clk: Some(xtal32k::default_rtc_slow_clk()),
         rtc_fast_clk: Some(RtcFastClkConfig::Rc),
         timg_calibration_clock: None,
     };
@@ -225,6 +225,12 @@ fn configure_pll_clk_impl(
 ) {
     // Nothing to do. The PLL may still be powered down. We'll configure it in
     // `enable_pll_clk_impl`.
+}
+
+// PLL_F160M_CLK
+
+fn enable_pll_f160m_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
 }
 
 // APLL_CLK
@@ -502,6 +508,7 @@ fn enable_apb_clk_80m_impl(_clocks: &mut ClockTree, _en: bool) {
 
 // XTAL32K_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     // This bit only enables the clock for the digital core, what about RTC? Should we split the
     // clock node in two?
@@ -583,6 +590,7 @@ fn configure_rtc_slow_clk_impl(
     LPWR::regs().clk_conf().modify(|_, w| unsafe {
         w.ana_clk_rtc_sel().bits(match new_config {
             RtcSlowClkConfig::RcSlow => 0,
+            #[cfg(use_xtal32k)]
             RtcSlowClkConfig::Xtal32k => 1,
             RtcSlowClkConfig::RcFast => 2,
         })
@@ -644,6 +652,7 @@ fn configure_timg_calibration_clock_impl(
         w.rtc_cali_clk_sel().bits(match new_config {
             TimgCalibrationClockConfig::RtcClk => 0,
             TimgCalibrationClockConfig::RcFastDivClk => 1,
+            #[cfg(use_xtal32k)]
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
@@ -681,6 +690,15 @@ impl TimgInstance {
     }
 }
 
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.function_clk_en().bit(en));
+    }
+}
 impl RmtInstance {
     // RMT_SCLK
 
@@ -699,92 +717,5 @@ impl RmtInstance {
                 .chconf1(ch_num)
                 .modify(|_, w| w.ref_always_on().bit(new_config == RmtSclkConfig::ApbClk));
         }
-    }
-}
-
-impl UartInstance {
-    // UART_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartFunctionClockConfig>,
-        new_config: UartFunctionClockConfig,
-    ) {
-        let regs = match self {
-            UartInstance::Uart0 => UART0::regs(),
-            UartInstance::Uart1 => UART1::regs(),
-        };
-        regs.conf0().modify(|_, w| {
-            w.tick_ref_always_on()
-                .bit(new_config.sclk == UartFunctionClockSclk::Apb)
-        });
-    }
-
-    // UART_BAUD_RATE_GENERATOR
-
-    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_baud_rate_generator_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartBaudRateGeneratorConfig>,
-        new_config: UartBaudRateGeneratorConfig,
-    ) {
-        let regs = match self {
-            UartInstance::Uart0 => UART0::regs(),
-            UartInstance::Uart1 => UART1::regs(),
-        };
-        regs.clkdiv().write(|w| unsafe {
-            w.clkdiv().bits(new_config.integral as _);
-            w.frag().bits(new_config.fractional as _)
-        });
-    }
-
-    // UART_MEM_CLOCK
-
-    fn enable_mem_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_mem_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartMemClockConfig>,
-        _new_config: UartMemClockConfig,
-    ) {
-        // Nothing to do.
-    }
-}
-
-impl I2cInstance {
-    // I2C_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // No dedicated enable bit on ESP32-S2; clock selection via ref_always_on.
-        let _ = self;
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<I2cFunctionClockConfig>,
-        new_config: I2cFunctionClockConfig,
-    ) {
-        let regs = match self {
-            I2cInstance::I2c0 => I2C0::regs(),
-            I2cInstance::I2c1 => I2C1::regs(),
-        };
-        // ref_always_on: 1 = APB, 0 = REF_TICK
-        regs.ctr().modify(|_, w| {
-            w.ref_always_on()
-                .bit(!matches!(new_config.sclk, I2cFunctionClockSclk::RefTick))
-        });
     }
 }

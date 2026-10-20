@@ -1,6 +1,6 @@
 //! SPI slave loopback test using DMA
 //!
-//! The following wiring is assumed for the (bitbang) slave:
+//! The following wiring is assumed for the slave:
 //!
 //! - SCLK => GPIO0
 //! - MISO => GPIO1
@@ -24,14 +24,16 @@
 //! pins except SCLK. SCLK is between MOSI and VDD3P3_RTC on the barebones chip,
 //! so no immediate neighbor is available.
 
+//% CHIP_FILTER: spi_slave_supports_dma && !esp32
+
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{DmaRxBuf, DmaTxBuf},
-    dma_buffers,
+    dma_rx_buffer,
+    dma_tx_buffer,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     main,
     spi::{Mode, slave::Spi},
@@ -58,17 +60,14 @@ fn main() -> ! {
     let slave_mosi = peripherals.GPIO2;
     let slave_cs = peripherals.GPIO3;
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32s2")] {
-            let dma_channel = peripherals.DMA_SPI2;
-        } else {
-            let dma_channel = peripherals.DMA_CH0;
-        }
-    }
+    let dma_channel = cfg_select! {
+        feature = "esp32s2" => peripherals.DMA_SPI2,
+        any(feature = "esp32p4", feature = "esp32s31") => peripherals.DMA_AXI_CH0,
+        _ => peripherals.DMA_CH0,
+    };
 
-    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
-    let mut slave_receive = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-    let mut slave_send = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+    let mut slave_receive = dma_rx_buffer!(32000).unwrap();
+    let mut slave_send = dma_tx_buffer!(32000).unwrap();
 
     let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
         .with_sck(slave_sclk)

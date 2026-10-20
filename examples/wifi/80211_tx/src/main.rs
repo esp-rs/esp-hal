@@ -2,6 +2,8 @@
 //!
 //! Periodically transmits a beacon frame.
 
+//% CHIP_FILTER: wifi_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -9,14 +11,7 @@ use core::marker::PhantomData;
 
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    delay::Delay,
-    interrupt::software::SoftwareInterruptControl,
-    ram,
-    time::Duration,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, delay::Delay, ram, time::Duration, timer::timg::TimerGroup};
 use esp_println::println;
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
@@ -29,6 +24,12 @@ use ieee80211::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+// Full `.dram2_uninit` region for this chip.
+const DRAM2_UNINIT_SIZE: usize = {
+    let range: core::ops::Range<usize> = esp_metadata_generated::memory_range!("DRAM2_UNINIT");
+    range.end - range.start
+};
+
 const SSID: &str = "esp-radio 802.11 injection";
 /// This is an arbitrary MAC address, used for the fake beacon frames.
 const MAC_ADDRESS: [u8; 6] = [0x00, 0x80, 0x41, 0x13, 0x37, 0x42];
@@ -39,17 +40,16 @@ async fn main(_spawner: embassy_executor::Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
-    // The sniffer borrows the controller, so we only need the controller here —
-    // no station/AP `Interface` is required for raw 802.11 transmit.
+    // Wi-Fi stays initialized while the sniffer is alive — no station/AP
+    // `Interface` is required for raw 802.11 transmit.
     let controller =
         esp_radio::wifi::WifiController::new(peripherals.WIFI, Default::default()).unwrap();
 

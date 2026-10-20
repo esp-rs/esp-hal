@@ -27,11 +27,11 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FadeError {
-    /// Start duty % out of range
+    /// Starts duty % out of range.
     StartDuty,
-    /// End duty % out of range
+    /// Ends duty % out of range.
     EndDuty,
-    /// Duty % change from start to end is out of range
+    /// Duty % change from start to end is out of range.
     DutyRange,
     /// Duration too long for timer frequency and duty resolution
     Duration,
@@ -99,13 +99,13 @@ pub trait ChannelIFace<'a, S: TimerSpeed + 'a>
 where
     Channel<'a, S>: ChannelHW,
 {
-    /// Configure channel
+    /// Configures channel.
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error>;
 
-    /// Set channel duty HW
+    /// Sets channel duty HW.
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error>;
 
-    /// Start a duty-cycle fade
+    /// Starts a duty-cycle fade.
     fn start_duty_fade(
         &self,
         start_duty_pct: u8,
@@ -113,23 +113,23 @@ where
         duration_ms: u16,
     ) -> Result<(), Error>;
 
-    /// Check whether a duty-cycle fade is running
+    /// Returns whether a duty-cycle fade is running.
     fn is_duty_fade_running(&self) -> bool;
 }
 
 /// Channel HW interface
 pub trait ChannelHW {
-    /// Configure Channel HW except for the duty which is set via
+    /// Configures Channel HW except for the duty which is set via
     /// [`Self::set_duty_hw`].
     fn configure_hw(&mut self) -> Result<(), Error>;
-    /// Configure the hardware for the channel with a specific pin
+    /// Configures the hardware for the channel with a specific pin
     /// configuration.
     fn configure_hw_with_drive_mode(&mut self, cfg: DriveMode) -> Result<(), Error>;
 
-    /// Set channel duty HW
+    /// Sets channel duty HW.
     fn set_duty_hw(&self, duty: u32);
 
-    /// Start a duty-cycle fade HW
+    /// Starts a duty-cycle fade HW.
     fn start_duty_fade_hw(
         &self,
         start_duty: u32,
@@ -139,7 +139,7 @@ pub trait ChannelHW {
         duty_per_cycle: u16,
     );
 
-    /// Check whether a duty-cycle fade is running HW
+    /// Returns whether a duty-cycle fade is running HW.
     fn is_duty_fade_running_hw(&self) -> bool;
 }
 
@@ -152,7 +152,7 @@ pub struct Channel<'a, S: TimerSpeed> {
 }
 
 impl<'a, S: TimerSpeed> Channel<'a, S> {
-    /// Return a new channel
+    /// Returns a new channel.
     pub fn new(number: Number, output_pin: impl PeripheralOutput<'a>) -> Self {
         let ledc = LEDC::regs();
         Channel {
@@ -168,7 +168,7 @@ impl<'a, S: TimerSpeed> ChannelIFace<'a, S> for Channel<'a, S>
 where
     Channel<'a, S>: ChannelHW,
 {
-    /// Configure channel
+    /// Configures channel.
     fn configure(&mut self, config: config::Config<'a, S>) -> Result<(), Error> {
         self.timer = Some(config.timer);
 
@@ -178,7 +178,7 @@ where
         Ok(())
     }
 
-    /// Set duty % of channel
+    /// Sets duty % of channel.
     fn set_duty(&self, duty_pct: u8) -> Result<(), Error> {
         let duty_exp;
         if let Some(timer) = self.timer {
@@ -204,9 +204,9 @@ where
         Ok(())
     }
 
-    /// Start a duty fade from one % to another.
+    /// Starts a duty fade from one % to another.
     ///
-    /// There's a constraint on the combination of timer frequency, timer PWM
+    /// There is a constraint on the combination of timer frequency, timer PWM
     /// duty resolution (the bit count), the fade "range" (abs(start-end)), and
     /// the duration:
     ///
@@ -214,8 +214,7 @@ where
     ///
     /// Small percentage changes, long durations, coarse PWM resolutions (that
     /// is, low bit counts), and high timer frequencies will all be more likely
-    /// to fail this requirement.  If it does fail, this function will return
-    /// an error Result.
+    /// to fail this requirement. If it does fail, returns an error.
     fn start_duty_fade(
         &self,
         start_duty_pct: u8,
@@ -355,7 +354,7 @@ impl<S> ChannelHW for Channel<'_, S>
 where
     S: crate::ledc::timer::TimerSpeed,
 {
-    /// Configure Channel HW
+    /// Configures Channel HW.
     fn configure_hw(&mut self) -> Result<(), Error> {
         self.configure_hw_with_drive_mode(DriveMode::PushPull)
     }
@@ -384,14 +383,14 @@ where
         Ok(())
     }
 
-    /// Set duty in channel HW
+    /// Sets duty in channel HW.
     fn set_duty_hw(&self, duty: u32) {
         low_level::set_duty_hw(self.ledc, self.number, S::IS_HS, duty);
         self.start_duty_without_fading();
         self.update_channel();
     }
 
-    /// Start a duty-cycle fade HW
+    /// Starts a duty-cycle fade HW.
     fn start_duty_fade_hw(
         &self,
         start_duty: u32,

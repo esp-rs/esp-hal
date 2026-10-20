@@ -3,6 +3,8 @@
 //! The following wiring is assumed:
 //! - Connect GPIO4 and GPIO5
 
+//% CHIP_FILTER: rmt_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -11,7 +13,6 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    interrupt::software::SoftwareInterruptControl,
     rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
     time::Rate,
     timer::timg::TimerGroup,
@@ -43,16 +44,12 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32h2")] {
-            let freq = Rate::from_mhz(32);
-        } else {
-            let freq = Rate::from_mhz(80);
-        }
+    let freq = cfg_select! {
+        feature = "esp32h2" => Rate::from_mhz(32),
+        _ => Rate::from_mhz(80),
     };
 
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();
@@ -60,15 +57,15 @@ async fn main(spawner: Spawner) {
         .with_clk_divider(255)
         .with_idle_threshold(10000);
 
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let channel = rmt.channel0.configure_rx(&rx_config).unwrap();
-        } else if #[cfg(feature = "esp32s3")] {
-            let channel = rmt.channel7.configure_rx(&rx_config).unwrap();
-        } else {
-            let channel = rmt.channel2.configure_rx(&rx_config).unwrap();
+    let channel = cfg_select! {
+        any(feature = "esp32", feature = "esp32s2") => {
+            rmt.channel0.configure_rx(&rx_config).unwrap()
         }
-    }
+        any(feature = "esp32s3", feature = "esp32s31", feature = "esp32p4") => {
+            rmt.channel7.configure_rx(&rx_config).unwrap()
+        }
+        _ => rmt.channel2.configure_rx(&rx_config).unwrap(),
+    };
 
     let mut channel = channel.with_pin(peripherals.GPIO4);
 
@@ -85,7 +82,11 @@ async fn main(spawner: Spawner) {
 
     loop {
         println!("receive");
-        channel.receive(&mut data).await.unwrap();
+        if channel.receive(&mut data).await.is_err() {
+            println!("receive error");
+            continue;
+        }
+
         let mut total = 0usize;
         for entry in &data[..data.len()] {
             if entry.length1() == 0 {

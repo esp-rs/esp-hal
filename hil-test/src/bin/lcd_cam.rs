@@ -1,387 +1,451 @@
 //! lcd_cam_i8080 and camera tests
-//% CHIPS: esp32s3
-//% FEATURES: unstable
+//!
+//! Camera/DPI loopback uses GPIO `split()` (no jumpers).
+//! ESP32-S31 avoids USB Serial/JTAG (GPIO13/14), Ethernet RGMII (GPIO8-19),
+//! and the CI GPIO2-GPIO3 tie.
+//% CHIP_FILTER: camera_driver_supported
+//% FEATURES: unstable defmt
 
 #![no_std]
 #![no_main]
 
+#[cfg(pcnt_driver_supported)]
+use esp_hal::pcnt::{
+    Unit,
+    channel::{CtrlMode, EdgeMode},
+};
 use esp_hal::{
     Async,
-    Blocking,
-    dma::{DmaChannel, DmaRxBuf, DmaTxBuf},
-    dma_buffers,
+    dma::{DmaChannel, DmaLoopBuf, DmaRxBuf, DmaTxBuf},
+    dma_loop_buffer,
+    dma_rx_buffer,
+    dma_tx_buffer,
     gpio::Level,
     lcd_cam::{
-        BitOrder,
         LcdCam,
         cam::{self, Camera, VhdeMode},
         lcd::{
             ClockMode,
             Phase,
             Polarity,
-            dpi::{self, Dpi, Format, FrameTiming},
+            dpi::{self, Dpi, DpiInterrupt, Format, FrameTiming},
             i8080::{Command, Config, I8080},
         },
     },
-    pcnt::{
-        Pcnt,
-        channel::{CtrlMode, EdgeMode},
-    },
-    peripherals::{DMA_CH0, Peripherals},
+    peripherals::Peripherals,
     time::Rate,
 };
 use hil_test as _;
 
 const DATA_SIZE: usize = 1024 * 10;
 
-#[allow(non_snake_case)]
-struct Pins {
-    pub GPIO8: esp_hal::peripherals::GPIO8<'static>,
-    pub GPIO11: esp_hal::peripherals::GPIO11<'static>,
-    pub GPIO12: esp_hal::peripherals::GPIO12<'static>,
-    pub GPIO16: esp_hal::peripherals::GPIO16<'static>,
-    pub GPIO17: esp_hal::peripherals::GPIO17<'static>,
+fn dpi_test_config() -> dpi::Config {
+    dpi::Config::default()
+        .with_clock_mode(ClockMode {
+            polarity: Polarity::IdleHigh,
+            phase: Phase::ShiftLow,
+        })
+        .with_frequency(Rate::from_khz(500))
+        .with_format(Format {
+            enable_2byte_mode: false,
+            ..Default::default()
+        })
+        .with_timing(FrameTiming {
+            horizontal_total_width: 65,
+            hsync_width: 5,
+            horizontal_blank_front_porch: 10,
+            horizontal_active_width: 50,
+            vertical_total_height: 65,
+            vsync_width: 5,
+            vertical_blank_front_porch: 10,
+            vertical_active_height: 50,
+            hsync_position: 0,
+        })
+        .with_vsync_idle_level(Level::High)
+        .with_hsync_idle_level(Level::High)
+        .with_de_idle_level(Level::Low)
+        .with_disable_black_region(false)
 }
 
-struct AsyncContext<'d> {
-    lcd_cam: LcdCam<'d, Async>,
-    dma: DMA_CH0<'d>,
-    dma_buf: DmaTxBuf,
-}
+cfg_select! {
+    lcd_cam_dma_engine = "AHB_GDMA" => {
+        use esp_hal::peripherals::DMA_CH0 as DmaChannelInstance;
+    }
 
-struct BlockingContext<'d> {
-    lcd_cam: LcdCam<'d, Blocking>,
-    pcnt: Pcnt<'d>,
-    pins: Pins,
-    dma: DMA_CH0<'d>,
-    dma_buf: DmaTxBuf,
-}
-
-struct CameraContext {
-    peripherals: Peripherals,
-    dma_tx_buf: DmaTxBuf,
-    dma_rx_buf: DmaRxBuf,
-}
-
-// lcd_cam_i8080 tests
-mod async_tests {
-    use super::*;
-
-    #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
-    mod tests {
-        use super::*;
-
-        #[init]
-        async fn init() -> AsyncContext<'static> {
-            let peripherals = esp_hal::init(esp_hal::Config::default());
-            let lcd_cam = LcdCam::new(peripherals.LCD_CAM).into_async();
-            let (_, _, tx_buffer, tx_desc) = dma_buffers!(0, DATA_SIZE);
-            let dma_buf = DmaTxBuf::new(tx_desc, tx_buffer).unwrap();
-
-            AsyncContext {
-                lcd_cam,
-                dma: peripherals.DMA_CH0,
-                dma_buf,
-            }
-        }
-
-        #[test]
-        async fn test_i8080_8bit(ctx: AsyncContext<'static>) {
-            let i8080 = I8080::new(
-                ctx.lcd_cam.lcd,
-                ctx.dma,
-                Config::default().with_frequency(Rate::from_mhz(20)),
-            )
-            .unwrap();
-
-            core::mem::drop(ctx.lcd_cam.cam);
-            let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
-
-            transfer.wait_for_done().await;
-            transfer.wait_for_done().await;
-            transfer.wait().0.unwrap();
-        }
+    lcd_cam_dma_engine = "AXI_GDMA" => {
+        use esp_hal::peripherals::DMA_AXI_CH0 as DmaChannelInstance;
     }
 }
 
 // lcd_cam_i8080 tests
-mod blocking_tests {
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod async_tests {
     use super::*;
 
-    #[embedded_test::tests(default_timeout = 3)]
-    mod tests {
-        use super::*;
+    struct Context<'d> {
+        lcd_cam: LcdCam<'d, Async>,
+        dma: DmaChannelInstance<'d>,
+        dma_buf: DmaTxBuf,
+    }
 
-        #[init]
-        fn init() -> BlockingContext<'static> {
-            let peripherals = esp_hal::init(esp_hal::Config::default());
-            let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-            let pcnt = Pcnt::new(peripherals.PCNT);
-            let (_, _, tx_buffer, tx_desc) = dma_buffers!(0, DATA_SIZE);
-            let dma_buf = DmaTxBuf::new(tx_desc, tx_buffer).unwrap();
+    #[init]
+    async fn init() -> Context<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM).into_async();
+        let dma_buf = dma_tx_buffer!(DATA_SIZE).unwrap();
+        let dma_channel = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
 
-            BlockingContext {
-                lcd_cam,
-                dma: peripherals.DMA_CH0,
-                pcnt,
-                pins: Pins {
-                    GPIO8: peripherals.GPIO8,
-                    GPIO11: peripherals.GPIO11,
-                    GPIO12: peripherals.GPIO12,
-                    GPIO16: peripherals.GPIO16,
-                    GPIO17: peripherals.GPIO17,
-                },
-                dma_buf,
-            }
+        Context {
+            lcd_cam,
+            dma: dma_channel,
+            dma_buf,
         }
+    }
 
-        #[test]
-        fn test_i8080_8bit(ctx: BlockingContext<'static>) {
-            let i8080 = I8080::new(
-                ctx.lcd_cam.lcd,
-                ctx.dma,
-                Config::default().with_frequency(Rate::from_mhz(20)),
-            )
-            .unwrap();
+    #[test]
+    async fn test_i8080_8bit(ctx: Context<'static>) {
+        let i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            ctx.dma,
+            Config::default().with_frequency(Rate::from_mhz(20)),
+        )
+        .unwrap();
 
-            let xfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
-            xfer.wait().0.unwrap();
+        core::mem::drop(ctx.lcd_cam.cam);
+        let mut transfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
+
+        transfer.wait_for_done().await;
+        transfer.wait_for_done().await;
+        transfer.wait().0.unwrap();
+    }
+}
+
+// lcd_cam_i8080 tests
+#[cfg(pcnt_driver_supported)]
+#[embedded_test::tests(default_timeout = 3)]
+mod blocking_tests {
+    use esp_hal::{Blocking, gpio::AnyPin, lcd_cam::BitOrder};
+
+    use super::*;
+
+    struct Context<'d> {
+        lcd_cam: LcdCam<'d, Blocking>,
+        units: [Unit<'d>; 4],
+        pins: [AnyPin<'d>; 5],
+        dma: DmaChannelInstance<'d>,
+        dma_buf: DmaTxBuf,
+    }
+
+    #[init]
+    fn init() -> Context<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let dma_buf = dma_tx_buffer!(DATA_SIZE).unwrap();
+        let dma_channel = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+
+        Context {
+            lcd_cam,
+            dma: dma_channel,
+            units: [
+                Unit::new(peripherals.PCNT0_UNIT0),
+                Unit::new(peripherals.PCNT0_UNIT1),
+                Unit::new(peripherals.PCNT0_UNIT2),
+                Unit::new(peripherals.PCNT0_UNIT3),
+            ],
+            pins: [
+                peripherals.GPIO8.into(),
+                peripherals.GPIO11.into(),
+                peripherals.GPIO12.into(),
+                peripherals.GPIO16.into(),
+                peripherals.GPIO17.into(),
+            ],
+            dma_buf,
         }
+    }
 
-        #[test]
-        fn test_i8080_8bit_is_seen_by_pcnt(ctx: BlockingContext<'static>) {
-            let (unit_ctrl, cs_signal) = unsafe { ctx.pins.GPIO8.split() };
-            let (unit0_input, unit0_signal) = unsafe { ctx.pins.GPIO11.split() };
-            let (unit1_input, unit1_signal) = unsafe { ctx.pins.GPIO12.split() };
-            let (unit2_input, unit2_signal) = unsafe { ctx.pins.GPIO16.split() };
-            let (unit3_input, unit3_signal) = unsafe { ctx.pins.GPIO17.split() };
+    #[test]
+    fn test_i8080_8bit(ctx: Context<'static>) {
+        let i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            ctx.dma,
+            Config::default().with_frequency(Rate::from_mhz(20)),
+        )
+        .unwrap();
 
-            let pcnt = ctx.pcnt;
-            pcnt.unit0
-                .channel0
-                .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-            pcnt.unit1
-                .channel0
-                .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-            pcnt.unit2
-                .channel0
-                .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-            pcnt.unit3
-                .channel0
-                .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
+        let xfer = i8080.send(Command::<u8>::None, 0, ctx.dma_buf).unwrap();
+        xfer.wait().0.unwrap();
+    }
 
-            pcnt.unit0
-                .channel0
-                .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            pcnt.unit1
-                .channel0
-                .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            pcnt.unit2
-                .channel0
-                .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            pcnt.unit3
-                .channel0
-                .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+    #[test]
+    fn test_i8080_8bit_is_seen_by_pcnt(ctx: Context<'static>) {
+        let [ctrl, u0, u1, u2, u3] = ctx.pins;
+        let (unit_ctrl, cs_signal) = unsafe { ctrl.split() };
+        let (unit0_input, unit0_signal) = unsafe { u0.split() };
+        let (unit1_input, unit1_signal) = unsafe { u1.split() };
+        let (unit2_input, unit2_signal) = unsafe { u2.split() };
+        let (unit3_input, unit3_signal) = unsafe { u3.split() };
 
-            let mut i8080 = I8080::new(
-                ctx.lcd_cam.lcd,
-                ctx.dma,
-                Config::default().with_frequency(Rate::from_mhz(20)),
-            )
-            .unwrap()
-            .with_cs(cs_signal)
-            .with_data0(unit0_signal)
-            .with_data1(unit1_signal)
-            .with_data2(unit2_signal)
-            .with_data3(unit3_signal);
+        let [unit0, unit1, unit2, unit3] = ctx.units;
+        unit0
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
+        unit1
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
+        unit2
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
+        unit3
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
 
-            core::mem::drop(ctx.lcd_cam.cam);
-            i8080.set_bit_order(BitOrder::Inverted);
+        unit0
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        unit1
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        unit2
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        unit3
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-            pcnt.unit0.channel0.set_edge_signal(unit0_input);
-            pcnt.unit1.channel0.set_edge_signal(unit1_input);
-            pcnt.unit2.channel0.set_edge_signal(unit2_input);
-            pcnt.unit3.channel0.set_edge_signal(unit3_input);
+        let mut i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            ctx.dma,
+            Config::default().with_frequency(Rate::from_mhz(20)),
+        )
+        .unwrap()
+        .with_cs(cs_signal)
+        .with_data0(unit0_signal)
+        .with_data1(unit1_signal)
+        .with_data2(unit2_signal)
+        .with_data3(unit3_signal);
 
-            pcnt.unit0.channel0.set_ctrl_signal(unit_ctrl.clone());
-            pcnt.unit1.channel0.set_ctrl_signal(unit_ctrl.clone());
-            pcnt.unit2.channel0.set_ctrl_signal(unit_ctrl.clone());
-            pcnt.unit3.channel0.set_ctrl_signal(unit_ctrl.clone());
+        core::mem::drop(ctx.lcd_cam.cam);
+        i8080.set_bit_order(BitOrder::Inverted);
 
-            pcnt.unit0.resume();
-            pcnt.unit1.resume();
-            pcnt.unit2.resume();
-            pcnt.unit3.resume();
+        unit0.channel0.set_edge_signal(unit0_input);
+        unit1.channel0.set_edge_signal(unit1_input);
+        unit2.channel0.set_edge_signal(unit2_input);
+        unit3.channel0.set_edge_signal(unit3_input);
 
-            let data_to_send = [
-                0b0000_0000,
-                0b1010_0000,
-                0b0110_0000,
-                0b1110_0000,
-                0b0000_0000,
-                0b1000_0000,
-                0b0100_0000,
-                0b1010_0000,
-                0b0101_0000,
-                0b1000_0000,
-            ];
+        unit0.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit1.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit2.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit3.channel0.set_ctrl_signal(unit_ctrl.clone());
 
-            let mut dma_buf = ctx.dma_buf;
-            dma_buf.as_mut_slice().fill(0);
-            dma_buf.as_mut_slice()[..data_to_send.len()].copy_from_slice(&data_to_send);
+        unit0.resume();
+        unit1.resume();
+        unit2.resume();
+        unit3.resume();
 
-            let xfer = i8080.send(Command::<u8>::None, 0, dma_buf).unwrap();
-            xfer.wait().0.unwrap();
+        let data_to_send = [
+            0b0000_0000,
+            0b1010_0000,
+            0b0110_0000,
+            0b1110_0000,
+            0b0000_0000,
+            0b1000_0000,
+            0b0100_0000,
+            0b1010_0000,
+            0b0101_0000,
+            0b1000_0000,
+        ];
 
-            let actual = [
-                pcnt.unit0.value(),
-                pcnt.unit1.value(),
-                pcnt.unit2.value(),
-                pcnt.unit3.value(),
-            ];
-            assert_eq!([5, 3, 2, 1], actual);
-        }
+        let mut dma_buf = ctx.dma_buf;
+        dma_buf.as_mut_slice().fill(0);
+        dma_buf.as_mut_slice()[..data_to_send.len()].copy_from_slice(&data_to_send);
 
-        #[test]
-        fn test_i8080_16bit_is_seen_by_pcnt(ctx: BlockingContext<'static>) {
-            let (unit_ctrl, cs_signal) = unsafe { ctx.pins.GPIO8.split() };
-            let (unit0_input, unit0_signal) = unsafe { ctx.pins.GPIO11.split() };
-            let (unit1_input, unit1_signal) = unsafe { ctx.pins.GPIO12.split() };
-            let (unit2_input, unit2_signal) = unsafe { ctx.pins.GPIO16.split() };
-            let (unit3_input, unit3_signal) = unsafe { ctx.pins.GPIO17.split() };
+        let xfer = i8080.send(Command::<u8>::None, 0, dma_buf).unwrap();
+        xfer.wait().0.unwrap();
 
-            let pcnt = ctx.pcnt;
-            pcnt.unit0
-                .channel0
-                .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-            pcnt.unit1
-                .channel0
-                .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-            pcnt.unit2
-                .channel0
-                .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
-            pcnt.unit3
-                .channel0
-                .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
+        let actual = [unit0.value(), unit1.value(), unit2.value(), unit3.value()];
+        assert_eq!([5, 3, 2, 1], actual);
+    }
 
-            pcnt.unit0
-                .channel0
-                .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            pcnt.unit1
-                .channel0
-                .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            pcnt.unit2
-                .channel0
-                .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
-            pcnt.unit3
-                .channel0
-                .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+    #[test]
+    fn test_i8080_16bit_is_seen_by_pcnt(ctx: Context<'static>) {
+        let [ctrl, u0, u1, u2, u3] = ctx.pins;
+        let (unit_ctrl, cs_signal) = unsafe { ctrl.split() };
+        let (unit0_input, unit0_signal) = unsafe { u0.split() };
+        let (unit1_input, unit1_signal) = unsafe { u1.split() };
+        let (unit2_input, unit2_signal) = unsafe { u2.split() };
+        let (unit3_input, unit3_signal) = unsafe { u3.split() };
 
-            let mut i8080 = I8080::new(
-                ctx.lcd_cam.lcd,
-                ctx.dma,
-                Config::default().with_frequency(Rate::from_mhz(20)),
-            )
-            .unwrap()
-            .with_cs(cs_signal)
-            .with_data3(unit0_signal)
-            .with_data7(unit1_signal)
-            .with_data11(unit2_signal)
-            .with_data15(unit3_signal);
+        let [unit0, unit1, unit2, unit3] = ctx.units;
+        unit0
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
+        unit1
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
+        unit2
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
+        unit3
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Disable);
 
-            i8080.set_bit_order(BitOrder::Inverted);
+        unit0
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        unit1
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        unit2
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
+        unit3
+            .channel0
+            .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-            pcnt.unit0.channel0.set_edge_signal(unit0_input);
-            pcnt.unit1.channel0.set_edge_signal(unit1_input);
-            pcnt.unit2.channel0.set_edge_signal(unit2_input);
-            pcnt.unit3.channel0.set_edge_signal(unit3_input);
+        let mut i8080 = I8080::new(
+            ctx.lcd_cam.lcd,
+            ctx.dma,
+            Config::default().with_frequency(Rate::from_mhz(20)),
+        )
+        .unwrap()
+        .with_cs(cs_signal)
+        .with_data3(unit0_signal)
+        .with_data7(unit1_signal)
+        .with_data11(unit2_signal)
+        .with_data15(unit3_signal);
 
-            pcnt.unit0.channel0.set_ctrl_signal(unit_ctrl.clone());
-            pcnt.unit1.channel0.set_ctrl_signal(unit_ctrl.clone());
-            pcnt.unit2.channel0.set_ctrl_signal(unit_ctrl.clone());
-            pcnt.unit3.channel0.set_ctrl_signal(unit_ctrl.clone());
+        i8080.set_bit_order(BitOrder::Inverted);
 
-            pcnt.unit0.resume();
-            pcnt.unit1.resume();
-            pcnt.unit2.resume();
-            pcnt.unit3.resume();
+        unit0.channel0.set_edge_signal(unit0_input);
+        unit1.channel0.set_edge_signal(unit1_input);
+        unit2.channel0.set_edge_signal(unit2_input);
+        unit3.channel0.set_edge_signal(unit3_input);
 
-            let data_to_send = [
-                0b0000_0000_0000_0000u16,
-                0b0001_0000_0001_0000,
-                0b0000_0001_0001_0000,
-                0b0001_0001_0001_0000,
-                0b0000_0000_0000_0000,
-                0b0001_0000_0000_0000,
-                0b0000_0001_0000_0000,
-                0b0001_0000_0001_0000,
-                0b0000_0001_0000_0001,
-                0b0001_0000_0000_0000,
-            ];
+        unit0.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit1.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit2.channel0.set_ctrl_signal(unit_ctrl.clone());
+        unit3.channel0.set_ctrl_signal(unit_ctrl.clone());
 
-            let mut dma_buf = ctx.dma_buf;
-            dma_buf
-                .as_mut_slice()
-                .iter_mut()
-                .zip(data_to_send.iter().flat_map(|&d| d.to_ne_bytes()))
-                .for_each(|(d, s)| *d = s);
+        unit0.resume();
+        unit1.resume();
+        unit2.resume();
+        unit3.resume();
 
-            let xfer = i8080.send(Command::<u16>::None, 0, dma_buf).unwrap();
-            xfer.wait().0.unwrap();
+        let data_to_send = [
+            0b0000_0000_0000_0000u16,
+            0b0001_0000_0001_0000,
+            0b0000_0001_0001_0000,
+            0b0001_0001_0001_0000,
+            0b0000_0000_0000_0000,
+            0b0001_0000_0000_0000,
+            0b0000_0001_0000_0000,
+            0b0001_0000_0001_0000,
+            0b0000_0001_0000_0001,
+            0b0001_0000_0000_0000,
+        ];
 
-            let actual = [
-                pcnt.unit0.value(),
-                pcnt.unit1.value(),
-                pcnt.unit2.value(),
-                pcnt.unit3.value(),
-            ];
-            assert_eq!([5, 3, 2, 1], actual);
-        }
+        let mut dma_buf = ctx.dma_buf;
+        dma_buf
+            .as_mut_slice()
+            .iter_mut()
+            .zip(data_to_send.iter().flat_map(|&d| d.to_ne_bytes()))
+            .for_each(|(d, s)| *d = s);
+
+        let xfer = i8080.send(Command::<u16>::None, 0, dma_buf).unwrap();
+        xfer.wait().0.unwrap();
+
+        let actual = [unit0.value(), unit1.value(), unit2.value(), unit3.value()];
+        assert_eq!([5, 3, 2, 1], actual);
     }
 }
 
 // LCD_CAM Camera and DPI tests
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod camera_tests {
+    use core::task::Poll;
+
+    use embassy_futures::{join::join, poll_once};
+    use esp_hal::{dma::DmaError, gpio::interconnect::InputSignal as GpioInputSignal};
+
     use super::*;
 
-    #[embedded_test::tests]
-    mod tests {
-        use super::*;
+    const FRAME_BYTES: usize = 50 * 50;
 
-        #[init]
-        fn init() -> CameraContext {
-            let peripherals = esp_hal::init(esp_hal::Config::default());
-            let (rx_buf, rx_desc, tx_buf, tx_desc) = dma_buffers!(50 * 50);
-            let dma_rx_buf = DmaRxBuf::new(rx_desc, rx_buf).unwrap();
-            let dma_tx_buf = DmaTxBuf::new(tx_desc, tx_buf).unwrap();
+    struct Context {
+        peripherals: Peripherals,
+        dma_tx_buf: DmaTxBuf,
+        dma_rx_buf: DmaRxBuf,
+    }
 
-            CameraContext {
-                peripherals,
-                dma_tx_buf,
-                dma_rx_buf,
-            }
+    #[init]
+    fn init() -> Context {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let dma_rx_buf = dma_rx_buffer!(3 * FRAME_BYTES).unwrap();
+        let dma_tx_buf = dma_tx_buffer!(FRAME_BYTES).unwrap();
+
+        Context {
+            peripherals,
+            dma_tx_buf,
+            dma_rx_buf,
         }
+    }
 
-        #[test]
-        fn test_camera_can_receive_from_rgb(ctx: CameraContext) {
-            let peripherals = ctx.peripherals;
-            let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-            let (rx_channel, tx_channel) = peripherals.DMA_CH2.split();
+    #[test]
+    fn test_camera_configuration(ctx: Context) {
+        let peripherals = ctx.peripherals;
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let dma_channel = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+        let _camera = Camera::new(
+            lcd_cam.cam,
+            dma_channel,
+            cam::Config::default().with_eof_mode(cam::EofMode::VsyncSignal),
+        )
+        .unwrap();
+        let regs = esp_hal::peripherals::LCD_CAM::regs();
+        hil_test::assert!(regs.cam_ctrl().read().cam_vs_eof_en().bit_is_set());
+    }
 
-            let (
-                (vsync_in, vsync_out),
-                (hsync_in, hsync_out),
-                (de_in, de_out),
-                (pclk_in, pclk_out),
-                (d0_in, d0_out),
-                (d1_in, d1_out),
-                (d2_in, d2_out),
-                (d3_in, d3_out),
-                (d4_in, d4_out),
-                (d5_in, d5_out),
-                (d6_in, d6_out),
-                (d7_in, d7_out),
-            ) = unsafe {
+    fn loopback(
+        ctx: Context,
+    ) -> (
+        Camera<'static>,
+        Dpi<'static, esp_hal::Blocking>,
+        DmaTxBuf,
+        DmaRxBuf,
+        GpioInputSignal<'static>,
+    ) {
+        let peripherals = ctx.peripherals;
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let dma_channel = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+        let (rx_channel, tx_channel) = dma_channel.split();
+
+        let (
+            (vsync_in, vsync_out),
+            (hsync_in, hsync_out),
+            (de_in, de_out),
+            (pclk_in, pclk_out),
+            (d0_in, d0_out),
+            (d1_in, d1_out),
+            (d2_in, d2_out),
+            (d3_in, d3_out),
+            (d4_in, d4_out),
+            (d5_in, d5_out),
+            (d6_in, d6_out),
+            (d7_in, d7_out),
+        ) = cfg_select! {
+            esp32s3 => unsafe {
                 (
                     peripherals.GPIO6.split(),
                     peripherals.GPIO7.split(),
@@ -396,84 +460,331 @@ mod camera_tests {
                     peripherals.GPIO17.split(),
                     peripherals.GPIO16.split(),
                 )
-            };
+            },
+            esp32s31 => unsafe {
+                (
+                    peripherals.GPIO20.split(),
+                    peripherals.GPIO21.split(),
+                    peripherals.GPIO22.split(),
+                    peripherals.GPIO23.split(),
+                    peripherals.GPIO24.split(),
+                    peripherals.GPIO25.split(),
+                    peripherals.GPIO35.split(),
+                    peripherals.GPIO42.split(),
+                    peripherals.GPIO43.split(),
+                    peripherals.GPIO46.split(),
+                    peripherals.GPIO47.split(),
+                    peripherals.GPIO48.split(),
+                )
+            },
+        };
 
-            let config = dpi::Config::default()
-                .with_clock_mode(ClockMode {
-                    polarity: Polarity::IdleHigh,
-                    phase: Phase::ShiftLow,
-                })
-                .with_frequency(Rate::from_khz(500))
-                .with_format(Format {
-                    enable_2byte_mode: false,
-                    ..Default::default()
-                })
-                .with_timing(FrameTiming {
-                    horizontal_total_width: 65,
-                    hsync_width: 5,
-                    horizontal_blank_front_porch: 10,
-                    horizontal_active_width: 50,
-                    vertical_total_height: 65,
-                    vsync_width: 5,
-                    vertical_blank_front_porch: 10,
-                    vertical_active_height: 50,
-                    hsync_position: 0,
-                })
-                .with_vsync_idle_level(Level::High)
-                .with_hsync_idle_level(Level::High)
-                .with_de_idle_level(Level::Low)
-                .with_disable_black_region(false);
-
-            let dpi = Dpi::new(lcd_cam.lcd, tx_channel, config)
-                .unwrap()
-                .with_vsync(vsync_out)
-                .with_hsync(hsync_out)
-                .with_de(de_out)
-                .with_pclk(pclk_out)
-                .with_data0(d0_out)
-                .with_data1(d1_out)
-                .with_data2(d2_out)
-                .with_data3(d3_out)
-                .with_data4(d4_out)
-                .with_data5(d5_out)
-                .with_data6(d6_out)
-                .with_data7(d7_out);
-
-            let camera = Camera::new(
-                lcd_cam.cam,
-                rx_channel,
-                cam::Config::default()
-                    .with_frequency(Rate::from_mhz(1))
-                    .with_vh_de_mode(VhdeMode::VsyncHsync),
-            )
+        let dpi = Dpi::new(lcd_cam.lcd, tx_channel, dpi_test_config())
             .unwrap()
-            .with_vsync(vsync_in)
-            .with_hsync(hsync_in)
-            .with_h_enable(de_in)
-            .with_pixel_clock(pclk_in)
-            .with_data0(d0_in)
-            .with_data1(d1_in)
-            .with_data2(d2_in)
-            .with_data3(d3_in)
-            .with_data4(d4_in)
-            .with_data5(d5_in)
-            .with_data6(d6_in)
-            .with_data7(d7_in);
+            .with_vsync(vsync_out)
+            .with_hsync(hsync_out)
+            .with_de(de_out)
+            .with_pclk(pclk_out)
+            .with_data0(d0_out)
+            .with_data1(d1_out)
+            .with_data2(d2_out)
+            .with_data3(d3_out)
+            .with_data4(d4_out)
+            .with_data5(d5_out)
+            .with_data6(d6_out)
+            .with_data7(d7_out);
 
-            let mut dma_tx_buf = ctx.dma_tx_buf;
-            let mut dma_rx_buf = ctx.dma_rx_buf;
+        let camera = Camera::new(
+            lcd_cam.cam,
+            rx_channel,
+            cam::Config::default()
+                .with_frequency(Rate::from_mhz(2))
+                .with_vh_de_mode(VhdeMode::VsyncHsync),
+        )
+        .unwrap()
+        .with_vsync(vsync_in)
+        .with_hsync(hsync_in)
+        .with_h_enable(de_in)
+        .with_pixel_clock(pclk_in.clone())
+        .with_data0(d0_in)
+        .with_data1(d1_in)
+        .with_data2(d2_in)
+        .with_data3(d3_in)
+        .with_data4(d4_in)
+        .with_data5(d5_in)
+        .with_data6(d6_in)
+        .with_data7(d7_in);
 
-            for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-                *b = (i % 256) as u8;
-            }
+        let mut dma_tx_buf = ctx.dma_tx_buf;
+        let mut dma_rx_buf = ctx.dma_rx_buf;
+        dma_tx_buf.set_length(FRAME_BYTES);
+        dma_rx_buf.set_length(FRAME_BYTES);
 
-            let camera_transfer = camera.receive(dma_rx_buf).map_err(|e| e.0).unwrap();
-            let dpi_transfer = dpi.send(true, dma_tx_buf).map_err(|e| e.0).unwrap();
-
-            (_, _, dma_rx_buf) = camera_transfer.wait();
-            (_, dma_tx_buf) = dpi_transfer.stop();
-
-            assert_eq!(dma_tx_buf.as_slice(), dma_rx_buf.as_slice());
+        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+            *b = (i % FRAME_BYTES % 256) as u8;
         }
+
+        (camera, dpi, dma_tx_buf, dma_rx_buf, pclk_in)
+    }
+
+    fn pulse_camera_vsync(pclk: &GpioInputSignal<'static>) {
+        use esp_hal::gpio::{InputSignal, interconnect::PeripheralSignal};
+
+        let delay = esp_hal::delay::Delay::new();
+        // Keep PCLK running during manual VSYNC pulses.
+        for vsync in [Level::Low, Level::High] {
+            vsync.connect_input_to_peripheral(InputSignal::CAM_V_SYNC);
+            for _ in 0..10 {
+                Level::Low.connect_input_to_peripheral(InputSignal::CAM_PCLK);
+                delay.delay_micros(1);
+                Level::High.connect_input_to_peripheral(InputSignal::CAM_PCLK);
+                delay.delay_micros(1);
+            }
+        }
+        InputSignal::CAM_PCLK.connect_to(pclk);
+    }
+
+    fn send_frame(
+        dpi: Dpi<'static, esp_hal::Blocking>,
+        sent: DmaTxBuf,
+        pclk: &GpioInputSignal<'static>,
+    ) -> (Dpi<'static, esp_hal::Blocking>, DmaTxBuf) {
+        let output = dpi.send(false, sent).map_err(|e| e.0).unwrap();
+        let (result, dpi, sent) = output.wait();
+        hil_test::assert_eq!(result, Ok(()));
+        // Pulse VSYNC after pixel input has stopped.
+        pulse_camera_vsync(pclk);
+        (dpi, sent)
+    }
+
+    #[test]
+    fn test_camera_can_receive_from_rgb(ctx: Context) {
+        let (camera, dpi, dma_tx_buf, dma_rx_buf, _) = loopback(ctx);
+        let camera_transfer = camera.receive(dma_rx_buf).map_err(|e| e.0).unwrap();
+        let dpi_transfer = dpi.send(true, dma_tx_buf).map_err(|e| e.0).unwrap();
+        let (result, _, dma_rx_buf) = camera_transfer.wait();
+        let (_, dma_tx_buf) = dpi_transfer.stop();
+
+        hil_test::assert_eq!(result, Ok(()));
+        hil_test::assert_eq!(dma_rx_buf.number_of_received_bytes(), FRAME_BYTES);
+        hil_test::assert_eq!(
+            &dma_tx_buf.as_slice()[..FRAME_BYTES],
+            &dma_rx_buf.as_slice()[..FRAME_BYTES]
+        );
+    }
+
+    #[test]
+    async fn test_camera_dma_eof(ctx: Context) {
+        let (camera, mut dpi, mut sent, mut received, pclk) = loopback(ctx);
+        let mut camera = camera
+            .with_vsync(Level::High)
+            .into_async()
+            .into_blocking()
+            .into_async();
+        for eof_mode in [
+            cam::EofMode::VsyncSignal,
+            cam::EofMode::ByteLen((FRAME_BYTES - 1) as u16),
+        ] {
+            camera
+                .apply_config(
+                    &cam::Config::default()
+                        .with_frequency(Rate::from_mhz(2))
+                        .with_vh_de_mode(VhdeMode::VsyncHsync)
+                        .with_eof_mode(eof_mode),
+                )
+                .unwrap();
+            for (rx_bytes, minimum_received) in [
+                (FRAME_BYTES, FRAME_BYTES),
+                (3 * FRAME_BYTES, 2 * FRAME_BYTES),
+            ] {
+                received.set_length(rx_bytes);
+                let mut transfer = camera.receive(received).map_err(|e| e.0).unwrap();
+                pulse_camera_vsync(&pclk);
+                for _ in 0..minimum_received / FRAME_BYTES {
+                    hil_test::assert!(poll_once(transfer.wait_for_dma_eof()).is_pending());
+
+                    let (eof_result, next_output) = join(transfer.wait_for_dma_eof(), async {
+                        send_frame(dpi, sent, &pclk)
+                    })
+                    .await;
+                    hil_test::assert_eq!(eof_result, Ok(()));
+                    (dpi, sent) = next_output;
+                }
+                (camera, received) = transfer.stop();
+
+                hil_test::assert_eq!(received.number_of_received_bytes(), minimum_received);
+                hil_test::assert!(
+                    received.received_data().flatten().eq(sent
+                        .as_slice()
+                        .iter()
+                        .cycle()
+                        .take(minimum_received))
+                );
+            }
+        }
+    }
+
+    #[test]
+    async fn test_camera_dma_eof_pending(ctx: Context) {
+        let (camera, mut dpi, mut sent, mut received, pclk) = loopback(ctx);
+        let mut camera = camera.with_vsync(Level::High).into_async();
+        received.set_length(received.capacity());
+        for poll_before_eof in [false, true] {
+            let mut transfer = camera.receive(received).map_err(|e| e.0).unwrap();
+            pulse_camera_vsync(&pclk);
+            {
+                let mut wait = core::pin::pin!(transfer.wait_for_dma_eof());
+                if poll_before_eof {
+                    hil_test::assert!(poll_once(wait.as_mut()).is_pending());
+                }
+                (dpi, sent) = send_frame(dpi, sent, &pclk);
+                // Cancel the wait after EOF, before observing its result.
+            }
+            hil_test::assert!(matches!(
+                poll_once(transfer.wait_for_dma_eof()),
+                Poll::Ready(Ok(()))
+            ));
+            (camera, received) = transfer.stop();
+
+            hil_test::assert!(received.number_of_received_bytes() >= sent.len());
+            hil_test::assert_eq!(
+                &received.as_slice()[..sent.len()],
+                &sent.as_slice()[..sent.len()]
+            );
+        }
+    }
+
+    #[test]
+    async fn test_camera_dma_eof_overflow(ctx: Context) {
+        let (camera, mut dpi, mut sent, mut received, pclk) = loopback(ctx);
+        let mut camera = camera.with_vsync(Level::High).into_async();
+        for (rx_bytes, expected) in [
+            (1024, Err(DmaError::DescriptorError)),
+            (2 * FRAME_BYTES, Ok(())),
+        ] {
+            received.set_length(rx_bytes);
+            let mut transfer = camera.receive(received).map_err(|e| e.0).unwrap();
+            pulse_camera_vsync(&pclk);
+            (dpi, sent) = send_frame(dpi, sent, &pclk);
+
+            hil_test::assert_eq!(
+                transfer.wait_for_dma_eof().await,
+                expected,
+                "First EOF, RX length {}",
+                rx_bytes
+            );
+            if expected.is_err() {
+                hil_test::assert!(matches!(
+                    poll_once(transfer.wait_for_dma_eof()),
+                    Poll::Ready(result) if result == expected
+                ));
+                let (result, next_camera, next_received) = transfer.wait();
+                hil_test::assert_eq!(result, expected);
+                (camera, received) = (next_camera, next_received);
+            } else {
+                (camera, received) = transfer.stop();
+                hil_test::assert_eq!(received.number_of_received_bytes(), FRAME_BYTES);
+                hil_test::assert_eq!(&received.as_slice()[..FRAME_BYTES], sent.as_slice());
+            }
+        }
+    }
+
+    #[test]
+    fn test_dpi_vsync_blocking(ctx: Context) {
+        let peripherals = ctx.peripherals;
+        let dma = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+        let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
+        let dpi = Dpi::new(lcd_cam.lcd, dma, dpi_test_config()).unwrap();
+        drop(lcd_cam.cam);
+        let mut transfer = dpi
+            .send(true, dma_loop_buffer!(2500))
+            .map_err(|e| e.0)
+            .unwrap();
+
+        transfer.clear_interrupts(DpiInterrupt::Vsync);
+        transfer.wait_for_vsync();
+        hil_test::assert!(transfer.interrupts().is_empty());
+        transfer.wait_for_vsync();
+        hil_test::assert!(transfer.interrupts().is_empty());
+
+        while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
+            core::hint::spin_loop();
+        }
+        let (dpi, buffer) = transfer.stop();
+        let transfer = dpi.send(true, buffer).map_err(|e| e.0).unwrap();
+        hil_test::assert!(transfer.interrupts().is_empty());
+
+        let _ = transfer.stop();
+    }
+}
+
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
+mod dpi_async_tests {
+    use core::{future::Future, task::Poll};
+
+    use super::*;
+
+    struct Context<'d> {
+        lcd_cam: LcdCam<'d, Async>,
+        dma: DmaChannelInstance<'d>,
+        dma_buf: DmaLoopBuf,
+    }
+
+    #[init]
+    async fn init() -> Context<'static> {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let dma = cfg_select! {
+            lcd_cam_dma_engine = "AHB_GDMA" => peripherals.DMA_CH0,
+            lcd_cam_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+        };
+
+        Context {
+            lcd_cam: LcdCam::new(peripherals.LCD_CAM).into_async(),
+            dma,
+            dma_buf: dma_loop_buffer!(2500),
+        }
+    }
+
+    #[test]
+    async fn test_dpi_vsync(ctx: Context<'static>) {
+        let dpi = Dpi::new(ctx.lcd_cam.lcd, ctx.dma, dpi_test_config()).unwrap();
+        drop(ctx.lcd_cam.cam);
+        let mut transfer = dpi.send(true, ctx.dma_buf).map_err(|e| e.0).unwrap();
+
+        while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
+            core::hint::spin_loop();
+        }
+        transfer.clear_interrupts(DpiInterrupt::Vsync);
+        {
+            let mut wait = core::pin::pin!(transfer.wait_for_vsync());
+            let first_poll = core::future::poll_fn(|cx| Poll::Ready(wait.as_mut().poll(cx))).await;
+            hil_test::assert!(first_poll.is_pending());
+        }
+        transfer.wait_for_vsync().await;
+        hil_test::assert!(transfer.interrupts().is_empty());
+        transfer.wait_for_vsync().await;
+        hil_test::assert!(transfer.interrupts().is_empty());
+
+        while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
+            core::hint::spin_loop();
+        }
+        {
+            let mut wait = core::pin::pin!(transfer.wait_for_vsync());
+            let first_poll = core::future::poll_fn(|cx| Poll::Ready(wait.as_mut().poll(cx))).await;
+            hil_test::assert!(first_poll.is_ready());
+        }
+        hil_test::assert!(transfer.interrupts().is_empty());
+
+        while !transfer.interrupts().contains(DpiInterrupt::Vsync) {
+            core::hint::spin_loop();
+        }
+        let (dpi, buffer) = transfer.stop();
+        let transfer = dpi.send(true, buffer).map_err(|e| e.0).unwrap();
+        hil_test::assert!(transfer.interrupts().is_empty());
+
+        let _ = transfer.stop();
     }
 }

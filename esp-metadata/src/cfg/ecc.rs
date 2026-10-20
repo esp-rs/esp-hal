@@ -1,24 +1,27 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EccDriverProperties {
     working_modes: Vec<WorkingModeEntry>,
     curves: Vec<CurveEntry>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct WorkingModeEntry {
     id: u32,
     mode: WorkingMode,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CurveEntry {
     id: u32,
     curve: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, strum::Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum WorkingMode {
     AffinePointMultiplication,
@@ -87,7 +90,7 @@ impl super::GenericProperty for EccDriverProperties {
             .iter()
             .map(|entry| {
                 let id = crate::number(entry.id);
-                let mode = quote::format_ident!("{}", entry.mode.to_string());
+                let mode = quote::format_ident!("{}", format!("{:?}", entry.mode));
 
                 quote::quote! {
                     #id, #mode

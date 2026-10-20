@@ -5,6 +5,8 @@
 //! The following wiring is assumed:
 //! - generated pulses => GPIO4
 
+//% CHIP_FILTER: rmt_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -13,7 +15,6 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::Level,
-    interrupt::software::SoftwareInterruptControl,
     rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator},
     time::Rate,
     timer::timg::TimerGroup,
@@ -29,16 +30,12 @@ async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "esp32h2")] {
-            let freq = Rate::from_mhz(32);
-        } else {
-            let freq = Rate::from_mhz(80);
-        }
+    let freq = cfg_select! {
+        feature = "esp32h2" => Rate::from_mhz(32),
+        _ => Rate::from_mhz(80),
     };
 
     let rmt = Rmt::new(peripherals.RMT, freq).unwrap().into_async();

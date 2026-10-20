@@ -1,11 +1,6 @@
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use esp_hal::{
-        clock::CpuClock,
-        interrupt::software::SoftwareInterruptControl,
-        peripherals::Peripherals,
-        timer::timg::TimerGroup,
-    };
+    use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
     use esp_radio::ble::controller::BleConnector;
     use trouble_host::prelude::*;
 
@@ -36,8 +31,7 @@ mod tests {
         let mut p = esp_hal::init(esp_hal::Config::default());
 
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         {
             let _connector = BleConnector::new(p.BT.reborrow(), Default::default()).unwrap();
@@ -63,8 +57,7 @@ mod tests {
     #[test]
     fn test_controller_comms(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let mut connector = BleConnector::new(p.BT, Default::default()).unwrap();
 
@@ -113,8 +106,7 @@ mod tests {
     #[test]
     fn test_dropping_controller_during_reset(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let mut connector = BleConnector::new(p.BT, Default::default()).unwrap();
 
@@ -142,8 +134,7 @@ mod tests {
     #[test]
     async fn test_trouble_starts_advertising(p: Peripherals) {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-        let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-        esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let connector = BleConnector::new(p.BT, Default::default()).unwrap();
         let controller: ExternalController<_, 1> = ExternalController::new(connector);
@@ -151,14 +142,16 @@ mod tests {
         let address: Address = Address::random([0xff, 0x8f, 0x1a, 0x05, 0xe4, 0xff]);
 
         let mut resources: HostResources<DefaultPacketPool, 1, 1> = HostResources::new();
-        let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
-        let Host { mut peripheral, .. } = stack.build();
+        let stack = trouble_host::new(controller, &mut resources)
+            .set_random_address(address)
+            .build();
+        let mut peripheral = stack.peripheral();
 
         let mut advertiser_data = [0; 31];
         let len = AdStructure::encode_slice(
             &[
                 AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-                AdStructure::ServiceUuids16(&[[0x0f, 0x18]]),
+                AdStructure::IncompleteServiceUuids16(&[[0x0f, 0x18]]),
                 AdStructure::CompleteLocalName("Peripheral".as_bytes()),
             ],
             &mut advertiser_data[..],

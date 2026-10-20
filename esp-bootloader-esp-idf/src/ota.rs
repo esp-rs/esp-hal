@@ -15,7 +15,7 @@
 //! should be used for the next boot.
 //!
 //! Note: The prebuilt bootloaders provided by `espflash` _might not_ include
-//! OTA support. In that case you need to build the bootloader yourself.
+//! OTA support. In that case, the bootloader must be built from source.
 //!
 //! The general procedure to change the active slot
 //! - read the partition table [crate::partitions::read_partition_table]
@@ -24,18 +24,17 @@
 //! - read the current slot, change the current slot
 //!
 //! For more details see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html>
-use embedded_storage::{ReadStorage, Storage};
-
 use crate::partitions::{
     AppPartitionSubType,
+    AutoFlashRegion,
     DataPartitionSubType,
     Error,
-    FlashRegion,
     PartitionType,
 };
 
 const SLOT0_DATA_OFFSET: u32 = 0x0000;
 const SLOT1_DATA_OFFSET: u32 = 0x1000;
+const SLOT_SIZE: u32 = 0x1000;
 
 const UNINITIALIZED_SEQUENCE: u32 = 0xffffffff;
 
@@ -43,16 +42,16 @@ const UNINITIALIZED_SEQUENCE: u32 = 0xffffffff;
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::FromRepr)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum OtaDataSlot {
-    /// If there is a `firmware` app-partition it's used. Otherwise OTA-0
+    /// If there is a `firmware` app-partition it's used. Otherwise OTA-0.
     None,
-    /// OTA-0
+    /// OTA-0.
     Slot0,
-    /// OTA-1
+    /// OTA-1.
     Slot1,
 }
 
 impl OtaDataSlot {
-    /// The next logical OTA-data slot
+    /// The next logical OTA-data slot.
     fn next(&self) -> OtaDataSlot {
         match self {
             OtaDataSlot::None => OtaDataSlot::Slot0,
@@ -78,7 +77,7 @@ pub enum OtaImageState {
     /// Monitor the first boot. The bootloader will change this to
     /// `PendingVerify` if auto-rollback is enabled.
     ///
-    /// You want to set this state after activating a newly installed update.
+    /// Applications set this state after activating a newly installed update.
     New           = 0x0,
 
     /// Bootloader changes [OtaImageState::New] to
@@ -132,46 +131,91 @@ struct OtaSelectEntry {
 }
 
 impl OtaSelectEntry {
-    fn as_bytes_mut(&mut self) -> &mut [u8; 0x20] {
-        debug_assert!(core::mem::size_of::<Self>() == 32);
-        unwrap!(
+    fn read<'a, 'd>(region: &mut AutoFlashRegion<'a, 'd>, offset: u32) -> Result<Self, Error> {
+        fn is_valid(buffer: &[u8]) -> bool {
+            let ota_seq = u32::from_le_bytes(unwrap!(buffer[0..4].try_into()));
+            let ota_state = u32::from_le_bytes(unwrap!(buffer[24..28].try_into()));
+            let crc = u32::from_le_bytes(unwrap!(buffer[28..32].try_into()));
+
+            if ota_seq == u32::MAX && ota_state == OtaImageState::Undefined as u32 {
+                return true;
+            }
+
+            if OtaImageState::try_from(ota_state).is_err() {
+                return false;
+            }
+
+            let calculated_crc = crate::crypto::Crc32::new().crc(&ota_seq.to_le_bytes());
+
+            crc == calculated_crc
+        }
+
+        let mut buffer = [0u8; 32];
+        region.read(offset, &mut buffer)?;
+
+        if !is_valid(&buffer) {
+            return Err(Error::Invalid);
+        }
+
+        let entry: *mut OtaSelectEntry = &mut buffer as *mut _ as *mut OtaSelectEntry;
+        let entry = unsafe { *entry };
+        Ok(entry)
+    }
+
+    fn write<'a, 'd>(
+        &mut self,
+        region: &mut AutoFlashRegion<'a, 'd>,
+        offset: u32,
+    ) -> Result<(), Error> {
+        let bytes: &mut [u8; 32] = unwrap!(
             unsafe { core::slice::from_raw_parts_mut(self as *mut _ as *mut u8, 0x20) }.try_into()
-        )
+        );
+        write_slot(region, offset, bytes)
     }
 }
 
-/// This is used to manipulate the OTA-data partition.
+/// Erases the OTA-data slot at `offset` and programs `bytes` into it.
 ///
-/// If you are looking for a more high-level way to do this, see [crate::ota_updater::OtaUpdater]
+/// Programming can only clear bits, so the slot has to be erased explicitly
+/// before it is rewritten.
+fn write_slot(
+    region: &mut AutoFlashRegion<'_, '_>,
+    offset: u32,
+    bytes: &[u8; 32],
+) -> Result<(), Error> {
+    region.erase(offset, offset + SLOT_SIZE)?;
+    region.write(offset, bytes)
+}
+
+/// Reads and updates the OTA-data partition.
+///
+/// For a higher-level API, see [crate::ota_updater::OtaUpdater].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Ota<'a, F>
-where
-    F: embedded_storage::Storage,
-{
-    flash: FlashRegion<'a, F>,
+pub struct Ota<'a, 'd> {
+    flash: AutoFlashRegion<'a, 'd>,
     ota_partition_count: usize,
 }
 
-impl<'a, F> Ota<'a, F>
-where
-    F: embedded_storage::Storage,
-{
-    /// Create a [Ota] instance from the given [FlashRegion] and the count of OTA app partitions
-    /// (not including "firmware" and "test" partitions)
+impl<'a, 'd> Ota<'a, 'd> {
+    /// Creates a new [Ota] instance from the given [AutoFlashRegion] and the count of OTA app
+    /// partitions (not including "firmware" and "test" partitions).
     ///
     /// # Errors
     /// A [Error::InvalidPartition] if the given flash region
     /// doesn't represent a Data/Ota partition or the size is unexpected.
     ///
     /// [Error::InvalidArgument] if the `ota_partition_count` exceeds the maximum or if it's 0.
-    pub fn new(flash: FlashRegion<'a, F>, ota_partition_count: usize) -> Result<Ota<'a, F>, Error> {
+    pub fn new(
+        flash: AutoFlashRegion<'a, 'd>,
+        ota_partition_count: usize,
+    ) -> Result<Ota<'a, 'd>, Error> {
         if ota_partition_count == 0 || ota_partition_count > 16 {
             return Err(Error::InvalidArgument);
         }
 
         if flash.capacity() != 0x2000
-            || flash.raw.partition_type() != PartitionType::Data(DataPartitionSubType::Ota)
+            || flash.partition_type() != PartitionType::Data(DataPartitionSubType::Ota)
         {
             return Err(Error::InvalidPartition {
                 expected_size: 0x2000,
@@ -216,10 +260,8 @@ where
     }
 
     fn get_slot_seq(&mut self) -> Result<(u32, u32), Error> {
-        let mut buffer1 = OtaSelectEntry::default();
-        let mut buffer2 = OtaSelectEntry::default();
-        self.flash.read(SLOT0_DATA_OFFSET, buffer1.as_bytes_mut())?;
-        self.flash.read(SLOT1_DATA_OFFSET, buffer2.as_bytes_mut())?;
+        let buffer1 = OtaSelectEntry::read(&mut self.flash, SLOT0_DATA_OFFSET)?;
+        let buffer2 = OtaSelectEntry::read(&mut self.flash, SLOT1_DATA_OFFSET)?;
         let seq0 = buffer1.ota_seq;
         let seq1 = buffer2.ota_seq;
         Ok((seq0, seq1))
@@ -235,8 +277,8 @@ where
     /// number exceeds the value given to the constructor.
     pub fn set_current_app_partition(&mut self, app: AppPartitionSubType) -> Result<(), Error> {
         if app == AppPartitionSubType::Factory {
-            self.flash.write(SLOT0_DATA_OFFSET, &[0xffu8; 0x20])?;
-            self.flash.write(SLOT1_DATA_OFFSET, &[0xffu8; 0x20])?;
+            write_slot(&mut self.flash, SLOT0_DATA_OFFSET, &[0xffu8; 0x20])?;
+            write_slot(&mut self.flash, SLOT1_DATA_OFFSET, &[0xffu8; 0x20])?;
             return Ok(());
         }
 
@@ -294,11 +336,10 @@ where
             let crc = crate::crypto::Crc32::new();
             let checksum = crc.crc(&new_seq.to_le_bytes());
 
-            let mut buffer = OtaSelectEntry::default();
-            self.flash.read(slot.offset(), buffer.as_bytes_mut())?;
+            let mut buffer = OtaSelectEntry::read(&mut self.flash, slot.offset())?;
             buffer.ota_seq = new_seq;
             buffer.crc = checksum;
-            self.flash.write(slot.offset(), buffer.as_bytes_mut())?;
+            buffer.write(&mut self.flash, slot.offset())?;
         }
 
         Ok(())
@@ -320,7 +361,7 @@ where
         Ok(slot)
     }
 
-    /// Set the [OtaImageState] of the currently selected slot.
+    /// Sets the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -329,15 +370,14 @@ where
             Err(Error::InvalidState)
         } else {
             let offset = self.current_slot()?.offset();
-            let mut buffer = OtaSelectEntry::default();
-            self.flash.read(offset, buffer.as_bytes_mut())?;
+            let mut buffer = OtaSelectEntry::read(&mut self.flash, offset)?;
             buffer.ota_state = state;
-            self.flash.write(offset, buffer.as_bytes_mut())?;
+            buffer.write(&mut self.flash, offset)?;
             Ok(())
         }
     }
 
-    /// Get the [OtaImageState] of the currently selected slot.
+    /// Returns the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -346,8 +386,7 @@ where
             Err(Error::InvalidState)
         } else {
             let offset = self.current_slot()?.offset();
-            let mut buffer = OtaSelectEntry::default();
-            self.flash.read(offset, buffer.as_bytes_mut())?;
+            let buffer = OtaSelectEntry::read(&mut self.flash, offset)?;
             Ok(buffer.ota_state)
         }
     }
@@ -356,31 +395,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::partitions::PartitionEntry;
-
-    struct MockFlash {
-        data: [u8; 0x2000],
-    }
-
-    impl embedded_storage::Storage for MockFlash {
-        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-            self.data[offset as usize..][..bytes.len()].copy_from_slice(bytes);
-            Ok(())
-        }
-    }
-
-    impl embedded_storage::ReadStorage for MockFlash {
-        type Error = crate::partitions::Error;
-        fn read(&mut self, offset: u32, buffer: &mut [u8]) -> Result<(), Self::Error> {
-            let l = buffer.len();
-            buffer[..l].copy_from_slice(&self.data[offset as usize..][..l]);
-            Ok(())
-        }
-
-        fn capacity(&self) -> usize {
-            unimplemented!()
-        }
-    }
+    use crate::partitions::{FlashStorage, PartitionEntry};
 
     const PARTITION_RAW: [u8; 32] = [
         0xaa, 0x50, // MAGIC
@@ -417,22 +432,29 @@ mod tests {
         255, 255, 255, 255, 1, 0, 0, 0, 17, 80, 74, 237,
     ];
 
+    fn ota_region<'a>(
+        flash: &'a mut FlashStorage<'static>,
+        binary: [u8; 32],
+    ) -> AutoFlashRegion<'a, 'static> {
+        PartitionEntry { binary }.as_auto_flash_region(flash)
+    }
+
+    fn init_ota_flash(flash: &mut FlashStorage<'static>) {
+        flash.erase(0, 0x2000).unwrap();
+    }
+
+    fn read_slot(flash: &mut FlashStorage<'static>, offset: u32) -> [u8; 0x20] {
+        let mut buf = [0u8; 0x20];
+        flash.read(offset, &mut buf).unwrap();
+        buf
+    }
+
     #[test]
     fn test_initial_state_and_next_slot() {
-        let mut binary = PARTITION_RAW;
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
-
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -460,29 +482,18 @@ mod tests {
         );
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::Undefined));
 
-        assert_eq!(SLOT_COUNT_1_UNDEFINED, &mock_flash.data[0x0000..][..0x20],);
-        assert_eq!(SLOT_INITIAL, &mock_flash.data[0x1000..][..0x20],);
+        assert_eq!(&read_slot(&mut flash, 0x0000)[..], SLOT_COUNT_1_UNDEFINED);
+        assert_eq!(&read_slot(&mut flash, 0x1000)[..], SLOT_INITIAL);
     }
 
     #[test]
     fn test_slot0_valid_next_slot() {
-        let mut binary = PARTITION_RAW;
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+        flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
+        flash.write(0x1000, SLOT_INITIAL).unwrap();
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
-
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        mock_flash.data[0x0000..][..0x20].copy_from_slice(SLOT_COUNT_1_VALID);
-        mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_INITIAL);
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -500,29 +511,18 @@ mod tests {
         );
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::New));
 
-        assert_eq!(SLOT_COUNT_1_VALID, &mock_flash.data[0x0000..][..0x20],);
-        assert_eq!(SLOT_COUNT_2_NEW, &mock_flash.data[0x1000..][..0x20],);
+        assert_eq!(&read_slot(&mut flash, 0x0000)[..], SLOT_COUNT_1_VALID);
+        assert_eq!(&read_slot(&mut flash, 0x1000)[..], SLOT_COUNT_2_NEW);
     }
 
     #[test]
     fn test_slot1_new_next_slot() {
-        let mut binary = PARTITION_RAW;
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+        flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
+        flash.write(0x1000, SLOT_COUNT_2_NEW).unwrap();
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
-
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        mock_flash.data[0x0000..][..0x20].copy_from_slice(SLOT_COUNT_1_VALID);
-        mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_COUNT_2_NEW);
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -541,26 +541,16 @@ mod tests {
         );
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::PendingVerify));
 
-        assert_eq!(SLOT_COUNT_3_PENDING, &mock_flash.data[0x0000..][..0x20],);
-        assert_eq!(SLOT_COUNT_2_NEW, &mock_flash.data[0x1000..][..0x20],);
+        assert_eq!(&read_slot(&mut flash, 0x0000)[..], SLOT_COUNT_3_PENDING);
+        assert_eq!(&read_slot(&mut flash, 0x1000)[..], SLOT_COUNT_2_NEW);
     }
 
     #[test]
     fn test_multi_updates() {
-        let mut binary = PARTITION_RAW;
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
-
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 2).unwrap();
         assert_eq!(
@@ -613,20 +603,10 @@ mod tests {
 
     #[test]
     fn test_multi_updates_4_apps() {
-        let mut binary = PARTITION_RAW;
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
-
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 4).unwrap();
         assert_eq!(
@@ -698,20 +678,10 @@ mod tests {
 
     #[test]
     fn test_multi_updates_skip_parts() {
-        let mut binary = PARTITION_RAW;
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
 
-        let mock_entry = PartitionEntry {
-            binary: &mut binary,
-        };
-
-        let mut mock_flash = MockFlash {
-            data: [0xff; 0x2000],
-        };
-
-        let mock_region = FlashRegion {
-            raw: mock_entry,
-            flash: &mut mock_flash,
-        };
+        let mock_region = ota_region(&mut flash, PARTITION_RAW);
 
         let mut sut = Ota::new(mock_region, 16).unwrap();
         assert_eq!(
@@ -753,5 +723,130 @@ mod tests {
         assert_eq!(OtaDataSlot::None.next(), OtaDataSlot::Slot0);
         assert_eq!(OtaDataSlot::Slot0.next(), OtaDataSlot::Slot1);
         assert_eq!(OtaDataSlot::Slot1.next(), OtaDataSlot::Slot0);
+    }
+
+    #[test]
+    fn test_read_erased_slot() {
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
+        let entry = OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET).unwrap();
+        assert_eq!(entry.ota_seq, UNINITIALIZED_SEQUENCE);
+        assert_eq!(entry.seq_label, [0xff; 20]);
+        assert_eq!(entry.ota_state, OtaImageState::Undefined);
+        assert_eq!(entry.crc, UNINITIALIZED_SEQUENCE);
+    }
+
+    #[test]
+    fn test_read_valid_slot() {
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+        flash.write(0x0000, SLOT_COUNT_1_VALID).unwrap();
+
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
+        let entry = OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET).unwrap();
+        assert_eq!(entry.ota_seq, 1);
+        assert_eq!(entry.ota_state, OtaImageState::Valid);
+    }
+
+    #[test]
+    fn test_read_rejects_bad_crc() {
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+
+        let mut slot = [0u8; 32];
+        slot.copy_from_slice(SLOT_COUNT_1_UNDEFINED);
+        slot[31] ^= 0xff;
+        flash.write(0x0000, &slot).unwrap();
+
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
+        assert!(matches!(
+            OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
+            Err(crate::partitions::Error::Invalid)
+        ));
+    }
+
+    #[test]
+    fn test_read_rejects_unknown_ota_state() {
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+
+        let ota_seq = 1u32;
+        let crc = crate::crypto::Crc32::new().crc(&ota_seq.to_le_bytes());
+        let mut slot = [0xffu8; 32];
+        slot[0..4].copy_from_slice(&ota_seq.to_le_bytes());
+        slot[24..28].copy_from_slice(&0x1234_5678u32.to_le_bytes());
+        slot[28..32].copy_from_slice(&crc.to_le_bytes());
+        flash.write(0x0000, &slot).unwrap();
+
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
+        assert!(matches!(
+            OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
+            Err(crate::partitions::Error::Invalid)
+        ));
+    }
+
+    #[test]
+    fn test_read_rejects_erased_seq_with_non_erased_state() {
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+
+        let mut slot = [0xffu8; 32];
+        slot[24..28].copy_from_slice(&(OtaImageState::Valid as u32).to_le_bytes());
+        flash.write(0x0000, &slot).unwrap();
+
+        let mut region = ota_region(&mut flash, PARTITION_RAW);
+        assert!(matches!(
+            OtaSelectEntry::read(&mut region, SLOT0_DATA_OFFSET),
+            Err(crate::partitions::Error::Invalid)
+        ));
+    }
+
+    #[test]
+    fn test_one_corrupt_slot_fails_current_app_partition() {
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+
+        let mut corrupt = [0u8; 32];
+        corrupt.copy_from_slice(SLOT_COUNT_1_UNDEFINED);
+        corrupt[31] ^= 0xff;
+        flash.write(0x0000, &corrupt).unwrap();
+        flash.write(0x1000, SLOT_COUNT_2_NEW).unwrap();
+
+        let region = ota_region(&mut flash, PARTITION_RAW);
+        let mut sut = Ota::new(region, 2).unwrap();
+        assert_eq!(
+            sut.current_app_partition(),
+            Err(crate::partitions::Error::Invalid)
+        );
+    }
+
+    #[test]
+    fn test_reset_to_factory_after_corrupt_ota_data() {
+        let mut flash = FlashStorage::new();
+        init_ota_flash(&mut flash);
+
+        let mut corrupt = [0u8; 32];
+        corrupt.copy_from_slice(SLOT_COUNT_1_UNDEFINED);
+        corrupt[31] ^= 0xff;
+        flash.write(0x0000, &corrupt).unwrap();
+        flash.write(0x1000, SLOT_COUNT_2_NEW).unwrap();
+
+        let region = ota_region(&mut flash, PARTITION_RAW);
+        let mut sut = Ota::new(region, 2).unwrap();
+        assert_eq!(
+            sut.current_app_partition(),
+            Err(crate::partitions::Error::Invalid)
+        );
+
+        sut.set_current_app_partition(AppPartitionSubType::Factory)
+            .unwrap();
+        assert_eq!(
+            sut.current_app_partition().unwrap(),
+            AppPartitionSubType::Factory
+        );
+        assert_eq!(&read_slot(&mut flash, 0x0000)[..], SLOT_INITIAL);
+        assert_eq!(&read_slot(&mut flash, 0x1000)[..], SLOT_INITIAL);
     }
 }

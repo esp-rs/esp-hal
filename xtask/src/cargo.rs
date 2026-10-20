@@ -355,13 +355,51 @@ pub struct BuiltCommand {
     pub artifact_name: String,
     pub command: Vec<String>,
     pub env_vars: Vec<(String, String)>,
+    pub artifact_dir: Option<PathBuf>,
 }
 
 impl BuiltCommand {
     pub fn run(&self, capture: bool) -> Result<String> {
         let env_vars = self.env_vars.clone();
         let cwd = std::env::current_dir()?;
-        run_with_env(&self.command, &cwd, env_vars, capture)
+        let output = run_with_env(&self.command, &cwd, env_vars, capture)?;
+
+        if let Some(artifact_dir) = self.artifact_dir.as_deref() {
+            self.copy_artifacts(artifact_dir, &cwd).with_context(|| {
+                format!("Failed to copy artifacts to {}", artifact_dir.display())
+            })?;
+        }
+
+        Ok(output)
+    }
+
+    /// Copies the executables built by this command into `artifact_dir`.
+    ///
+    /// Re-runs the finished build with `--message-format=json` to look up the
+    /// executable paths. The second build is a no-op, so this is quick.
+    fn copy_artifacts(&self, artifact_dir: &Path, cwd: &Path) -> Result<()> {
+        let mut command = self.command.clone();
+        command.push("--message-format=json".to_string());
+
+        let output = run_with_env(&command, cwd, self.env_vars.clone(), true)?;
+
+        std::fs::create_dir_all(artifact_dir)?;
+
+        let mut copied = 0;
+        for line in output.lines() {
+            if let Ok(artifact) = serde_json::from_str::<Artifact>(line)
+                && let Some(file_name) = artifact.executable.file_name()
+            {
+                std::fs::copy(&artifact.executable, artifact_dir.join(file_name))?;
+                copied += 1;
+            }
+        }
+
+        if copied == 0 {
+            bail!("The build did not produce any executables");
+        }
+
+        Ok(())
     }
 }
 
@@ -429,6 +467,7 @@ impl CargoCommandBatcher {
                         artifact_name: String::from("batch"),
                         command: std::mem::take(&mut command),
                         env_vars: key.env_vars.clone(),
+                        artifact_dir: None,
                     });
                 }
 
@@ -466,6 +505,7 @@ impl CargoCommandBatcher {
                     artifact_name: String::from("batch"),
                     command,
                     env_vars: key.env_vars.clone(),
+                    artifact_dir: None,
                 });
             }
         }
@@ -486,22 +526,28 @@ impl CargoCommandBatcher {
     }
 
     pub fn build_one_for_cargo(item: &CargoArgsBuilder) -> BuiltCommand {
+        // `--artifact-dir` is unstable and would require `-Zunstable-options`,
+        // which stable cargo rejects. Strip it from the command and copy the
+        // artifacts after the build, instead.
+        let mut item = item.clone();
+        let artifact_dir = item
+            .args
+            .iter()
+            .position(|arg| arg == "--artifact-dir")
+            .map(|position| {
+                item.args.remove(position);
+                PathBuf::from(item.args.remove(position))
+            });
+
         BuiltCommand {
             artifact_name: item.artifact_name.clone(),
-            command: {
-                let mut args = item.build();
-
-                if item.args.iter().any(|arg| arg == "--artifact-dir") {
-                    args.push("-Zunstable-options".to_string());
-                }
-
-                args
-            },
+            command: item.build(),
             env_vars: item
                 .env_vars
                 .iter()
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
+            artifact_dir,
         }
     }
 
@@ -530,6 +576,12 @@ impl CargoCommandBatcher {
     }
 }
 
+impl Default for CargoCommandBatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Drop for CargoCommandBatcher {
     fn drop(&mut self) {}
 }
@@ -544,13 +596,12 @@ pub struct CargoToml {
     pub manifest: toml_edit::DocumentMut,
 }
 
-const DEPENDENCY_KINDS: [&'static str; 3] =
-    ["dependencies", "dev-dependencies", "build-dependencies"];
+const DEPENDENCY_KINDS: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
 impl CargoToml {
     /// Load and parse the Cargo.toml for the specified package in the given workspace.
     pub fn new(workspace: &Path, package: Package) -> Result<Self> {
-        let package_path = workspace.join(package.to_string());
+        let package_path = workspace.join(package.directory());
         let manifest_path = package_path.join("Cargo.toml");
         if !manifest_path.exists() {
             bail!(
@@ -566,16 +617,32 @@ impl CargoToml {
     }
 
     pub fn espressif_metadata(&self) -> Option<&Table> {
-        let Some(package) = self.manifest.get("package") else {
-            return None;
-        };
-        let Some(metadata) = package.get("metadata") else {
-            return None;
-        };
-        let Some(espressif) = metadata.get("espressif") else {
-            return None;
-        };
-        Some(espressif.as_table()?)
+        let package = self.manifest.get("package")?;
+        let metadata = package.get("metadata")?;
+        let espressif = metadata.get("espressif")?;
+        espressif.as_table()
+    }
+
+    pub fn espressif_metadata_bool(&self, key: &str) -> Option<bool> {
+        self.espressif_metadata()
+            .and_then(|table| table.get(key))
+            .map(|value| {
+                value
+                    .as_bool()
+                    .unwrap_or_else(|| panic!("{key} must be a boolean"))
+            })
+    }
+
+    /// Load the Cargo.toml for `package` as it existed at `git_ref`, so a frozen
+    /// crate's requirements come from its release tag rather than the working
+    /// tree that `bump_crate_version` rewrites.
+    pub fn at_ref(workspace: &Path, package: Package, git_ref: &str) -> Result<Self> {
+        let repo_relative = format!("{}/Cargo.toml", package.directory());
+        let manifest = crate::git::show_file_at_ref(workspace, git_ref, &repo_relative)
+            .with_context(|| {
+                format!("Failed to read {repo_relative} at {git_ref} for package {package}")
+            })?;
+        Self::from_str(workspace, package, &manifest)
     }
 
     /// Create a `CargoToml` instance from a manifest string.
@@ -607,7 +674,7 @@ impl CargoToml {
 
     /// Get the absolute path to the package directory.
     pub fn package_path(&self) -> PathBuf {
-        self.workspace.join(self.package.to_string())
+        self.workspace.join(self.package.directory())
     }
 
     /// Get the absolute path to the Cargo.toml file of the package.
@@ -713,16 +780,62 @@ impl CargoToml {
                     name
                 };
 
-                if let Ok(package) = Package::from_str(name, true) {
-                    if !dependencies.contains(&package) {
-                        dependencies.push(package);
-                    }
+                if let Ok(package) = Package::from_str(name, true)
+                    && !dependencies.contains(&package)
+                {
+                    dependencies.push(package);
                 }
             }
         });
         dependencies
     }
 
+    /// The in-repo subset of [`dependency_requirements`], each dependency
+    /// resolved to its [`Package`].
+    pub fn repo_dependency_requirements(&mut self) -> Vec<(Package, String)> {
+        self.dependency_requirements()
+            .into_iter()
+            .filter_map(|(name, req)| Package::from_str(&name, true).ok().map(|pkg| (pkg, req)))
+            .collect()
+    }
+
+    /// Every non-dev dependency as a sorted `(name, requirement)` pair, so two
+    /// manifests can be diffed for drift directly. Renamed deps resolve to the
+    /// real crate name; deps without a `version` are skipped.
+    pub fn dependency_requirements(&mut self) -> Vec<(String, String)> {
+        let mut dependencies = Vec::new();
+        self.visit_dependencies(|_, dependency_kind, table| {
+            if dependency_kind == "dev-dependencies" {
+                return;
+            }
+            for (key, value) in table.iter() {
+                let (name, version) = match value {
+                    Item::Value(Value::String(version)) => (key, Some(version.value().to_string())),
+                    Item::Value(Value::InlineTable(t)) => {
+                        let name = t.get("package").and_then(|p| p.as_str()).unwrap_or(key);
+                        let version = t.get("version").and_then(|v| v.as_str()).map(String::from);
+                        (name, version)
+                    }
+                    Item::Table(t) => {
+                        let name = t.get("package").and_then(|p| p.as_str()).unwrap_or(key);
+                        let version = t.get("version").and_then(|v| v.as_str()).map(String::from);
+                        (name, version)
+                    }
+                    _ => (key, None),
+                };
+
+                if let Some(version) = version {
+                    dependencies.push((name.to_string(), version));
+                }
+            }
+        });
+        dependencies.sort();
+        dependencies.dedup();
+        dependencies
+    }
+
+    /// Only the release commands rewrite dependency requirements.
+    #[cfg_attr(not(feature = "release"), allow(dead_code))]
     pub(crate) fn change_version_of_dependency(
         &mut self,
         package_name: &str,
@@ -732,7 +845,7 @@ impl CargoToml {
 
         self.visit_dependencies(|_, _, table| {
             // Update dependencies which specify a version:
-            match &mut table[&package_name] {
+            match &mut table[package_name] {
                 Item::Value(Value::String(table)) => {
                     // package = "version"
                     *table = Formatted::new(format_dependency_version(table.value(), version));
@@ -754,15 +867,14 @@ impl CargoToml {
                 Item::None => {
                     // alias = { package = "foo", version = "version" }
                     let update_renamed_dep = table.get_values().iter().find_map(|(k, p)| {
-                        if let Value::InlineTable(table) = p {
-                            if let Some(Value::String(name)) = &table.get("package") {
-                                if name.value() == &package_name {
-                                    // Return the actual key of this dependency, e.g.:
-                                    // `procmacros = { package = "esp-hal-procmacros" }`
-                                    //  ^^^^^^^^^^
-                                    return Some(k.last().unwrap().get().to_string());
-                                }
-                            }
+                        if let Value::InlineTable(table) = p
+                            && let Some(Value::String(name)) = &table.get("package")
+                            && name.value() == package_name
+                        {
+                            // Return the actual key of this dependency, e.g.:
+                            // `procmacros = { package = "esp-hal-procmacros" }`
+                            //  ^^^^^^^^^^
+                            return Some(k.last().unwrap().get().to_string());
                         }
 
                         None
@@ -785,6 +897,7 @@ impl CargoToml {
     }
 }
 
+#[cfg_attr(not(feature = "release"), allow(dead_code))]
 fn format_dependency_version(previous: &str, new: &semver::Version) -> String {
     // we can expect the version specified in a TOML to be valid
     let previous = semver::VersionReq::parse(previous).unwrap();
@@ -878,6 +991,47 @@ mod tests {
                 "previous={previous}, new={new}"
             );
         }
+    }
+
+    #[test]
+    fn repo_dependency_requirements_excludes_dev_dependencies() {
+        // A dev-dependency (esp-radio -> esp-rtos in reality) must not be
+        // reported as a release dependency; normal and build dependencies are.
+        let manifest = r#"
+            [package]
+            name = "esp-radio"
+            version = "1.0.0"
+
+            [dependencies]
+            esp-hal = { version = "1.2.0", path = "../esp-hal" }
+
+            [build-dependencies]
+            esp-config = { version = "0.8.0", path = "../esp-config" }
+
+            [dev-dependencies]
+            esp-rtos = { version = "0.3.0", path = "../esp-rtos" }
+        "#;
+
+        let mut toml =
+            CargoToml::from_str(&std::path::PathBuf::new(), Package::EspRadio, manifest).unwrap();
+        let deps = toml
+            .repo_dependency_requirements()
+            .into_iter()
+            .map(|(pkg, _)| pkg)
+            .collect::<Vec<_>>();
+
+        assert!(
+            deps.contains(&Package::EspHal),
+            "normal dep missing: {deps:?}"
+        );
+        assert!(
+            deps.contains(&Package::EspConfig),
+            "build dep missing: {deps:?}"
+        );
+        assert!(
+            !deps.contains(&Package::EspRtos),
+            "dev dep should be excluded: {deps:?}"
+        );
     }
 
     #[test]

@@ -1,0 +1,513 @@
+# ESP32-S3 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo update-metadata` to
+# update the table in the esp-hal README.
+
+[device]
+name   = "esp32s3"
+arch   = "xtensa"
+target = "xtensa-esp32s3-none-elf"
+cores  = 2
+datasheet = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf"
+trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
+
+[device.mmu]
+page_size = 0x10000
+entry_num = 384
+
+[device.flash]
+support_status = "partial"
+
+[device.rom]
+has_crc_le  = true
+has_crc_be  = true
+has_md5_bsd = true
+
+[device.soc]
+multi_core_enabled = true
+has_swd_watchdog = true
+
+memory_map = { ranges = [
+    { name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 },
+    { name = "dram2_uninit", start = 0x3FCD_B700, end = 0x3FCE_D710 },
+    { name = "irom", start = 0x4200_0000, end = 0x4400_0000 },
+    { name = "drom", start = 0x3C00_0000, end = 0x3E00_0000 },
+] }
+
+peripherals = [
+    { name = "AES", interrupts = { peri = "AES" } },
+    { name = "APB_CTRL" },
+    { name = "APB_SARADC" },
+    { name = "ASSIST_DEBUG" },
+    { name = "DMA" },
+    { name = "DS" },
+    { name = "EFUSE", hidden = true },
+    { name = "EXTMEM" },
+    { name = "MMU_TABLE", hidden = true },
+    { name = "GPIO" },
+    { name = "GPIO_SD", clock_group = "SDM" },
+    { name = "HMAC" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" }, stable = true, clock_group = "I2C" },
+    { name = "I2C1", interrupts = { peri = "I2C_EXT1" }, stable = true, clock_group = "I2C" },
+    { name = "I2S0", interrupts = { peri = "I2S0" }, clock_group = "I2S" },
+    { name = "I2S1", interrupts = { peri = "I2S1" }, clock_group = "I2S" },
+    { name = "INTERRUPT_CORE0" },
+    { name = "INTERRUPT_CORE1" },
+    { name = "IO_MUX" },
+    { name = "LCD_CAM", clock_group = "LCD_CAM" },
+    { name = "LEDC" },
+    { name = "LPWR", pac = "RTC_CNTL" },
+    { name = "RTC_TIMER", pac = "RTC_CNTL" },
+    { name = "MCPWM0", clock_group = "MCPWM" },
+    { name = "MCPWM1", clock_group = "MCPWM" },
+    { name = "PCNT", interrupts = { peri = "PCNT" } },
+    { name = "PERI_BACKUP" },
+    { name = "RMT", clock_group = "RMT" },
+    { name = "RNG" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
+    { name = "RTC_CNTL" },
+    { name = "LP_I2C0", pac = "RTC_I2C" },
+    { name = "RTC_IO" },
+    { name = "SDHOST" },
+    { name = "SENS" },
+    { name = "SENSITIVE" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2" }, stable = true, clock_group = "SPI" },
+    { name = "SPI3", interrupts = { peri = "SPI3" }, stable = true, clock_group = "SPI" },
+    { name = "SYSTEM" },
+    { name = "SYSTIMER" },
+    { name = "TIMG0", clock_group = "TIMG" },
+    { name = "TIMG1", clock_group = "TIMG" },
+    { name = "TWAI0" },
+    { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
+    { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
+    { name = "UART2", interrupts = { peri = "UART2" }, stable = true, clock_group = "UART" },
+    { name = "UHCI0" },
+    { name = "USB_FS", interrupts = { peri = "USB" } },
+    { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
+    { name = "USB_WRAP", hidden = true },
+    { name = "WCL" },
+    { name = "XTS_AES" },
+
+    { name = "ADC1", virtual = true },
+    { name = "ADC2", virtual = true },
+    { name = "BT", virtual = true, interrupts = { rwble = "RWBLE", bb = "BT_BB" } },
+    { name = "CPU_CTRL", virtual = true },
+    { name = "FLASH", virtual = true },
+    { name = "GPIO_DEDICATED", virtual = true },
+    { name = "PSRAM", virtual = true },
+    { name = "ULP_RISCV_CORE", virtual = true },
+    { name = "WIFI", virtual = true, interrupts = { mac = "WIFI_MAC", pwr = "WIFI_PWR" }, stable = true },
+    { name = "IPC", virtual = true },
+    { name = "FROM_CPU_INTR0", virtual = true, hidden = true },
+    { name = "FROM_CPU_INTR1", virtual = true, hidden = true },
+    { name = "FROM_CPU_INTR2", virtual = true },
+    { name = "FROM_CPU_INTR3", virtual = true },
+]
+
+[device.soc.clocks]
+# {include clocks.toml}
+
+[device.adc]
+support_status = "partial"
+controller = "rtc"
+line_calibration = true
+curve_calibration = true
+basic_calibration = true
+calibration_v1_scheme_supported = true
+instances = [
+    { name = "adc1" },
+    { name = "adc2" },
+]
+
+[device.aes]
+support_status = "partial"
+has_split_text_registers = true
+endianness_configurable = false
+dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
+key_length = { options = [
+    { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
+    { bits = 256, encrypt_mode = 2, decrypt_mode = 6 }
+] }
+
+[device.assist_debug]
+support_status = "partial"
+has_region_monitor = true
+
+[device.dma]
+support_status = "partial"
+gdma_version = 1
+separate_in_out_interrupts = true
+mem2mem_requires_peripheral = true
+ext_mem_configurable_block_size = true
+engines = [
+    {
+        name = "AHB_GDMA",
+        max_priority = 9,
+        internal_ram_burst_sizes = [0, 4],
+        burst_sizes = [16, 32, 64],
+        drivers = ["aes", "sha", "spi_master", "spi_slave", "rmt", "uhci", "i2s", "lcd_cam"],
+        peripheral_instances = [
+            { name = "SPI2",       dma_id = 0 },
+            { name = "SPI3",       dma_id = 1 },
+            { name = "UHCI0",      dma_id = 2 },
+            { name = "I2S0",       dma_id = 3 },
+            { name = "I2S1",       dma_id = 4 },
+            { name = "LCD_CAM",    dma_id = 5 },
+            { name = "AES",        dma_id = 6 },
+            { name = "SHA",        dma_id = 7 },
+            { name = "APB_SARADC", dma_id = 8 },
+            { name = "RMT",        dma_id = 9 },
+        ],
+        channels = [
+            { name = "DMA_CH0", mem2mem = true, interrupt_in = "DMA_IN_CH0", interrupt_out = "DMA_OUT_CH0" },
+            { name = "DMA_CH1", mem2mem = true, interrupt_in = "DMA_IN_CH1", interrupt_out = "DMA_OUT_CH1" },
+            { name = "DMA_CH2", mem2mem = true, interrupt_in = "DMA_IN_CH2", interrupt_out = "DMA_OUT_CH2" },
+            { name = "DMA_CH3", mem2mem = true, interrupt_in = "DMA_IN_CH3", interrupt_out = "DMA_OUT_CH3" },
+            { name = "DMA_CH4", mem2mem = true, interrupt_in = "DMA_IN_CH4", interrupt_out = "DMA_OUT_CH4" },
+        ]
+    },
+]
+
+[device.gpio]
+support_status = "supported"
+# {include gpio.toml}
+
+[device.dedicated_gpio]
+version = "esp32s3"
+support_status = "partial"
+channels = [
+    ["PRO_ALONEGPIO0", "PRO_ALONEGPIO1", "PRO_ALONEGPIO2", "PRO_ALONEGPIO3", "PRO_ALONEGPIO4", "PRO_ALONEGPIO5", "PRO_ALONEGPIO6", "PRO_ALONEGPIO7"],
+    ["CORE1_GPIO0",    "CORE1_GPIO1",    "CORE1_GPIO2",    "CORE1_GPIO3",    "CORE1_GPIO4",    "CORE1_GPIO5",    "CORE1_GPIO6",    "CORE1_GPIO7"   ]
+]
+needs_initialization = true
+
+[device.i2c_master]
+support_status = "supported"
+version = 3
+instances = [
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+    { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
+]
+has_fsm_timeouts = true
+has_hw_bus_clear = false
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0x1F
+can_estimate_nack_reason = true
+has_conf_update = true
+has_arbitration_en = true
+has_tx_fifo_watermark = true
+bus_timeout_is_exponential = true
+has_pd_en = true
+
+[device.i2c_slave]
+support_status = { status = "not_supported", issue = 1909 }
+
+[device.lp_i2c_master]
+support_status = "partial"
+version = "rtc_i2c"
+
+[device.interrupts]
+support_status = "partial"
+status_registers = 4
+software_interrupt_count = 4
+controller = "Xtensa"
+context_switch_source = "software0"
+
+[device.rmt]
+support_status = "partial"
+ram_start = 0x60016800
+channel_ram_size = 48
+channels = ["Tx", "Tx", "Tx", "Tx", "Rx", "Rx", "Rx", "Rx"]
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
+
+[device.rsa]
+version = 2
+support_status = "partial"
+size_increment = 32
+memory_size_bytes = 512
+
+[device.sha]
+support_status = "partial"
+algo = {
+    sha1 = 0,
+    sha224 = 1,
+    sha256 = 2,
+    sha384 = 3,
+    sha512 = 4,
+    sha512_224 = 5,
+    sha512_256 = 6,
+    sha512_t = 7,
+}
+
+[device.sdm]
+support_status = "partial"
+channel_count = 8
+
+[device.spi_master]
+version = 3
+fifo_size = 64
+support_status = "supported"
+has_octal = true
+has_app_interrupts = true
+has_dma_segmented_transfer = true
+instances = [
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"],
+        cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"]
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "SPI3_CLK",
+        sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HD"],
+        cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"]
+    },
+]
+
+[device.spi_slave]
+support_status = "partial"
+instances = [
+    {
+        name = "spi2",
+        sys_instance = "Spi2",
+        sclk = "FSPICLK",
+        mosi = "FSPID",
+        miso = "FSPIQ",
+        cs = "FSPICS0"
+    },
+    {
+        name = "spi3",
+        sys_instance = "Spi3",
+        sclk = "SPI3_CLK",
+        mosi = "SPI3_D",
+        miso = "SPI3_Q",
+        cs = "SPI3_CS0"
+    },
+]
+
+[device.timergroup]
+support_status = "partial"
+timg_has_timer1 = true
+timg_has_divcnt_rst = false
+instances = [{ name = "timg0" }, { name = "timg1" }]
+
+[device.uart]
+support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+    { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS", wakeup_source = false },
+]
+ram_size = 128
+version = 1
+has_sclk_divider = true
+has_sclk_enable = true
+
+[device.uhci]
+support_status = "partial"
+
+[device.touch]
+support_status = { status = "not_supported", issue = 1905 }
+
+[device.ds]
+support_status = { status = "not_supported", issue = 884 }
+
+[device.rng]
+support_status = { status = "partial", issue = 5979 }
+trng_supported = true
+apb_cycle_wait_num = 16 # TODO
+
+[device.sleep]
+support_status = "partial"
+light_sleep = true
+deep_sleep = true
+ext1_version = 1
+pin_wakeup_version = 1
+deep_sleep_needs_gpio_isolation = true
+wakeup_sources = {
+    # A UART wake cannot reject a sleep.
+    rejectable = [
+        "Ext0",
+        "Ext1",
+        "Gpio",
+        "Timer",
+        "Sdio",
+        "Wifi",
+        "Touch",
+        "Bt",
+        "UlpRiscv",
+        "UlpRiscvTrap",
+    ],
+    Ext0 = 0,
+    Ext1 = 1,
+    Gpio = 2,
+    Timer = 3,
+    Sdio = 4,
+    Wifi = 5,
+    Uart0 = 6,
+    Uart1 = 7,
+    Touch = 8,
+    #UlpFsm = 9,
+    Bt = 10,
+    UlpRiscv = 11,
+    UlpRiscvTrap = 13
+}
+
+[device.sleep.retention]
+cpu_retention = "rtc_cntl"
+supports_tagmem_power_down = true
+cpu_retention_mem_size = 8800
+cpu_retention_mem_align = 16
+cpu_retention_mem_start = 0x3FC88000
+cpu_retention_mem_end = 0x3FCF0000
+
+# Other drivers which are partially supported but have no other configuration:
+
+## Crypto
+[device.hmac]
+
+## Interfaces
+[device.i2s]
+version = 2
+mclk_divider_bit_width = 9
+max_ws_width = 128
+instances = [
+    {
+        name = "i2s0",
+        sys_instance = "I2s0",
+        mclk = "I2S0_MCLK",
+        bclk = "I2S0O_BCK",
+        ws = "I2S0O_WS",
+        bclk_rx = "I2S0I_BCK",
+        ws_rx = "I2S0I_WS",
+        dout = ["I2S0O_SD", "I2S0O_SD1"],
+        din = ["I2S0I_SD", "I2S0I_SD1", "I2S0I_SD2", "I2S0I_SD3"],
+        pdm_tx = true,
+        pdm_rx = true,
+        pcm2pdm = true,
+        pdm2pcm = true,
+    },
+    {
+        name = "i2s1",
+        sys_instance = "I2s1",
+        mclk = "I2S1_MCLK",
+        bclk = "I2S1O_BCK",
+        ws = "I2S1O_WS",
+        bclk_rx = "I2S1I_BCK",
+        ws_rx = "I2S1I_WS",
+        dout = ["I2S1O_SD"],
+        din = ["I2S1I_SD"],
+        pdm_tx = true,
+        pdm_rx = true,
+    },
+]
+
+[device.camera]
+[device.rgb_display]
+output_lines = 16
+
+[device.ledc]
+version = 2
+channel_count = 8
+[device.mcpwm]
+[device.pcnt]
+instances = {
+    PCNT = {
+        sys_instance = "Pcnt",
+        interrupt = "PCNT",
+        units = [
+            { sig_ch0 = "PCNT0_SIG_CH0", sig_ch1 = "PCNT0_SIG_CH1", ctrl_ch0 = "PCNT0_CTRL_CH0", ctrl_ch1 = "PCNT0_CTRL_CH1" },
+            { sig_ch0 = "PCNT1_SIG_CH0", sig_ch1 = "PCNT1_SIG_CH1", ctrl_ch0 = "PCNT1_CTRL_CH0", ctrl_ch1 = "PCNT1_CTRL_CH1" },
+            { sig_ch0 = "PCNT2_SIG_CH0", sig_ch1 = "PCNT2_SIG_CH1", ctrl_ch0 = "PCNT2_CTRL_CH0", ctrl_ch1 = "PCNT2_CTRL_CH1" },
+            { sig_ch0 = "PCNT3_SIG_CH0", sig_ch1 = "PCNT3_SIG_CH1", ctrl_ch0 = "PCNT3_CTRL_CH0", ctrl_ch1 = "PCNT3_CTRL_CH1" },
+        ],
+    },
+}
+
+[device.sdmmc]
+support_status = "partial"
+delay_phase_num = 4
+has_iomux = false
+has_gpio_matrix = true
+psram_dma = false
+uhs = false
+# Both slots are routed entirely through the GPIO matrix.
+slot_config = [
+    {
+        iomux = false,
+        clk = "SDHOST_CCLK_OUT_1",
+        cmd_in = "SDHOST_CCMD_IN_1",
+        cmd_out = "SDHOST_CCMD_OUT_1",
+        data_in = ["SDHOST_CDATA_IN_10", "SDHOST_CDATA_IN_11", "SDHOST_CDATA_IN_12", "SDHOST_CDATA_IN_13", "SDHOST_CDATA_IN_14", "SDHOST_CDATA_IN_15", "SDHOST_CDATA_IN_16", "SDHOST_CDATA_IN_17"],
+        data_out = ["SDHOST_CDATA_OUT_10", "SDHOST_CDATA_OUT_11", "SDHOST_CDATA_OUT_12", "SDHOST_CDATA_OUT_13", "SDHOST_CDATA_OUT_14", "SDHOST_CDATA_OUT_15", "SDHOST_CDATA_OUT_16", "SDHOST_CDATA_OUT_17"],
+        cd = "SDHOST_CARD_DETECT_N_1",
+        wp = "SDHOST_CARD_WRITE_PRT_1",
+        card_int = "SDHOST_CARD_INT_N_1",
+        data_strobe = "SDHOST_DATA_STROBE_1",
+        rst = "SDHOST_RST_N_1",
+    },
+    {
+        iomux = false,
+        clk = "SDHOST_CCLK_OUT_2",
+        cmd_in = "SDHOST_CCMD_IN_2",
+        cmd_out = "SDHOST_CCMD_OUT_2",
+        data_in = ["SDHOST_CDATA_IN_20", "SDHOST_CDATA_IN_21", "SDHOST_CDATA_IN_22", "SDHOST_CDATA_IN_23", "SDHOST_CDATA_IN_24", "SDHOST_CDATA_IN_25", "SDHOST_CDATA_IN_26", "SDHOST_CDATA_IN_27"],
+        data_out = ["SDHOST_CDATA_OUT_20", "SDHOST_CDATA_OUT_21", "SDHOST_CDATA_OUT_22", "SDHOST_CDATA_OUT_23", "SDHOST_CDATA_OUT_24", "SDHOST_CDATA_OUT_25", "SDHOST_CDATA_OUT_26", "SDHOST_CDATA_OUT_27"],
+        cd = "SDHOST_CARD_DETECT_N_2",
+        wp = "SDHOST_CARD_WRITE_PRT_2",
+        card_int = "SDHOST_CARD_INT_N_2",
+        data_strobe = "SDHOST_DATA_STROBE_2",
+        rst = "SDHOST_RST_N_2",
+    },
+]
+
+[device.twai]
+[device.usb_otg]
+fifo_depth_words = 256
+
+[device.usb_serial_jtag]
+
+## Miscellaneous
+[device.io_mux]
+[device.psram]
+extmem_origin = 0x3C000000
+octal_spi = true
+
+[device.systimer]
+[device.temp_sensor]
+support_status = "not_supported"
+[device.ulp_fsm]
+support_status = { status = "not_supported", issue = 376 }
+[device.ulp_riscv]
+[device.lp_timer]
+
+## Radio
+[device.wifi]
+mac_version = 1
+csi_supported = true
+has_ftm = true
+
+[device.bt]
+support_status = "partial"
+controller = "btdm"
+
+[device.phy]
+combo_module = true
+backed_up_digital_register_count = 21

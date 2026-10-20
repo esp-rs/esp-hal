@@ -80,10 +80,11 @@ impl DmaTxChannel for SpiDmaTxChannel<'_> {}
 impl RegisterAccess for SpiDmaTxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let clock = Peripheral::SpiDma;
-            } else {
+            }
+            _ => {
                 let clock = match self.0 {
                     SpiDmaChannel(any::Inner::Spi2(_)) => Peripheral::Spi2Dma,
                     SpiDmaChannel(any::Inner::Spi3(_)) => Peripheral::Spi3Dma,
@@ -159,12 +160,14 @@ impl RegisterAccess for SpiDmaTxChannel<'_> {
 
 impl TxRegisterAccess for SpiDmaTxChannel<'_> {
     fn is_fifo_empty(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0
-            } else {
-                self.regs().dma_outstatus().read().dma_outfifo_empty().bit_is_set()
-            }
+        cfg_select! {
+            esp32 => self.regs().dma_rstatus().read().dma_out_status().bits() & 0x80000000 != 0,
+            _ => self
+                .regs()
+                .dma_outstatus()
+                .read()
+                .dma_outfifo_empty()
+                .bit_is_set(),
         }
     }
 
@@ -278,10 +281,11 @@ impl InterruptAccess<DmaTxInterrupt> for SpiDmaTxChannel<'_> {
 impl RegisterAccess for SpiDmaRxChannel<'_> {
     #[allow(private_interfaces)]
     fn enable(&self) -> Option<PeripheralGuard> {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
+        cfg_select! {
+            esp32 => {
                 let clock = Peripheral::SpiDma;
-            } else {
+            }
+            _ => {
                 let clock = match self.0 {
                     SpiDmaChannel(any::Inner::Spi2(_)) => Peripheral::Spi2Dma,
                     SpiDmaChannel(any::Inner::Spi3(_)) => Peripheral::Spi3Dma,
@@ -354,9 +358,9 @@ impl RegisterAccess for SpiDmaRxChannel<'_> {
 impl RxRegisterAccess for SpiDmaRxChannel<'_> {
     #[cfg(dma_supports_mem2mem)]
     fn set_mem2mem_mode(&self, en: bool) {
-        if en {
-            unimplemented!("SPI DMA mem2mem mode is not supported on this chip");
-        }
+        self.regs()
+            .dma_conf()
+            .modify(|_, w| w.mem_trans_en().bit(en));
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {

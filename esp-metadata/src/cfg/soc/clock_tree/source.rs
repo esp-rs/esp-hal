@@ -31,6 +31,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use serde::Deserialize;
@@ -39,11 +40,15 @@ use crate::{
     cfg::{
         ClockTreeNodeInstance,
         clock_tree::{
+            Bounds,
             ClockTreeNodeType,
             Expression,
             RejectExpression,
+            RootSource,
+            SourceFrequencySignature,
             ValidationContext,
             ValuesExpression,
+            expr_compiler::Operand,
             human_readable_frequency,
         },
         soc::ProcessedClockData,
@@ -54,10 +59,18 @@ use crate::{
 #[derive(Debug, Clone, Deserialize)]
 pub struct Source {
     /// The unique name of the clock tree item.
+    #[serde(default)]
     pub name: String,
 
     #[serde(default)]
     always_on: bool,
+
+    #[serde(default)]
+    wake_locking: bool,
+
+    /// Optional `#[cfg(...)]` expression. The node is omitted when the condition is false.
+    #[serde(default)]
+    cfg: Option<String>,
 
     /// If set, this expression will be used to validate the clock configuration.
     ///
@@ -70,7 +83,22 @@ pub struct Source {
     #[serde(default)]
     values: Option<ValuesExpression>,
 
+    /// The range (`min..=max`) that the frequency of a fixed source can be adjusted to at
+    /// runtime, e.g. after it has been measured.
+    #[serde(default)]
+    adjustable: Option<ValuesExpression>,
+
     output: OutputExpression,
+}
+
+impl Source {
+    pub(crate) fn set_wake_locking(&mut self, wake_locking: bool) {
+        self.wake_locking = wake_locking;
+    }
+
+    pub(crate) fn set_always_on(&mut self, always_on: bool) {
+        self.always_on = always_on;
+    }
 }
 
 impl ClockTreeNodeType for Source {
@@ -78,15 +106,63 @@ impl ClockTreeNodeType for Source {
         &self.name
     }
 
+    fn output_bounds(&self, instance: &ClockTreeNodeInstance, tree: &ProcessedClockData) -> Bounds {
+        let mut variables = IndexMap::new();
+        if let Some(values) = self.values.as_ref() {
+            variables.insert("VALUE", values.bounds());
+        }
+
+        let bounds = self.output.0.bounds_in_tree(&variables, instance, tree);
+        match self.adjustable_range() {
+            Some((min, max)) => bounds.union(Bounds::new(min as u64, max as u64)),
+            None => bounds,
+        }
+    }
+
+    fn adjustable_range(&self) -> Option<(u32, u32)> {
+        self.adjustable.as_ref().and_then(|range| range.as_range())
+    }
+
     fn always_on(&self) -> bool {
         self.always_on
     }
 
-    fn validate_source_data(
+    fn wake_locking(&self) -> bool {
+        self.wake_locking
+    }
+
+    fn root_source(
         &self,
         _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> RootSource {
+        RootSource::Itself
+    }
+
+    fn rustc_cfg(&self) -> Option<&str> {
+        self.cfg.as_deref()
+    }
+
+    fn validate_source_data(
+        &self,
+        instance: &ClockTreeNodeInstance,
         _ctx: &ValidationContext<'_>,
     ) -> Result<()> {
+        if let Some(range) = self.adjustable.as_ref() {
+            anyhow::ensure!(
+                range.as_range().is_some(),
+                "`adjustable` must be a single range (`min..=max`)"
+            );
+            anyhow::ensure!(
+                !self.is_configurable(),
+                "`adjustable` is only supported on fixed sources"
+            );
+            anyhow::ensure!(
+                instance.properties.receiver.is_none(),
+                "`adjustable` is not supported on clock group nodes"
+            );
+        }
+
         Ok(())
     }
 
@@ -107,7 +183,14 @@ impl ClockTreeNodeType for Source {
         let reject_exprs = self.reject.as_ref().map(|reject| {
             let mut variables = HashMap::new();
 
-            variables.insert("VALUE", quote! { config.value() });
+            let value_bounds = self
+                .values
+                .as_ref()
+                .map_or(Bounds::UNKNOWN, |values| values.bounds());
+            variables.insert(
+                "VALUE",
+                Operand::new(quote! { config.value() }, value_bounds),
+            );
 
             reject.to_rust(variables, instance, tree)
         });
@@ -125,6 +208,7 @@ impl ClockTreeNodeType for Source {
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
+        _frequency_receiver: &[TokenStream],
     ) -> TokenStream {
         if self.values.is_some() {
             quote! { config.value() }
@@ -306,6 +390,14 @@ impl ClockTreeNodeType for DerivedClockSource {
         self.source_options.name()
     }
 
+    fn output_bounds(&self, instance: &ClockTreeNodeInstance, tree: &ProcessedClockData) -> Bounds {
+        self.source_options.output_bounds(instance, tree)
+    }
+
+    fn wake_locking(&self) -> bool {
+        self.source_options.wake_locking()
+    }
+
     fn input_clocks(
         &self,
         _instance: &ClockTreeNodeInstance,
@@ -313,6 +405,14 @@ impl ClockTreeNodeType for DerivedClockSource {
     ) -> Vec<String> {
         // Note: Group-local derived clock are not supported.
         vec![self.from.clone()]
+    }
+
+    fn root_source(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> RootSource {
+        RootSource::PassThrough(self.from.clone())
     }
 
     fn validate_source_data(
@@ -325,12 +425,20 @@ impl ClockTreeNodeType for DerivedClockSource {
             "Clock `{}` is not defined",
             self.from
         );
+        anyhow::ensure!(
+            self.source_options.adjustable.is_none(),
+            "`adjustable` is not supported on derived sources"
+        );
 
         self.source_options.validate_source_data(instance, ctx)
     }
 
     fn is_configurable(&self) -> bool {
         self.source_options.is_configurable()
+    }
+
+    fn rustc_cfg(&self) -> Option<&str> {
+        self.source_options.rustc_cfg()
     }
 
     fn config_apply_function(
@@ -345,14 +453,34 @@ impl ClockTreeNodeType for DerivedClockSource {
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
+        frequency_receiver: &[TokenStream],
     ) -> TokenStream {
-        self.source_options.node_frequency_impl(instance, tree)
+        self.source_options
+            .node_frequency_impl(instance, tree, frequency_receiver)
+    }
+
+    fn node_source_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> SourceFrequencySignature {
+        let upstream_node = instance.resolve_node(tree, &self.from);
+        let Some(body) = upstream_node.try_frequency_call() else {
+            return SourceFrequencySignature::Skip;
+        };
+        SourceFrequencySignature::Parameterless(body)
     }
 
     fn config_type(&self, instance: &ClockTreeNodeInstance) -> TokenStream {
         let extra_docs = format!("Depends on `{}`.", self.from);
-        self.source_options
-            .impl_config_type(instance, Some(&extra_docs))
+        let cfg_attr = instance.rustc_cfg_attr();
+        let ty = self
+            .source_options
+            .impl_config_type(instance, Some(&extra_docs));
+        quote! {
+            #cfg_attr
+            #ty
+        }
     }
 
     fn request_direct_dependencies(

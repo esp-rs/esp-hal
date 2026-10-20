@@ -1,10 +1,8 @@
 //! Wi-Fi sniffer.
 
-use core::marker::PhantomData;
-
 use esp_sync::NonReentrantMutex;
 
-use super::{RxControlInfo, SNIFFER_BIT, release, try_acquire};
+use super::{RxControlInfo, SNIFFER_BIT, WifiRefGuard, release, try_acquire};
 use crate::{
     WifiError,
     sys::include::{
@@ -78,12 +76,12 @@ unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: 
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 #[non_exhaustive]
-pub struct Sniffer<'d> {
-    _phantom: PhantomData<&'d ()>,
+pub struct Sniffer {
+    _wifi_guard: WifiRefGuard,
 }
 
-impl Sniffer<'_> {
-    pub(crate) fn new() -> Self {
+impl Sniffer {
+    pub(crate) fn new(guard: WifiRefGuard) -> Self {
         assert!(try_acquire(SNIFFER_BIT), "sniffer already in use");
 
         // If registering the callback fails we panic, so release the singleton
@@ -95,9 +93,7 @@ impl Sniffer<'_> {
             unwrap!(res);
         }
 
-        Self {
-            _phantom: PhantomData,
-        }
+        Self { _wifi_guard: guard }
     }
 
     /// Set promiscuous mode enabled or disabled.
@@ -108,6 +104,9 @@ impl Sniffer<'_> {
     }
 
     /// Transmit a raw frame.
+    ///
+    /// Returns [`WifiError::Unsupported`] when `use_sta_interface` is `false` and the
+    /// `ESP_RADIO_CONFIG_WIFI_SOFTAP_SUPPORT` configuration option is disabled.
     #[instability::unstable]
     pub fn send_raw_frame(
         &mut self,
@@ -115,6 +114,10 @@ impl Sniffer<'_> {
         buffer: &[u8],
         use_internal_seq_num: bool,
     ) -> Result<(), WifiError> {
+        if !use_sta_interface && cfg!(not(wifi_softap_support)) {
+            return Err(WifiError::Unsupported);
+        }
+
         esp_wifi_result!(unsafe {
             esp_wifi_80211_tx(
                 if use_sta_interface {
@@ -136,7 +139,7 @@ impl Sniffer<'_> {
     }
 }
 
-impl Drop for Sniffer<'_> {
+impl Drop for Sniffer {
     fn drop(&mut self) {
         // Clear the user callback first so the C trampoline becomes a no-op even
         // if it fires during the teardown window below.

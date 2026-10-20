@@ -27,13 +27,16 @@ use crate::wifi::csi::CsiConfig;
 use crate::{
     asynch::AtomicWaker,
     sys::include::*,
-    wifi::{RxControlInfo, WifiError},
+    wifi::{RxControlInfo, WifiError, WifiRefGuard},
 };
 
 const RECEIVE_QUEUE_SIZE: usize = 10;
 
-/// Maximum payload length
-pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
+/// Maximum ESP-NOW v1.0 payload length.
+pub const ESP_NOW_MAX_DATA_LEN_V1: usize = crate::sys::include::ESP_NOW_MAX_DATA_LEN as _;
+
+/// Maximum ESP-NOW v2.0 payload length.
+pub const ESP_NOW_MAX_DATA_LEN_V2: usize = crate::sys::include::ESP_NOW_MAX_DATA_LEN_V2 as _;
 
 /// Broadcast address
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
@@ -176,74 +179,84 @@ pub struct PeerCount {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum WifiPhyRate {
-    /// < 1 Mbps with long preamble
-    Rate1mL = 0,
-    /// < 2 Mbps with long preamble
-    Rate2m,
-    /// < 5.5 Mbps with long preamble
-    Rate5mL,
-    /// < 11 Mbps with long preamble
-    Rate11mL,
-    /// < 2 Mbps with short preamble
-    Rate2mS,
-    /// < 5.5 Mbps with short preamble
-    Rate5mS,
-    /// < 11 Mbps with short preamble
-    Rate11mS,
-    /// < 48 Mbps
-    Rate48m,
-    /// < 24 Mbps
-    Rate24m,
-    /// < 12 Mbps
-    Rate12m,
-    /// < 6 Mbps
-    Rate6m,
-    /// < 54 Mbps
-    Rate54m,
-    /// < 36 Mbps
-    Rate36m,
-    /// < 18 Mbps
-    Rate18m,
-    /// < 9 Mbps
-    Rate9m,
-    /// < MCS0 with long GI, 6.5 Mbps for 20MHz, 13.5 Mbps for 40MHz
-    RateMcs0Lgi,
-    /// < MCS1 with long GI, 13 Mbps for 20MHz, 27 Mbps for 40MHz
-    RateMcs1Lgi,
-    /// < MCS2 with long GI, 19.5 Mbps for 20MHz, 40.5 Mbps for 40MHz
-    RateMcs2Lgi,
-    /// < MCS3 with long GI, 26 Mbps for 20MHz, 54 Mbps for 40MHz
-    RateMcs3Lgi,
-    /// < MCS4 with long GI, 39 Mbps for 20MHz, 81 Mbps for 40MHz
-    RateMcs4Lgi,
-    /// < MCS5 with long GI, 52 Mbps for 20MHz, 108 Mbps for 40MHz
-    RateMcs5Lgi,
-    /// < MCS6 with long GI, 58.5 Mbps for 20MHz, 121.5 Mbps for 40MHz
-    RateMcs6Lgi,
-    /// < MCS7 with long GI, 65 Mbps for 20MHz, 135 Mbps for 40MHz
-    RateMcs7Lgi,
-    /// < MCS0 with short GI, 7.2 Mbps for 20MHz, 15 Mbps for 40MHz
-    RateMcs0Sgi,
-    /// < MCS1 with short GI, 14.4 Mbps for 20MHz, 30 Mbps for 40MHz
-    RateMcs1Sgi,
-    /// < MCS2 with short GI, 21.7 Mbps for 20MHz, 45 Mbps for 40MHz
-    RateMcs2Sgi,
-    /// < MCS3 with short GI, 28.9 Mbps for 20MHz, 60 Mbps for 40MHz
-    RateMcs3Sgi,
-    /// < MCS4 with short GI, 43.3 Mbps for 20MHz, 90 Mbps for 40MHz
-    RateMcs4Sgi,
-    /// < MCS5 with short GI, 57.8 Mbps for 20MHz, 120 Mbps for 40MHz
-    RateMcs5Sgi,
-    /// < MCS6 with short GI, 65 Mbps for 20MHz, 135 Mbps for 40MHz
-    RateMcs6Sgi,
-    /// < MCS7 with short GI, 72.2 Mbps for 20MHz, 150 Mbps for 40MHz
-    RateMcs7Sgi,
-    /// < 250 Kbps
-    RateLora250k,
-    /// < 500 Kbps
-    RateLora500k,
-    /// Max
-    RateMax,
+    /// 1 Mbps with long preamble
+    Rate1mL      = wifi_phy_rate_t_WIFI_PHY_RATE_1M_L,
+    /// 2 Mbps with long preamble
+    Rate2m       = wifi_phy_rate_t_WIFI_PHY_RATE_2M_L,
+    /// 5.5 Mbps with long preamble
+    Rate5mL      = wifi_phy_rate_t_WIFI_PHY_RATE_5M_L,
+    /// 11 Mbps with long preamble
+    Rate11mL     = wifi_phy_rate_t_WIFI_PHY_RATE_11M_L,
+    /// 2 Mbps with short preamble
+    Rate2mS      = wifi_phy_rate_t_WIFI_PHY_RATE_2M_S,
+    /// 5.5 Mbps with short preamble
+    Rate5mS      = wifi_phy_rate_t_WIFI_PHY_RATE_5M_S,
+    /// 11 Mbps with short preamble
+    Rate11mS     = wifi_phy_rate_t_WIFI_PHY_RATE_11M_S,
+    /// 48 Mbps
+    Rate48m      = wifi_phy_rate_t_WIFI_PHY_RATE_48M,
+    /// 24 Mbps
+    Rate24m      = wifi_phy_rate_t_WIFI_PHY_RATE_24M,
+    /// 12 Mbps
+    Rate12m      = wifi_phy_rate_t_WIFI_PHY_RATE_12M,
+    /// 6 Mbps
+    Rate6m       = wifi_phy_rate_t_WIFI_PHY_RATE_6M,
+    /// 54 Mbps
+    Rate54m      = wifi_phy_rate_t_WIFI_PHY_RATE_54M,
+    /// 36 Mbps
+    Rate36m      = wifi_phy_rate_t_WIFI_PHY_RATE_36M,
+    /// 18 Mbps
+    Rate18m      = wifi_phy_rate_t_WIFI_PHY_RATE_18M,
+    /// 9 Mbps
+    Rate9m       = wifi_phy_rate_t_WIFI_PHY_RATE_9M,
+    /// MCS0 with long GI, 6.5 Mbps for 20MHz, 13.5 Mbps for 40MHz
+    RateMcs0Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS0_LGI,
+    /// MCS1 with long GI, 13 Mbps for 20MHz, 27 Mbps for 40MHz
+    RateMcs1Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS1_LGI,
+    /// MCS2 with long GI, 19.5 Mbps for 20MHz, 40.5 Mbps for 40MHz
+    RateMcs2Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS2_LGI,
+    /// MCS3 with long GI, 26 Mbps for 20MHz, 54 Mbps for 40MHz
+    RateMcs3Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS3_LGI,
+    /// MCS4 with long GI, 39 Mbps for 20MHz, 81 Mbps for 40MHz
+    RateMcs4Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS4_LGI,
+    /// MCS5 with long GI, 52 Mbps for 20MHz, 108 Mbps for 40MHz
+    RateMcs5Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS5_LGI,
+    /// MCS6 with long GI, 58.5 Mbps for 20MHz, 121.5 Mbps for 40MHz
+    RateMcs6Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS6_LGI,
+    /// MCS7 with long GI, 65 Mbps for 20MHz, 135 Mbps for 40MHz
+    RateMcs7Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS7_LGI,
+    /// MCS8 with long GI
+    #[cfg(not(wifi_mac_version = "1"))]
+    RateMcs8Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS8_LGI,
+    /// MCS9 with long GI
+    #[cfg(not(wifi_mac_version = "1"))]
+    RateMcs9Lgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS9_LGI,
+    /// MCS0 with short GI, 7.2 Mbps for 20MHz, 15 Mbps for 40MHz
+    RateMcs0Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS0_SGI,
+    /// MCS1 with short GI, 14.4 Mbps for 20MHz, 30 Mbps for 40MHz
+    RateMcs1Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS1_SGI,
+    /// MCS2 with short GI, 21.7 Mbps for 20MHz, 45 Mbps for 40MHz
+    RateMcs2Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS2_SGI,
+    /// MCS3 with short GI, 28.9 Mbps for 20MHz, 60 Mbps for 40MHz
+    RateMcs3Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS3_SGI,
+    /// MCS4 with short GI, 43.3 Mbps for 20MHz, 90 Mbps for 40MHz
+    RateMcs4Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS4_SGI,
+    /// MCS5 with short GI, 57.8 Mbps for 20MHz, 120 Mbps for 40MHz
+    RateMcs5Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS5_SGI,
+    /// MCS6 with short GI, 65 Mbps for 20MHz, 135 Mbps for 40MHz
+    RateMcs6Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS6_SGI,
+    /// MCS7 with short GI, 72.2 Mbps for 20MHz, 150 Mbps for 40MHz
+    RateMcs7Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS7_SGI,
+    /// MCS8 with short GI
+    #[cfg(not(wifi_mac_version = "1"))]
+    RateMcs8Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS8_SGI,
+    /// MCS9 with short GI
+    #[cfg(not(wifi_mac_version = "1"))]
+    RateMcs9Sgi  = wifi_phy_rate_t_WIFI_PHY_RATE_MCS9_SGI,
+    /// 250 Kbps
+    RateLora250k = wifi_phy_rate_t_WIFI_PHY_RATE_LORA_250K,
+    /// 500 Kbps
+    RateLora500k = wifi_phy_rate_t_WIFI_PHY_RATE_LORA_500K,
 }
 
 /// ESP-NOW peer information parameters.
@@ -324,6 +337,7 @@ impl Debug for ReceivedData {
 #[instability::unstable]
 pub enum EspNowWifiInterface {
     /// Use the access point interface
+    #[cfg(wifi_softap_support)]
     AccessPoint,
     /// Use the station interface
     Station,
@@ -332,6 +346,7 @@ pub enum EspNowWifiInterface {
 impl EspNowWifiInterface {
     fn as_wifi_interface(&self) -> wifi_interface_t {
         match self {
+            #[cfg(wifi_softap_support)]
             EspNowWifiInterface::AccessPoint => wifi_interface_t_WIFI_IF_AP,
             EspNowWifiInterface::Station => wifi_interface_t_WIFI_IF_STA,
         }
@@ -340,6 +355,7 @@ impl EspNowWifiInterface {
     fn from_wifi_interface(interface: wifi_interface_t) -> Self {
         #[allow(non_upper_case_globals)]
         match interface {
+            #[cfg(wifi_softap_support)]
             wifi_interface_t_WIFI_IF_AP => EspNowWifiInterface::AccessPoint,
             wifi_interface_t_WIFI_IF_STA => EspNowWifiInterface::Station,
             wifi_interface_t_WIFI_IF_NAN => panic!("NAN is unsupported"),
@@ -348,23 +364,69 @@ impl EspNowWifiInterface {
     }
 }
 
+/// Phy Mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum PhyMode {
+    /// PHY mode for Low Rate
+    Lr    = wifi_phy_mode_t_WIFI_PHY_MODE_LR,
+    /// PHY mode for 11b
+    _11b  = wifi_phy_mode_t_WIFI_PHY_MODE_11B,
+    /// PHY mode for 11g
+    _11g  = wifi_phy_mode_t_WIFI_PHY_MODE_11G,
+    /// PHY mode for 11a
+    _11a  = wifi_phy_mode_t_WIFI_PHY_MODE_11A,
+    /// PHY mode for Bandwidth HT20
+    Ht20  = wifi_phy_mode_t_WIFI_PHY_MODE_HT20,
+    /// PHY mode for Bandwidth HT40
+    Ht40  = wifi_phy_mode_t_WIFI_PHY_MODE_HT40,
+    /// PHY mode for Bandwidth HE20
+    He20  = wifi_phy_mode_t_WIFI_PHY_MODE_HE20,
+    /// PHY mode for Bandwidth VHT20
+    Vht20 = wifi_phy_mode_t_WIFI_PHY_MODE_VHT20,
+}
+
+/// Rate Config
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub struct RateConfig {
+    /// Phy mode
+    pub phy_mode: PhyMode,
+    /// The rate
+    pub rate: WifiPhyRate,
+    /// Using ERSU to send frame, ERSU is a transmission mode related to 802.11 ax. ERSU is always
+    /// used in long distance transmission, and its frame has lower rate compared with SU mode
+    pub ersu: bool,
+    /// Using dcm rate to send frame
+    pub dcm: bool,
+}
+
 /// Manages the `EspNow` instance lifecycle while ensuring it remains active.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct EspNowManager<'d> {
-    _rc: EspNowRc<'d>,
+pub struct EspNowManager {
+    _rc: EspNowRc,
 }
 
-impl EspNowManager<'_> {
+impl EspNowManager {
     /// Set primary Wi-Fi channel.
-    /// Should only be used when using ESP-NOW without access point or station.
+    /// When using ESP-NOW with an access point or station,
+    /// the device cannot switch channels after connecting to Wi-Fi.
+    /// It can only transmit and receive data on the current Wi-Fi channel.
     #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_set_channel(channel, 0) })
     }
 
     /// Get the version of ESP-NOW.
+    ///
+    /// ESP-NOW supports two versions: v1.0 and v2.0. v1.0 and v2.0 are capable of talking to each
+    /// other, but v1.0 devices may truncate or discard v2.0 messages that exceed the v1.0 maximum
+    /// data length ([`ESP_NOW_MAX_DATA_LEN_V1`]).
     #[instability::unstable]
     pub fn version(&self) -> Result<u32, EspNowError> {
         let mut version = 0u32;
@@ -526,10 +588,25 @@ impl EspNowManager<'_> {
         check_error!({ esp_now_set_wake_window(ms as u16) })
     }
 
-    /// Configure ESP-NOW rate.
+    /// Set ESP-NOW rate config for the given peer.
+    /// You need to add the peer first before setting the rate config.
     #[instability::unstable]
-    pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
-        check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) })
+    pub fn set_peer_rate(
+        &self,
+        peer_address: &[u8; 6],
+        cfg: RateConfig,
+    ) -> Result<(), EspNowError> {
+        check_error!({
+            esp_now_set_peer_rate_config(
+                peer_address.as_ptr(),
+                &mut esp_now_rate_config_t {
+                    phymode: cfg.phy_mode as u32,
+                    rate: cfg.rate as u32,
+                    ersu: cfg.ersu,
+                    dcm: cfg.dcm,
+                },
+            )
+        })
     }
 }
 
@@ -543,11 +620,11 @@ impl EspNowManager<'_> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct EspNowSender<'d> {
-    _rc: EspNowRc<'d>,
+pub struct EspNowSender {
+    _rc: EspNowRc,
 }
 
-impl EspNowSender<'_> {
+impl EspNowSender {
     /// Send data to peer
     ///
     /// The peer needs to be added to the peer list first.
@@ -577,7 +654,7 @@ impl EspNowSender<'_> {
 /// invoked.
 #[must_use]
 #[instability::unstable]
-pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender<'s>>);
+pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender>);
 
 impl SendWaiter<'_> {
     /// Wait for the previous sending to complete, i.e. the send callback is
@@ -610,11 +687,11 @@ impl Drop for SendWaiter<'_> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct EspNowReceiver<'d> {
-    _rc: EspNowRc<'d>,
+pub struct EspNowReceiver {
+    _rc: EspNowRc,
 }
 
-impl EspNowReceiver<'_> {
+impl EspNowReceiver {
     /// Receives data from the ESP-NOW queue.
     #[instability::unstable]
     pub fn receive(&self) -> Option<ReceivedData> {
@@ -625,24 +702,24 @@ impl EspNowReceiver<'_> {
 /// The reference counter for properly deinit espnow after all parts are
 /// dropped.
 #[derive(Debug)]
-struct EspNowRc<'d> {
+struct EspNowRc {
     rc: &'static AtomicU8,
-    inner: PhantomData<EspNow<'d>>,
+    _wifi_guard: WifiRefGuard,
 }
 
 #[cfg(feature = "defmt")]
-impl defmt::Format for EspNowRc<'_> {
+impl defmt::Format for EspNowRc {
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(
             f,
-            "EspNowRc {{ rc: {}, inner: ... }}",
+            "EspNowRc {{ rc: {}, _wifi_guard: ... }}",
             self.rc.load(Ordering::Relaxed)
         );
     }
 }
 
-impl EspNowRc<'_> {
-    fn new() -> Self {
+impl EspNowRc {
+    fn new(wifi_guard: WifiRefGuard) -> Self {
         static ESP_NOW_RC: AtomicU8 = AtomicU8::new(0);
         assert!(
             ESP_NOW_RC.fetch_add(1, Ordering::AcqRel) == 0,
@@ -651,22 +728,22 @@ impl EspNowRc<'_> {
 
         Self {
             rc: &ESP_NOW_RC,
-            inner: PhantomData,
+            _wifi_guard: wifi_guard,
         }
     }
 }
 
-impl Clone for EspNowRc<'_> {
+impl Clone for EspNowRc {
     fn clone(&self) -> Self {
         self.rc.fetch_add(1, Ordering::Release);
         Self {
             rc: self.rc,
-            inner: PhantomData,
+            _wifi_guard: self._wifi_guard.clone(),
         }
     }
 }
 
-impl Drop for EspNowRc<'_> {
+impl Drop for EspNowRc {
     fn drop(&mut self) {
         if self.rc.fetch_sub(1, Ordering::AcqRel) == 1 {
             unsafe {
@@ -691,16 +768,15 @@ impl Drop for EspNowRc<'_> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct EspNow<'d> {
-    manager: EspNowManager<'d>,
-    sender: EspNowSender<'d>,
-    receiver: EspNowReceiver<'d>,
-    _phantom: PhantomData<&'d ()>,
+pub struct EspNow {
+    manager: EspNowManager,
+    sender: EspNowSender,
+    receiver: EspNowReceiver,
 }
 
-impl<'d> EspNow<'d> {
-    pub(crate) fn new_internal() -> EspNow<'d> {
-        let espnow_rc = EspNowRc::new();
+impl EspNow {
+    pub(crate) fn new_internal(guard: WifiRefGuard) -> EspNow {
+        let espnow_rc = EspNowRc::new(guard);
         let esp_now = EspNow {
             manager: EspNowManager {
                 _rc: espnow_rc.clone(),
@@ -709,7 +785,6 @@ impl<'d> EspNow<'d> {
                 _rc: espnow_rc.clone(),
             },
             receiver: EspNowReceiver { _rc: espnow_rc },
-            _phantom: PhantomData,
         };
 
         check_error_expect!({ esp_now_init() }, "esp-now-init failed");
@@ -738,7 +813,7 @@ impl<'d> EspNow<'d> {
     /// Splits the `EspNow` instance into its manager, sender, and receiver
     /// components.
     #[instability::unstable]
-    pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
+    pub fn split(self) -> (EspNowManager, EspNowSender, EspNowReceiver) {
         (self.manager, self.sender, self.receiver)
     }
 
@@ -816,10 +891,15 @@ impl<'d> EspNow<'d> {
         self.manager.set_wake_window(wake_window)
     }
 
-    /// Configure ESP-NOW rate.
+    /// Set ESP-NOW rate config for the given peer.
+    /// You need to add the peer first before setting the rate config.
     #[instability::unstable]
-    pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
-        self.manager.set_rate(rate)
+    pub fn set_peer_rate(
+        &self,
+        peer_address: &[u8; 6],
+        cfg: RateConfig,
+    ) -> Result<(), EspNowError> {
+        self.manager.set_peer_rate(peer_address, cfg)
     }
 
     /// Send data to peer.
@@ -899,7 +979,7 @@ unsafe extern "C" fn rcv_cb(
     });
 }
 
-impl EspNowReceiver<'_> {
+impl EspNowReceiver {
     /// This function takes mutable reference to self because the
     /// implementation of `ReceiveFuture` is not logically thread
     /// safe.
@@ -909,7 +989,7 @@ impl EspNowReceiver<'_> {
     }
 }
 
-impl EspNowSender<'_> {
+impl EspNowSender {
     /// Sends data asynchronously to a peer (using its MAC) using ESP-NOW.
     #[instability::unstable]
     pub fn send_async<'s, 'r>(
@@ -926,7 +1006,7 @@ impl EspNowSender<'_> {
     }
 }
 
-impl EspNow<'_> {
+impl EspNow {
     /// This function takes mutable reference to self because the
     /// implementation of `ReceiveFuture` is not logically thread
     /// safe.
@@ -952,7 +1032,7 @@ impl EspNow<'_> {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[instability::unstable]
 pub struct SendFuture<'s, 'r> {
-    _sender: PhantomData<&'s mut EspNowSender<'s>>,
+    _sender: PhantomData<&'s mut EspNowSender>,
     addr: &'r [u8; 6],
     data: &'r [u8],
     sent: bool,
@@ -990,7 +1070,7 @@ impl core::future::Future for SendFuture<'_, '_> {
 /// the rest of them unwakable.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[instability::unstable]
-pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
+pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver>);
 
 impl core::future::Future for ReceiveFuture<'_> {
     type Output = ReceivedData;

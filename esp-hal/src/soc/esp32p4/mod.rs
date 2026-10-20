@@ -1,9 +1,6 @@
-// pub mod efuse;
-pub mod gpio;
-// pub mod peripherals;
-
 crate::unstable_module! {
     pub mod clocks;
+    pub mod trng;
 }
 
 pub(crate) mod cpu_control;
@@ -11,10 +8,13 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32p4 as pac;
 
-#[cfg(spi_master_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn spi_master_clock_source_frequency() -> u32 {
-    clocks::xtal_clk_frequency()
+#[inline(always)]
+#[cfg(feature = "rt")]
+pub(crate) fn riscv_preinit() {
+    // workaround: this shouldn't be needed - done by the 2nd stage bootloader
+    unsafe {
+        cache_invalidate_addr(0x40000000, 64 * 1024 * 1024);
+    }
 }
 
 pub(crate) fn pre_init() {
@@ -29,16 +29,25 @@ pub(crate) fn pre_init() {
     }
 }
 
+const MHCR_RS: u32 = 1 << 4;
+const MHCR_BFE: u32 = 1 << 5;
+const MHCR_BTB: u32 = 1 << 12;
+const MHCR_BRANCH_PREDICTOR: u32 = MHCR_RS | MHCR_BFE | MHCR_BTB;
+
 pub(crate) fn enable_branch_predictor() {
-    // Enable branch predictor
-    // Note that the branch predictor will start cache requests and needs to be disabled when
-    // the cache is disabled.
-    // MHCR: CSR 0x7c1
-    const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
-    const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
-    const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
+    // MHCR: CSR 0x7c1 — sourced from `components/riscv/include/riscv/rv_utils.h`. The predictor
+    // starts cache requests of its own, so it must be off while the cache is off.
     unsafe {
-        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
+    }
+}
+
+#[cfg(any(feature = "rt", feature = "unstable"))]
+pub(crate) fn disable_branch_predictor() {
+    // Clears the bits set by `enable_branch_predictor`.
+    // `rt` covers the CPU-retention rendezvous; `unstable` covers flash cache suspend.
+    unsafe {
+        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
     }
 }
 
@@ -47,36 +56,42 @@ const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
 const CACHE_MAP_L2_CACHE: u32 = 1 << 5;
 
-/// Write back a specific range of data in the cache.
+/// Cache buses that back the value at `addr`.
+fn cache_l2_bus(addr: u32) -> u32 {
+    let internal = memory_range!("DRAM").contains(&addr);
+    if internal { 0 } else { CACHE_MAP_L2_CACHE }
+}
+
+/// Writes back a specific range of data in the cache.
 pub(crate) unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_WriteBack_Addr(bus: u32, addr: u32, size: u32);
     }
 
     unsafe {
-        Cache_WriteBack_Addr(
-            CACHE_MAP_L1_ICACHE_0
-                | CACHE_MAP_L1_ICACHE_1
-                | CACHE_MAP_L1_DCACHE
-                | CACHE_MAP_L2_CACHE,
-            addr,
-            size,
-        );
+        Cache_WriteBack_Addr(CACHE_MAP_L1_DCACHE | cache_l2_bus(addr), addr, size);
     }
 }
 
-/// Write back a specific range of data in the cache.
+/// Invalidate a specific range of data in the cache.
 pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     unsafe extern "C" {
         fn Cache_Invalidate_Addr(bus: u32, addr: u32, size: u32);
     }
 
     unsafe {
+        Cache_Invalidate_Addr(CACHE_MAP_L1_DCACHE | cache_l2_bus(addr), addr, size);
+    }
+}
+
+pub(crate) unsafe fn cache_invalidate_icache_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(bus: u32, addr: u32, size: u32);
+    }
+
+    unsafe {
         Cache_Invalidate_Addr(
-            CACHE_MAP_L1_ICACHE_0
-                | CACHE_MAP_L1_ICACHE_1
-                | CACHE_MAP_L1_DCACHE
-                | CACHE_MAP_L2_CACHE,
+            CACHE_MAP_L1_ICACHE_0 | CACHE_MAP_L1_ICACHE_1 | cache_l2_bus(addr),
             addr,
             size,
         );

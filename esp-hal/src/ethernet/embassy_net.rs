@@ -5,14 +5,22 @@
 //! Ethernet peripheral to be used as a network interface with
 //! [`embassy-net`](https://crates.io/crates/embassy-net).
 //!
-//! # Usage
+//! ## Usage
 //!
 //! After obtaining an `Ethernet<'_, Async, P>` instance, pass it directly to
 //! `embassy_net::new()` — the [`Driver`] impl is inherent on the type.
 
 use core::task::Context;
 
-use embassy_net_driver_02::{Capabilities, Driver, HardwareAddress, LinkState, RxToken, TxToken};
+use embassy_net_driver_02::{
+    Capabilities,
+    Checksum,
+    Driver,
+    HardwareAddress,
+    LinkState,
+    RxToken,
+    TxToken,
+};
 
 use super::{Ethernet, RX_WAKER, TX_WAKER, mac::EmacRegs};
 use crate::{
@@ -105,10 +113,6 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
         // Check availability as plain booleans so the borrows end before we
         // split &mut self into the two ring references for the tokens.
         let rx_ready = self.rx.receive().is_some();
-        // Poke the RX DMA unconditionally: receive() may have recycled error
-        // frames back to DMA ownership without a poll-demand write, which
-        // would leave the GMAC RX channel suspended.
-        EmacRegs.demand_rx_poll();
         let tx_ready = self.tx.available_buf().is_some();
 
         if rx_ready && tx_ready {
@@ -130,13 +134,20 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
         }
     }
 
+    /// Polls the PHY and tracks the DMA interrupt state with the link.
+    ///
+    /// DMA interrupts are only enabled while the link is up: with no link there
+    /// is no RX clock, and error interrupts would otherwise fire continuously.
     fn link_state(&mut self, cx: &mut Context<'_>) -> LinkState {
         let state = self.poll_link(Some(cx));
         if state.up {
             self.set_speed(state.speed);
             self.set_duplex(state.duplex);
+            super::bind_eth_isr();
+            EmacRegs.dma_enable_interrupts(true);
             LinkState::Up
         } else {
+            EmacRegs.dma_disable_interrupts();
             LinkState::Down
         }
     }
@@ -144,6 +155,22 @@ impl<'d, P: Phy> Driver for Ethernet<'d, Async, P> {
     fn capabilities(&self) -> Capabilities {
         let mut caps = Capabilities::default();
         caps.max_transmission_unit = MTU;
+        caps.max_burst_size = Some(self.tx.len());
+        // `Checksum` names the direction(s) computed in software. Hardware
+        // offload is advertised so the stack skips that side.
+        const RX_COE: bool = property!("ethernet.rx_checksum_offload");
+        const TX_COE: bool = property!("ethernet.tx_checksum_offload");
+        let checksum = match (RX_COE, TX_COE) {
+            (true, true) => Checksum::None,
+            (true, false) => Checksum::Tx,
+            (false, true) => Checksum::Rx,
+            (false, false) => Checksum::Both,
+        };
+        caps.checksum.ipv4 = checksum;
+        caps.checksum.tcp = checksum;
+        caps.checksum.udp = checksum;
+        caps.checksum.icmpv4 = checksum;
+        caps.checksum.icmpv6 = checksum;
         caps
     }
 

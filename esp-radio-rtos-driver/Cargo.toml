@@ -1,6 +1,6 @@
 [package]
 name          = "esp-radio-rtos-driver"
-version       = "0.3.0"
+version       = "0.4.2"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "Task scheduler interface for esp-radio"
@@ -23,11 +23,10 @@ portable-atomic = "1"
 portable-atomic = { version = "1", features = ["unsafe-assume-single-core"] }
 
 [dependencies]
-esp-sync = { version = "0.2.1", path = "../esp-sync", optional = true }
-cfg-if = "1"
+esp-sync = { version = "0.3.0", path = "../esp-sync", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt  = { version = "1.0", optional = true }
+defmt  = { version = "1.1", optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 
 [features]
@@ -40,8 +39,10 @@ esp32c5 = ["esp-sync?/esp32c5"]
 esp32c6 = ["esp-sync?/esp32c6"]
 esp32c61 = ["esp-sync?/esp32c61"]
 esp32h2 = ["esp-sync?/esp32h2"]
+esp32h4 = ["esp-sync?/esp32h4"]
 esp32s2 = ["esp-sync?/esp32s2"]
 esp32s3 = ["esp-sync?/esp32s3"]
+esp32s31 = ["esp-sync?/esp32s31"]
 
 # Logging Feature Flags
 log-04 = ["dep:log-04"]

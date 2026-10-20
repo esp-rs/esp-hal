@@ -7,6 +7,7 @@ use crate::analog::adc::{
     AdcHasLineCal,
     Attenuation,
     CalibrationAccess,
+    Error,
 };
 
 const COEFF_MUL: i64 = 1 << 52;
@@ -15,27 +16,28 @@ const COEFF_MUL: i64 = 1 << 52;
 /// the type, this is a fixed-point number with 52 fractional bits.
 type CurveCoeff = i64;
 
-/// Polynomial coefficients for specified attenuation.
+/// Polynomial coefficients for a specified attenuation.
 pub struct CurveCoeffs {
-    /// Attenuation
+    /// Attenuation.
     atten: Attenuation,
-    /// Polynomial coefficients
+    /// Polynomial coefficients.
     coeff: &'static [CurveCoeff],
 }
 
 type CurvesCoeffs = &'static [CurveCoeffs];
 
-/// Marker trait for ADC which support curve fitting
+/// Marker trait for ADCs that support curve fitting.
 ///
 /// See also [`AdcCalCurve`].
 pub trait AdcHasCurveCal {
     /// Coefficients for calculating the reading voltage error.
     ///
-    /// A sets of coefficients for each attenuation.
-    const CURVES_COEFFS: CurvesCoeffs;
+    /// A set of coefficients for each attenuation, selected for the eFuse
+    /// calibration version on this chip.
+    fn curves_coeffs() -> CurvesCoeffs;
 }
 
-/// Curve fitting ADC calibration scheme
+/// Curve fitting ADC calibration scheme.
 ///
 /// This scheme implements polynomial error correction using predefined
 /// coefficient sets for each attenuation. It returns readings in mV.
@@ -66,44 +68,49 @@ impl<ADCX> AdcCalScheme<ADCX> for AdcCalCurve<ADCX>
 where
     ADCX: AdcCalEfuse + AdcHasLineCal + AdcHasCurveCal + CalibrationAccess,
 {
-    fn new_cal(atten: Attenuation) -> Self {
-        let line = AdcCalLine::<ADCX>::new_cal(atten);
-
-        let coeff = ADCX::CURVES_COEFFS
-            .iter()
-            .find(|item| item.atten == atten)
-            .expect("No curve coefficients for given attenuation")
-            .coeff;
-
-        Self {
-            line,
-            coeff,
-            _phantom: PhantomData,
-        }
+    fn new_cal(atten: Attenuation) -> Result<Self, Error> {
+        Self::new_cal_with_channel(atten, 0)
     }
 
-    fn adc_cal(&self) -> u16 {
-        self.line.adc_cal()
+    fn new_cal_with_channel(atten: Attenuation, channel: u8) -> Result<Self, Error> {
+        let line = AdcCalLine::<ADCX>::new_cal_with_channel(atten, channel)?;
+
+        // Every shipped coefficient table covers all four attenuations; a miss
+        // means the user requested an attenuation the chip never characterized.
+        let Some(coeff) = ADCX::curves_coeffs()
+            .iter()
+            .find(|item| item.atten == atten)
+        else {
+            return Err(Error::UnsupportedAttenuation(atten));
+        };
+
+        Ok(Self {
+            line,
+            coeff: coeff.coeff,
+            _phantom: PhantomData,
+        })
     }
 
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.line.adc_val(val);
 
-        // Calculate polynomial error using Horner's method to prevent overflow.
-        // Horner's evaluates: err = coeff[0] + val*(coeff[1] + val*(coeff[2] + ...))
-        // This avoids computing val^n which causes overflow when multiplied by coefficients.
+        // Truncate each polynomial term before summing to match integer division
+        // in the curve-fitting reference model.
+        //
+        // The products need i128: the highest-order term (ESP32-S3, x^4) times its
+        // coefficient does not fit an i64.
         let err = if val == 0 || self.coeff.is_empty() {
             0
         } else {
-            let val_i64 = val as i64;
-            let mut poly = 0i64;
+            let mut var: i128 = 1; // val^i
+            let mut err: i128 = 0;
 
-            // Iterate coefficients in reverse order for Horner's method
-            for &coeff in self.coeff.iter().rev() {
-                poly = poly * val_i64 + coeff;
+            for &coeff in self.coeff {
+                err += var * i128::from(coeff) / i128::from(COEFF_MUL);
+                var *= i128::from(val);
             }
 
-            (poly / COEFF_MUL) as i32
+            err as i32
         };
 
         (val as i32 - err) as u16
@@ -126,22 +133,26 @@ macro_rules! coeff_tables {
     };
 }
 
-#[cfg(any(esp32c3, esp32c5, esp32c6, esp32h2, esp32s3))]
+#[cfg(adc_curve_calibration)]
 mod impls {
     use super::*;
 
     impl AdcHasCurveCal for crate::peripherals::ADC1<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
+        fn curves_coeffs() -> CurvesCoeffs {
+            #[cfg(esp32c6)]
+            if crate::efuse::rtc_calib_version() == 2 {
+                return CURVES_COEFFS1_V2;
+            }
+
+            CURVES_COEFFS1
+        }
     }
 
-    #[cfg(esp32c3)]
+    #[cfg(adc_adc2)]
     impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS1;
-    }
-
-    #[cfg(esp32s3)]
-    impl AdcHasCurveCal for crate::peripherals::ADC2<'_> {
-        const CURVES_COEFFS: CurvesCoeffs = CURVES_COEFFS2;
+        fn curves_coeffs() -> CurvesCoeffs {
+            CURVES_COEFFS2
+        }
     }
 
     coeff_tables! {
@@ -197,12 +208,11 @@ mod impls {
             ],
         ];
 
-
-        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/903af13e8/components/esp_adc/esp32c6/curve_fitting_coefficients.c>
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/027613140/components/esp_adc/esp32c6/curve_fitting_coefficients.c#L29-L35>
         #[cfg(esp32c6)]
         CURVES_COEFFS1 [
             _0dB => [
-                -0.0487166399931449,
+                -0.487166399931449,
                 0.0006436483033201,
                 0.0000030410131806,
             ],
@@ -220,6 +230,47 @@ mod impls {
                 -0.3801417550380255,
                 -0.0006020352420772,
                 0.0000012442478488,
+            ],
+        ];
+
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/1e76669a8b940f5dc25adc35065cb53de3c71423/components/esp_adc/esp32c61/curve_fitting_coefficients.c>
+        #[cfg(esp32c61)]
+        CURVES_COEFFS1 [
+            _0dB => [
+                -0.8668885650149671,
+                0.0015630376830615,
+            ],
+            _2p5dB => [
+                -1.090569589734153,
+                0.0013859487941542,
+            ],
+            _6dB => [
+                -1.4231790752153335,
+                0.00122016745867,
+            ],
+            _11dB => [
+                -1.3204544579940347,
+                -0.0011762579610906,
+                0.0000007639928529,
+            ],
+        ];
+
+        /// Error curve coefficients for calibration version 2 derived from <https://github.com/espressif/esp-idf/blob/027613140/components/esp_adc/esp32c6/curve_fitting_coefficients.c#L36-L42>
+        ///
+        /// Version 2 does not apply a second-step polynomial at 0 dB and 2.5 dB.
+        #[cfg(esp32c6)]
+        CURVES_COEFFS1_V2 [
+            _0dB => [],
+            _2p5dB => [],
+            _6dB => [
+                -1.2217864764388775,
+                -0.0001954123107752,
+                0.0000006409679727,
+            ],
+            _11dB => [
+                -0.3915910437042445,
+                -0.0031536470857564,
+                0.0000012493873014,
             ],
         ];
 
@@ -245,6 +296,48 @@ mod impls {
                 -0.3637329628677273,
                 -0.0000196072597389,
                 0.0000007871689227,
+            ],
+        ];
+
+        /// Error curve coefficients for ADC1, derived from <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/esp_adc/esp32p4/curve_fitting_coefficients.c>
+        #[cfg(esp32p4)]
+        CURVES_COEFFS1 [
+            _0dB => [
+                -0.7170501832480995,
+                0.0010598497992115,
+            ],
+            _2p5dB => [
+                -0.9960085535084866,
+                0.0015840076608145,
+            ],
+            _6dB => [
+                -1.4711053224678996,
+                0.00001594266424857,
+            ],
+            _11dB => [
+                -2.8811493455181565,
+                0.0010082311568625,
+            ],
+        ];
+
+        /// Error curve coefficients for ADC2, derived from <https://github.com/espressif/esp-idf/blob/08e0d30a74a/components/esp_adc/esp32p4/curve_fitting_coefficients.c>
+        #[cfg(esp32p4)]
+        CURVES_COEFFS2 [
+            _0dB => [
+                -0.4900967548489932,
+                0.0005037402667913,
+            ],
+            _2p5dB => [
+                -0.7296214814536025,
+                0.0011021577596635,
+            ],
+            _6dB => [
+                -1.0991620450220592,
+                0.0011623930881896,
+            ],
+            _11dB => [
+                -2.442140102462673,
+                0.0009458501263393,
             ],
         ];
 
@@ -291,7 +384,7 @@ mod impls {
             _6dB => [
                 -0.9452499397020617,
                 -0.0200996773954387,
-                0.00000259011467956,
+                0.0000259011467956,
             ],
             _11dB => [
                 1.2247719764336924,

@@ -7,23 +7,14 @@
 
 crate::unstable_module! {
     pub mod clocks;
+    pub mod trng;
 }
-pub mod gpio;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32c61 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    clocks::pll_f160m_frequency()
-}
-
-#[cfg(spi_master_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn spi_master_clock_source_frequency() -> u32 {
-    clocks::pll_f80m_frequency()
-}
+#[cfg(feature = "rt")]
+pub(crate) fn riscv_preinit() {}
 
 pub(crate) fn pre_init() {
     // Reset TEE security modes. This allows unrestricted access to TEE masters, including DMA.
@@ -34,6 +25,16 @@ pub(crate) fn pre_init() {
 
     // this is hacky, but for some reason we must reset the output enable register manually
     crate::peripherals::GPIO::regs().enable().reset();
+
+    // Clear bit reset_event_bypass to ensure that the system bus is also reset during a core reset
+    // (WDT), preventing bus freezing caused by an incorrect MSPI core reset in ROM. Mirrors
+    // ESP-IDF's bootloader_hardware_init.
+    crate::peripherals::PCR::regs()
+        .reset_event_bypass()
+        .modify(|_, w| w.reset_event_bypass().clear_bit());
+
+    // Mirrors ESP-IDF's `init_rng`, see <https://github.com/espressif/esp-idf/blob/8d7d8aef588/components/esp_hw_support/hw_random.c#L114-L120>
+    trng::rng_ll_enable();
 }
 
 pub(crate) fn enable_branch_predictor() {
@@ -46,5 +47,41 @@ pub(crate) fn enable_branch_predictor() {
     const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
     unsafe {
         core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+    }
+}
+
+#[cfg(feature = "unstable")]
+pub(crate) fn disable_branch_predictor() {
+    // Clears the bits set by `enable_branch_predictor`.
+    const MHCR_RS: u32 = 1 << 4;
+    const MHCR_BFE: u32 = 1 << 5;
+    const MHCR_BTB: u32 = 1 << 12;
+    unsafe {
+        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
+    }
+}
+
+/// Writes back a specific range of data in the cache.
+#[doc(hidden)]
+#[crate::ram]
+pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_WriteBack_Addr(addr: u32, size: u32);
+    }
+
+    unsafe {
+        Cache_WriteBack_Addr(addr, size);
+    }
+}
+
+/// Invalidate a specific range of addresses in the cache.
+#[doc(hidden)]
+#[crate::ram]
+pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_Invalidate_Addr(addr, size);
     }
 }

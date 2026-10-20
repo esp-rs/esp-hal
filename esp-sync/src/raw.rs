@@ -34,9 +34,9 @@ const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
 impl RawLock for SingleCoreInterruptLock {
     #[inline]
     unsafe fn enter(&self) -> RestoreState {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32p4)] { // TODO: any with zcmp
-                // ESP32-P4 (v3.2/ECO7 etc.) Zcmp hardware bug workaround (IDF-14279 / DIG-661):
+        cfg_select! {
+            soc_cpu_has_zcmp_workaround => {
+                // Zcmp hardware bug workaround (IDF-14279 / DIG-661):
                 // Clearing mstatus.mie alone does not fully mask CLIC interrupts -- an
                 // interrupt can still fire mid-instruction on cm.push (and possibly on
                 // other multi-cycle sequences). Fix: raise mintthresh (CSR 0x347) to 0xFF
@@ -53,19 +53,28 @@ impl RawLock for SingleCoreInterruptLock {
                     );
                 }
                 let mut mstatus = 0u32;
-                unsafe { core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus); }
+                unsafe {
+                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                }
                 let mie_bit = mstatus & 0b1000;
                 let token = mie_bit | ((old_mintthresh & 0xff) << 8);
-            } else if #[cfg(riscv)] {
+            }
+            riscv => {
                 let mut mstatus = 0u32;
-                unsafe { core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus); }
+                unsafe {
+                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                }
                 let token = mstatus & 0b1000;
-            } else if #[cfg(xtensa)] {
+            }
+            xtensa => {
                 let token: u32;
-                unsafe { core::arch::asm!("rsil {0}, 5", out(reg) token); }
+                unsafe {
+                    core::arch::asm!("rsil {0}, 5", out(reg) token);
+                }
                 #[cfg(debug_assertions)]
                 let token = token & !RESERVED_MASK;
-            } else {
+            }
+            _ => {
                 compile_error!("Unsupported architecture")
             }
         };
@@ -85,14 +94,14 @@ impl RawLock for SingleCoreInterruptLock {
 
         let token = token.inner();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32p4)] {
+        cfg_select! {
+            soc_cpu_has_zcmp_workaround => {
                 if (token & 0b1000) != 0 {
                     unsafe {
                         riscv::interrupt::enable();
                     }
                 }
-                // Restore mintthresh AFTER re-enabling mie (P4 Zcmp workaround, see enter()).
+                // Restore mintthresh AFTER re-enabling mie (Zcmp workaround, see enter()).
                 let old_mintthresh = (token >> 8) & 0xff;
                 unsafe {
                     core::arch::asm!(
@@ -107,17 +116,20 @@ impl RawLock for SingleCoreInterruptLock {
                 riscv::asm::nop();
                 riscv::asm::nop();
                 riscv::asm::nop();
-            } else if #[cfg(riscv)] {
+            }
+            riscv => {
                 if token != 0 {
                     unsafe {
                         riscv::interrupt::enable();
                     }
                 }
-            } else if #[cfg(xtensa)] {
+            }
+            xtensa => {
                 #[cfg(debug_assertions)]
                 if token & RESERVED_MASK != 0 {
                     // We could do this transformation in fmt.rs automatically, but experiments
-                    // show this is only worth it in terms of binary size for code inlined into many places.
+                    // show this is only worth it in terms of binary size for code inlined into many
+                    // places.
                     #[cold]
                     #[inline(never)]
                     fn __assert_failed() {
@@ -132,7 +144,8 @@ impl RawLock for SingleCoreInterruptLock {
                         "wsr.ps {0}",
                         "rsync", in(reg) token)
                 }
-            } else {
+            }
+            _ => {
                 compile_error!("Unsupported architecture")
             }
         }

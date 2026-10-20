@@ -8,7 +8,7 @@
 //! allowing for increased storage capacity and improved performance in certain applications.
 #![doc = ""]
 #![cfg_attr(
-    psram_octal_spi,
+    esp32s3,
     doc = concat!("The ", chip_pretty!(), " can use either Quad SPI or Octal SPI to interface with PSRAM.
         `esp-hal` will try to automatically detect the best option, but manual configuration is also possible and more reliable.")
 )]
@@ -43,11 +43,15 @@
 
 use core::ops::Range;
 
+#[cfg(any(esp32s2, esp32s3))]
+mod quad_xtensa;
+
 #[cfg_attr(esp32, path = "esp32.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 #[cfg_attr(any(esp32c5, esp32c61), path = "esp32c5_c61.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "esp32s31.rs")]
 pub(crate) mod implem;
 
 pub use implem::*;
@@ -55,9 +59,9 @@ use portable_atomic::{AtomicUsize, Ordering};
 
 use crate::peripherals::PSRAM;
 
-/// Size of PSRAM
+/// Size of PSRAM.
 ///
-/// [PsramSize::AutoDetect] will try to detect the size of PSRAM
+/// [`PsramSize::AutoDetect`] tries to detect the size of PSRAM.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -65,7 +69,7 @@ pub enum PsramSize {
     /// Detect PSRAM size
     #[default]
     AutoDetect,
-    /// A fixed PSRAM size
+    /// A fixed PSRAM size.
     Size(usize),
 }
 
@@ -95,7 +99,7 @@ pub(crate) fn psram_range() -> Range<usize> {
 
 /// # Safety
 ///
-/// This function must only be called once.
+/// Must only be called once.
 unsafe fn set_psram_range(range: Range<usize>) {
     MAPPED_PSRAM_START.store(range.start, Ordering::Relaxed);
     MAPPED_PSRAM_END.store(range.end, Ordering::Release);
@@ -110,6 +114,7 @@ impl Psram {
     /// Initializes PSRAM.
     pub fn new(peri: PSRAM<'static>, mut config: PsramConfig) -> Self {
         if init_psram(&mut config) {
+            info!("PSRAM size: {} MB", config.size.get() / 1_024 / 1_024);
             let range = map_psram(config);
 
             unsafe { set_psram_range(range) };

@@ -397,6 +397,13 @@ pub(crate) fn set_pending_mode(enable: bool) {
 }
 
 #[inline(always)]
+pub(crate) fn set_pending_bit(pending: bool) {
+    IEEE802154::regs()
+        .ack_frame_pending_en()
+        .modify(|_, w| w.ack_frame_pending_en().bit(pending));
+}
+
+#[inline(always)]
 pub(crate) fn events() -> u16 {
     IEEE802154::regs().event_status().read().bits() as u16
 }

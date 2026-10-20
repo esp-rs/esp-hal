@@ -10,27 +10,29 @@ For more information regarding the examples, refer to the `README.md` file in an
 
 ## Building Examples
 
-You can build all examples for a given device using the `build examples` subcommand:
+Build all examples for a given device:
 
 ```shell
-cargo xtask build examples --chip esp32 all
+cargo xtask build examples all esp32
 ```
 
-Or build a single example with: 
+Or build a single example:
 
 ```shell
-cargo xtask build examples --chip esp32c6 hello_world
+cargo xtask build hello_world esp32c6
 ```
 
 ## Running Examples
 
-You can also build and then subsequently flash and run an example using the `run example` subcommand. With a target device connected to your host system, run:
+With a target device connected, chip is inferred when possible:
 
 ```shell
-cargo xtask run example embassy_hello_world --chip=esp32c6
+cargo xtask run embassy_hello_world
 ```
 
-Again, note that we must specify which package to build the example from, plus which example to build and flash to the target device.
+Pass the chip name when inference is unavailable.
+
+QA binaries live in `examples/qa` and run the same way (`cargo xtask run sleep_timer`).
 
 ## Adding Examples
 

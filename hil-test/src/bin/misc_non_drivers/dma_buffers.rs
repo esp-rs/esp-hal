@@ -42,68 +42,100 @@ mod tests {
         descriptors[descriptor_index].set_owner(Owner::Cpu);
     }
 
+    // Having a single wrapper function means we don't allocate the static buffer multiple times.
+    fn with_rx_stream_buffer(f: impl FnOnce(DmaRxStreamBuf)) {
+        let buf = dma_rx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
+        f(buf)
+    }
+    fn with_tx_stream_buffer(f: impl FnOnce(DmaTxStreamBuf)) {
+        let buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
+        f(buf)
+    }
+
     fn with_rx_view(initial_data: &[u8], eof: bool, f: impl FnOnce(DmaRxStreamBufView)) {
-        let mut buf = dma_rx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        buf.prepare();
-        let (mut descriptors, mut buffer) = buf.split();
-        if !initial_data.is_empty() {
-            simulate_dma_rx_fill(&mut descriptors, &mut buffer, 0, initial_data, eof);
-        }
-        let buf = DmaRxStreamBuf::new(descriptors, buffer).unwrap();
-        f(buf.into_view());
+        with_rx_stream_buffer(|mut buf| {
+            buf.prepare();
+            let (mut descriptors, mut buffer) = buf.split();
+            if !initial_data.is_empty() {
+                simulate_dma_rx_fill(&mut descriptors, &mut buffer, 0, initial_data, eof);
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                {
+                    buffer.writeback();
+                    descriptors.writeback();
+                }
+            }
+            let buf = DmaRxStreamBuf::new(descriptors, buffer).unwrap();
+            f(buf.into_view());
+        })
     }
 
     fn with_rx_view_multi<F>(fills: &[(&[u8], bool)], f: F)
     where
         F: FnOnce(DmaRxStreamBufView),
     {
-        let mut buf = dma_rx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        buf.prepare();
-        let (mut descriptors, mut buffer) = buf.split();
-        for (index, (data, eof)) in fills.iter().enumerate() {
-            simulate_dma_rx_fill(&mut descriptors, &mut buffer, index, data, *eof);
-        }
-        let buf = DmaRxStreamBuf::new(descriptors, buffer).unwrap();
-        f(buf.into_view());
+        with_rx_stream_buffer(|mut buf| {
+            buf.prepare();
+            let (mut descriptors, mut buffer) = buf.split();
+            for (index, (data, eof)) in fills.iter().enumerate() {
+                simulate_dma_rx_fill(&mut descriptors, &mut buffer, index, data, *eof);
+            }
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            {
+                buffer.writeback();
+                descriptors.writeback();
+            }
+            let buf = DmaRxStreamBuf::new(descriptors, buffer).unwrap();
+            f(buf.into_view());
+        })
     }
 
     fn with_tx_view(all_cpu_owned: bool, f: impl FnOnce(DmaTxStreamBufView)) {
-        let mut buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        buf.prepare();
-        let (descriptors, buffer) = buf.split();
-        if all_cpu_owned {
-            for desc in descriptors.iter_mut() {
-                desc.set_owner(Owner::Cpu);
-                desc.set_length(0);
+        with_rx_stream_buffer(|mut buf| {
+            buf.prepare();
+            let (mut descriptors, buffer) = buf.split();
+            if all_cpu_owned {
+                for desc in descriptors.iter_mut() {
+                    desc.set_owner(Owner::Cpu);
+                    desc.set_length(0);
+                }
+                #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+                descriptors.writeback();
             }
-        }
-        let mut buf = DmaTxStreamBuf::new(descriptors, buffer).unwrap();
-        buf.push(&[]);
-        f(buf.into_view());
+            let mut buf = DmaTxStreamBuf::new(descriptors, buffer).unwrap();
+            buf.push(&[]);
+            f(buf.into_view());
+        })
+    }
+
+    #[init]
+    fn init() {
+        // Ensures that watchdogs are disabled
+        let _ = esp_hal::init(Default::default());
     }
 
     #[test]
     fn test_dma_rx_stream_buf_new() {
-        let buf = dma_rx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        let (descriptors, buffer) = buf.split();
-        core::assert_eq!(buffer.len(), BUFFER_SIZE);
-        core::assert_eq!(descriptors.len(), BUFFER_SIZE / CHUNK_SIZE);
-        core::assert!(descriptors.len() >= 4);
+        with_rx_stream_buffer(|buf| {
+            let (descriptors, buffer) = buf.split();
+            core::assert_eq!(buffer.len(), BUFFER_SIZE);
+            core::assert_eq!(descriptors.len(), BUFFER_SIZE / CHUNK_SIZE);
+            core::assert!(descriptors.len() >= 4);
+        })
     }
 
     #[test]
     fn test_dma_tx_stream_buf_new() {
-        let buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        let (descriptors, buffer) = buf.split();
-        core::assert_eq!(buffer.len(), BUFFER_SIZE);
-        core::assert_eq!(descriptors.len(), BUFFER_SIZE / CHUNK_SIZE);
-        core::assert!(descriptors.len() >= 4);
+        with_tx_stream_buffer(|buf| {
+            let (descriptors, buffer) = buf.split();
+            core::assert_eq!(buffer.len(), BUFFER_SIZE);
+            core::assert_eq!(descriptors.len(), BUFFER_SIZE / CHUNK_SIZE);
+            core::assert!(descriptors.len() >= 4);
+        })
     }
 
     #[test]
-    fn test_dma_rx_stream_buf_insufficient_descriptors() {
-        let (buffer, descriptors) =
-            esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2, is_circular = false);
+    fn test_dma_rx_stream_buf_insufficient_descriptors_require_at_least_4() {
+        let (buffer, descriptors) = esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2);
         match DmaRxStreamBuf::new(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
             _ => core::panic!("expected InsufficientDescriptors"),
@@ -111,9 +143,8 @@ mod tests {
     }
 
     #[test]
-    fn test_dma_tx_stream_buf_insufficient_descriptors() {
-        let (buffer, descriptors) =
-            esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2, is_circular = false);
+    fn test_dma_tx_stream_buf_insufficient_descriptors_require_at_least_4() {
+        let (buffer, descriptors) = esp_hal::dma_buffers_impl!(BUFFER_SIZE, CHUNK_SIZE * 2);
         match DmaTxStreamBuf::new(descriptors, buffer) {
             Err(DmaBufError::InsufficientDescriptors) => (),
             _ => core::panic!("expected InsufficientDescriptors"),
@@ -122,60 +153,65 @@ mod tests {
 
     #[test]
     fn test_dma_rx_stream_buf_prepare_is_idempotent() {
-        let mut buf = dma_rx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        buf.prepare();
-        buf.prepare();
+        with_rx_stream_buffer(|mut buf| {
+            buf.prepare();
+            buf.prepare();
+        })
     }
 
     #[test]
     fn test_dma_tx_stream_buf_prepare_is_idempotent() {
-        let mut buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        buf.prepare();
-        buf.prepare();
+        with_tx_stream_buffer(|mut buf| {
+            buf.prepare();
+            buf.prepare();
+        })
     }
 
     #[test]
     fn test_dma_tx_stream_buf_push_before_transfer() {
-        let mut tx_buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        let first = [1u8, 2, 3, 4, 5];
-        let second = [6u8, 7, 8];
+        with_tx_stream_buffer(|mut tx_buf| {
+            let first = [1u8, 2, 3, 4, 5];
+            let second = [6u8, 7, 8];
 
-        core::assert_eq!(tx_buf.push(&first), first.len());
-        core::assert_eq!(tx_buf.push(&second), second.len());
+            core::assert_eq!(tx_buf.push(&first), first.len());
+            core::assert_eq!(tx_buf.push(&second), second.len());
 
-        let (_, buffer) = tx_buf.split();
-        core::assert_eq!(&buffer[..first.len()], &first);
-        core::assert_eq!(&buffer[first.len()..first.len() + second.len()], &second);
+            let (_, buffer) = tx_buf.split();
+            core::assert_eq!(&buffer[..first.len()], &first);
+            core::assert_eq!(&buffer[first.len()..first.len() + second.len()], &second);
+        })
     }
 
     #[test]
     fn test_dma_tx_stream_buf_push_with_before_transfer() {
-        let mut tx_buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        let pushed = tx_buf.push_with(|buf| {
-            for (index, byte) in buf.iter_mut().enumerate().take(10) {
-                *byte = index as u8;
-            }
-            10
-        });
-        core::assert_eq!(pushed, 10);
+        with_tx_stream_buffer(|mut tx_buf| {
+            let pushed = tx_buf.push_with(|buf| {
+                for (index, byte) in buf.iter_mut().enumerate().take(10) {
+                    *byte = index as u8;
+                }
+                10
+            });
+            core::assert_eq!(pushed, 10);
 
-        let (_, buffer) = tx_buf.split();
-        for (index, byte) in buffer[..10].iter().enumerate() {
-            core::assert_eq!(*byte, index as u8);
-        }
+            let (_, buffer) = tx_buf.split();
+            for (index, byte) in buffer[..10].iter().enumerate() {
+                core::assert_eq!(*byte, index as u8);
+            }
+        })
     }
 
     #[test]
     fn test_dma_tx_stream_buf_view_unprefilled_has_no_available_space() {
-        let mut buf = dma_tx_stream_buffer!(BUFFER_SIZE, CHUNK_SIZE);
-        buf.prepare();
-        let view = buf.into_view();
-        core::assert_eq!(view.available_bytes(), 0);
+        with_tx_stream_buffer(|mut buf| {
+            buf.prepare();
+            let mut view = buf.into_view();
+            core::assert_eq!(view.available_bytes(), 0);
+        })
     }
 
     #[test]
     fn test_dma_tx_stream_buf_view_available_bytes() {
-        with_tx_view(true, |view| {
+        with_tx_view(true, |mut view| {
             core::assert_eq!(view.available_bytes(), BUFFER_SIZE);
         });
     }
@@ -222,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_dma_rx_stream_buf_view_empty() {
-        with_rx_view(&[], false, |view| {
+        with_rx_view(&[], false, |mut view| {
             core::assert_eq!(view.available_bytes(), 0);
             core::assert_eq!(view.peek(), &[] as &[u8]);
         });
@@ -231,7 +267,7 @@ mod tests {
     #[test]
     fn test_dma_rx_stream_buf_view_peek_and_available_bytes() {
         let data = b"peek me";
-        with_rx_view(data, false, |view| {
+        with_rx_view(data, false, |mut view| {
             core::assert_eq!(view.available_bytes(), data.len());
             core::assert_eq!(view.peek(), data);
         });
@@ -240,7 +276,7 @@ mod tests {
     #[test]
     fn test_dma_rx_stream_buf_view_peek_until_eof() {
         let data = b"eof test";
-        with_rx_view(data, true, |view| {
+        with_rx_view(data, true, |mut view| {
             let (slice, eof) = view.peek_until_eof();
             core::assert_eq!(slice, data);
             core::assert!(eof);
@@ -285,7 +321,7 @@ mod tests {
         const SECOND_LEN: usize = 128;
         let first = [1u8; CHUNK_SIZE];
         let second = [2u8; SECOND_LEN];
-        with_rx_view_multi(&[(&first, false), (&second, false)], |view| {
+        with_rx_view_multi(&[(&first, false), (&second, false)], |mut view| {
             core::assert_eq!(view.available_bytes(), CHUNK_SIZE + SECOND_LEN);
             let peeked = view.peek();
             core::assert_eq!(peeked.len(), CHUNK_SIZE + SECOND_LEN);
@@ -330,15 +366,17 @@ mod tests {
 
     #[test]
     fn test_dma_tx_stream_buf_initial() {
-        with_tx_view(false, |view| {
+        with_tx_view(false, |mut view| {
             // initially all descriptors are owned by the DMA, so no space should be available
             core::assert_eq!(view.available_bytes(), 0);
 
             let buf = <DmaTxStreamBuf as DmaTxBuffer>::from_view(view);
-            let (descriptors, buffer) = buf.split();
+            let (mut descriptors, buffer) = buf.split();
 
             // DMA processed first descriptor, now it should be owned by CPU
             descriptors[0].set_owner(Owner::Cpu);
+            #[cfg(any(soc_internal_memory_cached, dma_can_access_psram))]
+            descriptors.writeback();
 
             let buf = DmaTxStreamBuf::new(descriptors, buffer).unwrap();
             let mut view = buf.into_view();
@@ -362,11 +400,104 @@ mod tests {
 
         buf.prepare();
 
-        // make sure initially all descriptors are owned by the DMA after prepare, even if we pushed
-        // data before
         let (descriptors, _buffer) = buf.split();
-        for desc in descriptors.iter() {
-            core::assert!(matches!(desc.owner(), Owner::Dma));
-        }
+        core::assert!(matches!(descriptors[0].owner(), Owner::Dma));
+        core::assert!(matches!(descriptors[1].owner(), Owner::Dma));
+        // Unused descriptors stay CPU-owned so they can be filled before DMA sees them.
+        core::assert!(matches!(descriptors[2].owner(), Owner::Cpu));
+        core::assert!(matches!(descriptors[3].owner(), Owner::Cpu));
+    }
+
+    #[test]
+    fn test_dma_tx_stream_buf_partial_prefill_continues_from_remainder() {
+        with_tx_stream_buffer(|mut buf| {
+            const PREFILL: usize = CHUNK_SIZE * 2 + 128;
+            buf.push_with(|buffer| {
+                buffer[..PREFILL].fill(1);
+                PREFILL
+            });
+            buf.prepare();
+
+            let mut view = buf.into_view();
+            let expected = BUFFER_SIZE - PREFILL;
+            core::assert_eq!(view.available_bytes(), expected);
+
+            let pushed = view.push_with(|slice| {
+                slice.fill(2);
+                slice.len()
+            });
+            core::assert_eq!(pushed, expected);
+            core::assert_ne!(pushed, CHUNK_SIZE);
+            core::assert_eq!(view.available_bytes(), 0);
+
+            let buf = <DmaTxStreamBuf as DmaTxBuffer>::from_view(view);
+            let (_, buffer) = buf.split();
+            core::assert!(buffer[..PREFILL].iter().all(|&b| b == 1));
+            core::assert!(buffer[PREFILL..].iter().all(|&b| b == 2));
+        });
+    }
+
+    #[test]
+    fn test_dma_tx_stream_buf_exact_prefill_leaves_unused_descriptors_for_cpu() {
+        with_tx_stream_buffer(|mut buf| {
+            buf.push(&[0u8; CHUNK_SIZE * 2]);
+            buf.prepare();
+
+            let mut view = buf.into_view();
+            core::assert_eq!(view.available_bytes(), CHUNK_SIZE * 2);
+            core::assert_eq!(view.push_with(|slice| slice.len()), CHUNK_SIZE * 2);
+
+            let buf = <DmaTxStreamBuf as DmaTxBuffer>::from_view(view);
+            let (descriptors, _) = buf.split();
+            core::assert_eq!(descriptors[0].len(), CHUNK_SIZE);
+            core::assert_eq!(descriptors[1].len(), CHUNK_SIZE);
+            core::assert!(matches!(descriptors[0].owner(), Owner::Dma));
+            core::assert!(matches!(descriptors[1].owner(), Owner::Dma));
+            core::assert!(matches!(descriptors[2].owner(), Owner::Dma));
+            core::assert!(matches!(descriptors[3].owner(), Owner::Dma));
+        });
+    }
+
+    #[test]
+    fn test_dma_tx_stream_buf_partial_prefill_does_not_give_incomplete_chunk_to_dma() {
+        with_tx_stream_buffer(|mut buf| {
+            const PREFILL: usize = CHUNK_SIZE * 2 + 128;
+            buf.push_with(|buffer| {
+                buffer[..PREFILL].fill(1);
+                PREFILL
+            });
+            buf.prepare();
+
+            let (descriptors, _) = buf.split();
+            core::assert_eq!(descriptors[0].len(), CHUNK_SIZE);
+            core::assert_eq!(descriptors[1].len(), CHUNK_SIZE);
+            core::assert!(matches!(descriptors[0].owner(), Owner::Dma));
+            core::assert!(matches!(descriptors[1].owner(), Owner::Dma));
+            core::assert!(matches!(descriptors[2].owner(), Owner::Cpu));
+            core::assert!(matches!(descriptors[3].owner(), Owner::Cpu));
+        });
+    }
+
+    #[test]
+    fn test_dma_tx_stream_buf_reuse_starts_with_empty_prefill() {
+        with_tx_stream_buffer(|mut buf| {
+            core::assert_eq!(buf.push(&[1u8; BUFFER_SIZE]), BUFFER_SIZE);
+            buf.prepare();
+
+            let view = buf.into_view();
+            let mut buf = <DmaTxStreamBuf as DmaTxBuffer>::from_view(view);
+
+            // Pushing into a buffer returned by a transfer starts from an empty pre-fill.
+            core::assert_eq!(buf.push(&[2u8; CHUNK_SIZE * 2]), CHUNK_SIZE * 2);
+            buf.prepare();
+
+            let (descriptors, buffer) = buf.split();
+            core::assert!(buffer[..CHUNK_SIZE * 2].iter().all(|&b| b == 2));
+            core::assert!(matches!(descriptors[0].owner(), Owner::Dma));
+            core::assert!(matches!(descriptors[1].owner(), Owner::Dma));
+            // Only the newly pushed bytes are handed to the DMA, not stale data.
+            core::assert!(matches!(descriptors[2].owner(), Owner::Cpu));
+            core::assert!(matches!(descriptors[3].owner(), Owner::Cpu));
+        });
     }
 }

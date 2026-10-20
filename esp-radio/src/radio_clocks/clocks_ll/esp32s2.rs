@@ -41,4 +41,24 @@ pub(crate) fn init_clocks() {
     regs!(SYSCON)
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | DPORT_WIFI_CLK_WIFI_EN) });
+
+    // The Wi-Fi light sleep clock: the RTC slow clock, undivided. The divider resets to 255.
+    regs!(SYSTEM)
+        .lpck_div_int()
+        .modify(|_, w| unsafe { w.lpck_div_num().bits(0) });
+    regs!(SYSTEM).bt_lpck_div_frac().modify(|_, w| {
+        w.lpclk_sel_xtal32k().clear_bit();
+        w.lpclk_sel_xtal().clear_bit();
+        w.lpclk_sel_8m().clear_bit();
+        w.lpclk_sel_rtc_slow().set_bit()
+    });
+}
+
+pub(crate) fn deinit_clocks() {
+    // Nothing to do: `enable_wifi(false)` (called by the Wi-Fi driver on
+    // deinit) clears `DPORT_WIFI_CLK_WIFI_EN_M`. That mask (0x7cf) is smaller
+    // than the value `init_clocks` writes (0x3807cf), so the upper bits stay
+    // set — ESP-IDF's `periph_ll_wifi_module_disable_clk_set_rst` leaves them
+    // set as well, and they only feed the modem, which
+    // `disable_wifi_power_domain` powers off.
 }

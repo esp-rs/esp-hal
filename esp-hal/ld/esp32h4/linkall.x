@@ -1,0 +1,19 @@
+INCLUDE "memory.x"
+
+/* esp-hal region aliases */
+REGION_ALIAS("ROTEXT", ROM);
+REGION_ALIAS("RODATA", ROM);
+
+REGION_ALIAS("RWTEXT", RAM);
+REGION_ALIAS("RWDATA", RAM);
+
+/* riscv-rt v0.16+ region aliases (required by upstream riscv-rt link.x) */
+REGION_ALIAS("REGION_TEXT", ROM);
+REGION_ALIAS("REGION_RODATA", ROM);
+REGION_ALIAS("REGION_DATA", RAM);
+REGION_ALIAS("REGION_BSS", RAM);
+REGION_ALIAS("REGION_HEAP", RAM);
+REGION_ALIAS("REGION_STACK", RAM);
+
+INCLUDE "esp32h4.x"
+INCLUDE "hal-defaults.x"

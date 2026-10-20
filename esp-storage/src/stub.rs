@@ -1,6 +1,6 @@
 use core::{ptr, slice};
 
-use crate::maybe_with_critical_section;
+use crate::{FlashStorageError, maybe_with_critical_section};
 
 const SUCCESS_CODE: i32 = 0;
 const ERROR_CODE: i32 = 1;
@@ -120,6 +120,20 @@ pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 
     } else {
         ERROR_CODE
     }
+}
+
+pub(crate) fn spiflash_write_encrypted(dest_addr: u32, data: *mut u32, len: u32) -> i32 {
+    spiflash_write(dest_addr, data as *const u32, len)
+}
+
+pub(crate) fn read_flash_encrypted(offset: u32, bytes: &mut [u8]) -> Result<(), FlashStorageError> {
+    if offset as usize + bytes.len() > FLASH_SIZE as usize {
+        return Err(FlashStorageError::OutOfBounds);
+    }
+    maybe_with_critical_section(|| unsafe {
+        bytes.copy_from_slice(&FLASH_DATA[offset as usize..][..bytes.len()]);
+    });
+    Ok(())
 }
 
 pub(crate) fn get_flash_size() -> u32 {

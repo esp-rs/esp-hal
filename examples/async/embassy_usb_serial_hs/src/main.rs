@@ -2,8 +2,10 @@
 //!
 //! This example should be built in release mode.
 //!
-//! The example uses the HS USB port of the ESP32-P4.
+//! The example uses the HS USB port of the ESP32-P4 and ESP32-S31.
 //! This port uses dedicated pins, not GPIOs.
+
+//% CHIP_FILTER: usb_otg_hs_driver_supported
 
 #![no_std]
 #![no_main]
@@ -17,7 +19,6 @@ use embassy_usb::{
 };
 use esp_backtrace as _;
 use esp_hal::{
-    interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
     usb::otg::{
         Usb,
@@ -34,9 +35,8 @@ async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
     let usb = Usb::new_hs(peripherals.USB_HS);
 

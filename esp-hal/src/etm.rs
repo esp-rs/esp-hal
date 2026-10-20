@@ -110,9 +110,9 @@ use crate::{peripherals::ETM, system::GenericPeripheralGuard};
 pub struct EtmChannel<const C: u8> {}
 
 impl<const C: u8> EtmChannel<C> {
-    /// Setup the channel
+    /// Sets up the channel.
     ///
-    /// Enabled the channel and configures the assigned event and task.
+    /// Enables the channel and configures the assigned event and task.
     pub fn setup<'a, E, T>(self, event: &'a E, task: &'a T) -> EtmConfiguredChannel<'a, E, T, C>
     where
         E: EtmEvent,
@@ -153,7 +153,7 @@ fn disable_channel(channel: u8) {
     }
 }
 
-/// A readily configured channel
+/// A readily configured channel.
 ///
 /// The channel is enabled and event and task are configured.
 #[non_exhaustive]
@@ -183,7 +183,7 @@ macro_rules! create_etm {
         paste::paste! {
             /// ETM Instance
             ///
-            /// Provides access to all the [EtmChannel]
+            /// Provides access to all the [`EtmChannel`].
             pub struct Etm<'d> {
                 _peripheral: crate::peripherals::ETM<'d>,
                 $(

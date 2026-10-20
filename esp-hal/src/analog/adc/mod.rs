@@ -1,9 +1,5 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
-    "analog_pin" => {
-        cfg(esp32) => "GPIO32",
-        cfg(any(esp32s2, esp32s3)) => "GPIO3",
-        cfg(not(any(esp32, esp32s2, esp32s3)))  => "GPIO2"
-    }
+    "analog_pin" => gpio_for_signal!(ADC1_CH0),
 ))]
 //! # Analog to Digital Converter (ADC)
 //!
@@ -36,12 +32,12 @@
 //! # use esp_hal::delay::Delay;
 //! let mut adc1_config = AdcConfig::new();
 //! let mut pin = adc1_config.enable_pin(peripherals.__analog_pin__, Attenuation::_11dB);
-//! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config);
+//! let mut adc1 = Adc::new(peripherals.ADC1, adc1_config)?;
 //!
 //! let mut delay = Delay::new();
 //!
 //! loop {
-//!     let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut pin))?;
+//!     let pin_value = nb::block!(adc1.read_oneshot(&mut pin))?;
 //!
 //!     delay.delay_millis(1500);
 //! }
@@ -51,15 +47,30 @@
 //! ## Implementation State
 //!
 //!  - [ADC calibration is not implemented for all targets].
+//!  - The ESP32-C3 has an ADC2 in silicon, but it is not exposed due to hardware errata in its
+//!    digital controller. GPIO5 is therefore not an ADC pin on ESP32-C3.
+//!  - The ESP32-S31 has no calibration scheme: calibration eFuses and curve fitting coefficients
+//!    are not available for this chip.
+//!  - The ESP32-S31 SAR ADC has one attenuation setting, so the attenuation given to
+//!    [`AdcConfig::enable_pin`] has no effect.
+//!  - The ESP32-S31 SAR is differential and its result is the weighted sum of 17 redundant
+//!    comparator bits. Readings run from 0 to `FULL_SCALE` (4393), and an input tied to ground
+//!    reads about `ZERO_DIFF_CODE` (2198), so a single-ended measurement only uses the codes above
+//!    that point.
 //!
 //! [ADC calibration is not implemented for all targets]: https://github.com/esp-rs/esp-hal/issues/326
 use core::marker::PhantomData;
 
 use crate::gpio::AnalogPin;
 
+// A chip lands in a file by the ADC controller it has, not by its CPU architecture: the RISC-V
+// ESP32-P4 drives the same RTC-style controller as the Xtensa ESP32-S2 and ESP32-S3, while the
+// chips in `dig_ctrl.rs` have no RTC controller and convert through the digital one instead.
 #[cfg_attr(esp32, path = "esp32.rs")]
-#[cfg_attr(riscv, path = "riscv.rs")]
-#[cfg_attr(any(esp32s2, esp32s3), path = "xtensa.rs")]
+#[cfg_attr(esp32p4, path = "p4.rs")]
+#[cfg_attr(esp32s31, path = "s31.rs")]
+#[cfg_attr(adc_controller = "rtc", path = "s2_s3.rs")]
+#[cfg_attr(adc_controller = "digital", path = "dig_ctrl.rs")]
 #[cfg(feature = "unstable")]
 mod implementation;
 
@@ -69,8 +80,8 @@ pub use self::implementation::*;
 /// The approximate attenuation of the ADC pin.
 ///
 /// The effective measurement range for a given attenuation is dependent on the
-/// device being targeted. Please refer to "ADC Characteristics" section of your
-/// device's datasheet for more information.
+/// device being targeted. Refer to the "ADC Characteristics" section of the
+/// device datasheet for more information.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(clippy::enum_variant_names, reason = "unit of measurement")]
@@ -85,20 +96,13 @@ pub enum Attenuation {
     _11dB  = 0b11,
 }
 
-/// Calibration source of the ADC.
-#[cfg(not(esp32))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum AdcCalSource {
-    /// Use Ground as the calibration source
-    Gnd,
-    /// Use Vref as the calibration source
-    Ref,
-}
+/// The number of [`Attenuation`] variants, and in turn the length of tables indexed by one.
+#[cfg(all(feature = "unstable", adc_calibration_v1_scheme_supported))]
+const ATTENUATION_COUNT: usize = 4;
 
 /// An I/O pin which can be read using the ADC.
 pub struct AdcPin<PIN, ADCX, CS = ()> {
-    /// The underlying GPIO pin
+    /// The underlying GPIO pin.
     pub pin: PIN,
     /// Calibration scheme used for the configured ADC pin
     pub cal_scheme: CS,
@@ -137,12 +141,12 @@ pub struct AdcConfig<ADCX> {
 
 #[cfg(feature = "unstable")]
 impl<ADCX> AdcConfig<ADCX> {
-    /// Create a new configuration struct with its default values
+    /// Creates a new configuration struct with its default values.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Enable the specified pin with the given attenuation
+    /// Enables the specified pin with the given attenuation.
     pub fn enable_pin<PIN>(&mut self, pin: PIN, attenuation: Attenuation) -> AdcPin<PIN, ADCX>
     where
         PIN: AdcChannel + AnalogPin,
@@ -153,34 +157,42 @@ impl<ADCX> AdcConfig<ADCX> {
 
         AdcPin {
             pin,
-            cal_scheme: AdcCalScheme::<()>::new_cal(attenuation),
+            // The unit scheme never fails; construct it directly to keep this infallible.
+            cal_scheme: (),
             _phantom: PhantomData,
         }
     }
 
-    /// Enable the specified pin with the given attenuation and calibration
-    /// scheme
-    #[cfg(not(esp32))]
+    /// Enables the specified pin with the given attenuation and calibration
+    /// scheme.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::MissingCalibrationData`] if the chip carries no
+    /// calibration data for the scheme, or [`Error::UnsupportedAttenuation`]
+    /// if the attenuation has no calibration data on this chip.
     #[cfg(feature = "unstable")]
     pub fn enable_pin_with_cal<PIN, CS>(
         &mut self,
         pin: PIN,
         attenuation: Attenuation,
-    ) -> AdcPin<PIN, ADCX, CS>
+    ) -> Result<AdcPin<PIN, ADCX, CS>, Error>
     where
-        ADCX: CalibrationAccess,
         PIN: AdcChannel + AnalogPin,
         CS: AdcCalScheme<ADCX>,
     {
+        let channel = pin.adc_channel();
+        let cal_scheme = CS::new_cal_with_channel(attenuation, channel)?;
+
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[pin.adc_channel() as usize] = Some(attenuation);
+        self.attenuations[channel as usize] = Some(attenuation);
 
-        AdcPin {
+        Ok(AdcPin {
             pin,
-            cal_scheme: CS::new_cal(attenuation),
+            cal_scheme,
             _phantom: PhantomData,
-        }
+        })
     }
 }
 
@@ -200,14 +212,77 @@ impl<ADCX> Default for AdcConfig<ADCX> {
 #[doc(hidden)]
 #[cfg(feature = "unstable")]
 pub trait CalibrationAccess: RegisterAccess {
-    const ADC_CAL_CNT_MAX: u16;
-    const ADC_CAL_CHANNEL: u16;
     const ADC_VAL_MASK: u16;
+
+    /// Returns whether the unit can measure a calibration source instead of a pad.
+    ///
+    /// Hardware self-calibration is not supported on ESP32-C5, where calibration depends on eFuse
+    /// data.
+    const SUPPORTS_SELF_CALIBRATION: bool = true;
 
     fn enable_vdef(enable: bool);
 
-    /// Enable internal calibration voltage source
-    fn connect_cal(source: AdcCalSource, enable: bool);
+    /// Disconnects the unit from its pad and ties the input to internal ground.
+    fn connect_gnd(enable: bool);
+
+    /// Configures the unit for calibration at the specified attenuation.
+    ///
+    /// See `cal_setup` in
+    /// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>.
+    fn setup_calibration(atten: Attenuation);
+}
+
+/// Number of times the search below is repeated. The extremes are discarded and the rest averaged.
+#[cfg(all(feature = "unstable", adc_calibration_v1_scheme_supported))]
+const ADC_CAL_TIMES: u32 = 10;
+
+/// One past the highest initial code. The field is twelve bits wide on every chip.
+#[cfg(all(feature = "unstable", adc_calibration_v1_scheme_supported))]
+const ADC_CAL_OFFSET_RANGE: u16 = 4096;
+
+/// Finds the initial code that cancels out the calibration source the unit is currently connected
+/// to.
+///
+/// The initial code shifts the SAR's transfer curve down, so the reading drops to zero once the
+/// code reaches the source, and finding that step is an ordinary bisection. Noise moves the step
+/// by a code or two between runs, hence the repetitions.
+///
+/// `measure` converts once and returns the result, leaving the initial code alone.
+///
+/// See `adc_hal_self_calibration` in
+/// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hal_ana_conv/adc_hal_common.c>.
+#[cfg(all(feature = "unstable", adc_calibration_v1_scheme_supported))]
+fn search_init_code<ADCX: CalibrationAccess>(mut measure: impl FnMut() -> u16) -> u16 {
+    let mut sum = 0;
+    let mut lowest = u16::MAX;
+    let mut highest = 0;
+
+    for _ in 0..ADC_CAL_TIMES {
+        // `low` still reads non-zero, `high` already reads zero.
+        let mut low = 0;
+        let mut high = ADC_CAL_OFFSET_RANGE;
+
+        while high - low > 1 {
+            let code = (low + high) / 2;
+            ADCX::set_init_code(code);
+
+            if measure() == 0 {
+                high = code;
+            } else {
+                low = code;
+            }
+        }
+
+        sum += u32::from(high);
+        lowest = lowest.min(high);
+        highest = highest.max(high);
+    }
+
+    let count = ADC_CAL_TIMES - 2;
+    let trimmed = sum - u32::from(lowest) - u32::from(highest);
+
+    // Round to nearest.
+    ((trimmed + count / 2) / count) as u16
 }
 
 /// A helper trait to get the ADC channel of a compatible GPIO pin.
@@ -218,19 +293,36 @@ pub trait AdcChannel {
 
 /// A trait abstracting over calibration methods.
 ///
-/// The methods in this trait are mostly for internal use. To get
-/// calibrated ADC reads, all you need to do is call `enable_pin_with_cal`
-/// and specify some implementor of this trait.
+/// The methods in this trait are mostly for internal use. Call
+/// `enable_pin_with_cal` with an implementor of this trait to get calibrated
+/// ADC reads.
 pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
-    /// Create a new calibration scheme for the given attenuation.
-    fn new_cal(atten: Attenuation) -> Self;
+    /// Creates a new calibration scheme for the given attenuation.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MissingCalibrationData` if the chip carries no
+    /// calibration data for the scheme, or `Error::UnsupportedAttenuation`
+    /// if the attenuation has no calibration data on this chip.
+    #[cfg(feature = "unstable")]
+    fn new_cal(atten: Attenuation) -> Result<Self, Error>;
 
-    /// Return the basic ADC bias value.
-    fn adc_cal(&self) -> u16 {
-        0
+    /// Creates a new calibration scheme for the given attenuation and ADC
+    /// channel.
+    ///
+    /// The default implementation ignores `channel` and calls [`Self::new_cal`].
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::MissingCalibrationData` if the chip carries no
+    /// calibration data for the scheme, or `Error::UnsupportedAttenuation`
+    /// if the attenuation has no calibration data on this chip.
+    #[cfg(feature = "unstable")]
+    fn new_cal_with_channel(atten: Attenuation, _channel: u8) -> Result<Self, Error> {
+        Self::new_cal(atten)
     }
 
-    /// Convert ADC value.
+    /// Converts ADC value.
     fn adc_val(&self, val: u16) -> u16 {
         val
     }
@@ -239,32 +331,142 @@ pub trait AdcCalScheme<ADCX>: Sized + crate::private::Sealed {
 impl crate::private::Sealed for () {}
 
 impl<ADCX> AdcCalScheme<ADCX> for () {
-    fn new_cal(_atten: Attenuation) -> Self {}
+    #[cfg(feature = "unstable")]
+    fn new_cal(_atten: Attenuation) -> Result<Self, Error> {
+        Ok(())
+    }
+}
+
+/// Errors that can occur while using the ADC.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+#[cfg(feature = "unstable")]
+pub enum Error {
+    /// The ADC channel was not configured for reading.
+    ChannelNotConfigured(u8),
+    /// `ADC2` cannot be used together with the radio.
+    ///
+    /// Only constructed on ESP32, where `ADC2` shares hardware with Wi-Fi and
+    /// Bluetooth.
+    Adc2InUse,
+    /// The chip carries no eFuse calibration data for the requested scheme.
+    ///
+    /// Constructed when line/curve fitting is requested but the calibration
+    /// eFuses are unburnt, or when the stored reference point is zero and
+    /// therefore unusable.
+    MissingCalibrationData,
+    /// The attenuation has no calibration reference point on this chip.
+    ///
+    /// Constructed when the requested attenuation is not characterized for
+    /// calibration (e.g. ESP32-C2 line fitting at 2.5 dB/6 dB, or a missing
+    /// curve-fitting coefficient set).
+    UnsupportedAttenuation(Attenuation),
+}
+
+#[cfg(feature = "unstable")]
+impl core::error::Error for Error {}
+
+#[cfg(feature = "unstable")]
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::ChannelNotConfigured(channel) => {
+                write!(f, "ADC channel {channel} is not configured for reading")
+            }
+            Self::Adc2InUse => f.write_str("ADC2 cannot be used together with the radio"),
+            Self::MissingCalibrationData => {
+                f.write_str("ADC calibration data is missing from eFuse for the requested scheme")
+            }
+            Self::UnsupportedAttenuation(atten) => {
+                write!(
+                    f,
+                    "ADC attenuation {atten:?} has no calibration data on this chip"
+                )
+            }
+        }
+    }
+}
+
+/// Returns the attenuation channel `channel` was configured with.
+///
+/// # Errors
+///
+/// Returns [`Error::ChannelNotConfigured`] if the channel was not enabled via
+/// [`AdcConfig::enable_pin`] or [`AdcConfig::enable_pin_with_cal`].
+#[cfg(all(feature = "unstable", adc_calibration_v1_scheme_supported))]
+fn channel_attenuation(
+    attenuations: &[Option<Attenuation>],
+    channel: u8,
+) -> Result<Attenuation, Error> {
+    match attenuations[channel as usize] {
+        Some(attenuation) => Ok(attenuation),
+        None => Err(Error::ChannelNotConfigured(channel)),
+    }
+}
+
+// Returns the hardware calibration code (`Dout0`) for every configured attenuation.
+//
+// The hardware subtracts this code from the conversion result before truncating it, so it has
+// to be programmed regardless of the calibration scheme in use - otherwise the usable output
+// range shrinks by the ADC's zero-voltage offset.
+//
+// Determining a code can involve measuring the ADC, and that measurement programs channel 0's
+// attenuation, so the caller has to apply the configured attenuations afterwards.
+#[cfg(all(feature = "unstable", adc_calibration_v1_scheme_supported))]
+fn hw_init_codes<ADCX>(attenuations: &[Option<Attenuation>]) -> [u16; ATTENUATION_COUNT]
+where
+    ADCX: AdcCalEfuse + CalibrationAccess,
+{
+    let mut init_codes = [0; ATTENUATION_COUNT];
+
+    for atten in attenuations.iter().flatten() {
+        // Boards with calibration eFuses never reach the self-calibration fallback, so HIL
+        // tests ignore the eFuses to exercise it.
+        #[cfg(not(__test_adc_self_cal))]
+        let efuse_code = ADCX::init_code(*atten);
+        #[cfg(__test_adc_self_cal)]
+        let efuse_code = None;
+
+        init_codes[*atten as usize] = efuse_code.unwrap_or_else(|| {
+            if ADCX::SUPPORTS_SELF_CALIBRATION {
+                AdcConfig::<ADCX>::adc_calibrate(*atten)
+            } else {
+                0
+            }
+        });
+    }
+
+    init_codes
 }
 
 /// A helper trait to get access to ADC calibration efuses.
-#[cfg(not(any(esp32, esp32s2)))]
-trait AdcCalEfuse {
-    /// Get ADC calibration init code
+#[cfg(adc_calibration_v1_scheme_supported)]
+#[doc(hidden)]
+pub trait AdcCalEfuse {
+    /// Returns the ADC calibration init code.
     ///
-    /// Returns digital value for zero voltage for a given attenuation
+    /// Returns digital value for zero voltage for a given attenuation.
     fn init_code(atten: Attenuation) -> Option<u16>;
 
-    /// Get ADC calibration reference point voltage
+    /// Returns the ADC calibration reference point voltage.
     ///
-    /// Returns reference voltage (millivolts) for a given attenuation
-    fn cal_mv(atten: Attenuation) -> u16;
+    /// Returns reference voltage (millivolts) for a given attenuation, or
+    /// `None` when the attenuation has no reference point on this chip
+    /// (e.g. ESP32-C2 at 2.5 dB/6 dB).
+    fn cal_mv(atten: Attenuation) -> Option<u16>;
 
-    /// Get ADC calibration reference point digital value
+    /// Returns the ADC calibration reference point digital value.
     ///
-    /// Returns digital value for reference voltage for a given attenuation
+    /// Returns digital value for reference voltage for a given attenuation.
     fn cal_code(atten: Attenuation) -> Option<u16>;
 
-    /// Get the ADC channel specific calibration
+    /// Returns the ADC channel specific calibration.
     ///
-    /// Returns digital per channel offset from reference voltage
-    #[cfg(esp32c5)]
-    fn cal_chan_compens(atten: Attenuation, channel: u16) -> Option<i32>;
+    /// Returns digital per channel offset from reference voltage.
+    #[cfg(adc_channel_compensation)]
+    fn cal_chan_compens(atten: Attenuation, channel: u8) -> Option<i32>;
 }
 
 for_each_analog_function! {

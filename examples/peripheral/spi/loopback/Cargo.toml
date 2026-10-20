@@ -45,6 +45,11 @@ esp32h2 = [
     "esp-bootloader-esp-idf/esp32h2",
     "esp-hal/esp32h2",
 ]
+esp32h4 = [
+    "esp-backtrace/esp32h4",
+    "esp-bootloader-esp-idf/esp32h4",
+    "esp-hal/esp32h4",
+]
 esp32s2 = [
     "esp-backtrace/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
@@ -54,6 +59,16 @@ esp32s3 = [
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
+]
+esp32p4 = [
+    "esp-backtrace/esp32p4",
+    "esp-bootloader-esp-idf/esp32p4",
+    "esp-hal/esp32p4",
+]
+esp32s31 = [
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
 ]
 
 [profile.release]

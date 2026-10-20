@@ -3,12 +3,38 @@ use quote::quote;
 use crate::{cfg::GenericProperty, number};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RcFastCalibrationProperties {
     divider: u32,
     #[serde(default)]
     min_rev: u32,
     #[serde(default)]
     tick_enable: bool,
+}
+
+/// The RC_SLOW calibration input may be tapped ahead of the divider that produces the RTC slow
+/// clock, in which case the calibration counts `multiplier` input cycles per measured cycle.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RcSlowCalibrationProperties {
+    multiplier: u32,
+}
+
+impl GenericProperty for RcSlowCalibrationProperties {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        Some(vec![String::from(
+            "timergroup_rc_slow_calibration_multiplier",
+        )])
+    }
+
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        let multiplier = number(self.multiplier);
+        quote! {
+            ("timergroup.rc_slow_calibration_multiplier") => {
+                #multiplier
+            };
+        }
+    }
 }
 
 impl GenericProperty for RcFastCalibrationProperties {

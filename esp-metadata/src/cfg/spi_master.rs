@@ -5,6 +5,7 @@ use crate::{cfg::SpiMasterProperties, generate_for_each_macro};
 
 /// Instance configuration, used in [device.spi_master.instances]
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SpiMasterInstanceConfig {
     /// The name of the instance in the `esp_hal::system::Peripheral` enum
     pub sys_instance: String,

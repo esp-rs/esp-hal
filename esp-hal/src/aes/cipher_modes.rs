@@ -200,7 +200,7 @@ impl Ofb {
 /// Counter mode.
 #[derive(Clone)]
 pub struct Ctr {
-    /// The nonce + counter. Note that the security of this relies on the nonce being random.
+    /// The nonce and counter. The security of this mode relies on the nonce being random.
     pub(super) nonce: [u8; BLOCK_SIZE],
     /// The key produced by the block cipher.
     pub(super) buffer: [u8; BLOCK_SIZE],

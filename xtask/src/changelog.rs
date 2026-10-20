@@ -120,6 +120,7 @@ impl Changelog {
     }
 
     /// Finalize the changelog for a new release.
+    #[cfg_attr(not(feature = "release"), allow(dead_code))]
     pub fn finalize(
         &mut self,
         package: Package,

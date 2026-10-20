@@ -1,0 +1,55 @@
+<div style="margin-top: 0.5rem; width: 100%">
+  <label for="version-select">Version:</label>
+  <select id="version-select" name="version-select" style="text-align: center; width: 100%">
+    <option value="{{ version }}" selected="selected">{{ version }}</option>
+  </select>
+</div>
+
+<script type="text/javascript">
+  const select = document.querySelector("#version-select");
+
+  select.addEventListener("change", (e) => {
+    const selected = select.value;
+    const packageName = "{{ package }}";
+
+    // Path layout is always `<base>/<package>/<version>/<rest>`. Replace only
+    // the version segment after the package directory.
+    const url = new URL(window.location.href);
+    const segments = url.pathname.split("/");
+    const packageIndex = segments.indexOf(packageName);
+    if (packageIndex !== -1 && packageIndex + 1 < segments.length) {
+      segments[packageIndex + 1] = selected;
+      url.pathname = segments.join("/");
+      window.location.href = url.toString();
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", (e) => {
+    const selected = select.value;
+
+    // Load the manifest JSON file and re-populate the select box with new
+    // options for all available versions:
+    const manifestUrl = "{{ base_url }}/{{ package }}/manifest.json";
+    fetch(manifestUrl)
+      .then((res) => res.json())
+      .then(({ versions }) => {
+        // The manifest of a freshly built version may not list it yet. The box must
+        // show the version of the page the reader is on, so keep it as an option.
+        if (!versions.includes(selected)) {
+          versions = [selected].concat(versions);
+        }
+
+        select.replaceChildren();
+
+        for (let version of versions) {
+          let option = document.createElement("option");
+          option.text = version;
+          option.value = version;
+          select.appendChild(option);
+        }
+
+        select.value = selected;
+      })
+      .catch((err) => console.error(err));
+  });
+</script>

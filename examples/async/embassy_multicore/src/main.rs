@@ -7,7 +7,12 @@
 //! is running.
 //!
 //! The following wiring is assumed:
-//! - LED => GPIO0
+//!
+//! Signal | ESP32-S31 | others |
+//! ------ | --------- | ------ |
+//! LED    | GPIO45    | GPIO0  |
+
+//% CHIP_FILTER: multi_core && gpio_driver_supported
 
 #![no_std]
 #![no_main]
@@ -18,7 +23,6 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    interrupt::software::SoftwareInterruptControl,
     system::{Cpu, Stack},
     timer::timg::TimerGroup,
 };
@@ -55,27 +59,25 @@ async fn main(_spawner: Spawner) {
     static APP_CORE_STACK: StaticCell<Stack<8192>> = StaticCell::new();
     let app_core_stack = APP_CORE_STACK.init(Stack::new());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
     static LED_CTRL: StaticCell<Signal<CriticalSectionRawMutex, bool>> = StaticCell::new();
     let led_ctrl_signal = &*LED_CTRL.init(Signal::new());
 
-    let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
+    let gpio = cfg_select! {
+        feature = "esp32s31" => peripherals.GPIO45,
+        _ => peripherals.GPIO0,
+    };
+    let led = Output::new(gpio, Level::Low, OutputConfig::default());
 
-    esp_rtos::start_second_core(
-        peripherals.CPU_CTRL,
-        sw_int.software_interrupt1,
-        app_core_stack,
-        move || {
-            static EXECUTOR: StaticCell<Executor> = StaticCell::new();
-            let executor = EXECUTOR.init(Executor::new());
-            executor.run(|spawner| {
-                spawner.spawn(control_led(led, led_ctrl_signal).unwrap());
-            });
-        },
-    );
+    esp_rtos::start_second_core(peripherals.CPU_CTRL, app_core_stack, move || {
+        static EXECUTOR: StaticCell<Executor> = StaticCell::new();
+        let executor = EXECUTOR.init(Executor::new());
+        executor.run(|spawner| {
+            spawner.spawn(control_led(led, led_ctrl_signal).unwrap());
+        });
+    });
 
     // Sends periodic messages to control_led, enabling or disabling it.
     println!(

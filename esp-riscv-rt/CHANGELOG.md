@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.15.0] - 2026-08-24
+
+### Changed
+
+- updated defmt to 1.1 (#5752)
+
 ## [v0.14.0] - 2026-04-16
 
 ### Added
@@ -124,4 +130,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.12.0]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.11.0...esp-riscv-rt-v0.12.0
 [v0.13.0]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.12.0...esp-riscv-rt-v0.13.0
 [v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.13.0...esp-riscv-rt-v0.14.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.14.0...HEAD
+[v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.14.0...esp-riscv-rt-v0.15.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.15.0...HEAD

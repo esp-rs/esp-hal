@@ -29,10 +29,10 @@
 //!
 //! let temperature_sensor = TemperatureSensor::new(peripherals.TSENS, Config::default())?;
 //! let delay = Delay::new();
-//! delay.delay_micros(200);
+//! delay.delay_micros(300);
 //! loop {
 //!     let temp = temperature_sensor.get_temperature();
-//!     println!("Temperature: {:.2}°C", temp.to_celcius());
+//!     println!("Temperature: {:.2}°C", temp.to_celsius());
 //!     delay.delay_millis(1_000);
 //! }
 //! # }
@@ -43,71 +43,62 @@
 //! - Temperature calibration range is not supported
 //! - Interrupts are not supported
 
+mod clocks;
+
+/// Clock source for the temperature sensor.
+pub use crate::soc::clocks::TsensSclkConfig as ClockSource;
 use crate::{
+    clock::ll::{ClockTree, TsensInstance},
     peripherals::{APB_SARADC, TSENS},
     system::GenericPeripheralGuard,
 };
-
-/// Clock source for the temperature sensor
-#[derive(Debug, Clone, Default, PartialEq, Eq, Copy, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub enum ClockSource {
-    /// Use RC_FAST clock source
-    RcFast,
-    /// Use XTAL clock source
-    #[default]
-    Xtal,
-}
 
 /// Temperature sensor configuration
 #[derive(Debug, Clone, Default, PartialEq, Eq, Copy, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub struct Config {
-    /// Clock source for the temperature sensor
+    /// Clock source for the temperature sensor.
     clock_source: ClockSource,
 }
 
-/// Temperature sensor configuration error
+/// Temperature sensor configuration error.
 #[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
 #[non_exhaustive]
 pub enum ConfigError {}
 
-/// Temperature value
-/// This struct stores the raw ADC value, and can be used to calculate the
-/// temperature in Celsius using the formula:
-/// `(raw_value * 0.4386) - (offset * 27.88) - 20.52`
+/// Stores the raw ADC value and can be used to calculate the temperature in Celsius using the
+/// formula: `(raw_value * 0.4386) - (offset * 27.88) - 20.52`.
 #[derive(Debug)]
 pub struct Temperature {
-    /// Raw ADC value
+    /// Raw ADC value.
     pub raw_value: u8,
 
-    /// Offset value - depends on the temperature range configured
+    /// Offset value - depends on the temperature range configured.
     pub offset: i8,
 }
 
 impl Temperature {
-    /// Create a new temperature value
+    /// Creates a new temperature value.
     #[inline]
     pub fn new(raw_value: u8, offset: i8) -> Self {
         Self { raw_value, offset }
     }
 
-    /// Get the temperature in Celsius
+    /// Returns the temperature in Celsius.
     #[inline]
     pub fn to_celsius(&self) -> f32 {
         (self.raw_value as f32) * 0.4386 - (self.offset as f32) * 27.88 - 20.52
     }
 
-    /// Get the temperature in Fahrenheit
+    /// Returns the temperature in Fahrenheit.
     #[inline]
     pub fn to_fahrenheit(&self) -> f32 {
         let celsius = self.to_celsius();
         (celsius * 1.8) + 32.0
     }
 
-    /// Get the temperature in Kelvin
+    /// Returns the temperature in Kelvin.
     #[inline]
     pub fn to_kelvin(&self) -> f32 {
         let celsius = self.to_celsius();
@@ -119,31 +110,35 @@ impl Temperature {
 #[derive(Debug)]
 pub struct TemperatureSensor<'d> {
     _peripheral: TSENS<'d>,
+    _clock_guard: TsensClockGuard,
     _tsens_guard: GenericPeripheralGuard<{ crate::system::Peripheral::Tsens as u8 }>,
     _abp_saradc_guard: GenericPeripheralGuard<{ crate::system::Peripheral::ApbSarAdc as u8 }>,
 }
 
 impl<'d> TemperatureSensor<'d> {
-    /// Create a new temperature sensor instance with configuration
-    /// The sensor will be automatically powered up
+    /// Creates a new temperature sensor instance with the given configuration.
+    ///
+    /// The sensor is automatically powered up.
     pub fn new(peripheral: TSENS<'d>, config: Config) -> Result<Self, ConfigError> {
         // NOTE: We need enable ApbSarAdc before enabling Tsens
         let apb_saradc_guard = GenericPeripheralGuard::new();
         let tsens_guard = GenericPeripheralGuard::new();
 
-        let mut tsens = Self {
+        let tsens = Self {
             _peripheral: peripheral,
+            _clock_guard: TsensClockGuard::new(config.clock_source),
             _tsens_guard: tsens_guard,
             _abp_saradc_guard: apb_saradc_guard,
         };
-        tsens.apply_config(&config)?;
 
         tsens.power_up();
+        // https://github.com/espressif/esp-idf/blob/ab95e70748f2eddac6f87217b0cf62533684a6ba/components/esp_hal_ana_conv/esp32c6/temperature_sensor_periph.c#L9-L16
+        crate::soc::regi2c::I2C_SARADC_TSENS_DAC.write_field(7); // 20 °C to 100 °C, offset -1.
 
         Ok(tsens)
     }
 
-    /// Power up the temperature sensor
+    /// Powers up the temperature sensor.
     pub fn power_up(&self) {
         debug!("Power up");
         APB_SARADC::regs()
@@ -151,25 +146,23 @@ impl<'d> TemperatureSensor<'d> {
             .modify(|_, w| w.pu().set_bit());
     }
 
-    /// Power down the temperature sensor - useful if you want to save power
+    /// Powers down the temperature sensor to save power.
     pub fn power_down(&self) {
         APB_SARADC::regs()
             .tsens_ctrl()
             .modify(|_, w| w.pu().clear_bit());
     }
 
-    /// Change the temperature sensor configuration
+    /// Changes the temperature sensor configuration.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        // Set clock source
-        APB_SARADC::regs().tsens_ctrl2().write(|w| {
-            w.clk_sel()
-                .bit(matches!(config.clock_source, ClockSource::Xtal))
+        ClockTree::with(|clocks| {
+            TsensInstance::Tsens.configure_sclk(clocks, config.clock_source);
         });
 
         Ok(())
     }
 
-    /// Get the raw temperature value
+    /// Returns the raw temperature value.
     #[inline]
     pub fn get_temperature(&self) -> Temperature {
         let raw_value = APB_SARADC::regs().tsens_ctrl().read().out().bits();
@@ -178,5 +171,30 @@ impl<'d> TemperatureSensor<'d> {
         let offset = -1i8;
 
         Temperature::new(raw_value, offset)
+    }
+}
+
+impl Drop for TemperatureSensor<'_> {
+    fn drop(&mut self) {
+        self.power_down();
+    }
+}
+
+#[derive(Debug)]
+struct TsensClockGuard;
+
+impl TsensClockGuard {
+    fn new(source: ClockSource) -> Self {
+        ClockTree::with(|clocks| {
+            TsensInstance::Tsens.configure_sclk(clocks, source);
+            TsensInstance::Tsens.request_sclk(clocks);
+        });
+        Self
+    }
+}
+
+impl Drop for TsensClockGuard {
+    fn drop(&mut self) {
+        ClockTree::with(|clocks| TsensInstance::Tsens.release_sclk(clocks));
     }
 }

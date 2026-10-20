@@ -1,6 +1,6 @@
 [package]
 name = "esp-bootloader-esp-idf"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 rust-version = "1.95.0"
 description = "Functionality related to the esp-idf bootloader"
@@ -11,6 +11,7 @@ repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+chip-features-matter = true
 doc-config = { features = ["defmt", "validation"] }
 check-configs = [
     { features = [] },
@@ -19,6 +20,9 @@ check-configs = [
 ]
 clippy-configs = [
     { features = ["defmt", "validation"] },
+]
+host-test-configs = [
+    { features = ["std", "embedded-storage"], cargo-args = ["--lib", "--tests"], test-args = ["--test-threads=1"] },
 ]
 
 [package.metadata.docs.rs]
@@ -29,28 +33,31 @@ bench = false
 test  = true
 
 [dependencies]
-cfg-if = "1"
-defmt = { version = "1.0.1", optional = true }
+defmt = { version = "1.1", optional = true }
 document-features = "0.2"
-esp-config = { version = "0.7.0", path = "../esp-config" }
-esp-hal-procmacros = { version = "0.22.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
+esp-config = { version = "0.8.0", path = "../esp-config" }
+esp-hal-procmacros = { version = "0.23.0", path = "../esp-hal-procmacros", features = ["__esp_idf_bootloader"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
 esp-rom-sys = { version = "~0.1", path = "../esp-rom-sys", optional = true }
-embedded-storage = "0.3.1"
+embedded-storage = { version = "0.3.1", optional = true }
 log-04 = { package = "log", version = "0.4", optional = true }
 strum = { version = "0.27", default-features = false, features = ["derive"] }
 
 crc = { version = "3.3.0", optional = true }
 md-5 = { version = "0.10.6", default-features = false, optional = true }
+sha2 = { version = "0.11", default-features = false }
 
 [build-dependencies]
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
-esp-config = { version = "0.7.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config = { version = "0.8.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
+[target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dependencies]
+esp-hal = { version = "~1.2.0", path = "../esp-hal", default-features = false, features = ["unstable"] }
 
 # Make doctests & host-tests work together:
 [target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))'.dev-dependencies]
-esp-hal = { version = "~1.1.0", path = "../esp-hal" }
+esp-hal = { version = "~1.2.0", path = "../esp-hal" }
 
 [features]
 default = ["validation"]
@@ -66,6 +73,9 @@ defmt = ["dep:defmt"]
 
 # Replace ROM functions with pure Rust implementations, needed for tests.
 std = ["dep:crc", "dep:md-5"]
+
+## Implement traits from `embedded-storage` for [`crate::partitions::FlashRegion`].
+embedded-storage = ["dep:embedded-storage"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
@@ -83,6 +93,8 @@ esp32c61   = ["esp-rom-sys/esp32c61", "esp-metadata-generated/esp32c61", "esp-ha
 ##
 esp32h2   = ["esp-rom-sys/esp32h2", "esp-metadata-generated/esp32h2", "esp-hal/esp32h2"]
 ##
+esp32h4   = ["esp-rom-sys/esp32h4", "esp-metadata-generated/esp32h4", "esp-hal/esp32h4"]
+##
 esp32p4   = ["esp-rom-sys/esp32p4", "esp-metadata-generated/esp32p4", "esp-hal/esp32p4"]
 ##
 esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32", "esp-hal/esp32"]
@@ -90,6 +102,8 @@ esp32     = ["esp-rom-sys/esp32", "esp-metadata-generated/esp32", "esp-hal/esp32
 esp32s2   = ["esp-rom-sys/esp32s2", "esp-metadata-generated/esp32s2", "esp-hal/esp32s2"]
 ##
 esp32s3   = ["esp-rom-sys/esp32s3", "esp-metadata-generated/esp32s3", "esp-hal/esp32s3"]
+##
+esp32s31  = ["esp-rom-sys/esp32s31", "esp-metadata-generated/esp32s31", "esp-hal/esp32s31"]
 
 # "md-5" is hidden behind `std` feature and `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]

@@ -16,7 +16,7 @@ MEMORY
 
 
     /* 320K of on soc RAM, 16K reserved for cache */
-    /* Instruction and Data RAM 
+    /* Instruction and Data RAM
     0x4083EFD0 = 2nd stage bootloader iram_loader_seg start address
     see https://github.com/espressif/esp-idf/blob/03414a15508036c8fc0f51642aed7a264e9527df/components/esp_system/ld/esp32h2/memory.ld.in#L26
     */
@@ -32,7 +32,7 @@ MEMORY
      has a 0x18 byte file header, and each segment has a 0x08 byte segment
      header. Setting this offset makes it simple to meet the flash cache MMU's
      constraint that (paddr % 64KB == vaddr % 64KB).)
-    */    
+    */
 
     /* Instruction and Data ROM */
     ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20

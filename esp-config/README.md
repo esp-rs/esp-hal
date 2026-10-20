@@ -71,9 +71,9 @@ options:
 - name: esp_idf_version
   description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
   default:
-    - if: 'chip == "esp32c6"'
+    - if: 'esp32c6'
       value: '"esp32c6"'
-    - if: 'chip == "esp32"'
+    - if: 'esp32'
       value: '"other"'
   active: true
 
@@ -86,7 +86,7 @@ options:
     - if: true
       value: 32768
   stability: Unstable
-  active: 'chip == "esp32c6"'
+  active: 'esp32c6'
 
 checks:
   - 'ESP_BOOTLOADER_ESP_IDF_CONFIG_PARTITION_TABLE_OFFSET >= 32768'
@@ -97,13 +97,13 @@ checks:
 The expression supports these custom functions:
 |Function|Description|
 |---|---|
-|feature(String)|`true` if the given chip feature is present|
 |cargo_feature(String)|`true` if the given Cargo feature is active|
 |ignore_feature_gates|Usually `false` but tooling will set this to `true` to hint that the expression is evaluated by e.g. a TUI|
 
 `ignore_feature_gates` is useful to enable otherwise disabled functionality - e.g. to offer all possible options regardless of any active / non-active features.
 
-The `chip` variable is populated with the name of the targeted chip (if the crate is using chip specific features).
+All `esp-metadata-generated` symbols are available for use as variables. Simple symbols are available as booleans, `key = "value"` pairs are available as strings.
+If a symbol is not defined for a particular chip, it will be substituted as `false` or an empty string.
 
 The conditions for `default` and `constraints` are evaluated in order and the first match is taken no matter if there is more.
 This way you could have a catch-all condition as the last item by just specifying `true`.

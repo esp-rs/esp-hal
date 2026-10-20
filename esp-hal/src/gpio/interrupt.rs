@@ -41,7 +41,7 @@
 //!
 //! ## Signaling async completion
 //!
-//! The completion is signalled by clearing a flag in an AtomicU32. This flag is
+//! The completion is signaled by clearing a flag in an AtomicU32. This flag is
 //! set at the start of the async operation, and cleared when the interrupt
 //! handler is called. The flag is not accessible by the user, so they can't
 //! force-complete an async operation accidentally from the interrupt handler.
@@ -51,47 +51,24 @@
 //! (If the user were to clear the interrupt status, we would need to re-enable
 //! it, for PinFuture to detect the completion).
 
-use portable_atomic::{AtomicPtr, Ordering};
+use portable_atomic::Ordering;
 use strum::EnumCount;
 
-use crate::{
-    gpio::{
-        AnyPin,
-        GPIO_LOCK,
-        GpioBank,
-        InputPin,
-        low_level::{InterruptStatusRegisterAccess, set_int_enable},
-    },
-    interrupt::Priority,
-    peripherals::Interrupt,
-    ram,
-};
 #[cfg(feature = "rt")]
 use crate::{
+    gpio::low_level::disable_cpu_interrupt,
     handler,
     interrupt::{self, DEFAULT_INTERRUPT_HANDLER},
+    peripherals::Interrupt,
+    system::Cpu,
+};
+use crate::{
+    gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, low_level::set_int_enable},
+    private::CFnPtr,
+    ram,
 };
 
-/// Convenience constant for `Option::None` pin
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
-
-pub(super) struct CFnPtr(AtomicPtr<()>);
-impl CFnPtr {
-    pub const fn new() -> Self {
-        Self(AtomicPtr::new(core::ptr::null_mut()))
-    }
-
-    pub fn store(&self, f: extern "C" fn()) {
-        self.0.store(f as *mut (), Ordering::Relaxed);
-    }
-
-    pub fn call(&self) {
-        let ptr = self.0.load(Ordering::Relaxed);
-        if !ptr.is_null() {
-            unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
-        }
-    }
-}
 
 #[cfg(feature = "rt")]
 pub(crate) fn bind_default_interrupt_handler() {
@@ -109,39 +86,23 @@ pub(crate) fn bind_default_interrupt_handler() {
     // The vector table doesn't contain a custom entry. Still, the
     // peripheral interrupt may already be bound to something else.
     let mut is_mapped = false;
-    super::low_level::for_each_interrupt_core(|cpu| {
+    for cpu in Cpu::all() {
         if interrupt::mapped_to(cpu, Interrupt::GPIO).is_some() {
             is_mapped = true;
         }
-    });
+    }
 
     if is_mapped {
         info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
         return;
     }
 
-    interrupt::bind_handler(Interrupt::GPIO, default_gpio_interrupt_handler);
-
-    // On ESP32, there are separate interrupt status registers for each core, we need to enable the
-    // interrupt handler on each core otherwise GPIOs listening on the App CPU will not receive
-    // interrupts.
-    super::low_level::enable_additional_default_interrupts(Interrupt::GPIO, Priority::Priority1);
+    super::low_level::enable_interrupt(default_gpio_interrupt_handler);
 }
 
-/// Configures the given peripheral interrupt to trigger the vectored handler of given priority.
-pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
-    super::low_level::for_each_interrupt_core(|cpu| {
-        // Only change priority if the interrupt is mapped to the core, otherwise we would enable
-        // the interrupt unconditionally, which we don't want to do.
-        if crate::interrupt::mapped_to(cpu, interrupt).is_some() {
-            crate::interrupt::enable_on_cpu(cpu, interrupt, priority);
-        }
-    });
-}
-
-/// The default GPIO interrupt handler, when the user has not set one.
+/// The default GPIO interrupt handler, used when no custom handler is set.
 ///
-/// This handler will disable all pending interrupts and leave the interrupt
+/// This handler disables all pending interrupts and leaves the interrupt
 /// status bits unchanged. This enables functions like `is_interrupt_set` to
 /// work correctly.
 #[ram]
@@ -170,15 +131,15 @@ fn default_gpio_interrupt_handler() {
                 let pin_nr = pin_pos as u8 + bank.offset();
 
                 // The remaining interrupts are not async, we treat them as single-shot.
-                set_int_enable(pin_nr, Some(0), 0, false);
+                disable_cpu_interrupt(pin_nr);
             }
         }
     });
 }
 
-/// The user GPIO interrupt handler, when the user has set one.
+/// The custom GPIO interrupt handler, used when one is set.
 ///
-/// This handler only disables interrupts associated with async pins. The user
+/// This handler only disables interrupts associated with async pins. The custom
 /// handler is responsible for clearing the interrupt status bits or disabling
 /// the interrupts.
 #[ram]
@@ -246,10 +207,10 @@ pub(super) unsafe fn wake_pin_impl(pin: u8) {
 }
 
 fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
-    let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
+    let intrs_bank0 = GpioBank::_0.read_interrupt_status_of_current_cpu();
 
     #[cfg(gpio_has_bank_1)]
-    let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
+    let intrs_bank1 = GpioBank::_1.read_interrupt_status_of_current_cpu();
 
     [
         (GpioBank::_0, intrs_bank0),

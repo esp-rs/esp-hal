@@ -1,6 +1,21 @@
 use strum::FromRepr;
 
-pub(crate) fn init() {}
+use crate::soc::clocks::ClockConfig;
+
+pub(crate) fn init(_config: &ClockConfig) {
+    calibrate_ocode();
+}
+
+// Trims the RTC bandgap using eFuse calibration data.
+//
+// See `set_ocode_by_efuse` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32s2/rtc_init.c>
+fn calibrate_ocode() {
+    super::calibrate_ocode(|| {
+        (crate::efuse::read_field_le::<u8>(crate::efuse::BLK_VERSION_MINOR) == 2)
+            .then(|| (crate::efuse::sign_magnitude(crate::efuse::ocode().into(), 6) + 93) as u8)
+    });
+}
 
 // Terminology:
 //
@@ -13,7 +28,7 @@ pub(crate) fn init() {}
 /// SOC Reset Reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ///
     /// In ESP-IDF this value (0x01) can *also* be `ChipBrownOut` or
     /// `ChipSuperWdt`, however that is not really compatible with Rust-style
@@ -35,7 +50,7 @@ pub enum SocResetReason {
     Cpu0Sw        = 0x0C,
     /// RTC watch dog resets CPU 0
     Cpu0RtcWdt    = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,

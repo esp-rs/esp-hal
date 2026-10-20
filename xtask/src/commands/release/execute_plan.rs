@@ -2,19 +2,29 @@ use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
-use esp_metadata::Chip;
 use strum::IntoEnumIterator;
-use toml_edit::{Item, Value};
 
 use crate::{
     cargo::CargoToml,
     commands::{
         VersionBump,
         checker::generate_baseline,
-        release::plan::{PackagePlan, Plan},
+        do_version_bump,
+        release::{
+            plan::{
+                PackagePlan,
+                Plan,
+                StaleDependency,
+                format_stale_dependency_warnings,
+                print_stale_dependency_warnings,
+                validate_plan,
+            },
+            registry::RegistrySnapshot,
+        },
         update_package,
     },
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
+    metadata::Chip,
 };
 
 /// Arguments for executing the release plan.
@@ -30,7 +40,8 @@ pub struct ApplyPlanArgs {
     manual_pull_request: bool,
 }
 
-/// Execute the release plan by making code changes, committing them to a new
+/// Execute the release plan: bump versions, merge changelog entries, commit the
+/// changes to a fresh release branch, and open (or update) the release PR.
 pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     ensure_workspace_clean(workspace)
         .with_context(|| format!("Workspace {workspace:?} is not clean!"))?;
@@ -62,12 +73,15 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    // Preflight: load and validate every package up front, before touching any
-    // files, so a mismatched version or other plan error aborts without leaving
-    // the workspace half-edited. The parsed manifests are reused by the apply
-    // loop below, so each is read and validated exactly once.
-    let mut manifests = Vec::with_capacity(plan.packages.len());
-    for step in plan.packages.iter() {
+    // Recompute each version and tag from `current_version` and `bump` before
+    // validation, so a hand-edited `bump` (not a stale `new_version`) decides
+    // what is released, and a drifted manifest aborts before any file changes.
+    //
+    // Do not reuse these manifests in the apply loop: bumping a package rewrites
+    // its workspace dependents on disk, so each must be re-read there or an
+    // earlier dependency bump would be silently reverted.
+    let mut bump_decisions = Vec::with_capacity(plan.packages.len());
+    for step in plan.packages.iter_mut() {
         let package = CargoToml::new(workspace, step.package).with_context(|| {
             format!(
                 "Couldn't create Cargo.toml in workspace {workspace:?} for {:?}",
@@ -75,17 +89,23 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             )
         })?;
 
-        match validate_package(&package, step)? {
-            Preflight::Bump => manifests.push(Some(package)),
+        match recompute_and_validate_package(&package, step)? {
+            Preflight::Bump => bump_decisions.push(true),
             Preflight::AlreadyReleased => {
                 println!(
                     "Package {} is already at version {}. Skipping.",
                     step.package, step.new_version
                 );
-                manifests.push(None);
+                bump_decisions.push(false);
             }
         }
     }
+
+    // The plan is hand-edited between `plan` and here (packages get removed and
+    // bumps get tweaked), so run every planner gate against the recomputed
+    // versions before touching any files.
+    let warnings = validate_plan(workspace, &plan.packages)?;
+    print_stale_dependency_warnings(&warnings);
 
     // Must run before the apply loop: `update_package` finalizes Unreleased into
     // the new version section, so fragments added after would land in the wrong
@@ -107,17 +127,30 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         println!("Dry run: would merge PR changelog entries into CHANGELOG.md / MIGRATING-*.md");
     }
 
-    // Make code changes, reusing the manifests validated above. Packages that
-    // were already at their target version are stored as `None` and skipped.
+    // The bumps are re-derived here, so they are re-checked against the index
+    let registry = RegistrySnapshot::fetch(plan.packages.iter().map(|step| step.package))?;
+
+    // Make code changes. Re-read each manifest from disk instead of reusing the
+    // preflight copies: earlier steps in this loop may have rewritten this
+    // package's dependency versions on disk, and saving a stale in-memory copy
+    // would revert them. Packages already at their target version are skipped.
     let skip_dependent_rewrites = plan.backport.is_some();
-    for (step, manifest) in plan.packages.iter_mut().zip(manifests) {
-        let Some(mut package) = manifest else {
+    for (step, should_bump) in plan.packages.iter_mut().zip(bump_decisions) {
+        if !should_bump {
             continue;
-        };
+        }
+
+        let mut package = CargoToml::new(workspace, step.package).with_context(|| {
+            format!(
+                "Couldn't create Cargo.toml in workspace {workspace:?} for {:?}",
+                step.package
+            )
+        })?;
 
         let new_version = update_package(
             &mut package,
             &step.bump,
+            &registry,
             !args.no_dry_run,
             skip_dependent_rewrites,
         )?;
@@ -168,12 +201,18 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     let branch_name = format!("release-branch-{}", plan.slug);
     let branch = make_git_changes(!args.no_dry_run, &branch_name, &commit_message(&plan))?;
 
+    // Report-only: include the compile-test chip coverage in the PR body. A read
+    // failure is logged and the section omitted rather than aborting the release.
+    let coverage_section = compile_test_coverage_section(workspace);
+
     open_pull_request(
         &branch,
         !args.no_dry_run,
         args.manual_pull_request,
         &plan_source,
         &plan,
+        &warnings,
+        &coverage_section,
     )
     .with_context(|| "Failed to open pull request")?;
 
@@ -195,44 +234,55 @@ enum Preflight {
     AlreadyReleased,
 }
 
-/// Validate a package against its plan entry without mutating anything.
+/// Recompute a package's `new_version`/`tag_name` from its `bump`, validate it
+/// against the manifest on disk, and update the plan entry in place.
 ///
 /// Run for every package before any changelog or version edits happen, so that
-/// a bad plan aborts cleanly instead of leaving the workspace half-edited. The
-/// same checks gate the actual bump, but live here only — the apply loop reuses
-/// the [`Preflight`] result instead of repeating them.
-fn validate_package(package: &CargoToml, step: &PackagePlan) -> Result<Preflight> {
+/// a bad plan aborts cleanly instead of leaving the workspace half-edited, and
+/// so the checks that follow see the version the `bump` actually produces rather
+/// than a possibly-stale `new_version` field.
+fn recompute_and_validate_package(
+    package: &CargoToml,
+    step: &mut PackagePlan,
+) -> Result<Preflight> {
     let current = package.package_version();
+
+    let new_version = do_version_bump(&step.current_version, &step.bump).with_context(|| {
+        format!(
+            "Failed to compute the new version of {} from its bump",
+            step.package
+        )
+    })?;
+
+    // Re-run after the bump was already applied: the manifest already carries
+    // the recomputed target version.
     if current != step.current_version {
-        if current == step.new_version {
+        if current == new_version {
+            step.new_version = new_version;
+            step.tag_name = step.package.tag(&step.new_version);
             return Ok(Preflight::AlreadyReleased);
         }
         bail!(
-            "The version of package {} has changed in an unexpected way. Cannot continue.",
+            "The manifest version of {} is {current}, but the plan's current_version is {}. \
+             Re-run `cargo xrelease plan`.",
+            step.package,
+            step.current_version
+        );
+    }
+
+    // Special case: some packages are perma-unstable, meaning they won't ever
+    // have a stable release. For these packages, we always use a patch release.
+    if let Some(true) = package.espressif_metadata_bool("forever-unstable")
+        && step.bump != VersionBump::patch()
+    {
+        bail!(
+            "Cannot bump perma-unstable package {} to a non-patch version",
             step.package
         );
     }
 
-    if let Some(metadata) = package.espressif_metadata()
-        && let Some(Item::Value(forever_unstable)) = metadata.get("forever-unstable")
-    {
-        // Special case: some packages are perma-unstable, meaning they won't ever
-        // have a stable release. For these packages, we always use a patch release.
-        let forever_unstable = if let Value::Boolean(forever_unstable) = forever_unstable {
-            *forever_unstable.value()
-        } else {
-            log::warn!("Invalid value for 'forever-unstable' in metadata - must be a boolean");
-            true
-        };
-
-        if forever_unstable && step.bump != VersionBump::patch() {
-            bail!(
-                "Cannot bump perma-unstable package {} to a non-patch version",
-                step.package
-            );
-        }
-    }
-
+    step.new_version = new_version;
+    step.tag_name = step.package.tag(&step.new_version);
     Ok(Preflight::Bump)
 }
 
@@ -378,24 +428,53 @@ fn commit_message(plan: &Plan) -> String {
 
 const UPSTREAM_REPO: &str = "esp-rs/esp-hal";
 // `manual-changelog` exempts the PR from the direct-CHANGELOG-edit check (the release
-// tooling writes the changelog wholesale). The `release:*` labels each gate an optional,
-// heavy CI workflow; all are applied by default so every check runs, and a maintainer can
-// remove individual ones to skip a check that isn't relevant to the packages being released.
-const PR_LABELS: &[&str] = &[
-    "manual-changelog",
-    "release:docs",
-    "release:registry:compile-test",
-    "release:registry:ci",
-];
+// tooling writes the changelog wholesale). `release:docs` gates the docs build.
+// `merge-freeze-exempt` lets the PR through the merge queue during a release freeze; it is a
+// no-op when no freeze is active.
+//
+// The registry compile-test runs on every release PR and the examples/tests step runs by
+// default, skipped only by adding `release:registry:skip-ci` (see `pre-rel-check.yml`), so
+// neither is applied here as an opt-in gate.
+const PR_LABELS: &[&str] = &["manual-changelog", "release:docs", "merge-freeze-exempt"];
 
-fn build_pr_body(plan: &Plan, release_plan_str: &str) -> String {
+/// The compile-test chip coverage section for the PR body, or an empty string
+/// when it cannot be computed. Report-only.
+fn compile_test_coverage_section(workspace: &Path) -> String {
+    match crate::firmware::compile_test_coverage(workspace) {
+        Ok(coverage) => format!(
+            "\n### Compile-test chip coverage\n\n{}\n",
+            crate::firmware::format_compile_test_coverage(&coverage)
+        ),
+        Err(e) => {
+            log::warn!("Could not compute compile-test coverage: {e}");
+            String::new()
+        }
+    }
+}
+
+fn build_pr_body(
+    plan: &Plan,
+    release_plan_str: &str,
+    warnings: &[StaleDependency],
+    coverage_section: &str,
+) -> String {
     let packages = format_package_list(plan);
+
+    let stale_section = if warnings.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n### Stale-dependency warnings\n\nThese in-repo dependencies have commits since \
+             their last release. The registry check decides whether this release needs them:\n\n{}\n",
+            format_stale_dependency_warnings(warnings).join("\n")
+        )
+    };
 
     let mut body = format!(
         r#"This pull request prepares the following packages for release:
 
 {packages}
-
+{stale_section}{coverage_section}
 <details>
 
 <summary>Release plan (click to expand)</summary>
@@ -434,8 +513,10 @@ fn open_pull_request(
     manual_pull_request: bool,
     release_plan_str: &str,
     release_plan: &Plan,
+    warnings: &[StaleDependency],
+    coverage_section: &str,
 ) -> Result<()> {
-    let body = build_pr_body(release_plan, release_plan_str);
+    let body = build_pr_body(release_plan, release_plan_str, warnings, coverage_section);
 
     if dry_run {
         println!("Dry run: would create/update the release PR with body:");
@@ -482,7 +563,11 @@ fn head_spec(upstream_url: &str, branch_name: &str) -> Result<String> {
     }
 }
 
-fn gh_stdin(args: &[&str], stdin_data: &str) -> Result<String> {
+/// Spawn `gh` with `args`, feed `stdin_data` to its stdin, and return the raw
+/// output. A non-zero exit is *not* treated as an error here so callers can
+/// inspect stderr (e.g. to detect "a pull request already exists"). Callers
+/// that only care about success should use [`gh_stdin`].
+fn gh_run(args: &[&str], stdin_data: &str) -> Result<std::process::Output> {
     use std::io::Write;
 
     let mut child = Command::new("gh")
@@ -500,9 +585,13 @@ fn gh_stdin(args: &[&str], stdin_data: &str) -> Result<String> {
         .write_all(stdin_data.as_bytes())
         .context("Failed to write stdin to gh")?;
 
-    let out = child
+    child
         .wait_with_output()
-        .with_context(|| format!("`gh {}` failed", args.join(" ")))?;
+        .with_context(|| format!("`gh {}` failed", args.join(" ")))
+}
+
+fn gh_stdin(args: &[&str], stdin_data: &str) -> Result<String> {
+    let out = gh_run(args, stdin_data)?;
     if !out.status.success() {
         bail!(
             "`gh {}` failed: {}",
@@ -543,64 +632,100 @@ fn find_existing_pr(branch_name: &str) -> Result<Option<u64>> {
         .and_then(|n| n.as_u64()))
 }
 
-fn upsert_pull_request(branch: &Branch, plan: &Plan, body: &str) -> Result<u64> {
-    let title = release_subject(plan);
-    if let Some(num) = find_existing_pr(&branch.name)? {
-        log::info!("Updating existing release PR #{num}");
-        let num_str = num.to_string();
-        gh_stdin(
-            &[
-                "pr",
-                "edit",
-                &num_str,
-                "--repo",
-                UPSTREAM_REPO,
-                "--title",
-                &title,
-                "--body-file",
-                "-",
-            ],
-            body,
-        )?;
-        Ok(num)
-    } else {
-        let head = head_spec(&branch.upstream, &branch.name)?;
-        log::info!("Creating release PR (head: {head}, base: {})", plan.base);
-        let mut args: Vec<&str> = vec![
+/// Extract the numeric PR id from any text containing a `.../pull/<n>` URL.
+///
+/// Works for both the URL `gh pr create` prints on success and the
+/// "...already exists: <url>" message it prints on failure. A `/pull/new/...`
+/// URL (as produced by `git push`) has no number and yields `None`.
+fn parse_pr_number(text: &str) -> Option<u64> {
+    let start = text.rfind("/pull/")? + "/pull/".len();
+    let digits: String = text[start..]
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    digits.parse().ok()
+}
+
+/// Update the title and body of an existing release PR, leaving labels and
+/// reviewers untouched.
+fn edit_release_pr(number: u64, title: &str, body: &str) -> Result<()> {
+    let number = number.to_string();
+    gh_stdin(
+        &[
             "pr",
-            "create",
+            "edit",
+            &number,
             "--repo",
             UPSTREAM_REPO,
-            "--base",
-            &plan.base,
-            "--head",
-            &head,
             "--title",
-            &title,
-        ];
-        for l in PR_LABELS {
-            args.push("--label");
-            args.push(l);
-        }
-        args.push("--body-file");
-        args.push("-");
-        let stdout = gh_stdin(&args, body)?;
-        // `gh pr create` prints the PR URL as the last line of stdout.
-        let url = stdout
-            .lines()
-            .rev()
-            .map(str::trim)
-            .find(|l| !l.is_empty())
-            .unwrap_or("");
-        let num = url
-            .rsplit('/')
-            .next()
-            .and_then(|s| s.parse::<u64>().ok())
-            .with_context(|| {
-                format!("Failed to parse PR number from `gh pr create` output: {url}")
-            })?;
-        Ok(num)
+            title,
+            "--body-file",
+            "-",
+        ],
+        body,
+    )?;
+    Ok(())
+}
+
+fn upsert_pull_request(branch: &Branch, plan: &Plan, body: &str) -> Result<u64> {
+    let title = release_subject(plan);
+
+    // Reuse an existing open release PR when we can find one, so re-running the
+    // release edits the same PR instead of opening (and re-labelling) another.
+    if let Some(num) = find_existing_pr(&branch.name)? {
+        log::info!("Updating existing release PR #{num}");
+        edit_release_pr(num, &title, body)?;
+        return Ok(num);
     }
+
+    let head = head_spec(&branch.upstream, &branch.name)?;
+    log::info!("Creating release PR (head: {head}, base: {})", plan.base);
+    let mut args: Vec<&str> = vec![
+        "pr",
+        "create",
+        "--repo",
+        UPSTREAM_REPO,
+        "--base",
+        &plan.base,
+        "--head",
+        &head,
+        "--title",
+        &title,
+    ];
+    // Labels are applied only when the PR is first created. A maintainer may
+    // later remove one to skip its optional CI check, so the edit path above
+    // deliberately never re-applies them.
+    for l in PR_LABELS {
+        args.push("--label");
+        args.push(l);
+    }
+    args.push("--body-file");
+    args.push("-");
+
+    let out = gh_run(&args, body)?;
+    if out.status.success() {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        return parse_pr_number(&stdout).with_context(|| {
+            format!("Failed to parse PR number from `gh pr create` output: {stdout}")
+        });
+    }
+
+    // GitHub's PR listing lags for a moment after the branch is pushed, so
+    // `find_existing_pr` can miss a PR that actually exists and we land here on
+    // a re-run. `gh pr create` then fails with "a pull request ... already
+    // exists: <url>". Recover by editing that PR instead of bailing: letting
+    // `gh pr create` run a second time is what re-applied every release label
+    // and re-requested reviews, showing up as duplicated PR timeline entries.
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if stderr.contains("already exists")
+        && let Some(num) = parse_pr_number(&stderr)
+    {
+        log::info!("Release PR #{num} already exists - updating it instead of opening a duplicate");
+        edit_release_pr(num, &title, body)?;
+        return Ok(num);
+    }
+
+    bail!("`gh pr create` failed: {stderr}");
 }
 
 fn print_manual_instructions(branch: &Branch, plan: &Plan, body: &str) -> Result<()> {
@@ -663,6 +788,29 @@ branch 'foo' set up to track 'origin/foo'.
 
         let url = extract_url_from_push(message);
         assert_eq!(url, "https://github.com/bugadani/esp-hal/pull/new/foo");
+    }
+
+    #[test]
+    fn parse_pr_number_from_create_and_already_exists() {
+        // `gh pr create` success: bare PR URL on stdout.
+        assert_eq!(
+            parse_pr_number("https://github.com/esp-rs/esp-hal/pull/1234\n"),
+            Some(1234)
+        );
+
+        // `gh pr create` failure when the PR already exists: the number must be
+        // recovered from the message so we can edit instead of duplicating.
+        let stderr = "a pull request for branch \"release-branch-t9telr\" into branch \"main\" \
+             already exists:\nhttps://github.com/esp-rs/esp-hal/pull/6190\n";
+        assert_eq!(parse_pr_number(stderr), Some(6190));
+
+        // A `/pull/new/<branch>` URL (from `git push`) carries no PR number.
+        assert_eq!(
+            parse_pr_number("https://github.com/esp-rs/esp-hal/pull/new/release-branch-x"),
+            None
+        );
+
+        assert_eq!(parse_pr_number("no pull url here"), None);
     }
 
     #[test]

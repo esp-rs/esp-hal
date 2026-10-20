@@ -151,8 +151,10 @@ type PrinterImpl = noop::Printer;
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32p4",
-        feature = "esp32s3"
+        feature = "esp32s3",
+        feature = "esp32s31"
     )
 ))]
 mod auto_printer {
@@ -181,9 +183,13 @@ mod auto_printer {
             ))]
             const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
             #[cfg(feature = "esp32s3")]
-            const USB_DEVICE_INT_RAW: *const u32 = 0x60038000 as *const u32;
+            const USB_DEVICE_INT_RAW: *const u32 = 0x60038008 as *const u32;
             #[cfg(feature = "esp32p4")]
             const USB_DEVICE_INT_RAW: *const u32 = 0x500D2008 as *const u32;
+            #[cfg(feature = "esp32s31")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x20391008 as *const u32;
+            #[cfg(feature = "esp32h4")]
+            const USB_DEVICE_INT_RAW: *const u32 = 0x6001D008 as *const u32;
 
             const SOF_INT_MASK: u32 = 0b10;
 
@@ -216,8 +222,10 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32p4",
-        feature = "esp32s3"
+        feature = "esp32s3",
+        feature = "esp32s31"
     ))
 ))]
 mod auto_printer {
@@ -233,8 +241,10 @@ mod auto_printer {
         feature = "esp32c6",
         feature = "esp32c61",
         feature = "esp32h2",
+        feature = "esp32h4",
         feature = "esp32p4",
-        feature = "esp32s3"
+        feature = "esp32s3",
+        feature = "esp32s31"
     )
 ))]
 mod serial_jtag_printer {
@@ -273,6 +283,18 @@ mod serial_jtag_printer {
     const SERIAL_JTAG_FIFO_REG: usize = 0x500D_2000;
     #[cfg(feature = "esp32p4")]
     const SERIAL_JTAG_CONF_REG: usize = 0x500D_2004;
+
+    // ESP32-S31: USB_DEVICE peripheral at 0x2039_1000 per PAC.
+    #[cfg(feature = "esp32s31")]
+    const SERIAL_JTAG_FIFO_REG: usize = 0x2039_1000;
+    #[cfg(feature = "esp32s31")]
+    const SERIAL_JTAG_CONF_REG: usize = 0x2039_1004;
+
+    // ESP32-H4: USB_DEVICE peripheral at 0x6001_D000 per PAC.
+    #[cfg(feature = "esp32h4")]
+    const SERIAL_JTAG_FIFO_REG: usize = 0x6001_D000;
+    #[cfg(feature = "esp32h4")]
+    const SERIAL_JTAG_CONF_REG: usize = 0x6001_D004;
 
     /// A previous wait has timed out. We use this flag to avoid blocking
     /// forever if there is no host attached.
@@ -349,64 +371,11 @@ mod serial_jtag_printer {
     }
 }
 
-#[cfg(all(any(feature = "uart", feature = "auto"), feature = "esp32"))]
-mod uart_printer {
-    use super::LockToken;
-    const UART_TX_ONE_CHAR: usize = 0x4000_9200;
-
-    pub struct Printer;
-    impl Printer {
-        pub fn write_bytes_in_cs(bytes: &[u8], _token: LockToken<'_>) {
-            for &b in bytes {
-                unsafe {
-                    let uart_tx_one_char: unsafe extern "C" fn(u8) -> i32 =
-                        core::mem::transmute(UART_TX_ONE_CHAR);
-                    uart_tx_one_char(b)
-                };
-            }
-        }
-
-        pub fn flush(_token: LockToken<'_>) {}
-    }
-}
-
-#[cfg(all(any(feature = "uart", feature = "auto"), feature = "esp32s2"))]
-mod uart_printer {
-    use super::LockToken;
-    pub struct Printer;
-    impl Printer {
-        pub fn write_bytes_in_cs(bytes: &[u8], _token: LockToken<'_>) {
-            // On ESP32-S2 the UART_TX_ONE_CHAR ROM-function seems to have some issues.
-            for chunk in bytes.chunks(64) {
-                for &b in chunk {
-                    unsafe {
-                        // write FIFO
-                        (0x3f400000 as *mut u32).write_volatile(b as u32);
-                    };
-                }
-
-                // wait for TX_DONE
-                while unsafe { (0x3f400004 as *const u32).read_volatile() } & (1 << 14) == 0 {}
-                unsafe {
-                    // reset TX_DONE
-                    (0x3f400010 as *mut u32).write_volatile(1 << 14);
-                }
-            }
-        }
-
-        pub fn flush(_token: LockToken<'_>) {}
-    }
-}
-
-#[cfg(all(
-    any(feature = "uart", feature = "auto"),
-    not(any(feature = "esp32", feature = "esp32s2"))
-))]
+#[cfg(any(feature = "uart", feature = "auto"))]
 mod uart_printer {
     use super::LockToken;
     trait Functions {
         const TX_ONE_CHAR: usize;
-        const CHUNK_SIZE: usize = 32;
 
         fn tx_byte(b: u8) {
             unsafe {
@@ -416,16 +385,14 @@ mod uart_printer {
             }
         }
 
-        fn flush();
+        fn flush() {}
     }
 
     struct Device;
 
-    // ESP32-P4: resolve through the linker-provided ROM symbol
-    // (`esp_rom_uart_tx_one_char` -> `uart_tx_one_char2 = 0x4fc0_0058`,
-    // see esp-rom-sys/ld/esp32p4/rom/esp32p4.rom.api.ld) instead of
-    // hardcoding the address. Matches the c5/c6/c61/h2 channel-aware path.
-    #[cfg(feature = "esp32p4")]
+    // ESP32-P4: resolve through the linker-provided ROM symbol instead of
+    // hardcoding the address.
+    #[cfg(any(feature = "esp32p4", feature = "esp32s31"))]
     impl Functions for Device {
         // Unused -- tx_byte() below resolves through the linker.
         const TX_ONE_CHAR: usize = 0;
@@ -438,90 +405,57 @@ mod uart_printer {
                 esp_rom_uart_tx_one_char(b);
             }
         }
+    }
 
-        fn flush() {
-            // tx_one_char waits for TX FIFO space
-        }
+    #[cfg(feature = "esp32")]
+    impl Functions for Device {
+        const TX_ONE_CHAR: usize = 0x4000_9200;
+    }
+
+    #[cfg(feature = "esp32s2")]
+    impl Functions for Device {
+        const TX_ONE_CHAR: usize = 0x4001_2B10;
     }
 
     #[cfg(feature = "esp32c2")]
     impl Functions for Device {
         const TX_ONE_CHAR: usize = 0x4000_005C;
-
-        fn flush() {
-            // tx_one_char waits for empty
-        }
     }
 
     #[cfg(feature = "esp32c3")]
     impl Functions for Device {
         const TX_ONE_CHAR: usize = 0x4000_0068;
-
-        fn flush() {
-            unsafe {
-                const TX_FLUSH: usize = 0x4000_0080;
-                const GET_CHANNEL: usize = 0x4000_058C;
-                let tx_flush: unsafe extern "C" fn(u8) = core::mem::transmute(TX_FLUSH);
-                let get_channel: unsafe extern "C" fn() -> u8 = core::mem::transmute(GET_CHANNEL);
-
-                const G_USB_PRINT_ADDR: usize = 0x3FCD_FFD0;
-                let g_usb_print = G_USB_PRINT_ADDR as *mut bool;
-
-                let channel = if *g_usb_print {
-                    // Flush USB-JTAG
-                    3
-                } else {
-                    get_channel()
-                };
-                tx_flush(channel);
-            }
-        }
     }
 
     #[cfg(feature = "esp32s3")]
     impl Functions for Device {
         const TX_ONE_CHAR: usize = 0x4000_0648;
-
-        fn flush() {
-            unsafe {
-                const TX_FLUSH: usize = 0x4000_0690;
-                const GET_CHANNEL: usize = 0x4000_1A58;
-                let tx_flush: unsafe extern "C" fn(u8) = core::mem::transmute(TX_FLUSH);
-                let get_channel: unsafe extern "C" fn() -> u8 = core::mem::transmute(GET_CHANNEL);
-
-                const G_USB_PRINT_ADDR: usize = 0x3FCE_FFB8;
-                let g_usb_print = G_USB_PRINT_ADDR as *mut bool;
-
-                let channel = if *g_usb_print {
-                    // Flush USB-JTAG
-                    4
-                } else {
-                    get_channel()
-                };
-                tx_flush(channel);
-            }
-        }
     }
 
     #[cfg(any(
         feature = "esp32c5",
         feature = "esp32c6",
         feature = "esp32c61",
-        feature = "esp32h2"
+        feature = "esp32h2",
+        feature = "esp32h4"
     ))]
     impl Functions for Device {
         const TX_ONE_CHAR: usize = 0x4000_0058;
 
         fn flush() {
+            const TX_FLUSH: usize = 0x4000_0074;
+
+            const GET_CHANNEL: usize = if cfg!(any(
+                feature = "esp32c5",
+                feature = "esp32c61",
+                feature = "esp32h4"
+            )) {
+                0x4000_0038
+            } else {
+                0x4000_003C
+            };
+
             unsafe {
-                const TX_FLUSH: usize = 0x4000_0074;
-
-                #[cfg(not(any(feature = "esp32c5", feature = "esp32c61")))]
-                const GET_CHANNEL: usize = 0x4000_003C;
-
-                #[cfg(any(feature = "esp32c5", feature = "esp32c61"))]
-                const GET_CHANNEL: usize = 0x4000_0038;
-
                 let tx_flush: unsafe extern "C" fn(u8) = core::mem::transmute(TX_FLUSH);
                 let get_channel: unsafe extern "C" fn() -> u8 = core::mem::transmute(GET_CHANNEL);
 
@@ -533,16 +467,14 @@ mod uart_printer {
     pub struct Printer;
     impl Printer {
         pub fn write_bytes_in_cs(bytes: &[u8], _token: LockToken<'_>) {
-            for chunk in bytes.chunks(Device::CHUNK_SIZE) {
-                for &b in chunk {
-                    Device::tx_byte(b);
-                }
-
-                Device::flush();
+            for &b in bytes {
+                Device::tx_byte(b);
             }
         }
 
-        pub fn flush(_token: LockToken<'_>) {}
+        pub fn flush(_token: LockToken<'_>) {
+            Device::flush();
+        }
     }
 }
 

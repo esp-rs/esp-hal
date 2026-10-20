@@ -1,5 +1,7 @@
 //! Uses DMA to copy psram to internal memory.
 
+//% CHIP_FILTER: dma_can_access_psram && dma_supports_mem2mem
+
 #![no_std]
 #![no_main]
 
@@ -10,7 +12,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{BurstConfig, DmaPeripheral, ExternalBurstConfig, Mem2Mem},
+    dma::{BurstConfig, ExternalBurstConfig, Mem2Mem},
     dma_descriptors_chunk_size,
     main,
     time::Duration,
@@ -56,12 +58,23 @@ fn main() -> ! {
     let intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
-    let mut mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2)
+    let mem2mem = cfg_select! {
+        feature = "esp32s2" => Mem2Mem::new(peripherals.DMA_CRYPTO),
+        feature = "esp32s3" => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+        feature = "esp32p4" => Mem2Mem::new(peripherals.DMA_AXI_CH0),
+        _ => Mem2Mem::new(peripherals.DMA_CH0),
+    };
+
+    let mut mem2mem = mem2mem
         .with_descriptors(
             rx_descriptors,
             tx_descriptors,
             BurstConfig {
-                external_memory: ExternalBurstConfig::Size64,
+                external_memory: cfg_select! {
+                    // ExternalBurstConfig::Size64 is not available on ESP32-S2.
+                    feature = "esp32s2" => ExternalBurstConfig::Size32,
+                    _ => ExternalBurstConfig::Size64,
+                },
                 internal_memory: Default::default(),
             },
         )

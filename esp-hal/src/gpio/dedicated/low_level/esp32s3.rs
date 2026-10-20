@@ -22,5 +22,5 @@ pub(super) fn read_out() -> u32 {
 
 #[inline(always)]
 pub(super) fn write(mask: u32, value: u32) {
-    unsafe { core::arch::asm!("ee.wr_mask_gpio_out {0}, {1}", in(reg) mask, in(reg) value) }
+    unsafe { core::arch::asm!("ee.wr_mask_gpio_out {0}, {1}", in(reg) value, in(reg) mask) }
 }

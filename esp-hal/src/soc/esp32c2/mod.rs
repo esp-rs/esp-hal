@@ -9,15 +9,22 @@ crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
 }
-pub mod gpio;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32c2 as pac;
 
-#[cfg(spi_master_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn spi_master_clock_source_frequency() -> u32 {
-    clocks::apb_clk_frequency()
-}
-
+#[cfg(feature = "rt")]
+pub(crate) fn riscv_preinit() {}
 pub(crate) fn pre_init() {}
+
+/// Invalidate a specific range of addresses in the cache.
+#[cfg(feature = "unstable")]
+#[crate::ram]
+pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_Invalidate_Addr(addr, size);
+    }
+}

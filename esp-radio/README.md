@@ -6,13 +6,9 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-radio?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-A WiFi, BLE and ESP-NOW driver for Espressif microcontrollers.
-
-This package also includes a low-level [IEEE 802.15.4] driver for the ESP32-C6 and ESP32-H2
+A driver for the radio peripherals found in Espressif microcontrollers.
 
 Note that this crate currently requires you to enable the `unstable` feature on `esp-hal`.
-
-[IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 
 ## Current support
 

@@ -2,10 +2,10 @@ use strum::FromRepr;
 
 use crate::{
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
-    soc::regi2c,
+    soc::{clocks::ClockConfig, regi2c},
 };
 
-pub(crate) fn init() {
+pub(crate) fn init(_config: &ClockConfig) {
     let rtc_cntl = LPWR::regs();
 
     regi2c::I2C_DIG_REG_XPD_DIG_REG.write_field(0);
@@ -54,11 +54,20 @@ pub(crate) fn init() {
     regi2c::I2C_ULP_IR_FORCE_XPD_CK.write_field(0);
 }
 
-fn calibrate_ocode() {}
+// Trims the RTC bandgap using eFuse calibration data.
+//
+// See `set_ocode_by_efuse` in
+// <https://github.com/espressif/esp-idf/blob/v6.1/components/esp_hw_support/port/esp32c3/rtc_init.c>
+fn calibrate_ocode() {
+    super::calibrate_ocode(|| {
+        (crate::efuse::block_version().0 == 1)
+            .then(|| crate::efuse::read_field_le::<u8>(crate::efuse::OCODE))
+    });
+}
 
 fn set_rtc_dig_dbias() {}
 
-/// Perform clock control related initialization
+/// Performs clock control related initialization.
 fn clock_control_init() {
     let extmem = EXTMEM::regs();
     let spi_mem_0 = SPI0::regs();
@@ -79,7 +88,7 @@ fn clock_control_init() {
     spi_mem_1.clock_gate().modify(|_, w| w.clk_en().clear_bit());
 }
 
-/// Perform power control related initialization
+/// Performs power control related initialization.
 fn power_control_init() {
     let rtc_cntl = LPWR::regs();
     let system = SYSTEM::regs();
@@ -151,7 +160,7 @@ fn power_control_init() {
     });
 }
 
-/// Configure whether certain peripherals are powered down in deep sleep
+/// Configures whether certain peripherals are powered down in deep sleep.
 fn rtc_sleep_pu() {
     let rtc_cntl = LPWR::regs();
     let apb_ctrl = APB_CTRL::regs();
@@ -183,7 +192,7 @@ fn rtc_sleep_pu() {
 /// SOC Reset Reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ///
     /// In ESP-IDF this value (0x01) can *also* be `ChipBrownOut` or
     /// `ChipSuperWdt`, however that is not really compatible with Rust-style
@@ -205,7 +214,7 @@ pub enum SocResetReason {
     Cpu0Sw        = 0x0C,
     /// RTC watch dog resets CPU 0
     Cpu0RtcWdt    = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,

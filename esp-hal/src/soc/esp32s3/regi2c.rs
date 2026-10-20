@@ -113,6 +113,12 @@ define_regi2c! {
             field: I2C_DIG_REG_XPD_RTC_REG(2..2)
         }
     }
+    master: REGI2C_ULP_CAL(0x61, 1) {
+        reg: I2C_ULP_IR_FORCE(5) {
+            field: I2C_ULP_IR_FORCE_CODE(6..6)
+        }
+        reg: I2C_ULP_EXT_CODE(6) {}
+    }
 }
 
 pub(crate) fn regi2c_read(block: u8, host_id: u8, reg_add: u8) -> u8 {

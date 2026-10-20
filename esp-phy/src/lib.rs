@@ -23,7 +23,7 @@
 mod fmt;
 pub(crate) mod reg_access;
 
-use core::{cell::Cell, marker::PhantomData};
+use core::marker::PhantomData;
 
 use esp_hal::system::Cpu;
 #[cfg(esp32)]
@@ -31,37 +31,32 @@ use esp_hal::time::{Duration, Instant};
 use esp_sync::{NonReentrantMutex, RawMutex};
 
 /// Tracks the number of references to the PHY clock.
-static PHY_CLOCK_REF_COUNTER: embassy_sync::blocking_mutex::Mutex<RawMutex, Cell<u8>> =
-    embassy_sync::blocking_mutex::Mutex::new(Cell::new(0));
+static PHY_CLOCK_REF_COUNTER: NonReentrantMutex<u8> = NonReentrantMutex::new(0);
 
 fn increase_phy_clock_ref_count_internal() {
-    PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
-        let phy_clock_ref_count = phy_clock_ref_counter.get();
+    PHY_CLOCK_REF_COUNTER.with(|refcount| {
+        let count = *refcount;
 
-        if phy_clock_ref_count == 0 {
+        if count == 0 {
             phy_clocks::enable_phy(true);
         }
-        let new_phy_clock_ref_count = unwrap!(
-            phy_clock_ref_count.checked_add(1),
-            "PHY clock ref count overflowed."
-        );
 
-        phy_clock_ref_counter.set(new_phy_clock_ref_count);
+        *refcount = unwrap!(count.checked_add(1), "PHY clock ref count overflowed.");
     })
 }
 
 fn decrease_phy_clock_ref_count_internal() {
-    PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
-        let new_phy_clock_ref_count = unwrap!(
-            phy_clock_ref_counter.get().checked_sub(1),
+    PHY_CLOCK_REF_COUNTER.with(|refcount| {
+        let count = unwrap!(
+            refcount.checked_sub(1),
             "PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used PhyController::decrease_phy_clock_ref_count incorrectly."
         );
 
-        if new_phy_clock_ref_count == 0 {
+        if count == 0 {
             phy_clocks::enable_phy(false);
         }
 
-        phy_clock_ref_counter.set(new_phy_clock_ref_count);
+        *refcount = count;
     })
 }
 
@@ -105,10 +100,14 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32c61::*;
     #[cfg(esp32h2)]
     pub use esp_wifi_sys_esp32h2::*;
+    #[cfg(esp32h4)]
+    pub use esp_wifi_sys_esp32h4::*;
     #[cfg(esp32s2)]
     pub use esp_wifi_sys_esp32s2::*;
     #[cfg(esp32s3)]
     pub use esp_wifi_sys_esp32s3::*;
+    #[cfg(esp32s31)]
+    pub use esp_wifi_sys_esp32s31::*;
 }
 
 mod common_adapter;
@@ -201,18 +200,18 @@ impl PhyState {
         unsafe {
             sys::include::phy_eco_version_sel(esp_hal::efuse::chip_revision().major);
         }
-        // Causes headaches for some reason.
-        // See: https://github.com/esp-rs/esp-hal/issues/4015
-        // #[cfg(phy_combo_module)]
-        // unsafe {
-        // phy_init_param_set(1);
-        // }
+        // For a combo module, PHY enable will not put the
+        // radio into the Wi-Fi RX state by default; the Wi-Fi driver is then responsible for
+        // turning Wi-Fi RX on/off via `set_wifi_rx_enabled` when it enables/disables the PHY.
+        // This mirrors `esp_phy_load_cal_and_init` in ESP-IDF.
+        cfg_select! {
+            phy_combo_module => unsafe {
+                sys::include::phy_init_param_set(1);
+            },
+            _ => {}
+        }
 
-        #[cfg(all(
-            phy_enable_usb,
-            any(soc_has_usb_fs, soc_has_usb_device),
-            not(any(esp32s2, esp32h2))
-        ))]
+        #[cfg(phy_enable_usb)]
         unsafe {
             // FIXME: we should be using from esp-wifi-sys, but the function is missing for C6
             // (CONFIG_ESP_PHY_ENABLE_USB is not defined)
@@ -288,16 +287,18 @@ impl PhyState {
                 self.phy_clock_state_transition_timestamp = now;
                 self.mac_clock_delta_since_last_call += delta;
             }
-            if self.calibrated {
-                unsafe {
-                    sys::include::phy_wakeup_init();
+            phy_clocks::with_calibration_clocks(|| {
+                if self.calibrated {
+                    unsafe {
+                        sys::include::phy_wakeup_init();
+                    }
+                    #[cfg(phy_backed_up_digital_register_count_is_set)]
+                    self.restore_digital_regs();
+                } else {
+                    self.calibrate();
+                    self.calibrated = true;
                 }
-                #[cfg(phy_backed_up_digital_register_count_is_set)]
-                self.restore_digital_regs();
-            } else {
-                self.calibrate();
-                self.calibrated = true;
-            }
+            });
         }
         #[cfg(esp32)]
         if let Some(cb) = self.mac_time_update_cb {
@@ -344,7 +345,8 @@ impl PhyState {
 fn is_reset_from_deepsleep() -> bool {
     // feature gated to avoid forgetting to double check the correct value for future chips
     #[cfg(any(
-        esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32s2, esp32s3
+        esp32, esp32c2, esp32c3, esp32c5, esp32c6, esp32c61, esp32h2, esp32h4, esp32s2, esp32s3,
+        esp32s31
     ))]
     const CORE_DEEP_SLEEP: u32 = 5;
 
@@ -410,6 +412,42 @@ pub fn disable_phy() {
     // Without this, PHY_CLOCK_REF_COUNTER (u8) leaks on every phy_enable/phy_disable
     // cycle from the WiFi blob C-callback interface, overflowing after ~9 TCP connects.
     decrease_phy_clock_ref_count_internal();
+}
+
+/// Enable the PHY for Wi-Fi: enables the PHY ([enable_phy]) and turns Wi-Fi RX on.
+///
+/// Wi-Fi must use this instead of [enable_phy] so that combo modules (which do not power up in the
+/// Wi-Fi RX state) actually receive.
+pub fn enable_phy_with_wifi_rx() {
+    core::mem::forget(enable_phy());
+    set_wifi_rx_enabled(true);
+}
+
+/// Disable the PHY for Wi-Fi: turns Wi-Fi RX off and disables the PHY ([disable_phy]).
+///
+/// Counterpart to [enable_phy_with_wifi_rx]. Mirrors ESP-IDF's `esp_phy_disable_wrapper`.
+pub fn disable_phy_with_wifi_rx() {
+    set_wifi_rx_enabled(false);
+    disable_phy();
+}
+
+/// Set the Wi-Fi RX state of the radio.
+///
+/// On combo modules the PHY does not power up in the Wi-Fi RX state, so Wi-Fi RX has to be enabled
+/// explicitly whenever the PHY is brought up, and disabled again when it is torn down. This
+/// mirrors the `phy_wifi_enable_set` calls ESP-IDF performs in its PHY enable/disable
+/// wrappers.
+///
+/// On non-combo modules this is a no-op.
+fn set_wifi_rx_enabled(enabled: bool) {
+    cfg_select! {
+        phy_combo_module => unsafe {
+            sys::include::phy_wifi_enable_set(enabled as u8);
+        },
+        _ => {
+            let _ = enabled;
+        }
+    }
 }
 
 /// Enable the PHY clock and acquire a [PhyClockGuard].

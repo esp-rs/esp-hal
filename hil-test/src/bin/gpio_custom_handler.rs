@@ -9,7 +9,7 @@
 //! let user-defined raw `GPIO()` handlers re-enable the async API
 //! (regression coverage for esp-rs/esp-hal#2659).
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32p4 esp32s2 esp32s3
+//% CHIP_FILTER: gpio_driver_supported
 //% FEATURES: unstable embassy
 
 #![no_std]
@@ -34,7 +34,7 @@ use esp_hal::{
         Pull,
     },
     handler,
-    interrupt::{InterruptHandler, Priority, bind_handler, software::SoftwareInterruptControl},
+    interrupt::{InterruptHandler, Priority, bind_handler},
     peripherals::Interrupt,
     timer::timg::TimerGroup,
 };
@@ -78,9 +78,9 @@ extern "C" fn gpio_isr() {
             // to clear the GPIO interrupts by hand and we deliberately do
             // *not* wake any async future.
             let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
-            let (gpio1, _) = hil_test::common_test_pins!(peripherals);
-            let mut gpio1 = Flex::new(gpio1);
-            gpio1.unlisten();
+            let (gpio, _) = hil_test::common_test_pins!(peripherals);
+            let mut gpio = Flex::new(gpio);
+            gpio.unlisten();
         }
     }
 }
@@ -160,9 +160,8 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
-        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -178,9 +177,8 @@ mod tests {
         io.set_interrupt_handler(interrupt_handler);
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
-        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -200,13 +198,12 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
-        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let interrupt_executor = mk_static!(
-            InterruptExecutor<1>,
-            InterruptExecutor::new(sw_int.software_interrupt1)
+            InterruptExecutor<2>,
+            InterruptExecutor::new(peripherals.FROM_CPU_INTR2)
         );
         // Run the executor at interrupt priority 1, which is the same as the default
         // interrupt priority of the GPIO interrupt handler.
@@ -233,9 +230,8 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
-        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -260,9 +256,8 @@ mod tests {
         SENSE_PIN_NR.store(gpio1.number(), Ordering::Relaxed);
         HANDLER_MODE.store(HandlerMode::WakeSpecificPin as u8, Ordering::Relaxed);
 
-        let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+        esp_rtos::start(timg0.timer0);
 
         let counter = drive_pins(gpio1, gpio2).await;
 
@@ -271,5 +266,60 @@ mod tests {
             "user-defined GPIO() handler was never invoked"
         );
         assert_eq!(counter, 5);
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    async fn user_handler_runs_once() {
+        use embassy_sync::signal::Signal;
+        use esp_hal::{gpio::Event, system::Stack};
+        use static_cell::ConstStaticCell;
+
+        rebind_user_gpio_handler();
+        HANDLER_MODE.store(HandlerMode::UnlistenOnly as u8, Ordering::Relaxed);
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
+
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_rtos::start(timg0.timer0);
+
+        static IO_SET_UP: ConstStaticCell<Signal<CriticalSectionRawMutex, ()>> =
+            ConstStaticCell::new(Signal::<CriticalSectionRawMutex, ()>::new());
+        let io_set_up = &*IO_SET_UP.take();
+
+        // Run the ISR on the second core.
+        let mut io = Io::new(peripherals.IO_MUX);
+        esp_rtos::start_second_core(
+            peripherals.CPU_CTRL,
+            mk_static!(Stack<4096>, Stack::new()),
+            move || {
+                // Set the interrupt handler for GPIO.
+                io.set_interrupt_handler(InterruptHandler::new(gpio_isr, Priority::Priority1));
+                io_set_up.signal(());
+            },
+        );
+
+        io_set_up.wait().await;
+
+        // is_listening is not implemented on Input
+        let mut test_gpio1 = Flex::new(gpio1);
+        test_gpio1.apply_input_config(&InputConfig::default().with_pull(Pull::Down));
+        test_gpio1.set_input_enable(true);
+        let mut test_gpio2 = Output::new(gpio2, Level::Low, OutputConfig::default());
+
+        // Set up and trigger.
+        test_gpio1.listen(Event::HighLevel);
+        test_gpio2.set_level(Level::High);
+
+        // This loop exits once the interrupt handler has finished on either core and is NOT
+        // running on this one (or we'd be in that handler, not in thread mode code).
+        while test_gpio1.is_listening() {}
+
+        // Wait for a bit in case the interrupt handler runs on the other core as well.
+        Timer::after(Duration::from_millis(50)).await;
+
+        assert_eq!(HANDLER_INVOCATIONS.load(Ordering::Relaxed), 1);
     }
 }

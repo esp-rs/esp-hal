@@ -5,7 +5,6 @@ use core::{ops::Range, sync::atomic::Ordering};
 use portable_atomic::AtomicU32;
 use procmacros::ram;
 
-pub use self::implementation::*;
 use crate::efuse::ChipRevision;
 
 #[cfg_attr(esp32, path = "esp32/mod.rs")]
@@ -15,10 +14,24 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32c6, path = "esp32c6/mod.rs")]
 #[cfg_attr(esp32c61, path = "esp32c61/mod.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2/mod.rs")]
+#[cfg_attr(esp32h4, path = "esp32h4/mod.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4/mod.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2/mod.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3/mod.rs")]
+#[cfg_attr(esp32s31, path = "esp32s31/mod.rs")]
 mod implementation;
+
+#[cfg(soc_has_xtal32k_pads)]
+pub(crate) mod xtal32k;
+
+cfg_select! {
+    all(feature = "unstable", ulp_riscv_driver_supported) => {
+        pub use self::implementation::*;
+    }
+    _ => {
+        pub(crate) use self::implementation::*;
+    }
+}
 
 #[allow(unused)]
 pub(crate) fn is_valid_ram_address(address: usize) -> bool {
@@ -44,15 +57,10 @@ pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
 
 #[allow(unused)]
 pub(crate) fn is_valid_memory_address(address: usize) -> bool {
-    if is_valid_ram_address(address) {
-        return true;
+    cfg_select! {
+        soc_has_psram => is_valid_ram_address(address) || is_valid_psram_address(address),
+        _ => is_valid_ram_address(address),
     }
-    #[cfg(soc_has_psram)]
-    if is_valid_psram_address(address) {
-        return true;
-    }
-
-    false
 }
 
 fn slice_in_range<T>(slice: &[T], range: Range<usize>) -> bool {
@@ -89,9 +97,8 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
 mod xtensa {
     use core::arch::{global_asm, naked_asm};
 
-    /// The ESP32 has a first stage bootloader that handles loading program data
-    /// into the right place therefore we skip loading it again. This function
-    /// is called by xtensa-lx-rt in Reset.
+    /// The ESP32 has a first stage bootloader that handles loading program data into the right
+    /// place, so loading is skipped here. Called by xtensa-lx-rt in Reset.
     #[unsafe(export_name = "__init_data")]
     extern "C" fn __init_data() -> bool {
         false
@@ -105,6 +112,8 @@ mod xtensa {
     }
 
     unsafe extern "C" {
+        static _dram2_uninit_bss_start: u32;
+        static _dram2_uninit_bss_end: u32;
         static _rtc_fast_bss_start: u32;
         static _rtc_fast_bss_end: u32;
         static _rtc_fast_persistent_end: u32;
@@ -125,6 +134,9 @@ mod xtensa {
         .literal sym_init_persistent, {__init_persistent}
         .literal sym_xtensa_lx_rt_zero_fill, {_xtensa_lx_rt_zero_fill}
 
+        .literal sym_dram2_uninit_bss_start, {_dram2_uninit_bss_start}
+        .literal sym_dram2_uninit_bss_end, {_dram2_uninit_bss_end}
+
         .literal sym_rtc_fast_bss_start, {_rtc_fast_bss_start}
         .literal sym_rtc_fast_bss_end, {_rtc_fast_bss_end}
         .literal sym_rtc_fast_persistent_end, {_rtc_fast_persistent_end}
@@ -137,6 +149,9 @@ mod xtensa {
         ",
         __init_persistent = sym __init_persistent,
         _xtensa_lx_rt_zero_fill = sym _xtensa_lx_rt_zero_fill,
+
+        _dram2_uninit_bss_end = sym _dram2_uninit_bss_end,
+        _dram2_uninit_bss_start = sym _dram2_uninit_bss_start,
 
         _rtc_fast_bss_end = sym _rtc_fast_bss_end,
         _rtc_fast_bss_start = sym _rtc_fast_bss_start,
@@ -158,6 +173,10 @@ mod xtensa {
             entry  a1, 0x10                            // 4 words for callx4 spill area
 
             l32r   a2, sym_xtensa_lx_rt_zero_fill      // Pre-load address of zero-fill function
+
+            l32r   a6, sym_dram2_uninit_bss_start      // Set input range to .dram2_uninit.bss
+            l32r   a7, sym_dram2_uninit_bss_end        //
+            callx4 a2                                  // Zero-fill
 
             l32r   a6, sym_rtc_fast_bss_start          // Set input range to .rtc_fast.bss
             l32r   a7, sym_rtc_fast_bss_end            //
@@ -185,13 +204,18 @@ mod xtensa {
         )
     }
 
-    #[cfg(esp32s3)]
-    global_asm!(".section .rwtext,\"ax\",@progbits");
+    // The section switch must stay in the same block as the literals: rustc does not emit
+    // separate `global_asm!` items in source order.
     global_asm!(
+        cfg_select! {
+            esp32s3 => ".pushsection .rwtext,\"ax\",@progbits",
+            _ => ".pushsection .text,\"ax\",@progbits",
+        },
         "
         .literal sym_stack_chk_guard, {__stack_chk_guard}
         .literal stack_guard_value, {stack_guard_value}
         .literal sym_esp32_init, {__esp32_init}
+        .popsection
         ",
         __stack_chk_guard = sym __stack_chk_guard,
         stack_guard_value = const esp_config::esp_config_int!(
@@ -256,19 +280,20 @@ fn setup_stack_guard() {
     }
 }
 
-#[cfg(feature = "rt")]
+#[cfg(all(init_stack_ptr_range_check, feature = "rt"))]
 pub(crate) fn ensure_stack_pointer_in_range() {
     unsafe extern "C" {
         static _stack_end_cpu0: u32;
         static _stack_start_cpu0: u32;
     }
     let current_sp: usize;
-    cfg_if::cfg_if! {
-        if #[cfg(xtensa)] {
-            unsafe { core::arch::asm!("mov {0}, sp", out(reg) current_sp); }
-        } else {
-            unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
-        }
+    cfg_select! {
+        xtensa => unsafe {
+            core::arch::asm!("mov {0}, sp", out(reg) current_sp);
+        },
+        _ => unsafe {
+            core::arch::asm!("mv {0}, sp", out(reg) current_sp);
+        },
     }
     let stack_bottom = (&raw const _stack_end_cpu0) as usize;
     let stack_top = (&raw const _stack_start_cpu0) as usize;
@@ -332,6 +357,213 @@ pub(crate) fn setup_trap_section_protection() {
     }
 }
 
+#[cfg(all(feature = "rt", enable_pmp, riscv))]
+pub(crate) fn enable_pmp() {
+    use core::arch::asm;
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum PmpError {
+        NoFreeEntries,
+        InvalidRange,
+    }
+
+    unsafe fn pmp_add_tor_region(
+        start_addr: u32,
+        end_addr: u32,
+        permission: u8,
+    ) -> Result<(), PmpError> {
+        // The CPU hardwires the address bits below the PMP granularity to zero, rounding both ends
+        // of the region down. Round the start up instead, so that the region cannot grow downwards
+        // over memory in front of it, such as the trap section and its interrupt handler table.
+        let granularity = property!("soc.cpu_pmp_granularity");
+        let start_addr = start_addr.next_multiple_of(granularity);
+        let end_addr = end_addr & !(granularity - 1);
+
+        if start_addr >= end_addr {
+            return Err(PmpError::InvalidRange);
+        }
+
+        const MAX_PMP_ENTRIES: usize = 16;
+        let mut free_idx = None;
+
+        // 1. Find two consecutive unpopulated PMP entries
+        for i in 1..MAX_PMP_ENTRIES {
+            unsafe {
+                if is_pmp_entry_free(i - 1) && is_pmp_entry_free(i) {
+                    free_idx = Some(i);
+                    break;
+                }
+            }
+        }
+
+        let idx = free_idx.ok_or(PmpError::NoFreeEntries)?;
+        let start_idx = idx - 1;
+        let end_idx = idx;
+
+        // 2. Write the addresses to pmpaddr registers
+        // For TOR: pmpaddr[idx-1] = start_bits, pmpaddr[idx] = end_bits
+        // PMP addresses shift physical addresses down by 2 bits (34-bit physical address support)
+        let pmpaddr_start = start_addr >> 2;
+        let pmpaddr_end = end_addr >> 2;
+
+        unsafe {
+            write_pmpaddr(start_idx, pmpaddr_start);
+            write_pmpaddr(end_idx, pmpaddr_end);
+        }
+
+        // 3. Configure the PMP settings
+        unsafe {
+            modify_pmp_config(start_idx, /* 0b00 | */ 1 << 7); // Off, no permissions, locked
+            modify_pmp_config(end_idx, 0b01 << 3 | 1 << 7 | permission); // TOR, locked
+        }
+
+        // 4. Flush instruction cache / pipeline to ensure PMP takes effect immediately
+        unsafe {
+            asm!("fence", "fence.i", options(nostack));
+        }
+
+        Ok(())
+    }
+
+    /// Returns whether a PMP entry is unlocked and disabled (address matching OFF).
+    unsafe fn is_pmp_entry_free(idx: usize) -> bool {
+        let cfg_reg = idx / 4;
+        let byte_offset = idx % 4;
+
+        let cfg_val = unsafe { read_pmpcfg(cfg_reg) };
+        let entry_cfg = (cfg_val >> (byte_offset * 8)) & 0xFF;
+
+        // Unlocked and no permissions or address-matching mode configured.
+        (entry_cfg & 0x9F) == 0
+    }
+
+    /// Helper to read pmpcfgX registers dynamically
+    unsafe fn read_pmpcfg(reg: usize) -> u32 {
+        let mut val: u32;
+        unsafe {
+            match reg {
+                0 => asm!("csrr {}, pmpcfg0", out(reg) val),
+                1 => asm!("csrr {}, pmpcfg1", out(reg) val),
+                2 => asm!("csrr {}, pmpcfg2", out(reg) val),
+                3 => asm!("csrr {}, pmpcfg3", out(reg) val),
+                _ => panic!("Invalid PMP config register"),
+            }
+        }
+        val
+    }
+
+    /// Helper to write to a dynamically chosen pmpcfgX register byte slot
+    unsafe fn modify_pmp_config(idx: usize, byte_cfg: u8) {
+        let reg = idx / 4;
+        let byte_offset = idx % 4;
+        let bit_shift = byte_offset * 8;
+
+        let mut current_val = unsafe { read_pmpcfg(reg) };
+        // Clear old configuration byte
+        current_val &= !(0xFF << bit_shift);
+        // Set new configuration byte
+        current_val |= (byte_cfg as u32) << bit_shift;
+
+        unsafe {
+            match reg {
+                0 => asm!("csrw pmpcfg0, {}", in(reg) current_val),
+                1 => asm!("csrw pmpcfg1, {}", in(reg) current_val),
+                2 => asm!("csrw pmpcfg2, {}", in(reg) current_val),
+                3 => asm!("csrw pmpcfg3, {}", in(reg) current_val),
+                _ => panic!("Invalid PMP config register"),
+            }
+        }
+    }
+
+    /// Helper to write to a pmpaddrX register
+    unsafe fn write_pmpaddr(idx: usize, val: u32) {
+        unsafe {
+            match idx {
+                0 => asm!("csrw pmpaddr0, {}", in(reg) val),
+                1 => asm!("csrw pmpaddr1, {}", in(reg) val),
+                2 => asm!("csrw pmpaddr2, {}", in(reg) val),
+                3 => asm!("csrw pmpaddr3, {}", in(reg) val),
+                4 => asm!("csrw pmpaddr4, {}", in(reg) val),
+                5 => asm!("csrw pmpaddr5, {}", in(reg) val),
+                6 => asm!("csrw pmpaddr6, {}", in(reg) val),
+                7 => asm!("csrw pmpaddr7, {}", in(reg) val),
+                8 => asm!("csrw pmpaddr8, {}", in(reg) val),
+                9 => asm!("csrw pmpaddr9, {}", in(reg) val),
+                10 => asm!("csrw pmpaddr10, {}", in(reg) val),
+                11 => asm!("csrw pmpaddr11, {}", in(reg) val),
+                12 => asm!("csrw pmpaddr12, {}", in(reg) val),
+                13 => asm!("csrw pmpaddr13, {}", in(reg) val),
+                14 => asm!("csrw pmpaddr14, {}", in(reg) val),
+                15 => asm!("csrw pmpaddr15, {}", in(reg) val),
+                _ => panic!("Invalid PMP address register index"),
+            }
+        }
+    }
+
+    // protect .rwtext
+    unsafe {
+        unsafe extern "C" {
+            static _rwtext_start: u32;
+            static _rwtext_end: u32;
+        }
+
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
+        if pmp_add_tor_region(
+            &_rwtext_start as *const _ as u32,
+            &_rwtext_end as *const _ as u32,
+            0b101, // X-R
+        )
+        .is_ok()
+        {
+            debug!("PMP write protection enabled for .rwtext");
+        } else {
+            debug!("Unable to enable PMP for .rwtext");
+        }
+    }
+
+    // protect .stack
+    unsafe {
+        unsafe extern "C" {
+            static _stack_end_cpu0: u32;
+            static _stack_start_cpu0: u32;
+        }
+
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
+        if pmp_add_tor_region(
+            &_stack_end_cpu0 as *const _ as u32,
+            &_stack_start_cpu0 as *const _ as u32,
+            0b011, // -WR
+        )
+        .is_ok()
+        {
+            debug!("PMP execute protection enabled for .stack");
+        } else {
+            debug!("Unable to enable PMP for .stack");
+        }
+    }
+
+    // protect data
+    unsafe {
+        unsafe extern "C" {
+            static _data_start: u32;
+            static _noinit_end: u32;
+        }
+
+        #[allow(clippy::if_same_then_else, reason = "False positive")]
+        if pmp_add_tor_region(
+            &_data_start as *const _ as u32,
+            &_noinit_end as *const _ as u32,
+            0b011, // -WR
+        )
+        .is_ok()
+        {
+            debug!("PMP execute protection enabled for data");
+        } else {
+            debug!("Unable to enable PMP for data");
+        }
+    }
+}
+
 static CHIP_REVISION: AtomicU32 = AtomicU32::new(0);
 const LOADED: u32 = 1 << 31;
 const MAX_REVISION: ChipRevision = ChipRevision::from_packed(0xFFFF);
@@ -381,13 +613,13 @@ fn chip_revision_in_range(range: Range<ChipRevision>) -> bool {
     range.start <= chip_revision && chip_revision < range.end
 }
 
-/// Returns true if the chip revision is at least the given revision.
+/// Returns whether the chip revision is at least the given revision.
 #[allow(dead_code)]
 pub(crate) fn chip_revision_above(revision: ChipRevision) -> bool {
     chip_revision_in_range(revision..MAX_REVISION)
 }
 
-/// Returns true if the chip is at least the given revision, in the same major version.
+/// Returns whether the chip is at least the given revision, in the same major version.
 #[allow(dead_code)]
 pub(crate) fn chip_minor_revision_above(revision: ChipRevision) -> bool {
     let next_major = ChipRevision {

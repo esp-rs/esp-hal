@@ -13,6 +13,7 @@ This guide outlines the contribution workflow, from reporting issues and submitt
     *   [Testing Your Contributions]
     *   [Commit Your Updates]
 *   [Pull Request: From Submission to Merge]
+*   [Merge Freezes]
 *   [Your PR is merged!]
 
 [New Contributor Guide]: #new-contributor-guide
@@ -22,6 +23,7 @@ This guide outlines the contribution workflow, from reporting issues and submitt
 [Testing Your Contributions]: #testing-your-contributions
 [Commit your updates]: #commit-your-updates
 [Pull Request: From Submission to Merge]: #pull-request-from-submission-to-merge
+[Merge Freezes]: #merge-freezes
 [Your PR is merged!]: #your-pr-is-merged
 
 ## New Contributor Guide
@@ -50,8 +52,15 @@ Before adding or changing code, review the [esp-rs developer guidelines].
 
 Encountered a problem or have an idea? First, [check existing issues] to avoid duplicates. If your concern is new, use our [issue form] to submit it.
 
+Include only the information someone needs to reproduce the problem, or at least to explore it, and
+leave out everything else. [REPRODUCERS.md] describes a good minimal reproducer.
+
+If an AI tool helps you write the issue, also follow [AI-Assisted Contributions].
+
 [check existing issues]: https://github.com/esp-rs/esp-hal/issues
 [issue form]: https://github.com/esp-rs/esp-hal/issues/new/
+[REPRODUCERS.md]: ./REPRODUCERS.md
+[AI-Assisted Contributions]: ./PULL-REQUESTS.md#ai-assisted-contributions
 
 #### Working on an Issue
 
@@ -85,9 +94,10 @@ Ensuring the quality and reliability of `esp-hal` is a shared responsibility, an
 
 Further steps that can (or should) be taken in testing:
 
-* Using [xtask], build examples for the specified chip.
-* When documentation or doctests change, run `cargo xtask build documentation` and `cargo xtask run doc-tests <CHIP>` to build the documentation and run the doctests. To reduce build/test time, use `--packages` to specify the package(s) and `--chips` (for documentation builds) to specify the target chip(s).
+* Using [xtask], build examples for the specified chip (`cargo xtask build <name> <chip>`, or `cargo xtask build examples all <chip>`).
+* When documentation or doctests change, run `cargo xtask documentation` and `cargo xtask doc-tests <CHIP>` to build the documentation and run the doctests. To reduce build/test time, use `--packages` to specify the package(s) and pass chip names to `documentation`.
 * Run the [HIL] tests locally if changes have been made to them.
+* Run host-side unit tests with `cargo xtask host-tests` (or `cargo xtask host-tests <package>`). When adding `#[test]` functions to a package for the first time, also add a match arm for that package in `run_host_tests` in `xtask/src/lib.rs` — see [xtask/README.md#host-tests].
 
 For detailed instructions on how to use our HIL tests with comment commands, see the [HIL guide].
 
@@ -106,24 +116,23 @@ We _strongly_ recommend that you format your code before committing to ensure co
 To format all packages in the workspace, run the following command in a terminal from the root of the repository:
 
 ```shell
-cargo xtask fmt-packages
+cargo xtask fmt
 ```
 
-We also recommend using the `lint-packages` subcommand, which uses `cargo clippy` and will lint the entire driver in order to catch common mistakes in the code.
+We also recommend using the `lint` subcommand, which uses `cargo clippy` and will lint the entire driver in order to catch common mistakes in the code.
 
 ```shell
-cargo xtask lint-packages
+cargo xtask lint
 ```
 
 This will use `rustfmt` to ensure that all source code is formatted correctly prior to committing.
 
 ## Pull Request: From Submission to Merge
 
+*   Before you open the PR, read [PULL-REQUESTS.md]. It lists what reviewers expect, how to write the description, the changelog and migration guide format, and the rules for AI-assisted contributions.
 *   Fill the pull request template so that we can review your PR. This template helps reviewers understand your changes as well as the purpose of your pull request.
 *   [Link your PR] to any relevant issues it addresses.
 *   [Allow edits from maintainers] so the branch can be updated for a merge. Once you submit your PR, a Docs team member will review your proposal. We may ask questions or request additional information.
-*   If your change is user-visible, consider adding a brief changelog entry and/or migration guide note in the PR description using the structured sections provided by the template (see below). This is optional — if you skip it, a maintainer will either add the entries or apply the `skip-changelog` label on your behalf. Do **not** edit `CHANGELOG.md` files directly — those are updated automatically at release time.
-*   If your change requires user code to be updated, add a `# Migration guide` section. Each breaking change needs a `## crate/area` heading and a `### Title` for the specific change, followed by the migration steps.
 *   We may ask for changes to be made before a PR can be merged, either using [suggested changes] or pull request comments. You can apply suggested changes directly through the UI. You can make any other changes in your fork, then commit them to your branch.
 *   As you update your PR and apply changes, mark each conversation as [resolved].
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
@@ -133,109 +142,20 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 [suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request
 [resolved]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/commenting-on-a-pull-request#resolving-conversations
 [this git tutorial]: https://github.com/skills/resolve-merge-conflicts
+[PULL-REQUESTS.md]: ./PULL-REQUESTS.md
 
+## Merge Freezes
 
-## Changelog and Migration Guide Entries
+Around a release we stop merging into `main`, so that what gets published is
+tested in isolation from new changes.
 
-Changelog entries are **optional for contributors**. If you don't add them a
-maintainer will either write them or apply the `skip-changelog` label before the
-PR is merged.
+A "freeze" is an open issue labelled `merge-freeze`, pinned so that everyone can
+see it. Anyone with write access starts a freeze by opening or reopening that
+issue and lifts it by closing it. Review and CI carry on as usual, only the
+merge queue rejects pull requests targeting `main` while it is open.
 
-If you do want to document your change, add entries directly in the PR description
-using the structured sections in the template. Do **not** edit `CHANGELOG.md` —
-those files are updated automatically at release time from the PR descriptions.
-
-### Format
-
-Use `# Changelog` and `# Migration guide` as top-level headings (H1). Under each
-heading, group entries using H2 headings. Changelog H2 headings may use just the
-crate name (e.g. `## esp-hal`), while migration guide H2 headings _must_ include
-an area (e.g. `## esp-hal/SPI driver`).
-
-```markdown
-# Changelog
-
-## esp-hal
-
-- Added: Support for the Foo peripheral.
-- Fixed: A bug in the Bar driver that caused incorrect output.
-
-## esp-hal/SPI driver
-
-- Changed: `SpiDevice::transfer` now accepts a mutable slice.
-
-# Migration guide
-
-## esp-hal/SPI driver
-
-### `SpiDevice::transfer` signature changed
-
-`SpiDevice::transfer` now takes `&mut [u8]` instead of `(&[u8], &mut [u8])`.
-Update your call sites accordingly.
-```
-
-### Entry kinds
-
-Each item in the `# Changelog` section must begin with one of:
-
-| Kind      | When to use                                        |
-| --------- | -------------------------------------------------- |
-| `Added`   | New public API, feature, or peripheral support     |
-| `Changed` | Behaviour or API change (non-breaking preferred)   |
-| `Fixed`   | Bug fixes                                          |
-| `Removed` | Removed API or feature                             |
-
-### Skipping the changelog for a specific crate
-
-If your PR touches a published crate but the change genuinely needs no
-user-visible entry (e.g. a documentation fix, an internal refactor, or a
-build-system tweak), you can exempt that crate by writing the special marker
-as the **sole** item in its `# Changelog` section:
-
-```markdown
-# Changelog
-
-## esp-metadata
-
-- No changelog necessary.
-```
-
-This tells CI that the omission is intentional.  The marker must be the only
-item in the section — combining it with real entries is an error.
-
-When the whole PR needs no changelog at all, a maintainer can apply the
-`skip-changelog` label instead.
-
-### Manually editing `CHANGELOG.md`
-
-In rare cases — such as backports, hotfixes, or curated release notes that
-cannot be expressed through the structured PR description format — a maintainer
-can apply the `manual-changelog` label to a PR.  This label:
-
-- Allows direct edits to `CHANGELOG.md` files (the automated "no direct
-  CHANGELOG.md edits" check is skipped).
-- Skips the per-package coverage check (the PR is not required to have
-  structured entries in the description).
-- Still validates any PR description entries that *are* present, as a
-  safety net against formatting accidents.
-
-Do **not** use `manual-changelog` for routine changes — the structured PR
-description format exists precisely to keep changelog maintenance consistent
-and automatable.
-
-### Validation
-
-You can validate your PR description locally before pushing:
-
-```shell
-# Pipe the body directly:
-echo "# Changelog\n\n## esp-hal\n\n- Added: Something." | cargo xtask check-pr-changelog
-
-# Or validate an open PR by number (requires the `gh` CLI):
-cargo xtask check-pr-changelog --pr 1234
-```
-
-CI will also validate the format automatically on every PR.
+To land a release blocker anyway, label the pull request with
+`merge-freeze-exempt`. Such merge gets recorded on the freeze issue.
 
 ## Your PR is Merged!
 

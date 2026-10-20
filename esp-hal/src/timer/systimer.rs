@@ -95,13 +95,14 @@ pub struct SystemTimer<'d> {
 }
 
 impl<'d> SystemTimer<'d> {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
+    cfg_select! {
+        esp32s2 => {
             /// Bitmask to be applied to the raw register value.
             pub const BIT_MASK: u64 = u64::MAX;
             // Bitmask to be applied to the raw period register value.
             const PERIOD_MASK: u64 = 0x1FFF_FFFF;
-        } else {
+        }
+        _ => {
             /// Bitmask to be applied to the raw register value.
             pub const BIT_MASK: u64 = 0xF_FFFF_FFFF_FFFF;
             // Bitmask to be applied to the raw period register value.
@@ -166,7 +167,7 @@ impl<'d> SystemTimer<'d> {
     }
 
     #[inline]
-    fn us_to_ticks(us: u64) -> u64 {
+    pub(crate) fn us_to_ticks(us: u64) -> u64 {
         // Safety: we only ever write ESP_HAL_SYSTIMER_CORRECTION in `init_timestamp_scaler`, which
         // is called once and only once during startup.
         let correction = unsafe { ESP_HAL_SYSTIMER_CORRECTION };
@@ -195,25 +196,22 @@ impl<'d> SystemTimer<'d> {
     pub fn ticks_per_second() -> u64 {
         // FIXME: this requires a critical section. We can probably do better, if we can formulate
         // invariants well.
-        cfg_if::cfg_if! {
-            if #[cfg(esp32c5)] {
+        cfg_select! {
+            esp32c5 => {
                 // Assuming SYSTIMER runs from XTAL, the hardware always runs at 16 MHz.
                 16_000_000
-            } else {
-                cfg_if::cfg_if! {
-                    if #[cfg(esp32s2)] {
-                        crate::soc::clocks::apb_clk_frequency() as u64
-                    } else if #[cfg(esp32h2)] {
-                        (crate::soc::clocks::xtal_clk_frequency() / 2) as u64
-                    } else {
-                        (crate::soc::clocks::xtal_clk_frequency() * 10 / 25) as u64
-                    }
+            }
+            _ => {
+                cfg_select! {
+                    esp32s2 => crate::soc::clocks::apb_clk_frequency() as u64,
+                    any(esp32h2, esp32h4) => (crate::soc::clocks::xtal_clk_frequency() / 2) as u64,
+                    _ => (crate::soc::clocks::xtal_clk_frequency() * 10 / 25) as u64,
                 }
             }
         }
     }
 
-    /// Create a new instance.
+    /// Creates a new instance.
     pub fn new(_systimer: SYSTIMER<'d>) -> Self {
         // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         if PeripheralClockControl::enable(PeripheralEnable::Systimer) {
@@ -234,7 +232,7 @@ impl<'d> SystemTimer<'d> {
         }
     }
 
-    /// Get the current count of the given unit in the System Timer.
+    /// Returns the current count of the given unit in the System Timer.
     #[inline]
     pub fn unit_value(unit: Unit) -> u64 {
         // This should be safe to access from multiple contexts
@@ -251,13 +249,13 @@ impl<'d> SystemTimer<'d> {
     ///
     /// # Safety
     ///
-    /// - Disabling a `Unit` whilst [`Alarm`]s are using it will affect the [`Alarm`]s operation.
+    /// - Disabling a `Unit` while [`Alarm`]s are using it will affect the [`Alarm`]s operation
     /// - Disabling Unit0 will affect [`Instant::now`].
     pub unsafe fn configure_unit(unit: Unit, config: UnitConfig) {
         unit.configure(config)
     }
 
-    /// Set the value of the counter immediately. If the unit is at work,
+    /// Sets the value of the counter immediately. If the unit is at work,
     /// the counter will continue to count up from the new reloaded value.
     ///
     /// This can be used to load back the sleep time recorded by RTC timer
@@ -265,7 +263,7 @@ impl<'d> SystemTimer<'d> {
     ///
     /// # Safety
     ///
-    /// - Modifying a unit's count whilst [`Alarm`]s are using it may cause unexpected behaviour
+    /// - Modifying a unit's count while [`Alarm`]s are using it may cause unexpected behavior
     /// - Any modification of the unit0 count will affect [`Instant::now`]
     pub unsafe fn set_unit_value(unit: Unit, value: u64) {
         unit.set_count(value)
@@ -333,28 +331,26 @@ impl Unit {
 
     fn set_count(&self, value: u64) {
         let systimer = SYSTIMER::regs();
-        #[cfg(not(esp32s2))]
-        {
-            let unitload = systimer.unitload(self.channel() as _);
-            let unit_load = systimer.unit_load(self.channel() as _);
 
-            unitload.hi().write(|w| w.load_hi().set((value << 32) as _));
-            unitload
-                .lo()
-                .write(|w| w.load_lo().set((value & 0xFFFF_FFFF) as _));
+        let value_lo = (value & 0xFFFF_FFFF) as _;
+        let value_hi = (value >> 32) as _;
 
-            unit_load.write(|w| w.load().set_bit());
-        }
-        #[cfg(esp32s2)]
-        {
-            systimer
-                .load_hi()
-                .write(|w| w.load_hi().set((value << 32) as _));
-            systimer
-                .load_lo()
-                .write(|w| w.load_lo().set((value & 0xFFFF_FFFF) as _));
+        cfg_select! {
+            esp32s2 => {
+                systimer.load_hi().write(|w| w.load_hi().set(value_hi));
+                systimer.load_lo().write(|w| w.load_lo().set(value_lo));
 
-            systimer.load().write(|w| w.load().set_bit());
+                systimer.load().write(|w| w.load().set_bit());
+            }
+            _ => {
+                let unitload = systimer.unitload(self.channel() as _);
+                let unit_load = systimer.unit_load(self.channel() as _);
+
+                unitload.hi().write(|w| w.load_hi().set(value_hi));
+                unitload.lo().write(|w| w.load_lo().set(value_lo));
+
+                unit_load.write(|w| w.load().set_bit());
+            }
         }
     }
 
@@ -395,7 +391,7 @@ enum Comparator {
     Comparator2,
 }
 
-/// An alarm unit
+/// An alarm unit.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Alarm<'d> {
@@ -417,7 +413,7 @@ impl Alarm<'_> {
     ///
     /// # Safety
     ///
-    /// You must ensure that you're only using one instance of this type at a
+    /// The caller must ensure that only one instance of this type is used at a
     /// time.
     pub unsafe fn clone_unchecked(&self) -> Self {
         Self {
@@ -429,8 +425,8 @@ impl Alarm<'_> {
 
     /// Creates a new peripheral reference with a shorter lifetime.
     ///
-    /// Use this method if you would like to keep working with the peripheral
-    /// after you dropped the driver that consumes this.
+    /// Use this method to keep working with the peripheral after dropping the
+    /// driver that consumes this.
     ///
     /// See [Peripheral singleton] section for more information.
     ///
@@ -445,8 +441,8 @@ impl Alarm<'_> {
         self.comp as u8
     }
 
-    /// Enables/disables the comparator. If enabled, this means
-    /// it will generate interrupt based on its configuration.
+    /// Enables or disables the comparator. If enabled, this means
+    /// it generates interrupts based on its configuration.
     fn set_enable(&self, enable: bool) {
         CONF_LOCK.lock(|| {
             #[cfg(not(esp32s2))]
@@ -466,7 +462,7 @@ impl Alarm<'_> {
             .modify(|_r, w| w.work_en().bit(enable));
     }
 
-    /// Returns true if the comparator has been enabled. This means
+    /// Returns whether the comparator has been enabled. This means
     /// it will generate interrupt based on its configuration.
     fn is_enabled(&self) -> bool {
         #[cfg(not(esp32s2))]
@@ -493,7 +489,7 @@ impl Alarm<'_> {
             .modify(|_, w| w.timer_unit_sel().bit(matches!(unit, Unit::Unit1)));
     }
 
-    /// Set the mode of the comparator to be either target or periodic.
+    /// Sets the mode of the comparator to be either target or periodic.
     fn set_mode(&self, mode: ComparatorMode) {
         let is_period_mode = match mode {
             ComparatorMode::Period => true,
@@ -504,7 +500,7 @@ impl Alarm<'_> {
             .modify(|_, w| w.period_mode().bit(is_period_mode));
     }
 
-    /// Get the current mode of the comparator, which is either target or
+    /// Returns the current mode of the comparator, which is either target or
     /// periodic.
     fn mode(&self) -> ComparatorMode {
         if SYSTIMER::regs()
@@ -519,7 +515,7 @@ impl Alarm<'_> {
         }
     }
 
-    /// Set how often the comparator should generate an interrupt when in
+    /// Sets how often the comparator should generate an interrupt when in
     /// periodic mode.
     fn set_period(&self, value: u32) {
         let systimer = SYSTIMER::regs();
@@ -532,7 +528,7 @@ impl Alarm<'_> {
         }
     }
 
-    /// Set when the comparator should generate an interrupt in target mode.
+    /// Sets when the comparator should generate an interrupt in target mode.
     fn set_target(&self, value: u64) {
         let systimer = SYSTIMER::regs();
         let target = systimer.trgt(self.channel() as usize);
@@ -547,7 +543,7 @@ impl Alarm<'_> {
         }
     }
 
-    /// Set the interrupt handler for this comparator.
+    /// Sets the interrupt handler for this comparator.
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
         let interrupt = match self.channel() {
             0 => Interrupt::SYSTIMER_TARGET0,
@@ -849,13 +845,13 @@ pub mod etm {
 
     use super::*;
 
-    /// An ETM controlled SYSTIMER event
+    /// An ETM controlled SYSTIMER event.
     pub struct Event {
         id: u8,
     }
 
     impl Event {
-        /// Creates an ETM event from the given [Alarm]
+        /// Creates an ETM event from the given [Alarm].
         pub fn new(alarm: &Alarm<'_>) -> Self {
             Self {
                 id: 50 + alarm.channel(),

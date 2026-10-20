@@ -1,0 +1,34 @@
+# Records on the freeze issue what was merged during a freeze.
+#
+# The gate itself cannot do this, it runs before the rest of CI, so a later
+# failure would leave "merged" on the freeze issue for something that never was.
+
+name: Merge freeze audit
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  record:
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'merge-freeze-exempt')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { recordExemptMerge } = require('./.github/scripts/merge-freeze.js');
+            await recordExemptMerge({ github, context, core });

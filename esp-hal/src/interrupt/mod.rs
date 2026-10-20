@@ -1,4 +1,3 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Interrupt support
 //!
 //! This module contains code to configure and handle peripheral interrupts.
@@ -18,55 +17,79 @@
 //! ## Usage
 //!
 //! Peripheral drivers manage interrupts for you. Where appropriate, a `set_interrupt_handler`
-//! function is provided, which allows you to register a function to handle interrupts at a priority
-//! level of your choosing. Interrupt handler functions need to be marked by the [`#[handler]`]
+//! function is provided to register a function that handles interrupts at a chosen priority
+//! level. Interrupt handler functions need to be marked by the [`#[handler]`][crate::handler]
 //! attribute. These drivers also provide `listen` and `unlisten` functions that control whether an
 //! interrupt will be generated for the matching event or not. For more information and examples,
 //! consult the documentation of the specific peripheral drivers.
 //!
 //! If you are writing your own peripheral driver, you will need to first register interrupt
-//! handlers using the [peripheral singletons'] `bind_X_interrupt` functions. You can use the
-//! matching `enable` and `disable` functions to control the peripheral interrupt in the interrupt
-//! matrix, or you can, depending on the peripheral, set or clear the appropriate enable bits in the
-//! `int_ena` register.
+//! handlers using the [peripheral singletons'][crate::peripherals::I2C0] `bind_X_interrupt`
+//! functions. You can use the matching `enable` and `disable` functions to control the peripheral
+//! interrupt in the interrupt matrix, or you can, depending on the peripheral, set or clear the
+//! appropriate enable bits in the `int_ena` register.
 //!
-//! [`#[handler]`]: crate::handler
-//! [peripheral singletons']: crate::peripherals::I2C0
-//!
-//! ## Software interrupts
+//! ## Software Interrupts
 //!
 //! The [`software`] module implements software interrupts using peripheral interrupt signals.
 #![cfg_attr(
     multi_core,
-    doc = "This mechanism can be used to implement efficient cross-core communication."
+    doc = "Those signals can also carry cross-core communication."
+)]
+#![cfg_attr(
+    all(feature = "rt", multi_core),
+    doc = "
+## Inter-Processor Call (IPC)
+
+The [`ipc`] module posts a function to a CPU, and raises the IPC interrupt of that CPU.
+"
+)]
+#![cfg_attr(
+    all(feature = "rt", multi_core, xtensa),
+    doc = "The HAL reserves `FROM_CPU_INTR0` and `FROM_CPU_INTR1` for this path."
+)]
+#![cfg_attr(
+    all(feature = "rt", single_core, context_switch_source = "from_cpu"),
+    doc = "The HAL reserves `FROM_CPU_INTR0` to switch tasks."
+)]
+#![cfg_attr(
+    all(feature = "rt", context_switch_source = "software0"),
+    doc = "
+## Context Switching
+
+The HAL defines the `Software0` interrupt handler, and switches tasks in that interrupt.
+"
 )]
 
-#[cfg(riscv)]
-pub use self::riscv::*;
-#[cfg(xtensa)]
-pub use self::xtensa::*;
 use crate::{peripherals::Interrupt, system::Cpu};
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        use crate::peripherals::DPORT as INTERRUPT_CORE0;
-        use crate::peripherals::DPORT as INTERRUPT_CORE1;
-    } else {
+cfg_select! {
+    esp32 => {
+        use crate::peripherals::{DPORT as INTERRUPT_CORE0, DPORT as INTERRUPT_CORE1};
+    }
+    _ => {
         use crate::peripherals::INTERRUPT_CORE0;
         #[cfg(multi_core)]
         use crate::peripherals::INTERRUPT_CORE1;
     }
 }
 
-#[cfg(riscv)]
-mod riscv;
-#[cfg(xtensa)]
-mod xtensa;
+#[cfg_attr(riscv, path = "riscv.rs")]
+#[cfg_attr(xtensa, path = "xtensa.rs")]
+mod arch;
+pub use arch::*;
 
 use crate::pac;
 
-unstable_driver! {
+unstable_module! {
     pub mod software;
+
+    #[cfg(all(feature = "rt", multi_core))]
+    pub mod ipc;
+
+    #[cfg(feature = "rt")]
+    #[doc(hidden)]
+    pub mod __rtos_implementation;
 }
 
 #[cfg(feature = "rt")]
@@ -90,29 +113,25 @@ pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
     Priority::min(),
 );
 
-/// Trait implemented by drivers which allow the user to set an
-/// [InterruptHandler]
+/// Trait implemented by drivers that support registering an
+/// [`InterruptHandler`].
 #[instability::unstable]
 pub trait InterruptConfigurable: crate::private::Sealed {
-    #[cfg_attr(
-        not(multi_core),
-        doc = "Registers an interrupt handler for the peripheral."
-    )]
-    #[cfg_attr(
-        multi_core,
-        doc = "Registers an interrupt handler for the peripheral on the current core."
-    )]
+    #[doc = cfg_select! {
+        multi_core => "Registers an interrupt handler for the peripheral on the current core.",
+        _ => "Registers an interrupt handler for the peripheral.",
+    }]
     #[doc = ""]
-    /// Note that this will replace any previously registered interrupt
-    /// handlers. Some peripherals offer a shared interrupt handler for
-    /// multiple purposes. It's the users duty to honor this.
+    /// Replaces any previously registered interrupt handlers. Some peripherals
+    /// offer a shared interrupt handler for multiple purposes. The caller must
+    /// honor this constraint.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
-    /// [DEFAULT_INTERRUPT_HANDLER]
+    /// The default/unhandled interrupt handler can be restored with
+    /// [`DEFAULT_INTERRUPT_HANDLER`].
     fn set_interrupt_handler(&mut self, handler: InterruptHandler);
 }
 
-/// Represents an ISR callback function
+/// Represents an ISR callback function.
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -121,7 +140,7 @@ pub struct IsrCallback {
 }
 
 impl IsrCallback {
-    /// Construct a new callback from the callback function.
+    /// Creates a new callback from the callback function.
     pub fn new(f: extern "C" fn()) -> Self {
         // a valid fn pointer is non zero
         Self { f }
@@ -146,7 +165,7 @@ impl PartialEq for IsrCallback {
     }
 }
 
-/// An interrupt handler
+/// An interrupt handler.
 #[cfg_attr(
     multi_core,
     doc = r"
@@ -163,7 +182,7 @@ pub struct InterruptHandler {
 }
 
 impl InterruptHandler {
-    /// Creates a new [InterruptHandler] which will call the given function at
+    /// Creates a new [`InterruptHandler`] which will call the given function at
     /// the given priority.
     pub const fn new(f: extern "C" fn(), prio: Priority) -> Self {
         Self { f, prio }
@@ -175,7 +194,7 @@ impl InterruptHandler {
         IsrCallback::new(self.f)
     }
 
-    /// Priority to be used when registering the interrupt
+    /// Returns the priority used when registering the interrupt.
     #[inline]
     pub fn priority(&self) -> Priority {
         self.prio
@@ -192,53 +211,80 @@ pub struct InterruptStatus {
 }
 
 impl InterruptStatus {
-    /// Get status of peripheral interrupts
+    /// Returns the status of a particular peripheral interrupt.
     #[instability::unstable]
-    pub fn current() -> InterruptStatus {
-        match Cpu::current() {
-            Cpu::ProCpu => InterruptStatus {
-                status: core::array::from_fn(|idx| {
-                    #[cfg(esp32p4)]
-                    if idx == 4 {
-                        // Discontiguous, cannot be part of the standard status array
-                        return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
+    #[inline]
+    pub fn is_pending(interrupt: Interrupt) -> bool {
+        let word = (interrupt as usize) / 32;
+        let bit = (interrupt as usize) % 32;
+        let mut status_word = 0;
+        for cpu in Cpu::all() {
+            status_word |= Self::interrupt_status_word(cpu, word);
+        }
+        (status_word & (1 << bit)) != 0
+    }
+
+    #[inline]
+    fn interrupt_status_word(cpu: Cpu, word: usize) -> u32 {
+        match cpu {
+            Cpu::ProCpu => {
+                cfg_select! {
+                    esp32p4 => {
+                        if word == 4 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE0::regs().core_0_intr_status4().read().bits();
+                        }
                     }
-                    INTERRUPT_CORE0::regs()
-                        .core_0_intr_status(idx)
-                        .read()
-                        .bits()
-                }),
-            },
+                    _ => {}
+                }
+
+                INTERRUPT_CORE0::regs()
+                    .core_0_intr_status(word)
+                    .read()
+                    .bits()
+            }
             #[cfg(multi_core)]
-            Cpu::AppCpu => InterruptStatus {
-                status: core::array::from_fn(|idx| {
-                    #[cfg(esp32p4)]
-                    if idx == 4 {
-                        // Discontiguous, cannot be part of the standard status array
-                        return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
+            Cpu::AppCpu => {
+                cfg_select! {
+                    esp32p4 => {
+                        if word == 4 {
+                            // Discontiguous, cannot be part of the standard status array
+                            return INTERRUPT_CORE1::regs().core_1_intr_status4().read().bits();
+                        }
                     }
-                    INTERRUPT_CORE1::regs()
-                        .core_1_intr_status(idx)
-                        .read()
-                        .bits()
-                }),
-            },
+                    _ => {}
+                }
+
+                INTERRUPT_CORE1::regs()
+                    .core_1_intr_status(word)
+                    .read()
+                    .bits()
+            }
         }
     }
 
-    /// Is the given interrupt bit set
+    /// Returns the status of peripheral interrupts.
+    #[instability::unstable]
+    pub fn current() -> InterruptStatus {
+        let cpu = Cpu::current();
+        InterruptStatus {
+            status: core::array::from_fn(|word| Self::interrupt_status_word(cpu, word)),
+        }
+    }
+
+    /// Is the given interrupt bit set.
     #[instability::unstable]
     pub fn is_set(&self, interrupt: u8) -> bool {
         (self.status[interrupt as usize / 32] & (1 << (interrupt % 32))) != 0
     }
 
-    /// Set the given interrupt status bit
+    /// Sets the given interrupt status bit.
     #[instability::unstable]
     pub fn set(&mut self, interrupt: u8) {
         self.status[interrupt as usize / 32] |= 1 << (interrupt % 32);
     }
 
-    /// Return an iterator over the set interrupt status bits
+    /// Returns an iterator over the set interrupt status bits.
     #[instability::unstable]
     pub fn iterator(&self) -> InterruptStatusIterator {
         InterruptStatusIterator {
@@ -276,11 +322,26 @@ impl Iterator for InterruptStatusIterator {
 // Peripheral interrupt API.
 
 fn vector_entry(interrupt: Interrupt) -> &'static pac::Vector {
-    cfg_if::cfg_if! {
-        if #[cfg(xtensa)] {
-            &pac::__INTERRUPTS[interrupt as usize]
-        } else {
-            &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]
+    unsafe extern "Rust" {
+        #[cfg(xtensa)]
+        static __INTERRUPTS: pac::Vector;
+        #[cfg(riscv)]
+        static __EXTERNAL_INTERRUPTS: pac::Vector;
+    }
+
+    // SAFETY: Interrupt numbers are guaranteed to be valid and in range because we use the
+    // Interrupt enum, which is generated from the list of valid peripheral interrupts in the PAC.
+    unsafe {
+        cfg_select! {
+            xtensa => (&__INTERRUPTS as *const pac::Vector)
+                .add(interrupt as usize)
+                .as_ref_unchecked(),
+            riscv => (&__EXTERNAL_INTERRUPTS as *const pac::Vector)
+                .add(interrupt as usize)
+                .as_ref_unchecked(),
+            _ => {
+                compile_error!("Unsupported architecture");
+            }
         }
     }
 }
@@ -311,13 +372,16 @@ pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
 /// Only one interrupt handler can be bound to a peripheral interrupt.
 #[instability::unstable]
 pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
+    bind_vector(interrupt, handler);
+    enable(interrupt, handler.priority());
+}
+
+/// Binds `handler` to `interrupt` without enabling the peripheral interrupt.
+pub(crate) fn bind_vector(interrupt: Interrupt, handler: InterruptHandler) {
     unsafe {
         let vector = vector_entry(interrupt);
-
         let ptr = (&raw const vector._handler).cast::<usize>().cast_mut();
 
-        // On RISC-V MCUs we may be protecting the trap section using a watchpoint.
-        // If we do, we need to temporarily disable this protection.
         #[cfg(all(riscv, write_vec_table_monitoring))]
         if crate::soc::trap_section_protected() {
             crate::debugger::DEBUGGER_LOCK.lock(|| {
@@ -325,21 +389,18 @@ pub fn bind_handler(interrupt: Interrupt, handler: InterruptHandler) {
                 ptr.write_volatile(handler.handler().address());
                 crate::debugger::restore_watchpoint(1, wp);
             });
-            enable(interrupt, handler.priority());
             return;
         }
 
         ptr.write_volatile(handler.handler().address());
     }
-    enable(interrupt, handler.priority());
 }
 
 /// Enables a peripheral interrupt at a given priority, using vectored CPU interrupts.
 ///
-/// Note that interrupts still need to be enabled globally for interrupts
-/// to be serviced.
+/// Interrupts must still be enabled globally for interrupts to be serviced.
 ///
-/// Internally, this function maps the interrupt to the appropriate CPU interrupt
+/// Internally maps the interrupt to the appropriate CPU interrupt
 /// for the specified priority level.
 #[inline]
 #[instability::unstable]
@@ -352,9 +413,9 @@ pub(crate) fn enable_on_cpu(cpu: Cpu, interrupt: Interrupt, level: Priority) {
     map_raw(cpu, interrupt, cpu_interrupt as u32);
 }
 
-/// Disable the given peripheral interrupt.
+/// Disables the given peripheral interrupt.
 ///
-/// Internally, this function maps the interrupt to a disabled CPU interrupt.
+/// Internally maps the interrupt to a disabled CPU interrupt.
 #[inline]
 #[instability::unstable]
 pub fn disable(core: Cpu, interrupt: Interrupt) {
@@ -366,33 +427,37 @@ pub(super) fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt: u32) {
         Cpu::ProCpu => {
             INTERRUPT_CORE0::regs()
                 .core_0_intr_map(interrupt as usize)
-                .write(|w| unsafe { w.bits(cpu_interrupt) });
+                .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
         }
         #[cfg(multi_core)]
         Cpu::AppCpu => {
             INTERRUPT_CORE1::regs()
                 .core_1_intr_map(interrupt as usize)
-                .write(|w| unsafe { w.bits(cpu_interrupt) });
+                .modify(|_, w| unsafe { w.map().bits(cpu_interrupt as u8) });
         }
     }
 }
 
-/// Get cpu interrupt assigned to peripheral interrupt
+/// Returns the CPU interrupt assigned to peripheral interrupt.
+#[cfg(all(feature = "rt", gpio_driver_supported))]
 pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
     mapped_to_raw(cpu, interrupt as u32)
 }
 
+#[cfg(feature = "rt")]
 pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
         Cpu::ProCpu => INTERRUPT_CORE0::regs()
             .core_0_intr_map(interrupt as usize)
             .read()
-            .bits(),
+            .map()
+            .bits() as u32,
         #[cfg(multi_core)]
         Cpu::AppCpu => INTERRUPT_CORE1::regs()
             .core_1_intr_map(interrupt as usize)
             .read()
-            .bits(),
+            .map()
+            .bits() as u32,
     };
     CpuInterrupt::from_u32(cpu_intr)
 }
@@ -417,7 +482,7 @@ impl RunLevel {
     #[procmacros::doc_replace]
     /// Returns the current run level.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -437,9 +502,8 @@ impl RunLevel {
     ///
     /// # Safety
     ///
-    /// This function must only be used to raise the run level and to restore it
-    /// to a previous value. It must not be used to arbitrarily lower the
-    /// run level.
+    /// Must only be used to raise the run level and to restore it to a previous
+    /// value. Must not be used to arbitrarily lower the run level.
     #[inline]
     #[instability::unstable]
     pub unsafe fn change(to: Self) -> Self {
@@ -447,11 +511,11 @@ impl RunLevel {
     }
 
     #[procmacros::doc_replace]
-    /// Checks if the run level indicates thread mode.
+    /// Returns whether the run level indicates thread mode.
     ///
-    /// This function can be used to determine if the CPU is executing an interrupt handler.
+    /// Thread mode means the CPU is not executing an interrupt handler.
     ///
-    /// ## Examples
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -502,12 +566,12 @@ impl From<RunLevel> for u32 {
     }
 }
 
-/// Priority Level Error
+/// Priority Level Error.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
 pub enum PriorityError {
-    /// The priority is not valid
+    /// The priority is not valid.
     InvalidInterruptPriority,
 }
 

@@ -19,6 +19,7 @@ const FRAME_VERSION_MASK: u8 = 0x30;
 /// IEEE 802.15.4 MAC frame
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[instability::unstable]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Frame {
     /// Header
     pub header: Header,
@@ -28,21 +29,6 @@ pub struct Frame {
     pub payload: Vec<u8>,
     /// This is a 2-byte CRC checksum
     pub footer: [u8; 2],
-}
-
-// FIXME: Remove and use derive when defmt 1.0.2 is released (we need https://github.com/knurling-rs/defmt/pull/955)
-#[cfg(feature = "defmt")]
-impl defmt::Format for Frame {
-    fn format(&self, f: defmt::Formatter<'_>) {
-        defmt::write!(
-            f,
-            "Frame {{ header: {}, content: {}, payload: {:?}, footer: {:?} }}",
-            self.header,
-            self.content,
-            self.payload.as_slice(),
-            self.footer
-        );
-    }
 }
 
 /// IEEE 802.15.4 MAC frame which has been received
@@ -61,15 +47,13 @@ pub struct ReceivedFrame {
 }
 
 pub(crate) fn frame_is_ack_required(frame: &[u8]) -> bool {
-    if frame.len() <= FRAME_AR_OFFSET {
-        return false;
-    }
-    (frame[FRAME_AR_OFFSET] & FRAME_AR_BIT) != 0
+    frame
+        .get(FRAME_AR_OFFSET)
+        .is_some_and(|fcf| fcf & FRAME_AR_BIT != 0)
 }
 
 pub(crate) fn frame_get_version(frame: &[u8]) -> u8 {
-    if frame.len() <= FRAME_VERSION_OFFSET {
-        return 0;
-    }
-    frame[FRAME_VERSION_OFFSET] & FRAME_VERSION_MASK
+    frame
+        .get(FRAME_VERSION_OFFSET)
+        .map_or(0, |fcf| fcf & FRAME_VERSION_MASK)
 }

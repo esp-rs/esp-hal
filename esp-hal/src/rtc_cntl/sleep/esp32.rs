@@ -1,8 +1,7 @@
-use super::{Ext0WakeupSource, Ext1WakeupSource, TimerWakeupSource, WakeSource, WakeTriggers};
+use super::SleepKind;
 use crate::{
-    gpio::{RtcFunction, RtcPin},
-    peripherals::{BB, DPORT, I2S0, LPWR, NRX, RTC_IO},
-    rtc_cntl::{Rtc, sleep::WakeupLevel},
+    peripherals::{BB, DPORT, I2S0, LPWR, NRX},
+    rtc_cntl::{Rtc, WakeupSource},
 };
 
 // Approximate mapping of voltages to RTC_CNTL_DBIAS_WAK, RTC_CNTL_DBIAS_SLP,
@@ -30,13 +29,13 @@ pub const RTC_CNTL_DBIAS_1V25: u8 = 7;
 pub const RTC_CNTL_XTL_BUF_WAIT_SLP_US: u32 = 1000;
 /// Cycles to wait for PLL buffer stabilization.
 pub const RTC_CNTL_PLL_BUF_WAIT_SLP_CYCLES: u8 = 1;
-/// Cycles to wait for the 8MHz clock to stabilize.
+/// Cycles to wait for the 8 MHz clock to stabilize.
 pub const RTC_CNTL_CK8M_WAIT_SLP_CYCLES: u8 = 4;
 /// Delay in cycles for wakeup signal to be applied.
 pub const RTC_CNTL_WAKEUP_DELAY_CYCLES: u8 = 7;
 /// Power-up cycles for other blocks.
 pub const RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES: u8 = 1;
-/// Wait cycles for other blocks.
+/// Waits cycles for other blocks.
 pub const RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES: u16 = 1;
 /// Minimum sleep value (in cycles).
 pub const RTC_CNTL_MIN_SLP_VAL_MIN: u8 = 128;
@@ -45,144 +44,29 @@ pub const RTC_CNTL_DBG_ATTEN_DEFAULT: u8 = 3;
 
 /// Power-up cycles for RTC memory.
 pub const RTC_MEM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for RTC memory.
+/// Waits cycles for RTC memory.
 pub const RTC_MEM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for ROM and RAM.
 pub const ROM_RAM_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for ROM and RAM.
+/// Waits cycles for ROM and RAM.
 pub const ROM_RAM_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for Wi-Fi.
 pub const WIFI_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for Wi-Fi.
+/// Waits cycles for Wi-Fi.
 pub const WIFI_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for RTC components.
 pub const RTC_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for RTC components.
+/// Waits cycles for RTC components.
 pub const RTC_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 /// Power-up cycles for the digital wrap components.
 pub const DG_WRAP_POWERUP_CYCLES: u8 = RTC_CNTL_OTHER_BLOCKS_POWERUP_CYCLES;
-/// Wait cycles for the digital wrap components.
+/// Waits cycles for the digital wrap components.
 pub const DG_WRAP_WAIT_CYCLES: u16 = RTC_CNTL_OTHER_BLOCKS_WAIT_CYCLES;
 
-/// Default wait cycles for the 8MHz clock.
+/// Default wait cycles for the 8 MHz clock.
 pub const RTC_CNTL_CK8M_WAIT_DEFAULT: u8 = 20;
-/// Default wait cycles to enable the 8MHz clock.
+/// Default wait cycles to enable the 8 MHz clock.
 pub const RTC_CK8M_ENABLE_WAIT_DEFAULT: u8 = 5;
-impl WakeSource for TimerWakeupSource {
-    fn apply(
-        &self,
-        rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        _sleep_config: &mut RtcSleepConfig,
-    ) {
-        triggers.set_timer(true);
-        // TODO: maybe add check to prevent overflow?
-        let ticks = crate::clock::us_to_rtc_ticks(self.duration.as_micros() as u64);
-        // "alarm" time in slow rtc ticks
-        let now = rtc.time_since_boot_raw();
-        let time_in_ticks = now + ticks;
-        unsafe {
-            LPWR::regs()
-                .slp_timer0()
-                .write(|w| w.slp_val_lo().bits((time_in_ticks & 0xffffffff) as u32));
-
-            LPWR::regs().slp_timer1().write(|w| {
-                w.slp_val_hi()
-                    .bits(((time_in_ticks >> 32) & 0xffff) as u16)
-                    .main_timer_alarm_en()
-                    .set_bit()
-            });
-        }
-    }
-}
-
-impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
-    ) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
-        triggers.set_ext0(true);
-
-        // set pin to RTC function
-        self.pin
-            .borrow_mut()
-            .rtc_set_config(true, true, RtcFunction::Rtc);
-
-        unsafe {
-            // set pin register field
-            RTC_IO::regs()
-                .ext_wakeup0()
-                .modify(|_, w| w.sel().bits(self.pin.borrow().rtc_number()));
-            // set level register field
-            LPWR::regs()
-                .ext_wakeup_conf()
-                .modify(|_r, w| w.ext_wakeup0_lv().bit(self.level == WakeupLevel::High));
-        }
-    }
-}
-
-impl<P: RtcPin> Drop for Ext0WakeupSource<P> {
-    fn drop(&mut self) {
-        // should we have saved the pin configuration first?
-        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-        // to IO_MUX)
-        self.pin
-            .borrow_mut()
-            .rtc_set_config(true, false, RtcFunction::Rtc);
-    }
-}
-
-impl WakeSource for Ext1WakeupSource<'_, '_> {
-    fn apply(
-        &self,
-        _rtc: &Rtc<'_>,
-        triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
-    ) {
-        // don't power down RTC peripherals
-        sleep_config.set_rtc_peri_pd_en(false);
-        triggers.set_ext1(true);
-
-        // set pins to RTC function
-        let mut pins = self.pins.borrow_mut();
-        let mut bits = 0u32;
-        for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, true, RtcFunction::Rtc);
-            bits |= 1 << pin.rtc_number();
-        }
-
-        // clear previous wakeup status
-        LPWR::regs()
-            .ext_wakeup1()
-            .modify(|_, w| w.status_clr().set_bit());
-        // set pin register field
-
-        LPWR::regs()
-            .ext_wakeup1()
-            .modify(|_, w| unsafe { w.sel().bits(bits) });
-
-        // set level register field
-        LPWR::regs()
-            .ext_wakeup_conf()
-            .modify(|_r, w| w.ext_wakeup1_lv().bit(self.level == WakeupLevel::High));
-    }
-}
-
-impl Drop for Ext1WakeupSource<'_, '_> {
-    fn drop(&mut self) {
-        // should we have saved the pin configuration first?
-        // set pin back to IO_MUX (input_enable and func have no effect when pin is sent
-        // to IO_MUX)
-        let mut pins = self.pins.borrow_mut();
-        for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, false, RtcFunction::Rtc);
-        }
-    }
-}
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]
@@ -203,7 +87,7 @@ bitfield::bitfield! {
     pub rtc_peri_pd_en, set_rtc_peri_pd_en: 5;
     /// power down WiFi
     pub wifi_pd_en, set_wifi_pd_en: 6;
-    /// Power down Internal 8M oscillator
+    /// Powers down Internal 8M oscillator.
     pub int_8m_pd_en, set_int_8m_pd_en: 7;
     /// power down main RAM and ROM
     pub rom_mem_pd_en, set_rom_mem_pd_en: 8;
@@ -263,95 +147,67 @@ impl RtcSleepConfig {
         cfg
     }
 
+    pub(crate) fn is_deep_sleep(&self) -> bool {
+        self.deep_slp()
+    }
+
+    pub(crate) fn set_sleep_kind(&mut self, kind: SleepKind) {
+        self.set_deep_slp(kind == SleepKind::Deep);
+    }
+
     pub(crate) fn base_settings(_rtc: &Rtc<'_>) {
         // settings derived from esp-idf after basic boot
         let rtc_cntl = LPWR::regs();
 
         rtc_cntl.options0().modify(|_, w| {
-            w.bias_core_force_pu()
-                .clear_bit()
-                .bias_core_folw_8m()
-                .set_bit()
-                .bias_i2c_force_pu()
-                .clear_bit()
-                .bias_i2c_folw_8m()
-                .set_bit()
-                .bias_force_nosleep()
-                .clear_bit()
-                .bias_sleep_folw_8m()
-                .set_bit()
-                .xtl_force_pu()
-                .clear_bit()
+            w.bias_core_force_pu().clear_bit();
+            w.bias_core_folw_8m().set_bit();
+            w.bias_i2c_force_pu().clear_bit();
+            w.bias_i2c_folw_8m().set_bit();
+            w.bias_force_nosleep().clear_bit();
+            w.bias_sleep_folw_8m().set_bit();
+            w.xtl_force_pu().clear_bit()
         });
 
         rtc_cntl.reg().modify(|_, w| {
-            w.force_pu()
-                .clear_bit()
-                .dboost_force_pu()
-                .clear_bit()
-                .dboost_force_pd()
-                .set_bit()
+            w.force_pu().clear_bit();
+            w.dboost_force_pu().clear_bit();
+            w.dboost_force_pd().set_bit()
         });
 
         rtc_cntl.pwc().modify(|_, w| {
-            w.slowmem_force_pu()
-                .clear_bit()
-                .fastmem_force_pu()
-                .clear_bit()
-                .force_noiso()
-                .clear_bit()
-                .slowmem_force_noiso()
-                .clear_bit()
-                .fastmem_force_noiso()
-                .clear_bit()
+            w.slowmem_force_pu().clear_bit();
+            w.fastmem_force_pu().clear_bit();
+            w.force_noiso().clear_bit();
+            w.slowmem_force_noiso().clear_bit();
+            w.fastmem_force_noiso().clear_bit()
         });
 
         rtc_cntl.dig_pwc().modify(|_, w| {
-            w.dg_wrap_force_pu()
-                .clear_bit()
-                .wifi_force_pu()
-                .clear_bit()
-                .wifi_force_pd()
-                .set_bit()
-                .inter_ram4_force_pu()
-                .clear_bit()
-                .inter_ram3_force_pu()
-                .clear_bit()
-                .inter_ram2_force_pu()
-                .clear_bit()
-                .inter_ram1_force_pu()
-                .clear_bit()
-                .inter_ram0_force_pu()
-                .clear_bit()
-                .rom0_force_pu()
-                .clear_bit()
-                .lslp_mem_force_pu()
-                .clear_bit()
+            w.dg_wrap_force_pu().clear_bit();
+            w.wifi_force_pu().clear_bit();
+            w.wifi_force_pd().set_bit();
+            w.inter_ram4_force_pu().clear_bit();
+            w.inter_ram3_force_pu().clear_bit();
+            w.inter_ram2_force_pu().clear_bit();
+            w.inter_ram1_force_pu().clear_bit();
+            w.inter_ram0_force_pu().clear_bit();
+            w.rom0_force_pu().clear_bit();
+            w.lslp_mem_force_pu().clear_bit()
         });
 
         rtc_cntl.dig_iso().modify(|_, w| {
-            w.dg_wrap_force_noiso()
-                .clear_bit()
-                .wifi_force_noiso()
-                .clear_bit()
-                .wifi_force_iso()
-                .set_bit()
-                .inter_ram4_force_noiso()
-                .clear_bit()
-                .inter_ram3_force_noiso()
-                .clear_bit()
-                .inter_ram2_force_noiso()
-                .clear_bit()
-                .inter_ram1_force_noiso()
-                .clear_bit()
-                .inter_ram0_force_noiso()
-                .clear_bit()
-                .rom0_force_noiso()
-                .clear_bit()
-                .dg_pad_force_unhold()
-                .clear_bit()
-                .dg_pad_force_noiso()
-                .clear_bit()
+            w.dg_wrap_force_noiso().clear_bit();
+            w.wifi_force_noiso().clear_bit();
+            w.wifi_force_iso().set_bit();
+            w.inter_ram4_force_noiso().clear_bit();
+            w.inter_ram3_force_noiso().clear_bit();
+            w.inter_ram2_force_noiso().clear_bit();
+            w.inter_ram1_force_noiso().clear_bit();
+            w.inter_ram0_force_noiso().clear_bit();
+            w.rom0_force_noiso().clear_bit();
+            w.dg_pad_force_unhold().clear_bit();
+            w.dg_pad_force_noiso().clear_bit()
         });
 
         rtc_cntl.int_ena().modify(|_, w| w.brown_out().set_bit());
@@ -363,41 +219,28 @@ impl RtcSleepConfig {
             let rtc_cntl = LPWR::regs();
 
             rtc_cntl.timer5().modify(|_, w| {
-                w.min_slp_val()
-                    .bits(RTC_CNTL_MIN_SLP_VAL_MIN)
-                    // set rtc memory timer
-                    .rtcmem_powerup_timer()
-                    .bits(RTC_MEM_POWERUP_CYCLES)
-                    .rtcmem_wait_timer()
-                    .bits(RTC_MEM_WAIT_CYCLES)
+                w.min_slp_val().bits(RTC_CNTL_MIN_SLP_VAL_MIN);
+                // set rtc memory timer
+                w.rtcmem_powerup_timer().bits(RTC_MEM_POWERUP_CYCLES);
+                w.rtcmem_wait_timer().bits(RTC_MEM_WAIT_CYCLES)
             });
 
             rtc_cntl.timer3().modify(|_, w| {
-                w
-                    // set rom&ram timer
-                    .rom_ram_powerup_timer()
-                    .bits(ROM_RAM_POWERUP_CYCLES)
-                    .rom_ram_wait_timer()
-                    .bits(ROM_RAM_WAIT_CYCLES)
-                    // set wifi timer
-                    .wifi_powerup_timer()
-                    .bits(WIFI_POWERUP_CYCLES)
-                    .wifi_wait_timer()
-                    .bits(WIFI_WAIT_CYCLES)
+                // set rom&ram timer
+                w.rom_ram_powerup_timer().bits(ROM_RAM_POWERUP_CYCLES);
+                w.rom_ram_wait_timer().bits(ROM_RAM_WAIT_CYCLES);
+                // set wifi timer
+                w.wifi_powerup_timer().bits(WIFI_POWERUP_CYCLES);
+                w.wifi_wait_timer().bits(WIFI_WAIT_CYCLES)
             });
 
             rtc_cntl.timer4().modify(|_, w| {
-                w
-                    // set rtc peri timer
-                    .powerup_timer()
-                    .bits(RTC_POWERUP_CYCLES)
-                    .wait_timer()
-                    .bits(RTC_WAIT_CYCLES)
-                    // set digital wrap timer
-                    .dg_wrap_powerup_timer()
-                    .bits(DG_WRAP_POWERUP_CYCLES)
-                    .dg_wrap_wait_timer()
-                    .bits(DG_WRAP_WAIT_CYCLES)
+                // set rtc peri timer
+                w.powerup_timer().bits(RTC_POWERUP_CYCLES);
+                w.wait_timer().bits(RTC_WAIT_CYCLES);
+                // set digital wrap timer
+                w.dg_wrap_powerup_timer().bits(DG_WRAP_POWERUP_CYCLES);
+                w.dg_wrap_wait_timer().bits(DG_WRAP_WAIT_CYCLES)
             });
 
             rtc_cntl
@@ -411,10 +254,8 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.lslp_mem_force_pu().clear_bit());
 
                 rtc_cntl.pwc().modify(|_, w| {
-                    w.slowmem_force_pu()
-                        .clear_bit()
-                        .fastmem_force_pu()
-                        .clear_bit()
+                    w.slowmem_force_pu().clear_bit();
+                    w.fastmem_force_pu().clear_bit()
                 });
 
                 // esp-idf also clears these:
@@ -432,12 +273,9 @@ impl RtcSleepConfig {
                     .modify(|_, w| w.fft_force_pu().clear_bit().dc_est_force_pu().clear_bit());
 
                 NRX::regs().nrxpd_ctrl().modify(|_, w| {
-                    w.rx_rot_force_pu()
-                        .clear_bit()
-                        .vit_force_pu()
-                        .clear_bit()
-                        .demap_force_pu()
-                        .clear_bit()
+                    w.rx_rot_force_pu().clear_bit();
+                    w.vit_force_pu().clear_bit();
+                    w.demap_force_pu().clear_bit()
                 });
                 // (&*esp32::FE::ptr()).gen_ctrl.modify(|_, w| w
                 //     .iq_est_force_pu().clear_bit()
@@ -449,29 +287,21 @@ impl RtcSleepConfig {
             }
 
             rtc_cntl.pwc().modify(|_, w| {
-                w.slowmem_folw_cpu()
-                    .bit(self.rtc_mem_inf_follow_cpu())
-                    .fastmem_folw_cpu()
-                    .bit(self.rtc_mem_inf_follow_cpu())
-                    // TODO: does this need to be optional based on if there is something stored in
-                    // fastmem?
-                    //.fastmem_pd_en().bit(self.rtc_fastmem_pd_en())
-                    .fastmem_force_pu()
-                    .bit(!self.rtc_fastmem_pd_en())
-                    .fastmem_force_lpu()
-                    .bit(!self.rtc_fastmem_pd_en())
-                    .fastmem_force_noiso()
-                    .bit(!self.rtc_fastmem_pd_en())
-                    .slowmem_pd_en()
-                    .bit(self.rtc_slowmem_pd_en())
-                    .slowmem_force_pu()
-                    .bit(!self.rtc_slowmem_pd_en())
-                    .slowmem_force_noiso()
-                    .bit(!self.rtc_slowmem_pd_en())
-                    .slowmem_force_lpu()
-                    .bit(!self.rtc_slowmem_pd_en())
-                    .pd_en()
-                    .bit(self.rtc_peri_pd_en())
+                w.slowmem_folw_cpu().bit(self.rtc_mem_inf_follow_cpu());
+                w.fastmem_folw_cpu().bit(self.rtc_mem_inf_follow_cpu());
+
+                // TODO: does this need to be optional based on if there is something stored in
+                // fastmem?
+                //.fastmem_pd_en().bit(self.rtc_fastmem_pd_en())
+
+                w.fastmem_force_pu().bit(!self.rtc_fastmem_pd_en());
+                w.fastmem_force_lpu().bit(!self.rtc_fastmem_pd_en());
+                w.fastmem_force_noiso().bit(!self.rtc_fastmem_pd_en());
+                w.slowmem_pd_en().bit(self.rtc_slowmem_pd_en());
+                w.slowmem_force_pu().bit(!self.rtc_slowmem_pd_en());
+                w.slowmem_force_noiso().bit(!self.rtc_slowmem_pd_en());
+                w.slowmem_force_lpu().bit(!self.rtc_slowmem_pd_en());
+                w.pd_en().bit(self.rtc_peri_pd_en())
             });
 
             // rtc_cntl.dig_pwc.modify(|_, w| w
@@ -481,41 +311,28 @@ impl RtcSleepConfig {
 
             if self.deep_slp() {
                 rtc_cntl.dig_iso().modify(|_, w| {
-                    w.dg_wrap_force_noiso()
-                        .clear_bit()
-                        .wifi_force_noiso()
-                        .clear_bit()
-                        .dg_pad_force_iso()
-                        .clear_bit()
-                        .dg_pad_force_noiso()
-                        .clear_bit()
+                    w.dg_wrap_force_noiso().clear_bit();
+                    w.wifi_force_noiso().clear_bit();
+                    w.dg_pad_force_iso().clear_bit();
+                    w.dg_pad_force_noiso().clear_bit()
                 });
 
                 rtc_cntl.dig_pwc().modify(|_, w| {
-                    w.dg_wrap_pd_en()
-                        .set_bit()
-                        .dg_wrap_force_pu()
-                        .clear_bit()
-                        .dg_wrap_force_pd()
-                        .clear_bit()
+                    w.dg_wrap_pd_en().set_bit();
+                    w.dg_wrap_force_pu().clear_bit();
+                    w.dg_wrap_force_pd().clear_bit()
                 });
 
                 rtc_cntl.options0().modify(|_, w| {
-                    w.bias_force_nosleep()
-                        .clear_bit()
-                        .bb_i2c_force_pu()
-                        .clear_bit()
+                    w.bias_force_nosleep().clear_bit();
+                    w.bb_i2c_force_pu().clear_bit()
                 });
 
                 rtc_cntl.ana_conf().modify(|_, w| {
-                    w.ckgen_i2c_pu()
-                        .clear_bit()
-                        .pll_i2c_pu()
-                        .clear_bit()
-                        .rfrx_pbus_pu()
-                        .clear_bit()
-                        .txrf_i2c_pu()
-                        .clear_bit()
+                    w.ckgen_i2c_pu().clear_bit();
+                    w.pll_i2c_pu().clear_bit();
+                    w.rfrx_pbus_pu().clear_bit();
+                    w.txrf_i2c_pu().clear_bit()
                 });
             } else {
                 rtc_cntl
@@ -536,33 +353,28 @@ impl RtcSleepConfig {
             // enable VDDSDIO control by state machine
 
             rtc_cntl.sdio_conf().modify(|_, w| {
-                w.sdio_force()
-                    .clear_bit()
-                    .sdio_pd_en()
-                    .bit(self.vddsdio_pd_en())
+                w.sdio_force().clear_bit();
+                w.sdio_pd_en().bit(self.vddsdio_pd_en())
             });
 
             rtc_cntl.reg().modify(|_, w| {
-                w.dbias_slp()
-                    .bits(self.rtc_dbias_slp())
-                    .dbias_wak()
-                    .bits(self.rtc_dbias_wak())
-                    .dig_dbias_slp()
-                    .bits(self.dig_dbias_slp())
-                    .dig_dbias_wak()
-                    .bits(self.dig_dbias_wak())
+                w.dbias_slp().bits(self.rtc_dbias_slp());
+                w.dbias_wak().bits(self.rtc_dbias_wak());
+                w.dig_dbias_slp().bits(self.dig_dbias_slp());
+                w.dig_dbias_wak().bits(self.dig_dbias_wak())
             });
 
             rtc_cntl.slp_reject_conf().modify(|_, w| {
-                w.deep_slp_reject_en()
-                    .bit(self.deep_slp_reject())
-                    .light_slp_reject_en()
-                    .bit(self.light_slp_reject())
+                w.deep_slp_reject_en().bit(self.deep_slp_reject());
+                w.light_slp_reject_en().bit(self.light_slp_reject())
             });
         }
     }
 
-    pub(crate) fn start_sleep(&self, wakeup_triggers: WakeTriggers) {
+    /// Configures the wakeup and reject sources of the sleep.
+    ///
+    /// [`Self::enter_sleep`] requests the sleep after this call.
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
         LPWR::regs()
             .reset_state()
             .modify(|_, w| w.procpu_stat_vector_sel().set_bit());
@@ -570,20 +382,31 @@ impl RtcSleepConfig {
         // set bits for what can wake us up
         LPWR::regs()
             .wakeup_state()
-            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_triggers.0) });
+            .modify(|_, w| unsafe { w.wakeup_ena().bits(wakeup_mask as u16) });
 
-        LPWR::regs()
-            .state0()
-            .write(|w| w.sleep_en().set_bit().slp_wakeup().set_bit());
+        // esp32 has no reject-source mask. GPIO and SDIO have one reject enable each, and no other
+        // source can reject a sleep. The reject bits that `apply` wrote arm these enables.
+        let rejects = enumset::EnumSet::<WakeupSource>::from_u32_truncated(reject_mask);
+        LPWR::regs().slp_reject_conf().modify(|_, w| {
+            w.gpio_reject_en().bit(rejects.contains(WakeupSource::Gpio));
+            w.sdio_reject_en().bit(rejects.contains(WakeupSource::Sdio))
+        });
+    }
+
+    /// Requests the sleep.
+    ///
+    /// The caller waits for the result of the request.
+    #[inline(always)]
+    pub(crate) fn enter_sleep(&self) -> bool {
+        LPWR::regs().state0().modify(|_, w| w.sleep_en().set_bit());
+        super::wait_for_sleep_result()
     }
 
     pub(crate) fn finish_sleep(&self) {
         // In deep sleep mode, we never get here
         LPWR::regs().int_clr().write(|w| {
-            w.slp_reject()
-                .clear_bit_by_one()
-                .slp_wakeup()
-                .clear_bit_by_one()
+            w.slp_reject().clear_bit_by_one();
+            w.slp_wakeup().clear_bit_by_one()
         });
 
         // restore DBG_ATTEN to the default value

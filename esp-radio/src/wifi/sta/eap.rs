@@ -71,7 +71,6 @@ type CertificateAndKey = (&'static [u8], &'static [u8], Option<&'static [u8]>);
 #[instability::unstable]
 pub struct EapStationConfig {
     /// The SSID of the network the station is connecting to.
-    #[builder_lite(skip_setter)]
     pub(crate) ssid: Ssid,
     /// The BSSID (MAC Address) of the specific access point.
     pub(crate) bssid: Option<[u8; 6]>,
@@ -138,18 +137,7 @@ pub struct EapStationConfig {
 }
 
 impl EapStationConfig {
-    /// Set the SSID of the access point.
-    #[instability::unstable]
-    pub fn with_ssid(mut self, ssid: impl Into<Ssid>) -> Self {
-        self.ssid = ssid.into();
-        self
-    }
-
     pub(crate) fn validate(&self) -> Result<(), WifiError> {
-        if self.ssid.len() > 32 {
-            return Err(WifiError::InvalidArguments);
-        }
-
         if self.identity.as_ref().unwrap_or(&String::new()).len() > 128 {
             return Err(WifiError::InvalidArguments);
         }

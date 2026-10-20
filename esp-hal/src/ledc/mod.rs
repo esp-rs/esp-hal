@@ -20,7 +20,7 @@
 //!
 //! ### Low Speed Channel
 //!
-//! The following example will configure the Low Speed Channel0 to 24kHz output
+//! The following example will configure the Low Speed Channel0 to 24 kHz output
 //! with 10% duty using the ABPClock and turn on LED with the option to change
 //! LED intensity depending on `duty` value. Possible values (`u32`) are in
 //! range 0..100.
@@ -120,7 +120,7 @@ impl Speed for LowSpeed {
 }
 
 impl<'d> Ledc<'d> {
-    /// Return a new LEDC
+    /// Returns a new LEDC.
     pub fn new(_instance: LEDC<'d>) -> Self {
         if PeripheralClockControl::enable(PeripheralEnable::Ledc) {
             PeripheralClockControl::reset(PeripheralEnable::Ledc);
@@ -134,17 +134,17 @@ impl<'d> Ledc<'d> {
         Ledc { _instance, ledc }
     }
 
-    /// Set global slow clock source
+    /// Sets global slow clock source.
     pub fn set_global_slow_clock(&mut self, clock_source: LSGlobalClkSource) {
         low_level::set_global_slow_clock(self.ledc, clock_source);
     }
 
-    /// Return a new timer
+    /// Returns a new timer.
     pub fn timer<S: TimerSpeed>(&self, number: timer::Number) -> Timer<'d, S> {
         Timer::new(self.ledc, number)
     }
 
-    /// Return a new channel
+    /// Returns a new channel.
     pub fn channel<S: TimerSpeed>(
         &self,
         number: channel::Number,

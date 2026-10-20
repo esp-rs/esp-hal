@@ -358,45 +358,85 @@ mod tests {
         );
     }
 
+    /// The crypto accelerators and the MCPWM peripherals share a clock, and its reference count.
     #[test]
-    #[cfg(not(esp32))]
+    #[cfg(soc_has_clock_node_crypto_pwm_clk)]
+    fn test_crypto_clock_shared_with_mcpwm() {
+        use esp_hal::{
+            clock::ll::{ClockTree, CryptoPwmClkConfig, McpwmInstance, crypto_pwm_clk_frequency},
+            mcpwm::{McPwm, PeripheralClockConfig},
+            time::Rate,
+        };
+
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        let mut aes = Aes::new(p.AES);
+
+        let clock_config = PeripheralClockConfig::with_frequency(Rate::from_mhz(32)).unwrap();
+        let mcpwm = McPwm::new(p.MCPWM0, clock_config);
+
+        hil_test::assert!(
+            ClockTree::with(|clocks| clocks.crypto_pwm_clk()) == Some(CryptoPwmClkConfig::Pll)
+        );
+        hil_test::assert_eq!(
+            McpwmInstance::Mcpwm0.function_clock_frequency(),
+            crypto_pwm_clk_frequency()
+        );
+        aes_ll_roundtrip::<16>(
+            &mut aes,
+            PLAINTEXT[0..16].try_into().unwrap(),
+            CIPHERTEXT_ECB_128[0..16].try_into().unwrap(),
+        );
+
+        core::mem::drop(mcpwm);
+
+        aes_ll_roundtrip::<16>(
+            &mut aes,
+            PLAINTEXT[0..16].try_into().unwrap(),
+            CIPHERTEXT_ECB_128[0..16].try_into().unwrap(),
+        );
+    }
+
+    #[test]
+    #[cfg(aes_supports_dma)]
     fn test_aes_dma_ecb() {
         use esp_hal::{
             aes::dma::AesDma,
             dma::{DmaRxBuf, DmaTxBuf},
-            dma_buffers,
+            dma_rx_buffer,
+            dma_tx_buffer,
         };
 
+        struct Context<'a> {
+            aes: AesDma<'a>,
+            output: DmaRxBuf,
+            input: DmaTxBuf,
+        }
+
         fn test_aes_ecb<const K: usize>(
-            mut aes: AesDma<'_>,
+            mut ctx: Context<'_>,
             plaintext: [u8; 16],
             ciphertext: [u8; 16],
-        ) -> AesDma<'_>
+        ) -> Context<'_>
         where
             Key: From<[u8; K]>,
         {
             use esp_hal::aes::dma::DmaCipherState;
 
-            const DMA_BUFFER_SIZE: usize = 16;
-
-            let (output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
-            let mut output = DmaRxBuf::new(rx_descriptors, output).unwrap();
-            let mut input = DmaTxBuf::new(tx_descriptors, input).unwrap();
-
             // Encrypt
-            input.as_mut_slice().copy_from_slice(&plaintext);
-            let transfer = aes
+            ctx.input.as_mut_slice().copy_from_slice(&plaintext);
+            let transfer = ctx
+                .aes
                 .process(
                     1,
-                    output,
-                    input,
+                    ctx.output,
+                    ctx.input,
                     Operation::Encrypt,
                     &DmaCipherState::from(Ecb),
                     pad_to::<K>(KEY),
                 )
                 .map_err(|e| e.0)
                 .unwrap();
-            (aes, output, input) = transfer.wait();
+            let (aes, output, mut input) = transfer.wait();
             hil_test::assert_eq!(output.as_slice(), ciphertext);
 
             // Decrypt
@@ -412,36 +452,41 @@ mod tests {
                 )
                 .map_err(|e| e.0)
                 .unwrap();
-            (aes, output, _) = transfer.wait();
+            let (aes, output, input) = transfer.wait();
             hil_test::assert_eq!(output.as_slice(), plaintext);
 
-            aes
+            Context { aes, output, input }
         }
+
+        const DMA_BUFFER_SIZE: usize = 16;
+
+        let input = dma_tx_buffer!(DMA_BUFFER_SIZE).unwrap();
+        let output = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
+
         let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                let dma_channel = peripherals.DMA_CRYPTO;
-            } else {
-                let dma_channel = peripherals.DMA_CH0;
-            }
-        }
+        let dma_channel = cfg_select! {
+            aes_dma_engine = "CRYPTO_DMA" => peripherals.DMA_CRYPTO,
+            aes_dma_engine = "AXI_GDMA" => peripherals.DMA_AXI_CH0,
+            _ => peripherals.DMA_CH0,
+        };
 
         let aes = Aes::new(peripherals.AES).with_dma(dma_channel);
+        let ctx = Context { aes, output, input };
 
-        let aes = test_aes_ecb::<16>(
-            aes,
+        let ctx = test_aes_ecb::<16>(
+            ctx,
             PLAINTEXT[0..16].try_into().unwrap(),
             CIPHERTEXT_ECB_128[0..16].try_into().unwrap(),
         );
         #[cfg(esp32s2)]
-        let aes = test_aes_ecb::<24>(
-            aes,
+        let ctx = test_aes_ecb::<24>(
+            ctx,
             PLAINTEXT[0..16].try_into().unwrap(),
             CIPHERTEXT_ECB_192[0..16].try_into().unwrap(),
         );
         let _ = test_aes_ecb::<32>(
-            aes,
+            ctx,
             PLAINTEXT[0..16].try_into().unwrap(),
             CIPHERTEXT_ECB_256[0..16].try_into().unwrap(),
         );
@@ -593,16 +638,14 @@ mod work_queue_dma_tests {
 
         esp_alloc::heap_allocator!(size: 32 * 1024);
 
-        #[cfg(soc_has_psram)]
+        #[cfg(all(soc_has_psram, dma_can_access_psram))]
         esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                let dma = p.DMA_CRYPTO;
-            } else {
-                let dma = p.DMA_CH0;
-            }
-        }
+        let dma = cfg_select! {
+            aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
+            aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
+            _ => p.DMA_CH0,
+        };
 
         Context {
             aes: AesDmaBackend::new(p.AES, dma),
@@ -624,7 +667,7 @@ mod work_queue_dma_tests {
     }
 
     #[test]
-    #[cfg(soc_has_psram)]
+    #[cfg(all(soc_has_psram, dma_can_access_psram))]
     fn test_aes_dma_work_queue_psram(mut ctx: Context) {
         let _backend = ctx.aes.start();
 

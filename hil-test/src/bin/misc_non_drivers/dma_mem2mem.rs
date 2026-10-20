@@ -11,19 +11,18 @@ mod tests {
     struct Context {
         mem2mem: Mem2Mem<'static, Blocking>,
     }
+
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32s2)] {
-                let mem2mem = Mem2Mem::new(peripherals.DMA_COPY);
-            } else if #[cfg(soc_has_mem2mem1)] {
-                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.MEM2MEM1);
-            } else {
-                let mem2mem = Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2);
-            }
-        }
+        let mem2mem = cfg_select! {
+            esp32s2 => Mem2Mem::new(peripherals.DMA_COPY),
+            any(esp32c3, esp32s3) => Mem2Mem::new(peripherals.DMA_CH0, peripherals.SPI2),
+            esp32p4 => Mem2Mem::new(peripherals.DMA_CH1),
+            esp32s31 => Mem2Mem::new(peripherals.DMA_AXI_CH1),
+            _ => Mem2Mem::new(peripherals.DMA_CH0),
+        };
 
         Context { mem2mem }
     }
@@ -37,12 +36,12 @@ mod tests {
             .with_descriptors(rx_descriptors, tx_descriptors, Default::default())
             .unwrap();
 
-        for i in 0..core::mem::size_of_val(tx_buffer) {
+        for i in 0..tx_buffer.len() {
             tx_buffer[i] = (i % 256) as u8;
         }
         let dma_wait = mem2mem.start_transfer(rx_buffer, tx_buffer).unwrap();
         dma_wait.wait().unwrap();
-        for i in 0..core::mem::size_of_val(tx_buffer) {
+        for i in 0..tx_buffer.len() {
             assert_eq!(rx_buffer[i], tx_buffer[i]);
         }
     }

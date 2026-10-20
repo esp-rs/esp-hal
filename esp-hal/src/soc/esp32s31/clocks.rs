@@ -1,0 +1,876 @@
+//! Clock tree implementation for ESP32-S31.
+//!
+//! CPLL supplies the 160 and 320 MHz CPU configurations. The independent
+//! 480 MHz BBPLL supplies the 240 MHz CPU configuration and peripheral taps.
+#![allow(dead_code, reason = "Clock functions called from generated macro code")]
+#![allow(
+    missing_docs,
+    reason = "Clock-tree types come from generated macro code"
+)]
+
+use core::sync::atomic::{AtomicBool, Ordering};
+
+use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
+
+use crate::{
+    peripherals::{HP_ALIVE_SYS, HP_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, MODEM_LPCON, PMU},
+    soc::xtal32k,
+};
+
+define_clock_tree_types!();
+
+/// CPU clock speed options.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[allow(
+    clippy::enum_variant_names,
+    reason = "MHz suffix indicates physical unit."
+)]
+#[non_exhaustive]
+pub enum CpuClock {
+    /// 160 MHz CPU clock.
+    #[default]
+    _160MHz = 160,
+    /// 240 MHz CPU clock.
+    _240MHz = 240,
+    /// 320 MHz CPU clock.
+    _320MHz = 320,
+}
+
+impl CpuClock {
+    const PRESET_160: ClockConfig = ClockConfig {
+        cpu_root_clk: Some(CpuRootClkConfig::Cpll),
+        cpu_clk: Some(CpuClkConfig::new(1)),
+        mem_clk: Some(MemClkConfig::new(0)), // Max 160 MHz
+        sys_clk: Some(SysClkConfig::new(1)), // Max ~320/3 MHz
+        apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
+        lp_fast_clk: Some(LpFastClkConfig::RcFast),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
+        timg_calibration_clock: None,
+    };
+    const PRESET_240: ClockConfig = ClockConfig {
+        cpu_root_clk: Some(CpuRootClkConfig::PllF240m),
+        cpu_clk: Some(CpuClkConfig::new(0)),
+        mem_clk: Some(MemClkConfig::new(1)), // Max 160 MHz
+        sys_clk: Some(SysClkConfig::new(2)), // Max ~320/3 MHz
+        apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
+        lp_fast_clk: Some(LpFastClkConfig::RcFast),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
+        timg_calibration_clock: None,
+    };
+    const PRESET_320: ClockConfig = ClockConfig {
+        cpu_root_clk: Some(CpuRootClkConfig::Cpll),
+        cpu_clk: Some(CpuClkConfig::new(0)),
+        mem_clk: Some(MemClkConfig::new(1)), // Max 160 MHz
+        sys_clk: Some(SysClkConfig::new(2)), // Max ~320/3 MHz
+        apb_clk: Some(ApbClkConfig::new(1)), // MAX ~320/6MHz
+        lp_fast_clk: Some(LpFastClkConfig::RcFast),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
+        crypto_clk: Some(CryptoClkConfig::PllF240m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::new(
+            IomuxFunctionClockSource::PllF80m,
+            0,
+        )),
+        timg_calibration_clock: None,
+    };
+}
+
+impl From<CpuClock> for ClockConfig {
+    fn from(value: CpuClock) -> ClockConfig {
+        match value {
+            CpuClock::_160MHz => CpuClock::PRESET_160,
+            CpuClock::_240MHz => CpuClock::PRESET_240,
+            CpuClock::_320MHz => CpuClock::PRESET_320,
+        }
+    }
+}
+
+impl Default for ClockConfig {
+    fn default() -> Self {
+        Self::from(CpuClock::default())
+    }
+}
+
+impl ClockConfig {
+    pub(crate) fn try_get_preset(self) -> Option<CpuClock> {
+        match self {
+            v if v == CpuClock::PRESET_160 => Some(CpuClock::_160MHz),
+            v if v == CpuClock::PRESET_240 => Some(CpuClock::_240MHz),
+            v if v == CpuClock::PRESET_320 => Some(CpuClock::_320MHz),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn configure(self, clocks: &mut ClockTree) {
+        // CPU_ROOT_CLK and the CPU, memory, AHB, and APB dividers share one
+        // update signal. Write the complete configuration before latching it;
+        // applying each change separately can temporarily overclock the buses.
+        BUS_CLOCK_UPDATE_DEFERRED.store(true, Ordering::Relaxed);
+        self.apply(clocks);
+        BUS_CLOCK_UPDATE_DEFERRED.store(false, Ordering::Relaxed);
+
+        update_bus_clocks();
+        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+    }
+}
+
+static BUS_CLOCK_UPDATE_DEFERRED: AtomicBool = AtomicBool::new(false);
+
+fn update_bus_clocks() {
+    if BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        return;
+    }
+
+    HP_SYS_CLKRST::regs()
+        .root_clk_ctrl0()
+        .modify(|_, w| w.soc_clk_div_update().set_bit());
+    while HP_SYS_CLKRST::regs()
+        .root_clk_ctrl0()
+        .read()
+        .soc_clk_div_update()
+        .bit_is_set()
+    {
+        core::hint::spin_loop();
+    }
+}
+
+// BBPLL_CLK
+
+fn enable_bbpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if en {
+        // The S31 BBPLL is fixed at 480 MHz. Program its documented divider taps.
+        HP_SYS_CLKRST::regs()
+            .ref_20m_ctrl0()
+            .modify(|_, w| unsafe { w.clk_div_num().bits(23) });
+        HP_SYS_CLKRST::regs()
+            .ref_80m_ctrl0()
+            .modify(|_, w| unsafe { w.clk_div_num().bits(5) });
+        HP_SYS_CLKRST::regs()
+            .ref_120m_ctrl0()
+            .modify(|_, w| unsafe { w.clk_div_num().bits(3) });
+        HP_SYS_CLKRST::regs()
+            .ref_160m_ctrl0()
+            .modify(|_, w| unsafe { w.clk_div_num().bits(2) });
+        HP_SYS_CLKRST::regs()
+            .ref_240m_ctrl0()
+            .modify(|_, w| unsafe { w.clk_div_num().bits(1) });
+
+        PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
+            w.tie_high_xpd_bbpll().set_bit();
+            w.tie_high_xpd_bbpll_i2c().set_bit();
+            w.tie_high_global_bbpll_icg().set_bit()
+        });
+    } else {
+        PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
+            w.tie_low_global_bbpll_icg().set_bit();
+            w.tie_low_xpd_bbpll().set_bit();
+            w.tie_low_xpd_bbpll_i2c().set_bit()
+        });
+    }
+    HP_ALIVE_SYS::regs()
+        .hp_clk_ctrl()
+        .modify(|_, w| w.hp_spll_480m_clk_en().bit(en));
+}
+
+// CPLL_CLK
+
+fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if en {
+        // Power the PLL up before the calibration, which cannot end without it. The PMU state
+        // must agree: a sleep that the PMU rejects does not apply the `HP_ACTIVE` state again.
+        PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
+            w.tie_high_xpd_pll().set_bit();
+            w.tie_high_xpd_pll_i2c().set_bit()
+        });
+        PMU::regs()
+            .imm_hp_ck_power_1()
+            .modify(|_, w| w.tie_high_global_pll_icg().set_bit());
+        HP_ALIVE_SYS::regs()
+            .hp_clk_ctrl()
+            .modify(|_, w| w.hp_cpll_300m_clk_en().set_bit());
+        PMU::regs().hp_active_hp_ck_power().modify(|_, w| {
+            w.hp_active_xpd_pll_i2c().set_bit();
+            w.hp_active_xpd_pll().set_bit()
+        });
+
+        HP_SYS_CLKRST::regs()
+            .ana_pll_ctrl0()
+            .modify(|_, w| w.cpu_pll_cal_stop().clear_bit());
+        while HP_SYS_CLKRST::regs()
+            .ana_pll_ctrl0()
+            .read()
+            .cpu_pll_cal_end()
+            .bit_is_clear()
+        {
+            core::hint::spin_loop();
+        }
+        crate::rom::ets_delay_us(10);
+        HP_SYS_CLKRST::regs()
+            .ana_pll_ctrl0()
+            .modify(|_, w| w.cpu_pll_cal_stop().set_bit());
+    } else {
+        PMU::regs()
+            .imm_hp_ck_power_1()
+            .modify(|_, w| w.tie_low_global_pll_icg().set_bit());
+        PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
+            w.tie_low_xpd_pll().set_bit();
+            w.tie_low_xpd_pll_i2c().set_bit()
+        });
+        HP_ALIVE_SYS::regs()
+            .hp_clk_ctrl()
+            .modify(|_, w| w.hp_cpll_300m_clk_en().clear_bit());
+        PMU::regs().hp_active_hp_ck_power().modify(|_, w| {
+            w.hp_active_xpd_pll_i2c().clear_bit();
+            w.hp_active_xpd_pll().clear_bit()
+        });
+    }
+}
+
+// MPLL_CLK
+
+fn enable_mpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if en {
+        psram_phy_ldo_init();
+
+        HP_SYS_CLKRST::regs()
+            .ref_25m_ctrl0()
+            .modify(|_, w| unsafe { w.clk_div_num().bits(19) });
+        HP_SYS_CLKRST::regs()
+            .ref_50m_ctrl0()
+            .modify(|_, w| unsafe { w.clk_div_num().bits(9) });
+
+        // Clock source of 25/50MHz dividers.
+        HP_SYS_CLKRST::regs()
+            .ref_500m_ctrl0()
+            .modify(|_, w| w.sel().set_bit()); // MPLL
+
+        PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
+            w.tie_high_global_mpll_icg().set_bit();
+            w.tie_high_xpd_mpll().set_bit();
+            w.tie_high_xpd_mpll_i2c().set_bit()
+        });
+    } else {
+        PMU::regs().imm_hp_ck_power_1().modify(|_, w| {
+            w.tie_low_global_mpll_icg().set_bit();
+            w.tie_low_xpd_mpll().set_bit();
+            w.tie_low_xpd_mpll_i2c().set_bit()
+        });
+    }
+
+    HP_ALIVE_SYS::regs()
+        .hp_clk_ctrl()
+        .modify(|_, w| w.hp_mpll_500m_clk_en().bit(en));
+    PMU::regs().hp_active_hp_ck_power().modify(|_, w| {
+        w.hp_active_xpd_mpll().bit(en);
+        w.hp_active_xpd_mpll_i2c().bit(en)
+    });
+}
+
+/// Programs the PMU external LDO regulators for the MSPI PHY.
+fn psram_phy_ldo_init() {
+    // Limit inrush current while the output cap charges; keep ripple
+    // suppression (voltage detector) enabled.
+    PMU::regs()
+        .ext_ldo_ctrl()
+        .modify(|_, w| w.ext_cur_lim().set_bit());
+
+    // Set up for 1800mV
+    let (dref, mul) = ldo_voltage_to_params(1800);
+    PMU::regs().ext_ldo_ctrl().modify(|_, w| unsafe {
+        w.ext_ldo_mul().bits(mul);
+        w.ext_ldo_dref().bits(dref);
+        w.ext_ldo_tie_high().clear_bit()
+    });
+
+    PMU::regs()
+        .ext_ldo_ctrl()
+        .modify(|_, w| w.ext_ldo_en_vdet().set_bit());
+
+    PMU::regs()
+        .psram_cfg()
+        .modify(|_, w| w.psram_xpd().set_bit());
+
+    // Drop the inrush current limit once the output has settled.
+    PMU::regs()
+        .ext_ldo_ctrl()
+        .modify(|_, w| w.ext_cur_lim().clear_bit());
+    crate::rom::ets_delay_us(1000);
+}
+
+// Returns None if rail voltage is to be used.
+fn ldo_voltage_to_params(voltage_mv: u16) -> (u8, u8) {
+    // to avoid using FPU, enlarge the constants by 1000 as fixed point
+    const K_1000: u32 = 1000;
+    const VOS_1000: u32 = 0;
+    const C_1000: u32 = 1000;
+
+    // TODO: [ESP32S31] IDF-15510 For efuse calibration.
+
+    // iterate all the possible dref and mul values to find the best match
+    let mut min_voltage_diff = 400_000_000;
+    let mut matched_dref = 0;
+    let mut matched_mul = 0;
+    for dref_val in 0..16 {
+        let vref_20 = if dref_val < 9 {
+            10 + dref_val
+        } else {
+            20 + (dref_val - 9) * 2
+        };
+        for mul_val in 0..8 {
+            let vout_80000000 = (vref_20 * K_1000 + 20 * VOS_1000) * (4000 + mul_val * C_1000);
+            let diff = (voltage_mv as u32 * 80000).abs_diff(vout_80000000);
+            if diff < min_voltage_diff {
+                min_voltage_diff = diff;
+                matched_dref = dref_val as u8;
+                matched_mul = mul_val as u8;
+            }
+        }
+    }
+
+    (matched_dref, matched_mul)
+}
+
+fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    PMU::regs()
+        .hp_sleep_lp_ck_power()
+        .modify(|_, w| w.hp_sleep_xpd_fosc_clk().bit(en));
+    HP_ALIVE_SYS::regs()
+        .hp_clk_ctrl()
+        .modify(|_, w| w.hp_fosc_20m_clk_en().bit(en));
+    if en {
+        crate::rom::ets_delay_us(50);
+    }
+}
+
+#[cfg(use_xtal32k)]
+fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if en {
+        LP_AON_CLK_RST::regs().xtal32k().modify(|_, w| unsafe {
+            w.dac_xtal32k().bits(7);
+            w.dres_xtal32k().bits(7);
+            w.dgm_xtal32k().bits(7);
+            w.dbuf_xtal32k().set_bit()
+        });
+    }
+    PMU::regs()
+        .hp_sleep_lp_ck_power()
+        .modify(|_, w| w.hp_sleep_xpd_xtal32k().bit(en));
+    HP_ALIVE_SYS::regs()
+        .hp_clk_ctrl()
+        .modify(|_, w| w.hp_xtal_32k_clk_en().bit(en));
+}
+
+fn enable_rc_slow_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    HP_ALIVE_SYS::regs()
+        .hp_clk_ctrl()
+        .modify(|_, w| w.hp_sosc_150k_clk_en().bit(en));
+}
+
+macro_rules! pll_gate {
+    ($name:ident, $register:ident) => {
+        fn $name(_clocks: &mut ClockTree, en: bool) {
+            HP_SYS_CLKRST::regs()
+                .$register()
+                .modify(|_, w| w.clk_en().bit(en));
+        }
+    };
+}
+
+pll_gate!(enable_pll_f20m_impl, ref_20m_ctrl0);
+pll_gate!(enable_pll_f25m_impl, ref_25m_ctrl0);
+pll_gate!(enable_pll_f50m_impl, ref_50m_ctrl0);
+pll_gate!(enable_pll_f80m_impl, ref_80m_ctrl0);
+pll_gate!(enable_pll_f120m_impl, ref_120m_ctrl0);
+pll_gate!(enable_pll_f160m_impl, ref_160m_ctrl0);
+pll_gate!(enable_pll_f240m_impl, ref_240m_ctrl0);
+
+fn enable_bbpll_d3_clock_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn enable_xtal_d2_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn enable_cpu_root_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    HP_ALIVE_SYS::regs()
+        .hp_clk_ctrl()
+        .modify(|_, w| w.hp_root_clk_en().bit(en));
+}
+
+fn configure_cpu_root_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<CpuRootClkConfig>,
+    new: CpuRootClkConfig,
+) {
+    HP_SYS_CLKRST::regs().soc_clk_sel().modify(|_, w| unsafe {
+        w.soc_clk_sel().bits(match new {
+            CpuRootClkConfig::Xtal => 0,
+            CpuRootClkConfig::Cpll => 1,
+            CpuRootClkConfig::RcFast => 2,
+            CpuRootClkConfig::PllF240m => 3,
+        })
+    });
+    update_bus_clocks();
+}
+
+fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn configure_cpu_clk_impl(_clocks: &mut ClockTree, _old: Option<CpuClkConfig>, new: CpuClkConfig) {
+    HP_SYS_CLKRST::regs()
+        .cpu_freq_ctrl0()
+        .modify(|_, w| unsafe {
+            w.cpu_clk_div_num().bits(new.divisor() as u8);
+            w.cpu_clk_div_numerator().bits(0);
+            w.cpu_clk_div_denominator().bits(0)
+        });
+    // MEM_CLK is a separate CPU branch and is limited to 160 MHz. Both
+    // dividers must be latched together when raising the CPU frequency.
+    HP_SYS_CLKRST::regs()
+        .mem_freq_ctrl0()
+        .modify(|_, w| w.mem_clk_div_num().bit(cpu_clk_frequency() > 160_000_000));
+    update_bus_clocks();
+
+    if !BUS_CLOCK_UPDATE_DEFERRED.load(Ordering::Relaxed) {
+        ets_update_cpu_frequency_rom(cpu_clk_frequency() / 1_000_000);
+    }
+}
+
+// MEM_CLK
+
+fn enable_mem_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn configure_mem_clk_impl(_clocks: &mut ClockTree, _old: Option<MemClkConfig>, new: MemClkConfig) {
+    HP_SYS_CLKRST::regs()
+        .mem_freq_ctrl0()
+        .modify(|_, w| w.mem_clk_div_num().bit(new.divisor() == 1));
+    update_bus_clocks();
+}
+
+// SYS_CLK
+
+fn enable_sys_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn configure_sys_clk_impl(_clocks: &mut ClockTree, _old: Option<SysClkConfig>, new: SysClkConfig) {
+    HP_SYS_CLKRST::regs()
+        .sys_freq_ctrl0()
+        .modify(|_, w| unsafe {
+            w.sys_clk_div_num().bits(new.divisor() as u8);
+            w.sys_clk_div_numerator().bits(0);
+            w.sys_clk_div_denominator().bits(0)
+        });
+    update_bus_clocks();
+}
+
+fn enable_apb_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn configure_apb_clk_impl(_clocks: &mut ClockTree, _old: Option<ApbClkConfig>, new: ApbClkConfig) {
+    HP_SYS_CLKRST::regs()
+        .apb_freq_ctrl0()
+        .modify(|_, w| unsafe {
+            w.apb_clk_div_num().bits(new.divisor() as u8);
+            w.apb_clk_div_numerator().bits(0);
+            w.apb_clk_div_denominator().bits(0)
+        });
+    update_bus_clocks();
+}
+
+fn enable_lp_fast_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn configure_lp_fast_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<LpFastClkConfig>,
+    new: LpFastClkConfig,
+) {
+    LP_AON_CLK_RST::regs()
+        .root_clk_conf()
+        .modify(|_, w| unsafe {
+            w.fast_clk_sel().bits(match new {
+                LpFastClkConfig::RcFast => 0,
+                LpFastClkConfig::Xtal => 1,
+            })
+        });
+}
+
+fn enable_lp_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do here
+}
+
+fn configure_lp_slow_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<LpSlowClkConfig>,
+    new: LpSlowClkConfig,
+) {
+    LP_AON_CLK_RST::regs()
+        .root_clk_conf()
+        .modify(|_, w| unsafe {
+            w.slow_clk_sel().bits(match new {
+                LpSlowClkConfig::RcSlow => 0,
+                #[cfg(use_xtal32k)]
+                LpSlowClkConfig::Xtal32k => 1,
+            })
+        });
+}
+
+fn enable_timg_calibration_clock_impl(_clocks: &mut ClockTree, en: bool) {
+    HP_SYS_CLKRST::regs()
+        .timergrp0_tgrt_ctrl0()
+        .modify(|_, w| w.clk_en().bit(en));
+}
+
+fn configure_timg_calibration_clock_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<TimgCalibrationClockConfig>,
+    new: TimgCalibrationClockConfig,
+) {
+    let (source, divider): (u8, u16) = match new {
+        TimgCalibrationClockConfig::RcFastDivClk => (7, 50),
+        TimgCalibrationClockConfig::RcSlowClk => (8, 1),
+        #[cfg(use_xtal32k)]
+        TimgCalibrationClockConfig::Xtal32kClk => (10, 1),
+    };
+    HP_SYS_CLKRST::regs()
+        .timergrp0_tgrt_ctrl0()
+        .modify(|_, w| unsafe {
+            w.clk_src_sel().bits(source);
+            w.clk_div_num().bits(divider - 1)
+        });
+}
+
+// CRYPTO_CLK
+
+fn enable_crypto_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    HP_SYS_CLKRST::regs().crypto_ctrl0().modify(|_, w| {
+        w.crypto_sys_clk_en().bit(en);
+        w.crypto_sec_clk_en().bit(en)
+    });
+}
+
+fn configure_crypto_clk_impl(
+    _clocks: &mut ClockTree,
+    _old: Option<CryptoClkConfig>,
+    new: CryptoClkConfig,
+) {
+    HP_SYS_CLKRST::regs().crypto_ctrl0().modify(|_, w| unsafe {
+        w.crypto_clk_src_sel().bits(match new {
+            CryptoClkConfig::Xtal => 0,
+            CryptoClkConfig::RcFast => 1,
+            CryptoClkConfig::PllF240m => 2,
+        })
+    });
+}
+
+// IOMUX_FUNCTION_CLOCK
+
+fn configure_iomux_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<IomuxFunctionClockConfig>,
+    new_config: IomuxFunctionClockConfig,
+) {
+    HP_SYS_CLKRST::regs().iomux_ctrl0().modify(|_, w| unsafe {
+        w.clk_src_sel().bit(matches!(
+            new_config.source,
+            IomuxFunctionClockSource::PllF80m
+        ));
+        w.clk_div_num().bits(new_config.div_num as u8)
+    });
+}
+
+impl TimgInstance {
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        match self {
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs().timergrp0_ctrl0().modify(|_, w| {
+                w.t0_clk_en().bit(en);
+                w.t1_clk_en().bit(en)
+            }),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs().timergrp1_ctrl0().modify(|_, w| {
+                w.t0_clk_en().bit(en);
+                w.t1_clk_en().bit(en)
+            }),
+        };
+    }
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old: Option<TimgFunctionClockConfig>,
+        new: TimgFunctionClockConfig,
+    ) {
+        let bits = match new {
+            TimgFunctionClockConfig::XtalClk => 0,
+            TimgFunctionClockConfig::RcFastClk => 1,
+            TimgFunctionClockConfig::PllF80m => 2,
+        };
+        match self {
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
+                .timergrp0_ctrl0()
+                .modify(|_, w| unsafe {
+                    w.t0_src_sel().bits(bits);
+                    w.t1_src_sel().bits(bits)
+                }),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
+                .timergrp1_ctrl0()
+                .modify(|_, w| unsafe {
+                    w.t0_src_sel().bits(bits);
+                    w.t1_src_sel().bits(bits)
+                }),
+        };
+    }
+
+    fn enable_wdt_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        match self {
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
+                .timergrp0_ctrl0()
+                .modify(|_, w| w.wdt_clk_en().bit(en)),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
+                .timergrp1_ctrl0()
+                .modify(|_, w| w.wdt_clk_en().bit(en)),
+        };
+    }
+    fn configure_wdt_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old: Option<TimgWdtClockConfig>,
+        new: TimgWdtClockConfig,
+    ) {
+        let bits = match new {
+            TimgWdtClockConfig::XtalClk => 0,
+            TimgWdtClockConfig::RcFastClk => 1,
+            TimgWdtClockConfig::PllF80m => 2,
+        };
+        match self {
+            TimgInstance::Timg0 => HP_SYS_CLKRST::regs()
+                .timergrp0_ctrl0()
+                .modify(|_, w| unsafe { w.wdt_src_sel().bits(bits) }),
+            TimgInstance::Timg1 => HP_SYS_CLKRST::regs()
+                .timergrp1_ctrl0()
+                .modify(|_, w| unsafe { w.wdt_src_sel().bits(bits) }),
+        };
+    }
+}
+
+impl RmtInstance {
+    // RMT_SCLK
+
+    fn enable_sclk_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS::regs().rmt_mem_lp_ctrl().modify(|_, w| {
+            w.rmt_mem_lp_force_ctrl().set_bit();
+            w.rmt_mem_lp_en().bit(!en)
+        });
+
+        HP_SYS_CLKRST::regs()
+            .rmt_ctrl0()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_sclk_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<RmtSclkConfig>,
+        new_config: RmtSclkConfig,
+    ) {
+        // Register values: 0 = XTAL, 1 = RC_FAST, 2 = REF_F80M (PLL_F80M).
+        HP_SYS_CLKRST::regs().rmt_ctrl0().modify(|_, w| unsafe {
+            w.clk_src_sel().bits(match new_config {
+                RmtSclkConfig::XtalClk => 0,
+                RmtSclkConfig::RcFastClk => 1,
+                RmtSclkConfig::PllF80m => 2,
+            })
+        });
+    }
+}
+
+impl PsramInstance {
+    // PSRAM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        HP_SYS_CLKRST::regs().psram_ctrl0().modify(|_, w| {
+            w.pll_clk_en().bit(en);
+            w.core_clk_en().bit(en)
+        });
+    }
+
+    fn configure_function_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<PsramFunctionClockConfig>,
+        new_config: PsramFunctionClockConfig,
+    ) {
+        HP_SYS_CLKRST::regs().psram_ctrl0().modify(|_, w| unsafe {
+            w.clk_src_sel().bits(match new_config {
+                PsramFunctionClockConfig::Xtal => 0,
+                PsramFunctionClockConfig::Mpll => 1,
+                PsramFunctionClockConfig::Cpll => 2,
+            })
+        });
+    }
+}
+
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.sigmadelta_clk_en().bit(en));
+    }
+}
+
+impl LcdCamInstance {
+    fn enable_shared_core_clock(self, clocks: &ClockTree, en: bool) {
+        let idx = self as usize;
+        let sibling_held = clocks.lcd_cam_lcd_clock_refcount[idx] > 0
+            || clocks.lcd_cam_cam_clock_refcount[idx] > 0;
+        if !en && sibling_held {
+            return;
+        }
+
+        HP_SYS::regs().lcdcam_mem_lp_ctrl().modify(|_, w| {
+            w.lcdcam_mem_lp_force_ctrl().set_bit();
+            w.lcdcam_mem_lp_en().bit(!en)
+        });
+        // Shared LCD/CAM core clock. Source 0 = XTAL. Divider stores N - 1.
+        HP_SYS_CLKRST::regs()
+            .lcdcam_lcdcam_ctrl0()
+            .modify(|_, w| unsafe {
+                w.clk_en().bit(en);
+                w.clk_src_sel().bits(0);
+                w.clk_div_num().bits(0)
+            });
+    }
+
+    fn enable_lcd_clock_impl(self, clocks: &mut ClockTree, en: bool) {
+        self.enable_shared_core_clock(clocks, en);
+        HP_SYS_CLKRST::regs()
+            .lcdcam_lcd_ctrl0()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_lcd_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamLcdClockConfig>,
+        new_config: LcdCamLcdClockConfig,
+    ) {
+        // Register stores N - 1. Source: 0 = XTAL, 1 = PLL_F160M, 2 = APLL.
+        let div_num = (new_config.div_num() - 1) as u8;
+        HP_SYS_CLKRST::regs()
+            .lcdcam_lcd_ctrl0()
+            .modify(|_, w| unsafe {
+                w.clk_src_sel().bits(match new_config.sclk() {
+                    LcdCamLcdClockSclk::XtalClk => 0,
+                    LcdCamLcdClockSclk::PllF160m => 1,
+                });
+                w.clk_div_num().bits(div_num);
+                w.clk_div_denominator().bits(new_config.div_a() as u8);
+                w.clk_div_numerator().bits(new_config.div_b() as u8)
+            });
+    }
+
+    fn enable_cam_clock_impl(self, clocks: &mut ClockTree, en: bool) {
+        self.enable_shared_core_clock(clocks, en);
+        HP_SYS_CLKRST::regs()
+            .lcdcam_cam_ctrl0()
+            .modify(|_, w| w.clk_en().bit(en));
+    }
+
+    fn configure_cam_clock_impl(
+        self,
+        _clocks: &mut ClockTree,
+        _old_config: Option<LcdCamCamClockConfig>,
+        new_config: LcdCamCamClockConfig,
+    ) {
+        let div_num = (new_config.div_num() - 1) as u8;
+        HP_SYS_CLKRST::regs()
+            .lcdcam_cam_ctrl0()
+            .modify(|_, w| unsafe {
+                w.clk_src_sel().bits(match new_config.sclk() {
+                    LcdCamCamClockSclk::XtalClk => 0,
+                    LcdCamCamClockSclk::PllF160m => 1,
+                });
+                w.clk_div_num().bits(div_num);
+                w.clk_div_denominator().bits(new_config.div_a() as u8);
+                w.clk_div_numerator().bits(new_config.div_b() as u8)
+            });
+    }
+}
+
+// BLE_LP_XTAL_CLK
+
+fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do.
+}
+
+// BLE_LP_CLK
+
+fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_lp_timer_en().bit(en));
+}
+
+fn configure_ble_lp_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<BleLpClkConfig>,
+    new_config: BleLpClkConfig,
+) {
+    let divisor = match new_config {
+        BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
+        _ => 0,
+    };
+    let sel_xtal32k = cfg_select! {
+        use_xtal32k => new_config == BleLpClkConfig::Xtal32k,
+        _ => false,
+    };
+
+    MODEM_LPCON::regs()
+        .test_conf()
+        .modify(|_, w| w.clk_en().set_bit());
+
+    MODEM_LPCON::regs().lp_timer_conf().modify(|_, w| unsafe {
+        w.clk_lp_timer_sel_osc_slow()
+            .bit(new_config == BleLpClkConfig::RcSlow);
+        w.clk_lp_timer_sel_osc_fast().clear_bit();
+        w.clk_lp_timer_sel_xtal()
+            .bit(new_config == BleLpClkConfig::Xtal);
+        w.clk_lp_timer_sel_xtal32k().bit(sel_xtal32k);
+        w.clk_lp_timer_div_num().bits(divisor as u16)
+    });
+
+    if sel_xtal32k {
+        // 0 routes XTAL32K to the modem 32 kHz input.
+        MODEM_LPCON::regs()
+            .modem_32k_clk_conf()
+            .modify(|_, w| unsafe { w.clk_modem_32k_sel().bits(0) });
+    }
+
+    // IDF `modem_lpcon_ll_reset_ble_rtc_timer`.
+    MODEM_LPCON::regs()
+        .rst_conf()
+        .modify(|_, w| w.rst_lp_timer().set_bit());
+    MODEM_LPCON::regs()
+        .rst_conf()
+        .modify(|_, w| w.rst_lp_timer().clear_bit());
+}

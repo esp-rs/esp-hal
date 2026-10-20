@@ -10,6 +10,7 @@ use crate::{
     SCHEDULER,
     TICK_RATE,
     TimeBase,
+    run_queue::RunSchedulerOn,
     task::{self, TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
 };
 
@@ -121,6 +122,17 @@ impl TimeDriver {
             timer_queue: TimerQueue::new(),
             current_alarm: u64::MAX,
         }
+    }
+
+    #[cfg(sleep_light_sleep)]
+    pub(crate) fn next_wakeup(&self) -> u64 {
+        self.timer_queue.next_wakeup()
+    }
+
+    /// Force-rearms the alarm timer.
+    pub(crate) fn rearm(&mut self, now: u64) {
+        self.current_alarm = u64::MAX;
+        self.arm_next_wakeup(now);
     }
 
     pub(crate) fn handle_alarm(&mut self, now: u64, on_task_ready: impl FnMut(TaskPtr)) {
@@ -247,6 +259,7 @@ extern "C" fn timer_tick_handler() {
         let mut scheduler = global_state.scheduler();
         let scheduler = &mut *scheduler;
 
+        let active_cores = scheduler.active_cores;
         let time_driver = unwrap!(scheduler.time_driver.as_mut());
 
         time_driver.timer.clear_interrupt();
@@ -265,9 +278,10 @@ extern "C" fn timer_tick_handler() {
 
             debug!("Task {:?} is ready", ready_task);
 
-            let run_scheduler = scheduler
-                .run_queue
-                .mark_task_ready(&scheduler.per_cpu, ready_task);
+            let run_scheduler =
+                scheduler
+                    .run_queue
+                    .mark_task_ready(&scheduler.per_cpu, active_cores, ready_task);
             task::trigger_scheduler(run_scheduler);
         });
 
@@ -281,20 +295,25 @@ extern "C" fn timer_tick_handler() {
         #[cfg(feature = "rtos-trace")]
         rtos_trace::trace::marker_end(TraceEvents::ProcessTimerQueue as u32);
 
-        if now >= time_driver.timer_queue.time_slice_target[0] {
-            crate::task::yield_task();
-        }
-
-        #[cfg(multi_core)]
-        if now >= time_driver.timer_queue.time_slice_target[1] {
-            crate::task::schedule_other_core();
+        // This handler can run on any CPU that runs the scheduler, so we must trigger the
+        // scheduler on the CPU whose time slice ran out, not on a fixed one.
+        for cpu in Cpu::all() {
+            if active_cores.contains(cpu)
+                && now >= time_driver.timer_queue.time_slice_target[cpu as usize]
+            {
+                // The context switch cannot preempt this handler, because it runs at the lowest
+                // interrupt priority. Clear the expired target, or this handler keeps re-arming
+                // the alarm for a time in the past, and its interrupt starves the context switch.
+                // The scheduler sets the next target when the context switch runs.
+                time_driver.set_time_slice(cpu, now, false);
+                task::trigger_scheduler(RunSchedulerOn::RunOnCore(cpu));
+            }
         }
 
         // Re-arm the timer. This should be relatively cheap, and ensures that the timer will keep
         // ticking even if the interrupt doesn't trigger a context switch.
         // FIXME: this SHOULD be relatively cheap, but arming the timer involves u64 division.
-        time_driver.current_alarm = u64::MAX;
-        time_driver.arm_next_wakeup(now);
+        time_driver.rearm(now);
     });
 
     #[cfg(feature = "rtos-trace")]

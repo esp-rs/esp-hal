@@ -2,6 +2,11 @@
 #
 # We want to check if we can compile examples/tests after bumping the deps by using a local registry.
 # (i.e. if we will publish the right set of crates)
+#
+# The compile-test build runs on every release PR; xtask derives its project-by-chip matrix from
+# each project's metadata. The heavier examples/qa/tests build runs by default (skipped by the
+# `release:registry:skip-ci` label) and loops the chips in `.github/chips.json`, the same source
+# the main CI uses.
 
 name: pre-release-checks
 
@@ -17,29 +22,25 @@ env:
 jobs:
   check:
     runs-on: macos-m1-self-hosted
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'release:registry:compile-test') || contains(github.event.pull_request.labels.*.name, 'release:registry:ci'))) }}
+    # Only release PRs (branched as `release-branch-*` by `execute-plan`) carry a
+    # plan, so ordinary PRs never run this. `xrel-check` bails if the plan is
+    # missing.
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-branch-') }}
 
     steps:
       - uses: actions/checkout@v6
 
-      # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.6
+      - uses: ./.github/actions/setup-toolchains
         with:
-          version: 1.96.0.0
-
-      # Install the Rust stable toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: stable
-          components: rust-src
+          xtensa: "true"
+          riscv: "true"
 
       # Install the Rust nightly toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
+      - uses: ./.github/actions/setup-nightly
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,riscv32imafc-unknown-none-elf
-          toolchain: nightly
+          targets: all
           components: rust-src
+          alias: "true"
 
       - name: Setup cargo-batch
         run: |
@@ -47,48 +48,36 @@ jobs:
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
+      # Warm the chip-metadata cache while crates.io is still reachable. A cold
+      # cache makes the later `build` step regenerate `esp-metadata-generated`,
+      # which builds the `esp-metadata` tool - and that host tool cannot resolve
+      # its dependencies (e.g. `prettyplease`) against the local registry.
+      - name: warm-metadata-cache
+        run: cargo update-metadata
+
       - name: init-local-registry
         run: |
-          # this example relies on a Cargo.lock file and won't compile after `cargo update` - for now lets remove it
-          # include it once that is resolved
-          rm -rf examples/async/embassy_usb_ethernet
-
           cargo xrel-check init
           cargo xrel-check update
           cargo xrel-check replace-path-deps
 
-      # Build the compile-tests against the local registry. This is the cheap smoke
-      # test, so it runs first. Gated on `release:registry:compile-test` so it can be
-      # run independently of the heavier CI build.
+      # Build the compile-tests against the local registry. xtask derives the
+      # project-by-chip matrix from each project's metadata (and the toolchain
+      # per chip), so there is no fixed chip set to keep in sync here.
       - name: try-build [compile-tests]
-        if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:compile-test') }}
-        shell: bash
-        run: |
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s2
-          cargo xtask build examples --toolchain esp --package=compile-tests all --chip=esp32s3
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c2
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c3
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c5
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c6
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32c61
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32p4
-          cargo xtask build examples --toolchain stable --package=compile-tests all --chip=esp32h2
+        run: cargo xtask build compile-tests
 
-      # Build the examples/qa-test/tests against the local registry. Gated on
-      # `release:registry:ci` so a release can opt out of this heavy check.
-      - name: try-build [examples/qa-test/tests]
-        if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'release:registry:ci') }}
+      # Build the examples/qa/tests against the local registry. Runs by default;
+      # add `release:registry:skip-ci` to the PR to opt out of this heavy check.
+      - name: try-build [examples/qa/tests]
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'release:registry:skip-ci') }}
         shell: bash
         run: |
           # lints and docs are checked a couple of times already by other workflows
-          cargo xcheck ci esp32 --toolchain esp --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32s2 --toolchain esp --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32s3 --toolchain esp --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32c2 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32c3 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32c5 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32c6 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32c61 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32p4 --toolchain stable --steps=lp-examples,examples,qa-test,tests
-          cargo xcheck ci esp32h2 --toolchain stable --steps=lp-examples,examples,qa-test,tests
+          for soc in $(jq -r '.[].soc' .github/chips.json); do
+            toolchain=$(jq -r --arg s "$soc" \
+              '.[] | select(.soc == $s) | ."ci-toolchain"' .github/chips.json)
+            echo "::group::examples/qa/tests $soc ($toolchain)"
+            cargo xcheck ci "$soc" --toolchain "$toolchain" --steps=lp-examples,examples,qa-test,tests
+            echo "::endgroup::"
+          done

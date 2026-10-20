@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal-procmacros"
-version       = "0.22.0"
+version       = "0.23.0"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "Procedural macros for esp-hal"
@@ -11,12 +11,17 @@ license       = "MIT OR Apache-2.0"
 exclude = ["testdata"]
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = [] }
 check-configs = [
     { features = [] },
 ]
 clippy-configs = [
     { features = [] },
+]
+host-test-configs = [
+    { features = ["has-lp-core", "is-lp-core", "rtc-slow", "rtc-fast"] },
 ]
 
 [package.metadata.docs.rs]
@@ -40,6 +45,10 @@ rtc-slow = []
 
 ## Indicates the target device has RTC fast memory available.
 rtc-fast = []
+
+## Indicates the target device has a data cache that when not used, is available
+## in a memory section *separate* from DRAM.
+dcache-reclaimed = []
 
 #! ### Low-power Core Feature Flags
 ## Indicate that the SoC contains an LP core.

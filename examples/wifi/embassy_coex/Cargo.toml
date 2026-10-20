@@ -14,7 +14,7 @@ embassy-net = { version = "0.8.0", features = [
     "dns",
 ] }
 embassy-time = "0.5.1"
-embassy-sync = "0.7" # TODO: update once trouble supports 0.8
+embassy-sync = "0.8"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
@@ -22,6 +22,7 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-metadata-generated = { path = "../../../esp-metadata-generated" }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
 esp-radio = { path = "../../../esp-radio", features = [
@@ -33,7 +34,7 @@ esp-radio = { path = "../../../esp-radio", features = [
 ] }
 reqwless = { version = "0.14.0", default-features = false }
 static_cell = "2.1.0"
-trouble-host = { version = "0.6.0", features = [
+trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
@@ -41,51 +42,74 @@ trouble-host = { version = "0.6.0", features = [
 
 [features]
 esp32 = [
+    "esp-alloc/esp32",
     "esp-backtrace/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-hal/esp32",
+    "esp-metadata-generated/esp32",
     "esp-rtos/esp32",
     "esp-radio/esp32",
 ]
 esp32c2 = [
+    "esp-alloc/esp32c2",
     "esp-backtrace/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-hal/esp32c2",
+    "esp-metadata-generated/esp32c2",
     "esp-rtos/esp32c2",
     "esp-radio/esp32c2",
 ]
 esp32c3 = [
+    "esp-alloc/esp32c3",
     "esp-backtrace/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-hal/esp32c3",
+    "esp-metadata-generated/esp32c3",
     "esp-rtos/esp32c3",
     "esp-radio/esp32c3",
 ]
 esp32c5 = [
+    "esp-alloc/esp32c5",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
+    "esp-metadata-generated/esp32c5",
     "esp-rtos/esp32c5",
     "esp-radio/esp32c5",
 ]
 esp32c6 = [
+    "esp-alloc/esp32c6",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
+    "esp-metadata-generated/esp32c6",
     "esp-rtos/esp32c6",
     "esp-radio/esp32c6",
 ]
 esp32c61 = [
+    "esp-alloc/esp32c61",
     "esp-backtrace/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-hal/esp32c61",
+    "esp-metadata-generated/esp32c61",
     "esp-rtos/esp32c61",
     "esp-radio/esp32c61",
 ]
+esp32s31 = [
+    "esp-alloc/esp32s31",
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+    "esp-metadata-generated/esp32s31",
+    "esp-rtos/esp32s31",
+    "esp-radio/esp32s31",
+]
 esp32s3 = [
+    "esp-alloc/esp32s3",
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",
+    "esp-metadata-generated/esp32s3",
     "esp-rtos/esp32s3",
     "esp-radio/esp32s3",
 ]

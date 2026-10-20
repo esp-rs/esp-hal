@@ -8,26 +8,52 @@
 crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
-    pub mod ulp_core;
+    pub mod lp_core;
+    // The light sleep path stalls the other core, and it is not gated on the feature.
+    pub mod cpu_control;
 }
-#[cfg(feature = "unstable")]
-pub mod cpu_control;
 pub mod gpio;
 pub(crate) mod regi2c;
 
 pub use esp32s3 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    clocks::pll_160m_frequency()
-}
+pub(crate) const CONFIG_INSTRUCTION_CACHE_SIZE: usize = cfg_select! {
+    instruction_cache_size_32kb => 0x8000,
+    instruction_cache_size_16kb => 0x4000,
+};
+pub(crate) const CONFIG_ICACHE_ASSOCIATED_WAYS: usize = cfg_select! {
+    icache_associated_ways_8 => 8,
+    icache_associated_ways_4 => 4,
+};
+pub(crate) const CONFIG_INSTRUCTION_CACHE_LINE_SIZE: usize = cfg_select! {
+    instruction_cache_line_size_32b => 32,
+    instruction_cache_line_size_16b => 16,
+};
 
-#[cfg(spi_master_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn spi_master_clock_source_frequency() -> u32 {
-    clocks::apb_clk_frequency()
-}
+pub(crate) const CONFIG_DATA_CACHE_SIZE: usize = cfg_select! {
+    data_cache_size_64kb => 0x10000,
+    data_cache_size_32kb => 0x8000,
+};
+pub(crate) const CONFIG_DCACHE_ASSOCIATED_WAYS: usize = cfg_select! {
+    dcache_associated_ways_8 => 8,
+    dcache_associated_ways_4 => 4,
+};
+pub(crate) const CONFIG_DATA_CACHE_LINE_SIZE: usize = cfg_select! {
+    data_cache_line_size_64b => 64,
+    data_cache_line_size_32b => 32,
+    data_cache_line_size_16b => 16,
+};
+
+const _: () = {
+    ::core::assert!(
+        !(CONFIG_INSTRUCTION_CACHE_SIZE == 0x8000 && CONFIG_INSTRUCTION_CACHE_LINE_SIZE == 16),
+        "A 16B instruction cache line size requires a 16KB instruction cache"
+    );
+    ::core::assert!(
+        !(CONFIG_DATA_CACHE_SIZE == 0x10000 && CONFIG_DATA_CACHE_LINE_SIZE == 16),
+        "A 16B data cache line size requires a 16KB or 32KB data cache"
+    );
+};
 
 #[unsafe(link_section = ".rwtext")]
 pub(crate) unsafe fn configure_cpu_caches() {
@@ -36,7 +62,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
     // see https://github.com/apache/nuttx/blob/f25db331136351dbf8ebe6925a98d3b77e1ca983/arch/xtensa/src/esp32s3/esp32s3_start.c#L213
 
     unsafe extern "C" {
-        fn Cache_Suspend_DCache();
+        fn Cache_Suspend_DCache() -> u32;
 
         fn Cache_Resume_DCache(param: u32);
 
@@ -53,46 +79,12 @@ pub(crate) unsafe fn configure_cpu_caches() {
         );
     }
 
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = match () {
-        _ if cfg!(instruction_cache_size_32kb) => 0x8000,
-        _ if cfg!(instruction_cache_size_16kb) => 0x4000,
-        _ => core::unreachable!(),
-    };
-    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = match () {
-        _ if cfg!(icache_associated_ways_8) => 8,
-        _ if cfg!(icache_associated_ways_4) => 4,
-        _ => core::unreachable!(),
-    };
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = match () {
-        _ if cfg!(instruction_cache_line_size_32b) => 32,
-        _ if cfg!(instruction_cache_line_size_16b) => 16,
-        _ => core::unreachable!(),
-    };
-
-    const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = match () {
-        _ if cfg!(data_cache_size_64kb) => 0x10000,
-        _ if cfg!(data_cache_size_32kb) => 0x8000,
-        _ if cfg!(data_cache_size_16kb) => 0x4000,
-        _ => core::unreachable!(),
-    };
-    const CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS: u8 = match () {
-        _ if cfg!(dcache_associated_ways_8) => 8,
-        _ if cfg!(dcache_associated_ways_4) => 4,
-        _ => core::unreachable!(),
-    };
-    const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = match () {
-        _ if cfg!(data_cache_line_size_64b) => 64,
-        _ if cfg!(data_cache_line_size_32b) => 32,
-        _ if cfg!(data_cache_line_size_16b) => 16,
-        _ => core::unreachable!(),
-    };
-
     // Configure the mode of instruction cache: cache size, cache line size.
     unsafe {
         rom_config_instruction_cache_mode(
-            CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE,
-            CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS,
-            CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE,
+            CONFIG_INSTRUCTION_CACHE_SIZE as u32,
+            CONFIG_ICACHE_ASSOCIATED_WAYS as u8,
+            CONFIG_INSTRUCTION_CACHE_LINE_SIZE as u8,
         );
     }
 
@@ -100,15 +92,15 @@ pub(crate) unsafe fn configure_cpu_caches() {
     unsafe {
         Cache_Suspend_DCache();
         rom_config_data_cache_mode(
-            CONFIG_ESP32S3_DATA_CACHE_SIZE,
-            CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS,
-            CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE,
+            CONFIG_DATA_CACHE_SIZE as u32,
+            CONFIG_DCACHE_ASSOCIATED_WAYS as u8,
+            CONFIG_DATA_CACHE_LINE_SIZE as u8,
         );
         Cache_Resume_DCache(0);
     }
 }
 
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
@@ -134,6 +126,42 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     }
     unsafe {
         Cache_Invalidate_Addr(addr, size);
+    }
+}
+
+/// Writes back all dirty data cache lines.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_writeback_all() {
+    unsafe extern "C" {
+        fn Cache_WriteBack_All();
+    }
+    unsafe {
+        Cache_WriteBack_All();
+    }
+}
+
+/// Invalidates the entire instruction cache.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_invalidate_icache_all() {
+    unsafe extern "C" {
+        fn Cache_Invalidate_ICache_All();
+    }
+    unsafe {
+        Cache_Invalidate_ICache_All();
+    }
+}
+
+/// Invalidates the entire data cache.
+#[doc(hidden)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_invalidate_dcache_all() {
+    unsafe extern "C" {
+        fn Cache_Invalidate_DCache_All();
+    }
+    unsafe {
+        Cache_Invalidate_DCache_All();
     }
 }
 

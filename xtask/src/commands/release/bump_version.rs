@@ -16,7 +16,7 @@ use crate::{
     Version,
     cargo::CargoToml,
     changelog::Changelog,
-    commands::PLACEHOLDER,
+    commands::{PLACEHOLDER, release::registry::RegistrySnapshot},
     find_packages,
 };
 
@@ -103,16 +103,21 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
         pre: args.pre,
     };
 
+    // Even a manual bump must not land on a version crates.io already holds.
+    let registry = RegistrySnapshot::fetch(args.packages.iter().copied())?;
+
     // Bump the version for each given package:
     for package in args.packages {
         let mut package = CargoToml::new(workspace, package)?;
-        update_package(&mut package, &bump, false, false)?;
+        update_package(&mut package, &bump, &registry, false, false)?;
     }
 
     Ok(())
 }
 
 /// Update the specified package by bumping its version, updating its changelog,
+///
+/// The bump steps over version numbers `registry` reports as taken.
 ///
 /// `skip_dependent_rewrites` skips rewriting intra-workspace path-dep version
 /// requirements on sibling crates. Set this on backport patch releases: those
@@ -122,12 +127,14 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
 /// them anyway is pure churn.
 pub fn update_package(
     package: &mut CargoToml,
-    version: &VersionBump,
+    amount: &VersionBump,
+    registry: &RegistrySnapshot,
     dry_run: bool,
     skip_dependent_rewrites: bool,
 ) -> Result<semver::Version> {
     check_crate_before_bumping(package)?;
-    let new_version = bump_crate_version(package, version, dry_run, skip_dependent_rewrites)?;
+    let new_version =
+        bump_crate_version(package, amount, registry, dry_run, skip_dependent_rewrites)?;
     finalize_changelog(package, &new_version, dry_run)?;
     finalize_placeholders(package, &new_version, dry_run)?;
 
@@ -169,7 +176,7 @@ fn check_crate_before_bumping(manifest: &mut CargoToml) -> Result<()> {
         let mut error_message = String::new();
         for (dep_kind, errors) in errors {
             if !error_message.is_empty() {
-                error_message.push_str("\n");
+                error_message.push('\n');
             }
             writeln!(&mut error_message, "In [{dep_kind}]:").unwrap();
             for (krate, error) in errors {
@@ -193,7 +200,7 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
         Ok(())
     }
 
-    fn check_for_non_version_deps<'a, T: TableLike>(dependency: &T) -> Result<()> {
+    fn check_for_non_version_deps<T: TableLike>(dependency: &T) -> Result<()> {
         if let Some(version) = dependency.get("version") {
             if let Some(version) = version.as_str() {
                 validate_simple_version(version)?;
@@ -230,17 +237,20 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
     Ok(())
 }
 
-/// Bump the version of the specified package by the specified amount.
+/// Bump the version of the specified package by the specified amount, stepping
+/// over version numbers crates.io has already seen.
 fn bump_crate_version(
     bumped_package: &mut CargoToml,
     amount: &VersionBump,
+    registry: &RegistrySnapshot,
     dry_run: bool,
     skip_dependent_rewrites: bool,
 ) -> Result<semver::Version> {
     let prev_version = bumped_package.package_version();
 
-    let version = do_version_bump(&prev_version, amount)
+    let planned = do_version_bump(&prev_version, amount)
         .with_context(|| format!("Failed to bump version of {}", bumped_package.package))?;
+    let version = registry.next_free_version(bumped_package.package, &planned, amount)?;
 
     if dry_run {
         log::info!(
@@ -267,10 +277,9 @@ fn bump_crate_version(
         .into_iter()
         .map(|p| p.join("Cargo.toml"));
 
-    // skip compile tests, these represent real world projects and therefore serve as a good test
-    // when we try and build them when the new versions are available in our local test registry.
+    // Skip the directories of standalone projects, they have no manifest of their own.
     let tomls = Package::iter()
-        .filter(|&p| p != Package::Examples && p != Package::CompileTests)
+        .filter(|p| !p.contains_standalone_projects())
         .map(|p| {
             CargoToml::new(&bumped_package.workspace, p)
                 .with_context(|| format!("Could not load Cargo.toml of {p}"))
@@ -280,7 +289,7 @@ fn bump_crate_version(
             let content = fs::read_to_string(&p)
                 .with_context(|| format!("Could not read {}", p.display()))?;
             CargoToml::from_str(&bumped_package.workspace, Package::Examples, &content)
-                .with_context(|| format!("Could not parse Cargo.toml"))
+                .with_context(|| "Could not parse Cargo.toml".to_string())
         }));
 
     for dependent in tomls {
@@ -298,6 +307,36 @@ fn bump_crate_version(
                     dependent.package()
                 );
                 dependent.save()?;
+            }
+        }
+    }
+
+    // compile-tests/hal tracks the current lines. Frozen ble_*/wifi_* stay on
+    // the minor they were snapshotted at, so they are not rewritten here.
+    let hal_manifest = bumped_package
+        .workspace
+        .join("compile-tests")
+        .join("hal")
+        .join("Cargo.toml");
+    if hal_manifest.exists() {
+        let content = fs::read_to_string(&hal_manifest)
+            .with_context(|| format!("Could not read {}", hal_manifest.display()))?;
+        let mut toml =
+            CargoToml::from_str(&bumped_package.workspace, Package::CompileTests, &content)
+                .with_context(|| format!("Could not parse {}", hal_manifest.display()))?;
+        if toml.change_version_of_dependency(&package_name, &version) {
+            if dry_run {
+                log::info!(
+                    "  Dry run: would update {package_name} in compile-tests/hal: \
+                     ({prev_version} -> {version})"
+                );
+            } else {
+                log::info!(
+                    "  Bumping {package_name} version for compile-tests/hal: \
+                     ({prev_version} -> {version})"
+                );
+                fs::write(&hal_manifest, toml.manifest.to_string())
+                    .with_context(|| format!("Could not write {}", hal_manifest.display()))?;
             }
         }
     }
@@ -402,10 +441,7 @@ fn finalize_changelog(
     new_version: &semver::Version,
     dry_run: bool,
 ) -> Result<()> {
-    let changelog_path = bumped_package
-        .workspace
-        .join(bumped_package.package.to_string())
-        .join("CHANGELOG.md");
+    let changelog_path = bumped_package.package_path().join("CHANGELOG.md");
 
     if !changelog_path.exists() {
         // No changelog exists for this package
@@ -460,16 +496,16 @@ fn finalize_placeholders(
     let is_prerelease = !new_version.pre.is_empty();
 
     walk_dir(&bumped_package.package_path(), &skip_paths, &mut |path| {
-        if is_prerelease {
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with("MIGRATING-") && name.ends_with(".md") {
-                    log::info!(
-                        "  Skipping migration guide {} (pre-release)",
-                        path.display()
-                    );
-                    return;
-                }
-            }
+        if is_prerelease
+            && let Some(name) = path.file_name().and_then(|n| n.to_str())
+            && name.starts_with("MIGRATING-")
+            && name.ends_with(".md")
+        {
+            log::info!(
+                "  Skipping migration guide {} (pre-release)",
+                path.display()
+            );
+            return;
         }
 
         let content = match fs::read_to_string(path) {
@@ -596,6 +632,71 @@ mod tests {
                 "expected error for bump {bump:?} of {version}",
             );
         }
+    }
+
+    /// A reserved version has to change what gets written: both the manifest of
+    /// the bumped package and the requirement its dependents carry.
+    #[test]
+    fn a_reserved_version_changes_what_is_written() {
+        let workspace = tempfile::tempdir().unwrap();
+        let manifest_of = |package: Package| {
+            workspace
+                .path()
+                .join(package.directory())
+                .join("Cargo.toml")
+        };
+
+        // The dependent rewrite pass loads every non-standalone package and the
+        // example projects, so all of them have to exist on disk.
+        fs::create_dir(workspace.path().join("examples")).unwrap();
+        for package in Package::iter().filter(|p| !p.contains_standalone_projects()) {
+            fs::create_dir_all(workspace.path().join(package.directory())).unwrap();
+            fs::write(
+                manifest_of(package),
+                format!("[package]\nname = \"{package}\"\nversion = \"0.0.0\"\n"),
+            )
+            .unwrap();
+        }
+
+        fs::write(
+            manifest_of(Package::EspSync),
+            "[package]\nname = \"esp-sync\"\nversion = \"0.1.1\"\n",
+        )
+        .unwrap();
+        fs::write(
+            manifest_of(Package::EspHal),
+            "[package]\nname = \"esp-hal\"\nversion = \"1.0.0\"\n\n\
+             [dependencies]\nesp-sync = { version = \"0.1.1\", path = \"../esp-sync\" }\n",
+        )
+        .unwrap();
+
+        // esp-rs/esp-hal#5385: the Minor bump lands on the yanked 0.2.0.
+        let registry =
+            RegistrySnapshot::from_taken([(Package::EspSync, vec!["0.2.0".parse().unwrap()])]);
+
+        let mut manifest = CargoToml::new(workspace.path(), Package::EspSync).unwrap();
+        let new_version = update_package(
+            &mut manifest,
+            &VersionBump::minor(),
+            &registry,
+            false,
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(new_version.to_string(), "0.2.1");
+
+        let bumped = fs::read_to_string(manifest_of(Package::EspSync)).unwrap();
+        assert!(
+            bumped.contains(r#"version = "0.2.1""#),
+            "esp-sync did not receive the stepped version:\n{bumped}"
+        );
+
+        let dependent = fs::read_to_string(manifest_of(Package::EspHal)).unwrap();
+        assert!(
+            dependent.contains(r#"version = "0.2.1""#),
+            "esp-hal still requires the reserved version:\n{dependent}"
+        );
     }
 
     #[test]

@@ -32,7 +32,7 @@
 
 use crate::time::{Duration, Instant};
 
-/// Delay driver, using [`Instant`].
+/// Delay driver that uses [`Instant`].
 #[derive(Clone, Copy, Default)]
 #[non_exhaustive]
 pub struct Delay;
@@ -49,24 +49,24 @@ impl Delay {
         Self {}
     }
 
-    /// Delay for the specified time
+    /// Delays for the specified time.
     pub fn delay(&self, delay: Duration) {
         let start = Instant::now();
 
         while start.elapsed() < delay {}
     }
 
-    /// Delay for the specified number of milliseconds
+    /// Delays for the specified number of milliseconds.
     pub fn delay_millis(&self, ms: u32) {
         self.delay(Duration::from_millis(ms as u64));
     }
 
-    /// Delay for the specified number of microseconds
+    /// Delays for the specified number of microseconds.
     pub fn delay_micros(&self, us: u32) {
         self.delay(Duration::from_micros(us as u64));
     }
 
-    /// Delay for the specified number of nanoseconds
+    /// Delays for the specified number of nanoseconds.
     pub fn delay_nanos(&self, ns: u32) {
         self.delay(Duration::from_micros(ns.div_ceil(1000) as u64));
     }

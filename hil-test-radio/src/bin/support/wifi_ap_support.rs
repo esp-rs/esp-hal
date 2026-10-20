@@ -1,8 +1,7 @@
-//% CHIPS(has_wifi_ble): esp32c6
+//% CHIP_FILTER(has_wifi_ble): esp32c6 || esp32s3
 //% SUPPORT-FIRMWARE: true
 //% FEATURES: unstable esp-alloc embassy
 //% FEATURES(has_wifi_ble): esp-radio/wifi esp-radio/ble esp-radio esp-radio-unstable
-//% FEATURES(has_wifi_ble): esp-radio/defmt defmt esp-radio/csi
 //% ENV: ESP_HAL_CONFIG_STACK_GUARD_OFFSET=4
 
 #![no_std]
@@ -21,13 +20,15 @@ use embassy_net::{
     tcp::TcpSocket,
 };
 use embassy_time::{Duration, Timer};
-use esp_hal::{
-    clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
-    rng::Rng,
-    timer::timg::TimerGroup,
+use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
+use esp_radio::wifi::{
+    AuthenticationMethodConfig,
+    Config,
+    ControllerConfig,
+    Interface,
+    WifiController,
+    ap::{AccessPointConfig, EventInfo},
 };
-use esp_radio::wifi::{Config, ControllerConfig, Interface, WifiController, ap::AccessPointConfig};
 use hil_test as _;
 use hil_test::mk_static;
 use semihosting as _;
@@ -35,14 +36,16 @@ use semihosting as _;
 extern crate alloc;
 
 fn init_heap() {
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c2, esp32c6))] {
+    cfg_select! {
+        any(esp32, esp32s2, esp32s3, esp32c3, esp32c2, esp32c6) => {
             use esp_hal::ram;
             esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
             esp_alloc::heap_allocator!(size: 36 * 1024);
-        } else if #[cfg(any(esp32c5, esp32h2))] {
+        }
+        any(esp32c5, esp32h2) => {
             esp_alloc::heap_allocator!(size: 72 * 1024);
         }
+        _ => {}
     }
 }
 
@@ -54,19 +57,18 @@ async fn main(spawner: Spawner) -> ! {
     let p = esp_hal::init(config);
 
     let timg0 = TimerGroup::new(p.TIMG0);
-    let sw_ints = SoftwareInterruptControl::new(p.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_ints.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
     let access_point_config = Config::AccessPoint(
         AccessPointConfig::default()
-            .with_ssid("AP")
-            .with_auth_method(esp_radio::wifi::AuthenticationMethod::None),
+            .with_ssid("AP".try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Open),
     );
 
     let device = esp_radio::wifi::Interface::access_point();
     let controller = esp_radio::wifi::WifiController::new(
         p.WIFI,
-        ControllerConfig::default().with_initial_config(access_point_config),
+        ControllerConfig::default().with_initial_config(access_point_config.clone()),
     )
     .unwrap();
 
@@ -89,12 +91,12 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    spawner.spawn(connection(controller).unwrap());
+    spawner.spawn(connection(controller, access_point_config).unwrap());
     spawner.spawn(net_task(runner).unwrap());
     spawner.spawn(run_dhcp(stack, gw_ip_addr_str).unwrap());
 
     stack.wait_config_up().await;
-    defmt::info!("[AP-SUPPORT] ready at {}:8080", gw_ip_addr_str);
+    hil_test::signal_harness_ready();
 
     let mut rx_buffer = [0u8; 1536];
     let mut tx_buffer = [0u8; 1536];
@@ -189,11 +191,17 @@ async fn run_dhcp(stack: Stack<'static>, gw_ip_addr: &'static str) {
     }
 }
 
+/// After each station connects, applies the unchanged configuration again. The station must stay
+/// connected (`unchanged_access_point_config_keeps_the_station`).
 #[embassy_executor::task]
-async fn connection(controller: WifiController<'static>) {
+async fn connection(mut controller: WifiController<'static>, config: Config) {
     loop {
-        let _ = controller
+        if let Ok(EventInfo::Connected(_)) = controller
             .wait_for_access_point_connected_event_async()
-            .await;
+            .await
+        {
+            Timer::after(Duration::from_secs(1)).await;
+            controller.set_config(&config).unwrap();
+        }
     }
 }

@@ -6,8 +6,10 @@
 //! console.
 //!
 //! The following wiring is assumed:
-//! - DP => GPIO20
-//! - DM => GPIO19
+//! - DP => GPIO20 (GPIO27 on ESP32-P4)
+//! - DM => GPIO19 (GPIO26 on ESP32-P4)
+
+//% CHIP_FILTER: usb_otg_driver_supported
 
 #![no_std]
 #![no_main]
@@ -16,7 +18,6 @@ use embassy_executor::Spawner;
 use embassy_usb_host::{BusRoute, BusState, class::hid::HidHost};
 use esp_backtrace as _;
 use esp_hal::{
-    interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
     usb::otg::{Usb, embassy_usb_host::Driver},
 };
@@ -31,11 +32,14 @@ async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
-    let usb = Usb::new_fs(peripherals.USB_FS, peripherals.GPIO20, peripherals.GPIO19);
+    let (dp, dm) = cfg_select! {
+        feature = "esp32p4" => (peripherals.GPIO27, peripherals.GPIO26),
+        _ => (peripherals.GPIO20, peripherals.GPIO19),
+    };
+    let usb = Usb::new_fs(peripherals.USB_FS, dp, dm);
     static BUS_STATE: BusState = BusState::new();
     let (mut bus_ctrl, bus) = embassy_usb_host::bus(Driver::new(usb), &BUS_STATE);
     info!("USB host initialized, waiting for device...");

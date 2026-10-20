@@ -3,7 +3,7 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use super::{AdcConfig, Attenuation};
+use super::{AdcCalScheme, AdcConfig, Attenuation, Error};
 use crate::{
     peripherals::{ADC1, ADC2, SENS},
     private,
@@ -11,19 +11,15 @@ use crate::{
 
 pub(super) const NUM_ATTENS: usize = 10;
 
+mod calibration;
+pub use self::calibration::*;
+
 // ADC2 cannot be used with `radio` functionality on `esp32`, this global helps us to track it's
 // state to prevent unexpected behaviour
 static ADC2_IN_USE: AtomicBool = AtomicBool::new(false);
 
-/// ADC Error
-#[derive(Debug)]
-pub enum Error {
-    /// `ADC2` is used together with `radio`.
-    Adc2InUse,
-}
-
 #[doc(hidden)]
-/// Tries to "claim" `ADC2` peripheral and set its status
+/// Tries to "claim" `ADC2` peripheral and sets its status.
 pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
     if ADC2_IN_USE.fetch_or(true, Ordering::Relaxed) {
         Err(Error::Adc2InUse)
@@ -33,7 +29,7 @@ pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
 }
 
 #[doc(hidden)]
-/// Resets `ADC2` usage status to `Unused`
+/// Resets `ADC2` usage status to `Unused`.
 pub fn release_adc2(_: private::Internal) {
     ADC2_IN_USE.store(false, Ordering::Relaxed);
 }
@@ -236,6 +232,9 @@ pub struct Adc<'d, ADC, Dm: crate::DriverMode> {
     _adc: ADC,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     active_channel: Option<u8>,
+    resolution_bits: u8,
+    // Set when this driver claimed ADC2, which it then releases on drop.
+    adc2_claimed: bool,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
 
@@ -243,19 +242,24 @@ impl<'d, ADCX> Adc<'d, ADCX, crate::Blocking>
 where
     ADCX: RegisterAccess + 'd,
 {
-    /// Configure a given ADC instance using the provided configuration, and
-    /// initialize the ADC for use
+    /// Configures a given ADC instance using the provided configuration, and
+    /// initializes the ADC for use.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// `ADC2` cannot be used simultaneously with `radio` functionalities, otherwise this function
-    /// will panic.
-    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Self {
-        if ADCX::instance_number() == 2 && try_claim_adc2(private::Internal).is_err() {
-            panic!(
-                "ADC2 is already in use by Radio. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth."
-            );
-        }
+    /// Returns [`Error::Adc2InUse`] if `ADC2` is already in use by the radio.
+    /// `ADC2` cannot be used simultaneously with `radio` functionalities.
+    /// The handle is consumed even on failure; pass a reborrowed handle to retry later.
+    pub fn new(adc_instance: ADCX, config: AdcConfig<ADCX>) -> Result<Self, Error> {
+        // Claim ADC2 for exclusive use; the driver releases it on drop.
+        let adc2_claimed = if ADCX::instance_number() == 2 {
+            if try_claim_adc2(private::Internal).is_err() {
+                return Err(Error::Adc2InUse);
+            }
+            true
+        } else {
+            false
+        };
 
         let sensors = SENS::regs();
 
@@ -308,28 +312,42 @@ where
             .sar_read_ctrl2()
             .modify(|_, w| w.sar2_data_inv().set_bit());
 
-        Adc {
+        Ok(Adc {
             _adc: adc_instance,
             attenuations: config.attenuations,
             active_channel: None,
+            resolution_bits: match config.resolution {
+                Resolution::_9Bit => 9,
+                Resolution::_10Bit => 10,
+                Resolution::_11Bit => 11,
+                Resolution::_12Bit => 12,
+            },
+            adc2_claimed,
             _phantom: PhantomData,
-        }
+        })
     }
 
-    /// Request that the ADC begin a conversion on the specified pin
+    /// Requests that the ADC begin a conversion on the specified pin.
     ///
-    /// This method takes an [AdcPin](super::AdcPin) reference, as it is
+    /// Takes an [`AdcPin`](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
-    pub fn read_oneshot<PIN>(&mut self, pin: &mut super::AdcPin<PIN, ADCX>) -> nb::Result<u16, ()>
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::ChannelNotConfigured`] if the channel was not configured in
+    /// [`AdcConfig`].
+    pub fn read_oneshot<PIN, CS>(
+        &mut self,
+        pin: &mut super::AdcPin<PIN, ADCX, CS>,
+    ) -> nb::Result<u16, Error>
     where
         PIN: super::AdcChannel,
+        CS: AdcCalScheme<ADCX>,
     {
-        if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
-            panic!(
-                "Channel {} is not configured reading!",
-                pin.pin.adc_channel()
-            );
+        let channel = pin.pin.adc_channel();
+        if self.attenuations[channel as usize].is_none() {
+            return Err(nb::Error::Other(Error::ChannelNotConfigured(channel)));
         }
 
         if let Some(active_channel) = self.active_channel {
@@ -355,18 +373,24 @@ where
             return Err(nb::Error::WouldBlock);
         }
 
-        // Get converted value
-        let converted_value = ADCX::read_data_sar();
+        // Get converted value and scale to 12 bits
+        let mut converted_value = ADCX::read_data_sar() as u32;
+        converted_value <<= 12 - self.resolution_bits;
+        if converted_value > 4095 {
+            converted_value = 4095;
+        }
 
         // Mark that no conversions are currently in progress
         self.active_channel = None;
 
-        Ok(converted_value)
+        Ok(pin.cal_scheme.adc_val(converted_value as u16))
     }
 }
 
-impl Drop for ADC2<'_> {
+impl<ADC, Dm: crate::DriverMode> Drop for Adc<'_, ADC, Dm> {
     fn drop(&mut self) {
-        release_adc2(private::Internal);
+        if self.adc2_claimed {
+            release_adc2(private::Internal);
+        }
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name          = "esp-backtrace"
-version       = "0.19.0"
+version       = "0.20.0"
 edition       = "2024"
 rust-version  = "1.95.0"
 description   = "Bare-metal backtrace support for Espressif devices"
@@ -11,6 +11,8 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
 doc-config = { features = ["defmt"] }
 check-configs = [
     { features = ["println", "esp-println/auto"] },
@@ -32,11 +34,10 @@ bench = false
 test  = false
 
 [dependencies]
-cfg-if      = "1"
-defmt       = { version = "1", optional = true }
-esp-config  = { version = "0.7.0", path = "../esp-config" }
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
-esp-println = { version = "0.17.0", optional = true, default-features = false, path = "../esp-println" }
+defmt       = { version = "1.1", optional = true }
+esp-config  = { version = "0.8.0", path = "../esp-config" }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
+esp-println = { version = "0.18.0", optional = true, default-features = false, path = "../esp-println" }
 heapless    = "0.9"
 semihosting = { version = "0.1.20", optional = true }
 document-features = "0.2"
@@ -48,8 +49,8 @@ riscv            = { version = "0.15.0" }
 xtensa-lx        = { version = "0.13.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-esp-config   = { version = "0.7.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.8.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["colors"]
@@ -61,9 +62,11 @@ esp32c5 = ["esp-println?/esp32c5", "esp-metadata-generated/esp32c5"]
 esp32c6 = ["esp-println?/esp32c6", "esp-metadata-generated/esp32c6"]
 esp32c61 = ["esp-println?/esp32c61", "esp-metadata-generated/esp32c61"]
 esp32h2 = ["esp-println?/esp32h2", "esp-metadata-generated/esp32h2"]
+esp32h4 = ["esp-println?/esp32h4", "esp-metadata-generated/esp32h4"]
 esp32p4 = ["esp-println?/esp32p4", "esp-metadata-generated/esp32p4"]
 esp32s2 = ["esp-println?/esp32s2", "esp-metadata-generated/esp32s2", "semihosting?/openocd-semihosting"]
 esp32s3 = ["esp-println?/esp32s3", "esp-metadata-generated/esp32s3", "semihosting?/openocd-semihosting", "print-float-registers"]
+esp32s31 = ["esp-println?/esp32s31", "esp-metadata-generated/esp32s31"]
 
 ## Use `esp-println`
 println = ["dep:esp-println"]

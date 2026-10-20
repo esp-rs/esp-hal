@@ -17,8 +17,10 @@
 // TODO: This is a temporary place for this, should probably be moved into clocks_ll.
 
 use crate::{
-    peripherals::{I2C_ANA_MST, LP_CLKRST, PCR, PMU, TIMG0, UART0, UART1},
-    soc::regi2c,
+    efuse::ChipRevision,
+    peripherals::{I2C_ANA_MST, LP_CLKRST, MODEM_LPCON, PCR, PMU, TIMG0},
+    rtc_cntl::rtc::ICG_NOGATING_SLEEP,
+    soc::{regi2c, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -53,8 +55,10 @@ impl CpuClock {
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
         apb_clk: Some(ApbClkConfig::new(ApbClkDivisor::_0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         timg_calibration_clock: None,
     };
     const PRESET_160: ClockConfig = ClockConfig {
@@ -69,8 +73,10 @@ impl CpuClock {
         mspi_fast_ls_clk: None, // Unused when root clock is PLL
         apb_clk: Some(ApbClkConfig::new(ApbClkDivisor::_0)),
         ledc_sclk: Some(LedcSclkConfig::PllF80m),
+        iomux_function_clock: Some(IomuxFunctionClockConfig::PllF80m),
         lp_fast_clk: Some(LpFastClkConfig::RcFastClk),
-        lp_slow_clk: Some(LpSlowClkConfig::RcSlow),
+        lp_slow_clk: Some(xtal32k::default_lp_slow_clk()),
+        ble_lp_clk: Some(BleLpClkConfig::Xtal),
         timg_calibration_clock: None,
     };
 }
@@ -125,6 +131,16 @@ fn configure_xtal_clk_impl(
 }
 
 // PLL_CLK
+
+/// Configures and calibrates the BBPLL again.
+///
+/// The BBPLL loses its analog configuration while the PMU powers it down, for example in a light
+/// sleep. ESP-IDF configures it again before it uses the PLL after a wake.
+pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
+    if clocks.pll_clk_refcount > 0 {
+        enable_pll_clk_impl(clocks, true);
+    }
+}
 
 fn enable_pll_clk_impl(_clocks: &mut ClockTree, en: bool) {
     if en {
@@ -208,6 +224,7 @@ fn enable_rc_fast_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 // XTAL32K_CLK
 
+#[cfg(use_xtal32k)]
 fn enable_xtal32k_clk_impl(_clocks: &mut ClockTree, en: bool) {
     LP_CLKRST::regs().xtal32k().write(|w| unsafe {
         w.dac_xtal32k().bits(3);
@@ -462,6 +479,21 @@ fn enable_pll_f240m_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
+fn configure_iomux_function_clock_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<IomuxFunctionClockConfig>,
+    new_config: IomuxFunctionClockConfig,
+) {
+    PCR::regs().iomux_clk_conf().modify(|_, w| unsafe {
+        w.iomux_func_clk_sel().bits(match new_config {
+            IomuxFunctionClockConfig::PllF80m => 1,
+            IomuxFunctionClockConfig::RcFastClk => 2,
+            IomuxFunctionClockConfig::XtalClk => 3,
+        });
+        w.iomux_func_clk_en().set_bit()
+    });
+}
+
 // LEDC_SCLK
 
 fn enable_ledc_sclk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -522,6 +554,7 @@ fn configure_lp_slow_clk_impl(
 ) {
     LP_CLKRST::regs().lp_clk_conf().modify(|_, w| unsafe {
         w.slow_clk_sel().bits(match new_config {
+            #[cfg(use_xtal32k)]
             LpSlowClkConfig::Xtal32k => 1,
             LpSlowClkConfig::RcSlow => 0,
             LpSlowClkConfig::OscSlow => 2,
@@ -545,6 +578,7 @@ fn configure_timg_calibration_clock_impl(
         w.rtc_cali_clk_sel().bits(match new_config {
             TimgCalibrationClockConfig::RcSlowClk => 0,
             TimgCalibrationClockConfig::RcFastDivClk => 1,
+            #[cfg(use_xtal32k)]
             TimgCalibrationClockConfig::Xtal32kClk => 2,
         })
     });
@@ -587,14 +621,14 @@ impl ParlIoInstance {
     fn configure_rx_clock_impl(
         self,
         _clocks: &mut ClockTree,
-        _old_config: Option<ParlIoRxClockConfig>,
-        new_config: ParlIoRxClockConfig,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
     ) {
         PCR::regs().parl_clk_rx_conf().modify(|_, w| unsafe {
             w.parl_clk_rx_sel().bits(match new_config {
-                ParlIoRxClockConfig::XtalClk => 0,
-                ParlIoRxClockConfig::RcFastClk => 2,
-                ParlIoRxClockConfig::PllF240m => 1,
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 2,
+                ParlIoClkConfig::PllF240m => 1,
             })
         });
     }
@@ -610,19 +644,28 @@ impl ParlIoInstance {
     fn configure_tx_clock_impl(
         self,
         _clocks: &mut ClockTree,
-        _old_config: Option<ParlIoTxClockConfig>,
-        new_config: ParlIoTxClockConfig,
+        _old_config: Option<ParlIoClkConfig>,
+        new_config: ParlIoClkConfig,
     ) {
         PCR::regs().parl_clk_tx_conf().modify(|_, w| unsafe {
             w.parl_clk_tx_sel().bits(match new_config {
-                ParlIoTxClockConfig::XtalClk => 0,
-                ParlIoTxClockConfig::RcFastClk => 2,
-                ParlIoTxClockConfig::PllF240m => 1,
+                ParlIoClkConfig::XtalClk => 0,
+                ParlIoClkConfig::RcFastClk => 2,
+                ParlIoClkConfig::PllF240m => 1,
             })
         });
     }
 }
 
+impl SdmInstance {
+    // SDM_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::GPIO_SD::regs()
+            .sigmadelta_misc()
+            .modify(|_, w| w.function_clk_en().bit(en));
+    }
+}
 impl RmtInstance {
     // RMT_SCLK
 
@@ -721,88 +764,87 @@ impl TimgInstance {
     }
 }
 
-impl UartInstance {
-    // UART_FUNCTION_CLOCK
+// BLE_LP_XTAL_CLK
 
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let uart = match self {
-            UartInstance::Uart0 => 0,
-            UartInstance::Uart1 => 1,
-        };
-        PCR::regs()
-            .uart(uart)
-            .clk_conf()
-            .modify(|_, w| w.sclk_en().bit(en));
-    }
-
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartFunctionClockConfig>,
-        new_config: UartFunctionClockConfig,
-    ) {
-        let uart = match self {
-            UartInstance::Uart0 => 0,
-            UartInstance::Uart1 => 1,
-        };
-        PCR::regs().uart(uart).clk_conf().modify(|_, w| unsafe {
-            w.sclk_sel().bits(match new_config.sclk {
-                UartFunctionClockSclk::PllF80m => 1,
-                UartFunctionClockSclk::RcFast => 2,
-                UartFunctionClockSclk::Xtal => 3,
-            });
-            w.sclk_div_a().bits(0);
-            w.sclk_div_b().bits(0);
-            w.sclk_div_num().bits(new_config.div_num as _);
-            w
-        });
-    }
-
-    // UART_BAUD_RATE_GENERATOR
-
-    fn enable_baud_rate_generator_impl(self, _clocks: &mut ClockTree, _en: bool) {
-        // Nothing to do.
-    }
-
-    fn configure_baud_rate_generator_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<UartBaudRateGeneratorConfig>,
-        new_config: UartBaudRateGeneratorConfig,
-    ) {
-        let regs = match self {
-            UartInstance::Uart0 => UART0::regs(),
-            UartInstance::Uart1 => UART1::regs(),
-        };
-        regs.clkdiv().write(|w| unsafe {
-            w.clkdiv().bits(new_config.integral as _);
-            w.frag().bits(new_config.fractional as _)
-        });
-    }
+/// Returns whether the BLE timer gets the crystal via the Wi-Fi power clock (crystal / 80).
+fn ble_timer_uses_wifi_pwr_clk() -> bool {
+    crate::soc::chip_revision_above(ChipRevision::from_combined(1))
 }
 
-impl I2cInstance {
-    // I2C_FUNCTION_CLOCK
-
-    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
-        let _ = self;
-        PCR::regs()
-            .i2c_sclk_conf()
-            .modify(|_, w| w.i2c_sclk_en().bit(en));
+// https://github.com/espressif/esp-idf/blob/ce2100d/components/esp_hw_support/modem/port/esp32c6/modem_clock_impl.c#L335-L348
+fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    if !ble_timer_uses_wifi_pwr_clk() {
+        return;
     }
 
-    fn configure_function_clock_impl(
-        self,
-        _clocks: &mut ClockTree,
-        _old_config: Option<I2cFunctionClockConfig>,
-        new_config: I2cFunctionClockConfig,
-    ) {
-        let _ = self;
-        // sclk_sel: 0 = XTAL, 1 = RC_FAST
-        PCR::regs().i2c_sclk_conf().modify(|_, w| unsafe {
-            w.i2c_sclk_sel()
-                .bit(matches!(new_config.sclk, I2cFunctionClockSclk::RcFast));
-            w.i2c_sclk_div_num().bits(new_config.div_num as _)
+    // `rtc::init` turns the Wi-Fi power clock on for good.
+    MODEM_LPCON::regs()
+        .clk_conf_power_st()
+        .modify(|r, w| unsafe {
+            let map = r.clk_wifipwr_st_map().bits();
+            w.clk_wifipwr_st_map().bits(if en {
+                map | ICG_NOGATING_SLEEP
+            } else {
+                map & !ICG_NOGATING_SLEEP
+            })
         });
+}
+
+pub(crate) fn wifi_pwr_clk_runs_in_sleep() -> bool {
+    let map = MODEM_LPCON::regs()
+        .clk_conf_power_st()
+        .read()
+        .clk_wifipwr_st_map()
+        .bits();
+    (map & ICG_NOGATING_SLEEP) != 0
+}
+
+// BLE_LP_CLK
+
+fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, en: bool) {
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_lp_timer_en().bit(en));
+}
+
+fn configure_ble_lp_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<BleLpClkConfig>,
+    new_config: BleLpClkConfig,
+) {
+    let divisor = match new_config {
+        BleLpClkConfig::Xtal => {
+            let mut ratio = xtal_clk_frequency() / ble_lp_xtal_clk_frequency();
+            if ble_timer_uses_wifi_pwr_clk() {
+                ratio /= 80;
+            }
+            ratio - 1
+        }
+        _ => 0,
+    };
+    let sel_xtal32k = cfg_select! {
+        use_xtal32k => new_config == BleLpClkConfig::Xtal32k,
+        _ => false,
+    };
+
+    MODEM_LPCON::regs()
+        .test_conf()
+        .modify(|_, w| w.clk_en().set_bit());
+
+    MODEM_LPCON::regs().lp_timer_conf().modify(|_, w| unsafe {
+        w.clk_lp_timer_sel_osc_slow()
+            .bit(new_config == BleLpClkConfig::RcSlow);
+        w.clk_lp_timer_sel_osc_fast().clear_bit();
+        w.clk_lp_timer_sel_xtal()
+            .bit(new_config == BleLpClkConfig::Xtal);
+        w.clk_lp_timer_sel_xtal32k().bit(sel_xtal32k);
+        w.clk_lp_timer_div_num().bits(divisor as u16)
+    });
+
+    if sel_xtal32k {
+        // 0 routes XTAL32K to the modem 32 kHz input.
+        MODEM_LPCON::regs()
+            .modem_32k_clk_conf()
+            .modify(|_, w| unsafe { w.clk_modem_32k_sel().bits(0) });
     }
 }

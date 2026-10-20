@@ -1,4 +1,6 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
+//! UHCI wrapper around UART
+//!
 //! ## Usage
 //! ```rust, no_run
 //! #![no_std]
@@ -12,7 +14,8 @@
 //! use esp_hal::{
 //!     clock::CpuClock,
 //!     dma::{DmaRxBuf, DmaTxBuf},
-//!     dma_buffers,
+//!     dma_rx_buffer,
+//!     dma_tx_buffer,
 //!     main,
 //!     rom::software_reset,
 //!     uart,
@@ -21,8 +24,6 @@
 //!
 //! #[main]
 //! fn main() -> ! {
-//!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-//!     let peripherals = esp_hal::init(config);
 //!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //!     let peripherals = esp_hal::init(config);
 //!
@@ -35,9 +36,8 @@
 //!         .with_tx(peripherals.GPIO2)
 //!         .with_rx(peripherals.GPIO3);
 //!
-//!     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4092);
-//!     let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-//!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+//!     let dma_rx = dma_rx_buffer!(4092).unwrap();
+//!     let mut dma_tx = dma_tx_buffer!(4092).unwrap();
 //!
 //!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
 //!     uhci.apply_rx_config(
@@ -143,7 +143,7 @@ crate::any_peripheral! {
 }
 
 impl AnyUhci<'_> {
-    /// Opens the enum into the peripheral below
+    /// Returns a reference to the UHCI register block.
     fn register_block(&self) -> &uhci0::RegisterBlock {
         any::delegate!(self, uhci => { uhci.register_block() })
     }
@@ -151,9 +151,7 @@ impl AnyUhci<'_> {
 
 with_uhci_dma_engine! {
     ($engine:tt, $any_ch:ident) => {
-        impl DmaEligiblePeripheral for AnyUhci<'_> {
-            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
-
+        impl<'d> DmaEligiblePeripheral<crate::dma::$any_ch<'d>> for AnyUhci<'d> {
             fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
                 any::delegate!(self, uhci => { uhci.dma_peripheral() })
             }
@@ -308,10 +306,10 @@ where
         let reg = self.uhci_per.register_block();
 
         for_each_uart! {
-            (all $( ($id:literal, $peri:ident, $variant:ident, $($pins:ident),*) ),*) => {
+            (all $( ($id:literal, $peri:ident, $variant:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = $_:literal) ),*) => {
                 reg.conf0().modify(|_, w| {
-                    cfg_if::cfg_if! {
-                        if #[cfg(uhci_combined_uart_selector_field)] {
+                    cfg_select! {
+                        uhci_combined_uart_selector_field => {
                             unsafe {
                                 w.uart_sel().bits(
                                     match &self.uart.tx.uart.0 {
@@ -322,7 +320,8 @@ where
                                     }
                                 )
                             }
-                        } else {
+                        }
+                        _ => {
                             paste::paste! {
                                 // Clear any previous selection
                                 $(
@@ -344,12 +343,12 @@ where
         }
     }
 
-    /// Sets the config the the consumed UART
+    /// Sets the configuration of the consumed UART.
     pub fn set_uart_config(&mut self, uart_config: &uart::Config) -> Result<(), uart::ConfigError> {
         self.uart.set_config(uart_config)
     }
 
-    /// Split the Uhci into UhciRx and UhciTx
+    /// Splits the Uhci into UhciRx and UhciTx.
     pub fn split(self) -> (UhciRx<'d, Dm>, UhciTx<'d, Dm>) {
         let (uart_rx, uart_tx) = self.uart.split();
         (
@@ -368,13 +367,13 @@ where
         )
     }
 
-    /// Sets the config to the UHCI peripheral, Rx part
+    /// Sets the config to the UHCI peripheral, Rx part.
     pub fn apply_rx_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
     }
 
-    /// Sets the config to the UHCI peripheral, Tx part
+    /// Sets the config to the UHCI peripheral, Tx part.
     pub fn apply_tx_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
@@ -382,7 +381,7 @@ where
 }
 
 impl<'d> Uhci<'d, Blocking> {
-    /// Creates a new instance of UHCI
+    /// Creates a new instance of UHCI.
     pub fn new(
         uart: Uart<'d, Blocking>,
         uhci: peripherals::UHCI0<'static>,
@@ -404,7 +403,7 @@ impl<'d> Uhci<'d, Blocking> {
         uhci
     }
 
-    /// Create a new instance in [crate::Async] mode.
+    /// Reconfigures the driver to operate in [`Async`] mode.
     pub fn into_async(self) -> Uhci<'d, Async> {
         Uhci {
             uart: self.uart.into_async(),
@@ -416,7 +415,7 @@ impl<'d> Uhci<'d, Blocking> {
 }
 
 impl<'d> Uhci<'d, Async> {
-    /// Create a new instance in [crate::Blocking] mode.
+    /// Reconfigures the driver to operate in [`Blocking`] mode.
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
         Uhci {
             uart: self.uart.into_blocking(),
@@ -432,9 +431,9 @@ pub struct UhciTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Internal UHCI struct. Use it to configure the UHCI peripheral
+    /// Internal UHCI driver used to configure the UHCI peripheral.
     uhci_per: AnyUhci<'static>,
-    /// Tx of the used uart. You can configure it by accessing the value
+    /// UART TX handle used by this UHCI instance.
     pub uart_tx: UartTx<'d, Dm>,
     channel_tx: ChannelTx<Dm, ErasedTxChannel<'d>>,
     // TODO: devices with UHCI1 need the non-generic guard
@@ -445,7 +444,7 @@ impl<'d, Dm> UhciTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Starts the write DMA transfer and returns the instance of UhciDmaTxTransfer
+    /// Starts the write DMA transfer and returns the instance of UhciDmaTxTransfer.
     pub fn write<Buf: DmaTxBuffer>(
         mut self,
         mut tx_buffer: Buf,
@@ -466,7 +465,7 @@ where
         Ok(UhciDmaTxTransfer::new(self, tx_buffer))
     }
 
-    /// Sets the config to the UHCI peripheral
+    /// Sets the config to the UHCI peripheral.
     pub fn apply_config(&mut self, config: &TxConfig) -> Result<(), ConfigError> {
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
@@ -478,9 +477,9 @@ pub struct UhciRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Internal UHCI struct. Use it to configure the UHCI peripheral
+    /// Internal UHCI driver used to configure the UHCI peripheral.
     uhci_per: AnyUhci<'static>,
-    /// Rx of the used uart. You can configure it by accessing the value
+    /// UART RX handle used by this UHCI instance.
     pub uart_rx: UartRx<'d, Dm>,
     channel_rx: ChannelRx<Dm, ErasedRxChannel<'d>>,
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
@@ -490,7 +489,7 @@ impl<'d, Dm> UhciRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer
+    /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer.
     pub fn read<Buf: DmaRxBuffer>(
         mut self,
         mut rx_buffer: Buf,
@@ -513,17 +512,16 @@ where
         }
     }
 
-    /// Sets the config to the UHCI peripheral
+    /// Sets the config to the UHCI peripheral.
     pub fn apply_config(&mut self, config: &RxConfig) -> Result<(), ConfigError> {
         let reg = self.uhci_per.register_block();
         config.apply_config(reg)
     }
 }
 
-/// A structure representing a DMA transfer for UHCI/UART.
+/// A structure representing a DMA transfer for UHCI or UART.
 ///
-/// This structure holds references to the UHCI instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the UHCI instance, DMA buffers, and transfer status.
 pub struct UhciDmaTxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
@@ -545,7 +543,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
         }
     }
 
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.uhci.channel_tx.is_done()
     }
@@ -566,7 +564,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
 
     /// Waits for the DMA transfer to complete.
     ///
-    /// This method blocks until the transfer is finished and returns the
+    /// Blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
     pub fn wait(mut self) -> (Result<(), Error>, UhciTx<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
@@ -604,7 +602,8 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
 }
 
 impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
-    /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
+    /// Waits for the DMA transfer to complete asynchronously. After that,
+    /// [`Self::wait`] must still be called.
     pub async fn wait_for_done(&mut self) {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
@@ -653,10 +652,9 @@ where
     }
 }
 
-/// A structure representing a DMA transfer for UHCI/UART.
+/// A structure representing a DMA transfer for UHCI or UART.
 ///
-/// This structure holds references to the UHCI instance, DMA buffers, and
-/// transfer status.
+/// Holds references to the UHCI instance, DMA buffers, and transfer status.
 pub struct UhciDmaRxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
@@ -678,7 +676,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
         }
     }
 
-    /// Returns true when [Self::wait] will not block.
+    /// Returns whether [`Self::wait`] will not block.
     pub fn is_done(&self) -> bool {
         self.uhci.channel_rx.is_done()
     }
@@ -699,7 +697,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
 
     /// Waits for the DMA transfer to complete.
     ///
-    /// This method blocks until the transfer is finished and returns the
+    /// Blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
     pub fn wait(mut self) -> (Result<(), Error>, UhciRx<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
@@ -728,7 +726,8 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
 }
 
 impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
-    /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
+    /// Waits for the DMA transfer to complete asynchronously. After that,
+    /// [`Self::wait`] must still be called.
     pub async fn wait_for_done(&mut self) {
         let res = DmaRxFuture::new(&mut self.uhci.channel_rx).await;
         if let Err(err) = res {

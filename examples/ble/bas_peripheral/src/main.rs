@@ -1,4 +1,25 @@
 //! A bluetooth battery service example built using Embassy and trouBLE.
+//!
+//! The example demonstrates how to use the trouBLE library to create a BLE
+//! peripheral that implements the Battery Service (BAS) GATT service.
+//! It advertises itself and allows a central device to connect and read
+//! the battery level characteristic, as well as receive notifications when
+//! the battery level changes.
+//!
+//! The example also shows how to save power. Change these constants to compare:
+//!
+//! - `MODEM_SLEEP` lets the controller turn the radio off between its events.
+//! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
+//!   sleeps only while the controller sleeps. The ESP32 can sleep only with a 32 kHz crystal as the
+//!   BLE low-power clock.
+//! - `CPU_POWERDOWN` lets light sleep power the CPU down, and retains its state in RAM. This saves
+//!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
+//!   -H2, -S3 and -S31 support this. On other chips the constant has no effect.
+//!
+//! The USB Serial/JTAG console stops while the chip is in light sleep. Use the UART port to see
+//! the output.
+
+//% CHIP_FILTER: bt_driver_supported
 
 #![no_std]
 #![no_main]
@@ -9,8 +30,7 @@ use embassy_time::Timer;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
-    clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
+    clock::{ClockConfig, CpuClock},
     timer::timg::TimerGroup,
 };
 use esp_radio::ble::controller::BleConnector;
@@ -19,17 +39,99 @@ use trouble_host::prelude::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+/// Whether the controller turns the radio off between its events.
+const MODEM_SLEEP: bool = true;
+/// Whether the chip enters automatic light sleep when all tasks are idle. Requires
+/// [`MODEM_SLEEP`] to be enabled.
+#[cfg(feature = "light_sleep")]
+const LIGHT_SLEEP: bool = true;
+/// Whether light sleep powers the CPU down. Requires [`LIGHT_SLEEP`] to be enabled.
+#[cfg(feature = "light_sleep")]
+const CPU_POWERDOWN: bool = true;
+
+// An example reads no chip capability, so this condition lists the chips that support CPU
+// power-down.
+#[cfg(feature = "light_sleep")]
+cfg_select! {
+    any(
+        feature = "esp32c3",
+        feature = "esp32c5",
+        feature = "esp32c6",
+        feature = "esp32c61",
+        feature = "esp32h2",
+        feature = "esp32s3",
+        feature = "esp32s31",
+    ) => {
+        fn enable_cpu_powerdown(sleep: &mut esp_rtos::sleep::Sleep) {
+            use esp_hal::rtc_cntl::CpuRetentionStorage;
+
+            // The memory that the bootloader used is otherwise unused after boot.
+            #[esp_hal::ram(reclaimed, unstable(zeroed))]
+            static CPU_RETENTION_MEMORY: CpuRetentionStorage = CpuRetentionStorage::new();
+
+            sleep
+                .enable_cpu_powerdown(CPU_RETENTION_MEMORY.take())
+                .unwrap();
+
+            // Keeping the cache tags makes the wake faster, because the cache stays warm.
+            #[cfg(feature = "esp32s3")]
+            {
+                use esp_hal::rtc_cntl::CacheTagRetentionStorage;
+
+                #[esp_hal::ram(reclaimed, unstable(zeroed))]
+                static CACHE_TAGMEM: CacheTagRetentionStorage = CacheTagRetentionStorage::new();
+
+                sleep.keep_cache_tags(CACHE_TAGMEM.take()).unwrap();
+            }
+        }
+    }
+    _ => {
+        fn enable_cpu_powerdown(_sleep: &mut esp_rtos::sleep::Sleep) {}
+    }
+}
+
 #[esp_hal::main]
 async fn main(_s: Spawner) {
     esp_println::logger::init_logger_from_env();
-    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
-    esp_alloc::heap_allocator!(size: 72 * 1024);
-    let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
-    let bluetooth = peripherals.BT;
-    let connector = BleConnector::new(bluetooth, Default::default()).unwrap();
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock({
+        #[cfg_attr(feature = "esp32c2", allow(unused_mut))]
+        let mut config = ClockConfig::from(CpuClock::max());
+
+        #[cfg(not(feature = "esp32c2"))]
+        {
+            use esp_hal::clock::ll::BleLpClkConfig;
+
+            // For now, only Xtal can be selected if modem-sleep is enabled.
+            // This is our default anyway, a safe choice even in light sleep,
+            // although it can raise the sleep current a bit.
+            config.ble_lp_clk = Some(BleLpClkConfig::Xtal);
+        }
+
+        config
+    }));
+
+    esp_alloc::heap_allocator!(size: 72 * 1024);
+
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    #[cfg(feature = "light_sleep")]
+    if LIGHT_SLEEP {
+        let mut sleep = esp_rtos::sleep::configure(peripherals.LPWR);
+        if CPU_POWERDOWN {
+            enable_cpu_powerdown(&mut sleep);
+        }
+        esp_rtos::start_with_idle_hook(timg0.timer0, sleep.light_sleep_hook);
+    } else {
+        esp_rtos::start(timg0.timer0);
+    }
+    #[cfg(not(feature = "light_sleep"))]
+    esp_rtos::start(timg0.timer0);
+
+    let connector = BleConnector::new(
+        peripherals.BT,
+        esp_radio::ble::Config::default().with_modem_sleep(MODEM_SLEEP),
+    )
+    .unwrap();
     let controller: ExternalController<_, 1> = ExternalController::new(connector);
 
     ble_bas_peripheral_run(controller).await;
@@ -70,12 +172,11 @@ where
 
     let mut resources: HostResources<DefaultPacketPool, CONNECTIONS_MAX, L2CAP_CHANNELS_MAX> =
         HostResources::new();
-    let stack = trouble_host::new(controller, &mut resources).set_random_address(address);
-    let Host {
-        mut peripheral,
-        runner,
-        ..
-    } = stack.build();
+    let stack = trouble_host::new(controller, &mut resources)
+        .set_random_address(address)
+        .build();
+    let runner = stack.runner();
+    let mut peripheral = stack.peripheral();
 
     info!("Starting advertising and GATT service");
     let server = Server::new_with_config(GapConfig::Peripheral(PeripheralConfig {
@@ -150,12 +251,12 @@ async fn gatt_events_task<P: PacketPool>(
                         }
                     }
                     GattEvent::Write(event) => {
-                        if event.handle() == level.handle {
+                        event.with_data(|offset, data| {
                             info!(
-                                "[gatt] Write Event to Level Characteristic: {:?}",
-                                event.data()
-                            );
-                        }
+                                "[gatt] Write Event to Level Characteristic at {}: {:?}",
+                                offset, data
+                            )
+                        });
                     }
                     _ => {}
                 };
@@ -183,7 +284,7 @@ async fn advertise<'values, 'server, C: Controller>(
     let len = AdStructure::encode_slice(
         &[
             AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-            AdStructure::ServiceUuids16(&[[0x0f, 0x18]]),
+            AdStructure::IncompleteServiceUuids16(&[[0x0f, 0x18]]),
             AdStructure::CompleteLocalName(name.as_bytes()),
         ],
         &mut advertiser_data[..],
@@ -217,7 +318,7 @@ async fn custom_task<C: Controller, P: PacketPool>(
     loop {
         tick = tick.wrapping_add(1);
         info!("[custom_task] notifying connection of tick {}", tick);
-        if level.notify(conn, &tick).await.is_err() {
+        if level.notify(conn, &tick, true).await.is_err() {
             info!("[custom_task] error notifying connection");
             break;
         };

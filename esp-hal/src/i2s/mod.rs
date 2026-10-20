@@ -2,6 +2,9 @@
 
 pub mod master;
 
+#[cfg(any(i2s_supports_pdm_tx, i2s_supports_pdm_rx))]
+pub mod pdm;
+
 #[cfg(esp32)]
 pub mod parallel;
 
@@ -12,6 +15,8 @@ crate::any_peripheral! {
         I2s0(crate::peripherals::I2S0<'d>),
         #[cfg(soc_has_i2s1)]
         I2s1(crate::peripherals::I2S1<'d>),
+        #[cfg(soc_has_i2s2)]
+        I2s2(crate::peripherals::I2S2<'d>),
     }
 }
 
@@ -19,9 +24,7 @@ with_i2s_dma_engine! {
     ($engine:tt, $any_ch:ident) => {
         use crate::dma::DmaEligiblePeripheral;
 
-        impl DmaEligiblePeripheral for AnyI2s<'_> {
-            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
-
+        impl<'d> DmaEligiblePeripheral<crate::dma::$any_ch<'d>> for AnyI2s<'d> {
             fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
                 any::delegate!(self, i2s => { i2s.dma_peripheral() })
             }

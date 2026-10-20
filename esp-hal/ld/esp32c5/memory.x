@@ -15,13 +15,13 @@ MEMORY
     ] */
 
     /* 512K of on soc RAM, 32K reserved for cache */
-    /* Instruction and Data RAM 
+    /* Instruction and Data RAM
     0x4084e5a0 = 2nd stage bootloader iram_loader_seg start address
     see https://github.com/espressif/esp-idf/blob/03414a15508036c8fc0f51642aed7a264e9527df/components/esp_system/ld/esp32c5/memory.ld.in#L26
     */
     RAM : ORIGIN = 0x40800000 , LENGTH = 0x4E5A0
 
-    /* memory available after the 2nd stage bootloader is finished */  
+    /* memory available after the 2nd stage bootloader is finished */
     dram2_seg ( RW )       : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4085e5a0 - (ORIGIN(RAM) + LENGTH(RAM))
 
     /* External flash

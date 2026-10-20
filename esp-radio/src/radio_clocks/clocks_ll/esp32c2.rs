@@ -31,30 +31,17 @@ pub(crate) fn init_clocks() {
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }
 
+pub(crate) fn deinit_clocks() {
+    // Nothing to do: when the last `PhyClockGuard` drops, esp-phy gates the
+    // shared modem clocks (`SYSTEM_WIFI_CLK_WIFI_BT_COMMON_M`) — the same
+    // state ESP-IDF leaves behind via `wifi_bt_common_module_disable`, and
+    // its `periph_ll_wifi_module_disable_clk_set_rst` is a no-op on ESP32-C2.
+    // Gating anything beyond that here breaks Wi-Fi re-initialization on
+    // ESP32-C2.
+}
+
 pub(crate) fn ble_rtc_clk_init() {
-    regs!(MODEM_CLKRST).modem_lp_timer_conf().modify(|_, w| {
-        w.lp_timer_sel_xtal32k().clear_bit();
-        w.lp_timer_sel_xtal().set_bit();
-        w.lp_timer_sel_8m().clear_bit();
-        w.lp_timer_sel_rtc_slow().clear_bit()
-    });
-
-    let xtal_frequency = esp_hal::clock::xtal_clock();
-    let bt_lpclk_target = match xtal_frequency.as_mhz() {
-        26 => 40000,
-        // 40MHz
-        _ => 32000,
-    };
-    let divider = xtal_frequency.as_hz() / (5 * bt_lpclk_target) - 1;
-
-    regs!(MODEM_CLKRST)
-        .modem_lp_timer_conf()
-        .modify(|_, w| unsafe { w.lp_timer_clk_div_num().bits(divider as u8) });
-
-    regs!(MODEM_CLKRST).etm_clk_conf().modify(|_, w| {
-        w.etm_clk_active().set_bit();
-        w.etm_clk_sel().clear_bit()
-    });
+    // `BLE_LP_CLK` is programmed by the clock tree.
 }
 
 pub(crate) fn reset_rpa() {

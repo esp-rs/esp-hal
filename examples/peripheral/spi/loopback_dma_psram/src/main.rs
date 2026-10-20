@@ -1,27 +1,35 @@
 //! SPI loopback test using DMA - send from PSRAM receive to internal RAM
 //!
 //! The following wiring is assumed:
-//! - SCLK => GPIO42
-//! - MISO => (looped back to MOSI via the GPIO MUX)
-//! - MOSI => GPIO48
-//! - CS   => GPIO38
+//!
+//! Signal    | ESP32-S3 | ESP32-S2 | ESP32-C5/C61/P4 | ESP32-S31 |
+//! --------- | -------- | -------- | --------------- | --------- |
+//! SCLK      | GPIO42   | GPIO6    | GPIO6           | GPIO11    |
+//! MOSI/MISO | GPIO48   | GPIO7    | GPIO7           | GPIO12    |
+//! CS        | GPIO38   | GPIO10   | GPIO10          | GPIO13    |
 //!
 //! Depending on your target and the board you are using you have to change the
 //! pins.
 //!
-//! This example transfers data via SPI.
-//! Connect MISO and MOSI pins to see the outgoing data is read as incoming
-//! data.
+//! This example requires a board with PSRAM. If no PSRAM is detected, the
+//! allocation will fail at runtime.
+//!
+//! This example transfers data via SPI. MISO/MOSI are connected together by the firmware.
+
+//% CHIP_FILTER: dma_can_access_psram
 
 #![no_std]
 #![no_main]
 
 extern crate alloc;
 
+use allocator_api2::boxed::Box;
+use esp_alloc::DmaCompatibleExternalMemory;
 use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
-    dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
+    dma::{DmaTxBuf, ExternalBurstConfig, aligned::DmaAlignedMut},
+    dma_rx_buffer,
     main,
     spi::{
         Mode,
@@ -33,23 +41,13 @@ use log::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-macro_rules! dma_alloc_buffer {
-    ($size:expr, $align:expr) => {{
-        let layout = core::alloc::Layout::from_size_align($size, $align).unwrap();
-        unsafe {
-            let ptr = alloc::alloc::alloc(layout);
-            if ptr.is_null() {
-                error!("dma_alloc_buffer: alloc failed");
-                alloc::alloc::handle_alloc_error(layout);
-            }
-            core::slice::from_raw_parts_mut(ptr, $size)
-        }
-    }};
-}
-
 const DMA_BUFFER_SIZE: usize = 8192;
-const DMA_ALIGNMENT: ExternalBurstConfig = ExternalBurstConfig::Size64;
-const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
+const DMA_ALIGNMENT: ExternalBurstConfig = cfg_select! {
+    // ExternalBurstConfig::Size64 is not available on
+    // ESP32-S2.
+    feature = "esp32s2" => ExternalBurstConfig::Size32,
+    _ => ExternalBurstConfig::Size64,
+};
 
 #[main]
 fn main() -> ! {
@@ -59,30 +57,35 @@ fn main() -> ! {
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
     let delay = Delay::new();
 
-    let sclk = peripherals.GPIO42;
-    let mosi = peripherals.GPIO48;
-    let miso = unsafe { mosi.clone_unchecked() };
-    let cs = peripherals.GPIO38;
+    let (sclk, mosi, cs) =
+        cfg_select! {
+            feature = "esp32s3" => (peripherals.GPIO42, peripherals.GPIO48, peripherals.GPIO38),
+            feature = "esp32s31" => (peripherals.GPIO11, peripherals.GPIO12, peripherals.GPIO13),
+            _ => (peripherals.GPIO6, peripherals.GPIO7, peripherals.GPIO10),
+        };
 
-    let (_, tx_descriptors) =
-        esp_hal::dma_descriptors_chunk_size!(0, DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
-    let tx_buffer = dma_alloc_buffer!(DMA_BUFFER_SIZE, DMA_ALIGNMENT as usize);
-    info!(
-        "TX: {:p} len {} ({} descripters)",
-        tx_buffer.as_ptr(),
-        tx_buffer.len(),
-        tx_descriptors.len()
-    );
-    let mut dma_tx_buf =
-        DmaTxBuf::new_with_config(tx_descriptors, tx_buffer, DMA_ALIGNMENT).unwrap();
-    let (rx_buffer, rx_descriptors, _, _) = esp_hal::dma_buffers!(DMA_BUFFER_SIZE, 0);
-    info!(
-        "RX: {:p} len {} ({} descripters)",
-        rx_buffer.as_ptr(),
-        rx_buffer.len(),
-        rx_descriptors.len()
-    );
-    let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+    let (miso, mosi) = unsafe { mosi.split() };
+
+    let dma_channel = cfg_select! {
+        feature = "esp32s2" => peripherals.DMA_SPI2,
+        any(feature = "esp32p4", feature = "esp32s31") => peripherals.DMA_AXI_CH0,
+        _ => peripherals.DMA_CH0,
+    };
+
+    let buffer = Box::leak(Box::new_in(
+        [0u8; DMA_BUFFER_SIZE],
+        DmaCompatibleExternalMemory,
+    ));
+
+    const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
+    let descriptors = esp_hal::dma_descriptors_impl!(DMA_BUFFER_SIZE, DMA_CHUNK_SIZE);
+    let mut dma_tx_buf = DmaTxBuf::new_with_config(
+        descriptors,
+        DmaAlignedMut::new(buffer).unwrap().unsize(),
+        DMA_ALIGNMENT,
+    )
+    .unwrap();
+    let mut dma_rx_buf = dma_rx_buffer!(DMA_BUFFER_SIZE).unwrap();
     // Need to set miso first so that mosi can overwrite the
     // output connection (because we are using the same pin to loop back)
     let mut spi = Spi::new(
@@ -96,7 +99,7 @@ fn main() -> ! {
     .with_miso(miso)
     .with_mosi(mosi)
     .with_cs(cs)
-    .with_dma(peripherals.DMA_CH0);
+    .with_dma(dma_channel);
 
     delay.delay_millis(100); // delay to let the above messages display
 

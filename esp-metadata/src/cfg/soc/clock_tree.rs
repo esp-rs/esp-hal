@@ -30,10 +30,8 @@
 
 // TODO: some clock sources don't _really_ need refcount. This needs analysis to see which nodes can
 //       be simplified. (Probably the ones that only have one user, or those that are always on).
-// TODO: optimize out 1-variant clock multiplexers?
 // TODO: ClockConfig doc comment should be tailored to the specific chip
 // TODO: finalize public API
-// TODO: define clock IDs and maintain active clocks as a bitmap
 // TODO: classified clocks should be returned in a topological order
 // TODO: ClockConfig should configure clocks in topological order
 
@@ -53,7 +51,7 @@ use somni_parser::{ast, lexer::Token, parser::DefaultTypeSet};
 
 use crate::cfg::{
     clock_tree::{
-        expr_compiler::ExprCompiler,
+        expr_compiler::{ExprCompiler, Operand},
         generic::Generic,
         mux::Multiplexer,
         source::{DerivedClockSource, Source},
@@ -66,14 +64,82 @@ mod generic;
 mod mux;
 mod source;
 
+/// Builds `#[cfg(...)]` from a metadata `cfg` property, or an empty token stream.
+pub(crate) fn rustc_cfg_attr(cfg: Option<&str>) -> TokenStream {
+    let Some(cfg) = cfg.filter(|cfg| !cfg.is_empty()) else {
+        return quote! {};
+    };
+    let cfg = TokenStream::from_str(cfg).unwrap_or_else(|err| {
+        panic!("Invalid clock-tree `cfg` expression `{cfg}`: {err}");
+    });
+    quote! { #[cfg(#cfg)] }
+}
+
+/// Returns the name of the config type generated for a node.
+///
+/// `group` is the template group the node belongs to, or an empty string for standalone nodes.
+pub(crate) fn config_type_name(group: &str, node: &str) -> Ident {
+    use convert_case::{Case, Casing};
+
+    let type_name = if group.is_empty() {
+        node.to_string()
+    } else {
+        format!("{group}_{node}")
+    }
+    .from_case(Case::Constant)
+    .to_case(Case::Pascal);
+
+    format_ident!("{type_name}Config")
+}
+
 #[derive(Clone)]
 pub(crate) struct Function {
     pub _name: String,
     pub implementation: TokenStream,
 }
 
+/// One arm of a [`RootSource::Selector`].
+pub(crate) struct RootSourceArm {
+    /// The `#[cfg(...)]` of the selected option, if it has one.
+    pub cfg_attr: TokenStream,
+    /// The configuration value that selects this arm.
+    pub pattern: TokenStream,
+    /// The name of the node this arm selects.
+    pub upstream: String,
+}
+
+/// How a clock tree node reaches the clock source it runs on.
+pub(crate) enum RootSource {
+    /// The node is a clock source.
+    Itself,
+
+    /// The node always runs on the output of one other node.
+    PassThrough(String),
+
+    /// The node's configuration selects which other node it runs on.
+    Selector {
+        /// The value to match, with the node's configuration in scope as `config`.
+        subject: TokenStream,
+        arms: Vec<RootSourceArm>,
+    },
+
+    /// The node cannot answer.
+    Unknown,
+}
+
+pub(crate) enum SourceFrequencySignature {
+    Skip,
+    Parameterless(TokenStream),
+    Selector {
+        param_type: TokenStream,
+        param_name: Ident,
+        body: TokenStream,
+    },
+}
+
 pub(crate) struct ClockNodeFunctions {
     pub impl_type: Option<Ident>,
+    pub cfg: Option<String>,
 
     pub request: Function,
     pub release: Function,
@@ -81,16 +147,30 @@ pub(crate) struct ClockNodeFunctions {
     pub current_config: Function,
 
     pub frequency: Function,
+    pub source_frequency: Function,
     pub hal_functions: Vec<TokenStream>,
 }
 
 impl ClockNodeFunctions {
     pub fn implement_functions(&self) -> TokenStream {
-        let request_impl = &self.request.implementation;
-        let release_impl = &self.release.implementation;
-        let apply_impl = &self.apply_config.implementation;
-        let current_config_impl = &self.current_config.implementation;
-        let frequency_impl = &self.frequency.implementation;
+        let cfg_attr = rustc_cfg_attr(self.cfg.as_deref());
+        let wrap = |implementation: &TokenStream| {
+            if implementation.is_empty() {
+                quote! {}
+            } else {
+                quote! {
+                    #cfg_attr
+                    #implementation
+                }
+            }
+        };
+
+        let apply_impl = wrap(&self.apply_config.implementation);
+        let current_config_impl = wrap(&self.current_config.implementation);
+        let request_impl = wrap(&self.request.implementation);
+        let release_impl = wrap(&self.release.implementation);
+        let frequency_impl = wrap(&self.frequency.implementation);
+        let source_frequency_impl = wrap(&self.source_frequency.implementation);
 
         quote! {
             #apply_impl
@@ -98,6 +178,7 @@ impl ClockNodeFunctions {
             #request_impl
             #release_impl
             #frequency_impl
+            #source_frequency_impl
         }
     }
 }
@@ -248,6 +329,9 @@ pub(crate) struct ManagementProperties {
     /// This clock node is considered always running.
     pub always_on: bool,
 
+    /// This clock node holds a wake lock while it is enabled.
+    pub wake_locking: bool,
+
     pub receiver: Option<TokenStream>,
     pub accessor: Option<TokenStream>,
 }
@@ -284,6 +368,10 @@ impl ManagementProperties {
         self.always_on
     }
 
+    pub fn wake_locking(&self) -> bool {
+        self.wake_locking
+    }
+
     /// For peripheral clocks, returns a receiver expression (`self`).
     pub fn receiver(&self) -> &[TokenStream] {
         self.receiver.as_slice()
@@ -307,9 +395,104 @@ impl ManagementProperties {
     }
 }
 
+/// The range of values an expression or a clock node's output can take.
+///
+/// Bounds are used to decide where 32-bit arithmetic is enough, and where the generated code has
+/// to compute in 64 bits to avoid overflowing. They are conservative: a wider range than the real
+/// one only costs a few casts in the generated code, a narrower one would generate code that
+/// overflows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Bounds {
+    pub min: u64,
+    pub max: u64,
+}
+
+impl Bounds {
+    /// The bounds of a value we know nothing about, other than that it is a `u32`.
+    pub const UNKNOWN: Self = Self {
+        min: 0,
+        max: u32::MAX as u64,
+    };
+
+    pub fn exact(value: u64) -> Self {
+        Self {
+            min: value,
+            max: value,
+        }
+    }
+
+    pub fn new(min: u64, max: u64) -> Self {
+        Self { min, max }
+    }
+
+    /// Widens `self` to also contain `other`.
+    pub fn union(self, other: Self) -> Self {
+        Self {
+            min: self.min.min(other.min),
+            max: self.max.max(other.max),
+        }
+    }
+
+    pub fn fits_in_u32(self) -> bool {
+        self.max <= u32::MAX as u64
+    }
+
+    /// Clamps the bounds to the `u32` range in which frequencies are stored.
+    pub fn as_frequency(self) -> Self {
+        Self {
+            min: self.min.min(u32::MAX as u64),
+            max: self.max.min(u32::MAX as u64),
+        }
+    }
+
+    /// Returns the bounds of `self <op> other`, where `op` is one of the supported arithmetic
+    /// operators. Returns `None` for operators that don't produce a number.
+    pub fn apply_operator(self, operator: &str, other: Self) -> Option<Self> {
+        // Saturate instead of overflowing: a saturated bound is still an upper bound, and it means
+        // the generated code is widened, which is what we want for an expression this extreme.
+        let bounds = match operator {
+            "+" => Self::new(
+                self.min.saturating_add(other.min),
+                self.max.saturating_add(other.max),
+            ),
+            "-" => Self::new(
+                self.min.saturating_sub(other.max),
+                self.max.saturating_sub(other.min),
+            ),
+            "*" => Self::new(
+                self.min.saturating_mul(other.min),
+                self.max.saturating_mul(other.max),
+            ),
+            // A zero divisor panics at runtime, so assume the divisor is at least 1.
+            "/" => Self::new(self.min / other.max.max(1), self.max / other.min.max(1)),
+            "%" => Self::new(0, self.max.min(other.max.saturating_sub(1))),
+            _ => return None,
+        };
+
+        Some(bounds)
+    }
+}
+
 /// Common interface for clock node types.
 pub(crate) trait ClockTreeNodeType: Any {
     fn name(&self) -> &str;
+
+    /// Returns the range of frequencies this node can output.
+    ///
+    /// The default implementation gives up and returns [`Bounds::UNKNOWN`].
+    fn output_bounds(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> Bounds {
+        Bounds::UNKNOWN
+    }
+
+    /// Returns the range (`min`, `max`) that the node's frequency can be adjusted to at runtime,
+    /// or `None` if the node is not adjustable.
+    fn adjustable_range(&self) -> Option<(u32, u32)> {
+        None
+    }
 
     /// Returns which clock nodes' configurations are affected when this node is configured.
     // TODO: pass instance to apply template naming scheme to returned clocks
@@ -326,7 +509,23 @@ pub(crate) trait ClockTreeNodeType: Any {
         vec![]
     }
 
+    /// Returns how the node reaches the clock source it runs on.
+    ///
+    /// Sleep code needs this to keep a clock running through a sleep: it asks a node for the source
+    /// it currently runs on, and keeps that source powered. The default implementation has no
+    /// answer, which leaves the node without a getter.
+    fn root_source(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> RootSource {
+        RootSource::Unknown
+    }
+
     fn always_on(&self) -> bool {
+        false
+    }
+    fn wake_locking(&self) -> bool {
         false
     }
     fn validate_source_data(
@@ -345,7 +544,41 @@ pub(crate) trait ClockTreeNodeType: Any {
         &self,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
+        frequency_receiver: &[TokenStream],
     ) -> TokenStream;
+
+    /// Returns true when `config_frequency` must take an `instance` parameter because its
+    /// frequency formula reads a per-instance upstream node's cached frequency.
+    fn config_frequency_needs_instance(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> bool {
+        false
+    }
+
+    /// Returns true when a configurable node's output frequency is a direct alias of a single
+    /// upstream node, so a dedicated frequency cache would only duplicate that upstream value.
+    fn skips_frequency_cache(
+        &self,
+        _instance: &ClockTreeNodeInstance,
+        _tree: &ProcessedClockData,
+    ) -> bool {
+        false
+    }
+
+    fn has_configures(&self) -> bool {
+        false
+    }
+
+    fn node_source_frequency_impl(
+        &self,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> SourceFrequencySignature {
+        let _ = (instance, tree);
+        SourceFrequencySignature::Skip
+    }
 
     /// Returns the documentation for the clock configuration, which will be placed on the
     /// `ClockConfig` field.
@@ -387,8 +620,25 @@ pub(crate) trait ClockTreeNodeType: Any {
         tree: &ProcessedClockData,
     ) -> TokenStream;
 
-    fn property_macro_branches(&self, _path: &str) -> TokenStream {
+    /// Generates `property!` branches for the node's configurable parameters.
+    ///
+    /// `group` is the name of the template group the node belongs to, or an empty string for
+    /// standalone nodes. It is needed to reconstruct the names of the generated config types.
+    ///
+    /// `config_type_stem` is the clock name used in the generated config type (`PARL_IO` + `CLK` →
+    /// `ParlIoClkConfig`). For a preset instantiation this is the preset name, not the node name.
+    fn property_macro_branches(
+        &self,
+        _path: &str,
+        _group: &str,
+        _config_type_stem: &str,
+    ) -> TokenStream {
         quote! {}
+    }
+
+    /// Optional `#[cfg(...)]` expression that disables this node when false.
+    fn rustc_cfg(&self) -> Option<&str> {
+        None
     }
 }
 
@@ -428,12 +678,61 @@ impl ClockTreeItem {
         }
     }
 
-    pub(crate) fn property_macro_branches(&self, path: &str) -> TokenStream {
+    pub(crate) fn is_configurable(&self) -> bool {
         match self {
-            ClockTreeItem::Multiplexer(mux) => mux.property_macro_branches(path),
-            ClockTreeItem::Source(src) => src.property_macro_branches(path),
-            ClockTreeItem::Generic(div) => div.property_macro_branches(path),
-            ClockTreeItem::Derived(drv) => drv.property_macro_branches(path),
+            ClockTreeItem::Multiplexer(mux) => mux.is_configurable(),
+            ClockTreeItem::Source(src) => src.is_configurable(),
+            ClockTreeItem::Generic(div) => div.is_configurable(),
+            ClockTreeItem::Derived(drv) => drv.is_configurable(),
+        }
+    }
+
+    pub(crate) fn property_macro_branches(
+        &self,
+        path: &str,
+        group: &str,
+        config_type_stem: &str,
+    ) -> TokenStream {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => {
+                mux.property_macro_branches(path, group, config_type_stem)
+            }
+            ClockTreeItem::Source(src) => {
+                src.property_macro_branches(path, group, config_type_stem)
+            }
+            ClockTreeItem::Generic(div) => {
+                div.property_macro_branches(path, group, config_type_stem)
+            }
+            ClockTreeItem::Derived(drv) => {
+                drv.property_macro_branches(path, group, config_type_stem)
+            }
+        }
+    }
+
+    pub(crate) fn set_name(&mut self, name: String) {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.name = name,
+            ClockTreeItem::Source(src) => src.name = name,
+            ClockTreeItem::Generic(div) => div.name = name,
+            ClockTreeItem::Derived(drv) => drv.source_options.name = name,
+        }
+    }
+
+    pub(crate) fn set_wake_locking(&mut self, wake_locking: bool) {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.set_wake_locking(wake_locking),
+            ClockTreeItem::Source(src) => src.set_wake_locking(wake_locking),
+            ClockTreeItem::Generic(div) => div.set_wake_locking(wake_locking),
+            ClockTreeItem::Derived(drv) => drv.source_options.set_wake_locking(wake_locking),
+        }
+    }
+
+    pub(crate) fn set_always_on(&mut self, always_on: bool) {
+        match self {
+            ClockTreeItem::Multiplexer(mux) => mux.set_always_on(always_on),
+            ClockTreeItem::Source(src) => src.set_always_on(always_on),
+            ClockTreeItem::Generic(div) => div.set_always_on(always_on),
+            ClockTreeItem::Derived(drv) => drv.source_options.set_always_on(always_on),
         }
     }
 }
@@ -578,6 +877,23 @@ fn human_readable_frequency(mut output: u64) -> (u64, &'static str) {
 pub struct ValuesExpression(Vec<ValueFragment>);
 
 impl ValuesExpression {
+    /// Returns the range of values the parameter can take.
+    fn bounds(&self) -> Bounds {
+        let mut bounds = None;
+        for fragment in self.0.iter() {
+            let fragment = match fragment {
+                ValueFragment::FixedFrequency(value) => Bounds::exact(*value as u64),
+                ValueFragment::Range(min, max) => Bounds::new(*min as u64, *max as u64),
+            };
+            bounds = Some(match bounds {
+                Some(bounds) => Bounds::union(bounds, fragment),
+                None => fragment,
+            });
+        }
+
+        bounds.unwrap_or(Bounds::UNKNOWN)
+    }
+
     fn as_enum_values(&self) -> Option<Vec<u32>> {
         let frequencies = self
             .0
@@ -677,7 +993,7 @@ pub struct RejectExpression(Expression);
 impl RejectExpression {
     fn to_rust<'a>(
         &'a self,
-        mut variables: HashMap<&'a str, TokenStream>,
+        mut variables: HashMap<&'a str, Operand>,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
@@ -688,7 +1004,10 @@ impl RejectExpression {
                 // Referring to a node by name resolves to its output frequency.
                 let node = instance.resolve_node(tree, var);
                 let freq_fn = node.frequency_function_name();
-                variables.insert(var, quote! { #freq_fn() });
+                variables.insert(
+                    var,
+                    Operand::new(quote! { #freq_fn() }, node.output_bounds(tree)),
+                );
 
                 // Only run the assert if the referenced nodes have been configured
                 let config_field = node.properties.indexed_config_accessor();
@@ -749,6 +1068,7 @@ impl Expression {
                     // bit of a convention over specification, though.
                     visit_variables(&arguments[0], f);
                 }
+                _ => unimplemented!("Unsupported expression: {:#?}", expr),
             }
         }
 
@@ -757,11 +1077,88 @@ impl Expression {
 
     fn to_rust(
         &self,
-        variables: HashMap<&str, TokenStream>,
+        variables: HashMap<&str, Operand>,
         instance: &ClockTreeNodeInstance,
         tree: &ProcessedClockData,
     ) -> TokenStream {
         ExprCompiler::new(&variables).compile_expression(self, instance, tree)
+    }
+
+    /// Solves the expression at codegen time, with every variable bound to a fixed value.
+    ///
+    /// Returns `None` if the expression can't be solved, e.g. because it divides by zero or calls
+    /// a function.
+    fn solve(&self, values: &IndexMap<&str, u64>) -> Option<u64> {
+        let mut ctx = somni_expr::Context::new();
+        for (name, value) in values.iter() {
+            ctx.add_variable(name, *value);
+        }
+
+        ctx.evaluate_parsed::<u64>(
+            &self.source,
+            &ast::Expression::Expression {
+                expression: self.expr.clone(),
+            },
+        )
+        .ok()
+    }
+
+    /// Returns the range of values the expression can evaluate to.
+    ///
+    /// The expression is solved at every combination of its variables' extremes. This is more
+    /// accurate than propagating bounds through the operators one by one, because a variable that
+    /// appears multiple times (like `a` in `SOURCE * a / (N * a + b)`) takes the same value in
+    /// every place it appears.
+    fn bounds(&self, variables: &IndexMap<&str, Bounds>) -> Bounds {
+        // Solving 2^n times is only reasonable for the handful of variables a clock node has.
+        if variables.len() > 8 {
+            return Bounds::UNKNOWN;
+        }
+
+        let mut bounds: Option<Bounds> = None;
+        for corner in 0..1u32 << variables.len() {
+            let values = variables
+                .iter()
+                .enumerate()
+                .map(|(index, (name, variable))| {
+                    let value = if corner & (1 << index) == 0 {
+                        variable.min
+                    } else {
+                        variable.max
+                    };
+                    (*name, value)
+                })
+                .collect::<IndexMap<_, _>>();
+
+            if let Some(value) = self.solve(&values) {
+                let value = Bounds::exact(value);
+                bounds = Some(match bounds {
+                    Some(bounds) => bounds.union(value),
+                    None => value,
+                });
+            }
+        }
+
+        bounds.unwrap_or(Bounds::UNKNOWN)
+    }
+
+    /// Returns the bounds of the expression, looking up the bounds of any variable that isn't
+    /// listed in `known` as a clock node's output.
+    fn bounds_in_tree<'s>(
+        &'s self,
+        known: &IndexMap<&'s str, Bounds>,
+        instance: &ClockTreeNodeInstance,
+        tree: &ProcessedClockData,
+    ) -> Bounds {
+        let mut variables = known.clone();
+
+        self.visit_variables(|variable| {
+            if !variables.contains_key(variable) {
+                variables.insert(variable, instance.upstream_bounds(tree, variable));
+            }
+        });
+
+        self.bounds(&variables)
     }
 }
 
@@ -783,5 +1180,61 @@ impl<'de> Deserialize<'de> for Expression {
                 MarkInSource(&s, err.location, "Expression error", &err.error)
             ))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn expression(source: &str) -> Expression {
+        let ast::Expression::Expression { expression } =
+            somni_parser::parser::parse_expression::<DefaultTypeSet>(source).unwrap()
+        else {
+            unreachable!()
+        };
+
+        Expression {
+            source: source.to_string(),
+            expr: expression,
+        }
+    }
+
+    #[test]
+    fn operator_bounds_are_conservative() {
+        let a = Bounds::new(2, 10);
+        let b = Bounds::new(3, 4);
+
+        assert_eq!(a.apply_operator("+", b), Some(Bounds::new(5, 14)));
+        assert_eq!(a.apply_operator("-", b), Some(Bounds::new(0, 7)));
+        assert_eq!(a.apply_operator("*", b), Some(Bounds::new(6, 40)));
+        assert_eq!(a.apply_operator("/", b), Some(Bounds::new(0, 3)));
+        assert_eq!(a.apply_operator("%", b), Some(Bounds::new(0, 3)));
+
+        // Comparisons don't produce a number.
+        assert_eq!(a.apply_operator("<", b), None);
+    }
+
+    #[test]
+    fn division_by_a_possibly_zero_value_assumes_a_divisor_of_one() {
+        let bounds = Bounds::new(0, 100).apply_operator("/", Bounds::new(0, 4));
+        assert_eq!(bounds, Some(Bounds::new(0, 100)));
+    }
+
+    #[test]
+    fn expression_bounds_account_for_repeated_variables() {
+        let expr = expression("(sclk * div_a) / (div_num * div_a + div_b)");
+
+        let variables = IndexMap::from_iter([
+            ("sclk", Bounds::new(40_000_000, 240_000_000)),
+            ("div_num", Bounds::new(2, 256)),
+            ("div_a", Bounds::new(1, 63)),
+            ("div_b", Bounds::new(0, 63)),
+        ]);
+
+        // The largest output is reached at div_num = 2, div_b = 0, for any div_a. Solving the
+        // expression keeps div_a consistent between the two places it appears, so the result
+        // isn't inflated to sclk * 63.
+        assert_eq!(expr.bounds(&variables), Bounds::new(125_391, 120_000_000));
     }
 }

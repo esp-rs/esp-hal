@@ -16,6 +16,8 @@
 //! WiFi has no internet connection, Chrome might not want to load the URL - you
 //! can use a shell and try `curl` and `ping`
 
+//% CHIP_FILTER: wifi_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -39,15 +41,10 @@ use embassy_time::{Duration, Timer};
 use embedded_io_async::Read;
 use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::{
-    clock::CpuClock,
-    interrupt::software::SoftwareInterruptControl,
-    ram,
-    rng::Rng,
-    timer::timg::TimerGroup,
-};
+use esp_hal::{clock::CpuClock, ram, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::wifi::{
+    AuthenticationMethodConfig,
     Config,
     ControllerConfig,
     Interface,
@@ -60,6 +57,12 @@ use reqwless::{
     request::{Method, RequestBuilder},
 };
 esp_bootloader_esp_idf::esp_app_desc!();
+
+// Full `.dram2_uninit` region for this chip.
+const DRAM2_UNINIT_SIZE: usize = {
+    let range: core::ops::Range<usize> = esp_metadata_generated::memory_range!("DRAM2_UNINIT");
+    range.end - range.start
+};
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -80,18 +83,19 @@ async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
     let access_point_station_config = Config::AccessPointStation(
         StationConfig::default()
-            .with_ssid(SSID)
-            .with_password(PASSWORD.into()),
-        AccessPointConfig::default().with_ssid("esp-radio-apsta"),
+            .with_ssid(SSID.try_into().unwrap())
+            .with_authentication(AuthenticationMethodConfig::Wpa2Personal(
+                PASSWORD.try_into().unwrap(),
+            )),
+        AccessPointConfig::default().with_ssid("esp-radio-apsta".try_into().unwrap()),
     );
 
     println!("Starting wifi");

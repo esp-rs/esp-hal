@@ -16,6 +16,7 @@ struct ShaAlgo {
 }
 
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ShaAlgoMap {
     sha1: Option<u32>,
     sha224: Option<u32>,
@@ -25,10 +26,11 @@ pub struct ShaAlgoMap {
     sha512_224: Option<u32>,
     sha512_256: Option<u32>,
     sha512_t: Option<u32>,
+    sm3: Option<u32>,
 }
 
-impl super::GenericProperty for ShaAlgoMap {
-    fn macros(&self) -> Option<proc_macro2::TokenStream> {
+impl ShaAlgoMap {
+    fn algorithms(&self) -> impl Iterator<Item = (ShaAlgo, u32)> {
         let modes = [
             ("SHA-1", self.sha1),
             ("SHA-224", self.sha224),
@@ -38,12 +40,28 @@ impl super::GenericProperty for ShaAlgoMap {
             ("SHA-512/224", self.sha512_224),
             ("SHA-512/256", self.sha512_256),
             ("SHA-512/t", self.sha512_t),
+            ("SM3", self.sm3),
         ];
 
-        let algos = modes
+        modes
             .into_iter()
             .filter_map(|(name, mode)| mode.map(|m| (name, m)))
-            .filter_map(|(name, mode)| ShaAlgo::new(name).map(|name| (name, mode)))
+            .filter_map(|(name, mode)| ShaAlgo::new(name).map(|algo| (algo, mode)))
+    }
+}
+
+impl super::GenericProperty for ShaAlgoMap {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        Some(
+            self.algorithms()
+                .map(|(algo, _)| format!("sha_has_{}", algo.ident.to_string().to_lowercase()))
+                .collect(),
+        )
+    }
+
+    fn macros(&self) -> Option<proc_macro2::TokenStream> {
+        let algos = self
+            .algorithms()
             .map(|(algo, mode)| {
                 let mode = number(mode);
                 quote! { #algo, #mode }
@@ -123,6 +141,15 @@ impl ShaAlgo {
                 insecure_against_collision: false,
                 insecure_against_length_extension: false,
             },
+            Self {
+                name: "SM3",
+                ident: format_ident!("Sm3"),
+                digest_len: 32,
+                block_size: 64,
+                message_len_bytes: 8,
+                insecure_against_collision: false,
+                insecure_against_length_extension: true,
+            },
         ];
 
         for a in known {
@@ -160,6 +187,28 @@ impl ToTokens for ShaAlgo {
 
         tokens.extend(
             quote! { #ident, #name (sizes: #block_size, #digest_len, #message_len_bytes) (insecure_against: #(#insecure),*) },
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cfg::GenericProperty;
+
+    #[test]
+    fn cfgs_only_include_implemented_algorithms() {
+        let modes = ShaAlgoMap {
+            sha1: Some(0),
+            sha512_224: Some(5),
+            sha512_t: Some(7),
+            sm3: Some(14),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            modes.cfgs().unwrap(),
+            ["sha_has_sha1", "sha_has_sha512_224", "sha_has_sm3"]
         );
     }
 }

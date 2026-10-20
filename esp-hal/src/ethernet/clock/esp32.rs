@@ -73,14 +73,18 @@ impl<P: RmiiClkIn> RmiiClockConfig for ExternalRefClock<P> {
     }
 }
 
+#[cfg_attr(docsrs, procmacros::doc_replace(
+    "clk_out_gpio" => gpio_for_signal!(EMAC_CLK_OUT),
+    "clk_180_gpio" => gpio_for_signal!(EMAC_CLK_180),
+))]
 /// RMII reference clock generated internally by the ESP32 APLL at 50 MHz.
 ///
 /// Should not be used together with Wi-Fi. No other APLL consumer must be active.
 ///
-/// The APLL output is routed to GPIO16 (`EMAC_CLK_OUT`) or GPIO17
+/// The APLL output is routed to __clk_out_gpio__ (`EMAC_CLK_OUT`) or __clk_180_gpio__
 /// (`EMAC_CLK_180`).  Wrap the chosen GPIO:
 /// ```rust,ignore
-/// ApllClock::new(peripherals.GPIO16)
+/// ApllClock::new(peripherals.__clk_out_gpio__)
 /// ```
 pub struct ApllClock<P>(P);
 
@@ -181,9 +185,13 @@ impl<P: RmiiClkOut> RmiiClockConfig for ApllClock<P> {
 
 // ── MiiClock ──────────────────────────────────────────────────────────────
 
+#[cfg_attr(docsrs, procmacros::doc_replace(
+    "tx_clk_gpio" => gpio_for_signal!(EMAC_TX_CLK),
+    "rx_clk_gpio" => gpio_for_signal!(EMAC_RX_CLK),
+))]
 /// MII clock configuration.
 ///
-/// In MII mode the PHY drives both `TX_CLK` (GPIO0) and `RX_CLK` (GPIO5).
+/// In MII mode the PHY drives both `TX_CLK` (__tx_clk_gpio__) and `RX_CLK` (__rx_clk_gpio__).
 /// The EMAC_EXT block only needs the MII clock buffers enabled;
 /// no internal clock source is required.
 pub(crate) struct MiiClock;

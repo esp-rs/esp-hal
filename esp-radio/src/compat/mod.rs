@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+/// C11 `__atomic_*` helpers where the target has no hardware CAS (RISC-V IMC, ESP32-S2).
+#[cfg(any(all(target_arch = "riscv32", not(target_feature = "a")), esp32s2))]
+pub mod atomic;
+
 pub mod common;
 pub mod malloc;
 pub mod misc;
@@ -7,7 +11,10 @@ pub mod mutex;
 pub mod queue;
 pub mod semaphore;
 
-#[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "npl")))]
+#[cfg(any(
+    feature = "wifi",
+    all(feature = "ble", any(bt_controller = "npl", bt_controller = "btdm2"))
+))]
 pub mod timer_compat;
 
 pub(crate) const OSI_FUNCS_TIME_BLOCKING: u32 = u32::MAX;

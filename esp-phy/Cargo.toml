@@ -1,6 +1,6 @@
 [package]
 name          = "esp-phy"
-version       = "0.2.0"
+version       = "0.3.0"
 edition       = "2024"
 description   = "PHY initialization"
 documentation = "https://docs.espressif.com/projects/rust/esp-phy/latest/"
@@ -10,9 +10,15 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
+# FIXME: enable doc tests by removing this once the docs are fixed up.
+skip-doctests = true
+chip-features-matter = true
 doc-config = { features = ["defmt"] }
 check-configs = [
     { features = [] },
+    { features = ["defmt"] },
+    { features = ["log-04"] },
+    { features = [], env = { ESP_PHY_CONFIG_PHY_ENABLE_USB = "false" }, if = 'soc_has_usb_device && soc_has_wifi' },
 ]
 clippy-configs = [
     { features = ["defmt"] },
@@ -26,42 +32,43 @@ features       = ["esp32c6"]
 bench = false
 
 [dependencies]
-cfg-if = "1"
 
 document-features = "0.2"
-esp-hal = { version = "~1.1.0", path = "../esp-hal", default-features = false }
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated" }
-esp-sync = { version = "0.2.1", path = "../esp-sync" }
+esp-hal = { version = "~1.2.0", path = "../esp-hal", default-features = false }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated" }
+esp-sync = { version = "0.3.0", path = "../esp-sync" }
 
 # Make sure these are aligned with esp-radio's dependencies, too!
-esp-wifi-sys-esp32 = { version = "0.2.0", optional = true }
-esp-wifi-sys-esp32c2 = { version = "0.2.0", optional = true }
-esp-wifi-sys-esp32c3 = { version = "0.2.0", optional = true }
-esp-wifi-sys-esp32c5 = { version = "0.2.0", optional = true }
-esp-wifi-sys-esp32c6 = { version = "0.2.0", optional = true }
-esp-wifi-sys-esp32c61 = { version = "0.2.0", optional = true }
-esp-wifi-sys-esp32h2 = { version = "0.2.0", optional = true }
-esp-wifi-sys-esp32s2 = { version = "0.2.0", optional = true }
-esp-wifi-sys-esp32s3 = { version = "0.2.0", optional = true }
+esp-wifi-sys-esp32 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32c2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32c3 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32c5 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32c6 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32c61 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32h2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32h4 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32s2 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32s3 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
+esp-wifi-sys-esp32s31 = { version = "0.3.0", optional = true, git = "https://github.com/esp-rs/esp-wifi-sys.git", rev = "5afc3a3" }
 
-esp32   = { version = "0.40", features = ["critical-section"], optional = true }
-esp32c2 = { version = "0.29", features = ["critical-section"], optional = true }
-esp32c3 = { version = "0.32", features = ["critical-section"], optional = true }
-esp32c5 = { version = "0.2",  features = ["critical-section"], optional = true }
-esp32c6 = { version = "0.23", features = ["critical-section"], optional = true }
-esp32c61 = { version = "0.3", features = ["critical-section"], optional = true }
-esp32h2 = { version = "0.19", features = ["critical-section"], optional = true }
-esp32s2 = { version = "0.31", features = ["critical-section"], optional = true }
-esp32s3 = { version = "0.35", features = ["critical-section"], optional = true }
+esp32   = { version = "0.42", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c2 = { version = "0.31", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c3 = { version = "0.34", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c5 = { version = "0.4",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c6 = { version = "0.25", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32c61 = { version = "0.5", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32h2 = { version = "0.21", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32h4 = { version = "0.1",  features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32s2 = { version = "0.33", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32s3 = { version = "0.37", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
+esp32s31 = { version = "0.3", features = ["critical-section"], optional = true, git = "https://github.com/esp-rs/esp-pacs.git", rev = "f7f79f2" }
 
-embassy-sync = "0.8"
-
-defmt = { version = "1.0.1", optional = true }
+defmt = { version = "1.1", optional = true }
 log-04 = { version = "0.4.27", package = "log", optional = true }
 
 [build-dependencies]
-esp-config   = { version = "0.7.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.4.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.8.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.6.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 #! ### Logging Feature Flags
@@ -117,6 +124,13 @@ esp32h2 = [
   "esp-metadata-generated/esp32h2",
 ]
 ##
+esp32h4 = [
+  "esp-hal/esp32h4",
+  "dep:esp-wifi-sys-esp32h4",
+  "dep:esp32h4",
+  "esp-metadata-generated/esp32h4",
+]
+##
 esp32 = [
   "esp-hal/esp32",
   "dep:esp-wifi-sys-esp32",
@@ -136,4 +150,11 @@ esp32s3 = [
   "dep:esp-wifi-sys-esp32s3",
   "dep:esp32s3",
   "esp-metadata-generated/esp32s3",
+]
+##
+esp32s31 = [
+  "esp-hal/esp32s31",
+  "dep:esp-wifi-sys-esp32s31",
+  "dep:esp32s31",
+  "esp-metadata-generated/esp32s31",
 ]

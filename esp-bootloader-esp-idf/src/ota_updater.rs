@@ -2,33 +2,27 @@
 
 use crate::{
     ota::OtaImageState,
-    partitions::{AppPartitionSubType, Error, FlashRegion, PartitionTable},
+    partitions::{AppPartitionSubType, AutoFlashRegion, Error, FlashStorage, PartitionTable},
 };
 
-/// This can be used as more convenient - yet less flexible, way to do OTA updates.
+/// Provides a more convenient, but less flexible, way to do OTA updates.
 ///
-/// If you need lower level access see [crate::ota::Ota]
+/// For lower-level access, see [crate::ota::Ota].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct OtaUpdater<'a, F>
-where
-    F: embedded_storage::Storage,
-{
-    flash: &'a mut F,
+pub struct OtaUpdater<'a, 'd> {
+    flash: &'a mut FlashStorage<'d>,
     pt: PartitionTable<'a>,
     ota_count: usize,
 }
 
-impl<'a, F> OtaUpdater<'a, F>
-where
-    F: embedded_storage::Storage,
-{
-    /// Create a new instance of [OtaUpdater].
+impl<'a, 'd> OtaUpdater<'a, 'd> {
+    /// Creates a new instance of [OtaUpdater].
     ///
     /// # Errors
     /// [Error::Invalid] if no OTA data partition or less than two OTA app partition were found.
     pub fn new(
-        flash: &'a mut F,
+        flash: &'a mut FlashStorage<'d>,
         buffer: &'a mut [u8; crate::partitions::PARTITION_TABLE_MAX_LEN],
     ) -> Result<Self, Error> {
         let pt = crate::partitions::read_partition_table(flash, buffer)?;
@@ -67,18 +61,18 @@ where
         })
     }
 
-    /// Returns an [`Ota`] for accessing the OTA-data partition.
+    /// Returns a [`crate::ota::Ota`] for accessing the OTA-data partition.
     ///
     /// # Errors
     /// [Error::Invalid] if no OTA data partition was found.
-    pub fn ota_data(&mut self) -> Result<crate::ota::Ota<'_, F>, Error> {
+    pub fn ota_data(&mut self) -> Result<crate::ota::Ota<'_, 'd>, Error> {
         let ota_part = self
             .pt
             .find_partition(crate::partitions::PartitionType::Data(
                 crate::partitions::DataPartitionSubType::Ota,
             ))?;
         if let Some(ota_part) = ota_part {
-            let ota_part = ota_part.as_embedded_storage(self.flash);
+            let ota_part = ota_part.as_auto_flash_region(self.flash);
             let ota = crate::ota::Ota::new(ota_part, self.ota_count)?;
             Ok(ota)
         } else {
@@ -117,7 +111,7 @@ where
         self.ota_data()?.current_app_partition()
     }
 
-    /// Get the [OtaImageState] of the currently selected partition.
+    /// Returns the [OtaImageState] of the currently selected partition.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -125,7 +119,7 @@ where
         self.ota_data()?.current_ota_state()
     }
 
-    /// Set the [OtaImageState] of the currently selected slot.
+    /// Sets the [OtaImageState] of the currently selected slot.
     ///
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
@@ -142,17 +136,33 @@ where
         self.ota_data()?.set_current_app_partition(next_slot)
     }
 
-    /// Returns a [FlashRegion] along with the [AppPartitionSubType] for the
+    /// Returns an [AutoFlashRegion] along with the [AppPartitionSubType] for the
     /// partition which would be selected by [Self::activate_next_partition].
-    pub fn next_partition(&mut self) -> Result<(FlashRegion<'_, F>, AppPartitionSubType), Error> {
+    ///
+    /// The region is encrypted when flash encryption is enabled. Erase it before
+    /// writing the new image.
+    pub fn next_partition(
+        &mut self,
+    ) -> Result<(AutoFlashRegion<'_, 'd>, AppPartitionSubType), Error> {
         let next_slot = self.next_ota_part()?;
 
         let flash_region = self
             .pt
             .find_partition(crate::partitions::PartitionType::App(next_slot))?
             .ok_or(Error::Invalid)?
-            .as_embedded_storage(self.flash);
+            .as_auto_flash_region(self.flash);
 
         Ok((flash_region, next_slot))
+    }
+
+    /// Resets the OTA-data.
+    ///
+    /// If present this will activate the FACTORY image, OTA0 otherwise.
+    pub fn reset_data(&mut self) -> Result<(), Error> {
+        // `Factory` resets the OTA data - the bootloader will
+        // check if a FACTORY image is present and boot it,
+        // will choose OTA0 otherwise
+        self.ota_data()?
+            .set_current_app_partition(AppPartitionSubType::Factory)
     }
 }

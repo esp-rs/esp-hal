@@ -6,6 +6,8 @@
 //! GPIO pins 2 and 4 must be connected to a touch pad (usually a larger copper
 //! pad on a PCB).
 
+//% CHIP_FILTER: touch_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -51,7 +53,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut rtc = Rtc::new(peripherals.LPWR);
+    let mut rtc = Rtc::new(peripherals.RTC_TIMER);
     rtc.set_interrupt_handler(interrupt_handler);
 
     let touch_pin0 = peripherals.GPIO2;

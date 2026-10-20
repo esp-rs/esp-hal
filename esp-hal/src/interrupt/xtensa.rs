@@ -10,8 +10,8 @@ use crate::{
 
 /// Enumeration of available CPU interrupts
 ///
-/// It's possible to create one handler per priority level. (e.g
-/// `level1_interrupt`)
+/// It is possible to create one handler per priority level (e.g.
+/// `level1_interrupt`).
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
@@ -69,6 +69,7 @@ pub enum CpuInterrupt {
 }
 
 impl CpuInterrupt {
+    #[cfg(feature = "rt")]
     pub(super) fn from_u32(n: u32) -> Option<Self> {
         match n {
             0 => Some(Self::Interrupt0LevelPriority1),
@@ -106,21 +107,21 @@ impl CpuInterrupt {
         true
     }
 
-    /// Enable the CPU interrupt
+    /// Enables the CPU interrupt.
     #[inline]
     #[instability::unstable]
     pub fn enable(self) {
         enable_cpu_interrupt_raw(self as u32);
     }
 
-    /// Clear the CPU interrupt status bit
+    /// Clears the CPU interrupt status bit.
     #[inline]
     #[instability::unstable]
     pub fn clear(self) {
         unsafe { xtensa_lx::interrupt::clear(1 << self as u32) };
     }
 
-    /// Get interrupt priority for the CPU
+    /// Returns the interrupt priority for the CPU.
     #[inline]
     #[instability::unstable]
     pub fn priority(self) -> Priority {
@@ -286,7 +287,7 @@ pub(crate) fn enable_cpu_interrupt_raw(cpu_interrupt: u32) {
 
 // Runlevel APIs
 
-/// Get the current run level (the level below which interrupts are masked).
+/// Returns the current run level (the level below which interrupts are masked).
 pub(crate) fn current_raw_runlevel() -> u32 {
     xtensa_lx::interrupt::get_level()
 }
@@ -296,9 +297,8 @@ pub(crate) fn current_raw_runlevel() -> u32 {
 ///
 /// # Safety
 ///
-/// This function must only be used to raise the runlevel and to restore it
-/// to a previous value. It must not be used to arbitrarily lower the
-/// runlevel.
+/// Must only be used to raise the runlevel and to restore it to a previous
+/// value. Must not be used to arbitrarily lower the runlevel.
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let token: u32;
     unsafe {
@@ -331,11 +331,11 @@ pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     unwrap!(RunLevel::try_from_u32(token & 0x0F))
 }
 
-/// Wait for an interrupt to occur.
+/// Waits for an interrupt to occur.
 ///
-/// This function causes the current CPU core to execute its Wait For Interrupt
-/// (WFI or equivalent) instruction. After executing this function, the CPU core
-/// will stop execution until an interrupt occurs.
+/// Causes the current CPU core to execute its Wait For Interrupt (WFI or
+/// equivalent) instruction. After this call, the CPU core stops execution until
+/// an interrupt occurs.
 #[inline(always)]
 #[instability::unstable]
 pub fn wait_for_interrupt() {
@@ -361,8 +361,8 @@ pub(crate) fn priority_to_cpu_interrupt(interrupt: Interrupt, level: Priority) -
     }
 }
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
+cfg_select! {
+    esp32 => {
         pub(crate) const EDGE_INTERRUPTS: [Interrupt; 8] = [
             Interrupt::TG0_T0_EDGE,
             Interrupt::TG0_T1_EDGE,
@@ -373,7 +373,8 @@ cfg_if::cfg_if! {
             Interrupt::TG1_WDT_EDGE,
             Interrupt::TG1_LACT_EDGE,
         ];
-    } else if #[cfg(esp32s2)] {
+    }
+    esp32s2 => {
         pub(crate) const EDGE_INTERRUPTS: [Interrupt; 11] = [
             Interrupt::TG0_T0_EDGE,
             Interrupt::TG0_T1_EDGE,
@@ -387,18 +388,20 @@ cfg_if::cfg_if! {
             Interrupt::SYSTIMER_TARGET1,
             Interrupt::SYSTIMER_TARGET2,
         ];
-    } else if #[cfg(esp32s3)] {
+    }
+    esp32s3 => {
         pub(crate) const EDGE_INTERRUPTS: [Interrupt; 0] = [];
-    } else {
+    }
+    _ => {
         compile_error!("Unsupported chip");
     }
 }
 
-/// Setup interrupts ready for vectoring
+/// Sets up interrupts ready for vectoring.
 ///
 /// # Safety
 ///
-/// This function must be called only during core startup.
+/// Must be called only during core startup.
 #[cfg(any(feature = "rt", all(feature = "unstable", multi_core)))]
 pub(crate) unsafe fn init_vectoring() {
     // Enable vectored interrupts. No configuration is needed because these interrupts have
@@ -580,12 +583,11 @@ pub(crate) mod rt {
     #[unsafe(no_mangle)]
     #[ram]
     unsafe fn __level_6_interrupt(save_frame: &mut Context) {
-        cfg_if::cfg_if! {
-            if #[cfg(all(feature = "rt", feature = "exception-handler", stack_guard_monitoring))] {
+        cfg_select! {
+            all(feature = "rt", feature = "exception-handler", stack_guard_monitoring) => {
                 crate::exception_handler::breakpoint_interrupt(save_frame);
-            } else {
-                unsafe { level6_interrupt(save_frame) }
             }
+            _ => unsafe { level6_interrupt(save_frame) },
         }
     }
 

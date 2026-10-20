@@ -1,6 +1,17 @@
 crate: esp-alloc
 
 options:
+  - name: max_regions
+    description: "Maximum number of memory regions that can be added to a
+      heap allocator. Each region slot is a small constant cost in the
+      allocator itself; only increase this if you need to register more
+      regions than the default allows."
+    default:
+      - value: 3
+    constraints:
+      - type:
+          validator: positive_integer
+
   - name: heap_algorithm
     description: "The heap algorithm to use. TLSF offers higher performance
       and bounded allocation time, but uses more memory."

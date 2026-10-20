@@ -1,19 +1,22 @@
-use super::{
+use crate::uart::{
     ConfigError,
     CtsConfig,
     HwFlowControl,
-    Info,
     RegisterBlock,
     RtsConfig,
     StopBits,
     SwFlowControl,
+    low_level::Info,
 };
 
 #[inline(always)]
-pub(super) fn sync_regs(register_block: &RegisterBlock) {
+pub(crate) fn enable_register_sync(_register_block: &RegisterBlock) {}
+
+#[inline(always)]
+pub(crate) fn sync_regs(register_block: &RegisterBlock) {
     let update_reg = register_block.reg_update();
 
-    update_reg.modify(|_, w| w.reg_update().set_bit());
+    update_reg.write(|w| w.reg_update().set_bit());
 
     while update_reg.read().reg_update().bit_is_set() {
         core::hint::spin_loop();
@@ -80,10 +83,8 @@ pub(super) fn change_flow_control(
                 .swfc_conf0()
                 .modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
             info.regs().swfc_conf1().modify(|_, w| unsafe {
-                w.xon_threshold()
-                    .bits(xon_threshold)
-                    .xoff_threshold()
-                    .bits(xoff_threshold)
+                w.xon_threshold().bits(xon_threshold);
+                w.xoff_threshold().bits(xoff_threshold)
             });
             info.regs()
                 .swfc_conf0()
@@ -107,6 +108,45 @@ pub(super) fn change_flow_control(
     }
 
     sync_regs(info.regs());
+}
+
+#[cfg(sleep_driver_supported)]
+pub(super) fn suspend(info: &Info, en: bool) {
+    info.regs().swfc_conf0().modify(|_, w| {
+        w.force_xon().bit(!en);
+        w.sw_flow_con_en().bit(en);
+        w.force_xoff().bit(en)
+    });
+    sync_regs(info.regs());
+
+    if !en {
+        // If we are resuming, we are toggling the XON bit, so clear it.
+        info.regs()
+            .swfc_conf0()
+            .modify(|_, w| w.force_xon().bit(false));
+        sync_regs(info.regs());
+    }
+}
+
+#[cfg(sleep_driver_supported)]
+pub(super) fn set_wakeup_edge_threshold(info: &Info, threshold: u16) {
+    info.regs().sleep_conf2().modify(|_, w| unsafe {
+        // Wake on a number of rising edges on RX, which is the only mode of this driver.
+        w.wk_mode_sel().bits(0);
+        w.active_threshold().bits(threshold)
+    });
+}
+
+#[cfg(sleep_driver_supported)]
+pub(super) fn wait_for_suspended(info: &Info) {
+    const FSM_IDLE: u8 = 0;
+    const FSM_TX_WAIT_SEND: u8 = 0x0F;
+    loop {
+        let bits = info.regs().fsm_status().read().st_utx_out().bits();
+        if [FSM_TX_WAIT_SEND, FSM_IDLE].contains(&bits) {
+            return;
+        }
+    }
 }
 
 fn configure_rts_flow_ctrl(info: &Info, enable: bool, threshold: Option<u8>) {

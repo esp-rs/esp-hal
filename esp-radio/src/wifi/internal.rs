@@ -22,6 +22,7 @@ unsafe extern "C" {
         ...
     );
 
+    #[allow(improper_ctypes)]
     pub unsafe fn __esp_radio_log_writev(
         level: crate::sys::c_types::c_uint,
         tag: *const crate::sys::c_types::c_char,
@@ -148,8 +149,8 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _rand: Some(rand),
     _dport_access_stall_other_cpu_start_wrap: Some(dport_access_stall_other_cpu_start_wrap),
     _dport_access_stall_other_cpu_end_wrap: Some(dport_access_stall_other_cpu_end_wrap),
-    _wifi_apb80m_request: Some(wifi_apb80m_request),
-    _wifi_apb80m_release: Some(wifi_apb80m_release),
+    _wifi_pm_sleep_lock_acquire: Some(wifi_pm_sleep_lock_acquire),
+    _wifi_pm_sleep_lock_release: Some(wifi_pm_sleep_lock_release),
     _phy_disable: Some(os_adapter::phy_disable),
     _phy_enable: Some(os_adapter::phy_enable),
     _phy_update_country_info: Some(phy_update_country_info),
@@ -217,7 +218,7 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _coex_schm_curr_period_get: Some(coex_schm_curr_period_get),
     _coex_schm_curr_phase_get: Some(coex_schm_curr_phase_get),
     #[cfg(any(
-        esp32c3, esp32c2, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3, esp32s2
+        esp32c3, esp32c2, esp32c5, esp32c6, esp32c61, esp32h2, esp32s3, esp32s2, esp32s31
     ))]
     _slowclk_cal_get: Some(slowclk_cal_get),
     #[cfg(any(esp32, esp32s2))]
@@ -226,11 +227,11 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _phy_common_clock_enable: Some(os_adapter_chip_specific::phy_common_clock_enable),
     _coex_register_start_cb: Some(coex_register_start_cb),
 
-    #[cfg(any(esp32c6, esp32c5, esp32c61))]
+    #[cfg(any(esp32c6, esp32c5, esp32c61, esp32s31))]
     _regdma_link_set_write_wait_content: Some(
         os_adapter_chip_specific::regdma_link_set_write_wait_content_dummy,
     ),
-    #[cfg(any(esp32c6, esp32c5, esp32c61))]
+    #[cfg(any(esp32c6, esp32c5, esp32c61, esp32s31))]
     _sleep_retention_find_link_by_id: Some(
         os_adapter_chip_specific::sleep_retention_find_link_by_id_dummy,
     ),
@@ -241,18 +242,41 @@ pub(crate) static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_func
     _coex_schm_flexible_period_get: Some(coex_schm_flexible_period_get),
     _coex_schm_get_phase_by_idx: Some(coex_schm_get_phase_by_idx),
 
+    #[cfg(esp32s31)]
+    _coex_configure_preemption_end_cb: Some(coex_configure_preemption_end_cb),
+    #[cfg(wifi_has_wifi6)]
+    _wifi_disable_ac_ax: Some(wifi_disable_ac_ax),
+    #[cfg(wifi_has_wifi6)]
+    _wifi_bb_sleep_retention_attach: Some(wifi_sleep_retention_unsupported),
+    #[cfg(wifi_has_wifi6)]
+    _wifi_bb_sleep_retention_detach: Some(wifi_sleep_retention_unsupported),
+    #[cfg(wifi_has_wifi6)]
+    _wifi_mac_sleep_retention_attach: Some(wifi_sleep_retention_unsupported),
+    #[cfg(wifi_has_wifi6)]
+    _wifi_mac_sleep_retention_detach: Some(wifi_sleep_retention_unsupported),
+
     _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,
 };
 
 const WIFI_ENABLE_WPA3_SAE: u64 = 1 << 0;
 const WIFI_ENABLE_ENTERPRISE: u64 = 1 << 7;
-// const WIFI_FTM_INITIATOR: u64 = 1 << 2;
-// const WIFI_FTM_RESPONDER: u64 = 1 << 3;
+pub(super) const WIFI_FTM_INITIATOR: u64 = if cfg!(all(wifi_ftm_enable, wifi_ftm_initiator_support))
+{
+    1 << 2
+} else {
+    0
+};
+const WIFI_FTM_RESPONDER: u64 = if cfg!(all(wifi_ftm_enable, wifi_ftm_responder_support)) {
+    1 << 3
+} else {
+    0
+};
 // const WIFI_ENABLE_GCMP: u64 = 1 << 4;
 // const WIFI_ENABLE_GMAC: u64 = 1 << 5;
 // const WIFI_ENABLE_11R: u64 = 1 << 6;
 
-const WIFI_FEATURE_CAPS: u64 = WIFI_ENABLE_WPA3_SAE | WIFI_ENABLE_ENTERPRISE;
+const WIFI_FEATURE_CAPS: u64 =
+    WIFI_ENABLE_WPA3_SAE | WIFI_ENABLE_ENTERPRISE | WIFI_FTM_INITIATOR | WIFI_FTM_RESPONDER;
 
 #[unsafe(no_mangle)]
 pub(super) static mut __ESP_RADIO_G_WIFI_FEATURE_CAPS: u64 = WIFI_FEATURE_CAPS;

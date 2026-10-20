@@ -2,6 +2,8 @@
 //! You need to connect via the Serial/JTAG interface to see any output.
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
 
+//% CHIP_FILTER: usb_serial_jtag_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -10,7 +12,6 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
     Async,
-    interrupt::software::SoftwareInterruptControl,
     timer::timg::TimerGroup,
     usb::usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
 };
@@ -67,9 +68,8 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
+    esp_rtos::start(timg0.timer0);
 
     let (rx, tx) = UsbSerialJtag::new(peripherals.USB_DEVICE)
         .into_async()

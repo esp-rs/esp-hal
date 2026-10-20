@@ -33,7 +33,7 @@
 //!
 //! ```rust, no_run
 #![doc = esp_hal::before_snippet!()]
-//! use esp_hal::interrupt::software::SoftwareInterruptControl;
+//! use esp_hal::interrupt::software::SoftwareInterrupt;
 //! use esp_hal::ram;
 //! use esp_hal::timer::timg::TimerGroup;
 //!
@@ -41,11 +41,10 @@
 //! esp_alloc::heap_allocator!(size: 36 * 1024);
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! let sw_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //!
 //! // THIS IS IMPORTANT FOR WIFI AND BLE: You MUST start the scheduler
 //! // before initializing the radio!
-//! esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
+//! esp_rtos::start(timg0.timer0);
 #![cfg_attr(
     wifi_driver_supported,
     doc = r#"
@@ -177,14 +176,10 @@ mod coex_utils;
 mod fmt;
 pub(crate) mod reg_access;
 
-use core::marker::PhantomData;
-
 use esp_hal as hal;
 #[instability::unstable]
 pub use esp_phy::CalibrationResult;
 use esp_radio_rtos_driver as preempt;
-#[cfg(all(esp32, feature = "unstable"))]
-use hal::analog::adc::{release_adc2, try_claim_adc2};
 #[cfg(feature = "wifi")]
 use hal::{after_snippet, before_snippet};
 use sys::include::esp_phy_calibration_data_t;
@@ -203,10 +198,14 @@ pub(crate) mod sys {
     pub use esp_wifi_sys_esp32c61::*;
     #[cfg(esp32h2)]
     pub use esp_wifi_sys_esp32h2::*;
+    #[cfg(esp32h4)]
+    pub use esp_wifi_sys_esp32h4::*;
     #[cfg(esp32s2)]
     pub use esp_wifi_sys_esp32s2::*;
     #[cfg(esp32s3)]
     pub use esp_wifi_sys_esp32s3::*;
+    #[cfg(esp32s31)]
+    pub use esp_wifi_sys_esp32s31::*;
 }
 
 use crate::refcount::Refcount;
@@ -237,6 +236,10 @@ macro_rules! unstable_module {
 
 mod asynch;
 mod compat;
+#[cfg(any(esp32h4, esp32s31))]
+mod compiler_rt_abi;
+#[cfg(any(feature = "wifi", all(feature = "ble", bt_controller = "btdm2")))]
+mod drop_guard;
 mod interrupt_dispatch;
 mod radio_clocks;
 mod refcount;
@@ -259,23 +262,19 @@ unstable_module! {
 
 pub(crate) mod common_adapter;
 
-#[cfg(all(feature = "ble", bt_controller = "npl"))]
-pub(crate) static ESP_RADIO_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
-
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
 const _: () = {
-    cfg_if::cfg_if! {
-        if #[cfg(wifi_driver_supported)] {
-            core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
-            core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM == 32);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
-            core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
-            core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);
-            core::assert!(sys::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
-        }
+    #[cfg(wifi_driver_supported)]
+    {
+        core::assert!(sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM == 10);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM == 32);
+        core::assert!(sys::include::WIFI_STATIC_TX_BUFFER_NUM == 0);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM == 32);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_RX_ENABLED == 1);
+        core::assert!(sys::include::CONFIG_ESP_WIFI_AMPDU_TX_ENABLED == 1);
+        core::assert!(sys::include::WIFI_AMSDU_TX_ENABLED == 0);
+        core::assert!(sys::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
     };
 };
 
@@ -302,11 +301,13 @@ const _: () = {
 /// - The function may return an error if interrupts are disabled.
 /// - The function may return an error if initializing the underlying driver fails.
 pub(crate) fn init() {
-    #[cfg(all(esp32, feature = "unstable"))]
-    if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
-        panic!(
-            "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
-        );
+    esp_hal::if_unstable_hal! {
+        #[cfg(esp32)]
+        if hal::analog::adc::try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
+            panic!(
+                "ADC2 is currently in use by esp-hal, but esp-radio requires it for Wi-Fi operation."
+            );
+        }
     }
 
     if !preempt::initialized() {
@@ -323,10 +324,9 @@ pub(crate) fn init() {
         );
     }
 
-    crate::common_adapter::enable_wifi_power_domain();
+    acquire_modem_domain();
 
     wifi_set_log_verbose();
-    radio_clocks::init_radio_clocks();
 
     #[cfg(feature = "coex")]
     match crate::wifi::coex_initialize() {
@@ -350,11 +350,95 @@ pub(crate) fn deinit() {
     #[cfg(feature = "ble")]
     ble::shutdown_ble_isr();
 
-    #[cfg(all(esp32, feature = "unstable"))]
-    // Allow using `ADC2` again
-    release_adc2(unsafe { esp_hal::Internal::conjure() });
+    // Gate the BT clocks (the Wi-Fi driver gates its own clocks during
+    // `wifi_deinit`), then let go of the modem power domain.
+    #[cfg(feature = "ble")]
+    crate::radio_clocks::enable_bt(false);
+    release_modem_domain();
+
+    esp_hal::if_unstable_hal! {
+        // Allow using `ADC2` again
+        #[cfg(esp32)]
+        hal::analog::adc::release_adc2(unsafe { esp_hal::Internal::conjure() });
+    }
 
     debug!("Radio deinitialized");
+}
+
+/// The modem power domain, held by every radio that is up.
+///
+/// Powering the domain up pulses a reset over the modem subsystems the radios share (the RF
+/// frontend, the basebands and the MACs), so it must happen before the first radio initializes
+/// and never again while any radio is live; powering it down gates clocks that every radio needs.
+/// Hence the count: whichever radio comes up first powers the domain up, whichever goes last
+/// powers it down. Wi-Fi and BLE hold it through [`RadioRefGuard`]; the IEEE 802.15.4 driver
+/// holds it on its own, as it needs nothing else of [`init`] (the scheduler, coexistence).
+static MODEM_DOMAIN_REFCOUNT: Refcount = Refcount::new();
+
+/// Take a reference to the modem power domain, powering it up if this is the first one.
+pub(crate) fn acquire_modem_domain() {
+    MODEM_DOMAIN_REFCOUNT.increment(|| {
+        // Ungate the modem clocks first: `enable_wifi_power_domain` pulses the
+        // modem reset, which is ineffective while the clocks are gated — and
+        // esp-phy's clock guard has gated them again by the time we re-init.
+        // (ESP-IDF never gates these clocks, so its power-up reset always lands.)
+        radio_clocks::init_radio_clocks();
+
+        crate::common_adapter::enable_wifi_power_domain();
+    });
+}
+
+/// Release a reference to the modem power domain, powering it down if this was the last one.
+pub(crate) fn release_modem_domain() {
+    MODEM_DOMAIN_REFCOUNT.decrement(|| {
+        // Power down the modem power domain and gate the remaining modem clocks,
+        // mirroring ESP-IDF's fixed-mask clock control
+        // (`periph_ll_wifi_module_disable_clk_set_rst` and friends). This must
+        // only run once all radios are off: PHY teardown still needs the modem
+        // clocks.
+        crate::common_adapter::disable_wifi_power_domain();
+        radio_clocks::deinit_radio_clocks();
+
+        // After the modem power domain has been powered down, the PHY driver's
+        // internal init flag must be reset, otherwise the next `phy_wakeup_init`
+        // assumes retained PHY registers that the power-down wiped (mirrors
+        // ESP-IDF's `esp_phy_modem_deinit`, "Fix the issue caused by the power
+        // domain off. This issue is only on ESP32C3.").
+        #[cfg(esp32c3)]
+        unsafe {
+            crate::sys::include::phy_init_flag()
+        };
+    });
+}
+
+/// The BT baseband, shared by BLE and IEEE 802.15.4.
+///
+/// Whichever radio comes up first initializes it, and the one that follows leaves it alone
+/// (ESP-IDF's `esp_btbb_enable`) rather than re-initializing it under the first one's feet.
+/// A power-up of the modem domain resets the baseband, and no radio holds this count without
+/// holding the domain, so the two counts reach zero together and the next radio re-initializes.
+///
+/// The `btdm2` controller (ESP32-S31) still initializes the baseband on its own.
+#[cfg(any(feature = "ieee802154", all(feature = "ble", bt_controller = "npl")))]
+static BTBB_REFCOUNT: Refcount = Refcount::new();
+
+/// Take a reference to the BT baseband, initializing it if this is the first one.
+#[cfg(any(feature = "ieee802154", all(feature = "ble", bt_controller = "npl")))]
+pub(crate) fn btbb_enable() {
+    unsafe extern "C" {
+        fn bt_bb_v2_init_cmplx(print_version: u8); // from libbtbb.a
+    }
+
+    const PRINT_VERSION: u8 = 1;
+
+    BTBB_REFCOUNT.increment(|| unsafe { bt_bb_v2_init_cmplx(PRINT_VERSION) });
+}
+
+/// Release a reference to the BT baseband. There is nothing to undo on the last one: the
+/// baseband goes down with the modem power domain.
+#[cfg(any(feature = "ieee802154", all(feature = "ble", bt_controller = "npl")))]
+pub(crate) fn btbb_disable() {
+    BTBB_REFCOUNT.decrement(|| {});
 }
 
 /// Management of the global reference count
@@ -362,7 +446,7 @@ pub(crate) fn deinit() {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) struct RadioRefGuard {
-    _private: PhantomData<()>,
+    wake_lock: bool,
 }
 
 static RADIO_REFCOUNT: Refcount = Refcount::new();
@@ -370,13 +454,31 @@ static RADIO_REFCOUNT: Refcount = Refcount::new();
 impl RadioRefGuard {
     /// Increments the refcount. If the old count was 0, it performs hardware init.
     /// If hardware init fails, it rolls back the refcount only once.
-    fn new() -> Self {
+    ///
+    /// The guard keeps the chip out of automatic light sleep while it exists.
+    #[cfg(any(feature = "ble", all(feature = "wifi", esp32)))]
+    pub(crate) fn new() -> Self {
+        Self::create(true)
+    }
+
+    /// Like [`Self::new`], but the chip can sleep while the guard exists.
+    ///
+    /// The driver must refuse the sleeps that are not safe for it.
+    #[cfg(any(feature = "ble", all(feature = "wifi", not(esp32))))]
+    pub(crate) fn without_wake_lock() -> Self {
+        Self::create(false)
+    }
+
+    fn create(wake_lock: bool) -> Self {
         debug!("Creating RadioRefGuard");
 
         RADIO_REFCOUNT.increment(init);
-        RadioRefGuard {
-            _private: PhantomData,
+        if wake_lock {
+            esp_hal::if_unstable_hal! {
+                esp_hal::rtc_cntl::WakeLock::acquire();
+            }
         }
+        RadioRefGuard { wake_lock }
     }
 }
 
@@ -386,6 +488,11 @@ impl Drop for RadioRefGuard {
         debug!("Dropping RadioRefGuard");
 
         RADIO_REFCOUNT.decrement(deinit);
+        if self.wake_lock {
+            esp_hal::if_unstable_hal! {
+                esp_hal::rtc_cntl::WakeLock::release();
+            }
+        }
     }
 }
 
@@ -393,7 +500,7 @@ impl Drop for RadioRefGuard {
 /// Does nothing unless the `print-logs-from-driver` feature is enabled.
 #[instability::unstable]
 pub fn wifi_set_log_verbose() {
-    #[cfg(all(feature = "print-logs-from-driver", not(esp32h2)))]
+    #[cfg(all(feature = "print-logs-from-driver", not(any(esp32h2, esp32h4))))]
     unsafe {
         use crate::sys::include::{
             esp_wifi_internal_set_log_level,

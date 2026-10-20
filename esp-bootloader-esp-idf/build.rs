@@ -12,8 +12,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // implementation detail.
     assert_unique_features!("log-04", "defmt");
 
+    // `SOURCE_DATE_EPOCH` is defined by the reproducible-builds spec as the number of
+    // *seconds* since the Unix epoch.
+    println!("cargo:rerun-if-env-changed=SOURCE_DATE_EPOCH");
     let build_time = match env::var("SOURCE_DATE_EPOCH") {
-        Ok(val) => Timestamp::from_microsecond(val.parse::<i64>()?).unwrap(),
+        Ok(val) => Timestamp::from_second(val.parse::<i64>()?)?,
         Err(_) => Timestamp::now(),
     };
 
@@ -29,6 +32,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     } else {
         None
     };
+
+    // Partition and OTA access is built on `esp_hal::flash`. Host tests replace it with a mock.
+    println!("cargo::rustc-check-cfg=cfg(flash_driver_supported)");
+    if chip.is_none_or(|chip| chip.contains("flash_driver_supported")) {
+        println!("cargo::rustc-cfg=flash_driver_supported");
+    }
 
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");

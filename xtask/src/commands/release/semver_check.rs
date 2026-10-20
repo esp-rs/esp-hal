@@ -1,10 +1,9 @@
 use std::path::Path;
 
 use clap::{Args, Subcommand};
-use esp_metadata::Chip;
 use strum::IntoEnumIterator;
 
-use crate::Package;
+use crate::{Package, metadata::Chip};
 
 /// Commands for performing semver checks on the public API of packages.
 #[derive(Debug, Subcommand)]
@@ -21,16 +20,16 @@ pub struct SemverCheckArgs {
     #[command(subcommand)]
     pub command: SemverCheckCmd,
 
-    /// Package(s) to target.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal, Package::EspRomSys, Package::EspRadio])]
+    /// Package(s) to target. Omitted means every semver-checked package.
+    #[arg(long, alias = "package", value_enum, value_delimiter = ',')]
     pub packages: Vec<Package>,
 
     /// Default packages that are not supposed to run, used in CI.
     #[arg(long, value_enum, value_delimiter = ' ')]
     pub exclude_packages: Vec<Package>,
 
-    /// Chip(s) to target.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    /// Chip(s) to target. Omitted means every chip.
+    #[arg(long, alias = "chip", value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
     pub chips: Vec<Chip>,
 }
 
@@ -47,17 +46,27 @@ pub fn semver_checks(workspace: &Path, args: SemverCheckArgs) -> anyhow::Result<
     }
 
     #[cfg(feature = "semver-checks")]
-    match args.command {
-        SemverCheckCmd::GenerateBaseline => {
-            checker::generate_baseline(&workspace, args.packages, args.chips)
+    {
+        let packages = if args.packages.is_empty() {
+            Package::iter()
+                .filter(|p| p.is_semver_checked() || p.has_semver_config())
+                .collect()
+        } else {
+            args.packages
+        };
+
+        match args.command {
+            SemverCheckCmd::GenerateBaseline => {
+                checker::generate_baseline(&workspace, packages, args.chips)
+            }
+            SemverCheckCmd::Check => checker::check_for_breaking_changes(
+                &workspace,
+                packages,
+                args.exclude_packages,
+                args.chips,
+            ),
+            SemverCheckCmd::DownloadBaselines => checker::download_baselines(&workspace, packages),
         }
-        SemverCheckCmd::Check => checker::check_for_breaking_changes(
-            &workspace,
-            args.packages,
-            args.exclude_packages,
-            args.chips,
-        ),
-        SemverCheckCmd::DownloadBaselines => checker::download_baselines(&workspace, args.packages),
     }
 }
 
@@ -73,11 +82,11 @@ pub mod checker {
 
     use anyhow::Context;
     use cargo_semver_checks::ReleaseType;
-    use esp_metadata::Chip;
 
     use crate::{
         Package,
-        semver_check::{build_doc_json, minimum_update},
+        metadata::Chip,
+        semver_check::{baseline_stem, build_prepared_doc_json, minimum_update},
     };
 
     /// Generate the API baselines for the specified packages and chips.
@@ -95,24 +104,14 @@ pub mod checker {
                     continue;
                 }
                 log::info!("Chip = {}", chip.to_string());
-                let package_name = package.to_string();
-                let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+                let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
 
-                package.prepare_semver_check(&package_path, chip)?;
+                let current_path = build_prepared_doc_json(package, chip, &package_path)?;
 
-                let current_path = build_doc_json(package, chip, &package_path)?;
-
-                let dest_path = workspace.join("esp-rom-sys/src/generated_rom_symbols.rs");
-                package.clean_semver_check(&dest_path)?;
-
-                let file_name = if package.chip_features_matter() {
-                    chip.to_string()
-                } else {
-                    "api".to_string()
-                };
-
-                let to_path = PathBuf::from(&package_path)
-                    .join(format!("api-baseline/{}.json.gz", file_name));
+                let to_path = PathBuf::from(&package_path).join(format!(
+                    "api-baseline/{}.json.gz",
+                    baseline_stem(package, *chip)
+                ));
                 fs::create_dir_all(to_path.parent().unwrap())?;
 
                 log::debug!("Compress into {current_path:?}");
@@ -224,7 +223,7 @@ pub mod checker {
             log::info!("Downloading API baselines for {package}");
 
             let package_name = package.to_string();
-            let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+            let package_path = crate::windows_safe_path(&workspace.join(package.directory()));
             let baseline_dir = package_path.join("api-baseline");
 
             // Remove existing baselines

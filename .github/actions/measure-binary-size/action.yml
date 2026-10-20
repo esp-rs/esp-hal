@@ -1,0 +1,71 @@
+name: Measure binary size
+description: >-
+  Build examples for one chip at two commits and record the size of every
+  section that ends up in the image, for `.github/scripts/binary-size.js` to
+  compare. Uploads the sizes as the `sizes-<soc>` artifact.
+
+inputs:
+  soc:
+    description: Chip to build for, as in chips.json.
+    required: true
+  examples:
+    description: Space-separated examples to build.
+    required: true
+  package:
+    description: Optional package the examples belong to (e.g. "qa").
+    required: false
+    default: ""
+  base:
+    description: Commit to compare against.
+    required: true
+  head:
+    description: Commit to measure.
+    required: true
+  between:
+    description: >-
+      Space-separated commits between base and head. Examples that grew past
+      the `MAX_*` limits are also built at each of them.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Rust target
+      id: target
+      shell: bash
+      env:
+        SOC: ${{ inputs.soc }}
+      run: |
+        ENTRY=$(jq -c --arg s "$SOC" '.[] | select(.soc == $s)' .github/chips.json)
+        echo "rust-target=$(echo "$ENTRY" | jq -r '."rust-target"')" >> "$GITHUB_OUTPUT"
+        echo "arch=$(echo "$ENTRY" | jq -r '.arch')" >> "$GITHUB_OUTPUT"
+
+    - uses: ./.github/actions/setup-toolchains
+      with:
+        xtensa: ${{ steps.target.outputs.arch == 'xtensa' }}
+        xtensa-buildtargets: ${{ inputs.soc }}
+        xtensa-default: "true"
+        riscv: ${{ steps.target.outputs.arch == 'riscv' }}
+        riscv-targets: ${{ steps.target.outputs.rust-target }}
+
+    - name: Measure ${{ inputs.soc }}
+      uses: actions/github-script@v8
+      env:
+        SOC: ${{ inputs.soc }}
+        TARGET: ${{ steps.target.outputs.rust-target }}
+        EXAMPLES: ${{ inputs.examples }}
+        PACKAGE: ${{ inputs.package }}
+        BASE: ${{ inputs.base }}
+        HEAD: ${{ inputs.head }}
+        BETWEEN: ${{ inputs.between }}
+      with:
+        script: |
+          const { measure } = require('./.github/scripts/binary-size.js');
+          await measure({ core, exec });
+
+    - uses: actions/upload-artifact@v6
+      with:
+        name: sizes-${{ inputs.soc }}
+        path: sizes/${{ inputs.soc }}.txt
+        if-no-files-found: ignore

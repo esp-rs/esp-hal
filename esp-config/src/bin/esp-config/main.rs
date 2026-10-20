@@ -30,8 +30,10 @@ struct Args {
     config_file: Option<String>,
 }
 
-fn chip_from_str(str: &str) -> Result<Option<Chip>, String> {
-    Chip::from_str(str).map(Some)
+// `clap` already handles the `Option` wrapper via the struct field type,
+// so the value parser should return `Chip` directly instead of `Option<Chip>`.
+fn chip_from_str(str: &str) -> Result<Chip, String> {
+    Chip::from_str(str)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -324,4 +326,16 @@ fn parse_configs(
     }
 
     Ok((hint_about_configs, configs))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Regression test to ensure `--chip` argument parsing does not panic
+    #[test]
+    fn parses_chip_arg() {
+        let args = Args::try_parse_from(["esp-config", "--chip", "esp32c6"]).unwrap();
+        assert_eq!(args.chip, Some(Chip::Esp32c6));
+    }
 }

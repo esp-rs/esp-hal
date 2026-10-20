@@ -8,31 +8,14 @@
 crate::unstable_module! {
     pub mod clocks;
     pub mod trng;
-    pub mod ulp_core;
+    pub mod lp_core;
 }
 pub mod gpio;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32s2 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    // I2S uses the 160 MHz PLL tap, derived from either supported PLL frequency.
-    match clocks::pll_clk_frequency() {
-        320_000_000 => 320_000_000 / 2,
-        480_000_000 => 480_000_000 / 3,
-        _ => unreachable!(),
-    }
-}
-
-#[cfg(spi_master_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn spi_master_clock_source_frequency() -> u32 {
-    clocks::apb_clk_frequency()
-}
-
-/// Write back a specific range of data in the cache.
+/// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
 pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
@@ -56,6 +39,29 @@ pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
     }
 }
 
+// Byte values (not ROM enum indices) to let DMA alignment code use these directly. The ROM calls in
+// configure_cpu_caches will convert to the expected enum index.
+pub(crate) const CONFIG_INSTRUCTION_CACHE_LINE_SIZE: usize = cfg_select! {
+    instruction_cache_line_size_16b => 16,
+    instruction_cache_line_size_32b => 32,
+};
+
+pub(crate) const CONFIG_DATA_CACHE_LINE_SIZE: usize = cfg_select! {
+    data_cache_line_size_16b => 16,
+    data_cache_line_size_32b => 32,
+};
+
+pub(crate) const CONFIG_INSTRUCTION_CACHE_SIZE: usize = cfg_select! {
+    instruction_cache_size_8kb => 0,
+    instruction_cache_size_16kb => 1,
+};
+pub(crate) const CONFIG_DATA_CACHE_SIZE: usize =
+    cfg_select! {
+        data_cache_size_0kb => 0, // doesn't matter according to esp-idf
+        data_cache_size_8kb => 0,
+        data_cache_size_16kb => 1,
+    };
+
 #[crate::ram]
 pub(crate) unsafe fn configure_cpu_caches() {
     // Set up caches. Doesn't work when put in `configure_cpu_caches`.
@@ -63,7 +69,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// Invalidate all cache items in ICache.
         fn Cache_Invalidate_ICache_All();
 
-        /// Set ICache modes: cache size, associate ways and cache line size.
+        /// Sets ICache modes: cache size, associate ways and cache line size.
         ///
         /// @param cache_size_t cache_size : the cache size, can be CACHE_SIZE_HALF and
         /// CACHE_SIZE_FULL
@@ -74,12 +80,12 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// CACHE_LINE_SIZE_16B, CACHE_LINE_SIZE_32B
         fn Cache_Set_ICache_Mode(cache_size: u32, ways: u32, cache_line_size: u32);
 
-        /// Resume ICache access for the cpu.
+        /// Resumes ICache access for the cpu.
         ///
         /// @param  uint32_t autoload : ICache will preload then.
         fn Cache_Resume_ICache(autoload: u32);
 
-        /// Allocate memory to used by ICache and DCache.
+        /// Allocates memory to used by ICache and DCache.
         ///
         /// [`sram0_layout`]: u32 the usage of first 8KB internal memory block,
         /// can be CACHE_MEMORY_INVALID,
@@ -95,7 +101,7 @@ pub(crate) unsafe fn configure_cpu_caches() {
             sram3_layout: u32,
         );
 
-        /// Set DCache modes: cache size, associate ways and cache line size.
+        /// Sets DCache modes: cache size, associate ways and cache line size.
         ///
         /// [`cache_size`]: u32 the cache size, can be CACHE_SIZE_HALF and CACHE_SIZE_FULL
         /// [`ways`]: u32 the associate ways of cache, can only be CACHE_4WAYS_ASSOC
@@ -105,36 +111,13 @@ pub(crate) unsafe fn configure_cpu_caches() {
         /// Invalidate all cache items in DCache.
         fn Cache_Invalidate_DCache_All();
 
-        /// Enable DCache access for the cpu.
+        /// Enables DCache access for the cpu.
         ///
         /// @param  uint32_t autoload : DCache will preload then.
         fn Cache_Enable_DCache(autoload: u32);
     }
 
     const CACHE_4WAYS_ASSOC: u32 = 0;
-
-    const CONFIG_ESP32S2_INSTRUCTION_CACHE_SIZE: u32 = match () {
-        _ if cfg!(instruction_cache_size_8kb) => 0,
-        _ if cfg!(instruction_cache_size_16kb) => 1,
-        _ => core::unreachable!(),
-    };
-    const CONFIG_ESP32S2_INSTRUCTION_CACHE_LINE_SIZE: u32 = match () {
-        _ if cfg!(instruction_cache_line_size_16b) => 0,
-        _ if cfg!(instruction_cache_line_size_32b) => 1,
-        _ => core::unreachable!(),
-    };
-
-    const CONFIG_ESP32S2_DATA_CACHE_SIZE: u32 = match () {
-        _ if cfg!(data_cache_size_0kb) => 0, // doesn't matter according to esp-idf
-        _ if cfg!(data_cache_size_8kb) => 0,
-        _ if cfg!(data_cache_size_16kb) => 1,
-        _ => core::unreachable!(),
-    };
-    const CONFIG_ESP32S2_DATA_CACHE_LINE_SIZE: u32 = match () {
-        _ if cfg!(data_cache_line_size_16b) => 0,
-        _ if cfg!(data_cache_line_size_32b) => 1,
-        _ => core::unreachable!(),
-    };
 
     #[derive(Clone, Copy, Debug)]
     enum CacheLayout {
@@ -176,18 +159,28 @@ pub(crate) unsafe fn configure_cpu_caches() {
     }
 
     unsafe {
+        // Unlike S3 code, Cache_Set_(I/D)Cache_Mode takes a cache_line_size_t enum
+        // (CACHE_LINE_SIZE_16B=0, CACHE_LINE_SIZE_32B=1) rather than the size in bytes.
         Cache_Set_ICache_Mode(
-            CONFIG_ESP32S2_INSTRUCTION_CACHE_SIZE,
+            CONFIG_INSTRUCTION_CACHE_SIZE as u32,
             CACHE_4WAYS_ASSOC,
-            CONFIG_ESP32S2_INSTRUCTION_CACHE_LINE_SIZE,
+            match CONFIG_INSTRUCTION_CACHE_LINE_SIZE {
+                16 => 0,
+                32 => 1,
+                _ => unreachable!(),
+            },
         );
         Cache_Invalidate_ICache_All();
         Cache_Resume_ICache(0);
 
         Cache_Set_DCache_Mode(
-            CONFIG_ESP32S2_DATA_CACHE_SIZE,
+            CONFIG_DATA_CACHE_SIZE as u32,
             CACHE_4WAYS_ASSOC,
-            CONFIG_ESP32S2_DATA_CACHE_LINE_SIZE,
+            match CONFIG_DATA_CACHE_LINE_SIZE {
+                16 => 0,
+                32 => 1,
+                _ => unreachable!(),
+            },
         );
         Cache_Invalidate_DCache_All();
         Cache_Enable_DCache(0);

@@ -18,7 +18,7 @@
 //!
 //! The HAL implements both [`Blocking`] _and_ [`Async`] APIs for all applicable peripherals.
 //! Where applicable, driver implement the [embedded-hal] and
-//! [embedded-hal-async] traits. Drivers that don't currently have a stable API
+//! [embedded-hal-async] traits. Drivers that do not currently have a stable API
 //! are marked as `unstable` in the documentation.
 //!
 //! ### Peripheral singletons
@@ -31,9 +31,9 @@
 //! These singletons, by default, represent peripherals for the entire lifetime
 //! of the program. To allow for reusing peripherals, the HAL provides a
 //! `reborrow` method on each peripheral singleton. This method creates a new
-//! handle to the peripheral with a shorter lifetime. This allows you to pass
-//! the handle to a driver, while still keeping the original handle alive. Once
-//! you drop the driver, you will be able to reborrow the peripheral again.
+//! handle to the peripheral with a shorter lifetime. This lets the handle be
+//! passed to a driver while keeping the original handle alive. Once the driver
+//! is dropped, the peripheral can be reborrowed again.
 #![cfg_attr(
     // Feature-gated so that this doesn't prevent gradual device bringup. Any
     // stable driver would serve the purpose here, so this block will be part
@@ -41,7 +41,7 @@
     i2c_master_driver_supported,
     doc = r#"
 For example, if you want to use the [`I2c`](i2c::master::I2c) driver and you
-don't intend to drop the driver, you can pass the peripheral singleton to
+do not intend to drop the driver, you can pass the peripheral singleton to
 the driver by value:
 
 ```rust, ignore
@@ -89,7 +89,7 @@ let mut i2c = I2c::new(peripherals.I2C0, /* ... */);
 //! ## Creating a Project
 //!
 //! We have a [book] that explains the full esp-hal ecosystem
-//! and how to get started, it's advisable to give that a read
+//! and how to get started, it is advisable to give that a read
 //! before proceeding. We also have a [training] that covers some common
 //! scenarios with examples.
 //!
@@ -149,9 +149,9 @@ fn main() -> ! {
 )]
 //! ## Additional configuration
 //!
-//! We've exposed some configuration options that don't fit into cargo
+//! Some configuration options do not fit into cargo
 //! features. These can be set via environment variables, or via cargo's `[env]`
-//! section inside `.cargo/config.toml`. Note that unstable options can only be
+//! section inside `.cargo/config.toml`. Unstable options can only be
 //! enabled when the `unstable` feature is enabled for the crate. Below is a
 //! table of tunable parameters for this crate:
 #![doc = ""]
@@ -161,7 +161,7 @@ fn main() -> ! {
 //!
 //! You should never use `core::mem::forget` on any type defined in [esp crates].
 //! Many types heavily rely on their `Drop` implementation to not leave the
-//! hardware in undefined state which can cause undefined behaviour in your program.
+//! hardware in undefined state which can cause undefined behavior in your program.
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
 //!
@@ -197,11 +197,7 @@ fn main() -> ! {
 #![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
-// TODO(esp32p4): fill `[device.clock_tree]` doc strings in esp32p4.toml,
-// then promote back to `deny`. Until then, downgrade to warn for P4 only.
-#![cfg_attr(not(esp32p4), deny(missing_docs))]
-#![cfg_attr(esp32p4, warn(missing_docs))]
-#![deny(rust_2018_idioms, rustdoc::all)]
+#![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![allow(rustdoc::private_doc_tests)] // compile tests are done via rustdoc
 #![cfg_attr(docsrs, feature(doc_cfg, custom_inner_attributes, proc_macro_hygiene))]
 // Don't trip up on broken/private links when running semver-checks
@@ -263,7 +259,7 @@ use core::marker::PhantomData;
 
 pub use esp_metadata_generated::chip;
 use esp_rom_sys as _;
-#[cfg_attr(esp32c61, allow(unused))]
+#[allow(unused)]
 pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
@@ -274,17 +270,21 @@ metadata!(
     esp_config::esp_config_str!("ESP_HAL_CONFIG_MIN_CHIP_REVISION")
 );
 
-#[cfg(all(riscv, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use esp_riscv_rt::{self, riscv};
-pub(crate) use peripherals::pac;
-#[cfg(xtensa)]
-#[cfg(all(xtensa, feature = "rt"))]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
-#[cfg_attr(not(feature = "unstable"), doc(hidden))]
-pub use xtensa_lx_rt::{self, xtensa_lx};
+#[cfg(feature = "rt")]
+cfg_select! {
+    riscv => {
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+        #[cfg_attr(not(feature = "unstable"), doc(hidden))]
+        pub use esp_riscv_rt::{self, riscv};
+    }
+    xtensa => {
+        #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
+        #[cfg_attr(not(feature = "unstable"), doc(hidden))]
+        pub use xtensa_lx_rt::{self, xtensa_lx};
+    }
+}
 
+pub(crate) use peripherals::pac;
 pub(crate) mod private;
 
 #[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
@@ -293,14 +293,25 @@ pub mod clock;
 pub mod gpio;
 #[cfg(i2c_master_driver_supported)]
 pub mod i2c;
+// The I2S driver is unstable, but its clock tree nodes are part of every build.
+#[cfg(i2s_driver_supported)]
+#[path = "i2s/clocks/mod.rs"]
+mod i2s_clocks;
 pub mod peripherals;
-#[cfg(all(feature = "unstable", any(hmac_driver_supported, sha_driver_supported)))]
+#[cfg(all(
+    feature = "unstable",
+    any(
+        hmac_driver_supported,
+        sha_driver_supported,
+        ethernet_driver_supported,
+        mipi_dsi_driver_supported
+    )
+))]
 mod reg_access;
 #[cfg(rng_driver_supported)]
 pub mod rng;
 #[cfg(any(spi_master_driver_supported, spi_slave_driver_supported))]
 pub mod spi;
-#[cfg_attr(any(esp32c5, esp32c61), allow(dead_code))]
 pub mod system;
 pub mod time;
 #[cfg(uart_driver_supported)]
@@ -311,18 +322,15 @@ mod macros;
 #[instability::unstable]
 pub use procmacros::handler;
 #[instability::unstable]
-#[cfg(any(lp_core, ulp_riscv_core))]
+#[cfg(ulp_riscv_driver_supported)]
 pub use procmacros::load_lp_code;
 #[cfg(feature = "rt")]
 pub use procmacros::main;
 pub use procmacros::ram;
 
 #[instability::unstable]
-#[cfg(lp_core)]
+#[cfg(ulp_riscv_driver_supported)]
 pub use self::soc::lp_core;
-#[instability::unstable]
-#[cfg(ulp_riscv_core)]
-pub use self::soc::ulp_core;
 
 #[cfg(all(feature = "rt", feature = "exception-handler"))]
 mod exception_handler;
@@ -341,6 +349,8 @@ unstable_module! {
     pub mod analog;
     #[cfg(any(systimer_driver_supported, timergroup_driver_supported))]
     pub mod timer;
+    #[cfg(temp_sensor_driver_supported)]
+    pub mod tsens;
     #[cfg(soc_has_lpwr)]
     pub mod rtc_cntl;
     #[cfg(dma_driver_supported)]
@@ -364,9 +374,13 @@ unstable_driver! {
     pub mod aes;
     #[cfg(assist_debug_driver_supported)]
     pub mod assist_debug;
+    #[cfg(canfd_driver_supported)]
+    pub mod canfd;
     pub mod delay;
     #[cfg(ecc_driver_supported)]
     pub mod ecc;
+    #[cfg(flash_driver_supported)]
+    pub mod flash;
     #[cfg(hmac_driver_supported)]
     pub mod hmac;
     #[cfg(i2s_driver_supported)]
@@ -385,14 +399,16 @@ unstable_driver! {
     pub mod rmt;
     #[cfg(rsa_driver_supported)]
     pub mod rsa;
+    #[cfg(sdmmc_driver_supported)]
+    pub mod sdmmc;
     #[cfg(sha_driver_supported)]
     pub mod sha;
-    #[cfg(touch)]
+    #[cfg(sdm_driver_supported)]
+    pub mod sdm;
+    #[cfg(touch_driver_supported)]
     pub mod touch;
     #[cfg(soc_has_trace0)]
     pub mod trace;
-    #[cfg(soc_has_tsens)]
-    pub mod tsens;
     #[cfg(twai_driver_supported)]
     pub mod twai;
     #[cfg(any(
@@ -403,6 +419,8 @@ unstable_driver! {
     pub mod usb;
     #[cfg(ethernet_driver_supported)]
     pub mod ethernet;
+    #[cfg(mipi_dsi_driver_supported)]
+    pub mod mipi_dsi;
 }
 
 /// State of the CPU saved when entering exception or interrupt
@@ -429,7 +447,7 @@ trait RegisterToggle {
 
     /// Toggles bits in the register, applying the given operation to set and clear them.
     ///
-    /// This method is more efficient than two modify calls, as it will not read the register
+    /// More efficient than two modify calls, because it does not read the register
     /// value twice.
     fn toggle(&self, op: impl Fn(&mut W<Self::Reg>, bool) -> &mut W<Self::Reg>);
 }
@@ -456,7 +474,7 @@ WARNING: use --release
   We *strongly* recommend using release profile when building esp-hal.
   The dev profile can potentially be one or more orders of magnitude
   slower than release, and may cause issues with timing-sensitive
-  peripherals and/or devices.
+  peripherals or devices.
 "}
 
 /// A marker trait for driver modes.
@@ -467,7 +485,7 @@ WARNING: use --release
 pub trait DriverMode: crate::private::Sealed {}
 
 #[procmacros::doc_replace]
-/// Marker type signalling that a driver is initialized in blocking mode.
+/// Marker type signaling that a driver is initialized in blocking mode.
 ///
 /// Drivers are constructed in blocking mode by default. To learn about the
 /// differences between blocking and async drivers, see the [`Async`] mode
@@ -498,7 +516,7 @@ let blocking_uart = uart.into_blocking();
 pub struct Blocking;
 
 #[procmacros::doc_replace]
-/// Marker type signalling that a driver is initialized in async mode.
+/// Marker type signaling that a driver is initialized in async mode.
 ///
 /// Drivers are constructed in blocking mode by default. To set up an async
 /// driver, a [`Blocking`] driver must be converted to an `Async` driver using
@@ -529,12 +547,11 @@ let uart = Uart::new(peripherals.UART0, Config::default())?
 /// available in async mode, as they are handled by the driver's interrupt
 /// handlers.
 ///
-/// Note that async functions usually take up more space than their blocking
-/// counterparts, and they are generally slower. This is because async functions
-/// are implemented using a state machine that is driven by interrupts and is
-/// polled by a runtime. For short operations, the overhead of the state machine
-/// can be significant. Consider using the blocking functions on the async
-/// driver for small transfers.
+/// Async functions usually take up more space than their blocking counterparts,
+/// and they are generally slower. This is because async functions are implemented
+/// using a state machine that is driven by interrupts and is polled by a runtime.
+/// For short operations, the overhead of the state machine can be significant.
+/// Consider using the blocking functions on the async driver for small transfers.
 ///
 /// When initializing an async driver, the driver disables user-specified
 /// interrupt handlers, and sets up internal interrupt handlers that drive the
@@ -611,6 +628,7 @@ pub mod __macro_implementation {
     #[cfg(feature = "rt")]
     #[cfg(riscv)]
     pub use esp_riscv_rt::entry as __entry;
+    pub use static_cell;
     #[cfg(feature = "rt")]
     #[cfg(xtensa)]
     pub use xtensa_lx_rt::entry as __entry;
@@ -627,12 +645,12 @@ pub(crate) static ESP_HAL_LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 #[procmacros::doc_replace]
 /// System configuration.
 ///
-/// This `struct` is marked with `#[non_exhaustive]` and can't be instantiated
+/// This `struct` is marked with `#[non_exhaustive]` and cannot be instantiated
 /// directly. This is done to prevent breaking changes when new fields are added
 /// to the `struct`. Instead, use the [`Config::default()`] method to create a
 /// new instance.
 ///
-/// ## Examples
+/// # Examples
 ///
 /// ### Default initialization
 ///
@@ -659,7 +677,7 @@ pub struct Config {
 }
 
 impl Config {
-    /// Apply a clock configuration.
+    /// Applies a clock configuration.
     #[cfg_attr(
         feature = "unstable",
         doc = r"
@@ -675,7 +693,7 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
         }
     }
 
-    /// Apply a clock configuration.
+    /// Applies a clock configuration.
     #[cfg(not(feature = "unstable"))]
     pub fn with_cpu_clock(self, cpu_clock: CpuClock) -> Self {
         Self {
@@ -688,8 +706,7 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
     ///
     /// # Panics
     ///
-    /// This function will panic if the CPU clock configuration is not **exactly** one of the
-    /// [`CpuClock`] presets.
+    /// Panics if the CPU clock configuration is not **exactly** one of the [`CpuClock`] presets
     #[cfg_attr(feature = "unstable", deprecated(note = "Use `clock_config` instead."))] // TODO: mention ClockTree APIs once they are exposed to the user.
     pub fn cpu_clock(&self) -> CpuClock {
         unwrap!(
@@ -706,12 +723,11 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 }
 
 #[procmacros::doc_replace]
-/// Initialize the system.
+/// Initializes the system.
 ///
-/// This function sets up the CPU clock and watchdog, then, returns the
-/// peripherals and clocks.
+/// Sets up the CPU clock and watchdog, then returns the peripherals and clocks.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -724,12 +740,27 @@ With the `unstable` feature enabled, this function accepts both [`ClockConfig`] 
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
+    let min_rev = esp_config::esp_config_int!(u16, "ESP_HAL_CONFIG_MIN_CHIP_REVISION");
+    assert!(
+        crate::efuse::chip_revision() >= crate::efuse::ChipRevision::from_combined(min_rev),
+        "This chip's hardware revision is older than the minimum required \
+         v{}.{} (ESP_HAL_CONFIG_MIN_CHIP_REVISION).",
+        min_rev / 100,
+        min_rev % 100,
+    );
+
     #[cfg(soc_cpu_has_branch_predictor)]
     crate::soc::enable_branch_predictor();
 
+    // Have we already overflown the stack?
+    #[cfg(init_stack_ptr_range_check)]
     crate::soc::ensure_stack_pointer_in_range();
+
     #[cfg(stack_guard_monitoring)]
     crate::soc::enable_main_stack_guard_monitoring();
+
+    #[cfg(all(feature = "rt", enable_pmp, riscv))]
+    crate::soc::enable_pmp();
 
     system::disable_peripherals();
 
@@ -738,13 +769,13 @@ pub fn init(config: Config) -> Peripherals {
     crate::clock::init(config.clock_config());
 
     // RTC domain must be enabled before we try to disable
-    let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
+    let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.RTC_TIMER.reborrow());
 
     #[cfg(sleep_driver_supported)]
-    crate::rtc_cntl::sleep::RtcSleepConfig::base_settings(&rtc);
+    crate::rtc_cntl::sleep::init(&rtc);
 
     // Disable watchdog timers
-    #[cfg(swd)]
+    #[cfg(soc_has_swd_watchdog)]
     rtc.swd.disable();
 
     rtc.rwdt.disable();
@@ -766,6 +797,9 @@ pub fn init(config: Config) -> Peripherals {
 
     #[cfg(all(riscv, write_vec_table_monitoring))]
     crate::soc::setup_trap_section_protection();
+
+    #[cfg(all(feature = "unstable", multi_core))]
+    crate::interrupt::ipc::install();
 
     peripherals
 }

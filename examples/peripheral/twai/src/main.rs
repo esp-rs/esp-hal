@@ -21,6 +21,8 @@
 //! * use `new()` function to create the TWAI configuration.
 //! * change the `tx_pin` and `rx_pin` to the appropriate pins for your boards.
 
+//% CHIP_FILTER: twai_driver_supported
+
 #![no_std]
 #![no_main]
 

@@ -11,7 +11,10 @@ use crate::{
 };
 
 #[ram]
-#[cfg(any(feature = "coex", all(feature = "ble", bt_controller = "btdm")))]
+#[cfg(any(
+    feature = "coex",
+    all(feature = "ble", any(bt_controller = "btdm", bt_controller = "btdm2"))
+))]
 pub(crate) unsafe extern "C" fn is_in_isr() -> i32 {
     !hal::interrupt::RunLevel::current().is_thread() as i32
 }
@@ -243,12 +246,13 @@ pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
     // Just using IEEE802.15.4 doesn't need the current time. If we don't use `preempt::now`, users
     // will not need to have a scheduler in their firmware.
-    cfg_if::cfg_if! {
-        if #[cfg(any(feature = "wifi", feature = "ble"))] {
-            crate::preempt::now() as i64
-        } else {
+    cfg_select! {
+        any(feature = "wifi", feature = "ble") => crate::preempt::now() as i64,
+        _ => {
             // In this case we don't have a scheduler, we can return esp-hal's timestamp.
-            esp_hal::time::Instant::now().duration_since_epoch().as_micros() as i64
+            esp_hal::time::Instant::now()
+                .duration_since_epoch()
+                .as_micros() as i64
         }
     }
 }
@@ -300,20 +304,15 @@ unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
-// Clock control is no-op because the wifi blobs don't symmetrically enable/disable the clock,
-// causing an eventual overflow. Currently we are holding onto a guard ourselves while Wi-Fi/BT is
-// active, so the blobs should not be able to disable the clock anyway.
-//
-// This might have some low-power issues, but we're not there yet anyway.
-#[allow(unused)]
+#[cfg_attr(not(any(esp32, esp32s2)), expect(unused))]
 pub(crate) unsafe fn phy_enable_clock() {
-    // Stealing the peripheral is safe here, as they must have been passed into the relevant
-    // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
+    let guard = esp_phy::enable_phy();
+    core::mem::forget(guard);
 }
 
-#[allow(unused)]
+#[cfg_attr(not(any(esp32, esp32s2)), expect(unused))]
 pub(crate) unsafe fn phy_disable_clock() {
-    // No-op, see `phy_enable_clock`.
+    esp_phy::disable_phy();
 }
 
 pub(crate) fn enable_wifi_power_domain() {
@@ -327,11 +326,17 @@ pub(crate) fn enable_wifi_power_domain() {
             .dig_pwc()
             .modify(|_, w| w.wifi_force_pd().clear_bit());
 
+        // Give the domain time to power up before touching it, mirroring
+        // ESP-IDF's `esp_wifi_bt_power_domain_on`.
+        esp_rom_sys::rom::ets_delay_us(10);
+
         #[cfg(not(esp32))]
-        cfg_if::cfg_if! {
-            if #[cfg(soc_has_apb_ctrl)] {
+        cfg_select! {
+            soc_has_apb_ctrl => {
                 let syscon = regs!(APB_CTRL);
-            } else { // S2
+            }
+            _ => {
+                // S2
                 let syscon = regs!(SYSCON);
             }
         }
@@ -367,6 +372,69 @@ pub(crate) fn enable_wifi_power_domain() {
         rtc_cntl
             .dig_iso()
             .modify(|_, w| w.wifi_force_iso().clear_bit());
+    }
+
+    // Pulse a reset over the shared modem subsystems (RF frontend, BT/Wi-Fi
+    // baseband and MAC). On PMU-based chips a system reset restarts the digital core
+    // but leaves the modem power domain untouched, so without this the radio
+    // would inherit whatever state the previously-used radio left.
+    cfg_select! {
+        not(wifi_mac_version = "1") => {
+            regs!(MODEM_SYSCON).modem_rst_conf().modify(|_, w| {
+                w.rst_fe().set_bit();
+                w.rst_btbb().set_bit();
+                w.rst_btbb_apb().set_bit();
+                w.rst_btmac().set_bit();
+                w.rst_btmac_apb().set_bit();
+                #[cfg(soc_has_ieee802154)]
+                w.rst_zbmac().set_bit();
+                #[cfg(soc_has_wifi)]
+                {
+                    w.rst_wifibb().set_bit();
+                    w.rst_wifimac().set_bit();
+                }
+                w
+            });
+            regs!(MODEM_SYSCON).modem_rst_conf().modify(|_, w| {
+                w.rst_fe().clear_bit();
+                w.rst_btbb().clear_bit();
+                w.rst_btbb_apb().clear_bit();
+                w.rst_btmac().clear_bit();
+                w.rst_btmac_apb().clear_bit();
+                #[cfg(soc_has_ieee802154)]
+                w.rst_zbmac().clear_bit();
+                #[cfg(soc_has_wifi)]
+                {
+                    w.rst_wifibb().clear_bit();
+                    w.rst_wifimac().clear_bit();
+                }
+                w
+            });
+        }
+        // ESP32-C2 has no separate modem power domain (RTC_CNTL lacks
+        // wifi_force_pd/iso) — nothing to power up here. ESP-IDF's
+        // `esp_wifi_bt_power_domain_on` is a no-op on this chip for the same
+        // reason; in particular it does not reset the shared modem, whose
+        // state the Wi-Fi driver retains across a deinit/init cycle.
+        _ => {}
+    }
+}
+
+/// Power down the Wi-Fi power domain, mirroring `enable_wifi_power_domain` and
+/// ESP-IDF's `esp_wifi_bt_power_domain_off`.
+pub(crate) fn disable_wifi_power_domain() {
+    #[cfg(not(any(soc_has_pmu, esp32c2)))]
+    {
+        let rtc_cntl = regs!(RTC_CNTL);
+
+        // Isolate before powering down.
+        rtc_cntl
+            .dig_iso()
+            .modify(|_, w| w.wifi_force_iso().set_bit());
+
+        rtc_cntl
+            .dig_pwc()
+            .modify(|_, w| w.wifi_force_pd().set_bit());
     }
 }
 

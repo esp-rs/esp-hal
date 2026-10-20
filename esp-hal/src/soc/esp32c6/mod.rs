@@ -13,22 +13,12 @@ crate::unstable_module! {
     pub mod lp_core;
     pub mod trng;
 }
-pub mod gpio;
 pub(crate) mod regi2c;
 
 pub(crate) use esp32c6 as pac;
 
-#[cfg(i2s_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn i2s_sclk_frequency() -> u32 {
-    clocks::pll_f160m_frequency()
-}
-
-#[cfg(spi_master_driver_supported)]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) fn spi_master_clock_source_frequency() -> u32 {
-    clocks::pll_f80m_frequency()
-}
+#[cfg(feature = "rt")]
+pub(crate) fn riscv_preinit() {}
 
 pub(crate) fn pre_init() {
     // By default, these access path filters are enable and allow the access to
@@ -48,4 +38,19 @@ pub(crate) fn pre_init() {
     crate::peripherals::HP_APM::regs()
         .func_ctrl()
         .write(|w| unsafe { w.bits(0x0) });
+
+    // Mirrors ESP-IDF's `init_rng`, see <https://github.com/espressif/esp-idf/blob/8d7d8aef588/components/esp_hw_support/hw_random.c#L114-L120>
+    trng::rng_ll_enable();
+}
+
+/// Invalidate a specific range of addresses in the cache.
+#[cfg(feature = "unstable")]
+#[crate::ram]
+pub(crate) unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    unsafe extern "C" {
+        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+    }
+    unsafe {
+        Cache_Invalidate_Addr(addr, size);
+    }
 }

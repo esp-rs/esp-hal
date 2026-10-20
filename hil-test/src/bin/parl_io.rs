@@ -1,6 +1,6 @@
 //! PARL_IO test
 
-//% CHIPS: esp32c5 esp32c6 esp32h2
+//% CHIP_FILTER: parl_io_driver_supported
 //% FEATURES: unstable
 
 #![no_std]
@@ -10,9 +10,11 @@ use hil_test as _;
 
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
+    #[cfg(esp32c6)]
+    use esp_hal::parl_io::{RxEightBits, TxEightBits};
     use esp_hal::{
-        dma::{DmaRxBuf, DmaTxBuf},
-        dma_buffers,
+        dma_rx_buffer,
+        dma_tx_buffer,
         gpio::{AnyPin, Pin},
         parl_io::{
             BitPackOrder,
@@ -21,14 +23,12 @@ mod tests {
             ParlIo,
             RxClkInPin,
             RxConfig,
-            RxEightBits,
             RxFourBits,
             RxOneBit,
             RxPinConfigWithValidPin,
             RxTwoBits,
             SampleEdge,
             TxConfig,
-            TxEightBits,
             TxFourBits,
             TxOneBit,
             TxPinConfigWithValidPin,
@@ -46,13 +46,7 @@ mod tests {
         data_pins: [AnyPin<'static>; 8],
     }
 
-    const MAX_CLK_RATE: Rate = Rate::from_mhz(if cfg!(esp32c5) {
-        // FIXME: Tests become flakey at higher speeds, no matter the sampling edge.
-        // Maybe an effect of the GPIO matrix injecting delay to the valid signal?
-        10
-    } else {
-        40
-    });
+    const MAX_CLK_RATE: Rate = Rate::from_mhz(40);
 
     #[init]
     fn init() -> Context {
@@ -62,51 +56,60 @@ mod tests {
 
         let parl_io = peripherals.PARL_IO;
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32c5)] {
-                // 27 is RGB, 9 and 10 are connected, 13 and 14 is USB
-                let valid_pin = peripherals.GPIO0.degrade();
-                let clock_pin = peripherals.GPIO1.degrade();
-                let data_pins = [
-                    peripherals.GPIO2.degrade(),
-                    peripherals.GPIO3.degrade(),
-                    peripherals.GPIO4.degrade(),
-                    peripherals.GPIO5.degrade(),
-                    peripherals.GPIO6.degrade(),
-                    peripherals.GPIO7.degrade(),
-                    peripherals.GPIO8.degrade(),
-                    peripherals.GPIO9.degrade(),
-                ];
-            } else if #[cfg(esp32c6)] {
-                // 8 is RGB, 2 and 3 are connected, 12 and 13 is USB
-                let valid_pin = peripherals.GPIO0.degrade();
-                let clock_pin = peripherals.GPIO1.degrade();
-                let data_pins = [
-                    peripherals.GPIO2.degrade(),
-                    peripherals.GPIO4.degrade(),
-                    peripherals.GPIO5.degrade(),
-                    peripherals.GPIO6.degrade(),
-                    peripherals.GPIO7.degrade(),
-                    peripherals.GPIO8.degrade(),
-                    peripherals.GPIO9.degrade(),
-                    peripherals.GPIO10.degrade(),
-                ];
-            } else if #[cfg(esp32h2)] {
-                // 8 is RGB, 2 and 3 are connected, 26 and 27 is USB
-                let valid_pin = peripherals.GPIO0.degrade();
-                let clock_pin = peripherals.GPIO1.degrade();
-                let data_pins = [
-                    peripherals.GPIO2.degrade(),
-                    peripherals.GPIO4.degrade(),
-                    peripherals.GPIO5.degrade(),
-                    peripherals.GPIO8.degrade(),
-                    peripherals.GPIO9.degrade(),
-                    peripherals.GPIO10.degrade(),
-                    peripherals.GPIO11.degrade(),
-                    peripherals.GPIO23.degrade(),
-                ];
+        let (valid_pin, clock_pin, data_pins) = cfg_select! {
+            esp32c5 => {
+                // 27 is RGB, 13 and 14 is USB, 4 is tied to 5, 9 is tied to 10 (only 9 is driven)
+                (
+                    peripherals.GPIO0.degrade(),
+                    peripherals.GPIO1.degrade(),
+                    [
+                        peripherals.GPIO2.degrade(),
+                        peripherals.GPIO3.degrade(),
+                        peripherals.GPIO23.degrade(),
+                        peripherals.GPIO24.degrade(),
+                        peripherals.GPIO6.degrade(),
+                        peripherals.GPIO7.degrade(),
+                        peripherals.GPIO8.degrade(),
+                        peripherals.GPIO9.degrade(),
+                    ],
+                )
             }
-        }
+            esp32c6 => {
+                // 8 is RGB, 12 and 13 is USB, 2 is tied to 3 (only 2 is driven)
+                (
+                    peripherals.GPIO0.degrade(),
+                    peripherals.GPIO1.degrade(),
+                    [
+                        peripherals.GPIO2.degrade(),
+                        peripherals.GPIO4.degrade(),
+                        peripherals.GPIO5.degrade(),
+                        peripherals.GPIO6.degrade(),
+                        peripherals.GPIO7.degrade(),
+                        peripherals.GPIO8.degrade(),
+                        peripherals.GPIO9.degrade(),
+                        peripherals.GPIO10.degrade(),
+                    ],
+                )
+            }
+            esp32h2 => {
+                // 8 is RGB, 26 and 27 is USB, 12 and 22 are I2C, 2 is tied to 3, 10 is tied to 11.
+                // Only the first four pins are driven, the 8 bit mode is not tested here.
+                (
+                    peripherals.GPIO0.degrade(),
+                    peripherals.GPIO1.degrade(),
+                    [
+                        peripherals.GPIO2.degrade(),
+                        peripherals.GPIO4.degrade(),
+                        peripherals.GPIO5.degrade(),
+                        peripherals.GPIO8.degrade(),
+                        peripherals.GPIO9.degrade(),
+                        peripherals.GPIO13.degrade(),
+                        peripherals.GPIO23.degrade(),
+                        peripherals.GPIO25.degrade(),
+                    ],
+                )
+            }
+        };
 
         Context {
             parl_io,
@@ -121,9 +124,8 @@ mod tests {
     fn test_parl_io_rx_can_read_tx_in_1_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
@@ -136,7 +138,9 @@ mod tests {
         let rx_pins = RxPinConfigWithValidPin::new(rx_pins, valid_rx, EnableMode::HighLevel);
 
         let clock_out_pin = ClkOutPin::new(clock_tx);
-        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
+        // Sample on the opposite edge of TX. Loopback through the GPIO matrix delays
+        // clock and data and same-edge sampling can violate hold time.
+        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Invert);
 
         let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
@@ -184,9 +188,8 @@ mod tests {
     fn test_parl_io_rx_can_read_tx_in_2_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
@@ -199,7 +202,7 @@ mod tests {
         let rx_pins = RxPinConfigWithValidPin::new(rx_pins, valid_rx, EnableMode::HighLevel);
 
         let clock_out_pin = ClkOutPin::new(clock_tx);
-        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
+        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Invert);
 
         let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
@@ -247,9 +250,8 @@ mod tests {
     fn test_parl_io_rx_can_read_tx_in_4_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
@@ -268,7 +270,7 @@ mod tests {
         let rx_pins = RxPinConfigWithValidPin::new(rx_pins, valid_rx, EnableMode::HighLevel);
 
         let clock_out_pin = ClkOutPin::new(clock_tx);
-        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
+        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Invert);
 
         let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
@@ -321,9 +323,8 @@ mod tests {
     fn test_parl_io_rx_can_read_tx_in_8_bit_mode(ctx: Context) {
         const BUFFER_SIZE: usize = 250;
 
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
-        let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
         let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
         let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
@@ -345,7 +346,7 @@ mod tests {
         let rx_pins = RxPinConfigWithValidPin::new(rx_pins, valid_rx, EnableMode::HighLevel);
 
         let clock_out_pin = ClkOutPin::new(clock_tx);
-        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
+        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Invert);
 
         let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
@@ -408,7 +409,6 @@ mod tx {
         },
         parl_io::{BitPackOrder, ClkOutPin, ParlIo, SampleEdge, TxConfig, TxEightBits},
         pcnt::{
-            Pcnt,
             channel::{CtrlMode, EdgeMode},
             unit::Unit,
         },
@@ -423,7 +423,7 @@ mod tx {
         valid: OutputSignal<'static>,
         clock_loopback: InputSignal<'static>,
         valid_loopback: InputSignal<'static>,
-        pcnt_unit: Unit<'static, 0>,
+        pcnt_unit: Unit<'static>,
     }
     #[init]
     fn init() -> Context {
@@ -433,8 +433,7 @@ mod tx {
         let valid = hil_test::unconnected_pin!(peripherals);
         let (clock_loopback, clock) = unsafe { clock.split() };
         let (valid_loopback, valid) = unsafe { valid.split() };
-        let pcnt = Pcnt::new(peripherals.PCNT);
-        let pcnt_unit = pcnt.unit0;
+        let pcnt_unit = Unit::new(peripherals.PCNT0_UNIT0);
         let dma_channel = peripherals.DMA_CH0;
 
         let parl_io = peripherals.PARL_IO;
@@ -582,7 +581,6 @@ mod async_tx {
         },
         parl_io::{BitPackOrder, ClkOutPin, ParlIo, SampleEdge, TxConfig, TxEightBits},
         pcnt::{
-            Pcnt,
             channel::{CtrlMode, EdgeMode},
             unit::Unit,
         },
@@ -597,7 +595,7 @@ mod async_tx {
         valid: OutputSignal<'static>,
         clock_loopback: InputSignal<'static>,
         valid_loopback: InputSignal<'static>,
-        pcnt_unit: Unit<'static, 0>,
+        pcnt_unit: Unit<'static>,
     }
     #[init]
     async fn init() -> Context {
@@ -607,8 +605,7 @@ mod async_tx {
         let valid = hil_test::unconnected_pin!(peripherals);
         let (clock_loopback, clock) = unsafe { clock.split() };
         let (valid_loopback, valid) = unsafe { valid.split() };
-        let pcnt = Pcnt::new(peripherals.PCNT);
-        let pcnt_unit = pcnt.unit0;
+        let pcnt_unit = Unit::new(peripherals.PCNT0_UNIT0);
         let dma_channel = peripherals.DMA_CH0;
 
         let parl_io = peripherals.PARL_IO;

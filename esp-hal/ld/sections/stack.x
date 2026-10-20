@@ -8,6 +8,8 @@ SECTIONS {
     /* The stack_guard for `stack-protector` mitigation - https://doc.rust-lang.org/rustc/exploit-mitigations.html#stack-smashing-protection */
     __stack_chk_guard = ABSOLUTE(_stack_end) + ${ESP_HAL_CONFIG_STACK_GUARD_OFFSET};
 
+    ASSERT(_stack_start - _stack_end >= ${ESP_HAL_CONFIG_ENSURE_MAIN_STACK_MINIMUM}, "Main stack is smaller than ${ESP_HAL_CONFIG_ENSURE_MAIN_STACK_MINIMUM} bytes.");
+
     . = ORIGIN(RWDATA) + LENGTH(RWDATA);
 
     . = ALIGN (4);

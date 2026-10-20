@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-bt-hci = "0.8.0"
+bt-hci = "0.10.1"
 embassy-executor = "0.10.0"
 embassy-futures = "0.1"
 embassy-time = "0.5.0"
@@ -25,7 +25,7 @@ esp-radio = { path = "../../../esp-radio", features = [
 ] }
 heapless = "0.9.1"
 log = "0.4.27"
-trouble-host = { version = "0.6.0", features = [
+trouble-host = { version = "0.8.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",
@@ -33,6 +33,7 @@ trouble-host = { version = "0.6.0", features = [
 
 [features]
 esp32 = [
+    "esp-alloc/esp32",
     "esp-backtrace/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-hal/esp32",
@@ -40,6 +41,7 @@ esp32 = [
     "esp-radio/esp32",
 ]
 esp32c2 = [
+    "esp-alloc/esp32c2",
     "esp-backtrace/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-hal/esp32c2",
@@ -47,6 +49,7 @@ esp32c2 = [
     "esp-radio/esp32c2",
 ]
 esp32c3 = [
+    "esp-alloc/esp32c3",
     "esp-backtrace/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-hal/esp32c3",
@@ -54,6 +57,7 @@ esp32c3 = [
     "esp-radio/esp32c3",
 ]
 esp32c5 = [
+    "esp-alloc/esp32c5",
     "esp-backtrace/esp32c5",
     "esp-bootloader-esp-idf/esp32c5",
     "esp-hal/esp32c5",
@@ -61,6 +65,7 @@ esp32c5 = [
     "esp-radio/esp32c5",
 ]
 esp32c6 = [
+    "esp-alloc/esp32c6",
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
@@ -68,20 +73,39 @@ esp32c6 = [
     "esp-radio/esp32c6",
 ]
 esp32c61 = [
+    "esp-alloc/esp32c61",
     "esp-backtrace/esp32c61",
     "esp-bootloader-esp-idf/esp32c61",
     "esp-hal/esp32c61",
     "esp-rtos/esp32c61",
     "esp-radio/esp32c61",
 ]
+esp32s31 = [
+    "esp-alloc/esp32s31",
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+    "esp-rtos/esp32s31",
+    "esp-radio/esp32s31",
+]
 esp32h2 = [
+    "esp-alloc/esp32h2",
     "esp-backtrace/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-hal/esp32h2",
     "esp-rtos/esp32h2",
     "esp-radio/esp32h2",
 ]
+esp32h4 = [
+    "esp-alloc/esp32h4",
+    "esp-backtrace/esp32h4",
+    "esp-bootloader-esp-idf/esp32h4",
+    "esp-hal/esp32h4",
+    "esp-rtos/esp32h4",
+    "esp-radio/esp32h4",
+]
 esp32s3 = [
+    "esp-alloc/esp32s3",
     "esp-backtrace/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-hal/esp32s3",

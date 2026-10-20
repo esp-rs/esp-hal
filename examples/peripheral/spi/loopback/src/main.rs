@@ -10,6 +10,8 @@
 //!
 //! This example transfers data via SPI.
 
+//% CHIP_FILTER: spi_master_driver_supported
+
 #![no_std]
 #![no_main]
 
@@ -36,7 +38,7 @@ fn main() -> ! {
     let miso_mosi = peripherals.GPIO2;
     let cs = peripherals.GPIO5;
 
-    let miso = unsafe { miso_mosi.clone_unchecked() };
+    let (miso, mosi) = unsafe { miso_mosi.split() };
 
     let mut spi = Spi::new(
         peripherals.SPI2,
@@ -46,8 +48,8 @@ fn main() -> ! {
     )
     .unwrap()
     .with_sck(sclk)
-    .with_miso(miso) // order matters
-    .with_mosi(miso_mosi) // order matters
+    .with_miso(miso)
+    .with_mosi(mosi)
     .with_cs(cs);
 
     let delay = Delay::new();

@@ -33,6 +33,13 @@ pub(crate) fn init_clocks() {
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | SYSTEM_WIFI_CLK_EN) });
 }
 
+pub(crate) fn deinit_clocks() {
+    // Nothing to do: ESP-IDF's Wi-Fi disable mask
+    // (`SYSTEM_WIFI_CLK_WIFI_EN_M`) is 0 on this chip — its
+    // `periph_ll_wifi_module_disable_clk_set_rst` clears nothing — and
+    // `disable_wifi_power_domain` powers the modem power domain off.
+}
+
 pub(crate) fn ble_rtc_clk_init() {
     // nothing for this target
 }

@@ -1,16 +1,47 @@
+use core::task::Poll;
+
+use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
-use super::*;
-use crate::asynch::AtomicWaker;
+#[cfg(feature = "unstable")]
+use super::BaudrateTolerance;
+use super::{
+    AnyUart,
+    Config,
+    ConfigError,
+    DataBits,
+    HwFlowControl,
+    Parity,
+    RxError,
+    RxErrorKind,
+    StopBits,
+    SwFlowControl,
+    TxError,
+    UartInterrupt,
+    any,
+};
+#[cfg(sleep_driver_supported)]
+use super::{WakeConfigError, WakeupConfig};
+use crate::{
+    asynch::AtomicWaker,
+    gpio::{InputSignal, OutputSignal},
+    handler,
+    interrupt::InterruptHandler,
+    pac::uart0::RegisterBlock,
+    ram,
+    soc::clocks::{
+        self,
+        ClockTree,
+        UartBaudRateGeneratorConfig as BaudRateConfig,
+        UartFunctionClockConfig as ClockConfig,
+    },
+};
 
 #[cfg_attr(uart_version = "1", path = "v1.rs")]
 #[cfg_attr(uart_version = "2", path = "v2.rs")]
 mod version;
 
-#[inline(always)]
-pub(super) fn sync_regs(register_block: &RegisterBlock) {
-    version::sync_regs(register_block);
-}
+pub(super) use version::{enable_register_sync, sync_regs};
 
 #[derive(Debug, EnumSetType)]
 pub(super) enum TxEvent {
@@ -30,21 +61,32 @@ pub(super) enum RxEvent {
     BreakDetected,
 }
 
-pub(super) fn rx_event_check_for_error(events: EnumSet<RxEvent>) -> Result<(), RxError> {
+pub(super) fn rx_event_check_for_error(
+    events: EnumSet<RxEvent>,
+    reported_errors: EnumSet<RxErrorKind>,
+) -> Result<(), RxError> {
     for event in events {
-        match event {
-            RxEvent::FifoOvf => return Err(RxError::FifoOverflowed),
-            RxEvent::GlitchDetected => return Err(RxError::GlitchOccurred),
-            RxEvent::FrameError => return Err(RxError::FrameFormatViolated),
-            RxEvent::ParityError => return Err(RxError::ParityMismatch),
-            RxEvent::FifoFull
-            | RxEvent::CmdCharDetected
-            | RxEvent::FifoTout
-            | RxEvent::BreakDetected => continue,
+        if let Some(error) = rx_error_kind(event)
+            && reported_errors.contains(error)
+        {
+            return Err(error.into());
         }
     }
 
     Ok(())
+}
+
+fn rx_error_kind(event: RxEvent) -> Option<RxErrorKind> {
+    match event {
+        RxEvent::FifoOvf => Some(RxErrorKind::FifoOverflowed),
+        RxEvent::GlitchDetected => Some(RxErrorKind::GlitchOccurred),
+        RxEvent::FrameError => Some(RxErrorKind::FrameFormatViolated),
+        RxEvent::ParityError => Some(RxErrorKind::ParityMismatch),
+        RxEvent::FifoFull
+        | RxEvent::CmdCharDetected
+        | RxEvent::FifoTout
+        | RxEvent::BreakDetected => None,
+    }
 }
 
 /// A future that resolves when the passed interrupt is triggered,
@@ -210,7 +252,7 @@ pub trait Instance: crate::private::Sealed + any::Degrade {
 pub struct Info {
     /// Pointer to the register block for this UART instance.
     ///
-    /// Use [Self::register_block] to access the register block.
+    /// Used with [`Self::register_block`] to access the register block.
     pub register_block: *const RegisterBlock,
 
     /// The system peripheral marker.
@@ -233,6 +275,10 @@ pub struct Info {
 
     /// RTS (Request to Send) pin
     pub rts_signal: OutputSignal,
+
+    /// The wakeup source of this instance, or `None` if the instance cannot wake the chip.
+    #[cfg(sleep_driver_supported)]
+    pub wakeup_source: Option<crate::rtc_cntl::WakeupSource>,
 }
 
 /// Peripheral state for a UART instance.
@@ -264,7 +310,7 @@ impl Info {
         unsafe { &*self.register_block }
     }
 
-    /// Listen for the given interrupts
+    /// Listens for the given interrupts.
     pub(super) fn enable_listen(&self, interrupts: EnumSet<UartInterrupt>, enable: bool) {
         let reg_block = self.regs();
 
@@ -448,9 +494,9 @@ impl Info {
         });
     }
 
-    /// Configures the RX-FIFO threshold
+    /// Configures the RX-FIFO threshold.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::RxFifoThresholdNotSupported`] if the provided value is zero
     /// or exceeds [`Info::RX_FIFO_MAX_THRHD`].
@@ -466,15 +512,15 @@ impl Info {
         Ok(())
     }
 
-    /// Reads the RX-FIFO threshold
+    /// Reads the RX-FIFO threshold.
     #[allow(clippy::useless_conversion)]
     pub(super) fn rx_fifo_full_threshold(&self) -> u16 {
         self.regs().conf1().read().rxfifo_full_thrhd().bits().into()
     }
 
-    /// Configures the TX-FIFO threshold
+    /// Configures the TX-FIFO threshold.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::TxFifoThresholdNotSupported`] if the provided value exceeds
     /// [`Info::TX_FIFO_MAX_THRHD`].
@@ -503,14 +549,14 @@ impl Info {
             _ => "- The value you pass times the symbol size must be <= **0x3FF**.",
         }
     )]
-    /// Configures the Receive Timeout detection setting
+    /// Configures the Receive Timeout detection setting.
     ///
     /// ## Arguments
     ///
     /// `timeout` - the number of symbols ("bytes") to wait for before
     /// triggering a timeout. Pass None to disable the timeout.
     ///
-    /// ## Errors
+    /// # Errors
     ///
     /// [`ConfigError::TimeoutTooLong`] if the provided value exceeds
     /// the maximum value for SOC:
@@ -527,6 +573,15 @@ impl Info {
         version::rx_timeout_enabled(self)
     }
 
+    pub(super) fn set_discard_erroneous_bytes(&self, discard: bool) {
+        // ERR_WR_MASK causes the hardware to discard bytes with UART errors
+        // instead of storing them in the RX FIFO.
+        self.regs()
+            .conf0()
+            .modify(|_, w| w.err_wr_mask().bit(discard));
+        self.sync_regs();
+    }
+
     pub(super) fn is_tx_idle(&self) -> bool {
         version::is_tx_idle(self)
     }
@@ -539,12 +594,7 @@ impl Info {
         ClockTree::with(|clocks| {
             let clock = self.clock_instance;
 
-            let source_config = ClockConfig::new(
-                config.clock_source,
-                #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))]
-                0,
-            );
-            let clk = clock.function_clock_config_frequency(clocks, source_config);
+            let clk = clocks::UartInstance::function_clock_source_frequency(config.clock_source);
 
             // The UART baud rate clock divider is, depending on the device, either a
             // 20.4 bit, or a 12.4 bit divider.
@@ -558,15 +608,17 @@ impl Info {
 
             // TODO: this block should only prepare the new clock config, and it should
             // be applied only after validating the resulting baud rate.
-            cfg_if::cfg_if! {
-                if #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))] {
-                    const MAX_DIV: u32 = property!("clock_tree.uart.baud_rate_generator.integral").1;
+            cfg_select! {
+                any(uart_has_sclk_divider, soc_has_pcr, esp32p4, esp32s31) => {
+                    const MAX_DIV: u32 =
+                        property!("clock_tree.uart.baud_rate_generator.integral").1;
                     let clk_div = clk.div_ceil(MAX_DIV).div_ceil(config.baudrate);
                     debug!("SCLK: {} divider: {}", clk, clk_div);
 
                     let conf = ClockConfig::new(config.clock_source, clk_div - 1);
                     let divider = (clk << FRAC_BITS) / (config.baudrate * clk_div);
-                } else {
+                }
+                _ => {
                     debug!("SCLK: {}", clk);
                     let conf = ClockConfig::new(config.clock_source);
                     let divider = (clk << FRAC_BITS) / config.baudrate;
@@ -656,6 +708,9 @@ impl Info {
 
         txfifo_rst(self.regs(), true);
         txfifo_rst(self.regs(), false);
+
+        // The reset can drive the state machine. Wait for it to settle.
+        while !self.is_tx_idle() {}
     }
 
     pub(super) fn current_symbol_length(&self) -> u8 {
@@ -680,21 +735,38 @@ impl Info {
             .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
     }
 
-    pub(super) fn check_for_errors(&self) -> Result<(), RxError> {
-        let errors = RxEvent::FifoOvf
-            | RxEvent::FifoTout
-            | RxEvent::GlitchDetected
-            | RxEvent::FrameError
-            | RxEvent::ParityError;
+    fn check_for_errors_and_reset_fifo(
+        &self,
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<bool, RxError> {
+        let errors =
+            RxEvent::FifoOvf | RxEvent::GlitchDetected | RxEvent::FrameError | RxEvent::ParityError;
         let events = self.rx_events().intersection(errors);
-        let result = rx_event_check_for_error(events);
-        if result.is_err() {
-            self.clear_rx_events(errors);
-            if events.contains(RxEvent::FifoOvf) {
+        let result = rx_event_check_for_error(events, reported_errors);
+        let fifo_overflowed = events.contains(RxEvent::FifoOvf);
+        if !events.is_empty() {
+            self.clear_rx_events(events);
+            if fifo_overflowed {
                 self.rxfifo_reset();
             }
         }
-        result
+        result.map(|()| fifo_overflowed)
+    }
+
+    pub(super) fn check_for_errors(
+        &self,
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<(), RxError> {
+        self.check_for_errors_and_reset_fifo(reported_errors)
+            .map(|_| ())
+    }
+
+    pub(super) fn check_rx_break_detected(&self) -> bool {
+        self.rx_events().contains(RxEvent::BreakDetected)
+    }
+
+    pub(super) fn clear_rx_break_detected(&self) {
+        self.clear_rx_events(RxEvent::BreakDetected);
     }
 
     pub(super) fn rx_fifo_count(&self) -> u16 {
@@ -717,24 +789,39 @@ impl Info {
         Ok(to_write)
     }
 
-    pub(super) fn read(&self, buf: &mut [u8]) -> Result<usize, RxError> {
+    pub(super) fn read(
+        &self,
+        buf: &mut [u8],
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<usize, RxError> {
         if buf.is_empty() {
             return Ok(0);
         }
 
-        while self.rx_fifo_count() == 0 {
-            // Block until we received at least one byte
-            self.check_for_errors()?;
-        }
+        loop {
+            while self.rx_fifo_count() == 0 {
+                // Block until we received at least one byte
+                self.check_for_errors(reported_errors)?;
+            }
 
-        self.read_buffered(buf)
+            let read = self.read_buffered(buf, reported_errors)?;
+            if read > 0 {
+                break Ok(read);
+            }
+        }
     }
 
-    pub(super) fn read_buffered(&self, buf: &mut [u8]) -> Result<usize, RxError> {
+    pub(super) fn read_buffered(
+        &self,
+        buf: &mut [u8],
+        reported_errors: EnumSet<RxErrorKind>,
+    ) -> Result<usize, RxError> {
         // Get the count first, to avoid accidentally reading a corrupted byte received
         // after the error check.
         let to_read = (self.rx_fifo_count() as usize).min(buf.len());
-        self.check_for_errors()?;
+        if self.check_for_errors_and_reset_fifo(reported_errors)? {
+            return Ok(0);
+        }
 
         for byte_into in buf[..to_read].iter_mut() {
             *byte_into = self.read_next_from_fifo();
@@ -744,6 +831,56 @@ impl Info {
         self.clear_rx_events(RxEvent::FifoFull);
 
         Ok(to_read)
+    }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn suspend_for_sleep(&self) {
+        version::suspend(self, true);
+        version::wait_for_suspended(self);
+    }
+
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn resume_from_sleep(&self) {
+        version::suspend(self, false);
+    }
+
+    /// Lets this instance wake the chip from light sleep.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn enable_wakeup(&self, config: &WakeupConfig) -> Result<(), WakeConfigError> {
+        let source = self
+            .wakeup_source
+            .ok_or(WakeConfigError::NotAWakeupSource)?;
+
+        let edges = config.rising_edges();
+        if !(super::MIN_WAKEUP_EDGES..=super::MAX_WAKEUP_EDGES).contains(&edges) {
+            return Err(WakeConfigError::EdgeCountUnsupported);
+        }
+
+        // The register holds the number of edges above a fixed offset.
+        version::set_wakeup_edge_threshold(self, edges - super::WAKEUP_EDGE_OFFSET);
+
+        source.enable_with_hooks(Some(keep_peripherals_powered), None);
+
+        Ok(())
+    }
+
+    /// Stops this instance from waking the chip.
+    #[cfg(sleep_driver_supported)]
+    pub(crate) fn disable_wakeup(&self) {
+        if let Some(source) = self.wakeup_source {
+            source.disable();
+        }
+    }
+}
+
+/// The UART peripheral monitors the RX line itself, so the peripheral must stay powered.
+#[cfg(sleep_driver_supported)]
+#[crate::ram]
+fn keep_peripherals_powered(config: &mut crate::rtc_cntl::sleep::WrappedSleepConfig<'_>) {
+    // A deep sleep powers the peripheral down in all cases, so this request gives no wake there. It
+    // only increases the current.
+    if !config.is_deep_sleep() {
+        config.keep_alive(crate::rtc_cntl::sleep::SleepResource::HpPeripherals);
     }
 }
 
@@ -755,8 +892,10 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-for_each_uart! {
-    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
+// Each instance names its wakeup source, and no code calculates the source from the metadata flag.
+// An instance that cannot wake the chip has no `WakeupSource` variant to name.
+macro_rules! impl_instance {
+    ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, $wakeup_source:expr) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[handler]
@@ -781,10 +920,21 @@ for_each_uart! {
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
                     rts_signal: OutputSignal::$rts,
+                    #[cfg(sleep_driver_supported)]
+                    wakeup_source: $wakeup_source,
                 };
                 (&PERIPHERAL, &STATE)
             }
         }
+    };
+}
+
+for_each_uart! {
+    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = true) => {
+        impl_instance!($inst, $peri, $rxd, $txd, $cts, $rts, Some(crate::rtc_cntl::WakeupSource::$peri));
+    };
+    ($id:literal, $inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident, wakeup_source = false) => {
+        impl_instance!($inst, $peri, $rxd, $txd, $cts, $rts, None);
     };
 }
 
@@ -794,16 +944,24 @@ pub(super) struct UartClockGuard<'t> {
 
 impl<'t> UartClockGuard<'t> {
     pub(super) fn new(uart: AnyUart<'t>) -> Self {
+        let this = Self::new_inner(uart, false);
+        crate::rom::ets_delay_us(100);
+        this
+    }
+
+    pub(super) fn new_inner(uart: AnyUart<'t>, clone: bool) -> Self {
         ClockTree::with(|clocks| {
             let clock = uart.info().clock_instance;
 
-            // Apply default SCLK configuration
-            let sclk_config = ClockConfig::new(
-                Default::default(),
-                #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4))]
-                0,
-            );
-            clock.configure_function_clock(clocks, sclk_config);
+            // Apply default SCLK configuration when first instance is created.
+            if !clone {
+                let sclk_config = ClockConfig::new(
+                    Default::default(),
+                    #[cfg(any(uart_has_sclk_divider, soc_has_pcr, esp32p4, esp32s31))]
+                    0,
+                );
+                clock.configure_function_clock(clocks, sclk_config);
+            }
             clock.request_function_clock(clocks);
             clock.request_baud_rate_generator(clocks);
             #[cfg(soc_has_clock_node_uart_mem_clock)]
@@ -816,7 +974,7 @@ impl<'t> UartClockGuard<'t> {
 
 impl Clone for UartClockGuard<'_> {
     fn clone(&self) -> Self {
-        Self::new(unsafe { self.uart.clone_unchecked() })
+        Self::new_inner(unsafe { self.uart.clone_unchecked() }, true)
     }
 }
 

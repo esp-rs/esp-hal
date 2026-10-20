@@ -7,6 +7,7 @@
 #[cfg_attr(esp32h2, path = "esp32h2.rs")]
 #[cfg_attr(esp32s2, path = "esp32s2.rs")]
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
+#[cfg_attr(esp32s31, path = "esp32s31.rs")]
 pub(crate) mod os_adapter_chip_specific;
 
 use core::ptr::NonNull;
@@ -756,24 +757,53 @@ pub unsafe extern "C" fn dport_access_stall_other_cpu_end_wrap() {
     trace!("dport_access_stall_other_cpu_end_wrap")
 }
 /// **************************************************************************
-/// Name: wifi_apb80m_request
+/// Name: wifi_pm_sleep_lock_acquire
 ///
 /// Description:
 ///   Take Wi-Fi lock in auto-sleep
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_apb80m_request() {
-    trace!("wifi_apb80m_request - no-op")
+pub unsafe extern "C" fn wifi_pm_sleep_lock_acquire() {
+    trace!("wifi_pm_sleep_lock_acquire");
+    esp_hal::if_unstable_hal! {
+        #[cfg(not(esp32))]
+        super::sleep::acquire_sleep_lock();
+    }
 }
 /// **************************************************************************
-/// Name: wifi_apb80m_release
+/// Name: wifi_pm_sleep_lock_release
 ///
 /// Description:
 ///   Release Wi-Fi lock in auto-sleep
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_apb80m_release() {
-    trace!("wifi_apb80m_release - no-op")
+pub unsafe extern "C" fn wifi_pm_sleep_lock_release() {
+    trace!("wifi_pm_sleep_lock_release");
+    esp_hal::if_unstable_hal! {
+        #[cfg(not(esp32))]
+        super::sleep::release_sleep_lock();
+    }
+}
+
+#[cfg(wifi_has_wifi6)]
+pub unsafe extern "C" fn wifi_disable_ac_ax() -> bool {
+    // IDF's C6/C5/C61 wrappers return false: disabling 11ac/11ax is not supported.
+    false
+}
+
+#[cfg(wifi_has_wifi6)]
+pub unsafe extern "C" fn wifi_sleep_retention_unsupported() -> i32 {
+    // IDF returns 1 when CONFIG_MAC_BB_PD is off.
+    1
+}
+
+#[cfg(esp32s31)]
+pub unsafe extern "C" fn coex_configure_preemption_end_cb(
+    _is_register: bool,
+    _cb: Option<unsafe extern "C" fn(u32) -> crate::sys::c_types::c_int>,
+) -> crate::sys::c_types::c_int {
+    // IDF's wrapper returns 0 unless software coex and BLE ISO are both on.
+    0
 }
 
 /// **************************************************************************
@@ -791,7 +821,8 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
-    esp_phy::disable_phy();
+    // Wi-Fi modem disable: also clears Wi-Fi RX (unlike the common-clock gate).
+    esp_phy::disable_phy_with_wifi_rx();
 }
 
 /// **************************************************************************
@@ -810,7 +841,26 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-    core::mem::forget(esp_phy::enable_phy());
+    // Wi-Fi modem enable: also sets Wi-Fi RX (unlike the common-clock gate).
+    esp_phy::enable_phy_with_wifi_rx();
+
+    // ESP-IDF turns off the baseband idle check (maximum 139 ms) to prevent an unexpected
+    // RXTXPANIC.
+    #[cfg(any(esp32c5, esp32c61, esp32s31))]
+    unsafe {
+        unsafe extern "C" {
+            fn set_bb_wdg(
+                busy_chk: bool,
+                srch_chk: bool,
+                max_busy: u16,
+                max_srch: u16,
+                rst_en: bool,
+                int_en: bool,
+                clr: bool,
+            );
+        }
+        set_bb_wdg(true, false, 0x18, 0xaa, false, false, false);
+    }
 }
 
 /// **************************************************************************
@@ -823,9 +873,9 @@ pub unsafe extern "C" fn phy_enable() {
 #[allow(clippy::unnecessary_cast)]
 pub unsafe extern "C" fn phy_update_country_info(country: *const c_char) -> c_int {
     unsafe {
-        // not implemented in original code
+        // FIXME
         trace!("phy_update_country_info {}", str_from_c(country.cast()));
-        -1
+        0
     }
 }
 
@@ -862,7 +912,7 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    crate::radio_clocks::clocks_ll::enable_wifi(true);
+    crate::radio_clocks::enable_wifi(true);
 }
 
 /// **************************************************************************
@@ -880,7 +930,7 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
-    crate::radio_clocks::clocks_ll::enable_wifi(false);
+    crate::radio_clocks::enable_wifi(false);
 }
 
 /// **************************************************************************
@@ -1429,13 +1479,12 @@ extern_coex_fns! {
 pub unsafe extern "C" fn coex_status_get() -> u32 {
     trace!("coex_status_get");
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
+    cfg_select! {
+        feature = "coex" => {
             const COEX_STATUS_GET_WIFI_BITMAP: u8 = 1;
             unsafe { crate::sys::include::coex_status_get(COEX_STATUS_GET_WIFI_BITMAP) }
-        } else {
-            0
         }
+        _ => 0,
     }
 }
 
@@ -1452,17 +1501,14 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
 ) -> c_int {
     trace!("coex_schm_register_cb_wrapper {} {:?}", arg1, cb);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "coex")] {
-            unsafe {
-                crate::sys::include::coex_schm_register_callback(
-                    arg1 as u32,
-                    unwrap!(cb) as *mut c_void,
-                )
-            }
-        } else {
-            0
-        }
+    cfg_select! {
+        feature = "coex" => unsafe {
+            crate::sys::include::coex_schm_register_callback(
+                arg1 as u32,
+                unwrap!(cb) as *mut c_void,
+            )
+        },
+        _ => 0,
     }
 }
 
@@ -1483,23 +1529,16 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
 pub unsafe extern "C" fn slowclk_cal_get() -> u32 {
     trace!("slowclk_cal_get");
 
-    // TODO not hardcode this
+    // esp-hal stores the RTC slow clock period in STORE1, in microseconds, with 19 fractional
+    // bits. The Wi-Fi driver expects 12 fractional bits.
+    const RTC_CLK_CAL_FRACT: u32 = 19;
+    const WIFI_LIGHT_SLEEP_CLK_WIDTH: u32 = 12;
 
-    #[cfg(esp32s2)]
-    return 44462;
+    let period = cfg_select! {
+        esp32s31 => regs!(LP_SYS).lp_store(1).read().bits(),
+        soc_has_lp_aon => regs!(LP_AON).store1().read().bits(),
+        _ => regs!(RTC_CNTL).store1().read().bits(),
+    };
 
-    #[cfg(esp32s3)]
-    return 44462;
-
-    #[cfg(esp32c3)]
-    return 28639;
-
-    #[cfg(esp32c2)]
-    return 28639;
-
-    #[cfg(any(esp32c6, esp32h2, esp32c5, esp32c61))]
-    return 0;
-
-    #[cfg(esp32)]
-    return 28639;
+    period >> (RTC_CLK_CAL_FRACT - WIFI_LIGHT_SLEEP_CLK_WIDTH)
 }

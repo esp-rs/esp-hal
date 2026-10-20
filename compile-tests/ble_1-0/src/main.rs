@@ -3,6 +3,8 @@
 #![no_std]
 #![no_main]
 
+//% CHIP_FILTER: bt_driver_supported
+
 use embassy_executor::Spawner;
 use embassy_futures::{join::join, select::select};
 use embassy_time::Timer;

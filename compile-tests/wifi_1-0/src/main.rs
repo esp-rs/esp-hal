@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+//% CHIP_FILTER: wifi_driver_supported
+
 use core::net::Ipv4Addr;
 
 use embassy_executor::Spawner;

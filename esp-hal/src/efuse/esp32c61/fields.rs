@@ -127,10 +127,10 @@ pub const ECC_FORCE_CONST_TIME: EfuseField = EfuseField::new(0, 3, 127, 1);
 /// Represents the anti-rollback secure version of the 2nd stage bootloader used
 /// by the ROM bootloader
 pub const BOOTLOADER_ANTI_ROLLBACK_SECURE_VERSION: EfuseField = EfuseField::new(0, 4, 128, 4);
-/// Represents whether the ani-rollback check for the 2nd stage bootloader is
+/// Represents whether the anti-rollback check for the 2nd stage bootloader is
 /// enabled.1: Enabled0: Disabled
 pub const BOOTLOADER_ANTI_ROLLBACK_EN: EfuseField = EfuseField::new(0, 4, 132, 1);
-/// Represents whether the ani-rollback SECURE_VERSION will be updated from the
+/// Represents whether the anti-rollback SECURE_VERSION will be updated from the
 /// ROM bootloader.1: Enable0: Disable
 pub const BOOTLOADER_ANTI_ROLLBACK_UPDATE_IN_ROM: EfuseField = EfuseField::new(0, 4, 133, 1);
 /// Represents the starting flash sector (flash sector size is 0x1000) of the

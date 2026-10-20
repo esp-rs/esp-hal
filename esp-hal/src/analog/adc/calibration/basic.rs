@@ -1,30 +1,19 @@
 use core::marker::PhantomData;
 
-use crate::analog::adc::{
-    AdcCalEfuse,
-    AdcCalScheme,
-    AdcCalSource,
-    AdcConfig,
-    Attenuation,
-    CalibrationAccess,
-};
+use crate::analog::adc::{AdcCalEfuse, AdcCalScheme, Attenuation, CalibrationAccess, Error};
 
-/// Basic ADC calibration scheme
+/// Basic ADC calibration scheme.
 ///
-/// Basic calibration sets the initial ADC bias value so that a zero voltage
-/// gives a reading of zero. The correct bias value is usually stored in efuse,
-/// but can also be measured at runtime by connecting the ADC input to ground
-/// internally.
+/// The zero-voltage bias (`Dout0`) is applied by the driver for every
+/// conversion, whether or not a calibration scheme is in use, because the
+/// hardware subtracts it before truncating the result.
 ///
-/// Failing to apply basic calibration can substantially reduce the ADC's output
-/// range because bias correction is done *before* the ADC's output is truncated
-/// to 12 bits.
+/// What is left for this scheme is the per-channel correction to that bias,
+/// which only some chips characterize in eFuse. On the others this scheme
+/// returns readings unchanged.
 #[derive(Clone, Copy)]
 pub struct AdcCalBasic<ADCX> {
-    /// Calibration value to set to ADC unit
-    cal_val: u16,
-
-    #[cfg(esp32c5)]
+    #[cfg(adc_channel_compensation)]
     chan_compens: i32,
 
     _phantom: PhantomData<ADCX>,
@@ -36,33 +25,23 @@ impl<ADCX> AdcCalScheme<ADCX> for AdcCalBasic<ADCX>
 where
     ADCX: AdcCalEfuse + CalibrationAccess,
 {
-    fn new_cal(atten: Attenuation) -> Self {
-        // Try to get init code (Dout0) from efuse
-        // Dout0 means mean raw ADC value when zero voltage applied to input.
-        let cal_val = ADCX::init_code(atten).unwrap_or_else(|| {
-            // As a fallback try to calibrate via connecting input to ground internally.
-            AdcConfig::<ADCX>::adc_calibrate(atten, AdcCalSource::Gnd)
-        });
+    fn new_cal(atten: Attenuation) -> Result<Self, Error> {
+        Self::new_cal_with_channel(atten, 0)
+    }
 
-        #[cfg(esp32c5)]
-        let chan_compens = ADCX::cal_chan_compens(atten, ADCX::ADC_CAL_CHANNEL).unwrap_or(0);
-
-        Self {
-            cal_val,
-            #[cfg(esp32c5)]
-            chan_compens,
+    fn new_cal_with_channel(_atten: Attenuation, _channel: u8) -> Result<Self, Error> {
+        Ok(Self {
+            // A missing per-channel offset means the chip did not characterize this
+            // channel, so no correction applies. `channel` always comes from a valid
+            // ADC pin, and unburnt eFuses likewise mean zero correction.
+            #[cfg(adc_channel_compensation)]
+            chan_compens: ADCX::cal_chan_compens(_atten, _channel).unwrap_or(0),
             _phantom: PhantomData,
-        }
+        })
     }
 
-    fn adc_cal(&self) -> u16 {
-        self.cal_val
-    }
-
-    // This is default from the trait for other target than esp32c5
-    #[cfg(esp32c5)]
+    #[cfg(adc_channel_compensation)]
     fn adc_val(&self, val: u16) -> u16 {
-        val.saturating_sub(self.chan_compens as u16)
-            .clamp(0, ADCX::ADC_VAL_MASK)
+        (val as i32 - self.chan_compens).clamp(0, ADCX::ADC_VAL_MASK as i32) as u16
     }
 }

@@ -11,10 +11,9 @@ fn tee_enabled() -> bool {
 
 #[inline]
 fn current_cpu_cycles() -> usize {
-    cfg_if::cfg_if! {
-        if #[cfg(xtensa)] {
-            xtensa_lx::timer::get_cycle_count() as usize
-        } else if #[cfg(soc_cpu_has_csr_pc)] {
+    cfg_select! {
+        xtensa => xtensa_lx::timer::get_cycle_count() as usize,
+        soc_cpu_has_csr_pc => {
             const PRV_M: usize = 3;
             macro_rules! read_csr_fn {
                 ($fnname:ident, $csr:expr) => {
@@ -49,9 +48,8 @@ fn current_cpu_cycles() -> usize {
             } else {
                 read_pccr_user()
             }
-        } else {
-            riscv::register::mcycle::read()
         }
+        _ => riscv::register::mcycle::read(),
     }
 }
 
@@ -64,12 +62,11 @@ fn read_one(wait_cycles: usize) -> u32 {
             if now.wrapping_sub(*last_wait_start) >= wait_cycles {
                 *last_wait_start = now;
 
-                cfg_if::cfg_if! {
-                    if #[cfg(rng_is_lp_sys)] {
-                        Some(RNG::regs().rng_data().read().bits())
-                    } else {
-                        Some(RNG::regs().data().read().bits())
-                    }
+                cfg_select! {
+                    any(esp32c5, esp32c61) => Some(RNG::regs().rng_data_sync().read().bits()),
+                    rng_is_lp_sys => Some(RNG::regs().rng_data().read().bits()),
+                    esp32s31 => Some(RNG::regs().crc_sync_data().read().bits()),
+                    _ => Some(RNG::regs().data().read().bits()),
                 }
             } else {
                 None

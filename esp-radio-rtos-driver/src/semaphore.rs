@@ -325,6 +325,10 @@ macro_rules! register_semaphore_implementation {
 /// This handle is used to interact with semaphores created by the driver implementation.
 #[repr(transparent)]
 pub struct SemaphoreHandle(SemaphorePtr);
+
+unsafe impl Send for SemaphoreHandle {}
+unsafe impl Sync for SemaphoreHandle {}
+
 impl SemaphoreHandle {
     /// Creates a new semaphore instance.
     ///
@@ -445,8 +449,6 @@ impl Drop for SemaphoreHandle {
         unsafe { esp_rtos_semaphore_delete(self.0) };
     }
 }
-
-unsafe impl Send for SemaphoreHandle {}
 
 #[cfg(feature = "ipc-implementations")]
 mod implementation {

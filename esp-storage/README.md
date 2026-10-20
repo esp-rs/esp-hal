@@ -6,22 +6,20 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-storage?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-This implements [`embedded-storage`](https://github.com/rust-embedded-community/embedded-storage) traits to access unencrypted ESP32 flash.
+> **Deprecated.** Use instead:
+>
+> - `esp_hal::flash::Flash` from [esp-hal](https://docs.espressif.com/projects/rust/esp-hal/latest/) for raw and encrypted flash I/O
+>   (`read`, `write`, `erase`, `read_encrypted`, `write_encrypted`). This driver is unstable (requires the `unstable` feature of `esp-hal`).
+>   It works on `u32` word buffers in DRAM at 4-byte-aligned offsets, does not erase before writing, and does not implement `embedded-storage` traits.
+> - `FlashRegion`, `EncryptedFlashRegion` and `AutoFlashRegion` from [esp-bootloader-esp-idf](https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/)
+>   for byte-oriented, partition-scoped access, including encrypted partitions.
+>   With the `embedded-storage` feature, `FlashRegion` implements `ReadNorFlash`, `NorFlash` and `MultiwriteNorFlash`.
+>   For the read-modify-write behavior of the `Storage` trait, wrap it in `embedded_storage::nor_flash::RmwMultiwriteNorFlashStorage`.
+>
+> See [#6447](https://github.com/esp-rs/esp-hal/pull/6447) for migration notes.
 
-## Current support
-
-ESP32, ESP32-C2, ESP32-C3, ESP32-C6, ESP32-H2, ESP32-S2 and ESP32-S3 are supported in `esp-storage`
-
-## Important
-
-For ESP32 it is necessary to build with [optimization level](https://doc.rust-lang.org/cargo/reference/profiles.html#opt-level) 2 or 3.
-
-To make it work also for `debug` builds add this to your `Cargo.toml`
-
-```toml
-[profile.dev.package.esp-storage]
-opt-level = 3
-```
+This crate provides functionality to access ESP32 flash. Enable the
+`embedded-storage` feature for [`embedded-storage`](https://github.com/rust-embedded-community/embedded-storage) trait implementations.
 
 ## Minimum Supported Rust Version (MSRV)
 

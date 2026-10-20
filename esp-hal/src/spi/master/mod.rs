@@ -65,6 +65,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     private::Sealed,
+    spi::master::low_level::SpiClockGuard,
     time::Rate,
 };
 
@@ -93,7 +94,7 @@ pub enum SpiInterrupt {
     App1,
 }
 
-/// The size of the FIFO buffer for SPI
+/// The size of the FIFO buffer for SPI.
 const FIFO_SIZE: usize = property!("spi_master.fifo_size");
 
 /// Padding byte for empty write transfers
@@ -414,15 +415,8 @@ impl Address {
 }
 
 /// SPI clock source.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub enum ClockSource {
-    /// Use the APB clock.
-    Apb,
-    // #[cfg(any(esp32c2, esp32c3, esp32s3))]
-    // Xtal,
-}
+pub use crate::soc::clocks::SpiFunctionClockConfig as ClockSource;
 
 /// SPI peripheral configuration
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, procmacros::BuilderLite)]
@@ -434,19 +428,19 @@ pub struct Config {
     /// Clock divider calculations are relatively expensive, and the SPI
     /// peripheral is commonly expected to be used in a shared bus
     /// configuration, where different devices may need different bus clock
-    /// frequencies. To reduce the time required to reconfigure the bus, we
-    /// cache clock register's value here, for each configuration.
+    /// frequencies. To reduce the time required to reconfigure the bus, the
+    /// clock register value is cached here for each configuration.
     ///
-    /// This field is not intended to be set by the user, and is only used
+    /// This field is not intended to be set from application code, and is only used
     /// internally.
     #[builder_lite(skip)]
     reg: Result<u32, ConfigError>,
 
-    /// The target frequency
+    /// The target frequency.
     #[builder_lite(skip_setter)]
     frequency: Rate,
 
-    /// The clock source
+    /// The clock source.
     #[builder_lite(unstable)]
     #[builder_lite(skip_setter)]
     clock_source: ClockSource,
@@ -467,7 +461,8 @@ pub struct Config {
     /// async context-switch cost exceeds the benefit. For
     /// [`SpiDma`][crate::spi::master::dma::SpiDma], the threshold applies in
     /// both blocking and async DMA modes: when met, DMA is disabled and the
-    /// transfer is performed by the CPU.
+    /// transfer is performed by the CPU. This applies to both full-duplex and
+    /// half-duplex transfers.
     ///
     /// A value of `0` (the default) disables the threshold — all transfers use
     /// the driver's default method.
@@ -480,7 +475,7 @@ impl Default for Config {
         let mut this = Config {
             reg: Ok(0),
             frequency: Rate::from_mhz(1),
-            clock_source: ClockSource::Apb,
+            clock_source: ClockSource::default(),
             mode: Mode::_0,
             read_bit_order: BitOrder::MsbFirst,
             write_bit_order: BitOrder::MsbFirst,
@@ -494,7 +489,10 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Set the frequency of the SPI bus clock.
+    /// Sets the frequency of the SPI bus clock.
+    ///
+    /// The closest available frequency that does not exceed `frequency` is used,
+    /// so the bus never runs faster than requested.
     pub fn with_frequency(mut self, frequency: Rate) -> Self {
         self.frequency = frequency;
         self.reg = self.recalculate();
@@ -502,7 +500,7 @@ impl Config {
         self
     }
 
-    /// Set the clock source of the SPI bus.
+    /// Sets the clock source of the SPI bus.
     #[instability::unstable]
     pub fn with_clock_source(mut self, clock_source: ClockSource) -> Self {
         self.clock_source = clock_source;
@@ -512,84 +510,103 @@ impl Config {
     }
 
     fn clock_source_freq_hz(&self) -> Rate {
-        // FIXME: take clock source into account
-        Rate::from_hz(crate::soc::spi_master_clock_source_frequency())
+        Rate::from_hz(
+            crate::soc::clocks::SpiInstance::function_clock_source_frequency(self.clock_source),
+        )
     }
 
     fn recalculate(&self) -> Result<u32, ConfigError> {
+        // TODO: model peripheral-side clock divider, allow the user to directly configure it
         // taken from https://github.com/apache/incubator-nuttx/blob/8267a7618629838231256edfa666e44b5313348e/arch/risc-v/src/esp32c3/esp32c3_spi.c#L496
         let source_freq = self.clock_source_freq_hz();
-
-        let reg_val: u32;
-        let duty_cycle = 128;
 
         // In HW, n, h and l fields range from 1 to 64, pre ranges from 1 to 8K.
         // The value written to register is one lower than the used value.
 
-        if self.frequency > ((source_freq / 4) * 3) {
-            // Using APB frequency directly will give us the best result here.
-            reg_val = 1 << 31;
-        } else {
-            // For best duty cycle resolution, we want n to be as close to 32 as
-            // possible, but we also need a pre/n combo that gets us as close as
-            // possible to the intended frequency. To do this, we bruteforce n and
-            // calculate the best pre to go along with that. If there's a choice
-            // between pre/n combos that give the same result, use the one with the
-            // higher n.
-
-            let mut pre: i32;
-            let mut bestn: i32 = -1;
-            let mut bestpre: i32 = -1;
-            let mut besterr: i32 = 0;
-            let mut errval: i32;
-
-            let target_freq_hz = self.frequency.as_hz() as i32;
-            let source_freq_hz = source_freq.as_hz() as i32;
-
-            // Start at n = 2. We need to be able to set h/l so we have at least
-            // one high and one low pulse.
-
-            for n in 2..=64 {
-                // Effectively, this does:
-                // pre = round((APB_CLK_FREQ / n) / frequency)
-
-                pre = ((source_freq_hz / n) + (target_freq_hz / 2)) / target_freq_hz;
-
-                if pre <= 0 {
-                    pre = 1;
-                }
-
-                if pre > 16 {
-                    pre = 16;
-                }
-
-                errval = (source_freq_hz / (pre * n) - target_freq_hz).abs();
-                if bestn == -1 || errval <= besterr {
-                    besterr = errval;
-                    bestn = n;
-                    bestpre = pre;
-                }
-            }
-
-            let n: i32 = bestn;
-            pre = bestpre;
-            let l: i32 = n;
-
-            // Effectively, this does:
-            // h = round((duty_cycle * n) / 256)
-
-            let mut h: i32 = (duty_cycle * n + 127) / 256;
-            if h <= 0 {
-                h = 1;
-            }
-
-            reg_val = (l as u32 - 1)
-                | ((h as u32 - 1) << 6)
-                | ((n as u32 - 1) << 12)
-                | ((pre as u32 - 1) << 18);
+        if self.frequency >= source_freq {
+            // Bypass the divider, which is exactly the source frequency.
+            // Set the SPI_CLK_EQU_SYSCLK bit.
+            return Ok(1 << 31);
         }
 
-        Ok(reg_val)
+        let (n, pre) = Self::divider_pair(source_freq.as_hz(), self.frequency.as_hz());
+
+        // In master mode, L == N
+        let l = n;
+
+        // In master mode, this field must be floor((SPI_CLKCNT_N + 1)/2 - 1)
+        let h = (n / 2).max(1);
+
+        Ok((l - 1) // SPI_CLKCNT_L
+            | ((h - 1) << 6) // SPI_CLKCNT_H
+            | ((n - 1) << 12) // SPI_CLKCNT_N
+            | ((pre - 1) << 18)) // SPI_CLKDIV_PRE
+    }
+
+    /// Finds the `(n, pre)` pair producing the highest bus frequency that does
+    /// not exceed `target_freq_hz`, where `n` is `SPI_CLKCNT_N + 1` and `pre` is
+    /// `SPI_CLKDIV_PRE + 1`.
+    ///
+    /// The peripheral divides the source clock by `pre * n`, so this is the
+    /// smallest divider that does not overshoot. `n` also determines the duty
+    /// cycle resolution, so among pairs forming that divider the one with the
+    /// largest `n` is preferred.
+    ///
+    /// Out-of-range frequencies (see [`Config::validate`]) yield the slowest pair
+    /// available rather than an error.
+    fn divider_pair(source_freq_hz: u32, target_freq_hz: u32) -> (u32, u32) {
+        // A zero target is rejected by `validate`, but must not divide by zero
+        // here.
+        if target_freq_hz == 0 {
+            return (64, 16);
+        }
+
+        // Any smaller divider would run the bus faster than requested. `n` starts
+        // at 2 so that h/l can describe at least one high and one low pulse.
+        let min_divider = source_freq_hz.div_ceil(target_freq_hz).max(2);
+
+        // A `pre` of 1 offers every divider up to 64, so if the smallest usable
+        // divider is in that range we can form it directly, with the largest `n`
+        // that produces it.
+        if min_divider <= 64 {
+            return (min_divider, 1);
+        }
+
+        // `n` maxes out at 64, so a smaller `pre` cannot bring the source clock
+        // down to the target. As `n` shrinks when `pre` grows, walking `pre`
+        // upwards visits the candidates in order of decreasing duty cycle
+        // resolution, which lets us keep the first of several that share a
+        // divider.
+        //
+        // The seed is the slowest pair, which also answers requests below the
+        // supported range.
+        let mut best = (64, 16);
+        let mut best_divider = 64 * 16;
+
+        // A `for` loop over a range would leave a divide-by-zero check on `pre`
+        // in the generated code, as the lower bound is not visible through the
+        // range iterator on all targets.
+        let mut pre = min_divider.div_ceil(64);
+        while pre <= 16 {
+            // The smallest `n` that keeps `pre * n` from overshooting. The lower
+            // bound on `pre` keeps this at or below 64.
+            let n = min_divider.div_ceil(pre);
+            let divider = pre * n;
+
+            if divider < best_divider {
+                best = (n, pre);
+                best_divider = divider;
+
+                // Nothing can beat hitting the smallest usable divider exactly.
+                if divider == min_divider {
+                    break;
+                }
+            }
+
+            pre += 1;
+        }
+
+        best
     }
 
     fn raw_clock_reg_value(&self) -> Result<u32, ConfigError> {
@@ -656,7 +673,7 @@ impl core::fmt::Display for ConfigError {
 #[procmacros::doc_replace]
 /// SPI peripheral driver
 ///
-/// ## Example
+/// # Examples
 ///
 /// ```rust, no_run
 /// # {before_snippet}
@@ -686,13 +703,9 @@ impl<Dm: DriverMode> Sealed for Spi<'_, Dm> {}
 
 impl<'d> Spi<'d, Blocking> {
     #[procmacros::doc_replace]
-    /// Constructs an SPI instance in 8bit dataframe mode.
+    /// Creates a new SPI instance in 8-bit data-frame mode.
     ///
-    /// ## Errors
-    ///
-    /// See [`Spi::apply_config`].
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -706,6 +719,10 @@ impl<'d> Spi<'d, Blocking> {
     ///     .with_miso(peripherals.GPIO2);
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// See [`Spi::apply_config`]
     pub fn new(spi: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let mut this = Spi {
             _mode: PhantomData,
@@ -747,12 +764,11 @@ impl<'d> Spi<'d, Blocking> {
             _ => "peripheral",
         }
     )]
-    /// # Registers an interrupt handler for the __peripheral_on__.
+    /// Registers an interrupt handler for the __peripheral_on__.
     ///
-    /// Note that this will replace any previously registered interrupt
-    /// handlers.
+    /// Replaces any previously registered interrupt handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
+    /// The default/unhandled interrupt handler can be restored with
     /// [crate::interrupt::DEFAULT_INTERRUPT_HANDLER]
     ///
     /// # Panics
@@ -767,7 +783,7 @@ impl<'d> Spi<'d, Blocking> {
 
 #[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for Spi<'_, Blocking> {
-    /// Sets the interrupt handler
+    /// Sets the interrupt handler.
     ///
     /// Interrupts are not enabled at the peripheral level here.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
@@ -791,7 +807,7 @@ impl<'d> Spi<'d, Async> {
     #[procmacros::doc_replace]
     /// Waits for the completion of previous operations.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -812,19 +828,17 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn flush_async(&mut self) -> Result<(), Error> {
-        self.driver().flush_async().await;
         Ok(())
     }
 
     #[procmacros::doc_replace]
     /// Sends `words` to the slave. Returns the `words` received from the slave.
     ///
-    /// This function aborts the transfer when its Future is dropped. Some
-    /// amount of data may have been transferred before the Future is
-    /// dropped. Dropping the future may block for a short while to ensure
-    /// the transfer is aborted.
+    /// Aborts the transfer when its Future is dropped. Some amount of data may have
+    /// been transferred before the Future is dropped. Dropping the future may block
+    /// for a short while to ensure the transfer is aborted.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -844,9 +858,8 @@ impl<'d> Spi<'d, Async> {
     /// # {after_snippet}
     /// ```
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -856,12 +869,86 @@ impl<'d> Spi<'d, Async> {
         self.driver().transfer_in_place_async(words).await
     }
 
+    /// Half-duplex read.
+    ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
+    /// Aborts the transfer when its Future is dropped. Some amount of data may have
+    /// been transferred before the Future is dropped. Dropping the future may block
+    /// for a short while to ensure the transfer is aborted.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] when the buffer is empty (currently unsupported).
+    /// `DataMode::Single` cannot be combined with any other [`DataMode`], otherwise
+    /// [`Error::Unsupported`].
+    #[instability::unstable]
+    pub async fn half_duplex_read_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
+
+        if self.use_blocking_transfer(buffer.len()) {
+            return self
+                .driver()
+                .half_duplex_read(data_mode, cmd, address, dummy, buffer);
+        }
+
+        self.driver()
+            .half_duplex_read_async(data_mode, cmd, address, dummy, buffer)
+            .await
+    }
+
+    /// Half-duplex write.
+    ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
+    /// Aborts the transfer when its Future is dropped. Some amount of data may have
+    /// been transferred before the Future is dropped. Dropping the future may block
+    /// for a short while to ensure the transfer is aborted.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Unsupported`] for unsupported combinations of command, address,
+    /// dummy, and data modes.
+    #[cfg_attr(
+        esp32,
+        doc = "Dummy phase configuration is currently not supported, only value `0` is valid (see issue [#2240](https://github.com/esp-rs/esp-hal/issues/2240))."
+    )]
+    #[instability::unstable]
+    pub async fn half_duplex_write_async(
+        &mut self,
+        data_mode: DataMode,
+        cmd: Command,
+        address: Address,
+        dummy: u8,
+        buffer: &[u8],
+    ) -> Result<(), Error> {
+        let _clock = SpiClockGuard::new(self.spi.info());
+
+        if self.use_blocking_transfer(buffer.len()) {
+            return self
+                .driver()
+                .half_duplex_write(data_mode, cmd, address, dummy, buffer);
+        }
+
+        self.driver()
+            .half_duplex_write_async(data_mode, cmd, address, dummy, buffer)
+            .await
+    }
+
     // TODO: These inherent methods should be public
 
     async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
@@ -872,14 +959,12 @@ impl<'d> Spi<'d, Async> {
     }
 
     async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(words.len()) {
-            self.driver().write(words)?;
-            return self.driver().flush();
+            return self.driver().write(words);
         }
 
         self.driver().write_async(words).await
@@ -937,14 +1022,14 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Assign the SCK (Serial Clock) pin for the SPI instance.
+    /// Assigns the SCK (Serial Clock) pin for the SPI instance.
     ///
     /// Configures the specified pin to push-pull output and connects it to the
     /// SPI clock signal.
     ///
     /// Disconnects the previous pin that was assigned with `with_sck`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -964,16 +1049,16 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
+    /// Assigns the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
     /// Enables output functionality for the pin, and connects it as the MOSI
-    /// signal. You want to use this for full-duplex SPI or
-    /// if you intend to use [DataMode::SingleTwoDataLines].
+    /// signal. Use this for full-duplex SPI or
+    /// when using [DataMode::SingleTwoDataLines].
     ///
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -991,15 +1076,15 @@ where
     }
 
     #[procmacros::doc_replace]
-    /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
+    /// Assigns the MISO (Master In Slave Out) pin for the SPI instance.
     ///
     /// Enables input functionality for the pin, and connects it to the MISO
     /// signal.
     ///
-    /// You want to use this for full-duplex SPI or
+    /// Use this for full-duplex SPI or
     /// [DataMode::SingleTwoDataLines]
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1022,7 +1107,7 @@ where
         self
     }
 
-    /// Assign the SIO0 pin for the SPI instance.
+    /// Assigns the SIO0 pin for the SPI instance.
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MOSI output signal and SIO0 input signal.
@@ -1032,7 +1117,7 @@ where
     ///
     /// Use this if any of the devices on the bus use half-duplex SPI.
     ///
-    /// See also [Self::with_mosi] when you only need a one-directional MOSI
+    /// See also [Self::with_mosi] for a one-directional MOSI
     /// signal.
     #[instability::unstable]
     pub fn with_sio0(mut self, mosi: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
@@ -1041,7 +1126,7 @@ where
         self
     }
 
-    /// Assign the SIO1/MISO pin for the SPI instance.
+    /// Assigns the SIO1/MISO pin for the SPI instance.
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the MISO input signal and SIO1 output signal.
@@ -1050,7 +1135,7 @@ where
     ///
     /// Use this if any of the devices on the bus use half-duplex SPI.
     ///
-    /// See also [Self::with_miso] when you only need a one-directional MISO
+    /// See also [Self::with_miso] for a one-directional MISO
     /// signal.
     #[instability::unstable]
     pub fn with_sio1(mut self, sio1: impl PeripheralInput<'d> + PeripheralOutput<'d>) -> Self {
@@ -1074,7 +1159,7 @@ where
     #[cfg(spi_master_has_octal)]
     def_with_sio_pin!(with_sio7, 7);
 
-    /// Assign the CS (Chip Select) pin for the SPI instance.
+    /// Assigns the CS (Chip Select) pin for the SPI instance.
     ///
     /// Configures the specified pin to push-pull output and connects it to the
     /// SPI CS signal.
@@ -1099,14 +1184,9 @@ where
             _ => "80MHz",
         }
     )]
-    /// Change the bus configuration.
+    /// Changes the bus configuration.
     ///
-    /// # Errors
-    ///
-    /// If frequency passed in config exceeds __max_frequency__ or is below 70kHz,
-    /// [`ConfigError::FrequencyOutOfRange`] error will be returned.
-    ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1120,15 +1200,20 @@ where
     /// #
     /// # {after_snippet}
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`ConfigError::FrequencyOutOfRange`] when frequency passed in config exceeds
+    /// __max_frequency__ or is below 70 kHz.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
 
     #[procmacros::doc_replace]
-    /// Write bytes to SPI. After writing, flush is called to ensure all data
+    /// Writes bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1148,25 +1233,17 @@ where
     /// # {after_snippet}
     /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
-
-        for chunk in words.chunks(FIFO_SIZE) {
-            self.driver().write_one(chunk)?;
-            // NOTE: While we don't need to flush after the last chunk, changing
-            // that would change the behavior of the function.
-            // https://github.com/esp-rs/esp-hal/issues/5257
-            self.driver().flush()?;
-        }
-
-        Ok(())
+        self.driver().write(words)
     }
 
     #[procmacros::doc_replace]
-    /// Read bytes from SPI. The provided slice is filled with data received
+    /// Reads bytes from SPI. The provided slice is filled with data received
     /// from the slave.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1186,7 +1263,7 @@ where
     /// # {after_snippet}
     /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().read(words)
     }
@@ -1195,7 +1272,7 @@ where
     /// Sends `words` to the slave. The received data will be written to
     /// `words`, overwriting its contents.
     ///
-    /// ## Example
+    /// # Examples
     ///
     /// ```rust, no_run
     /// # {before_snippet}
@@ -1215,19 +1292,21 @@ where
     /// # {after_snippet}
     /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place(words)
     }
 
     /// Half-duplex read.
     ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
     /// # Errors
     ///
-    /// [`Error::FifoSizeExeeded`] or [`Error::Unsupported`] will be returned if
-    /// passed buffer is bigger than FIFO size or if buffer is empty (currently
-    /// unsupported). `DataMode::Single` cannot be combined with any other
-    /// [`DataMode`], otherwise [`Error::Unsupported`] will be returned.
+    /// [`Error::Unsupported`] when the buffer is empty (currently unsupported).
+    /// `DataMode::Single` cannot be combined with any other [`DataMode`], otherwise
+    /// [`Error::Unsupported`].
     #[instability::unstable]
     pub fn half_duplex_read(
         &mut self,
@@ -1237,38 +1316,20 @@ where
         dummy: u8,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
-
-        if buffer.is_empty() {
-            error!("Half-duplex mode does not support empty buffer");
-            return Err(Error::Unsupported);
-        }
-
-        self.flush()?;
-        self.driver().setup_half_duplex(
-            false,
-            cmd,
-            address,
-            false,
-            dummy,
-            buffer.is_empty(),
-            data_mode,
-        )?;
-
-        self.driver().configure_datalen(buffer.len(), 0);
-        self.driver().start_operation();
-        self.driver().flush()?;
-        self.driver().read_from_fifo(buffer)
+        let _clock = SpiClockGuard::new(self.spi.info());
+        self.driver()
+            .half_duplex_read(data_mode, cmd, address, dummy, buffer)
     }
 
     /// Half-duplex write.
     ///
+    /// Transfers larger than the hardware FIFO are split into chunks. CS remains asserted across
+    /// chunks, but the clock pauses while the CPU prepares each subsequent chunk.
+    ///
     /// # Errors
     ///
-    /// [`Error::FifoSizeExeeded`] will be returned if
-    /// passed buffer is bigger than FIFO size.
+    /// [`Error::Unsupported`] for unsupported combinations of command, address,
+    /// dummy, and data modes.
     #[cfg_attr(
         esp32,
         doc = "Dummy phase configuration is currently not supported, only value `0` is valid (see issue [#2240](https://github.com/esp-rs/esp-hal/issues/2240))."
@@ -1282,56 +1343,9 @@ where
         dummy: u8,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
-
-        self.flush()?;
-
-        cfg_if::cfg_if! {
-            if #[cfg(all(spi_master_version = "1", spi_address_workaround))] {
-                let mut buffer = buffer;
-                let mut data_mode = data_mode;
-                let mut address = address;
-                let addr_bytes;
-                if buffer.is_empty() && !address.is_none() {
-                    // If the buffer is empty, we need to send a dummy byte
-                    // to trigger the address phase.
-                    let bytes_to_write = address.width().div_ceil(8);
-                    // The address register is read in big-endian order,
-                    // we have to prepare the emulated write in the same way.
-                    addr_bytes = address.value().to_be_bytes();
-                    buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
-                    data_mode = address.mode();
-                    address = Address::None;
-                }
-
-                if dummy > 0 {
-                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
-                    error!("Dummy bits are not supported without data");
-                    return Err(Error::Unsupported);
-                }
-            }
-        }
-
-        self.driver().setup_half_duplex(
-            true,
-            cmd,
-            address,
-            false,
-            dummy,
-            buffer.is_empty(),
-            data_mode,
-        )?;
-
-        if !buffer.is_empty() {
-            self.driver().configure_datalen(0, buffer.len());
-            self.driver().fill_fifo(buffer);
-        }
-
-        self.driver().start_operation();
-
-        self.driver().flush()
+        let _clock = SpiClockGuard::new(self.spi.info());
+        self.driver()
+            .half_duplex_write(data_mode, cmd, address, dummy, buffer)
     }
 
     fn use_blocking_transfer(&self, transfer_size: usize) -> bool {
@@ -1380,19 +1394,11 @@ where
     }
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
-        // Do not call the inherent `write` method. The trait impl does not flush after.
-        // Flush before starting to ensure the bus is clear before we reconfigure to full duplex.
-        self.driver().flush()?;
-        self.driver().setup_full_duplex()?;
-        for chunk in words.chunks(FIFO_SIZE) {
-            self.driver().flush()?;
-            self.driver().write_one(chunk)?;
-        }
-        Ok(())
+        self.write(words)
     }
 
     fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
 
         if read.is_empty() {
@@ -1405,13 +1411,13 @@ where
     }
 
     fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        self.driver().flush()?;
+        let _clock = SpiClockGuard::new(self.spi.info());
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place(words)
     }
 
     fn flush(&mut self) -> Result<(), Self::Error> {
-        self.driver().flush()
+        Ok(())
     }
 }
 
@@ -1425,18 +1431,18 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 
     async fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        self.driver().flush_async().await;
+        let _clock = SpiClockGuard::new(self.spi.info());
+
         self.driver().setup_full_duplex()?;
 
         if self.use_blocking_transfer(read.len().max(write.len())) {
-            if read.is_empty() {
-                self.driver().write(write)?;
-                return self.driver().flush();
+            return if read.is_empty() {
+                self.driver().write(write)
             } else if write.is_empty() {
-                return self.driver().read(read);
+                self.driver().read(read)
             } else {
-                return self.driver().transfer(read, write);
-            }
+                self.driver().transfer(read, write)
+            };
         }
 
         if read.is_empty() {
@@ -1453,11 +1459,11 @@ impl SpiBusAsync for Spi<'_, Async> {
     }
 
     async fn flush(&mut self) -> Result<(), Self::Error> {
-        self.flush_async().await
+        Ok(())
     }
 }
 
-/// SPI data mode
+/// SPI data mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
@@ -1490,9 +1496,7 @@ with_spi_master_dma_engine! {
     ($engine:tt, $any_ch:ident) => {
         use crate::dma::DmaEligiblePeripheral;
 
-        impl DmaEligiblePeripheral for AnySpi<'_> {
-            type ErasedChannel<'a> = crate::dma::$any_ch<'a>;
-
+        impl<'d> DmaEligiblePeripheral<crate::dma::$any_ch<'d>> for AnySpi<'d> {
             fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
                 any::delegate!(self, spi => { spi.dma_peripheral() })
             }

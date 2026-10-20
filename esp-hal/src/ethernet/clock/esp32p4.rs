@@ -1,3 +1,7 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "rmii_clk_gpio" => gpio_for_signal!(EMAC_RMII_CLK),
+    "ref_50m_gpio" => gpio_for_signal!(REF_50M_CLK),
+))]
 //! EMAC clock configuration for ESP32-P4.
 //!
 //! # RMII reference clock sources
@@ -5,12 +9,12 @@
 //! The ESP32-P4 EMAC needs a 50 MHz reference clock for RMII.
 //!
 //! - **[`ExternalRefClock`]** — the PHY drives the reference clock into one of the `EMAC_RMII_CLK`
-//!   input pads (GPIO32, GPIO44, or GPIO50). This is the recommended configuration when the PHY has
-//!   an integrated oscillator.
+//!   input pads (for example __rmii_clk_gpio__). This is the recommended configuration when the PHY
+//!   has an integrated oscillator.
 //!
 //! - **[`InternalRefClock`]** — the ESP32-P4 MPLL generates a 50 MHz clock and drives it out on a
-//!   `REF_50M_CLK` pad (GPIO23 or GPIO39). This signal must be looped back externally into one of
-//!   the `EMAC_RMII_CLK` input pads.
+//!   `REF_50M_CLK` pad (for example __ref_50m_gpio__). This signal must be looped back externally
+//!   into one of the `EMAC_RMII_CLK` input pads.
 //!
 //! # MII clock source
 //!
@@ -30,10 +34,13 @@ const CLOCK_STABILIZE_US: u32 = 300;
 
 // ── ExternalRefClock ─────────────────────────────────────────────────────────
 
+#[cfg_attr(docsrs, procmacros::doc_replace(
+    "rmii_clk_gpio" => gpio_for_signal!(EMAC_RMII_CLK),
+))]
 /// RMII reference clock provided externally by the PHY.
 ///
 /// The PHY must drive a 50 MHz clock into one of the `EMAC_RMII_CLK` input
-/// pads: GPIO32, GPIO44, or GPIO50.
+/// pads (for example __rmii_clk_gpio__).
 pub struct ExternalRefClock<P>(P);
 
 impl<P> ExternalRefClock<P> {
@@ -54,22 +61,31 @@ impl<P: RmiiClkIn> RmiiClockConfig for ExternalRefClock<P> {
 
 // ── InternalRefClock ─────────────────────────────────────────────────────────
 
+#[cfg_attr(docsrs, procmacros::doc_replace(
+    "rmii_clk_gpio" => gpio_for_signal!(EMAC_RMII_CLK),
+    "ref_50m_gpio" => gpio_for_signal!(REF_50M_CLK),
+))]
 /// RMII reference clock derived from the ESP32-P4 MPLL at 50 MHz.
 ///
-/// The MPLL output is driven out on a `REF_50M_CLK` output pad (GPIO23 or
-/// GPIO39) and must be looped back externally into one of the `EMAC_RMII_CLK`
-/// input pads (GPIO32, GPIO44, or GPIO50).
+/// The MPLL output is driven out on a `REF_50M_CLK` output pad (for example
+/// __ref_50m_gpio__) and must be looped back externally into one of the `EMAC_RMII_CLK`
+/// input pads (for example __rmii_clk_gpio__).
 pub struct InternalRefClock<POut, PIn> {
     ref_clk_out: POut,
     ref_clk_in: PIn,
 }
 
 impl<POut, PIn> InternalRefClock<POut, PIn> {
+    #[cfg_attr(docsrs, procmacros::doc_replace(
+        "rmii_clk_gpio" => gpio_for_signal!(EMAC_RMII_CLK),
+        "ref_50m_gpio" => gpio_for_signal!(REF_50M_CLK),
+    ))]
     /// Creates an internal MPLL clock configuration.
     ///
-    /// - `ref_clk_out` — the pad that will output the 50 MHz `REF_50M_CLK` signal (GPIO23 or
-    ///   GPIO39).
-    /// - `ref_clk_in` — the pad that receives the looped-back signal (GPIO32, GPIO44, or GPIO50).
+    /// - `ref_clk_out` — the pad that will output the 50 MHz `REF_50M_CLK` signal (for example
+    ///   __ref_50m_gpio__).
+    /// - `ref_clk_in` — the pad that receives the looped-back signal (for example
+    ///   __rmii_clk_gpio__).
     pub fn new(ref_clk_out: POut, ref_clk_in: PIn) -> Self {
         Self {
             ref_clk_out,
@@ -112,8 +128,6 @@ impl MiiClock {
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 /// Configures the EMAC clock tree for RMII with an external clock input.
-///
-/// Matches `emac_ll_clock_enable_rmii_input()` in esp-idf.
 fn configure_rmii_input() {
     HP_SYS::regs()
         .gmac_ctrl0()
@@ -177,8 +191,7 @@ fn enable_mpll_50m_output() {
 
 /// Configures the EMAC clock tree for MII mode.
 ///
-/// Matches `emac_ll_clock_enable_mii()` in esp-idf. In MII mode the RX and TX
-/// clocks come from separate pads (not the combined RMII pad), so
+/// In MII mode the RX and TX clocks come from separate pads (not the combined RMII pad), so
 /// `emac_rx_clk_src_sel = 1` and `emac_tx_clk_src_sel = 1`.
 fn configure_mii() {
     HP_SYS::regs()
@@ -217,9 +230,8 @@ fn configure_mii() {
 
 /// Pulses the EMAC peripheral reset via `LP_AON_CLKRST` (assert then deassert).
 ///
-/// Matches `emac_ll_reset_register()` in esp-idf. The `GenericPeripheralGuard`
-/// for EMAC on P4 does not perform a hardware reset (the reset handler is a
-/// no-op), so this must be called explicitly during clock configuration.
+/// The `GenericPeripheralGuard` for EMAC on P4 does not perform a hardware reset (the reset handler
+/// is a no-op), so this must be called explicitly during clock configuration.
 fn deassert_reset() {
     LP_AON_CLKRST::regs()
         .lp_aonclkrst_hp_sdmmc_emac_rst_ctrl()

@@ -2,10 +2,10 @@ use strum::FromRepr;
 
 use crate::{
     peripherals::{PCR, PMU},
-    soc::regi2c,
+    soc::{clocks::ClockConfig, regi2c},
 };
 
-pub(crate) fn init() {
+pub(crate) fn init(_config: &ClockConfig) {
     // * No peripheral reg i2c power up required on the target */
     regi2c::I2C_PMU_EN_I2C_RTC_DREG.write_field(0);
     regi2c::I2C_PMU_EN_I2C_DIG_DREG.write_field(0);
@@ -31,40 +31,27 @@ pub(crate) fn init() {
             .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(26));
 
         pmu.hp_sleep_dig_power().modify(|_, w| {
-            w.hp_sleep_vdd_spi_pd_en()
-                .set_bit()
-                .hp_sleep_pd_hp_wifi_pd_en()
-                .set_bit()
-                .hp_sleep_pd_hp_cpu_pd_en()
-                .set_bit()
-                .hp_sleep_pd_top_pd_en()
-                .set_bit()
+            w.hp_sleep_vdd_spi_pd_en().set_bit();
+            w.hp_sleep_pd_hp_wifi_pd_en().set_bit();
+            w.hp_sleep_pd_hp_cpu_pd_en().set_bit();
+            w.hp_sleep_pd_top_pd_en().set_bit()
         });
 
         pmu.hp_active_hp_ck_power().modify(|_, w| {
-            w.hp_active_xpd_bbpll()
-                .set_bit()
-                .hp_active_xpd_bb_i2c()
-                .set_bit()
-                .hp_active_xpd_bbpll_i2c()
-                .set_bit()
+            w.hp_active_xpd_bbpll().set_bit();
+            w.hp_active_xpd_bb_i2c().set_bit();
+            w.hp_active_xpd_bbpll_i2c().set_bit()
         });
 
         pmu.hp_active_sysclk().modify(|_, w| {
-            w.hp_active_icg_sys_clock_en()
-                .set_bit()
-                .hp_active_sys_clk_slp_sel()
-                .clear_bit()
-                .hp_active_icg_slp_sel()
-                .clear_bit()
+            w.hp_active_icg_sys_clock_en().set_bit();
+            w.hp_active_sys_clk_slp_sel().clear_bit();
+            w.hp_active_icg_slp_sel().clear_bit()
         });
         pmu.hp_sleep_sysclk().modify(|_, w| {
-            w.hp_sleep_icg_sys_clock_en()
-                .clear_bit()
-                .hp_sleep_sys_clk_slp_sel()
-                .set_bit()
-                .hp_sleep_icg_slp_sel()
-                .set_bit()
+            w.hp_sleep_icg_sys_clock_en().clear_bit();
+            w.hp_sleep_sys_clk_slp_sel().set_bit();
+            w.hp_sleep_icg_slp_sel().set_bit()
         });
 
         pmu.slp_wakeup_cntl5()
@@ -89,7 +76,7 @@ pub(crate) fn init() {
 /// SOC Reset Reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr)]
 pub enum SocResetReason {
-    /// Power on reset
+    /// Powers on reset.
     ///
     /// In ESP-IDF this value (0x01) can *also* be `ChipBrownOut` or
     /// `ChipSuperWdt`, however that is not really compatible with Rust-style
@@ -111,7 +98,7 @@ pub enum SocResetReason {
     Cpu0Sw        = 0x0C,
     /// RTC watch dog resets CPU 0
     Cpu0RtcWdt    = 0x0D,
-    /// VDD voltage is not stable and resets the digital core
+    /// VDD voltage is not stable and resets the digital core.
     SysBrownOut   = 0x0F,
     /// RTC watch dog resets digital core and rtc module
     SysRtcWdt     = 0x10,

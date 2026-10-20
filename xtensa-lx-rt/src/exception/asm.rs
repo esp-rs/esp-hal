@@ -87,7 +87,7 @@ global_asm!(
     .set PS_INTLEVEL_EXCM, 3	        // interrupt handlers above this level shouldn't be written in high level languages
     .set PS_INTLEVEL_MASK, 0x0000000f
     .set PS_EXCM,          0x00000010
-    .set PS_UM,            0x00000020
+    .set PS_UM,            0x00000020      // user mode: general exceptions use the user, not the kernel vector
     .set PS_WOE,           0x00040000
 
     .set EXCCAUSE_LEVEL1_INTERRUPT, 4
@@ -193,7 +193,7 @@ global_asm!(
     .macro HANDLE_INTERRUPT_LEVEL level
     SAVE_CONTEXT \\level
 
-    movi    a0, (\\level | PS_WOE)
+    movi    a0, (\\level | PS_WOE | PS_UM)
     wsr     a0, PS
     rsync
 
@@ -343,6 +343,8 @@ save_context:
 
     // SPILL_REGISTERS macro requires window overflow exceptions to be enabled,
     // i.e. PS.EXCM cleared and PS.WOE set.
+    // We also set PS.UM, so that an exception during the spill uses the same
+    // vector as the rest of the handler.
     // Since we are going to clear PS.EXCM, we also need to increase INTLEVEL
     // at least to XCHAL_EXCM_LEVEL. This matches that value of effective INTLEVEL
     // at entry (CINTLEVEL=max(PS.INTLEVEL, XCHAL_EXCM_LEVEL) when PS.EXCM is set.
@@ -362,7 +364,7 @@ save_context:
     bgeui   a3, +PS_INTLEVEL_EXCM, 1f  // calculate max(INTLEVEL, XCHAL_EXCM_LEVEL) - 3 = XCHAL_EXCM_LEVEL
     movi    a3, PS_INTLEVEL_EXCM
     1:
-    movi    a0, PS_WOE       // clear EXCM, enable window overflow, set new INTLEVEL
+    movi    a0, (PS_WOE | PS_UM)   // clear EXCM, enable window overflow, set user mode and new INTLEVEL
     or      a3, a3, a0
     wsr     a3, ps
     rsr     a0, EPC1
@@ -518,7 +520,7 @@ __default_naked_exception:
 
     bnei    a6, EXCCAUSE_LEVEL1_INTERRUPT, .HandleException   // Handle exception elsewhere
 
-    movi    a0, (1 | PS_WOE)          // set PS.INTLEVEL accordingly
+    movi    a0, (1 | PS_WOE | PS_UM)  // set PS.INTLEVEL, and run the handler in user mode
     wsr     a0, PS
     rsync
     mov     a6, sp                    // put address of save frame in a6=a2 in callee
@@ -533,7 +535,7 @@ __default_naked_exception:
 .HandleException:
     mov     a7, sp                    // put address of save frame in a7=a3 in callee
 
-    movi    a0, (PS_INTLEVEL_EXCM | PS_WOE)
+    movi    a0, (PS_INTLEVEL_EXCM | PS_WOE | PS_UM)
     wsr     a0, PS
     rsync
 
