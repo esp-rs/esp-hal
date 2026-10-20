@@ -118,6 +118,12 @@ macro_rules! property {
     ("dedicated_gpio.channel_count", str) => {
         stringify!(8)
     };
+    ("lp_io.version") => {
+        "v4"
+    };
+    ("lp_io.has_gpio_matrix") => {
+        false
+    };
     ("uart.ram_size") => {
         128
     };
@@ -302,6 +308,30 @@ macro_rules! property {
         false
     };
     ("rng.is_lp_sys") => {
+        false
+    };
+    ("sleep.light_sleep") => {
+        true
+    };
+    ("sleep.deep_sleep") => {
+        false
+    };
+    ("sleep.rejectable_mask") => {
+        17622
+    };
+    ("sleep.ext1_version") => {
+        2
+    };
+    ("sleep.ext1_version", str) => {
+        stringify!(2)
+    };
+    ("sleep.pin_wakeup_version") => {
+        3
+    };
+    ("sleep.pin_wakeup_version", str) => {
+        stringify!(3)
+    };
+    ("sleep.deep_sleep_needs_gpio_isolation") => {
         false
     };
     ("dma.mem2mem_requires_peripheral") => {
@@ -525,6 +555,28 @@ macro_rules! for_each_dedicated_gpio {
         CPU_GPIO_5), (0, 6, CPU_GPIO_6), (0, 7, CPU_GPIO_7), (1, 0, CPU_GPIO_8), (1, 1,
         CPU_GPIO_9), (1, 2, CPU_GPIO_10), (1, 3, CPU_GPIO_11), (1, 4, CPU_GPIO_12), (1,
         5, CPU_GPIO_13), (1, 6, CPU_GPIO_14), (1, 7, CPU_GPIO_15)));
+    };
+}
+/// Defines the `LpInputSignal` and `LpOutputSignal` enums.
+///
+/// This macro is intended to be called in esp-hal only.
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! define_lp_io_signals {
+    () => {};
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_wakeup_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner_wakeup_source { $(($pattern) => $code;)* ($other :
+        tt) => {} } _for_each_inner_wakeup_source!((Ext1, 1));
+        _for_each_inner_wakeup_source!((Gpio, 2)); _for_each_inner_wakeup_source!((Timer,
+        4)); _for_each_inner_wakeup_source!((Uart0, 6));
+        _for_each_inner_wakeup_source!((Uart1, 7)); _for_each_inner_wakeup_source!((Bt,
+        10)); _for_each_inner_wakeup_source!((Usb, 14));
+        _for_each_inner_wakeup_source!((all(Ext1, 1), (Gpio, 2), (Timer, 4), (Uart0, 6),
+        (Uart1, 7), (Bt, 10), (Usb, 14)));
     };
 }
 #[macro_export]
@@ -5184,7 +5236,25 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner_lp_function { $(($pattern) => $code;)* ($other : tt)
-        => {} } _for_each_inner_lp_function!((all));
+        => {} } _for_each_inner_lp_function!((LP_GPIO0, GPIO0, _1));
+        _for_each_inner_lp_function!((LP_GPIO1, GPIO1, _1));
+        _for_each_inner_lp_function!((LP_GPIO2, GPIO2, _1));
+        _for_each_inner_lp_function!((LP_GPIO3, GPIO3, _1));
+        _for_each_inner_lp_function!((LP_GPIO4, GPIO4, _1));
+        _for_each_inner_lp_function!((LP_GPIO5, GPIO5, _1));
+        _for_each_inner_lp_function!(((LP_GPIO0, LP_GPIOn, 0), GPIO0, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO1, LP_GPIOn, 1), GPIO1, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO2, LP_GPIOn, 2), GPIO2, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO3, LP_GPIOn, 3), GPIO3, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO4, LP_GPIOn, 4), GPIO4, _1, () ()));
+        _for_each_inner_lp_function!(((LP_GPIO5, LP_GPIOn, 5), GPIO5, _1, () ()));
+        _for_each_inner_lp_function!((all(LP_GPIO0, GPIO0, _1), (LP_GPIO1, GPIO1, _1),
+        (LP_GPIO2, GPIO2, _1), (LP_GPIO3, GPIO3, _1), (LP_GPIO4, GPIO4, _1), (LP_GPIO5,
+        GPIO5, _1))); _for_each_inner_lp_function!((LP_GPIOn((LP_GPIO0, LP_GPIOn, 0),
+        GPIO0, _1, () ()), ((LP_GPIO1, LP_GPIOn, 1), GPIO1, _1, () ()), ((LP_GPIO2,
+        LP_GPIOn, 2), GPIO2, _1, () ()), ((LP_GPIO3, LP_GPIOn, 3), GPIO3, _1, () ()),
+        ((LP_GPIO4, LP_GPIOn, 4), GPIO4, _1, () ()), ((LP_GPIO5, LP_GPIOn, 5), GPIO5, _1,
+        () ())));
     };
 }
 /// This macro can be used to generate code for each IOMUX digital function of each GPIO.
@@ -5273,19 +5343,37 @@ macro_rules! gpio_for_signal {
     (ZCD0 $(, $_fallback:literal)?) => {
         "GPIO0"
     };
+    (LP_GPIO0 $(, $_fallback:literal)?) => {
+        "GPIO0"
+    };
     (ZCD1 $(, $_fallback:literal)?) => {
+        "GPIO1"
+    };
+    (LP_GPIO1 $(, $_fallback:literal)?) => {
         "GPIO1"
     };
     (ZCD2 $(, $_fallback:literal)?) => {
         "GPIO2"
     };
+    (LP_GPIO2 $(, $_fallback:literal)?) => {
+        "GPIO2"
+    };
     (ZCD3 $(, $_fallback:literal)?) => {
+        "GPIO3"
+    };
+    (LP_GPIO3 $(, $_fallback:literal)?) => {
         "GPIO3"
     };
     (XTAL_32K_N $(, $_fallback:literal)?) => {
         "GPIO4"
     };
+    (LP_GPIO4 $(, $_fallback:literal)?) => {
+        "GPIO4"
+    };
     (XTAL_32K_P $(, $_fallback:literal)?) => {
+        "GPIO5"
+    };
+    (LP_GPIO5 $(, $_fallback:literal)?) => {
         "GPIO5"
     };
     (USJ_DM $(, $_fallback:literal)?) => {
@@ -5616,7 +5704,23 @@ macro_rules! define_io_mux_signals {
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! define_lp_functions {
-    () => {};
+    () => {
+        /// LP IO MUX function of a pad.
+        ///
+        /// This is the low-power counterpart of `AlternateFunction`: it selects which function
+        /// drives a pad while the pad belongs to the low-power domain.
+        #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum LpFunction {
+            /// LP IO MUX function 1.
+            _1 = 1,
+        }
+        impl LpFunction {
+            /// The function that connects the pad to the LP GPIO peripheral.
+            pub const LP_GPIO: Self = Self::_1;
+        }
+    };
 }
 /// Defines and implements the `io_mux_reg` function.
 ///

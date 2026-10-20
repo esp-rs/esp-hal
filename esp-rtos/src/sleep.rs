@@ -145,6 +145,9 @@ pub fn configure(lpwr: LPWR<'static>) -> Sleep {
         esp_hal::rtc_cntl::sleep::__rtos_implementation::set_can_sleep_handler(can_sleep)
     };
 
+    #[cfg(not(sleep_deep_sleep))]
+    let _ = lpwr;
+
     Sleep {
         #[cfg(sleep_deep_sleep)]
         deep_sleep: DeepSleep { lpwr },

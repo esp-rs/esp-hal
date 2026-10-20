@@ -123,6 +123,20 @@ fn update_bus_clocks() {
     {}
 }
 
+/// Powers up and configures the BBPLL and the XTAL frequency doubler again, if a clock uses them.
+///
+/// The PMU powers both circuits down in light sleep, and the BBPLL loses its analog configuration.
+/// ESP-IDF configures the BBPLL again before it uses the PLL after a wake
+/// (`rtc_clk_cpu_freq_set_xtal_for_sleep`).
+pub(crate) fn reconfigure_pll(clocks: &mut ClockTree) {
+    if clocks.pll_f96m_clk_refcount > 0 {
+        enable_pll_f96m_clk_impl(clocks, true);
+    }
+    if clocks.xtal_x2_clk_refcount > 0 {
+        enable_xtal_x2_clk_impl(clocks, true);
+    }
+}
+
 // PLL_F96M_CLK
 
 fn enable_pll_f96m_clk_impl(_clocks: &mut ClockTree, en: bool) {

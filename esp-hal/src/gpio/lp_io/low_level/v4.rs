@@ -7,7 +7,7 @@ cfg_select! {
     esp32c6 => {
         use crate::peripherals::{LP_IO as LP_GPIO, LP_IO as LP_IO_MUX};
     }
-    any(esp32c5, esp32c61) => {
+    any(esp32c5, esp32c61, esp32h4) => {
         // Only a low-power peripheral or a low-power core reads and drives the pads.
         #[cfg(any(
             ulp_riscv_driver_supported,

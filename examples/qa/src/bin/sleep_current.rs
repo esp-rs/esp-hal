@@ -13,7 +13,7 @@
 //! maximum-clock active cases. Dual-core cases run only on multi-core chips.
 //! CPU power-down and tag-memory cases run only where the hardware supports them.
 
-//% CHIP_FILTER: sleep_driver_supported
+//% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
 
 #![no_std]
 #![no_main]

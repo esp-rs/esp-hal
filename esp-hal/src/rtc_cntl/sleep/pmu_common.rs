@@ -48,6 +48,7 @@ impl SleepTimeConfig {
         this
     }
 
+    #[cfg(sleep_deep_sleep)]
     pub fn deep_sleep() -> Self {
         let mut this = Self::new(true);
 

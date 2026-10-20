@@ -16,11 +16,9 @@
 
 use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 
-use crate::{
-    gpio,
-    peripherals::LPWR,
-    rtc_cntl::{Rtc, WakeupSource},
-};
+#[cfg(sleep_deep_sleep)]
+use crate::rtc_cntl::WakeupSource;
+use crate::{gpio, peripherals::LPWR, rtc_cntl::Rtc};
 
 #[cfg(soc_has_pmu)]
 pub(crate) mod pmu_common;
@@ -34,6 +32,7 @@ pub(crate) mod pmu_common;
 #[cfg_attr(esp32c6, path = "esp32c6.rs")]
 #[cfg_attr(esp32c2, path = "esp32c2.rs")]
 #[cfg_attr(esp32h2, path = "esp32h2.rs")]
+#[cfg_attr(esp32h4, path = "esp32h4.rs")]
 #[cfg_attr(esp32p4, path = "esp32p4.rs")]
 #[cfg_attr(esp32s31, path = "esp32s31.rs")]
 mod sleep_impl;

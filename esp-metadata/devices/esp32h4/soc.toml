@@ -158,10 +158,9 @@ channels = [
 
 [device.io_mux]
 
-# GPIO0-5 are also LP pads, but ESP-IDF does not describe the LP IO MUX for this chip yet.
 [device.lp_io]
-support_status = "not_supported"
-version = "esp32h2"
+support_status = "partial"
+version = "v4"
 
 [device.uart]
 support_status = "partial"
@@ -426,7 +425,20 @@ algo = {
 }
 
 [device.sleep]
-support_status = "not_supported"
+support_status = "partial"
+light_sleep = true
+ext1_version = 2
+pin_wakeup_version = 3
+# esp-idf components/esp_hw_support/port/esp32h4/private_include/pmu_bit_defs.h
+wakeup_sources = {
+    Ext1 = 1,
+    Gpio = 2,
+    Timer = 4,
+    Uart0 = 6,
+    Uart1 = 7,
+    Bt = 10,
+    Usb = 14,
+}
 
 [device.assist_debug]
 support_status = "not_supported"

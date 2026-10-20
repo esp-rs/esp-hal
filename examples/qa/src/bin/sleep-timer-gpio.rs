@@ -14,7 +14,7 @@
 //! Each pin idles at the level that does not wake the chip. Pull the low-level pin to ground, or
 //! the high-level pin to 3V3, to end the sleep.
 
-//% CHIP_FILTER: sleep_driver_supported
+//% CHIP_FILTER: sleep_driver_supported && sleep_deep_sleep
 
 #![no_std]
 #![no_main]
