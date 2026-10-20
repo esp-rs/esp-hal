@@ -33,6 +33,47 @@ pub struct AnalogSleepConfig {
 }
 
 impl AnalogSleepConfig {
+    fn defaults_deep_sleep() -> Self {
+        Self {
+            // PMU_SLEEP_ANALOG_DSLP_CONFIG_DEFAULT
+            hp_sys: {
+                let mut cfg = HpAnalog::default();
+
+                cfg.bias.set_dcdc_ccm_enb(true);
+                cfg.bias.set_dig_reg_dpcur_bias(1);
+                cfg.bias.set_dig_reg_dsfmos(4);
+                cfg.bias.set_dcm_vset(20);
+                cfg.bias.set_dcm_mode(3);
+                cfg.bias.set_discnnt_dig_rtc(false);
+                cfg.bias.set_xpd_trx(false);
+                cfg.bias.set_pd_cur(false);
+                cfg.bias.set_bias_sleep(false);
+                cfg.regulator0.set_xpd(false);
+
+                cfg
+            },
+            lp_sys_sleep: {
+                let mut cfg = LpAnalog::default();
+
+                cfg.bias.set_dcdc_ccm_enb(true);
+                cfg.bias.set_dig_reg_dpcur_bias(1);
+                cfg.bias.set_dig_reg_dsfmos(4);
+                cfg.bias.set_dcm_vset(0);
+                cfg.bias.set_dcm_mode(3);
+                cfg.bias.set_discnnt_dig_rtc(true);
+                cfg.bias.set_pd_cur(true);
+                cfg.bias.set_bias_sleep(true);
+                cfg.regulator0.set_slp_xpd(false);
+                cfg.regulator0.set_slp_dbias(0);
+                cfg.regulator0.set_xpd(false);
+                cfg.regulator0.set_dbias(3); // PMU_LP_DBIAS_SLEEP_0V7_DEFAULT
+                cfg.regulator1.set_drv_b(0);
+
+                cfg
+            },
+        }
+    }
+
     fn defaults_light_sleep(pd_flags: PowerDownFlags) -> Self {
         let mut this = Self {
             // PMU_SLEEP_ANALOG_LSLP_CONFIG_DEFAULT
@@ -173,12 +214,27 @@ impl DigitalSleepConfig {
         }
     }
 
-    fn apply(&self) {
+    fn defaults_deep_sleep() -> Self {
+        // PMU_SLEEP_DIGITAL_DSLP_CONFIG_DEFAULT
+        let mut syscntl = HpSysCntlReg::default();
+        syscntl.set_dig_pad_slp_sel(true);
+        syscntl.set_dig_pause_wdt(true);
+
+        Self {
+            syscntl,
+            sleep_icg_func: 0,
+        }
+    }
+
+    fn apply(&self, deep: bool) {
         // pmu_sleep_digital_init
         PMU::regs().hp_sleep_hp_sys_cntl().modify(|_, w| {
             w.hp_sleep_dig_pause_wdt().bit(self.syscntl.dig_pause_wdt());
-            w.hp_sleep_dig_pad_slp_sel()
-                .bit(self.syscntl.dig_pad_slp_sel())
+            if !deep {
+                w.hp_sleep_dig_pad_slp_sel()
+                    .bit(self.syscntl.dig_pad_slp_sel());
+            }
+            w
         });
         PMU::regs()
             .hp_sleep_sysclk()
@@ -475,6 +531,7 @@ impl ParamSleepConfig {
 }
 
 impl SleepTimeConfig {
+    pub(crate) const CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ: u32 = 96;
     pub(crate) const LIGHT_SLEEP_TIME_OVERHEAD_US: u32 = 9;
 
     pub(crate) fn pmu_sleep_calculate_hw_wait_time(&self, pd_flags: PowerDownFlags) -> u32 {
@@ -637,13 +694,29 @@ impl RtcSleepConfig {
             _ => false,
         };
 
-        // Light sleep: the digital domain (CPU, RAM, peripherals) stays powered and only clock
-        // gated, so execution resumes in place. The sleep powers down the clock sources that
-        // nothing uses while the core is gated. With XTAL and RC_FAST off, the analog
-        // configuration also drops the regulators to their sleep voltages.
-        self.pd_flags.set_pd_xtal(true);
-        self.pd_flags.set_pd_rc_fast(true);
-        self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
+        if self.deep {
+            // Like esp-idf `esp_deep_sleep_start`. A wakeup source that needs the LP peripherals
+            // keeps them powered.
+            self.pd_flags.set_pd_top(true);
+            self.pd_flags.set_pd_vddsdio(true);
+            self.pd_flags.set_pd_modem(true);
+            self.pd_flags.set_pd_hp_periph(true);
+            self.pd_flags.set_pd_cpu(true);
+            self.pd_flags.set_pd_hp_aon(true);
+            self.pd_flags.set_pd_xtal(true);
+            self.pd_flags.set_pd_lp_periph(true);
+            self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
+            self.pd_flags.set_pd_rc32k(true);
+            self.pd_flags.set_pd_rc_fast(true);
+        } else {
+            // Light sleep: the digital domain (CPU, RAM, peripherals) stays powered and only
+            // clock gated, so execution resumes in place. The sleep powers down the clock sources
+            // that nothing uses while the core is gated. With XTAL and RC_FAST off, the analog
+            // configuration also drops the regulators to their sleep voltages.
+            self.pd_flags.set_pd_xtal(true);
+            self.pd_flags.set_pd_rc_fast(true);
+            self.pd_flags.set_pd_xtal32k(!lp_slow_uses_xtal32k);
+        }
     }
 
     /// Configures the wakeup and reject sources of the sleep.
@@ -687,12 +760,25 @@ impl RtcSleepConfig {
         power.apply(self.deep);
 
         // Needs to happen after rtc_clk_cpu_freq_set_xtal
-        let config = SleepTimeConfig::light_sleep(self.pd_flags);
+        let config = if self.deep {
+            SleepTimeConfig::deep_sleep()
+        } else {
+            SleepTimeConfig::light_sleep(self.pd_flags)
+        };
 
-        let param = ParamSleepConfig::defaults(config, power.hp_sys.xtal.xpd_xtal());
+        let mut param = ParamSleepConfig::defaults(config, power.hp_sys.xtal.xpd_xtal());
 
-        DigitalSleepConfig::defaults_light_sleep(self.pd_flags).apply();
-        AnalogSleepConfig::defaults_light_sleep(self.pd_flags).apply();
+        if self.deep {
+            const PMU_LP_ANALOG_WAIT_TARGET_TIME_DSLP_US: u32 = 500;
+            param.lp_sys.analog_wait_target_cycle =
+                config.us_to_slowclk(PMU_LP_ANALOG_WAIT_TARGET_TIME_DSLP_US) as u8;
+
+            DigitalSleepConfig::defaults_deep_sleep().apply(true);
+            AnalogSleepConfig::defaults_deep_sleep().apply();
+        } else {
+            DigitalSleepConfig::defaults_light_sleep(self.pd_flags).apply(false);
+            AnalogSleepConfig::defaults_light_sleep(self.pd_flags).apply();
+        }
 
         param.apply();
 

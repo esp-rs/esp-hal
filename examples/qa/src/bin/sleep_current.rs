@@ -50,14 +50,16 @@ const HOLD: Duration = Duration::from_secs(3);
 /// Interrupt period that lets WAITI/WFI return and check the hold deadline.
 const WAITI_TICK: Duration = Duration::from_millis(250);
 
-#[cfg(not(any(feature = "esp32c2", feature = "esp32c61")))]
+#[cfg(not(any(feature = "esp32c2", feature = "esp32c61", feature = "esp32h4")))]
 #[esp_hal::ram(unstable(rtc_fast, persistent))]
 static mut PHASE: u32 = 0;
 
 fn load_phase() -> u32 {
     cfg_select! {
         feature = "esp32c2" => esp_hal::peripherals::LPWR::regs().store6().read().bits(),
-        feature = "esp32c61" => esp_hal::peripherals::LP_AON::regs().store6().read().bits(),
+        any(feature = "esp32c61", feature = "esp32h4") => {
+            esp_hal::peripherals::LP_AON::regs().store6().read().bits()
+        }
         _ => unsafe { PHASE },
     }
 }
@@ -69,7 +71,7 @@ fn store_phase(value: u32) {
                 .store6()
                 .write(|w| unsafe { w.bits(value) });
         }
-        feature = "esp32c61" => {
+        any(feature = "esp32c61", feature = "esp32h4") => {
             esp_hal::peripherals::LP_AON::regs()
                 .store6()
                 .write(|w| unsafe { w.bits(value) });

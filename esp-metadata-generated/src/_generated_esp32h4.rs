@@ -314,7 +314,7 @@ macro_rules! property {
         true
     };
     ("sleep.deep_sleep") => {
-        false
+        true
     };
     ("sleep.rejectable_mask") => {
         17622

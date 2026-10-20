@@ -427,6 +427,7 @@ algo = {
 [device.sleep]
 support_status = "partial"
 light_sleep = true
+deep_sleep = true
 ext1_version = 2
 pin_wakeup_version = 3
 # esp-idf components/esp_hw_support/port/esp32h4/private_include/pmu_bit_defs.h
