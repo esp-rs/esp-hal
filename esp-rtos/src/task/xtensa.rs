@@ -122,5 +122,7 @@ pub(crate) fn setup_multitasking() {
 
 #[ram]
 extern "C" fn trigger_task_switch(context: &mut CpuContext) {
-    SCHEDULER.with(|scheduler| scheduler.switch_task(context));
+    SCHEDULER.with(|scheduler| {
+        scheduler.switch_task(context);
+    });
 }
