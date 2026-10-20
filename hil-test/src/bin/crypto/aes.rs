@@ -1781,3 +1781,196 @@ mod gcm_cpu_backend_tests {
         );
     }
 }
+
+/// Tests of the AES work queue under contention: a waiter at a higher interrupt priority, and a
+/// second core. GCM and ECB operations are the load.
+#[cfg(aes_dma_mode_gcm)]
+#[embedded_test::tests(default_timeout = 30, executor = hil_test::Executor::new())]
+mod work_queue_concurrency_tests {
+    use esp_hal::{
+        aes::dma::{AesDmaBackend, AesGcmContext},
+        interrupt::{InterruptHandler, Priority, software::SoftwareInterrupt},
+        peripherals::{FROM_CPU_INTR3, Peripherals},
+        time::{Duration, Instant},
+    };
+    use portable_atomic::{AtomicU8, Ordering};
+
+    use super::{gcm::*, *};
+
+    const NOT_DONE: u8 = 0;
+    const PASSED: u8 = 1;
+    const FAILED: u8 = 2;
+    const TIMED_OUT: u8 = 3;
+
+    #[init]
+    fn init() -> Peripherals {
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        gcm_heap();
+        p
+    }
+
+    /// Encrypts 100 random bytes with GCM and compares the result with RustCrypto, using only the
+    /// stack.
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    fn gcm_round() -> bool {
+        let key = random::<16>();
+        let nonce = random::<12>();
+        let aad = random::<16>();
+        let plaintext = random::<100>();
+        let mut expected = plaintext;
+        let expected_tag = sw_encrypt(&key, &nonce, &aad, &mut expected);
+
+        let mut gcm = AesGcmContext::new(hw_key(&key));
+        let mut output = [0; 100];
+        let mut tag = [0; 16];
+        let result = gcm
+            .encrypt(&nonce, &aad, &plaintext, &mut output, &mut tag)
+            .unwrap()
+            .wait_blocking();
+        result.is_ok() && output == expected && tag == expected_tag
+    }
+
+    /// Encrypts the known plaintext with ECB and compares it with the known ciphertext, using only
+    /// the stack.
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    fn ecb_round() -> bool {
+        let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+        fill_with_plaintext(&mut plaintext);
+        let mut output = [0; PLAINTEXT_BUF_SIZE];
+        let mut ecb = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+        ecb.process(&plaintext, &mut output)
+            .unwrap()
+            .wait_blocking();
+        output == CIPHERTEXT_ECB_128
+    }
+
+    /// As [`ecb_round`], but polls for at most `limit`, so a queue that stops making progress
+    /// fails the test instead of hanging it. Returns `None` when the operation has not completed
+    /// by then.
+    fn ecb_round_within(limit: Duration) -> Option<bool> {
+        let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+        fill_with_plaintext(&mut plaintext);
+        let mut output = [0; PLAINTEXT_BUF_SIZE];
+        let mut ecb = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+        let mut handle = ecb.process(&plaintext, &mut output).unwrap();
+        let start = Instant::now();
+        while !handle.poll() {
+            if start.elapsed() > limit {
+                // Dropping the handle removes the operation at once while it waits in the queue.
+                // When the backend has started it, the drop waits for the hardware to finish it.
+                return None;
+            }
+        }
+        core::mem::drop(handle);
+        Some(output == CIPHERTEXT_ECB_128)
+    }
+
+    /// A handler at a higher priority than the AES interrupt posts an ECB operation and waits for
+    /// it while a GCM decryption from thread mode is in progress. The handler's wait processes
+    /// the queue, because the AES interrupt cannot run until the handler returns.
+    ///
+    /// The handler runs at `Priority::max()`, the highest level a handler can have. That level is
+    /// still below what the queue's critical section masks.
+    #[test]
+    fn test_wait_at_higher_priority_during_gcm(p: Peripherals) {
+        static HANDLER_RESULT: AtomicU8 = AtomicU8::new(NOT_DONE);
+
+        extern "C" fn high_priority() {
+            SoftwareInterrupt::new(unsafe { FROM_CPU_INTR3::steal() }).reset();
+            let result = match ecb_round_within(Duration::from_secs(1)) {
+                Some(true) => PASSED,
+                Some(false) => FAILED,
+                None => TIMED_OUT,
+            };
+            HANDLER_RESULT.store(result, Ordering::Release);
+        }
+
+        let dma = cfg_select! {
+            aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
+            aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
+            _ => p.DMA_CH0,
+        };
+        let mut aes = AesDmaBackend::new(p.AES, dma);
+        let _backend = aes.start();
+
+        let key = random::<16>();
+        let nonce = random::<12>();
+        let plaintext = random_vec(MAX_TEXT);
+        let mut ciphertext = copy_vec(&plaintext);
+        let tag = sw_encrypt(&key, &nonce, &[], &mut ciphertext);
+
+        let mut gcm = AesGcmContext::new(hw_key(&key));
+        let mut output = zeroed_vec(MAX_TEXT);
+        let mut handle = gcm
+            .decrypt(&nonce, &[], &ciphertext, &mut output, &tag)
+            .unwrap();
+        // The first poll hands the decryption to the backend, which starts the DMA.
+        hil_test::assert!(!handle.poll(), "decryption finished before the handler ran");
+
+        let mut interrupt = SoftwareInterrupt::new(p.FROM_CPU_INTR3);
+        interrupt.set_interrupt_handler(InterruptHandler::new(high_priority, Priority::max()));
+        interrupt.raise();
+
+        // The core can take the interrupt a few instructions after the raise.
+        let start = Instant::now();
+        while HANDLER_RESULT.load(Ordering::Acquire) == NOT_DONE {
+            hil_test::assert!(
+                start.elapsed() < Duration::from_secs(1),
+                "the handler did not run"
+            );
+        }
+        hil_test::assert_eq!(HANDLER_RESULT.load(Ordering::Acquire), PASSED);
+        hil_test::assert_eq!(handle.wait_blocking(), Ok(()));
+        hil_test::assert!(output[..] == plaintext[..], "decryption differs");
+    }
+
+    /// Both cores post GCM and ECB operations to the one queue at the same time, and each gets
+    /// its own results. Core 1 uses only its stack and two atomics that core 0 owns.
+    #[test]
+    #[cfg(all(multi_core, soc_has_cpu_ctrl))]
+    fn test_two_cores(p: Peripherals) {
+        use esp_hal::system::{CpuControl, Stack};
+        use portable_atomic::AtomicBool;
+
+        const ROUNDS: usize = 20;
+        let start_signal = AtomicBool::new(false);
+        let core_1_result = AtomicU8::new(NOT_DONE);
+
+        let dma = cfg_select! {
+            aes_dma_engine = "CRYPTO_DMA" => p.DMA_CRYPTO,
+            aes_dma_engine = "AXI_GDMA" => p.DMA_AXI_CH0,
+            _ => p.DMA_CH0,
+        };
+        let mut aes = AesDmaBackend::new(p.AES, dma);
+        let _backend = aes.start();
+
+        let core_1 = || {
+            while !start_signal.load(Ordering::Acquire) {}
+            let mut passed = true;
+            for _ in 0..ROUNDS {
+                passed &= gcm_round();
+            }
+            core_1_result.store(if passed { PASSED } else { FAILED }, Ordering::Release);
+            loop {}
+        };
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let stack = mk_static!(Stack<16384>, Stack::new());
+        let _guard = cpu_control.start_app_core(stack, core_1).unwrap();
+
+        start_signal.store(true, Ordering::Release);
+        for round in 0..ROUNDS {
+            hil_test::assert!(ecb_round(), "core 0 ECB round {}", round);
+            hil_test::assert!(gcm_round(), "core 0 GCM round {}", round);
+        }
+
+        let start = Instant::now();
+        while core_1_result.load(Ordering::Acquire) == NOT_DONE {
+            hil_test::assert!(
+                start.elapsed() < Duration::from_secs(10),
+                "core 1 did not finish"
+            );
+        }
+        hil_test::assert_eq!(core_1_result.load(Ordering::Acquire), PASSED);
+    }
+}
