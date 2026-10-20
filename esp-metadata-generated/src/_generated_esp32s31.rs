@@ -419,7 +419,7 @@ macro_rules! property {
         stringify!(8)
     };
     ("timergroup.timg_has_timer1") => {
-        false
+        true
     };
     ("timergroup.timg_has_divcnt_rst") => {
         true
