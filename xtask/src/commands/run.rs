@@ -486,7 +486,7 @@ pub fn run_examples(
         log::info!("Running example '{}'", example.output_file_name());
 
         if interactive {
-            if let Some(description) = example.description() {
+            if let Some(description) = example.description_for(&target) {
                 log::info!(
                     "\n\n{}\n\nPress ENTER to run example, `s` to skip",
                     description.trim()
