@@ -2710,11 +2710,6 @@ impl Drop for WifiRefGuard {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct WifiController<'d> {
     _guard: WifiRefGuard,
-    /// The access point configuration applied last. The driver changes some fields of the
-    /// configuration it stores, so `esp_wifi_get_config` never returns the configuration as
-    /// applied.
-    #[cfg(wifi_softap_support)]
-    access_point_config: Option<AccessPointConfig>,
     _phantom: PhantomData<&'d ()>,
 }
 
@@ -2848,8 +2843,6 @@ impl<'d> WifiController<'d> {
             _guard: WifiRefGuard {
                 _radio_guard: radio_guard,
             },
-            #[cfg(wifi_softap_support)]
-            access_point_config: None,
             _phantom: Default::default(),
         };
 
@@ -3135,9 +3128,6 @@ impl WifiController<'_> {
 
         let reset_mode_on_error = ResetModeOnDrop;
 
-        #[cfg(wifi_softap_support)]
-        let applied = self.access_point_config.take();
-
         conf.validate()?;
 
         let mut previous_mode = 0u32;
@@ -3166,12 +3156,12 @@ impl WifiController<'_> {
             }
             #[cfg(wifi_softap_support)]
             Config::AccessPoint(config) => {
-                self.apply_ap_config(config, applied.as_ref())?;
+                self.apply_ap_config(config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)?;
             }
             #[cfg(wifi_softap_support)]
             Config::AccessPointStation(sta_config, ap_config) => {
-                self.apply_ap_config(ap_config, applied.as_ref())?;
+                self.apply_ap_config(ap_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &ap_config.protocols)?;
                 self.apply_sta_config(sta_config)?;
                 Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &sta_config.protocols)?;
@@ -3207,16 +3197,6 @@ impl WifiController<'_> {
                 };
                 esp_wifi_result!(unsafe { esp_wifi_set_scan_parameters(&params) })?;
             }
-        }
-
-        #[cfg(wifi_softap_support)]
-        {
-            self.access_point_config = match conf {
-                Config::AccessPoint(config) | Config::AccessPointStation(_, config) => {
-                    Some(config.clone())
-                }
-                _ => applied,
-            };
         }
 
         reset_mode_on_error.defuse();
@@ -3329,10 +3309,6 @@ ignored."
         secondary: SecondaryChannel,
     ) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_channel(primary, secondary as u32) })?;
-        #[cfg(wifi_softap_support)]
-        {
-            self.access_point_config = None;
-        }
 
         Ok(())
     }
@@ -3677,17 +3653,8 @@ ignored."
     }
 
     #[cfg(wifi_softap_support)]
-    fn apply_ap_config(
-        &mut self,
-        config: &AccessPointConfig,
-        applied: Option<&AccessPointConfig>,
-    ) -> Result<(), WifiError> {
+    fn apply_ap_config(&mut self, config: &AccessPointConfig) -> Result<(), WifiError> {
         config.validate()?;
-
-        // Applying a configuration restarts the access point, which disconnects its stations.
-        if applied == Some(config) {
-            return Ok(());
-        }
 
         // The upper limit of connections available for the AP. The user set limit in
         // apply_ap_config is clipped to this value
@@ -3703,6 +3670,7 @@ ignored."
                 authmode: config.authentication.auth_method().to_raw(),
                 ssid_hidden: if config.ssid_hidden { 1 } else { 0 },
                 // Clip max_connection in the same way as done internally in esp_wifi_set_config.
+                // Doing this here so that we can do easy comparisons below
                 max_connection: (config.max_connections as u8).min(ap_max_connections),
                 beacon_interval: 100,
                 pairwise_cipher: wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
@@ -3731,6 +3699,16 @@ ignored."
             cfg.ap.ssid_len = config.ssid.len() as u8;
             if let Some(password) = config.authentication.password() {
                 cfg.ap.password[0..(password.len())].copy_from_slice(password);
+            }
+
+            // Compare the new ap config with the current. Only update if something is changing.
+            // This avoids unnecessary connection issues.
+            let mut current: wifi_config_t = core::mem::zeroed();
+            if esp_wifi_get_config(wifi_interface_t_WIFI_IF_AP, &mut current)
+                == include::ESP_OK as i32
+                && same_access_point_config(&current.ap, &cfg.ap)
+            {
+                return Ok(());
             }
 
             esp_wifi_result!(esp_wifi_set_config(wifi_interface_t_WIFI_IF_AP, &mut cfg)).inspect_err(
@@ -3935,4 +3913,20 @@ ignored."
             Ok(())
         }
     }
+}
+
+/// Compares the fields that come from [`AccessPointConfig`]. The driver changes others in
+/// the configuration it stores (`sae_pwe_h2e`; `pmf_cfg` and `pairwise_cipher` for some
+/// authentication methods), so a comparison of the whole configuration never matches.
+#[cfg(wifi_softap_support)]
+fn same_access_point_config(current: &wifi_ap_config_t, new: &wifi_ap_config_t) -> bool {
+    current.ssid == new.ssid
+        && current.ssid_len == new.ssid_len
+        && current.password == new.password
+        && current.channel == new.channel
+        && current.authmode == new.authmode
+        && current.ssid_hidden == new.ssid_hidden
+        && current.max_connection == new.max_connection
+        && current.beacon_interval == new.beacon_interval
+        && current.dtim_period == new.dtim_period
 }
