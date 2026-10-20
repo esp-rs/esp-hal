@@ -281,7 +281,6 @@ pub struct Flash<'d, Dm: DriverMode> {
     _flash: FLASH<'d>,
     capacity: usize,
     chip_id: u32,
-    unlocked: bool,
     #[cfg(multi_core)]
     multi_core_strategy: MultiCoreStrategy,
     _mode: PhantomData<Dm>,
@@ -321,7 +320,6 @@ impl<'d> Flash<'d, Blocking> {
             _flash: flash,
             capacity,
             chip_id,
-            unlocked: false,
             #[cfg(multi_core)]
             multi_core_strategy: config.multi_core_strategy,
             _mode: PhantomData,
@@ -439,7 +437,6 @@ impl<'d> Flash<'d, Blocking> {
         self.check_word_offset(offset)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
-        self.ensure_unlocked()?;
         self.with_guard(Some((offset, len as u32)), |_| rom::write(offset, data))
     }
 
@@ -479,7 +476,6 @@ impl<'d> Flash<'d, Blocking> {
 
         self.check_alignment(SECTOR_SIZE, from, len)?;
         self.check_bounds(from, len)?;
-        self.ensure_unlocked()?;
         self.erase_range(from, to)
     }
 
@@ -573,7 +569,6 @@ impl<'d> Flash<'d, Blocking> {
         self.check_alignment(ENCRYPT_BLOCK_SIZE, offset, len)?;
         self.check_bounds(offset, len)?;
         check_buffer(data)?;
-        self.ensure_unlocked()?;
 
         #[cfg(esp32)]
         let neighbors = self.esp32_row_neighbors(offset, len)?;
@@ -785,18 +780,6 @@ impl Flash<'_, Blocking> {
                 }
             }
             result
-        })
-    }
-
-    #[ram]
-    fn ensure_unlocked(&mut self) -> Result<(), Error> {
-        if self.unlocked {
-            return Ok(());
-        }
-        self.with_guard(None, |this| {
-            rom::unlock()?;
-            this.unlocked = true;
-            Ok(())
         })
     }
 

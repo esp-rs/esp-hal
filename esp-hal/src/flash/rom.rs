@@ -177,11 +177,6 @@ pub(super) fn write_encrypted(dest_addr: u32, data: *mut u32, len: u32) -> Resul
 }
 
 #[inline(always)]
-pub(super) fn unlock() -> Result<(), Error> {
-    check_rc(unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_unlock() })
-}
-
-#[inline(always)]
 pub(super) fn erase_sector(sector_number: u32) -> Result<(), Error> {
     check_rc(unsafe { esp_rom_sys::rom::spiflash::esp_rom_spiflash_erase_sector(sector_number) })
 }
