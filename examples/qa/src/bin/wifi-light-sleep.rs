@@ -32,6 +32,7 @@ use esp_radio::wifi::{
     event::{EventInfo, WifiEvent, enable_wifi_events},
     sta::StationConfig,
 };
+use qa_test::DRAM2_UNINIT_SIZE;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -54,7 +55,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);

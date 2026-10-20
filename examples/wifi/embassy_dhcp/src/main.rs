@@ -53,6 +53,12 @@ use reqwless::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+// Full `.dram2_uninit` region for this chip.
+const DRAM2_UNINIT_SIZE: usize = {
+    let range: core::ops::Range<usize> = esp_metadata_generated::memory_range!("DRAM2_UNINIT");
+    range.end - range.start
+};
+
 #[cfg(feature = "alloc-hooks")]
 use enumset::EnumSet;
 #[cfg(feature = "alloc-hooks")]
@@ -152,7 +158,7 @@ async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024 - CPU_POWERDOWN_RAM);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE - CPU_POWERDOWN_RAM);
     esp_alloc::heap_allocator!(size: 36 * 1024 + CPU_POWERDOWN_RAM);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);

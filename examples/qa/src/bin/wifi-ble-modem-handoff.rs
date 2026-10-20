@@ -22,6 +22,7 @@ use esp_radio::{
     wifi::{Config, ControllerConfig, WifiController, ap::AccessPointConfig},
 };
 use log::{info, warn};
+use qa_test::DRAM2_UNINIT_SIZE;
 use trouble_host::prelude::*;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -89,11 +90,11 @@ struct BatteryService {
 fn init_heap() {
     cfg_select! {
         feature = "esp32" => {
-            esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 96 * 1024);
+            esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
             esp_alloc::heap_allocator!(size: 24 * 1024);
         }
         _ => {
-            esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+            esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
             esp_alloc::heap_allocator!(size: 64 * 1024);
         }
     }

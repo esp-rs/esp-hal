@@ -32,6 +32,7 @@ use esp_radio::wifi::{
     scan::ScanConfig,
     sta::StationConfig,
 };
+use qa_test::DRAM2_UNINIT_SIZE;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -39,7 +40,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 async fn main(_spawner: Spawner) -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[ram(reclaimed)] size: DRAM2_UNINIT_SIZE);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
