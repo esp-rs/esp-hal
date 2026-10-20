@@ -1432,6 +1432,10 @@ mod tests {
             "{html}"
         );
         assert!(html.contains("<code>esp-hal</code>"), "{html}");
+        assert!(
+            html.contains(r#"<a href="esp-hal/main/index.html#peripheral-support">Peripheral Support Matrix</a>"#),
+            "{html}"
+        );
     }
 
     #[test]

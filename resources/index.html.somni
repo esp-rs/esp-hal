@@ -124,6 +124,7 @@
 
     <div class="resource"><span class="resource-name"><a href="https://docs.espressif.com/projects/rust/book/">The Rust on ESP Book</a></span></div>
     <div class="resource"><span class="resource-name"><a href="https://docs.espressif.com/projects/rust/no_std-training/">Embedded Rust (no_std) on Espressif Training</a></span></div>
+    <div class="resource"><span class="resource-name"><a href="esp-hal/main/index.html#peripheral-support">Peripheral Support Matrix</a></span></div>
 
 
     <h2>Package Documentation</h2>
