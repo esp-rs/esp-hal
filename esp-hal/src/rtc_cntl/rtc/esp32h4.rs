@@ -59,7 +59,7 @@ fn pmu_power_domain_force_default() {
         w.force_hp_cpu_pd().bit(false)
     });
 
-    // PMU_HP_PD_BT_154, which uses the register of the Wi-Fi domain of the other chips.
+    // PMU_HP_PD_BT_154
     PMU::regs().power_pd_hpwifi_cntl().modify(|_, w| {
         w.force_hp_wifi_reset().bit(false);
         w.force_hp_wifi_iso().bit(false);
@@ -575,8 +575,7 @@ impl HpSystemInit {
             .dcm_ctrl()
             .modify(|_, w| w.dcdc_ccm_sw_en().set_bit());
 
-        // lp_aon_ll_set_ldo_sw: the DC-DC LDO mode for a VDD below about 2.6 V. The PAC does not
-        // describe LP_AON_DREG_LDO_HW (bit 5) and LP_AON_DREG_LDO_SW (bits 11..=14).
+        // lp_aon_ll_set_ldo_sw: the DC-DC LDO mode for a VDD below about 2.6 V.
         const DREG_LDO_HW: u32 = 1 << 5;
         const DREG_LDO_SW_SHIFT: u32 = 11;
         const DREG_LDO_SW_MASK: u32 = 0xf << DREG_LDO_SW_SHIFT;
@@ -794,6 +793,11 @@ pub(crate) fn init(_config: &ClockConfig) {
     regi2c::I2C_DCDC_VCM_DREG0.write_field(24);
     regi2c::I2C_DCDC_VCM_PCUR_LIMIT0.write_field(2);
     regi2c::I2C_DCDC_XPD_TRX.write_field(0);
+
+    // Power down the RF PLL.
+    PMU::regs()
+        .date()
+        .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << 25)) });
 
     // Regulator settings for the active modes.
     PMU::regs()

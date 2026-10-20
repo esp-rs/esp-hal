@@ -151,11 +151,9 @@ impl AnalogSleepConfig {
             w.hp_sleep_dcm_mode().bits(self.hp_sys.bias.dcm_mode());
             w.hp_sleep_dcm_vset().bits(self.hp_sys.bias.dcm_vset())
         });
-        PMU::regs().hp_sleep_hp_regulator0().modify(|_, w| unsafe {
+        PMU::regs().hp_sleep_hp_regulator0().modify(|_, w| {
             w.hp_sleep_hp_regulator_xpd()
-                .bit(self.hp_sys.regulator0.xpd());
-            w.hp_sleep_hp_regulator_dbias()
-                .bits(self.hp_sys.regulator0.dbias())
+                .bit(self.hp_sys.regulator0.xpd())
         });
         PMU::regs().hp_sleep_hp_regulator1().modify(|_, w| unsafe {
             w.hp_sleep_hp_regulator_drv_b()
@@ -321,7 +319,7 @@ impl PowerSleepConfig {
         });
 
         // pmu_ll_hp_set_memory_power_on_mask
-        let mem_mask = if deep { 0 } else { 0xf };
+        let mem_mask = if deep { 0 } else { 1 };
         PMU::regs().power_pd_mem_mask().modify(|_, w| unsafe {
             w.pd_hp_mem0_mask().bits(mem_mask);
             w.pd_hp_mem1_mask().bits(mem_mask);
@@ -421,7 +419,7 @@ impl ParamSleepConfig {
             analog_wait_target_cycle: 2419,
             digital_power_supply_wait_cycle: 32,
             digital_power_up_wait_cycle: 32,
-            modem_wakeup_wait_cycle: 20700,
+            modem_wakeup_wait_cycle: 0,
             pll_stable_wait_cycle: 2,
             isolate_wait_cycle: 0,
             reset_wait_cycle: 0,
@@ -535,7 +533,7 @@ impl SleepTimeConfig {
     pub(crate) const LIGHT_SLEEP_TIME_OVERHEAD_US: u32 = 9;
 
     pub(crate) fn pmu_sleep_calculate_hw_wait_time(&self, pd_flags: PowerDownFlags) -> u32 {
-        // esp-hal always uses RC_FAST as the LP fast clock, so XTAL is never the RTC fast clock.
+        // The LP fast clock is always RC_FAST.
 
         // LP core hardware wait time, microsecond
         let lp_clk_switch_time_us = self.slowclk_to_us(MachineConstants::LP_CLK_SWITCH_CYCLE);
