@@ -396,7 +396,7 @@ fn start_core1_init_impl<F>() -> !
 where
     F: FnOnce(),
 {
-    crate::soc::enable_branch_predictor();
+    crate::soc::branch_predictor::enable();
 
     // The ROM has already handed off to us; clear the AppCpu boot address so a subsequent software
     // reset doesn't re-enter this stale entry point. Matches IDF's `call_start_cpu1`.

@@ -14,28 +14,6 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32s31 as pac;
 
-const MHCR_RS: u32 = 1 << 4;
-const MHCR_BFE: u32 = 1 << 5;
-const MHCR_BTB: u32 = 1 << 12;
-const MHCR_BRANCH_PREDICTOR: u32 = MHCR_RS | MHCR_BFE | MHCR_BTB;
-
-pub(crate) fn enable_branch_predictor() {
-    // MHCR: CSR 0x7c1 — sourced from SOC_BRANCH_PREDICTOR_SUPPORTED in
-    // esp-idf/components/soc/esp32s31/include/soc/soc_caps.h
-    unsafe {
-        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
-    }
-}
-
-#[cfg(any(feature = "rt", feature = "unstable"))]
-pub(crate) fn disable_branch_predictor() {
-    // Clears the bits set by `enable_branch_predictor`.
-    // `rt` covers the CPU-retention rendezvous; `unstable` covers flash cache suspend.
-    unsafe {
-        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
-    }
-}
-
 #[cfg(feature = "rt")]
 pub(crate) fn riscv_preinit() {}
 

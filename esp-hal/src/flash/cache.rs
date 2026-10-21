@@ -8,6 +8,9 @@ use procmacros::ram;
 /// Suspends the flash-backed caches for the duration of a ROM flash operation.
 pub(super) struct CacheGuard {
     inner: Inner,
+    // Fields drop after `Drop::drop`, so the predictor turns on after the caches resume.
+    #[cfg(soc_cpu_has_branch_predictor)]
+    _predictor: crate::soc::branch_predictor::DisabledBranchPredictor,
 }
 
 cfg_select! {
@@ -49,12 +52,15 @@ impl CacheGuard {
     /// external-memory caches.
     #[ram]
     pub(super) fn suspend() -> Self {
-        // Runs while the cache is still on, so it may live in flash.
         #[cfg(soc_cpu_has_branch_predictor)]
-        crate::soc::disable_branch_predictor();
+        let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
         let inner = suspend_caches();
-        Self { inner }
+        Self {
+            inner,
+            #[cfg(soc_cpu_has_branch_predictor)]
+            _predictor,
+        }
     }
 
     /// Flush every line. Must run while the caches are still off.
@@ -76,10 +82,6 @@ impl Drop for CacheGuard {
     #[ram]
     fn drop(&mut self) {
         resume_caches(&self.inner);
-
-        // Runs once the cache is back on, so it may live in flash.
-        #[cfg(soc_cpu_has_branch_predictor)]
-        crate::soc::enable_branch_predictor();
     }
 }
 

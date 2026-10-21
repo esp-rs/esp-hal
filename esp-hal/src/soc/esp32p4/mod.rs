@@ -29,28 +29,6 @@ pub(crate) fn pre_init() {
     }
 }
 
-const MHCR_RS: u32 = 1 << 4;
-const MHCR_BFE: u32 = 1 << 5;
-const MHCR_BTB: u32 = 1 << 12;
-const MHCR_BRANCH_PREDICTOR: u32 = MHCR_RS | MHCR_BFE | MHCR_BTB;
-
-pub(crate) fn enable_branch_predictor() {
-    // MHCR: CSR 0x7c1 — sourced from `components/riscv/include/riscv/rv_utils.h`. The predictor
-    // starts cache requests of its own, so it must be off while the cache is off.
-    unsafe {
-        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
-    }
-}
-
-#[cfg(any(feature = "rt", feature = "unstable"))]
-pub(crate) fn disable_branch_predictor() {
-    // Clears the bits set by `enable_branch_predictor`.
-    // `rt` covers the CPU-retention rendezvous; `unstable` covers flash cache suspend.
-    unsafe {
-        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_BRANCH_PREDICTOR);
-    }
-}
-
 const CACHE_MAP_L1_ICACHE_0: u32 = 1 << 0;
 const CACHE_MAP_L1_ICACHE_1: u32 = 1 << 1;
 const CACHE_MAP_L1_DCACHE: u32 = 1 << 4;
