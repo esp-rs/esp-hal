@@ -19,38 +19,43 @@ pub(crate) fn enable() {
     }
 }
 
-/// Turns the branch predictor off. [`Drop`] sets the bits that were set before.
 #[cfg(any(feature = "unstable", all(multi_core, feature = "rt")))]
-pub(crate) struct DisabledBranchPredictor(u32);
+pub(crate) use guard::DisabledBranchPredictor;
 
 #[cfg(any(feature = "unstable", all(multi_core, feature = "rt")))]
-impl DisabledBranchPredictor {
-    /// Turns the branch predictor off.
-    #[inline(always)]
-    pub(crate) fn new() -> Self {
-        let bits: u32;
-        unsafe {
-            core::arch::asm!(
-                "csrrc {0}, 0x7c1, {1}",
-                "fence iorw, iorw",
-                out(reg) bits,
-                in(reg) MHCR_BRANCH_PREDICTOR,
-            );
+mod guard {
+    use super::MHCR_BRANCH_PREDICTOR;
+
+    /// Turns the branch predictor off. [`Drop`] sets the bits that were set before.
+    pub(crate) struct DisabledBranchPredictor(u32);
+
+    impl DisabledBranchPredictor {
+        /// Turns the branch predictor off.
+        #[inline(always)]
+        pub(crate) fn new() -> Self {
+            let bits: u32;
+            unsafe {
+                core::arch::asm!(
+                    "csrrc {0}, 0x7c1, {1}",
+                    "fence iorw, iorw",
+                    out(reg) bits,
+                    in(reg) MHCR_BRANCH_PREDICTOR,
+                );
+            }
+            Self(bits & MHCR_BRANCH_PREDICTOR)
         }
-        Self(bits & MHCR_BRANCH_PREDICTOR)
     }
-}
 
-#[cfg(any(feature = "unstable", all(multi_core, feature = "rt")))]
-impl Drop for DisabledBranchPredictor {
-    #[inline(always)]
-    fn drop(&mut self) {
-        unsafe {
-            core::arch::asm!(
-                "fence iorw, iorw",
-                "csrs 0x7c1, {0}",
-                in(reg) self.0,
-            );
+    impl Drop for DisabledBranchPredictor {
+        #[inline(always)]
+        fn drop(&mut self) {
+            unsafe {
+                core::arch::asm!(
+                    "fence iorw, iorw",
+                    "csrs 0x7c1, {0}",
+                    in(reg) self.0,
+                );
+            }
         }
     }
 }
