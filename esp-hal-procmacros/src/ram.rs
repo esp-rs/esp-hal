@@ -693,9 +693,8 @@ mod tests {
         );
     }
 
-    #[cfg(not(feature = "uncached"))]
     #[test]
-    fn test_uncached_unavailable() {
+    fn test_uncached_availablility() {
         let result = ram(
             quote::quote! {
                 unstable(uncached)
@@ -707,37 +706,18 @@ mod tests {
             .into(),
         );
 
-        assert_eq!(
-            result.to_string(),
-            quote::quote! {
-                ::core::compile_error!{ "uncached is not available for this target" }
-            }
-            .to_string()
-        );
-    }
-
-    #[cfg(feature = "uncached")]
-    #[test]
-    fn test_uncached_data() {
-        let result = ram(
-            quote::quote! {
-                unstable(uncached)
-            }
-            .into(),
-            quote::quote! {
-                static mut FOO: [u8; 4] = [1, 2, 3, 4];
-            }
-            .into(),
-        );
-
-        assert_eq!(
-            result.to_string(),
-            quote::quote! {
+        let expectation = cfg_select! {
+            feature = "uncached" => quote::quote! {
                 #[unsafe(link_section = ".uncached.data")]
-                static mut FOO: [u8; 4] = [1, 2, 3, 4];
-            }
-            .to_string()
-        );
+                static mut FOO: [u8; 4] = [0; 4];
+            },
+            _ => quote::quote! {
+                ::core::compile_error!{ "uncached is not available for this target" }
+            },
+        };
+
+        #[cfg(not(feature = "uncached"))]
+        assert_eq!(result.to_string(), expectation.to_string());
     }
 
     #[cfg(feature = "uncached")]
