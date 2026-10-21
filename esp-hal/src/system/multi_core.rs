@@ -3,7 +3,7 @@
 use core::{
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
-    sync::atomic::{AtomicPtr, Ordering},
+    sync::atomic::{AtomicBool, AtomicPtr, Ordering},
 };
 
 #[instability::unstable]
@@ -193,8 +193,8 @@ impl<'d> CpuControl<'d> {
 
     /// Starts the APP (second) core.
     ///
-    /// The second core starts running the closure `entry`. If the closure exits, the core is
-    /// parked.
+    /// The second core starts running the closure `entry`. The core enables interrupts before
+    /// `entry` runs. If the closure exits, the core is parked.
     ///
     /// Dropping the returned guard will park the core.
     #[instability::unstable]
@@ -224,8 +224,8 @@ impl<'d> CpuControl<'d> {
 
     /// Starts the APP (second) core.
     ///
-    /// The second core starts running the closure `entry`. If the closure exits, the core is
-    /// parked.
+    /// The second core starts running the closure `entry`. The core enables interrupts before
+    /// `entry` runs. If the closure exits, the core is parked.
     ///
     /// Dropping the returned guard will park the core.
     #[instability::unstable]
@@ -245,6 +245,7 @@ impl<'d> CpuControl<'d> {
 
         setup_second_core_stack(stack, stack_guard_offset, entry);
 
+        APP_CORE_TAKES_IPC.store(false, Ordering::Release);
         crate::soc::cpu_control::start_core1(start_core1_init::<F> as *const u32);
 
         self.unpark_core(Cpu::AppCpu);
@@ -358,6 +359,8 @@ where
     // Do not call setup_interrupts as that would disable peripheral interrupts, too.
     unsafe { crate::interrupt::init_vectoring() };
 
+    enable_app_core_interrupts();
+
     // Trampoline to run from the new stack.
     // start_core1_run should _NEVER_ be inlined
     // as we rely on the function call to use
@@ -431,5 +434,24 @@ where
         crate::interrupt::ipc::install_app();
     }
 
+    enable_app_core_interrupts();
+
     unsafe { CpuControl::start_core1_run::<F>() }
+}
+
+fn enable_app_core_interrupts() {
+    unsafe {
+        crate::interrupt::RunLevel::change(crate::interrupt::RunLevel::ThreadMode);
+        #[cfg(riscv)]
+        core::arch::asm!("csrsi mstatus, 8", options(nomem, nostack));
+    }
+    APP_CORE_TAKES_IPC.store(true, Ordering::Release);
+}
+
+static APP_CORE_TAKES_IPC: AtomicBool = AtomicBool::new(false);
+
+/// Returns `true` if [`CpuControl`] started the APP core in this boot. That core takes IPC
+/// interrupts unless it masks them.
+pub(crate) fn app_core_takes_ipc() -> bool {
+    APP_CORE_TAKES_IPC.load(Ordering::Acquire)
 }

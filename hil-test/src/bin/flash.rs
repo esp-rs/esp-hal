@@ -335,6 +335,49 @@ mod tests {
 
     #[cfg(multi_core)]
     #[test]
+    fn test_auto_park_other_core_in_cas_loop() {
+        use core::sync::atomic::{AtomicU32, Ordering};
+
+        use esp_hal::system::{CpuControl, Stack};
+        use hil_test::mk_static;
+
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, || {
+                loop {
+                    let mut current = COUNTER.load(Ordering::Relaxed);
+                    while let Err(actual) = COUNTER.compare_exchange_weak(
+                        current,
+                        current.wrapping_add(1),
+                        Ordering::AcqRel,
+                        Ordering::Relaxed,
+                    ) {
+                        current = actual;
+                    }
+                }
+            })
+            .unwrap();
+
+        while COUNTER.load(Ordering::Relaxed) == 0 {}
+
+        let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
+        let mut words = [0u32; 64];
+
+        for _ in 0..1000 {
+            flash.read(APP_DESC_OFFSET, &mut words).unwrap();
+            assert_eq!(as_bytes(&words), expected_app_desc());
+        }
+
+        let before = COUNTER.load(Ordering::Relaxed);
+        while COUNTER.load(Ordering::Relaxed) == before {}
+    }
+
+    #[cfg(multi_core)]
+    #[test]
     fn test_error_if_other_core_running() {
         use core::sync::atomic::{AtomicBool, Ordering};
 
