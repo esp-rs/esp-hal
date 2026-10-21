@@ -539,6 +539,13 @@ fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
+// BLE_LP_RC_SLOW_CLK
+
+fn enable_ble_lp_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // Nothing to do, divisor and gate are configured in BLE_LP_CLK
+    // (see modem_clock_select_lp_clock_source() in modem_clock.c).
+}
+
 // BLE_LP_CLK
 
 fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -554,7 +561,10 @@ fn configure_ble_lp_clk_impl(
 ) {
     let divisor = match new_config {
         BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
-        _ => 0,
+        // Divided by 5 (div_num = 4), see esp_bt_rtc_slow_clk_select() in esp32c6/bt.c.
+        BleLpClkConfig::RcSlow => rc_slow_clk_frequency() / ble_lp_rc_slow_clk_frequency() - 1,
+        #[cfg(use_xtal32k)]
+        BleLpClkConfig::Xtal32k => 0,
     };
     let sel_xtal32k = cfg_select! {
         use_xtal32k => new_config == BleLpClkConfig::Xtal32k,

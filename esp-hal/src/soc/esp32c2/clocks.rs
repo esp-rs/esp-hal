@@ -691,6 +691,11 @@ fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // The divide-by-5 crystal input has no clock gate.
 }
 
+fn enable_ble_lp_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+    // The divide-by-5 RC_SLOW input has no clock gate
+    // (see esp_bt_rtc_slow_clk_select() and ble_rtc_clk_init() in bt.c).
+}
+
 fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 
 fn configure_ble_lp_clk_impl(

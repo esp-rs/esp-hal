@@ -1819,6 +1819,12 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // BLE_LP_RC_SLOW_CLK
+///
+/// fn enable_ble_lp_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
+///     todo!()
+/// }
+///
 /// // BLE_LP_CLK
 ///
 /// fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -2284,7 +2290,7 @@ macro_rules! define_clock_tree_types {
         pub enum BleLpClkConfig {
             /// Selects `BLE_LP_XTAL_CLK`.
             Xtal,
-            /// Selects `RC_SLOW_CLK`.
+            /// Selects `BLE_LP_RC_SLOW_CLK`.
             RcSlow,
             #[cfg(use_xtal32k)]
             /// Selects `XTAL32K_CLK`.
@@ -3210,12 +3216,16 @@ macro_rules! define_clock_tree_types {
         pub fn ble_lp_xtal_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
             xtal_clk_root_source(clocks)
         }
+        /// Returns the clock source that `BLE_LP_RC_SLOW_CLK` currently runs on.
+        pub fn ble_lp_rc_slow_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            rc_slow_clk_root_source(clocks)
+        }
         /// Returns the clock source that `BLE_LP_CLK` currently runs on.
         pub fn ble_lp_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
             let config = clocks.ble_lp_clk?;
             match config {
                 BleLpClkConfig::Xtal => ble_lp_xtal_clk_root_source(clocks),
-                BleLpClkConfig::RcSlow => rc_slow_clk_root_source(clocks),
+                BleLpClkConfig::RcSlow => ble_lp_rc_slow_clk_root_source(clocks),
                 #[cfg(use_xtal32k)]
                 BleLpClkConfig::Xtal32k => xtal32k_clk_root_source(clocks),
             }
@@ -3947,13 +3957,31 @@ macro_rules! define_clock_tree_types {
         pub fn ble_lp_xtal_clk_source_frequency() -> u32 {
             xtal_clk_frequency()
         }
+        pub fn request_ble_lp_rc_slow_clk(clocks: &mut ClockTree) {
+            trace!("Requesting BLE_LP_RC_SLOW_CLK");
+            trace!("Enabling BLE_LP_RC_SLOW_CLK");
+            request_rc_slow_clk(clocks);
+            enable_ble_lp_rc_slow_clk_impl(clocks, true);
+        }
+        pub fn release_ble_lp_rc_slow_clk(clocks: &mut ClockTree) {
+            trace!("Releasing BLE_LP_RC_SLOW_CLK");
+            trace!("Disabling BLE_LP_RC_SLOW_CLK");
+            enable_ble_lp_rc_slow_clk_impl(clocks, false);
+            release_rc_slow_clk(clocks);
+        }
+        pub fn ble_lp_rc_slow_clk_frequency() -> u32 {
+            (rc_slow_clk_frequency() / 5)
+        }
+        pub fn ble_lp_rc_slow_clk_source_frequency() -> u32 {
+            rc_slow_clk_frequency()
+        }
         pub fn configure_ble_lp_clk(clocks: &mut ClockTree, new_selector: BleLpClkConfig) {
             let old_selector = clocks.ble_lp_clk.replace(new_selector);
             refresh_ble_lp_clk_downstream(clocks);
             if clocks.ble_lp_clk_refcount > 0 {
                 match new_selector {
                     BleLpClkConfig::Xtal => request_ble_lp_xtal_clk(clocks),
-                    BleLpClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                    BleLpClkConfig::RcSlow => request_ble_lp_rc_slow_clk(clocks),
                     #[cfg(use_xtal32k)]
                     BleLpClkConfig::Xtal32k => request_xtal32k_clk(clocks),
                 }
@@ -3961,7 +3989,7 @@ macro_rules! define_clock_tree_types {
                 if let Some(old_selector) = old_selector {
                     match old_selector {
                         BleLpClkConfig::Xtal => release_ble_lp_xtal_clk(clocks),
-                        BleLpClkConfig::RcSlow => release_rc_slow_clk(clocks),
+                        BleLpClkConfig::RcSlow => release_ble_lp_rc_slow_clk(clocks),
                         #[cfg(use_xtal32k)]
                         BleLpClkConfig::Xtal32k => release_xtal32k_clk(clocks),
                     }
@@ -3979,7 +4007,7 @@ macro_rules! define_clock_tree_types {
                 trace!("Enabling BLE_LP_CLK");
                 match unwrap!(clocks.ble_lp_clk) {
                     BleLpClkConfig::Xtal => request_ble_lp_xtal_clk(clocks),
-                    BleLpClkConfig::RcSlow => request_rc_slow_clk(clocks),
+                    BleLpClkConfig::RcSlow => request_ble_lp_rc_slow_clk(clocks),
                     #[cfg(use_xtal32k)]
                     BleLpClkConfig::Xtal32k => request_xtal32k_clk(clocks),
                 }
@@ -3993,7 +4021,7 @@ macro_rules! define_clock_tree_types {
                 enable_ble_lp_clk_impl(clocks, false);
                 match unwrap!(clocks.ble_lp_clk) {
                     BleLpClkConfig::Xtal => release_ble_lp_xtal_clk(clocks),
-                    BleLpClkConfig::RcSlow => release_rc_slow_clk(clocks),
+                    BleLpClkConfig::RcSlow => release_ble_lp_rc_slow_clk(clocks),
                     #[cfg(use_xtal32k)]
                     BleLpClkConfig::Xtal32k => release_xtal32k_clk(clocks),
                 }
@@ -4003,7 +4031,7 @@ macro_rules! define_clock_tree_types {
         pub fn ble_lp_clk_config_frequency(clocks: &mut ClockTree, config: BleLpClkConfig) -> u32 {
             match config {
                 BleLpClkConfig::Xtal => ble_lp_xtal_clk_frequency(),
-                BleLpClkConfig::RcSlow => rc_slow_clk_frequency(),
+                BleLpClkConfig::RcSlow => ble_lp_rc_slow_clk_frequency(),
                 #[cfg(use_xtal32k)]
                 BleLpClkConfig::Xtal32k => xtal32k_clk_frequency(),
             }
@@ -4014,7 +4042,7 @@ macro_rules! define_clock_tree_types {
         pub fn ble_lp_clk_source_frequency(source: BleLpClkConfig) -> u32 {
             match source {
                 BleLpClkConfig::Xtal => ble_lp_xtal_clk_frequency(),
-                BleLpClkConfig::RcSlow => rc_slow_clk_frequency(),
+                BleLpClkConfig::RcSlow => ble_lp_rc_slow_clk_frequency(),
                 #[cfg(use_xtal32k)]
                 BleLpClkConfig::Xtal32k => xtal32k_clk_frequency(),
             }
