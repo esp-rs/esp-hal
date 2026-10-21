@@ -103,19 +103,19 @@ macro_rules! define_operations {
                 ($op) => {
                     #[doc = concat!("# ", $first_line)]
                     $(#[doc = $lines])*
-                    #[cfg_attr(ecc_has_curve_sm2, doc = "\n# Panics\nPanics if SM2 is selected and disabled by eFuse.")]
                     #[doc = r"
 
 # Errors
 
-[`KeyLengthMismatch`] when the bitlength of the parameters is different from the bitlength of the prime fields of the curve."]
+[`OperationError::ParameterLengthMismatch`] if an input does not match the curve's size."]
+                    #[cfg_attr(ecc_has_curve_sm2, doc = "\n[`OperationError::UnsupportedCurve`] if SM2 is disabled by eFuse.")]
                     #[inline]
                     pub fn $function<'op>(
                         &'op mut self,
                         curve: EllipticCurve,
                         $(#[cfg($is_modular)] modulus: EccModBase,)?
                         $($input: &[u8],)*
-                    ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
+                    ) -> Result<EccResultHandle<'op, $op>, OperationError> {
                         curve.check_parameters([$($input),*])?;
 
                         paste::paste! {
@@ -151,12 +151,16 @@ macro_rules! define_operations {
                     #[doc = concat!("Configures a new ", $first_line, " operation with the given inputs, to be executed on [`EccBackend`].")]
                     ///
                     /// Outputs need to be assigned separately before executing the operation.
-                    #[cfg_attr(ecc_has_curve_sm2, doc = "\n# Panics\nPanics if SM2 is selected and disabled by eFuse.")]
+                    ///
+                    /// # Errors
+                    ///
+                    /// [`OperationError::ParameterLengthMismatch`] if an input does not match the curve's size.
+                    #[cfg_attr(ecc_has_curve_sm2, doc = "\n[`OperationError::UnsupportedCurve`] if SM2 is disabled by eFuse.")]
                     pub fn $function<'op>(
                         self,
                         $(#[cfg($is_modular)] modulus: EccModBase,)?
                         $($input: &'op [u8],)*
-                    ) -> Result<EccBackendOperation<'op, $op>, KeyLengthMismatch> {
+                    ) -> Result<EccBackendOperation<'op, $op>, OperationError> {
                         self.check_parameters([&$($input,)*])?;
 
                         #[cfg(ecc_has_modular_arithmetic)]
@@ -429,10 +433,6 @@ Only available on chip revision 1.2 and above."
     enhanced_security: bool,
 }
 
-/// The length of the arguments do not match the length required by the curve.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct KeyLengthMismatch;
-
 /// ECC operation error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationError {
@@ -441,6 +441,9 @@ pub enum OperationError {
 
     /// Point verification failed.
     PointNotOnCurve,
+
+    /// The selected curve is not supported.
+    UnsupportedCurve,
 }
 
 /// Modulus base.
@@ -452,12 +455,6 @@ pub enum EccModBase {
 
     /// Prime modulus.
     PrimeModulus = 1,
-}
-
-impl From<KeyLengthMismatch> for OperationError {
-    fn from(_: KeyLengthMismatch) -> Self {
-        OperationError::ParameterLengthMismatch
-    }
 }
 
 for_each_ecc_curve! {
@@ -500,16 +497,19 @@ for_each_ecc_curve! {
 for_each_ecc_working_mode! {
     (all $(($wm_id:literal, $op:tt)),*) => {
         impl EllipticCurve {
-            fn check_parameters<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
-                assert!(self.is_supported(), "SM2 is disabled by eFuse");
+            fn check_parameters<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), OperationError> {
+                if !self.is_supported() {
+                    return Err(OperationError::UnsupportedCurve);
+                }
+
                 self.size_check(params)
             }
 
-            fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
+            fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), OperationError> {
                 let bytes = self.size();
 
                 if params.iter().any(|p| p.len() != bytes) {
-                    return Err(KeyLengthMismatch);
+                    return Err(OperationError::ParameterLengthMismatch);
                 }
 
                 Ok(())
@@ -1249,8 +1249,8 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// # Errors
     ///
-    /// [`KeyLengthMismatch`] when `out` is not the correct size.
-    pub fn with_scalar_result(mut self, out: &'op mut [u8]) -> Result<Self, KeyLengthMismatch>
+    /// [`OperationError::ParameterLengthMismatch`] when `out` is not the correct size.
+    pub fn with_scalar_result(mut self, out: &'op mut [u8]) -> Result<Self, OperationError>
     where
         O: OperationReturnsScalar,
     {
@@ -1270,12 +1270,12 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// # Errors
     ///
-    /// [`KeyLengthMismatch`] when `x` or `y` are not the correct size.
+    /// [`OperationError::ParameterLengthMismatch`] when `x` or `y` are not the correct size.
     pub fn with_affine_point_result(
         mut self,
         px: &'op mut [u8],
         py: &'op mut [u8],
-    ) -> Result<Self, KeyLengthMismatch>
+    ) -> Result<Self, OperationError>
     where
         O: OperationReturnsAffinePoint,
     {
@@ -1293,13 +1293,13 @@ impl<'op, O: EccOperation> EccBackendOperation<'op, O> {
     ///
     /// # Errors
     ///
-    /// [`KeyLengthMismatch`] when `x`, `y`, or `z` are not the correct size.
+    /// [`OperationError::ParameterLengthMismatch`] when `x`, `y`, or `z` are not the correct size.
     pub fn with_jacobian_point_result(
         mut self,
         qx: &'op mut [u8],
         qy: &'op mut [u8],
         qz: &'op mut [u8],
-    ) -> Result<Self, KeyLengthMismatch>
+    ) -> Result<Self, OperationError>
     where
         O: OperationReturnsJacobianPoint,
     {
