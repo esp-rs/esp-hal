@@ -5,17 +5,17 @@ gpio_function = 1
 # From gpio_pins.h: GPIO_MATRIX_CONST_ONE_INPUT = 0x40, GPIO_MATRIX_CONST_ZERO_INPUT = 0x60
 constant_0_input = 0x60
 constant_1_input = 0x40
-# GPIO0-5 double as LP_GPIO0-5, but ESP-IDF does not describe the LP IO MUX for this chip
-# yet, so the `lp` functions are left out until LP IO support is added.
+# GPIO0-5 double as LP_GPIO0-5 (`RTCIO_LL_GPIO_NUM_OFFSET = 0` and `RTCIO_LL_PIN_FUNC = 1` in
+# esp-idf `rtc_io_ll.h`).
 pins = [
     # Unlike the two-pad comparators of the other chips, any of these can be selected as one of the three comparison
     # channels or as the reference channel.
-    { pin =  0,                            analog = { 0 = "ZCD0" } },
-    { pin =  1,                            analog = { 0 = "ZCD1" } },
-    { pin =  2,                            analog = { 0 = "ZCD2" } },
-    { pin =  3,                            analog = { 0 = "ZCD3" } },
-    { pin =  4,                            analog = { 0 = "XTAL_32K_N" } },
-    { pin =  5,                            analog = { 0 = "XTAL_32K_P" } },
+    { pin =  0,                            analog = { 0 = "ZCD0" },       lp = { 1 = "LP_GPIO0" } },
+    { pin =  1,                            analog = { 0 = "ZCD1" },       lp = { 1 = "LP_GPIO1" } },
+    { pin =  2,                            analog = { 0 = "ZCD2" },       lp = { 1 = "LP_GPIO2" } },
+    { pin =  3,                            analog = { 0 = "ZCD3" },       lp = { 1 = "LP_GPIO3" } },
+    { pin =  4,                            analog = { 0 = "XTAL_32K_N" }, lp = { 1 = "LP_GPIO4" } },
+    { pin =  5,                            analog = { 0 = "XTAL_32K_P" }, lp = { 1 = "LP_GPIO5" } },
     { pin =  6,                                                            limitations = ["spi_flash"] }, # SPICS1
     { pin =  7,                                                            limitations = ["spi_flash"] }, # SPICS0
     { pin =  8,                                                            limitations = ["spi_flash"] }, # SPIQ

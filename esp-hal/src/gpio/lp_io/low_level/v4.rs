@@ -7,7 +7,7 @@ cfg_select! {
     esp32c6 => {
         use crate::peripherals::{LP_IO as LP_GPIO, LP_IO as LP_IO_MUX};
     }
-    any(esp32c5, esp32c61) => {
+    any(esp32c5, esp32c61, esp32h4) => {
         // Only a low-power peripheral or a low-power core reads and drives the pads.
         #[cfg(any(
             ulp_riscv_driver_supported,
@@ -43,17 +43,25 @@ pub(crate) fn is_pad_held(lp: u8) -> bool {
 
 /// Takes or releases the hold of the pad of `gpio`.
 pub(crate) fn digital_pad_hold(gpio: u8, enable: bool) {
-    let mask = 1 << gpio;
-    LP_AON::regs().gpio_hold0().modify(|r, w| unsafe {
-        let bits = r.gpio_hold0().bits();
-        w.gpio_hold0()
-            .bits(if enable { bits | mask } else { bits & !mask })
-    });
+    let update = |bits: u32, mask: u32| if enable { bits | mask } else { bits & !mask };
+    if gpio < 32 {
+        LP_AON::regs()
+            .gpio_hold0()
+            .modify(|r, w| unsafe { w.bits(update(r.bits(), 1 << gpio)) });
+    } else {
+        LP_AON::regs()
+            .gpio_hold1()
+            .modify(|r, w| unsafe { w.bits(update(r.bits(), 1 << (gpio - 32))) });
+    }
 }
 
 /// Returns whether something holds the pad of `gpio`.
 pub(crate) fn is_digital_pad_held(gpio: u8) -> bool {
-    LP_AON::regs().gpio_hold0().read().gpio_hold0().bits() & (1 << gpio) != 0
+    if gpio < 32 {
+        LP_AON::regs().gpio_hold0().read().bits() & (1 << gpio) != 0
+    } else {
+        LP_AON::regs().gpio_hold1().read().bits() & (1 << (gpio - 32)) != 0
+    }
 }
 
 pub(crate) fn set_config(lp: u8, input_enable: bool, mux: bool, func: LpFunction) {

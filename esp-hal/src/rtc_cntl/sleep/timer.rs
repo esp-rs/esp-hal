@@ -54,6 +54,7 @@ pub(crate) fn clear_deadline() {
 /// is readable on every chip, also where the alarm enable beside it is not readable. Only a caller
 /// that finds the timer source enabled calls this function, so the target always comes from this
 /// run.
+#[cfg(sleep_deep_sleep)]
 pub(crate) fn deadline_missed() -> bool {
     target_ticks() < crate::rtc_cntl::time_since_boot_raw() + ALARM_TO_SLEEP_TICKS
 }
@@ -151,7 +152,7 @@ fn target_ticks() -> u64 {
     let regs = RTC_TIMER::regs();
 
     let (low, high) = cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => (
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32h4, esp32p4, esp32s31) => (
             regs.tar0_low().read().main_timer_tar_low0().bits(),
             regs.tar0_high().read().main_timer_tar_high0().bits(),
         ),
@@ -183,7 +184,7 @@ fn arm(ticks: u64) {
     let regs = RTC_TIMER::regs();
 
     cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => {
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32h4, esp32p4, esp32s31) => {
             regs.int_clr().write(|w| w.soc_wakeup().clear_bit_by_one());
             regs.tar0_low()
                 .write(|w| unsafe { w.main_timer_tar_low0().bits(low) });
@@ -208,7 +209,7 @@ fn disarm() {
     let regs = RTC_TIMER::regs();
 
     cfg_select! {
-        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32p4, esp32s31) => {
+        any(esp32c5, esp32c6, esp32c61, esp32h2, esp32h4, esp32p4, esp32s31) => {
             regs.tar0_high()
                 .modify(|_, w| w.main_timer_tar_en0().clear_bit());
             regs.int_clr().write(|w| w.soc_wakeup().clear_bit_by_one());
