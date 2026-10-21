@@ -385,12 +385,6 @@ macro_rules! property {
     ("adc.pcr_clock") => {
         true
     };
-    ("adc.pll_clock_sel") => {
-        1
-    };
-    ("adc.pll_clock_sel", str) => {
-        stringify!(1)
-    };
     ("adc.pcr_sar_clk_div") => {
         false
     };
@@ -755,6 +749,11 @@ macro_rules! property {
         [crate ::soc::clocks::SpiFunctionClockConfig::PllF80m, crate
         ::soc::clocks::SpiFunctionClockConfig::Xtal, crate
         ::soc::clocks::SpiFunctionClockConfig::RcFast]
+    };
+    ("clock_tree.adc.function_clock") => {
+        [crate ::soc::clocks::AdcFunctionClockConfig::Xtal, crate
+        ::soc::clocks::AdcFunctionClockConfig::PllF80m, crate
+        ::soc::clocks::AdcFunctionClockConfig::RcFast]
     };
 }
 #[macro_export]
@@ -1705,6 +1704,22 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// impl AdcInstance {
+///     // ADC_FUNCTION_CLOCK
+///
+///     fn enable_function_clock_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+///
+///     fn configure_function_clock_impl(
+///         self,
+///         _clocks: &mut ClockTree,
+///         _old_config: Option<AdcFunctionClockConfig>,
+///         _new_config: AdcFunctionClockConfig,
+///     ) {
+///         todo!()
+///     }
+/// }
 /// impl SdmInstance {
 ///     // SDM_FUNCTION_CLOCK
 ///
@@ -1934,6 +1949,11 @@ macro_rules! for_each_sw_interrupt {
 /// ```
 macro_rules! define_clock_tree_types {
     () => {
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum AdcInstance {
+            ApbSaradc = 0,
+        }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum SdmInstance {
@@ -2425,6 +2445,18 @@ macro_rules! define_clock_tree_types {
             /// Selects `XTAL32K_CLK`.
             Xtal32kClk,
         }
+        /// The list of clock signals that the `APB_SARADC_FUNCTION_CLOCK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum AdcFunctionClockConfig {
+            /// Selects `XTAL_CLK`.
+            Xtal,
+            #[default]
+            /// Selects `PLL_F80M`.
+            PllF80m,
+            /// Selects `RC_FAST_CLK`.
+            RcFast,
+        }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum I2cFunctionClockSclk {
@@ -2727,6 +2759,7 @@ macro_rules! define_clock_tree_types {
             lp_slow_clk: Option<LpSlowClkConfig>,
             ble_lp_clk: Option<BleLpClkConfig>,
             timg_calibration_clock: Option<TimgCalibrationClockConfig>,
+            adc_function_clock: [Option<AdcFunctionClockConfig>; 1],
             i2c_function_clock: [Option<I2cFunctionClockConfig>; 1],
             i2s_tx_clk: [Option<I2sClkConfig>; 1],
             i2s_rx_clk: [Option<I2sClkConfig>; 1],
@@ -2757,6 +2790,7 @@ macro_rules! define_clock_tree_types {
             lp_fast_clk_refcount: u32,
             ble_lp_clk_refcount: u32,
             timg_calibration_clock_refcount: u32,
+            adc_function_clock_refcount: [u32; 1],
             sdm_function_clock_refcount: [u32; 1],
             i2c_function_clock_refcount: [u32; 1],
             i2s_tx_clk_refcount: [u32; 1],
@@ -2854,6 +2888,10 @@ macro_rules! define_clock_tree_types {
             pub fn timg_calibration_clock(&self) -> Option<TimgCalibrationClockConfig> {
                 self.timg_calibration_clock
             }
+            /// Returns the current configuration of the APB_SARADC_FUNCTION_CLOCK clock tree node
+            pub fn apb_saradc_function_clock(&self) -> Option<AdcFunctionClockConfig> {
+                self.adc_function_clock[AdcInstance::ApbSaradc as usize]
+            }
             /// Returns the current configuration of the I2C0_FUNCTION_CLOCK clock tree node
             pub fn i2c0_function_clock(&self) -> Option<I2cFunctionClockConfig> {
                 self.i2c_function_clock[I2cInstance::I2c0 as usize]
@@ -2948,6 +2986,7 @@ macro_rules! define_clock_tree_types {
                 lp_slow_clk: None,
                 ble_lp_clk: None,
                 timg_calibration_clock: None,
+                adc_function_clock: [None; 1],
                 i2c_function_clock: [None; 1],
                 i2s_tx_clk: [None; 1],
                 i2s_rx_clk: [None; 1],
@@ -2978,6 +3017,7 @@ macro_rules! define_clock_tree_types {
                 lp_fast_clk_refcount: 0,
                 ble_lp_clk_refcount: 0,
                 timg_calibration_clock_refcount: 0,
+                adc_function_clock_refcount: [0; 1],
                 sdm_function_clock_refcount: [0; 1],
                 i2c_function_clock_refcount: [0; 1],
                 i2s_tx_clk_refcount: [0; 1],
@@ -3010,6 +3050,8 @@ macro_rules! define_clock_tree_types {
             ::core::sync::atomic::AtomicU32::new(0);
         static TIMG_CALIBRATION_CLOCK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
+        static ADC_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
+            [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static I2C_FUNCTION_CLOCK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
             [const { ::core::sync::atomic::AtomicU32::new(0) }; 1];
         static I2S_TX_CLK_FREQ_CACHE: [::core::sync::atomic::AtomicU32; 1] =
@@ -4388,6 +4430,87 @@ macro_rules! define_clock_tree_types {
                 TimgCalibrationClockConfig::Xtal32kClk => xtal32k_clk_frequency(),
             }
         }
+        impl AdcInstance {
+            pub fn configure_function_clock(
+                self,
+                clocks: &mut ClockTree,
+                new_selector: AdcFunctionClockConfig,
+            ) {
+                let old_selector = clocks.adc_function_clock[self as usize].replace(new_selector);
+                refresh_adc_function_clock_downstream(clocks, self);
+                if clocks.adc_function_clock_refcount[self as usize] > 0 {
+                    match new_selector {
+                        AdcFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        AdcFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                        AdcFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
+                    }
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                    if let Some(old_selector) = old_selector {
+                        match old_selector {
+                            AdcFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                            AdcFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                            AdcFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
+                        }
+                    }
+                } else {
+                    self.configure_function_clock_impl(clocks, old_selector, new_selector);
+                }
+            }
+            pub fn function_clock_config(
+                self,
+                clocks: &mut ClockTree,
+            ) -> Option<AdcFunctionClockConfig> {
+                clocks.adc_function_clock[self as usize]
+            }
+            pub fn request_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::FUNCTION_CLOCK", self);
+                if increment_reference_count(&mut clocks.adc_function_clock_refcount[self as usize])
+                {
+                    trace!("Enabling {:?}::FUNCTION_CLOCK", self);
+                    match unwrap!(clocks.adc_function_clock[self as usize]) {
+                        AdcFunctionClockConfig::Xtal => request_xtal_clk(clocks),
+                        AdcFunctionClockConfig::PllF80m => request_pll_f80m(clocks),
+                        AdcFunctionClockConfig::RcFast => request_rc_fast_clk(clocks),
+                    }
+                    self.enable_function_clock_impl(clocks, true);
+                }
+            }
+            pub fn release_function_clock(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::FUNCTION_CLOCK", self);
+                if decrement_reference_count(&mut clocks.adc_function_clock_refcount[self as usize])
+                {
+                    trace!("Disabling {:?}::FUNCTION_CLOCK", self);
+                    self.enable_function_clock_impl(clocks, false);
+                    match unwrap!(clocks.adc_function_clock[self as usize]) {
+                        AdcFunctionClockConfig::Xtal => release_xtal_clk(clocks),
+                        AdcFunctionClockConfig::PllF80m => release_pll_f80m(clocks),
+                        AdcFunctionClockConfig::RcFast => release_rc_fast_clk(clocks),
+                    }
+                }
+            }
+            #[allow(unused_variables)]
+            pub fn function_clock_config_frequency(
+                clocks: &mut ClockTree,
+                config: AdcFunctionClockConfig,
+            ) -> u32 {
+                match config {
+                    AdcFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    AdcFunctionClockConfig::PllF80m => pll_f80m_frequency(),
+                    AdcFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
+                }
+            }
+            pub fn function_clock_frequency(self) -> u32 {
+                ADC_FUNCTION_CLOCK_FREQ_CACHE[self as usize]
+                    .load(::core::sync::atomic::Ordering::Acquire)
+            }
+            pub fn function_clock_source_frequency(source: AdcFunctionClockConfig) -> u32 {
+                match source {
+                    AdcFunctionClockConfig::Xtal => xtal_clk_frequency(),
+                    AdcFunctionClockConfig::PllF80m => pll_f80m_frequency(),
+                    AdcFunctionClockConfig::RcFast => rc_fast_clk_frequency(),
+                }
+            }
+        }
         impl SdmInstance {
             pub fn request_function_clock(self, clocks: &mut ClockTree) {
                 trace!("Requesting {:?}::FUNCTION_CLOCK", self);
@@ -5546,6 +5669,9 @@ macro_rules! define_clock_tree_types {
             refresh_ledc_sclk_downstream(clocks);
             refresh_lp_fast_clk_downstream(clocks);
             refresh_ble_lp_clk_downstream(clocks);
+            for child_instance in [AdcInstance::ApbSaradc] {
+                refresh_adc_function_clock_downstream(clocks, child_instance);
+            }
             for child_instance in [I2cInstance::I2c0] {
                 refresh_i2c_function_clock_downstream(clocks, child_instance);
             }
@@ -5583,6 +5709,9 @@ macro_rules! define_clock_tree_types {
             refresh_ledc_sclk_downstream(clocks);
             refresh_lp_fast_clk_downstream(clocks);
             refresh_timg_calibration_clock_downstream(clocks);
+            for child_instance in [AdcInstance::ApbSaradc] {
+                refresh_adc_function_clock_downstream(clocks, child_instance);
+            }
             for child_instance in [I2cInstance::I2c0] {
                 refresh_i2c_function_clock_downstream(clocks, child_instance);
             }
@@ -5668,6 +5797,14 @@ macro_rules! define_clock_tree_types {
             if let Some(config) = clocks.timg_calibration_clock {
                 TIMG_CALIBRATION_CLOCK_FREQ_CACHE.store(
                     timg_calibration_clock_config_frequency(clocks, config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_adc_function_clock_downstream(clocks: &mut ClockTree, instance: AdcInstance) {
+            if let Some(config) = clocks.adc_function_clock[instance as usize] {
+                ADC_FUNCTION_CLOCK_FREQ_CACHE[instance as usize].store(
+                    AdcInstance::function_clock_config_frequency(clocks, config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }

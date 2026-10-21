@@ -593,6 +593,19 @@ fn configure_timg_calibration_clock_impl(
     });
 }
 
+impl AdcInstance {
+    // ADC_FUNCTION_CLOCK
+
+    fn enable_function_clock_impl(self, _clocks: &mut ClockTree, en: bool) {
+        crate::peripherals::APB_SARADC::regs()
+            .clkm_conf()
+            .modify(|_, w| unsafe {
+                w.clk_en().bit(en);
+                w.clk_sel().bits(if en { 2 } else { 0 })
+            });
+    }
+}
+
 impl SdmInstance {
     // SDM_FUNCTION_CLOCK
 

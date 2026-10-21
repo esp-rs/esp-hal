@@ -109,36 +109,23 @@ fn init_hardware() {
 
     let (div_num, div_b, div_a) = DIV;
 
-    // The ESP32-C2 and ESP32-C3 keep the divider in the ADC itself, and only support APB as the
-    // source. The other chips take the PLL output via the PCR - 80 MHz, or 96 MHz on the
-    // ESP32-H2.
+    // The ESP32-C2 and ESP32-C3 keep the divider in the ADC itself; the other chips configure
+    // it in PCR. See `adc_ll_digi_controller_clk_div`.
     #[cfg(not(adc_pcr_clock))]
     APB_SARADC::regs().clkm_conf().modify(|_, w| unsafe {
-        w.clk_sel().bits(2);
         w.clkm_div_num().bits(div_num);
         w.clkm_div_b().bits(div_b);
         w.clkm_div_a().bits(div_a)
     });
 
     #[cfg(adc_pcr_clock)]
-    {
-        // The PLL is source 1 on the ESP32-C6 and ESP32-H2, but source 2 on the ESP32-C5 and
-        // ESP32-C61 - there, 1 selects the imprecise RC_FAST oscillator instead.
-        let pll: u8 = property!("adc.pll_clock_sel");
-
-        // The peripheral guard only enables the bus clock (`saradc_reg_clk_en`); the
-        // controller runs off a separate function clock that has to be enabled here.
-        // See `adc_ll_enable_func_clock`.
-        crate::peripherals::PCR::regs()
-            .saradc_clkm_conf()
-            .modify(|_, w| unsafe {
-                w.saradc_clkm_en().set_bit();
-                w.saradc_clkm_sel().bits(pll);
-                w.saradc_clkm_div_num().bits(div_num);
-                w.saradc_clkm_div_b().bits(div_b);
-                w.saradc_clkm_div_a().bits(div_a)
-            });
-    }
+    crate::peripherals::PCR::regs()
+        .saradc_clkm_conf()
+        .modify(|_, w| unsafe {
+            w.saradc_clkm_div_num().bits(div_num);
+            w.saradc_clkm_div_b().bits(div_b);
+            w.saradc_clkm_div_a().bits(div_a)
+        });
 
     APB_SARADC::regs().ctrl().modify(|_, w| unsafe {
         // Conversions are triggered through `onetime_start`, so the software start of the
@@ -160,27 +147,25 @@ fn init_hardware() {
         .modify(|_, w| unsafe { w.sar1_clk_div_num().bits(1) });
 }
 
-/// Keeps the PLL output that `init_hardware` selects as the controller clock running.
-///
-/// Nothing else necessarily requests that clock, and the bootloader may leave it gated.
 struct FunctionClockGuard;
 
 impl FunctionClockGuard {
     fn new() -> Self {
-        #[cfg(any(esp32c5, esp32c6, esp32c61))]
-        crate::clock::ll::ClockTree::with(crate::clock::ll::request_pll_f80m);
-        #[cfg(esp32h2)]
-        crate::clock::ll::ClockTree::with(crate::clock::ll::request_pll_f96m_clk);
+        crate::clock::ll::ClockTree::with(|clocks| {
+            #[cfg(soc_clock_node_adc_function_clock_is_configurable)]
+            crate::clock::ll::AdcInstance::ApbSaradc
+                .configure_function_clock(clocks, Default::default());
+            crate::clock::ll::AdcInstance::ApbSaradc.request_function_clock(clocks);
+        });
         Self
     }
 }
 
 impl Drop for FunctionClockGuard {
     fn drop(&mut self) {
-        #[cfg(any(esp32c5, esp32c6, esp32c61))]
-        crate::clock::ll::ClockTree::with(crate::clock::ll::release_pll_f80m);
-        #[cfg(esp32h2)]
-        crate::clock::ll::ClockTree::with(crate::clock::ll::release_pll_f96m_clk);
+        crate::clock::ll::ClockTree::with(|clocks| {
+            crate::clock::ll::AdcInstance::ApbSaradc.release_function_clock(clocks);
+        });
     }
 }
 
@@ -433,8 +418,8 @@ pub struct Adc<'d, ADCX, Dm: crate::DriverMode> {
     /// Hardware calibration code per attenuation, indexed by [`Attenuation`].
     init_codes: [u16; super::ATTENUATION_COUNT],
     active_channel: Option<u8>,
-    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     _clock: FunctionClockGuard,
+    _guard: GenericPeripheralGuard<{ Peripheral::ApbSarAdc as u8 }>,
     sar_power: SarPowerGuard,
     _phantom: PhantomData<(Dm, &'d mut ())>,
 }
