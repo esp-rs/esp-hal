@@ -66,14 +66,7 @@ mod tests {
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
-        #[allow(unused_mut)]
-        let mut rsa = Rsa::new(peripherals.RSA);
-
-        #[cfg(not(esp32))]
-        {
-            rsa.disable_constant_time(true);
-            rsa.search_acceleration(true);
-        }
+        let rsa = Rsa::new(peripherals.RSA, esp_hal::rsa::Config::default()).unwrap();
 
         Context { rsa }
     }
@@ -220,6 +213,46 @@ mod tests {
         mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
         mod_exp.read_results(&mut outbuf);
         hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+    }
+
+    #[test]
+    #[cfg(not(esp32))]
+    fn test_constant_time_off_speeds_up_exponentiation(mut ctx: Context<'static>) {
+        // 65537 has only two 1 bits, so with constant time off the block skips almost every
+        // multiply, and the two times differ the most. Both configurations keep the search off, the
+        // default, so only the constant time setting changes the time.
+        let constant_time = esp_hal::rsa::Config::default();
+        let accelerated = constant_time.with_constant_time(false);
+        let exponent = U512::from_u32(65537);
+        let r = compute_r(&BIGNUM_3);
+        let mprime = compute_mprime(&BIGNUM_3);
+        let exponentiation_us = |rsa: &mut Rsa<'static, Blocking>| {
+            let mut outbuf = [0_u32; U512::LIMBS];
+            let start = esp_hal::time::Instant::now();
+            let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
+                rsa,
+                exponent.as_words(),
+                BIGNUM_3.as_words(),
+                mprime,
+            );
+            mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
+            mod_exp.read_results(&mut outbuf);
+            start.elapsed().as_micros()
+        };
+
+        // An untimed run first, so that neither timed run pays for cache misses.
+        exponentiation_us(&mut ctx.rsa);
+        ctx.rsa.apply_config(&constant_time).unwrap();
+        let constant_time_us = exponentiation_us(&mut ctx.rsa);
+        ctx.rsa.apply_config(&accelerated).unwrap();
+        let accelerated_us = exponentiation_us(&mut ctx.rsa);
+
+        hil_test::assert!(
+            accelerated_us * 8 < constant_time_us,
+            "constant time {} us, accelerated {} us",
+            constant_time_us,
+            accelerated_us
+        );
     }
 
     #[test]
@@ -439,5 +472,44 @@ mod work_queue_tests {
         .wait_blocking();
 
         hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+    }
+
+    #[test]
+    #[cfg(not(esp32))]
+    fn test_rsa_work_queue_is_constant_time_by_default(mut ctx: Context<'static>) {
+        let _rsa = ctx.rsa.start();
+
+        // Sparse, for the reason in `test_constant_time_off_speeds_up_exponentiation`.
+        let exponent = U512::from_u32(65537);
+        let r = compute_r(&BIGNUM_3);
+        let mprime = compute_mprime(&BIGNUM_3);
+        let exponentiation_us = |rsa: &mut RsaContext| {
+            let mut outbuf = [0_u32; U512::LIMBS];
+            let start = esp_hal::time::Instant::now();
+            rsa.modular_exponentiate::<Op512>(
+                BIGNUM_1.as_words(),
+                exponent.as_words(),
+                BIGNUM_3.as_words(),
+                r.as_words(),
+                mprime,
+                &mut outbuf,
+            )
+            .wait_blocking();
+            start.elapsed().as_micros()
+        };
+
+        // An untimed run first, so that neither timed run pays for cache misses.
+        exponentiation_us(&mut RsaContext::new());
+        let constant_time_us = exponentiation_us(&mut RsaContext::new());
+        let mut accelerated = RsaContext::new();
+        accelerated.enable_acceleration();
+        let accelerated_us = exponentiation_us(&mut accelerated);
+
+        hil_test::assert!(
+            accelerated_us * 8 < constant_time_us,
+            "constant time {} us, accelerated {} us",
+            constant_time_us,
+            accelerated_us
+        );
     }
 }
