@@ -332,6 +332,7 @@ apb_cycle_wait_num = 16 # TODO
 [device.parl_io]
 support_status = "partial"
 version = 2
+max_data_width = 8
 
 [device.sleep]
 support_status = "partial"

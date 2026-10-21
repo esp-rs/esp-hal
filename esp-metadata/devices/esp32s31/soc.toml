@@ -534,7 +534,9 @@ has_rx_demodulation = true
 
 [device.parl_io]
 support_status = "not_supported"
-version = 1 # FIXME placeholder
+version = 2
+max_data_width = 16
+has_tx_cs = true
 
 [device.sdmmc]
 support_status = "partial"

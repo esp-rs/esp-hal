@@ -366,6 +366,7 @@ supports_top_power_down = true
 [device.parl_io]
 support_status = "partial"
 version = 1
+max_data_width = 16
 
 # Other drivers which are partially supported but have no other configuration:
 

@@ -595,8 +595,21 @@ driver_configs![
             driver: parl_io,
             name: "PARL_IO",
             properties: {
+                /// Register block.
+                ///
+                /// `1` uses `tx_cfg0` and `rx_cfg0`, stores a byte length, and shares one interrupt.
+                /// `2` uses separate data, clock, and general registers, stores a bit length, and
+                /// has separate TX and RX interrupts.
                 version: u32,
-                // TODO: model signal counts, RC CLK out capability, etc.
+                /// Number of data lines on the TX unit and on the RX unit.
+                ///
+                /// The driver accepts 8 and 16.
+                max_data_width: u32,
+                /// The TX unit has a dedicated chip-select output, `PARL_TX_CS`.
+                ///
+                /// When this is false, the most significant TX data line carries the valid signal.
+                #[serde(default)]
+                has_tx_cs: bool,
             }
         },
         RmtProperties {
