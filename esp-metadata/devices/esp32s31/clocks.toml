@@ -3,7 +3,7 @@ system_clocks = { clock_tree = [
     { name = "XTAL_CLK",    type = "source",  output = "40_000_000", always_on = true },
     { name = "BBPLL_CLK",   type = "derived", from = "XTAL_CLK", output = "480 * 1_000_000" },
     { name = "CPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "320 * 1_000_000" },
-    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", output = "500 * 1_000_000" },
+    { name = "MPLL_CLK",    type = "derived", from = "XTAL_CLK", values = "400, 500", output = "VALUE * 1_000_000" },
     { name = "RC_FAST_CLK", type = "source",                     output = "17_500_000", adjustable = "8_750_000..=26_250_000" },
 
     # Low-speed clocks
@@ -20,8 +20,9 @@ system_clocks = { clock_tree = [
     # Virtual clock node for peripherals that can be sourced from BBPLL but have a 160MHz max constraint.
     { name = "BBPLL_D3_CLOCK", type = "generic", output = "BBPLL_CLK / 3" },
 
-    { name = "PLL_F25M", type = "generic", output = "MPLL_CLK / 20" },
-    { name = "PLL_F50M", type = "generic", output = "MPLL_CLK / 10" },
+    # Their dividers follow the MPLL rate, see enable_mpll_clk_impl.
+    { name = "PLL_F25M", type = "derived", from = "MPLL_CLK", output = "25_000_000" },
+    { name = "PLL_F50M", type = "derived", from = "MPLL_CLK", output = "50_000_000" },
 
     # XTAL half
     { name = "XTAL_D2_CLK", type = "generic", output = "XTAL_CLK / 2" },

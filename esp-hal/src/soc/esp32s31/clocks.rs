@@ -14,7 +14,7 @@ use esp_rom_sys::rom::ets_update_cpu_frequency_rom;
 
 use crate::{
     peripherals::{HP_ALIVE_SYS, HP_SYS, HP_SYS_CLKRST, LP_AON_CLK_RST, MODEM_LPCON, PMU},
-    soc::xtal32k,
+    soc::{regi2c, xtal32k},
 };
 
 define_clock_tree_types!();
@@ -40,6 +40,7 @@ pub enum CpuClock {
 impl CpuClock {
     const PRESET_160: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
+        mpll_clk: Some(MpllClkConfig::_400),
         cpu_clk: Some(CpuClkConfig::new(1)),
         mem_clk: Some(MemClkConfig::new(0)), // Max 160 MHz
         sys_clk: Some(SysClkConfig::new(1)), // Max ~320/3 MHz
@@ -56,6 +57,7 @@ impl CpuClock {
     };
     const PRESET_240: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::PllF240m),
+        mpll_clk: Some(MpllClkConfig::_400),
         cpu_clk: Some(CpuClkConfig::new(0)),
         mem_clk: Some(MemClkConfig::new(1)), // Max 160 MHz
         sys_clk: Some(SysClkConfig::new(2)), // Max ~320/3 MHz
@@ -72,6 +74,7 @@ impl CpuClock {
     };
     const PRESET_320: ClockConfig = ClockConfig {
         cpu_root_clk: Some(CpuRootClkConfig::Cpll),
+        mpll_clk: Some(MpllClkConfig::_400),
         cpu_clk: Some(CpuClkConfig::new(0)),
         mem_clk: Some(MemClkConfig::new(1)), // Max 160 MHz
         sys_clk: Some(SysClkConfig::new(2)), // Max ~320/3 MHz
@@ -241,16 +244,18 @@ fn enable_cpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
 
 // MPLL_CLK
 
-fn enable_mpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
-    if en {
+fn enable_mpll_clk_impl(clocks: &mut ClockTree, en: bool) {
+    let mpll_mhz = en.then(|| unwrap!(clocks.mpll_clk).value() / 1_000_000);
+    if let Some(mpll_mhz) = mpll_mhz {
         psram_phy_ldo_init();
 
+        // Keep PLL_F25M and PLL_F50M at 25 and 50 MHz.
         HP_SYS_CLKRST::regs()
             .ref_25m_ctrl0()
-            .modify(|_, w| unsafe { w.clk_div_num().bits(19) });
+            .modify(|_, w| unsafe { w.clk_div_num().bits((mpll_mhz / 25 - 1) as u8) });
         HP_SYS_CLKRST::regs()
             .ref_50m_ctrl0()
-            .modify(|_, w| unsafe { w.clk_div_num().bits(9) });
+            .modify(|_, w| unsafe { w.clk_div_num().bits((mpll_mhz / 50 - 1) as u8) });
 
         // Clock source of 25/50MHz dividers.
         HP_SYS_CLKRST::regs()
@@ -277,6 +282,56 @@ fn enable_mpll_clk_impl(_clocks: &mut ClockTree, en: bool) {
         w.hp_active_xpd_mpll().bit(en);
         w.hp_active_xpd_mpll_i2c().bit(en)
     });
+
+    if let Some(mpll_mhz) = mpll_mhz {
+        set_mpll_frequency(mpll_mhz);
+    }
+}
+
+/// Programs the MPLL to `mpll_mhz` and waits for its calibration to end.
+///
+/// MPLL = XTAL * (fb_div + 1) / (ref_div + 1), with ref_div 1.
+///
+/// Ref: [IDF `clk_ll_mpll_set_config` (esp32s31)](https://github.com/espressif/esp-idf/blob/27506a49bc919926f546e325d5f5334ba23db316/components/esp_hal_clock/esp32s31/include/hal/clk_tree_ll.h#L527-L545)
+fn set_mpll_frequency(mpll_mhz: u32) {
+    // Analog settings IDF writes before each calibration.
+    regi2c::I2C_MPLL_IR_CAL_EXT_CAP.write_field(3);
+    regi2c::I2C_MPLL_IR_CAL_ENX_CAP.write_field(1);
+    LP_AON_CLK_RST::regs()
+        .mspi_div()
+        .modify(|_, w| unsafe { w.mspi_fb_div().bits(9) });
+    regi2c::I2C_MPLL_DHREF.write_field(3);
+    regi2c::I2C_MPLL_IR_CAL_ENX_CAP.write_field(0);
+
+    // Calibration starts before the divider is written, and stops after the PLL reports that it
+    // ended.
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.mspi_cal_stop().clear_bit());
+    let ref_div = 1;
+    let fb_div = mpll_mhz * (ref_div + 1) / (xtal_clk_frequency() / 1_000_000) - 1;
+    LP_AON_CLK_RST::regs()
+        .mspi_div()
+        .modify(|_, w| unsafe { w.mspi_fb_div().bits(fb_div as u8) });
+    while HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .read()
+        .mspi_cal_end()
+        .bit_is_clear()
+    {
+        core::hint::spin_loop();
+    }
+    HP_SYS_CLKRST::regs()
+        .ana_pll_ctrl0()
+        .modify(|_, w| w.mspi_cal_stop().set_bit());
+}
+
+fn configure_mpll_clk_impl(
+    _clocks: &mut ClockTree,
+    _old_config: Option<MpllClkConfig>,
+    _new_config: MpllClkConfig,
+) {
+    // Configuration applied in enable_mpll_clk_impl
 }
 
 /// Programs the PMU external LDO regulators for the MSPI PHY.

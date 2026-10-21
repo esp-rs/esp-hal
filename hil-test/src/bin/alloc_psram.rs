@@ -298,3 +298,82 @@ mod flash_tests {
         }
     }
 }
+
+/// PSRAM at the default 200 MHz with the MPLL at 400 MHz, and at 250 MHz with the MPLL at
+/// 500 MHz.
+#[cfg(feature = "esp32s31")]
+#[embedded_test::tests]
+mod mpll {
+    use esp_hal::{
+        clock::{
+            ClockConfig,
+            CpuClock,
+            ll::{MpllClkConfig, mpll_clk_frequency},
+        },
+        peripherals::{HP_SYS_CLKRST, LP_AON_CLK_RST},
+        psram::{Psram, PsramConfig, PsramTimingParams},
+    };
+
+    fn assert_mpll_programmed(expected_hz: u32) {
+        let div = unsafe { LP_AON_CLK_RST::steal() }
+            .register_block()
+            .mspi_div()
+            .read();
+        let fb_div = div.mspi_fb_div().bits() as u32;
+        let ref_div = div.mspi_ref_div().bits() as u32;
+        let mpll_hz = 40_000_000 * (fb_div + 1) / (ref_div + 1);
+
+        hil_test::assert_eq!(mpll_hz, expected_hz);
+        hil_test::assert_eq!(mpll_hz, mpll_clk_frequency());
+
+        let cal = unsafe { HP_SYS_CLKRST::steal() }
+            .register_block()
+            .ana_pll_ctrl0()
+            .read();
+        hil_test::assert!(
+            cal.mspi_cal_stop().bit_is_set(),
+            "esp-hal's MPLL calibration did not run"
+        );
+    }
+
+    fn assert_psram_holds_a_pattern(psram: &Psram) {
+        let (start, size) = psram.raw_parts();
+        hil_test::assert!(size > 0);
+
+        let words = size / 4;
+        let psram = unsafe { core::slice::from_raw_parts_mut(start as *mut u32, words) };
+
+        for (i, word) in psram.iter_mut().enumerate() {
+            *word = (i as u32).wrapping_mul(0x9E37_79B9);
+        }
+        for (i, word) in psram.iter().enumerate() {
+            hil_test::assert_eq!(*word, (i as u32).wrapping_mul(0x9E37_79B9));
+        }
+    }
+
+    #[test]
+    fn default_mpll_400_psram_200() {
+        let p = esp_hal::init(
+            esp_hal::Config::default().with_cpu_clock(ClockConfig::from(CpuClock::max())),
+        );
+        let psram = Psram::new(p.PSRAM, PsramConfig::default());
+
+        assert_mpll_programmed(400_000_000);
+        assert_psram_holds_a_pattern(&psram);
+    }
+
+    #[test]
+    fn mpll_500_psram_250() {
+        let mut clocks = ClockConfig::from(CpuClock::max());
+        clocks.mpll_clk = Some(MpllClkConfig::_500);
+        let p = esp_hal::init(esp_hal::Config::default().with_cpu_clock(clocks));
+        let config = PsramConfig {
+            timing: PsramTimingParams::MHZ_250,
+            ..Default::default()
+        };
+        let psram = Psram::new(p.PSRAM, config);
+
+        assert_mpll_programmed(500_000_000);
+        assert_psram_holds_a_pattern(&psram);
+    }
+}

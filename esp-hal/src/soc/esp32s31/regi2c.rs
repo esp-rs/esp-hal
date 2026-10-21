@@ -153,7 +153,15 @@ define_regi2c! {
         }
     }
     master: REGI2C_CPLL(0x0A, 0) {}
-    master: REGI2C_MPLL(0x0B, 0) {}
+    master: REGI2C_MPLL(0x0B, 0) {
+        reg: I2C_MPLL_IR_CAL(1) {
+            field: I2C_MPLL_IR_CAL_EXT_CAP(1..0),
+            field: I2C_MPLL_IR_CAL_ENX_CAP(2..2)
+        }
+        reg: I2C_MPLL_DHREF_REG(3) {
+            field: I2C_MPLL_DHREF(5..4)
+        }
+    }
     master: REGI2C_DIG_REG(0x6D, 0) {
         reg: I2C_DIG_REG4(4) {
             field: I2C_DIG_REG_EXT_RTC_DREG(4..0),
