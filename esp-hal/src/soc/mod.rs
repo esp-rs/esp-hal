@@ -55,11 +55,11 @@ pub(crate) fn is_uncached_ram_address(address: usize) -> bool {
 fn uncached_ram_range() -> Range<usize> {
     unsafe extern "C" {
         static _uncached_data_start: u8;
-        static _uncached_bss_end: u8;
+        static _uncached_end: u8;
     }
 
     let start = &raw const _uncached_data_start as usize;
-    let end = &raw const _uncached_bss_end as usize;
+    let end = &raw const _uncached_end as usize;
     start..end
 }
 
