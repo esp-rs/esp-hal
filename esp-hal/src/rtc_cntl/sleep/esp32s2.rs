@@ -185,8 +185,15 @@ fn rtc_sleep_pu(val: bool) {
 
 impl RtcSleepConfig {
     /// Configures the RTC for deep sleep mode.
+    ///
+    /// The RTC regulator is off in this mode, for the lowest current.
     pub fn deep() -> Self {
-        // Set up for ultra-low power sleep. Wakeup sources may modify these settings.
+        // Set up for ultra-low power sleep. Wakeup sources may modify these settings. ESP-IDF
+        // uses this mode only on request, and does not support RTC IO inputs or RTC memory at high
+        // temperature in it:
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/sleep_modes.c#L3083-L3085
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/components/esp_hw_support/port/esp32s2/rtc_sleep.c#L95-L105
+        // https://github.com/espressif/esp-idf/blob/fff9895c82d/docs/en/api-reference/system/sleep_modes.rst#L54-L94
         let mut cfg = Self::default();
 
         cfg.set_lslp_mem_inf_fpu(false);
@@ -584,8 +591,13 @@ impl RtcSleepConfig {
 
     /// Configures the wakeup and reject sources of the sleep.
     ///
-    /// [`Self::enter_sleep`] requests the sleep after this call.
-    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) {
+    /// [`Self::enter_sleep`] requests the sleep after this call. The return value is a guard that
+    /// restores what sleep entry changed for the sleep only, so the caller keeps it until the
+    /// sleep ends.
+    #[crate::ram]
+    pub(crate) fn start_sleep(&self, wakeup_mask: u32, reject_mask: u32) -> impl Sized {
+        let restore_clock_config = super::cpu_clock_for_sleep();
+
         unsafe {
             LPWR::regs()
                 .reset_state()
@@ -602,6 +614,8 @@ impl RtcSleepConfig {
                 .slp_reject_conf()
                 .modify(|_, w| w.sleep_reject_ena().bits(reject_mask));
         }
+
+        restore_clock_config
     }
 
     /// Requests the sleep.

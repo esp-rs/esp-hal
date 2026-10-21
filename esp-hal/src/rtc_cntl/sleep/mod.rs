@@ -20,6 +20,36 @@ use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
 use crate::rtc_cntl::WakeupSource;
 use crate::{gpio, peripherals::LPWR, rtc_cntl::Rtc};
 
+/// Runs the CPU from the crystal until the guard drops, then configures the PLL again.
+///
+/// The PLL is powered down across the sleep.
+#[cfg(not(soc_has_pmu))]
+fn cpu_clock_for_sleep() -> impl Sized {
+    use crate::{
+        private::DropGuard,
+        soc::clocks::{self, ClockTree, CpuClkConfig},
+    };
+
+    ClockTree::with(|clocks| {
+        let old_cpu_clk = clocks.cpu_clk();
+
+        clocks::configure_cpu_clk(clocks, CpuClkConfig::Xtal);
+
+        DropGuard::new((), move |_| {
+            ClockTree::with(|clocks| {
+                // If another consumer kept `PLL_CLK` requested while the CPU ran from `XTAL`,
+                // restoring `CPU_CLK` below will not re-enable the PLL. `PLL_CLK` on esp32c2 and
+                // esp32c3 has no other consumer, so restoring `CPU_CLK` configures it again.
+                #[cfg(not(any(esp32c2, esp32c3)))]
+                clocks::reconfigure_pll(clocks);
+                if let Some(old_cpu_clk) = old_cpu_clk {
+                    clocks::configure_cpu_clk(clocks, old_cpu_clk);
+                }
+            });
+        })
+    })
+}
+
 #[cfg(soc_has_pmu)]
 pub(crate) mod pmu_common;
 
