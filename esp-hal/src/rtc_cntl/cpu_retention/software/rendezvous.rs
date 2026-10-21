@@ -274,7 +274,7 @@ fn helper_entry() {
 /// has no power. esp-idf turns it off for this routine only, and not for the single-core path.
 #[crate::ram]
 fn run_helper() {
-    crate::soc::disable_branch_predictor();
+    let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
 
     // SAFETY: the PRO CPU starts the rendezvous for a sleep that retains the CPU only, so the
     // memory of the frames is installed.
@@ -308,8 +308,6 @@ fn run_helper() {
     while phase() == Phase::Done {
         core::hint::spin_loop();
     }
-
-    crate::soc::enable_branch_predictor();
 }
 
 /// Returns whether the core that runs this function agrees to a light sleep.

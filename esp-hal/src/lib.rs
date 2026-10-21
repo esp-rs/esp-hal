@@ -750,7 +750,7 @@ pub fn init(config: Config) -> Peripherals {
     );
 
     #[cfg(soc_cpu_has_branch_predictor)]
-    crate::soc::enable_branch_predictor();
+    crate::soc::branch_predictor::enable();
 
     // Have we already overflown the stack?
     #[cfg(init_stack_ptr_range_check)]

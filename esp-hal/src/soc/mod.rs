@@ -21,6 +21,9 @@ use crate::efuse::ChipRevision;
 #[cfg_attr(esp32s31, path = "esp32s31/mod.rs")]
 mod implementation;
 
+#[cfg(soc_cpu_has_branch_predictor)]
+pub(crate) mod branch_predictor;
+
 #[cfg(soc_has_xtal32k_pads)]
 pub(crate) mod xtal32k;
 

@@ -37,30 +37,6 @@ pub(crate) fn pre_init() {
     trng::rng_ll_enable();
 }
 
-pub(crate) fn enable_branch_predictor() {
-    // Enable branch predictor
-    // Note that the branch predictor will start cache requests and needs to be disabled when
-    // the cache is disabled.
-    // MHCR: CSR 0x7c1
-    const MHCR_RS: u32 = 1 << 4; // R/W, address return stack set bit
-    const MHCR_BFE: u32 = 1 << 5; // R/W, allow predictive jump set bit
-    const MHCR_BTB: u32 = 1 << 12; // R/W, branch target prediction enable bit
-    unsafe {
-        core::arch::asm!("csrrs x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
-    }
-}
-
-#[cfg(feature = "unstable")]
-pub(crate) fn disable_branch_predictor() {
-    // Clears the bits set by `enable_branch_predictor`.
-    const MHCR_RS: u32 = 1 << 4;
-    const MHCR_BFE: u32 = 1 << 5;
-    const MHCR_BTB: u32 = 1 << 12;
-    unsafe {
-        core::arch::asm!("csrrc x0, 0x7c1, {0}", in(reg) MHCR_RS | MHCR_BFE | MHCR_BTB);
-    }
-}
-
 /// Writes back a specific range of data in the cache.
 #[doc(hidden)]
 #[crate::ram]
