@@ -169,6 +169,58 @@ mod dcache_reclaimed {
     }
 }
 
+#[cfg(multi_core)]
+#[embedded_test::tests]
+mod multi_core_tests {
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    use allocator_api2::boxed::Box;
+    use esp_alloc::ExternalMemory;
+    use esp_hal::{
+        clock::CpuClock,
+        peripherals::CPU_CTRL,
+        system::{CpuControl, Stack},
+        time::{Duration, Instant},
+    };
+    use hil_test::mk_static;
+
+    #[init]
+    fn init() -> CPU_CTRL<'static> {
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+        let p = esp_hal::init(config);
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
+        p.CPU_CTRL
+    }
+
+    #[test]
+    fn test_other_core_writes_psram(cpu_ctrl: CPU_CTRL<'static>) {
+        const PATTERN: u32 = 0xA5C3_5A3C;
+        static WRITTEN: AtomicBool = AtomicBool::new(false);
+
+        let word = Box::into_raw(Box::new_in(0u32, ExternalMemory)) as usize;
+
+        let mut cpu_control = CpuControl::new(cpu_ctrl);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, move || {
+                unsafe { (word as *mut u32).write_volatile(PATTERN) };
+                WRITTEN.store(true, Ordering::Release);
+                loop {}
+            })
+            .unwrap();
+
+        let deadline = Instant::now() + Duration::from_millis(100);
+        while !WRITTEN.load(Ordering::Acquire) {
+            assert!(
+                Instant::now() < deadline,
+                "the other core did not finish its write"
+            );
+        }
+        assert_eq!(unsafe { (word as *const u32).read_volatile() }, PATTERN);
+    }
+}
+
 #[cfg(flash_driver_supported)]
 #[embedded_test::tests]
 mod flash_tests {

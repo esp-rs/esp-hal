@@ -291,10 +291,19 @@ fn setup_second_core_stack<'a, F, const SIZE: usize>(
         entry_dst.write(entry);
 
         let entry_fn = entry_dst.cast::<()>();
+        #[cfg(esp32s31)]
+        crate::soc::cpu_control::save_core0_pma(&mut *core0_pma_slot::<F>(entry_fn));
         START_CORE1_FUNCTION.store(entry_fn, Ordering::Release);
         APP_CORE_STACK_TOP.store(stack.top(), Ordering::Release);
         APP_CORE_STACK_GUARD.store(stack_guard.cast(), Ordering::Release);
     }
+}
+
+#[cfg(esp32s31)]
+fn core0_pma_slot<F>(entry: *mut ()) -> *mut [u32; 32] {
+    let end = entry.cast::<u8>().wrapping_add(core::mem::size_of::<F>());
+    end.wrapping_add(end.align_offset(core::mem::align_of::<u32>()))
+        .cast()
 }
 
 /// Core 1 entry point, set as the boot address.
@@ -396,6 +405,11 @@ fn start_core1_init_impl<F>() -> !
 where
     F: FnOnce(),
 {
+    #[cfg(esp32s31)]
+    crate::soc::cpu_control::set_core1_pma(unsafe {
+        &*core0_pma_slot::<F>(START_CORE1_FUNCTION.load(Ordering::Acquire))
+    });
+
     crate::soc::branch_predictor::enable();
 
     // The ROM has already handed off to us; clear the AppCpu boot address so a subsequent software
