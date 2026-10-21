@@ -17,9 +17,10 @@ PROVIDE(_mp_hook = default_mp_hook);
 INCLUDE "uncached.x"
 
 SECTIONS {
-  /* Reserve the RAM that UNCACHE uses. Round up to the 64-byte L1 cache line. */
+  /* Reserve the RAM that `.uncached.bss` uses. Round the uncached sections up
+     to the 64-byte L1 cache line. */
   .uncached.hole (NOLOAD) : {
-    . = . + ALIGN(_uncached_bss_end - _uncached_data_start, 64);
+    . = . + ALIGN(_uncached_end - _uncached_data_start, 64) - SIZEOF(.uncached.data);
   } > RAM
 
   /* Shared sections - ordering matters */
@@ -52,5 +53,5 @@ INCLUDE "eh_frame.x"
 /* Do not add section sizes. Alignment of `.trap` can add padding after the hole. */
 _dram_data_start = ABSOLUTE(ADDR(.rwtext) + SIZEOF(.rwtext));
 
-ASSERT(ADDR(.uncached.hole) == ORIGIN(RAM), "
-ERROR(esp-hal): .uncached.hole must start at the origin of RAM");
+ASSERT(SIZEOF(.uncached.hole) == 0 || ADDR(.uncached.hole) == ORIGIN(RAM) + SIZEOF(.uncached.data), "
+ERROR(esp-hal): .uncached.hole must follow the load address of .uncached.data");
