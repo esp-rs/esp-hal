@@ -20,10 +20,10 @@ pub(crate) fn enable() {
 }
 
 /// Turns the branch predictor off. [`Drop`] sets the bits that were set before.
-#[cfg_attr(not(feature = "unstable"), allow(dead_code))]
+#[cfg(any(feature = "unstable", all(multi_core, feature = "rt")))]
 pub(crate) struct DisabledBranchPredictor(u32);
 
-#[cfg_attr(not(feature = "unstable"), allow(dead_code))]
+#[cfg(any(feature = "unstable", all(multi_core, feature = "rt")))]
 impl DisabledBranchPredictor {
     /// Turns the branch predictor off.
     #[inline(always)]
@@ -41,6 +41,7 @@ impl DisabledBranchPredictor {
     }
 }
 
+#[cfg(any(feature = "unstable", all(multi_core, feature = "rt")))]
 impl Drop for DisabledBranchPredictor {
     #[inline(always)]
     fn drop(&mut self) {
