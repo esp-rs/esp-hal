@@ -795,6 +795,16 @@ unsafe extern "C" fn btdm_lp_wake_up_cb(arg: *mut c_void) {
             });
         }
     }
+    // `btdm_lp_wakeup_params_t` in `btdm_lp.c` has no `rtc_freq` field, refresh the controller's
+    // LP clock frequency via the HAL/BLE hooks (see `btdm_lp_init()` in `btdm_lp.c` and
+    // `ble_stack_init()`).
+    if super::lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source) {
+        let hz = lpclk_hz();
+        unsafe {
+            r_btdm_hal_rtc_freq_set(hz);
+            r_esp_ble_change_rtc_freq(hz as u32);
+        }
+    }
 }
 
 /// Returns whether the controller refuses a light sleep, because its next event is too close.
