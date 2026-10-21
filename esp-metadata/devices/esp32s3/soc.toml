@@ -83,6 +83,7 @@ peripherals = [
     { name = "SYSTIMER" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
+    { name = "TSENS", virtual = true, clock_group = "TSENS" },
     { name = "TWAI0" },
     { name = "UART0", interrupts = { peri = "UART0" }, stable = true, clock_group = "UART" },
     { name = "UART1", interrupts = { peri = "UART1" }, stable = true, clock_group = "UART" },
@@ -492,7 +493,7 @@ octal_spi = true
 
 [device.systimer]
 [device.temp_sensor]
-support_status = "not_supported"
+register_block = "sens"
 [device.ulp_fsm]
 support_status = { status = "not_supported", issue = 376 }
 [device.ulp_riscv]

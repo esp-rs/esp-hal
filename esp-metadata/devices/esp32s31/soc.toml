@@ -114,6 +114,7 @@ peripherals = [
     { name = "TEE" },
     { name = "TIMG0", clock_group = "TIMG" },
     { name = "TIMG1", clock_group = "TIMG" },
+    { name = "TSENS", pac = "LP_TSENS", clock_group = "TSENS" },
     { name = "UART0", interrupts = { peri = "UART0" }, clock_group = "UART", stable = true },
     { name = "UART1", interrupts = { peri = "UART1" }, clock_group = "UART", stable = true },
     { name = "UART2", interrupts = { peri = "UART2" }, clock_group = "UART", stable = true },
@@ -508,7 +509,7 @@ support_status = "partial"
 channel_count = 8
 
 [device.temp_sensor]
-support_status = "not_supported"
+register_block = "lp_tsens"
 [device.touch]
 support_status = "not_supported"
 [device.canfd]

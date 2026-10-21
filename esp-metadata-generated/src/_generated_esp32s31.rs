@@ -633,6 +633,9 @@ macro_rules! property {
         [crate ::soc::clocks::LpSlowClkConfig::RcSlow, #[cfg(use_xtal32k)] crate
         ::soc::clocks::LpSlowClkConfig::Xtal32k]
     };
+    ("clock_tree.lp_peri_clk.divisor") => {
+        (0, 7)
+    };
     ("clock_tree.ble_lp_clk") => {
         [crate ::soc::clocks::BleLpClkConfig::Xtal, #[cfg(use_xtal32k)] crate
         ::soc::clocks::BleLpClkConfig::Xtal32k]
@@ -1820,6 +1823,16 @@ macro_rules! for_each_sw_interrupt {
 ///     todo!()
 /// }
 ///
+/// // LP_PERI_CLK
+///
+/// fn configure_lp_peri_clk_impl(
+///     _clocks: &mut ClockTree,
+///     _old_config: Option<LpPeriClkConfig>,
+///     _new_config: LpPeriClkConfig,
+/// ) {
+///     todo!()
+/// }
+///
 /// // BLE_LP_XTAL_CLK
 ///
 /// fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
@@ -2041,6 +2054,13 @@ macro_rules! for_each_sw_interrupt {
 ///         todo!()
 ///     }
 /// }
+/// impl TsensInstance {
+///     // TSENS_SCLK
+///
+///     fn enable_sclk_impl(self, _clocks: &mut ClockTree, _en: bool) {
+///         todo!()
+///     }
+/// }
 /// impl UartInstance {
 ///     // UART_FUNCTION_CLOCK
 ///
@@ -2135,6 +2155,11 @@ macro_rules! define_clock_tree_types {
         pub enum TimgInstance {
             Timg0 = 0,
             Timg1 = 1,
+        }
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TsensInstance {
+            Tsens = 0,
         }
         #[derive(Clone, Copy, PartialEq, Eq, Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -2301,6 +2326,32 @@ macro_rules! define_clock_tree_types {
             #[cfg(use_xtal32k)]
             /// Selects `XTAL32K_CLK`.
             Xtal32k,
+        }
+        /// Configures the `LP_PERI_CLK` clock node.
+        ///
+        /// The output is calculated as `OUTPUT = LP_FAST_CLK / (divisor + 1)`.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct LpPeriClkConfig {
+            divisor: u32,
+        }
+        impl LpPeriClkConfig {
+            /// Creates a new configuration for the LP_PERI_CLK clock node.
+            ///
+            /// ## Panics
+            ///
+            /// Panics if the divisor value is outside the
+            /// valid range (0 ..= 7).
+            pub const fn new(divisor: u32) -> Self {
+                ::core::assert!(
+                    divisor <= 7,
+                    "`LP_PERI_CLK` divisor must be between 0 and 7 (inclusive)."
+                );
+                Self { divisor }
+            }
+            pub fn divisor(self) -> u32 {
+                self.divisor as u32
+            }
         }
         /// The list of clock signals that the `BLE_LP_CLK` multiplexer can output.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2677,6 +2728,14 @@ macro_rules! define_clock_tree_types {
             /// Selects `RC_FAST_CLK`.
             RcFastClk,
         }
+        /// The list of clock signals that the `TSENS_SCLK` multiplexer can output.
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub enum TsensSclkConfig {
+            #[default]
+            /// Selects `LP_PERI_CLK`.
+            LpPeri,
+        }
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
         pub enum UartFunctionClockSclk {
@@ -2781,6 +2840,7 @@ macro_rules! define_clock_tree_types {
             apb_clk: Option<ApbClkConfig>,
             lp_fast_clk: Option<LpFastClkConfig>,
             lp_slow_clk: Option<LpSlowClkConfig>,
+            lp_peri_clk: Option<LpPeriClkConfig>,
             ble_lp_clk: Option<BleLpClkConfig>,
             crypto_clk: Option<CryptoClkConfig>,
             iomux_function_clock: Option<IomuxFunctionClockConfig>,
@@ -2816,7 +2876,6 @@ macro_rules! define_clock_tree_types {
             xtal_d2_clk_refcount: u32,
             cpu_clk_refcount: u32,
             mem_clk_refcount: u32,
-            lp_fast_clk_refcount: u32,
             lp_slow_clk_refcount: u32,
             ble_lp_clk_refcount: u32,
             crypto_clk_refcount: u32,
@@ -2832,6 +2891,7 @@ macro_rules! define_clock_tree_types {
             spi_function_clock_refcount: [u32; 2],
             timg_function_clock_refcount: [u32; 2],
             timg_wdt_clock_refcount: [u32; 2],
+            tsens_sclk_refcount: [u32; 1],
             uart_function_clock_refcount: [u32; 4],
             uart_baud_rate_generator_refcount: [u32; 4],
             uart_mem_clock_refcount: [u32; 4],
@@ -2873,6 +2933,10 @@ macro_rules! define_clock_tree_types {
             /// Returns the current configuration of the LP_SLOW_CLK clock tree node
             pub fn lp_slow_clk(&self) -> Option<LpSlowClkConfig> {
                 self.lp_slow_clk
+            }
+            /// Returns the current configuration of the LP_PERI_CLK clock tree node
+            pub fn lp_peri_clk(&self) -> Option<LpPeriClkConfig> {
+                self.lp_peri_clk
             }
             /// Returns the current configuration of the BLE_LP_CLK clock tree node
             pub fn ble_lp_clk(&self) -> Option<BleLpClkConfig> {
@@ -3005,6 +3069,7 @@ macro_rules! define_clock_tree_types {
                 apb_clk: None,
                 lp_fast_clk: None,
                 lp_slow_clk: None,
+                lp_peri_clk: None,
                 ble_lp_clk: None,
                 crypto_clk: None,
                 iomux_function_clock: None,
@@ -3040,7 +3105,6 @@ macro_rules! define_clock_tree_types {
                 xtal_d2_clk_refcount: 0,
                 cpu_clk_refcount: 0,
                 mem_clk_refcount: 0,
-                lp_fast_clk_refcount: 0,
                 lp_slow_clk_refcount: 0,
                 ble_lp_clk_refcount: 0,
                 crypto_clk_refcount: 0,
@@ -3056,6 +3120,7 @@ macro_rules! define_clock_tree_types {
                 spi_function_clock_refcount: [0; 2],
                 timg_function_clock_refcount: [0; 2],
                 timg_wdt_clock_refcount: [0; 2],
+                tsens_sclk_refcount: [0; 1],
                 uart_function_clock_refcount: [0; 4],
                 uart_baud_rate_generator_refcount: [0; 4],
                 uart_mem_clock_refcount: [0; 4],
@@ -3076,6 +3141,8 @@ macro_rules! define_clock_tree_types {
         static LP_FAST_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static LP_SLOW_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
+            ::core::sync::atomic::AtomicU32::new(0);
+        static LP_PERI_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
         static BLE_LP_CLK_FREQ_CACHE: ::core::sync::atomic::AtomicU32 =
             ::core::sync::atomic::AtomicU32::new(0);
@@ -3235,6 +3302,10 @@ macro_rules! define_clock_tree_types {
                 #[cfg(use_xtal32k)]
                 LpSlowClkConfig::Xtal32k => xtal32k_clk_root_source(clocks),
             }
+        }
+        /// Returns the clock source that `LP_PERI_CLK` currently runs on.
+        pub fn lp_peri_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
+            lp_fast_clk_root_source(clocks)
         }
         /// Returns the clock source that `BLE_LP_XTAL_CLK` currently runs on.
         pub fn ble_lp_xtal_clk_root_source(clocks: &mut ClockTree) -> Option<ClockSource> {
@@ -3823,15 +3894,12 @@ macro_rules! define_clock_tree_types {
         pub fn configure_lp_fast_clk(clocks: &mut ClockTree, new_selector: LpFastClkConfig) {
             let old_selector = clocks.lp_fast_clk.replace(new_selector);
             refresh_lp_fast_clk_downstream(clocks);
-            let active = clocks.lp_fast_clk_refcount > 0;
-            if active {
-                match new_selector {
-                    LpFastClkConfig::RcFast => request_rc_fast_clk(clocks),
-                    LpFastClkConfig::Xtal => request_xtal_clk(clocks),
-                }
+            match new_selector {
+                LpFastClkConfig::RcFast => request_rc_fast_clk(clocks),
+                LpFastClkConfig::Xtal => request_xtal_clk(clocks),
             }
             configure_lp_fast_clk_impl(clocks, old_selector, new_selector);
-            if active && let Some(old_selector) = old_selector {
+            if let Some(old_selector) = old_selector {
                 match old_selector {
                     LpFastClkConfig::RcFast => release_rc_fast_clk(clocks),
                     LpFastClkConfig::Xtal => release_xtal_clk(clocks),
@@ -3842,25 +3910,19 @@ macro_rules! define_clock_tree_types {
             clocks.lp_fast_clk
         }
         pub fn request_lp_fast_clk(clocks: &mut ClockTree) {
-            trace!("Requesting LP_FAST_CLK");
-            if increment_reference_count(&mut clocks.lp_fast_clk_refcount) {
-                trace!("Enabling LP_FAST_CLK");
-                match unwrap!(clocks.lp_fast_clk) {
-                    LpFastClkConfig::RcFast => request_rc_fast_clk(clocks),
-                    LpFastClkConfig::Xtal => request_xtal_clk(clocks),
-                }
-                enable_lp_fast_clk_impl(clocks, true);
+            trace!("Enabling LP_FAST_CLK");
+            match unwrap!(clocks.lp_fast_clk) {
+                LpFastClkConfig::RcFast => request_rc_fast_clk(clocks),
+                LpFastClkConfig::Xtal => request_xtal_clk(clocks),
             }
+            enable_lp_fast_clk_impl(clocks, true);
         }
         pub fn release_lp_fast_clk(clocks: &mut ClockTree) {
-            trace!("Releasing LP_FAST_CLK");
-            if decrement_reference_count(&mut clocks.lp_fast_clk_refcount) {
-                trace!("Disabling LP_FAST_CLK");
-                enable_lp_fast_clk_impl(clocks, false);
-                match unwrap!(clocks.lp_fast_clk) {
-                    LpFastClkConfig::RcFast => release_rc_fast_clk(clocks),
-                    LpFastClkConfig::Xtal => release_xtal_clk(clocks),
-                }
+            trace!("Disabling LP_FAST_CLK");
+            enable_lp_fast_clk_impl(clocks, false);
+            match unwrap!(clocks.lp_fast_clk) {
+                LpFastClkConfig::RcFast => release_rc_fast_clk(clocks),
+                LpFastClkConfig::Xtal => release_xtal_clk(clocks),
             }
         }
         pub fn lp_fast_clk_config_frequency(config: LpFastClkConfig) -> u32 {
@@ -3934,6 +3996,25 @@ macro_rules! define_clock_tree_types {
         }
         pub fn lp_slow_clk_source_frequency(source: LpSlowClkConfig) -> u32 {
             lp_slow_clk_config_frequency(source)
+        }
+        pub fn configure_lp_peri_clk(clocks: &mut ClockTree, config: LpPeriClkConfig) {
+            let old_config = clocks.lp_peri_clk.replace(config);
+            refresh_lp_peri_clk_downstream(clocks);
+            configure_lp_peri_clk_impl(clocks, old_config, config);
+        }
+        pub fn lp_peri_clk_config(clocks: &mut ClockTree) -> Option<LpPeriClkConfig> {
+            clocks.lp_peri_clk
+        }
+        fn request_lp_peri_clk(_clocks: &mut ClockTree) {}
+        fn release_lp_peri_clk(_clocks: &mut ClockTree) {}
+        pub fn lp_peri_clk_config_frequency(config: LpPeriClkConfig) -> u32 {
+            (lp_fast_clk_frequency() / (config.divisor() + 1))
+        }
+        pub fn lp_peri_clk_frequency() -> u32 {
+            LP_PERI_CLK_FREQ_CACHE.load(::core::sync::atomic::Ordering::Acquire)
+        }
+        pub fn lp_peri_clk_source_frequency() -> u32 {
+            lp_fast_clk_frequency()
         }
         pub fn request_ble_lp_xtal_clk(clocks: &mut ClockTree) {
             trace!("Enabling BLE_LP_XTAL_CLK");
@@ -4832,6 +4913,32 @@ macro_rules! define_clock_tree_types {
                 Self::wdt_clock_config_frequency(source)
             }
         }
+        impl TsensInstance {
+            pub fn request_sclk(self, clocks: &mut ClockTree) {
+                trace!("Requesting {:?}::SCLK", self);
+                if increment_reference_count(&mut clocks.tsens_sclk_refcount[self as usize]) {
+                    trace!("Enabling {:?}::SCLK", self);
+                    request_lp_peri_clk(clocks);
+                    self.enable_sclk_impl(clocks, true);
+                }
+            }
+            pub fn release_sclk(self, clocks: &mut ClockTree) {
+                trace!("Releasing {:?}::SCLK", self);
+                if decrement_reference_count(&mut clocks.tsens_sclk_refcount[self as usize]) {
+                    trace!("Disabling {:?}::SCLK", self);
+                    self.enable_sclk_impl(clocks, false);
+                    release_lp_peri_clk(clocks);
+                }
+            }
+            pub fn sclk_frequency(self) -> u32 {
+                lp_peri_clk_frequency()
+            }
+            pub fn sclk_source_frequency(source: TsensSclkConfig) -> u32 {
+                match source {
+                    TsensSclkConfig::LpPeri => lp_peri_clk_frequency(),
+                }
+            }
+        }
         impl UartInstance {
             pub fn configure_function_clock(
                 self,
@@ -5079,6 +5186,8 @@ macro_rules! define_clock_tree_types {
             pub lp_fast_clk: Option<LpFastClkConfig>,
             /// `LP_SLOW_CLK` configuration.
             pub lp_slow_clk: Option<LpSlowClkConfig>,
+            /// `LP_PERI_CLK` configuration.
+            pub lp_peri_clk: Option<LpPeriClkConfig>,
             /// `BLE_LP_CLK` configuration.
             pub ble_lp_clk: Option<BleLpClkConfig>,
             /// `CRYPTO_CLK` configuration.
@@ -5113,6 +5222,9 @@ macro_rules! define_clock_tree_types {
                 }
                 if let Some(config) = self.lp_slow_clk {
                     configure_lp_slow_clk(clocks, config);
+                }
+                if let Some(config) = self.lp_peri_clk {
+                    configure_lp_peri_clk(clocks, config);
                 }
                 if let Some(config) = self.ble_lp_clk {
                     configure_ble_lp_clk(clocks, config);
@@ -5231,11 +5343,20 @@ macro_rules! define_clock_tree_types {
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
+            refresh_lp_peri_clk_downstream(clocks);
         }
         fn refresh_lp_slow_clk_downstream(clocks: &mut ClockTree) {
             if let Some(config) = clocks.lp_slow_clk {
                 LP_SLOW_CLK_FREQ_CACHE.store(
                     lp_slow_clk_config_frequency(config),
+                    ::core::sync::atomic::Ordering::Release,
+                );
+            }
+        }
+        fn refresh_lp_peri_clk_downstream(clocks: &mut ClockTree) {
+            if let Some(config) = clocks.lp_peri_clk {
+                LP_PERI_CLK_FREQ_CACHE.store(
+                    lp_peri_clk_config_frequency(config),
                     ::core::sync::atomic::Ordering::Release,
                 );
             }
@@ -5445,6 +5566,8 @@ macro_rules! implement_peripheral_clocks {
             Timg0,
             /// TIMG1 peripheral clock signal
             Timg1,
+            /// TSENS peripheral clock signal
+            Tsens,
             /// UART0 peripheral clock signal
             Uart0,
             /// UART1 peripheral clock signal
@@ -5493,6 +5616,7 @@ macro_rules! implement_peripheral_clocks {
                 Self::Systimer,
                 Self::Timg0,
                 Self::Timg1,
+                Self::Tsens,
                 Self::Uart0,
                 Self::Uart1,
                 Self::Uart2,
@@ -5624,6 +5748,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .timergrp1_ctrl0()
                         .modify(|_, w| w.apb_clk_en().bit(enable));
+                }
+                Peripheral::Tsens => {
+                    crate::peripherals::LP_PERI::regs()
+                        .tsens_ctrl()
+                        .modify(|_, w| w.lp_tsens_clk_en().bit(enable));
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -5777,6 +5906,11 @@ macro_rules! implement_peripheral_clocks {
                     crate::peripherals::HP_SYS_CLKRST::regs()
                         .timergrp1_ctrl0()
                         .modify(|_, w| w.rst_en().bit(reset));
+                }
+                Peripheral::Tsens => {
+                    crate::peripherals::LP_PERI::regs()
+                        .tsens_ctrl()
+                        .modify(|_, w| w.lp_tsens_rst_en().bit(reset));
                 }
                 Peripheral::Uart0 => {
                     crate::peripherals::HP_SYS_CLKRST::regs()
@@ -6512,18 +6646,20 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((@ peri_type #[doc = "TIMG0 peripheral singleton"]
         TIMG0 <= TIMG0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
         "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART0 peripheral singleton"]
-        UART0 <= UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART1 peripheral singleton"] UART1 <= UART1(UART1 : { bind_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "TSENS peripheral singleton"]
+        TSENS <= LP_TSENS() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc
+        = "UART0 peripheral singleton"] UART0 <= UART0(UART0 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UART2 peripheral singleton"]
-        UART2 <= UART2(UART2 : { bind_peri_interrupt, enable_peri_interrupt,
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART1 peripheral singleton"]
+        UART1 <= UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
-        "UART3 peripheral singleton"] UART3 <= UART3(UART3 : { bind_peri_interrupt,
+        "UART2 peripheral singleton"] UART2 <= UART2(UART2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner_peripheral!((@ peri_type #[doc = "UHCI0 peripheral singleton"]
-        UHCI0 <= UHCI0() (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        _for_each_inner_peripheral!((@ peri_type #[doc = "UART3 peripheral singleton"]
+        UART3 <= UART3(UART3 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner_peripheral!((@ peri_type #[doc =
+        "UHCI0 peripheral singleton"] UHCI0 <= UHCI0() (unstable)));
+        _for_each_inner_peripheral!((@ peri_type #[doc =
         "USB_DEVICE peripheral singleton"] USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner_peripheral!((@ peri_type #[doc =
@@ -6669,6 +6805,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner_peripheral!((TEE(unstable)));
         _for_each_inner_peripheral!((TIMG0(unstable)));
         _for_each_inner_peripheral!((TIMG1(unstable)));
+        _for_each_inner_peripheral!((TSENS(unstable)));
         _for_each_inner_peripheral!((UART0)); _for_each_inner_peripheral!((UART1));
         _for_each_inner_peripheral!((UART2)); _for_each_inner_peripheral!((UART3));
         _for_each_inner_peripheral!((UHCI0(unstable)));
@@ -7007,7 +7144,8 @@ macro_rules! for_each_peripheral {
         (@ peri_type #[doc = "TEE peripheral singleton"] TEE <= TEE() (unstable)), (@
         peri_type #[doc = "TIMG0 peripheral singleton"] TIMG0 <= TIMG0() (unstable)), (@
         peri_type #[doc = "TIMG1 peripheral singleton"] TIMG1 <= TIMG1() (unstable)), (@
-        peri_type #[doc = "UART0 peripheral singleton"] UART0 <= UART0(UART0 : {
+        peri_type #[doc = "TSENS peripheral singleton"] TSENS <= LP_TSENS() (unstable)),
+        (@ peri_type #[doc = "UART0 peripheral singleton"] UART0 <= UART0(UART0 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
         peri_type #[doc = "UART1 peripheral singleton"] UART1 <= UART1(UART1 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (@
@@ -7078,10 +7216,10 @@ macro_rules! for_each_peripheral {
         (SPI0(unstable)), (SPI1(unstable)), (SPI2), (SPI3), (AXI_GDMA(unstable)),
         (DMA(unstable)), (SHA(unstable)), (SYSTEM(unstable)), (SYSTIMER(unstable)),
         (SDHOST(unstable)), (TEE(unstable)), (TIMG0(unstable)), (TIMG1(unstable)),
-        (UART0), (UART1), (UART2), (UART3), (UHCI0(unstable)), (USB_DEVICE(unstable)),
-        (USB_HS(unstable)), (ADC1(unstable)), (ADC2(unstable)), (BT(unstable)),
-        (FLASH(unstable)), (PSRAM(unstable)), (GPIO_DEDICATED(unstable)), (WIFI),
-        (CPU_CTRL(unstable)), (IPC(unstable)), (FROM_CPU_INTR0(unstable)),
+        (TSENS(unstable)), (UART0), (UART1), (UART2), (UART3), (UHCI0(unstable)),
+        (USB_DEVICE(unstable)), (USB_HS(unstable)), (ADC1(unstable)), (ADC2(unstable)),
+        (BT(unstable)), (FLASH(unstable)), (PSRAM(unstable)), (GPIO_DEDICATED(unstable)),
+        (WIFI), (CPU_CTRL(unstable)), (IPC(unstable)), (FROM_CPU_INTR0(unstable)),
         (FROM_CPU_INTR1(unstable)), (FROM_CPU_INTR2(unstable)),
         (FROM_CPU_INTR3(unstable)))); _for_each_inner_peripheral!((dma_eligible(UHCI0,
         Uhci0, 0, AhbGdmaChannel), (LCD_CAM, LcdCam, 0, AxiGdmaChannel), (I2S0, I2s0, 1,
