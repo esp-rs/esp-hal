@@ -98,6 +98,11 @@
 #![doc(html_logo_url = "https://docs.espressif.com/projects/rust/esp-rs-grey-bg.svg")]
 #![no_std]
 
+// Assumptions about the bootloader which needs to get double checked for other supported
+// bootloaders
+//
+// - The bootloader unlocked the flash chip - see https://github.com/espressif/esp-idf/blob/383dda6c182e3dabf6355160166fe007df775629/components/bootloader_support/bootloader_flash/src/bootloader_flash.c#L734
+
 // MUST be the first module
 mod fmt;
 
