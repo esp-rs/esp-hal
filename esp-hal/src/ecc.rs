@@ -103,6 +103,7 @@ macro_rules! define_operations {
                 ($op) => {
                     #[doc = concat!("# ", $first_line)]
                     $(#[doc = $lines])*
+                    #[cfg_attr(ecc_has_curve_sm2, doc = "\n# Panics\nPanics if SM2 is selected and disabled by eFuse.")]
                     #[doc = r"
 
 # Errors
@@ -115,7 +116,7 @@ macro_rules! define_operations {
                         $(#[cfg($is_modular)] modulus: EccModBase,)?
                         $($input: &[u8],)*
                     ) -> Result<EccResultHandle<'op, $op>, KeyLengthMismatch> {
-                        curve.size_check([$($input),*])?;
+                        curve.check_parameters([$($input),*])?;
 
                         paste::paste! {
                             $(
@@ -150,12 +151,13 @@ macro_rules! define_operations {
                     #[doc = concat!("Configures a new ", $first_line, " operation with the given inputs, to be executed on [`EccBackend`].")]
                     ///
                     /// Outputs need to be assigned separately before executing the operation.
+                    #[cfg_attr(ecc_has_curve_sm2, doc = "\n# Panics\nPanics if SM2 is selected and disabled by eFuse.")]
                     pub fn $function<'op>(
                         self,
                         $(#[cfg($is_modular)] modulus: EccModBase,)?
                         $($input: &'op [u8],)*
                     ) -> Result<EccBackendOperation<'op, $op>, KeyLengthMismatch> {
-                        self.size_check([&$($input,)*])?;
+                        self.check_parameters([&$($input,)*])?;
 
                         #[cfg(ecc_has_modular_arithmetic)]
                         let mod_base = $crate::if_set! {
@@ -472,6 +474,17 @@ for_each_ecc_curve! {
             )*
         }
         impl EllipticCurve {
+            /// Returns whether the curve is available for hardware operations.
+            #[cfg_attr(ecc_has_curve_sm2, doc = "\nSM2 is disabled when the `DIS_SM_CRYPT` eFuse is set.")]
+            #[instability::unstable]
+            pub fn is_supported(self) -> bool {
+                match self {
+                    #[cfg(ecc_has_curve_sm2)]
+                    Self::Sm2 => !crate::efuse::read_bit(crate::efuse::DIS_SM_CRYPT),
+                    _ => true,
+                }
+            }
+
             /// Returns the size of the elliptic curve in bytes.
             pub const fn size(self) -> usize {
                 match self {
@@ -487,6 +500,11 @@ for_each_ecc_curve! {
 for_each_ecc_working_mode! {
     (all $(($wm_id:literal, $op:tt)),*) => {
         impl EllipticCurve {
+            fn check_parameters<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
+                assert!(self.is_supported(), "SM2 is disabled by eFuse");
+                self.size_check(params)
+            }
+
             fn size_check<const N: usize>(&self, params: [&[u8]; N]) -> Result<(), KeyLengthMismatch> {
                 let bytes = self.size();
 
