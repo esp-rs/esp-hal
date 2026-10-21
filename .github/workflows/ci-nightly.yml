@@ -17,6 +17,7 @@ jobs:
     outputs:
       riscv: ${{ steps.resolve.outputs.riscv }}
       xtensa: ${{ steps.resolve.outputs.xtensa }}
+      template: ${{ steps.resolve.outputs.template }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -28,6 +29,11 @@ jobs:
             echo "$arch=$(jq -c --arg a "$arch" \
               '[.[] | select(.arch == $a) | .soc]' .github/chips.json)" >> "$GITHUB_OUTPUT"
           done
+          # esp-generate's chip plugin (esp-template-plugin-chip) does not offer
+          # the ESP32-H4 and ESP32-P4 yet. Remove them from this list once it does.
+          echo "template=$(jq -c \
+            '[.[] | select(.soc != "esp32h4" and .soc != "esp32p4") | {soc, arch}]' \
+            .github/chips.json)" >> "$GITHUB_OUTPUT"
 
   esp-hal-riscv-nightly:
     name: esp-hal | nightly (${{ matrix.device }})
@@ -84,6 +90,51 @@ jobs:
       - name: Lint esp-hal on Xtensa chip
         run: cargo xtask lint ${{ matrix.device }} --toolchain esp
 
+  esp-generate:
+    name: Build esp-generate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install esp-generate
+        run: cargo install --git https://github.com/esp-rs/esp-generate --locked --root "$RUNNER_TEMP/esp-generate" esp-generate
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: esp-generate
+          path: ${{ runner.temp }}/esp-generate/bin/esp-generate
+          retention-days: 1
+
+  template:
+    name: esp-generate template (${{ matrix.chip.soc }})
+    needs: [chips, esp-generate]
+    runs-on: ubuntu-latest
+    env:
+      CI: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        chip: ${{ fromJSON(needs.chips.outputs.template) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-toolchains
+        with:
+          xtensa: ${{ matrix.chip.arch == 'xtensa' }}
+          xtensa-buildtargets: ${{ matrix.chip.arch == 'xtensa' && matrix.chip.soc || '' }}
+          riscv: ${{ matrix.chip.arch == 'riscv' }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: esp-generate
+          path: ${{ runner.temp }}/esp-generate
+
+      - name: Add esp-generate to PATH
+        run: |
+          chmod +x "$RUNNER_TEMP/esp-generate/esp-generate"
+          echo "$RUNNER_TEMP/esp-generate" >> "$GITHUB_PATH"
+
+      - name: Check the esp-generate template
+        run: cargo xtask ci ${{ matrix.chip.soc }} --steps template
+
   check-global-symbols:
     name: Check Global Symbols in esp-hal
     runs-on: ubuntu-latest
@@ -106,6 +157,8 @@ jobs:
         chips,
         esp-hal-riscv-nightly,
         esp-hal-xtensa-clippy,
+        esp-generate,
+        template,
         check-global-symbols,
       ]
     if: ${{ failure() }}

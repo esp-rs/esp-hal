@@ -472,6 +472,37 @@ jobs:
         run: cd extras/ieee802154-sniffer && cargo build
 
   # --------------------------------------------------------------------------
+  # Check that the esp-generate template in `template/` renders and builds
+  # against this commit
+
+  template:
+    needs: calculate
+    if: needs.calculate.outputs.run-build == 'true'
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CI: 1
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-toolchains
+        with:
+          xtensa: "true"
+          xtensa-buildtargets: esp32s3
+          riscv: "true"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Setup esp-generate
+        run: cargo install --git https://github.com/esp-rs/esp-generate --locked esp-generate
+
+      - name: Check the esp-generate template (RISC-V)
+        run: cargo xtask ci esp32c6 --steps template
+
+      - name: Check the esp-generate template (Xtensa)
+        run: cargo xtask ci esp32s3 --steps template
+
+  # --------------------------------------------------------------------------
   # Check links in .rs, .md, and .toml files
   #
   # Deliberately absent from `ci-result` below.
@@ -556,6 +587,7 @@ jobs:
       - msrv
       - xtensa-lld
       - host-tests
+      - template
       - changelog
       - semver-check
       - hil

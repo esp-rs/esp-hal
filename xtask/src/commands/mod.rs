@@ -12,6 +12,7 @@ pub use self::{
     fmt::*,
     host_tests::*,
     lint::*,
+    new_project::*,
     release::*,
     run::*,
 };
@@ -32,6 +33,7 @@ mod host_tests;
 mod lint;
 #[cfg(feature = "mcp")]
 pub mod mcp;
+mod new_project;
 #[cfg(feature = "rel-check")]
 pub mod relcheck;
 mod release;
