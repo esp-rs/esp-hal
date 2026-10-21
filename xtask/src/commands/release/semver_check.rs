@@ -212,10 +212,10 @@ pub mod checker {
 
     #[derive(Debug)]
     enum BaselineSource {
-        Artifact(String), // GitHub Actions artifact name
+        ReleaseAsset(String), // GitHub release asset name
     }
 
-    /// Download API baselines from GitHub Actions artifacts for the specified packages.
+    /// Download API baselines from the `api-baselines` GitHub release for the specified packages.
     /// Fails with helpful error message if baselines are not available.
     pub fn download_baselines(workspace: &Path, packages: Vec<Package>) -> anyhow::Result<()> {
         for package in packages {
@@ -230,24 +230,23 @@ pub mod checker {
                 std::fs::remove_dir_all(&baseline_dir)?;
             }
 
-            // Try to download from GitHub Actions artifacts
-            // Note: Artifacts have a 90-day retention limit for public repositories
-            let artifact_name = format!("api-baselines-{}", package_name);
+            // Try to download from the `api-baselines` GitHub release
+            let asset_name = format!("api-baselines-{}", package_name);
 
-            let baseline_sources = vec![BaselineSource::Artifact(artifact_name)];
+            let baseline_sources = vec![BaselineSource::ReleaseAsset(asset_name)];
 
             let mut downloaded = false;
             for baseline_source in baseline_sources {
                 match &baseline_source {
-                    BaselineSource::Artifact(artifact_name) => {
+                    BaselineSource::ReleaseAsset(asset_name) => {
                         log::info!(
-                            "Attempting to download from GitHub Actions artifact: {artifact_name}"
+                            "Attempting to download from GitHub release asset: {asset_name}"
                         );
                         let repo = std::env::var("GITHUB_REPOSITORY")
                             .unwrap_or_else(|_| "esp-rs/esp-hal".to_string());
-                        if try_download_from_artifact(&package_path, artifact_name, &repo)? {
+                        if try_download_from_release(&package_path, asset_name, &repo)? {
                             log::info!(
-                                "Successfully downloaded baselines from artifact {artifact_name}"
+                                "Successfully downloaded baselines from release asset {asset_name}"
                             );
                             downloaded = true;
                             break;
@@ -257,7 +256,9 @@ pub mod checker {
             }
 
             if !downloaded {
-                return Err(anyhow::anyhow!("No API baselines found for {package}!"));
+                return Err(anyhow::anyhow!(
+                    "No API baselines found for {package}! A run of `API Baseline Generation` restores the baselines."
+                ));
             }
 
             // Verify that baselines were extracted correctly
@@ -296,10 +297,10 @@ pub mod checker {
         Ok(())
     }
 
-    /// Try to download baselines from a GitHub Actions artifact
-    fn try_download_from_artifact(
+    /// Try to download baselines from the `api-baselines` GitHub release
+    fn try_download_from_release(
         package_path: &PathBuf,
-        artifact_name: &str,
+        asset_name: &str,
         repo: &str,
     ) -> anyhow::Result<bool> {
         use std::{io::Cursor, process::Command};
@@ -309,12 +310,12 @@ pub mod checker {
         // Check if GitHub CLI is available
         let gh_check = Command::new("gh").arg("--version").output();
         if gh_check.is_err() {
-            log::error!("GitHub CLI (gh) not available, skipping artifact download");
+            log::error!("GitHub CLI (gh) not available, skipping release asset download");
             return Ok(false);
         }
 
         // Download the baseline ZIP from the `api-baselines` GitHub release
-        log::info!("Attempting to download artifact: {artifact_name} from {repo}");
+        log::info!("Attempting to download release asset: {asset_name} from {repo}");
 
         let download = Command::new("gh")
             .args([
@@ -324,22 +325,22 @@ pub mod checker {
                 "--repo",
                 repo,
                 "--pattern",
-                &format!("{artifact_name}.zip"),
+                &format!("{asset_name}.zip"),
                 "--output",
                 "-",
             ])
             .output();
 
         let Ok(result) = download else {
-            log::debug!("Error invoking gh release download for {}", artifact_name);
+            log::debug!("Error invoking gh release download for {}", asset_name);
             return Ok(false);
         };
 
         if !result.status.success() {
             let stderr = String::from_utf8_lossy(&result.stderr);
-            log::debug!(
+            log::error!(
                 "Failed to download release asset {}.zip. stderr: {}",
-                artifact_name,
+                asset_name,
                 stderr
             );
             return Ok(false);
@@ -351,7 +352,7 @@ pub mod checker {
         let mut archive = match ZipArchive::new(Cursor::new(&result.stdout)) {
             Ok(arc) => arc,
             Err(e) => {
-                log::debug!("Failed to open ZIP archive for {}: {}", artifact_name, e);
+                log::debug!("Failed to open ZIP archive for {}: {}", asset_name, e);
                 return Ok(false);
             }
         };
@@ -405,7 +406,7 @@ pub mod checker {
             }
         }
 
-        // Check if artifact produced any baselines
+        // Check if release asset produced any baselines
         if let Ok(entries) = std::fs::read_dir(&baseline_dir) {
             if entries.flatten().any(|e| {
                 let p = e.path();
@@ -418,7 +419,7 @@ pub mod checker {
                 return Ok(true);
             }
         }
-        log::debug!("No downloadable artifacts found for {}", artifact_name);
+        log::debug!("No baselines found in release asset {}", asset_name);
         Ok(false)
     }
 }

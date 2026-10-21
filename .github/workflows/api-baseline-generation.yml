@@ -168,14 +168,23 @@ jobs:
         shell: bash
         run: |
           if ! gh release view api-baselines -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/commits" -f message="Storage for the API baselines release, not part of any branch" -f tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904 --jq .sha)
-            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/tags/api-baselines -f sha="$SHA"
+            if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/api-baselines" > /dev/null 2>&1; then
+              SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/commits" -f message="Storage for the API baselines release, not part of any branch" -f tree=4b825dc642cb6eb9a060e54bf8d69288fbee4904 --jq .sha)
+              gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/tags/api-baselines -f sha="$SHA"
+            fi
             gh release create api-baselines -R "$GITHUB_REPOSITORY" --verify-tag --prerelease --latest=false --title "API baselines" --notes "Latest API baselines for semver checks. Not a release."
           fi
+          COMMIT=$(git rev-parse HEAD)
           PACKAGES="${{ steps.check-generation.outputs.packages }}"
           for PACKAGE_NAME in ${PACKAGES//,/ }; do
-            (cd "$PACKAGE_NAME/api-baseline" && zip -q "$GITHUB_WORKSPACE/api-baselines-$PACKAGE_NAME.zip" ./*.json.gz)
-            gh release upload api-baselines "$GITHUB_WORKSPACE/api-baselines-$PACKAGE_NAME.zip" -R "$GITHUB_REPOSITORY" --clobber
+            ASSET_NAME="api-baselines-$PACKAGE_NAME.zip"
+            TEMP_ASSET="api-baselines-$PACKAGE_NAME.tmp.zip"
+            ASSET_LABEL="$ASSET_NAME ($COMMIT)"
+            (cd "$PACKAGE_NAME/api-baseline" && zip -q "$GITHUB_WORKSPACE/$TEMP_ASSET" ./*.json.gz)
+            gh release upload api-baselines "$GITHUB_WORKSPACE/$TEMP_ASSET#$ASSET_LABEL" -R "$GITHUB_REPOSITORY" --clobber
+            gh release delete-asset api-baselines "$ASSET_NAME" -R "$GITHUB_REPOSITORY" -y || true
+            ASSET_ID=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/api-baselines" --jq ".assets[] | select(.name == \"$TEMP_ASSET\") | .id")
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID" -f name="$ASSET_NAME" -f label="$ASSET_LABEL" > /dev/null
           done
 
       - name: Create baseline summary
