@@ -6,7 +6,7 @@ SECTIONS {
    /* Keep each object's literal pool adjacent to its code (see comment in `text.x`). */
    *(.rtc_slow.literal .rtc_slow.text .rtc_slow.literal.* .rtc_slow.text.*)
    . = ALIGN(4);
-  } > rtc_slow_seg AT > RODATA
+  } > rtc_slow_seg
 
   .rtc_slow.data :
   {
@@ -15,10 +15,7 @@ SECTIONS {
     *(.rtc_slow.data .rtc_slow.data.*)
     _rtc_slow_data_end = ABSOLUTE(.);
     . = ALIGN(4);
-  } > rtc_slow_seg AT > RODATA
-
-  /* LMA of .data */
-  _rtc_slow_sidata = LOADADDR(.rtc_slow.data);
+  } > rtc_slow_seg
 
  .rtc_slow.bss (NOLOAD) :
   {
