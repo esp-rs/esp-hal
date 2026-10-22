@@ -53,6 +53,8 @@ struct IeeeState {
     /// as it is received, but, only delivered (queued and notified) once the
     /// ACK is sent or aborted - see [`deliver_pending_rx`].
     pending_rx: Option<RawReceived>,
+    /// The driver's PHY reference is given back while asleep - the C driver's `s_rf_closed`.
+    rf_closed: bool,
 }
 
 static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
@@ -62,6 +64,7 @@ static STATE: NonReentrantMutex<IeeeState> = NonReentrantMutex::new(IeeeState {
     pending_tx: None,
     ack_frame: None,
     pending_rx: None,
+    rf_closed: false,
 });
 
 unsafe extern "C" {
@@ -266,6 +269,8 @@ static mut TX_FRAME: *const u8 = core::ptr::null();
 
 pub fn ieee802154_transmit(frame: *const u8, cca: bool) -> i32 {
     STATE.with(|state| {
+        rf_enable(state);
+
         // TX deferral: don't abort in-flight frame reception or ACK transmission.
         // Matches the C driver's ieee802154_transmit() which defers to pending_tx.
         if state.state == Ieee802154State::TxAck
@@ -303,6 +308,8 @@ fn transmit_internal(state: &mut IeeeState, frame: *const u8, cca: bool) {
 
 pub fn ieee802154_receive() -> i32 {
     STATE.with(|state| {
+        rf_enable(state);
+
         if state.state == Ieee802154State::Receive || state.state == Ieee802154State::TxAck {
             // already in rx or tx_ack state, don't abort current operation
             return;
@@ -322,7 +329,8 @@ pub fn ieee802154_receive() -> i32 {
 ///
 /// As there, the operation is stopped even with a frame on the air: a frame being received is
 /// lost, the ACK of a received frame is aborted (the frame itself is delivered), and a
-/// transmission fails.
+/// transmission fails. The PHY reference is given back, so the RF is closed unless another radio
+/// still uses it.
 pub fn ieee802154_sleep() -> i32 {
     STATE.with(sleep_inner);
 
@@ -342,6 +350,33 @@ fn sleep_inner(state: &mut IeeeState) {
     }
 
     state.state = Ieee802154State::Sleep;
+
+    rf_disable(state);
+}
+
+/// Takes the PHY reference back - the C driver's `ieee802154_rf_enable`.
+fn rf_enable(state: &mut IeeeState) {
+    if state.rf_closed {
+        core::mem::forget(esp_phy::enable_phy());
+        state.rf_closed = false;
+    }
+}
+
+/// Gives the PHY reference back - the C driver's `ieee802154_rf_disable`.
+///
+/// The driver's [`PhyInitGuard`] stays alive: [`ieee802154_rf_restore`] retakes the reference
+/// before it is dropped.
+fn rf_disable(state: &mut IeeeState) {
+    if !state.rf_closed {
+        esp_phy::disable_phy();
+        state.rf_closed = true;
+    }
+}
+
+/// Takes the PHY reference back if sleep gave it back, so the driver's [`PhyInitGuard`] can be
+/// dropped.
+pub(crate) fn ieee802154_rf_restore() {
+    STATE.with(rf_enable);
 }
 
 pub fn ieee802154_poll() -> Option<RawReceived> {
