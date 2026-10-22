@@ -107,3 +107,21 @@ pub(crate) fn request_sleep() -> bool {
 
     super::wait_for_sleep_result()
 }
+
+/// Waits until the eFuse controller has reloaded the eFuse memory after the sleep request.
+///
+/// An eFuse read before this point can return stale data.
+#[cfg(not(esp32h2))]
+#[inline(always)]
+pub(crate) fn wait_for_efuse_idle() {
+    // `EFUSE_CONTROLLER_STATE_IDLE`
+    const IDLE: u8 = 1;
+
+    while crate::peripherals::EFUSE::regs()
+        .status()
+        .read()
+        .state()
+        .bits()
+        != IDLE
+    {}
+}

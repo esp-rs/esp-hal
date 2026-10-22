@@ -73,6 +73,7 @@ impl DigitalSleepConfig {
                 let mut cfg = HpSysCntlReg::default();
 
                 cfg.set_dig_pad_slp_sel(pd_flags.pd_top().not());
+                cfg.set_dig_pause_wdt(true);
 
                 cfg
             },
@@ -86,7 +87,13 @@ impl DigitalSleepConfig {
     fn defaults_deep_sleep() -> Self {
         Self {
             // PMU_SLEEP_DIGITAL_DSLP_CONFIG_DEFAULT
-            syscntl: HpSysCntlReg::default(),
+            syscntl: {
+                let mut cfg = HpSysCntlReg::default();
+
+                cfg.set_dig_pause_wdt(true);
+
+                cfg
+            },
             icg_func: 0,
             deep_sleep: true,
         }
@@ -100,12 +107,15 @@ impl DigitalSleepConfig {
         PMU::regs().hp_sleep_icg_hp_func().modify(|_, w| unsafe {
             w.hp_sleep_dig_icg_func_en().bits(self.icg_func) // pmu_ll_hp_set_icg_func
         });
-        if !self.deep_sleep {
-            PMU::regs().hp_sleep_hp_sys_cntl().modify(|_, w| {
+        PMU::regs().hp_sleep_hp_sys_cntl().modify(|_, w| {
+            w.hp_sleep_dig_pause_wdt().bit(self.syscntl.dig_pause_wdt());
+            w.hp_sleep_dig_cpu_stall().set_bit();
+            if !self.deep_sleep {
                 w.hp_sleep_dig_pad_slp_sel()
-                    .bit(self.syscntl.dig_pad_slp_sel()) // pmu_ll_hp_set_dig_pad_slp_sel
-            });
-        }
+                    .bit(self.syscntl.dig_pad_slp_sel()); // pmu_ll_hp_set_dig_pad_slp_sel
+            }
+            w
+        });
     }
 }
 
@@ -142,6 +152,8 @@ impl PowerSleepConfig {
         self.hp_sys.dig_power.set_cpu_pd_en(pd_flags.pd_cpu());
         self.hp_sys.dig_power.set_top_pd_en(pd_flags.pd_top());
 
+        self.hp_sys.clk.set_i2c_iso_en(true);
+        self.hp_sys.clk.set_i2c_retention(true);
         self.hp_sys.clk.set_xpd_bbpll(false);
 
         self.hp_sys.xtal.set_xpd_xtal(pd_flags.pd_xtal().not());
@@ -555,6 +567,7 @@ impl RtcSleepConfig {
             // Restore the old clock settings when we return
             DropGuard::new((), move |_| {
                 ClockTree::with(|clocks| {
+                    crate::soc::clocks::reconfigure_pll(clocks);
                     if let Some(old_hp_root_clk) = old_hp_root_clk {
                         clocks::configure_hp_root_clk(clocks, old_hp_root_clk);
                     }
@@ -637,6 +650,9 @@ impl RtcSleepConfig {
     /// Cleans up after sleep.
     #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
+        // Sleep loses this setting, which `rtc::init` also writes.
+        crate::soc::regi2c::I2C_BIAS_DREG_0P8.write_field(8);
+
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
     }
