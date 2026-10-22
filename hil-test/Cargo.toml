@@ -75,7 +75,7 @@ harness           = false
 [[bin]]
 name              = "ppa"
 harness           = false
-required-features = ["unstable"]
+required-features = ["unstable", "psram"]
 
 [[bin]]
 name              = "rmt"

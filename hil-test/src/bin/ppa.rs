@@ -1,13 +1,16 @@
 //! PPA SRM tests. No external wiring is required.
 
 //% CHIP_FILTER: pixel_accelerator_driver_supported
-//% FEATURES: unstable
+//% FEATURES: unstable psram
 
 #![no_std]
 #![no_main]
 
+use allocator_api2::boxed::Box;
+use esp_alloc::ExternalMemory;
 use esp_hal::{
     Blocking,
+    dma::aligned::DmaAlignedMut,
     peripherals::{DMA2D, PPA},
     ppa::srm::{Config, Error, Input, Offset, Output, PixelFormat, Rotation, Size, Srm},
 };
@@ -149,6 +152,7 @@ mod tests {
     #[init]
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+        esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);
         static SOURCE: ConstStaticCell<Buffer<SOURCE_BYTES>> =
             ConstStaticCell::new(Buffer([0; SOURCE_BYTES]));
         static DESTINATION: ConstStaticCell<Buffer<DESTINATION_BYTES>> =
@@ -225,37 +229,59 @@ mod tests {
 
     #[test]
     fn test_scaling(mut ctx: Context) {
-        const SIDE: usize = 32;
+        const SIDE: usize = 80;
         let size = Size {
-            width: 16,
-            height: 8,
+            width: 40,
+            height: 36,
         };
         let offset = Offset { x: 3, y: 5 };
         let source = &mut ctx.source[..size.width * size.height];
         for y in 0..size.height {
             for x in 0..size.width {
-                source[y * size.width + x] = (4 * x + 12 * y) as u8;
+                source[y * size.width + x] = (2 * x + 4 * y) as u8;
             }
         }
         let destination = &mut ctx.destination[..SIDE * SIDE];
         let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
-        for (config, output_size) in [
+        for (config, (scale_x, scale_y), output_size) in [
             (
                 Config::default()
                     .with_scale_x(0.5)
                     .with_scale_y(0.25)
                     .with_rotation(Rotation::Degrees90)
                     .with_mirror_x(true),
+                (0.5, 0.25),
                 Size {
-                    width: 2,
-                    height: 8,
+                    width: 9,
+                    height: 20,
                 },
             ),
             (
                 Config::default().with_scale_x(1.5).with_scale_y(2.0),
+                (1.5, 2.0),
                 Size {
-                    width: 24,
-                    height: 16,
+                    width: 60,
+                    height: 72,
+                },
+            ),
+            (
+                Config::default()
+                    .with_scale_x(1.24)
+                    .with_scale_y(1.0 / 16.0),
+                (19.0 / 16.0, 1.0 / 16.0),
+                Size {
+                    width: 47,
+                    height: 2,
+                },
+            ),
+            (
+                Config::default()
+                    .with_scale_x(1.0 / 16.0)
+                    .with_scale_y(1.24),
+                (1.0 / 16.0, 19.0 / 16.0),
+                Size {
+                    width: 2,
+                    height: 42,
                 },
             ),
         ] {
@@ -295,13 +321,13 @@ mod tests {
                             _ => unreachable!(),
                         };
                         // Pixel-center sampling; upscaling allows one level of rounding error.
-                        let x = ((x as f32 + 0.5) / config.scale_x() - 0.5)
-                            .clamp(0.0, (size.width - 1) as f32);
-                        let y = ((y as f32 + 0.5) / config.scale_y() - 0.5)
-                            .clamp(0.0, (size.height - 1) as f32);
+                        let x =
+                            ((x as f32 + 0.5) / scale_x - 0.5).clamp(0.0, (size.width - 1) as f32);
+                        let y =
+                            ((y as f32 + 0.5) / scale_y - 0.5).clamp(0.0, (size.height - 1) as f32);
                         (
-                            (4.0 * x + 12.0 * y + 0.5) as u8,
-                            u8::from(config.scale_x() > 1.0 || config.scale_y() > 1.0),
+                            (2.0 * x + 4.0 * y + 0.5) as u8,
+                            u8::from(scale_x > 1.0 || scale_y > 1.0),
                         )
                     } else {
                         (0xa5, 0)
@@ -454,6 +480,556 @@ mod tests {
             Offset { x: 3, y: 5 },
             Config::default().with_rotation(Rotation::Degrees90),
         );
+    }
+
+    #[test]
+    fn test_buffer_layouts(mut ctx: Context) {
+        let size = Size {
+            width: 17,
+            height: 3,
+        };
+        let bytes = size.width * size.height * 2;
+        let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+        for (source_start, destination_start, padding) in
+            [(0, 0, 0), (1, 0, 0), (0, 1, 0), (1, 1, 0), (1, 1, 17)]
+        {
+            ctx.source.fill(0x5a);
+            ctx.destination.fill(0xa5);
+            let source = &mut ctx.source[source_start..source_start + bytes + padding];
+            fill_source(source, size, PixelFormat::Rgb565);
+            srm.run(
+                Input {
+                    data: source,
+                    size,
+                    format: PixelFormat::Rgb565,
+                },
+                Output {
+                    data: &mut ctx.destination
+                        [destination_start..destination_start + bytes + padding],
+                    size,
+                    format: PixelFormat::Rgb565,
+                    offset: Offset::default(),
+                },
+                Config::default(),
+            )
+            .unwrap();
+            assert_eq!(
+                &ctx.destination[destination_start..destination_start + bytes],
+                &source[..bytes],
+                "source {source_start}, destination {destination_start}, padding {padding}",
+            );
+            assert!(
+                ctx.destination[..destination_start]
+                    .iter()
+                    .all(|&byte| byte == 0xa5)
+            );
+            assert!(
+                ctx.destination[destination_start + bytes..]
+                    .iter()
+                    .all(|&byte| byte == 0xa5)
+            );
+            assert!(ctx.source[..source_start].iter().all(|&byte| byte == 0x5a));
+            assert!(
+                ctx.source[source_start + bytes..]
+                    .iter()
+                    .all(|&byte| byte == 0x5a)
+            );
+        }
+    }
+
+    #[test]
+    fn test_dimension_limits(mut ctx: Context) {
+        use allocator_api2::vec::Vec;
+
+        const DMA_MAX: usize = 0x3fff;
+        const SRM_MAX: usize = 0x1fff;
+        const CAPACITY: usize = (DMA_MAX * 3).next_multiple_of(64);
+        let dimensions = |long, vertical| {
+            if vertical {
+                Size {
+                    width: 3,
+                    height: long,
+                }
+            } else {
+                Size {
+                    width: long,
+                    height: 3,
+                }
+            }
+        };
+        let mut source = Vec::new_in(ExternalMemory);
+        source.resize(CAPACITY, 0u8);
+        for (i, byte) in source.iter_mut().enumerate() {
+            *byte = ((17 * i) ^ (i >> 8)) as u8;
+        }
+        let mut storage = Vec::new_in(ExternalMemory);
+        storage.resize(CAPACITY + 3 * 64 - 1, 0xa5);
+        let start = storage.as_ptr().align_offset(64) + 64;
+        for range in [start - 64..start, start + CAPACITY..start + CAPACITY + 64] {
+            DmaAlignedMut::new(&mut storage[range]).unwrap().writeback();
+        }
+        let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+        for (dimension, step) in [(SRM_MAX, 1), (DMA_MAX, 2)] {
+            for vertical in [false, true] {
+                let size = dimensions(dimension, vertical);
+                let scaled = dimensions(SRM_MAX, vertical);
+                for rotation in [Rotation::Degrees0, Rotation::Degrees90] {
+                    let config = if vertical {
+                        Config::default().with_scale_y(1.0 / step as f32)
+                    } else {
+                        Config::default().with_scale_x(1.0 / step as f32)
+                    }
+                    .with_rotation(rotation);
+                    let canvas_vertical = vertical != (rotation == Rotation::Degrees90);
+                    let canvas = dimensions(DMA_MAX, canvas_vertical);
+                    let transformed = dimensions(SRM_MAX, canvas_vertical);
+                    let offset = Offset {
+                        x: canvas.width - transformed.width,
+                        y: canvas.height - transformed.height,
+                    };
+                    assert_eq!(config.output_size(size), Ok(transformed));
+                    let destination = &mut storage[start..start + CAPACITY];
+                    destination.fill(0xa5);
+                    assert_eq!(
+                        srm.run(
+                            Input {
+                                data: &source[..size.width * size.height],
+                                size,
+                                format: PixelFormat::Gray8,
+                            },
+                            Output {
+                                data: destination,
+                                size: canvas,
+                                format: PixelFormat::Gray8,
+                                offset,
+                            },
+                            config,
+                        ),
+                        Ok(()),
+                        "{size:?}, {config:?}",
+                    );
+                    for y in 0..canvas.height {
+                        for x in 0..canvas.width {
+                            let (expected, tolerance) = if x >= offset.x && y >= offset.y {
+                                let (x, y) = (x - offset.x, y - offset.y);
+                                let (x, y) = match rotation {
+                                    Rotation::Degrees0 => (x, y),
+                                    Rotation::Degrees90 => (scaled.width - 1 - y, x),
+                                    _ => unreachable!(),
+                                };
+                                let (first, second) = if vertical {
+                                    let first = y * step * size.width + x;
+                                    (first, first + (step - 1) * size.width)
+                                } else {
+                                    let first = y * size.width + x * step;
+                                    (first, first + step - 1)
+                                };
+                                (
+                                    (source[first] as u16 + source[second] as u16).div_ceil(2)
+                                        as u8,
+                                    (step - 1) as u8,
+                                )
+                            } else {
+                                (0xa5, 0)
+                            };
+                            let actual = destination[y * canvas.width + x];
+                            assert!(
+                                actual.abs_diff(expected) <= tolerance,
+                                "pixel ({x}, {y}), {size:?}, {config:?}: actual={actual}, expected={expected}",
+                            );
+                        }
+                    }
+                    assert!(
+                        destination[canvas.width * canvas.height..]
+                            .iter()
+                            .all(|&b| b == 0xa5)
+                    );
+                    for range in [start - 64..start, start + CAPACITY..start + CAPACITY + 64] {
+                        let guard = DmaAlignedMut::new(&mut storage[range]).unwrap();
+                        guard.invalidate();
+                        assert!(guard.iter().all(|&byte| byte == 0xa5));
+                    }
+                }
+            }
+        }
+        for dimension in [SRM_MAX + 1, DMA_MAX] {
+            for vertical in [false, true] {
+                let size = dimensions(dimension, vertical);
+                for rotation in [Rotation::Degrees0, Rotation::Degrees90] {
+                    let config = Config::default().with_rotation(rotation);
+                    let canvas = dimensions(DMA_MAX, vertical != (rotation == Rotation::Degrees90));
+                    assert_eq!(config.output_size(size), Err(Error::InvalidSize));
+                    let destination = &mut storage[start..start + CAPACITY];
+                    destination.fill(0xa5);
+                    assert_eq!(
+                        srm.run(
+                            Input {
+                                data: &source[..size.width * size.height],
+                                size,
+                                format: PixelFormat::Gray8,
+                            },
+                            Output {
+                                data: destination,
+                                size: canvas,
+                                format: PixelFormat::Gray8,
+                                offset: Offset::default(),
+                            },
+                            config,
+                        ),
+                        Err(Error::InvalidSize),
+                    );
+                    assert!(destination.iter().all(|&byte| byte == 0xa5));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_invalid_sizes(mut ctx: Context) {
+        let size = Size {
+            width: 17,
+            height: 3,
+        };
+        let bytes = size.width * size.height * 2;
+        let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+        for (source_len, destination_len, offset) in [
+            (bytes - 1, bytes, Offset::default()),
+            (bytes, bytes - 1, Offset::default()),
+            (bytes, bytes, Offset { x: 1, y: 0 }),
+            (bytes, bytes, Offset { x: 0, y: 1 }),
+            (
+                bytes,
+                bytes,
+                Offset {
+                    x: usize::MAX,
+                    y: 0,
+                },
+            ),
+            (
+                bytes,
+                bytes,
+                Offset {
+                    x: 0,
+                    y: usize::MAX,
+                },
+            ),
+        ] {
+            ctx.destination.fill(0xa5);
+            assert_eq!(
+                srm.run(
+                    Input {
+                        data: &ctx.source[..source_len],
+                        size,
+                        format: PixelFormat::Rgb565,
+                    },
+                    Output {
+                        data: &mut ctx.destination[..destination_len],
+                        size,
+                        format: PixelFormat::Rgb565,
+                        offset,
+                    },
+                    Config::default(),
+                ),
+                Err(Error::InvalidSize),
+            );
+            assert!(ctx.destination.iter().all(|&byte| byte == 0xa5));
+        }
+    }
+
+    #[test]
+    fn test_invalid_dimensions(mut ctx: Context) {
+        let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+        for dimension in [0, 0x4000, usize::MAX] {
+            for invalid in [
+                Size {
+                    width: dimension,
+                    height: 1,
+                },
+                Size {
+                    width: 1,
+                    height: dimension,
+                },
+            ] {
+                for (input_size, output_size) in [(invalid, SOURCE_SIZE), (SOURCE_SIZE, invalid)] {
+                    ctx.destination.fill(0xa5);
+                    assert_eq!(
+                        srm.run(
+                            Input {
+                                data: ctx.source,
+                                size: input_size,
+                                format: PixelFormat::Rgb565,
+                            },
+                            Output {
+                                data: ctx.destination,
+                                size: output_size,
+                                format: PixelFormat::Rgb565,
+                                offset: Offset::default(),
+                            },
+                            Config::default(),
+                        ),
+                        Err(Error::InvalidSize),
+                        "{input_size:?} -> {output_size:?}",
+                    );
+                    assert!(ctx.destination.iter().all(|&byte| byte == 0xa5));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_invalid_scaling(mut ctx: Context) {
+        let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+        for (scale, expected) in [
+            (-1.0, Error::InvalidScale),
+            (0.0, Error::InvalidScale),
+            (1.0 / 32.0, Error::InvalidScale),
+            (1.0 / 16.0, Error::InvalidSize),
+            (256.0, Error::InvalidScale),
+            (f32::NAN, Error::InvalidScale),
+            (f32::INFINITY, Error::InvalidScale),
+            (f32::NEG_INFINITY, Error::InvalidScale),
+        ] {
+            for config in [
+                Config::default().with_scale_x(scale),
+                Config::default().with_scale_y(scale),
+            ] {
+                ctx.destination.fill(0xa5);
+                assert_eq!(
+                    srm.run(
+                        Input {
+                            data: ctx.source,
+                            size: Size {
+                                width: 1,
+                                height: 1,
+                            },
+                            format: PixelFormat::Rgb565,
+                        },
+                        Output {
+                            data: ctx.destination,
+                            size: SOURCE_SIZE,
+                            format: PixelFormat::Rgb565,
+                            offset: Offset::default(),
+                        },
+                        config,
+                    ),
+                    Err(expected),
+                    "{config:?}",
+                );
+                assert!(ctx.destination.iter().all(|&byte| byte == 0xa5));
+            }
+        }
+    }
+
+    #[test]
+    fn test_invalid_uyvy422_sizes(mut ctx: Context) {
+        let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+        for (input_format, output_format, input_width, output_width, offset_x) in [
+            (PixelFormat::Uyvy422, PixelFormat::Rgb565, 17, 20, 0),
+            (PixelFormat::Rgb565, PixelFormat::Uyvy422, 16, 19, 0),
+            (PixelFormat::Rgb565, PixelFormat::Uyvy422, 16, 20, 1),
+            (PixelFormat::Rgb565, PixelFormat::Uyvy422, 17, 20, 0),
+        ] {
+            ctx.destination.fill(0xa5);
+            assert_eq!(
+                srm.run(
+                    Input {
+                        data: ctx.source,
+                        size: Size {
+                            width: input_width,
+                            height: 2,
+                        },
+                        format: input_format,
+                    },
+                    Output {
+                        data: ctx.destination,
+                        size: Size {
+                            width: output_width,
+                            height: 2,
+                        },
+                        format: output_format,
+                        offset: Offset { x: offset_x, y: 0 },
+                    },
+                    Config::default(),
+                ),
+                Err(Error::InvalidSize),
+                "{input_format:?} -> {output_format:?}, widths {input_width} -> {output_width}, offset {offset_x}",
+            );
+            assert!(ctx.destination.iter().all(|&byte| byte == 0xa5));
+        }
+    }
+
+    #[test]
+    fn test_psram(mut ctx: Context) {
+        let mut source = Box::new_in(Buffer([0x5a; SOURCE_BYTES + 128]), ExternalMemory);
+        let mut destination = Box::new_in(Buffer([0xa5; DESTINATION_BYTES + 128]), ExternalMemory);
+        // Seed guard bytes in RAM before dirtying the source image.
+        DmaAlignedMut::new(&mut source.0).unwrap().writeback();
+        DmaAlignedMut::new(&mut destination.0[..64])
+            .unwrap()
+            .writeback();
+        fill_source(
+            &mut source.0[1..SOURCE_BYTES + 1],
+            SOURCE_SIZE,
+            PixelFormat::Rgb565,
+        );
+        let input = Input {
+            data: &source.0[1..SOURCE_BYTES + 18],
+            size: SOURCE_SIZE,
+            format: PixelFormat::Rgb565,
+        };
+        let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+        for (start, len) in [(1, DESTINATION_BYTES), (0, DESTINATION_BYTES + 1)] {
+            assert_eq!(
+                srm.run(
+                    Input { ..input },
+                    Output {
+                        data: &mut destination.0[start..start + len],
+                        size: Size {
+                            width: DESTINATION_SIZE,
+                            height: DESTINATION_SIZE,
+                        },
+                        format: PixelFormat::Rgb565,
+                        offset: Offset::default(),
+                    },
+                    Config::default(),
+                ),
+                Err(Error::UnalignedBuffer),
+            );
+            assert!(destination.0.iter().all(|&byte| byte == 0xa5));
+        }
+        fill_source(ctx.source, SOURCE_SIZE, PixelFormat::Rgb565);
+        for rotation in [Rotation::Degrees0, Rotation::Degrees90] {
+            check_unscaled(
+                &mut srm,
+                Input { ..input },
+                ctx.destination,
+                OFFSET,
+                Config::default().with_rotation(rotation),
+            );
+            for data in [ctx.source.as_slice(), input.data] {
+                check_unscaled(
+                    &mut srm,
+                    Input { data, ..input },
+                    &mut destination.0[64..],
+                    OFFSET,
+                    Config::default().with_rotation(rotation),
+                );
+                DmaAlignedMut::new(&mut destination.0[..64])
+                    .unwrap()
+                    .invalidate();
+                assert!(destination.0[..64].iter().all(|&byte| byte == 0xa5));
+                assert!(
+                    destination.0[64 + DESTINATION_BYTES..]
+                        .iter()
+                        .all(|&byte| byte == 0xa5)
+                );
+            }
+        }
+        DmaAlignedMut::new(&mut source.0).unwrap().invalidate();
+        assert_eq!(source.0[0], 0x5a);
+        assert!(
+            source.0[SOURCE_BYTES + 1..]
+                .iter()
+                .all(|&byte| byte == 0x5a)
+        );
+    }
+
+    #[test]
+    fn test_hardware_error_recovery(mut ctx: Context) {
+        use core::sync::atomic::{AtomicBool, Ordering};
+
+        use allocator_api2::vec::Vec;
+        use esp_hal::{handler, interrupt, peripherals::Interrupt, system::Cpu};
+
+        static INJECTED: AtomicBool = AtomicBool::new(false);
+        #[unsafe(link_section = ".data")]
+        static INVALID: Buffer<24> = Buffer([0; 24]);
+
+        #[handler]
+        fn inject_error() {
+            let dma = DMA2D::regs();
+            dma.out_int_ena_ch(0)
+                .write(|w| w.out_done_ch_int_ena().clear_bit());
+            dma.out_link_conf_ch(0)
+                .modify(|_, w| w.outlink_stop_ch().set_bit());
+            dma.out_conf0_ch(0)
+                .modify(|_, w| w.out_cmd_disable_ch().set_bit());
+            while !dma.out_state_ch(0).read().out_reset_avail_ch().bit() {
+                core::hint::spin_loop();
+            }
+            dma.out_conf0_ch(0).modify(|_, w| w.out_rst_ch().set_bit());
+            dma.out_conf0_ch(0).modify(|_, w| {
+                w.out_rst_ch().clear_bit();
+                w.out_cmd_disable_ch().clear_bit();
+                w.out_check_owner_ch().set_bit()
+            });
+            dma.out_link_addr_ch(0)
+                .write(|w| unsafe { w.outlink_addr_ch().bits((&raw const INVALID) as u32) });
+            dma.out_link_conf_ch(0)
+                .modify(|_, w| w.outlink_start_ch().set_bit());
+            while !dma.out_int_raw_ch(0).read().out_dscr_err_ch_int_raw().bit() {
+                core::hint::spin_loop();
+            }
+            INJECTED.store(true, Ordering::Relaxed);
+        }
+
+        let size = Size {
+            width: SOURCE_SIZE.width * 8,
+            height: SOURCE_SIZE.height * 8,
+        };
+        let bytes = size.width * size.height * 2;
+        let mut storage = Vec::new_in(ExternalMemory);
+        // Own complete cache lines for both guards.
+        storage.resize(bytes + 3 * 64 - 1, 0xa5);
+        let start = storage.as_ptr().align_offset(64) + 64;
+        for range in [start - 64..start, start + bytes..start + bytes + 64] {
+            DmaAlignedMut::new(&mut storage[range]).unwrap().writeback();
+        }
+        fill_source(ctx.source, SOURCE_SIZE, PixelFormat::Rgb565);
+        let mut srm = Srm::new(ctx.ppa.reborrow(), ctx.dma.reborrow());
+        interrupt::bind_handler(Interrupt::DMA2D_OUT_CH0, inject_error);
+        for rotation in [Rotation::Degrees0, Rotation::Degrees90] {
+            INJECTED.store(false, Ordering::Relaxed);
+            let dma = DMA2D::regs();
+            dma.out_int_clr_ch(0)
+                .write(|w| w.out_done_ch_int_clr().set_bit());
+            // Upscaling keeps RX active while TX completion triggers the descriptor fault.
+            dma.out_int_ena_ch(0)
+                .write(|w| w.out_done_ch_int_ena().set_bit());
+            let result = srm.run(
+                Input {
+                    data: ctx.source,
+                    size: SOURCE_SIZE,
+                    format: PixelFormat::Rgb565,
+                },
+                Output {
+                    data: &mut storage[start..start + bytes],
+                    size,
+                    format: PixelFormat::Rgb565,
+                    offset: Offset::default(),
+                },
+                Config::default().with_scale_x(8.0).with_scale_y(8.0),
+            );
+            assert!(INJECTED.load(Ordering::Relaxed));
+            assert_eq!(result, Err(Error::Hardware));
+            for range in [start - 64..start, start + bytes..start + bytes + 64] {
+                let guard = DmaAlignedMut::new(&mut storage[range]).unwrap();
+                guard.invalidate();
+                assert!(guard.iter().all(|&byte| byte == 0xa5));
+            }
+            check_unscaled(
+                &mut srm,
+                Input {
+                    data: ctx.source,
+                    size: SOURCE_SIZE,
+                    format: PixelFormat::Rgb565,
+                },
+                ctx.destination,
+                OFFSET,
+                Config::default().with_rotation(rotation),
+            );
+        }
+        interrupt::disable(Cpu::current(), Interrupt::DMA2D_OUT_CH0);
     }
 
     #[test]

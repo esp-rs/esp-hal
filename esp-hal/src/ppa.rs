@@ -9,7 +9,5 @@
     chip!(),
     "/api-reference/peripherals/ppa.html)"
 )]
-//! ## Implementation State
-//! Only the ESP32-S31 [`srm`] driver is implemented.
 
 pub mod srm;
