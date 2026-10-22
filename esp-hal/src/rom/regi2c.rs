@@ -57,25 +57,29 @@ pub(crate) struct RawRegI2cField {
 impl RawRegI2cField {
     #[allow(unused)]
     pub const fn new(register: RegI2cRegister, msb: u8, lsb: u8) -> Self {
-        ::core::assert!(msb < 8 + lsb);
+        ::core::assert!(lsb <= msb && msb < 8);
         Self { register, msb, lsb }
+    }
+
+    const fn mask(&self) -> u8 {
+        const fn lower_n_bits(bits: u8) -> u8 {
+            !((u32::MAX << bits) as u8)
+        }
+
+        lower_n_bits(self.msb - self.lsb + 1)
     }
 
     #[allow(unused)]
     pub fn read(&self) -> u8 {
-        let reg_raw = self.register.read();
-        (reg_raw >> self.lsb) & !(u8::MAX << (self.msb - self.lsb + 1))
+        (self.register.read() >> self.lsb) & self.mask()
     }
 
     #[allow(unused)]
     pub fn write_field(&self, data: u8) {
+        let mask = self.mask() << self.lsb;
         let bits = self.register.read();
-
-        let unwritten_bits = (!(u32::MAX << self.lsb) | (u32::MAX << (self.msb + 1))) as u8;
-        let data_mask = !(u32::MAX << (self.msb - self.lsb + 1)) as u8;
-        let data_bits = (data & data_mask) << self.lsb;
-
-        self.register.write_reg((bits & unwritten_bits) | data_bits);
+        self.register
+            .write_reg((bits & !mask) | ((data << self.lsb) & mask));
     }
 }
 
