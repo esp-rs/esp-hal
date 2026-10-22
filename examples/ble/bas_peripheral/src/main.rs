@@ -102,9 +102,8 @@ async fn main(_s: Spawner) {
         {
             use esp_hal::clock::ll::BleLpClkConfig;
 
-            // For now, only Xtal can be selected if modem-sleep is enabled.
-            // This is our default anyway, a safe choice even in light sleep,
-            // although it can raise the sleep current a bit.
+            // `Xtal` is the default, and a safe choice even in light sleep, although keeping the
+            // main crystal running raises the sleep current compared to an RC oscillator.
             config.ble_lp_clk = Some(BleLpClkConfig::Xtal);
         }
 

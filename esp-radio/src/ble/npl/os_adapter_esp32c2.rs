@@ -2,7 +2,7 @@ use procmacros::BuilderLite;
 
 use super::*;
 use crate::{
-    ble::InvalidConfigError,
+    ble::{InvalidConfigError, lp_clk},
     hal::{interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
     sys::include::esp_bt_controller_config_t,
@@ -278,7 +278,7 @@ impl Config {
 pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
     let main_xtal_freq = esp_hal::clock::xtal_clock().as_mhz() as u8;
 
-    let rtc_freq = u64::from(super::super::lp_clk::frequency_hz());
+    let rtc_freq = u64::from(lp_clk::frequency_hz());
 
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
@@ -293,7 +293,12 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_adv_dup_list_count: config.ll_adv_dup_list_count,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
         rtc_freq,
-        ble_ll_sca: CONFIG_BT_LE_LL_SCA as _,
+        // ESP-IDF: `ble_rtc_clk_init()` in `bt.c`.
+        ble_ll_sca: if lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source) {
+            lp_clk::RC_SCA_PPM as _
+        } else {
+            CONFIG_BT_LE_LL_SCA as _
+        },
         ble_ll_scan_phy_number: if CONFIG_BT_LE_LL_CFG_FEAT_LE_CODED_PHY != 0 {
             2
         } else {

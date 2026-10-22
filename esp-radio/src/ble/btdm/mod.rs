@@ -310,7 +310,22 @@ unsafe extern "C" fn btdm_sleep_enter_phase1(lpcycles: i32) {
         esp32 => lp_time,
         _ => lp_time >> 1,
     };
-    let uncertainty = (us_to_sleep >> 11).max(MIN_UNCERTAINTY_US);
+    let uncertainty = cfg_select! {
+        esp32 => us_to_sleep >> 11,
+        _ => {
+            // When either the controller sleep clock or the RTC wakeup timer runs
+            // on an RC oscillator, allow a 7% drift margin.
+            if super::lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source)
+                || super::lp_clk::source_is_rc(esp_hal::clock::ll::rtc_slow_clk_root_source)
+            {
+                const RC_DRIFT_PERCENT: u64 = 7;
+                (u64::from(us_to_sleep) * RC_DRIFT_PERCENT / 100) as u32
+            } else {
+                us_to_sleep >> 11
+            }
+        }
+    };
+    let uncertainty = uncertainty.max(MIN_UNCERTAINTY_US);
     let now = esp_hal::time::Instant::now()
         .duration_since_epoch()
         .as_micros();
@@ -354,6 +369,9 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
         }
         _ => {
             let _ = phy_restored;
+            if super::lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source) {
+                LP_CYCLE_US.store(super::lp_clk::btdm_lpcycle_us(), Ordering::Relaxed);
+            }
             unsafe { while btdm_sleep_clock_sync() != 0 {} }
         }
     }

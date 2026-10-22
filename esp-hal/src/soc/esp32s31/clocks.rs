@@ -893,7 +893,8 @@ fn configure_ble_lp_clk_impl(
 ) {
     let divisor = match new_config {
         BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
-        _ => 0,
+        #[cfg(use_xtal32k)]
+        BleLpClkConfig::Xtal32k => 0,
     };
     let sel_xtal32k = cfg_select! {
         use_xtal32k => new_config == BleLpClkConfig::Xtal32k,
@@ -905,8 +906,7 @@ fn configure_ble_lp_clk_impl(
         .modify(|_, w| w.clk_en().set_bit());
 
     MODEM_LPCON::regs().lp_timer_conf().modify(|_, w| unsafe {
-        w.clk_lp_timer_sel_osc_slow()
-            .bit(new_config == BleLpClkConfig::RcSlow);
+        w.clk_lp_timer_sel_osc_slow().clear_bit();
         w.clk_lp_timer_sel_osc_fast().clear_bit();
         w.clk_lp_timer_sel_xtal()
             .bit(new_config == BleLpClkConfig::Xtal);

@@ -59,7 +59,6 @@ system_clocks = { clock_tree = [
     { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "100_000" },
     { name = "BLE_LP_CLK", type = "mux", variants = [
         { name = "XTAL",    outputs = "BLE_LP_XTAL_CLK" },
-        { name = "RC_SLOW", outputs = "RC_SLOW_CLK" },
         { name = "XTAL32K", outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 
