@@ -944,7 +944,7 @@ impl LpSystemInit {
 
     fn sleep() -> Self {
         let mut dig_power = LpDigPower::default();
-        dig_power.set_mem_dslp(true);
+        dig_power.set_mem_dslp(false);
         dig_power.set_peri_pd_en(false);
 
         let mut clk_power = LpClkPower::default();
