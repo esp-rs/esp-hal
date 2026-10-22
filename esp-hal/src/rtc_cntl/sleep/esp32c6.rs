@@ -247,7 +247,7 @@ impl PowerSleepConfig {
         self.lp_sys_sleep
             .dig_power
             .set_peri_pd_en(pd_flags.pd_lp_periph());
-        self.lp_sys_sleep.dig_power.set_mem_dslp(true);
+        self.lp_sys_sleep.dig_power.set_mem_dslp(false);
 
         self.lp_sys_sleep
             .clk_power
@@ -844,8 +844,7 @@ impl RtcSleepConfig {
     /// Cleans up after sleep.
     #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
-        // like esp-idf pmu_sleep_finish()
-        // In "pd_cpu lightsleep" and "deepsleep" modes we never get here
+        super::pmu_common::wait_for_efuse_idle();
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.
