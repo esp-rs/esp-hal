@@ -10,12 +10,6 @@ use hil_test as _;
 
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
-    #[cfg(any(esp32c5, esp32c6))]
-    use esp_hal::gpio::NoPin;
-    #[cfg(any(esp32c5, esp32c6))]
-    use esp_hal::parl_io::{RxEightBits, RxPinConfigIncludingValidPin, TxEightBits};
-    #[cfg(esp32c6)]
-    use esp_hal::parl_io::{RxSixteenBits, TxPinConfigIncludingValidPin, TxSixteenBits};
     use esp_hal::{
         dma_rx_buffer,
         dma_tx_buffer,
@@ -27,12 +21,15 @@ mod tests {
             ParlIo,
             RxClkInPin,
             RxConfig,
+            RxEightBits,
             RxFourBits,
             RxOneBit,
+            RxPinConfigIncludingValidPin,
             RxPinConfigWithValidPin,
             RxTwoBits,
             SampleEdge,
             TxConfig,
+            TxEightBits,
             TxFourBits,
             TxOneBit,
             TxPinConfigWithValidPin,
@@ -41,6 +38,21 @@ mod tests {
         peripherals::{DMA_CH0, PARL_IO},
         time::Rate,
     };
+
+    cfg_select! {
+        esp32c5 => {
+            use esp_hal::gpio::NoPin;
+        }
+        esp32c6 => {
+            use esp_hal::{
+                gpio::NoPin,
+                parl_io::{RxSixteenBits, TxPinConfigIncludingValidPin, TxSixteenBits},
+            };
+        }
+        esp32h2 => {
+            use esp_hal::parl_io::TxPinConfigIncludingValidPin;
+        }
+    }
 
     struct Context {
         parl_io: PARL_IO<'static>,
@@ -97,7 +109,7 @@ mod tests {
             }
             esp32h2 => {
                 // 8 is RGB, 26 and 27 is USB, 12 and 22 are I2C, 2 is tied to 3, 10 is tied to 11.
-                // Only the first four pins are driven, the 8 bit mode is not tested here.
+                // 23 is UART0 RX. The 8-bit test does not drive the last pin.
                 (
                     peripherals.GPIO0.degrade(),
                     peripherals.GPIO1.degrade(),
@@ -108,8 +120,8 @@ mod tests {
                         peripherals.GPIO8.degrade(),
                         peripherals.GPIO9.degrade(),
                         peripherals.GPIO13.degrade(),
-                        peripherals.GPIO23.degrade(),
                         peripherals.GPIO25.degrade(),
+                        peripherals.GPIO23.degrade(),
                     ],
                 )
             }
@@ -391,7 +403,7 @@ mod tests {
         assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
-    #[cfg(esp32c5)]
+    #[cfg(any(esp32c5, esp32h2))]
     #[test]
     fn test_parl_io_rx_can_read_tx_in_8_bit_mode_with_included_valid_pin(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
@@ -412,10 +424,16 @@ mod tests {
             _,
         ] = ctx.data_pins.map(|pin| unsafe { pin.split() });
 
-        let tx_pins = TxEightBits::new(d0_tx, d1_tx, d2_tx, d3_tx, d4_tx, d5_tx, d6_tx, NoPin);
+        let tx_pins = cfg_select! {
+            esp32c5 => TxPinConfigWithValidPin::new(
+                TxEightBits::new(d0_tx, d1_tx, d2_tx, d3_tx, d4_tx, d5_tx, d6_tx, NoPin),
+                valid_tx,
+            ),
+            _ => TxPinConfigIncludingValidPin::new(TxEightBits::new(
+                d0_tx, d1_tx, d2_tx, d3_tx, d4_tx, d5_tx, d6_tx, valid_tx,
+            )),
+        };
         let rx_pins = RxEightBits::new(d0_rx, d1_rx, d2_rx, d3_rx, d4_rx, d5_rx, d6_rx, valid_rx);
-
-        let tx_pins = TxPinConfigWithValidPin::new(tx_pins, valid_tx);
         let rx_pins = RxPinConfigIncludingValidPin::new(rx_pins, EnableMode::HighLevel);
 
         let clock_out_pin = ClkOutPin::new(clock_tx);
@@ -557,12 +575,6 @@ mod tests {
 #[embedded_test::tests(default_timeout = 3)]
 mod tx {
     use defmt::info;
-    #[cfg(any(esp32c6, esp32h2))]
-    use esp_hal::parl_io::TxPinConfigIncludingValidPin;
-    #[cfg(any(esp32c5, esp32c6))]
-    use esp_hal::parl_io::TxPinConfigWithValidPin;
-    #[cfg(esp32c6)]
-    use esp_hal::parl_io::TxSixteenBits;
     use esp_hal::{
         dma::DmaTxBuf,
         dma_tx_buffer,
@@ -578,6 +590,22 @@ mod tx {
         peripherals::{DMA_CH0, PARL_IO},
         time::Rate,
     };
+
+    cfg_select! {
+        esp32c5 => {
+            use esp_hal::parl_io::TxPinConfigWithValidPin;
+        }
+        esp32c6 => {
+            use esp_hal::parl_io::{
+                TxPinConfigIncludingValidPin,
+                TxPinConfigWithValidPin,
+                TxSixteenBits,
+            };
+        }
+        esp32h2 => {
+            use esp_hal::parl_io::TxPinConfigIncludingValidPin;
+        }
+    }
 
     struct Context {
         parl_io: PARL_IO<'static>,
@@ -668,24 +696,15 @@ mod tx {
         const BUFFER_SIZE: usize = 64;
         let mut dma_tx_buf: DmaTxBuf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
-        let pins = TxEightBits::new(
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-            #[cfg(esp32h2)]
-            ctx.valid,
-            #[cfg(any(esp32c5, esp32c6))]
-            NoPin,
-        );
-
-        #[cfg(esp32h2)]
-        let pins = TxPinConfigIncludingValidPin::new(pins);
-        #[cfg(any(esp32c5, esp32c6))]
-        let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
+        let pins = cfg_select! {
+            esp32h2 => TxPinConfigIncludingValidPin::new(TxEightBits::new(
+                NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, ctx.valid,
+            )),
+            _ => TxPinConfigWithValidPin::new(
+                TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin),
+                ctx.valid,
+            ),
+        };
 
         let clock_pin = ClkOutPin::new(ctx.clock);
 
@@ -729,12 +748,6 @@ mod tx {
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod async_tx {
     use defmt::info;
-    #[cfg(any(esp32c6, esp32h2))]
-    use esp_hal::parl_io::TxPinConfigIncludingValidPin;
-    #[cfg(any(esp32c5, esp32c6))]
-    use esp_hal::parl_io::TxPinConfigWithValidPin;
-    #[cfg(esp32c6)]
-    use esp_hal::parl_io::TxSixteenBits;
     use esp_hal::{
         dma::DmaTxBuf,
         dma_tx_buffer,
@@ -750,6 +763,22 @@ mod async_tx {
         peripherals::{DMA_CH0, PARL_IO},
         time::Rate,
     };
+
+    cfg_select! {
+        esp32c5 => {
+            use esp_hal::parl_io::TxPinConfigWithValidPin;
+        }
+        esp32c6 => {
+            use esp_hal::parl_io::{
+                TxPinConfigIncludingValidPin,
+                TxPinConfigWithValidPin,
+                TxSixteenBits,
+            };
+        }
+        esp32h2 => {
+            use esp_hal::parl_io::TxPinConfigIncludingValidPin;
+        }
+    }
 
     struct Context {
         parl_io: PARL_IO<'static>,
@@ -843,24 +872,15 @@ mod async_tx {
 
         let mut dma_tx_buf: DmaTxBuf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
 
-        let pins = TxEightBits::new(
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-            #[cfg(esp32h2)]
-            ctx.valid,
-            #[cfg(any(esp32c5, esp32c6))]
-            NoPin,
-        );
-
-        #[cfg(esp32h2)]
-        let pins = TxPinConfigIncludingValidPin::new(pins);
-        #[cfg(any(esp32c5, esp32c6))]
-        let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
+        let pins = cfg_select! {
+            esp32h2 => TxPinConfigIncludingValidPin::new(TxEightBits::new(
+                NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, ctx.valid,
+            )),
+            _ => TxPinConfigWithValidPin::new(
+                TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin),
+                ctx.valid,
+            ),
+        };
 
         let clock_pin = ClkOutPin::new(ctx.clock);
 
