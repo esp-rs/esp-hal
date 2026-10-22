@@ -52,11 +52,9 @@ system_clocks = { clock_tree = [
         { name = "XTAL32K",  outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
     # BLE RTC timer (MODEM_LPCON). Independent of LP_SLOW_CLK.
-    { name = "BLE_LP_XTAL_CLK",    type = "derived", from = "XTAL_CLK", output = "100_000" },
-    { name = "BLE_LP_RC_SLOW_CLK", type = "generic", output = "RC_SLOW_CLK / 5" },
+    { name = "BLE_LP_XTAL_CLK", type = "derived", from = "XTAL_CLK", output = "100_000" },
     { name = "BLE_LP_CLK", type = "mux", variants = [
         { name = "XTAL",    outputs = "BLE_LP_XTAL_CLK" },
-        { name = "RC_SLOW", outputs = "BLE_LP_RC_SLOW_CLK" },
         { name = "XTAL32K", outputs = "XTAL32K_CLK", cfg = "use_xtal32k" },
     ] },
 

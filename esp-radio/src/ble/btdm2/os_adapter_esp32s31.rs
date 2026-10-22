@@ -2,7 +2,7 @@ use procmacros::BuilderLite;
 
 use super::*;
 use crate::{
-    ble::{InvalidConfigError, lp_clk},
+    ble::InvalidConfigError,
     hal::{
         interrupt::{self, Priority},
         peripherals::Interrupt,
@@ -172,13 +172,8 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_rsp_dup_list_count: CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT as u16,
         ble_ll_adv_dup_list_count: CONFIG_BT_LE_LL_DUP_SCAN_LIST_COUNT as u16,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
-        rtc_freq: lp_clk::frequency_hz() as u64,
-        // ESP-IDF: `ble_rtc_clk_init()` in `bt.c`.
-        ble_ll_sca: if lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source) {
-            lp_clk::RC_SCA_PPM as _
-        } else {
-            CONFIG_BT_LE_LL_SCA as _
-        },
+        rtc_freq: super::super::lp_clk::frequency_hz() as u64,
+        ble_ll_sca: CONFIG_BT_LE_LL_SCA as _,
         ble_ll_scan_phy_number: BLE_LL_SCAN_PHY_NUMBER_N as u8,
         ble_ll_conn_def_auth_pyld_tmo: BLE_LL_CONN_DEF_AUTH_PYLD_TMO_N as u16,
         ble_ll_jitter_usecs: BLE_LL_JITTER_USECS_N as u8,

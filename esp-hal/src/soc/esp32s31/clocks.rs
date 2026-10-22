@@ -823,13 +823,6 @@ fn enable_ble_lp_xtal_clk_impl(_clocks: &mut ClockTree, _en: bool) {
     // Nothing to do.
 }
 
-// BLE_LP_RC_SLOW_CLK
-
-fn enable_ble_lp_rc_slow_clk_impl(_clocks: &mut ClockTree, _en: bool) {
-    // Nothing to do, divisor and gate are configured in BLE_LP_CLK
-    // (see modem_clock_select_lp_clock_source() in modem_clock.c).
-}
-
 // BLE_LP_CLK
 
 fn enable_ble_lp_clk_impl(_clocks: &mut ClockTree, en: bool) {
@@ -845,8 +838,6 @@ fn configure_ble_lp_clk_impl(
 ) {
     let divisor = match new_config {
         BleLpClkConfig::Xtal => xtal_clk_frequency() / ble_lp_xtal_clk_frequency() - 1,
-        // Divided by 5 (div_num = 4), see btdm_lp_rtc_slow_clk_select() in btdm_lp.c.
-        BleLpClkConfig::RcSlow => rc_slow_clk_frequency() / ble_lp_rc_slow_clk_frequency() - 1,
         #[cfg(use_xtal32k)]
         BleLpClkConfig::Xtal32k => 0,
     };
@@ -860,8 +851,7 @@ fn configure_ble_lp_clk_impl(
         .modify(|_, w| w.clk_en().set_bit());
 
     MODEM_LPCON::regs().lp_timer_conf().modify(|_, w| unsafe {
-        w.clk_lp_timer_sel_osc_slow()
-            .bit(new_config == BleLpClkConfig::RcSlow);
+        w.clk_lp_timer_sel_osc_slow().clear_bit();
         w.clk_lp_timer_sel_osc_fast().clear_bit();
         w.clk_lp_timer_sel_xtal()
             .bit(new_config == BleLpClkConfig::Xtal);

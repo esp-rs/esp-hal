@@ -14,7 +14,7 @@ use {
 
 /// Sleep clock accuracy (in ppm) reported to the BLE controller when `BLE_LP_CLK` runs from an RC
 /// oscillator (see `ble_rtc_clk_init()` in `bt.c`).
-#[cfg(not(bt_controller = "btdm"))]
+#[cfg(bt_controller = "npl")]
 pub(crate) const RC_SCA_PPM: u16 = 3000;
 
 /// BTDM blob parameters for the selected low-power clock.
@@ -131,6 +131,7 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
 }
 
 /// Returns whether the clock node's root source is an internal RC oscillator.
+#[cfg(not(bt_controller = "btdm2"))]
 pub(crate) fn source_is_rc(f: fn(&mut ll::ClockTree) -> Option<ClockSource>) -> bool {
     matches!(
         ll::ClockTree::with(f),
