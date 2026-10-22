@@ -82,7 +82,7 @@ pub enum ClockSource {
     /// 160 MHz PLL.
     #[cfg(not(esp32s31))]
     Pll160m,
-    /// 500 MHz PLL.
+    /// Configured MPLL clock.
     #[cfg(esp32s31)]
     Mpll,
     /// Crystal oscillator.
@@ -1915,9 +1915,10 @@ impl<'d, const S: u8> sdio::MmcBus for Slot<'d, S, Async> {
     }
 
     async fn init_idle(&mut self, hz: u32) -> Result<(), MmcError> {
-        let mut session = lock_engine(slot_id(S)).await?;
+        let mut session = ENGINE.lock().await;
         self.validate_pins().map_err(|_| MmcError::Other)?;
         self.set_bus_low_level(BusWidth::Bit1, hz)?;
+        session.select_and_apply(slot_id(S))?;
         session.send_init_sequence(slot_id(S))?;
         Ok(())
     }
@@ -2355,7 +2356,7 @@ fn disable_idmac() {
 fn module_hz(source: ClockSource, div: u8) -> u32 {
     let base = match source {
         #[cfg(esp32s31)]
-        ClockSource::Mpll => 500_000_000,
+        ClockSource::Mpll => crate::clock::ll::mpll_clk_frequency(),
         #[cfg(not(esp32s31))]
         ClockSource::Pll160m => 160_000_000,
         //#[cfg(esp32p4)]
