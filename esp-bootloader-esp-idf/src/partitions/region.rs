@@ -78,7 +78,8 @@ impl PartitionEntry {
 
     #[cfg(not(feature = "std"))]
     fn contains_running_app(&self) -> bool {
-        (self.offset()..self.offset() + self.len()).contains(&super::table::booted_app_offset())
+        super::table::booted_app_offset()
+            .is_some_and(|app| (self.offset()..self.offset() + self.len()).contains(&app))
     }
 }
 

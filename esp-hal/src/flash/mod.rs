@@ -276,6 +276,24 @@ pub struct ChipInfo {
     pub page_size: u32,
 }
 
+/// Returns the flash MMU entries that map the data (DROM) window, in address
+/// order.
+///
+/// Entry `start` maps the window's first page and entry `end - 1` its last.
+#[instability::unstable]
+pub fn flash_mmu_drom_entries() -> core::ops::Range<u32> {
+    mmu::drom_entries()
+}
+
+/// Returns the flash offset that the DROM entry `index` maps.
+///
+/// Returns `None` when `index` is outside [`flash_mmu_drom_entries`], or when
+/// the entry is invalid or maps PSRAM.
+#[instability::unstable]
+pub fn flash_mmu_entry_offset(index: u32) -> Option<u32> {
+    mmu::drom_entry_offset(index)
+}
+
 /// Internal SPI flash driver.
 ///
 /// Constructible only in [`Blocking`] mode.
