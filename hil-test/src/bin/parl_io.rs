@@ -10,8 +10,12 @@ use hil_test as _;
 
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {
+    #[cfg(any(esp32c5, esp32c6))]
+    use esp_hal::gpio::NoPin;
+    #[cfg(any(esp32c5, esp32c6))]
+    use esp_hal::parl_io::{RxEightBits, RxPinConfigIncludingValidPin, TxEightBits};
     #[cfg(esp32c6)]
-    use esp_hal::parl_io::{RxEightBits, TxEightBits};
+    use esp_hal::parl_io::{RxSixteenBits, TxPinConfigIncludingValidPin, TxSixteenBits};
     use esp_hal::{
         dma_rx_buffer,
         dma_tx_buffer,
@@ -314,10 +318,7 @@ mod tests {
         assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
-    // This test is disabled on the H2 because in 8-bit mode, there's no external
-    // enable pin to indicate when data is valid. The C6 has the same issue in
-    // 16-bit mode. The test would have to be written differently for it to work
-    // reliably. See https://github.com/esp-rs/esp-hal/pull/3339.
+    // On 8-line chips, `RxEightBits` uses data line 7 for the valid signal.
     #[cfg(esp32c6)]
     #[test]
     fn test_parl_io_rx_can_read_tx_in_8_bit_mode(ctx: Context) {
@@ -388,6 +389,168 @@ mod tests {
         (_, _, dma_rx_buf) = rx_transfer.wait();
 
         assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
+    }
+
+    #[cfg(esp32c5)]
+    #[test]
+    fn test_parl_io_rx_can_read_tx_in_8_bit_mode_with_included_valid_pin(ctx: Context) {
+        const BUFFER_SIZE: usize = 64;
+
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
+
+        let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
+        let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
+        let [
+            (d0_rx, d0_tx),
+            (d1_rx, d1_tx),
+            (d2_rx, d2_tx),
+            (d3_rx, d3_tx),
+            (d4_rx, d4_tx),
+            (d5_rx, d5_tx),
+            (d6_rx, d6_tx),
+            _,
+        ] = ctx.data_pins.map(|pin| unsafe { pin.split() });
+
+        let tx_pins = TxEightBits::new(d0_tx, d1_tx, d2_tx, d3_tx, d4_tx, d5_tx, d6_tx, NoPin);
+        let rx_pins = RxEightBits::new(d0_rx, d1_rx, d2_rx, d3_rx, d4_rx, d5_rx, d6_rx, valid_rx);
+
+        let tx_pins = TxPinConfigWithValidPin::new(tx_pins, valid_tx);
+        let rx_pins = RxPinConfigIncludingValidPin::new(rx_pins, EnableMode::HighLevel);
+
+        let clock_out_pin = ClkOutPin::new(clock_tx);
+        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Invert);
+
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
+
+        let pio_tx = pio
+            .tx
+            .with_config(
+                tx_pins,
+                clock_out_pin,
+                TxConfig::default()
+                    .with_frequency(MAX_CLK_RATE)
+                    .with_sample_edge(SampleEdge::Normal)
+                    .with_bit_order(BitPackOrder::Lsb),
+            )
+            .unwrap();
+        let pio_rx = pio
+            .rx
+            .with_config(
+                rx_pins,
+                clock_in_pin,
+                RxConfig::default()
+                    .with_frequency(MAX_CLK_RATE)
+                    .with_bit_order(BitPackOrder::Lsb),
+            )
+            .unwrap();
+
+        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+            *b = i as u8;
+        }
+
+        let rx_transfer = pio_rx
+            .read(Some(dma_rx_buf.len()), dma_rx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        let tx_transfer = pio_tx
+            .write(dma_tx_buf.len(), dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        (_, _, dma_tx_buf) = tx_transfer.wait();
+        (_, _, dma_rx_buf) = rx_transfer.wait();
+
+        // Data line 7 carries the valid signal. RX reads the valid level as data bit 7.
+        for (rx, tx) in dma_rx_buf.as_slice().iter().zip(dma_tx_buf.as_slice()) {
+            assert_eq!(*rx, tx & 0x7F | 0x80);
+        }
+    }
+
+    #[cfg(esp32c6)]
+    #[test]
+    fn test_parl_io_rx_can_read_tx_in_16_bit_mode_with_included_valid_pin(ctx: Context) {
+        const BUFFER_SIZE: usize = 128;
+
+        let mut dma_rx_buf = dma_rx_buffer!(BUFFER_SIZE).unwrap();
+        let mut dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
+
+        let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
+        let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
+        let [
+            (d0_rx, d0_tx),
+            (d1_rx, d1_tx),
+            (d2_rx, d2_tx),
+            (d3_rx, d3_tx),
+            (d4_rx, d4_tx),
+            (d5_rx, d5_tx),
+            (d6_rx, d6_tx),
+            (d7_rx, d7_tx),
+        ] = ctx.data_pins.map(|pin| unsafe { pin.split() });
+
+        let tx_pins = TxSixteenBits::new(
+            d0_tx, d1_tx, d2_tx, d3_tx, d4_tx, d5_tx, d6_tx, d7_tx, NoPin, NoPin, NoPin, NoPin,
+            NoPin, NoPin, NoPin, valid_tx,
+        );
+        let rx_pins = RxSixteenBits::new(
+            d0_rx, d1_rx, d2_rx, d3_rx, d4_rx, d5_rx, d6_rx, d7_rx, NoPin, NoPin, NoPin, NoPin,
+            NoPin, NoPin, NoPin, valid_rx,
+        );
+
+        let tx_pins = TxPinConfigIncludingValidPin::new(tx_pins);
+        let rx_pins = RxPinConfigIncludingValidPin::new(rx_pins, EnableMode::HighLevel);
+
+        let clock_out_pin = ClkOutPin::new(clock_tx);
+        let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Invert);
+
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
+
+        // RX times out with 16 lines at `MAX_CLK_RATE`.
+        // With `BitPackOrder::Lsb`, RX swaps each pair of 16-bit samples.
+        let pio_tx = pio
+            .tx
+            .with_config(
+                tx_pins,
+                clock_out_pin,
+                TxConfig::default()
+                    .with_frequency(MAX_CLK_RATE / 2)
+                    .with_sample_edge(SampleEdge::Normal)
+                    .with_bit_order(BitPackOrder::Msb),
+            )
+            .unwrap();
+        let pio_rx = pio
+            .rx
+            .with_config(
+                rx_pins,
+                clock_in_pin,
+                RxConfig::default()
+                    .with_frequency(MAX_CLK_RATE / 2)
+                    .with_bit_order(BitPackOrder::Msb),
+            )
+            .unwrap();
+
+        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+            *b = i as u8;
+        }
+
+        let rx_transfer = pio_rx
+            .read(Some(dma_rx_buf.len()), dma_rx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        let tx_transfer = pio_tx
+            .write(dma_tx_buf.len(), dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        (_, _, dma_tx_buf) = tx_transfer.wait();
+        (_, _, dma_rx_buf) = rx_transfer.wait();
+
+        // Data lines 8 to 14 read low. Data line 15 carries the valid signal.
+        // RX reads the valid level as data bit 15.
+        let rx = dma_rx_buf.as_slice().chunks_exact(2);
+        let tx = dma_tx_buf.as_slice().chunks_exact(2);
+        for (rx, tx) in rx.zip(tx) {
+            assert_eq!(rx[0], tx[0]);
+            assert_eq!(rx[1], 0x80);
+        }
     }
 }
 
