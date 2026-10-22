@@ -295,6 +295,15 @@ macro_rules! property {
     ("parl_io.version", str) => {
         stringify!(1)
     };
+    ("parl_io.max_data_width") => {
+        16
+    };
+    ("parl_io.max_data_width", str) => {
+        stringify!(16)
+    };
+    ("parl_io.has_tx_cs") => {
+        false
+    };
     ("rmt.ram_start") => {
         1610638336
     };

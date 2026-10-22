@@ -689,11 +689,10 @@ where
             .apply_output_config(&gpio::OutputConfig::default());
         self.valid_pin.set_output_enable(true);
 
-        #[cfg(esp32c5)]
+        #[cfg(parl_io_has_tx_cs)]
         {
-            // C5 has a dedicated chip select signal. This signal is active low, and we need to
-            // invert it to end up with the same behaviour as older chips.
-            // TODO: this needs to be turned into metadata.
+            // The dedicated chip-select output is active low. Invert it so the pin is
+            // active high, as on chips that use a data line.
             use crate::gpio::interconnect::OutputSignal;
 
             let valid_pin = core::mem::replace(
@@ -808,7 +807,7 @@ tx_pins!(
     P6 = PARL_TX_DATA6,
     P7 = PARL_TX_DATA7
 );
-#[cfg(parl_io_version = "1")]
+#[cfg(parl_io_max_data_width = "16")]
 tx_pins!(
     TxSixteenBits,
     16,
@@ -834,14 +833,17 @@ impl NotContainsValidSignalPin for TxOneBit<'_> {}
 impl NotContainsValidSignalPin for TxTwoBits<'_> {}
 impl NotContainsValidSignalPin for TxFourBits<'_> {}
 
-#[cfg(any(esp32c5, esp32c6))]
+#[cfg(any(parl_io_has_tx_cs, parl_io_max_data_width = "16"))]
 impl NotContainsValidSignalPin for TxEightBits<'_> {}
 
-#[cfg(esp32h2)]
+#[cfg(all(parl_io_max_data_width = "8", not(parl_io_has_tx_cs)))]
 impl ContainsValidSignalPin for TxEightBits<'_> {}
 
-#[cfg(parl_io_version = "1")]
+#[cfg(all(parl_io_max_data_width = "16", not(parl_io_has_tx_cs)))]
 impl ContainsValidSignalPin for TxSixteenBits<'_> {}
+
+#[cfg(all(parl_io_max_data_width = "16", parl_io_has_tx_cs))]
+impl NotContainsValidSignalPin for TxSixteenBits<'_> {}
 
 /// Pin configuration with an additional pin for the valid signal.
 pub struct RxPinConfigWithValidPin<'d, P>
@@ -884,6 +886,7 @@ where
         self.valid_pin.set_input_enable(true);
 
         Instance::rx_valid_pin_signal().connect_to(&self.valid_pin);
+        Instance::set_rx_valid_line();
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
             Instance::set_rx_pulse_submode_sel(sel);
@@ -930,6 +933,7 @@ where
 {
     fn configure(&mut self) {
         self.rx_pins.configure();
+        Instance::set_rx_valid_line();
         Instance::set_rx_sw_en(false);
         if let Some(sel) = self.enable_mode.pulse_submode_sel() {
             Instance::set_rx_pulse_submode_sel(sel);
@@ -1008,7 +1012,7 @@ rx_pins!(
     P6 = PARL_RX_DATA6,
     P7 = PARL_RX_DATA7
 );
-#[cfg(parl_io_version = "1")]
+#[cfg(parl_io_max_data_width = "16")]
 rx_pins!(
     RxSixteenBits,
     16,
@@ -1034,13 +1038,13 @@ impl NotContainsValidSignalPin for RxOneBit<'_> {}
 impl NotContainsValidSignalPin for RxTwoBits<'_> {}
 impl NotContainsValidSignalPin for RxFourBits<'_> {}
 
-#[cfg(any(esp32c5, esp32c6))]
+#[cfg(parl_io_max_data_width = "16")]
 impl NotContainsValidSignalPin for RxEightBits<'_> {}
 
-#[cfg(esp32h2)]
+#[cfg(parl_io_max_data_width = "8")]
 impl ContainsValidSignalPin for RxEightBits<'_> {}
 
-#[cfg(parl_io_version = "1")]
+#[cfg(parl_io_max_data_width = "16")]
 impl ContainsValidSignalPin for RxSixteenBits<'_> {}
 
 impl<'d, Dm> TxCreator<'d, Dm>
@@ -2105,10 +2109,12 @@ mod private {
 
     #[cfg(parl_io_version = "2")]
     pub(super) enum WidSel {
-        Bits8 = 3,
-        Bits4 = 2,
-        Bits2 = 1,
-        Bits1 = 0,
+        Bits8  = 3,
+        Bits4  = 2,
+        Bits2  = 1,
+        Bits1  = 0,
+        #[cfg(parl_io_max_data_width = "16")]
+        Bits16 = 4,
     }
 
     pub(super) enum SampleMode {
@@ -2217,6 +2223,14 @@ mod private {
 
         pub fn rx_valid_pin_signal() -> InputSignal {
             InputSignal::PARL_RX_DATA15
+        }
+
+        pub fn set_rx_valid_line() {
+            let reg_block = PARL_IO::regs();
+
+            reg_block
+                .rx_cfg1()
+                .modify(|_, w| unsafe { w.rx_ext_en_sel().bits(15) });
         }
 
         pub fn set_rx_sw_en(value: bool) {
@@ -2409,7 +2423,8 @@ mod private {
 
         pub fn tx_valid_pin_signal() -> OutputSignal {
             cfg_select! {
-                esp32c5 => OutputSignal::PARL_TX_CS,
+                parl_io_has_tx_cs => OutputSignal::PARL_TX_CS,
+                parl_io_max_data_width = "16" => OutputSignal::PARL_TX_DATA15,
                 _ => OutputSignal::PARL_TX_DATA7,
             }
         }
@@ -2439,7 +2454,23 @@ mod private {
         }
 
         pub fn rx_valid_pin_signal() -> InputSignal {
-            InputSignal::PARL_RX_DATA7
+            cfg_select! {
+                parl_io_max_data_width = "16" => InputSignal::PARL_RX_DATA15,
+                _ => InputSignal::PARL_RX_DATA7,
+            }
+        }
+
+        pub fn set_rx_valid_line() {
+            // The external-enable line select resets to 7. A 16-line bus uses line 15.
+            let line = cfg_select! {
+                parl_io_max_data_width = "16" => 15,
+                _ => 7,
+            };
+            let reg_block = PARL_IO::regs();
+
+            reg_block
+                .rx_mode_cfg()
+                .modify(|_, w| unsafe { w.rx_ext_en_sel().bits(line) });
         }
 
         pub fn set_rx_sw_en(value: bool) {

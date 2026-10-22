@@ -421,8 +421,8 @@ instances = {
 [device.parl_io]
 support_status = "partial"
 version = 2
-
-# TODO: model chip select signal (active low)
+max_data_width = 8
+has_tx_cs = true
 
 [device.ledc]
 version = 3

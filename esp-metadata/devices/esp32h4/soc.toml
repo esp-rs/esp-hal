@@ -271,6 +271,8 @@ instances = [
 [device.parl_io]
 support_status = "not_supported"
 version = 2
+max_data_width = 8
+has_tx_cs = true
 
 [device.rmt]
 support_status = "not_supported"
