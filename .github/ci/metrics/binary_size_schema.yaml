@@ -1,0 +1,89 @@
+title: esp-hal Binary Size Metrics
+type: object
+properties:
+  binary_size:
+    type: object
+    title: Binary Size Totals
+    description: Total flash and bss sizes per chip and example.
+    properties:
+      data:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          properties:
+            chip:
+              type: string
+              title: Chip
+              description: Target SoC identifier (InfluxDB tag).
+            example:
+              type: string
+              title: Example
+              description: Example binary name (InfluxDB tag).
+            flash:
+              type: integer
+              title: Flash size
+              description: Total flash usage in bytes.
+              unit: bytes
+            bss:
+              type: integer
+              title: BSS size
+              description: Total bss usage in bytes.
+              unit: bytes
+          required:
+            - chip
+            - example
+            - flash
+            - bss
+          additionalProperties: false
+    required:
+      - data
+    additionalProperties: false
+
+  binary_size_sections:
+    type: object
+    title: Binary Size Sections
+    description: Per-ELF-section size breakdown per chip and example.
+    properties:
+      data:
+        type: array
+        minItems: 1
+        items:
+          type: object
+          properties:
+            chip:
+              type: string
+              title: Chip
+              description: Target SoC identifier (InfluxDB tag).
+            example:
+              type: string
+              title: Example
+              description: Example binary name (InfluxDB tag).
+            section:
+              type: string
+              title: ELF section
+              description: ELF section name, e.g. .text, .rodata, .bss (InfluxDB tag).
+            kind:
+              type: string
+              title: Memory kind
+              description: Memory region kind, flash or bss (InfluxDB tag).
+            bytes:
+              type: integer
+              title: Section size
+              description: Section size in bytes.
+              unit: bytes
+          required:
+            - chip
+            - example
+            - section
+            - kind
+            - bytes
+          additionalProperties: false
+    required:
+      - data
+    additionalProperties: false
+
+required:
+  - binary_size
+  - binary_size_sections
+additionalProperties: false

@@ -12,11 +12,23 @@ const ISSUE_TITLE = "Nightly Workflow: Binary size regression on main";
 const PR_REPORT_HEADING = "## Binary Size Report";
 // Sizes written by `measure`, one file per chip.
 const SIZES_DIR = "sizes";
+// Metrics JSON written by `reportNightly` for `esp-metrics-cli`.
+const METRICS_FILE = "binary_size_metrics.json";
+const MAX_BETWEEN_COMMITS = 15;
 
 // Runs git and returns its trimmed output.
 async function git(exec, args) {
   const { stdout } = await exec.getExecOutput("git", args, { silent: true });
   return stdout.trim();
+}
+
+async function isAncestor(exec, ancestor, descendant) {
+  const { exitCode } = await exec.getExecOutput(
+    "git",
+    ["merge-base", "--is-ancestor", ancestor, descendant],
+    { ignoreReturnCode: true, silent: true },
+  );
+  return exitCode === 0;
 }
 
 function runUrl(context) {
@@ -34,33 +46,66 @@ async function previousHead({ github, context, exec }) {
     per_page: 1,
   });
   const sha = data.workflow_runs[0]?.head_sha;
-  if (!sha) return "";
-  const { exitCode } = await exec.getExecOutput(
-    "git",
-    ["merge-base", "--is-ancestor", sha, "HEAD"],
-    { ignoreReturnCode: true, silent: true },
-  );
-  return exitCode === 0 ? sha : "";
+  return sha && (await isAncestor(exec, sha, "HEAD")) ? sha : "";
 }
 
-// Base is the given commit, or where the last successful scheduled run ended,
-// so every commit is measured once. Commit dates can't tell that: the merge
-// queue dates a commit about half an hour before it lands on `main`. Without
-// such a run, base is the last `main` commit older than 24 hours.
+// Resolves a date (`YYYY-MM-DD`), release tag (`esp-hal-v1.2.0` / `v1.2.0`),
+// or commit hash to a commit SHA.
+async function resolveInput(exec, input, isStart, head = "HEAD") {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+    const time = `${input}T${isStart ? "00:00:00" : "23:59:59"}Z`;
+    const sha =
+      (await git(exec, ["rev-list", "-1", "--first-parent", `--before=${time}`, head])) ||
+      (await git(exec, ["rev-list", "-1", "--first-parent", `--before=${input}T23:59:59Z`, head]));
+    if (!sha) throw new Error(`No commit on main before ${input}.`);
+    return sha;
+  }
+  for (const ref of [input, `esp-hal-${input}`, `esp-hal-v${input}`]) {
+    const { exitCode, stdout } = await exec.getExecOutput(
+      "git",
+      ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`],
+      { ignoreReturnCode: true, silent: true },
+    );
+    if (exitCode === 0) return stdout.trim();
+  }
+  throw new Error(`Unknown commit, tag, or date: ${input}`);
+}
+
+// Picks the `base` and `head` commits to compare, from the workflow inputs or
+// from the last scheduled run.
 // `--first-parent` keeps to `main` itself: one commit per merged pull request.
 async function resolveNightlyRange({ github, context, core, exec }) {
-  const input = process.env.INPUT_BASE || "";
-  const head = await git(exec, ["rev-parse", "HEAD"]);
-  const base = input
-    ? await git(exec, ["rev-parse", "--verify", `${input}^{commit}`])
-    : (await previousHead({ github, context, exec })) ||
-      (await git(exec, [
-        "rev-list",
-        "-1",
-        "--first-parent",
-        "--before=24 hours ago",
-        "HEAD",
-      ]));
+  const range = process.env.INPUT_RANGE || "since-last-run";
+  const baseInput = (process.env.INPUT_BASE || "").trim();
+  const headInput = (process.env.INPUT_HEAD || "").trim();
+
+  const head = headInput
+    ? await resolveInput(exec, headInput, false)
+    : await git(exec, ["rev-parse", "HEAD"]);
+
+  let base = "";
+  if (baseInput) {
+    base = await resolveInput(exec, baseInput, true, head);
+  } else if (range === "since-last-release") {
+    const tag = await git(exec, [
+      "describe",
+      "--tags",
+      "--match",
+      "esp-hal-v*",
+      "--exclude",
+      "esp-hal-v*-*",
+      "--abbrev=0",
+      head,
+    ]);
+    base = await resolveInput(exec, tag, true, head);
+  } else if (range === "last-7-days" || range === "last-30-days") {
+    const days = range === "last-7-days" ? 7 : 30;
+    base = await git(exec, ["rev-list", "-1", "--first-parent", `--before=${days} days ago`, head]);
+  } else {
+    base =
+      (await previousHead({ github, context, exec })) ||
+      (await git(exec, ["rev-list", "-1", "--first-parent", "--before=24 hours ago", head]));
+  }
   core.info(`Comparing ${base} with ${head}`);
 
   // Empty outputs skip the other jobs.
@@ -69,19 +114,25 @@ async function resolveNightlyRange({ github, context, core, exec }) {
     return;
   }
 
+  if (await isAncestor(exec, head, base)) {
+    throw new Error(`Start commit ${base.slice(0, 10)} is newer than end commit ${head.slice(0, 10)}.`);
+  }
+
   // The commits merged before `head`, oldest first. `measure` builds them only
   // for examples that grew past the limits, to find the pull request behind it.
-  const between = (
-    await git(exec, ["rev-list", "--first-parent", "--reverse", `${base}..${head}`])
-  )
-    .split("\n")
-    .slice(0, -1);
+  const between = (await isAncestor(exec, base, head))
+    ? (await git(exec, ["rev-list", "--first-parent", "--reverse", `${base}..${head}`]))
+        .split("\n")
+        .slice(0, -1)
+    : [];
+  if (between.length <= MAX_BETWEEN_COMMITS) {
+    core.setOutput("between", between.join(" "));
+  }
 
   // The matrix of the `measure` jobs.
   const chips = JSON.parse(fs.readFileSync(".github/chips.json", "utf8"));
   core.setOutput("base", base);
   core.setOutput("head", head);
-  core.setOutput("between", between.join(" "));
   core.setOutput("chips", JSON.stringify(chips.map((chip) => chip.soc)));
 }
 
@@ -225,7 +276,13 @@ async function measureCommit({ core, exec, soc, target, pkg, examples, role, com
     }
 
     const packageArgs = pkg ? ["--package", pkg] : [];
-    await exec.exec("cargo", ["xtask", "build", example, ...packageArgs, soc]);
+    try {
+      await exec.exec("cargo", ["xtask", "build", example, ...packageArgs, soc]);
+    } catch (error) {
+      if (role === "head") throw error;
+      core.warning(`Skipping ${example} at ${commit} on ${soc}: ${error.message}`);
+      continue;
+    }
 
     const elf = names
       .map((name) => path.join("target", target, "release", name))
@@ -289,8 +346,11 @@ function groupSizes(lines) {
     if (!line.trim()) continue;
     const [chip, example, role, section, kind, bytes] = line.trim().split(/\s+/);
     const key = `${chip} ${example}`;
-    if (!examples.has(key)) examples.set(key, { chip, example, between: {} });
+    if (!examples.has(key)) {
+      examples.set(key, { chip, example, kinds: new Map(), between: {} });
+    }
     const entry = examples.get(key);
+    entry.kinds.set(section, kind);
     const sizes = role === "base" || role === "head" ? entry : entry.between;
     sizes[role] ??= { flash: 0, bss: 0, sections: new Map() };
     sizes[role][kind] += Number(bytes);
@@ -316,6 +376,35 @@ function readSizes() {
     );
 }
 
+// Writes the head measurements in the format `esp-metrics-cli` expects.
+function writeMetrics(entries) {
+  if (entries.length === 0) return;
+  const totals = [];
+  const sections = [];
+  for (const entry of entries) {
+    totals.push({
+      chip: entry.chip,
+      example: entry.example,
+      flash: entry.head.flash,
+      bss: entry.head.bss,
+    });
+    for (const [section, bytes] of entry.head.sections) {
+      sections.push({
+        chip: entry.chip,
+        example: entry.example,
+        section,
+        kind: entry.kinds.get(section),
+        bytes,
+      });
+    }
+  }
+  const metrics = {
+    binary_size: { data: totals },
+    binary_size_sections: { data: sections },
+  };
+  fs.writeFileSync(METRICS_FILE, `${JSON.stringify(metrics, null, 2)}\n`);
+}
+
 // Chips that were asked for but produced no sizes: their build failed, or
 // none of the examples supports them.
 function missingChips(entries) {
@@ -327,20 +416,31 @@ function signed(number) {
   return number > 0 ? `+${number}` : `${number}`;
 }
 
-// Formats a cell like `72734 (+4112, +5.99%)`. With limits, it regresses, in
-// bold, only when it grows by more than both of them.
+// Formats a cell like `72734 (+4112, +5.99%)`. With limits, regressions and
+// reductions that cross both thresholds are marked in bold.
 function compare(was, now, maxBytes, maxPercent) {
-  if (was === undefined) return { text: `${now} (new)`, regressed: false };
+  if (was === undefined) {
+    return { text: `${now} (new)`, delta: 0, regressed: false, improved: false };
+  }
 
   const delta = now - was;
-  if (delta === 0) return { text: `${now}`, regressed: false };
+  if (delta === 0) {
+    return { text: `${now}`, delta: 0, regressed: false, improved: false };
+  }
 
   const percent = was > 0 ? (100 * delta) / was : 0;
   const sign = delta > 0 ? "+" : "";
   const text = `${now} (${sign}${delta}, ${sign}${percent.toFixed(2)}%)`;
   const regressed =
     maxBytes !== undefined && delta > maxBytes && percent > maxPercent;
-  return { text: regressed ? `**${text}**` : text, regressed };
+  const improved =
+    maxBytes !== undefined && -delta > maxBytes && -percent > maxPercent;
+  return {
+    text: regressed || improved ? `**${text}**` : text,
+    delta,
+    regressed,
+    improved,
+  };
 }
 
 // Compares the totals of every entry. Without limits nothing regresses.
@@ -348,7 +448,10 @@ function compareEntries(entries, limits) {
   return entries.map((entry) => {
     const flash = compare(entry.base?.flash, entry.head.flash, limits?.flash, limits?.percent);
     const bss = compare(entry.base?.bss, entry.head.bss, limits?.bss, limits?.percent);
-    return { ...entry, flash, bss, regressed: flash.regressed || bss.regressed };
+    const regressed = flash.regressed || bss.regressed;
+    const improved = flash.improved || bss.improved;
+    const shrank = !regressed && (improved || flash.delta + bss.delta < 0);
+    return { ...entry, flash, bss, regressed, improved, shrank };
   });
 }
 
@@ -430,6 +533,7 @@ async function growthByPullRequest(api, rows, chain, limits) {
   const culprits = new Map();
   const unexplained = [];
   for (const row of rows) {
+    if (!row.base) continue;
     let previous = row.base;
     let pending = [];
     const explained = { flash: false, bss: false };
@@ -469,7 +573,7 @@ async function growthByPullRequest(api, rows, chain, limits) {
     "|---|---|---|---|---|",
     ...lines,
   ].join("\n");
-  return { table, culprits, unexplained };
+  return { table, hasRows: lines.length > 0, culprits, unexplained };
 }
 
 // Lists rows as "`example` on `chip`, `chip`; `example` on `chip`".
@@ -498,36 +602,79 @@ function causeText({ culprits, unexplained }) {
   return lines.length === 1 ? lines[0] : lines.map((line) => `- ${line}`).join("\n");
 }
 
-// Writes the nightly table to the run summary and, when something grew past
-// the limits, opens or updates the regression issue.
+// Writes the nightly table to the run summary, exports `binary_size_metrics.json`
+// for `esp-metrics-cli`, and on scheduled runs opens or updates the regression
+// issue when an example grew past the limits.
 async function reportNightly({ github, context, core, exec }) {
   const base = process.env.BASE;
   const head = process.env.HEAD;
   const limits = limitsFromEnv();
 
   const entries = readSizes();
+  writeMetrics(entries);
+
   const rows = compareEntries(entries, limits);
   const regressions = rows.filter((row) => row.regressed);
+  const improvements = rows.filter((row) => row.shrank);
   const missing = missingNote(missingChips(entries));
 
-  // The run summary always gets the full report.
-  await core.summary
-    .addRaw(
-      [
-        "## Binary size report",
+  const between = (process.env.BETWEEN || "").split(/\s+/).filter(Boolean);
+  const growth =
+    regressions.length > 0
+      ? await growthByPullRequest(
+          { github, context, exec },
+          regressions,
+          [base, ...between, head],
+          limits,
+        )
+      : null;
+
+  const summary = [
+    "## Binary size report",
+    "",
+    `Base: \`${base.slice(0, 10)}\`, head: \`${head.slice(0, 10)}\`. Changes past the limits are marked in bold.`,
+    "",
+    ...(missing ? [missing, ""] : []),
+  ];
+
+  if (regressions.length > 0) {
+    summary.push("### Cause", "", causeText(growth), "");
+    summary.push("### Regressions", "", totalsTable(regressions), "", sectionsDetails(regressions), "");
+    if (growth.hasRows) {
+      summary.push(
+        "### Growth by pull request",
         "",
-        `Base: ${base}, head: ${head}. Regressions are marked in bold.`,
+        "The size after each pull request that changed it. In bold where that pull request alone grew past the limits.",
         "",
-        ...(missing ? [missing, ""] : []),
-        totalsTable(rows),
+        growth.table,
         "",
-        sectionsDetails(rows),
-      ].join("\n"),
-    )
-    .write();
+      );
+    }
+  }
+
+  if (improvements.length > 0) {
+    summary.push("### Improvements", "", totalsTable(improvements), "", sectionsDetails(improvements), "");
+  }
+
+  summary.push(
+    "<details><summary>All examples</summary>",
+    "",
+    totalsTable(rows),
+    "",
+    sectionsDetails(rows),
+    "",
+    "</details>",
+  );
+
+  await core.summary.addRaw(summary.join("\n")).write();
 
   if (regressions.length === 0) {
     core.info("No example grew past the limits.");
+    return;
+  }
+
+  if (context.eventName !== "schedule") {
+    core.info("Manual run: skipping issue creation.");
     return;
   }
 
@@ -537,15 +684,6 @@ async function reportNightly({ github, context, core, exec }) {
   const merged = (
     await git(exec, ["log", "--first-parent", "--format=- %h %s", `${base}..${head}`])
   ).replaceAll("@", "@\u200b");
-
-  const between = (process.env.BETWEEN || "").split(/\s+/).filter(Boolean);
-  const chain = [base, ...between, head];
-  const growth = await growthByPullRequest(
-    { github, context, exec },
-    regressions,
-    chain,
-    limits,
-  );
 
   const body = [
     "The nightly binary size check found examples that grew past the limits.",
@@ -568,6 +706,9 @@ async function reportNightly({ github, context, core, exec }) {
     "",
     growth.table,
     "",
+    ...(improvements.length > 0
+      ? ["### Improvements", "", totalsTable(improvements), "", sectionsDetails(improvements), ""]
+      : []),
     `### Merged between \`${base.slice(0, 10)}\` and \`${head.slice(0, 10)}\``,
     "",
     merged,

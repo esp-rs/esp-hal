@@ -1,0 +1,72 @@
+name: Upload metrics to S3
+description: >-
+  Validate and upload a metrics JSON artifact to the Espressif App Metrics S3
+  storage using `esp-metrics-cli`. Must run on a Brno self-hosted runner with
+  access to the internal S3 endpoint.
+
+inputs:
+  artifact:
+    description: Artifact containing the metrics JSON file.
+    required: false
+    default: binary-size-metrics
+  metrics-file:
+    description: Path to the metrics JSON file inside the artifact.
+    required: false
+    default: binary_size_metrics.json
+  definitions:
+    description: Path to the YAML schema definition file.
+    required: false
+    default: .github/ci/metrics/binary_size_schema.yaml
+  commit-sha:
+    description: Commit SHA the metrics belong to.
+    required: true
+  branch-name:
+    description: Branch name for bucket routing ("main" routes to long-term).
+    required: false
+    default: ${{ github.ref_name }}
+  s3-server:
+    description: S3 endpoint URL.
+    required: false
+    default: https://idf-s3.espressif.cn:9000
+  long-term-bucket:
+    description: S3 bucket for default/release branches.
+    required: false
+    default: longterm
+  short-term-bucket:
+    description: S3 bucket for other branches.
+    required: false
+    default: idf-artifacts
+  s3-access-key:
+    description: S3 access key.
+    required: true
+  s3-secret-key:
+    description: S3 secret key.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact }}
+
+    - name: Validate and upload metrics
+      shell: bash
+      env:
+        ESP_METRICS_S3_SERVER: ${{ inputs.s3-server }}
+        ESP_METRICS_S3_ACCESS_KEY: ${{ inputs.s3-access-key }}
+        ESP_METRICS_S3_SECRET_KEY: ${{ inputs.s3-secret-key }}
+        ESP_METRICS_S3_LONG_TERM_BUCKET: ${{ inputs.long-term-bucket }}
+        ESP_METRICS_S3_SHORT_TERM_BUCKET: ${{ inputs.short-term-bucket }}
+        ESP_METRICS_PROJECT_URL: ${{ github.server_url }}/${{ github.repository }}
+        ESP_METRICS_PROJECT_ID: ${{ github.repository_id }}
+        ESP_METRICS_COMMIT_SHA: ${{ inputs.commit-sha }}
+        ESP_METRICS_BRANCH_NAME: ${{ inputs.branch-name }}
+        DEFINITIONS: ${{ inputs.definitions }}
+        METRICS_FILE: ${{ inputs.metrics-file }}
+      run: |
+        trap 'rm -rf .metrics-venv' EXIT
+        python3 -m venv .metrics-venv
+        .metrics-venv/bin/pip install --no-cache-dir esp-metrics-cli
+        .metrics-venv/bin/esp-metrics-cli validate -d "$DEFINITIONS" -i "$METRICS_FILE" --verbose
+        .metrics-venv/bin/esp-metrics-cli upload   -d "$DEFINITIONS" -i "$METRICS_FILE" --verbose
