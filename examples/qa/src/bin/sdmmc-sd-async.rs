@@ -7,6 +7,9 @@
 //! single-block (CMD24/CMD17) and multi-block (CMD25/CMD18, with auto-stop)
 //! transfer paths are written and read back. No raw blocks are overwritten.
 //!
+//! Build with `SDMMC_FORMAT=1` to erase the card first: the test writes an MBR
+//! with one FAT32 partition and formats it. This destroys all data on the card.
+//!
 //! Pins:
 //!
 //! | Signal | ESP32-S3 (1-bit) | ESP32 (4-bit) | ESP32-S31 (4-bit) | ESP32-P4 (4-bit, slot 0)
@@ -26,8 +29,8 @@
 use block_device_adapters::BufStream;
 use embassy_executor::Spawner;
 use embassy_time::Delay;
-use embedded_fatfs::{FileSystem, FsOptions, ReadWriteSeek};
-use embedded_io_async::{Read, Write};
+use embedded_fatfs::{FatType, FileSystem, FormatVolumeOptions, FsOptions, ReadWriteSeek};
+use embedded_io_async::{Read, Seek, SeekFrom, Write};
 use embedded_partitions::mbr::Scheme;
 use esp_backtrace as _;
 #[cfg(any(feature = "esp32s3", feature = "esp32p4"))]
@@ -38,7 +41,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use sdio::{BlockDevice, sd::Card};
+use sdio::{Addressable, BlockDevice, sd::Card};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -49,6 +52,12 @@ const CARD_HZ: u32 = 40_000_000;
 /// init fails with a timeout, try `_1`, `_2`, then `_3`.
 #[cfg(any(feature = "esp32s3", feature = "esp32p4"))]
 const INPUT_DELAY_PHASE: DelayPhase = DelayPhase::_0;
+
+/// Erase and format the card before the test when set at compile time.
+const FORMAT: bool = option_env!("SDMMC_FORMAT").is_some();
+
+/// First block of the FAT32 partition that the format step creates.
+const PART_START: u32 = 2048;
 
 /// Test-owned file (8.3 name); assumed not to exist on the card.
 const TEST_FILE: &str = "ESPQA.TXT";
@@ -128,6 +137,41 @@ async fn main(_spawner: Spawner) {
         .unwrap();
     println!("card initialized: {:?}", card.card());
 
+    if FORMAT {
+        let blocks = card.card().block_count();
+        println!("Formatting card ({blocks} blocks)");
+
+        let mut mbr = [0u8; 512];
+        let entry = &mut mbr[446..462];
+        entry[1..4].copy_from_slice(&[0xFE, 0xFF, 0xFF]);
+        entry[4] = 0x0C; // FAT32 (LBA)
+        entry[5..8].copy_from_slice(&[0xFE, 0xFF, 0xFF]);
+        entry[8..12].copy_from_slice(&PART_START.to_le_bytes());
+        entry[12..16].copy_from_slice(&(blocks - PART_START).to_le_bytes());
+        mbr[510] = 0x55;
+        mbr[511] = 0xAA;
+
+        let mut stream = BufStream::<_, 512>::new(&mut card);
+        stream.write_all(&mbr).await.unwrap();
+        stream.flush().await.unwrap();
+
+        let Ok(Scheme::Mbr(mut mbr)) = Scheme::open(stream).await else {
+            panic!("MBR not detected after write");
+        };
+        let mut part = RamWrites(mbr.open_partition(0).await.unwrap());
+        embedded_fatfs::format_volume(
+            &mut part,
+            FormatVolumeOptions::new().fat_type(FatType::Fat32),
+        )
+        .await
+        .unwrap();
+        part.flush().await.unwrap();
+        part.seek(SeekFrom::Start(0)).await.unwrap();
+        let fs = FileSystem::new(&mut part, FsOptions::new()).await.unwrap();
+        println!("Formatted: {:?}", fs.fat_type());
+        fs.unmount().await.unwrap();
+    }
+
     let mut button = Input::new(
         cfg_select! {
             feature = "esp32p4" => peripherals.GPIO35,
@@ -160,6 +204,42 @@ async fn main(_spawner: Spawner) {
 
         println!("Press the BOOT button to re-run.");
         button.wait_for_high().await;
+    }
+}
+
+/// Copies each write into RAM in pieces shorter than a block.
+///
+/// `format_volume` writes zeros from a constant in flash, and the SDMMC DMA
+/// cannot read flash. `BufStream` sends whole-block writes directly to the card
+/// and does not update its cached block, so the cached block can overwrite them.
+struct RamWrites<IO>(IO);
+
+impl<IO: embedded_io_async::ErrorType> embedded_io_async::ErrorType for RamWrites<IO> {
+    type Error = IO::Error;
+}
+
+impl<IO: Read> Read for RamWrites<IO> {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        self.0.read(buf).await
+    }
+}
+
+impl<IO: Write> Write for RamWrites<IO> {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        let mut ram = [0u8; 256];
+        let len = buf.len().min(ram.len());
+        ram[..len].copy_from_slice(&buf[..len]);
+        self.0.write(&ram[..len]).await
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        self.0.flush().await
+    }
+}
+
+impl<IO: Seek> Seek for RamWrites<IO> {
+    async fn seek(&mut self, pos: SeekFrom) -> Result<u64, Self::Error> {
+        self.0.seek(pos).await
     }
 }
 
