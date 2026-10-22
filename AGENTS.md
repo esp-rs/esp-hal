@@ -18,6 +18,7 @@ task.
 | Writing an issue | `documentation/CONTRIBUTING.md`, `documentation/REPRODUCERS.md` |
 | Examples | `examples/README.md` |
 | HIL tests | `hil-test/README.md`, `documentation/HIL-GUIDE.md` |
+| Log output from HIL tests (off by default) | `hil-test/README.md`, "Logging in tests" |
 | Build-time configuration (`esp_config.yml`) | `esp-config/README.md` |
 | New chip bring-up | `documentation/CHIP_BRING_UP.md` |
 | Releases | `documentation/RELEASING.md` |
