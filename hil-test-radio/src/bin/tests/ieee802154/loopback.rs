@@ -279,4 +279,23 @@ mod tests {
             "the stopped transmission completed"
         );
     }
+
+    /// Asleep, the driver gives its PHY reference back, but the RF stays on for BLE. Dropping BLE
+    /// then closes the RF, and `start_receive` must reopen it.
+    #[test]
+    async fn wakes_after_ble_dropped_while_asleep(p: Peripherals) {
+        use esp_radio::ble::controller::BleConnector;
+
+        let mut ieee802154 = start_radio(p.TIMG0, p.IEEE802154);
+        let ble = BleConnector::new(p.BT, Default::default()).unwrap();
+
+        ieee802154.sleep();
+        drop(ble);
+
+        ieee802154.start_receive();
+        assert!(
+            receives_echo(&mut ieee802154).await,
+            "802.15.4 did not wake up after BLE was dropped while it slept"
+        );
+    }
 }
