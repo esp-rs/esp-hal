@@ -381,6 +381,15 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
         7 => unsafe {
             ISR_INTERRUPT_7.set(handler, arg);
             BT::steal().enable_lp_timer_interrupt(interrupt::Priority::Priority1);
+            // `r_hal_timer_init` pulses `TASKS_STOP`, `TASKS_CLEAR`, and `TASKS_START` on the BLE
+            // RTC timer back-to-back before allocating this interrupt, and
+            // `r_ble_controller_enable` pulses `TASKS_START` again
+            // (`r_hal_timer_task_start`) right after `r_hal_timer_init` returns. Wait
+            // for `TASKS_STOP` / `TASKS_CLEAR` to cross into the `BLE_LP_CLK` domain
+            // before `r_hal_timer_task_start` runs, otherwise `TASKS_STOP` overrides both
+            // `TASKS_START` strobes and the timer stays stopped at 0.
+            let cycle_us = 1_000_000u32.div_ceil(lp_clk::frequency_hz());
+            esp_hal::rom::ets_delay_us(cycle_us * 2);
         },
         _ => panic!("Unexpected interrupt source {}", source),
     }
