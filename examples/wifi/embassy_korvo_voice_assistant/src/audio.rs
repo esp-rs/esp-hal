@@ -1,9 +1,8 @@
-//! Full-duplex audio over I2S.
+//! Recording from the two microphones over I2S.
 //!
-//! I2S runs all the time, because the ES8389 needs BCLK to stay out of standby. Each frame holds
-//! two 16-bit channels at 48 kHz: the two microphones on the way in, the two speakers on the way
-//! out. When nothing is recorded, the microphone frames are dropped. When nothing is played, the
-//! speakers get silence.
+//! I2S runs all the time, because the ES8389 needs BCLK to stay out of standby. TX drives BCLK and
+//! WS and only sends silence. RX receives frames of two 16-bit channels at 48 kHz, one per
+//! microphone. When nothing is recorded, the frames are dropped.
 
 use allocator_api2::vec::Vec;
 use embassy_sync::{
@@ -28,8 +27,6 @@ use esp_hal::{
 pub const I2S_SAMPLE_RATE: u32 = 48_000;
 /// The rate of recorded speech, 1/3 of the I2S rate.
 pub const RECORDING_SAMPLE_RATE: u32 = 16_000;
-/// The rate of played speech, 1/2 of the I2S rate.
-pub const PLAYBACK_SAMPLE_RATE: u32 = 24_000;
 /// Recordings stop growing after this time.
 pub const MAX_RECORDING: Duration = Duration::from_secs(30);
 
@@ -42,12 +39,10 @@ const FRAME_BYTES: usize = 4;
 enum Command {
     Record,
     StopRecording,
-    Play(Samples),
 }
 
 static COMMANDS: Channel<CriticalSectionRawMutex, Command, 1> = Channel::new();
 static RECORDING: Signal<CriticalSectionRawMutex, Samples> = Signal::new();
-static PLAYED: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
 /// Starts recording mono speech at [`RECORDING_SAMPLE_RATE`].
 pub async fn start_recording() {
@@ -60,16 +55,9 @@ pub async fn stop_recording() -> Samples {
     RECORDING.wait().await
 }
 
-/// Plays mono speech at [`PLAYBACK_SAMPLE_RATE`] on both speakers and waits until it is done.
-pub async fn play(samples: Samples) {
-    COMMANDS.send(Command::Play(samples)).await;
-    PLAYED.wait().await;
-}
-
 enum State {
     Idle,
     Recording(Decimator),
-    Playing(Interpolator),
 }
 
 #[embassy_executor::task]
@@ -81,52 +69,52 @@ pub async fn run(
     dout: AnyPin<'static>,
     din: AnyPin<'static>,
 ) {
-    // TX drives BCLK and WS, and RX shares them. The 16-bit samples travel in 32-bit slots, because
-    // the codec derives its clocks from BCLK and expects BCLK = 64 x the sample rate.
+    // RX shares BCLK and WS with TX. The 16-bit samples travel in 32-bit slots, because the codec
+    // derives its clocks from BCLK and expects BCLK = 64 x the sample rate.
     let config = TdmConfig::new_tdm_philips()
         .with_signal_loopback(true)
         .with_sample_rate(Rate::from_hz(I2S_SAMPLE_RATE))
         .with_data_format(DataFormat::Data32Channel16)
         .with_channels(Channels::STEREO);
     let i2s = I2s::new(i2s, dma, config).unwrap().into_async();
-    let mut speakers = i2s
+    let mut tx = i2s
         .i2s_tx
         .with_bclk(bclk)
         .with_ws(ws)
         .with_dout(dout)
         .build();
     let mut microphones = i2s.i2s_rx.with_din(din).build();
-    let mut speaker_buffer = dma_tx_stream_buffer!(16 * 1024, 2048);
+    let mut tx_buffer = dma_tx_stream_buffer!(16 * 1024, 2048);
     let mut microphone_buffer = dma_rx_stream_buffer!(16 * 1024, 2048);
 
     let mut state = State::Idle;
     loop {
-        let Ok(mut speaker_transfer) = speakers.write(speaker_buffer) else {
-            panic!("Failed to start the speaker DMA");
+        let Ok(mut tx_transfer) = tx.write(tx_buffer) else {
+            panic!("Failed to start the I2S TX DMA");
         };
         let Ok(mut microphone_transfer) = microphones.read(microphone_buffer) else {
             panic!("Failed to start the microphone DMA");
         };
 
-        let error = stream(&mut speaker_transfer, &mut microphone_transfer, &mut state).await;
+        let error = stream(&mut tx_transfer, &mut microphone_transfer, &mut state).await;
         // The DMA stops when Wi-Fi starts.
         log::warn!("Audio DMA stopped ({error:?}), restarting it");
 
-        (speakers, speaker_buffer) = speaker_transfer.stop();
+        (tx, tx_buffer) = tx_transfer.stop();
         (microphones, microphone_buffer) = microphone_transfer.stop();
     }
 }
 
-/// Moves frames between the DMA buffers and `state` until the DMA stops.
+/// Keeps TX fed with silence and hands microphone frames to `state` until the DMA stops.
 async fn stream(
-    speakers: &mut I2sTxDmaTransfer<'static, Async, DmaTxStreamBuf>,
+    tx: &mut I2sTxDmaTransfer<'static, Async, DmaTxStreamBuf>,
     microphones: &mut I2sRxDmaTransfer<'static, Async, DmaRxStreamBuf>,
     state: &mut State,
 ) -> DmaError {
     let mut frames = [0u8; 2048];
 
     loop {
-        if let Err(error) = speakers.wait_for_available_async().await {
+        if let Err(error) = tx.wait_for_available_async().await {
             return error;
         }
 
@@ -141,7 +129,6 @@ async fn stream(
                     RECORDING.signal(Vec::new_in(ExternalMemory));
                     State::Idle
                 }
-                (Command::Play(samples), _) => State::Playing(Interpolator::new(samples)),
             };
         }
 
@@ -158,28 +145,13 @@ async fn stream(
         }
 
         loop {
-            let pushed = speakers.push_with(|out| {
-                let (frames, _) = out.as_chunks_mut::<FRAME_BYTES>();
-                for frame in frames.iter_mut() {
-                    let sample = match state {
-                        State::Playing(interpolator) => interpolator.next().unwrap_or(0),
-                        _ => 0,
-                    };
-                    let [low, high] = sample.to_le_bytes();
-                    *frame = [low, high, low, high];
-                }
-                frames.len() * FRAME_BYTES
+            let pushed = tx.push_with(|out| {
+                out.fill(0);
+                out.len()
             });
             if pushed == 0 {
                 break;
             }
-        }
-
-        if let State::Playing(interpolator) = state
-            && interpolator.is_done()
-        {
-            PLAYED.signal(());
-            *state = State::Idle;
         }
     }
 }
@@ -215,44 +187,5 @@ impl Decimator {
                 self.count = 0;
             }
         }
-    }
-}
-
-/// Inserts the midpoint between consecutive samples (24 kHz -> 48 kHz).
-struct Interpolator {
-    samples: Samples,
-    position: usize,
-    previous: i16,
-    midpoint_sent: bool,
-}
-
-impl Interpolator {
-    fn new(samples: Samples) -> Self {
-        Self {
-            samples,
-            position: 0,
-            previous: 0,
-            midpoint_sent: false,
-        }
-    }
-
-    fn is_done(&self) -> bool {
-        self.position == self.samples.len()
-    }
-}
-
-impl Iterator for Interpolator {
-    type Item = i16;
-
-    fn next(&mut self) -> Option<i16> {
-        let sample = *self.samples.get(self.position)?;
-        if !self.midpoint_sent {
-            self.midpoint_sent = true;
-            return Some(((i32::from(self.previous) + i32::from(sample)) / 2) as i16);
-        }
-        self.midpoint_sent = false;
-        self.previous = sample;
-        self.position += 1;
-        Some(sample)
     }
 }

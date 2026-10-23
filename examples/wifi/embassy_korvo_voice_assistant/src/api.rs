@@ -1,5 +1,4 @@
-//! The three API calls of a conversation turn: speech to text (Deepgram), the answer (Claude), and
-//! text to speech (Deepgram).
+//! The two API calls of a conversation turn: speech to text (Deepgram) and the answer (Claude).
 
 use alloc::string::String;
 use core::fmt;
@@ -21,7 +20,7 @@ use reqwless::{
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::audio::{PLAYBACK_SAMPLE_RATE, RECORDING_SAMPLE_RATE};
+use crate::audio::RECORDING_SAMPLE_RATE;
 
 const DEEPGRAM_AUTHORIZATION: &str = concat!("Token ", env!("DEEPGRAM_API_KEY"));
 const CLAUDE_API_KEY: &str = env!("CLAUDE_API_KEY");
@@ -30,9 +29,6 @@ const CLAUDE_API_KEY: &str = env!("CLAUDE_API_KEY");
 const LISTEN_URL: &str = "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true\
     &encoding=linear16&sample_rate=16000&channels=1";
 const MESSAGES_URL: &str = "https://api.anthropic.com/v1/messages";
-/// Text in, raw 16-bit 24 kHz mono speech out.
-const SPEAK_URL: &str = "https://api.deepgram.com/v1/speak?model=aura-2-thalia-en\
-    &encoding=linear16&sample_rate=24000&container=none";
 
 const CLAUDE_MODEL: &str = "claude-haiku-5-5";
 
@@ -40,8 +36,9 @@ const INSTRUCTIONS: &str = "You are a voice assistant running on an ESP32-S31 mi
     Answer in one to three short sentences of plain text without markdown or emoji, because your \
     answer is spoken aloud and shown on a small screen.";
 
-/// The largest response body. It limits the spoken answer to about 40 seconds.
-const RESPONSE_BUFFER_SIZE: usize = 2 * 1024 * 1024;
+/// The largest response body. A transcript of a 30 s recording, with the timing of every word,
+/// takes about 40 KiB.
+const RESPONSE_BUFFER_SIZE: usize = 128 * 1024;
 /// One received TLS record: up to 16 KiB of data plus its overhead.
 const TLS_READ_BUFFER_SIZE: usize = 16 * 1024 + 256;
 /// `embedded-tls` puts the whole write buffer, minus the record overhead, into one record, which
@@ -171,27 +168,6 @@ impl Api {
             .into_iter()
             .map(|block| block.text)
             .collect())
-    }
-
-    /// Converts text to 24 kHz mono speech.
-    pub async fn speak(&mut self, text: &str) -> Result<Vec<i16, ExternalMemory>, Error> {
-        const _: () = assert!(PLAYBACK_SAMPLE_RATE == 24_000, "See `SPEAK_URL`");
-
-        let request = serde_json::to_vec(&json!({ "text": text }))?;
-        let headers = [
-            ("Authorization", DEEPGRAM_AUTHORIZATION),
-            ("Content-Type", ContentType::ApplicationJson.as_str()),
-        ];
-        let body = self.post(SPEAK_URL, &headers, request.as_slice()).await?;
-
-        let mut speech = Vec::with_capacity_in(body.len() / 2, ExternalMemory);
-        speech.extend(
-            body.as_chunks::<2>()
-                .0
-                .iter()
-                .map(|&bytes| i16::from_le_bytes(bytes)),
-        );
-        Ok(speech)
     }
 
     /// Sends a POST request over a new TLS connection and returns the response body.
