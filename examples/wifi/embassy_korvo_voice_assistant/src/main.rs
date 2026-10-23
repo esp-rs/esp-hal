@@ -94,26 +94,27 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_rtos::start(timg0.timer0);
 
-    // Display
+    // Display, with the sub-board timings from Espressif's `esp32_s3_lcd_ev_board` BSP
+    // (`SUB_BOARD3_800_480_PANEL_35HZ_RGB_TIMING`).
     let dpi_config = DpiConfig::default()
         .with_clock_mode(ClockMode {
             polarity: Polarity::IdleLow,
-            phase: Phase::ShiftLow,
+            phase: Phase::ShiftHigh,
         })
-        .with_frequency(Rate::from_mhz(16))
+        .with_frequency(Rate::from_mhz(18))
         .with_format(Format {
             enable_2byte_mode: true,
             ..Default::default()
         })
         .with_timing(FrameTiming {
             horizontal_active_width: display::WIDTH as usize,
-            horizontal_total_width: display::WIDTH as usize + 40,
-            horizontal_blank_front_porch: 10,
+            horizontal_total_width: display::WIDTH as usize + 40 + 40 + 48,
+            horizontal_blank_front_porch: 40 + 40,
             vertical_active_height: display::HEIGHT as usize,
-            vertical_total_height: display::HEIGHT as usize + 30,
-            vertical_blank_front_porch: 10,
-            hsync_width: 10,
-            vsync_width: 10,
+            vertical_total_height: display::HEIGHT as usize + 23 + 32 + 13,
+            vertical_blank_front_porch: 23 + 32,
+            hsync_width: 40,
+            vsync_width: 23,
             hsync_position: 0,
         })
         .with_vsync_idle_level(Level::High)
@@ -146,7 +147,7 @@ async fn main(spawner: Spawner) -> ! {
         .with_data13(peripherals.GPIO34)
         .with_data14(peripherals.GPIO35)
         .with_data15(peripherals.GPIO36);
-    spawner.spawn(display::run(dpi, display::frame_buffer()).unwrap());
+    spawner.spawn(display::run(dpi).unwrap());
 
     // Audio. The audio task must keep the DMA fed while other tasks block the thread executor, for
     // example while Wi-Fi starts or a TLS connection is set up.
@@ -166,16 +167,11 @@ async fn main(spawner: Spawner) -> ! {
         .unwrap(),
     );
 
-    // The Korvo-1 needs a slow I2C clock for reliable codec access, see the `esp_codec_dev`
-    // ES8389 test board.
-    let mut i2c = I2c::new(
-        peripherals.I2C0,
-        i2c::master::Config::default().with_frequency(Rate::from_khz(10)),
-    )
-    .unwrap()
-    .with_sda(peripherals.GPIO0)
-    .with_scl(peripherals.GPIO1)
-    .into_async();
+    let mut i2c = I2c::new(peripherals.I2C0, i2c::master::Config::default())
+        .unwrap()
+        .with_sda(peripherals.GPIO0)
+        .with_scl(peripherals.GPIO1)
+        .into_async();
     es8389::init(&mut i2c).await.unwrap();
     let _amplifiers = Output::new(peripherals.GPIO7, Level::High, OutputConfig::default());
 

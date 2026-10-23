@@ -4,6 +4,7 @@
 //! frames at 48 kHz in both directions. The register sequence follows Espressif's `esp_codec_dev`
 //! ES8389 driver (`es8389_open`, `es8389_set_fs`, `es8389_set_bias_on`).
 
+use embassy_time::Timer;
 use esp_hal::{
     Async,
     i2c::master::{Error, I2c},
@@ -128,8 +129,16 @@ const BIAS_ON: &[(u8, u8)] = &[
 ///
 /// The codec drops into analog standby without BCLK, so I2S must already be clocking.
 pub async fn init(i2c: &mut I2c<'_, Async>) -> Result<(), Error> {
+    // The first transfer after power-up is sometimes not acknowledged.
     let mut id = [0; 2];
-    i2c.write_read_async(ADDRESS, &[0xFD], &mut id).await?;
+    let mut attempt = 1;
+    while let Err(error) = i2c.write_read_async(ADDRESS, &[0xFD], &mut id).await {
+        if attempt == 3 {
+            return Err(error);
+        }
+        attempt += 1;
+        Timer::after_millis(10).await;
+    }
     log::info!("ES8389 chip ID: {:02x?}", id);
 
     write_all(i2c, OPEN).await?;

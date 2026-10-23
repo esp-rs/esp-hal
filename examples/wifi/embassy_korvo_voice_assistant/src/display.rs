@@ -1,14 +1,14 @@
 //! The 800x480 RGB panel of the LCD sub-board and the screen drawn on it.
 //!
-//! The panel has no frame memory, so the frame buffer in PSRAM is sent to it over and over. A new
-//! [`Screen`] is drawn between two frames.
+//! The panel has no frame memory, so the LCD peripheral sends it the frame buffer in PSRAM over and
+//! over: the DMA descriptors of the frame buffer form a ring. The refresh stops while a new
+//! [`Screen`] is drawn.
 
 use alloc::string::String;
 use core::convert::Infallible;
 
 use allocator_api2::vec::Vec;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-use embassy_time::Timer;
 use embedded_graphics::{
     mono_font::{MonoTextStyle, iso_8859_1::FONT_10X20},
     pixelcolor::{Rgb565, raw::RawU16},
@@ -23,7 +23,15 @@ use embedded_text::{
 use esp_alloc::DmaCompatibleExternalMemory;
 use esp_hal::{
     Blocking,
-    dma::{DmaTxBuf, ExternalBurstConfig, aligned::DmaAlignedMut},
+    dma::{
+        BurstConfig,
+        DmaDescriptor,
+        DmaTxBuffer,
+        ExternalBurstConfig,
+        Owner,
+        Preparation,
+        aligned::DmaAlignedMut,
+    },
     dma_descriptors_impl,
     lcd_cam::lcd::dpi::Dpi,
 };
@@ -63,39 +71,87 @@ pub fn show(screen: &Screen) {
     SCREEN.signal(screen.clone());
 }
 
-/// Allocates a black frame buffer in PSRAM.
-pub fn frame_buffer() -> DmaTxBuf {
-    const BURST: ExternalBurstConfig = ExternalBurstConfig::Size64;
-    const CHUNK_SIZE: usize = 4096 - BURST as usize;
-
-    let mut buffer = Vec::with_capacity_in(FRAME_BYTES, DmaCompatibleExternalMemory);
-    buffer.resize(FRAME_BYTES, 0);
-    let descriptors = dma_descriptors_impl!(FRAME_BYTES, CHUNK_SIZE);
-    DmaTxBuf::new_with_config(
-        descriptors,
-        DmaAlignedMut::new(buffer.leak()).unwrap(),
-        BURST,
-    )
-    .unwrap()
+#[embassy_executor::task]
+pub async fn run(mut dpi: Dpi<'static, Blocking>) {
+    let mut frame = FrameRing::new();
+    loop {
+        let Ok(transfer) = dpi.send(true, frame) else {
+            panic!("Failed to start the display refresh");
+        };
+        let screen = SCREEN.wait().await;
+        // A bus stall (Wi-Fi starting, for example) can starve the LCD, which then keeps going one
+        // frame offset from the data. Restarting the refresh realigns the picture.
+        (dpi, frame) = transfer.stop();
+        draw(&mut FrameBuffer(frame.buffer.as_mut()), &screen);
+        frame.buffer.writeback();
+    }
 }
 
-#[embassy_executor::task]
-pub async fn run(mut dpi: Dpi<'static, Blocking>, mut frame: DmaTxBuf) {
-    loop {
-        if let Some(screen) = SCREEN.try_take() {
-            draw(&mut FrameBuffer(frame.as_mut_slice()), &screen);
-        }
+/// A black frame buffer in PSRAM, with DMA descriptors that link back to the start.
+struct FrameRing {
+    descriptors: DmaAlignedMut<'static, [DmaDescriptor]>,
+    buffer: DmaAlignedMut<'static, [u8]>,
+}
 
-        let transfer = match dpi.send(false, frame) {
-            Ok(transfer) => transfer,
-            Err((error, _, _)) => panic!("Failed to send a frame: {error:?}"),
-        };
-        while !transfer.is_done() {
-            Timer::after_millis(1).await;
+const BURST: ExternalBurstConfig = ExternalBurstConfig::Size64;
+/// The largest DMA chunk that keeps every chunk aligned to the burst size.
+const CHUNK_SIZE: usize = 4096 - BURST as usize;
+
+impl FrameRing {
+    fn new() -> Self {
+        let mut buffer = Vec::with_capacity_in(FRAME_BYTES, DmaCompatibleExternalMemory);
+        buffer.resize(FRAME_BYTES, 0);
+        let mut buffer = DmaAlignedMut::new(buffer.leak()).unwrap();
+        let mut descriptors = dma_descriptors_impl!(FRAME_BYTES, CHUNK_SIZE);
+
+        let first: *mut DmaDescriptor = &mut descriptors[0];
+        let count = descriptors.len();
+        for (index, (descriptor, chunk)) in descriptors
+            .iter_mut()
+            .zip(buffer.chunks_mut(CHUNK_SIZE))
+            .enumerate()
+        {
+            descriptor.set_owner(Owner::Dma);
+            descriptor.set_suc_eof(false);
+            descriptor.set_size(chunk.len());
+            descriptor.set_length(chunk.len());
+            descriptor.buffer = chunk.as_mut_ptr();
+            descriptor.next = if index + 1 == count {
+                first
+            } else {
+                (descriptor as *mut DmaDescriptor).wrapping_add(1)
+            };
         }
-        let result;
-        (result, dpi, frame) = transfer.wait();
-        result.unwrap();
+        buffer.writeback();
+
+        Self {
+            descriptors,
+            buffer,
+        }
+    }
+}
+
+unsafe impl DmaTxBuffer for FrameRing {
+    type View = FrameRing;
+    type Final = FrameRing;
+
+    fn prepare(&mut self) -> Preparation {
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+            accesses_psram: true,
+            burst_transfer: BurstConfig::from(BURST),
+            // The DMA never hands the descriptors back, so it must not check their owner.
+            check_owner: Some(false),
+            auto_write_back: false,
+        }
+    }
+
+    fn into_view(self) -> FrameRing {
+        self
+    }
+
+    fn from_view(view: FrameRing) -> FrameRing {
+        view
     }
 }
 
