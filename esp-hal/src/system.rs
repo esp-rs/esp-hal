@@ -303,7 +303,6 @@ impl Cpu {
 /// this bit to determine the core id.
 #[inline(always)]
 pub(crate) fn raw_core() -> usize {
-    // This method must never return UNUSED_THREAD_ID_VALUE
     cfg_select! {
         all(multi_core, riscv) => riscv::register::mhartid::read(),
         all(multi_core, xtensa) => (xtensa_lx::get_processor_id() & 0x2000) as usize,
