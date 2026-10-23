@@ -78,6 +78,8 @@ mod unified_main;
 /// - `zeroed`: Initialize the memory of the `static` to zero. The initializer expression will be
 ///   discarded. Types used must implement [`bytemuck::Zeroable`].
 /// - `reclaimed`: Memory reclaimed from the esp-idf bootloader.
+/// - `uncached`: Use internal SRAM through the L1-bypass address range. The CPU does not cache this
+///   memory. Only available on ESP32-P4.
 ///
 /// Using both `rtc_fast` and `rtc_slow` or `persistent` and `zeroed` together
 /// is an error.
@@ -111,6 +113,12 @@ mod unified_main;
 ///
 /// #[ram(unstable(rtc_fast, zeroed))]
 /// static mut SOME_ZEROED_DATA: [u8; 8] = [0; 8];
+///
+/// #[ram(unstable(uncached))]
+/// static mut UNCACHE_DATA: [u8; 4] = [0x11, 0x22, 0x33, 0x44];
+///
+/// #[ram(unstable(uncached, zeroed))]
+/// static mut UNCACHE_BSS: [u8; 8] = [0; 8];
 /// ```
 ///
 /// See the `ram` example in `examples/qa` of the esp-hal repository for a full usage example.

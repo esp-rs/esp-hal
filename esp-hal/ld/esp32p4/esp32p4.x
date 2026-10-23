@@ -13,7 +13,16 @@ PROVIDE(interrupt0 = DefaultHandler);
 */
 PROVIDE(_mp_hook = default_mp_hook);
 
+/* Include this before `.uncached.hole`. The hole uses the size of these sections. */
+INCLUDE "uncached.x"
+
 SECTIONS {
+  /* Reserve the RAM that `.uncached.bss` uses. Round the uncached sections up
+     to the 64-byte L1 cache line. */
+  .uncached.hole (NOLOAD) : {
+    . = . + ALIGN(_uncached_end - _uncached_data_start, 64) - SIZEOF(.uncached.data);
+  } > RAM
+
   /* Shared sections - ordering matters */
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
@@ -41,4 +50,8 @@ INCLUDE "metadata.x"
 INCLUDE "eh_frame.x"
 /* End of Shared sections */
 
-_dram_data_start = ORIGIN(RAM) + SIZEOF(.trap) + SIZEOF(.rwtext);
+/* Do not add section sizes. Alignment of `.trap` can add padding after the hole. */
+_dram_data_start = ABSOLUTE(ADDR(.rwtext) + SIZEOF(.rwtext));
+
+ASSERT(SIZEOF(.uncached.hole) == 0 || ADDR(.uncached.hole) == ORIGIN(RAM) + SIZEOF(.uncached.data), "
+ERROR(esp-hal): .uncached.hole must follow the load address of .uncached.data");
