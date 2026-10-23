@@ -449,6 +449,7 @@ pub(crate) fn current_raw_runlevel() -> u32 {
 ///
 /// Must only be used to raise the runlevel and to restore it to a previous
 /// value. Must not be used to arbitrarily lower the runlevel.
+#[crate::ram]
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let previous = cpu_int::change_current_runlevel(level);
     unwrap!(RunLevel::try_from_u32(previous as u32))
@@ -661,7 +662,12 @@ pub(crate) mod rt {
             _ => {
                 // Change the current runlevel so that interrupt handlers can access the correct
                 // runlevel.
-                let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
+                let prio = unwrap!(
+                    INTERRUPT_TO_PRIORITY
+                        .get(cpu_intr as usize)
+                        .copied()
+                        .flatten()
+                );
                 let level = unsafe {
                     change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio)))
                 };
@@ -670,11 +676,10 @@ pub(crate) mod rt {
         }
 
         let handle_interrupts = || unsafe {
-            for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
-                crate::interrupt::should_handle(Cpu::current(), interrupt_nr as u32, prio as u32)
+            for interrupt in status.iterator().filter(|&interrupt| {
+                crate::interrupt::should_handle(Cpu::current(), interrupt as u32, prio as u32)
             }) {
-                let handler =
-                    crate::soc::pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler;
+                let handler = crate::soc::pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
 
                 handler();
             }
