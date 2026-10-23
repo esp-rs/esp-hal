@@ -48,6 +48,7 @@ use embassy_usb_synopsys_otg::{
     on_interrupt,
     otg_v1::Otg,
 };
+use esp_sync::RawMutex;
 use procmacros::handler;
 
 #[cfg(usb_otg_hs_driver_supported)]
@@ -86,8 +87,8 @@ impl AnyUsb<'_> {
             fn info(&self) -> &'static UsbOtgInfo;
             fn bind_peri_interrupt(&self, handler: InterruptHandler);
             fn disable_peri_interrupt_on_all_cores(&self);
-            fn embassy_device_state(&self) -> State<'static>;
-            fn embassy_host_state(&self) -> HostState<'static>;
+            fn embassy_device_state(&self) -> State<'static, UsbMutex>;
+            fn embassy_host_state(&self) -> HostState<'static, UsbMutex>;
         }
     }
 }
@@ -106,6 +107,7 @@ pub struct UsbOtgInfo {
     pub(crate) register_ptr: *const (),
     pub(crate) peripheral: Peripheral,
     pub(crate) fifo_depth_words: usize,
+    pub(crate) tx_fifo_count: u8,
     pub(crate) phy_type: PhyType,
     pub(crate) rx_fifo_extra_words: u16,
     pub(crate) device_interrupt: InterruptHandler,
@@ -113,6 +115,21 @@ pub struct UsbOtgInfo {
     pub(crate) enable_device_mode: fn(),
     pub(crate) enable_host_mode: fn(),
     pub(crate) platform_bus_disable_on_drop: fn(),
+}
+
+/// Copyable handle to the lock that protects the state of one USB OTG controller.
+#[doc(hidden)]
+#[derive(Clone, Copy)]
+pub struct UsbMutex(&'static RawMutex);
+
+static UNUSED_LOCK: RawMutex = RawMutex::new();
+
+unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for UsbMutex {
+    const INIT: Self = Self(&UNUSED_LOCK);
+
+    fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.0.lock(f)
+    }
 }
 
 unsafe impl Send for UsbOtgInfo {}
@@ -130,13 +147,18 @@ impl<'d> USB_FS<'d> {
         AnyUsb::Fs(self)
     }
 
-    fn device_state() -> State<'static> {
-        static DEVICE: StateStorage<7> = StateStorage::new();
+    const MUTEX: UsbMutex = {
+        static LOCK: RawMutex = RawMutex::new();
+        UsbMutex(&LOCK)
+    };
+
+    fn device_state() -> State<'static, UsbMutex> {
+        static DEVICE: StateStorage<7, UsbMutex> = StateStorage::new(USB_FS::MUTEX);
         DEVICE.as_state()
     }
 
-    fn host_state() -> HostState<'static> {
-        static HOST: HostStateStorage<8> = HostStateStorage::new();
+    fn host_state() -> HostState<'static, UsbMutex> {
+        static HOST: HostStateStorage<8, UsbMutex> = HostStateStorage::new(USB_FS::MUTEX);
         HOST.as_host_state()
     }
 
@@ -200,6 +222,7 @@ impl<'d> USB_FS<'d> {
             register_ptr: USB_FS::PTR.cast(),
             peripheral: Peripheral::UsbFs,
             fifo_depth_words: property!("usb_otg.fifo_depth_words"),
+            tx_fifo_count: property!("usb_otg.tx_fifo_count"),
             phy_type: PhyType::InternalFullSpeed,
             rx_fifo_extra_words: 30,
             device_interrupt: otg_fs_device_interrupt,
@@ -212,11 +235,11 @@ impl<'d> USB_FS<'d> {
         &INFO
     }
 
-    fn embassy_device_state(&self) -> State<'static> {
+    fn embassy_device_state(&self) -> State<'static, UsbMutex> {
         Self::device_state()
     }
 
-    fn embassy_host_state(&self) -> HostState<'static> {
+    fn embassy_host_state(&self) -> HostState<'static, UsbMutex> {
         Self::host_state()
     }
 }
@@ -227,13 +250,18 @@ impl<'d> USB_HS<'d> {
         AnyUsb::Hs(self)
     }
 
-    fn device_state() -> State<'static> {
-        static DEVICE: StateStorage<16> = StateStorage::new();
+    const MUTEX: UsbMutex = {
+        static LOCK: RawMutex = RawMutex::new();
+        UsbMutex(&LOCK)
+    };
+
+    fn device_state() -> State<'static, UsbMutex> {
+        static DEVICE: StateStorage<16, UsbMutex> = StateStorage::new(USB_HS::MUTEX);
         DEVICE.as_state()
     }
 
-    fn host_state() -> HostState<'static> {
-        static HOST: HostStateStorage<16> = HostStateStorage::new();
+    fn host_state() -> HostState<'static, UsbMutex> {
+        static HOST: HostStateStorage<16, UsbMutex> = HostStateStorage::new(USB_HS::MUTEX);
         HOST.as_host_state()
     }
 
@@ -254,6 +282,7 @@ impl<'d> USB_HS<'d> {
             register_ptr: USB_HS::PTR.cast(),
             peripheral: Peripheral::UsbHs,
             fifo_depth_words: property!("usb_otg_hs.fifo_depth_words"),
+            tx_fifo_count: property!("usb_otg_hs.tx_fifo_count"),
             phy_type: PhyType::InternalHighSpeed,
             rx_fifo_extra_words: 31,
             device_interrupt: otg_hs_device_interrupt,
@@ -266,11 +295,11 @@ impl<'d> USB_HS<'d> {
         &INFO
     }
 
-    fn embassy_device_state(&self) -> State<'static> {
+    fn embassy_device_state(&self) -> State<'static, UsbMutex> {
         Self::device_state()
     }
 
-    fn embassy_host_state(&self) -> HostState<'static> {
+    fn embassy_host_state(&self) -> HostState<'static, UsbMutex> {
         Self::host_state()
     }
 }
@@ -303,11 +332,11 @@ impl<'d> Usb<'d> {
         self.inner.disable_peri_interrupt_on_all_cores();
     }
 
-    pub(crate) fn embassy_device_state(&self) -> State<'static> {
+    pub(crate) fn embassy_device_state(&self) -> State<'static, UsbMutex> {
         self.inner.embassy_device_state()
     }
 
-    pub(crate) fn embassy_host_state(&self) -> HostState<'static> {
+    pub(crate) fn embassy_host_state(&self) -> HostState<'static, UsbMutex> {
         self.inner.embassy_host_state()
     }
 
