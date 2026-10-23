@@ -39,8 +39,11 @@ const INSTRUCTIONS: &str = "You are a voice assistant running on an ESP32-S31 mi
 
 /// The largest response body. It limits the spoken answer to about 40 seconds.
 const RESPONSE_BUFFER_SIZE: usize = 2 * 1024 * 1024;
-/// The size of one TLS record plus its overhead.
-const TLS_BUFFER_SIZE: usize = 16 * 1024 + 256;
+/// One received TLS record: up to 16 KiB of data plus its overhead.
+const TLS_READ_BUFFER_SIZE: usize = 16 * 1024 + 256;
+/// `embedded-tls` puts the whole write buffer, minus the record overhead, into one record, which
+/// must not carry more than 16 KiB of data.
+const TLS_WRITE_BUFFER_SIZE: usize = 16 * 1024;
 const TCP_BUFFER_SIZE: usize = 16 * 1024;
 
 #[derive(Debug)]
@@ -87,8 +90,8 @@ impl OpenAi {
             tcp: TcpClient::new(stack, tcp_state),
             dns: DnsSocket::new(stack),
             authorization: format!("Bearer {API_KEY}"),
-            tls_read_buffer: zeroed(TLS_BUFFER_SIZE),
-            tls_write_buffer: zeroed(TLS_BUFFER_SIZE),
+            tls_read_buffer: zeroed(TLS_READ_BUFFER_SIZE),
+            tls_write_buffer: zeroed(TLS_WRITE_BUFFER_SIZE),
             response: zeroed(RESPONSE_BUFFER_SIZE),
         }
     }
