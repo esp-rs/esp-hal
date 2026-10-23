@@ -233,6 +233,10 @@ impl ClockTreeNodeType for Multiplexer {
             variant_frequencies.push(frequency);
         }
 
+        if self.is_configurable() && !self.config_frequency_needs_instance(instance, tree) {
+            return SourceFrequencySignature::SameAsConfig;
+        }
+
         SourceFrequencySignature::Selector {
             param_type: quote! { #ty_name },
             param_name: format_ident!("source"),
@@ -461,23 +465,25 @@ impl Multiplexer {
             }
         };
 
-        let apply_and_switch_input = quote! {
-            #request_upstream
-            #hal_impl(clocks, old_selector, new_selector);
-            if let Some(old_selector) = old_selector {
-                #release_upstream
-            }
-        };
         let apply_impl = if let Some(refcount_accessor) = instance.properties.refcount_accessor() {
             quote! {
-                if #refcount_accessor > 0 {
-                    #apply_and_switch_input
-                } else {
-                    #hal_impl(clocks, old_selector, new_selector);
+                let active = #refcount_accessor > 0;
+                if active {
+                    #request_upstream
+                }
+                #hal_impl(clocks, old_selector, new_selector);
+                if active && let Some(old_selector) = old_selector {
+                    #release_upstream
                 }
             }
         } else {
-            apply_and_switch_input
+            quote! {
+                #request_upstream
+                #hal_impl(clocks, old_selector, new_selector);
+                if let Some(old_selector) = old_selector {
+                    #release_upstream
+                }
+            }
         };
 
         quote! {
