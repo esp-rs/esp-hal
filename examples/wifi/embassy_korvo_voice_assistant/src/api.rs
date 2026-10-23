@@ -1,7 +1,7 @@
-//! The three API calls of a conversation turn: speech to text (OpenAI), the answer (Claude), and
-//! text to speech (OpenAI).
+//! The three API calls of a conversation turn: speech to text (Deepgram), the answer (Claude), and
+//! text to speech (Deepgram).
 
-use alloc::{format, string::String};
+use alloc::string::String;
 use core::fmt;
 
 use allocator_api2::vec::Vec;
@@ -23,17 +23,18 @@ use serde_json::json;
 
 use crate::audio::{PLAYBACK_SAMPLE_RATE, RECORDING_SAMPLE_RATE};
 
-const OPENAI_AUTHORIZATION: &str = concat!("Bearer ", env!("OPENAI_API_KEY"));
+const DEEPGRAM_AUTHORIZATION: &str = concat!("Token ", env!("DEEPGRAM_API_KEY"));
 const CLAUDE_API_KEY: &str = env!("CLAUDE_API_KEY");
 
-const TRANSCRIPTION_URL: &str = "https://api.openai.com/v1/audio/transcriptions";
+/// Raw 16-bit 16 kHz mono speech in, text out.
+const LISTEN_URL: &str = "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true\
+    &encoding=linear16&sample_rate=16000&channels=1";
 const MESSAGES_URL: &str = "https://api.anthropic.com/v1/messages";
-const SPEECH_URL: &str = "https://api.openai.com/v1/audio/speech";
+/// Text in, raw 16-bit 24 kHz mono speech out.
+const SPEAK_URL: &str = "https://api.deepgram.com/v1/speak?model=aura-2-thalia-en\
+    &encoding=linear16&sample_rate=24000&container=none";
 
-const TRANSCRIPTION_MODEL: &str = "gpt-4o-mini-transcribe";
 const CLAUDE_MODEL: &str = "claude-haiku-5-5";
-const SPEECH_MODEL: &str = "gpt-4o-mini-tts";
-const VOICE: &str = "alloy";
 
 const INSTRUCTIONS: &str = "You are a voice assistant running on an ESP32-S31 microcontroller. \
     Answer in one to three short sentences of plain text without markdown or emoji, because your \
@@ -106,20 +107,33 @@ impl Api {
 
     /// Converts 16 kHz mono speech to text.
     pub async fn transcribe(&mut self, speech: &[i16]) -> Result<String, Error> {
+        const _: () = assert!(RECORDING_SAMPLE_RATE == 16_000, "See `LISTEN_URL`");
+
         #[derive(Deserialize)]
-        struct Transcription {
-            text: String,
+        struct Response {
+            results: Results,
+        }
+        #[derive(Deserialize)]
+        struct Results {
+            channels: [Channel; 1],
+        }
+        #[derive(Deserialize)]
+        struct Channel {
+            alternatives: [Alternative; 1],
+        }
+        #[derive(Deserialize)]
+        struct Alternative {
+            transcript: String,
         }
 
-        let content_type = format!("multipart/form-data; boundary={BOUNDARY}");
         let headers = [
-            ("Authorization", OPENAI_AUTHORIZATION),
-            ("Content-Type", content_type.as_str()),
+            ("Authorization", DEEPGRAM_AUTHORIZATION),
+            ("Content-Type", ContentType::ApplicationOctetStream.as_str()),
         ];
-        let body = self
-            .post(TRANSCRIPTION_URL, &headers, WavUpload::new(speech))
-            .await?;
-        Ok(serde_json::from_slice::<Transcription>(body)?.text)
+        let body = self.post(LISTEN_URL, &headers, Pcm(speech)).await?;
+        let [channel] = serde_json::from_slice::<Response>(body)?.results.channels;
+        let [alternative] = channel.alternatives;
+        Ok(alternative.transcript)
     }
 
     /// Answers the question.
@@ -159,22 +173,14 @@ impl Api {
 
     /// Converts text to 24 kHz mono speech.
     pub async fn speak(&mut self, text: &str) -> Result<Vec<i16, ExternalMemory>, Error> {
-        const _: () = assert!(
-            PLAYBACK_SAMPLE_RATE == 24_000,
-            "OpenAI sends `pcm` at 24 kHz"
-        );
+        const _: () = assert!(PLAYBACK_SAMPLE_RATE == 24_000, "See `SPEAK_URL`");
 
-        let request = serde_json::to_vec(&json!({
-            "model": SPEECH_MODEL,
-            "voice": VOICE,
-            "input": text,
-            "response_format": "pcm",
-        }))?;
+        let request = serde_json::to_vec(&json!({ "text": text }))?;
         let headers = [
-            ("Authorization", OPENAI_AUTHORIZATION),
+            ("Authorization", DEEPGRAM_AUTHORIZATION),
             ("Content-Type", ContentType::ApplicationJson.as_str()),
         ];
-        let body = self.post(SPEECH_URL, &headers, request.as_slice()).await?;
+        let body = self.post(SPEAK_URL, &headers, request.as_slice()).await?;
 
         let mut speech = Vec::with_capacity_in(body.len() / 2, ExternalMemory);
         speech.extend(
@@ -232,11 +238,12 @@ fn zeroed(len: usize) -> Vec<u8, ExternalMemory> {
     buffer
 }
 
-/// Extracts `error.message` from an OpenAI or Claude error response.
+/// Extracts the message from a Claude (`error.message`) or Deepgram (`err_msg`) error response.
 fn error_message(body: &[u8]) -> String {
     #[derive(Deserialize)]
     struct Response {
-        error: Error,
+        error: Option<Error>,
+        err_msg: Option<String>,
     }
     #[derive(Deserialize)]
     struct Error {
@@ -244,78 +251,33 @@ fn error_message(body: &[u8]) -> String {
     }
 
     match serde_json::from_slice::<Response>(body) {
-        Ok(response) => response.error.message,
-        Err(_) => String::from_utf8_lossy(body).into_owned(),
+        Ok(Response {
+            error: Some(error), ..
+        }) => error.message,
+        Ok(Response {
+            err_msg: Some(message),
+            ..
+        }) => message,
+        _ => String::from_utf8_lossy(body).into_owned(),
     }
 }
 
-const BOUNDARY: &str = "esp-hal-voice-assistant";
-const WAV_HEADER_LEN: usize = 44;
+/// Speech as little-endian 16-bit samples.
+struct Pcm<'a>(&'a [i16]);
 
-/// A multipart form with the transcription model and the speech as a WAV file.
-struct WavUpload<'a> {
-    head: String,
-    speech: &'a [i16],
-    tail: String,
-}
-
-impl<'a> WavUpload<'a> {
-    fn new(speech: &'a [i16]) -> Self {
-        let head = format!(
-            "--{BOUNDARY}\r\n\
-             Content-Disposition: form-data; name=\"model\"\r\n\r\n\
-             {TRANSCRIPTION_MODEL}\r\n\
-             --{BOUNDARY}\r\n\
-             Content-Disposition: form-data; name=\"file\"; filename=\"speech.wav\"\r\n\
-             Content-Type: audio/wav\r\n\r\n"
-        );
-        let tail = format!("\r\n--{BOUNDARY}--\r\n");
-        Self { head, speech, tail }
-    }
-
-    fn data_len(&self) -> usize {
-        self.speech.len() * 2
-    }
-
-    /// A RIFF header for 16-bit mono PCM.
-    fn wav_header(&self) -> [u8; WAV_HEADER_LEN] {
-        let data_len = self.data_len() as u32;
-        let byte_rate = RECORDING_SAMPLE_RATE * 2;
-
-        let mut header = [0; WAV_HEADER_LEN];
-        header[0..4].copy_from_slice(b"RIFF");
-        header[4..8].copy_from_slice(&(36 + data_len).to_le_bytes());
-        header[8..16].copy_from_slice(b"WAVEfmt ");
-        header[16..20].copy_from_slice(&16u32.to_le_bytes());
-        header[20..22].copy_from_slice(&1u16.to_le_bytes()); // PCM
-        header[22..24].copy_from_slice(&1u16.to_le_bytes()); // mono
-        header[24..28].copy_from_slice(&RECORDING_SAMPLE_RATE.to_le_bytes());
-        header[28..32].copy_from_slice(&byte_rate.to_le_bytes());
-        header[32..34].copy_from_slice(&2u16.to_le_bytes()); // bytes per frame
-        header[34..36].copy_from_slice(&16u16.to_le_bytes()); // bits per sample
-        header[36..40].copy_from_slice(b"data");
-        header[40..44].copy_from_slice(&data_len.to_le_bytes());
-        header
-    }
-}
-
-impl RequestBody for WavUpload<'_> {
+impl RequestBody for Pcm<'_> {
     fn len(&self) -> Option<usize> {
-        Some(self.head.len() + WAV_HEADER_LEN + self.data_len() + self.tail.len())
+        Some(self.0.len() * 2)
     }
 
     async fn write<W: Write>(&self, writer: &mut W) -> Result<(), W::Error> {
-        writer.write_all(self.head.as_bytes()).await?;
-        writer.write_all(&self.wav_header()).await?;
-
         let mut bytes = [0; 1024];
-        for samples in self.speech.chunks(bytes.len() / 2) {
+        for samples in self.0.chunks(bytes.len() / 2) {
             for (bytes, sample) in bytes.as_chunks_mut::<2>().0.iter_mut().zip(samples) {
                 *bytes = sample.to_le_bytes();
             }
             writer.write_all(&bytes[..samples.len() * 2]).await?;
         }
-
-        writer.write_all(self.tail.as_bytes()).await
+        Ok(())
     }
 }

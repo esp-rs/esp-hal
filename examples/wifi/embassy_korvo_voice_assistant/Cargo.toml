@@ -37,7 +37,8 @@ esp-radio = { path = "../../../esp-radio", features = [
 ] }
 esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
 log = "0.4.27"
-reqwless = "0.14.0"
+# `rsa` lets `embedded-tls` connect to servers with RSA certificates, such as Deepgram's.
+reqwless = { version = "0.14.0", features = ["rsa"] }
 serde = { version = "1.0.228", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1.0.145", default-features = false, features = ["alloc"] }
 static_cell = "2.1.0"

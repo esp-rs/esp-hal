@@ -1,10 +1,9 @@
 //! Voice assistant for the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board.
 //!
-//! Tap the button on the screen and speak, then tap it again. The recording is transcribed by the
-//! OpenAI API and answered by Claude, and the answer is shown on the screen and spoken on the
-//! speakers by the OpenAI API. Claude has no speech input or output.
+//! Tap the button on the screen and speak, then tap it again. Deepgram transcribes the recording,
+//! Claude answers, and the answer is shown on the screen and spoken on the speakers by Deepgram.
 //!
-//! Set the `SSID`, `PASSWORD`, `OPENAI_API_KEY` and `CLAUDE_API_KEY` environment variables before
+//! Set the `SSID`, `PASSWORD`, `DEEPGRAM_API_KEY` and `CLAUDE_API_KEY` environment variables before
 //! building. The API keys are stored in the firmware in plain text, and anyone with access to the
 //! board can read them. Use keys with a spending limit.
 //!
