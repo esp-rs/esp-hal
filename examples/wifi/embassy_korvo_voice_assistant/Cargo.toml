@@ -1,0 +1,60 @@
+[package]
+name    = "embassy-korvo-voice-assistant"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
+# `embedded-tls` 0.18, used by `reqwless`, does not build with the stable `der` 0.8 releases.
+der = "=0.8.0-rc.10"
+der_derive = "=0.8.0-rc.6"
+embassy-executor = "0.10.0"
+embassy-net = { version = "0.9.0", features = [
+    "dhcpv4",
+    "medium-ethernet",
+    "tcp",
+    "dns",
+] }
+embassy-sync = "0.8.0"
+embassy-time = "0.5.0"
+embedded-graphics = "0.8.1"
+embedded-io-async = "0.7.0"
+embedded-text = "0.7.2"
+esp-alloc = { path = "../../../esp-alloc" }
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-metadata-generated = { path = "../../../esp-metadata-generated" }
+esp-println = { path = "../../../esp-println", features = ["log-04"] }
+esp-radio = { path = "../../../esp-radio", features = [
+    "log-04",
+    "unstable",
+    "wifi",
+] }
+esp-rtos = { path = "../../../esp-rtos", features = ["esp-radio", "embassy", "log-04"] }
+log = "0.4.27"
+reqwless = "0.14.0"
+serde = { version = "1.0.228", default-features = false, features = ["alloc", "derive"] }
+serde_json = { version = "1.0.145", default-features = false, features = ["alloc"] }
+static_cell = "2.1.0"
+
+[features]
+esp32s31 = [
+    "esp-alloc/esp32s31",
+    "esp-backtrace/esp32s31",
+    "esp-bootloader-esp-idf/esp32s31",
+    "esp-hal/esp32s31",
+    "esp-metadata-generated/esp32s31",
+    "esp-rtos/esp32s31",
+    "esp-radio/esp32s31",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1
