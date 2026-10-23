@@ -1,7 +1,7 @@
 use core::ops::Not;
 
 use crate::{
-    peripherals::{EFUSE, HP_APM, LP_AON, PMU},
+    peripherals::{HP_APM, LP_AON, PMU},
     private::DropGuard,
     rtc_cntl::{
         Rtc,
@@ -826,8 +826,7 @@ impl RtcSleepConfig {
     pub(crate) fn finish_sleep(&self) {
         // like esp-idf pmu_sleep_finish()
 
-        // Wait until the eFuse controller is idle.
-        while EFUSE::regs().status().read().state().bits() != 1 {}
+        super::pmu_common::wait_for_efuse_idle();
 
         // apm_hal_enable_ctrl_filter_all(false), see `soc::pre_init`.
         HP_APM::regs().func_ctrl().write(|w| unsafe { w.bits(0) });

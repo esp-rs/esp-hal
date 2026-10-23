@@ -251,7 +251,7 @@ impl PowerSleepConfig {
         self.lp_sys_sleep
             .dig_power
             .set_peri_pd_en(pd_flags.pd_lp_periph());
-        self.lp_sys_sleep.dig_power.set_mem_dslp(true);
+        self.lp_sys_sleep.dig_power.set_mem_dslp(false);
 
         self.lp_sys_sleep
             .clk_power
@@ -418,10 +418,17 @@ impl ParamSleepConfig {
                 .bits(self.hp_sys.analog_wait_target_cycle)
         });
 
+        // From v1.1, the two low bits enable a power domain power-down that limits the inrush
+        // current.
+        let mut hp_digital_power_supply_wait_cycle = self.hp_sys.digital_power_supply_wait_cycle;
+        if crate::soc::chip_revision_above(crate::efuse::ChipRevision::from_combined(101)) {
+            hp_digital_power_supply_wait_cycle |= 0b11;
+        }
+
         PMU::regs().power_wait_timer0().modify(|_, w| unsafe {
             // pmu_ll_hp_set_digital_power_supply_wait_cycle
             w.dg_hp_pd_wait_timer()
-                .bits(self.hp_sys.digital_power_supply_wait_cycle);
+                .bits(hp_digital_power_supply_wait_cycle);
             // pmu_ll_hp_set_digital_power_up_wait_cycle
             w.dg_hp_powerup_timer()
                 .bits(self.hp_sys.digital_power_up_wait_cycle)
@@ -831,7 +838,7 @@ impl RtcSleepConfig {
 
         // lp_aon_hal_inform_wakeup_type - tells ROM which wakeup stub to run
         LP_AON::regs()
-            .store9()
+            .store8()
             .modify(|r, w| unsafe { w.bits(r.bits() & !0x01 | self.deep as u32) });
 
         // pmu_ll_hp_set_wakeup_enable
@@ -877,8 +884,7 @@ impl RtcSleepConfig {
     /// Cleans up after sleep.
     #[inline(always)]
     pub(crate) fn finish_sleep(&self) {
-        // like esp-idf pmu_sleep_finish()
-        // In "pd_cpu lightsleep" and "deepsleep" modes we never get here
+        super::pmu_common::wait_for_efuse_idle();
 
         // The post-wake hook of the GPIO driver releases the pads that the sleep armed. Only that
         // driver knows which pads it prepared.

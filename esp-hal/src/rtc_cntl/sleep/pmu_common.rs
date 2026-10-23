@@ -107,3 +107,34 @@ pub(crate) fn request_sleep() -> bool {
 
     super::wait_for_sleep_result()
 }
+
+/// Waits until the eFuse controller has reloaded the eFuse memory after the sleep request.
+///
+/// An eFuse read before this point can return stale data.
+#[cfg(not(esp32h2))]
+#[inline(always)]
+pub(crate) fn wait_for_efuse_idle() {
+    // `EFUSE_CONTROLLER_STATE_IDLE`
+    const IDLE: u8 = 1;
+
+    cfg_select! {
+        esp32c5 => {
+            // TODO: fix pacs
+            // The esp32c5 PAC lacks `EFUSE_ECDSA_REG` at offset 0x1d0, so its `status` register is
+            // `EFUSE_ECDSA_REG`. `EFUSE_STATUS_REG` is at offset 0x1d4, with the state in bits
+            // [3:0].
+            let status = (core::ptr::from_ref(crate::peripherals::EFUSE::regs()) as usize + 0x1d4)
+                as *const u32;
+            while unsafe { status.read_volatile() } & 0xf != IDLE as u32 {}
+        }
+        _ => {
+            while crate::peripherals::EFUSE::regs()
+                .status()
+                .read()
+                .state()
+                .bits()
+                != IDLE
+            {}
+        }
+    }
+}
