@@ -118,7 +118,6 @@ pub mod sta;
 
 pub(crate) mod os_adapter;
 esp_hal::if_unstable_hal! {
-    #[cfg(not(esp32))]
     pub(crate) mod sleep;
 }
 pub(crate) mod state;
@@ -2368,7 +2367,6 @@ pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
         })
     })?;
     esp_hal::if_unstable_hal! {
-        #[cfg(not(esp32))]
         sleep::set_power_save(ps != PowerSaveMode::None);
     }
     Ok(())
@@ -2664,17 +2662,9 @@ pub(crate) struct WifiRefGuard {
     _radio_guard: RadioRefGuard,
 }
 
-/// Wi-Fi refuses the unsafe sleeps itself, except on ESP32, which has no hardware TSF.
-fn wifi_radio_guard() -> RadioRefGuard {
-    cfg_select! {
-        esp32 => RadioRefGuard::new(),
-        _ => RadioRefGuard::without_wake_lock(),
-    }
-}
-
 impl Clone for WifiRefGuard {
     fn clone(&self) -> Self {
-        let _radio_guard = wifi_radio_guard();
+        let _radio_guard = RadioRefGuard::without_wake_lock();
         WIFI_REFCOUNT.increment(|| {});
         Self { _radio_guard }
     }
@@ -2688,7 +2678,6 @@ impl Drop for WifiRefGuard {
                 set_station_state(WifiStationState::Uninitialized);
 
                 esp_hal::if_unstable_hal! {
-                    #[cfg(not(esp32))]
                     sleep::release_wake_source();
                 }
 
@@ -2770,7 +2759,7 @@ impl<'d> WifiController<'d> {
                 | WifiEvent::ScanDone,
         );
 
-        let radio_guard = wifi_radio_guard();
+        let radio_guard = RadioRefGuard::without_wake_lock();
 
         let first = WIFI_REFCOUNT.try_increment(|| -> Result<(), WifiError> {
             unsafe {
@@ -2822,7 +2811,6 @@ impl<'d> WifiController<'d> {
             crate::wifi::wifi_init(device)?;
 
             esp_hal::if_unstable_hal! {
-                #[cfg(not(esp32))]
                 sleep::claim_wake_source();
             }
 
@@ -3183,7 +3171,6 @@ impl WifiController<'_> {
         }
 
         esp_hal::if_unstable_hal! {
-            #[cfg(not(esp32))]
             sleep::set_station_only(mode == wifi_mode_t_WIFI_MODE_STA);
         }
 
