@@ -11,7 +11,7 @@
 //! - `POWER_SAVE` selects the Wi-Fi modem power save mode. With power save, the radio is off
 //!   between beacons.
 //! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
-//!   sleeps only while the station is in power save. On the ESP32, Wi-Fi keeps the chip awake.
+//!   sleeps only while the station is in power save.
 //! - `CPU_POWERDOWN` lets light sleep power the CPU down, and retains its state in RAM. This saves
 //!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
 //!   -S3 and -S31 support this. On other chips the constant has no effect.
@@ -98,8 +98,7 @@ const PASSWORD: &str = env!("PASSWORD");
 /// light-sleep.
 const POWER_SAVE: PowerSaveMode = PowerSaveMode::Minimum;
 /// Whether the chip enters automatic light sleep when all tasks are idle. Requires [`POWER_SAVE`]
-/// to be enabled. The chip sleeps only while the station is in power save. On the ESP32, Wi-Fi
-/// keeps the chip awake.
+/// to be enabled. The chip sleeps only while the station is in power save.
 const LIGHT_SLEEP: bool = true;
 /// Whether light sleep powers the CPU down. Requires [`LIGHT_SLEEP`] to be enabled.
 const CPU_POWERDOWN: bool = true;
