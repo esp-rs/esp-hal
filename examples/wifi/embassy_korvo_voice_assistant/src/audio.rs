@@ -15,8 +15,13 @@ use embassy_time::Duration;
 use esp_alloc::ExternalMemory;
 use esp_hal::{
     Async,
-    dma::{DmaRxStreamBuf, DmaTxStreamBuf},
-    i2s::master::{I2sRxDmaTransfer, I2sTxDmaTransfer},
+    dma::{DmaError, DmaRxStreamBuf, DmaTxStreamBuf},
+    dma_rx_stream_buffer,
+    dma_tx_stream_buffer,
+    gpio::AnyPin,
+    i2s::master::{Channels, DataFormat, I2s, I2sRxDmaTransfer, I2sTxDmaTransfer, TdmConfig},
+    peripherals::{DMA_CH0, I2S0},
+    time::Rate,
 };
 
 /// The frame rate on the I2S bus.
@@ -69,17 +74,63 @@ enum State {
 
 #[embassy_executor::task]
 pub async fn run(
-    mut speakers: I2sTxDmaTransfer<'static, Async, DmaTxStreamBuf>,
-    mut microphones: I2sRxDmaTransfer<'static, Async, DmaRxStreamBuf>,
+    i2s: I2S0<'static>,
+    dma: DMA_CH0<'static>,
+    bclk: AnyPin<'static>,
+    ws: AnyPin<'static>,
+    dout: AnyPin<'static>,
+    din: AnyPin<'static>,
 ) {
+    // TX drives BCLK and WS, and RX shares them.
+    let config = TdmConfig::new_tdm_philips()
+        .with_signal_loopback(true)
+        .with_sample_rate(Rate::from_hz(I2S_SAMPLE_RATE))
+        .with_data_format(DataFormat::Data16Channel16)
+        .with_channels(Channels::STEREO);
+    let i2s = I2s::new(i2s, dma, config).unwrap().into_async();
+    let mut speakers = i2s
+        .i2s_tx
+        .with_bclk(bclk)
+        .with_ws(ws)
+        .with_dout(dout)
+        .build();
+    let mut microphones = i2s.i2s_rx.with_din(din).build();
+    let mut speaker_buffer = dma_tx_stream_buffer!(16 * 1024, 2048);
+    let mut microphone_buffer = dma_rx_stream_buffer!(16 * 1024, 2048);
+
     let mut state = State::Idle;
+    loop {
+        let Ok(mut speaker_transfer) = speakers.write(speaker_buffer) else {
+            panic!("Failed to start the speaker DMA");
+        };
+        let Ok(mut microphone_transfer) = microphones.read(microphone_buffer) else {
+            panic!("Failed to start the microphone DMA");
+        };
+
+        let error = stream(&mut speaker_transfer, &mut microphone_transfer, &mut state).await;
+        // The DMA stops when Wi-Fi starts.
+        log::warn!("Audio DMA stopped ({error:?}), restarting it");
+
+        (speakers, speaker_buffer) = speaker_transfer.stop();
+        (microphones, microphone_buffer) = microphone_transfer.stop();
+    }
+}
+
+/// Moves frames between the DMA buffers and `state` until the DMA stops.
+async fn stream(
+    speakers: &mut I2sTxDmaTransfer<'static, Async, DmaTxStreamBuf>,
+    microphones: &mut I2sRxDmaTransfer<'static, Async, DmaRxStreamBuf>,
+    state: &mut State,
+) -> DmaError {
     let mut frames = [0u8; 2048];
 
     loop {
-        speakers.wait_for_available_async().await.unwrap();
+        if let Err(error) = speakers.wait_for_available_async().await {
+            return error;
+        }
 
         if let Ok(command) = COMMANDS.try_receive() {
-            state = match (command, state) {
+            *state = match (command, core::mem::replace(state, State::Idle)) {
                 (Command::Record, _) => State::Recording(Decimator::new()),
                 (Command::StopRecording, State::Recording(decimator)) => {
                     RECORDING.signal(decimator.samples);
@@ -100,7 +151,7 @@ pub async fn run(
                 break;
             }
             let len = microphones.pop(&mut frames[..len]);
-            if let State::Recording(decimator) = &mut state {
+            if let State::Recording(decimator) = state {
                 decimator.push(&frames[..len]);
             }
         }
@@ -109,7 +160,7 @@ pub async fn run(
             let pushed = speakers.push_with(|out| {
                 let (frames, _) = out.as_chunks_mut::<FRAME_BYTES>();
                 for frame in frames.iter_mut() {
-                    let sample = match &mut state {
+                    let sample = match state {
                         State::Playing(interpolator) => interpolator.next().unwrap_or(0),
                         _ => 0,
                     };
@@ -123,11 +174,11 @@ pub async fn run(
             }
         }
 
-        if let State::Playing(interpolator) = &state
+        if let State::Playing(interpolator) = state
             && interpolator.is_done()
         {
             PLAYED.signal(());
-            state = State::Idle;
+            *state = State::Idle;
         }
     }
 }

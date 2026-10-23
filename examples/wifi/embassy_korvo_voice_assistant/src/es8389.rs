@@ -5,7 +5,7 @@
 //! ES8389 driver (`es8389_open`, `es8389_set_fs`, `es8389_set_bias_on`).
 
 use esp_hal::{
-    Blocking,
+    Async,
     i2c::master::{Error, I2c},
 };
 
@@ -127,32 +127,32 @@ const BIAS_ON: &[(u8, u8)] = &[
 /// Configures the codec for 48 kHz playback and recording.
 ///
 /// The codec drops into analog standby without BCLK, so I2S must already be clocking.
-pub fn init(i2c: &mut I2c<'_, Blocking>) -> Result<(), Error> {
+pub async fn init(i2c: &mut I2c<'_, Async>) -> Result<(), Error> {
     let mut id = [0; 2];
-    i2c.write_read(ADDRESS, &[0xFD], &mut id)?;
+    i2c.write_read_async(ADDRESS, &[0xFD], &mut id).await?;
     log::info!("ES8389 chip ID: {:02x?}", id);
 
-    write_all(i2c, OPEN)?;
-    bias_on(i2c)?;
+    write_all(i2c, OPEN).await?;
+    bias_on(i2c).await?;
     // `OPEN` left the codec in slave mode. Take the internal clock from the BCLK pin and leave the
     // DAC reference out of the ADC data.
-    write_all(i2c, &[(0x02, 0x40), (0xF0, 0x12)])?;
+    write_all(i2c, &[(0x02, 0x40), (0xF0, 0x12)]).await?;
 
-    write_all(i2c, SAMPLE_RATE_48K)?;
-    bias_on(i2c)
+    write_all(i2c, SAMPLE_RATE_48K).await?;
+    bias_on(i2c).await
 }
 
-fn bias_on(i2c: &mut I2c<'_, Blocking>) -> Result<(), Error> {
-    write_all(i2c, &[(0x4D, 0x00)])?;
+async fn bias_on(i2c: &mut I2c<'_, Async>) -> Result<(), Error> {
+    write_all(i2c, &[(0x4D, 0x00)]).await?;
     let mut value = [0];
-    i2c.write_read(ADDRESS, &[0x69], &mut value)?;
-    write_all(i2c, &[(0x69, value[0] | 0x20)])?;
-    write_all(i2c, BIAS_ON)
+    i2c.write_read_async(ADDRESS, &[0x69], &mut value).await?;
+    write_all(i2c, &[(0x69, value[0] | 0x20)]).await?;
+    write_all(i2c, BIAS_ON).await
 }
 
-fn write_all(i2c: &mut I2c<'_, Blocking>, registers: &[(u8, u8)]) -> Result<(), Error> {
+async fn write_all(i2c: &mut I2c<'_, Async>, registers: &[(u8, u8)]) -> Result<(), Error> {
     for &(register, value) in registers {
-        i2c.write(ADDRESS, &[register, value])?;
+        i2c.write_async(ADDRESS, &[register, value]).await?;
     }
     Ok(())
 }

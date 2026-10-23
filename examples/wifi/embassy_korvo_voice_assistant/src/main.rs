@@ -38,7 +38,7 @@ use esp_hal::{
     clock::CpuClock,
     gpio::{Level, Output, OutputConfig},
     i2c::{self, master::I2c},
-    i2s::master::{Channels, DataFormat, I2s, TdmConfig},
+    interrupt::Priority,
     lcd_cam::{
         LcdCam,
         lcd::{
@@ -61,6 +61,7 @@ use esp_radio::wifi::{
     WifiController,
     sta::StationConfig,
 };
+use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
 
 use crate::{
@@ -147,29 +148,23 @@ async fn main(spawner: Spawner) -> ! {
         .with_data15(peripherals.GPIO36);
     spawner.spawn(display::run(dpi, display::frame_buffer()).unwrap());
 
-    // Audio: TX drives BCLK and WS, and RX shares them (`signal_loopback`).
-    let i2s_config = TdmConfig::new_tdm_philips()
-        .with_signal_loopback(true)
-        .with_sample_rate(Rate::from_hz(audio::I2S_SAMPLE_RATE))
-        .with_data_format(DataFormat::Data16Channel16)
-        .with_channels(Channels::STEREO);
-    let i2s = I2s::new(peripherals.I2S0, peripherals.DMA_CH0, i2s_config)
-        .unwrap()
-        .into_async();
-    let speakers = i2s
-        .i2s_tx
-        .with_bclk(peripherals.GPIO3)
-        .with_ws(peripherals.GPIO4)
-        .with_dout(peripherals.GPIO5)
-        .build()
-        .write(esp_hal::dma_tx_stream_buffer!(16 * 1024, 2048))
-        .unwrap();
-    let microphones = i2s
-        .i2s_rx
-        .with_din(peripherals.GPIO6)
-        .build()
-        .read(esp_hal::dma_rx_stream_buffer!(16 * 1024, 2048))
-        .unwrap();
+    // Audio. The audio task must keep the DMA fed while other tasks block the thread executor, for
+    // example while Wi-Fi starts or a TLS connection is set up.
+    static AUDIO_EXECUTOR: StaticCell<InterruptExecutor<2>> = StaticCell::new();
+    let audio_spawner = AUDIO_EXECUTOR
+        .init(InterruptExecutor::new(peripherals.FROM_CPU_INTR2))
+        .start(Priority::Priority3);
+    audio_spawner.spawn(
+        audio::run(
+            peripherals.I2S0,
+            peripherals.DMA_CH0,
+            peripherals.GPIO3.into(),
+            peripherals.GPIO4.into(),
+            peripherals.GPIO5.into(),
+            peripherals.GPIO6.into(),
+        )
+        .unwrap(),
+    );
 
     // The Korvo-1 needs a slow I2C clock for reliable codec access, see the `esp_codec_dev`
     // ES8389 test board.
@@ -179,12 +174,12 @@ async fn main(spawner: Spawner) -> ! {
     )
     .unwrap()
     .with_sda(peripherals.GPIO0)
-    .with_scl(peripherals.GPIO1);
-    es8389::init(&mut i2c).unwrap();
+    .with_scl(peripherals.GPIO1)
+    .into_async();
+    es8389::init(&mut i2c).await.unwrap();
     let _amplifiers = Output::new(peripherals.GPIO7, Level::High, OutputConfig::default());
-    spawner.spawn(audio::run(speakers, microphones).unwrap());
 
-    spawner.spawn(touch::run(i2c.into_async()).unwrap());
+    spawner.spawn(touch::run(i2c).unwrap());
 
     // Wi-Fi
     let station_config = Config::Station(
