@@ -15,6 +15,11 @@ on:
         required: false
         type: number
         default: 10
+      min_age_days:
+        description: "Only label issues created at least this many days ago"
+        required: false
+        type: number
+        default: 30
 
 permissions:
   issues: write
@@ -31,9 +36,11 @@ jobs:
         env:
           DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
           BATCH_SIZE: ${{ inputs.batch_size || '10' }}
+          MIN_AGE_DAYS: ${{ inputs.min_age_days || '30' }}
         with:
           script: |
             const { run } = require('./.github/scripts/bug-jury-labeler.js');
             const dryRun = process.env.DRY_RUN !== 'false';
             const batchSize = parseInt(process.env.BATCH_SIZE, 10) || 10;
-            await run({ github, context, core, batchSize, dryRun });
+            const minAgeDays = parseInt(process.env.MIN_AGE_DAYS, 10) || 30;
+            await run({ github, context, core, batchSize, dryRun, minAgeDays });
