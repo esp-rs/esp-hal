@@ -73,6 +73,11 @@ name              = "parl_io"
 harness           = false
 
 [[bin]]
+name              = "ppa"
+harness           = false
+required-features = ["unstable", "psram"]
+
+[[bin]]
 name              = "rmt"
 harness           = false
 required-features = ["embassy", "esp-alloc"]
