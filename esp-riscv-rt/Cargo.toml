@@ -42,6 +42,8 @@ no-mie-mip = ["riscv-rt/no-xie-xip"]
 rtc-ram = []
 ## CLIC with 48 total interrupt lines
 clic-48 = []
+## Save and restore floating-point registers in interrupt routines
+float-save-restore = []
 
 ## Implement `defmt::Format`
 defmt = ["dep:defmt", "riscv-rt/defmt"]
