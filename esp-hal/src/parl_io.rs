@@ -1,4 +1,9 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(parl_io_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(parl_io_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
+    },
+))]
 //! # Parallel IO (PARL_IO)
 //!
 //! ## Overview
@@ -24,7 +29,7 @@
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let mut dma_rx_buf = dma_rx_buffer!(32000)?;
-//! let dma_channel = peripherals.DMA_CH0;
+//! let dma_channel = peripherals.{dma_channel};
 //!
 //! // Configure the 4-bit input pins and clock pin
 //! let mut rx_pins = RxFourBits::new(
@@ -69,7 +74,7 @@
 //!
 //! // Initialize DMA buffer and descriptors for data transmission
 //! let mut dma_tx_buf = dma_tx_buffer!(32000).unwrap();
-//! let dma_channel = peripherals.DMA_CH0;
+//! let dma_channel = peripherals.{dma_channel};
 //!
 //! // Configure the 4-bit input pins and clock pin
 //! let tx_pins = TxFourBits::new(
@@ -148,7 +153,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
-    peripherals::{PARL_IO, PCR},
+    peripherals::PARL_IO,
     soc::clocks::{ClockTree, ParlIoInstance},
     system::{GenericPeripheralGuard, Peripheral},
     time::Rate,
@@ -526,18 +531,197 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
-/// PCR value that selects the clock from the GPIO pad.
-const PCR_PAD_CLK_SEL: u8 = 3;
+// The clock and reset registers of the TX and RX units are outside of the PARL_IO register block.
+mod unit_clock {
+    /// Clock source value that selects the clock from the GPIO pad.
+    const PAD_CLK_SEL: u8 = 3;
+
+    cfg_select! {
+        soc_has_pcr => {
+            use crate::peripherals::PCR;
+
+            pub(super) const MAX_DIVIDER: u32 = 0xFFFF;
+
+            pub(super) fn uses_pad_clock(tx: bool) -> bool {
+                let pcr = PCR::regs();
+                if tx {
+                    pcr.parl_clk_tx_conf().read().parl_clk_tx_sel().bits() == PAD_CLK_SEL
+                } else {
+                    pcr.parl_clk_rx_conf().read().parl_clk_rx_sel().bits() == PAD_CLK_SEL
+                }
+            }
+
+            pub(super) fn select_pad_clock(tx: bool) {
+                let pcr = PCR::regs();
+                if tx {
+                    pcr.parl_clk_tx_conf().modify(|_, w| unsafe {
+                        w.parl_clk_tx_sel()
+                            .bits(PAD_CLK_SEL)
+                            .parl_clk_tx_div_num()
+                            .bits(0)
+                    });
+                } else {
+                    pcr.parl_clk_rx_conf().modify(|_, w| unsafe {
+                        w.parl_clk_rx_sel()
+                            .bits(PAD_CLK_SEL)
+                            .parl_clk_rx_div_num()
+                            .bits(0)
+                    });
+                }
+            }
+
+            pub(super) fn set_divider(tx: bool, divider: u32) {
+                let pcr = PCR::regs();
+                if tx {
+                    pcr.parl_clk_tx_conf()
+                        .modify(|_, w| unsafe { w.parl_clk_tx_div_num().bits(divider as u16) });
+                } else {
+                    pcr.parl_clk_rx_conf()
+                        .modify(|_, w| unsafe { w.parl_clk_rx_div_num().bits(divider as u16) });
+                }
+            }
+
+            pub(super) fn set_reset(tx: bool, reset: bool) {
+                let pcr = PCR::regs();
+                if tx {
+                    pcr.parl_clk_tx_conf()
+                        .modify(|_, w| w.parl_tx_rst_en().bit(reset));
+                } else {
+                    pcr.parl_clk_rx_conf()
+                        .modify(|_, w| w.parl_rx_rst_en().bit(reset));
+                }
+            }
+        }
+        esp32p4 => {
+            use crate::peripherals::{HP_SYS_CLKRST, LP_AON_CLKRST};
+
+            pub(super) const MAX_DIVIDER: u32 = 0xFF;
+
+            pub(super) fn uses_pad_clock(tx: bool) -> bool {
+                let clkrst = HP_SYS_CLKRST::regs();
+                if tx {
+                    clkrst
+                        .peri_clk_ctrl118()
+                        .read()
+                        .parlio_tx_clk_src_sel()
+                        .bits()
+                        == PAD_CLK_SEL
+                } else {
+                    clkrst
+                        .peri_clk_ctrl117()
+                        .read()
+                        .parlio_rx_clk_src_sel()
+                        .bits()
+                        == PAD_CLK_SEL
+                }
+            }
+
+            pub(super) fn select_pad_clock(tx: bool) {
+                let clkrst = HP_SYS_CLKRST::regs();
+                let pad_clk = LP_AON_CLKRST::regs().lp_aonclkrst_hp_clk_ctrl();
+                if tx {
+                    pad_clk.modify(|_, w| w.lp_aonclkrst_hp_pad_parlio_tx_clk_en().set_bit());
+                    clkrst.peri_clk_ctrl118().modify(|_, w| unsafe {
+                        w.parlio_tx_clk_src_sel()
+                            .bits(PAD_CLK_SEL)
+                            .parlio_tx_clk_div_num()
+                            .bits(0)
+                    });
+                } else {
+                    pad_clk.modify(|_, w| w.lp_aonclkrst_hp_pad_parlio_rx_clk_en().set_bit());
+                    clkrst.peri_clk_ctrl117().modify(|_, w| unsafe {
+                        w.parlio_rx_clk_src_sel()
+                            .bits(PAD_CLK_SEL)
+                            .parlio_rx_clk_div_num()
+                            .bits(0)
+                    });
+                }
+            }
+
+            pub(super) fn set_divider(tx: bool, divider: u32) {
+                let clkrst = HP_SYS_CLKRST::regs();
+                if tx {
+                    clkrst
+                        .peri_clk_ctrl118()
+                        .modify(|_, w| unsafe { w.parlio_tx_clk_div_num().bits(divider as u8) });
+                } else {
+                    clkrst
+                        .peri_clk_ctrl117()
+                        .modify(|_, w| unsafe { w.parlio_rx_clk_div_num().bits(divider as u8) });
+                }
+            }
+
+            pub(super) fn set_reset(tx: bool, reset: bool) {
+                HP_SYS_CLKRST::regs().hp_rst_en2().modify(|_, w| {
+                    if tx {
+                        w.rst_en_parlio_tx().bit(reset)
+                    } else {
+                        w.rst_en_parlio_rx().bit(reset)
+                    }
+                });
+            }
+        }
+        esp32s31 => {
+            use crate::peripherals::{HP_ALIVE_SYS, HP_SYS_CLKRST};
+
+            pub(super) const MAX_DIVIDER: u32 = 0xFF;
+
+            pub(super) fn uses_pad_clock(tx: bool) -> bool {
+                let clkrst = HP_SYS_CLKRST::regs();
+                if tx {
+                    clkrst.parlio_tx_ctrl0().read().clk_src_sel().bits() == PAD_CLK_SEL
+                } else {
+                    clkrst.parlio_rx_ctrl0().read().clk_src_sel().bits() == PAD_CLK_SEL
+                }
+            }
+
+            pub(super) fn select_pad_clock(tx: bool) {
+                let clkrst = HP_SYS_CLKRST::regs();
+                let pad_clk = HP_ALIVE_SYS::regs().hp_pad_parlio_ctrl();
+                if tx {
+                    pad_clk.modify(|_, w| w.hp_pad_parlio_tx_clk_en().set_bit());
+                    clkrst.parlio_tx_ctrl0().modify(|_, w| unsafe {
+                        w.clk_src_sel().bits(PAD_CLK_SEL).clk_div_num().bits(0)
+                    });
+                } else {
+                    pad_clk.modify(|_, w| w.hp_pad_parlio_rx_clk_en().set_bit());
+                    clkrst.parlio_rx_ctrl0().modify(|_, w| unsafe {
+                        w.clk_src_sel().bits(PAD_CLK_SEL).clk_div_num().bits(0)
+                    });
+                }
+            }
+
+            pub(super) fn set_divider(tx: bool, divider: u32) {
+                let clkrst = HP_SYS_CLKRST::regs();
+                if tx {
+                    clkrst
+                        .parlio_tx_ctrl0()
+                        .modify(|_, w| unsafe { w.clk_div_num().bits(divider as u8) });
+                } else {
+                    clkrst
+                        .parlio_rx_ctrl0()
+                        .modify(|_, w| unsafe { w.clk_div_num().bits(divider as u8) });
+                }
+            }
+
+            pub(super) fn set_reset(tx: bool, reset: bool) {
+                let clkrst = HP_SYS_CLKRST::regs();
+                if tx {
+                    clkrst
+                        .parlio_tx_ctrl0()
+                        .modify(|_, w| w.rst_en().bit(reset));
+                } else {
+                    clkrst
+                        .parlio_rx_ctrl0()
+                        .modify(|_, w| w.rst_en().bit(reset));
+                }
+            }
+        }
+    }
+}
 
 fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> {
-    let pcr = PCR::regs();
-    let using_pad_clock = if is_tx {
-        pcr.parl_clk_tx_conf().read().parl_clk_tx_sel().bits() == PCR_PAD_CLK_SEL
-    } else {
-        pcr.parl_clk_rx_conf().read().parl_clk_rx_sel().bits() == PCR_PAD_CLK_SEL
-    };
-
-    if using_pad_clock {
+    if unit_clock::uses_pad_clock(is_tx) {
         // The GPIO pad supplies the unit clock. `TxConfig`/`RxConfig` frequency is the
         // internal divider target and must not be applied to the pad clock.
         return Ok(());
@@ -553,18 +737,11 @@ fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> 
         ParlIoInstance::ParlIo.rx_clock_frequency()
     };
     let divider = source_hz / frequency.as_hz();
-    if divider > 0xFFFF {
+    if divider > unit_clock::MAX_DIVIDER {
         return Err(ConfigError::UnreachableClockRate);
     }
-    let divider = divider as u16;
 
-    if is_tx {
-        pcr.parl_clk_tx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_tx_div_num().bits(divider) });
-    } else {
-        pcr.parl_clk_rx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_rx_div_num().bits(divider) });
-    }
+    unit_clock::set_divider(is_tx, divider);
 
     Ok(())
 }
@@ -612,9 +789,7 @@ impl<'d> ClkInPin<'d> {
 }
 impl TxClkPin for ClkInPin<'_> {
     fn configure(&mut self) {
-        let pcr = PCR::regs();
-        pcr.parl_clk_tx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
+        unit_clock::select_pad_clock(true);
 
         self.pin.apply_input_config(&gpio::InputConfig::default());
         self.pin.set_input_enable(true);
@@ -638,9 +813,7 @@ impl<'d> RxClkInPin<'d> {
 }
 impl RxClkPin for RxClkInPin<'_> {
     fn configure(&mut self) {
-        let pcr = PCR::regs();
-        pcr.parl_clk_rx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_RX, no divider
+        unit_clock::select_pad_clock(false);
 
         self.pin.apply_input_config(&gpio::InputConfig::default());
         self.pin.set_input_enable(true);
@@ -1422,9 +1595,7 @@ where
             return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
         }
 
-        PCR::regs()
-            .parl_clk_tx_conf()
-            .modify(|_, w| w.parl_tx_rst_en().set_bit());
+        unit_clock::set_reset(true, true);
 
         Instance::clear_tx_interrupts();
         Instance::set_tx_bytes(number_of_bytes as u16);
@@ -1442,9 +1613,7 @@ where
 
         Instance::set_tx_start(true);
 
-        PCR::regs()
-            .parl_clk_tx_conf()
-            .modify(|_, w| w.parl_tx_rst_en().clear_bit());
+        unit_clock::set_reset(true, false);
 
         Ok(ParlIoTxTransfer {
             parl_io: ManuallyDrop::new(self),
@@ -1768,9 +1937,7 @@ where
     where
         BUF: DmaRxBuffer,
     {
-        PCR::regs()
-            .parl_clk_rx_conf()
-            .modify(|_, w| w.parl_rx_rst_en().set_bit());
+        unit_clock::set_reset(false, true);
 
         Instance::clear_rx_interrupts();
         if let Some(number_of_bytes) = number_of_bytes {
@@ -1796,9 +1963,7 @@ where
 
         Instance::set_rx_start(true);
 
-        PCR::regs()
-            .parl_clk_rx_conf()
-            .modify(|_, w| w.parl_rx_rst_en().clear_bit());
+        unit_clock::set_reset(false, false);
 
         Ok(ParlIoRxTransfer {
             parl_io: ManuallyDrop::new(self),
