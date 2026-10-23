@@ -661,7 +661,12 @@ pub(crate) mod rt {
             _ => {
                 // Change the current runlevel so that interrupt handlers can access the correct
                 // runlevel.
-                let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
+                let prio = unwrap!(
+                    INTERRUPT_TO_PRIORITY
+                        .get(cpu_intr as usize)
+                        .copied()
+                        .flatten()
+                );
                 let level = unsafe {
                     change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio)))
                 };
@@ -673,10 +678,11 @@ pub(crate) mod rt {
             for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
                 crate::interrupt::should_handle(Cpu::current(), interrupt_nr as u32, prio as u32)
             }) {
-                let handler =
-                    crate::soc::pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler;
-
-                handler();
+                if let Some(vector) =
+                    crate::soc::pac::__EXTERNAL_INTERRUPTS.get(interrupt_nr as usize)
+                {
+                    (vector._handler)();
+                }
             }
         };
 
