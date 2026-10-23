@@ -641,11 +641,10 @@ fn write_encrypted_rows(
     let mut i = 0;
     while i < data.len() {
         let row_addr = offset + i as u32;
-        let (program_addr, program_len, consumed) =
-            cfg_select! {
-                esp32 => prepare_esp32_row(&mut row.0, row_addr, &data[i..], neighbors),
-                _ => prepare_xts_row(&mut row.0, row_addr, &data[i..]),
-            };
+        let (program_addr, program_len, consumed) = cfg_select! {
+            esp32 => prepare_esp32_row(&mut row.0, row_addr, &data[i..], neighbors),
+            _ => prepare_xts_row(&mut row.0, row_addr, &data[i..]),
+        };
         rom::write_encrypted(program_addr, row.0.as_mut_ptr().cast(), program_len)?;
         i += consumed;
     }

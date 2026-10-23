@@ -132,7 +132,9 @@ cfg_select! {
         const CPU_POWERDOWN_RAM: usize = size_of::<CpuRetentionStorage>()
             + 16
             + cfg_select! {
-                feature = "esp32s3" => size_of::<esp_hal::rtc_cntl::CacheTagRetentionStorage>() + 16,
+                feature = "esp32s3" => {
+                    size_of::<esp_hal::rtc_cntl::CacheTagRetentionStorage>() + 16
+                }
                 _ => 0,
             };
 
