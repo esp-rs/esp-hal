@@ -494,14 +494,9 @@ where
     ) -> Result<DpiTransfer<'d, TX, Dm>, (DmaError, Self, TX)> {
         Instance::clear_interrupts(LcdCamInterrupt::LcdVsync.into());
 
-        // Reset before DMA start. AXI-GDMA can fill the LCD AFIFO immediately; a later
-        // FIFO reset would drop the first pixels of the frame.
         self.regs()
             .lcd_user()
             .modify(|_, w| w.lcd_reset().set_bit());
-        self.regs()
-            .lcd_misc()
-            .modify(|_, w| w.lcd_afifo_reset().set_bit());
 
         self.regs().lcd_misc().modify(|_, w| {
             // 1: Send the next frame data when the current frame is sent out.
@@ -509,12 +504,21 @@ where
             w.lcd_next_frame_en().bit(next_frame_en)
         });
 
-        let result = unsafe {
+        if let Err(err) = unsafe {
             self.tx_channel
                 .prepare_transfer(DmaPeripheral::LCD_CAM, &mut buf)
+        } {
+            return Err((err, self, buf));
         }
-        .and_then(|_| self.tx_channel.start_transfer());
-        if let Err(err) = result {
+
+        // Reset the AFIFO after the DMA channel, which may still hold data of the previous
+        // transfer, and before the DMA starts, because AXI-GDMA can fill the AFIFO immediately.
+        // Either way, the frame would start with stale or missing pixels.
+        self.regs()
+            .lcd_misc()
+            .modify(|_, w| w.lcd_afifo_reset().set_bit());
+
+        if let Err(err) = self.tx_channel.start_transfer() {
             return Err((err, self, buf));
         }
 
