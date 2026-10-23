@@ -423,7 +423,9 @@ has_rx_demodulation = true
 
 [device.parl_io]
 support_status = "not_supported"
-version = 1 # FIXME placeholder
+version = 2
+max_data_width = 16
+has_tx_cs = true
 
 [device.rng]
 support_status = { status = "partial", issue = 5982 }
@@ -593,9 +595,9 @@ working_modes = [
     { id = 11, mode = "modular_division" }
 ]
 curves = [
-    { id = 0, curve = 192 },
-    { id = 1, curve = 256 },
-    { id = 2, curve = 384 },
+    { id = 0, curve = "p192" },
+    { id = 1, curve = "p256" },
+    { id = 2, curve = "p384" },
 ]
 separate_jacobian_point_memory = true
 has_memory_clock_gate = true

@@ -266,6 +266,24 @@ fn find_free_entry() -> Option<u32> {
         .find(|&entry_id| !entry_is_valid(entry_id))
 }
 
+/// The entries that map the data (DROM) window, in address order.
+pub(super) fn drom_entries() -> Range<u32> {
+    cfg_select! {
+        // DROM0 is served by IBUS2. The data buses after it map other windows.
+        esp32s2 => s2::DATA_ENTRY_START..s2::IBUS_ENTRY_END,
+        _ => data_entries(),
+    }
+}
+
+/// The flash offset that a DROM entry maps, or `None` when the entry is
+/// outside the DROM window, invalid, or maps PSRAM.
+pub(super) fn drom_entry_offset(entry_id: u32) -> Option<u32> {
+    (drom_entries().contains(&entry_id)
+        && entry_is_valid(entry_id)
+        && entry_is_flash_mapping(entry_id))
+    .then(|| entry_flash_page(entry_id) * mmu_page_size())
+}
+
 /// Entries that can back a temporary mapping and be read through as data.
 fn data_entries() -> Range<u32> {
     cfg_select! {
@@ -568,7 +586,7 @@ mod s2 {
 
     pub(super) const DATA_ENTRY_START: u32 = 0x200 / 4;
     pub(super) const DATA_ENTRY_END: u32 = 0x500 / 4;
-    const IBUS_ENTRY_END: u32 = 0x300 / 4;
+    pub(super) const IBUS_ENTRY_END: u32 = 0x300 / 4;
 
     /// Virtual address for an S2 MMU entry.
     ///

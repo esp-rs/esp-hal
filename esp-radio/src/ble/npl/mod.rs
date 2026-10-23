@@ -1133,19 +1133,26 @@ unsafe extern "C" fn controller_wakeup_cb(arg: *mut c_void) {
         #[cfg(not(esp32c2))]
         r_ble_rtc_wake_up_state_clr();
 
-        // The controller passes its `bt_wakeup_params_t`. Bit 31 tells it that the BLE timer
-        // ended the light sleep.
+        // ESP-IDF: `controller_wakeup_cb()` and `bt_wakeup_params_t` in `bt.c`.
+        // Bits 0..20 hold `rtc_freq`, bit 31 tells the controller that the BLE timer ended the
+        // light sleep.
         const BT_WAKEUP: u32 = 1 << 31;
+        const RTC_FREQ_MASK: u32 = 0xfffff;
         let params = arg.cast::<u32>();
         if !params.is_null() {
             let by_bt =
                 esp_hal::rtc_cntl::wakeup_cause().contains(esp_hal::rtc_cntl::WakeupSource::Bt);
-            let value = params.read_volatile();
-            params.write_volatile(if by_bt {
-                value | BT_WAKEUP
+            let mut value = params.read_volatile();
+            if by_bt {
+                value |= BT_WAKEUP;
             } else {
-                value & !BT_WAKEUP
-            });
+                value &= !BT_WAKEUP;
+            }
+            if super::lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source) {
+                let freq = super::lp_clk::frequency_hz();
+                value = (value & !RTC_FREQ_MASK) | (freq & RTC_FREQ_MASK);
+            }
+            params.write_volatile(value);
         }
     }
     super::modem_phy_acquire();

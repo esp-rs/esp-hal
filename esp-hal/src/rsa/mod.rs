@@ -45,6 +45,53 @@ pub struct Rsa<'d, Dm: DriverMode> {
     _guard: RsaGuard,
 }
 
+/// RSA accelerator configuration.
+///
+/// The default is the most secure: constant time on and search acceleration off. The ESP32 has
+/// neither option, so its `Config` is empty.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct Config {
+    /// Constant time operation for modular exponentiation.
+    ///
+    /// Turning it off makes modular exponentiation faster for an exponent with many 0 bits,
+    /// and exposes the exponent to timing-based side-channel attacks. Turn it off only for a
+    /// public exponent, such as when verifying a signature.
+    ///
+    /// Default value: `true`.
+    #[cfg(not(rsa_version = "1"))]
+    constant_time: bool,
+
+    /// Search acceleration for modular exponentiation.
+    ///
+    /// Turning it on makes modular exponentiation faster by skipping the exponent's bits above
+    /// its most significant set bit, and exposes the exponent's length. Turn it on only for a
+    /// public exponent, such as when verifying a signature.
+    ///
+    /// Default value: `false`.
+    #[cfg(not(rsa_version = "1"))]
+    search_acceleration: bool,
+}
+
+#[cfg_attr(rsa_version = "1", expect(clippy::derivable_impls))]
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            #[cfg(not(rsa_version = "1"))]
+            constant_time: true,
+            #[cfg(not(rsa_version = "1"))]
+            search_acceleration: false,
+        }
+    }
+}
+
+/// RSA configuration error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConfigError {}
+
 // There are two distinct peripheral versions: ESP32, and all else. There is a naming split in the
 // later devices, and they use different (memory size, operand size increment) parameters, but they
 // are largely the same.
@@ -112,11 +159,11 @@ impl Drop for RsaGuard {
 }
 
 impl<'d> Rsa<'d, Blocking> {
-    /// Creates a new instance in [Blocking] mode.
+    /// Creates a new instance in [Blocking] mode, with the given configuration.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(rsa: RSA<'d>) -> Self {
-        let this = Self {
+    pub fn new(rsa: RSA<'d>, config: Config) -> Result<Self, ConfigError> {
+        let mut this = Self {
             rsa,
             phantom: PhantomData,
             _guard: RsaGuard::new(),
@@ -124,7 +171,8 @@ impl<'d> Rsa<'d, Blocking> {
 
         while !this.ready() {}
 
-        this
+        this.apply_config(&config)?;
+        Ok(this)
     }
 
     /// Reconfigures the RSA driver to operate in asynchronous mode.
@@ -304,39 +352,25 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
         self.read_out(outbuf);
     }
 
-    /// Enables or disables constant time operation.
+    /// Applies a new configuration.
     ///
-    /// Disabling constant time operation increases the performance of modular
-    /// exponentiation by simplifying the calculation concerning the 0 bits
-    /// of the exponent. I.e. the less the Hamming weight, the greater the
-    /// performance.
-    ///
-    /// Compromises security by enabling timing-based side-channel attacks.
-    ///
-    /// For more information refer to the
+    /// For more information on the options, refer to the
     #[doc = trm_markdown_link!("rsa")]
-    #[cfg(not(rsa_version = "1"))]
-    pub fn disable_constant_time(&mut self, disable: bool) {
-        self.regs()
-            .constant_time()
-            .write(|w| w.constant_time().bit(disable));
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.write_config(config);
+        Ok(())
     }
 
-    /// Enables or disables search acceleration.
-    ///
-    /// When enabled it would increase the performance of modular
-    /// exponentiation by discarding the exponent's bits before the most
-    /// significant set bit.
-    ///
-    /// Compromises security by effectively decreasing the key length.
-    ///
-    /// For more information refer to the
-    #[doc = trm_markdown_link!("rsa")]
-    #[cfg(not(rsa_version = "1"))]
-    pub fn search_acceleration(&mut self, enable: bool) {
-        self.regs()
-            .search_enable()
-            .write(|w| w.search_enable().bit(enable));
+    fn write_config(&mut self, _config: &Config) {
+        #[cfg(not(rsa_version = "1"))]
+        {
+            self.regs()
+                .constant_time()
+                .write(|w| w.constant_time().bit(_config.constant_time));
+            self.regs()
+                .search_enable()
+                .write(|w| w.search_enable().bit(_config.search_acceleration));
+        }
     }
 
     /// Returns whether the search functionality is enabled in the RSA hardware.
@@ -880,11 +914,7 @@ impl<'d> RsaBackend<'d> {
                 work_queue::Poll::Pending(true)
             }
             RsaBackendState::Ready(mut rsa) => {
-                #[cfg(not(rsa_version = "1"))]
-                {
-                    rsa.disable_constant_time(!item.constant_time);
-                    rsa.search_acceleration(item.search_acceleration);
-                }
+                rsa.write_config(&item.config);
 
                 match item.operation {
                     RsaOperation::Multiplication { x, y } => {
@@ -946,7 +976,7 @@ impl<'d> RsaBackend<'d> {
                         rsa.write_r(unsafe { r_inv.as_ref() });
 
                         #[cfg(not(rsa_version = "1"))]
-                        if item.search_acceleration {
+                        if item.config.search_acceleration {
                             fn find_search_pos(exponent: &[u32]) -> u32 {
                                 for (i, byte) in exponent.iter().rev().enumerate() {
                                     if *byte == 0 {
@@ -1032,11 +1062,7 @@ impl<'t, 'd> RsaWorkQueueDriver<'t, 'd> {
 
 #[derive(Clone)]
 struct RsaWorkItem {
-    // Acceleration options
-    #[cfg(not(rsa_version = "1"))]
-    search_acceleration: bool,
-    #[cfg(not(rsa_version = "1"))]
-    constant_time: bool,
+    config: Config,
 
     // The operation to execute.
     operation: RsaOperation,
@@ -1110,10 +1136,7 @@ impl RsaContext {
     pub fn new() -> Self {
         Self {
             frontend: WorkQueueFrontend::new(RsaWorkItem {
-                #[cfg(not(rsa_version = "1"))]
-                search_acceleration: false,
-                #[cfg(not(rsa_version = "1"))]
-                constant_time: true,
+                config: Config::default(),
                 operation: RsaOperation::Multiplication {
                     x: NonNull::from(&[]),
                     y: NonNull::from(&[]),
@@ -1135,7 +1158,7 @@ impl RsaContext {
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
     pub fn enable_search_acceleration(&mut self) {
-        self.frontend.data_mut().search_acceleration = true;
+        self.frontend.data_mut().config.search_acceleration = true;
     }
 
     #[cfg(not(rsa_version = "1"))]
@@ -1151,7 +1174,7 @@ impl RsaContext {
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
     pub fn enable_acceleration(&mut self) {
-        self.frontend.data_mut().constant_time = false;
+        self.frontend.data_mut().config.constant_time = false;
     }
 
     fn post(&mut self) -> RsaHandle<'_> {

@@ -133,7 +133,9 @@ impl<'a> PartitionTable<'a> {
     #[cfg(not(feature = "std"))]
     /// Returns the currently booted partition.
     pub fn booted_partition(&self) -> Result<Option<PartitionEntry>, Error> {
-        let paddr = booted_app_offset();
+        let Some(paddr) = booted_app_offset() else {
+            return Ok(None);
+        };
 
         for id in 0..self.len() {
             let entry = self.get_partition(id)?;
@@ -146,64 +148,28 @@ impl<'a> PartitionTable<'a> {
     }
 }
 
-/// Returns the flash offset of the running application image.
+/// Returns the flash offset of the running application image, or `None` when no MMU entry maps
+/// it.
+///
+/// The bootloader maps the app's first page at the last page of the DROM window, so the app can
+/// find its partition. The ESP32's bootloader uses the window's first page.
+/// See <https://github.com/espressif/esp-idf/blob/4d59230ddff16327812782151ef0afef202dc6d7/components/bootloader_support/src/bootloader_utility.c#L1080-L1082>.
 #[cfg(not(feature = "std"))]
-pub(super) fn booted_app_offset() -> u32 {
-    // Read entry 0 from MMU to know which partition is mapped
-    //
-    // See <https://github.com/espressif/esp-idf/blob/758939caecb16e5542b3adfba0bc85025517db45/components/hal/mmu_hal.c#L124>
-    cfg_select! {
-        feature = "esp32" => {
-            let paddr = unsafe { ((0x3FF10000 as *const u32).read_volatile() & 0xff) << 16 };
-        }
-        feature = "esp32s2" => {
-            let paddr =
-                unsafe { (((0x61801000 + 128 * 4) as *const u32).read_volatile() & 0xff) << 16 };
-        }
-        feature = "esp32s3" => {
-            // Revisit this once we support XiP from PSRAM for ESP32-S3
-            let paddr = unsafe { ((0x600C5000 as *const u32).read_volatile() & 0xff) << 16 };
-        }
-        any(feature = "esp32c2", feature = "esp32c3") => {
-            let paddr = unsafe { ((0x600c5000 as *const u32).read_volatile() & 0xff) << 16 };
-        }
-        feature = "esp32p4" => {
-            // DR_REG_FLASH_SPI0_BASE : 0x5008C000 = DR_REG_HPPERIPH0_BASE + 0x8C000
-            // TODO: verify MSPI register for partition physical address read
-            let paddr = unsafe {
-                ((0x5008C000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_C_MMU_ITEM_INDEX_REG
-                (((0x5008C000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
-            };
-        }
-        feature = "esp32s31" => {
-            // Read MMU entry 0, which maps the beginning of the flash
-            // virtual-address range.
-            let paddr = unsafe {
-                ((0x20500000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_C_MMU_ITEM_INDEX_REG
-                (((0x20500000 + 0x37c) as *const u32).read_volatile() & 0x7ff) << 16 // SPI_MEM_C_MMU_ITEM_CONTENT_REG
-            };
-        }
-        feature = "esp32h4" => {
-            let paddr = unsafe {
-                ((0x60098000 + 0x380) as *mut u32).write_volatile(0); // SPI_MEM_MMU_ITEM_INDEX_REG
-                (((0x60098000 + 0x37c) as *const u32).read_volatile() & 0x1ff) << 16 // SPI_MEM_MMU_ITEM_CONTENT_REG
-            };
-        }
-        any(
-            feature = "esp32c5",
-            feature = "esp32c6",
-            feature = "esp32c61",
-            feature = "esp32h2"
-        ) => {
-            let paddr = unsafe {
-                ((0x60002000 + 0x380) as *mut u32).write_volatile(0);
-                (((0x60002000 + 0x37c) as *const u32).read_volatile() & 0xff) << 16
-            };
-        }
-        _ => {}
-    }
+pub(super) fn booted_app_offset() -> Option<u32> {
+    use esp_hal::flash::{flash_mmu_drom_entries, flash_mmu_entry_offset};
 
-    paddr
+    let drom = flash_mmu_drom_entries();
+    let entry = if cfg!(feature = "esp32") {
+        drom.start
+    } else {
+        drom.end - 1
+    };
+    let offset = flash_mmu_entry_offset(entry);
+    // The ESP32-S31 bootloader that espflash 4.6 bundles is built for 32 KB pages, and maps the
+    // app at entry 511 instead of 1023.
+    #[cfg(feature = "esp32s31")]
+    let offset = offset.or_else(|| flash_mmu_entry_offset(511));
+    offset
 }
 
 /// Reads the partition table.

@@ -11,7 +11,7 @@
 //!   between beacons.
 //! - `MODEM_SLEEP` lets the BLE controller turn the radio off between its events.
 //! - `LIGHT_SLEEP` lets the chip enter automatic light sleep when all tasks are idle. The chip
-//!   sleeps only while both radios allow it. On the ESP32, Wi-Fi keeps the chip awake.
+//!   sleeps only while both radios allow it.
 //! - `CPU_POWERDOWN` lets light sleep power the CPU down, and retains its state in RAM. This saves
 //!   more current, but it makes the sleep and the wake slower. Only the ESP32-C3, -C5, -C6, -C61,
 //!   -S3 and -S31 support this. On other chips the constant has no effect.
@@ -120,7 +120,9 @@ cfg_select! {
         const CPU_POWERDOWN_RAM: usize = size_of::<CpuRetentionStorage>()
             + 16
             + cfg_select! {
-                feature = "esp32s3" => size_of::<esp_hal::rtc_cntl::CacheTagRetentionStorage>() + 16,
+                feature = "esp32s3" => {
+                    size_of::<esp_hal::rtc_cntl::CacheTagRetentionStorage>() + 16
+                }
                 _ => 0,
             };
 
@@ -174,9 +176,8 @@ async fn main(spawner: Spawner) -> ! {
         {
             use esp_hal::clock::ll::BleLpClkConfig;
 
-            // For now, only Xtal can be selected if modem-sleep is enabled.
-            // This is our default anyway, a safe choice even in light sleep,
-            // although it can raise the sleep current a bit.
+            // `Xtal` is the default, and a safe choice even in light sleep, although keeping the
+            // main crystal running raises the sleep current compared to an RC oscillator.
             config.ble_lp_clk = Some(BleLpClkConfig::Xtal);
         }
 

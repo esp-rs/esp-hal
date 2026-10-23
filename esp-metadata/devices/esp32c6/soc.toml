@@ -196,8 +196,8 @@ working_modes = [
     { id = 7, mode = "affine_point_verification_and_jacobian_point_multiplication" }
 ]
 curves = [
-    { id = 0, curve = 192 },
-    { id = 1, curve = 256 }
+    { id = 0, curve = "p192" },
+    { id = 1, curve = "p256" }
 ]
 zero_extend_writes = true
 has_memory_clock_gate = true
@@ -366,6 +366,7 @@ supports_top_power_down = true
 [device.parl_io]
 support_status = "partial"
 version = 1
+max_data_width = 16
 
 # Other drivers which are partially supported but have no other configuration:
 

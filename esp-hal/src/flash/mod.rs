@@ -22,8 +22,7 @@
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/spi_flash/index.html)")]
 //! ## Configuration
 //!
-//! On dual-core chips, [`Config`] selects the multi-core strategy (default:
-//! automatically park the other core).
+//! On a dual-core chip, [`Config`] selects the strategy for the other core.
 //!
 //! ## Usage
 //!
@@ -59,12 +58,10 @@
 //!   smaller.
 //! - Operations do not check whether the target flash range is mapped. Writing or erasing a mapped
 //!   section (such as `.text` or `.rodata`) can corrupt running code or immutable data.
-//! - Each [`Flash::read`] or [`Flash::write`] call executes a single ROM operation. The flash cache
-//!   remains disabled (and the other core remains parked) for the entire transfer. Split large
-//!   operations in higher-level code if latency is critical.
-//! - On dual-core chips, the default strategy stalls the other core around every operation,
-//!   including reads. The other core can freeze while holding a lock or executing an interrupt
-//!   handler.
+//! - Each [`Flash::read`] or [`Flash::write`] call executes one ROM operation. The flash cache
+//!   stays off for the whole transfer. Split a large transfer when latency matters.
+//! - On a dual-core chip, the multi-core strategy controls the other core for every operation,
+//!   including a read.
 
 use core::marker::PhantomData;
 
@@ -102,10 +99,12 @@ const ESP32_ENCRYPT_ROW: u32 = 32;
 pub struct Config {
     /// Strategy for the other core during flash operations.
     ///
-    /// Default: [`MultiCoreStrategy::AutoPark`].
-    ///
     /// [`MultiCoreStrategy::ignore`] is safe only when the other core cannot
     /// fetch from flash during the operation.
+    #[doc = cfg_select! {
+        feature = "rt" => "\n\nDefault: [`MultiCoreStrategy::AutoPark`].",
+        _ => "\n\nDefault: [`MultiCoreStrategy::Error`].",
+    }]
     #[cfg(multi_core)]
     #[builder_lite(unstable)]
     multi_core_strategy: MultiCoreStrategy,
@@ -119,16 +118,21 @@ pub struct Config {
 #[non_exhaustive]
 pub enum MultiCoreStrategy {
     /// Returns [`Error::OtherCoreRunning`] if the other core is running.
+    #[cfg_attr(not(feature = "rt"), default)]
     Error,
-    /// Parks the other core for the operation and unparks it afterward.
+    /// Posts an IPC function on the other core for the operation.
     ///
-    /// The stall can freeze the other core at any instruction. The other core can hold a
-    /// lock or execute an interrupt handler. Parking uses CPU-control
-    /// registers even if the application already owns
-    /// [`crate::peripherals::CPU_CTRL`].
+    /// The function runs from RAM. The function masks interrupts on that core and waits until
+    /// the operation finishes. The operation waits until that core enters the function. A core
+    /// that does not take the IPC interrupt delays the operation.
+    ///
+    /// If [`crate::system::CpuControl`] did not start the APP core, the CPU-control registers
+    /// stall that core instead.
+    #[cfg(feature = "rt")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "rt")))]
     #[default]
     AutoPark,
-    /// Does not check or park the other core.
+    /// Does not check or stop the other core.
     ///
     /// Construct with [`Self::ignore`].
     Ignore(IgnoreMarker),
@@ -147,7 +151,7 @@ pub struct IgnoreMarker {
 
 #[cfg(multi_core)]
 impl MultiCoreStrategy {
-    /// Creates a strategy that does not check or park the other core.
+    /// Creates a strategy that does not check or stop the other core.
     ///
     /// # Safety
     ///
@@ -270,6 +274,24 @@ pub struct ChipInfo {
     pub block_size: u32,
     /// Program page size in bytes.
     pub page_size: u32,
+}
+
+/// Returns the flash MMU entries that map the data (DROM) window, in address
+/// order.
+///
+/// Entry `start` maps the window's first page and entry `end - 1` its last.
+#[instability::unstable]
+pub fn flash_mmu_drom_entries() -> core::ops::Range<u32> {
+    mmu::drom_entries()
+}
+
+/// Returns the flash offset that the DROM entry `index` maps.
+///
+/// Returns `None` when `index` is outside [`flash_mmu_drom_entries`], or when
+/// the entry is invalid or maps PSRAM.
+#[instability::unstable]
+pub fn flash_mmu_entry_offset(index: u32) -> Option<u32> {
+    mmu::drom_entry_offset(index)
 }
 
 /// Internal SPI flash driver.
@@ -619,11 +641,10 @@ fn write_encrypted_rows(
     let mut i = 0;
     while i < data.len() {
         let row_addr = offset + i as u32;
-        let (program_addr, program_len, consumed) =
-            cfg_select! {
-                esp32 => prepare_esp32_row(&mut row.0, row_addr, &data[i..], neighbors),
-                _ => prepare_xts_row(&mut row.0, row_addr, &data[i..]),
-            };
+        let (program_addr, program_len, consumed) = cfg_select! {
+            esp32 => prepare_esp32_row(&mut row.0, row_addr, &data[i..], neighbors),
+            _ => prepare_xts_row(&mut row.0, row_addr, &data[i..]),
+        };
         rom::write_encrypted(program_addr, row.0.as_mut_ptr().cast(), program_len)?;
         i += consumed;
     }
@@ -811,10 +832,19 @@ impl Flash<'_, Blocking> {
     }
 }
 
-/// Parks the other core according to [`MultiCoreStrategy`], unparking on drop.
+/// Stops the other core according to [`MultiCoreStrategy`]. [`Drop`] releases that core.
 struct ParkGuard {
-    #[cfg(multi_core)]
-    parked: Option<crate::system::Cpu>,
+    #[cfg(all(multi_core, feature = "rt"))]
+    release: Release,
+}
+
+#[cfg(multi_core)]
+#[cfg_attr(not(feature = "rt"), expect(dead_code))]
+#[derive(Clone, Copy)]
+enum Release {
+    None,
+    Ipc,
+    Unpark(crate::system::Cpu),
 }
 
 impl ParkGuard {
@@ -822,31 +852,46 @@ impl ParkGuard {
     fn enter(_flash: &Flash<'_, Blocking>) -> Result<Self, Error> {
         cfg_select! {
             multi_core => {
-                let parked = match _flash.multi_core_strategy {
+                #[cfg_attr(not(feature = "rt"), expect(unused_variables))]
+                let release = match _flash.multi_core_strategy {
                     MultiCoreStrategy::Error => {
                         for other in crate::system::Cpu::other() {
                             if crate::system::is_running(other) {
                                 return Err(Error::OtherCoreRunning);
                             }
                         }
-                        None
+                        Release::None
                     }
+                    #[cfg(feature = "rt")]
                     MultiCoreStrategy::AutoPark => {
-                        let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
-                            crate::peripherals::CPU_CTRL::steal()
-                        });
-                        let mut parked = None;
+                        let mut release = Release::None;
                         for other in crate::system::Cpu::other() {
-                            if crate::system::is_running(other) {
+                            if !crate::system::is_running(other) {
+                                continue;
+                            }
+                            // A core that `CpuControl` did not start has no IPC handler. It can
+                            // run ROM code, which a CPU-control stall does not break.
+                            if other == crate::system::Cpu::ProCpu
+                                || crate::system::multi_core::app_core_takes_ipc()
+                            {
+                                ipc_stall::enter(other);
+                                release = Release::Ipc;
+                            } else {
+                                let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
+                                    crate::peripherals::CPU_CTRL::steal()
+                                });
                                 unsafe { cpu_ctrl.park_core(other) };
-                                parked = Some(other);
+                                release = Release::Unpark(other);
                             }
                         }
-                        parked
+                        release
                     }
-                    MultiCoreStrategy::Ignore(_) => None,
+                    MultiCoreStrategy::Ignore(_) => Release::None,
                 };
-                Ok(Self { parked })
+                Ok(Self {
+                    #[cfg(feature = "rt")]
+                    release,
+                })
             }
             _ => Ok(Self {}),
         }
@@ -856,16 +901,73 @@ impl ParkGuard {
 impl Drop for ParkGuard {
     #[ram]
     fn drop(&mut self) {
-        cfg_select! {
-            multi_core => {
-                if let Some(core) = self.parked {
-                    let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
-                        crate::peripherals::CPU_CTRL::steal()
-                    });
-                    cpu_ctrl.unpark_core(core);
-                }
+        #[cfg(all(multi_core, feature = "rt"))]
+        match self.release {
+            Release::None => {}
+            Release::Ipc => ipc_stall::leave(),
+            Release::Unpark(core) => {
+                let mut cpu_ctrl = crate::system::CpuControl::new(unsafe {
+                    crate::peripherals::CPU_CTRL::steal()
+                });
+                cpu_ctrl.unpark_core(core);
             }
-            _ => {}
         }
+    }
+}
+
+/// RAM loop posted to the other core for [`MultiCoreStrategy::AutoPark`].
+#[cfg(all(multi_core, feature = "rt"))]
+mod ipc_stall {
+    use esp_sync::raw::{RawLock, SingleCoreInterruptLock};
+    use portable_atomic::Ordering;
+    use portable_atomic_enum::atomic_enum;
+    use procmacros::ram;
+
+    use crate::private::DropGuard;
+
+    #[atomic_enum]
+    #[derive(PartialEq, Debug, Clone, Copy)]
+    enum Phase {
+        /// The other core is outside the loop.
+        Idle,
+        /// The other core is inside the loop. Interrupts on that core are masked.
+        Ack,
+        /// The operation has finished. The caches are on. The other core leaves the loop.
+        Release,
+    }
+
+    static PHASE: AtomicPhase = AtomicPhase::new(Phase::Idle);
+
+    pub(super) fn enter(core: crate::system::Cpu) {
+        crate::interrupt::ipc::Ipc.call_function(core, stall);
+        while PHASE.load(Ordering::Acquire) != Phase::Ack {
+            core::hint::spin_loop();
+        }
+    }
+
+    pub(super) fn leave() {
+        PHASE.store(Phase::Release, Ordering::Release);
+        while PHASE.load(Ordering::Acquire) != Phase::Idle {
+            core::hint::spin_loop();
+        }
+    }
+
+    #[ram]
+    fn stall() {
+        {
+            // The mask is taken before `Phase::Ack`. The guards drop after the cache is on again.
+            let token = unsafe { SingleCoreInterruptLock.enter() };
+            let _mask = DropGuard::new(token, |token| unsafe {
+                SingleCoreInterruptLock.exit(token)
+            });
+            #[cfg(soc_cpu_has_branch_predictor)]
+            let _predictor = crate::soc::branch_predictor::DisabledBranchPredictor::new();
+
+            PHASE.store(Phase::Ack, Ordering::Release);
+            while PHASE.load(Ordering::Acquire) == Phase::Ack {
+                core::hint::spin_loop();
+            }
+        }
+        PHASE.store(Phase::Idle, Ordering::Release);
     }
 }

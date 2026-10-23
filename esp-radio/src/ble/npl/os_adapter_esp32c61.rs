@@ -2,7 +2,7 @@ use procmacros::BuilderLite;
 
 use super::*;
 use crate::{
-    ble::InvalidConfigError,
+    ble::{InvalidConfigError, lp_clk},
     hal::{interrupt, peripherals::BT},
     interrupt_dispatch::Handler,
     sys::include::esp_bt_controller_config_t,
@@ -284,8 +284,13 @@ pub(crate) fn create_ble_config(config: &Config) -> esp_bt_controller_config_t {
         ble_ll_rsp_dup_list_count: config.ll_rsp_dup_list_count,
         ble_ll_adv_dup_list_count: config.ll_adv_dup_list_count,
         ble_ll_tx_pwr_dbm: config.default_tx_power.dbm() as u8,
-        rtc_freq: u64::from(super::super::lp_clk::frequency_hz()),
-        ble_ll_sca: 60,
+        rtc_freq: u64::from(lp_clk::frequency_hz()),
+        // ESP-IDF: `ble_rtc_clk_init()` in `bt.c`.
+        ble_ll_sca: if lp_clk::source_is_rc(esp_hal::clock::ll::ble_lp_clk_root_source) {
+            lp_clk::RC_SCA_PPM
+        } else {
+            60
+        },
         ble_ll_scan_phy_number: 2,
         ble_ll_conn_def_auth_pyld_tmo: 3000,
         ble_ll_jitter_usecs: 16,

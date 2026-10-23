@@ -335,6 +335,49 @@ mod tests {
 
     #[cfg(multi_core)]
     #[test]
+    fn test_auto_park_other_core_in_cas_loop() {
+        use core::sync::atomic::{AtomicU32, Ordering};
+
+        use esp_hal::system::{CpuControl, Stack};
+        use hil_test::mk_static;
+
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
+        let stack = mk_static!(Stack<8192>, Stack::new());
+        let _guard = cpu_control
+            .start_app_core(stack, || {
+                loop {
+                    let mut current = COUNTER.load(Ordering::Relaxed);
+                    while let Err(actual) = COUNTER.compare_exchange_weak(
+                        current,
+                        current.wrapping_add(1),
+                        Ordering::AcqRel,
+                        Ordering::Relaxed,
+                    ) {
+                        current = actual;
+                    }
+                }
+            })
+            .unwrap();
+
+        while COUNTER.load(Ordering::Relaxed) == 0 {}
+
+        let mut flash = Flash::new(peripherals.FLASH, Config::default()).unwrap();
+        let mut words = [0u32; 64];
+
+        for _ in 0..1000 {
+            flash.read(APP_DESC_OFFSET, &mut words).unwrap();
+            assert_eq!(as_bytes(&words), expected_app_desc());
+        }
+
+        let before = COUNTER.load(Ordering::Relaxed);
+        while COUNTER.load(Ordering::Relaxed) == before {}
+    }
+
+    #[cfg(multi_core)]
+    #[test]
     fn test_error_if_other_core_running() {
         use core::sync::atomic::{AtomicBool, Ordering};
 
@@ -543,5 +586,36 @@ mod tests {
         }
 
         unsafe { flash.erase(NVS, NVS + sector).unwrap() };
+    }
+
+    #[test]
+    fn test_booted_partition_is_the_factory_app() {
+        use esp_bootloader_esp_idf::partitions::{self, AppPartitionSubType, PartitionType};
+
+        let mut flash = flash_from_peripherals(esp_hal::init(esp_hal::Config::default()));
+        let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+        let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
+
+        let booted = pt.booted_partition().unwrap().unwrap();
+        assert_eq!(
+            booted.partition_type(),
+            PartitionType::App(AppPartitionSubType::Factory)
+        );
+        assert_eq!(booted.offset(), APP_DESC_OFFSET - 0x20);
+    }
+
+    #[test]
+    fn test_drom_entry_offset_reads_the_window() {
+        use esp_hal::flash::{flash_mmu_drom_entries, flash_mmu_entry_offset};
+
+        let _peripherals = esp_hal::init(esp_hal::Config::default());
+        let drom = flash_mmu_drom_entries();
+
+        // The linker scripts put the app's rodata at the start of the DROM window.
+        assert_eq!(
+            flash_mmu_entry_offset(drom.start),
+            Some(APP_DESC_OFFSET - 0x20)
+        );
+        assert_eq!(flash_mmu_entry_offset(drom.end), None);
     }
 }
