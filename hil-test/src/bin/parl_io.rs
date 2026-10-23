@@ -692,6 +692,58 @@ mod tx {
     }
 
     #[test]
+    fn test_parl_io_tx_clock_frequency(ctx: Context) {
+        use esp_hal::{
+            parl_io::{TxOneBit, TxPinConfigWithValidPin},
+            time::{Duration, Instant},
+        };
+
+        // 64000 clock cycles, 4 ms at 16 MHz.
+        let dma_tx_buf: DmaTxBuf = dma_tx_buffer!(8000).unwrap();
+        let pins = TxPinConfigWithValidPin::new(TxOneBit::new(NoPin), ctx.valid);
+
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
+
+        // 16 MHz divides the PARL_IO source clock of all chips.
+        let pio = pio
+            .tx
+            .with_config(
+                pins,
+                ClkOutPin::new(ctx.clock),
+                TxConfig::default().with_frequency(Rate::from_mhz(16)),
+            )
+            .unwrap();
+
+        let clock_unit = ctx.pcnt_unit;
+        clock_unit.channel0.set_edge_signal(ctx.clock_loopback);
+        clock_unit
+            .channel0
+            .set_input_mode(EdgeMode::Increment, EdgeMode::Hold);
+        clock_unit
+            .channel0
+            .set_ctrl_mode(CtrlMode::Keep, CtrlMode::Keep);
+
+        let xfer = pio
+            .write(dma_tx_buf.len(), dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+
+        // Count the clock edges in a window after the start of the transfer.
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_micros(200) {}
+        clock_unit.clear();
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_micros(1000) {}
+        let edges = clock_unit.value() as u64;
+        let elapsed = start.elapsed().as_micros();
+        _ = xfer.wait();
+
+        let khz = edges * 1000 / elapsed;
+        info!("clock frequency: {} kHz", khz);
+        assert!((15840..=16160).contains(&khz), "clock is {} kHz", khz);
+    }
+
+    #[test]
     fn test_parl_io_tx_8bit_valid_clock_count(ctx: Context) {
         const BUFFER_SIZE: usize = 64;
         let mut dma_tx_buf: DmaTxBuf = dma_tx_buffer!(BUFFER_SIZE).unwrap();

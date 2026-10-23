@@ -552,18 +552,19 @@ fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> 
     } else {
         ParlIoInstance::ParlIo.rx_clock_frequency()
     };
+    // The unit clock is the source clock divided by `div_num + 1`.
     let divider = source_hz / frequency.as_hz();
-    if divider > 0xFFFF {
+    if divider == 0 || divider - 1 > 0xFFFF {
         return Err(ConfigError::UnreachableClockRate);
     }
-    let divider = divider as u16;
+    let div_num = (divider - 1) as u16;
 
     if is_tx {
         pcr.parl_clk_tx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_tx_div_num().bits(divider) });
+            .modify(|_, w| unsafe { w.parl_clk_tx_div_num().bits(div_num) });
     } else {
         pcr.parl_clk_rx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_rx_div_num().bits(divider) });
+            .modify(|_, w| unsafe { w.parl_clk_rx_div_num().bits(div_num) });
     }
 
     Ok(())
