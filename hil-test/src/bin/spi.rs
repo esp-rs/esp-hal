@@ -13,12 +13,11 @@ use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 use esp_hal::{
     Blocking,
-    gpio::Input,
     spi::{
         Mode,
         master::{Config, Spi},
     },
-    time::Rate,
+    time::{Duration, Instant, Rate},
 };
 use hil_test as _;
 
@@ -28,8 +27,6 @@ cfg_select! {
         use allocator_api2::vec::Vec;
         #[cfg(all(spi_master_supports_dma, pcnt_driver_supported))]
         use esp_hal::Async;
-        #[cfg(pcnt_driver_supported)]
-        use esp_hal::pcnt::{channel::EdgeMode, unit::Unit};
         #[cfg(spi_master_supports_dma)]
         use esp_hal::{
             dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf, aligned::DmaAlignedMut},
@@ -38,6 +35,11 @@ cfg_select! {
             dma_tx_buffer,
             gpio::{Level, NoPin},
             spi::master::SpiDma,
+        };
+        #[cfg(pcnt_driver_supported)]
+        use esp_hal::{
+            gpio::Input,
+            pcnt::{channel::EdgeMode, unit::Unit},
         };
         use esp_hal::{
             peripherals::SPI2,
@@ -90,6 +92,7 @@ struct Context {
     #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
     tx_descriptors: &'static mut [DmaDescriptor],
 
+    #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     miso_input: Input<'static>,
     #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
     sclk_input: Input<'static>,
@@ -327,15 +330,14 @@ mod tests {
         let sclk = hil_test::unconnected_pin!(peripherals);
 
         // A bit ugly but the peripheral interconnect APIs aren't yet stable.
-        let miso_input = unsafe { miso.clone_unchecked() };
+        // Will be used later to detect edges through PCNT.
         #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        let sclk_input = unsafe { sclk.clone_unchecked() };
-
-        // Will be used later to detect edges directly or through PCNT.
-        let miso_input = Input::new(miso_input, Default::default());
-
-        #[cfg(all(pcnt_driver_supported, feature = "unstable"))]
-        let sclk_input = Input::new(sclk_input, Default::default());
+        let (miso_input, sclk_input) = unsafe {
+            (
+                Input::new(miso.clone_unchecked(), Default::default()),
+                Input::new(sclk.clone_unchecked(), Default::default()),
+            )
+        };
 
         #[cfg(all(spi_master_supports_dma, feature = "unstable"))]
         let dma_channel = cfg_select! {
@@ -373,6 +375,7 @@ mod tests {
                 spi,
                 rx_buffer,
                 tx_buffer,
+                #[cfg(pcnt_driver_supported)]
                 miso_input,
                 #[cfg(pcnt_driver_supported)]
                 sclk_input,
@@ -389,7 +392,6 @@ mod tests {
                 spi,
                 rx_buffer,
                 tx_buffer,
-                miso_input,
             },
         }
     }
@@ -1027,14 +1029,17 @@ mod tests {
         assert_eq!(&[0xff, 0xff, 0xff, 0xff], dma_rx_buf.as_slice());
     }
 
-    #[test]
-    async fn cancel_stops_basic_async_spi_transfer(mut ctx: Context) {
-        // Slow down. We don't rely on the transfer speed much, just that it's slow
-        // enough that we can detect pulses if cancelling the future leaves the
-        // transfer running.
+    async fn check_cancel_stops_basic_async_spi(
+        mut ctx: Context,
+        op: impl AsyncFnOnce(&mut Spi<'static, esp_hal::Async>, &mut [u8], &mut [u8]),
+    ) {
+        use embassy_futures::select::{Either, select};
+
+        // At 100 kHz, a 64-byte FIFO chunk takes ~5.12 ms. Cancelling after 500 µs
+        // leaves ~4.6 ms of that chunk if cancelling does not abort it.
         ctx.spi
             .apply_config(&{
-                let config = Config::default().with_frequency(Rate::from_khz(800));
+                let config = Config::default().with_frequency(Rate::from_khz(100));
                 #[cfg(soc_clock_node_spi_function_clock_is_configurable)]
                 let config = config.with_clock_source(ClockSource::Xtal);
                 config
@@ -1043,36 +1048,67 @@ mod tests {
 
         let mut spi = ctx.spi.into_async();
 
-        for i in 0..ctx.tx_buffer.len() {
-            ctx.tx_buffer[i] = (i % 256) as u8;
-        }
-
-        let transfer = spi.transfer_in_place_async(ctx.tx_buffer);
-
-        // Wait for a bit before cancelling
         let cancel = async {
-            for _ in 0..100 {
+            let start = Instant::now();
+            while start.elapsed() < Duration::from_micros(500) {
                 embassy_futures::yield_now().await;
             }
         };
-
-        embassy_futures::select::select(transfer, cancel).await;
-
-        // Listen for a while to see if the SPI peripheral correctly stopped.
-        let detect_edge = ctx.miso_input.wait_for_any_edge();
-        let wait = async {
-            for _ in 0..10000 {
-                embassy_futures::yield_now().await;
-            }
-        };
-
-        let result = embassy_futures::select::select(detect_edge, wait).await;
-
-        // Assert that we timed out - we should not have detected any edges
+        let result = select(op(&mut spi, ctx.rx_buffer, ctx.tx_buffer), cancel).await;
         assert!(
-            matches!(result, embassy_futures::select::Either::Second(_)),
-            "Detected edge after cancellation"
+            matches!(result, Either::Second(_)),
+            "Operation was not cancelled"
         );
+
+        // A transfer waits for the peripheral to become idle before it starts. If a
+        // chunk was left over, its rest (~4.6 ms) is clocked out before this transfer's
+        // own ~320 µs. That is true whether the chunk kept running, or was frozen
+        // because releasing the clock guard turned off the SPI function clock.
+        let write = [0xde, 0xad, 0xbe, 0xef];
+        let mut read = [0x00; 4];
+        let start = Instant::now();
+        SpiBusAsync::transfer(&mut spi, &mut read, &write)
+            .await
+            .expect("Transfer after cancel failed");
+        let elapsed = start.elapsed();
+        assert_eq!(write, read);
+        assert!(
+            elapsed < Duration::from_millis(2),
+            "Transfer after cancel took too long ({:?}), leftover chunk was not aborted",
+            elapsed
+        );
+    }
+
+    #[test]
+    async fn cancel_stops_basic_async_spi_transfer_in_place(ctx: Context) {
+        check_cancel_stops_basic_async_spi(ctx, async |spi, _rx, tx| {
+            SpiBusAsync::transfer_in_place(spi, tx).await.unwrap();
+        })
+        .await;
+    }
+
+    #[test]
+    async fn cancel_stops_basic_async_spi_transfer(ctx: Context) {
+        check_cancel_stops_basic_async_spi(ctx, async |spi, rx, tx| {
+            SpiBusAsync::transfer(spi, rx, tx).await.unwrap();
+        })
+        .await;
+    }
+
+    #[test]
+    async fn cancel_stops_basic_async_spi_write(ctx: Context) {
+        check_cancel_stops_basic_async_spi(ctx, async |spi, _rx, tx| {
+            SpiBusAsync::write(spi, tx).await.unwrap();
+        })
+        .await;
+    }
+
+    #[test]
+    async fn cancel_stops_basic_async_spi_read(ctx: Context) {
+        check_cancel_stops_basic_async_spi(ctx, async |spi, rx, _tx| {
+            SpiBusAsync::read(spi, rx).await.unwrap();
+        })
+        .await;
     }
 
     #[test]
