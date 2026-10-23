@@ -661,7 +661,12 @@ pub(crate) mod rt {
             _ => {
                 // Change the current runlevel so that interrupt handlers can access the correct
                 // runlevel.
-                let prio = unwrap!(INTERRUPT_TO_PRIORITY[cpu_intr as usize]);
+                let prio = unwrap!(
+                    INTERRUPT_TO_PRIORITY
+                        .get(cpu_intr as usize)
+                        .copied()
+                        .flatten()
+                );
                 let level = unsafe {
                     change_current_runlevel(RunLevel::Interrupt(ElevatedRunLevel::from(prio)))
                 };
