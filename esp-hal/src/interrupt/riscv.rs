@@ -678,11 +678,10 @@ pub(crate) mod rt {
             for interrupt_nr in status.iterator().filter(|&interrupt_nr| {
                 crate::interrupt::should_handle(Cpu::current(), interrupt_nr as u32, prio as u32)
             }) {
-                if let Some(vector) =
-                    crate::soc::pac::__EXTERNAL_INTERRUPTS.get(interrupt_nr as usize)
-                {
-                    (vector._handler)();
-                }
+                let vector =
+                    unwrap!(crate::soc::pac::__EXTERNAL_INTERRUPTS.get(interrupt_nr as usize));
+
+                (vector._handler)();
             }
         };
 
