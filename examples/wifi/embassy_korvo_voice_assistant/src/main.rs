@@ -1,12 +1,12 @@
 //! Voice assistant for the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board.
 //!
 //! Tap the button on the screen and speak, then tap it again. The recording is transcribed by the
-//! OpenAI API, answered by a chat model, and the answer is shown on the screen and spoken on the
-//! speakers.
+//! OpenAI API and answered by Claude, and the answer is shown on the screen and spoken on the
+//! speakers by the OpenAI API. Claude has no speech input or output.
 //!
-//! Set the `SSID`, `PASSWORD` and `OPENAI_API_KEY` environment variables before building. The API
-//! key is stored in the firmware in plain text, and anyone with access to the board can read it.
-//! Use a key with a spending limit.
+//! Set the `SSID`, `PASSWORD`, `OPENAI_API_KEY` and `CLAUDE_API_KEY` environment variables before
+//! building. The API keys are stored in the firmware in plain text, and anyone with access to the
+//! board can read them. Use keys with a spending limit.
 //!
 //! The server certificate is not verified yet.
 //!
@@ -21,10 +21,10 @@
 
 extern crate alloc;
 
+mod api;
 mod audio;
 mod display;
 mod es8389;
-mod openai;
 mod touch;
 
 use alloc::{format, string::String};
@@ -65,8 +65,8 @@ use esp_rtos::embassy::InterruptExecutor;
 use static_cell::StaticCell;
 
 use crate::{
+    api::{Api, TcpState},
     display::{Button, Screen},
-    openai::{OpenAi, TcpState},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -218,7 +218,7 @@ async fn assistant(stack: Stack<'static>) -> ! {
     stack.wait_config_up().await;
 
     static TCP_STATE: StaticCell<TcpState> = StaticCell::new();
-    let mut openai = OpenAi::new(stack, TCP_STATE.init(TcpState::new()));
+    let mut api = Api::new(stack, TCP_STATE.init(TcpState::new()));
 
     loop {
         screen.status = String::from("Ready");
@@ -235,7 +235,7 @@ async fn assistant(stack: Stack<'static>) -> ! {
         log::info!("Recorded {} samples", speech.len());
 
         screen.button = Button::Busy;
-        if let Err(error) = converse(&mut openai, &mut screen, &speech).await {
+        if let Err(error) = converse(&mut api, &mut screen, &speech).await {
             log::error!("{error}");
             screen.status = String::from("Error");
             screen.assistant = format!("{error}");
@@ -243,14 +243,10 @@ async fn assistant(stack: Stack<'static>) -> ! {
     }
 }
 
-async fn converse(
-    openai: &mut OpenAi,
-    screen: &mut Screen,
-    speech: &[i16],
-) -> Result<(), openai::Error> {
+async fn converse(api: &mut Api, screen: &mut Screen, speech: &[i16]) -> Result<(), api::Error> {
     screen.status = String::from("Transcribing");
     display::show(screen);
-    screen.you = openai.transcribe(speech).await?;
+    screen.you = api.transcribe(speech).await?;
     screen.assistant.clear();
     log::info!("You: {}", screen.you);
     if screen.you.trim().is_empty() {
@@ -260,12 +256,12 @@ async fn converse(
 
     screen.status = String::from("Thinking");
     display::show(screen);
-    screen.assistant = openai.chat(&screen.you).await?;
+    screen.assistant = api.chat(&screen.you).await?;
     log::info!("Assistant: {}", screen.assistant);
 
     screen.status = String::from("Speaking");
     display::show(screen);
-    let answer = openai.speak(&screen.assistant).await?;
+    let answer = api.speak(&screen.assistant).await?;
     audio::play(answer).await;
     Ok(())
 }
