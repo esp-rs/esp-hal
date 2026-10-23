@@ -630,12 +630,12 @@ function signed(number) {
 // reductions that cross both thresholds are marked in bold.
 function compare(was, now, maxBytes, maxPercent) {
   if (was === undefined) {
-    return { text: `${now} (new)`, delta: 0, regressed: false, improved: false };
+    return { text: `${now} (new)`, regressed: false, improved: false };
   }
 
   const delta = now - was;
   if (delta === 0) {
-    return { text: `${now}`, delta: 0, regressed: false, improved: false };
+    return { text: `${now}`, regressed: false, improved: false };
   }
 
   const percent = was > 0 ? (100 * delta) / was : 0;
@@ -647,7 +647,6 @@ function compare(was, now, maxBytes, maxPercent) {
     maxBytes !== undefined && -delta > maxBytes && -percent > maxPercent;
   return {
     text: regressed || improved ? `**${text}**` : text,
-    delta,
     regressed,
     improved,
   };
@@ -659,9 +658,8 @@ function compareEntries(entries, limits) {
     const flash = compare(entry.base?.flash, entry.head.flash, limits?.flash, limits?.percent);
     const bss = compare(entry.base?.bss, entry.head.bss, limits?.bss, limits?.percent);
     const regressed = flash.regressed || bss.regressed;
-    const improved = flash.improved || bss.improved;
-    const shrank = !regressed && (improved || flash.delta + bss.delta < 0);
-    return { ...entry, flash, bss, regressed, improved, shrank };
+    const improved = !regressed && (flash.improved || bss.improved);
+    return { ...entry, flash, bss, regressed, improved };
   });
 }
 
@@ -827,7 +825,7 @@ async function reportNightly({ github, context, core, exec }) {
 
   const rows = compareEntries(entries, limits);
   const regressions = rows.filter((row) => row.regressed);
-  const improvements = rows.filter((row) => row.shrank);
+  const improvements = rows.filter((row) => row.improved);
   const missingText = missingNote(missing);
 
   const between = (process.env.BETWEEN || "").split(/\s+/).filter(Boolean);
@@ -918,9 +916,6 @@ async function reportNightly({ github, context, core, exec }) {
     "",
     growth.table,
     "",
-    ...(improvements.length > 0
-      ? ["### Improvements", "", totalsTable(improvements), "", sectionsDetails(improvements), ""]
-      : []),
     `### Merged between \`${base.slice(0, 10)}\` and \`${head.slice(0, 10)}\``,
     "",
     merged,
