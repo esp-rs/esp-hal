@@ -1,4 +1,9 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(parl_io_dma_engine = "AHB_GDMA") => "DMA_CH0",
+        cfg(parl_io_dma_engine = "AXI_GDMA") => "DMA_AXI_CH0",
+    },
+))]
 //! # Parallel IO (PARL_IO)
 //!
 //! ## Overview
@@ -24,7 +29,7 @@
 //!
 //! // Initialize DMA buffer and descriptors for data reception
 //! let mut dma_rx_buf = dma_rx_buffer!(32000)?;
-//! let dma_channel = peripherals.DMA_CH0;
+//! let dma_channel = peripherals.{dma_channel};
 //!
 //! // Configure the 4-bit input pins and clock pin
 //! let mut rx_pins = RxFourBits::new(
@@ -69,7 +74,7 @@
 //!
 //! // Initialize DMA buffer and descriptors for data transmission
 //! let mut dma_tx_buf = dma_tx_buffer!(32000).unwrap();
-//! let dma_channel = peripherals.DMA_CH0;
+//! let dma_channel = peripherals.{dma_channel};
 //!
 //! // Configure the 4-bit input pins and clock pin
 //! let tx_pins = TxFourBits::new(
@@ -148,7 +153,7 @@ use crate::{
     },
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
-    peripherals::{PARL_IO, PCR},
+    peripherals::PARL_IO,
     soc::clocks::{ClockTree, ParlIoInstance},
     system::{GenericPeripheralGuard, Peripheral},
     time::Rate,
@@ -526,18 +531,17 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
-/// PCR value that selects the clock from the GPIO pad.
-const PCR_PAD_CLK_SEL: u8 = 3;
+// The clock and reset registers of the TX and RX units are outside of the PARL_IO register block.
+#[cfg_attr(soc_has_pcr, path = "parl_io/unit_clock/pcr.rs")]
+#[cfg_attr(esp32p4, path = "parl_io/unit_clock/esp32p4.rs")]
+#[cfg_attr(esp32s31, path = "parl_io/unit_clock/esp32s31.rs")]
+mod unit_clock;
+
+/// Clock source value that selects the clock from the GPIO pad.
+const PAD_CLK_SEL: u8 = 3;
 
 fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> {
-    let pcr = PCR::regs();
-    let using_pad_clock = if is_tx {
-        pcr.parl_clk_tx_conf().read().parl_clk_tx_sel().bits() == PCR_PAD_CLK_SEL
-    } else {
-        pcr.parl_clk_rx_conf().read().parl_clk_rx_sel().bits() == PCR_PAD_CLK_SEL
-    };
-
-    if using_pad_clock {
+    if unit_clock::uses_pad_clock(is_tx) {
         // The GPIO pad supplies the unit clock. `TxConfig`/`RxConfig` frequency is the
         // internal divider target and must not be applied to the pad clock.
         return Ok(());
@@ -554,18 +558,11 @@ fn apply_clock_divider(is_tx: bool, frequency: Rate) -> Result<(), ConfigError> 
     };
     // The unit clock is the source clock divided by `div_num + 1`.
     let divider = source_hz / frequency.as_hz();
-    if divider == 0 || divider - 1 > 0xFFFF {
+    if divider == 0 || divider - 1 > unit_clock::MAX_DIV_NUM {
         return Err(ConfigError::UnreachableClockRate);
     }
-    let div_num = (divider - 1) as u16;
 
-    if is_tx {
-        pcr.parl_clk_tx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_tx_div_num().bits(div_num) });
-    } else {
-        pcr.parl_clk_rx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_rx_div_num().bits(div_num) });
-    }
+    unit_clock::set_div_num(is_tx, divider - 1);
 
     Ok(())
 }
@@ -613,9 +610,7 @@ impl<'d> ClkInPin<'d> {
 }
 impl TxClkPin for ClkInPin<'_> {
     fn configure(&mut self) {
-        let pcr = PCR::regs();
-        pcr.parl_clk_tx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
+        unit_clock::select_pad_clock(true);
 
         self.pin.apply_input_config(&gpio::InputConfig::default());
         self.pin.set_input_enable(true);
@@ -639,9 +634,7 @@ impl<'d> RxClkInPin<'d> {
 }
 impl RxClkPin for RxClkInPin<'_> {
     fn configure(&mut self) {
-        let pcr = PCR::regs();
-        pcr.parl_clk_rx_conf()
-            .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_RX, no divider
+        unit_clock::select_pad_clock(false);
 
         self.pin.apply_input_config(&gpio::InputConfig::default());
         self.pin.set_input_enable(true);
@@ -1423,9 +1416,7 @@ where
             return Err((Error::MaxDmaTransferSizeExceeded, self, buffer));
         }
 
-        PCR::regs()
-            .parl_clk_tx_conf()
-            .modify(|_, w| w.parl_tx_rst_en().set_bit());
+        unit_clock::set_reset(true, true);
 
         Instance::clear_tx_interrupts();
         Instance::set_tx_bytes(number_of_bytes as u16);
@@ -1443,9 +1434,7 @@ where
 
         Instance::set_tx_start(true);
 
-        PCR::regs()
-            .parl_clk_tx_conf()
-            .modify(|_, w| w.parl_tx_rst_en().clear_bit());
+        unit_clock::set_reset(true, false);
 
         Ok(ParlIoTxTransfer {
             parl_io: ManuallyDrop::new(self),
@@ -1769,9 +1758,7 @@ where
     where
         BUF: DmaRxBuffer,
     {
-        PCR::regs()
-            .parl_clk_rx_conf()
-            .modify(|_, w| w.parl_rx_rst_en().set_bit());
+        unit_clock::set_reset(false, true);
 
         Instance::clear_rx_interrupts();
         if let Some(number_of_bytes) = number_of_bytes {
@@ -1797,9 +1784,7 @@ where
 
         Instance::set_rx_start(true);
 
-        PCR::regs()
-            .parl_clk_rx_conf()
-            .modify(|_, w| w.parl_rx_rst_en().clear_bit());
+        unit_clock::set_reset(false, false);
 
         Ok(ParlIoRxTransfer {
             parl_io: ManuallyDrop::new(self),
