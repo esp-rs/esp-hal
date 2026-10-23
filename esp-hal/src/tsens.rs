@@ -241,9 +241,7 @@ impl<'d> TemperatureSensor<'d> {
                 },
                 0,
             ),
-            temp_sensor_register_block_lp_tsens => {
-                (TSENS::regs().ctrl().read().out().bits(), 0)
-            }
+            temp_sensor_register_block_lp_tsens => (TSENS::regs().ctrl().read().out().bits(), 0),
         };
 
         Temperature::new(raw_value, offset)
