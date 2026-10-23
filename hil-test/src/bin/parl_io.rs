@@ -36,7 +36,7 @@ mod tests {
             TxTwoBits,
         },
         peripherals::{DMA_CH0, PARL_IO},
-        time::Rate,
+        time::{Instant, Rate},
     };
 
     cfg_select! {
@@ -134,6 +134,46 @@ mod tests {
             valid_pin,
             data_pins,
         }
+    }
+
+    #[test]
+    fn test_parl_io_tx_clock_frequency(ctx: Context) {
+        const BUFFER_SIZE: usize = 8000;
+
+        let dma_tx_buf = dma_tx_buffer!(BUFFER_SIZE).unwrap();
+
+        let [d0, ..] = ctx.data_pins;
+        let tx_pins = TxPinConfigWithValidPin::new(TxOneBit::new(d0), ctx.valid_pin);
+
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
+
+        // 16 MHz divides the PARL_IO source clock of all chips.
+        let pio_tx = pio
+            .tx
+            .with_config(
+                tx_pins,
+                ClkOutPin::new(ctx.clock_pin),
+                TxConfig::default()
+                    .with_frequency(Rate::from_mhz(16))
+                    .with_sample_edge(SampleEdge::Normal)
+                    .with_bit_order(BitPackOrder::Lsb),
+            )
+            .unwrap();
+
+        let start = Instant::now();
+        let tx_transfer = pio_tx
+            .write(dma_tx_buf.len(), dma_tx_buf)
+            .map_err(|e| e.0)
+            .unwrap();
+        _ = tx_transfer.wait();
+        let elapsed = start.elapsed().as_micros();
+
+        // 64000 bits at 16 MHz take 4000 us.
+        assert!(
+            (3880..=4120).contains(&elapsed),
+            "transfer took {} us",
+            elapsed
+        );
     }
 
     #[test]
