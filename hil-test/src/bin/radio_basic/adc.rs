@@ -55,12 +55,8 @@ mod tests {
 
         {
             let _radio = cfg_select! {
-                soc_has_wifi => {
-                    esp_radio::wifi::WifiController::new(p.WIFI, Default::default())
-                }
-                _ => {
-                    esp_radio::ble::controller::BleConnector::new(p.BT, Default::default())
-                }
+                soc_has_wifi => esp_radio::wifi::WifiController::new(p.WIFI, Default::default()),
+                _ => esp_radio::ble::controller::BleConnector::new(p.BT, Default::default()),
             }
             .unwrap();
 

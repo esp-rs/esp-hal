@@ -692,13 +692,13 @@ pub(crate) mod rt {
         }
 
         cfg_select! {
-            interrupt_controller = "clic" => {
+            interrupt_controller = "clic" => unsafe {
                 // In case the target uses the CLIC, it is mandatory to restore `mcause` register
                 // since it contains the former CPU priority. When executing `mret`,
                 // the hardware will restore the former threshold, from `mcause` to
                 // `mintstatus` CSR
-                unsafe { core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits()) }
-            }
+                core::arch::asm!("csrw 0x342, {}", in(reg) mcause.bits())
+            },
             _ => {
                 unsafe { change_current_runlevel(level) };
             }
