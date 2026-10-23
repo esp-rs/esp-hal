@@ -130,6 +130,8 @@ pub(crate) enum RootSource {
 pub(crate) enum SourceFrequencySignature {
     Skip,
     Parameterless(TokenStream),
+    /// Same signature and result as the node's `config_frequency` function.
+    SameAsConfig,
     Selector {
         param_type: TokenStream,
         param_name: Ident,

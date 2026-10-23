@@ -546,6 +546,18 @@ impl ClockTreeNodeInstance {
                     }
                 }
             }
+            SourceFrequencySignature::SameAsConfig => {
+                let path = if receiver.is_empty() {
+                    quote! {}
+                } else {
+                    quote! { Self:: }
+                };
+                quote! {
+                    pub fn #source_frequency_function_name(source: #ty_name) -> u32 {
+                        #path #config_frequency_function_name(source)
+                    }
+                }
+            }
             SourceFrequencySignature::Selector {
                 param_type,
                 param_name,
@@ -618,7 +630,6 @@ impl ClockTreeNodeInstance {
                 } else if self.properties.has_enable() {
                     quote! {
                         pub fn #request_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
-                            trace!(#request_trace);
                             trace!(#enable_trace);
                             #request_direct_dependencies
                             #(#receiver.)* #enable_fn_impl_name(clocks, true);
@@ -654,7 +665,6 @@ impl ClockTreeNodeInstance {
                 } else if self.properties.has_enable() {
                     quote! {
                         pub fn #release_fn_name(#(#receiver,)* clocks: &mut ClockTree) {
-                            trace!(#release_trace);
                             trace!(#disable_trace);
                             #(#receiver.)* #enable_fn_impl_name(clocks, false);
                             #release_direct_dependencies
@@ -696,7 +706,6 @@ impl ClockTreeNodeInstance {
                         #[allow(unused_variables)]
                         pub fn #config_frequency_function_name(
                             #(#config_fn_self,)*
-                            clocks: &mut ClockTree,
                             config: #ty_name,
                         ) -> u32 {
                             #frequency_function_impl
@@ -716,10 +725,8 @@ impl ClockTreeNodeInstance {
                     let config_fn_self = needs_instance.then_some(quote! { self }).into_iter();
 
                     quote! {
-                        #[allow(unused_variables)]
                         pub fn #config_frequency_function_name(
                             #(#config_fn_self,)*
-                            clocks: &mut ClockTree,
                             config: #ty_name,
                         ) -> u32 {
                             #frequency_function_impl
@@ -1138,9 +1145,9 @@ impl SystemClocks {
                 });
                 // Refresh stmt for template nodes uses an `instance` variable (passed by caller).
                 let config_freq_call = if node.config_frequency_needs_instance(tree) {
-                    quote! { instance.#config_freq_fn(clocks, config) }
+                    quote! { instance.#config_freq_fn(config) }
                 } else {
-                    quote! { #instance_type::#config_freq_fn(clocks, config) }
+                    quote! { #instance_type::#config_freq_fn(config) }
                 };
                 refresh_stmt_by_key.insert(
                     template_key.clone(),
@@ -1166,7 +1173,7 @@ impl SystemClocks {
                     quote! {
                         if let Some(config) = #config_field {
                             #cache_name.store(
-                                #config_freq_fn(clocks, config),
+                                #config_freq_fn(config),
                                 ::core::sync::atomic::Ordering::Release,
                             );
                         }
