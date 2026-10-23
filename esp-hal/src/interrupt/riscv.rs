@@ -449,6 +449,7 @@ pub(crate) fn current_raw_runlevel() -> u32 {
 ///
 /// Must only be used to raise the runlevel and to restore it to a previous
 /// value. Must not be used to arbitrarily lower the runlevel.
+#[crate::ram]
 pub(crate) unsafe fn change_current_runlevel(level: RunLevel) -> RunLevel {
     let previous = cpu_int::change_current_runlevel(level);
     unwrap!(RunLevel::try_from_u32(previous as u32))
