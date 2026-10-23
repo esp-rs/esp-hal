@@ -97,7 +97,7 @@ peripherals = [
     { name = "MEM_MONITOR" },
     { name = "MODEM_LPCON" },
     { name = "MODEM_SYSCON" },
-    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" } },
+    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" }, clock_group = "PARL_IO" },
     { name = "PAU", interrupts = { peri = "PAU" } },
     { name = "PCNT", interrupts = { peri = "PCNT" } },
     { name = "PCR" },
@@ -269,7 +269,7 @@ instances = [
 ]
 
 [device.parl_io]
-support_status = "not_supported"
+support_status = "partial"
 version = 2
 max_data_width = 8
 has_tx_cs = true
@@ -455,7 +455,7 @@ engines = [
         name = "AHB_GDMA",
         max_priority = 5,
         # Mux IDs below include later peripherals; only list HAL drivers that are enabled.
-        drivers = ["i2s", "spi_master"],
+        drivers = ["i2s", "parl_io", "spi_master"],
         # Peripheral selector values, TRM table 2.4-1.
         peripheral_instances = [
             { name = "SPI3", dma_id = 0 },
