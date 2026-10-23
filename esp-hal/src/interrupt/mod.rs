@@ -305,6 +305,7 @@ pub struct InterruptStatusIterator {
 impl Iterator for InterruptStatusIterator {
     type Item = Interrupt;
 
+    #[inline(always)]
     fn next(&mut self) -> Option<Self::Item> {
         for i in self.idx..STATUS_WORDS {
             while self.status.status[i] != 0 {
@@ -447,6 +448,7 @@ pub(crate) fn mapped_to(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> 
 }
 
 #[cfg(feature = "rt")]
+#[crate::ram]
 pub(crate) fn mapped_to_raw(cpu: Cpu, interrupt: u32) -> Option<CpuInterrupt> {
     let cpu_intr = match cpu {
         Cpu::ProCpu => INTERRUPT_CORE0::regs()
