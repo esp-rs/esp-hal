@@ -180,29 +180,58 @@ const P384_TEST_DATA: TestData<48> = TestData {
     ],
 };
 
+#[cfg(all(
+    any(ecc_has_point_addition, ecc_has_modular_arithmetic),
+    ecc_has_curve_sm2
+))]
+const SM2_TEST_DATA: TestData<32> = TestData {
+    curve: EllipticCurve::Sm2,
+    mod_base: EccModBase::OrderOfCurve,
+    x: hex!("c7744c3389455a71e10b66f2bf0be38f94c9396a4604995f1981191f2caec432"),
+    y: hex!("a0f03921e532df0240472ac67c87a9d05321696be3cebd599c77f6f4a23637bc"),
+    num: hex!("c7744c3389455a71e10b66f2bf0be38f94c9396a4604995f1981191f2caec432"),
+    den: hex!("a0f03921e532df0240472ac67c87a9d05321696be3cebd599c77f6f4a23637bc"),
+    expected_sum: hex!("676586546e783974215390b83c938c60e8eaa2d529d356b9b5f80f14cfe4fbee"),
+    expected_diff: hex!("4ac5e74bad0637c2ccc9014eae633d3140a8d0fe6235db057d09232a88778d76"),
+    expected_prod: hex!("23669ddfa03452818d9c8e031cb479c7e96249291ba1e9b54bb6f0cbd59672cf"),
+    expected_div: hex!("ef1d8483cd699edb733c44bdc1021b2635f984c95a03b04d837cbbfe07187e80"),
+};
+
+#[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+const SM2_PRIME_TEST_DATA: TestData<32> = TestData {
+    mod_base: EccModBase::PrimeModulus,
+    expected_sum: hex!("676586546e783974215390b83c938c60e8eaa2d529d356b9b5f80f14cfe4fbee"),
+    expected_diff: hex!("26841212a4127b6ea2c43b2c428439bf40a8d0fe6235db057d09232a88778d76"),
+    expected_prod: hex!("6ae7ac91993431c4f382f002f2db4653523a035710daa1cf0c63c4bd45e7d7ed"),
+    expected_div: hex!("f1d46363a49c41f0f3a1b502bb1b6ccd5daf4a857eedfaa8a22e877b8d325f32"),
+    ..SM2_TEST_DATA
+};
+
 fn for_each_test_case(mut test: impl FnMut(&[u8], EllipticCurve)) {
-    let prime_fields: &[&[u8]] = &[
-        &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
-        &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
+    let test_cases: &[(&[u8], EllipticCurve)] = &[
+        (
+            &hex!("fffffffffffffffffffffffffffffffeffffffffffffffff"),
+            EllipticCurve::P192,
+        ),
+        (
+            &hex!("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"),
+            EllipticCurve::P256,
+        ),
         #[cfg(ecc_has_curve_p384)]
-        &hex!(
-            "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff"
+        (
+            &hex!(
+                "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeffffffff0000000000000000ffffffff"
+            ),
+            EllipticCurve::P384,
+        ),
+        #[cfg(ecc_has_curve_sm2)]
+        (
+            &hex!("fffffffeffffffffffffffffffffffffffffffff00000000ffffffffffffffff"),
+            EllipticCurve::Sm2,
         ),
     ];
 
-    for &prime_field in prime_fields {
-        let curve;
-        for_each_ecc_curve! {
-            (all $(($_id:tt, $name:tt, $bits:literal)),*) => {
-                curve = match prime_field.len() {
-                    $(
-                        v if v == $bits / 8 => EllipticCurve::$name,
-                    )*
-                    _ => unimplemented!(),
-                }
-            };
-        };
-
+    for &(prime_field, curve) in test_cases {
         test(prime_field, curve)
     }
 }
@@ -243,6 +272,9 @@ macro_rules! curve_crate {
         (P384 $($rest:tt)*) => {
             p384 $($rest)*
         };
+        (Sm2 $($rest:tt)*) => {
+            sm2 $($rest)*
+        };
     }
 
 macro_rules! uint {
@@ -254,6 +286,9 @@ macro_rules! uint {
     };
     (P384) => {
         crypto_bigint::U384
+    };
+    (Sm2) => {
+        crypto_bigint::U256
     };
 }
 
@@ -717,6 +752,12 @@ mod tests {
         test_ecc_point_addition(ctx, P384_TEST_DATA);
     }
 
+    #[test]
+    #[cfg(all(ecc_has_point_addition, ecc_has_curve_sm2))]
+    fn test_ecc_point_addition_sm2(ctx: Context<'static>) {
+        test_ecc_point_addition(ctx, SM2_TEST_DATA);
+    }
+
     #[cfg(ecc_has_modular_arithmetic)]
     fn run_mod_tests<const N: usize>(mut ctx: Context<'static>, test_case: TestData<N>) {
         let result = &mut [0; N][..];
@@ -786,6 +827,18 @@ mod tests {
     #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_p384))]
     fn test_ecc_mod_operations_384(ctx: Context<'static>) {
         run_mod_tests(ctx, P384_TEST_DATA);
+    }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+    fn test_ecc_mod_operations_sm2(ctx: Context<'static>) {
+        run_mod_tests(ctx, SM2_TEST_DATA);
+    }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+    fn test_ecc_mod_operations_sm2_prime(ctx: Context<'static>) {
+        run_mod_tests(ctx, SM2_PRIME_TEST_DATA);
     }
 }
 
@@ -901,5 +954,19 @@ mod work_queue_tests {
     fn test_ecc_backend_mod_operations_384(mut ctx: Context<'static>) {
         let _backend = ctx.ecc.start();
         run_backend_mod_tests(P384_TEST_DATA);
+    }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+    fn test_ecc_backend_mod_operations_sm2(mut ctx: Context<'static>) {
+        let _backend = ctx.ecc.start();
+        run_backend_mod_tests(SM2_TEST_DATA);
+    }
+
+    #[test]
+    #[cfg(all(ecc_has_modular_arithmetic, ecc_has_curve_sm2))]
+    fn test_ecc_backend_mod_operations_sm2_prime(mut ctx: Context<'static>) {
+        let _backend = ctx.ecc.start();
+        run_backend_mod_tests(SM2_PRIME_TEST_DATA);
     }
 }

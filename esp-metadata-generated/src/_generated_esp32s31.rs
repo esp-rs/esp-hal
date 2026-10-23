@@ -970,8 +970,9 @@ macro_rules! for_each_ecc_curve {
         macro_rules! _for_each_inner_ecc_curve { $(($pattern) => $code;)* ($other : tt)
         => {} } _for_each_inner_ecc_curve!((0, P192, 192));
         _for_each_inner_ecc_curve!((1, P256, 256)); _for_each_inner_ecc_curve!((2, P384,
-        384)); _for_each_inner_ecc_curve!((all(0, P192, 192), (1, P256, 256), (2, P384,
-        384)));
+        384)); _for_each_inner_ecc_curve!((3, Sm2, 256));
+        _for_each_inner_ecc_curve!((all(0, P192, 192), (1, P256, 256), (2, P384, 384),
+        (3, Sm2, 256)));
     };
 }
 #[macro_export]
