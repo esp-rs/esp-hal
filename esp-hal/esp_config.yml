@@ -231,14 +231,37 @@ options:
       - value: false
 
   - name: code-in-psram
-    description: "Run `.text` and `.rodata` from PSRAM. Start-up brings PSRAM up and
-      copies both from flash before `esp_hal::init`. With flash encryption, the copy in PSRAM is
-      plaintext and can be read from the PSRAM pins. On a chip whose PSRAM has its own address
-      window, such as the ESP32-S31, esp-hal must be built at opt-level 2 or 3, as the
-      [Optimization level](#optimization-level) section states."
+    description: "Run `.text` and `.rodata` from PSRAM. The start-up starts PSRAM at
+      `psram-frequency` and copies both from flash before `esp_hal::init`. With flash encryption,
+      the copy in PSRAM is plaintext and can be read from the PSRAM pins. On a chip whose PSRAM
+      has its own address window, such as the ESP32-S31, esp-hal must be built at opt-level 2 or
+      3, as the [Optimization level](#optimization-level) section states."
     default:
       - value: false
-    active: "false"
+    active: "psram_code_in_psram"
+
+  - name: psram-frequency
+    description: "The PSRAM frequency when `code-in-psram` is on. The start-up then starts PSRAM
+      before `ClockConfig` and `PsramConfig` apply. On the ESP32-S31, 200 MHz runs the MPLL at
+      400 MHz, which limits RGMII Ethernet to 100 Mbit/s, and 250 MHz runs it at 500 MHz.
+      `ClockConfig::mpll_clk` cannot change the MPLL: `esp_hal::init` keeps the start-up's rate
+      and warns. The `CpuClock` presets and `PsramConfig::default()` follow the option. Without
+      `code-in-psram`, `ClockConfig::mpll_clk` and `PsramConfig` set the frequency. On other chips
+      the option is inactive."
+    default:
+      - value: '"200MHz"'
+    constraints:
+      - if: "esp32s31"
+        type:
+          validator: enumeration
+          value:
+            - "200MHz"
+            - "250MHz"
+      - type:
+          validator: enumeration
+          value:
+            - "200MHz"
+    active: "psram_code_in_psram"
 
   - name: clear-crypto-secrets
     description: "Clear secret material (keys, exponents, intermediate results) from
