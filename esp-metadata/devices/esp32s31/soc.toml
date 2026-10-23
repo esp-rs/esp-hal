@@ -343,7 +343,7 @@ engines = [
 ]
 
 [device.ecc]
-support_status = { status = "partial", issue = 5972 }
+support_status = "partial"
 working_modes = [
     { id = 0, mode = "affine_point_multiplication" },
     { id = 2, mode = "affine_point_verification" },
@@ -358,10 +358,10 @@ working_modes = [
     { id = 11, mode = "modular_division" }
 ]
 curves = [
-    { id = 0, curve = 192 },
-    { id = 1, curve = 256 },
-    { id = 2, curve = 384 },
-    # TODO: SM2 = 3
+    { id = 0, curve = "p192" },
+    { id = 1, curve = "p256" },
+    { id = 2, curve = "p384" },
+    { id = 3, curve = "sm2" },
 ]
 separate_jacobian_point_memory = true
 has_memory_clock_gate = true

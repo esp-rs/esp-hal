@@ -457,7 +457,7 @@ impl RadioRefGuard {
     /// If hardware init fails, it rolls back the refcount only once.
     ///
     /// The guard keeps the chip out of automatic light sleep while it exists.
-    #[cfg(any(feature = "ble", all(feature = "wifi", esp32)))]
+    #[cfg(feature = "ble")]
     pub(crate) fn new() -> Self {
         Self::create(true)
     }
@@ -465,7 +465,7 @@ impl RadioRefGuard {
     /// Like [`Self::new`], but the chip can sleep while the guard exists.
     ///
     /// The driver must refuse the sleeps that are not safe for it.
-    #[cfg(any(feature = "ble", all(feature = "wifi", not(esp32))))]
+    #[cfg(any(feature = "ble", feature = "wifi"))]
     pub(crate) fn without_wake_lock() -> Self {
         Self::create(false)
     }

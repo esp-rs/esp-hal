@@ -1,11 +1,13 @@
 //! Light sleep while the station is in power save.
 //!
-//! The blob wakes the chip for each beacon through the TSF hardware and the `Wifi` wakeup source.
-//! The entry hook refuses every sleep that the blob is not ready for.
+//! The blob wakes the chip for each beacon through the TSF hardware and the `Wifi` wakeup source,
+//! or with software timers on the ESP32. The entry hook refuses every sleep that the blob is not
+//! ready for.
 
 use esp_hal::rtc_cntl::{WakeupSource, sleep::WrappedSleepConfig};
 use portable_atomic::{AtomicBool, AtomicU32, Ordering};
 
+#[cfg(not(esp32))]
 unsafe extern "C" {
     fn esp_wifi_internal_is_tsf_active() -> bool;
     fn esp_wifi_internal_update_light_sleep_wake_ahead_time(time_us: u32);
@@ -15,6 +17,7 @@ unsafe extern "C" {
 ///
 /// The blob starts this much earlier before a beacon. esp-hal does not measure its wake time, so
 /// this is an estimate with margin. ESP-IDF uses about 370 µs on the C6.
+#[cfg(not(esp32))]
 const WAKE_AHEAD_US: u32 = 2000;
 
 static POWER_SAVE: AtomicBool = AtomicBool::new(false);
@@ -51,6 +54,7 @@ pub(crate) fn release_sleep_lock() {
 pub(crate) fn claim_wake_source() {
     let mhz = esp_hal::clock::cpu_clock().as_mhz() as i32;
     unsafe {
+        #[cfg(not(esp32))]
         esp_wifi_internal_update_light_sleep_wake_ahead_time(WAKE_AHEAD_US);
         // Without this call, the blob does not arm the TSF wakeup for the next beacon.
         crate::sys::include::esp_wifi_internal_update_light_sleep_default_params(mhz, mhz);
@@ -72,11 +76,12 @@ fn sleep_entry(config: &mut WrappedSleepConfig<'_>) {
     }
 
     let station_idle = POWER_SAVE.load(Ordering::Relaxed) && STATION_ONLY.load(Ordering::Relaxed);
+    let tsf_active = cfg_select! {
+        esp32 => false,
+        _ => unsafe { esp_wifi_internal_is_tsf_active() },
+    };
 
-    if !station_idle
-        || SLEEP_LOCK.load(Ordering::Relaxed) > 0
-        || unsafe { esp_wifi_internal_is_tsf_active() }
-    {
+    if !station_idle || SLEEP_LOCK.load(Ordering::Relaxed) > 0 || tsf_active {
         config.reject_sleep();
     }
 }

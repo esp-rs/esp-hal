@@ -766,7 +766,6 @@ pub unsafe extern "C" fn dport_access_stall_other_cpu_end_wrap() {
 pub unsafe extern "C" fn wifi_pm_sleep_lock_acquire() {
     trace!("wifi_pm_sleep_lock_acquire");
     esp_hal::if_unstable_hal! {
-        #[cfg(not(esp32))]
         super::sleep::acquire_sleep_lock();
     }
 }
@@ -780,7 +779,6 @@ pub unsafe extern "C" fn wifi_pm_sleep_lock_acquire() {
 pub unsafe extern "C" fn wifi_pm_sleep_lock_release() {
     trace!("wifi_pm_sleep_lock_release");
     esp_hal::if_unstable_hal! {
-        #[cfg(not(esp32))]
         super::sleep::release_sleep_lock();
     }
 }

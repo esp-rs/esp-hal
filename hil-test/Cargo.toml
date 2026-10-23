@@ -136,6 +136,7 @@ nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
 p256                = { version = "0.13.2", default-features = false, features = ["arithmetic"] }
 p384                = { version = "0.13.1", default-features = false, features = ["arithmetic"] }
+sm2                 = { version = "0.13.3", default-features = false, features = ["arithmetic"] }
 sha1                = { version = "0.11", default-features = false }
 sha2                = { version = "0.11", default-features = false }
 sm3                 = { version = "0.5", default-features = false }
