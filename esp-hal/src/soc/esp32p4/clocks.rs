@@ -276,6 +276,30 @@ fn configure_cpu_root_clk_impl(
         .modify(|_, w| unsafe { w.lp_aonclkrst_hp_root_clk_src_sel().bits(sel) });
 }
 
+// Idle frequency scaling. These functions write the registers, but do not change the
+// configuration that the clock tree stores.
+//
+// Only CPU_ROOT_CLK changes. The dividers keep MEM_CLK and APB_CLK within their limits for both
+// root clocks.
+
+/// Returns whether the CPU clock comes from the CPLL.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn cpu_clock_from_pll(clocks: &mut ClockTree) -> bool {
+    clocks.cpu_root_clk() == Some(CpuRootClkConfig::Cpll)
+}
+
+/// Switches the CPU clock to XTAL_CLK.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn switch_cpu_clock_to_xtal(clocks: &mut ClockTree) {
+    configure_cpu_root_clk_impl(clocks, None, CpuRootClkConfig::Xtal);
+}
+
+/// Restores the CPU clock that the clock tree configures.
+#[cfg(idle_frequency_scaling)]
+pub(crate) fn restore_cpu_clock(clocks: &mut ClockTree) {
+    configure_cpu_root_clk_impl(clocks, None, unwrap!(clocks.cpu_root_clk()));
+}
+
 // CPU_CLK divider
 fn enable_cpu_clk_impl(_clocks: &mut ClockTree, _en: bool) {}
 fn configure_cpu_clk_impl(
