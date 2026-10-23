@@ -303,15 +303,17 @@ pub struct InterruptStatusIterator {
 }
 
 impl Iterator for InterruptStatusIterator {
-    type Item = u8;
+    type Item = Interrupt;
 
     fn next(&mut self) -> Option<Self::Item> {
         for i in self.idx..STATUS_WORDS {
-            if self.status.status[i] != 0 {
+            while self.status.status[i] != 0 {
                 let bit = self.status.status[i].trailing_zeros();
                 self.status.status[i] ^= 1 << bit;
                 self.idx = i;
-                return Some((bit + 32 * i as u32) as u8);
+                if let Ok(interrupt) = Interrupt::try_from((bit + 32 * i as u32) as _) {
+                    return Some(interrupt);
+                }
             }
         }
         self.idx = usize::MAX;
