@@ -82,7 +82,9 @@ pub enum PsramSize {
     Size(usize),
 }
 
-#[cfg(not(code_in_psram))]
+// Where flash and PSRAM share one MMU, the start-up starts PSRAM through the driver's own
+// `PsramConfig`.
+#[cfg(any(not(code_in_psram), not(psram_separate_window)))]
 impl PsramSize {
     pub(crate) fn get(&self) -> usize {
         match self {
@@ -159,15 +161,20 @@ pub struct Psram {
 /// Panics if `.bss.psram` ends past the end of PSRAM. The start-up then left it unzeroed.
 #[cfg(code_in_psram)]
 pub(crate) fn start_with_code() {
-    const PAGE: usize = property!("mmu.page_size");
-
     implem::request_clock();
 
     let size = code_in_psram::SIZE.load(Ordering::Relaxed);
-    let end = EXTMEM_ORIGIN + size;
-    let used = code_in_psram::CODE_END.load(Ordering::Relaxed);
+    info!("PSRAM size: {} MB", size / 1_024 / 1_024);
+    if code_in_psram::flash_encrypted() {
+        warn!("The code copied to PSRAM is plaintext: esp-hal does not encrypt PSRAM");
+    }
+
+    // The heap takes the window after the code and `.bss.psram`.
     #[cfg(psram_separate_window)]
-    let used = {
+    let range = {
+        const PAGE: usize = property!("mmu.page_size");
+
+        let end = EXTMEM_ORIGIN + size;
         let bss_end = &raw const code_in_psram::_psram_bss_end as usize;
         if bss_end > end {
             panic!(
@@ -176,14 +183,13 @@ pub(crate) fn start_with_code() {
                 size / 1_024 / 1_024
             );
         }
-        used.max(bss_end)
+        let used = code_in_psram::CODE_END.load(Ordering::Relaxed).max(bss_end);
+        used.next_multiple_of(PAGE)..end
     };
-    let start = used.next_multiple_of(PAGE);
-    info!("PSRAM size: {} MB", size / 1_024 / 1_024);
-    if code_in_psram::flash_encrypted() {
-        warn!("The code copied to PSRAM is plaintext: esp-hal does not encrypt PSRAM");
-    }
-    unsafe { set_psram_range(start..end) };
+    // The heap needs entries of its own, after the code's.
+    #[cfg(not(psram_separate_window))]
+    let range = code_in_psram::map_heap(size);
+    unsafe { set_psram_range(range) };
 }
 
 impl Psram {

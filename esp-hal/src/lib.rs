@@ -180,6 +180,12 @@ fn main() -> ! {
 //! With `-Z stack-protector`, the code of these operations is instrumented too. If it detects
 //! stack corruption while the caches are suspended, the panic handler cannot run, because it lives
 //! in flash, and the chip locks up instead of reporting the corruption.
+#![cfg_attr(psram_code_in_psram, doc = "")]
+#![cfg_attr(
+    psram_code_in_psram,
+    doc = "With the `code-in-psram` option, every application uses these operations, so esp-hal \
+           must be built at `opt-level` 2 or 3."
+)]
 #![cfg_attr(psram_separate_window, doc = "")]
 #![cfg_attr(
     psram_separate_window,

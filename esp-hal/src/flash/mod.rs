@@ -70,8 +70,17 @@
 ## With `code-in-psram`
 
 Nothing fetches from flash, so an operation leaves interrupts enabled, the caches on, and the other
-core running. The limits above on the cache and the other core do not apply. [`MultiCoreStrategy`]
-is not relevant, and operations do not return [`Error::OtherCoreRunning`].
+core running. The limits above on the cache and the other core do not apply."
+)]
+#![cfg_attr(
+    all(psram_code_in_psram, multi_core),
+    doc = "[`MultiCoreStrategy`] is not relevant, and operations do not return
+[`Error::OtherCoreRunning`]."
+)]
+#![cfg_attr(
+    psram_code_in_psram,
+    doc = "
+These limits still apply:
 
 - Flash must not be mapped during an erase or a write. No flash page stays mapped after start-up,
   and [`Flash::read_encrypted`] maps one only for its own call.

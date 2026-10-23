@@ -1,8 +1,10 @@
-//! Code in PSRAM: the firmware's code and read-only data run from the PSRAM window.
+//! Code in PSRAM: the firmware's code and read-only data run from PSRAM.
 
-//% CHIP_FILTER(at_200mhz, at_250mhz): psram_code_in_psram
+//% CHIP_FILTER(at_200mhz, at_250mhz): psram_code_in_psram && psram_separate_window
+//% CHIP_FILTER(at_40mhz, at_80mhz): psram_code_in_psram && !psram_separate_window
 //% ENV: ESP_HAL_CONFIG_CODE_IN_PSRAM=true
 //% ENV(at_250mhz): ESP_HAL_CONFIG_PSRAM_FREQUENCY=250MHz
+//% ENV(at_40mhz): ESP_HAL_CONFIG_PSRAM_FREQUENCY=40MHz
 //% FEATURES: unstable esp-alloc embassy
 
 #![no_std]
@@ -24,30 +26,90 @@ static RODATA: [u32; 4] = [0x5053_524D; 4];
 static mut DATA: u32 = 0x4441_5441;
 static mut BSS: u32 = 0;
 
+// Statics in PSRAM need a separate PSRAM window, which the S31 has.
+
 // 256 KiB, so the static spans several MMU pages.
+#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static mut PSRAM_BSS: [u32; 0x1_0000] = [0; 0x1_0000];
 
+#[cfg(psram_separate_window)]
 struct PsramState {
     waker: Mutex<RefCell<Option<core::task::Waker>>>,
     flag: core::sync::atomic::AtomicBool,
 }
 
+#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static PSRAM_STATE: PsramState = PsramState {
     waker: Mutex::new(RefCell::new(None)),
     flag: core::sync::atomic::AtomicBool::new(false),
 };
 
+#[cfg(psram_separate_window)]
 #[repr(C, align(64))]
 struct DmaBlock([u8; 4096]);
 
+#[cfg(psram_separate_window)]
 #[esp_hal::psram(zeroed)]
 static mut DMA_SOURCE: DmaBlock = DmaBlock([0; 4096]);
 
+#[cfg(psram_separate_window)]
 unsafe extern "C" {
     static _psram_code_end: u8;
     static _psram_bss_end: u8;
+}
+
+const WINDOW: u32 = property!("psram.extmem_origin");
+const PAGE: u32 = property!("mmu.page_size");
+const ENTRIES: u32 = property!("mmu.entry_num");
+
+/// The MMU entry for the virtual page at `addr`, in the window that holds the code.
+fn entry_of(addr: u32) -> u32 {
+    let spi0 = esp_hal::peripherals::SPI0::regs();
+    spi0.mmu_item_index()
+        .write(|w| unsafe { w.bits((addr - WINDOW) / PAGE) });
+    spi0.mmu_item_content().read().bits()
+}
+
+/// Returns whether entry `i` maps flash. On the ESP32-S31, this MMU maps only flash, and bit 12
+/// marks an entry valid. On the ESP32-C5, flash and PSRAM share the MMU: bit 10 marks an entry
+/// valid, and bit 9 selects PSRAM.
+fn maps_flash(i: u32) -> bool {
+    let entry = entry_of(WINDOW + i * PAGE);
+    cfg_select! {
+        psram_separate_window => entry & (1 << 12) != 0,
+        _ => entry & (1 << 10) != 0 && entry & (1 << 9) == 0,
+    }
+}
+
+/// Returns whether the code or data at `addr` comes from PSRAM.
+fn in_psram(addr: u32) -> bool {
+    // The ESP32-S31's code links in the PSRAM window, which only PSRAM backs. On the ESP32-C5, the
+    // entry decides.
+    if !(WINDOW..WINDOW + ENTRIES * PAGE).contains(&addr) {
+        return false;
+    }
+    cfg_select! {
+        psram_separate_window => true,
+        _ => {
+            let entry = entry_of(addr);
+            entry & (1 << 10) != 0 && entry & (1 << 9) != 0
+        }
+    }
+}
+
+/// The PSRAM bytes the code takes below `heap`, the start of the heap.
+fn code_bytes(heap: u32) -> u32 {
+    cfg_select! {
+        psram_separate_window => heap - WINDOW,
+        _ => {
+            (0..(heap - WINDOW) / PAGE)
+                .filter(|&i| in_psram(WINDOW + i * PAGE))
+                .count() as u32
+                * PAGE
+        }
+    }
 }
 
 /// A random 64 KiB block after the image in the booted partition, so that each run wears another.
@@ -102,13 +164,12 @@ mod tests {
 
     use esp_bootloader_esp_idf::partitions::{self, AppPartitionSubType, PartitionType};
     #[cfg(soc_has_clock_node_mpll_clk)]
-    use esp_hal::{
-        clock::{
-            ClockConfig,
-            ll::{ClockTree, mpll_clk_frequency, request_mpll_clk},
-        },
-        psram::PsramTimingParams,
+    use esp_hal::clock::{
+        ClockConfig,
+        ll::{ClockTree, mpll_clk_frequency, request_mpll_clk},
     };
+    #[cfg(feature = "esp32s31")]
+    use esp_hal::psram::PsramTimingParams;
     use esp_hal::{
         flash::{Config, Flash},
         interrupt::{InterruptHandler, Priority},
@@ -117,12 +178,10 @@ mod tests {
 
     use super::*;
 
-    const WINDOW: u32 = property!("psram.extmem_origin");
-    const WINDOW_SIZE: u32 = property!("mmu.entry_num") * property!("mmu.page_size");
     const PATTERN: u32 = 0xA5C3_5A3C;
 
     fn in_window(addr: u32) -> bool {
-        (WINDOW..WINDOW + WINDOW_SIZE).contains(&addr)
+        (WINDOW..WINDOW + ENTRIES * PAGE).contains(&addr)
     }
 
     fn booted_app_offset(flash: &mut Flash<'_, esp_hal::Blocking>) -> u32 {
@@ -135,7 +194,7 @@ mod tests {
     fn test_code_in_window() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
 
-        assert!(in_window(in_text as *const () as u32));
+        assert!(in_psram(in_text as *const () as u32));
         assert_eq!(in_text(), 0x5053_524D);
     }
 
@@ -143,7 +202,7 @@ mod tests {
     fn test_rodata_in_window() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
 
-        assert!(in_window(addr_of!(RODATA) as u32));
+        assert!(in_psram(addr_of!(RODATA) as u32));
         assert_eq!(RODATA, [0x5053_524D; 4]);
     }
 
@@ -208,7 +267,7 @@ mod tests {
         let (start, size) = psram.raw_parts();
         assert!(start as u32 > in_text as *const () as u32);
         assert!(start as u32 > addr_of!(RODATA) as u32);
-        assert_eq!(psram.size(), start as usize - WINDOW as usize + size);
+        assert_eq!(psram.size(), code_bytes(start as u32) as usize + size);
 
         let words = size / 4;
         let heap = unsafe { core::slice::from_raw_parts_mut(start as *mut u32, words) };
@@ -222,6 +281,7 @@ mod tests {
     }
 
     // PSRAM keeps its content across a reset, so the zeros come from the start-up, at every boot.
+    #[cfg(psram_separate_window)]
     #[test]
     fn test_psram_static_is_zeroed_above_the_code() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
@@ -241,6 +301,7 @@ mod tests {
         }
     }
 
+    #[cfg(psram_separate_window)]
     #[test]
     fn test_psram_static_holds_none_and_false() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
@@ -258,7 +319,7 @@ mod tests {
     // The CPU writes the source through the cache just before the transfer, so the DMA reads the
     // written bytes only if the driver treats the static as PSRAM and writes the cache back.
     // Outside `psram_range`, the driver rejects the buffer.
-    #[cfg(all(dma_can_access_psram, dma_supports_mem2mem))]
+    #[cfg(all(psram_separate_window, dma_can_access_psram, dma_supports_mem2mem))]
     #[test]
     fn test_dma_reads_psram_static() {
         use esp_hal::dma::{BurstConfig, ExternalBurstConfig, Mem2Mem};
@@ -281,7 +342,7 @@ mod tests {
             .unwrap();
 
         let source = unsafe { &mut (*addr_of_mut!(DMA_SOURCE)).0 };
-        assert!(in_window(source.as_ptr() as u32));
+        assert!(in_psram(source.as_ptr() as u32));
         for (i, byte) in source.iter_mut().enumerate() {
             *byte = (i as u8).wrapping_mul(31).wrapping_add(7);
         }
@@ -297,6 +358,7 @@ mod tests {
         }
     }
 
+    #[cfg(psram_separate_window)]
     #[test]
     fn test_heap_after_psram_statics() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -340,7 +402,7 @@ mod tests {
         critical_section::with(|cs| SWINT.borrow_ref(cs).as_ref().unwrap().raise());
 
         while INTERRUPTS.load(Ordering::Relaxed) == 0 {}
-        assert!(in_window(swint_handler as *const () as u32));
+        assert!(in_psram(swint_handler as *const () as u32));
     }
 
     // The ESP32-S31 clocks PSRAM from the MPLL, at 400 MHz for 200 MHz PSRAM and at 500 MHz for
@@ -357,19 +419,12 @@ mod tests {
         assert_eq!(mpll_clk_frequency(), expected);
     }
 
-    #[cfg(psram_separate_window)]
     #[test]
     fn test_no_flash_page_mapped() {
         let _peripherals = esp_hal::init(esp_hal::Config::default());
-        let spi0 = esp_hal::peripherals::SPI0::regs();
 
-        for i in 0..1024 {
-            spi0.mmu_item_index().write(|w| unsafe { w.bits(i) });
-            assert!(
-                !spi0.mmu_item_content().read().valid().bit_is_set(),
-                "entry {} is mapped",
-                i
-            );
+        for i in 0..ENTRIES {
+            assert!(!maps_flash(i), "entry {} maps flash", i);
         }
     }
 
@@ -409,7 +464,8 @@ mod tests {
         }
     }
 
-    #[cfg(soc_has_clock_node_mpll_clk)]
+    // No metadata names the ESP32-S31's 200 and 250 MHz PSRAM timings.
+    #[cfg(feature = "esp32s31")]
     #[test]
     fn test_psram_new_with_another_frequency() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -659,6 +715,160 @@ mod flash_operations {
 
         let mut buffer = [0u32; 4];
         assert_eq!(flash.read(0x1_0000, &mut buffer), Ok(()));
+    }
+
+    #[test]
+    fn test_read_into_psram_is_refused() {
+        let mut ctx = setup();
+        let mut buffer = Box::new_in([0u32; 4], ExternalMemory);
+        assert_eq!(
+            ctx.flash.read(0x1_0000, &mut buffer[..]),
+            Err(Error::NotSupported)
+        );
+    }
+}
+
+/// Flash operations while code runs from PSRAM on the single-core ESP32-C5: interrupts keep
+/// running.
+///
+/// A periodic timer interrupt is the probe. Its handler is ordinary code, which runs from PSRAM,
+/// and the ESP32-C5's flash and PSRAM share the MSPI bus. So each count in ROM is also a fetch from
+/// PSRAM while the ROM drives the flash. A 64 KiB erase or a 16 KiB write runs for milliseconds,
+/// against the probe's 50 µs period.
+#[cfg(feature = "esp32c5")]
+#[embedded_test::tests(default_timeout = 30)]
+mod flash_operations {
+    use allocator_api2::boxed::Box;
+    use esp_alloc::ExternalMemory;
+    use esp_bootloader_esp_idf::partitions;
+    use esp_hal::{
+        Blocking,
+        flash::{Config, Error, Flash},
+        handler,
+        peripherals::Peripherals,
+        time::Duration,
+        timer::{PeriodicTimer, systimer::SystemTimer},
+    };
+    use hil_test::mk_static;
+
+    use super::*;
+
+    /// The ESP32-C5's ROM, where the flash routines run.
+    ///
+    /// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/soc/esp32c5/include/soc/soc.h#L150-L151>.
+    const ROM: core::ops::Range<u32> = 0x4000_0000..0x4005_0000;
+    const BLOCK: u32 = 0x1_0000;
+    const PATTERN_WORD: u32 = 0x5AA5_C33C;
+
+    static IN_ROM: AtomicU32 = AtomicU32::new(0);
+    static PROBE: Mutex<RefCell<Option<PeriodicTimer<'static, Blocking>>>> =
+        Mutex::new(RefCell::new(None));
+
+    // An interrupt taken while the ROM routine ran is what the operation must allow.
+    #[handler(priority = esp_hal::interrupt::Priority::max())]
+    fn probe_handler() {
+        let mepc: u32;
+        unsafe { core::arch::asm!("csrr {0}, mepc", out(reg) mepc) };
+        if ROM.contains(&mepc) {
+            IN_ROM.fetch_add(1, Ordering::Relaxed);
+        }
+        critical_section::with(|cs| {
+            if let Some(timer) = PROBE.borrow_ref_mut(cs).as_mut() {
+                timer.clear_interrupt();
+            }
+        });
+    }
+
+    struct Context {
+        flash: Flash<'static, Blocking>,
+        heap: Box<[u32; 1024], ExternalMemory>,
+    }
+
+    fn setup() -> Context {
+        let p: Peripherals = esp_hal::init(esp_hal::Config::default());
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
+        let mut timer = PeriodicTimer::new(SystemTimer::new(p.SYSTIMER).alarm0);
+        timer.set_interrupt_handler(probe_handler);
+        timer.listen();
+        timer.start(Duration::from_micros(50)).unwrap();
+        critical_section::with(|cs| PROBE.borrow_ref_mut(cs).replace(timer));
+
+        Context {
+            flash: Flash::new(p.FLASH, Config::default()).unwrap(),
+            heap: Box::new_in([PATTERN_WORD; 1024], ExternalMemory),
+        }
+    }
+
+    /// Runs `operation` and returns how many probe interrupts it took in ROM.
+    fn in_rom_during(operation: impl FnOnce()) -> u32 {
+        let before = IN_ROM.load(Ordering::Relaxed);
+        operation();
+        IN_ROM.load(Ordering::Relaxed) - before
+    }
+
+    #[test]
+    fn test_erase_and_write_run_with_interrupts() {
+        let mut ctx = setup();
+        let block = scratch_block(&mut ctx.flash);
+        let data = mk_static!([u32; 4096], [PATTERN_WORD; 4096]);
+
+        let flash = &mut ctx.flash;
+        // SAFETY: the block is in the booted partition, after the image.
+        unsafe { flash.erase(block, block + BLOCK).unwrap() };
+        let in_write = in_rom_during(|| unsafe { flash.write(block, data).unwrap() });
+        let in_erase = in_rom_during(|| unsafe { flash.erase(block, block + BLOCK).unwrap() });
+
+        assert!(in_write > 0, "no interrupt ran during the write");
+        assert!(in_erase > 0, "no interrupt ran during the erase");
+        assert!(ctx.heap.iter().all(|&w| w == PATTERN_WORD));
+    }
+
+    #[test]
+    fn test_reads_run_with_interrupts() {
+        let mut ctx = setup();
+        let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+        let app = partitions::read_partition_table(&mut ctx.flash, &mut pt_mem)
+            .unwrap()
+            .booted_partition()
+            .unwrap()
+            .unwrap()
+            .offset();
+        let flash = &mut ctx.flash;
+        let buffer = mk_static!([u32; 4096], [0; 4096]);
+
+        let in_reads = in_rom_during(|| {
+            for _ in 0..200 {
+                flash.read(app, buffer).unwrap();
+            }
+        });
+
+        assert!(in_reads > 0, "no interrupt ran during 200 reads");
+        assert!(ctx.heap.iter().all(|&w| w == PATTERN_WORD));
+    }
+
+    // A page left mapped with its old cache lines would return the old words to the second
+    // `read_encrypted`.
+    #[test]
+    fn test_read_encrypted_sees_new_data() {
+        let mut ctx = setup();
+        let block = scratch_block(&mut ctx.flash);
+        let flash = &mut ctx.flash;
+        let mut plain = [0u32; 256];
+        let mut through_mmu = [0u32; 256];
+
+        flash.read(block, &mut plain).unwrap();
+        flash.read_encrypted(block, &mut through_mmu).unwrap();
+        assert_eq!(plain, through_mmu);
+
+        let data = [PATTERN_WORD; 256];
+        // SAFETY: the block is in the booted partition, after the image.
+        unsafe {
+            flash.erase(block, block + BLOCK).unwrap();
+            flash.write(block, &data).unwrap();
+        }
+        flash.read_encrypted(block, &mut through_mmu).unwrap();
+        assert_eq!(through_mmu, data);
     }
 
     #[test]

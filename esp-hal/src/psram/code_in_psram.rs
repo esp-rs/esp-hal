@@ -12,13 +12,17 @@
 //!   `set_flash_entry`, `flash_page_shift`, and `flash_entry_maps_psram`.
 //! - `IMAGE_CHIP_ID`, the chip ID in the image header.
 //! - `efuse_block0`, the address of eFuse block 0, whose register name differs between chips.
-//! - `cache_writeback`, `cache_invalidate`, and `cache_invalidate_code`, which invalidates what
-//!   fetches the copied code.
+//! - `cache_writeback`, `cache_invalidate`, and with a separate window `cache_invalidate_code`,
+//!   which invalidates the instruction caches over the copied code.
 //!
 //! Where PSRAM has its own MMU and address window (`psram.separate_window`), `.text` and
 //! `.rodata` link in that window, and the start-up copies each image segment there. Nothing in
 //! `.text` or `.rodata` can run until the copy ends, so `start` and everything it calls are
 //! inlined into `riscv_preinit` in `.boot.code_in_psram`. None of it can panic.
+//!
+//! Where flash and PSRAM share one MMU, the code links at flash addresses. It runs from flash
+//! until the start-up copies each page to PSRAM and points the page's entry at the copy, at the
+//! same address. The chip then also supplies `FLASH_PSRAM`, the entry bit that selects PSRAM.
 
 use portable_atomic::{AtomicU32, AtomicUsize, Ordering};
 
@@ -26,10 +30,13 @@ use super::implem as chip;
 
 /// The PSRAM size the chip reports, for `Psram::size`.
 pub(crate) static SIZE: AtomicUsize = AtomicUsize::new(0);
-/// The end of the copied code and read-only data.
+/// The end of the copied code and read-only data, at the addresses it runs from.
 pub(crate) static CODE_END: AtomicUsize = AtomicUsize::new(0);
 /// The flash offset of the booted app, for `flash_mmu_entry_offset`.
 pub(crate) static APP_OFFSET: AtomicU32 = AtomicU32::new(0);
+/// The PSRAM pages that hold the code, from page 0. The heap takes the pages after them.
+#[cfg(not(psram_separate_window))]
+static COPIED_PAGES: AtomicU32 = AtomicU32::new(0);
 
 /// The stage the start-up reached, for a probe to read.
 ///
@@ -45,9 +52,12 @@ pub(crate) static APP_OFFSET: AtomicU32 = AtomicU32::new(0);
 ///
 /// - 0x101 (ESP32-S31): the MPLL cannot clock PSRAM at `psram-frequency`.
 /// - 0x102 (ESP32-S31): PSRAM reports an unknown size.
+/// - 0x103 (ESP32-C5): the root clock is not a PLL, which the MSPI clock divider assumes.
+/// - 0x104 (ESP32-C5): no PSRAM answers.
 /// - 0x301: no flash MMU entry maps the app, or no entry is free.
 /// - 0x402: a segment is not word-sized, is out of order or overlaps, or lies past the end of
 ///   PSRAM.
+/// - 0x403: the pages of code do not fit in PSRAM, where flash and PSRAM share one MMU.
 ///
 /// If the bootloader started the RTC watchdog, a stop ends in its reset. Otherwise the chip stays
 /// stopped.
@@ -225,8 +235,10 @@ pub(crate) fn start() {
     };
 
     stage(4);
-    #[cfg(psram_separate_window)]
-    copy_segments(&mut flash, app, size as u32);
+    cfg_select! {
+        psram_separate_window => copy_segments(&mut flash, app, size as u32),
+        _ => remap_pages(&mmu, spare, size as u32),
+    }
 
     stage(5);
     APP_OFFSET.store(app, Ordering::Relaxed);
@@ -296,4 +308,82 @@ fn copy_segments(flash: &mut FlashReader<'_>, app: u32, size: u32) {
         }
         chip::cache_writeback(bss_start, bss_end.wrapping_sub(bss_start));
     }
+}
+
+/// Copies each page that a flash entry maps to PSRAM pages from 0 up, and points each entry at its
+/// copy at the same address. It skips the last entry, where the bootloader can leave the app's
+/// first page mapped and which the unmap in `start` then removes, and the spare entry.
+///
+/// The copy goes through the spare entry before the entry changes, so each page holds the same
+/// bytes at every moment, and code fetched from it stays correct.
+///
+/// See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_psram/xip_impl/mmu_psram_flash_v2.c#L52-L106>.
+#[cfg(not(psram_separate_window))]
+#[crate::ram]
+fn remap_pages(mmu: &FlashMmu, spare: u32, size: u32) {
+    let last = FLASH_ENTRIES.wrapping_sub(1);
+    let page_size = mmu.page_size();
+
+    // The pages are counted before any entry changes, so a PSRAM that is too small never leaves
+    // the table half remapped.
+    let mut pages: u32 = 0;
+    let mut entry = 0;
+    while entry < last {
+        if entry != spare && maps_flash(chip::flash_entry(entry)) {
+            pages = pages.wrapping_add(1);
+        }
+        entry = entry.wrapping_add(1);
+    }
+    if pages > size / page_size {
+        stop(0x403);
+    }
+
+    let copy = mmu.entry_addr(spare);
+    let mut page = 0;
+    let mut code_end = chip::FLASH_WINDOW;
+    let mut entry = 0;
+    while entry < last {
+        if entry != spare && maps_flash(chip::flash_entry(entry)) {
+            let code = mmu.entry_addr(entry);
+            let psram_page = chip::FLASH_VALID | chip::FLASH_PSRAM | page;
+            chip::set_flash_entry(spare, psram_page);
+            chip::cache_invalidate(copy, page_size);
+            let mut done = 0;
+            while done < page_size {
+                store_word(copy.wrapping_add(done), load_word(code.wrapping_add(done)));
+                done = done.wrapping_add(4);
+            }
+            chip::cache_writeback(copy, page_size);
+            chip::cache_invalidate(copy, page_size);
+            chip::set_flash_entry(entry, psram_page);
+            chip::cache_invalidate(code, page_size);
+            page = page.wrapping_add(1);
+            code_end = code.wrapping_add(page_size);
+        }
+        entry = entry.wrapping_add(1);
+    }
+    mmu.unmap(spare);
+    COPIED_PAGES.store(page, Ordering::Relaxed);
+    CODE_END.store(code_end as usize, Ordering::Relaxed);
+}
+
+/// Maps the PSRAM pages after the code at the entries after the code, and returns their range.
+///
+/// It leaves the last entry free, so the flash driver always finds a free entry.
+#[cfg(not(psram_separate_window))]
+pub(crate) fn map_heap(size: usize) -> core::ops::Range<usize> {
+    const PAGE: u32 = property!("mmu.page_size");
+
+    let start = CODE_END.load(Ordering::Relaxed) as u32;
+    let first_entry = (start - chip::FLASH_WINDOW) / PAGE;
+    let copied = COPIED_PAGES.load(Ordering::Relaxed);
+    let pages = (size as u32 / PAGE - copied).min(FLASH_ENTRIES - 1 - first_entry);
+    for i in 0..pages {
+        chip::set_flash_entry(
+            first_entry + i,
+            chip::FLASH_VALID | chip::FLASH_PSRAM | (copied + i),
+        );
+    }
+    chip::cache_invalidate(start, pages * PAGE);
+    start as usize..(start + pages * PAGE) as usize
 }
