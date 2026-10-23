@@ -481,6 +481,7 @@ slot_config = [
 [device.twai]
 [device.usb_otg]
 fifo_depth_words = 256
+tx_fifo_count = 5
 
 [device.usb_serial_jtag]
 

@@ -343,11 +343,23 @@ macro_rules! property {
     ("usb_otg.fifo_depth_words", str) => {
         stringify!(200)
     };
+    ("usb_otg.tx_fifo_count") => {
+        5
+    };
+    ("usb_otg.tx_fifo_count", str) => {
+        stringify!(5)
+    };
     ("usb_otg_hs.fifo_depth_words") => {
         896
     };
     ("usb_otg_hs.fifo_depth_words", str) => {
         stringify!(896)
+    };
+    ("usb_otg_hs.tx_fifo_count") => {
+        8
+    };
+    ("usb_otg_hs.tx_fifo_count", str) => {
+        stringify!(8)
     };
     ("ethernet.mii_via_gpio_matrix") => {
         true

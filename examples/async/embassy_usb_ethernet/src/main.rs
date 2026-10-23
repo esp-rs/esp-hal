@@ -26,7 +26,7 @@ use embassy_time::{Duration, Timer};
 use embassy_usb::{
     Builder,
     UsbDevice,
-    class::cdc_ncm::{
+    class::cdc_ncm::device::{
         CdcNcmClass,
         State as CdcNcmState,
         embassy_net::{Device, Runner as NcmRunner, State as NetState},
@@ -48,7 +48,7 @@ static SERVER_CONFIG: picoserve::Config =
     picoserve::Config::const_default().keep_connection_alive();
 
 static CDC_NCM_STATE: StaticCell<CdcNcmState<'_>> = StaticCell::new();
-static NET_STATE: StaticCell<NetState<{ ETHERNET_MTU }, 4, 4>> = StaticCell::new();
+static NET_STATE: StaticCell<NetState<4, 4>> = StaticCell::new();
 static RESOURCES: StaticCell<StackResources<4>> = StaticCell::new();
 
 const GW_IP_ADDR_ENV: Option<&'static str> = option_env!("GATEWAY_IP");
@@ -109,9 +109,10 @@ async fn main(spawner: Spawner) -> ! {
         64,
     );
 
-    let (runner, device) = usb_cdc_ncm.into_embassy_net_device::<{ ETHERNET_MTU }, 4, 4>(
+    let (runner, device) = usb_cdc_ncm.into_embassy_net_device::<4, 4>(
         NET_STATE.init_with(NetState::new),
         our_mac_addr,
+        ETHERNET_MTU,
     );
 
     // Run the USB device.
@@ -148,7 +149,7 @@ async fn main(spawner: Spawner) -> ! {
 }
 
 #[task]
-async fn net_task(mut runner: Runner<'static, Device<'static, ETHERNET_MTU>>) -> ! {
+async fn net_task(mut runner: Runner<'static, Device<'static>>) -> ! {
     runner.run().await
 }
 
@@ -158,7 +159,7 @@ async fn usb_task(mut device: UsbDevice<'static, UsbDriver<'static>>) -> ! {
 }
 
 #[task]
-async fn usb_ncm_task(class: NcmRunner<'static, UsbDriver<'static>, ETHERNET_MTU>) -> ! {
+async fn usb_ncm_task(class: NcmRunner<'static, UsbDriver<'static>>) -> ! {
     class.run().await;
 }
 
