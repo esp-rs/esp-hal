@@ -1277,7 +1277,7 @@ impl DmaRxStreamBufView {
             } else {
                 let length = last_descriptor.len() - self.descriptor_offset;
                 let chunk_size = last_descriptor.size();
-                let buffer_start = self.buf.buffer.len() - chunk_size;
+                let buffer_start = self.buf.buffer.len() - chunk_size + self.descriptor_offset;
                 #[cfg(soc_internal_memory_cached)]
                 if length != 0 {
                     unsafe {

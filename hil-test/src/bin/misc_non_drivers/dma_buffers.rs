@@ -345,6 +345,18 @@ mod tests {
     }
 
     #[test]
+    fn test_dma_rx_stream_buf_view_consume_partial_last_descriptor() {
+        let chunks: [[u8; CHUNK_SIZE]; 4] =
+            core::array::from_fn(|c| core::array::from_fn(|i| ((c * CHUNK_SIZE + i) % 251) as u8));
+        let fills = chunks.each_ref().map(|chunk| (chunk.as_slice(), false));
+        with_rx_view_multi(&fills, |mut view| {
+            core::assert_eq!(view.consume(3 * CHUNK_SIZE + 4), 3 * CHUNK_SIZE + 4);
+            core::assert_eq!(view.available_bytes(), CHUNK_SIZE - 4);
+            core::assert_eq!(view.peek(), &chunks[3][4..]);
+        });
+    }
+
+    #[test]
     fn test_dma_rx_stream_buf_from_view() {
         with_rx_view(b"round trip", false, |view| {
             let buf = <DmaRxStreamBuf as DmaRxBuffer>::from_view(view);
