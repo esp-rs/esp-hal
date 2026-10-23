@@ -166,16 +166,6 @@ async fn main(spawner: Spawner) -> ! {
         .unwrap(),
     );
 
-    let mut i2c = I2c::new(peripherals.I2C0, i2c::master::Config::default())
-        .unwrap()
-        .with_sda(peripherals.GPIO0)
-        .with_scl(peripherals.GPIO1)
-        .into_async();
-    es8389::init(&mut i2c).await.unwrap();
-    let _amplifiers = Output::new(peripherals.GPIO7, Level::High, OutputConfig::default());
-
-    spawner.spawn(touch::run(i2c).unwrap());
-
     // Wi-Fi
     let station_config = Config::Station(
         StationConfig::default()
@@ -189,6 +179,18 @@ async fn main(spawner: Spawner) -> ! {
         ControllerConfig::default().with_initial_config(station_config),
     )
     .unwrap();
+
+    // Starting Wi-Fi stops I2S for a moment, which puts the codec into analog standby. Configure
+    // the codec afterwards.
+    let mut i2c = I2c::new(peripherals.I2C0, i2c::master::Config::default())
+        .unwrap()
+        .with_sda(peripherals.GPIO0)
+        .with_scl(peripherals.GPIO1)
+        .into_async();
+    es8389::init(&mut i2c).await.unwrap();
+    let _amplifiers = Output::new(peripherals.GPIO7, Level::High, OutputConfig::default());
+
+    spawner.spawn(touch::run(i2c).unwrap());
 
     let rng = Rng::new();
     let seed = u64::from(rng.random()) << 32 | u64::from(rng.random());
@@ -257,6 +259,10 @@ async fn converse(api: &mut Api, screen: &mut Screen, speech: &[i16]) -> Result<
     display::show(screen);
     screen.assistant = api.chat(&screen.you).await?;
     log::info!("Assistant: {}", screen.assistant);
+    if screen.assistant.trim().is_empty() {
+        screen.assistant = String::from("Claude did not answer.");
+        return Ok(());
+    }
 
     screen.status = String::from("Speaking");
     display::show(screen);

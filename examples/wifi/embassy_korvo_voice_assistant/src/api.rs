@@ -151,7 +151,9 @@ impl Api {
 
         let request = serde_json::to_vec(&json!({
             "model": CLAUDE_MODEL,
-            "max_tokens": 300,
+            "max_tokens": 1024,
+            // Thinking delays the answer and can use up `max_tokens` before any text.
+            "thinking": { "type": "disabled" },
             "system": INSTRUCTIONS,
             "messages": [{ "role": "user", "content": question }],
         }))?;

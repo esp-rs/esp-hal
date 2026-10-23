@@ -81,11 +81,12 @@ pub async fn run(
     dout: AnyPin<'static>,
     din: AnyPin<'static>,
 ) {
-    // TX drives BCLK and WS, and RX shares them.
+    // TX drives BCLK and WS, and RX shares them. The 16-bit samples travel in 32-bit slots, because
+    // the codec derives its clocks from BCLK and expects BCLK = 64 x the sample rate.
     let config = TdmConfig::new_tdm_philips()
         .with_signal_loopback(true)
         .with_sample_rate(Rate::from_hz(I2S_SAMPLE_RATE))
-        .with_data_format(DataFormat::Data16Channel16)
+        .with_data_format(DataFormat::Data32Channel16)
         .with_channels(Channels::STEREO);
     let i2s = I2s::new(i2s, dma, config).unwrap().into_async();
     let mut speakers = i2s
