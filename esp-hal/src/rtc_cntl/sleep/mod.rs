@@ -572,10 +572,7 @@ fn sleep_transition(
         // A CPU power-down loses the dirty cache lines, and with them the writes to PSRAM.
         // See <https://github.com/espressif/esp-idf/blob/383dda6c182/components/esp_hw_support/sleep_cache.c#L55-L72>.
         #[cfg(soc_cpu_powers_down_cache)]
-        if retention_buffer.is_some()
-            && config.pd_flags.pd_cpu()
-            && !crate::psram::psram_range().is_empty()
-        {
+        if retention_buffer.is_some() && config.pd_flags.pd_cpu() && crate::psram::in_use() {
             crate::soc::cache_writeback_all();
         }
 

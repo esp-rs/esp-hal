@@ -22,8 +22,9 @@ name with them:
 - `hal-defaults.x`: interrupt and runtime defaults, includes the PAC's `device.x`.
 - `esp_hal_config.x`: esp-hal's configuration as symbols, plus `__stack_chk_guard` and the main stack
   size check. It defines `ESP_HAL_INSTRUCTION_CACHE_SIZE`, `ESP_HAL_DATA_CACHE_SIZE` and
-  `ESP_HAL_L2_CACHE_SIZE` (bytes of RAM used as cache) and, on the ESP32,
-  `ESP_HAL_BT_RESERVED_DRAM`.
+  `ESP_HAL_L2_CACHE_SIZE` (bytes of RAM used as cache), `ESP_HAL_CODE_IN_PSRAM` (1 if `.text`
+  and `.rodata` run from PSRAM, else 0), and, on the ESP32, `ESP_HAL_BT_RESERVED_DRAM`. On the
+  ESP32-S31, `ESP_HAL_CODE_IN_PSRAM` moves `ROM` from the flash window to the PSRAM window.
 - `esp_hal_rwtext.x` / `esp_hal_rwdata.x`: input sections that esp-hal's configuration places in
   RAM. They contain input section descriptions only.
 - `esp_hal_rwtext_sections.x`: output sections in `RWTEXT` that esp-hal defines.

@@ -1,3 +1,6 @@
+/* With code in PSRAM, `.text` and `.rodata` link in the PSRAM window. */
+ROM_WINDOW = ESP_HAL_CODE_IN_PSRAM ? 0x50000000 : 0x40000000;
+
 MEMORY
 {
      /* MEMORY_MAP = [
@@ -27,7 +30,7 @@ MEMORY
        See <https://github.com/espressif/esp-idf/blob/0e6b480f858c/components/soc/esp32s31/include/soc/ext_mem_defs.h#L34-L35>.
        Source: esp-idf components/esp_system/ld/esp32s31/memory.ld.in
     */
-    ROM : ORIGIN = 0x40000000 + 0x20, LENGTH = 0x4000000 - 0x20
+    ROM : ORIGIN = ROM_WINDOW + 0x20, LENGTH = 0x4000000 - 0x20
 
     /* LP SRAM (32 KB, persists over deep sleep).
        Source: esp-idf components/esp_system/ld/esp32s31/memory.ld.in (lp_ram_seg)

@@ -620,7 +620,7 @@ macro_rules! property {
         false
     };
     ("psram.supports_code_in_psram") => {
-        false
+        true
     };
     ("psram.separate_window") => {
         true
