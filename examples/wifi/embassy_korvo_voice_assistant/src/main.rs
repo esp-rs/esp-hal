@@ -1,7 +1,7 @@
 //! Voice assistant for the ESP32-S31-Korvo-1 with the 4.3" LCD sub-board.
 //!
 //! Tap the button on the screen and speak, then tap it again. Deepgram transcribes the recording,
-//! Claude answers, and the answer is shown on the screen and spoken on the speakers by Deepgram.
+//! Claude answers, and the question and the answer are shown on the screen.
 //!
 //! Set the `SSID`, `PASSWORD`, `DEEPGRAM_API_KEY` and `CLAUDE_API_KEY` environment variables before
 //! building. The API keys are stored in the firmware in plain text, and anyone with access to the
@@ -10,7 +10,7 @@
 //! The server certificate is not verified yet.
 //!
 //! Hardware setup:
-//! - Connect the LCD sub-board and one or two speakers.
+//! - Connect the LCD sub-board.
 //! - Connect the USB-UART port to the computer and switch the board on.
 
 //% CHIP_FILTER: esp32s31
@@ -35,7 +35,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    gpio::{Level, Output, OutputConfig},
+    gpio::Level,
     i2c::{self, master::I2c},
     interrupt::Priority,
     lcd_cam::{
@@ -188,7 +188,6 @@ async fn main(spawner: Spawner) -> ! {
         .with_scl(peripherals.GPIO1)
         .into_async();
     es8389::init(&mut i2c).await.unwrap();
-    let _amplifiers = Output::new(peripherals.GPIO7, Level::High, OutputConfig::default());
 
     spawner.spawn(touch::run(i2c).unwrap());
 
@@ -261,13 +260,7 @@ async fn converse(api: &mut Api, screen: &mut Screen, speech: &[i16]) -> Result<
     log::info!("Assistant: {}", screen.assistant);
     if screen.assistant.trim().is_empty() {
         screen.assistant = String::from("Claude did not answer.");
-        return Ok(());
     }
-
-    screen.status = String::from("Speaking");
-    display::show(screen);
-    let answer = api.speak(&screen.assistant).await?;
-    audio::play(answer).await;
     Ok(())
 }
 
